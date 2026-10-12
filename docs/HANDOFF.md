@@ -137,9 +137,9 @@ Full detail is in the two architecture documents; this is the spine.
 
 ## 6 · Repository state
 
-`C:\mycity-hub` has about 1,011 files outside `.git`, **all empty except** `README.MD`, the two
+`C:\mycity-hub` has 957 files outside `.git`, **all empty except** `README.MD`, the two
 architecture docs, and the client pack. 63 modules in `src/modules/` (9 for M0, 54 for M1 to M11),
-schema files per module in `packages/contract/schemas/`, jobs, prompts, templates, CI check scripts,
+schema files per module in `packages/contract/schemas/` (modules carry only the files they need; README §5.1 lists the ai:none, search:none and no-events modules), jobs, prompts, templates, CI check scripts,
 ops files, runbooks and manual stubs. Empty directories with no files: `migrations/`, `seeds/build`,
 `seeds/staging`, `assets/brand`, `assets/fonts`, `tests/{unit,integration,staging}`. Git does not track
 empty directories; the user knows.
