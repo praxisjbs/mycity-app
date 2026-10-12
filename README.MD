@@ -71,6 +71,16 @@ mycity-app/
 └── .github/workflows/        ci.yml, release.yml, rollback.yml
 ```
 
+**About `.gitkeep`.** Git does not track empty folders, so a folder with nothing in it would not
+exist in a fresh clone. These folders hold a `.gitkeep` placeholder so the layout above survives:
+`assets/brand`, `assets/fonts`, `migrations`, `seeds/build`, `seeds/staging`, `tests/unit`,
+`tests/integration`, `tests/staging`. The file is empty and has no meaning to any tool.
+
+When you add the first real file to one of these folders, **delete its `.gitkeep` in the same
+commit**. A `.gitkeep` next to real files is clutter, and in `migrations/` the runner must see only
+`NNNN_name.sql` files. Do not add `.gitkeep` anywhere else: an empty source file already keeps its
+folder.
+
 ---
 
 ## 4 · `src/` outside the modules
