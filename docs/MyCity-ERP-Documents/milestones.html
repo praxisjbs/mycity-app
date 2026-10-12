@@ -1,0 +1,760 @@
+<title>MyCity ERP Milestones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a single reading column with full-bleed Deep Green bands at the top and
+   bottom; diagrams break out to a wider track and scroll inside themselves. */
+:root{
+  --bg:#FFFFFF;
+  --surface:#F4F7F6;
+  --ink:#0A1412;
+  --ink-2:#566662;
+  --line:#DDE5E3;
+  --line-2:#65756F;
+  --brand:#014339;           /* City Green */
+  --brand-soft:#E8F0EE;
+  --yellow:#FFDF55;
+  --yellow-tint:#FFEFAA;
+  --on-yellow:#01221D;
+  --reuse:#014339;
+  --new:#FFDF55;
+  --new-edge:#01221D;
+  --band:#01221D;            /* Deep Green — their own footer colour */
+  --band-ink:#FFFFFF;
+  --band-ink-2:#CCCFCE;
+  --band-line:rgba(255,255,255,.14);
+  --pin-hole:#FFFFFF;
+  --shadow:0 8px 14px rgba(16,24,40,.05);
+  --shadow-lg:0 20px 40px rgba(16,24,40,.10);
+  --f-display:"Geist","Inter",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --f-body:"Geist","Inter",ui-sans-serif,system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#01110E; --surface:#01221D; --ink:#E6EDEB; --ink-2:#A9B8B4;
+    --line:#16564A; --line-2:#1F7465;
+    --brand:#45C8B0; --brand-soft:#012B24;
+    --reuse:#45C8B0; --new-edge:#01110E;
+    --band:#01221D; --band-line:rgba(255,255,255,.12);
+    --pin-hole:#01221D;
+    --shadow:0 8px 14px rgba(0,0,0,.4); --shadow-lg:0 20px 40px rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#01110E; --surface:#01221D; --ink:#E6EDEB; --ink-2:#A9B8B4;
+  --line:#16564A; --line-2:#1F7465;
+  --brand:#45C8B0; --brand-soft:#012B24;
+  --reuse:#45C8B0; --new-edge:#01110E;
+  --band:#01221D; --band-line:rgba(255,255,255,.12);
+  --pin-hole:#01221D;
+  --shadow:0 8px 14px rgba(0,0,0,.4); --shadow-lg:0 20px 40px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--f-body);font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;
+}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px}
+h1,h2,h3,h4{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:clamp(2rem,5.4vw,3.5rem);line-height:1.04;font-weight:700;letter-spacing:-.025em}
+h2{font-size:clamp(1.4rem,3vw,2rem);line-height:1.12;font-weight:650;letter-spacing:-.018em}
+h3{font-size:1.0625rem;line-height:1.25;font-weight:600;letter-spacing:-.008em}
+p{margin:0}
+.eyebrow{font-size:.6875rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+
+/* ── header ─────────────────────────────────────────────────────────── */
+.top{
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:30;
+  background:var(--band);border-bottom:1px solid var(--band-line);
+}
+.top-in{display:flex;align-items:center;gap:14px;min-height:56px;padding-block:8px}
+.mark{display:flex;align-items:center;gap:9px;color:var(--yellow);flex-shrink:0}
+.mark svg{width:22px;height:22px;display:block}
+.mark b{font-family:var(--f-display);font-size:.9375rem;font-weight:700;letter-spacing:-.01em;color:var(--band-ink)}
+.top-sep{width:1px;height:20px;background:var(--band-line);flex-shrink:0}
+.top-sub{font-size:.8125rem;color:var(--band-ink-2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbtn{
+  margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;gap:6px;
+  background:transparent;border:1px solid var(--band-line);color:var(--band-ink-2);
+  font:inherit;font-size:.75rem;padding:5px 11px;border-radius:999px;cursor:pointer;
+}
+.tbtn:hover{border-color:var(--yellow);color:var(--yellow)}
+.tbtn:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+
+/* ── hero ───────────────────────────────────────────────────────────── */
+.hero{background:var(--band);color:var(--band-ink);padding-block:clamp(34px,6vw,62px) clamp(30px,5vw,52px)}
+.hero .eyebrow{color:var(--yellow)}
+.hero h1{margin-top:14px;max-width:17ch}
+.hero h1 em{font-style:normal;color:var(--yellow)}
+.hero-lede{margin-top:18px;max-width:58ch;color:var(--band-ink-2);font-size:clamp(.9375rem,1.5vw,1.0625rem)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:34px;background:var(--band-line);border:1px solid var(--band-line);border-radius:14px;overflow:hidden}
+.stat{background:var(--band);padding:16px 14px}
+.stat b{display:block;font-family:var(--f-display);font-size:clamp(1.5rem,3.4vw,2.125rem);font-weight:700;letter-spacing:-.03em;color:var(--yellow);line-height:1}
+.stat span{display:block;margin-top:7px;font-size:.75rem;color:var(--band-ink-2);line-height:1.3}
+@media(max-width:620px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+/* ── sections ───────────────────────────────────────────────────────── */
+section{padding-block:clamp(42px,6vw,72px)}
+section+section{border-top:1px solid var(--line)}
+.shead{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 18px;margin-bottom:8px}
+.shead .eyebrow{color:var(--brand)}
+.sintro{margin-top:10px;max-width:62ch;color:var(--ink-2);font-size:.9375rem}
+
+/* ── figures ────────────────────────────────────────────────────────── */
+figure{margin:28px 0 0}
+.scroller{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.scroller>svg{display:block;width:100%;height:auto}
+.gantt-svg{min-width:860px}
+.effort-svg{min-width:720px}
+.arch-svg{min-width:680px}
+figcaption{margin-top:12px;font-size:.8125rem;color:var(--ink-2);max-width:66ch}
+
+/* svg tokens */
+.s-label{fill:var(--ink);font-family:var(--f-display);font-size:12px;font-weight:600}
+.s-sub{fill:var(--ink-2);font-family:var(--f-body);font-size:11px}
+.s-axis{fill:var(--ink-2);font-family:var(--f-body);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:600}
+.s-grid{stroke:var(--line);stroke-width:1}
+.s-bar{fill:var(--brand)}
+.s-bar-ghost{fill:none;stroke:var(--brand);stroke-width:1.5;stroke-dasharray:4 3}
+.s-reuse{fill:var(--reuse)}
+.s-new{fill:var(--new);stroke:var(--new-edge);stroke-width:1}
+.s-track{fill:var(--line);opacity:.5}
+.s-tick{fill:var(--yellow);stroke:var(--new-edge);stroke-width:1}
+.s-num{fill:var(--ink);font-family:var(--f-display);font-size:11.5px;font-weight:650}
+.s-onbar{fill:#FFFFFF;font-family:var(--f-display);font-size:11px;font-weight:650}
+.s-box{fill:var(--bg);stroke:var(--line);stroke-width:1}
+.s-box-b{fill:var(--brand-soft);stroke:var(--brand);stroke-width:1.5}
+.s-chip{fill:var(--surface);stroke:var(--line);stroke-width:1}
+
+/* ── milestone cards ────────────────────────────────────────────────── */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(282px,1fr));gap:14px;margin-top:30px}
+.card{
+  border:1px solid var(--line);border-radius:16px;background:var(--bg);
+  padding:18px 18px 16px;display:flex;flex-direction:column;gap:12px;min-width:0;
+}
+.card.found{background:var(--surface);border-style:dashed}
+.card-top{display:flex;align-items:center;gap:10px}
+.code{
+  flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+  min-width:38px;height:26px;padding:0 9px;border-radius:999px;
+  background:var(--yellow);color:var(--on-yellow);
+  font-family:var(--f-display);font-size:.8125rem;font-weight:700;letter-spacing:-.01em;
+}
+.card.found .code{background:transparent;color:var(--brand);border:1.5px dashed var(--brand)}
+.wt{margin-left:auto;font-size:.75rem;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.card h3{color:var(--ink)}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:.75rem;color:var(--ink-2)}
+.dot{width:3px;height:3px;border-radius:50%;background:var(--line-2);flex-shrink:0}
+.who{display:inline-flex;gap:4px}
+.who i{
+  font-style:normal;display:inline-flex;align-items:center;justify-content:center;
+  width:21px;height:21px;border-radius:50%;background:var(--brand-soft);color:var(--brand);
+  font-size:.625rem;font-weight:700;letter-spacing:.01em;border:1px solid var(--brand);
+}
+.pts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.pts li{position:relative;padding-left:16px;font-size:.84375rem;line-height:1.42;color:var(--ink-2)}
+.pts li::before{
+  content:"";position:absolute;left:0;top:.52em;width:7px;height:2px;border-radius:1px;background:var(--brand);
+}
+.reuse-row{margin-top:auto;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.reuse-bar{flex:1;height:7px;border-radius:999px;background:var(--line);overflow:hidden;display:flex;min-width:0}
+.reuse-bar b{display:block;height:100%;background:var(--reuse)}
+.reuse-bar i{display:block;height:100%;background:var(--yellow);flex:1}
+.reuse-lab{font-size:.6875rem;color:var(--ink-2);white-space:nowrap;font-weight:600}
+
+/* ── gates ──────────────────────────────────────────────────────────── */
+.inv{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:28px}
+@media(max-width:1040px){.inv{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:800px){.inv{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.inv{grid-template-columns:1fr}}
+.ivc{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:12px 13px 13px;min-width:0}
+.ivc .ar{font-size:.625rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2);font-weight:650;opacity:.75}
+.ivc h4{font-size:.875rem;font-weight:650;letter-spacing:-.012em;margin:4px 0 0;display:flex;align-items:baseline;gap:8px}
+.ivc h4 em{font-style:normal;margin-left:auto;font-size:.625rem;font-weight:700;color:var(--brand);flex-shrink:0}
+.ivc p{margin-top:8px;font-size:.6875rem;line-height:1.6;color:var(--ink-2)}
+.ivc.pub{background:var(--yellow);border-color:var(--yellow);color:var(--on-yellow)}
+.ivc.pub .ar,.ivc.pub p{color:var(--on-yellow);opacity:.8}
+.ivc.pub h4 em{color:var(--on-yellow)}
+.ivsep{margin-top:22px;max-width:76ch;font-size:.84375rem;line-height:1.6;color:var(--ink-2);
+  border-left:2px solid var(--yellow);padding-left:13px}
+.ivsep b{color:var(--ink)}
+.ivpub{margin-top:14px;grid-template-columns:1fr}
+.ivpub .ivc{max-width:none}
+.ivnote{margin-top:24px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:800px){.ivnote{grid-template-columns:1fr}}
+.ivnote div{border-left:2px solid var(--yellow);padding-left:12px}
+.ivnote b{display:block;font-size:.8125rem;font-weight:650}
+.ivnote span{display:block;margin-top:4px;font-size:.75rem;line-height:1.6;color:var(--ink-2)}
+.gates{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:28px}
+@media(max-width:1040px){.gates{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:800px){.gates{grid-template-columns:repeat(2,1fr)}}
+.gate{
+  display:flex;align-items:baseline;gap:8px;min-width:0;
+  border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--bg);
+  font-size:.8125rem;
+}
+.gate b{font-size:.6875rem;color:var(--ink-2);font-weight:650;flex-shrink:0;width:16px}
+.gate span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gate.key{background:var(--yellow);border-color:var(--yellow);color:var(--on-yellow)}
+.gate.key b{color:var(--on-yellow);opacity:.7}
+
+/* ── legend ─────────────────────────────────────────────────────────── */
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:16px;font-size:.78125rem;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:13px;height:9px;border-radius:2px;flex-shrink:0}
+.sw.r{background:var(--reuse)}
+.sw.n{background:var(--yellow);border:1px solid var(--new-edge)}
+.sw.g{border:1.5px dashed var(--brand);height:11px}
+
+/* ── footer ─────────────────────────────────────────────────────────── */
+.foot{background:var(--band);color:var(--band-ink-2);padding-block:34px;font-size:.8125rem}
+.foot-in{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center}
+.foot b{color:var(--band-ink);font-weight:600}
+.byline{color:var(--yellow);text-decoration:none;font-weight:600}
+.byline:hover{text-decoration:underline}
+.byline:focus-visible{outline:2px solid var(--yellow);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap top-in">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 1.5c-4.26 0-7.7 3.45-7.7 7.7 0 5.78 7.7 13.3 7.7 13.3s7.7-7.52 7.7-13.3c0-4.25-3.44-7.7-7.7-7.7z" fill="currentColor"/><circle cx="12" cy="7.7" r="2.35" fill="var(--pin-hole)"/><path d="M7.8 14.5c0-2.32 1.88-4.2 4.2-4.2s4.2 1.88 4.2 4.2z" fill="var(--pin-hole)"/></svg>
+      <b>MyCity App ERP</b>
+    </span>
+    <span class="top-sep" aria-hidden="true"></span>
+    <span class="top-sub">Technical milestones &middot; v1.4 &middot; 12 Oct 2026</span>
+    <button class="tbtn" id="themeBtn" type="button">Theme</button>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Internal &middot; Engineering</p>
+    <h1>Twelve milestones.<br>Eleven weeks. <em>One system.</em></h1>
+    <p class="hero-lede">Eleven contracted milestones plus M0, the foundation they stand on. Demonstrated on staging every Friday, from 9 October to 18 December 2026.</p>
+    <div class="stats">
+      <div class="stat"><b>12</b><span>Milestones, M0 to M11</span></div>
+      <div class="stat"><b>11</b><span>Weeks to handover</span></div>
+      <div class="stat"><b>4</b><span>Engineers</span></div>
+      <div class="stat"><b>~67%</b><span>Built on existing code</span></div>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+
+<!-- ════════ SCHEDULE ════════ -->
+<section>
+  <div class="shead"><p class="eyebrow">The schedule</p></div>
+  <h2>Ten build weeks, one handover week</h2>
+  <p class="sintro">M0 and M1 share a window: M1 cannot be demonstrated until the foundation is standing. Two pairs run as parallel tracks to recover the nine days lost to the late start and still land on 18 December.</p>
+
+  <figure>
+    <div class="scroller">
+      <svg class="gantt-svg" viewBox="0 0 1120 470" role="img" aria-label="Gantt chart of twelve milestones from 9 October to 18 December 2026">
+        <!-- month bands -->
+        <line class="s-grid" x1="464.8" y1="12" x2="464.8" y2="446"/>
+        <line class="s-grid" x1="872.8" y1="12" x2="872.8" y2="446"/>
+        <text class="s-axis" x="308" y="24" text-anchor="middle">October</text>
+        <text class="s-axis" x="669" y="24" text-anchor="middle">November</text>
+        <text class="s-axis" x="988" y="24" text-anchor="middle">December</text>
+        <line class="s-grid" x1="152" y1="34" x2="1104" y2="34"/>
+
+        <!-- M0 -->
+        <text class="s-label" x="144" y="60" text-anchor="end">M0 <tspan class="s-sub">Foundation</tspan></text>
+        <rect class="s-bar-ghost" x="152" y="46" width="136" height="20" rx="10"/>
+        <!-- M1 -->
+        <text class="s-label" x="144" y="94" text-anchor="end">M1 <tspan class="s-sub">Core operations</tspan></text>
+        <rect class="s-bar" x="152" y="80" width="136" height="20" rx="10"/>
+        <text class="s-onbar" x="220" y="94" text-anchor="middle">9 &ndash; 19 Oct</text>
+        <polygon class="s-tick" points="288,90 294,96 288,102 282,96"/>
+        <!-- M2 -->
+        <text class="s-label" x="144" y="128" text-anchor="end">M2 <tspan class="s-sub">Productivity</tspan></text>
+        <rect class="s-bar" x="301.6" y="114" width="40.8" height="20" rx="10"/>
+        <polygon class="s-tick" points="342,124 348,130 342,136 336,130"/>
+        <text class="s-num" x="358" y="130">23 Oct</text>
+        <!-- M3 -->
+        <text class="s-label" x="144" y="162" text-anchor="end">M3 <tspan class="s-sub">Queries</tspan></text>
+        <rect class="s-bar" x="383.2" y="148" width="54.4" height="20" rx="10"/>
+        <polygon class="s-tick" points="437,158 443,164 437,170 431,164"/>
+        <text class="s-num" x="453" y="164">30 Oct</text>
+        <!-- M4 -->
+        <text class="s-label" x="144" y="196" text-anchor="end">M4 <tspan class="s-sub">Recruitment</tspan></text>
+        <rect class="s-bar" x="478.4" y="182" width="149.6" height="20" rx="10"/>
+        <text class="s-onbar" x="553" y="196" text-anchor="middle">two weeks</text>
+        <polygon class="s-tick" points="628,192 634,198 628,204 622,198"/>
+        <text class="s-num" x="644" y="198">13 Nov</text>
+        <!-- M5 -->
+        <text class="s-label" x="144" y="230" text-anchor="end">M5 <tspan class="s-sub">Offers &amp; docs</tspan></text>
+        <rect class="s-bar" x="668.8" y="216" width="54.4" height="20" rx="10"/>
+        <polygon class="s-tick" points="723,226 729,232 723,238 717,232"/>
+        <text class="s-num" x="739" y="232">20 Nov</text>
+        <!-- M6 -->
+        <text class="s-label" x="144" y="264" text-anchor="end">M6 <tspan class="s-sub">Payroll</tspan></text>
+        <rect class="s-bar" x="764" y="250" width="54.4" height="20" rx="10"/>
+        <polygon class="s-tick" points="818,260 824,266 818,272 812,266"/>
+        <text class="s-num" x="834" y="266">27 Nov</text>
+        <!-- M7 -->
+        <text class="s-label" x="144" y="298" text-anchor="end">M7 <tspan class="s-sub">Partnerships</tspan></text>
+        <rect class="s-bar" x="859.2" y="284" width="54.4" height="20" rx="10"/>
+        <polygon class="s-tick" points="913,294 919,300 913,306 907,300"/>
+        <text class="s-num" x="929" y="300">4 Dec</text>
+        <!-- M8 -->
+        <text class="s-label" x="144" y="332" text-anchor="end">M8 <tspan class="s-sub">Expenses</tspan></text>
+        <rect class="s-bar" x="954.4" y="318" width="54.4" height="20" rx="10"/>
+        <polygon class="s-tick" points="1008,328 1014,334 1008,340 1002,334"/>
+        <text class="s-num" x="1024" y="334">11 Dec</text>
+        <!-- M9 parallel -->
+        <text class="s-label" x="144" y="366" text-anchor="end">M9 <tspan class="s-sub">Governance</tspan></text>
+        <rect class="s-bar" x="954.4" y="352" width="54.4" height="20" rx="10"/>
+        <text class="s-sub" x="1024" y="368">parallel</text>
+        <path class="s-grid" d="M948 328 h-7 v40 h7" fill="none" stroke-dasharray="3 3"/>
+        <!-- M10 -->
+        <text class="s-label" x="144" y="400" text-anchor="end">M10 <tspan class="s-sub">Knowledge &amp; AI</tspan></text>
+        <rect class="s-bar" x="1049.6" y="386" width="54.4" height="20" rx="10"/>
+        <!-- M11 parallel -->
+        <text class="s-label" x="144" y="434" text-anchor="end">M11 <tspan class="s-sub">Handover</tspan></text>
+        <rect class="s-bar" x="1049.6" y="420" width="54.4" height="20" rx="10"/>
+        <path class="s-grid" d="M1043 396 h-7 v40 h7" fill="none" stroke-dasharray="3 3"/>
+        <text class="s-num" x="1104" y="462" text-anchor="end">18 Dec &middot; handover</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i class="sw g" aria-hidden="true"></i>M0, unweighted, inside M1's window</span>
+      <span><i class="sw r" aria-hidden="true"></i>Build</span>
+      <span><svg width="13" height="11" aria-hidden="true"><polygon points="6.5,1 12,5.5 6.5,10 1,5.5" fill="var(--yellow)" stroke="var(--new-edge)"/></svg>Demonstrated on staging</span>
+    </div>
+    <figcaption>M8 runs beside M9, and M10 beside M11, under clause 2.2's overlapping parallel tracks. No production release between 21 December and 5 January; M11 training runs on staging, which carries every feature.</figcaption>
+  </figure>
+</section>
+
+<!-- ════════ EFFORT ════════ -->
+<section>
+  <div class="shead"><p class="eyebrow">Where the work is</p></div>
+  <h2>Reuse against net-new build</h2>
+  <p class="sintro">Measured against the two reference codebases, file by file, and revised after the client requirements meeting of 10 October. The weight beside each bar is the contracted share of the work. Two milestones carry far more new code than their weight suggests, and they are adjacent.</p>
+
+  <figure>
+    <div class="scroller">
+      <svg class="effort-svg" viewBox="0 0 1060 446" role="img" aria-label="Bar chart of reuse against net-new build for milestones M0 to M10, with contracted weight">
+        <text class="s-axis" x="124" y="28">Reuse</text>
+        <text class="s-axis" x="944" y="28" text-anchor="end">Net-new</text>
+        <text class="s-axis" x="1012" y="28" text-anchor="end">Weight</text>
+        <line class="s-grid" x1="124" y1="38" x2="1012" y2="38"/>
+
+        <g>
+          <text class="s-label" x="112" y="62" text-anchor="end">M0 Foundation</text>
+          <rect class="s-track" x="124" y="48" width="820" height="18" rx="9"/>
+          <rect class="s-new" x="124" y="48" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="48" width="697" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="62" text-anchor="end">&mdash;</text>
+        </g>
+        <g>
+          <text class="s-label" x="112" y="96" text-anchor="end">M1 Core operations</text>
+          <rect class="s-new" x="124" y="82" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="82" width="590" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="96" text-anchor="end">12%</text>
+        </g>
+        <g>
+          <text class="s-label" x="112" y="130" text-anchor="end">M2 Productivity</text>
+          <rect class="s-new" x="124" y="116" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="116" width="410" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="130" text-anchor="end">9%</text>
+        </g>
+        <g>
+          <rect x="116" y="112" width="904" height="26" rx="6" fill="var(--yellow)" opacity=".14"/>
+          <text class="s-label" x="112" y="164" text-anchor="end">M3 Queries</text>
+          <rect class="s-new" x="124" y="150" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="150" width="246" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="164" text-anchor="end">5%</text>
+        </g>
+        <g>
+          <rect x="116" y="146" width="904" height="26" rx="6" fill="var(--yellow)" opacity=".14"/>
+          <text class="s-label" x="112" y="198" text-anchor="end">M4 Recruitment</text>
+          <rect class="s-new" x="124" y="184" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="184" width="451" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="198" text-anchor="end">13%</text>
+        </g>
+        <g>
+          <text class="s-label" x="112" y="232" text-anchor="end">M5 Offers &amp; docs</text>
+          <rect class="s-new" x="124" y="218" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="218" width="574" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="232" text-anchor="end">11%</text>
+        </g>
+        <g>
+          <text class="s-label" x="112" y="266" text-anchor="end">M6 Payroll</text>
+          <rect class="s-new" x="124" y="252" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="252" width="656" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="266" text-anchor="end">11%</text>
+        </g>
+        <g>
+          <text class="s-label" x="112" y="300" text-anchor="end">M7 Partnerships</text>
+          <rect class="s-new" x="124" y="286" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="286" width="451" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="300" text-anchor="end">10%</text>
+        </g>
+        <g>
+          <text class="s-label" x="112" y="334" text-anchor="end">M8 Expenses</text>
+          <rect class="s-new" x="124" y="320" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="320" width="656" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="334" text-anchor="end">8%</text>
+        </g>
+        <g>
+          <text class="s-label" x="112" y="368" text-anchor="end">M9 Governance</text>
+          <rect class="s-new" x="124" y="354" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="354" width="697" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="368" text-anchor="end">7%</text>
+        </g>
+        <g>
+          <text class="s-label" x="112" y="402" text-anchor="end">M10 Knowledge &amp; AI</text>
+          <rect class="s-new" x="124" y="388" width="820" height="18" rx="9"/>
+          <rect class="s-reuse" x="124" y="388" width="656" height="18" rx="9"/>
+          <text class="s-num" x="1012" y="402" text-anchor="end">10%</text>
+        </g>
+        <line class="s-grid" x1="124" y1="418" x2="1012" y2="418"/>
+        <text class="s-sub" x="124" y="436">M11 is handover and training, not a build</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i class="sw r" aria-hidden="true"></i>Ported from Praxis LS or Pixie Girl Hub</span>
+      <span><i class="sw n" aria-hidden="true"></i>Written from scratch</span>
+    </div>
+    <figcaption>The 10 October meeting moved these. <b>M2</b> absorbed a four-level goal cascade, a separate performance module and voice capture, dropping it from 80% to 50% in the shortest window of the build. <b>M3</b> was already the worst ratio in the contract: 5% of the weight against two donor tables of 415 lines with no escalation anywhere in either tree. They sit in consecutive weeks and together carry 14% of the fee. <b>M10</b> gained ground, because the assistant narrowed to reads only.</figcaption>
+  </figure>
+</section>
+
+<!-- ════════ ARCHITECTURE ════════ -->
+<section>
+  <div class="shead"><p class="eyebrow">Environment</p></div>
+  <h2>One server, two environments, six surfaces</h2>
+  <p class="sintro">Staging matches production in every respect but data: real SMTP, every feature on, every public URL live. It is marked, never crippled, so training in December runs on a system that behaves exactly like the live one.</p>
+
+  <figure>
+    <div class="scroller">
+      <svg class="arch-svg" viewBox="0 0 920 452" role="img" aria-label="Diagram of one server hosting production and staging environments">
+        <text class="s-axis" x="16" y="18">One server &middot; 4 vCPU &middot; 8 GB &middot; 80 GB NVMe</text>
+        <rect x="8" y="28" width="904" height="382" rx="18" fill="none" stroke="var(--line-2)" stroke-width="1.5"/>
+
+        <rect class="s-chip" x="34" y="52" width="852" height="38" rx="10"/>
+        <text class="s-label" x="50" y="76">nginx</text>
+        <text class="s-sub" x="100" y="76">4 TLS hosts &middot; Let's Encrypt</text>
+
+        <!-- production -->
+        <rect class="s-box-b" x="34" y="108" width="404" height="166" rx="14"/>
+        <rect x="34" y="108" width="404" height="30" rx="14" fill="var(--brand)"/>
+        <rect x="34" y="126" width="404" height="12" fill="var(--brand)"/>
+        <text class="s-onbar" x="50" y="128">PRODUCTION</text>
+        <rect class="s-box" x="50" y="150" width="182" height="46" rx="9"/>
+        <text class="s-label" x="64" y="170">Admin app</text>
+        <text class="s-sub" x="64" y="186">hub.mycityapp.io</text>
+        <rect class="s-box" x="240" y="150" width="182" height="46" rx="9"/>
+        <text class="s-label" x="254" y="170">Public site</text>
+        <text class="s-sub" x="254" y="186">go.mycityapp.io</text>
+        <rect class="s-box" x="50" y="208" width="182" height="46" rx="9"/>
+        <text class="s-label" x="64" y="228">API</text>
+        <text class="s-sub" x="64" y="244">mycity-api-prod</text>
+        <rect class="s-box" x="240" y="208" width="182" height="46" rx="9"/>
+        <text class="s-label" x="254" y="228">Worker</text>
+        <text class="s-sub" x="254" y="244">BullMQ</text>
+
+        <!-- staging -->
+        <rect x="482" y="108" width="404" height="166" rx="14" fill="none" stroke="var(--line-2)" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <rect x="482" y="108" width="404" height="30" rx="14" fill="var(--yellow)"/>
+        <rect x="482" y="126" width="404" height="12" fill="var(--yellow)"/>
+        <text x="498" y="128" font-family="var(--f-display)" font-size="11" font-weight="650" fill="var(--on-yellow)">STAGING &middot; FULL PARITY</text>
+        <rect class="s-box" x="498" y="150" width="182" height="46" rx="9"/>
+        <text class="s-label" x="512" y="170">Admin app</text>
+        <text class="s-sub" x="512" y="186">hub.staging.mycityapp.io</text>
+        <rect class="s-box" x="688" y="150" width="182" height="46" rx="9"/>
+        <text class="s-label" x="702" y="170">Public site</text>
+        <text class="s-sub" x="702" y="186">go.staging.mycityapp.io</text>
+        <rect class="s-box" x="498" y="208" width="182" height="46" rx="9"/>
+        <text class="s-label" x="512" y="228">API</text>
+        <text class="s-sub" x="512" y="244">mycity-api-stg</text>
+        <rect class="s-box" x="688" y="208" width="182" height="46" rx="9"/>
+        <text class="s-label" x="702" y="228">Worker</text>
+        <text class="s-sub" x="702" y="244">BullMQ</text>
+
+        <!-- data -->
+        <rect class="s-chip" x="34" y="292" width="414" height="96" rx="12"/>
+        <text class="s-label" x="50" y="316">PostgreSQL 16</text>
+        <text class="s-sub" x="50" y="332">one instance &middot; two databases &middot; two roles</text>
+        <rect x="50" y="344" width="188" height="28" rx="8" fill="var(--brand-soft)" stroke="var(--brand)"/>
+        <text class="s-num" x="62" y="363">mycity_prod</text>
+        <rect x="248" y="344" width="188" height="28" rx="8" fill="none" stroke="var(--line-2)" stroke-dasharray="4 3"/>
+        <text class="s-num" x="260" y="363">mycity_stg</text>
+
+        <rect class="s-chip" x="472" y="292" width="414" height="96" rx="12"/>
+        <text class="s-label" x="488" y="316">Redis</text>
+        <text class="s-sub" x="488" y="332">two logical DBs &middot; distinct BullMQ prefixes</text>
+        <rect x="488" y="344" width="188" height="28" rx="8" fill="var(--brand-soft)" stroke="var(--brand)"/>
+        <text class="s-num" x="500" y="363">mycity:prod</text>
+        <rect x="686" y="344" width="188" height="28" rx="8" fill="none" stroke="var(--line-2)" stroke-dasharray="4 3"/>
+        <text class="s-num" x="698" y="363">mycity:stg</text>
+
+        <text class="s-sub" x="16" y="434">Build data is synthetic &middot; staging holds realistic demonstration data &middot; production starts clean and is never seeded</text>
+      </svg>
+    </div>
+    <figcaption>Two databases with no cross-grants, so a staging credential cannot read a production row. Distinct BullMQ prefixes, because BullMQ keys by prefix and a shared one lets a staging worker execute a production job. The public site is a separate origin rather than a path on the admin host: a path would still share cookies, storage and the service worker with the PWA.</figcaption>
+  </figure>
+</section>
+
+<!-- ════════ MILESTONES ════════ -->
+<section>
+  <div class="shead"><p class="eyebrow">The twelve</p></div>
+  <h2>What each milestone delivers</h2>
+  <p class="sintro">A milestone is complete when its functionality is demonstrated on staging and handed over for testing. Owners as agreed on 8 October.</p>
+
+  <div class="cards">
+
+    <article class="card found">
+      <div class="card-top"><span class="code">M0</span><span class="wt">unweighted</span></div>
+      <h3>Foundation</h3>
+      <p class="meta">9 &ndash; 19 Oct<span class="dot"></span><span class="who"><i title="Godwin-Okoh Elisha">GE</i><i title="Love Adeola">LA</i></span></p>
+      <ul class="pts">
+        <li>Server, two databases, two Redis prefixes</li>
+        <li>Ported workflow engine, RBAC, audit ledger</li>
+        <li>Brand tokens, two shells, first eight gates</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:85%"></b><i></i></span><span class="reuse-lab">85% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M1</span><span class="wt">12%</span></div>
+      <h3>Core operations</h3>
+      <p class="meta">9 &ndash; 19 Oct<span class="dot"></span><span class="who"><i title="Tom-Blake Asaah">TB</i><i title="Love Adeola">LA</i><i title="Adole Jerome">AJ</i><i title="Godwin-Okoh Elisha">GE</i></span></p>
+      <ul class="pts">
+        <li>Dashboard with role-locked KPI tiles</li>
+        <li>Clock-in with geofence and device checks</li>
+        <li>ESS, staff channels, mailbox client</li>
+        <li>Recognition, birthdays, per-day working week</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:72%"></b><i></i></span><span class="reuse-lab">72% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M2</span><span class="wt">9%</span></div>
+      <h3>Productivity, goals &amp; performance</h3>
+      <p class="meta">20 &ndash; 23 Oct<span class="dot"></span><span class="who"><i title="Adole Jerome">AJ</i><i title="Tom-Blake Asaah">TB</i></span></p>
+      <ul class="pts">
+        <li>Manager sets the week, you add your own</li>
+        <li>Goal cascade: CEO down to daily task</li>
+        <li>Reviews: self first, then two approvals</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:50%"></b><i></i></span><span class="reuse-lab">50% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M3</span><span class="wt">5%</span></div>
+      <h3>Queries &amp; consequence</h3>
+      <p class="meta">26 &ndash; 30 Oct<span class="dot"></span><span class="who"><i title="Godwin-Okoh Elisha">GE</i></span></p>
+      <ul class="pts">
+        <li>Rules with thresholds, not the first offence</li>
+        <li>Caution to dismissal, as a definition</li>
+        <li>Letters generated, filed and sent</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:30%"></b><i></i></span><span class="reuse-lab">30% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M4</span><span class="wt">13%</span></div>
+      <h3>Recruitment, end to end</h3>
+      <p class="meta">2 &ndash; 13 Nov<span class="dot"></span><span class="who"><i title="Tom-Blake Asaah">TB</i><i title="Love Adeola">LA</i><i title="Adole Jerome">AJ</i></span></p>
+      <ul class="pts">
+        <li>Vacancy, careers page, AI screening</li>
+        <li>Assessment platform, timed and scored</li>
+        <li>Blind panel, then one consolidated report</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:55%"></b><i></i></span><span class="reuse-lab">55% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M5</span><span class="wt">11%</span></div>
+      <h3>Offers &amp; onboarding</h3>
+      <p class="meta">16 &ndash; 20 Nov<span class="dot"></span><span class="who"><i title="Love Adeola">LA</i><i title="Godwin-Okoh Elisha">GE</i></span></p>
+      <ul class="pts">
+        <li>Offer letter, canvas signature, locked</li>
+        <li>Two hashes, two verdicts on verification</li>
+        <li>Documentation before onboarding opens</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:70%"></b><i></i></span><span class="reuse-lab">70% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M6</span><span class="wt">11%</span></div>
+      <h3>Payroll &amp; notifications</h3>
+      <p class="meta">23 &ndash; 27 Nov<span class="dot"></span><span class="who"><i title="Love Adeola">LA</i><i title="Adole Jerome">AJ</i></span></p>
+      <ul class="pts">
+        <li>Simple by default, statutory behind a toggle</li>
+        <li>PAYE, pension, NHF, ITF, NSITF when on</li>
+        <li>In-app, push and email, one route map</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:80%"></b><i></i></span><span class="reuse-lab">80% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M7</span><span class="wt">10%</span></div>
+      <h3>Partnerships &amp; CRM</h3>
+      <p class="meta">30 Nov &ndash; 4 Dec<span class="dot"></span><span class="who"><i title="Godwin-Okoh Elisha">GE</i><i title="Love Adeola">LA</i></span></p>
+      <ul class="pts">
+        <li>Partnership 360, correct on day one</li>
+        <li>Proposals, MOUs, contract lifecycle</li>
+        <li>Importer, type config, lead analytics</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:55%"></b><i></i></span><span class="reuse-lab">55% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M8</span><span class="wt">8%</span></div>
+      <h3>Expenses &amp; budget</h3>
+      <p class="meta">7 &ndash; 11 Dec<span class="dot"></span><span class="who"><i title="Adole Jerome">AJ</i></span></p>
+      <ul class="pts">
+        <li>One chain, grouped into a requisition</li>
+        <li>Lines over threshold ticked by the CEO</li>
+        <li>Budget against actual, seeded in 2027</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:80%"></b><i></i></span><span class="reuse-lab">80% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M9</span><span class="wt">7%</span></div>
+      <h3>Settings &amp; governance</h3>
+      <p class="meta">7 &ndash; 11 Dec<span class="dot"></span><span class="who"><i title="Godwin-Okoh Elisha">GE</i></span></p>
+      <ul class="pts">
+        <li>Roles, record scope, field visibility</li>
+        <li>MFA, sessions, remote kill</li>
+        <li>An audit log nobody can edit</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:85%"></b><i></i></span><span class="reuse-lab">85% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M10</span><span class="wt">10%</span></div>
+      <h3>Knowledge hub &amp; AI</h3>
+      <p class="meta">14 &ndash; 18 Dec<span class="dot"></span><span class="who"><i title="Tom-Blake Asaah">TB</i><i title="Godwin-Okoh Elisha">GE</i></span></p>
+      <ul class="pts">
+        <li>Policies, SOPs, searchable FAQ</li>
+        <li>Assistant inherits the caller's permissions</li>
+        <li>Reads only, writes route to the module</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:80%"></b><i></i></span><span class="reuse-lab">80% reuse</span></div>
+    </article>
+
+    <article class="card">
+      <div class="card-top"><span class="code">M11</span><span class="wt">4%</span></div>
+      <h3>Handover &amp; training</h3>
+      <p class="meta">14 &ndash; 18 Dec<span class="dot"></span><span class="who"><i title="Tom-Blake Asaah">TB</i><i title="the whole team">ALL</i></span></p>
+      <ul class="pts">
+        <li>Three sessions, on staging, on their data</li>
+        <li>Manual written from the shipped build</li>
+        <li>Restore rehearsed and timed, not asserted</li>
+      </ul>
+      <div class="reuse-row"><span class="reuse-bar"><b style="width:100%;background:var(--line-2)"></b></span><span class="reuse-lab">Documentation</span></div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ════════ GATES ════════ -->
+<section>
+  <div class="shead"><p class="eyebrow">What CI refuses</p></div>
+  <h2>Twenty gates, eight standing at M0</h2>
+  <p class="sintro">The five in yellow carry the product. Three were agreed on 8 October: supporting text behind an info icon, two real shells rather than one stretched layout, and validation that speaks as the field is filled. Two keep every module visible to search and to the assistant from the day it lands.</p>
+
+  <div class="gates">
+    <div class="gate"><b>1</b><span>Lint</span></div>
+    <div class="gate"><b>2</b><span>Whole test suite</span></div>
+    <div class="gate"><b>3</b><span>Migration numbering</span></div>
+    <div class="gate"><b>4</b><span>Migration reversibility</span></div>
+    <div class="gate"><b>5</b><span>Migration idempotency</span></div>
+    <div class="gate"><b>6</b><span>Schema drift</span></div>
+    <div class="gate"><b>7</b><span>Write routes validated</span></div>
+    <div class="gate key"><b>8</b><span>Five-second rule</span></div>
+    <div class="gate key"><b>9</b><span>AI manifest coverage</span></div>
+    <div class="gate key"><b>10</b><span>Search coverage</span></div>
+    <div class="gate key"><b>11</b><span>Two shells</span></div>
+    <div class="gate key"><b>12</b><span>Inline validation</span></div>
+    <div class="gate"><b>13</b><span>Palette</span></div>
+    <div class="gate"><b>14</b><span>Contrast, both themes</span></div>
+    <div class="gate"><b>15</b><span>Day-first dates</span></div>
+    <div class="gate"><b>16</b><span>No native dialogs</span></div>
+    <div class="gate"><b>17</b><span>No dashes</span></div>
+    <div class="gate"><b>18</b><span>Upload engine</span></div>
+    <div class="gate"><b>19</b><span>AI read manifest</span></div>
+    <div class="gate"><b>20</b><span>Money</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><p class="eyebrow">What the client sees</p></div>
+  <h2>Fifteen modules, eighty-five screens</h2>
+  <p class="sintro">This is the vocabulary: what every screen is called, where it sits, and which milestone builds it. The same names drive the route table, the &#8984;K index, the permission catalogue and the training material. <b>Approved 12 October 2026.</b></p>
+
+  <div class="inv">
+    <div class="ivc"><span class="ar">ungrouped</span><h4>Home<em>M1</em></h4><p>Overview · Alerts · Reports</p></div>
+    <div class="ivc"><span class="ar">ungrouped</span><h4>My Workspace<em>M2</em></h4><p>Today · Tasks · Calendar · Analytics</p></div>
+    <div class="ivc"><span class="ar">ungrouped</span><h4>Employee Self-Service<em>M1</em></h4><p>My Profile · My Attendance · My Performance · My Payslips · My Leave · My Queries · My Documents</p></div>
+    <div class="ivc"><span class="ar">Work</span><h4>Staff Community<em>M1</em></h4><p>Channels · Direct Messages · Announcements</p></div>
+    <div class="ivc"><span class="ar">Work</span><h4>Mailbox<em>M1</em></h4><p>Inbox · Sent · Drafts · Archive · Spam · Trash</p></div>
+    <div class="ivc"><span class="ar">People</span><h4>People<em>M1</em></h4><p>Employees · Attendance · Leave · Devices · Worksites</p></div>
+    <div class="ivc"><span class="ar">People</span><h4>Performance<em>M2</em></h4><p>Goals · Targets · KPIs · Reviews · Analytics</p></div>
+    <div class="ivc"><span class="ar">People</span><h4>Queries &amp; Sanctions<em>M3</em></h4><p>Queries · Rules · Sanctions · Letter Templates</p></div>
+    <div class="ivc"><span class="ar">People</span><h4>Recruitment<em>M4&nbsp;M5</em></h4><p>Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool</p></div>
+    <div class="ivc"><span class="ar">People</span><h4>Payroll<em>M6</em></h4><p>Payroll Runs · Payslips · Salary Structure · Deductions · Statutory</p></div>
+    <div class="ivc"><span class="ar">Business</span><h4>Partnerships<em>M7</em></h4><p>Pipeline · Partners · Leads · Proposals · Contracts &amp; MOUs · Analytics</p></div>
+    <div class="ivc"><span class="ar">Business</span><h4>Expenses<em>M8</em></h4><p>My Requests · Approvals · Requisitions · Disbursements · Budgets · Categories</p></div>
+    <div class="ivc"><span class="ar">System</span><h4>Knowledge Hub<em>M10</em></h4><p>Policies · SOPs · FAQs · Training · Announcements</p></div>
+    <div class="ivc"><span class="ar">System</span><h4>Praxis AI<em>M10</em></h4><p>Ask · History</p></div>
+    <div class="ivc"><span class="ar">System</span><h4>Settings<em>M9</em></h4><p>Organisation · Users · Roles &amp; Permissions · Approvals · Attendance Policy · Notifications · Appearance · Documents &amp; Numbering · Integrations · Security · Audit Log</p></div>
+  </div>
+
+  <p class="ivsep"><b>Not a sixteenth module.</b> The public site is the third deployable: its own application, its own build, its own origin. Nothing in the rail links to it and no member of staff navigates to it to do their job. It carries six of the eighty-five screens, so they are named here too.</p>
+
+  <div class="inv ivpub">
+    <div class="ivc pub"><span class="ar">Separate application &middot; go.mycityapp.io</span><h4>Public site<em>M4&nbsp;M5</em></h4><p>Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document</p></div>
+  </div>
+
+  <div class="ivnote">
+    <div><b>Home, not Dashboard</b><span>First in the rail and first thing a new employee sees. A plain word survives an icons-only rail and does not promise more than three tabs deliver.</span></div>
+    <div><b>Alerts are not notifications</b><span>An alert is work nobody has done; it ages and needs a permission to clear. A notification is something that happened to you. Separate screens, on purpose.</span></div>
+    <div><b>A label is chrome, a slug is a URL</b><span>Deep links appear in email and training material. Renaming a tab changes what is displayed, never the address it lives at.</span></div>
+  </div>
+</section>
+
+</main>
+
+<div class="foot">
+  <div class="wrap foot-in">
+    <span><b>MyCity App ERP</b> &middot; Technical milestone document v1.4</span>
+    <span>12 October 2026</span>
+    <span>Engineered by <a href="https://jbspraxis.com" target="_blank" rel="noopener" class="byline">JBS Praxis</a></span>
+  </div>
+</div>
+
+<script>
+(function(){
+  var btn = document.getElementById('themeBtn');
+  var root = document.documentElement;
+  var saved = null;
+  try { saved = localStorage.getItem('mca-theme'); } catch(e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+  function current(){
+    var a = root.getAttribute('data-theme');
+    if (a) return a;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function label(){ btn.textContent = current() === 'dark' ? 'Light' : 'Dark'; }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('mca-theme', next); } catch(e) {}
+    label();
+  });
+  label();
+})();
+</script>
