@@ -37,6 +37,8 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 
 ```
 mycity-app/
+├── app/                      staff React + Vite app (frontend team), served at hub.mycityapp.io
+├── public-app/               public React + Vite app (frontend team), served at go.mycityapp.io
 ├── src/                      backend source (§4, §5)
 ├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2)
 ├── migrations/               NNNN_name.sql, block per milestone (§6.3)
@@ -73,7 +75,7 @@ mycity-app/
 
 **About `.gitkeep`.** Git does not track empty folders, so a folder with nothing in it would not
 exist in a fresh clone. These folders hold a `.gitkeep` placeholder so the layout above survives:
-`assets/brand`, `assets/fonts`, `migrations`, `seeds/build`, `seeds/staging`, `tests/unit`,
+`app`, `public-app`, `assets/brand`, `assets/fonts`, `migrations`, `seeds/build`, `seeds/staging`, `tests/unit`,
 `tests/integration`, `tests/staging`. The file is empty and has no meaning to any tool.
 
 When you add the first real file to one of these folders, **delete its `.gitkeep` in the same
