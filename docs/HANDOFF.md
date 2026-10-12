@@ -46,11 +46,11 @@ architecture and the empty repository.
 
 | Path | What |
 |---|---|
-| `C:\mycity-hub\` | The new repository. Git initialised, one commit. **All code files are empty** |
-| `C:\mycity-hub\README.MD` | Engineer guide (filled, 28 KB). Note the uppercase `.MD`, his choice |
-| `C:\mycity-hub\docs\SYSTEM_ARCHITECTURE.md` | System architecture v1.0 + edits (filled) |
-| `C:\mycity-hub\docs\BACKEND_STRUCTURE.md` | Backend structure v1.1 + AI and offline sections (filled) |
-| `C:\mycity-hub\docs\MyCity-ERP-Documents\` | Client pack: `MILESTONES.md` (v1.4), `REUSE_MAP.md`, `MILESTONE_QUESTIONS.md`, `INDEX.md`, `EMAIL-naming-approval.md`, `milestones.html`, `demo.html` |
+| `C:\mycity-app\` | The new repository. Git initialised, one commit. **All code files are empty** |
+| `C:\mycity-app\README.MD` | Engineer guide (filled, 28 KB). Note the uppercase `.MD`, his choice |
+| `C:\mycity-app\docs\SYSTEM_ARCHITECTURE.md` | System architecture v1.0 + edits (filled) |
+| `C:\mycity-app\docs\BACKEND_STRUCTURE.md` | Backend structure v1.1 + AI and offline sections (filled) |
+| `C:\mycity-app\docs\MyCity-ERP-Documents\` | Client pack: `MILESTONES.md` (v1.4), `REUSE_MAP.md`, `MILESTONE_QUESTIONS.md`, `INDEX.md`, `EMAIL-naming-approval.md`, `milestones.html`, `demo.html` |
 | `C:\praxis-ls\` | Donor repo 1 (multi-tenant logistics ERP, Cameroon). Has a `CLAUDE.md` worth reading |
 | `C:\pixie-girl-hub\` | Donor repo 2 (multi-brand Nigerian ERP). Has a `CLAUDE.md` worth reading |
 
@@ -137,7 +137,7 @@ Full detail is in the two architecture documents; this is the spine.
 
 ## 6 · Repository state
 
-`C:\mycity-hub` has 957 files outside `.git`, **all empty except** `README.MD`, the two
+`C:\mycity-app` has 957 files outside `.git`, **all empty except** `README.MD`, the two
 architecture docs, and the client pack. 63 modules in `src/modules/` (9 for M0, 54 for M1 to M11),
 schema files per module in `packages/contract/schemas/` (modules carry only the files they need; README §5.1 lists the ai:none, search:none and no-events modules), jobs, prompts, templates, CI check scripts,
 ops files, runbooks and manual stubs. Empty directories with no files: `migrations/`, `seeds/build`,

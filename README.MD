@@ -36,7 +36,7 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 ## 3 · Repository map
 
 ```
-mycity-hub/
+mycity-app/
 ├── src/                      backend source (§4, §5)
 ├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2)
 ├── migrations/               NNNN_name.sql, block per milestone (§6.3)
