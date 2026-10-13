@@ -287,7 +287,114 @@ A script that writes data goes through services like any other caller.
 
 ---
 
-## 8 · Done means
+## 8 · Branches, pull requests and CI
+
+### 8.1 Nobody pushes to `main`
+
+`main` is protected. `git push origin main` is refused for everyone, the repository owner
+included. Every change, however small, goes: **branch → push the branch → pull request → CI green
+→ approval → merge.** Merging to `main` deploys to staging, so `main` only ever holds work that
+passed CI and a second pair of eyes.
+
+### 8.2 Opening a branch and a pull request
+
+You do not fork. Every collaborator pushes branches to the same repository.
+
+```
+git checkout main
+git pull                                   # start from the latest main
+git checkout -b m1/attendance-clock-in     # m<milestone>/<short-name>
+```
+
+Work and commit as often as you like:
+
+```
+git add .
+git commit -m "feat(attendance): clock-in with geofence check"
+```
+
+Push the branch and open the pull request:
+
+```
+git push -u origin m1/attendance-clock-in
+gh pr create --base main --title "feat(attendance): clock-in with geofence check"
+```
+
+or open it from the **Compare & pull request** button GitHub shows after the push. The PR
+description is pre-filled from `.github/pull_request_template.md`; fill it in.
+
+- **Branch names**: `m<milestone>/<short-name>`, e.g. `m3/query-rules`, `m0/numbering`.
+- **PR titles**: Conventional Commits, `type(module): what it does`. Types: `feat`, `fix`,
+  `refactor`, `test`, `docs`, `chore`.
+- **One feature per PR.** Small PRs get reviewed the same day; a week of work in one PR does not.
+
+**From VS Code instead of the terminal:** click the branch name at the bottom left → *Create new
+branch* → name it. Commit in the Source Control panel, then *Publish Branch*. VS Code then offers
+*Create Pull Request*.
+
+### 8.3 Keeping the branch up to date
+
+`main` moves while your PR is open, and the branch must be up to date before it can merge:
+
+```
+git checkout m1/attendance-clock-in
+git fetch origin
+git rebase origin/main          # replay your commits on top of the latest main
+git push --force-with-lease     # needed after a rebase; only ever on your own branch
+```
+
+If the rebase stops on a conflict, fix the files, `git add` them, `git rebase --continue`.
+`git merge origin/main` also works if you prefer it; then a plain `git push` is enough.
+
+### 8.4 What CI checks, and why your PR will fail
+
+CI runs `npm run ci` on every push to a PR. **Run it yourself before pushing**; it is the same
+command and the same result. A PR cannot merge until it is green. These are the usual reasons it is
+red:
+
+| CI says | Why | Fix |
+|---|---|---|
+| **Lint** | ESLint error or warning; the limit is zero | Fix it. `npm run lint` lists them |
+| **Tests** | A test fails, anywhere in the suite | Fix the code or the test. Never delete a test to go green |
+| **Every list pages at 25** | A repo wrote `LIMIT`/`OFFSET`, or a page-size key appeared in the contract or frontend | Use `pageQuery()` (§3.5) |
+| **PROGRESS.md updated** | You changed product code (`src/`, `packages/contract/schemas/`, `migrations/`, `seeds/`, `templates/`, `app/`, `public-app/`) and `docs/PROGRESS.md` got no dated note, or the file is malformed | Tick the screens, set Status and Updated, add `- dd/mm/yyyy · XX · what was done, what is left` under the module |
+| **Feature guides** | You changed code a guide in `docs/guides/` covers and the guide got no Change log line | Update the guide to match what you built, add the line |
+| **README map** | You added a file outside the places the map already covers | Add it to the right section of `README.MD`, or put it where an existing file of that kind lives |
+| **CODEOWNERS** | A new module or guide has no owner line, or a username is wrong | Add `/src/modules/<m>/ @owner @backup` (or the guide's path) to `.github/CODEOWNERS` |
+
+**When a process check genuinely does not apply** (a refactor that moves no screen, a test-only
+change), say so with a reason in the PR description, one line each:
+
+```
+Progress-unchanged: renamed a private helper, no screen affected
+Guide-unchanged: tests only, behaviour as the guide describes
+```
+
+A line with no reason does not count. Editing the PR description re-runs CI.
+
+`npm run ci` also lists gates as **NOT BUILT**. Those are rules whose check is not written yet
+(money, dates, migrations and others during M0). They do not fail your PR today, but the rules
+still apply, and review will hold you to them.
+
+If you use Claude Code, the same progress, guide and README-map checks run before it finishes a
+task (`.claude/hooks/stop-check.js`), so most of these are caught before you push.
+
+### 8.5 Review and merge
+
+- One approval, **not yours**, and from a code owner of every path you touched
+  (`.github/CODEOWNERS`): change attendance and LA or her backup must approve.
+- A new push after approval dismisses the approval; ask again.
+- Resolve every review conversation.
+- When CI is green and the PR is approved, the author merges, with **Squash and merge**.
+- Afterwards:
+
+  ```
+  git checkout main
+  git pull
+  git branch -d m1/attendance-clock-in
+  ```
+
+## 9 · Done means
 
 - [ ] Contract schemas in `packages/contract`, `gen:contract` run, no hand edit of the generated file
 - [ ] Every route has a contract, a permission and (for writes) a body
@@ -297,6 +404,7 @@ A script that writes data goes through services like any other caller.
 - [ ] `.ai.js` and `.search.js` present (or a written `none` with the reason)
 - [ ] Unit tests beside the code; integration tests for every endpoint
 - [ ] `npm run ci` green, the whole suite, before pushing
+- [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked and a note left
 - [ ] The feature guide in `docs/guides/` matches what was built
 

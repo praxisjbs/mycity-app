@@ -163,7 +163,13 @@ _To be written._
 
 ---
 
-## 10 · Done means
+## 10 · Branches, pull requests and CI
+
+The same as the backend: nobody pushes to `main`; branch, push, pull request, CI green, a code
+owner's approval, merge. How to open a branch, keep it up to date, and what makes CI fail are in
+`BACKEND_GUIDE.md` §8.
+
+## 11 · Done means
 
 - [ ] Built against the real API through the contract; no mock data left in components
 - [ ] Every list uses the shared pager, sends `page` only, shows the true total
@@ -172,6 +178,7 @@ _To be written._
 - [ ] Day-first dates, formatted money, brand tokens only
 - [ ] No native dialogs; inline validation; upload engine
 - [ ] `npm run ci` green, the whole suite, before pushing
+- [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked (UI, Mobile) and a note left
 - [ ] The feature guide in `docs/guides/` matches what was built
 
