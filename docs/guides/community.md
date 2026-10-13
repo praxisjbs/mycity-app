@@ -33,7 +33,7 @@ track who has read them.
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | Staff Community · Channels (`channels`) | Staff app | Every employee; only channels they belong to | Channel list (#announcements pinned first), the open channel's thread, its composer | Read, post, react, vote, recognise, celebrate, attach files, create a channel, view or edit members |
-| Staff Community · Direct Messages (`direct-messages`) | Staff app | Every employee; only their own conversations | Conversation list (All / Unread), the open conversation | Message one colleague, attach files, record voice notes |
+| Staff Community · Direct Messages (`direct-messages`) | Staff app | Every employee; only their own conversations | Conversation list (All / Unread), the open conversation, the colleague's profile | Message one colleague, attach files, record voice notes, view their profile, search the conversation, mute |
 | Staff Community · Announcements (`announcements`) | Staff app | People and the CEO | The configuration and tracking side: KPI strip, every announcement with read counts | Publish or schedule an announcement, see who has and has not read it |
 | #announcements channel | Staff app, inside Channels | Every employee, read only | Published announcements, newest last | Read; only People and the CEO post |
 | Knowledge Hub · Announcements (M10) | Staff app | Every employee | The same announcement records, as an archive | Read. No second copy of the data |
@@ -69,6 +69,30 @@ track who has read them.
    from a button on the page.
 7. **Direct messages** start from New Message → employee picker → the conversation appears in the
    list once the first message is sent.
+8. **View Profile** (the person's name in the thread header, or ⋮ → View Profile): a third column on
+   desktop, a sheet on mobile. It shows title, status, work email, phone, worksite and local time,
+   the files and voice notes shared in this conversation, channels in common, a mute switch, and
+   **View in People** (only for users with the `people` grant, opening the employee 360). No work
+   details (department, manager, pattern, start date): those belong to People. It reads the employee
+   record; nothing is stored in Community.
+9. **Search in Conversation** (the search icon in the thread header, ⋮ in a DM, or ⋮ → Search in
+   Channel): matches are highlighted in place with a count ("2 of 4"), Enter and the arrows move
+   between them, Escape closes. The search runs on the server over the caller's own conversation
+   (`GET /channels/:id/messages?q=`), never across conversations they are not in.
+10. **Message ticks** on direct messages the user sent: one tick when the server has it (sent), two
+    grey ticks when it reached the other person's device (delivered), two blue ticks once they have
+    opened the conversation (read). Channels show no ticks.
+11. **Voice notes** play inline with a progress waveform. **Transcribe** under a voice note asks the
+    server for a transcript, shows "Transcribing…" and then the text, which can be hidden again.
+    The transcript is stored once per voice note, so the second person to ask gets it at once.
+12. **Announcement read tracking** (Announcements tab): each card shows its title, an "N of 25 read"
+    pill (or Scheduled), the body and who posted it. Clicking a card opens it: the posted line, the
+    body, "Read by N of 25" with its bar, and under that two lists, **Not read** (with a **Remind
+    Them** button that notifies only those people) and **Read**. The lists live in the modal only,
+    never on the card.
+13. **Resizable list.** On desktop the divider between the list and the conversation can be dragged
+    (or moved with the arrow keys; double click resets). The width is remembered per browser. The
+    list and the conversation each scroll on their own; the page never scrolls behind them.
 
 ## 4 · Data
 
@@ -77,8 +101,8 @@ Proposed for the M1 migration block (1000 to 1999). Column names are the contrac
 | Table | Key columns | Notes |
 |---|---|---|
 | `community_channel` | `channel_id`, `name` (unique, `^[a-z0-9][a-z0-9-]{1,29}$`), `description`, `kind` (`channel` / `direct`), `post_policy` (`members` / `admins` / `people_ceo`), `is_system`, `pinned`, `archived_at`, `created_by` | `#announcements` (`people_ceo`, pinned) and `#general` are seeded system channels and cannot be deleted or left |
-| `community_member` | `channel_id`, `user_id`, `role` (`admin` / `member`), `muted`, `last_read_message_id`, `joined_at` | **Membership is the authorisation boundary** for every read and write |
-| `community_message` | `message_id`, `channel_id`, `author_id` (null for system posts), `kind` (`text` / `file` / `voice` / `recognition` / `celebration` / `poll` / `announcement`), `body`, `document_id`, `meta` jsonb, `reply_to_id`, `edited_at`, `deleted_at`, `created_at` | `meta` holds the kind's fields: poll options, voice duration, celebration type and employee |
+| `community_member` | `channel_id`, `user_id`, `role` (`admin` / `member`), `muted`, `last_delivered_message_id`, `last_read_message_id`, `joined_at` | **Membership is the authorisation boundary** for every read and write. The two pointers drive the ticks |
+| `community_message` | `message_id`, `channel_id`, `author_id` (null for system posts), `kind` (`text` / `file` / `voice` / `recognition` / `celebration` / `poll` / `announcement`), `body`, `document_id`, `meta` jsonb, `transcript`, `reply_to_id`, `edited_at`, `deleted_at`, `created_at` | `meta` holds the kind's fields: poll options, voice duration, celebration type and employee. `transcript` is filled on first request |
 | `community_reaction` | `message_id`, `user_id`, `emoji` | Celebrate and thumbs up are reactions |
 | `community_poll_vote` | `message_id`, `user_id`, `option_index` | One vote per person, changeable |
 | `community_recognition` | `message_id`, `from_user_id`, `to_employee_id`, `note`, `note_written_by_system` | Kept separately so M2 performance and Home can count recognitions |
@@ -101,16 +125,20 @@ All under `/api/v1/community`. Every list is paged at 25 (BACKEND_STRUCTURE §16
 | `GET /channels/:id/members` | `PageQuery` → `MemberPage` | member | yes | |
 | `POST /channels/:id/members`, `DELETE /channels/:id/members/:user_id` | `MemberAdd` | channel admin | | |
 | `POST /channels/:id/mute`, `POST /channels/:id/read` | | member | | |
-| `GET /channels/:id/messages` | `MessageListQuery` → `MessagePage` | member | yes | Newest page first; "Load Older" asks for the next page |
+| `GET /channels/:id/messages` | `MessageListQuery` → `MessagePage` | member | yes | Newest page first; "Load Older" asks for the next page. `q` searches this conversation and returns the matching pages |
 | `POST /channels/:id/messages` | `MessageCreate` → `Message` | member, and allowed by `post_policy` | | Idempotency-Key required |
 | `POST /channels/:id/media` | multipart → `Message` | member, `post_policy` | | Through `middleware/upload` (sniffed, size-capped, progress on the client) |
 | `POST /channels/:id/recognitions` | `RecognitionCreate` → `Message` | member, `post_policy` | | `to_employee_id` cannot be the sender |
 | `POST /messages/:id/reactions`, `POST /messages/:id/vote` | `ReactionToggle`, `PollVote` | member | | |
 | `GET /direct` | `PageQuery` → `ConversationPage` | own | yes | Filter `unread` |
+| `GET /people/:user_id/card` | → `ProfileCard` | `community` view | | The profile panel: public work fields only, field masking applied. Restricted fields never appear |
 | `POST /direct` | `{ user_id }` → `Conversation` | `community` create | | Returns the existing conversation if there is one |
 | `GET /announcements` | `AnnouncementListQuery` → `AnnouncementPage` | `announcements.post` capability | yes | The tracking tab |
 | `POST /announcements` | `AnnouncementCreate` → `Announcement` | `announcements.post` capability | | `publish_at` optional (day-first on screen, ISO on the wire) |
 | `GET /announcements/:id/reads` | `ReadListQuery` → `ReadPage` | author or capability | yes | Filter `read` / `not_read` |
+| `POST /announcements/:id/remind` | → `{ reminded }` | author or capability | | Notifies only those who have not read it; once per day per announcement |
+| `POST /messages/:id/transcript` | → `Transcript` | member | | Voice notes only. Through `services/ai/transcription.js` (governance, ledger); cached on the message |
+| `POST /channels/:id/delivered` | `{ up_to_message_id }` | member | | The client acknowledges receipt: drives the delivered tick |
 
 Posting to #announcements is gated by the `announcements.post` capability (BACKEND_STRUCTURE §11,
 `capability` / `user_capability`), held by People and the CEO.
@@ -202,7 +230,12 @@ Nobody, including People and the CEO, can read a direct message they are not par
 - Message edit and delete windows (Praxis allows edit of your own message; proposed: 15 minutes).
 - Voice note maximum length (proposed: 5 minutes).
 - Is the donor's certified (SHA-256) channel export wanted?
+- Transcription runs through the AI service (cost per minute of audio): on request only, as in the
+  demo, or automatically for every voice note? Can a user switch off read receipts?
 
 ## 14 · Change log
 
 - 13/10/2026 · GE · First version, from the 12 October internal workflow meeting and MILESTONES §6.4.
+- 13/10/2026 · GE · Added View Profile and Search in Conversation (TB review of the demo).
+- 13/10/2026 · GE · Added message ticks, voice note playback and transcription, read and not read lists on announcements, resizable list; removed work details from the profile (TB review).
+- 13/10/2026 · GE · Announcement cards back to the original design; read and not read lists moved into the card's modal. Page header slides away while reading a conversation (TB review).
