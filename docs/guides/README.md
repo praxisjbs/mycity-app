@@ -11,7 +11,7 @@ Start a new guide by copying `_TEMPLATE.md` to `<module>.md` (the backend module
 | Guide | Feature | Owner | Milestone | Written |
 |---|---|---|---|---|
 | `home.md` | Home: Overview, Alerts, Reports (dashboard, KPI catalogue, alert rules, scheduled reports) | TB | M1 | ☐ |
-| `attendance.md` | Clock-in and clock-out across ESS, People, Settings and Devices | LA | M1 | ☐ |
+| `attendance.md` | Clock-in and clock-out across ESS, People, Settings and Devices | LA | M1 | ☑ |
 | `ess.md` | Employee Self-Service, all seven tabs | AJ | M1 | ☐ |
 | `community.md` | Staff Community: Channels, Direct Messages, Announcements, recognition, celebrations | GE | M1 | ☑ |
 | `mailbox.md` | Mailbox client | GE | M1 | ☑ |

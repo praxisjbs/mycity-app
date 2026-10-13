@@ -1,4 +1,4 @@
-# MyCity App Attendance Guide
+# Attendance
 
 This guide explains the end-to-end attendance workflow demonstrated in demo.html. The demo date is 9 October 2026 and all times are shown in Africa/Lagos.
 
