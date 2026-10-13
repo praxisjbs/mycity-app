@@ -1,0 +1,17 @@
+# Every text file is stored and checked out with LF, on Windows too.
+# Shell scripts with CRLF fail on the server ("bad interpreter"), and
+# check/shell.js refuses them, so the repository never holds one.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.xlsx binary

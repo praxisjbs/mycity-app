@@ -1,0 +1,45 @@
+{
+  "name": "mycity-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MyCity App ERP: Express API, worker, and the wire contract. Built by JBS Praxis.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20.19 <21"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "ci": "node scripts/ci-local.js",
+    "ci:list": "node scripts/ci-local.js --list",
+    "lint": "eslint --max-warnings 0 .",
+    "test": "jest",
+    "start": "node src/server.js",
+    "worker": "node src/worker.js",
+    "dev": "node --watch src/server.js",
+    "dev:worker": "node --watch src/worker.js",
+    "db:migrate": "node scripts/db/migrate.js",
+    "db:seed": "node scripts/db/seed.js",
+    "db:create-admin": "node scripts/db/create-admin.js",
+    "gen:contract": "node scripts/gen/contract.js",
+    "gen:env": "node scripts/gen/env-example.js",
+    "check:pagination": "node scripts/check/pagination.js",
+    "check:progress": "node scripts/check/progress.js",
+    "check:guides": "node scripts/check/guides.js",
+    "check:readme-map": "node scripts/check/readme-map.js",
+    "check:codeowners": "node scripts/check/codeowners.js"
+  },
+  "dependencies": {
+    "@mycity/contract": "file:packages/contract",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "jest": "^30.5.2"
+  }
+}

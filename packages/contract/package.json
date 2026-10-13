@@ -1,0 +1,12 @@
+{
+  "name": "@mycity/contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MyCity App ERP wire contract: Zod schemas and the generated contract.gen.ts",
+  "main": "index.js",
+  "types": "contract.gen.ts",
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "zod": "^3.23.8"
+  }
+}

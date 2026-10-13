@@ -1,0 +1,54 @@
+name: CI
+
+# One job, one command: `npm run ci`, exactly what everyone runs locally
+# (scripts/ci-local.js). Branch protection on main requires the "ci" check.
+#
+# This workflow never deploys and never references the production environment
+# (check/production-environment-refs.js). Deploys are release.yml.
+
+on:
+  pull_request:
+    branches: [main]
+    # `edited`: the process gates read trailers from the PR description
+    # ("Progress-unchanged: <reason>"). Without this, fixing the description
+    # fires no event and the red run stands (lesson from praxis-ls CI).
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+  # Run CI by hand on a ref an outage skipped. GitHub does not replay dropped
+  # webhook events, and an empty commit to re-trigger would invent history.
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out (full history, the process gates diff against main)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: All gates
+        run: npm run ci
+        env:
+          # Set to "1" once M0 is complete: a gate whose script is still empty
+          # then fails the run instead of being reported as NOT BUILT.
+          CI_STRICT: "0"

@@ -11,6 +11,10 @@ v1.1 adds documents, media and images (§5), the generated FE/BE contract (§6),
 (§7), the import engine and the staff importer (§9), the coverage check (§12), the AI foundation that
 carries every module's `.ai.js` (§14), and the position on offline and sync (§15).
 
+**Amended 13 October 2026** after the internal meeting of 12 October: the system-wide pagination
+rule (§16), how the first administrator is created (§17), AI reads paged (§14.3), and the reverse
+proxy configured in the hosting panel rather than from `ops/nginx/` (§1, §5.2).
+
 Donor line counts are from the checked-out trees on 12 October. `praxis` = `praxis-ls`, `pixie` =
 `pixie-girl-hub`.
 
@@ -44,11 +48,11 @@ mycity-erp/
 │   ├── import/              CLI over the import engine (first staff load)
 │   └── deploy/              deploy-gate, release-manifest, verify-staging, rollback
 ├── ops/
-│   ├── nginx/               four server blocks, internal media location (§5.4)
 │   ├── systemd/             four units + env file templates
 │   ├── provision/           server packages: postgres 16 + pgvector, redis, chromium,
 │   │                        ffmpeg, clamav, fonts
 │   └── ssh/                 authorized_keys template for mycity-deploy
+│                            (proxy: hosting panel, settings in docs/runbooks/proxy.md)
 ├── tests/
 │   ├── unit/
 │   ├── integration/         real Postgres + Redis, RUN_DB_TESTS=1
@@ -199,7 +203,8 @@ src/
 | `config/env.js` | praxis | 1,075 | **Rewritten** (same technique, MyCity variables only) |
 | `config/db.js` | pixie `config/database.js` | ~150 | One pool, no brand GUCs |
 | `shared/db/tx.js` | praxis | 121 | As is |
-| `shared/db/query-helpers.js` | praxis | 274 | As is |
+| `shared/db/query-helpers.js` | praxis | 274 | As is, **except `page()`** (default 50, client limit to 200) and `TOTAL_COL`/`splitTotal`, which are not ported: paging lives only in `shared/http/paged.js` (§16) |
+| `shared/http/paged.js` | praxis `shared/http/paged.js` | 27 | **Rewritten** as the pagination gate: fixed 25, `pageQuery`, envelope in the body, `completeQuery` (§16) |
 | `shared/crud/resource.js` | praxis | 361 | No tenant pool; `scope: { ownColumn, teamColumn }` |
 | `shared/http/validate.js` | praxis | 182 | Schemas from `packages/contract` only |
 | `shared/events/emit.js` | praxis | 415 | **Reworked**: event_log + audit + outbox in one tx; inline workflow and fan-out removed |
@@ -295,8 +300,8 @@ multipart (memory, 25 MB hard cap; per-type caps tighter)
   → document row, inside the caller's transaction
 ```
 
-The nginx → Express → multer size chain is set once in `ops/nginx` (`client_max_body_size 30m`) and
-`middleware/upload.js`, the "works locally, fails live 413" pixie documents in
+The proxy → Express → multer size chain is set once in the hosting panel's proxy settings
+(`client_max_body_size 30m`, `docs/runbooks/proxy.md`) and `middleware/upload.js`, the "works locally, fails live 413" pixie documents in
 `docs/UPLOAD_SIZE_LIMITS.md`.
 
 **Public uploads** (CVs, candidate documents from M4/M5) land in `media/quarantine/` with
@@ -653,7 +658,7 @@ What it handles that a naive import does not:
 | 8 Five-second rule | frontend gate; backend half is `check/dashes.js` over templates |
 
 Pipeline guards, also from M0: `gen:contract --check`, `.env.example` matches schema, module
-catalogue equals enforced keys, public routes import no auth/rbac, numbering schemes exist for every
+catalogue equals enforced keys, every list paged at 25 (`check/pagination.js`, §16), public routes import no auth/rbac, numbering schemes exist for every
 allocated type, only `release.yml`/`rollback.yml` reference the `production` environment, shell
 scripts LF and `bash -n`, `node --check` on every file.
 
@@ -735,7 +740,11 @@ folder and adds a row here; a module never grows its own copy of a shared concer
 
 - `server.js` and `worker.js` boot on both environments; `/api/health/ready` reports build sha, nine
   modules mounted, migration head, numbering schemes present.
-- `mycity_prod` holds `system_marker('production')`, reference data and one CEO user. No other row.
+- `mycity_prod` holds `system_marker('production')`, reference data and one CEO user, created by
+  `create-admin` as a complete employee with a staff number, department, login and role (§17).
+  No other row.
+- Every list endpoint in the M0 modules returns `{ data, page }` with at most 25 rows;
+  `check/pagination.js` is green.
 - `contract.gen.ts` generated; editing it by hand fails CI; a route without a contract fails CI.
 - `emit()` inside a rolled-back transaction leaves no event, audit, outbox row **and no consumed
   number** (test).
@@ -820,6 +829,13 @@ module.exports = defineManifest({
 receives the caller's own scope, so a manifest read returns exactly what the same person would see on
 screen; field masking is applied to its rows by `authorise.js` before the model sees them.
 
+**AI reads are paged like every other list (§16).** A list read's `params` is a `listQuery()` schema,
+so it accepts `page` and never a size. `run` returns the `pageQuery` envelope, and `authorise.js`
+passes every result through `assertPage()` before the model sees it, so the assistant can never pull
+more than 25 rows in one step, however the question is phrased. Asked for "all our contacts", it
+answers with the first 25 and the total ("showing 25 of 312") and fetches the next page when asked.
+This keeps a broad question from timing out the AI call or the request behind it.
+
 ### 14.4 Registry, catalogue, gate
 
 - `shared/ai/registry.js` discovers every `src/modules/*/*.ai.js` at boot, as the search registry
@@ -858,3 +874,120 @@ What the foundation already gives, so a later Change Report would not be a rewri
 
 The one place a dropped connection is already handled is the M4 assessment, which autosaves and
 resumes on the server; that is a feature of that screen, not offline sync.
+
+---
+
+## 16 · Pagination: 25 per page, everywhere
+
+Decided at the internal meeting of 12 October 2026. Neither donor had one rule: praxis-ls clamps
+lists to 50 with a client `limit` up to 200 and several endpoints had no limit at all; a list that
+loads a whole table works in testing and takes the server down when the table is large.
+
+### 16.1 The rule
+
+- **Every list is paged on the server at 25 rows.** Screens, pickers, search results, exports'
+  previews, mobile infinite scroll and AI reads. The size is fixed, not a default: the client cannot
+  ask for more or for fewer.
+- The client sends `page` (1-based) and the list's own filters. The contract has no `limit`,
+  `offset`, `per_page` or `page_size` key; `listQuery()` is `.strict()`, so a client that sends one
+  gets a 422 naming it.
+- Search, filtering and sorting happen in SQL, before the page is cut. A page is never filtered in
+  the browser and presented as the whole result.
+
+### 16.2 Where it lives
+
+| Piece | File |
+|---|---|
+| `PAGE_SIZE = 25`, `listQuery(filters)`, `PageQuery`, `PageMeta`, `Paged(item)` | `packages/contract/schemas/common.js` |
+| `pageQuery`, `TOTAL_COL`, `sendPaged`, `assertPage`, `completeQuery` | `src/shared/http/paged.js` |
+| The gate | `scripts/check/pagination.js` |
+
+Every list response is the same envelope, in the body (no header to expose through CORS):
+
+```json
+{ "data": [ "...at most 25 rows" ],
+  "page": { "number": 2, "size": 25, "total": 312, "pages": 13, "has_next": true } }
+```
+
+`pageQuery` requires `TOTAL_COL` (`COUNT(*) OVER()`) in the SELECT list, a unique `ORDER BY`, and no
+hand-written `LIMIT`/`OFFSET`; it throws at the first call otherwise. The count and the rows come from
+one query, so they cannot disagree. Past the last page it counts separately so the client still gets
+the real total.
+
+### 16.3 The one exception
+
+A set that must be loaded whole because acting on part of it would be wrong (the permission matrix:
+praxis-ls loaded it paged, an editor saw half the grants and saved over the rest) uses
+`completeQuery()`. It returns up to 5,000 rows and **fails loudly** above that instead of
+truncating. It is never a list a person scrolls and never an AI read. Every call carries
+`// pagination:complete <reason>` on the line above it.
+
+### 16.4 What the gate refuses
+
+| Refused | Where |
+|---|---|
+| `LIMIT`/`OFFSET`/`FETCH FIRST` in SQL outside `paged.js` (`LIMIT 1` allowed) | `src/` |
+| `completeQuery()` without its marker | `src/` |
+| A page-size key | `packages/contract/schemas/` (except `common.js`), any `*.ai.js` |
+| A page-size parameter or a local `PAGE_SIZE` | `app/`, `public-app/` |
+
+---
+
+## 17 · The first administrator: `scripts/db/create-admin.js`
+
+Decided at the internal meeting of 12 October 2026. The praxis-ls script created an `app_user` with
+an email and a password: an account that could sign in but was not an employee, so it appeared in no
+staff list, reported to nobody and could not be traced to a person. In a public repository it was
+also a readable recipe for an account outside the HR record. MyCity does it differently.
+
+### 17.1 What it creates
+
+One transaction, through the services (never raw SQL):
+
+```
+department     found by name, or created          organisation.service
+employee       full payload, staff number issued    organisation.service   (numbering, audit, events)
+app_user       linked to that employee              identity.service       (Argon2id, is_ceo)
+user_role      the chosen role                      access.service
+```
+
+The input is `AdminBootstrap` in `packages/contract/schemas/organisation.js`: every field
+`EmployeeCreate` requires (name, work email, phone, job title, department, start date, employment
+type, work pattern), plus the role code and whether the person is the CEO. If the employee already
+exists (imported before the first login was made), the login is attached to that record instead.
+
+### 17.2 What it refuses
+
+| Refused | Why |
+|---|---|
+| A login with no employee | Schema rule: `app_user.employee_id uuid NOT NULL REFERENCES employee` (0010/0040). The script cannot do it, and neither can anything else |
+| An existing login for that email or employee | It never changes an existing login; passwords are reset in the app. praxis-ls's `ON CONFLICT DO UPDATE SET password_hash` let the script take over any account |
+| A role that already has an active holder | It is a bootstrap. Everyone after the first is created in the app, by a person, under their own name in the audit log. `--allow-additional` overrides, deliberately |
+| A second CEO | `is_ceo` is unique |
+| A password on the command line or in a file | Typed at a hidden prompt, twice, at least 12 characters |
+| A non-interactive run | Needs a terminal; seeds and tests call `createAdmin()` directly |
+| `--sample` on production | The production administrator is a real person |
+
+It reads the server's own `.env`, so it only works where the database credentials already are, and
+it asks the operator to type the environment name before writing.
+
+### 17.3 Staging and local
+
+`--sample` fills the employee with a complete, obviously sample profile ("System Administrator",
+department "Administration") and asks only for the work email, role and password, so a developer
+gets a real employee record behind their login without typing twelve fields. `scripts/db/seed.js`
+calls the exported `createAdmin()` with the demonstration data.
+
+### 17.4 What it needs from the M0 modules
+
+The script is written ahead of the services it calls. They must expose:
+
+| Service | Functions |
+|---|---|
+| `organisation.service` | `findDepartmentByName(client, name)`, `createDepartment(client, { name }, actor)`, `findEmployeeByWorkEmail(client, email)`, `createEmployee(client, EmployeeCreate, actor)` returning the row with `employee_id` and `number` |
+| `identity.service` | `findUserByEmail`, `findUserByEmployeeId`, `findCeo`, `createUserForEmployee(client, { employee_id, email, password, is_ceo }, actor)` returning `{ user_id, email }` |
+| `access.service` | `findRoleByCode`, `listRoles`, `countActiveUsersWithRole(client, role_id)`, `assignRole(client, { user_id, role_id }, actor)` |
+| `config/env`, `config/db` | `{ config: { APP_ENV } }`, `{ pool }` |
+
+`actor` is `{ user_id: null, source: "script:create-admin" }`; the audit row records that source.
+

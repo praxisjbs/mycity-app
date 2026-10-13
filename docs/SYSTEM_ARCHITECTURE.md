@@ -14,7 +14,7 @@ file was read in the checked-out tree on 12 October. Backend source layout is in
                          Internet
                             │
             ┌───────────────┴────────────────┐
-            │   nginx (TLS, Let's Encrypt)   │   one server, 4 vCPU / 8 GB / 80 GB NVMe
+            │   nginx (TLS, Let's Encrypt)   │   one server, 18 GB RAM / 240 GB SSD
             └──┬──────────┬──────────┬───────┘
      hub.mycityapp.io  go.mycityapp.io  hub.staging…  go.staging…
             │          │                │          │
@@ -48,6 +48,10 @@ file was read in the checked-out tree on 12 October. Backend source layout is in
 Four systemd units: `mycity-api-prod`, `mycity-worker-prod`, `mycity-api-stg`, `mycity-worker-stg`.
 One codebase, one build, two running copies that differ only in their `.env`.
 
+The four virtual hosts are configured in the hosting panel's web server settings, not from files in
+the repository. What they must contain (path allow-list per host, body size, internal media location,
+WebSocket upgrade) is in `docs/runbooks/proxy.md`.
+
 Installed on the server at M0 (`ops/provision`), so no later milestone is a server change: PostgreSQL
 16 with **pgvector** (M10), Redis, headless **Chromium** (PDFs), **ffmpeg** (voice notes, video),
 **ClamAV** `clamd` (stranger uploads, M4/M5), Geist fonts.
@@ -72,7 +76,8 @@ third process (`src/jobs/mail-idle.js`); at 50 users the worker carries it. If I
 crowd the worker, it becomes a fifth unit with no code change, because the IDLE loop is already its
 own module.
 
-**Scaling stays vertical** (A6): 12 GB RAM above 50 users. Nothing in the design assumes a second
+**Scaling stays vertical** (A6). The server is 18 GB RAM / 240 GB SSD (confirmed 13 October 2026),
+above the A6 sizing of 8 GB to 50 users and 12 GB beyond. Nothing in the design assumes a second
 host, and nothing prevents one: sessions are in Redis, jobs are in BullMQ, outbox claims use
 `SKIP LOCKED`.
 

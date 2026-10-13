@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment. Real values live on the server in /srv/mycity/<env>/shared/.env
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+coverage/
+
+# Runtime files never live in the repo (BACKEND_STRUCTURE §1)
+media/
+releases/
+*.log
+npm-debug.log*
+
+# Local tooling
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
