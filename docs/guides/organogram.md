@@ -143,6 +143,39 @@ the chain, and a search to jump to anyone.
 | pixie | `src/shared/org_workflow/` (1,336 lines, per MILESTONES M2 notes) | Reporting lines. Take our table names, drop the brand schema. It already backs permission scope; the organogram is a read over it |
 | MyCity | the staff list spreadsheet | Seed the initial tree. Resolve the free-text Line Manager to ids, reconcile department names, flag column-shifted rows for a human rather than guessing (see §13) |
 
+### 12.1 Seed structure from the staff list (2026)
+
+Recorded here so the real senior structure is not lost before the import is built. Names, titles and
+reporting lines only, no contact details, pay or bank. Lines marked "(assumed)" were reconstructed
+where the sheet was ambiguous and a human should confirm them (see §13). Twenty seats, eighteen
+filled and two vacant.
+
+- Ifeoma Mbonu · Chief Executive Officer · General Management (root, no line manager)
+  - Bode Oluwasanmi · Chief Technology Officer · Technology
+    - Oladotun Shola-Adido · Back-end Manager · Backend Operations
+      - Tobiloba Iyanuoluwa Dada · Content & Listing Associate
+      - Bassey Ekpe · Content & Listing Associate
+  - Etudor Edidiong · Program Manager · General Management
+    - Cynthia Osasere Osakunih · Operations & People Lead · HR & Operations (assumed: her row was column-shifted and the manager cell read "Program Manager")
+    - Chinyere Elechi · Head PR, Marketing & Brand Strategy · Sales & Marketing
+      - Precious Iyeserhen · Graphics Designer
+      - Aaron Agama · Social Media Manager
+      - Similoluwa Michael · Graphics Design Associate
+    - [Vacant] Head Sales & Revenue · Sales & Marketing (assumed parent: Program Manager; the sheet does not say)
+      - Tochukwu Ifeanyi · Marketing Lead, Abuja (dotted line to Head PR)
+      - John Ojelola · Marketing Lead, South West (dotted line to Head PR)
+      - David Idowu-Agida · PR & Marketing Lead, MyLagosApp (dotted line to Head PR)
+      - Gideon Fidelis Ekom · Marketing & Growth Officer, Enugu (dotted line to Head PR)
+      - Adaeze Chike · Marketing & Growth Officer, Abia (dotted line to Head PR)
+      - Victor Esuk · Marketing & Growth Officer, Imo (dotted line to Head PR)
+      - Rabi'a Zawiya · Marketing & Growth Officer, Kano (dotted line to Head PR)
+  - [Vacant] Technical Assistant · General Management (assumed parent: CEO)
+
+The CTO (Bode Oluwasanmi) heads the technology line under the CEO, with the back-end team beneath
+him. The two vacant seats (Head Sales & Revenue, Technical Assistant) seed as vacant seats and can
+be sent to Recruitment (§3). The marketing and growth officers report to the vacant Head Sales &
+Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 full matrix draws.
+
 ## 13 · Open questions
 
 - **Inventory ratification.** Adding Organogram and Org Chart takes the fixed inventory from 85 to
@@ -158,9 +191,16 @@ the chain, and a search to jump to anyone.
   upload engine and vault is a later pass. Confirm.
 - **Data cleanup on import.** The spreadsheet's Line Manager is free text and mixes names with
   roles; a few rows are column-shifted. Agree the cleanup pass before seeding.
+- **Seed reporting-line gaps (§12.1).** The sheet does not state who the vacant Head Sales & Revenue
+  reports to, and Cynthia Osakunih's line manager is inferred from a column-shifted row. Confirm both
+  with People before import.
 
 ## 14 · Change log
 
+- 13/10/2026 · TB · Recorded the real seed reporting structure in §12.1 after a review note that
+  the CTO (Bode Oluwasanmi) was missing from the preview: CEO over CTO over the back-end line, the
+  Program Manager branch, and the two vacant seats with the marketing dotted-line matrix. Flagged
+  the inferred lines in §13.
 - 13/10/2026 · TB · Guide created from the organogram brainstorm. Agreed: one live source (the
   `line_manager_id` tree), two pages (People · Organogram builder with HR-rich cards and in-place
   editing; ESS · Org Chart read-only viewer with the standard card for every employee), full matrix
