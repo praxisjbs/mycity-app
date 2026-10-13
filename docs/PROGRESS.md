@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 85 screens (79 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 86 screens (80 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | items below | | | | | |
-| M1 Core Operations & Employee Management | 24 | 24 | 0 | 0 | 0 | 0 |
+| M1 Core Operations & Employee Management | 25 | 25 | 0 | 0 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **85** | **85** | **0** | **0** | **0** | **0** |
+| **Total** | **86** | **86** | **0** | **0** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -110,9 +110,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 1 | Overview | `overview` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
 | 2 | Alerts | `alerts` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
 | 3 | Reports | `reports` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
+| 86 | Team | `team` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 13/10/2026 · TB · Team tab ratified into the inventory (MILESTONES §18): Home is now four tabs, with Team added as #86 (`team`, M1). Summary counts and the SCREENS constant moved to 86. Full engineering guide written at `docs/guides/home.md`; Home reads live from the owning modules and owns the alert and report engines.
 - 13/10/2026 · TB · Home demo upgraded in `docs/MyCity-ERP-Documents/demo.html` from the two 12
   October meetings: role sensitive Overview (Operations, CEO, Partnerships, Staff), every KPI card
   opens a detail modal paged at 25, Alerts gained an Over by (days past threshold) column and a

@@ -1217,7 +1217,7 @@ while CI is not, because a change to a shared service breaks suites you did not 
 
 ## 18 · Screen inventory
 
-Fifteen modules in the admin application, plus a separate public site of six pages. 85 screens in
+Fifteen modules in the admin application, plus a separate public site of six pages. 86 screens in
 all. This is the vocabulary the client sees, the vocabulary the ⌘K index is built from, and the
 vocabulary every later document uses. It is reproduced exactly in the prototype.
 
@@ -1229,19 +1229,21 @@ the route table, the registry, the permission catalogue and the knowledge base i
 clear, well-presented organogram adds two screens: **People · Organogram** (HR builder) and
 **Employee Self-Service · Org Chart** (read-only viewer for every member of staff), both drawing
 the live `line_manager_id` reporting tree, not a separate structure. This would take the inventory
-from 85 to 87. It is deliberately not yet applied to the tables above or to `docs/PROGRESS.md`;
+from 86 to 88. It is deliberately not yet applied to the tables above or to `docs/PROGRESS.md`;
 ratifying it also updates the summary counts, the `SCREENS` constant in
 `scripts/check/progress.js`, and the command menu and permission registry. The agreed shape is in
 `docs/guides/organogram.md`, with a preview in `demo.html`.
 
+**Ratified 13/10/2026 (TB).** Home gains a fourth tab, **Team** (`team`), a managers-and-CEO roster and today’s attendance view that reads the live attendance roster. This is applied to the table above (Home now lists four tabs), taking the admin surface to 80 screens and the inventory to 86. It is reflected in the summary counts, the `SCREENS` constant in `scripts/check/progress.js`, and `docs/PROGRESS.md` (row #86). Its engineering shape is in `docs/guides/home.md`, with the built preview in `demo.html`. It reuses the `home` permission key, so the command menu and permission registry pick it up when the frontend foundation lands.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
-application, its own build, its own origin, listed below only because it carries six of the 85
+application, its own build, its own origin, listed below only because it carries six of the 86
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
 staff never navigates to it to do their job.
 
 | Area | Module | Tabs | Screens | Built in |
 |---|---|---|---|---|
-| (ungrouped) | **Home** | 3 | Overview · Alerts · Reports | M1 |
+| (ungrouped) | **Home** | 4 | Overview · Team · Alerts · Reports | M1 |
 | (ungrouped) | **My Workspace** | 4 | Today · Tasks · Calendar · Analytics | M2 |
 | (ungrouped) | **Employee Self-Service** | 7 | My Profile · My Attendance · My Performance · My Payslips · My Leave · My Queries · My Documents | M1 |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
@@ -1272,7 +1274,7 @@ in M6 with the notification engine, not in M9 with the rest of the module.
 
 **Home, not Command Centre or Dashboard.** It is the first thing in the rail and the first thing a
 new employee sees. A plain word survives translation, fits an icons-only rail and does not promise
-more than three tabs deliver.
+more than four tabs deliver.
 
 **Praxis AI carries our name, and it is the only place it appears in the chrome.** The assistant is
 the signature. Every other module is named for what it does.
