@@ -653,6 +653,25 @@ tbody tr:last-child td{border-bottom:0}
   .mread .mh{flex-wrap:wrap}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ═════ HOME: role bar, clickable KPI cards, over-threshold chip ═════ */
+.rolebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.rolebar .rl{font-size:11.5px;color:var(--ink-3);font-weight:600}
+.rolebar .rl-r{margin-left:auto}
+.rolebtn{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--raised);
+  color:var(--ink-2);font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.rolebtn:hover{border-color:var(--ink-3);color:var(--ink)}
+.rolebtn.on{background:var(--green);border-color:var(--green);color:#fff}
+.rolebtn .av{width:19px;height:19px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+  display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+.rolebtn.on .av{background:rgba(255,255,255,.22);color:#fff}
+.kpi.clk{position:relative;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.kpi.clk:hover{border-color:var(--ink-3);box-shadow:var(--sh-2)}
+.kpi.clk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpi.clk .dig{position:absolute;top:11px;right:11px;color:var(--ink-3);opacity:.45}
+.kpi.clk .dig svg{width:15px;height:15px}
+.mnote{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
+.tover{display:inline-block;font-size:11px;font-weight:600;color:var(--warn);background:var(--warn-bg);border-radius:999px;padding:2px 9px;white-space:nowrap}
+@media(max-width:760px){.rolebar .rl-r{display:none}}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -1261,82 +1280,372 @@ var PARTNERS=[
  lines:[['Kano city launch',0,'₦0 of ₦1.9M','var(--line-2)']]}
 ];
 
-var M=[
-{k:'home',n:'Home',i:'grid',g:'',tabs:[
-  {n:'Overview',r:function(){return head('Good morning, Cynthia','Friday, 09/10/2026 · 22 of 25 clocked in',[['Export'],['New',1]])+
-    kpis([['Clocked in today','22 / 25','','88% · 3 late','up'],['Overdue tasks','7','','3 more than last week','dn'],
-          ['Awaiting approval','₦1.84M','','5 requests · 2 with CEO'],['Active partnerships','23','','3 closed this month','up']])+
-    '<div class="grid g23">'+areaChart('Attendance, last 14 working days',[22,24,23,21,24,12,23,25,22,21,23,11,24,22],'Saturdays run 09:00 to 15:00 and show lower by design.')+
-    donut(87,'on time','37 on time, 4 late, 7 absent this month. Three late arrivals by Bashir Lawal in 30 days, which is the threshold the rule watches.')+'</div>'+
-    '<div class="grid g2">'+
-    table([['Request'],['From'],['Amount','n'],['Stage']],[
+/* ═════════════ HOME (Command Centre) ═════════════
+   The command centre, renamed Home (12 Oct). It is a role sensitive dashboard:
+   HROLE is the role in view and the role bar switches it. Every KPI card opens a
+   detail modal, the report models agreed in the 12 Oct demo, paged at 25, the
+   system wide limit. Team, Alerts and Reports are permission gated, so a role
+   that does not hold them is told so rather than shown an empty screen. Need You
+   is common to every role; the KPIs, the main chart and the rest are tailored.
+   All data here is mock, seeded for the staging preview. Nothing is wired to a
+   live source and nothing is hard coded into a real screen. */
+var HROLE='ops';
+var HROLES=[
+  {k:'ops',     lab:'Operations',   av:'CO', who:'Cynthia Osakunih', role:'Operations and People Lead'},
+  {k:'ceo',     lab:'CEO',          av:'IC', who:'Ifeoma Chukwu',     role:'Chief Executive'},
+  {k:'partner', lab:'Partnerships', av:'NE', who:'Ngozi Eze',         role:'Marketing and Sales Lead'},
+  {k:'staff',   lab:'Staff',        av:'TA', who:'Tolu Adeyemi',      role:'Content'}
+];
+var HSEES={team:{ops:1,ceo:1,partner:1,staff:0},alerts:{ops:1,ceo:1,partner:1,staff:0},reports:{ops:1,ceo:1,partner:1,staff:0}};
+function hrole(){for(var i=0;i<HROLES.length;i++){if(HROLES[i].k===HROLE)return HROLES[i];}return HROLES[0];}
+function hgreet(){var h=9,g=h<12?'Good morning':h<17?'Good afternoon':'Good evening';return g+', '+hrole().who.split(' ')[0];}
+function roleBar(){return '<div class="rolebar"><span class="rl">Viewing as</span>'+
+  HROLES.map(function(x){return '<button class="rolebtn'+(x.k===HROLE?' on':'')+'" data-role="'+x.k+'" aria-pressed="'+(x.k===HROLE?'true':'false')+'"><span class="av">'+x.av+'</span>'+esc(x.lab)+'</button>';}).join('')+
+  '<span class="rl rl-r">'+esc(hrole().who)+' · '+esc(hrole().role)+'</span></div>';}
+
+/* clickable KPI cards: [label, value, colourVar, trend, trendDir, modalKey] */
+function hkpis(list){return '<div class="grid g4">'+list.map(function(k){
+  var clk=k[5]?' clk':'';
+  return '<div class="card kpi'+clk+'"'+(k[5]?' data-hk="'+k[5]+'" role="button" tabindex="0" aria-label="'+esc(k[0]+', '+k[1]+', open details')+'"':'')+'>'+
+    (k[5]?'<span class="dig">'+ic('right')+'</span>':'')+
+    '<span class="lab">'+esc(k[0])+'</span><b'+(k[2]?' style="color:var(--'+k[2]+')"':'')+'>'+esc(k[1])+'</b>'+
+    (k[3]?'<span class="trend '+(k[4]||'fl')+'">'+esc(k[3])+'</span>':'')+'</div>';}).join('')+'</div>';}
+function pagenote(n){return '<p class="sub mnote">Showing '+n+' of '+n+'. Lists page at 25, the system wide limit.</p>';}
+function gate(what){return emptyb('lock','Part of the command centre',what+' is for people who manage others, which is People, Operations and the CEO. Your Home shows your own work, attendance and goals.');}
+
+/* ---- mock team: the nine named staff. The organisation has 25. ---- */
+/* [av, name, dept, mode, clockIn, [pillKey,label], kpi, openTasks, empIndex] */
+var HTEAM=[
+ ['TA','Tolu Adeyemi','Content','On site','07:52',['ok','On time'],'88%','9',0],
+ ['BL','Bashir Lawal','Marketing & Sales','On site','09:41',['er','Late, 3rd'],'54%','4',1],
+ ['AO','Amara Okafor','Finance','Remote','08:04',['ok','Remote'],'82%','6',2],
+ ['SB','Seyi Balogun','Engineering','Remote','08:58',['wa','New device'],'81%','7',3],
+ ['HY','Hauwa Yusuf','Support','—','—',['in','On leave'],'76%','5',4],
+ ['EO','Emeka Obi','Studio','On site','08:22',['wa','No clock-out 08/10'],'61%','6',5],
+ ['NE','Ngozi Eze','Marketing & Sales','Remote','07:48',['ok','Remote'],'79%','8',6],
+ ['CN','Chidera Nwosu','Content','On site','08:10',['ok','On time'],'64%','5',7],
+ ['AD','Adedotun Oyinloye','Marketing & Sales','On site','08:06',['ok','On time'],'72%','7',8]
+];
+function teamScope(){if(HROLE==='partner')return HTEAM.filter(function(p){return p[2]==='Marketing & Sales'||p[2]==='Content';});return HTEAM;}
+function tOnsite(l){return l.filter(function(p){return p[3]==='On site';});}
+function tRemote(l){return l.filter(function(p){return p[3]==='Remote';});}
+function tLate(l){return l.filter(function(p){return /Late/.test(p[5][1]);});}
+function tNoout(l){return l.filter(function(p){return /No clock-out/.test(p[5][1]);});}
+function tLeave(l){return l.filter(function(p){return /leave/i.test(p[5][1]);});}
+function tPresent(l){return l.filter(function(p){return p[4]!=='—';});}
+function prow(p){return [who(p[0],p[1],p[2]),esc(p[3]),esc(p[4]),pill(p[5][0],p[5][1])];}
+function peopleTable(list,title){return table([['Employee'],['Mode'],['Clock-in'],['Status']],list.map(prow),title);}
+
+/* ---- organisation goals, shared by the org wide roles ---- */
+var HGOALS=[['Revenue, FY target ₦180M',62,'₦112M'],['Ember to Remember delivered',78,'On track'],
+ ['Headcount, 30 by Q1',83,'25 of 30'],['Partner network, 10 signed',50,'5 of 10','var(--c4)'],
+ ['On time attendance 90%',87,'87%','var(--yellow)'],['Engagement actions',40,'2 of 5']];
+var HPIPE=[['Contacted',100,'31'],['In discussion',71,'22'],['Proposal sent',45,'14'],['MOU drafted',26,'8'],['Signed',16,'5','var(--yellow)']];
+
+/* ---- alerts: [alert, trigger, whoClears, age, [sevKey,sevLabel], overBy, category] ---- */
+var HALERTS=[
+ ['Bashir Lawal, 3 late arrivals in 30 days','Attendance rule','Operations','2 days',['er','High'],'+1 over 3','attendance'],
+ ['Emeka Obi, no clock-out on 08/10','Missing punch','Operations','1 day',['wa','Medium'],'1 day open','attendance'],
+ ['Seyi Balogun punched from a new device','Device policy','Operations','1 day',['wa','Medium'],'—','attendance'],
+ ['Eko Hotels, no contact in 34 days','Partnership inactivity','Ngozi Eze','4 days',['wa','Medium'],'+4 over 30','partnership'],
+ ['Kano Trade Council, no contact in 52 days','Partnership inactivity','Ngozi Eze','22 days',['er','High'],'+22 over 30','partnership'],
+ ['Requisition REQ-0042 with CEO for 6 days','Approval ageing','CEO','6 days',['er','High'],'+4 over 2','approval'],
+ ['NDPA certificate expires 30/11/2026','Document expiry','People','today',['in','Low'],'44 days left','document'],
+ ['MTN MOU renewal due 13/03/2027','Contract renewal','Ngozi Eze','today',['in','Low'],'90 days notice','partnership'],
+ ['Chidera Nwosu probation ends 24/10','Confirmation due','People','3 days',['wa','Medium'],'11 days left','people'],
+ ['Marketing spend at 92% of budget','Budget threshold','Finance','1 day',['wa','Medium'],'+2 over 90','budget'],
+ ['October payroll not submitted','Payroll cycle','Operations','today',['wa','Medium'],'due today','payroll'],
+ ['Adaeze Nnamdi awaiting panel feedback','Recruitment SLA','Hiring manager','5 days',['er','High'],'+2 over 3','recruitment']
+];
+function alertScope(){if(HROLE==='partner')return HALERTS.filter(function(a){return a[6]==='partnership';});return HALERTS;}
+
+/* ---- reports: [name, cadence, statusHTML, audienceRoles, seeLabel] ---- */
+var HREPORTS=[
+ ['Daily attendance','Every weekday at 18:00 to Operations and the CEO.',pill('ok','Scheduled'),['ops','ceo'],'Operations, CEO'],
+ ['Weekly productivity','Mondays at 08:00. Completion, overdue, workload by team.',pill('ok','Scheduled'),['ops','ceo'],'All managers'],
+ ['Recruitment pipeline','Fridays. Stage counts and time at stage per vacancy.',pill('ok','Scheduled'),['ops','ceo'],'Hiring managers'],
+ ['Partnership pipeline','Monthly. Stage movement, signed value, lead owner.',pill('nt','Paused'),['ops','ceo','partner'],'Partnerships, CEO'],
+ ['Monthly expenses','First working day. By department, project and category.',pill('ok','Scheduled'),['ops','ceo'],'Operations, CEO'],
+ ['Pending approvals','Daily at 09:00 to whoever is holding one.',pill('ok','Scheduled'),['ops','ceo'],'Approvers']
+];
+function reportScope(){return HREPORTS.filter(function(r){return r[3].indexOf(HROLE)>=0;});}
+
+/* ═════ Overviews, one per role ═════ */
+function homeOverview(){
+  var b=roleBar();
+  if(HROLE==='ceo')return b+ceoOverview();
+  if(HROLE==='partner')return b+partnerOverview();
+  if(HROLE==='staff')return b+staffOverview();
+  return b+opsOverview();
+}
+function opsOverview(){return head(hgreet(),'Friday, 09/10/2026 · 22 of 25 clocked in',[['Export'],['New',1]])+
+  hkpis([['Clocked in today','22 / 25','','88% · 3 late','up','clockedin'],['Overdue tasks','7','','3 more than last week','dn','overdue'],
+        ['Awaiting approval','₦1.84M','','5 requests · 2 with CEO','fl','approval'],['Active partnerships','23','','3 closed this month','up','partnerships']])+
+  '<div class="grid g23">'+areaChart('Attendance, last 14 working days',[22,24,23,21,24,12,23,25,22,21,23,11,24,22],'Saturdays run 09:00 to 15:00 and show lower by design.')+
+  donut(87,'on time','37 on time, 4 late, 7 absent this month. Three late arrivals by Bashir Lawal in 30 days, which is the threshold the rule watches.')+'</div>'+
+  '<div class="grid g2">'+
+  table([['Request'],['From'],['Amount','n'],['Stage']],[
+    ['Ember to Remember, stage hire',st(8),'₦820,000',pill('wa','Operations')],
+    ['Enugu city launch, transport',st(0),'₦345,000',pill('in','CEO')],
+    ['Studio equipment repair',st(5),'₦128,500',pill('wa','Operations')],
+    ['Partner dinner, ProvidusBank',st(6),'₦412,000',pill('in','CEO')]],'Need You',pill('wa','5 pending'))+
+  bars('Partnership pipeline',HPIPE,'4 partnerships have had no contact in 30 days. Follow ups raised automatically.')+'</div>'+
+  bars('Goals this quarter',HGOALS,'The dashboard leans on the goals each role owns. Attendance is primary for People and Operations, not for everyone.')+
+  '<div class="grid g2">'+
+  tl('Across the organisation today',[
+    ['Adedotun Oyinloye raised EXP-0122','08:14','Stage hire, ₦820,000. Over ₦500,000, so the CEO co-approves.','hi'],
+    ['Query raised against Bashir Lawal','09:41','Third late arrival in 30 days. Raised by the rule, not a manager.','hi'],
+    ['Seyi Balogun punched from a new device','08:58','Pixel 7, Chrome. Warned, not blocked.'],
+    ['Hauwa Yusuf birthday posted','00:01','Posted automatically from her employee record.','ok'],
+    ['Amara Okafor submitted October payroll','Yesterday 17:22','25 staff, ₦11.36M net.','ok']])+
+  weekCard('Your week','Mon 12 to Sat 17 October',[['Mon 12','Close out Q4 departmental targets','wa'],['Tue 13','Panel interview, Adaeze Nnamdi, 11:00','in'],
+   ['Wed 14','Ember to Remember Lagos leg, all hands','in'],['Thu 15','Onboarding pack for the Enugu hires','wa'],
+   ['Fri 16','Weekly productivity report goes out','nt'],['Sat 17','Half day, 09:00 to 15:00','nt']])+'</div>';}
+
+function ceoOverview(){return head(hgreet(),'Friday, 09/10/2026 · The organisation at a glance',[['Export'],['New',1]])+
+  hkpis([['Goals on track','4 of 6','','2 need attention','dn','goals'],['Awaiting your approval','₦1.26M','','2 requests with you','fl','approval'],
+        ['Signed value, FY','₦9.2M','','of ₦18M target','up','signed'],['Open high alerts','3','err','2 over 7 days','dn','alerts_high']])+
+  '<div class="grid g23">'+bars('Organisational goals',HGOALS,'These roll up from every department. The CEO sees the whole board, not one function.')+
+  donut(76,'org KPI','Weighted across departments. People 81, Finance 82, Content 76, Partnerships 61, Support 76.')+'</div>'+
+  '<div class="grid g2">'+
+  table([['Request'],['From'],['Amount','n'],['Stage']],[
+    ['Ember to Remember, stage hire',st(8),'₦820,000',pill('in','With you')],
+    ['Partner dinner, ProvidusBank',st(6),'₦412,000',pill('in','With you')]],'Need You',pill('in','2 with the CEO'))+
+  bars('Partnership pipeline',HPIPE,'Signed value is ₦9.2M against an ₦18M target for the year.')+'</div>'+
+  '<div class="grid g2">'+
+  tl('Across the organisation today',[
+    ['October payroll submitted for approval','Yesterday 17:22','25 staff, ₦11.36M net. Awaiting your sign off.','hi'],
+    ['REQ-0042 ageing with you, 6 days','09:00','Over the 2 day approval rule. Alert raised.','hi'],
+    ['Kano Trade Council, 52 days quiet','05:00','Oldest open alert on the board.'],
+    ['Q4 departmental targets closing Monday','08:00','Four of six departments confirmed.']])+
+  weekCard('Your week','Mon 12 to Sat 17 October',[['Mon 12','Board pack review','wa'],['Tue 13','Payroll sign off','in'],
+   ['Wed 14','Ember to Remember Lagos leg','in'],['Thu 15','Investor update draft','wa'],
+   ['Fri 16','Weekly productivity report','nt'],['Sat 17','Rest day','nt']])+'</div>';}
+
+function partnerOverview(){return head(hgreet(),'Friday, 09/10/2026 · Your pipeline and partners',[['Export'],['New',1]])+
+  hkpis([['Active partnerships','23','','3 closed this month','up','partnerships'],['Signed value','₦9.2M','','of ₦18M target','fl','signed'],
+        ['No contact 30 days +','4','warn','2 over 50 days','dn','stale'],['Proposals out','2','','1 awaiting reply','fl','proposals']])+
+  '<div class="grid g23">'+bars('Partnership pipeline',HPIPE,'Attendance does not sit on your Home. Your clocking lives in My Attendance; your Home is your pipeline.')+
+  areaChart('Signed value by month, ₦M',[2.1,3.4,3.4,5.0,6.2,7.1,7.1,9.2])+'</div>'+
+  '<div class="grid g2">'+
+  table([['Partnership'],['Stage'],['Quiet'],['Owner']],[
+    ['Eko Hotels and Suites',pill('wa','Proposal sent'),'34 days',st(6)],
+    ['Kano Trade Council',pill('er','Contacted'),'52 days',st(1)],
+    ['Enugu City Council',pill('in','In discussion'),'9 days',st(8)]],'Need You',pill('wa','4 going quiet'))+
+  weekCard('Your week','Mon 12 to Sat 17 October',[['Mon 12','Eko Hotels re-engagement call','wa'],['Tue 13','ProvidusBank proposal due','in'],
+   ['Wed 14','MTN quarterly review','in'],['Thu 15','Pipeline review with Operations','wa'],
+   ['Fri 16','Lead owner one to ones','nt'],['Sat 17','Rest day','nt']])+'</div>'+
+  '<p class="sub" style="margin-top:4px">You clocked in at 07:48, remote. Your full attendance is in My Attendance.</p>';}
+
+function staffOverview(){var e=EMP[0];return head(hgreet(),'Friday, 09/10/2026 · Your day')+
+  statstrip([['Today, shift','09:00 to 17:00'],['Clock-in','07:52','ok'],['Where','Victoria Island, on site'],['Status','On time','ok'],['Hours today','1h 08m']])+
+  hkpis([['Pieces published','18 of 24','','75%','up','sk0'],['Channel growth','+6.2%','','up on last month','up','sk1'],
+        ['Reviews filed','2 of 4','warn','Due Friday','fl','sk2'],['My attendance, 30d','20 / 20','ok','100% on time','up','sk3']])+
+  '<div class="grid g2">'+bars('My goals this quarter',e.kpis,'Your goals are set with your manager in Performance. Progress counts from the tasks linked to each goal.')+
+  '<div class="card"><div class="ch"><h3>Upcoming leave</h3>'+infoBtn('h-leave')+'</div>'+
+  infoText('h-leave','Leave is requested in My Attendance and approved by your manager. Approved leave shows here and suppresses the clock in reminder on those days.')+
+  '<div style="display:flex;gap:11px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><b style="width:92px;flex:none;font-size:12px;color:var(--ink-3)">22 to 24 Dec</b><span style="flex:1;font-size:12.5px">Annual leave, 3 days</span>'+pill('ok','Approved')+'</div>'+
+  '<div style="display:flex;gap:11px;align-items:center;padding:10px 0"><b style="width:92px;flex:none;font-size:12px;color:var(--ink-3)">Balance</b><span style="flex:1;font-size:12.5px">12 days left this year</span>'+pill('nt','Annual')+'</div></div></div>'+
+  weekCard('This week at a glance','Mon 12 to Sat 17 October',[['Mon 12','Shift 09:00 to 17:00, on site','in'],['Tue 13','Shift 09:00 to 17:00, on site','in'],
+   ['Wed 14','Ember to Remember Lagos leg','in'],['Thu 15','Shift 09:00 to 17:00, on site','in'],
+   ['Fri 16','Reviews due to your manager','wa'],['Sat 17','Half day, 09:00 to 15:00','nt']])+
+  '<p class="sub" style="margin-top:4px">Your tasks and diary live in My Workspace. This is your day and your goals at a glance.</p>';}
+
+/* small week list card, shared by the overviews */
+function weekCard(title,range,rows){return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3><span class="right sub">'+esc(range)+'</span></div>'+
+  rows.map(function(d){return '<div style="display:flex;gap:11px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">'+
+    '<b style="width:58px;flex:none;font-size:12px;color:var(--ink-3)">'+esc(d[0])+'</b>'+
+    '<span style="flex:1;min-width:0;font-size:12.5px">'+esc(d[1])+'</span>'+pill(d[2],d[2]==='in'?'Diary':d[2]==='wa'?'Task':'Note')+'</div>';}).join('')+'</div>';}
+
+/* ═════ Team tab (gated to managers and the CEO) ═════ */
+function homeTeam(){var b=roleBar();
+  if(!HSEES.team[HROLE])return b+head('Team','Who is in, where they are, and how they are tracking')+gate('A team view');
+  var l=teamScope(),scope=HROLE==='partner'?'Marketing, Sales and Content':'The whole organisation';
+  return b+head('Team','Who is in, where they are, and how they are tracking · '+scope)+
+  hkpis([['Present today',tPresent(l).length+' / '+l.length,'','1 on leave','fl','tm_present'],['On site',''+tOnsite(l).length,'','','fl','tm_onsite'],
+        ['Remote',''+tRemote(l).length,'','','fl','tm_remote'],['Flags',''+(tLate(l).length+tNoout(l).length),'warn','1 late, 1 no clock-out','dn','tm_flags']])+
+  table([['Employee'],['Department'],['Today'],['Clock-in'],['KPI'],['Open tasks','n']],
+    l.map(function(p){return [who(p[0],p[1],p[2]),esc(p[2]),pill(p[5][0],p[5][1]),esc(p[4]),esc(p[6]),esc(p[7])];}),
+    'Team roster',pill('nt',l.length+' people'),
+    function(ri){return ' data-hk="person:'+l[ri][8]+'" style="cursor:pointer"';})+
+  '<div class="grid g2">'+
+  bars('Attendance this month by person',l.slice(0,6).map(function(p){var n=p[6].replace('%','')*1;return [p[1],n,p[6],n<70?'var(--c4)':'var(--c1)'];}),'Click a KPI card above to see exactly who is onsite, remote, late or missing a clock-out.')+
+  kvcard('How the team view reads',[['Source','The same attendance and task data the other screens use'],
+    ['Scope','You see only the people you manage, filtered by permission'],
+    ['Today','On site, remote, late and on leave are read from todays punches'],
+    ['A name','Opens that person, their punches and their KPIs, without leaving Home']])+'</div>';}
+
+/* ═════ Alerts tab (gated) ═════ */
+function homeAlerts(){var b=roleBar();
+  if(!HSEES.alerts[HROLE])return b+head('Alerts','Rules that have crossed a threshold and nobody has cleared yet')+gate('Alerts');
+  var l=alertScope();
+  return b+head('Alerts','Rules that have crossed a threshold and nobody has cleared yet',[['Dismissed'],['Alert rules',0,'h-rules'],['New rule',1,'h-newrule']])+
+  hkpis([['Open alerts',''+l.length,'','','fl','al_open'],['Needs you','6','warn','','fl','al_needs'],['Overdue 7 days +','3','err','','fl','al_overdue'],['Cleared this week','9','ok','','fl','al_cleared']])+
+  chips([['All '+l.length,1],['Attendance'],['Partnerships'],['Approvals'],['Documents'],['People'],['Budget']])+
+  table([['Alert'],['Trigger'],['Who can clear'],['Age'],['Over by'],['Severity']],
+    l.map(function(a){return [esc(a[0]),esc(a[1]),esc(a[2]),esc(a[3]),'<span class="tover">'+esc(a[5])+'</span>',pill(a[4][0],a[4][1])];}),
+    'Open alerts',pill('wa',l.length+' open'),
+    function(ri){return ' data-rule="alert:'+HALERTS.indexOf(l[ri])+'" style="cursor:pointer"';})+
+  '<div class="grid g2" style="margin-top:12px">'+
+  bars('Where alerts come from, last 30 days',[['Attendance rules',100,'18'],['Partnership inactivity',55,'10'],
+    ['Approval ageing',39,'7'],['Document expiry',33,'6'],['Recruitment SLA',22,'4'],['Budget threshold',11,'2']],
+    'Every one of these is a configured threshold, not code. Changing a number needs no deploy.')+
+  '<div class="card"><div class="ch"><h3>Alerts are not notifications</h3>'+infoBtn('h-adiff')+'</div>'+
+  infoText('h-adiff','A notification is something that happened to you. It is read once and gone. An alert is something nobody has done; it sits here until a person with the right permission clears it, and it ages while it waits.')+
+  '<p class="sub">Each row shows how far past its threshold it has gone, under Over by. Click a row to clear it or edit its rule.</p>'+
+  '<dl class="kv" style="margin-top:14px;grid-template-columns:120px 1fr"><dt>Escalation</dt><dd>High severity escalates to the CEO after 14 days</dd>'+
+  '<dt>Clearing</dt><dd>Needs the permission the rule names, not any manager</dd>'+
+  '<dt>Audit</dt><dd>Who cleared it and when is written to the audit log</dd></dl></div></div>';}
+
+/* ═════ Reports tab (gated, and cards filtered by role) ═════ */
+function homeReports(){var b=roleBar();
+  if(!HSEES.reports[HROLE])return b+head('Reports','Scheduled and on demand')+gate('Reports');
+  var l=reportScope();
+  return b+head('Reports','Scheduled and on demand · Managers and the CEO',[['New report',1]])+
+  hkpis([['Scheduled',''+l.filter(function(r){return r[2].indexOf('Scheduled')>=0;}).length,'','','fl','rp_sched'],['Paused','1','warn','','fl','rp_paused'],
+        ['Run this month','38','','','fl','rp_runs'],['Recipients','11','','','fl','rp_recip']])+
+  '<div class="grid g3">'+l.map(function(r){return '<div class="tile"><h4>'+esc(r[0])+'</h4><p>'+esc(r[1])+'</p>'+
+    '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+r[2]+pill('nt',r[4])+'</div></div>';}).join('')+'</div>'+
+  '<div class="grid g2" style="margin-top:12px">'+table([['Report'],['Last run'],['Recipients'],['Format']],[
+    ['Daily attendance','09/10/2026 18:00','Operations, CEO','PDF'],
+    ['Pending approvals','09/10/2026 09:00','4 approvers','PDF'],
+    ['Weekly productivity','06/10/2026 08:00','All managers','PDF, XLSX'],
+    ['Recruitment pipeline','03/10/2026 17:00','Hiring managers','PDF'],
+    ['Monthly expenses','01/10/2026 09:12','Operations, CEO','XLSX']],'Recent runs')+
+  '<div class="card"><div class="ch"><h3>How a report is built</h3>'+infoBtn('h-rbuilt')+'</div>'+
+  infoText('h-rbuilt','Reports are permission gated. A card only renders for a role that may see it, so a Partnerships lead never sees Daily Attendance or Monthly Expenses, and a report is generated as its recipient so nobody receives a row they could not open.')+
+  '<dl class="kv"><dt>Who can see</dt><dd>Managers and the CEO. Each card is tagged with its audience</dd>'+
+  '<dt>Source</dt><dd>The same queries the screens use, so a report never disagrees with a page</dd>'+
+  '<dt>Formats</dt><dd>PDF for reading, XLSX for working, both day first dates</dd>'+
+  '<dt>Delivery</dt><dd>Email on a schedule, or downloaded on demand</dd>'+
+  '<dt>Retention</dt><dd>Every generated file is kept and re downloadable</dd></dl></div></div>';}
+
+/* ═════ KPI detail modals: the report models ═════ */
+function hmodal(k){
+  if(k.indexOf('person:')===0){var e=EMP[+k.split(':')[1]],nm=(STAFF[+k.split(':')[1]]||['','',''])[1];
+    return {title:nm||'Employee',body:
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+pill(e.st[0],e.st[1])+pill('nt',e.title)+pill('nt',e.arr)+pill('nt','Manager '+e.mgr)+'</div>'+
+      statstrip([['Attendance, 30d',e.att],['KPI score',e.kpi],['Open tasks',e.tasks],['Leave left',e.leave],['Open queries',e.q,e.q==='0'?'ok':'warn']])+
+      peopleTableFromPunches(e)+
+      pagenote(e.punches.length)};}
+  switch(k){
+    case 'clockedin': case 'tm_present': {var l=teamScope();return {title:'Clocked in today',wide:1,body:
+      '<p class="sub" style="margin-bottom:12px">22 of 25 clocked in across the organisation. Here are the people on this board, grouped the way the rules read them.</p>'+
+      peopleTable(tOnsite(l),'On site ('+tOnsite(l).length+')')+peopleTable(tRemote(l),'Remote ('+tRemote(l).length+')')+
+      peopleTable(tLate(l),'Late ('+tLate(l).length+')')+peopleTable(tNoout(l),'No clock-out, yesterday ('+tNoout(l).length+')')+
+      peopleTable(tLeave(l),'On leave ('+tLeave(l).length+')')+pagenote(l.length)};}
+    case 'tm_onsite':{var l=teamScope();return {title:'On site today',body:peopleTable(tOnsite(l),'On site ('+tOnsite(l).length+')')+pagenote(tOnsite(l).length)};}
+    case 'tm_remote':{var l=teamScope();return {title:'Working remotely',body:peopleTable(tRemote(l),'Remote ('+tRemote(l).length+')')+pagenote(tRemote(l).length)};}
+    case 'tm_flags':{var l=teamScope();return {title:'Flags today',body:peopleTable(tLate(l),'Late ('+tLate(l).length+')')+peopleTable(tNoout(l),'No clock-out ('+tNoout(l).length+')')+pagenote(tLate(l).length+tNoout(l).length)};}
+    case 'overdue':return {title:'Overdue tasks',wide:1,body:table([['Task'],['Owner'],['Due'],['Overdue']],[
+      ['Confirm Ember to Remember venue list',st(0),'07/10/2026',pill('er','+2 days')],
+      ['Eko Hotels re-engagement decision',st(1),'21/09/2026',pill('er','+22 days')],
+      ['NDPA certificate upload',st(1),'01/10/2026',pill('er','+12 days')],
+      ['October budget variance note',st(2),'06/10/2026',pill('er','+7 days')],
+      ['Panel feedback, Adaeze Nnamdi',st(6),'04/10/2026',pill('er','+5 days')],
+      ['Studio utilisation report',st(5),'05/10/2026',pill('er','+4 days')],
+      ['Knowledge article backlog',st(4),'02/10/2026',pill('er','+7 days')]],'7 overdue')+pagenote(7)};
+    case 'approval':return {title:'Awaiting approval',wide:1,body:table([['Request'],['From'],['Amount','n'],['Stage']],[
       ['Ember to Remember, stage hire',st(8),'₦820,000',pill('wa','Operations')],
       ['Enugu city launch, transport',st(0),'₦345,000',pill('in','CEO')],
       ['Studio equipment repair',st(5),'₦128,500',pill('wa','Operations')],
-      ['Partner dinner, ProvidusBank',st(6),'₦412,000',pill('in','CEO')]],'Needs you',pill('wa','5 pending'))+
-    bars('Partnership pipeline',[['Contacted',100,'31'],['In discussion',71,'22'],['Proposal sent',45,'14'],['MOU drafted',26,'8'],['Signed',16,'5','var(--yellow)']],
-      '4 partnerships have had no contact in 30 days. Follow-ups raised automatically.')+'</div>'+
-    '<div class="grid g2">'+
-    tl('Across the organisation today',[
-      ['Adedotun Oyinloye raised EXP-0122','08:14','Stage hire, ₦820,000. Over ₦500,000, so the CEO co-approves.','hi'],
-      ['Query raised against Bashir Lawal','09:41','Third late arrival in 30 days. Raised by the rule, not a manager.','hi'],
-      ['Seyi Balogun punched from a new device','08:58','Pixel 7, Chrome. Warned, not blocked.'],
-      ['Hauwa Yusuf’s birthday posted','00:01','Posted automatically from her employee record.','ok'],
-      ['Amara Okafor submitted October payroll','Yesterday 17:22','25 staff, ₦11.36M net.','ok']])+
-    '<div class="card"><div class="ch"><h3>Your week</h3><span class="right sub">Mon 12 to Sat 17 October</span></div>'+
-    [['Mon 12','Close out Q4 departmental targets','wa'],['Tue 13','Panel interview, Adaeze Nnamdi, 11:00','in'],
-     ['Wed 14','Ember to Remember Lagos leg, all hands','in'],['Thu 15','Onboarding pack for the Enugu hires','wa'],
-     ['Fri 16','Weekly productivity report goes out','nt'],['Sat 17','Half day, 09:00 to 15:00','nt']].map(function(d){
-      return '<div style="display:flex;gap:11px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">'+
-      '<b style="width:58px;flex:none;font-size:12px;color:var(--ink-3)">'+d[0]+'</b>'+
-      '<span style="flex:1;min-width:0;font-size:12.5px">'+esc(d[1])+'</span>'+pill(d[2],d[2]==='in'?'Diary':d[2]==='wa'?'Task':'Note')+'</div>'}).join('')+
-    '</div></div>'}},
-  {n:'Alerts',r:function(){return head('Alerts','Rules that have crossed a threshold and nobody has cleared yet',[['Dismissed'],['Alert rules']])+
-    kpis([['Open alerts','14'],['Needs you','6','warn'],['Overdue 7 days +','3','err'],['Cleared this week','9','ok']])+
-    chips([['All 14',1],['Attendance 4'],['Partnerships 3'],['Approvals 2'],['Documents 2'],['Recruitment 1'],['Payroll 1'],['Budget 1']])+
-    table([['Alert'],['Trigger'],['Who can clear'],['Age'],['Severity']],[
-      ['Bashir Lawal, 3 late arrivals in 30 days','Attendance rule',st(1),'2 days',pill('er','High')],
-      ['Emeka Obi, no clock-out on 08/10','Missing punch','Operations','1 day',pill('wa','Medium')],
-      ['Seyi Balogun punched from a new device','Device policy','Operations','1 day',pill('wa','Medium')],
-      ['Eko Hotels, no contact in 34 days','Partnership inactivity',st(1),'4 days',pill('wa','Medium')],
-      ['Kano Trade Council, no contact in 52 days','Partnership inactivity',st(6),'22 days',pill('er','High')],
-      ['Requisition REQ-0042 with CEO for 6 days','Approval ageing','CEO','6 days',pill('er','High')],
-      ['NDPA certificate expires 30/11/2026','Document expiry','People','today',pill('in','Low')],
-      ['MTN MOU renewal due 13/03/2027','Contract renewal',st(8),'today',pill('in','Low')],
-      ['Chidera Nwosu probation ends 24/10','Confirmation due','People','3 days',pill('wa','Medium')],
-      ['Marketing spend at 92% of budget','Budget threshold','Finance','1 day',pill('wa','Medium')],
-      ['October payroll not submitted','Payroll cycle','Operations','today',pill('wa','Medium')],
-      ['Adaeze Nnamdi awaiting panel feedback','Recruitment SLA','Hiring manager','5 days',pill('er','High')]])+
-    '<div class="grid g2" style="margin-top:12px">'+
-    bars('Where alerts come from, last 30 days',[['Attendance rules',100,'18'],['Partnership inactivity',55,'10'],
-      ['Approval ageing',39,'7'],['Document expiry',33,'6'],['Recruitment SLA',22,'4'],['Budget threshold',11,'2']],
-      'Every one of these is a configured threshold, not code. Changing a number needs no deploy.')+
-    '<div class="card"><div class="ch"><h3>Alerts are not notifications</h3></div>'+
-    '<p class="sub">An alert is something nobody has done. It sits here until a person with the right permission clears it, and it ages while it waits.</p>'+
-    '<p class="sub" style="margin-top:9px">A notification is something that happened to you. It is read once and gone.</p>'+
-    '<div class="quote" style="margin-top:12px">They are separate screens on purpose. An alert that could be dismissed by reading it would be useless.</div>'+
-    '<dl class="kv" style="margin-top:14px;grid-template-columns:120px 1fr"><dt>Escalation</dt><dd>High severity escalates to the CEO after 14 days</dd>'+
-    '<dt>Clearing</dt><dd>Needs the permission the rule names, not any manager</dd>'+
-    '<dt>Audit</dt><dd>Who cleared it and when is written to the audit log</dd></dl></div></div>'}},
-  {n:'Reports',r:function(){return head('Reports','Scheduled and on demand',[['New report',1]])+
-    kpis([['Scheduled','5'],['Paused','1','warn'],['Run this month','38'],['Recipients','11']])+
-    cards([['Daily attendance','Every weekday at 18:00 to Operations and the CEO.','<span class="pill ok"><i></i>Scheduled</span>'],
-      ['Weekly productivity','Mondays at 08:00. Completion rate, overdue, workload by team.','<span class="pill ok"><i></i>Scheduled</span>'],
-      ['Recruitment pipeline','Fridays. Stage counts and time at stage per vacancy.','<span class="pill ok"><i></i>Scheduled</span>'],
-      ['Partnership pipeline','Monthly. Stage movement, signed value, lead owner performance.','<span class="pill nt">Paused</span>'],
-      ['Monthly expenses','First working day. By department, project and category.','<span class="pill ok"><i></i>Scheduled</span>'],
-      ['Pending approvals','Daily at 09:00 to whoever is holding one.','<span class="pill ok"><i></i>Scheduled</span>']])+
-    '<div class="grid g2" style="margin-top:12px">'+table([['Report'],['Last run'],['Recipients'],['Format']],[
-      ['Daily attendance','09/10/2026 18:00','Operations, CEO','PDF'],
-      ['Pending approvals','09/10/2026 09:00','4 approvers','PDF'],
-      ['Weekly productivity','06/10/2026 08:00','All managers','PDF, XLSX'],
-      ['Recruitment pipeline','03/10/2026 17:00','Hiring managers','PDF'],
-      ['Monthly expenses','01/10/2026 09:12','Operations, CEO','XLSX']],'Recent runs')+
-    kvcard('How a report is built',[['Source','The same queries the screens use, so a report never disagrees with a page'],
-      ['Permission','Generated as the recipient, so nobody receives a row they cannot open'],
-      ['Formats','PDF for reading, XLSX for working, both day-first dates'],
-      ['Delivery','Email on a schedule, or downloaded on demand'],
-      ['Retention','Every generated file is kept and re-downloadable']])+'</div>'}}]},
+      ['Partner dinner, ProvidusBank',st(6),'₦412,000',pill('in','CEO')],
+      ['October payroll run',st(2),'₦11,360,000',pill('in','CEO')]],'5 requests, ₦1.84M')+pagenote(5)};
+    case 'partnerships':return {title:'Active partnerships',wide:1,body:table([['Partnership'],['Stage'],['Last contact'],['Health']],[
+      ['MTN Nigeria',pill('ok','Signed'),'2 days','MOU active'],
+      ['ProvidusBank',pill('in','In discussion'),'6 days','Healthy'],
+      ['Eko Hotels and Suites',pill('wa','Proposal sent'),'34 days',pill('wa','Going quiet')],
+      ['Enugu City Council',pill('in','In discussion'),'9 days','Healthy'],
+      ['Kano Trade Council',pill('nt','Contacted'),'52 days',pill('er','Stale')],
+      ['Lagos State Tourism',pill('in','Contract review'),'6 days','Healthy']],'23 active, 6 shown')+pagenote(6)};
+    case 'signed':return {title:'Signed value, this year',body:table([['Partnership'],['Signed'],['Value','n']],[
+      ['MTN Nigeria','13/03/2025','₦4,200,000'],['ProvidusBank','02/06/2025','₦1,800,000'],
+      ['Ikeja City Mall','19/01/2026','₦1,350,000'],['Access Bank','28/02/2026','₦1,100,000'],
+      ['GTCO Foundation','11/07/2025','₦750,000']],'₦9.2M of ₦18M target')+pagenote(5)};
+    case 'stale':return {title:'No contact in 30 days or more',body:table([['Partnership'],['Owner'],['Quiet'],['Severity']],[
+      ['Kano Trade Council',st(1),'52 days',pill('er','High')],
+      ['Eko Hotels and Suites',st(6),'34 days',pill('wa','Medium')],
+      ['Abuja Chamber of Commerce',st(8),'31 days',pill('wa','Medium')],
+      ['Oyo Tourism Board',st(6),'30 days',pill('in','Low')]],'4 going quiet')+pagenote(4)};
+    case 'proposals':return {title:'Proposals out',body:table([['Partnership'],['Sent'],['Status']],[
+      ['ProvidusBank','07/10/2026',pill('wa','Awaiting reply')],
+      ['Eko Hotels and Suites','29/09/2026',pill('in','In review')]],'2 out')+pagenote(2)};
+    case 'goals':return {title:'Organisational goals',wide:1,body:bars('Goals this quarter',HGOALS)+pagenote(HGOALS.length)};
+    case 'alerts_high': case 'al_overdue':{var hi=HALERTS.filter(function(a){return a[4][1]==='High';});
+      return {title:'High severity alerts',wide:1,body:table([['Alert'],['Trigger'],['Who can clear'],['Over by']],
+        hi.map(function(a){return [esc(a[0]),esc(a[1]),esc(a[2]),'<span class="tover">'+esc(a[5])+'</span>'];}),hi.length+' high')+pagenote(hi.length)};}
+    case 'al_open':return {title:'Open alerts',wide:1,body:table([['Alert'],['Trigger'],['Over by'],['Severity']],
+      HALERTS.map(function(a){return [esc(a[0]),esc(a[1]),'<span class="tover">'+esc(a[5])+'</span>',pill(a[4][0],a[4][1])];}),HALERTS.length+' open')+pagenote(HALERTS.length)};
+    case 'al_needs':return {title:'Alerts that need you',body:table([['Alert'],['Who can clear'],['Over by']],
+      HALERTS.filter(function(a){return a[2]==='Operations'||a[2]==='People';}).map(function(a){return [esc(a[0]),esc(a[2]),'<span class="tover">'+esc(a[5])+'</span>'];}),'Assigned to you')+pagenote(6)};
+    case 'al_cleared':return {title:'Cleared this week',body:table([['Alert'],['Cleared by'],['When']],[
+      ['Seyi Balogun new device, September',st(0),'02/10/2026'],['Studio monitor damage recovered',st(0),'30/09/2026'],
+      ['Proposal follow up, Access Bank',st(6),'29/09/2026']],'9 cleared, 3 shown')+pagenote(3)};
+    case 'sk0':return {title:'Pieces published',body:bars('Contributing work',[['Blog, 12 published',75,'9 of 12'],['Social copy, 14 of 20',70,'14 of 20'],['Enugu brief',100,'Done','var(--yellow)']],'18 of 24 toward the quarter goal. Linked to tasks in My Workspace.')+pagenote(3)};
+    case 'sk1':return {title:'Channel growth',body:bars('By channel, this month',[['Instagram',72,'+7.1%'],['LinkedIn',55,'+5.4%'],['X',40,'+3.9%']],'Overall +6.2% on last month.')+pagenote(3)};
+    case 'sk2':return {title:'Reviews filed',body:table([['Review'],['Status']],[
+      ['Tolu self rating, Q3',pill('ok','Filed')],['Peer review, Chidera',pill('ok','Filed')],
+      ['Peer review, Adedotun',pill('wa','Due Friday')],['Peer review, Emeka',pill('wa','Due Friday')]],'2 of 4')+pagenote(4)};
+    case 'sk3':return {title:'My attendance, last 30 days',body:table([['Date'],['In'],['Out'],['Status']],EMP[0].punches.map(function(p){return [esc(p[0]),esc(p[1]),esc(p[2]),p[3]];}),'20 of 20 on time')+pagenote(EMP[0].punches.length)};
+    case 'rp_sched':return {title:'Scheduled reports',body:'<div class="grid g2">'+reportScope().filter(function(r){return r[2].indexOf('Scheduled')>=0;}).map(function(r){return '<div class="tile"><h4>'+esc(r[0])+'</h4><p>'+esc(r[1])+'</p></div>';}).join('')+'</div>'+pagenote(reportScope().filter(function(r){return r[2].indexOf('Scheduled')>=0;}).length)};
+    case 'rp_paused':return {title:'Paused reports',body:'<p class="sub" style="margin-bottom:10px">A paused report keeps its schedule but does not send until resumed.</p>'+'<div class="tile"><h4>Partnership pipeline</h4><p>Monthly. Paused on 01/10/2026 by Cynthia Osakunih.</p></div>'+pagenote(1)};
+    case 'rp_runs':return {title:'Runs this month',body:table([['Report'],['Last run'],['Format']],[
+      ['Daily attendance','09/10/2026 18:00','PDF'],['Pending approvals','09/10/2026 09:00','PDF'],
+      ['Weekly productivity','06/10/2026 08:00','PDF, XLSX'],['Recruitment pipeline','03/10/2026 17:00','PDF'],
+      ['Monthly expenses','01/10/2026 09:12','XLSX']],'38 runs, 5 shown')+pagenote(5)};
+    case 'rp_recip':return {title:'Recipients',body:table([['Recipient'],['Reports']],[
+      ['Ifeoma Chukwu, CEO','All'],['Cynthia Osakunih, Operations','All'],['Ngozi Eze, Partnerships','Partnership pipeline'],
+      ['Amara Okafor, Finance','Monthly expenses']],'11 recipients, 4 shown')+pagenote(4)};
+    default:return {title:'Details',body:'<p class="sub">No detail is wired for this card yet.</p>'};
+  }
+}
+function peopleTableFromPunches(e){return table([['Date'],['In'],['Out'],['Status']],e.punches.map(function(p){return [esc(p[0]),esc(p[1]),esc(p[2]),p[3]];}),'Recent punches');}
+
+/* ═════ alert rule create and dismiss ═════ */
+function ruleForm(){return '<div class="grid g2">'+
+  field('rn','Rule name','<input id="rn" placeholder="3 late arrivals in 30 days">')+
+  field('rmetric','Metric','<select id="rmetric"><option>Late arrivals</option><option>Partnership inactivity</option><option>Approval ageing</option><option>Document expiry</option><option>Budget threshold</option></select>')+
+  '</div><div class="grid g2">'+
+  field('rthr','Threshold','<input id="rthr" placeholder="3">')+
+  field('rwin','Window, days','<input id="rwin" placeholder="30">')+'</div>'+
+  field('rsev','Severity','<select id="rsev"><option>Low</option><option>Medium</option><option>High</option></select>')+
+  '<p class="sub mnote">A rule is a number, not code. Changing it needs no deploy.</p>';}
+function ruleList(){var seen={},rules=[];HALERTS.forEach(function(a){if(!seen[a[1]]){seen[a[1]]=1;rules.push(a);}});
+  return '<p class="sub" style="margin-bottom:10px">Every alert on the board comes from one of these rules. Toggle a rule off and its alerts stop.</p>'+
+  rules.map(function(a,i){return '<div class="tog"><div><div style="font-size:13px;font-weight:550">'+esc(a[1])+'</div><div class="sub">For example: '+esc(a[0])+'</div></div><span class="sw on" data-rtog="'+i+'"></span></div>';}).join('');}
+function bindRuleToggles(m){$$('[data-rtog]',m).forEach(function(s){s.onclick=function(){s.classList.toggle('on');toast(s.classList.contains('on')?'Rule enabled':'Rule disabled, its alerts cleared');};});}
+function openRuleModal(id){
+  if(id==='new'){openModal({title:'New alert rule',body:ruleForm(),foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-act="save">Create rule</button>',
+    onMount:function(m){var s=m.querySelector('[data-act="save"]');if(s)s.onclick=function(){closeModal();toast('Alert rule created. It runs on the next cycle.');};}});return;}
+  if(id==='manage'){openModal({title:'Alert rules',wide:1,body:ruleList(),foot:'<button class="btn" data-mx>Close</button><button class="btn pri" data-act="new">New rule</button>',
+    onMount:function(m){var n=m.querySelector('[data-act="new"]');if(n)n.onclick=function(){openRuleModal('new');};bindRuleToggles(m);}});return;}
+  var a=HALERTS[+id.split(':')[1]];if(!a)return;
+  openModal({title:'Alert',body:
+    '<h3 style="font-size:15px;margin-bottom:8px">'+esc(a[0])+'</h3>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+pill(a[4][0],a[4][1])+pill('nt',a[1])+pill('wa','Over '+a[5])+'</div>'+
+    kvcard('This alert',[['Trigger',esc(a[1])],['Who can clear',esc(a[2])],['Age',esc(a[3])],['Over threshold',esc(a[5])],['Severity',a[4][1]]])+
+    '<p class="sub mnote">Clearing is written to the audit log with who did it and when.</p>',
+    foot:'<button class="btn" data-mx>Close</button><button class="btn" data-act="rule">Edit the rule</button><button class="btn pri" data-act="clear">Clear this alert</button>',
+    onMount:function(m){var c=m.querySelector('[data-act="clear"]');if(c)c.onclick=function(){closeModal();toast('Alert cleared, logged against you.');};
+      var r=m.querySelector('[data-act="rule"]');if(r)r.onclick=function(){openRuleModal('new');};}});
+}
+
+/* ═════ bind Home interactions, called from bind() when Home is active ═════ */
+function bindHome(){
+  $$('.rolebar [data-role]').forEach(function(btn){btn.onclick=function(){HROLE=btn.dataset.role;render();};});
+  $$('#page [data-hk]').forEach(function(c){var open=function(){var d=hmodal(c.dataset.hk);if(d)openModal({title:d.title,body:d.body,wide:d.wide});};
+    c.onclick=open;c.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};});
+  $$('#page [data-rule]').forEach(function(r){r.onclick=function(){openRuleModal(r.dataset.rule);};});
+  var nr=$('#h-newrule');if(nr)nr.onclick=function(){openRuleModal('new');};
+  var ar=$('#h-rules');if(ar)ar.onclick=function(){openRuleModal('manage');};
+}
+
+var M=[
+{k:'home',n:'Home',i:'grid',g:'',tabs:[
+  {n:'Overview',r:homeOverview},
+  {n:'Team',r:homeTeam},
+  {n:'Alerts',r:homeAlerts},
+  {n:'Reports',r:homeReports}]},
 
 {k:'workspace',n:'My Workspace',i:'check',g:'',cnt:'4',tabs:[
   {n:'Today',r:function(){return head('Today','Friday, 09/10/2026')+
@@ -3447,6 +3756,7 @@ function bind(){
   $$('.rnav button').forEach(function(c){c.onclick=function(){
     $$('.rnav button').forEach(function(x){x.classList.remove('on')});c.classList.add('on');
     toast('Opening: '+c.textContent)}});
+  if(M[cur.m].k==='home')bindHome();
   bindComm();bindMail();
 }
 $('#slim').onclick=function(){$('#app').classList.toggle('slim')};
