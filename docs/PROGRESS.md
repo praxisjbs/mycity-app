@@ -113,7 +113,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
-_None yet._
+- 13/10/2026 · TB · Home demo upgraded in `docs/MyCity-ERP-Documents/demo.html` from the two 12
+  October meetings: role sensitive Overview (Operations, CEO, Partnerships, Staff), every KPI card
+  opens a detail modal paged at 25, Alerts gained an Over by (days past threshold) column and a
+  create or dismiss rule modal, and Reports is role gated. Added a new Team tab (manager and CEO
+  view of the roster and today's attendance). Team is not yet in the approved inventory
+  (MILESTONES §18); adopting it would take M1 to 25 screens and needs sign off. Demo prototype only,
+  no app screens built, so API, UI and Mobile stay unticked and Status stays Not started.
 
 ### My Workspace
 
