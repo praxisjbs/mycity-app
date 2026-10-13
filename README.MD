@@ -379,7 +379,7 @@ No new modules. Fills `docs/manual/*.md` (one per staff module plus the public s
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
 | M0 | `email-send`, `pdf-render`, `notification-deliver`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
-| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `scheduled-report` | `celebrations`, `mail-sync`, `attendance-day-close`, `scheduled-reports`; loop `loops/mail-idle` |
+| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `scheduled-report`, `announcement-publish` (delayed, scheduled announcements) | `celebrations`, `mail-sync`, `attendance-day-close`, `scheduled-reports`; loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |
 | M4 | `assessment-expire`, `interview-feedback-reminder` | `assessment-expiry`, `interview-reminders` |
