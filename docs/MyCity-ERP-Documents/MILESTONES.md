@@ -1225,6 +1225,15 @@ vocabulary every later document uses. It is reproduced exactly in the prototype.
 entry, a permission key and a line in the training material, so a rename after M9 means touching
 the route table, the registry, the permission catalogue and the knowledge base in one change.
 
+**Proposed additions, pending ratification (flagged 13/10/2026, TB).** A client request for a
+clear, well-presented organogram adds two screens: **People · Organogram** (HR builder) and
+**Employee Self-Service · Org Chart** (read-only viewer for every member of staff), both drawing
+the live `line_manager_id` reporting tree, not a separate structure. This would take the inventory
+from 85 to 87. It is deliberately not yet applied to the tables above or to `docs/PROGRESS.md`;
+ratifying it also updates the summary counts, the `SCREENS` constant in
+`scripts/check/progress.js`, and the command menu and permission registry. The agreed shape is in
+`docs/guides/organogram.md`, with a preview in `demo.html`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 85
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
