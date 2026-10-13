@@ -452,6 +452,206 @@ tbody tr:last-child td{border-bottom:0}
   .cal{font-size:10px} .cal .dy{min-height:52px}
   .tscroll table{min-width:560px}
 }
+/* ═════ SHARED OVERLAYS: modal (sheet on mobile), popover, inline help ═════
+   One modal for the whole demo. Any module opens it with openModal({...}). */
+.modal{position:fixed;inset:0;z-index:75;display:none;align-items:center;justify-content:center;
+  padding:20px;background:rgba(1,17,14,.46);backdrop-filter:blur(2px)}
+.modal.on{display:flex}
+.mbox{width:100%;max-width:500px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;
+  background:var(--raised);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-3);animation:rise .2s ease-out}
+.mbox.wide{max-width:780px}
+.mhd{display:flex;align-items:center;gap:10px;padding:13px 14px 13px 18px;border-bottom:1px solid var(--line);flex:none}
+.mhd h3{font-size:15px;flex:1;min-width:0}
+.mbd{padding:16px 18px;overflow-y:auto;flex:1;min-height:0}
+.mft{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--line);flex:none;flex-wrap:wrap}
+.mft .grow{margin-right:auto}
+.f{margin-bottom:14px}
+.f>label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.f .inp,.f textarea.inp{transition:border-color .15s}
+.f textarea.inp{height:auto;min-height:84px;padding:9px 12px;resize:vertical;line-height:1.5}
+.f.bad .inp{border-color:var(--err)} .f.good .inp{border-color:var(--ok)}
+.f .fm{display:none;font-size:11.5px;color:var(--err);margin-top:5px}
+.f.bad .fm{display:block}
+.seg{display:flex;border:1px solid var(--line-2);border-radius:999px;padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{flex:1;height:30px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--ink-2);padding:0 10px;white-space:nowrap}
+.seg button.on{background:var(--green);color:#fff}
+.plist{border:1px solid var(--line);border-radius:12px;max-height:250px;overflow-y:auto}
+.prow{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border-bottom:1px solid var(--line);text-align:left}
+.prow:last-child{border-bottom:0}
+.prow:hover{background:var(--surface)}
+.prow .av{width:30px;height:30px;font-size:11px;background:var(--accent-soft);color:var(--accent)}
+.prow .pn{flex:1;min-width:0;font-size:13px}
+.prow .pn b{display:block;font-weight:600}
+.prow .pn span{font-size:11.5px;color:var(--ink-3)}
+.prow .tick{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line-2);flex:none;display:flex;align-items:center;justify-content:center;color:#fff}
+.prow.on .tick{background:var(--green);border-color:var(--green)}
+.prow .tick svg{display:none} .prow.on .tick svg{display:block}
+.pop{position:fixed;z-index:78;min-width:210px;background:var(--raised);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--sh-3);padding:6px;animation:rise .16s ease-out}
+.pop button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border-radius:8px;font-size:13px;text-align:left}
+.pop button:hover{background:var(--accent-soft)}
+.pop button svg{color:var(--accent)}
+.pop .sep{height:1px;background:var(--line);margin:5px 4px}
+.ib{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-3);vertical-align:middle}
+.ib:hover,.ib[aria-expanded="true"]{background:var(--accent-soft);color:var(--accent)}
+.ihelp{display:none;font-size:12.5px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px;margin:-6px 0 14px;line-height:1.5}
+.ihelp.on{display:block}
+.prog{height:6px;border-radius:99px;background:var(--surface);overflow:hidden;margin-top:6px}
+.prog i{display:block;height:100%;background:var(--green);border-radius:99px;transition:width .12s linear}
+
+/* ═════ STAFF COMMUNITY: two panes, composer fixed, page height locked ═════ */
+.chatwrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px;height:calc(100vh - 232px);min-height:460px}
+.clist,.thread{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1);
+  display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.clhd{display:flex;align-items:center;gap:8px;padding:12px 12px 8px 14px;flex:none}
+.clhd h3{font-size:13.5px;flex:1}
+.clsrch{padding:0 12px 8px;flex:none}
+.clsrch .inp{height:34px;border-radius:999px}
+.clfil{display:flex;gap:4px;padding:0 12px 8px;flex:none}
+.clfil button{height:26px;padding:0 11px;border-radius:999px;font-size:11.5px;font-weight:650;color:var(--ink-2)}
+.clfil button.on{background:var(--green);color:#fff}
+.clbody{flex:1;overflow-y:auto;padding:0 6px 8px;min-height:0}
+.clgl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:650;padding:8px 8px 4px}
+.crow{display:flex;align-items:center;gap:10px;width:100%;padding:9px 8px;border-radius:10px;text-align:left}
+.crow:hover{background:var(--surface)}
+.crow.on{background:var(--accent-soft)}
+.crow .hash{width:30px;height:30px;border-radius:9px;background:var(--surface);color:var(--ink-2);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;border:1px solid var(--line)}
+.crow.on .hash{background:var(--green);color:#fff;border-color:var(--green)}
+.crow .av{width:32px;height:32px;font-size:11px;background:var(--accent-soft);color:var(--accent);position:relative}
+.crow .av .dot{position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--ok);border:2px solid var(--raised)}
+.crow .cb{flex:1;min-width:0}
+.crow .cb b{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .cb span{display:block;font-size:11.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .cr{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.crow .cr em{font-style:normal;font-size:10.5px;color:var(--ink-3)}
+.crow .cr i{font-style:normal;min-width:18px;height:18px;border-radius:999px;background:var(--yellow);color:var(--on-yellow);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.crow.un .cb b{font-weight:700} .crow.un .cr em{color:var(--accent);font-weight:650}
+.thd{display:flex;align-items:center;gap:10px;padding:11px 12px 11px 16px;border-bottom:1px solid var(--line);flex:none}
+.thd .tt{flex:1;min-width:0}
+.thd .tt b{display:flex;align-items:center;gap:6px;font-size:14.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thd .tt span{display:block;font-size:11.5px;color:var(--ink-3)}
+.thd .mback,.thd .mdraw{display:none}
+.tbody{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0;overscroll-behavior:contain}
+.tday{align-self:center;font-size:10.5px;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);padding:2px 10px;border-radius:999px}
+.tcomp{flex:none;border-top:1px solid var(--line);padding:10px 12px;display:flex;gap:8px;align-items:center;background:var(--raised)}
+.tcomp .inp{height:40px;border-radius:999px;background:var(--surface)}
+.cbtn{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;border:1px solid var(--line-2);color:var(--ink-2);background:var(--bg)}
+.cbtn:hover{background:var(--surface)}
+.cbtn.pri{background:var(--yellow);border-color:var(--yellow);color:var(--on-yellow)}
+.cbtn.rec{background:var(--err);border-color:var(--err);color:#fff}
+.recbar{flex:1;display:flex;align-items:center;gap:9px;height:40px;padding:0 14px;border-radius:999px;background:var(--err-bg);color:var(--err);font-size:13px;font-weight:600}
+.recbar i{width:9px;height:9px;border-radius:50%;background:var(--err);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.roline{flex:1;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3)}
+/* messages */
+.msg2{display:flex;gap:9px;max-width:82%}
+.msg2 .av{width:30px;height:30px;font-size:11px;background:var(--accent-soft);color:var(--accent);margin-top:2px}
+.msg2 .mb2{min-width:0}
+.msg2 .nm{font-size:12px;font-weight:650;margin-bottom:3px;display:flex;gap:7px;align-items:baseline}
+.msg2 .nm span{font-weight:400;color:var(--ink-3);font-size:10.5px}
+.msg2 .bb{background:var(--surface);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:8px 12px;font-size:13px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere}
+.msg2.me{align-self:flex-end;flex-direction:row-reverse}
+.msg2.me .av{display:none}
+.msg2.me .nm{justify-content:flex-end}
+.msg2.me .bb{background:var(--green);border-color:var(--green);color:#fff;border-radius:14px 4px 14px 14px}
+.msg2 .seen{font-size:10.5px;color:var(--ink-3);text-align:right;margin-top:3px}
+.vn{display:flex;align-items:center;gap:9px;min-width:190px}
+.vn .pl{width:30px;height:30px;border-radius:50%;background:var(--yellow);color:var(--on-yellow);display:flex;align-items:center;justify-content:center;flex:none}
+.vn .wv{display:flex;align-items:center;gap:2px;height:24px;flex:1}
+.vn .wv i{width:3px;border-radius:2px;background:currentColor;opacity:.55}
+.vn em{font-style:normal;font-size:11px;opacity:.8}
+.fpost{display:flex;align-items:center;gap:9px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 11px;margin-top:2px;color:var(--ink)}
+.msg2.me .fpost{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);color:#fff}
+.fpost .sub{color:inherit;opacity:.7}
+/* celebration, recognition, poll, announcement posts */
+.celeb{position:relative;overflow:hidden;border-radius:16px;padding:16px;color:#fff;display:flex;gap:14px;align-items:center;max-width:560px;
+  background:radial-gradient(circle at 92% 18%,rgba(255,223,85,.38) 0 7px,transparent 8px),
+             radial-gradient(circle at 84% 70%,rgba(255,223,85,.25) 0 4px,transparent 5px),
+             radial-gradient(circle at 70% 26%,rgba(255,255,255,.22) 0 3px,transparent 4px),
+             linear-gradient(135deg,var(--green),var(--green-deep))}
+.celeb .big{width:58px;height:58px;border-radius:50%;background:var(--yellow);color:var(--on-yellow);display:flex;align-items:center;justify-content:center;
+  font-size:19px;font-weight:700;flex:none;box-shadow:0 0 0 4px rgba(255,223,85,.25)}
+.celeb .cbd{flex:1;min-width:0}
+.celeb .kk{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--yellow);font-weight:700}
+.celeb h4{font-size:16px;margin-top:2px}
+.celeb p{font-size:13px;color:#D7E2DF;margin-top:4px}
+.celeb .cf{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.celeb .cf small{font-size:11px;color:#9FB3AE}
+.rx{height:28px;padding:0 11px;border-radius:999px;font-size:12px;font-weight:650;display:inline-flex;align-items:center;gap:6px;
+  background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.rx.on{background:var(--yellow);border-color:var(--yellow);color:var(--on-yellow)}
+.celeb .rx{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);color:#fff}
+.celeb .rx.on{background:var(--yellow);border-color:var(--yellow);color:var(--on-yellow)}
+.recog{max-width:560px;border-radius:14px;padding:12px 14px;background:var(--accent-soft);border:1px solid var(--line);border-left:3px solid var(--yellow)}
+.recog .rh{display:flex;align-items:center;gap:8px;font-size:13px}
+.recog .rh .av{width:26px;height:26px;font-size:10px}
+.recog q{display:block;font-size:13px;color:var(--ink-2);margin:7px 0 9px;quotes:"\201C" "\201D"}
+.poll{max-width:560px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--bg)}
+.poll h4{font-size:13.5px;margin-bottom:9px}
+.popt{display:block;width:100%;text-align:left;position:relative;border:1px solid var(--line);border-radius:10px;padding:8px 11px;margin-bottom:6px;overflow:hidden;font-size:12.5px}
+.popt i{position:absolute;left:0;top:0;bottom:0;background:var(--accent-soft)}
+.popt span{position:relative;display:flex;justify-content:space-between;gap:8px}
+.popt.on{border-color:var(--green)} .popt.on span{font-weight:650}
+.annmsg{max-width:620px;border:1px solid var(--line);border-radius:14px;padding:13px 15px;background:var(--bg)}
+.annmsg .ah{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-3);margin-bottom:6px}
+.annmsg h4{font-size:14.5px}
+.annmsg p{font-size:13px;color:var(--ink-2);margin-top:5px;line-height:1.5}
+.annc{cursor:pointer;transition:box-shadow .14s,transform .14s;text-align:left;width:100%}
+.annc:hover{box-shadow:var(--sh-2);transform:translateY(-1px)}
+.drawer{position:fixed;inset:0;z-index:72;display:none;background:rgba(1,17,14,.46)}
+.drawer.on{display:block}
+.drawer .dpane{position:absolute;left:0;top:0;bottom:0;width:min(86vw,340px);background:var(--raised);display:flex;flex-direction:column;
+  box-shadow:var(--sh-3);animation:slin .2s ease-out;padding-top:env(safe-area-inset-top,0px)}
+@keyframes slin{from{transform:translateX(-100%)}}
+
+/* ═════ MAILBOX: rich text composer, mobile reader ═════ */
+.mback{display:none}
+.comp-row{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:6px 0;min-height:42px;flex-wrap:wrap}
+.comp-row>label{width:58px;flex:none;font-size:12px;color:var(--ink-3);font-weight:600}
+.comp-row input{flex:1;min-width:120px;border:0;background:none;outline:none;height:30px;font-size:13.5px}
+.comp-row select{border:1px solid var(--line);border-radius:8px;background:var(--bg);height:30px;padding:0 8px}
+.comp-row .lnk{font-size:12px;font-weight:600;color:var(--accent)}
+.rchip{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 4px 0 10px;border-radius:999px;background:var(--accent-soft);font-size:12.5px}
+.rchip.bad{background:var(--err-bg);color:var(--err)}
+.rchip button{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.tbar{display:flex;gap:2px;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--line);align-items:center}
+.tbar button{min-width:30px;height:30px;border-radius:7px;font-size:13px;font-weight:650;color:var(--ink-2);padding:0 6px;display:flex;align-items:center;justify-content:center}
+.tbar button:hover,.tbar button.on{background:var(--accent-soft);color:var(--ink)}
+.tbar .tsep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.tbar .lkbox{display:none;align-items:center;gap:6px;flex-basis:100%;padding-top:6px}
+.tbar .lkbox.on{display:flex}
+.rte{min-height:220px;padding:12px 2px;outline:none;font-size:13.5px;line-height:1.6;color:var(--ink)}
+.rte:empty::before{content:attr(data-ph);color:var(--ink-3)}
+.rte blockquote{border-left:3px solid var(--line-2);margin:8px 0;padding:2px 12px;color:var(--ink-2)}
+.rte h2{font-size:17px;margin:8px 0 4px}
+.rte a{color:var(--accent)}
+.atray{display:flex;gap:8px;flex-wrap:wrap;padding-top:8px}
+.atray .attchip{flex-direction:column;align-items:stretch;min-width:170px}
+
+/* ═════ MOBILE: conversations and the reader take the whole screen ═════ */
+@media(max-width:1180px){.chatwrap{grid-template-columns:260px minmax(0,1fr)}}
+@media(max-width:760px){
+  .modal{align-items:flex-end;padding:0}
+  .mbox,.mbox.wide{max-width:none;border-radius:18px 18px 0 0;max-height:92vh;max-height:92dvh}
+  .mbox.full{height:100vh;height:100dvh;max-height:none;border-radius:0}
+  .mft{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .statstrip>.dsk{display:none}
+  .chatwrap{display:block;height:auto;min-height:0}
+  .chatwrap .thread{display:none}
+  .chatwrap.full .thread{display:flex;position:fixed;inset:0;z-index:62;border-radius:0;border:0;
+    padding-top:env(safe-area-inset-top,0px)}
+  .chatwrap .clist{border-radius:var(--r-lg)}
+  .chatwrap .clbody{overflow:visible}
+  .thd{padding:9px 8px}
+  .thd .mback,.thd .mdraw{display:flex}
+  .tcomp{padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+  .msg2{max-width:90%}
+  .mail2.open .mread{position:fixed;inset:0;z-index:62;border-radius:0;border:0;overflow-y:auto;
+    padding:12px 14px calc(20px + env(safe-area-inset-bottom,0px))}
+  .mail2.open .mback{display:inline-flex;margin-bottom:10px}
+  .mread .mh{flex-wrap:wrap}
+}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -487,6 +687,16 @@ tbody tr:last-child td{border-bottom:0}
 <g id="i-flag"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></g>
 <g id="i-globe"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></g>
 <g id="i-target"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/></g>
+<g id="i-x"><path d="M18 6L6 18M6 6l12 12"/></g>
+<g id="i-left"><path d="M15 6l-6 6 6 6"/></g>
+<g id="i-dots"><circle cx="12" cy="5" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="19" r="1.4" fill="currentColor"/></g>
+<g id="i-lock"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></g>
+<g id="i-info"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4.5M12 8h.01"/></g>
+<g id="i-thumb"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/><path d="M7 10l4-7a2 2 0 0 1 2.9 2.2L13 9h5.6a2 2 0 0 1 2 2.4l-1.5 7.4A2 2 0 0 1 17.1 21H7"/></g>
+<g id="i-clip"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></g>
+<g id="i-mic"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></g>
+<g id="i-play"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></g>
+<g id="i-image"><rect x="3" y="3" width="18" height="18" rx="2.4"/><circle cx="9" cy="9" r="1.8"/><path d="M21 15l-5-5L5 21"/></g>
 </defs></svg>
 
 <div class="auth" id="auth">
@@ -563,6 +773,8 @@ tbody tr:last-child td{border-bottom:0}
   </div>
 </div>
 <div class="toasts" id="toasts"></div>
+<div class="modal" id="modal"></div>
+<div class="drawer" id="drawer"></div>
 
 <script>
 (function(){
@@ -602,7 +814,7 @@ $('#lform').addEventListener('submit',function(e){e.preventDefault();
 
 /* ───── render helpers ───── */
 function head(t,s,acts){return '<div class="phead"><div><h1>'+esc(t)+'</h1>'+(s?'<p>'+esc(s)+'</p>':'')+'</div>'+
-  (acts?'<div class="right">'+acts.map(function(a){return '<button class="btn'+(a[1]?' pri':'')+'">'+(a[1]?ic('plus'):'')+esc(a[0])+'</button>'}).join('')+'</div>':'')+'</div>'}
+  (acts?'<div class="right">'+acts.map(function(a){return '<button class="btn'+(a[1]?' pri':'')+'"'+(a[2]?' id="'+a[2]+'"':'')+'>'+(a[1]?ic('plus'):'')+esc(a[0])+'</button>'}).join('')+'</div>':'')+'</div>'}
 function kpis(list){return '<div class="grid g4">'+list.map(function(k){
   return '<div class="card kpi"><span class="lab">'+esc(k[0])+'</span><b'+(k[2]?' style="color:var(--'+k[2]+')"':'')+'>'+esc(k[1])+'</b>'+
   (k[3]?'<span class="trend '+(k[4]||'fl')+'">'+esc(k[3])+'</span>':'')+'</div>'}).join('')+'</div>'}
@@ -669,7 +881,7 @@ function prof(o){return '<div class="prof"><span class="big'+(o.y?' y':'')+'">'+
   (o.chips?'<div class="chips">'+o.chips+'</div>':'')+'</span>'+
   (o.acts?'<span class="acts">'+o.acts.map(function(a){return '<button class="btn'+(a[1]?' pri':'')+'">'+esc(a[0])+'</button>'}).join('')+'</span>':'')+'</div>'}
 function statstrip(list){return '<div class="statstrip">'+list.map(function(s){
-  return '<div><span class="lab">'+esc(s[0])+'</span><b'+(s[2]?' style="color:var(--'+s[2]+')"':'')+'>'+esc(s[1])+'</b></div>'}).join('')+'</div>'}
+  return '<div'+(s[3]?' class="'+s[3]+'"':'')+'><span class="lab">'+esc(s[0])+'</span><b'+(s[2]?' style="color:var(--'+s[2]+')"':'')+'>'+esc(s[1])+'</b></div>'}).join('')+'</div>'}
 function tl(title,items){return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3></div><div class="tl">'+
   items.map(function(i){return '<div class="it'+(i[3]?' '+i[3]:'')+'"><b>'+esc(i[0])+'</b><span>'+esc(i[1])+'</span>'+
   (i[2]?'<p>'+esc(i[2])+'</p>':'')+'</div>'}).join('')+'</div></div>'}
@@ -719,14 +931,14 @@ function gmap(){return '<div class="card"><div class="ch"><h3>Worksite geofences
   '<p class="sub" style="margin-top:10px">A punch outside every fence is recorded with its distance and raises a warning. Blocking is a setting, currently off.</p></div>'}
 
 /* ───── mailbox two pane ───── */
-function mail2(rows,sel){
+function mail2(rows,sel,open){
   var m=rows[sel]||rows[0];
-  return '<div class="mail2"><div class="mlist">'+rows.map(function(r,i){
+  return '<div class="mail2'+(open?' open':'')+'"><div class="mlist">'+rows.map(function(r,i){
     return '<button class="mrow'+(i===sel?' on':'')+'" data-mi="'+i+'">'+(r[3]?'<i class="u"></i>':'<i class="r"></i>')+
     '<span class="mb"><b>'+esc(r[0])+'</b><span>'+esc(r[1])+'</span></span><span class="mt">'+esc(r[2])+'</span></button>'}).join('')+'</div>'+
-  '<div class="mread"><div class="mh"><span class="av" style="width:38px;height:38px;font-size:13px;background:var(--accent-soft);color:var(--accent)">'+esc(m[5]||'MC')+'</span>'+
+  '<div class="mread"><button class="btn mback" data-mback>'+ic('left')+'Back</button><div class="mh"><span class="av" style="width:38px;height:38px;font-size:13px;background:var(--accent-soft);color:var(--accent)">'+esc(m[5]||'MC')+'</span>'+
   '<span style="flex:1;min-width:0"><h3>'+esc(m[1])+'</h3><p class="sub">'+esc(m[0])+' &lt;'+esc(m[6]||'contact@example.com')+'&gt; · '+esc(m[2])+'</p></span>'+
-  '<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn">'+ic('send')+'Reply</button><button class="btn">Forward</button></span></div>'+
+  '<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-reply="'+sel+'">'+ic('send')+'Reply</button><button class="btn" data-reply="'+sel+'" data-kind="fw">Forward</button></span></div>'+
   '<div class="body">'+(m[4]||'<p>No preview available for this message.</p>')+'</div>'+
   (m[7]?'<div class="att">'+m[7].map(function(a){return '<span class="attchip">'+ic('doc')+esc(a[0])+'<span class="sub">'+esc(a[1])+'</span></span>'}).join('')+'</div>':'')+
   '</div></div>'}
@@ -1316,68 +1528,9 @@ var M=[
     '<p class="sub" style="margin-top:12px">A missing document on a confirmed employee does not block anything. On a new hire it blocks onboarding until it arrives.</p>'}}]},
 
 {k:'community',n:'Staff Community',i:'msg',g:'WORK',cnt:'3',tabs:[
-  {n:'Channels',r:function(){return head('#ember-to-remember','18 members · active now',[['Members'],['New channel',1]])+
-    '<div class="grid g23"><div class="card">'+
-    '<div class="chat">'+
-    bub('AD','Adedotun Oyinloye','08:14','Stage build for the Lagos leg is confirmed. MTN have signed off on the branding placement.')+
-    bub('TA','Tolu Adeyemi','08:21','Shot list for the Enugu segment is in the vault. Three locations, two days.')+
-    '<div class="sysbub">🎉 <b>Happy birthday, Hauwa Yusuf.</b> Posted automatically from her employee record.</div>'+
-    bub('NE','Ngozi Eze','09:02','ProvidusBank want their logo on the ticket confirmation email. Raising it as a task against the partnership.')+
-    '<div class="sysbub">👍 <b>Cynthia Osakunih recognised Tolu Adeyemi.</b> "Turned the Enugu shot list around in a day."</div>'+
-    bub('CO','Cynthia Osakunih','09:08','Good. Link it to the MOU so it shows on the 360.')+
-    '<div class="sysbub">📌 <b>Seyi Balogun shared a file.</b> ember-venue-list-v3.xlsx · 84 KB</div>'+
-    bub('EO','Emeka Obi','09:21','Studio is booked for the 22nd and 23rd. Equipment repair is still with Operations.')+
-    '</div>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">'+
-    '<button class="btn" id="plusbtn" style="width:38px;padding:0;justify-content:center;border-radius:50%;height:38px">'+ic('plus')+'</button>'+
-    '<input class="inp" style="height:38px;border-radius:999px" placeholder="Message #ember-to-remember" aria-label="Message">'+
-    '<button class="btn pri" style="width:38px;padding:0;justify-content:center;border-radius:50%;height:38px">'+ic('send')+'</button></div></div>'+
-    '<div>'+
-    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>Channels</h3><span class="right sub">6</span></div>'+
-    [['#ember-to-remember','18 members · active now',1],['#operations','25 members'],['#partnerships','9 members'],
-     ['#enugu-launch','6 members · task force'],['#general','25 members'],['#announcements','25 members · read only']].map(function(c){
-      return '<button class="task" style="margin:0 0 2px;border-color:transparent'+(c[2]?';background:var(--accent-soft)':'')+'"><b style="margin:0">'+esc(c[0])+'</b><span class="sub">'+esc(c[1])+'</span></button>'}).join('')+
-    '</div>'+
-    '<div class="card"><div class="ch"><h3>What the ＋ posts</h3></div>'+
-    [['Recognition','Names a colleague and says what they did','spark'],['Celebration','Birthday, anniversary, a win','flag'],
-     ['Poll','One question, counted live','chart'],['File','Shared into the channel, kept in the vault','doc']].map(function(p){
-      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">'+
-      '<span style="color:var(--accent);margin-top:1px">'+ic(p[2])+'</span>'+
-      '<span style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600">'+esc(p[0])+'</div><div class="sub">'+esc(p[1])+'</div></span></div>'}).join('')+
-    '<p class="sub" style="margin-top:11px">Birthdays and work anniversaries post themselves from the employee record. Nobody has to remember.</p></div></div></div>'}},
-  {n:'Direct Messages',r:function(){return head('Direct Messages','3 unread',[['New message',1]])+
-    '<div class="grid g23"><div class="card"><div class="ch"><h3>Ifeoma Chukwu</h3><span class="right">'+pill('ok','Online')+'</span></div>'+
-    '<div class="chat">'+bub('IC','Ifeoma Chukwu','Yesterday 18:02','Did the Content target get approved?')+
-    bub('CO','Cynthia Osakunih','Yesterday 18:14','Yes, you approved it at 16:40. Marketing and Operations are still with you.')+
-    bub('IC','Ifeoma Chukwu','07:52','Cynthia, has the JBS requisition gone through?')+
-    bub('CO','Cynthia Osakunih','07:58','Yes, it is with you for approval. REQ-0042, ₦1,841,500 across five requests.')+
-    bub('IC','Ifeoma Chukwu','08:03','Seen. Approving this morning.')+'</div>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">'+
-    '<input class="inp" style="height:38px;border-radius:999px" placeholder="Message Ifeoma" aria-label="Message">'+
-    '<button class="btn pri" style="width:38px;padding:0;justify-content:center;border-radius:50%;height:38px">'+ic('send')+'</button></div></div>'+
-    '<div class="card"><div class="ch"><h3>Conversations</h3><span class="right">'+pill('wa','3 unread')+'</span></div>'+
-    [['Ifeoma Chukwu','Seen. Approving this morning.',1],['Adedotun Oyinloye','Sent the sponsor deck'],['Tolu Adeyemi','Shot list uploaded'],
-     ['Bashir Lawal','Can we move the Eko call?'],['Amara Okafor','Payroll preview ready'],
-     ['Seyi Balogun','Assessment is ready to publish'],['Hauwa Yusuf','Thank you for the birthday wishes']].map(function(c){
-      return '<button class="task" style="margin:0 0 2px;border-color:transparent'+(c[2]?';background:var(--accent-soft)':'')+'"><b style="margin:0">'+esc(c[0])+'</b><span class="sub">'+esc(c[1])+'</span></button>'}).join('')+
-    '<p class="sub" style="margin-top:11px">A direct message is between people. It is never a record, and it never becomes one by accident.</p></div></div>'}},
-  {n:'Announcements',r:function(){return head('Announcements','Read only · posted by People and the CEO',[['New announcement',1]])+
-    statstrip([['Published','4'],['Scheduled','1'],['Average read','92%','ok'],['Audience','25 staff'],['This month','2']])+
-    cards([['Ember to Remember kicks off','The 100 day calendar runs 22 September to 31 December. All hands on the Lagos leg from 14 October.','<span class="sub">Posted 22/09/2026 by Ifeoma Chukwu</span>'],
-      ['Saturday hours confirmed','Saturdays are 09:00 to 15:00 for all departments. Clock in applies as on weekdays.','<span class="sub">Posted 01/10/2026 by Cynthia Osakunih</span>'],
-      ['NDPA refresher due','Everyone must complete the data protection refresher before 30 November.','<span class="sub">Posted 28/09/2026 by Cynthia Osakunih</span>'],
-      ['New faces in Enugu','Two content roles join on 20 October. Say hello in #enugu-launch.','<span class="sub">Posted 06/10/2026 by People</span>']],2)+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Announcement'],['Read','n'],['Reach']],[
-      ['Ember to Remember kicks off','25 of 25',mini(100,'100%')],
-      ['Saturday hours confirmed','24 of 25',mini(96,'96%')],
-      ['NDPA refresher due','23 of 25',mini(92,'92%')],
-      ['New faces in Enugu','19 of 25',mini(76,'76%')]],'Who has read them')+
-    kvcard('How an announcement works',[['Posted by','People, or the CEO. Nobody else'],
-      ['Where it appears','Here, in #announcements, and as a notification'],
-      ['Replies','None. The channel is read only by design'],
-      ['Scheduling','Can be dated forward, like the Q4 cycle on 20 October'],
-      ['Read receipts','Counted per person, visible to the poster only']])+'</div>'}}]},
+  {n:'Channels',r:function(){return channelsTab()}},
+  {n:'Direct Messages',r:function(){return dmTab()}},
+  {n:'Announcements',r:function(){return annTab()}}]},
 
 {k:'mailbox',n:'Mailbox',i:'mail',g:'WORK',cnt:'12',tabs:[
   mailTab('Inbox','MT',[
@@ -2744,14 +2897,16 @@ function bub(av,name,time,text){return '<div class="bub"><span class="av">'+av+'
 var MAILSEL={};
 function mailTab(name,dav,rows){
   rows.forEach(function(r){if(!r[5])r[5]=dav});
+  MAILROWS=MAILROWS||{};MAILROWS[name]=rows;
   return {n:name,r:function(){
     var sel=MAILSEL[name]||0, unread=rows.filter(function(r){return r[3]}).length,
         att=rows.reduce(function(a,r){return a+(r[7]?r[7].length:0)},0);
-    return head(name,rows.length+' messages'+(unread?' · '+unread+' unread':''),[['Refresh'],['Compose',1]])+
+    return '<div class="phead"><div><h1>'+esc(name)+' '+infoBtn('mail-help')+'</h1><p>'+rows.length+' messages'+(unread?' · '+unread+' unread':'')+'</p></div>'+
+      '<div class="right"><button class="btn" id="mrefresh">Refresh</button><button class="btn pri" id="compose">'+ic('plus')+'Compose</button></div></div>'+
+      infoText('mail-help','Custom domain only. No Google, no Microsoft. Signed in with an address and a password, the same as any other mailbox. Mail here sends and receives only; it is not linked to any other module.')+
     statstrip([['Folder',name],['Messages',String(rows.length)],['Unread',String(unread),unread?'warn':'ok'],
-      ['Attachments',String(att)],['Mailbox','cynthia@mycityapp.io']])+
-    mail2(rows,sel)+
-    '<p class="sub" style="margin-top:12px">Custom domain only. No Google, no Microsoft. Signed in with an address and a password, the same as any other mailbox.</p>'}}}
+      ['Attachments',String(att)],['Mailbox','cynthia@mycityapp.io','','dsk']])+
+    mail2(rows,sel,MAILOPEN&&MAILOPEN[name])}}}
 
 /* kanban state */
 var TASKS=[['Confirm Ember to Remember venue list with MTN',0,'CO','er','Overdue 2d'],
@@ -2774,6 +2929,482 @@ function boardHTML(){var cols=[['To do','var(--ink-3)'],['In progress','var(--c2
       items.map(function(p){return '<button class="task" data-ti="'+p[1]+'"><b>'+esc(p[0][0])+'</b><span class="meta">'+
         pill(p[0][3],p[0][4])+'<span class="av">'+p[0][2]+'</span></span></button>'}).join('')+'</div>'}).join('')+'</div>'}
 
+/* ═════════════ SHARED: modal (sheet on mobile), popover, inline help ═════════════
+   openModal({title, body, foot, wide, full, onMount}) is the one modal every module
+   uses. It never uses a native dialog (gate 16). Escape and the scrim close it. */
+function openModal(o){
+  var m=$('#modal');
+  m.innerHTML='<div class="mbox'+(o.wide?' wide':'')+(o.full?' full':'')+'" role="dialog" aria-modal="true" aria-label="'+esc(o.title)+'">'+
+    '<div class="mhd"><h3>'+esc(o.title)+'</h3><button class="iconbtn" data-mx aria-label="Close">'+ic('x','ico')+'</button></div>'+
+    '<div class="mbd">'+o.body+'</div>'+(o.foot?'<div class="mft">'+o.foot+'</div>':'')+'</div>';
+  m.classList.add('on');
+  $$('[data-mx]',m).forEach(function(b){b.onclick=closeModal});
+  if(o.onMount)o.onMount(m);
+  var first=m.querySelector('.mbd input:not([type=hidden]),.mbd textarea,.mbd [contenteditable]');
+  if(first&&window.innerWidth>760)setTimeout(function(){first.focus()},30);
+}
+function closeModal(){var m=$('#modal');m.classList.remove('on');m.innerHTML=''}
+$('#modal').addEventListener('click',function(e){if(e.target===this)closeModal()});
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  if($('.pop')){closePop();return}
+  if($('#modal').classList.contains('on'))closeModal();
+  else if($('#drawer').classList.contains('on'))$('#drawer').classList.remove('on')});
+
+function closePop(){var p=$('.pop');if(p)p.remove()}
+/* items: [label, icon, fn] or 'sep' */
+function popover(anchor,items,above){
+  closePop();
+  var p=document.createElement('div');p.className='pop';p.setAttribute('role','menu');
+  p.innerHTML=items.map(function(it,i){return it==='sep'?'<div class="sep"></div>':
+    '<button role="menuitem" data-pi="'+i+'">'+ic(it[1])+esc(it[0])+'</button>'}).join('');
+  document.body.appendChild(p);
+  var r=anchor.getBoundingClientRect(),w=p.offsetWidth,h=p.offsetHeight;
+  var left=Math.min(Math.max(8,r.right-w),window.innerWidth-w-8);
+  var top=above?r.top-h-6:r.bottom+6;
+  if(top+h>window.innerHeight-8)top=r.top-h-6;
+  p.style.left=left+'px';p.style.top=Math.max(8,top)+'px';
+  $$('[data-pi]',p).forEach(function(b){b.onclick=function(){var it=items[+b.dataset.pi];closePop();it[2]()}});
+  setTimeout(function(){document.addEventListener('click',function off(e){
+    if(!p.contains(e.target)){closePop();document.removeEventListener('click',off)}})},0);
+}
+/* An ⓘ that is a SIBLING of what it explains; the text stays in the DOM (gate 8). */
+function infoBtn(id){return '<button class="ib" data-ib="'+id+'" aria-expanded="false" aria-controls="'+id+'" aria-label="More information">'+ic('info')+'</button>'}
+function infoText(id,text){return '<p class="ihelp" id="'+id+'">'+esc(text)+'</p>'}
+function field(id,label,inner,msg){return '<div class="f" id="fw-'+id+'"><label for="'+id+'">'+esc(label)+'</label>'+inner+
+  (msg?'<p class="fm">'+esc(msg)+'</p>':'')+'</div>'}
+/* inline validation as the field is filled (gate 12): a mark on the field, never a dialog */
+function live(id,test){var el=$('#'+id),w=$('#fw-'+id);if(!el)return;
+  var run=function(){var v=el.value,ok=test(v);w.classList.toggle('bad',!ok&&v.length>0);w.classList.toggle('good',ok)};
+  el.addEventListener('input',run);run()}
+function isDayFirst(v){var m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);if(!m)return false;
+  var d=new Date(+m[3],+m[2]-1,+m[1]);return d.getDate()===+m[1]&&d.getMonth()===+m[2]-1}
+function nowHM(){var d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())}
+function hashPick(s,list){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return list[h%list.length]}
+
+/* ═════════════ STAFF COMMUNITY ═════════════ */
+var ME=['CO','Cynthia Osakunih','Operations & People'];
+var PEOPLE=[ME,['IC','Ifeoma Chukwu','Executive']].concat(STAFF);
+var DEPTS=['Executive','Operations & People','Marketing & Sales','Content','Finance','Engineering','Support','Studio'];
+var POSTERS={CO:1,IC:1};   /* People and the CEO post to #announcements */
+var BDAY=['Wishing you a year of good work and better rest.','Here is to another year around the sun, from all of us.',
+  'May the year ahead be your best one yet.','Today is yours. Enjoy every minute of it.'];
+var ANNIV=['Thank you for every one of them.','Here is to the next one.','The work shows. Thank you.'];
+function person(av){for(var i=0;i<PEOPLE.length;i++)if(PEOPLE[i][0]===av)return PEOPLE[i];return [av,av,'']}
+
+var CHANNELS=[
+ {n:'announcements',mem:25,ro:1,pin:1,last:'Saturday hours confirmed',t:'01/10',msgs:[
+   {k:'ann',av:'IC',title:'Ember to Remember kicks off',body:'The 100 day calendar runs 22 September to 31 December. All hands on the Lagos leg from 14 October.',at:'22/09/2026'},
+   {k:'ann',av:'CO',title:'NDPA refresher due',body:'Everyone must complete the data protection refresher before 30 November.',at:'28/09/2026'},
+   {k:'ann',av:'CO',title:'Saturday hours confirmed',body:'Saturdays are 09:00 to 15:00 for all departments. Clock in applies as on weekdays.',at:'01/10/2026'}]},
+ {n:'general',mem:25,un:3,last:'Happy birthday, Hauwa Yusuf',t:'00:01',msgs:[
+   {k:'day',x:'Yesterday'},
+   {k:'anniv',av:'EO',yrs:3,likes:11},
+   {k:'m',av:'NE',t:'17:42',x:'Congratulations Emeka, three years of the studio running like clockwork.'},
+   {k:'day',x:'Today'},
+   {k:'bday',av:'HY',likes:14},
+   {k:'rec',from:'CO',to:'TA',x:'Turned the Enugu shot list around in a day.',likes:6},
+   {k:'m',av:'AD',t:'08:31',x:'Happy birthday Hauwa! Cake at the Abuja hub at 4?'},
+   {k:'poll',av:'CO',q:'Team lunch on Friday: where?',opts:[['Jollof Joint, VI',7],['Bukka Hut',4],['Order in to the office',3]]}]},
+ {n:'ember-to-remember',mem:18,last:'Studio is booked for the 22nd and 23rd',t:'09:21',msgs:[
+   {k:'day',x:'Today'},
+   {k:'m',av:'AD',t:'08:14',x:'Stage build for the Lagos leg is confirmed. MTN have signed off on the branding placement.'},
+   {k:'m',av:'TA',t:'08:21',x:'Shot list for the Enugu segment is in the vault. Three locations, two days.'},
+   {k:'m',av:'NE',t:'09:02',x:'ProvidusBank want their logo on the ticket confirmation email. Raising it as a task against the partnership.'},
+   {k:'m',av:'CO',t:'09:08',x:'Good. Link it to the MOU so it shows on the 360.'},
+   {k:'file',av:'SB',t:'09:12',f:'ember-venue-list-v3.xlsx',s:'84 KB'},
+   {k:'m',av:'EO',t:'09:21',x:'Studio is booked for the 22nd and 23rd. Equipment repair is still with Operations.'}]},
+ {n:'operations',mem:25,last:'Generator service moved to Thursday',t:'Yesterday',msgs:[
+   {k:'m',av:'CO',t:'Yesterday 16:10',x:'Generator service moved to Thursday. Please save your work before 14:00.'}]},
+ {n:'partnerships',mem:9,un:1,last:'Filmhouse prefer a revenue share',t:'Yesterday',msgs:[
+   {k:'m',av:'NE',t:'Yesterday 15:22',x:'Filmhouse prefer a revenue share over a flat listing fee. Modelling it with Amara.'}]},
+ {n:'enugu-launch',mem:6,last:'Two content roles join on 20 October',t:'06/10',msgs:[
+   {k:'m',av:'CN',t:'06/10 11:04',x:'Two content roles join on 20 October. Desk space is sorted.'}]}
+];
+var DMS=[
+ {p:'IC',on:1,un:1,t:'08:03',msgs:[
+   {k:'day',x:'Yesterday'},
+   {k:'m',av:'IC',t:'18:02',x:'Did the Content target get approved?'},
+   {k:'m',av:'CO',t:'18:14',x:'Yes, you approved it at 16:40. Marketing and Operations are still with you.'},
+   {k:'day',x:'Today'},
+   {k:'m',av:'IC',t:'07:52',x:'Cynthia, has the JBS requisition gone through?'},
+   {k:'m',av:'CO',t:'07:58',x:'Yes, it is with you for approval. REQ-0042, ₦1,841,500 across five requests.'},
+   {k:'m',av:'IC',t:'08:03',x:'Seen. Approving this morning.'}]},
+ {p:'TA',on:1,t:'Yesterday',msgs:[
+   {k:'m',av:'TA',t:'Yesterday 14:20',x:'Shot list uploaded. Quick one on the Enugu permits:'},
+   {k:'vn',av:'TA',t:'Yesterday 14:21',d:'0:24'},
+   {k:'m',av:'CO',t:'Yesterday 14:35',x:'Got it. I will call the state office in the morning.'}]},
+ {p:'AD',t:'Yesterday',msgs:[{k:'file',av:'AD',t:'Yesterday 11:02',f:'mtn-sponsor-deck.pdf',s:'3.2 MB'},{k:'m',av:'AD',t:'Yesterday 11:02',x:'Sent the sponsor deck.'}]},
+ {p:'BL',un:2,t:'Yesterday',msgs:[{k:'m',av:'BL',t:'Yesterday 10:15',x:'Can we move the Eko call?'},{k:'m',av:'BL',t:'Yesterday 10:16',x:'Thursday afternoon works for them.'}]},
+ {p:'AO',t:'08/10',msgs:[{k:'m',av:'AO',t:'08/10 17:30',x:'Payroll preview ready for your review.'}]},
+ {p:'HY',t:'Today',msgs:[{k:'m',av:'HY',t:'09:40',x:'Thank you for the birthday wishes!'}]}
+];
+var CM={ch:1,dm:0,open:false,dmf:'all',q:'',dq:''};
+var MREC={timer:null,sec:0,on:false};
+
+function lastOf(m){if(!m)return '';return m.k==='m'?m.x:m.k==='vn'?'Voice note':m.k==='file'?m.f:m.k==='ann'?m.title:
+  m.k==='bday'?'Happy birthday, '+person(m.av)[1]:m.k==='anniv'?'Work anniversary, '+person(m.av)[1]:
+  m.k==='rec'?person(m.from)[1]+' recognised '+person(m.to)[1]:m.k==='poll'?'Poll: '+m.q:''}
+
+function wave(n){var h='';for(var i=0;i<(n||26);i++)h+='<i style="height:'+(5+((i*37)%17))+'px"></i>';return '<span class="wv">'+h+'</span>'}
+
+function postHTML(m,i,where){
+  if(m.k==='day')return '<span class="tday">'+esc(m.x)+'</span>';
+  if(m.k==='bday'||m.k==='anniv'){var p=person(m.av),b=m.k==='bday';
+    return '<div class="celeb"><span class="big">'+esc(p[0])+'</span><div class="cbd"><div class="kk">'+(b?'Birthday':'Work anniversary')+'</div>'+
+      '<h4>'+(b?'Happy birthday, '+esc(p[1]):esc(p[1])+', '+m.yrs+' years at MyCity')+'</h4>'+
+      '<p>'+esc(hashPick(p[1],b?BDAY:ANNIV))+'</p>'+
+      '<div class="cf"><button class="rx'+(m.mine?' on':'')+'" data-like="'+where+':'+i+'">🎉 Celebrate · '+m.likes+'</button><small>From everyone at MyCity</small></div></div></div>'}
+  if(m.k==='rec'){var f=person(m.from),t=person(m.to);
+    return '<div class="recog"><div class="rh"><span class="av">'+esc(t[0])+'</span><span><b>'+esc(f[1])+'</b> recognised <b>'+esc(t[1])+'</b></span></div>'+
+      '<q>'+esc(m.x)+'</q><button class="rx'+(m.mine?' on':'')+'" data-like="'+where+':'+i+'">👍 '+m.likes+'</button></div>'}
+  if(m.k==='poll'){var tot=m.opts.reduce(function(a,o){return a+o[1]},0)||1;
+    return '<div class="poll"><div class="ah sub" style="margin-bottom:5px">Poll by '+esc(person(m.av)[1])+' · '+tot+' votes</div><h4>'+esc(m.q)+'</h4>'+
+      m.opts.map(function(o,oi){var pc=Math.round(o[1]*100/tot);
+        return '<button class="popt'+(m.v===oi?' on':'')+'" data-vote="'+where+':'+i+':'+oi+'"><i style="width:'+pc+'%"></i><span><span>'+esc(o[0])+'</span><span>'+pc+'%</span></span></button>'}).join('')+'</div>'}
+  if(m.k==='ann'){var a=person(m.av);
+    return '<div class="annmsg"><div class="ah">'+ic('flag')+esc(a[1])+' · '+esc(m.at)+'</div><h4>'+esc(m.title)+'</h4><p>'+esc(m.body)+'</p></div>'}
+  var me=m.av===ME[0],pp=person(m.av),inner;
+  if(m.k==='vn')inner='<div class="vn"><span class="pl">'+ic('play')+'</span>'+wave()+'<em>'+esc(m.d)+'</em></div>';
+  else if(m.k==='file')inner='<div class="fpost">'+ic('doc')+'<span><b style="font-size:12.5px;display:block">'+esc(m.f)+'</b><span class="sub">'+esc(m.s)+'</span></span></div>';
+  else inner=esc(m.x);
+  return '<div class="msg2'+(me?' me':'')+'"><span class="av">'+esc(pp[0])+'</span><div class="mb2">'+
+    '<div class="nm">'+(me?'':esc(pp[1]))+'<span>'+esc(m.t||'')+'</span></div><div class="bb">'+inner+'</div>'+
+    (me&&m.seen?'<div class="seen">'+esc(m.seen)+'</div>':'')+'</div></div>'}
+
+function chanRow(c,i){
+  return '<button class="crow'+(i===CM.ch?' on':'')+(c.un?' un':'')+'" data-ch="'+i+'"><span class="hash">#</span>'+
+    '<span class="cb"><b>'+esc(c.n)+(c.ro?ic('lock'):'')+'</b><span>'+esc(c.last||(c.mem+' members'))+'</span></span>'+
+    '<span class="cr"><em>'+esc(c.t||'')+'</em>'+(c.un?'<i>'+c.un+'</i>':'')+'</span></button>'}
+function chanList(){
+  var q=CM.q.toLowerCase(),pinned='',rest='';
+  CHANNELS.forEach(function(c,i){if(q&&c.n.indexOf(q)<0)return;if(c.pin)pinned+=chanRow(c,i);else rest+=chanRow(c,i)});
+  return (pinned?'<div class="clgl">Pinned</div>'+pinned:'')+'<div class="clgl">Channels</div>'+(rest||'<p class="sub" style="padding:8px">No channel matches.</p>')}
+
+function chanThread(){
+  var c=CHANNELS[CM.ch],canPost=!c.ro||POSTERS[ME[0]];
+  return '<div class="thread">'+
+    '<div class="thd"><button class="iconbtn mback" data-cback aria-label="Back to channels">'+ic('left','ico')+'</button>'+
+    '<button class="iconbtn mdraw" data-cdraw aria-label="Switch channel">'+ic('menu','ico')+'</button>'+
+    '<span class="tt"><b># '+esc(c.n)+(c.ro?' '+pill('nt','Read only'):'')+'</b><span>'+c.mem+' members</span></span>'+
+    '<button class="iconbtn" data-cmenu aria-label="Channel menu">'+ic('dots','ico')+'</button></div>'+
+    '<div class="tbody" id="tbody">'+c.msgs.map(function(m,i){return postHTML(m,i,'c')}).join('')+'</div>'+
+    '<div class="tcomp">'+(canPost?
+      '<button class="cbtn" id="plusbtn" aria-label="Add to message">'+ic('plus')+'</button>'+
+      '<input class="inp" id="cmsg" placeholder="Message #'+esc(c.n)+'" aria-label="Message" autocomplete="off">'+
+      '<button class="cbtn pri" id="csend" aria-label="Send">'+ic('send')+'</button>':
+      '<span class="roline">'+ic('lock')+'Only People and the CEO post here</span>')+
+    '</div></div>'}
+
+function channelsTab(){
+  return head('Channels',CHANNELS.length+' channels · 25 staff',[['New Channel',1,'newch']])+
+    '<div class="chatwrap'+(CM.open?' full':'')+'"><div class="clist">'+
+    '<div class="clsrch" style="padding-top:12px"><input class="inp" id="chq" placeholder="Search channels" aria-label="Search channels" value="'+esc(CM.q)+'"></div>'+
+    '<div class="clbody" id="clbody">'+chanList()+'</div></div>'+chanThread()+'</div>'}
+
+/* direct messages */
+function dmRow(d,i){var p=person(d.p),l=d.msgs[d.msgs.length-1];
+  return '<button class="crow'+(i===CM.dm?' on':'')+(d.un?' un':'')+'" data-dm="'+i+'"><span class="av">'+esc(p[0])+(d.on?'<i class="dot"></i>':'')+'</span>'+
+    '<span class="cb"><b>'+esc(p[1])+'</b><span>'+(l&&l.av===ME[0]?'You: ':'')+esc(lastOf(l))+'</span></span>'+
+    '<span class="cr"><em>'+esc(d.t||'')+'</em>'+(d.un?'<i>'+d.un+'</i>':'')+'</span></button>'}
+function dmList(){var q=CM.dq.toLowerCase(),h='';
+  DMS.forEach(function(d,i){var p=person(d.p);
+    if(CM.dmf==='unread'&&!d.un)return; if(q&&p[1].toLowerCase().indexOf(q)<0)return; h+=dmRow(d,i)});
+  return h||'<p class="sub" style="padding:10px">Nothing here.</p>'}
+function dmThread(){var d=DMS[CM.dm],p=person(d.p);
+  return '<div class="thread">'+
+    '<div class="thd"><button class="iconbtn mback" data-cback aria-label="Back to conversations">'+ic('left','ico')+'</button>'+
+    '<span class="av" style="background:var(--accent-soft);color:var(--accent)">'+esc(p[0])+'</span>'+
+    '<span class="tt"><b>'+esc(p[1])+'</b><span>'+(d.on?'Online':'Last seen yesterday')+' · '+esc(p[2])+'</span></span>'+
+    '<button class="iconbtn" data-dmenu aria-label="Conversation menu">'+ic('dots','ico')+'</button></div>'+
+    '<div class="tbody" id="tbody">'+d.msgs.map(function(m,i){return postHTML(m,i,'d')}).join('')+'</div>'+
+    '<div class="tcomp" id="dcomp">'+dmComposer()+'</div></div>'}
+function dmComposer(){
+  if(MREC.on)return '<button class="cbtn" id="vcancel" aria-label="Cancel recording">'+ic('x')+'</button>'+
+    '<span class="recbar"><i></i>Recording <span id="vtime">'+fmtSec(MREC.sec)+'</span></span>'+
+    '<button class="cbtn pri" id="vsend" aria-label="Send voice note">'+ic('send')+'</button>';
+  return '<button class="cbtn" id="dplus" aria-label="Attach">'+ic('clip')+'</button>'+
+    '<input class="inp" id="dmsg" placeholder="Message '+esc(person(DMS[CM.dm].p)[1].split(' ')[0])+'" aria-label="Message" autocomplete="off">'+
+    '<button class="cbtn" id="vrec" aria-label="Record a voice note">'+ic('mic')+'</button>'+
+    '<button class="cbtn pri" id="dsend" aria-label="Send">'+ic('send')+'</button>'}
+function fmtSec(s){return Math.floor(s/60)+':'+pad(s%60)}
+function dmTab(){var un=DMS.filter(function(d){return d.un}).length;
+  return head('Direct Messages',un?un+' unread':'All caught up',[['New Message',1,'newdm']])+
+    '<div class="chatwrap'+(CM.open?' full':'')+'"><div class="clist">'+
+    '<div class="clsrch" style="padding-top:12px"><input class="inp" id="dmq" placeholder="Search people" aria-label="Search conversations" value="'+esc(CM.dq)+'"></div>'+
+    '<div class="clfil"><button data-dmf="all"'+(CM.dmf==='all'?' class="on"':'')+'>All</button><button data-dmf="unread"'+(CM.dmf==='unread'?' class="on"':'')+'>Unread</button></div>'+
+    '<div class="clbody" id="clbody">'+dmList()+'</div></div>'+dmThread()+'</div>'}
+
+/* announcements: the configuration and tracking side. Staff read them in #announcements. */
+var ANN=[
+ {title:'Q4 review cycle opens',body:'Self ratings open on 20 October. Managers review from 27 October.',av:'CO',at:'20/10/2026 09:00',sch:1,read:0},
+ {title:'New faces in Enugu',body:'Two content roles join on 20 October. Say hello in #enugu-launch.',av:'CO',at:'06/10/2026',read:19},
+ {title:'Saturday hours confirmed',body:'Saturdays are 09:00 to 15:00 for all departments. Clock in applies as on weekdays.',av:'CO',at:'01/10/2026',read:24},
+ {title:'NDPA refresher due',body:'Everyone must complete the data protection refresher before 30 November.',av:'CO',at:'28/09/2026',read:23},
+ {title:'Ember to Remember kicks off',body:'The 100 day calendar runs 22 September to 31 December. All hands on the Lagos leg from 14 October.',av:'IC',at:'22/09/2026',read:25}];
+function annTab(){
+  var pub=ANN.filter(function(a){return !a.sch}),avg=Math.round(pub.reduce(function(s,a){return s+a.read},0)*100/(pub.length*25));
+  return '<div class="phead"><div><h1>Announcements '+infoBtn('ann-help')+'</h1><p>Posted by People and the CEO · staff read them in #announcements</p></div>'+
+    '<div class="right"><button class="btn pri" id="newann">'+ic('plus')+'New Announcement</button></div></div>'+
+    infoText('ann-help','Only People and the CEO can post. An announcement appears in #announcements, which is pinned and read only for everyone else, and as a notification. It can be scheduled. Read counts are visible to the poster only.')+
+    statstrip([['Published',String(pub.length)],['Scheduled',String(ANN.length-pub.length)],['Average read',avg+'%','ok'],['Audience','25 staff'],['This month','2','','dsk']])+
+    '<div class="grid g2" style="margin-top:12px">'+ANN.map(function(a,i){var p=person(a.av);
+      return '<button class="card annc" data-an="'+i+'"><div class="ch" style="margin-bottom:6px"><h3>'+esc(a.title)+'</h3><span class="right">'+
+        (a.sch?pill('in','Scheduled'):pill(a.read===25?'ok':'nt',a.read+' of 25 read'))+'</span></div>'+
+        '<p style="font-size:13px;color:var(--ink-2)">'+esc(a.body)+'</p>'+
+        '<p class="sub" style="margin-top:9px">'+(a.sch?'Goes out ':'Posted ')+esc(a.at)+' by '+esc(p[1])+'</p></button>'}).join('')+'</div>'}
+
+/* ───── community modals ───── */
+function picker(id,list,multi,sel){sel=sel||{};
+  return '<input class="inp" id="'+id+'-q" placeholder="Search by name or department" aria-label="Search people" style="margin-bottom:8px">'+
+    '<div class="plist" id="'+id+'">'+list.map(function(p){
+      return '<button class="prow'+(sel[p[0]]?' on':'')+'" data-pk="'+p[0]+'" data-pdept="'+esc(p[2])+'"><span class="av">'+esc(p[0])+'</span>'+
+        '<span class="pn"><b>'+esc(p[1])+'</b><span>'+esc(p[2])+'</span></span>'+(multi?'<span class="tick">'+ic('ok')+'</span>':'')+'</button>'}).join('')+'</div>'}
+function bindPicker(m,id,multi,onPick){
+  var box=$('#'+id,m),q=$('#'+id+'-q',m);
+  q.addEventListener('input',function(){var v=q.value.toLowerCase();
+    $$('.prow',box).forEach(function(r){r.style.display=r.textContent.toLowerCase().indexOf(v)>=0?'':'none'})});
+  $$('.prow',box).forEach(function(r){r.onclick=function(){
+    if(multi){r.classList.toggle('on');if(onPick)onPick()}else{$$('.prow',box).forEach(function(x){x.classList.remove('on')});r.classList.add('on');if(onPick)onPick(r.dataset.pk)}}})}
+function picked(m,id){return $$('#'+id+' .prow.on',m).map(function(r){return r.dataset.pk})}
+
+function newChannelModal(){
+  openModal({title:'New Channel',body:
+    field('chn','Channel name','<input class="inp" id="chn" placeholder="e.g. abuja-hub" autocomplete="off">','Lower case letters, numbers and hyphens, 2 to 30 characters')+
+    field('chd','What is it for','<input class="inp" id="chd" placeholder="Optional">')+
+    '<div class="f"><label>Add whole departments</label><div class="chips" id="chdepts" style="margin:0">'+DEPTS.map(function(d){return '<button class="chip" data-dept="'+esc(d)+'">'+esc(d)+'</button>'}).join('')+'</div></div>'+
+    '<div class="f"><label>Add people <span class="sub" id="chcount">· 0 selected</span></label>'+picker('chpk',PEOPLE.slice(1),true)+'</div>'+
+    '<div class="f"><label>Who can post '+infoBtn('wp-help')+'</label>'+infoText('wp-help','Set when the channel is created. Everyone can read. Channels are internal to MyCity: there is no public link to join one.')+
+    '<div class="seg" id="chwho"><button class="on" data-w="all">Every member</button><button data-w="admins">Only admins</button></div></div>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="chgo">Create Channel</button>',
+    onMount:function(m){
+      live('chn',function(v){return /^[a-z0-9][a-z0-9-]{1,29}$/.test(v)&&!CHANNELS.some(function(c){return c.n===v})});
+      var count=function(){$('#chcount',m).textContent='· '+picked(m,'chpk').length+' selected'};
+      bindPicker(m,'chpk',true,count);
+      $$('#chdepts .chip',m).forEach(function(c){c.onclick=function(){c.classList.toggle('on');var on=c.classList.contains('on');
+        $$('#chpk .prow',m).forEach(function(r){if(r.dataset.pdept===c.dataset.dept)r.classList.toggle('on',on)});count()}});
+      $$('#chwho button',m).forEach(function(b){b.onclick=function(){$$('#chwho button',m).forEach(function(x){x.classList.remove('on')});b.classList.add('on')}});
+      bindInfo(m);
+      $('#chgo',m).onclick=function(){var n=$('#chn',m).value.trim();
+        if(!/^[a-z0-9][a-z0-9-]{1,29}$/.test(n)||CHANNELS.some(function(c){return c.n===n})){$('#fw-chn',m).classList.add('bad');$('#chn',m).focus();return}
+        var mem=picked(m,'chpk').length+1,adm=$('#chwho .on',m).dataset.w==='admins';
+        CHANNELS.push({n:n,mem:mem,adminOnly:adm,last:'Channel created',t:nowHM(),msgs:[{k:'day',x:'Today'},
+          {k:'m',av:ME[0],t:nowHM(),x:'Created #'+n+($('#chd',m).value?': '+$('#chd',m).value:'')+'.'}]});
+        CM.ch=CHANNELS.length-1;CM.open=true;closeModal();render();toast('#'+n+' created with '+mem+' members')}}})}
+
+function membersModal(edit){var c=CHANNELS[CM.ch],list=PEOPLE.slice(0,Math.min(PEOPLE.length,c.mem));
+  openModal({title:(edit?'Edit Members':'Members')+' · #'+c.n,body:
+    '<p class="sub" style="margin-bottom:10px">'+c.mem+' members'+(c.mem>list.length?', showing '+list.length:'')+'</p>'+
+    '<div class="plist">'+list.map(function(p,i){return '<div class="prow"><span class="av">'+esc(p[0])+'</span><span class="pn"><b>'+esc(p[1])+'</b><span>'+esc(p[2])+'</span></span>'+
+      (i===0?pill('ok','Admin'):'')+(edit&&i>0?'<button class="btn" data-rm="'+p[0]+'" style="height:28px">Remove</button>':'')+'</div>'}).join('')+'</div>',
+    foot:edit?'<button class="btn" id="addmem">'+ic('plus')+'Add People</button><button class="btn pri" data-mx>Done</button>':'<button class="btn pri" data-mx>Close</button>',
+    onMount:function(m){$$('[data-rm]',m).forEach(function(b){b.onclick=function(){b.closest('.prow').remove();c.mem--;toast('Removed from #'+c.n)}});
+      var a=$('#addmem',m);if(a)a.onclick=function(){toast('Pick people or a whole department, as when creating a channel')}}})}
+
+function channelMenu(btn){var c=CHANNELS[CM.ch];
+  popover(btn,[['View Members','users',function(){membersModal(false)}],
+    ['Edit Members','user',function(){membersModal(true)}],
+    ['Channel Details','info',function(){openModal({title:'#'+c.n,body:'<dl class="kv"><dt>Members</dt><dd>'+c.mem+'</dd><dt>Who can post</dt><dd>'+
+      (c.ro?'People and the CEO':c.adminOnly?'Admins only':'Every member')+'</dd><dt>Visibility</dt><dd>Internal to MyCity</dd></dl>',foot:'<button class="btn pri" data-mx>Close</button>'})}],
+    'sep',['Mute Notifications','bell',function(){toast('#'+c.n+' muted')}]])}
+
+function postToChannel(msg){var c=CHANNELS[CM.ch];msg.t=msg.t||nowHM();c.msgs.push(msg);c.last=lastOf(msg);c.t=nowHM();render()}
+
+function plusMenu(btn){
+  popover(btn,[['Recognise a Colleague','thumb',recogniseModal],['Celebrate','flag',celebrateModal],
+    ['Start a Poll','chart',pollModal],['Attach a File','clip',function(){fileModal(function(f){postToChannel({k:'file',av:ME[0],f:f[0],s:f[1]})})}]],true)}
+function recogniseModal(){
+  openModal({title:'Recognise a Colleague',body:'<div class="f"><label>Who</label>'+picker('rpk',PEOPLE.slice(1),false)+'</div>'+
+    field('rwhat','What did they do','<textarea class="inp" id="rwhat" placeholder="Optional. Leave it blank and a note is written for you."></textarea>'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="rgo">'+ic('thumb')+'Post</button>',
+    onMount:function(m){bindPicker(m,'rpk',false);$('#rgo',m).onclick=function(){var who=picked(m,'rpk')[0];
+      if(!who){toast('Choose who you are recognising');return}
+      var x=$('#rwhat',m).value.trim()||'Thank you for the great work this week.';
+      closeModal();postToChannel({k:'rec',from:ME[0],to:who,x:x,likes:0});toast('Posted to #'+CHANNELS[CM.ch].n)}}})}
+function celebrateModal(){
+  openModal({title:'Celebrate',body:'<div class="f"><label>Who</label>'+picker('cpk',PEOPLE.slice(1),false)+'</div>'+
+    '<div class="f"><label>What</label><div class="seg" id="cwhat"><button class="on" data-c="bday">Birthday</button><button data-c="anniv">Work Anniversary</button></div></div>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="cgo">'+ic('flag')+'Post</button>',
+    onMount:function(m){bindPicker(m,'cpk',false);
+      $$('#cwhat button',m).forEach(function(b){b.onclick=function(){$$('#cwhat button',m).forEach(function(x){x.classList.remove('on')});b.classList.add('on')}});
+      $('#cgo',m).onclick=function(){var who=picked(m,'cpk')[0];if(!who){toast('Choose who you are celebrating');return}
+        var k=$('#cwhat .on',m).dataset.c;closeModal();postToChannel({k:k,av:who,yrs:2,likes:0})}}})}
+function pollModal(){
+  openModal({title:'Start a Poll',body:field('pq','Question','<input class="inp" id="pq" placeholder="Ask one question">','Ask a question')+
+    '<div class="f"><label>Options</label>'+[1,2,3,4].map(function(n){return '<input class="inp" data-po style="margin-bottom:6px" placeholder="Option '+n+(n>2?' (optional)':'')+'">'}).join('')+'</div>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="pgo">'+ic('chart')+'Post Poll</button>',
+    onMount:function(m){live('pq',function(v){return v.trim().length>3});
+      $('#pgo',m).onclick=function(){var q=$('#pq',m).value.trim(),o=$$('[data-po]',m).map(function(i){return i.value.trim()}).filter(Boolean);
+        if(q.length<4){$('#fw-pq',m).classList.add('bad');return} if(o.length<2){toast('Give at least two options');return}
+        closeModal();postToChannel({k:'poll',av:ME[0],q:q,opts:o.map(function(x){return [x,0]})})}}})}
+/* the upload engine shows a percentage; never a raw file input (gate 18) */
+function fileModal(done){
+  var files=[['q4-content-calendar.xlsx','212 KB'],['enugu-permit-letter.pdf','480 KB'],['studio-floorplan.png','1.4 MB']];
+  openModal({title:'Attach a File',body:'<p class="sub" style="margin-bottom:10px">Files are stored in the vault and shared here.</p>'+
+    '<div class="plist">'+files.map(function(f,i){return '<button class="prow" data-fi="'+i+'">'+ic('doc')+'<span class="pn"><b>'+esc(f[0])+'</b><span>'+esc(f[1])+'</span></span></button>'}).join('')+'</div>'+
+    '<div id="upl" style="display:none;margin-top:12px"><div class="sub" id="upln"></div><div class="prog"><i id="uplb" style="width:0"></i></div></div>',
+    foot:'<button class="btn" data-mx>Cancel</button>',
+    onMount:function(m){$$('[data-fi]',m).forEach(function(b){b.onclick=function(){var f=files[+b.dataset.fi],pc=0;
+      $('#upl',m).style.display='';var tm=setInterval(function(){pc=Math.min(100,pc+9+Math.round(Math.random()*12));
+        $('#uplb',m).style.width=pc+'%';$('#upln',m).textContent=f[0]+' · '+pc+'%';
+        if(pc>=100){clearInterval(tm);setTimeout(function(){closeModal();done(f)},250)}},90)}})}})}
+
+function newDmModal(){
+  openModal({title:'New Message',body:picker('dpk',PEOPLE.slice(1),false),foot:'<button class="btn" data-mx>Cancel</button>',
+    onMount:function(m){bindPicker(m,'dpk',false,function(av){
+      var at=-1;DMS.forEach(function(d,i){if(d.p===av)at=i});
+      if(at<0){DMS.unshift({p:av,t:'Now',msgs:[]});at=0}
+      CM.dm=at;CM.open=true;closeModal();render();setTimeout(function(){var i=$('#dmsg');if(i)i.focus()},40)})}})}
+
+function annModal(i){var a=ANN[i],p=person(a.av),un=PEOPLE.slice(2).filter(function(x,k){return k>=a.read-2});
+  openModal({title:a.title,body:'<p class="sub">'+(a.sch?'Goes out ':'Posted ')+esc(a.at)+' by '+esc(p[1])+'</p>'+
+    '<p style="margin:10px 0 14px;font-size:13.5px;color:var(--ink-2)">'+esc(a.body)+'</p>'+
+    (a.sch?pill('in','Scheduled. Not yet visible to staff'):
+      '<div class="ch" style="margin-bottom:6px"><h3>Read by '+a.read+' of 25</h3></div>'+mini(Math.round(a.read*4),Math.round(a.read*4)+'%')+
+      (a.read<25?'<p class="sub" style="margin:12px 0 6px">Not yet read</p><div class="plist">'+un.slice(0,25-a.read).map(function(x){return '<div class="prow"><span class="av">'+esc(x[0])+'</span><span class="pn"><b>'+esc(x[1])+'</b><span>'+esc(x[2])+'</span></span></div>'}).join('')+'</div>':'')),
+    foot:'<button class="btn pri" data-mx>Close</button>'})}
+
+function newAnnModal(){
+  openModal({title:'New Announcement',wide:false,body:
+    field('at','Headline','<input class="inp" id="at" placeholder="One line staff will read first">','Give it a headline')+
+    field('ab','Message','<textarea class="inp" id="ab" placeholder="What staff need to know"></textarea>','Write the message')+
+    '<div class="f"><label>Audience</label><div class="seg" id="aaud"><button class="on" data-a="all">All Staff</button><button data-a="dept">Departments</button></div>'+
+    '<div class="chips" id="adepts" style="display:none;margin:8px 0 0">'+DEPTS.map(function(d){return '<button class="chip">'+esc(d)+'</button>'}).join('')+'</div></div>'+
+    '<div class="f"><label>When</label><div class="seg" id="awhen"><button class="on" data-w="now">Now</button><button data-w="later">Schedule</button></div></div>'+
+    '<div id="asch" style="display:none">'+field('ad','Date (dd/mm/yyyy)','<input class="inp" id="ad" placeholder="20/10/2026" inputmode="numeric">','Use day, month, year: 20/10/2026')+'</div>'+
+    '<p class="sub">'+ic('user')+' Posting as '+esc(ME[1])+'</p>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="ago">Publish</button>',
+    onMount:function(m){live('at',function(v){return v.trim().length>3});live('ab',function(v){return v.trim().length>3});live('ad',isDayFirst);
+      var seg=function(id,fn){$$('#'+id+' button',m).forEach(function(b){b.onclick=function(){$$('#'+id+' button',m).forEach(function(x){x.classList.remove('on')});b.classList.add('on');fn(b)}})};
+      seg('aaud',function(b){$('#adepts',m).style.display=b.dataset.a==='dept'?'':'none'});
+      seg('awhen',function(b){var l=b.dataset.w==='later';$('#asch',m).style.display=l?'':'none';$('#ago',m).textContent=l?'Schedule':'Publish'});
+      $$('#adepts .chip',m).forEach(function(c){c.onclick=function(){c.classList.toggle('on')}});
+      $('#ago',m).onclick=function(){var t=$('#at',m).value.trim(),b=$('#ab',m).value.trim(),later=$('#awhen .on',m).dataset.w==='later',d=$('#ad',m).value.trim();
+        if(t.length<4){$('#fw-at',m).classList.add('bad');return} if(b.length<4){$('#fw-ab',m).classList.add('bad');return}
+        if(later&&!isDayFirst(d)){$('#fw-ad',m).classList.add('bad');return}
+        var today=new Date(),ds=pad(today.getDate())+'/'+pad(today.getMonth()+1)+'/'+today.getFullYear();
+        ANN.unshift({title:t,body:b,av:ME[0],at:later?d+' 09:00':ds,sch:later?1:0,read:later?0:1});
+        if(!later){CHANNELS[0].msgs.push({k:'ann',av:ME[0],title:t,body:b,at:ds});CHANNELS[0].last=t;CHANNELS[0].t=nowHM()}
+        closeModal();render();toast(later?'Scheduled for '+d:'Published to #announcements')}}})}
+
+/* ═════════════ MAILBOX: the rich text composer ═════════════
+   Same tools as the praxis-ls composer; send and receive only, linked to nothing else. */
+/* filled by mailTab() while the module list is built, before this line runs: keep what is there */
+var MAILROWS=MAILROWS||{},MAILOPEN=MAILOPEN||{};
+function composeModal(pre){pre=pre||{};
+  var tools=[['B','bold','Bold'],['I','italic','Italic'],['U','underline','Underline'],['S','strikeThrough','Strikethrough'],'|',
+    ['H','h2','Heading'],['•','insertUnorderedList','Bulleted list'],['1.','insertOrderedList','Numbered list'],['❝','blockquote','Quote'],'|',
+    ['link','link','Link'],['Tx','removeFormat','Clear formatting']];
+  openModal({title:pre.title||'New Message',wide:true,full:true,body:
+    '<div class="comp-row"><label>From</label><select id="mfrom" aria-label="From"><option>cynthia@mycityapp.io</option></select></div>'+
+    '<div class="comp-row" id="mto-row"><label for="mto">To</label><span id="mto-chips" style="display:contents"></span>'+
+      '<input id="mto" placeholder="Type an address, then Enter" autocomplete="off"><button class="lnk" id="mccb">Cc Bcc</button></div>'+
+    '<div class="comp-row" id="mcc-row" style="display:none"><label for="mcc">Cc</label><input id="mcc" autocomplete="off"></div>'+
+    '<div class="comp-row" id="mbcc-row" style="display:none"><label for="mbcc">Bcc</label><input id="mbcc" autocomplete="off"></div>'+
+    '<div class="comp-row"><label for="msub">Subject</label><input id="msub" value="'+esc(pre.sub||'')+'"></div>'+
+    '<div class="tbar" role="toolbar" aria-label="Formatting">'+tools.map(function(t){return t==='|'?'<span class="tsep"></span>':
+      '<button data-cmd="'+t[1]+'" title="'+t[2]+'" aria-label="'+t[2]+'"'+(t[0]==='B'?' style="font-weight:800"':t[0]==='I'?' style="font-style:italic"':t[0]==='U'?' style="text-decoration:underline"':t[0]==='S'?' style="text-decoration:line-through"':'')+'>'+(t[0]==='link'?ic('link'):esc(t[0]))+'</button>'}).join('')+
+      '<button data-cmd="attach" title="Attach a file" aria-label="Attach a file">'+ic('clip')+'</button>'+
+      '<span class="lkbox" id="lkbox"><input class="inp" id="lkurl" placeholder="https://" style="height:30px"><button class="btn" id="lkgo" style="height:30px">Add Link</button></span></div>'+
+    '<div class="rte" id="rte" contenteditable="true" data-ph="Write your message" aria-label="Message body" role="textbox" aria-multiline="true">'+(pre.body||'')+'</div>'+
+    '<div class="atray" id="atray"></div>',
+    foot:'<span class="grow" id="mdraft"></span><button class="btn" id="mdiscard">Discard</button><button class="btn" id="msched">'+ic('clock')+'Schedule</button><button class="btn pri" id="msend">'+ic('send')+'Send</button>',
+    onMount:function(m){
+      var to=pre.to?[pre.to]:[],rte=$('#rte',m),sel=null,draftT=null;
+      var good=function(a){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a)};
+      var chips=function(){$('#mto-chips',m).innerHTML=to.map(function(a,i){return '<span class="rchip'+(good(a)?'':' bad')+'">'+esc(a)+'<button data-rmto="'+i+'" aria-label="Remove '+esc(a)+'">'+ic('x')+'</button></span>'}).join('');
+        $$('[data-rmto]',m).forEach(function(b){b.onclick=function(){to.splice(+b.dataset.rmto,1);chips()}})};
+      chips();
+      var add=function(){var v=$('#mto',m).value.replace(/[,;\s]+$/,'').trim();if(v){to.push(v);$('#mto',m).value='';chips()}};
+      $('#mto',m).addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===','||e.key===';'){e.preventDefault();add()}
+        else if(e.key==='Backspace'&&!this.value&&to.length){to.pop();chips()}});
+      $('#mto',m).addEventListener('blur',add);
+      $('#mccb',m).onclick=function(){$('#mcc-row',m).style.display='';$('#mbcc-row',m).style.display='';this.style.display='none'};
+      var saved=function(){clearTimeout(draftT);$('#mdraft',m).innerHTML='';draftT=setTimeout(function(){var d=$('#mdraft',m);if(d)d.innerHTML=pill('nt','Draft saved')},700)};
+      rte.addEventListener('input',saved);$('#msub',m).addEventListener('input',saved);
+      rte.addEventListener('keyup',function(){var s=window.getSelection();if(s.rangeCount)sel=s.getRangeAt(0)});
+      rte.addEventListener('mouseup',function(){var s=window.getSelection();if(s.rangeCount)sel=s.getRangeAt(0)});
+      var restore=function(){rte.focus();if(sel){var s=window.getSelection();s.removeAllRanges();s.addRange(sel)}};
+      $$('[data-cmd]',m).forEach(function(b){b.addEventListener('mousedown',function(e){e.preventDefault()});b.onclick=function(){var c=b.dataset.cmd;
+        if(c==='attach'){fileModalInline(m);return}
+        if(c==='link'){$('#lkbox',m).classList.toggle('on');$('#lkurl',m).focus();return}
+        restore();
+        if(c==='h2'||c==='blockquote')document.execCommand('formatBlock',false,c);else document.execCommand(c,false,null);saved()}});
+      $('#lkgo',m).onclick=function(){var u=$('#lkurl',m).value.trim();if(!/^(https:\/\/|mailto:)/.test(u)){$('#lkurl',m).style.borderColor='var(--err)';return}
+        restore();document.execCommand('createLink',false,u);$('#lkbox',m).classList.remove('on');$('#lkurl',m).value='';saved()};
+      $('#mdiscard',m).onclick=function(){var f=m.querySelector('.mft');f.innerHTML='<span class="grow">Discard this draft and its attachments?</span>'+
+        '<button class="btn" id="mkeep">Keep Editing</button><button class="btn pri" id="mdrop">Discard</button>';
+        $('#mkeep',m).onclick=function(){closeModal();composeModal(pre)};$('#mdrop',m).onclick=function(){closeModal();toast('Draft discarded')}};
+      var send=function(when){add();if(!to.length){$('#mto-row',m).style.borderColor='var(--err)';$('#mto',m).focus();toast('Add at least one recipient');return}
+        var bad=to.filter(function(a){return !good(a)});if(bad.length){toast(bad[0]+' is not an email address');return}
+        var sub=$('#msub',m).value.trim()||'(no subject)';
+        if(MAILROWS.Sent&&!when)MAILROWS.Sent.unshift([to[0],sub,nowHM(),0,rte.innerHTML||'<p></p>','CO','cynthia@mycityapp.io',null]);
+        closeModal();if(M[cur.m].k==='mailbox')render();toast(when?'Scheduled for '+when:'Sent to '+to.join(', '))};
+      $('#msend',m).onclick=function(){send()};
+      $('#msched',m).onclick=function(){popover(this,[['Tomorrow, 08:00','clock',function(){send('tomorrow 08:00')}],
+        ['Monday, 08:00','clock',function(){send('Monday 08:00')}]],true)};
+    }})}
+function fileModalInline(m){var tray=$('#atray',m),f=['proposal-draft.pdf','620 KB'],id='u'+Date.now(),pc=0;
+  tray.insertAdjacentHTML('beforeend','<span class="attchip" id="'+id+'"><span style="display:flex;gap:7px;align-items:center">'+ic('doc')+esc(f[0])+'<span class="sub">'+f[1]+'</span></span><span class="prog"><i style="width:0"></i></span></span>');
+  var tm=setInterval(function(){pc=Math.min(100,pc+12);var el=$('#'+id+' .prog i',m);if(!el){clearInterval(tm);return}el.style.width=pc+'%';
+    if(pc>=100){clearInterval(tm);$('#'+id+' .prog',m).outerHTML='<span class="sub">Attached</span>'}},90)}
+
+/* ═════════════ binding for the two modules (called from bind()) ═════════════ */
+function bindInfo(scope){$$('[data-ib]',scope).forEach(function(b){b.onclick=function(e){e.stopPropagation();var t=$('#'+b.dataset.ib);
+  var on=!t.classList.contains('on');t.classList.toggle('on',on);b.setAttribute('aria-expanded',String(on))}})}
+function scrollThread(){var t=$('#tbody');if(t)t.scrollTop=t.scrollHeight}
+function bindComm(){
+  bindInfo(document);
+  scrollThread();
+  var nc=$('#newch');if(nc)nc.onclick=newChannelModal;
+  var nd=$('#newdm');if(nd)nd.onclick=newDmModal;
+  var na=$('#newann');if(na)na.onclick=newAnnModal;
+  $$('[data-an]').forEach(function(b){b.onclick=function(){annModal(+b.dataset.an)}});
+  $$('[data-ch]').forEach(function(b){b.onclick=function(){CM.ch=+b.dataset.ch;CM.open=true;CHANNELS[CM.ch].un=0;$('#drawer').classList.remove('on');render()}});
+  $$('[data-dm]').forEach(function(b){b.onclick=function(){CM.dm=+b.dataset.dm;CM.open=true;DMS[CM.dm].un=0;MREC.on=false;render()}});
+  $$('[data-dmf]').forEach(function(b){b.onclick=function(){CM.dmf=b.dataset.dmf;render()}});
+  $$('[data-cback]').forEach(function(b){b.onclick=function(){CM.open=false;MREC.on=false;render()}});
+  $$('[data-cdraw]').forEach(function(b){b.onclick=function(){var d=$('#drawer');
+    d.innerHTML='<div class="dpane"><div class="clhd"><h3>Channels</h3><button class="iconbtn" id="dclose" aria-label="Close">'+ic('x','ico')+'</button></div><div class="clbody">'+chanList()+'</div></div>';
+    d.classList.add('on');$('#dclose').onclick=function(){d.classList.remove('on')};
+    d.onclick=function(e){if(e.target===d)d.classList.remove('on')};
+    $$('[data-ch]',d).forEach(function(r){r.onclick=function(){CM.ch=+r.dataset.ch;CHANNELS[CM.ch].un=0;d.classList.remove('on');render()}})}});
+  var cm=$('[data-cmenu]');if(cm)cm.onclick=function(e){e.stopPropagation();channelMenu(cm)};
+  var dm=$('[data-dmenu]');if(dm)dm.onclick=function(e){e.stopPropagation();var p=person(DMS[CM.dm].p);
+    popover(dm,[['View Profile','user',function(){toast('Opening '+p[1])}],['Search in Conversation','srch',function(){toast('Search in conversation')}],'sep',
+      ['Mute Notifications','bell',function(){toast('Muted '+p[1])}]])};
+  var chq=$('#chq');if(chq)chq.oninput=function(){CM.q=chq.value;$('#clbody').innerHTML=chanList();bindComm()};
+  var dmq=$('#dmq');if(dmq)dmq.oninput=function(){CM.dq=dmq.value;$('#clbody').innerHTML=dmList();bindComm()};
+  var pb=$('#plusbtn');if(pb)pb.onclick=function(e){e.stopPropagation();plusMenu(pb)};
+  var send=function(inp,fn){var v=inp.value.trim();if(!v)return;fn(v);var n=$('#'+inp.id);if(n)n.focus()};
+  var cs=$('#csend'),ci=$('#cmsg');
+  if(ci){var go=function(){send(ci,function(v){var c=CHANNELS[CM.ch];
+      if(c.ro){postToChannel({k:'ann',av:ME[0],title:v,body:'',at:'Today'})}else postToChannel({k:'m',av:ME[0],x:v})})};
+    cs.onclick=go;ci.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();go()}}}
+  var ds=$('#dsend'),di=$('#dmsg');
+  if(di){var dgo=function(){send(di,function(v){var d=DMS[CM.dm];d.msgs.push({k:'m',av:ME[0],t:nowHM(),x:v,seen:'Delivered'});d.t=nowHM();render()})};
+    ds.onclick=dgo;di.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();dgo()}}}
+  var dp=$('#dplus');if(dp)dp.onclick=function(e){e.stopPropagation();popover(dp,[['Photo or Video','image',function(){fileModal(function(f){DMS[CM.dm].msgs.push({k:'file',av:ME[0],t:nowHM(),f:f[0],s:f[1]});render()})}],
+    ['Document','doc',function(){fileModal(function(f){DMS[CM.dm].msgs.push({k:'file',av:ME[0],t:nowHM(),f:f[0],s:f[1]});render()})}]],true)};
+  var vr=$('#vrec');if(vr)vr.onclick=function(){MREC.on=true;MREC.sec=0;$('#dcomp').innerHTML=dmComposer();bindComm();
+    MREC.timer=setInterval(function(){MREC.sec++;var t=$('#vtime');if(t)t.textContent=fmtSec(MREC.sec);else{clearInterval(MREC.timer);MREC.timer=null}},1000)};
+  var vc=$('#vcancel');if(vc)vc.onclick=function(){clearInterval(MREC.timer);MREC.timer=null;MREC.on=false;$('#dcomp').innerHTML=dmComposer();bindComm()};
+  var vs=$('#vsend');if(vs)vs.onclick=function(){clearInterval(MREC.timer);MREC.timer=null;MREC.on=false;
+    DMS[CM.dm].msgs.push({k:'vn',av:ME[0],t:nowHM(),d:fmtSec(Math.max(1,MREC.sec)),seen:'Delivered'});render()};
+  $$('[data-like]').forEach(function(b){b.onclick=function(){var p=b.dataset.like.split(':'),m=(p[0]==='c'?CHANNELS[CM.ch]:DMS[CM.dm]).msgs[+p[1]];
+    m.mine=!m.mine;m.likes+=m.mine?1:-1;render()}});
+  $$('[data-vote]').forEach(function(b){b.onclick=function(){var p=b.dataset.vote.split(':'),m=CHANNELS[CM.ch].msgs[+p[1]],o=+p[2];
+    if(m.v!==undefined)m.opts[m.v][1]--;if(m.v===o){m.v=undefined}else{m.opts[o][1]++;m.v=o}render()}});
+}
+function bindMail(){
+  var c=$('#compose');if(c)c.onclick=function(){composeModal()};
+  $$('[data-reply]').forEach(function(b){b.onclick=function(){var r=MAILROWS[M[cur.m].tabs[cur.t].n][+b.dataset.reply],fw=b.dataset.kind==='fw';
+    composeModal({title:fw?'Forward':'Reply',to:fw?'':r[6],sub:(fw?'Fwd: ':'Re: ')+r[1].replace(/^(Re|Fwd): /,''),
+      body:'<p><br></p><blockquote><p class="sub">'+esc(r[0])+' &lt;'+esc(r[6]||'')+'&gt; · '+esc(r[2])+'</p>'+(r[4]||'')+'</blockquote>'})}});
+  var mb=$('[data-mback]');if(mb)mb.onclick=function(){MAILOPEN[M[cur.m].tabs[cur.t].n]=false;render()};
+  bindInfo(document);
+}
+
 /* ───── routing ───── */
 var cur={m:0,t:0,d:null};
 var DETAIL={emp:emp360,partner:partner360};
@@ -2794,12 +3425,12 @@ function render(){
   bind();
 }
 function bind(){
-  $$('#nav a,#mob a').forEach(function(a){a.onclick=function(e){e.preventDefault();cur={m:+a.dataset.m,t:0,d:null};render()}});
-  $$('.tabbtn').forEach(function(b){b.onclick=function(){cur.t=+b.dataset.t;cur.d=null;render()}});
+  $$('#nav a,#mob a').forEach(function(a){a.onclick=function(e){e.preventDefault();cur={m:+a.dataset.m,t:0,d:null};CM.open=false;MAILOPEN={};render()}});
+  $$('.tabbtn').forEach(function(b){b.onclick=function(){cur.t=+b.dataset.t;cur.d=null;CM.open=false;render()}});
   $$('[data-dk]').forEach(function(r){r.onclick=function(){cur.d={k:r.dataset.dk,i:+r.dataset.di};render()}});
   var b=$('[data-bk]'); if(b)b.onclick=function(){cur.d=null;render()};
   $$('.mrow[data-mi]').forEach(function(r){r.onclick=function(){
-    MAILSEL[M[cur.m].tabs[cur.t].n]=+r.dataset.mi;render()}});
+    MAILSEL[M[cur.m].tabs[cur.t].n]=+r.dataset.mi;MAILOPEN[M[cur.m].tabs[cur.t].n]=true;render()}});
   $$('.task[data-ti]').forEach(function(b){b.onclick=function(){var i=+b.dataset.ti;
     if(TASKS[i][1]<3){TASKS[i][1]++;if(TASKS[i][1]===3){TASKS[i][3]='ok';TASKS[i][4]='Done'}
       $('#board').innerHTML=boardHTML();bind();toast('Moved to '+['To do','In progress','In review','Done'][TASKS[i][1]])}}});
@@ -2809,7 +3440,6 @@ function bind(){
       steps[2].className='step done';steps[2].innerHTML=ic('ok')+'Operations';steps[3].className='step now';
       toast('Approved. Routed to the CEO, over ₦500,000.');
       ap.classList.remove('pri');ap.innerHTML=ic('clock')+'Waiting on CEO'}};
-  var pb=$('#plusbtn'); if(pb)pb.onclick=function(){toast('Recognition, celebration, poll, file')};
   $$('.sw').forEach(function(s){s.onclick=function(){s.classList.toggle('on')}});
   $$('.chips .chip').forEach(function(c){c.onclick=function(){
     var sibs=c.parentNode.children;for(var i=0;i<sibs.length;i++)sibs[i].classList.remove('on');
@@ -2817,6 +3447,7 @@ function bind(){
   $$('.rnav button').forEach(function(c){c.onclick=function(){
     $$('.rnav button').forEach(function(x){x.classList.remove('on')});c.classList.add('on');
     toast('Opening: '+c.textContent)}});
+  bindComm();bindMail();
 }
 $('#slim').onclick=function(){$('#app').classList.toggle('slim')};
 

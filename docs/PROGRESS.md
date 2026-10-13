@@ -154,7 +154,9 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 13/10/2026 · GE · Demo updated per the 12 October meeting (guides removed, ＋ menu, members behind ⋮, fixed
+  composer, read-only pinned #announcements, birthday and recognition cards, Praxis-style DMs with
+  voice notes, mobile full screen). Engineering guide `docs/guides/community.md` written. No product code yet.
 
 ### Mailbox
 
@@ -169,7 +171,8 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 13/10/2026 · GE · Demo composer added (rich text, recipient chips, attachments with progress, schedule,
+  inline discard), reader full screen on mobile. Engineering guide `docs/guides/mailbox.md` written.
 
 ### People
 

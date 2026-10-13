@@ -195,3 +195,5 @@
 /.github/CODEOWNERS                                @swizfcodes @tomblakeasaah196
 /.claude/settings.json                             @swizfcodes @tomblakeasaah196
 /.claude/hooks/                                    @swizfcodes @tomblakeasaah196
+/docs/guides/community.md                          @swizfcodes @tomblakeasaah196
+/docs/guides/mailbox.md                            @swizfcodes @tomblakeasaah196
