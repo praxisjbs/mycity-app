@@ -148,7 +148,15 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 13/10/2026 · AJ · ESS demo updated from the 12 October meeting. Desktop: photo upload on My Profile,
+  work schedule inside Employment (read from LA's attendance data), year switcher and a deductions
+  breakdown on My Payslips, pension text removed, three cards on My Queries (Open, Archived, Sanctions)
+  with the build flowchart removed, leave approval text removed, Coming Soon preview for tabs not in M1.
+  Mobile: icon cards that open the shared modal, previews on tap. New My Security tab (devices link to
+  LA's My Devices). Demo gained a viewport tag and a mobile menu drawer. LA's four attendance tabs
+  untouched on desktop; on a phone they get the same icon cards, built from her page. Guide
+  `docs/guides/ess.md` written (Draft). My Security is not in the approved inventory (MILESTONES §18)
+  and needs sign off. Demo only, no app screens, so no ticks.
 
 ### Staff Community
 
