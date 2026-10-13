@@ -777,14 +777,6 @@ mark.hit.cur{background:var(--yellow);color:var(--on-yellow);box-shadow:0 0 0 2p
 }
 /* ═════ ATTENDANCE DEMO: clock panel, reconciliation queue, policy draft bar ═════ */
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.mbox.xwide{max-width:1060px}
-.ckgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;align-items:start}
-.ckkv{grid-template-columns:minmax(0,150px) minmax(0,1fr);font-size:12.5px;gap:7px 14px}
-.ckdemo{border:1.5px dashed var(--line-2);border-radius:12px;padding:12px;background:var(--surface);min-width:0}
-.ckdemo h4{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);display:flex;gap:6px;align-items:center}
-.ckdemo .f{margin-bottom:10px}
-.seg.sm{border-radius:12px}
-.seg.sm button{height:auto;min-height:28px;font-size:11.5px;padding:4px 9px;white-space:normal;flex:1 1 auto;border-radius:9px}
 .seg button:disabled{opacity:.45;cursor:not-allowed}
 .ckres{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:12px;margin-bottom:12px}
 .ckres.ok{background:var(--ok-bg);color:var(--ok)} .ckres.wa{background:var(--warn-bg);color:var(--warn)}
@@ -793,8 +785,6 @@ mark.hit.cur{background:var(--yellow);color:var(--on-yellow);box-shadow:0 0 0 2p
 .ckres p{font-size:12.5px;color:var(--ink-2);margin-top:2px}
 .ckres .cklab{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:650;opacity:.85}
 .ckres .ckic{flex:none;margin-top:2px}
-.ckmap{border:1px solid var(--line);border-radius:12px;background:var(--surface);margin-top:12px;overflow:hidden}
-.ckmap svg{display:block;width:100%;height:auto;max-height:210px}
 .fdet>summary{list-style:none;cursor:pointer;font-size:12.5px;font-weight:650;color:var(--ink-2);margin-bottom:8px;display:inline-flex;align-items:center;gap:6px}
 .fdet>summary::-webkit-details-marker{display:none}
 .fdet>summary::before{content:"+";color:var(--accent);font-weight:700}
@@ -838,8 +828,7 @@ input.pctl[type=number]{width:96px;min-width:0}
 .pinbox b{display:block}
 tr[data-att]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 @media(max-width:1180px){.rq{grid-template-columns:1fr}}
-@media(max-width:860px){.ckgrid{grid-template-columns:1fr}}
-@media(max-width:760px){.mbox.xwide{max-width:none}.tscroll table.wide{min-width:980px}.ckkv{grid-template-columns:1fr;gap:2px 0}.ckkv dd{margin-bottom:6px}
+@media(max-width:760px){.tscroll table.wide{min-width:980px}
   .draftbar{top:-14px}.pctl{max-width:150px}
   .attk .g4{grid-template-columns:repeat(2,1fr)}.attk .kpi b{font-size:21px}.attk .grid{gap:8px;margin-bottom:8px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -950,6 +939,10 @@ tr[data-att]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
         <svg class="ico-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--accent);margin-top:1px"><use href="#i-alert"/></svg>
         <span><b>Demo.</b> Credentials are filled in. Clear the email to see validation speak as you type, not after you submit.</span>
       </div>
+      <div class="hint" id="login-susp" role="alert" style="display:none;background:var(--err-bg);color:var(--err);border-color:transparent">
+        <svg class="ico-s" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-lock"/></svg>
+        <span><b>Account suspended.</b> Access to MyCity App, direct pages and attendance actions is disabled. Contact People or your line manager.</span>
+      </div>
     </form>
   </div>
 </div>
@@ -1018,13 +1011,30 @@ function mark(id,err,show){var f=$('#f-'+id);f.classList.remove('bad','good');
   el.addEventListener('input',function(){mark(id,fn(el.value),touched[id])});
   el.addEventListener('blur',function(){touched[id]=true;mark(id,fn(el.value),true)});
   mark(id,fn(el.value),false)});
+function attLoginIdentity(email){var p=String(email||'').toLowerCase().split('@')[0].split(/[._-]/)[0],m={cynthia:'CO',ifeoma:'IC',tolu:'TA',bashir:'BL',amara:'AO',seyi:'SB',hauwa:'HY',emeka:'EO',ngozi:'NE',chidera:'CN',adedotun:'AD'};
+  return m[p]||'CO'}
+function attSuspended(id){var e=ATT&&aEmp(id);return !!(e&&e.status==='Suspended')}
+function attBlockSuspended(id){if(!attSuspended(id))return false;
+  $('#app').classList.remove('on');$('#auth').style.display='grid';$('#login-susp').style.display='flex';$('#pass').value='';$('#pass').focus();return true}
+function attPromptClockAfterSignIn(id,attempt){
+  if(attClockedToday(id))return;
+  if($('#modal').classList.contains('on')){
+    if((attempt||0)<10)setTimeout(function(){attPromptClockAfterSignIn(id,(attempt||0)+1)},300);
+    return}
+  attOpenClock()}
+$('#email').addEventListener('input',function(){$('#login-susp').style.display='none'});
 $('#lform').addEventListener('submit',function(e){e.preventDefault();
   var a=vE($('#email').value),b=vP($('#pass').value);touched.email=touched.pass=true;mark('email',a,true);mark('pass',b,true);
   if(a){$('#email').focus();return}if(b){$('#pass').focus();return}
-  ATT.demo.actor='CO';attSave();
+  var aid=attLoginIdentity($('#email').value);ATT.demo.actor=aid;ATT.demo.auth=aid;attSave();
+  if(attBlockSuspended(aid))return;
   $('#auth').style.display='none';$('#app').classList.add('on');render();
-  setTimeout(function(){toast('Signed in as Cynthia Osakunih')},260);
-  setTimeout(function(){if(!attClockedToday('CO')&&!$('#modal').classList.contains('on'))attOpenClock()},700)});
+  setTimeout(function(){toast('Signed in as '+aName(aid))},260);
+  /* Every employee who has not clocked in today receives the attendance
+     prompt after sign-in. attOpenClock remains the single enforcement point:
+     eligible staff can clock in, while approved-leave staff see the reason
+     attendance is unavailable. Suspended staff never reach this point. */
+  setTimeout(function(){attPromptClockAfterSignIn(aid,0)},700)});
 
 /* ───── render helpers ───── */
 function head(t,s,acts){return '<div class="phead"><div><h1>'+esc(t)+'</h1>'+(s?'<p>'+esc(s)+'</p>':'')+'</div>'+
@@ -2472,7 +2482,7 @@ var M=[
       ['Effective dating','A band change applies from a date, never retrospectively'],
       ['Above maximum','One person sits above G5. It is flagged, not blocked']])+'</div>'+
     '<p class="sub" style="margin-top:12px">Placeholder bands. MyCity has been asked for their real structure so these are replaced before M6 is demonstrated.</p>'}},
-  {n:'Deductions',r:function(){return head('Deductions','Pending and applied',[['Rules'],['Add deduction',1]])+
+  {n:'Deductions',r:function(){var tiers=attPolicy().settings.deductionTiers;return head('Deductions','Pending and applied · attendance tiers '+(tiers?'on':'off'),[['Rules'],['Add deduction',1]])+
     kpis([['Pending acceptance','1','warn'],['Applied, October','₦62,500'],['Recovered this year','₦45,000','ok'],['Sources','3']])+
     table([['Employee'],['Reason'],['Source'],['Amount','n'],['Month'],['Status']],[
       [st(1),'Lateness, 3 instances','Queries & Sanctions','₦12,500','October',pill('wa','Pending acceptance')],
@@ -2485,7 +2495,7 @@ var M=[
     '<p class="sub" style="margin-top:11px">Raised by the August warning. It has waited for a person since 29 August, which is correct: nothing deducts itself.</p>'+
     '<div style="display:flex;gap:8px;margin-top:13px;flex-wrap:wrap"><button class="btn pri">'+ic('ok')+'Accept into October</button>'+
     '<button class="btn">Spread over two runs</button><button class="btn">Waive</button></div></div>'+
-    kvcard('Deduction tiers, from attendance',[['Up to 1 hour late','10% of the day'],['Up to 2 hours','20% of the day'],
+    kvcard('Deduction tiers, from attendance',[['Current policy',tiers?pill('ok','On · applies to future reviewed outcomes'):pill('nt','Off · configuration preserved')],['Up to 1 hour late','10% of the day'],['Up to 2 hours','20% of the day'],
       ['Up to 3 hours','30% of the day'],['Beyond 3 hours','Treated as absence, by decision'],
       ['Who sets these','Operations, in Settings. Still to be confirmed by MyCity'],
       ['Automatic?','No. The figure is computed. A person accepts it']])+'</div>'+
@@ -2763,7 +2773,7 @@ var M=[
       '<p>Each day is configured separately in the system, so a change to Saturday hours does not require a change to any other day.</p>'+
       '<h4>The grace window</h4><p>A clock-in up to fifteen minutes after the start of the day is on time. At 09:16 on a weekday you are late, and the system records by how much.</p>'+
       '<blockquote>The grace window is a setting. If MyCity changes it to ten minutes, nothing is rebuilt and nothing is deployed.</blockquote>'+
-      '<h4>Where you clock in</h4><p>Office days are at MTN Head Office, MTN Plaza, Falomo, Ikoyi, within 100 metres. Remote days are at your approved home, within 150 metres unless People set a different radius. Field days are at the approved assignment sites, within 200 metres by default.</p>'+
+      '<h4>Where you clock in</h4><p>Office days are at MTN Head Office, MTN Plaza, Falomo, Ikoyi, within 100 metres. Remote days are at your registered or approved temporary home, within a fixed 100 metres. Field days are at approved assignment sites, within 200 metres by default.</p>'+
       '<p>Outside a fence, remote staff are blocked and can request an exception. Hybrid, field and office-only staff are accepted with a warning and the day is reviewed. Location is read only when you clock in or out, never tracked.</p>'+
       '<h4>Lateness, and what follows</h4><ul>'+
       '<li>A single late arrival is recorded and nothing else happens.</li>'+
@@ -3303,20 +3313,25 @@ function boardHTML(){var cols=[['To do','var(--ink-3)'],['In progress','var(--c2
 /* ═════════════ SHARED: modal (sheet on mobile), popover, inline help ═════════════
    openModal({title, body, foot, wide, full, onMount}) is the one modal every module
    uses. It never uses a native dialog (gate 16). Escape and the scrim close it. */
+var MODAL_RETURN=null;
 function openModal(o){
   var m=$('#modal');
+  if(!m.classList.contains('on'))MODAL_RETURN=document.activeElement;
   m.innerHTML='<div class="mbox'+(o.wide?' wide':'')+(o.full?' full':'')+'" role="dialog" aria-modal="true" aria-label="'+esc(o.title)+'">'+
     '<div class="mhd"><h3>'+esc(o.title)+'</h3><button class="iconbtn" data-mx aria-label="Close">'+ic('x','ico')+'</button></div>'+
     '<div class="mbd">'+o.body+'</div>'+(o.foot?'<div class="mft">'+o.foot+'</div>':'')+'</div>';
   m.classList.add('on');
   $$('[data-mx]',m).forEach(function(b){b.onclick=closeModal});
   if(o.onMount)o.onMount(m);
-  var first=m.querySelector('.mbd input:not([type=hidden]),.mbd textarea,.mbd [contenteditable]');
+  var first=m.querySelector('.mbd input:not([type=hidden]),.mbd textarea,.mbd select,.mbd [contenteditable]')||m.querySelector('.mft .pri')||m.querySelector('[data-mx]');
   if(first&&window.innerWidth>760)setTimeout(function(){first.focus()},30);
 }
-function closeModal(){var m=$('#modal');m.classList.remove('on');m.innerHTML=''}
+function closeModal(){var m=$('#modal'),back=MODAL_RETURN;m.classList.remove('on');m.innerHTML='';MODAL_RETURN=null;
+  if(back&&document.contains(back)&&back.focus)setTimeout(function(){back.focus()},0)}
 $('#modal').addEventListener('click',function(e){if(e.target===this)closeModal()});
 document.addEventListener('keydown',function(e){
+  if(e.key==='Tab'&&$('#modal').classList.contains('on')){var f=$$('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',$('#modal'));
+    if(f.length){var a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}}}
   if(e.key!=='Escape')return;
   if($('.pop')){closePop();return}
   if($('#modal').classList.contains('on'))closeModal();
@@ -3987,7 +4002,7 @@ var ATT_MODES={record:'Record only',warn:'Warn and accept',block:'Block and requ
 var ATT_TIMES=[['live','Live, Africa/Lagos'],['07:55','07:55'],['08:52','08:52'],['09:24','09:24'],['12:30','12:30'],
   ['17:05','17:05'],['17:48','17:48'],['19:10','19:10']];
 var ATT_LOCS=[['inside','Inside approved geofence'],['slight','Slightly outside geofence'],['far','Far outside geofence'],
-  ['home','At permanent home'],['office','At MTN Head Office']];
+  ['home','At registered home'],['office','At MTN Head Office'],['denied','GPS permission denied'],['unavailable','GPS unavailable']];
 var ATT_ACCS=[['good','Good, 18 m',18],['fair','Fair, 76 m',76],['poor','Poor, 160 m',160]];
 var ATT_AREAS=[['lekki',6.44740,3.47200],['ajah',6.46700,3.57100],['yaba',6.50950,3.37110],['surulere',6.50020,3.35410],
   ['ikeja',6.60180,3.35150],['gbagada',6.55420,3.38860],['ikoyi',6.45200,3.43900],['victoria island',6.42810,3.42190],
@@ -4029,10 +4044,19 @@ function aMgrName(id){var e=ATT.emps[id];return e&&e.mgr?aName(e.mgr):'Board'}
 
 /* ───── persistence ───── */
 function attSave(){try{localStorage.setItem(ATT_KEY,JSON.stringify(ATT))}catch(e){}}
+function attMigrate(){var d=attDefaults();
+  ATT.demo=ATT.demo||{};if(!ATT.demo.auth)ATT.demo.auth='CO';ATT.tiers=ATT.tiers||{
+    deduction:[['Up to 1 hour late','10% of the day'],['Up to 2 hours late','20% of the day'],['Up to 3 hours late','30% of the day'],['Beyond 3 hours','Absence only after a decision']],
+    overtime:[['Recorded overtime','Manager approval required'],['Monetary rates','Not configured by MyCity']]};
+  Object.keys(ATT.emps||{}).forEach(function(id){if(!ATT.emps[id].status)ATT.emps[id].status=id==='CN'?'Suspended':'Active'});
+  (ATT.homes||[]).forEach(function(h){h.radius=100});
+  (ATT.requests||[]).forEach(function(q){if(q.type!=='Client-site visit'&&q.type!=='Field-assignment correction')q.radius=100});
+  (ATT.policies||[]).forEach(function(p){Object.keys(d).forEach(function(k){if(p.settings[k]===undefined)p.settings[k]=d[k]});p.settings.radiusRemote=100});
+  if(ATT.draft){Object.keys(d).forEach(function(k){if(ATT.draft[k]===undefined)ATT.draft[k]=d[k]});ATT.draft.radiusRemote=100}}
 function attLoad(){var s=null;
   try{s=JSON.parse(localStorage.getItem(ATT_KEY)||'null')}catch(e){s=null}
-  if(s&&s.v===1&&s.emps&&s.policies&&s.events)ATT=s;else{attSeed();attSave()}}
-function attReset(){try{localStorage.removeItem(ATT_KEY)}catch(e){}attSeed();attSave();ATTUI.caseSel=null;ATTUI.cf={};ATTUI.filter='All'}
+  if(s&&s.v===1&&s.emps&&s.policies&&s.events){ATT=s;attMigrate();attSave()}else{attSeed();attMigrate();attSave()}}
+function attReset(){try{localStorage.removeItem(ATT_KEY)}catch(e){}attSeed();attMigrate();attSave();ATTUI.caseSel=null;ATTUI.cf={};ATTUI.filter='All'}
 
 /* ───── lookups ───── */
 function attSite(id){for(var i=0;i<ATT.sites.length;i++)if(ATT.sites[i].id===id)return ATT.sites[i];return ATT.sites[0]}
@@ -4068,6 +4092,11 @@ function attDeviceFor(id,choice){var mine=ATT.devices.filter(function(d){return 
     mine.filter(function(d){return d.status!=='Revoked'&&d.status!=='Blocked'})[0]||fresh}
 function attEnrolled(id){return ATT.devices.filter(function(d){return d.emp===id&&d.status==='Enrolled'})}
 function attOnLeave(id,date){var r=null;ATT.leave.forEach(function(l){if(l.emp===id&&l.status==='Approved'&&aCmp(l.from,date)<=0&&aCmp(l.to,date)>=0)r=l});return r}
+function attCanClock(id,date){date=date||ATT_TODAY;var e=aEmp(id),lv=attOnLeave(id,date);
+  if(!e)return {ok:false,kind:'account',message:'No employee record is linked to this user.'};
+  if(e.status==='Suspended')return {ok:false,kind:'suspended',message:'Your employee account is suspended. You cannot access the app or record attendance.'};
+  if(lv)return {ok:false,kind:'leave',message:'You are on approved '+lv.type.toLowerCase()+' leave from '+lv.from+' to '+lv.to+'. Attendance actions are unavailable for this period.'};
+  return {ok:true}}
 function attHrOpen(){return ATT.cases.filter(function(c){return c.status==='Awaiting HR'}).length}
 function attOpenCases(){return ATT.cases.filter(function(c){return c.status!=='Resolved'&&c.status!=='Escalated'})}
 function attFenceName(h){return (h.kind==='Temporary'?'Temporary location · ':'Approved home · ')+h.area}
@@ -4098,9 +4127,10 @@ function attWhere(id,date,sc){
   if(dx&&day==='Office'){day='Remote';r.request=dx.id;r.schedule='Remote day, approved '+dx.type.toLowerCase()+' '+dx.id}
   if(day==='Remote'){var h=attActiveHome(id,date);
     if(h){r.mode='Remote';r.kind=h.kind==='Temporary'?'temp':'home';r.home=h.id;
-      r.sites=[{name:attFenceName(h),lat:h.lat,lng:h.lng,radius:h.radius}];r.label=attFenceName(h);
+      r.sites=[{name:attFenceName(h),lat:h.lat,lng:h.lng,radius:100}];r.label=attFenceName(h);
       r.enforced=!!pol.enforceRemote;return r}
-    r.note='No approved home on file, so the office applies'}
+    r.mode='Remote';r.kind='home';r.label='Registered home coordinates missing';r.note='People must register and approve the home coordinates before attendance can be verified.';
+    r.sites=[{name:r.label,lat:null,lng:null,radius:100,missing:true}];r.enforced=true;return r}
   var s=attSite(e.office||'mtn');r.mode='Office';r.kind='office';
   r.sites=[{name:s.name,lat:s.lat,lng:s.lng,radius:s.radius}];r.label=s.name;
   r.enforced=e.arr==='Hybrid'?!!pol.enforceHybrid:true;return r}
@@ -4109,42 +4139,48 @@ function attWhere(id,date,sc){
 function attMatchAny(id,date,lat,lng){
   var e=ATT.emps[id],c=[];
   ATT.sites.forEach(function(s){if(s.status==='Active')c.push([s.name,s.lat,s.lng,s.radius])});
-  ATT.homes.forEach(function(h){if(h.emp===id&&(h.status==='Active'||attHomeState(h)==='Active'))c.push([attFenceName(h),h.lat,h.lng,h.radius])});
+  ATT.homes.forEach(function(h){if(h.emp===id&&h.lat!=null&&h.lng!=null&&(h.status==='Active'||attHomeState(h)==='Active'))c.push([attFenceName(h),h.lat,h.lng,100])});
   ATT.assignments.forEach(function(a){if(a.date===date&&a.emps.indexOf(id)>=0&&a.status==='Approved')a.sites.forEach(function(s){c.push([a.id+' · '+s.name,s.lat,s.lng,s.radius])})});
   for(var i=0;i<c.length;i++)if(aDist(lat,lng,c[i][1],c[i][2])<=c[i][3])return c[i][0];
   return ''}
 function attInHome(id,lat,lng){var h=attActiveHome(id,ATT_TODAY),p=attPermHome(id);
-  return (h&&aDist(lat,lng,h.lat,h.lng)<=h.radius)||(p&&aDist(lat,lng,p.lat,p.lng)<=p.radius)}
+  return (h&&h.lat!=null&&h.lng!=null&&aDist(lat,lng,h.lat,h.lng)<=100)||(p&&p.lat!=null&&p.lng!=null&&aDist(lat,lng,p.lat,p.lng)<=100)}
 
 /* ───── the simulated server check ─────
    Returns {ev, x, result, tone, headline, reasons, late, offer}. ev is what would be stored. */
 function attEvaluate(id,date,time,sc,kind){
   var e=ATT.emps[id],P=attPolicy(date),pol=P.settings,x=attWhere(id,date,sc),acc=sc.accM!=null?sc.accM:18,
-      capture=kind==='out'?pol.captureOut:pol.captureIn,c=x.sites[0],pt;
-  if(sc.loc==='custom')pt=[sc.lat,sc.lng];
-  else if(sc.loc==='home'){var hh=attPermHome(id);pt=hh?aOffset(hh.lat,hh.lng,20,120):aOffset(c.lat,c.lng,30,60)}
+      capture=kind==='out'?pol.captureOut:pol.captureIn,c=x.sites[0],pt=null,locFailure='';
+  if(capture&&c.missing)locFailure='Registered home coordinates are missing. People must add and approve a home pin before this punch can be verified.';
+  else if(capture&&sc.loc==='denied')locFailure='GPS permission was denied. Location evidence was not captured, so the punch cannot be marked compliant.';
+  else if(capture&&sc.loc==='unavailable')locFailure='GPS is unavailable on this device or browser. Location evidence was not captured; try again when location services are available.';
+  else if(sc.loc==='custom')pt=[sc.lat,sc.lng];
+  else if(sc.loc==='home'){var hh=attPermHome(id);pt=hh&&hh.lat!=null&&hh.lng!=null?aOffset(hh.lat,hh.lng,20,120):null}
   else if(sc.loc==='office'){var oo=attSite(e.office==='abj'?'abj':'mtn');pt=aOffset(oo.lat,oo.lng,30,200)}
   else pt=aOffset(c.lat,c.lng,sc.loc==='slight'?c.radius+70:sc.loc==='far'?2400:35,40);
-  var best=null;x.sites.forEach(function(s){var d=aDist(pt[0],pt[1],s.lat,s.lng);if(!best||d<best.d)best={s:s,d:d}});
+  if(capture&&!pt&&!locFailure)locFailure='Location data is unavailable. No geofence decision has been made.';
+  var best=null;if(pt)x.sites.forEach(function(s){if(s.lat==null||s.lng==null)return;var ds=aDist(pt[0],pt[1],s.lat,s.lng);if(!best||ds<best.d)best={s:s,d:ds}});
+  if(!best)best={s:c,d:null};
   var d=attDeviceFor(id,sc.device),skew=d.status==='Enrolled'?1:3,
-      ev={emp:id,date:date,kind:kind,sys:time,dev:aHM(aMin(time)+skew),lat:capture?pt[0]:null,lng:capture?pt[1]:null,acc:capture?acc:null,
-        expected:x.label,matched:'',dist:capture?best.d:null,radius:best.s.radius,arr:e.arr,mode:x.mode,shift:aShiftTxt(x.shift),
+      ev={emp:id,date:date,kind:kind,sys:time,dev:aHM(aMin(time)+skew),lat:capture&&pt?pt[0]:null,lng:capture&&pt?pt[1]:null,acc:capture&&pt?acc:null,
+        expected:x.label,matched:'',dist:capture&&pt?best.d:null,radius:best.s.radius||100,arr:e.arr,mode:x.mode,shift:aShiftTxt(x.shift),
         device:pol.devRecord?d.name:'Not recorded (policy)',devId:d.id,devStatus:pol.devRecord?d.status:'Not recorded',
         result:'Accepted',exception:'',reason:'',policy:'v'+P.v,source:'Punch',superseded:false,excluded:false,outside:false,late:0,
         assignment:x.assignment||'',request:x.request||''},
       R={ev:ev,x:x,reasons:[],warn:[],late:0,offer:'',newDevice:false};
   var mode=pol[x.modeKey]||'warn';if(!x.enforced)mode='record';R.mode=mode;
-  var inside=capture?best.d<=best.s.radius:true;
-  ev.matched=!capture?'Not captured (policy)':inside?best.s.name:(attMatchAny(id,date,pt[0],pt[1])||'No approved location');
+  var inside=capture&&pt&&best.d!=null?best.d<=best.s.radius:true;
+  ev.matched=!capture?'Not captured (policy)':locFailure?'Unverified — no usable GPS evidence':inside?best.s.name:(attMatchAny(id,date,pt[0],pt[1])||'No approved location');
   /* 1. the clock */
   var t=aMin(time);
   if(kind==='in'&&t<aMin(pol.earliest)){R.result='Rejected';R.reasons.push('Before the earliest clock-in time of '+pol.earliest+'.');}
   /* 2. accuracy before any fence decision */
-  if(capture&&acc>pol.retryAcc){R.result=R.result||'Retry';
+  if(locFailure){R.result=sc.loc==='denied'||c.missing?'Rejected':'Retry';R.reasons.push(locFailure);R.offer=c.missing?'home':''}
+  else if(capture&&acc>pol.retryAcc){R.result=R.result||'Retry';
     R.reasons.push('GPS accuracy is '+acc+' m, worse than the '+pol.retryAcc+' m retry threshold. No geofence decision has been made.');}
   else if(capture&&acc>pol.goodAcc)R.warn.push('GPS accuracy '+acc+' m. Acceptable, but not good.');
   /* 3. the fence */
-  if(capture&&!inside&&R.result!=='Retry'){
+  if(capture&&pt&&!inside&&R.result!=='Retry'){
     var mismatch=x.mode==='Office'&&e.arr==='Hybrid'&&attInHome(id,pt[0],pt[1]);
     var issue=mismatch?'Location and schedule mismatch: at approved home on an office day':
       x.kind==='field'?'Outside the field assignment geofence':
@@ -4195,7 +4231,7 @@ function attSV(s,list){
     if(!s.excApproved&&!e.superseded&&!e.excluded){var t=e.exception||(e.result==='Needs approval'||e.result==='Rejected'?e.reason:'');
       if(t&&v.exceptions.indexOf(t)<0)v.exceptions.push(t)}});
   if(s.cls)v.status=s.cls;
-  else if(!v.inE&&!v.outE)v.status=v.attempts.length?'Attempt blocked':'Not clocked in';
+  else if(!v.inE&&!v.outE)v.status=v.attempts.some(function(e){return e.result==='Needs approval'})?'Pending HR review':v.attempts.length?'Attempt blocked':'Not clocked in';
   else if(v.inE&&!v.outE)v.status=s.date===ATT_TODAY?'Clocked in':'Missing clock-out';
   else if(!v.inE&&v.outE)v.status='Missing clock-in';
   else v.status='Complete';
@@ -4204,6 +4240,7 @@ function attStatusPill(v){
   var s=v.status;
   if(s==='Complete')return v.late?pill('wa','Late '+v.late+'m'):pill('ok','On time');
   if(s==='Clocked in')return v.late?pill(v.late>30?'er':'wa','Late '+v.late+'m'):pill('ok','Clocked in, on time');
+  if(s==='Pending HR review')return pill('wa',s);
   if(s==='Missing clock-out'||s==='Missing clock-in'||s==='Attempt blocked'||s==='Unauthorised absence')return pill('er',s);
   if(s==='Approved leave'||s==='Authorised absence'||s==='On leave')return pill('in',s);
   return pill('nt',s)}
@@ -4216,8 +4253,8 @@ function attClockedToday(id){return attSessionsOf(id,ATT_TODAY).some(function(s)
 function attAudit(action,entity,before,after,reason,actor,at){
   ATT.audit.unshift({id:'AU-'+aNum(ATT.seq.au++,5),at:at||aStamp(),actor:actor||'Cynthia Osakunih',action:action,entity:entity,
     before:before||'',after:after||'',reason:reason||'',mod:'Attendance'})}
-function attNotify(to,title,body,kind,at){
-  ATT.notes.unshift({id:'NO-'+aNum(ATT.seq.no++,5),to:to,title:title,body:body||'',kind:kind||'info',at:at||aStamp(),read:false})}
+function attNotify(to,title,body,kind,at,ref){
+  ATT.notes.unshift({id:'NO-'+aNum(ATT.seq.no++,5),to:to,title:title,body:body||'',kind:kind||'info',at:at||aStamp(),ref:ref||'',read:false})}
 function attAlert(title,trigger,sev,ref,at){
   ATT.alerts.unshift({id:'AL-'+aNum(ATT.seq.al++,4),title:title,trigger:trigger,who:'People',sev:sev||'Medium',ref:ref||'',at:at||aStamp(),open:true})}
 function attClearAlerts(ref){ATT.alerts.forEach(function(a){if(a.ref===ref)a.open=false})}
@@ -4250,7 +4287,7 @@ var ATT_PF=[
  ['recordAttempts','Record outside-geofence attempts','A blocked attempt stays on the record for review.','bool',null,'all','loc'],
  ['goodAcc','Good GPS accuracy','Metres or better. Up to the retry threshold, a warning shows.','num',[10,100],'all','loc'],
  ['retryAcc','Retry threshold','Worse than this, the employee retries before any fence decision.','num',[50,300],'all','loc'],
- ['radiusRemote','Default remote radius','Metres. People can set 100 to 250 per employee where justified.','num',[100,250],['Remote','Hybrid'],'loc'],
+ ['radiusRemote','Remote home radius','Fixed at 100 metres for registered and approved temporary home locations.','lock',null,['Remote','Hybrid'],'loc'],
  ['radiusOffice','Default office radius','Metres. MTN Head Office uses 100.','num',[50,300],['Hybrid','Office-only'],'loc'],
  ['radiusField','Default field-assignment radius','Metres. 100 to 500 depending on venue size.','num',[100,500],['Field'],'loc'],
  ['modeRemote','Remote staff','Outside-geofence behaviour','mode',null,['Remote'],'rules'],
@@ -4273,6 +4310,8 @@ var ATT_PF=[
  ['breakRule','Break rule','','sel',['60 minutes unpaid after 6 hours','30 minutes unpaid after 5 hours','No automatic break'],'all','time'],
  ['overtimeApproval','Overtime needs approval','Time past the end of the shift is paid only once a manager approves it.','bool',null,'all','time'],
  ['overnight','Overnight shift handling','','sel',['Close at midnight and flag for review','Allow shifts across midnight'],'all','time'],
+ ['deductionTiers','Deduction tiers','Apply the configured attendance deduction tiers. Turning this off preserves the tier configuration. No deduction is automatic.','bool',null,'all','tiers'],
+ ['overtimeTiers','Overtime tiers','Apply configured overtime tiers after manager approval. Monetary rates are not yet configured by MyCity.','bool',null,'all','tiers'],
  ['autoExceptions','Automatically create attendance exceptions','A warned punch opens a reconciliation case.','bool',null,'all','exc'],
  ['lateThreshold','Repeated lateness threshold','','sel',['3 in 30 days','2 in 30 days','4 in 30 days'],'all','exc'],
  ['absenceThreshold','Absence-without-notice threshold','','sel',['1 working day','2 working days'],'all','exc'],
@@ -4284,15 +4323,15 @@ var ATT_PF=[
  ['ackBlocksClockIn','Require acknowledgment before clock-in','Off means a strong reminder only. A pending acknowledgment never stops an urgent clock-in.','bool',null,'all','pub']];
 function attPF(k){for(var i=0;i<ATT_PF.length;i++)if(ATT_PF[i][0]===k)return ATT_PF[i];return null}
 function attFmt(k,v){var f=attPF(k);if(!f)return String(v);
-  if(f[3]==='bool'||f[3]==='lock')return v?'On':'Off';if(f[3]==='mode')return ATT_MODES[v]||v;
+  if(k==='radiusRemote')return '100 m · fixed';if(f[3]==='bool'||f[3]==='lock')return v?'On':'Off';if(f[3]==='mode')return ATT_MODES[v]||v;
   if(f[3]==='num')return v+(k==='grace'?' minutes':' m');return String(v)}
 function attDefaults(){return {captureIn:true,captureOut:true,enforceRemote:true,enforceHybrid:true,allowField:true,allowTemp:true,recordAttempts:true,
-  goodAcc:50,retryAcc:100,radiusRemote:150,radiusOffice:100,radiusField:200,
+  goodAcc:50,retryAcc:100,radiusRemote:100,radiusOffice:100,radiusField:200,
   modeRemote:'block',modeHybrid:'warn',modeField:'warn',modeOffice:'warn',
   devRecord:true,devWarnNew:true,devRequireEnrol:true,devBlockUnenrolled:false,devBlockRevoked:true,
   wkStart:'09:00',wkEnd:'17:00',satStart:'09:00',satEnd:'15:00',grace:15,earliest:'06:00',
   missingIn:'Flag at 11:00 the same day',missingOut:'Flag the next morning',breakRule:'60 minutes unpaid after 6 hours',
-  overtimeApproval:true,overnight:'Close at midnight and flag for review',
+  overtimeApproval:true,overnight:'Close at midnight and flag for review',deductionTiers:true,overtimeTiers:false,
   autoExceptions:true,lateThreshold:'3 in 30 days',absenceThreshold:'1 working day',missingOutRule:'Reconcile first, query only if unexplained',
   newDeviceRule:'Device-review alert to People',responsePeriod:'48 hours',escalation:'Line manager, then People, then CEO',autoDeduct:false,
   ackBlocksClockIn:false}}
@@ -4302,11 +4341,13 @@ function attAffected(keys){var arrs={};keys.forEach(function(k){var a=attPF(k)[5
 
 /* ───── seed: the stories the demo tells ───── */
 function attSeed(){
-  ATT={v:1,demo:{actor:'CO',time:'live',loc:'inside',acc:'good',device:'enrolled',field:'on',day:'auto',payrollLocked:false},
+  ATT={v:1,demo:{actor:'CO',auth:'CO',time:'live',loc:'inside',acc:'good',device:'enrolled',field:'on',day:'auto',payrollLocked:false},
     emps:{},sites:[],homes:[],assignments:[],requests:[],leave:[],events:[],sessions:[],cases:[],devices:[],
     policies:[],draft:null,acks:{},notes:[],alerts:[],audit:[],queries:[],arrHist:[],
+    tiers:{deduction:[['Up to 1 hour late','10% of the day'],['Up to 2 hours late','20% of the day'],['Up to 3 hours late','30% of the day'],['Beyond 3 hours','Absence only after a decision']],
+      overtime:[['Recorded overtime','Manager approval required'],['Monetary rates','Not configured by MyCity']]},
     seq:{ev:1,ss:1,rec:101,req:7,fa:30,qry:28,dev:1,al:1,no:1,au:1,ws:1}};
-  var E=function(id,name,dept,title,mgr,arr,office,si,sched){ATT.emps[id]={id:id,name:name,dept:dept,title:title,mgr:mgr,arr:arr,office:office,si:si,sched:sched||null}},
+  var E=function(id,name,dept,title,mgr,arr,office,si,sched,status){ATT.emps[id]={id:id,name:name,dept:dept,title:title,mgr:mgr,arr:arr,office:office,si:si,sched:sched||null,status:status||'Active'}},
       HYB=function(tue,wed){return {Mon:'Office',Tue:tue||'Office',Wed:wed||'Remote',Thu:'Office',Fri:'Office',Sat:'Remote'}};
   E('CO','Cynthia Osakunih','Operations & People','Operations and People Lead','IC','Hybrid','mtn',-1,HYB());
   E('IC','Ifeoma Chukwu','Executive','Chief Executive Officer','','Office-only','mtn',-1);
@@ -4317,7 +4358,7 @@ function attSeed(){
   E('HY','Hauwa Yusuf','Support','Support Officer','CO','Office-only','abj',4);
   E('EO','Emeka Obi','Studio','Studio Producer','NE','Office-only','mtn',5);
   E('NE','Ngozi Eze','Marketing & Sales','Head of Marketing and Sales','IC','Hybrid','mtn',6,HYB('Remote','Office'));
-  E('CN','Chidera Nwosu','Content','Content Producer','CO','Remote','mtn',7);
+  E('CN','Chidera Nwosu','Content','Content Producer','CO','Remote','mtn',7,null,'Suspended');
   E('AD','Adedotun Oyinloye','Marketing & Sales','Brand and Design Lead','NE','Field','mtn',8);
 
   ATT.sites=[
@@ -4328,12 +4369,12 @@ function attSeed(){
 
   var H=function(emp,area,addr,lat,lng,r,kind,from,to,status,just){ATT.homes.push({id:'HM-'+aNum(ATT.homes.length+1,3),emp:emp,area:area,address:addr,
     lat:lat,lng:lng,radius:r,kind:kind,from:from,to:to||'',status:status,just:just||'',by:'Cynthia Osakunih'})};
-  H('CO','Lekki','14 Admiralty Way, Lekki Phase 1, Lagos',6.44740,3.47200,150,'Permanent','02/05/2024','','Active');
-  H('TA','Gbagada','7 Olaniyi Street, Gbagada Phase 2, Lagos',6.55420,3.38860,150,'Permanent','02/05/2024','','Active');
-  H('AO','Lekki','Flat 3, 22 Fola Osibo Road, Lekki Phase 1, Lagos',6.43810,3.45480,150,'Permanent','03/03/2025','','Active');
-  H('SB','Yaba','41 Herbert Macaulay Way, Yaba, Lagos',6.50950,3.37110,200,'Permanent','19/08/2024','','Active','Ten-storey block. GPS drifts between floors.');
-  H('NE','Ikoyi','5 Bourdillon Road, Ikoyi, Lagos',6.45200,3.43900,150,'Permanent','22/02/2024','','Active');
-  H('CN','Surulere','9 Adeniran Ogunsanya Street, Surulere, Lagos',6.50020,3.35410,150,'Permanent','24/07/2026','','Active');
+  H('CO','Lekki','14 Admiralty Way, Lekki Phase 1, Lagos',6.44740,3.47200,100,'Permanent','02/05/2024','','Active');
+  H('TA','Gbagada','7 Olaniyi Street, Gbagada Phase 2, Lagos',6.55420,3.38860,100,'Permanent','02/05/2024','','Active');
+  H('AO','Lekki','Flat 3, 22 Fola Osibo Road, Lekki Phase 1, Lagos',6.43810,3.45480,100,'Permanent','03/03/2025','','Active');
+  H('SB','Yaba','41 Herbert Macaulay Way, Yaba, Lagos',6.50950,3.37110,100,'Permanent','19/08/2024','','Active','WFH geofence is fixed by policy.');
+  H('NE','Ikoyi','5 Bourdillon Road, Ikoyi, Lagos',6.45200,3.43900,100,'Permanent','22/02/2024','','Active');
+  H('CN','Surulere','9 Adeniran Ogunsanya Street, Surulere, Lagos',6.50020,3.35410,100,'Permanent','24/07/2026','','Active');
   H('CN','Ikeja','12 Oduduwa Crescent, Ikeja GRA, Lagos',6.57900,3.35600,150,'Temporary','21/09/2026','30/09/2026','Approved');
 
   var EKO={name:'Eko Hotels and Suites',address:'Plot 1415 Adetokunbo Ademola Street, Victoria Island, Lagos',lat:6.42620,lng:3.42970,radius:250};
@@ -4381,7 +4422,7 @@ function attSeed(){
    {v:3,published:'14/06/2026 11:20',effective:'01/07/2026',by:'Cynthia Osakunih',ack:true,channels:'In app, email',arrs:ATT_ARRS.slice(),
     summary:'Saturday hours confirmed as 09:00 to 15:00. Remote days record location without a geofence.',settings:v3,changed:[]},
    {v:4,published:'01/10/2026 10:05',effective:'01/10/2026',by:'Cynthia Osakunih',ack:true,channels:'In app, email',arrs:ATT_ARRS.slice(),
-    summary:'The principal office is now MTN Head Office, at 100 metres. Remote staff clock in within 150 metres of an approved home, and are blocked outside it. Field staff clock in at approved assignment locations.',
+    summary:'The principal office is MTN Head Office, at 100 metres. Remote staff clock in and out within a fixed 100 metres of a registered or approved temporary home. Field staff use approved assignment locations.',
     settings:v4,changed:['enforceRemote','modeRemote','radiusOffice','devRequireEnrol','allowField']}];
   ATT.acks={3:{},4:{}};
   ATT_ORDER.forEach(function(id,i){ATT.acks[3][id]={read:'15/06/2026 09:'+pad(10+i),ack:'15/06/2026 09:'+pad(12+i)};
@@ -4478,117 +4519,75 @@ function attScenario(){var d=ATT.demo,a=ATT_ACCS.filter(function(x){return x[0]=
 function attAckPending(id){var L=attLatest(),a=ATT.acks[L.v]&&ATT.acks[L.v][id];return !!(L.ack&&a&&!a.ack)}
 function attPaintPunch(){if(!ATT)return;var id=ATT.demo.actor,o=attOpenSession(id,ATT_TODAY),b=$('#punch'),t=(o?'Clock out':'Clock in');
   $('#punchtxt').textContent=t+(id!=='CO'?' · '+aName(id).split(' ')[0]:'');
-  b.classList.toggle('out',!!o);b.title=t+' as '+aName(id);b.setAttribute('aria-label',b.title)}
+  var can=attCanClock(id),done=!o&&attClockedToday(id);b.classList.toggle('out',!!o);b.disabled=!can.ok||done;b.title=!can.ok?can.message:done?'Attendance is complete for today':t+' as '+aName(id);b.setAttribute('aria-label',b.title)}
 function attOpenClock(){
+  var id=ATT.demo.actor,can=attCanClock(id);
+  if(!can.ok){openModal({title:can.kind==='leave'?'Attendance unavailable while on leave':'Attendance unavailable',body:
+    '<div class="attban '+(can.kind==='leave'?'in':'er')+'">'+ic(can.kind==='leave'?'info':'alert','ico')+'<span><b>'+esc(aName(id))+'</b><br>'+esc(can.message)+'</span></div>',
+    foot:'<button class="btn pri" data-mx>Close</button>'});return}
+  /* A clock prompt represents a fresh reading. Demo presenter controls are
+     intentionally excluded from the employee-facing sign-in workflow. */
+  ATT.demo.loc='inside';ATT.demo.acc='good';ATT.demo.device='enrolled';ATT.demo.field='on';ATT.demo.day='auto';ATT.demo.time='live';attSave();
   ATTUI.ck={kind:'in',stage:'review',retries:0,R:null,att:null,busy:false};
-  openModal({title:'Clock In',wide:true,body:'<div id="ckbody"></div>',foot:'<span></span>',onMount:function(m){
-    m.querySelector('.mbox').classList.add('xwide');attCkPaint();
-    /* on a phone the sheet opens at the result; focusing a control would scroll it away */
-    var f=window.innerWidth>760?$('#ck-actor'):m.querySelector('[data-mx]');if(f)f.focus()}})}
-function attSeg(key,opts,cur,label,disabled){
-  return '<div class="seg sm" role="group" aria-label="'+esc(label)+'">'+opts.map(function(o){var on=String(cur)===String(o[0]);
-    return '<button type="button" data-ck="'+key+'" data-v="'+esc(o[0])+'" aria-pressed="'+on+'"'+(on?' class="on"':'')+(disabled?' disabled':'')+'>'+esc(o[1])+'</button>'}).join('')+'</div>'}
+  openModal({title:'Clock In',body:'<div id="ckbody"></div>',foot:'<span></span>',onMount:function(){attCkPaint()}})}
 function attResultBox(tone,label,head,text){var icn=tone==='ok'?'ok':tone==='in'?'info':'alert';
   return '<div class="ckres '+tone+'" role="status"><span class="ckic">'+ic(icn,'ico')+'</span><span style="min-width:0">'+
     (label?'<span class="cklab">'+esc(label)+'</span>':'')+'<b>'+esc(head)+'</b>'+(text?'<p>'+text+'</p>':'')+'</span></div>'}
-function attMiniMap(R){
-  var ev=R.ev,x=R.x,best=null;if(ev.lat==null)return '';
-  x.sites.forEach(function(s){var d=aDist(ev.lat,ev.lng,s.lat,s.lng);if(!best||d<best.d)best={s:s,d:d}});
-  var s=best.s,sc=46/s.radius,dx=(ev.lng-s.lng)*111320*Math.cos(s.lat*Math.PI/180),dy=(ev.lat-s.lat)*111320,
-      dd=Math.sqrt(dx*dx+dy*dy)||1,px=Math.min(dd*sc,150),clamped=dd*sc>150,
-      cx=180+dx/dd*px,cy=78-dy/dd*px,halo=Math.min(Math.max(ev.acc*sc,6),80),ok=best.d<=s.radius;
-  return '<div class="ckmap"><svg viewBox="0 0 360 156" role="img" aria-label="Simulated map: detected point '+aFmtDist(best.d)+' from '+esc(s.name)+'">'+
-    '<circle cx="180" cy="78" r="46" fill="var(--c1)" opacity=".12"/><circle cx="180" cy="78" r="46" fill="none" stroke="var(--c1)" stroke-width="1.5" stroke-dasharray="5 4"/>'+
-    '<circle cx="180" cy="78" r="4" fill="var(--c1)"/>'+
-    '<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+halo.toFixed(1)+'" fill="'+(ok?'var(--ok)':'var(--err)')+'" opacity=".14"/>'+
-    '<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="5.5" fill="'+(ok?'var(--ok)':'var(--err)')+'" stroke="var(--raised)" stroke-width="2"/>'+
-    '<text x="10" y="18" font-size="10.5" fill="var(--ink-2)">'+esc(s.name)+' · '+s.radius+' m fence</text>'+
-    '<text x="10" y="146" font-size="10" fill="var(--ink-3)">'+(clamped?'Not to scale. ':'')+'Halo is GPS accuracy, '+ev.acc+' m</text></svg></div>'}
+/* Employee-facing attendance prompt. */
 function attCkPaint(){
   var ck=ATTUI.ck;if(!ck||!$('#ckbody'))return;
-  var id=ATT.demo.actor,e=aEmp(id),open=attOpenSession(id,ATT_TODAY),time=aSysTime(),pol=attPolicy().settings,P=attPolicy();
+  var id=ATT.demo.actor,e=aEmp(id),open=attOpenSession(id,ATT_TODAY),time=aSysTime(),pol=attPolicy().settings;
   if(ck.stage==='review')ck.kind=open?'out':'in';
   var R=attEvaluate(id,ATT_TODAY,time,attScenario(),ck.kind),ev=R.ev,x=R.x;ck.R=R;
   var title=ck.kind==='out'?'Clock Out':'Clock In',hd=$('#modal .mhd h3');if(hd)hd.textContent=title;
   var box=$('#modal .mbox');if(box)box.setAttribute('aria-label',title);
-  var ack=attAckPending(id),L=attLatest(),blockAck=ack&&L.settings.ackBlocksClockIn&&ck.kind==='in',h='';
-  if(ack)h+='<div class="attban '+(blockAck?'er':'')+'">'+ic('alert','ico')+'<span><b>Attendance policy v'+L.v+' needs your acknowledgment.</b> '+
-    (blockAck?'This organisation requires it before clock-in.':'You can still clock in. Please read it today.')+'</span>'+
-    '<button class="btn" data-att="go-policy">Read now</button></div>';
-  /* result */
-  var outInfo=null;
+  var L=attLatest(),ack=attAckPending(id),blockAck=ack&&L.settings.ackBlocksClockIn&&ck.kind==='in',h='',outInfo=null;
   if(ck.kind==='out'&&open){var v=attSV(open),ti=aMin(v.inE.sys),to=aMin(time),g=to-ti,sh=String(open.shift).split(' to ');
     outInfo={inT:v.inE.sys,g:g,brk:g>0?attBreak(g,pol):0,early:to<aMin(sh[1])?aMin(sh[1])-to:0,ot:to>aMin(sh[1])+30?to-aMin(sh[1]):0,end:sh[1]};outInfo.net=g-outInfo.brk}
-  if(ck.stage==='blocked')h+=attResultBox('er','Server result',(ck.kind==='out'?'Clock-out':'Clock-in')+' not completed',
-    'Your attempt at '+esc(ck.att?ck.att.sys:time)+' is saved with its location. '+esc(ck.reason||'')+' Ask for an exception and People will decide.');
-  else if(ck.stage==='rejected')h+=attResultBox('er','Server result','Rejected',esc(ck.reason||'')+(ck.offer==='device'?' You can ask People to enrol this device.':''));
-  else if(ck.stage==='exception'||ck.stage==='issue'||ck.stage==='enrol')h+='';
-  else if(blockAck)h+=attResultBox('er','Expected result','Acknowledgment required','Policy v'+L.v+' must be acknowledged before clock-in.');
-  else if(outInfo&&outInfo.g<0)h+=attResultBox('er','Expected result','Cannot clock out yet','The system time '+time+' is earlier than your clock-in at '+outInfo.inT+'. Pick a later demo time.');
-  else{var txt=R.reasons.length?R.reasons.join(' '):R.warn.length?R.warn.join(' '):
-      (ev.lat==null?'Location is not captured on this action.':'Inside '+esc(ev.matched)+'.')+' '+(ev.devStatus==='Enrolled'?'Device enrolled.':'');
-    if(R.result==='Retry')txt+=' Move to an open space or near a window, then retry.'+(ck.retries?' Retries so far: '+ck.retries+'.':'');
-    if(R.late&&R.result!=='Retry')txt+=' Late by '+R.late+' minutes, past the '+pol.grace+' minute grace period.';
-    if(R.result==='Needs approval')txt+=' The attempt will be saved and you can request an exception.';
-    if(R.result==='Rejected'&&R.offer==='device')txt+=' You can request device enrolment.';
-    h+=attResultBox(R.tone,'Expected result',R.headline,esc(txt))}
-  /* forms */
-  if(ck.stage==='exception'||ck.stage==='issue'){
-    h+='<div class="card" style="margin-bottom:12px"><div class="ch"><h3>'+(ck.stage==='exception'?'Request an exception':'Report an attendance issue')+'</h3></div>'+
-      '<p class="sub" style="margin-bottom:10px">'+(ck.stage==='exception'?'Your saved attempt goes to People with this explanation. Your manager is copied.':'GPS could not be verified after '+ck.retries+' retries. People will reconcile the day.')+'</p>'+
-      field('ck-why','Explanation','<textarea class="inp" id="ck-why" placeholder="What happened, in a sentence or two"></textarea>','Write at least 10 characters')+
-      field('ck-evi','Supporting evidence label (optional)','<input class="inp" id="ck-evi" placeholder="For example, generator receipt.jpg">')+'</div>'}
-  if(ck.stage==='enrol'){
-    h+='<div class="card" style="margin-bottom:12px"><div class="ch"><h3>Request device enrolment</h3></div>'+
-      field('ck-dev','Device name','<input class="inp" id="ck-dev" value="'+esc(ev.device)+'">','Name the device')+
-      field('ck-devwhy','Why a new device (optional)','<input class="inp" id="ck-devwhy" placeholder="For example, replaced a broken phone">')+'</div>'}
-  /* details */
-  var accPill=ev.acc==null?pill('nt','Not captured'):ev.acc<=pol.goodAcc?pill('ok','Good'):ev.acc<=pol.retryAcc?pill('wa','Acceptable, warning'):pill('in','Retry needed'),
-      inPill=ev.dist==null?'':ev.dist<=ev.radius?pill('ok','Inside'):pill('er','Outside'),
-      devTone={'Enrolled':'ok','New':'wa','Pending review':'wa','Blocked':'er','Revoked':'er','Verification unavailable':'nt'}[ev.devStatus]||'nt';
-  var kv=[['Employee',aWho(id,e.title)],
-    ['Today’s work arrangement',esc(e.arr)+' · '+esc(x.schedule||'')],
-    ['Today’s shift',esc(aDow(ATT_TODAY)==='Sat'?'Saturday ':'Friday ')+esc(aShiftTxt(x.shift))+' · grace '+pol.grace+' min'],
-    ['Expected location',esc(x.label)+' · '+x.sites[0].radius+' m'+(x.sites.length>1?' · '+x.sites.length+' approved sites':'')+(x.note?'<br><span class="sub">'+esc(x.note)+'</span>':'')],
-    ['Simulated detected location',ev.lat==null?'Not captured (policy)':esc(aCoord(ev.lat,ev.lng))+'<br><span class="sub">Matched: '+esc(ev.matched)+'</span>'],
-    ['Distance from expected',ev.dist==null?'Not measured':aFmtDist(ev.dist)+' '+inPill],
-    ['GPS accuracy',(ev.acc==null?'':ev.acc+' m ')+accPill],
-    ['Device and enrolment',esc(ev.device)+' '+pill(devTone,ev.devStatus)],
-    ['System time',esc(time)+' <span class="sub">Africa/Lagos · server clock, simulated</span>'],
-    ['Employee device time',esc(ev.dev)+' <span class="sub">Shown for comparison. Never used.</span>'],
-    ['Applicable policy','Version '+P.v+' · effective '+esc(P.effective)+'<br><span class="sub">Outside the fence: '+esc(ATT_MODES[pol[x.modeKey]]||'')+(x.enforced?'':' (not enforced, recorded only)')+'</span>']];
-  if(outInfo&&outInfo.g>=0)kv=kv.concat([['Clock-in time',esc(outInfo.inT)],['Proposed system clock-out',esc(time)],
-    ['Gross duration',aDur(outInfo.g)],['Break',outInfo.brk?aDur(outInfo.brk)+' unpaid':'None applied'],['Net working duration','<b>'+aDur(outInfo.net)+'</b>'],
-    ['Early departure or overtime',outInfo.early?pill('wa','Early by '+aDur(outInfo.early))+' <span class="sub">Shift ends '+outInfo.end+'</span>':outInfo.ot?pill('in','Overtime '+aDur(outInfo.ot))+(pol.overtimeApproval?' <span class="sub">Needs manager approval</span>':''):pill('ok','Neither')],
-    ['Location result',ev.lat==null?'Not captured (policy)':ev.dist<=ev.radius?pill('ok','Inside '+ev.matched):pill('er','Outside, '+aFmtDist(ev.dist))],
-    ['Final status',pill(R.tone==='in'?'nt':R.tone,R.headline)]]);
-  h+='<div class="ckgrid"><div style="min-width:0"><dl class="kv ckkv">'+kv.map(function(p){return '<dt>'+esc(p[0])+'</dt><dd>'+p[1]+'</dd>'}).join('')+'</dl>'+attMiniMap(R)+'</div>';
-  /* presenter controls */
-  var dis=ck.stage!=='review';
-  h+='<aside class="ckdemo" aria-label="Demo location scenario"><h4>'+ic('target')+'Demo location scenario</h4>'+
-    '<p class="sub" style="margin:4px 0 10px">Presenter controls. They set what the simulated phone reports. A real punch reads location once, at this moment, and never tracks.</p>'+
-    '<div class="f"><label for="ck-actor">Act as employee</label><select class="inp" id="ck-actor"'+(dis?' disabled':'')+'>'+ATT_ORDER.map(function(k){
-      return '<option value="'+k+'"'+(k===id?' selected':'')+'>'+esc(aName(k))+' · '+esc(aEmp(k).arr)+'</option>'}).join('')+'</select></div>'+
-    '<div class="f"><label>Location</label>'+attSeg('loc',ATT_LOCS,ATT.demo.loc,'Location',dis)+'</div>'+
-    '<div class="f"><label>GPS accuracy</label>'+attSeg('acc',ATT_ACCS,ATT.demo.acc,'GPS accuracy',dis)+'</div>'+
-    '<div class="f"><label>Device</label>'+attSeg('device',[['enrolled','Enrolled device'],['new','New device']],ATT.demo.device,'Device',dis)+'</div>'+
-    '<div class="f"><label>Field assignment</label>'+attSeg('field',[['on','Approved field assignment'],['off','No field assignment']],ATT.demo.field,'Field assignment',dis)+
-      (attAssignmentFor(id,ATT_TODAY)?'':'<p class="sub" style="margin-top:5px">'+esc(aName(id).split(' ')[0])+' has no approved assignment today.</p>')+'</div>'+
-    '<div class="f"><label>Schedule today</label>'+attSeg('day',[['auto','As scheduled'],['Office','Office day'],['Remote','Remote day']],ATT.demo.day,'Schedule today',dis||e.arr!=='Hybrid')+
-      (e.arr!=='Hybrid'?'<p class="sub" style="margin-top:5px">Applies to hybrid staff only.</p>':'')+'</div>'+
-    '<div class="f" style="margin-bottom:0"><label for="ck-time">Demo time</label><select class="inp" id="ck-time"'+(dis?' disabled':'')+'>'+ATT_TIMES.map(function(t){
-      return '<option value="'+t[0]+'"'+(ATT.demo.time===t[0]?' selected':'')+'>'+esc(t[1])+(t[0]==='live'?' ('+aLagosHM()+')':'')+'</option>'}).join('')+'</select></div>'+
-    '</aside></div>';
+
+  if(ck.stage==='blocked')h+=attResultBox('er','Attendance status','Pending People review',
+    'Your '+(ck.kind==='out'?'clock-out':'clock-in')+' attempt at '+esc(ck.att?ck.att.sys:time)+' was saved with its original evidence. '+
+    esc(ck.reason||'')+' It is not compliant until People decides '+esc(ck.caseId||'the case')+'.');
+  else if(ck.stage==='rejected')h+=attResultBox('er','Attendance status','Unable to '+(ck.kind==='out'?'clock out':'clock in'),
+    esc(ck.reason||'')+(ck.offer==='device'?' You can ask People to enrol this device.':''));
+  else if(ck.stage==='review'){
+    h+='<div style="text-align:center;padding:2px 0 15px"><span class="av" style="width:42px;height:42px;margin:0 auto 10px">'+esc(id)+'</span>'+
+      '<h2 style="font-size:20px;margin-bottom:4px">'+(ck.kind==='out'?'Ready to finish for today?':'Ready to start your day?')+'</h2>'+
+      '<p class="sub">'+esc(aName(id))+' · '+esc(aLong(ATT_TODAY))+'</p></div>';
+    if(blockAck)h+=attResultBox('er','Action required','Attendance policy acknowledgment needed','Read policy v'+L.v+' before clocking in.');
+    else if(outInfo&&outInfo.g<0)h+=attResultBox('er','Time check','Cannot clock out yet','The current system time is earlier than your clock-in.');
+    else if(R.result==='Retry')h+=attResultBox('in','Location check','Location needs another try','Move near a window or into an open area, then retry.');
+    else if(R.result==='Rejected')h+=attResultBox('er','Location check','Location could not be verified',esc(R.reasons.join(' ')));
+    else h+=attResultBox(R.result==='Accepted'?'ok':'wa','Location check',R.result==='Accepted'?'Location verified':'Attendance will be reviewed',
+      ev.lat==null?'Location is not required by today’s policy.':R.result==='Accepted'?'You are within '+esc(ev.matched)+'.':esc(R.warn[0]||R.reasons[0]||'People will review this attendance.'));
+    h+='<div class="card" style="margin:12px 0 0"><dl class="kv">'+
+      '<dt>Work arrangement</dt><dd>'+esc(e.arr)+' · '+esc(x.schedule||'')+'</dd>'+
+      '<dt>Shift</dt><dd>'+esc(aShiftTxt(x.shift))+(pol.grace?' · '+pol.grace+' min grace':'')+'</dd>'+
+      '<dt>Clock location</dt><dd>'+esc(x.label)+(x.sites[0]?' · '+x.sites[0].radius+' m':'')+(x.note?'<br><span class="sub">'+esc(x.note)+'</span>':'')+'</dd>'+
+      (ck.kind==='out'&&outInfo&&outInfo.g>=0?'<dt>Clocked in</dt><dd>'+esc(outInfo.inT)+'</dd><dt>Time so far</dt><dd><b>'+aDur(outInfo.net)+'</b></dd>':'')+
+      '<dt>Current time</dt><dd><b>'+esc(time)+'</b> <span class="sub">Africa/Lagos</span></dd></dl></div>'+
+      '<p class="sub" style="margin:12px 2px 0;display:flex;gap:7px;align-items:flex-start">'+ic('lock')+' Location is read only for this action and is not continuously tracked.</p>'+
+      (ack&&!blockAck?'<p class="sub" style="margin:8px 2px 0">Policy v'+L.v+' still needs acknowledgment. You may clock in now and read it from Policy Updates afterward.</p>':'');
+  }
+  if(ck.stage==='exception'||ck.stage==='issue')h+='<div class="card"><div class="ch"><h3>'+(ck.stage==='exception'?'Add exception details':'Report a location issue')+'</h3></div>'+
+    '<p class="sub" style="margin-bottom:10px">'+(ck.stage==='exception'?'Explain why you were outside the approved location. People and your manager will review it.':'Explain why your location could not be verified after retrying.')+'</p>'+
+    field('ck-why','Explanation','<textarea class="inp" id="ck-why" placeholder="What happened, in a sentence or two"></textarea>','Write at least 10 characters')+
+    field('ck-evi','Supporting evidence label (optional)','<input class="inp" id="ck-evi" placeholder="For example, assignment message.jpg">')+'</div>';
+  if(ck.stage==='enrol')h+='<div class="card"><div class="ch"><h3>Request device enrolment</h3></div>'+
+    field('ck-dev','Device name','<input class="inp" id="ck-dev" value="'+esc(ev.device)+'">','Name the device')+
+    field('ck-devwhy','Reason (optional)','<input class="inp" id="ck-devwhy" placeholder="For example, replaced a broken phone">')+'</div>';
   $('#ckbody').innerHTML=h;
-  /* footer */
-  var f='<span class="sub grow">Simulated server check. Nothing leaves this browser.</span>',lab=ck.kind==='out'?'Clock out':'Clock in';
-  if(ck.stage==='review'){f+='<button class="btn" data-mx>Cancel</button>';
-    if(R.result==='Retry'){if(ck.retries>=2)f+='<button class="btn" data-att="ck-issue">Report attendance issue</button>';
+
+  var f='<span class="sub grow">One time and location reading will be recorded.</span>',lab=ck.kind==='out'?'Clock Out':'Clock In';
+  if(ck.stage==='review'){f+='<button class="btn" data-mx>Not now</button>';
+    if(blockAck)f+='<button class="btn pri" data-att="go-policy">View policy</button>';
+    else if(R.result==='Retry'){if(ck.retries>=2)f+='<button class="btn" data-att="ck-issue">Report issue</button>';
       f+='<button class="btn pri" data-att="ck-retry">'+ic('target')+'Retry location</button>'}
-    else f+='<button class="btn pri" data-att="ck-submit"'+((blockAck||(outInfo&&outInfo.g<0))?' disabled':'')+'>'+ic('clock')+'Confirm '+lab.toLowerCase()+'</button>'}
-  else if(ck.stage==='blocked')f+='<button class="btn" data-mx>Close</button><button class="btn pri" data-att="ck-exc">Request exception</button>';
-  else if(ck.stage==='rejected')f+='<button class="btn" data-mx>Close</button>'+(ck.offer==='device'?'<button class="btn pri" data-att="ck-enrol">Request device enrolment</button>':'');
-  else f+='<button class="btn" data-att="ck-back">Back</button><button class="btn pri" data-att="ck-send">'+ic('send')+'Send request</button>';
+    else if(R.result==='Rejected'||(outInfo&&outInfo.g<0))f+='<button class="btn pri" data-mx>Close</button>';
+    else f+='<button class="btn pri" data-att="ck-submit">'+ic('clock')+lab+'</button>'}
+  else if(ck.stage==='blocked')f+='<button class="btn" data-mx>Close</button><button class="btn pri" data-att="ck-exc">Add details</button>';
+  else if(ck.stage==='rejected')f+='<button class="btn pri" data-mx>Close</button>'+(ck.offer==='device'?'<button class="btn" data-att="ck-enrol">Request device enrolment</button>':'');
+  else f+='<button class="btn" data-att="ck-back">Back</button><button class="btn pri" data-att="ck-send">'+ic('send')+'Send</button>';
   var ft=$('#modal .mft');if(ft)ft.innerHTML=f;
   $$('#modal [data-mx]').forEach(function(b){b.onclick=closeModal});
   if(ck.stage==='exception'||ck.stage==='issue'){live('ck-why',function(v){return v.trim().length>=10});setTimeout(function(){var w=$('#ck-why');if(w)w.focus()},30)}
@@ -4596,6 +4595,9 @@ function attCkPaint(){
 /* the submit is the "server" deciding */
 function attCkSubmit(){
   var ck=ATTUI.ck,id=ATT.demo.actor,e=aEmp(id),time=aSysTime(),pol=attPolicy().settings;
+  var can=attCanClock(id),live=attOpenSession(id,ATT_TODAY);
+  if(!can.ok){ck.stage='rejected';ck.reason=can.message;ck.offer='';attCkPaint();return}
+  if((ck.kind==='in'&&attClockedToday(id))||(ck.kind==='out'&&!live)){ck.stage='rejected';ck.reason=ck.kind==='in'?'A clock-in already exists for today. Duplicate submissions are not allowed.':'There is no open clock-in to close. Refresh before trying again.';ck.offer='';attCkPaint();return}
   var R=attEvaluate(id,ATT_TODAY,time,attScenario(),ck.kind),ev=R.ev,nm=aName(id),kindTxt=ck.kind==='out'?'Clock-out':'Clock-in';
   if(R.result==='Retry'){ck.retries++;attCkPaint();return}
   if(R.result==='Accepted'||R.result==='Accepted with warning'){
@@ -4626,9 +4628,18 @@ function attCkSubmit(){
   /* blocked or rejected: the attempt is kept, the punch is not */
   if(pol.recordAttempts||R.result==='Rejected'){attCommit(ev);ck.att=ev}else ck.att={sys:time};
   ck.reason=R.reasons.join(' ');ck.offer=R.offer;ck.stage=R.result==='Rejected'?'rejected':'blocked';ck.issue=R.issue||'';ck.x=R.x;
+  if(R.result==='Needs approval'){
+    var ps=attSess(ev.ss),type=R.issue&&R.issue.indexOf('mismatch')>=0?'Location and schedule mismatch':R.x.kind==='field'?'Outside field assignment geofence':
+      (R.x.kind==='home'||R.x.kind==='temp')?'Outside home geofence':'Outside geofence';
+    var pc=attNewCase({type:type,emp:id,date:ATT_TODAY,status:'Awaiting HR',payroll:'Possible',ss:ps?ps.id:'',evs:[ev.id],assignment:R.x.assignment||'',
+      hist:'Opened automatically from a non-compliant '+kindTxt.toLowerCase()+' attempt. Original GPS evidence retained.',by:'System'});
+    ck.caseId=pc.id;attAlert(nm+', '+type.toLowerCase(),'Pending attendance review','Medium',pc.id);
+    attNotify('HR','Attendance review required, '+nm,ck.reason+' Case '+pc.id+' is awaiting a decision.','geofence',null,pc.id);
+    attNotify(id,'Attendance pending review',kindTxt+' was recorded as non-compliant. Track '+pc.id+' in My Attendance.','geofence',null,pc.id)
+  }
   attAudit('Failed clock attempt',nm+' · '+kindTxt+' '+time,'None',(R.result==='Rejected'?'Rejected':'Blocked')+': '+ck.reason,'Policy '+ev.policy,nm);
-  attNotify(id,kindTxt+' not completed',ck.reason,'geofence');
-  if(ev.outside){attNotify('HR','Outside-geofence attempt, '+nm,ck.reason,'geofence');attAlert(nm+' blocked outside a geofence','Outside-geofence attempt','Medium',ev.id||'')}
+  if(R.result==='Rejected')attNotify(id,kindTxt+' not completed',ck.reason,'geofence',null,ev.id||'');
+  if(ev.outside&&R.result==='Rejected'){attNotify('HR','Outside-geofence attempt, '+nm,ck.reason,'geofence',null,ev.id||'');attAlert(nm+' blocked outside a geofence','Outside-geofence attempt','Medium',ev.id||'')}
   attSave();attBellPaint();render();attCkPaint()}
 function attCkSend(){
   var ck=ATTUI.ck,id=ATT.demo.actor,nm=aName(id),e=aEmp(id);
@@ -4646,24 +4657,28 @@ function attCkSend(){
   if(ck.stage==='issue')type='GPS could not be verified';
   else type=ck.issue.indexOf('mismatch')>=0?'Location and schedule mismatch':ck.x&&ck.x.kind==='field'?'Outside field assignment geofence':
     ck.x&&(ck.x.kind==='home'||ck.x.kind==='temp')?'Outside home geofence':(e.arr==='Field'?'Field location without a matching assignment':'Outside geofence');
-  var c=attNewCase({type:type,emp:id,date:ATT_TODAY,status:'Awaiting HR',payroll:'Possible',ss:s?s.id:'',evs:s?s.evs.slice():[],expl:why,
+  var c=ck.caseId?attCase(ck.caseId):null;
+  if(c){c.expl=why;c.history.push([aStamp(),nm,'Employee added exception details: '+why])}
+  else c=attNewCase({type:type,emp:id,date:ATT_TODAY,status:'Awaiting HR',payroll:'Possible',ss:s?s.id:'',evs:s?s.evs.slice():[],expl:why,
     hist:ck.stage==='issue'?'Employee reported that GPS could not be verified':'Employee requested an exception for a blocked '+(ck.kind==='out'?'clock-out':'clock-in'),by:nm});
   c.evidence=evi;
-  attNotify('HR',(ck.stage==='issue'?'Attendance issue':'Exception request')+', '+nm,why,'correction');
-  if(e.mgr)attNotify(e.mgr,'For your recommendation: '+nm,type+'. '+why,'correction');
+  attNotify('HR',(ck.stage==='issue'?'Attendance issue':'Exception details')+', '+nm,c.id+' · '+why,'correction',null,c.id);
+  if(e.mgr)attNotify(e.mgr,'For your recommendation: '+nm,c.id+' · '+type+'. '+why,'correction',null,c.id);
   attAudit(ck.stage==='issue'?'Attendance issue reported':'Exception requested',nm+' · '+c.id,'None','Awaiting HR',type,nm);
   attSave();closeModal();attBellPaint();render();toast(c.id+' sent to People. Your manager is copied.')}
 
 /* ═════════════ NOTIFICATIONS AND ALERTS (the bell) ═════════════ */
-function attUnread(){return ATT.notes.filter(function(x){return !x.read&&(x.to==='CO'||x.to==='HR')}).length}
+function attViewer(){return ATT.demo.auth||ATT.demo.actor||'CO'}
+function attUnread(){var v=attViewer();return ATT.notes.filter(function(x){return !x.read&&(x.to===v||(v==='CO'&&x.to==='HR'))}).length}
 function attBellPaint(){var d=$('#bell .dotred');if(d)d.style.display=attUnread()?'':'none'}
 function attOpenBell(){openModal({title:'Notifications and Alerts',wide:true,body:'<div id="bellbody"></div>',
   foot:'<button class="btn" data-att="bell-read">Mark all as read</button><button class="btn pri" data-mx>Done</button>',onMount:function(){attBellRender()}})}
 function attBellRender(){var b=$('#bellbody');if(!b)return;
   var byTime=function(a,b){return (aDate(b.at.slice(0,10))-aDate(a.at.slice(0,10)))||(b.at.slice(11)>a.at.slice(11)?1:b.at.slice(11)<a.at.slice(11)?-1:0)};
-  var v=ATTUI.bell,mine=ATT.notes.filter(function(n){return n.to==='CO'||n.to==='HR'}),staff=ATT.notes.filter(function(n){return n.to!=='CO'&&n.to!=='HR'}),
-      al=ATT.alerts.filter(function(a){return a.open});
-  var h='<div class="seg" role="tablist" aria-label="Show" style="margin-bottom:10px">'+[['Notifications','Notifications · '+mine.length],['Alerts','Alerts · '+al.length],['Staff','Sent to staff · '+staff.length]].map(function(t){
+  var viewer=attViewer(),isHR=viewer==='CO',v=ATTUI.bell;if(!isHR&&v!=='Notifications')v=ATTUI.bell='Notifications';
+  var mine=ATT.notes.filter(function(n){return n.to===viewer||(isHR&&n.to==='HR')}),staff=isHR?ATT.notes.filter(function(n){return n.to!=='CO'&&n.to!=='HR'}):[],
+      al=isHR?ATT.alerts.filter(function(a){return a.open}):[],tabs=isHR?[['Notifications','Notifications · '+mine.length],['Alerts','Alerts · '+al.length],['Staff','Sent to staff · '+staff.length]]:[['Notifications','Notifications · '+mine.length]];
+  var h='<div class="seg" role="tablist" aria-label="Show" style="margin-bottom:10px">'+tabs.map(function(t){
     return '<button type="button" role="tab" aria-selected="'+(v===t[0])+'" data-att="bell-tab" data-v="'+t[0]+'"'+(v===t[0]?' class="on"':'')+'>'+esc(t[1])+'</button>'}).join('')+'</div>'+
     '<p class="sub" style="margin-bottom:10px">'+(v==='Alerts'?'An alert is an unresolved condition. It stays until someone with the right permission acts on it.':
       v==='Staff'?'What employees were sent. In the product each person sees only their own.':'A notification is something that happened to you. Read once and gone.')+'</p>';
@@ -4672,9 +4687,24 @@ function attBellRender(){var b=$('#bellbody');if(!b)return;
       (a.ref?'<button class="btn" data-att="alert-open" data-v="'+esc(a.ref)+'">Open</button>':'')+'</div>'}).join(''):emptyb('ok','No open alerts','Everything that needed action has been dealt with.');
   else{var list=(v==='Staff'?staff:mine).slice().sort(byTime);
     h+=list.length?list.slice(0,40).map(function(n){return '<div class="nrow'+(n.read?'':' un')+'"><span class="nic">'+ic(n.kind==='policy'?'doc':n.kind==='device'?'lock':n.kind==='punch'?'clock':'bell')+'</span>'+
-      '<span class="nb"><b>'+esc(n.title)+(n.read?'':' <span class="sr">unread</span>')+'</b><span class="sub">'+esc(n.body)+'</span><span class="sub">'+esc(n.at)+' · to '+esc(n.to==='HR'?'People team':n.to==='CO'?'you':aName(n.to))+'</span></span></div>'}).join(''):
+      '<span class="nb"><b>'+esc(n.title)+(n.read?'':' <span class="sr">unread</span>')+'</b><span class="sub">'+esc(n.body)+'</span><span class="sub">'+esc(n.at)+' · to '+esc(n.to==='HR'?'People team':n.to==='CO'?'you':aName(n.to))+'</span></span>'+
+      (v==='Staff'?'':'<button class="btn" data-att="note-open" data-v="'+esc(n.id)+'">Open</button>')+'</div>'}).join(''):
       emptyb('bell','Nothing yet','New notifications appear here.')}
   b.innerHTML=h}
+function attOpenNote(id){var n=null;ATT.notes.forEach(function(x){if(x.id===id)n=x});if(!n)return;
+  var viewer=attViewer();if(!(n.to===viewer||(viewer==='CO'&&n.to==='HR')))return;n.read=true;attSave();attBellPaint();
+  var ref=n.ref||((n.title+' '+n.body).match(/(?:REC|REQ|DV|FA)-\d+/)||[])[0]||'',hr=viewer==='CO';
+  if(/^REC-/.test(ref)&&hr){ATTUI.caseSel=ref;attGo('people','Attendance',{k:'recon',i:0});return}
+  if(/^REC-/.test(ref)&&attIsManager(viewer)){ATTUI.view='Manager View';attGo('people','Attendance');return}
+  if(/^DV-/.test(ref)&&hr){ATTUI.devSel=ref;attGo('people','Devices');return}
+  if(/^REQ-/.test(ref)){if(hr){ATTUI.view='Location Requests';attGo('people','Attendance')}else if(attIsManager(viewer)){ATTUI.view='Manager View';attGo('people','Attendance')}else attGo('ess','Work Location Requests');return}
+  if(/^FA-/.test(ref)){if(hr){ATTUI.view='Field Assignments';attGo('people','Attendance')}else if(attIsManager(viewer)){ATTUI.view='Manager View';attGo('people','Attendance')}else attGo('ess','My Attendance');return}
+  if(n.kind==='policy'){attGo(hr?'settings':'ess',hr?'Attendance Policy':'Policy Updates');return}
+  if(n.kind==='device'){attGo(hr?'people':'ess',hr?'Devices':'My Devices');return}
+  if(n.kind==='request'||n.kind==='assignment'||n.kind==='location'){if(hr){ATTUI.view=n.kind==='assignment'?'Field Assignments':'Location Requests';attGo('people','Attendance')}else attGo('ess','Work Location Requests');return}
+  if(n.kind==='correction'||n.kind==='geofence'){attGo(hr?'people':'ess',hr?'Attendance':'My Attendance');return}
+  if(n.kind==='query'){attGo('queries','Queries');return}
+  attGo('ess','My Attendance')}
 
 /* ═════════════ SHARED PIECES FOR THE SCREENS ═════════════ */
 var ATT_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -4714,14 +4744,14 @@ function attEssAttendance(){
       late=present.filter(function(p){return p[1].late}).length,open=attOpenSession(id,ATT_TODAY),
       mine=ATT.cases.filter(function(c){return c.emp===id}),openC=mine.filter(function(c){return c.status!=='Resolved'&&c.status!=='Escalated'}).length,
       today=attTodaySession(id),tv=today?attSV(today):null,x=attWhere(id,ATT_TODAY,{field:'on',day:'auto'}),
-      days={};ss.forEach(function(s){days[s.date]=1});
+      days={},can=attCanClock(id),home=attPermHome(id);ss.forEach(function(s){days[s.date]=1});
   var hrs=vs.slice().reverse().filter(function(p){return p[1].net!=null}).map(function(p){return Math.round(p[1].net/6)/10});
   return '<div class="phead"><div><h1>My Attendance</h1><p>October 2026 · '+esc(e.name)+' · '+esc(e.arr)+'</p></div><div class="right">'+
-    '<button class="btn" data-att="ess-issue">Report an issue</button><button class="btn pri" data-att="punch-open">'+ic('clock')+(open?'Clock out':'Clock in')+'</button></div></div>'+
+    '<button class="btn pri" data-att="punch-open"'+(can.ok?'':' disabled title="'+esc(can.message)+'"')+'>'+ic('clock')+(can.kind==='leave'?'On approved leave':open?'Clock out':'Clock in')+'</button></div></div>'+
     attActorStrip()+attAckBanner(id)+
     kpis([['Days present',present.length+' / '+Object.keys(days).length],['On time',String(present.length-late),'ok'],['Late',String(late),late?'warn':''],['Open exceptions',String(openC),openC?'warn':'ok']])+
     '<div class="grid g23"><div class="card"><div class="ch"><h3>Today, '+esc(aLong(ATT_TODAY))+'</h3><span class="right">'+(tv?attStatusPill(tv):attOnLeave(id,ATT_TODAY)?pill('in','On leave'):pill('nt','Not clocked in'))+'</span></div>'+
-    '<dl class="kv"><dt>Expected location</dt><dd>'+esc(today?today.expected:x.label)+'</dd><dt>Schedule</dt><dd>'+esc(x.schedule)+' · '+esc(aShiftTxt(x.shift))+'</dd>'+
+    '<dl class="kv"><dt>Expected location</dt><dd>'+esc(today?today.expected:x.label)+'</dd>'+(x.mode==='Remote'?'<dt>Registered home</dt><dd>'+(home?esc(home.address)+' · fixed 100 m geofence':'Missing — contact People')+'</dd>':'')+'<dt>Schedule</dt><dd>'+esc(x.schedule)+' · '+esc(aShiftTxt(x.shift))+'</dd>'+
     '<dt>Clock in</dt><dd>'+(tv?attTimeCell(tv,'in'):'None')+'</dd><dt>Clock out</dt><dd>'+(tv?attTimeCell(tv,'out'):'None')+'</dd>'+
     '<dt>Matched location</dt><dd>'+esc(tv&&tv.inE?tv.inE.matched:'Not yet')+'</dd>'+(tv&&tv.exceptions.length?'<dt>Exception</dt><dd>'+esc(tv.exceptions[0])+'</dd>':'')+'</dl>'+
     '<p class="sub" style="margin-top:11px">The time recorded is the system time, not your phone’s clock.</p></div>'+
@@ -4740,7 +4770,7 @@ function attEssRequests(){
   return head('Work Location Requests','Temporary changes to where you clock in · '+e.name,[['New request',1,'att-req-new']])+
     attActorStrip()+attAckBanner(id)+
     '<div class="grid g2">'+kvcard('Where you clock in today',[['Arrangement',pill('nt',e.arr)+' '+esc(ATT_PROFILE[e.arr])],
-      ['Permanent home',h?esc('Approved home · '+h.area)+' · '+h.radius+' m':'None on file'],
+      ['Permanent home',h?esc(h.address)+' · fixed 100 m geofence':'None on file'],
       ['Active location',ah?esc(attFenceName(ah))+(ah.kind==='Temporary'?' · until '+esc(ah.to):''):esc(attSite(e.office||'mtn').name)],
       ['Field assignment today',fa?esc(fa.id+' · '+fa.name):'None'],['Office',esc(attSite(e.office||'mtn').name)]])+
     '<div class="card"><div class="ch"><h3>How a request moves</h3></div>'+
@@ -4762,10 +4792,10 @@ function attReqModal(){
     field('rq-type','Request type','<select class="inp" id="rq-type">'+ATT_REQTYPES.map(function(t){return '<option>'+esc(t)+'</option>'}).join('')+'</select>')+
     '<div class="grid g2" style="margin-bottom:0">'+field('rq-from','Start date','<input class="inp" id="rq-from" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY" inputmode="numeric">','Use DD/MM/YYYY, today or later')+
     field('rq-to','End date','<input class="inp" id="rq-to" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY" inputmode="numeric">','On or after the start date')+'</div>'+
-    field('rq-addr','Address','<input class="inp" id="rq-addr" placeholder="Street, area, city" value="">','Enter the address')+
+    field('rq-addr','Address','<input class="inp" id="rq-addr" placeholder="Street, area, city" value="">','Enter the address. Home locations use a mandatory 100 m geofence; approved client sites use the field-policy radius.')+
     '<div class="f"><button type="button" class="btn" data-att="rq-pin">'+ic('target')+'Drop pin at address</button><span class="sub" style="margin-left:8px">Simulated map pin</span><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(null)+'</div></div>'+
     '</div><div>'+
-    field('rq-rad','Requested radius, metres','<input class="inp" id="rq-rad" type="number" value="150" min="100" max="500">','Between 100 and 250 for a home, up to 500 for a site')+
+    '<div class="attban in">'+ic('target','ico')+'<span><b>Radius is assigned by policy.</b><br>Home and one-day remote locations use 100 m. Client and field sites use the configured field radius.</span></div>'+
     field('rq-why','Reason','<textarea class="inp" id="rq-why" placeholder="Why, in a sentence or two"></textarea>','Write at least 10 characters')+
     field('rq-evi','Supporting evidence label (optional)','<input class="inp" id="rq-evi" placeholder="For example, tenancy letter.pdf">')+
     '</div></div>',
@@ -4778,13 +4808,12 @@ function attReqModal(){
       live('rq-why',function(v){return v.trim().length>=10});sync()}})}
 function attReqSave(mode){
   var id=ATT.demo.actor,t=$('#rq-type').value,from=$('#rq-from').value.trim(),to=$('#rq-to').value.trim(),addr=$('#rq-addr').value.trim(),
-      rad=+$('#rq-rad').value,why=$('#rq-why').value.trim(),evi=$('#rq-evi').value.trim(),site=t==='Client-site visit'||t==='Field-assignment correction',
+      why=$('#rq-why').value.trim(),evi=$('#rq-evi').value.trim(),site=t==='Client-site visit'||t==='Field-assignment correction',rad=site?attPolicy().settings.radiusField:100,
       bad=function(k){$('#fw-'+k).classList.add('bad');var el=$('#'+k);if(el)el.focus();return false},ok=true;
   $$('#modal .f.bad').forEach(function(f){f.classList.remove('bad')});
   if(!aValidDate(from)||aCmp(from,ATT_TODAY)<0)ok=bad('rq-from');
   else if(!aValidDate(to)||aCmp(to,from)<0)ok=bad('rq-to');
   else if(!addr)ok=bad('rq-addr');
-  else if(!(rad>=100&&rad<=(site?500:250)))ok=bad('rq-rad');
   else if(why.length<10)ok=bad('rq-why');
   if(!ok)return;
   var p=ATTUI.essReq.pin||attPin(addr),nm=aName(id);
@@ -4844,11 +4873,12 @@ function attEssPolicy(){
       ['GPS',esc('Read once per punch. '+L.settings.goodAcc+' m or better is good. Worse than '+L.settings.retryAcc+' m, you retry.')],
       ['Hours',esc('Weekdays '+L.settings.wkStart+' to '+L.settings.wkEnd+'. Saturday '+L.settings.satStart+' to '+L.settings.satEnd+'. Grace '+L.settings.grace+' minutes.')],
       ['Devices',esc(L.settings.devBlockUnenrolled?'Unenrolled devices are blocked.':'A new device is accepted with a warning and reviewed.')],
-      ['Deductions','Never automatic. A person accepts or waives each one.']])+'</div>'+
+      ['Deduction tiers',(L.settings.deductionTiers?'On':'Off')+'. Never automatic; a person accepts or waives each proposal.'],
+      ['Overtime tiers',(L.settings.overtimeTiers?'On':'Off')+'. Monetary rates are not configured.']])+'</div>'+
     table([['Version'],['Published'],['Effective'],['Summary'],['Your acknowledgment'],['']],ATT.policies.slice().reverse().map(function(p){var x=ATT.acks[p.v]&&ATT.acks[p.v][id];
       return ['v'+p.v,esc(p.published),esc(p.effective),esc(p.summary),x?(x.ack?pill('ok',x.ack):pill('wa','Pending')):pill('nt','Not affected'),
         '<button class="btn" data-att="pol-full" data-v="'+p.v+'">Read</button>']}),'All versions')}
-function attPolSections(s){var sec=[['loc','Location verification'],['rules','Outside-geofence behaviour by arrangement'],['dev','Device verification'],['time','Time and attendance'],['exc','Exceptions and queries'],['pub','Publication']];
+function attPolSections(s){var sec=[['loc','Location verification'],['rules','Outside-geofence behaviour by arrangement'],['dev','Device verification'],['time','Time and attendance'],['tiers','Pay-impact tiers'],['exc','Exceptions and queries'],['pub','Publication']];
   return sec.map(function(x){return '<details class="acc"'+(x[0]==='loc'?' open':'')+'><summary>'+esc(x[1])+'</summary><dl class="kv" style="padding:0 14px 13px">'+
     ATT_PF.filter(function(f){return f[6]===x[0]}).map(function(f){return '<dt>'+esc(f[1])+'</dt><dd>'+esc(attFmt(f[0],s[f[0]]))+'</dd>'}).join('')+'</dl></details>'}).join('')}
 function attPolChanges(v){var p=null,prev=null;ATT.policies.forEach(function(x,i){if(x.v===+v){p=x;prev=ATT.policies[i-1]||null}});if(!p)return;
@@ -4866,15 +4896,15 @@ function attPrimary(id){var e=aEmp(id),o=attSite(e.office||'mtn'),h=attPermHome(
   return e.arr==='Remote'?(h?'Approved home · '+h.area:'No home on file'):e.arr==='Hybrid'?o.name+', home on remote days':e.arr==='Field'?'Field assignments, base '+o.name:o.name}
 function attEmployeesTab(){
   var cnt={};ATT_ARRS.forEach(function(a){cnt[a]=0});ATT_ORDER.forEach(function(k){cnt[aEmp(k).arr]++});
-  return head('Employees','25 staff · 6 departments · click a row for the 360',[['Import'],['Add employee',1]])+
+  return head('Employees','25 staff · 6 departments · select a row for details and actions',[['Import'],['Add employee',1]])+
     kpis([['Headcount','25'],['Confirmed','21','ok'],['On probation','3','warn'],['Attrition, 90 days','1']])+
     statstrip(ATT_ARRS.map(function(a){return [a,String(cnt[a])+' in demo roster']}))+
-    table([['Employee'],['Department'],['Line manager'],['Arrangement'],['Primary work location'],['Approved home'],['Assigned office'],['Field assignment today'],['Temporary location'],['Attendance profile'],['Status']],
-      STAFF.map(function(s,i){var id=s[0],e=aEmp(id),h=attPermHome(id),fa=attAssignmentFor(id,ATT_TODAY),ts=attTempStatus(id);
-        return [who(s[0],s[1],s[2]),esc(s[2]),esc(aMgrName(id)),pill('nt',e.arr),esc(attPrimary(id)),h?esc('Approved home · '+h.area+' · '+h.radius+' m'):'<span class="sub">Not required</span>',
-          esc(attSite(e.office||'mtn').name),fa?esc(fa.id+' · '+fa.sites[0].name+(fa.sites.length>1?' +'+(fa.sites.length-1):'')):'<span class="sub">None</span>',
-          pill(ts[0],ts[1]),esc(ATT_PROFILE[e.arr]),i===7?pill('wa','Probation'):pill('ok','Confirmed')]}),'All employees',
-      '<span class="sub">Showing 9 of 25 · home addresses masked</span>',function(i){return ' class="rowlink" data-dk="emp" data-di="'+i+'"'},'wide')+
+    table([['Employee'],['Department'],['Line manager'],['Arrangement'],['Attendance today'],['Employment status'],['']],
+      STAFF.map(function(s,i){var id=s[0],e=aEmp(id),ss=attTodaySession(id),v=ss?attSV(ss):null,lv=attOnLeave(id,ATT_TODAY);
+        return [who(id,s[1],s[2]),esc(s[2]),esc(aMgrName(id)),pill('nt',e.arr),v?attStatusPill(v):lv?pill('in','On leave'):pill('nt','Not clocked in'),
+          e.status==='Suspended'?pill('er','Suspended'):i===7?pill('wa','Probation'):pill('ok','Active'),
+          '<button class="btn" data-att="emp-open" data-v="'+id+'">View details</button>']}),'All employees',
+      '<span class="sub">Showing 9 of 25 · sensitive home addresses appear only in the authorised details modal</span>',function(i){return ' class="rowlink" tabindex="0" data-att="emp-open" data-v="'+STAFF[i][0]+'"'})+
     '<div class="grid g2" style="margin-top:12px">'+
     bars('Headcount by department',[['Marketing & Sales',100,'6'],['Content',83,'5'],['Operations',66,'4'],
       ['Engineering',66,'4'],['Studio',50,'3'],['Support',50,'3']],'Six departments. A department is a setting, not a code change.')+
@@ -4884,6 +4914,20 @@ function attEmployeesTab(){
      ['Bashir Lawal','Query open since 07/10','Awaiting his response','er']].map(function(r){
       return '<button class="task"><b>'+esc(r[0])+'</b><span class="sub" style="display:block;margin-bottom:6px">'+esc(r[1])+'</span>'+
       '<span class="meta">'+pill(r[3],r[2])+'</span></button>'}).join('')+'</div></div>'}
+function attEmployeeModal(id){var e=aEmp(id),h=attPermHome(id),fa=attAssignmentFor(id,ATT_TODAY),ts=attTempStatus(id),idx=-1;
+  STAFF.forEach(function(s,i){if(s[0]===id)idx=i});if(!e)return;
+  openModal({title:'Employee Details · '+e.name,wide:true,body:
+    '<div class="attban in">'+ic('lock','ico')+'<span>Home-address details are visible to authorised People users and are recorded in the audit trail when opened.</span></div>'+
+    '<div class="grid g2"><div class="card"><div class="ch"><h3>Employment</h3><span class="right">'+(e.status==='Suspended'?pill('er','Suspended'):pill('ok','Active'))+'</span></div>'+
+      '<dl class="kv"><dt>Employee</dt><dd>'+aWho(id,e.title)+'</dd><dt>Department</dt><dd>'+esc(e.dept)+'</dd><dt>Line manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
+      '<dt>Work arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary location</dt><dd>'+esc(attPrimary(id))+'</dd><dt>Assigned office</dt><dd>'+esc(attSite(e.office||'mtn').name)+'</dd></dl></div>'+
+    '<div class="card"><div class="ch"><h3>Attendance and location</h3></div><dl class="kv">'+
+      '<dt>Registered home</dt><dd>'+(h?esc(h.address):'Not on file')+'</dd><dt>Home coordinates</dt><dd>'+(h?esc(aCoord(h.lat,h.lng)):'Not captured')+'</dd>'+
+      '<dt>Home geofence</dt><dd>'+(h?'100 m · mandatory':'Not available')+'</dd><dt>Temporary location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
+      '<dt>Field assignment today</dt><dd>'+(fa?esc(fa.id+' · '+fa.name):'None')+'</dd><dt>Attendance profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+'</dd></dl></div></div>',
+    foot:'<button class="btn" data-mx>Close</button>'+(e.arr==='Remote'||e.arr==='Hybrid'?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit home</button>':'')+
+      '<button class="btn" data-att="arr-change" data-v="'+id+'">Change arrangement</button><button class="btn pri" data-att="emp-full" data-v="'+idx+'">Open full employee record</button>',
+    onMount:function(){attAudit('Viewed approved home details',e.name+' · employee details','Masked','Full address shown','People employee modal');attSave()}})}
 function attSetupCard(id){var e=aEmp(id);if(!e)return '';
   var h=attPermHome(id),fa=attAssignmentFor(id,ATT_TODAY),ts=attTempStatus(id),o=attSite(e.office||'mtn'),P=attPolicy(),
       hist=ATT.audit.filter(function(a){return a.entity.indexOf(e.name)===0&&/arrangement|Home location|Temporary location|Viewed approved home/.test(a.action)});
@@ -4916,8 +4960,8 @@ function attHomeModal(id){var e=aEmp(id),h=attPermHome(id),pol=attPolicy().setti
   openModal({title:'Edit Home Geofence',body:'<p class="sub" style="margin-bottom:12px">'+esc(e.name)+'. The old home is kept in history, never overwritten.</p>'+
     field('hm-addr','Full address','<input class="inp" id="hm-addr" value="'+esc(h?h.address:'')+'">','Enter the address')+
     '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="hm-addr">'+ic('target')+'Drop pin at address</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(ATTUI.essReq.pin)+'</div></div>'+
-    field('hm-rad','Radius, metres','<input class="inp" id="hm-rad" type="number" min="100" max="250" value="'+(h?h.radius:pol.radiusRemote)+'">','Between 100 and 250. The default is '+pol.radiusRemote)+
-    field('hm-just','Justification','<input class="inp" id="hm-just" value="'+esc(h?h.just:'')+'" placeholder="Needed when the radius is not the default">','Say why the radius differs from '+pol.radiusRemote+' m'),
+    '<div class="attban in">'+ic('lock','ico')+'<span><b>100 m geofence</b><br>This radius is mandatory for registered and temporary home locations and cannot be changed.</span></div>'+
+    field('hm-just','Change reason','<input class="inp" id="hm-just" value="'+esc(h?h.just:'')+'" placeholder="For example, employee moved home">','Recorded in the audit trail'),
     foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="home-save" data-v="'+id+'">Save home</button>'})}
 
 /* ═════════════ PEOPLE → ATTENDANCE ═════════════ */
@@ -4934,17 +4978,17 @@ function attFilterRow(r,f){
   if(f==='Missing punch')return (!r.leave&&!(r.v&&r.v.inE))||r.cases.some(function(c){return /Missing clock/.test(c.type)});
   if(f==='Needs reconciliation')return r.cases.length>0;return true}
 function attPeopleAttendance(){
-  var k=attKpis(),n=ATT_ORDER.length,view=ATTUI.view,body='';
+  var k=attKpis(),n=ATT_ORDER.length,isHR=attViewer()==='CO'||attViewer()==='IC',view=isHR?ATTUI.view:'Manager View',body='';
   if(view==='Register')body=attRegisterView(k);else if(view==='Field Assignments')body=attFAView();
   else if(view==='Location Requests')body=attReqHRView();else body=attMgrView();
-  return '<div class="phead"><div><h1>Attendance '+infoBtn('att-help')+'</h1><p>'+esc(aLong(ATT_TODAY))+' · Africa/Lagos · demo roster of '+n+' of 25 staff</p></div>'+
-    '<div class="right"><button class="btn" data-att="punch-open">'+ic('clock')+'Clock In panel</button>'+
-    '<button class="btn pri" data-att="recon" aria-label="Reconcile, '+k.recon+' unresolved">'+ic('check')+'Reconcile <span class="cntb">'+k.recon+'</span></button></div></div>'+
+  return '<div class="phead"><div><h1>Attendance '+infoBtn('att-help')+'</h1><p>'+esc(aLong(ATT_TODAY))+' · Africa/Lagos · '+(isHR?'demo roster of '+n+' of 25 staff':'manager team view')+'</p></div>'+
+    (isHR?'<div class="right"><button class="btn" data-att="punch-open">'+ic('clock')+'Clock In panel</button>'+
+    '<button class="btn pri" data-att="recon" aria-label="Reconcile, '+k.recon+' unresolved">'+ic('check')+'Reconcile <span class="cntb">'+k.recon+'</span></button></div>':'')+'</div>'+
     infoText('att-help','Every figure here is computed from the clock events in this demo. Reconcile fixes what the record should say and never edits a punch. Possible policy breaches go to Queries & Sanctions, which is separate.')+
-    '<div class="attk">'+kpis([['Clocked in',k.inn+' / '+n],['On site',String(k.site)],['Remote',String(k.remote)],['On assignment',String(k.field)]])+
+    (isHR?'<div class="attk">'+kpis([['Clocked in',k.inn+' / '+n],['On site',String(k.site)],['Remote',String(k.remote)],['On assignment',String(k.field)]])+
     kpis([['Late',String(k.late),k.late?'warn':''],['Outside geofence',String(k.out),k.out?'warn':''],['Missing clock-out',String(k.missOut),k.missOut?'err':''],['Needs reconciliation',String(k.recon),k.recon?'warn':'ok']])+'</div>'+
     '<div class="seg" role="tablist" aria-label="Attendance views" style="margin-bottom:12px;max-width:640px">'+['Register','Field Assignments','Location Requests','Manager Preview'].map(function(t){
-      return '<button type="button" role="tab" aria-selected="'+(t===view)+'" data-att="att-view" data-v="'+t+'"'+(t===view?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')+'</div>'+body}
+      return '<button type="button" role="tab" aria-selected="'+(t===view)+'" data-att="att-view" data-v="'+t+'"'+(t===view?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')+'</div>':'')+body}
 function attRegisterView(k){
   var f=ATTUI.filter,rows=k.rows.filter(function(r){return attFilterRow(r,f)}),
       ins=k.rows.filter(function(r){return r.v&&r.v.inE}).map(function(r){return aMin(r.v.inE.sys)}),
@@ -5034,14 +5078,14 @@ function attReqDecide(rid,ok){var r=attReq(rid);if(!r)return;var note=($('#rd-no
 
 /* manager preview: the same data, seen through a line manager's narrower scope */
 function attMgrView(){
-  var team=ATT_ORDER.filter(function(k){return aEmp(k).mgr==='CO'}),rows=attRegisterRows().filter(function(r){return team.indexOf(r.id)>=0}),
+  var mgr=attViewer(),team=ATT_ORDER.filter(function(k){return aEmp(k).mgr===mgr}),rows=attRegisterRows().filter(function(r){return team.indexOf(r.id)>=0}),
       exp=rows.filter(function(r){return !r.leave}).length,inn=rows.filter(function(r){return r.v&&r.v.inE}).length,
       late=rows.filter(function(r){return r.v&&r.v.late}).length,rem=rows.filter(function(r){return r.e.arr==='Remote'||(r.s&&r.s.mode==='Remote')}).length,
       fld=rows.filter(function(r){return r.s&&r.s.mode==='Field'&&r.v.inE}).length,miss=rows.filter(function(r){return !r.leave&&!(r.v&&r.v.inE)}).length,
       reqs=ATT.requests.filter(function(q){return team.indexOf(q.emp)>=0&&q.status==='Awaiting manager'}),
       cs=ATT.cases.filter(function(c){return team.indexOf(c.emp)>=0&&c.status==='Awaiting manager'}),
       fas=ATT.assignments.filter(function(a){return a.status==='Awaiting manager'&&a.emps.some(function(x){return team.indexOf(x)>=0})});
-  return '<div class="attban in">'+ic('users','ico')+'<span><b>Manager preview.</b> What Cynthia sees as line manager of '+team.length+' people: '+esc(team.map(aName).join(', '))+'. Nothing outside this team is visible here.</span></div>'+
+  return '<div class="attban in">'+ic('users','ico')+'<span><b>Manager view.</b> What '+esc(aName(mgr))+' sees as line manager of '+team.length+' people: '+esc(team.map(aName).join(', ')||'no linked reports')+'. Nothing outside this team is visible here.</span></div>'+
     '<div class="attk">'+kpis([['Expected today',String(exp)],['Clocked in',String(inn)],['Late',String(late),late?'warn':''],['Remote',String(rem)]])+
     kpis([['On assignment',String(fld)],['Missing punch',String(miss),miss?'err':''],['Pending location requests',String(reqs.length),reqs.length?'warn':''],['Corrections awaiting recommendation',String(cs.length),cs.length?'warn':'']])+'</div>'+
     table([['Employee'],['Arrangement'],['Today'],['Expected location'],['Matched location']],rows.map(function(r){var v=r.v,last=v?(v.all[v.all.length-1]||{}):{};
@@ -5165,11 +5209,11 @@ function attPlan(c,f){
   p.before=live||{status:'No session',net:null,exceptions:[],late:0,ot:0};p.after=attSV(sc,copy);return p}
 function attPayrollText(c,f,p){
   var b=p.before,a=p.after,pol=attPolicy(c.date).settings,t;
-  if(f.o==='unauth_abs')t='A one-day deduction is computed and waits in Payroll → Deductions for Finance or Operations to accept or waive. Nothing deducts itself.';
+  if(f.o==='unauth_abs')t=pol.deductionTiers?'The configured deduction tier is proposed and waits in Payroll → Deductions for Finance or Operations to accept or waive. Nothing deducts itself.':'Deduction tiers are off, so no attendance deduction tier is proposed. The unauthorised absence classification is still recorded.';
   else if(f.o==='leave')t='Paid as approved leave. No deduction.';else if(f.o==='auth_abs')t='Authorised absence. Paid, no deduction.';
   else if(f.o==='exclude_dup')t='The duplicate no longer counts. Hours are unchanged at '+aDur(a.net)+'.';
   else if(f.o==='info'||f.o==='unresolved')t='None until the case is decided.';
-  else if(String(b.net)!==String(a.net))t='Net hours change from '+(b.net==null?'none':aDur(b.net))+' to '+aDur(a.net)+'.'+(a.ot&&pol.overtimeApproval?' Overtime of '+aDur(a.ot)+' needs manager approval before it is paid.':'');
+  else if(String(b.net)!==String(a.net))t='Net hours change from '+(b.net==null?'none':aDur(b.net))+' to '+aDur(a.net)+'.'+(a.ot?(pol.overtimeTiers?(pol.overtimeApproval?' Overtime of '+aDur(a.ot)+' needs manager approval. Monetary rates are not configured, so payment calculation remains pending.':' Overtime tiers are on, but monetary rates are not configured.'):' Overtime time is retained, but overtime tiers are off and no tier calculation applies.'):'');
   else t='No change to hours or pay.';
   return t+' '+(ATT.demo.payrollLocked?'October payroll is locked, so this lands in the next run as an adjustment line.':'October payroll is not locked, so the preview recalculates.')}
 function attQueryText(c,f,p){
@@ -5213,7 +5257,7 @@ function attApplyCase(){
   if(p.query){var q={id:'QRY-'+aNum(ATT.seq.qry++,4),emp:c.emp,subject:c.type+' on '+aShort(c.date),by:'Cynthia Osakunih',date:ATT_TODAY,status:'Awaiting response',from:c.id};ATT.queries.unshift(q);c.query=q.id;
     attNotify(c.emp,'Query raised: '+q.subject,'Respond within '+attPolicy().settings.responsePeriod+'. This is separate from your attendance record.','query')}
   if(p.status!=='Awaiting HR'&&p.status!=='Awaiting manager')attClearAlerts(c.id);
-  attNotify(c.emp,'People decided '+c.id,c.type+' on '+c.date+': '+c.outcome+'.','decision');
+  attNotify(c.emp,'People decided '+c.id,c.type+' on '+c.date+': '+c.outcome+'.','decision',null,c.id);
   attAudit('Reconciliation resolution',nm+' · '+c.id,before,(after.status||'')+', '+attHours(after)+' · '+c.outcome,f.why+(f.evi?' · evidence: '+f.evi:''));
   attSave();ATTUI.pending=null;closeModal();attBellPaint();render();
   toast(p.status==='More information requested'?'More information requested from '+nm:
@@ -5279,7 +5323,7 @@ function attWorksitesTab(){
     '<div style="margin-top:12px">'+table([['Location'],['Type'],['Address'],['Radius'],['Assigned employees'],['Attendance today','n'],['Active dates'],['Enforcement mode'],['Status']],
       rows.map(function(r){return [r.n,esc(r.t),r.a,r.r,esc(r.emp),r.today,r.dates,esc(r.mode),pill(tone(r.st),r.st)]}),'All locations','<span class="sub">Click an approved home for the HR detail view</span>',
       function(i){return rows[i].click?' class="rowlink" data-att="home-detail" data-v="'+rows[i].click+'" tabindex="0"':''},'wide')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+kvcard('How the geofence behaves, policy v'+attPolicy().v,[['Remote',ATT_MODES[pol.modeRemote]+' outside the approved home, '+pol.radiusRemote+' m by default'],
+    '<div class="grid g2" style="margin-top:12px">'+kvcard('How the geofence behaves, policy v'+attPolicy().v,[['Remote',ATT_MODES[pol.modeRemote]+' outside the approved home, fixed '+pol.radiusRemote+' m'],
       ['Hybrid','MTN Head Office on office days, home on remote days. '+ATT_MODES[pol.modeHybrid]],['Field','An approved assignment overrides office and home. '+ATT_MODES[pol.modeField]],
       ['Office-only',ATT_MODES[pol.modeOffice]+' outside the assigned office'],['Accuracy','Good at '+pol.goodAcc+' m or better. Worse than '+pol.retryAcc+' m, retry before any fence decision'],
       ['Tracking','None. Location is read only at clock-in and clock-out']])+
@@ -5304,7 +5348,7 @@ function attWsModal(){var pol=attPolicy().settings;ATTUI.essReq={pin:null};
 function attDraft(){return ATT.draft||attLatest().settings}
 function attCtl(f,val){var k=f[0];
   if(f[3]==='bool')return '<button type="button" class="sw'+(val?' on':'')+'" role="switch" aria-checked="'+!!val+'" aria-label="'+esc(f[1])+'" data-pk="'+k+'"></button>';
-  if(f[3]==='lock')return '<span style="display:flex;align-items:center;gap:8px">'+pill('nt','Always off')+ic('lock')+'</span>';
+  if(f[3]==='lock')return '<span style="display:flex;align-items:center;gap:8px">'+pill('nt',k==='radiusRemote'?'100 m · fixed':'Always off')+ic('lock')+'</span>';
   if(f[3]==='mode')return '<select class="inp pctl" data-attc="pk" data-k="'+k+'" aria-label="'+esc(f[1])+'">'+['record','warn','block'].map(function(m){return '<option value="'+m+'"'+(m===val?' selected':'')+'>'+esc(ATT_MODES[m])+'</option>'}).join('')+'</select>';
   if(f[3]==='sel')return '<select class="inp pctl" data-attc="pk" data-k="'+k+'" aria-label="'+esc(f[1])+'">'+f[4].map(function(o){return '<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>';
   if(f[3]==='time')return '<input class="inp pctl" type="time" data-attc="pk" data-k="'+k+'" value="'+esc(val)+'" aria-label="'+esc(f[1])+'">';
@@ -5324,12 +5368,17 @@ function attPolicyTab(){
     (keys.length?'<div class="draftbar" role="status">'+ic('alert','ico')+'<span><b>Draft changes not yet published</b> · '+keys.length+' change'+(keys.length>1?'s':'')+'. Employees have not been told.</span>'+
       '<span class="acts"><button class="btn" data-att="pol-discard">Discard changes</button><button class="btn" data-att="pol-review">Review changes</button><button class="btn pri" data-att="pol-publish">Publish policy</button></span></div>':
       '<div class="draftbar ok" role="status">'+ic('ok','ico')+'<span>No draft changes. Version '+L.v+' is the latest published policy. Any change below starts a draft.</span><span class="acts"><button class="btn" disabled>Publish policy</button></span></div>')+
-    '<div class="grid g2">'+attPolCard('1 · Location verification','loc','Defaults: remote 150 m, MTN Head Office 100 m, field 200 m. Good GPS 50 m or better; retry when worse than 100 m.')+
+    '<div class="grid g2">'+attPolCard('1 · Location verification','loc','Remote home locations are fixed at 100 m. MTN Head Office is 100 m; the field default is 200 m. Good GPS is 50 m or better; retry when worse than 100 m.')+
     '<div>'+attPolCard('Outside-geofence behaviour, by arrangement','rules','Attendance rules by employee category. Block keeps the attempt on record and offers the employee an exception request.')+
     '<div style="margin-top:12px">'+attPolCard('2 · Device verification','dev')+'</div></div></div>'+
     '<div class="grid g2">'+attPolCard('3 · Time and attendance','time','Seeded values: weekdays 09:00 to 17:00, Saturday 09:00 to 15:00, 15 minute grace, missing clock-out flagged the next morning.')+
-    attPolCard('4 · Exceptions and queries','exc','No deduction enters payroll automatically. An authorised person must accept or waive it.')+'</div>'+
-    '<div class="grid g2">'+attPolCard('5 · Policy publication','pub')+
+    attPolCard('4 · Pay-impact tiers','tiers','Each toggle is independent. Switching one off stops that rule from applying but keeps every configured tier for later use.')+'</div>'+
+    '<div class="grid g2"><div class="card"><div class="ch"><h3>Configured tiers</h3></div>'+
+      '<h4 style="margin-bottom:6px">Deduction tiers</h4><div class="tscroll"><table><tbody>'+ATT.tiers.deduction.map(function(t){return '<tr><td>'+esc(t[0])+'</td><td>'+esc(t[1])+'</td></tr>'}).join('')+'</tbody></table></div>'+
+      '<h4 style="margin:14px 0 6px">Overtime tiers</h4><div class="tscroll"><table><tbody>'+ATT.tiers.overtime.map(function(t){return '<tr><td>'+esc(t[0])+'</td><td>'+esc(t[1])+'</td></tr>'}).join('')+'</tbody></table></div>'+
+      '<p class="sub" style="margin-top:10px">No overtime monetary rates are configured, so the demo records time and manager approval without inventing a payment rate.</p></div>'+
+    attPolCard('5 · Exceptions and queries','exc','No deduction enters payroll automatically. An authorised person must accept or waive it.')+'</div>'+
+    '<div class="grid g2">'+attPolCard('6 · Policy publication','pub')+
     '<div class="card"><div class="ch"><h3>Acknowledgment report · v'+L.v+'</h3><span class="right">'+pill(done===ids.length?'ok':'wa',done+' of '+ids.length+' acknowledged')+'</span></div>'+
     '<p class="sub" style="margin-bottom:8px">'+read+' read · '+done+' acknowledged · '+(ids.length-done)+' pending. Affects: '+esc((L.arrs||[]).join(', '))+'.</p>'+
     '<div class="tscroll"><table><thead><tr><th>Employee</th><th>Read</th><th>Acknowledged</th></tr></thead><tbody>'+ids.map(function(i){var a=acks[i];
@@ -5423,10 +5472,13 @@ var ATT_ACT={
   'actor-co':function(){ATT.demo.actor='CO';attSave();attPaintPunch();render()},
   'go-policy':function(){attGo('ess','Policy Updates')},
   'bell-tab':function(b){ATTUI.bell=b.dataset.v;attBellRender()},
-  'bell-read':function(){ATT.notes.forEach(function(n){if(n.to==='CO'||n.to==='HR')n.read=true});attSave();attBellPaint();attBellRender()},
+  'bell-read':function(){var v=attViewer();ATT.notes.forEach(function(n){if(n.to===v||(v==='CO'&&n.to==='HR'))n.read=true});attSave();attBellPaint();attBellRender()},
+  'note-open':function(b){attOpenNote(b.dataset.v)},
   'alert-open':function(b){var r=b.dataset.v;if(r.indexOf('REC-')===0){ATTUI.caseSel=r;attGo('people','Attendance',{k:'recon',i:0})}
     else if(r.indexOf('DV-')===0){ATTUI.devSel=r;attGo('people','Devices')}else attGo('people','Attendance')},
   'toast':function(b){toast(b.dataset.v)},
+  'emp-open':function(b){attEmployeeModal(b.dataset.v)},
+  'emp-full':function(b){var i=+b.dataset.v;if(i<0)return;closeModal();cur={m:attTabIndex('people','Employees')[0],t:attTabIndex('people','Employees')[1],d:{k:'emp',i:i}};render()},
   'recon':function(){attGo('people','Attendance',{k:'recon',i:0})},
   'go-case':function(b){ATTUI.caseSel=b.dataset.v;ATTUI.cf={};attGo('people','Attendance',{k:'recon',i:0})},
   'case-sel':function(b){ATTUI.caseSel=b.dataset.v;var y=$('#scroll').scrollTop;render();$('#scroll').scrollTop=y},
@@ -5439,8 +5491,8 @@ var ATT_ACT={
   'att-row':function(b){attEventModal(b.dataset.v)},
   'fa-new':function(){attFAModal()},'att-fa-new':function(){attFAModal()},
   'fa-save':function(){attFASave()},
-  'fa-confirm':function(b){var a=attFA(b.dataset.v);if(!a)return;a.status='Approved';a.approver='Cynthia Osakunih';
-    attAudit('Field assignment approved',a.emps.map(aName).join(', ')+' · '+a.id,'Awaiting manager','Approved · '+a.sites.map(function(s){return s.name}).join(', '),'Confirmed by line manager');
+  'fa-confirm':function(b){var a=attFA(b.dataset.v),mgr=aName(attViewer());if(!a)return;a.status='Approved';a.approver=mgr;
+    attAudit('Field assignment approved',a.emps.map(aName).join(', ')+' · '+a.id,'Awaiting manager','Approved · '+a.sites.map(function(s){return s.name}).join(', '),'Confirmed by line manager',mgr);
     a.emps.forEach(function(id){attNotify(id,'Field assignment confirmed',a.id+' · '+a.name+', '+a.date+' '+a.start+' to '+a.end+'.','assignment')});
     attSave();attBellPaint();render();toast(a.id+' confirmed. It will count on '+a.date)},
   'req-decide':function(b){attReqDecideModal(b.dataset.v)},'req-view':function(b){attReqView(b.dataset.v)},
@@ -5452,14 +5504,14 @@ var ATT_ACT={
   'rq-pin':function(b){var src=$('#'+(b.dataset.v||'rq-addr')),v=src?src.value.trim():'';if(!v){var w=$('#fw-'+(b.dataset.v||'rq-addr'));if(w)w.classList.add('bad');return}
     ATTUI.essReq=ATTUI.essReq||{};ATTUI.essReq.pin=attPin(v);$('#rq-pinbox').innerHTML=attPinSvg(ATTUI.essReq.pin)},
   'mgr-req':function(b){attMgrReqModal(b.dataset.v)},
-  'mgr-req-send':function(b){var q=attReq(b.dataset.v),n=($('#mr-note').value||'').trim(),ok=b.dataset.ok==='1';if(!n){$('#fw-mr-note').classList.add('bad');return}
-    q.status='Awaiting HR';q.mgrNote='Cynthia Osakunih: '+(ok?'Recommended. ':'Not recommended. ')+n;q.history.push([aStamp(),'Cynthia Osakunih',(ok?'Recommended':'Not recommended')+' by line manager: '+n]);
+  'mgr-req-send':function(b){var q=attReq(b.dataset.v),n=($('#mr-note').value||'').trim(),ok=b.dataset.ok==='1',mgr=aName(attViewer());if(!n){$('#fw-mr-note').classList.add('bad');return}
+    q.status='Awaiting HR';q.mgrNote=mgr+': '+(ok?'Recommended. ':'Not recommended. ')+n;q.history.push([aStamp(),mgr,(ok?'Recommended':'Not recommended')+' by line manager: '+n]);
     attNotify('HR','Manager recommendation, '+q.id,(ok?'Recommended':'Not recommended')+': '+n,'request');attNotify(q.emp,'Your manager reviewed '+q.id,'It is now with People.','request');
-    attAudit('Manager recommendation',aName(q.emp)+' · '+q.id,'Awaiting manager','Awaiting HR · '+(ok?'recommended':'not recommended'),n);attSave();closeModal();attBellPaint();render();toast(q.id+' sent to People')},
+    attAudit('Manager recommendation',aName(q.emp)+' · '+q.id,'Awaiting manager','Awaiting HR · '+(ok?'recommended':'not recommended'),n,mgr);attSave();closeModal();attBellPaint();render();toast(q.id+' sent to People')},
   'mgr-case':function(b){attMgrCaseModal(b.dataset.v)},
-  'mgr-case-send':function(b){var c=attCase(b.dataset.v),n=($('#mc-note').value||'').trim(),esc2=b.dataset.ok==='esc';if(n.length<10){$('#fw-mc-note').classList.add('bad');return}
-    c.status='Awaiting HR';c.mgrNote='Cynthia Osakunih: '+(esc2?'Escalated to People. ':'Recommends '+attOutLabel($('#mc-out').value).toLowerCase()+'. ')+n;
-    c.history.push([aStamp(),'Cynthia Osakunih',(esc2?'Escalated to People by line manager':'Manager recommendation: '+attOutLabel($('#mc-out').value))+'. '+n]);
+  'mgr-case-send':function(b){var c=attCase(b.dataset.v),n=($('#mc-note').value||'').trim(),esc2=b.dataset.ok==='esc',mgr=aName(attViewer());if(n.length<10){$('#fw-mc-note').classList.add('bad');return}
+    c.status='Awaiting HR';c.mgrNote=mgr+': '+(esc2?'Escalated to People. ':'Recommends '+attOutLabel($('#mc-out').value).toLowerCase()+'. ')+n;
+    c.history.push([aStamp(),mgr,(esc2?'Escalated to People by line manager':'Manager recommendation: '+attOutLabel($('#mc-out').value))+'. '+n]);
     attNotify('HR','Manager recommendation, '+c.id,c.mgrNote,'correction');attAudit('Manager recommendation',aName(c.emp)+' · '+c.id,'Awaiting manager','Awaiting HR',n);
     attSave();closeModal();attBellPaint();render();toast(c.id+' is with People now')},
   'ess-issue':function(){attIssueModal()},'iss-send':function(){attIssueSend()},
@@ -5515,8 +5567,8 @@ function attWsSave(){var nm=($('#ws-name').value||'').trim(),ad=($('#ws-addr').v
   var p=(ATTUI.essReq&&ATTUI.essReq.pin)||attPin(ad);
   ATT.sites.push({id:'ws'+(ATT.seq.ws++),type:'Office',name:nm,address:ad,lat:p.lat,lng:p.lng,radius:r,status:'Active',from:ATT_TODAY,to:''});
   attAudit('Worksite created',nm,'None','Office · '+r+' m','Added in People → Worksites');attSave();closeModal();render();toast(nm+' added at '+r+' m')}
-function attHomeSave(id){var e=aEmp(id),old=attPermHome(id),ad=($('#hm-addr').value||'').trim(),r=+$('#hm-rad').value,j=($('#hm-just').value||'').trim(),def=attPolicy().settings.radiusRemote,ok=true;
-  if(!ad){$('#fw-hm-addr').classList.add('bad');ok=false}if(!(r>=100&&r<=250)){$('#fw-hm-rad').classList.add('bad');ok=false}if(r!==def&&j.length<5){$('#fw-hm-just').classList.add('bad');ok=false}if(!ok)return;
+function attHomeSave(id){var e=aEmp(id),old=attPermHome(id),ad=($('#hm-addr').value||'').trim(),r=100,j=($('#hm-just').value||'').trim(),ok=true;
+  if(!ad){$('#fw-hm-addr').classList.add('bad');ok=false}if(!ok)return;
   var p=(ATTUI.essReq&&ATTUI.essReq.pin&&old&&ad===old.address)?ATTUI.essReq.pin:(ATTUI.essReq&&ATTUI.essReq.pin)||attPin(ad);
   if(old){old.status='Superseded';old.to=ATT_TODAY}
   ATT.homes.push({id:'HM-'+aNum(ATT.homes.length+1,3),emp:id,area:p.area||(old&&old.area)||'Lagos',address:ad,lat:p.lat,lng:p.lng,radius:r,kind:'Permanent',from:ATT_TODAY,to:'',status:'Active',just:j,by:'Cynthia Osakunih'});
@@ -5547,12 +5599,9 @@ function attIssueSend(){var id=ATT.demo.actor,why=($('#is-why').value||'').trim(
   var mg=aEmp(id).mgr;if(mg)attNotify(mg,'Correction from your team, '+aName(id),t,'correction');
   attAudit('Correction submitted',aName(id)+' · '+c.id,'None','Awaiting HR',t,aName(id));attSave();closeModal();attBellPaint();render();toast(c.id+' sent to People')}
 
-function attOnClick(e){var b=e.target.closest?e.target.closest('[data-att],[data-ck],button[id^="att-"]'):null;if(!b||b.disabled)return;
-  if(b.dataset.ck){ATT.demo[b.dataset.ck]=b.dataset.v;if(b.dataset.ck!=='loc')ATTUI.ck.retries=0;attSave();attCkPaint();return}
+function attOnClick(e){var b=e.target.closest?e.target.closest('[data-att],button[id^="att-"]'):null;if(!b||b.disabled)return;
   var act=b.dataset.att||b.id,fn=ATT_ACT[act];if(fn){e.preventDefault();fn(b,e)}}
 function attOnChange(e){var t=e.target;
-  if(t.id==='ck-actor'){ATT.demo.actor=t.value;ATTUI.ck.retries=0;attSave();attPaintPunch();attCkPaint();var y=$('#scroll').scrollTop;render();$('#scroll').scrollTop=y;setTimeout(function(){var a=$('#ck-actor');if(a)a.focus()},0);return}
-  if(t.id==='ck-time'){ATT.demo.time=t.value;attSave();attCkPaint();setTimeout(function(){var a=$('#ck-time');if(a)a.focus()},0);return}
   if(t.dataset&&t.dataset.attc==='cf'){ATTUI.cf[t.dataset.k]=t.value;render();return}
   if(t.dataset&&t.dataset.attc==='pk'){attPolSet(t.dataset.k,t.type==='number'?t.value:t.value);return}
   if(t.id==='rc-out')attRcSync()}
@@ -5568,18 +5617,27 @@ document.addEventListener('keydown',attOnKey);
 /* ───── routing ───── */
 var cur={m:0,t:0,d:null};
 var DETAIL={emp:emp360,partner:partner360,recon:function(){return attReconPage()}};
+function attIsManager(v){return ATT_ORDER.some(function(id){return aEmp(id).mgr===v})}
+function attModuleAllowed(k){var v=attViewer();if(v==='CO'||v==='IC')return true;if(k==='people'&&attIsManager(v))return true;
+  return ['home','workspace','ess','community','mailbox','performance','expenses','knowledge','ai','public'].indexOf(k)>=0}
 function render(){
+  var viewer=attViewer();if(attSuspended(viewer)){attBlockSuspended(viewer);return}
+  if(!attModuleAllowed(M[cur.m].k)){var ep=attTabIndex('ess','My Attendance');cur={m:ep[0],t:ep[1],d:null}}
+  if(M[cur.m].k==='people'&&viewer!=='CO'&&viewer!=='IC'){var mp=attTabIndex('people','Attendance');cur.t=mp[1];cur.d=null;ATTUI.view='Manager View'}
+  var ve=aEmp(viewer),rw=$('.rail-who');if(rw&&ve){$('.av',rw).textContent=viewer;$('.uinfo b',rw).textContent=ve.name;$('.uinfo span',rw).textContent=ve.title||ve.dept}
   var nav='',mob='',lastg=null;
   M.forEach(function(m,i){
+    if(!attModuleAllowed(m.k))return;
     if(m.g!==lastg){if(m.g)nav+='<div class="navgrp">'+m.g+'</div>';lastg=m.g}
     nav+='<a href="#'+m.k+'" data-m="'+i+'"'+(i===cur.m?' class="on"':'')+'>'+ic(m.i,'ico')+'<span class="navlab">'+esc(m.n)+'</span>'+
       (m.cnt?'<span class="cnt">'+m.cnt+'</span>':'')+'</a>'});
   $('#nav').innerHTML=nav;
   [[0,'Home','grid'],[1,'Work','check'],[3,'Chat','msg'],[5,'People','users'],[13,'Praxis','spark']].forEach(function(x){
+    if(!attModuleAllowed(M[x[0]].k))return;
     mob+='<a href="#" data-m="'+x[0]+'"'+(x[0]===cur.m?' class="on"':'')+'>'+ic(x[2],'ico')+esc(x[1])+'</a>'});
   $('#mob').innerHTML=mob;
   var mod=M[cur.m];
-  $('#tabs').innerHTML=mod.tabs.map(function(t,i){return '<button class="tabbtn'+(i===cur.t&&!cur.d?' on':'')+'" data-t="'+i+'">'+esc(t.n)+'</button>'}).join('');
+  $('#tabs').innerHTML=mod.tabs.map(function(t,i){if(mod.k==='people'&&viewer!=='CO'&&viewer!=='IC'&&t.n!=='Attendance')return '';return '<button class="tabbtn'+(i===cur.t&&!cur.d?' on':'')+'" data-t="'+i+'">'+esc(t.n)+'</button>'}).join('');
   $('#page').innerHTML=cur.d?DETAIL[cur.d.k](cur.d.i):mod.tabs[cur.t].r();
   $('#scroll').scrollTop=0;
   bind();
@@ -5627,7 +5685,7 @@ PARTNERS.forEach(function(p,i){ITEMS.push({g:'Partners',n:p.n,k:p.st[1],m:10,t:1
   ITEMS.push({g:r[0],n:r[1],k:r[2],m:r[3],t:r[4],d:r[1]==='Reconciliation queue'?{k:'recon',i:0}:null})});
 var pal=$('#pal'),palq=$('#palq'),pcur=0,shown=[];
 function prender(){var q=palq.value.toLowerCase().trim();
-  shown=ITEMS.filter(function(i){return !q||(i.n+' '+(i.k||'')+' '+i.g).toLowerCase().indexOf(q)>=0}).slice(0,10);
+  shown=ITEMS.filter(function(i){return attModuleAllowed(M[i.m].k)&&(!q||(i.n+' '+(i.k||'')+' '+i.g).toLowerCase().indexOf(q)>=0)}).slice(0,10);
   pcur=0;var h='',lg='';
   shown.forEach(function(i,n){if(i.g!==lg){h+='<div class="gl">'+esc(i.g)+'</div>';lg=i.g}
     h+='<button data-n="'+n+'" class="'+(n===0?'cur':'')+'">'+ic('right')+'<span>'+esc(i.n)+'</span>'+(i.k?'<span class="k">'+esc(i.k)+'</span>':'')+'</button>'});
