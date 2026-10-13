@@ -51,7 +51,12 @@ password, as with any mail app.
    the person types.
 5. **Send**: `POST /messages` puts the message on the send queue (`send-queue`) → `email-send`
    delivers through SMTP → the message lands in Sent. Scheduled mail waits on the queue until its
-   release time and can be cancelled until then.
+   release time and can be cancelled until then. Schedule offers tomorrow 08:00, next Monday 08:00,
+   or **any date and time** (day-first date, 24 hour time, Lagos); a time already passed is refused.
+   A scheduled message waits in Drafts, labelled Scheduled, until it is released.
+6. **Layout.** On desktop the message list and the reader scroll on their own and the page does not
+   scroll behind them. The divider between them can be dragged, or moved with the arrow keys, to
+   widen the list; double click resets it. The width is remembered per browser.
 
 ## 4 · Data
 
@@ -165,3 +170,5 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 ## 14 · Change log
 
 - 13/10/2026 · GE · First version, from the 12 October internal workflow meeting and MILESTONES §6.5.
+- 13/10/2026 · GE · Schedule send at any date and time; independent panes with a resizable list (TB review).
+- 13/10/2026 · GE · Page header slides away while reading so the panes get the full height (TB review).
