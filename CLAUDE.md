@@ -104,6 +104,9 @@ A task is not finished until:
   the author. Merges to `main` deploy to staging; production waits for a person's approval.
 - Do not commit, push or open a PR unless asked.
 - Ask only when a decision genuinely blocks the work; otherwise state the assumption you made.
+- When you do ask a question or surface a decision, use the AskUserQuestion tool, not prose, unless
+  the person asks for the answer in chat or requests Markdown. Always include a recommendation: put
+  the recommended option first and mark it `(Recommended)`.
 
 Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M7, M9, community and mailbox) · TB Tom-Blake
 Asaah (Home, M4, M10, M11) · LA Love Adeola (migrations and data, attendance, M5, M6) · AJ Adole

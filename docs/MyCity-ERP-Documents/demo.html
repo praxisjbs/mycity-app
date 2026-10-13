@@ -1302,6 +1302,86 @@ var STAFF=[['TA','Tolu Adeyemi','Content'],['BL','Bashir Lawal','Marketing & Sal
  ['NE','Ngozi Eze','Marketing & Sales'],['CN','Chidera Nwosu','Content'],['AD','Adedotun Oyinloye','Marketing & Sales']];
 function st(i){return who(STAFF[i][0],STAFF[i][1],STAFF[i][2])}
 
+/* ───── organogram · one render, builder (People) and viewer (ESS) ───── */
+function og(mode){
+  var builder=mode==='builder';
+  var tree={av:'IC',n:'Ifeoma Chukwu',t:'Chief Executive Officer',d:'General Management',ceo:1,meta:'Since 2019 · Hybrid',children:[
+    {av:'CO',n:'Cynthia Osakunih',t:'Operations & People Lead',d:'Operations',meta:'Since 2024 · Hybrid',children:[
+      {av:'HY',n:'Hauwa Yusuf',t:'People & Support Officer',d:'Support',meta:'Since 2025 · On site'}]},
+    {av:'NE',n:'Ngozi Eze',t:'Head, Marketing & Sales',d:'Marketing & Sales',meta:'Since 2024 · Hybrid',children:[
+      {av:'BL',n:'Bashir Lawal',t:'Growth Officer',d:'Marketing & Sales',meta:'Since 2024 · Hybrid'},
+      {av:'AD',n:'Adedotun Oyinloye',t:'Growth Officer',d:'Marketing & Sales',meta:'Since 2025 · Remote',dotted:'Content Lead'}]},
+    {av:'TA',n:'Tolu Adeyemi',t:'Content Lead',d:'Content',meta:'Since 2024 · Hybrid',children:[
+      {av:'CN',n:'Chidera Nwosu',t:'Content Associate',d:'Content',meta:'On probation · Remote'},
+      {av:'EO',n:'Emeka Obi',t:'Studio Producer',d:'Studio',meta:'Since 2025 · On site'}]},
+    {av:'SB',n:'Seyi Balogun',t:'Engineering Lead',d:'Engineering',meta:'Since 2024 · Remote'},
+    {vacant:1,n:'Head, Finance',t:'Open role',d:'Finance',children:[
+      {av:'AO',n:'Amara Okafor',t:'Finance Officer',d:'Finance',meta:'Since 2024 · Hybrid'}]}]};
+  function cardOf(n){
+    if(n.vacant){return '<div class="og-n og-vac">'+
+      '<span class="og-av og-vacav">'+ic('plus')+'</span>'+
+      '<b>'+esc(n.n)+'</b><span class="og-t">Vacant · '+esc(n.d)+'</span>'+
+      (builder?'<button class="og-chip">'+ic('plus')+'Create vacancy</button>':'<span class="og-open">Open role</span>')+
+      '</div>';}
+    return '<div class="og-n'+(n.ceo?' og-ceo':'')+'" tabindex="0">'+
+      '<span class="og-av'+(n.ceo?' og-ceoav':'')+'">'+esc(n.av)+'</span>'+
+      '<b>'+esc(n.n)+'</b><span class="og-t">'+esc(n.t)+'</span>'+
+      '<span class="og-d">'+esc(n.d)+'</span>'+
+      (builder&&n.meta?'<span class="og-meta">'+esc(n.meta)+'</span>':'')+
+      (n.dotted?'<span class="og-dotted">Dotted line · '+esc(n.dotted)+'</span>':'')+
+      '</div>';}
+  function nodeOf(n){return '<li>'+cardOf(n)+(n.children&&n.children.length?'<ul>'+n.children.map(nodeOf).join('')+'</ul>':'')+'</li>';}
+  var css='<style>'+
+    '.ogt{overflow-x:auto;padding:10px 4px 6px}'+
+    '.ogt ul{display:flex;justify-content:center;position:relative;padding:26px 0 0;margin:0;list-style:none}'+
+    '.ogt li{display:flex;flex-direction:column;align-items:center;list-style:none;position:relative;padding:26px 12px 0}'+
+    '.ogt li::before,.ogt li::after{content:"";position:absolute;top:0;right:50%;border-top:2px solid var(--line-2);width:50%;height:26px}'+
+    '.ogt li::after{right:auto;left:50%;border-left:2px solid var(--line-2)}'+
+    '.ogt li:only-child::before,.ogt li:only-child::after{display:none}'+
+    '.ogt li:only-child{padding-top:0}'+
+    '.ogt li:first-child::before,.ogt li:last-child::after{border:0 none}'+
+    '.ogt li:last-child::before{border-right:2px solid var(--line-2);border-radius:0 7px 0 0}'+
+    '.ogt li:first-child::after{border-radius:7px 0 0 0}'+
+    '.ogt ul ul::before{content:"";position:absolute;top:0;left:50%;border-left:2px solid var(--line-2);width:0;height:26px}'+
+    '.ogt>ul{padding-top:0}.ogt>ul>li{padding-top:0}.ogt>ul>li::before,.ogt>ul>li::after{display:none}'+
+    '.og-n{position:relative;width:178px;background:var(--raised);border:1px solid var(--line);border-radius:13px;padding:11px 12px;box-shadow:var(--sh-1);text-align:center;transition:box-shadow .15s,border-color .15s}'+
+    '.og-n:hover{box-shadow:var(--sh-2);border-color:var(--line-2)}'+
+    '.og-av{width:42px;height:42px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13.5px;margin:0 auto 8px}'+
+    '.og-n b{display:block;font-size:13px;font-weight:650;line-height:1.25}'+
+    '.og-t{display:block;font-size:11px;color:var(--ink-2);margin-top:2px}'+
+    '.og-d{display:inline-block;margin-top:8px;font-size:10px;font-weight:650;padding:2px 9px;border-radius:999px;background:var(--surface);color:var(--ink-3);border:1px solid var(--line)}'+
+    '.og-meta{display:block;font-size:10px;color:var(--ink-3);margin-top:6px}'+
+    '.og-dotted{display:inline-block;margin-top:7px;font-size:9.5px;color:var(--ink-3);border:1px dashed var(--line-2);border-radius:999px;padding:1px 8px}'+
+    '.og-ceo{border-color:var(--yellow);box-shadow:0 0 0 2px var(--yellow-tint),var(--sh-1)}'+
+    '.og-ceoav{background:var(--yellow);color:var(--on-yellow)}'+
+    '.og-vac{border-style:dashed;background:transparent}'+
+    '.og-vacav{background:var(--surface);color:var(--ink-3);border:1px dashed var(--line-2)}'+
+    '.og-vacav svg{width:16px;height:16px}'+
+    '.og-open{display:inline-block;margin-top:8px;font-size:10px;font-weight:650;color:var(--ink-3);border:1px dashed var(--line-2);border-radius:999px;padding:2px 9px}'+
+    '.og-chip{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:10.5px;font-weight:650;color:var(--on-yellow);background:var(--yellow);border-radius:999px;padding:3px 10px}'+
+    '.og-chip svg{width:12px;height:12px}'+
+    '.og-legend{display:flex;flex-wrap:wrap;gap:16px;margin:2px 0 4px;font-size:11.5px;color:var(--ink-2)}'+
+    '.og-legend span{display:inline-flex;align-items:center;gap:7px}'+
+    '.og-legend i{width:22px;height:0;border-top:2px solid var(--line-2);display:inline-block}'+
+    '.og-legend i.dash{border-top-style:dashed}'+
+    '.og-legend i.ceo{width:13px;height:13px;border:0;border-radius:4px;background:var(--yellow)}'+
+    '.og-legend i.vac{width:13px;height:13px;border:1px dashed var(--line-2);border-radius:4px}'+
+    '</style>';
+  var acts=builder?[['Search'],['Expand all'],['Download PDF'],['Add role',1]]:[['Search'],['Download PDF']];
+  var sub=builder?'The live reporting structure · 12 seats · 11 filled · 1 open · drag a card to reassign'
+                 :'Who reports to whom across MyCity · read only · 12 seats · 11 filled';
+  var legend='<div class="og-legend">'+
+    '<span><i></i>Reporting line</span>'+
+    '<span><i class="dash"></i>Dotted line (matrix)</span>'+
+    '<span><i class="ceo"></i>CEO</span>'+
+    '<span><i class="vac"></i>Vacant seat</span></div>';
+  var note=builder
+    ? '<p class="sub" style="margin-top:12px">Drag a card onto a new manager to change its reporting line. Every change is written through People and recorded in the audit log, the same write the employee form uses. A vacant seat can be sent to Recruitment as a suggested vacancy. Salary, bank details and phone numbers are never shown here.</p>'
+    : '<p class="sub" style="margin-top:12px">Read only. Every employee sees the whole company here. Salary, bank details and phone numbers are never shown. On a phone this becomes a focus view: your manager, you and your reports, with tap to expand.</p>';
+  return head(builder?'Organogram':'Org Chart',sub,acts)+css+legend+
+    '<div class="card" style="padding:6px"><div class="ogt"><ul>'+nodeOf(tree)+'</ul></div></div>'+note;
+}
+
 /* ───── the 16 modules ───── */
 /* ───── 360 records ───── */
 var EMP=[
@@ -2099,7 +2179,8 @@ var M=[
      '<div class="pfoot">'+'<span>Content hash verified</span><span>Artifact hash verified</span>'+
      '<span style="margin-left:auto">go.mycityapp.io/verify/CON-0004</span></div>',
      'Click any row to preview it. Signed documents carry two hashes and a public verification link.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">A missing document on a confirmed employee does not block anything. On a new hire it blocks onboarding until it arrives.</p>'}}]},
+    '<p class="sub" style="margin-top:12px">A missing document on a confirmed employee does not block anything. On a new hire it blocks onboarding until it arrives.</p>'}},
+  {n:'Org Chart',r:function(){return og('viewer')}}]},
 
 {k:'community',n:'Staff Community',i:'msg',g:'WORK',cnt:'3',tabs:[
   {n:'Channels',r:function(){return channelsTab()}},
@@ -2172,6 +2253,7 @@ var M=[
 
 {k:'people',n:'People',i:'users',g:'PEOPLE',tabs:[
   {n:'Employees',r:function(){return attEmployeesTab()}},
+  {n:'Organogram',r:function(){return og('builder')}},
   {n:'Attendance',r:function(){return attPeopleAttendance()}},
   {n:'Leave',r:function(){return head('Leave','October 2026',[['Leave calendar'],['Record leave',1]])+
     kpis([['On leave today','1'],['Pending approval','2','warn'],['Approved this month','4'],['Clashes','0','ok']])+

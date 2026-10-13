@@ -200,7 +200,12 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 13/10/2026 · TB · Organogram agreed with the client rep and written up as
+  `docs/guides/organogram.md`: two screens, People · Organogram (HR builder) and ESS · Org Chart
+  (read-only viewer for all staff), over the live reporting tree. Proposed scope addition to the
+  §18 inventory (85 to 87), pending ratification, so no numbered screen rows added here yet. A demo
+  preview was added to `demo.html` for sign-off. What is left: ratify the inventory, assign owner
+  and milestone, then add the rows and build.
 
 ### Performance
 
