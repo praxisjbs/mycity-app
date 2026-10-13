@@ -5856,6 +5856,7 @@ function bind(){
   $$('.rnav button').forEach(function(c){c.onclick=function(){
     $$('.rnav button').forEach(function(x){x.classList.remove('on')});c.classList.add('on');
     toast('Opening: '+c.textContent)}});
+  if(M[cur.m].k==='home')bindHome();
   bindComm();bindMail();attBindPage();
 }
 $('#slim').onclick=function(){$('#app').classList.toggle('slim')};
