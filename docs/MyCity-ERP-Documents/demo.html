@@ -501,7 +501,25 @@ tbody tr:last-child td{border-bottom:0}
 .prog i{display:block;height:100%;background:var(--green);border-radius:99px;transition:width .12s linear}
 
 /* ═════ STAFF COMMUNITY: two panes, composer fixed, page height locked ═════ */
-.chatwrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px;height:calc(100vh - 232px);min-height:460px}
+.chatwrap{display:grid;grid-template-columns:var(--lw,300px) 8px minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:4px;height:calc(100vh - 232px);min-height:420px}
+.chatwrap.info{grid-template-columns:var(--lw,300px) 8px minmax(0,1fr) 300px}
+/* the draggable divider between a list and what it opens */
+.split{cursor:col-resize;border-radius:6px;position:relative;touch-action:none;outline-offset:-2px}
+.split::after{content:"";position:absolute;left:3px;top:50%;width:2px;height:40px;margin-top:-20px;border-radius:2px;background:var(--line-2);opacity:.55;transition:opacity .15s,height .15s}
+.split:hover,.split.on,.split:focus-visible{background:var(--accent-soft)}
+.split:hover::after,.split.on::after{opacity:1;height:64px;margin-top:-32px}
+body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!important}
+/* When a chat is on screen the page itself does not scroll: the chat fills what is left under the
+   header and tabs, and only the message list scrolls. One scrollbar, composer always visible. */
+.scroll.fit{display:flex;flex-direction:column;padding-bottom:16px}
+.scroll.fit .page{flex:1;min-height:0;display:flex;flex-direction:column;width:100%}
+.scroll.fit .page>*{flex:none}
+.scroll.fit .chatwrap{flex:1;height:auto;min-height:380px}
+/* the mailbox, same idea: list and reader scroll on their own */
+@media(min-width:761px){.mail2{grid-template-columns:var(--mw,330px) 8px minmax(0,1fr);gap:4px}}
+.scroll.fit .page>.mail2{flex:1;min-height:360px;grid-template-rows:minmax(0,1fr);align-items:stretch;margin:0}
+.scroll.fit .mlist,.scroll.fit .mread{overflow-y:auto;min-height:0;overscroll-behavior:contain}
+.scroll.fit .page>.statstrip{margin-bottom:12px}
 .clist,.thread{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1);
   display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .clhd{display:flex;align-items:center;gap:8px;padding:12px 12px 8px 14px;flex:none}
@@ -533,6 +551,7 @@ tbody tr:last-child td{border-bottom:0}
 .thd .tt span{display:block;font-size:11.5px;color:var(--ink-3)}
 .thd .mback,.thd .mdraw{display:none}
 .tbody{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0;overscroll-behavior:contain}
+.tbody>*{flex-shrink:0}
 .tday{align-self:center;font-size:10.5px;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);padding:2px 10px;border-radius:999px}
 .tcomp{flex:none;border-top:1px solid var(--line);padding:10px 12px;display:flex;gap:8px;align-items:center;background:var(--raised)}
 .tcomp .inp{height:40px;border-radius:999px;background:var(--surface)}
@@ -565,19 +584,49 @@ tbody tr:last-child td{border-bottom:0}
 .msg2.me .fpost{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);color:#fff}
 .fpost .sub{color:inherit;opacity:.7}
 /* celebration, recognition, poll, announcement posts */
-.celeb{position:relative;overflow:hidden;border-radius:16px;padding:16px;color:#fff;display:flex;gap:14px;align-items:center;max-width:560px;
-  background:radial-gradient(circle at 92% 18%,rgba(255,223,85,.38) 0 7px,transparent 8px),
-             radial-gradient(circle at 84% 70%,rgba(255,223,85,.25) 0 4px,transparent 5px),
-             radial-gradient(circle at 70% 26%,rgba(255,255,255,.22) 0 3px,transparent 4px),
-             linear-gradient(135deg,var(--green),var(--green-deep))}
-.celeb .big{width:58px;height:58px;border-radius:50%;background:var(--yellow);color:var(--on-yellow);display:flex;align-items:center;justify-content:center;
-  font-size:19px;font-weight:700;flex:none;box-shadow:0 0 0 4px rgba(255,223,85,.25)}
+.celeb{position:relative;overflow:hidden;border-radius:18px;padding:18px 18px 16px;color:#fff;display:flex;gap:16px;align-items:center;
+  max-width:580px;isolation:isolate;animation:celebIn .55s cubic-bezier(.2,.9,.3,1.25) both;
+  background:radial-gradient(120% 140% at 100% 0%,rgba(255,223,85,.20),transparent 55%),linear-gradient(135deg,var(--green),var(--green-deep))}
+.celeb.anniv{background:radial-gradient(120% 140% at 0% 100%,rgba(124,196,250,.22),transparent 55%),linear-gradient(135deg,var(--green-deep),var(--green))}
+@keyframes celebIn{from{opacity:0;transform:translateY(10px) scale(.96)}}
+/* a slow sheen across the card */
+.celeb::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.10) 50%,transparent 65%);background-size:250% 100%;animation:sheen 5s ease-in-out infinite}
+@keyframes sheen{0%{background-position:120% 0}60%,100%{background-position:-120% 0}}
+/* confetti drifting down behind the content */
+.celeb .cfx{position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.celeb .cfx i{position:absolute;top:-14px;width:7px;height:11px;border-radius:2px;opacity:.9;animation:fall linear infinite}
+.celeb .cfx i:nth-child(3n){border-radius:50%;width:7px;height:7px}
+.celeb .cfx i:nth-child(4n){width:4px;height:13px}
+@keyframes fall{0%{transform:translateY(-10px) rotate(0)}100%{transform:translateY(190px) rotate(540deg)}}
+.celeb.anniv .cfx i{border-radius:1px;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);width:11px;height:11px}
+/* the avatar, ringed, gently bobbing */
+.celeb .pwrap{position:relative;flex:none}
+.celeb .ring{position:relative;flex:none;width:70px;height:70px;border-radius:50%;padding:4px;
+  background:conic-gradient(var(--yellow),rgba(255,223,85,.15),var(--yellow),rgba(255,223,85,.15),var(--yellow));animation:spin 8s linear infinite}
+.celeb.anniv .ring{background:conic-gradient(var(--c2),rgba(124,196,250,.15),var(--yellow),rgba(124,196,250,.15),var(--c2))}
+@keyframes spin{to{transform:rotate(360deg)}}
+.celeb .big{width:100%;height:100%;border-radius:50%;background:var(--yellow);color:var(--on-yellow);display:flex;align-items:center;justify-content:center;
+  font-size:21px;font-weight:750;border:3px solid var(--green-deep);animation:spin 8s linear infinite reverse}
+.celeb .badge{position:absolute;right:-6px;bottom:-4px;width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:15px;box-shadow:0 4px 10px rgba(0,0,0,.25);animation:bob 2.4s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-4px) rotate(-8deg)}}
 .celeb .cbd{flex:1;min-width:0}
-.celeb .kk{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--yellow);font-weight:700}
-.celeb h4{font-size:16px;margin-top:2px}
-.celeb p{font-size:13px;color:#D7E2DF;margin-top:4px}
-.celeb .cf{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
-.celeb .cf small{font-size:11px;color:#9FB3AE}
+.celeb .kk{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--on-yellow);
+  background:var(--yellow);font-weight:750;padding:3px 9px;border-radius:999px}
+.celeb.anniv .kk{background:var(--c2);color:var(--green-deep)}
+.celeb h4{font-size:18px;line-height:1.25;margin-top:8px;letter-spacing:-.02em}
+.celeb h4 em{font-style:normal;color:var(--yellow)}
+.celeb p{font-size:13px;color:#D7E2DF;margin-top:5px}
+.celeb .cf{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.celeb .who3{display:flex;align-items:center}
+.celeb .who3 span{width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:8.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;border:2px solid var(--green-deep);margin-left:-6px}
+.celeb .who3 span:first-child{margin-left:0}
+.celeb .cf small{font-size:11.5px;color:#B9C8C4}
+/* the floating +1 when someone celebrates */
+.burst{position:fixed;z-index:90;pointer-events:none;font-size:20px;animation:burst .9s ease-out forwards}
+@keyframes burst{0%{opacity:1;transform:translate(0,0) scale(.7)}100%{opacity:0;transform:translate(var(--dx),-70px) scale(1.25)}}
 .rx{height:28px;padding:0 11px;border-radius:999px;font-size:12px;font-weight:650;display:inline-flex;align-items:center;gap:6px;
   background:var(--surface);border:1px solid var(--line);color:var(--ink)}
 .rx.on{background:var(--yellow);border-color:var(--yellow);color:var(--on-yellow)}
@@ -605,6 +654,76 @@ tbody tr:last-child td{border-bottom:0}
   box-shadow:var(--sh-3);animation:slin .2s ease-out;padding-top:env(safe-area-inset-top,0px)}
 @keyframes slin{from{transform:translateX(-100%)}}
 
+/* profile panel (third column on desktop, sheet on mobile) and search in conversation */
+.infop{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.infop .ihd{display:flex;align-items:center;gap:8px;padding:11px 12px 11px 16px;border-bottom:1px solid var(--line);flex:none}
+.infop .ihd h3{font-size:13.5px;flex:1}
+.infop .ibd{flex:1;overflow-y:auto;padding:16px;min-height:0}
+.pfh{text-align:center;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.pfh .pav{width:76px;height:76px;border-radius:50%;margin:0 auto 10px;background:var(--yellow);color:var(--on-yellow);display:flex;align-items:center;justify-content:center;
+  font-size:24px;font-weight:750;position:relative}
+.pfh .pav .dot{position:absolute;right:3px;bottom:3px;width:14px;height:14px;border-radius:50%;background:var(--ok);border:3px solid var(--raised)}
+.pfh h2{font-size:16px}
+.pfh .sub{margin-top:2px}
+.pfacts{display:flex;justify-content:center;gap:8px;margin-top:12px}
+.pfsec{padding:14px 0;border-bottom:1px solid var(--line)}
+.pfsec:last-child{border-bottom:0}
+.pfsec h4{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:650;margin-bottom:8px}
+.pfrow{display:flex;align-items:center;gap:10px;font-size:13px;padding:5px 0;min-width:0}
+.pfrow svg{color:var(--ink-3);flex:none}
+.pfrow span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfrow .sub{margin-left:auto;flex:none}
+.tsearch{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--surface);flex:none}
+.tsearch .inp{height:32px;border-radius:999px;flex:1}
+.tsearch .cnt{font-size:11.5px;color:var(--ink-3);min-width:52px;text-align:center}
+.tsearch .iconbtn{width:32px;height:32px}
+mark.hit{background:rgba(255,223,85,.45);color:inherit;border-radius:3px;padding:0 1px}
+mark.hit.cur{background:var(--yellow);color:var(--on-yellow);box-shadow:0 0 0 2px var(--yellow)}
+
+/* header slides away while reading a chat or the mailbox */
+.scroll.fit .page>.phead,.scroll.fit .page>.ihelp,.scroll.fit .page>.statstrip{transition:max-height .28s ease,opacity .2s ease,margin .28s ease,padding .28s ease;max-height:220px}
+.scroll.fit.hidehead .page>.phead,.scroll.fit.hidehead .page>.ihelp,.scroll.fit.hidehead .page>.statstrip{max-height:0;opacity:0;margin:0;padding-top:0;padding-bottom:0;border-width:0;overflow:hidden;pointer-events:none}
+.scroll.fit.hidehead{padding-top:10px}
+
+/* scrollbars: the side menu's slim rounded bar, everywhere, tinted for the theme */
+:root{--sb:rgba(10,20,18,.22);--sb-h:rgba(10,20,18,.36)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sb:rgba(255,255,255,.14);--sb-h:rgba(255,255,255,.26)}}
+:root[data-theme="dark"]{--sb:rgba(255,255,255,.14);--sb-h:rgba(255,255,255,.26)}
+.app ::-webkit-scrollbar,.modal ::-webkit-scrollbar,.drawer ::-webkit-scrollbar,.pal ::-webkit-scrollbar{width:6px;height:6px}
+.app ::-webkit-scrollbar-track,.modal ::-webkit-scrollbar-track,.drawer ::-webkit-scrollbar-track,.pal ::-webkit-scrollbar-track{background:transparent}
+.app ::-webkit-scrollbar-thumb,.modal ::-webkit-scrollbar-thumb,.drawer ::-webkit-scrollbar-thumb,.pal ::-webkit-scrollbar-thumb{background:var(--sb);border-radius:3px}
+.app ::-webkit-scrollbar-thumb:hover,.modal ::-webkit-scrollbar-thumb:hover{background:var(--sb-h)}
+.app ::-webkit-scrollbar-button,.modal ::-webkit-scrollbar-button{display:none}
+.app ::-webkit-scrollbar-corner{background:transparent}
+.nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14)}
+@supports (-moz-appearance:none){.app *,.modal *,.drawer *{scrollbar-width:thin;scrollbar-color:var(--sb) transparent}}
+
+/* message ticks, voice note playback and transcript */
+.tk{display:inline-flex;vertical-align:-3px;margin-left:4px;color:var(--ink-3)}
+.tk svg{width:15px;height:15px}
+.tk.read{color:var(--info)}
+.vn .pl{border:0;cursor:pointer}
+.vn .wv i{transition:opacity .2s}
+.vn.playing .wv i{animation:vfill .25s linear forwards;animation-play-state:running}
+.vn.playing .pl{box-shadow:0 0 0 4px rgba(255,223,85,.25)}
+@keyframes vfill{to{opacity:1;transform:scaleY(1.25)}}
+.vtr{font-size:12.5px;line-height:1.5;margin-top:8px;padding:8px 10px;border-radius:9px;background:rgba(0,0,0,.06);max-width:320px}
+.msg2.me .vtr{background:rgba(255,255,255,.12)}
+.vtr.loading{opacity:.75;background:linear-gradient(90deg,rgba(0,0,0,.05) 30%,rgba(0,0,0,.12) 50%,rgba(0,0,0,.05) 70%);background-size:200% 100%;animation:shim 1.1s linear infinite}
+.msg2.me .vtr.loading{background:linear-gradient(90deg,rgba(255,255,255,.08) 30%,rgba(255,255,255,.2) 50%,rgba(255,255,255,.08) 70%);background-size:200% 100%}
+@keyframes shim{to{background-position:-200% 0}}
+.vtb{display:inline-flex;align-items:center;gap:5px;margin-top:7px;font-size:11.5px;font-weight:650;opacity:.85;text-decoration:underline;text-underline-offset:2px}
+.vtb svg{width:13px;height:13px}
+.stack .av.more{background:var(--surface);color:var(--ink-2)}
+.lnkb{font-size:11.5px;font-weight:650;color:var(--accent);margin-left:auto;padding-top:3px}
+/* schedule send */
+.schedbox{display:none;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.schedbox.on{display:block}
+.schedbox h3{display:flex;align-items:center;gap:7px}
+.schedf{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.schedf .f{margin-bottom:0}
+.schedb{display:flex;gap:6px;padding-bottom:1px}
+
 /* ═════ MAILBOX: rich text composer, mobile reader ═════ */
 .mback{display:none}
 .comp-row{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:6px 0;min-height:42px;flex-wrap:wrap}
@@ -630,14 +749,18 @@ tbody tr:last-child td{border-bottom:0}
 .atray .attchip{flex-direction:column;align-items:stretch;min-width:170px}
 
 /* ═════ MOBILE: conversations and the reader take the whole screen ═════ */
-@media(max-width:1180px){.chatwrap{grid-template-columns:260px minmax(0,1fr)}}
+@media(max-width:1180px){.chatwrap.info{grid-template-columns:var(--lw,240px) 8px minmax(0,1fr) 260px}}
 @media(max-width:760px){
   .modal{align-items:flex-end;padding:0}
   .mbox,.mbox.wide{max-width:none;border-radius:18px 18px 0 0;max-height:92vh;max-height:92dvh}
   .mbox.full{height:100vh;height:100dvh;max-height:none;border-radius:0}
   .mft{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
   .statstrip>.dsk{display:none}
-  .chatwrap{display:block;height:auto;min-height:0}
+  .scroll.fit{display:block;padding-bottom:90px}
+  .scroll.fit .chatwrap,.chatwrap{display:block;height:auto;min-height:0}
+  .chatwrap .infop,.split{display:none}
+  .schedf{grid-template-columns:1fr 1fr}.schedb{grid-column:1/-1;justify-content:flex-end}
+  .celeb{padding:14px;gap:12px} .celeb .ring{width:58px;height:58px} .celeb h4{font-size:16px}
   .chatwrap .thread{display:none}
   .chatwrap.full .thread{display:flex;position:fixed;inset:0;z-index:62;border-radius:0;border:0;
     padding-top:env(safe-area-inset-top,0px)}
@@ -696,6 +819,9 @@ tbody tr:last-child td{border-bottom:0}
 <g id="i-clip"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></g>
 <g id="i-mic"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></g>
 <g id="i-play"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></g>
+<g id="i-tick"><path d="M4 12.5l5 5L20 6.5"/></g>
+<g id="i-ticks"><path d="M2 12.5l5 5L18 6.5"/><path d="M10.5 16l1.5 1.5L23 6.5"/></g>
+<g id="i-pause"><rect x="6.5" y="5" width="3.6" height="14" rx="1" fill="currentColor"/><rect x="13.9" y="5" width="3.6" height="14" rx="1" fill="currentColor"/></g>
 <g id="i-image"><rect x="3" y="3" width="18" height="18" rx="2.4"/><circle cx="9" cy="9" r="1.8"/><path d="M21 15l-5-5L5 21"/></g>
 </defs></svg>
 
@@ -936,7 +1062,7 @@ function mail2(rows,sel,open){
   return '<div class="mail2'+(open?' open':'')+'"><div class="mlist">'+rows.map(function(r,i){
     return '<button class="mrow'+(i===sel?' on':'')+'" data-mi="'+i+'">'+(r[3]?'<i class="u"></i>':'<i class="r"></i>')+
     '<span class="mb"><b>'+esc(r[0])+'</b><span>'+esc(r[1])+'</span></span><span class="mt">'+esc(r[2])+'</span></button>'}).join('')+'</div>'+
-  '<div class="mread"><button class="btn mback" data-mback>'+ic('left')+'Back</button><div class="mh"><span class="av" style="width:38px;height:38px;font-size:13px;background:var(--accent-soft);color:var(--accent)">'+esc(m[5]||'MC')+'</span>'+
+  splitter('mw')+'<div class="mread"><button class="btn mback" data-mback>'+ic('left')+'Back</button><div class="mh"><span class="av" style="width:38px;height:38px;font-size:13px;background:var(--accent-soft);color:var(--accent)">'+esc(m[5]||'MC')+'</span>'+
   '<span style="flex:1;min-width:0"><h3>'+esc(m[1])+'</h3><p class="sub">'+esc(m[0])+' &lt;'+esc(m[6]||'contact@example.com')+'&gt; · '+esc(m[2])+'</p></span>'+
   '<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-reply="'+sel+'">'+ic('send')+'Reply</button><button class="btn" data-reply="'+sel+'" data-kind="fw">Forward</button></span></div>'+
   '<div class="body">'+(m[4]||'<p>No preview available for this message.</p>')+'</div>'+
@@ -2991,6 +3117,21 @@ var BDAY=['Wishing you a year of good work and better rest.','Here is to another
   'May the year ahead be your best one yet.','Today is yours. Enjoy every minute of it.'];
 var ANNIV=['Thank you for every one of them.','Here is to the next one.','The work shows. Thank you.'];
 function person(av){for(var i=0;i<PEOPLE.length;i++)if(PEOPLE[i][0]===av)return PEOPLE[i];return [av,av,'']}
+var PROFILE={
+  CO:{t:'Head of Operations and People',ph:'+234 803 555 0114',site:'Victoria Island, Lagos',mgr:'IC',pat:'On site',since:'02/2021'},
+  IC:{t:'Chief Executive Officer',ph:'+234 803 555 0101',site:'Victoria Island, Lagos',mgr:null,pat:'On site',since:'03/2019'},
+  TA:{t:'Content Producer',ph:'+234 806 555 0132',site:'Remote, Lekki',mgr:'CN',pat:'Hybrid',since:'08/2023'},
+  BL:{t:'Sales Executive',ph:'+234 802 555 0177',site:'Victoria Island, Lagos',mgr:'NE',pat:'On site',since:'01/2024'},
+  AO:{t:'Finance Officer',ph:'+234 805 555 0145',site:'Victoria Island, Lagos',mgr:'CO',pat:'On site',since:'05/2022'},
+  SB:{t:'Backend Engineer',ph:'+234 809 555 0168',site:'Remote, Yaba',mgr:'CO',pat:'Remote',since:'11/2023'},
+  HY:{t:'Customer Support Lead',ph:'+234 807 555 0190',site:'Abuja hub',mgr:'CO',pat:'On site',since:'09/2024'},
+  EO:{t:'Studio Manager',ph:'+234 803 555 0123',site:'Victoria Island, Lagos',mgr:'CO',pat:'On site',since:'10/2023'},
+  NE:{t:'Head of Partnerships',ph:'+234 802 555 0109',site:'Victoria Island, Lagos',mgr:'IC',pat:'Hybrid',since:'06/2021'},
+  CN:{t:'Content Lead',ph:'+234 806 555 0151',site:'Enugu',mgr:'IC',pat:'Hybrid',since:'04/2022'},
+  AD:{t:'Brand Partnerships Manager',ph:'+234 808 555 0186',site:'Victoria Island, Lagos',mgr:'NE',pat:'On site',since:'07/2022'}};
+function profileOf(av){var p=person(av),x=PROFILE[av]||{};
+  return {av:av,n:p[1],dept:p[2],t:x.t||p[2],e:p[1].split(' ')[0].toLowerCase()+'@mycityapp.io',ph:x.ph||'',site:x.site||'Victoria Island, Lagos',
+    mgr:x.mgr?person(x.mgr)[1]:'Board',pat:x.pat||'On site',since:x.since||''}}
 
 var CHANNELS=[
  {n:'announcements',mem:25,ro:1,pin:1,last:'Saturday hours confirmed',t:'01/10',msgs:[
@@ -2999,10 +3140,10 @@ var CHANNELS=[
    {k:'ann',av:'CO',title:'Saturday hours confirmed',body:'Saturdays are 09:00 to 15:00 for all departments. Clock in applies as on weekdays.',at:'01/10/2026'}]},
  {n:'general',mem:25,un:3,last:'Happy birthday, Hauwa Yusuf',t:'00:01',msgs:[
    {k:'day',x:'Yesterday'},
-   {k:'anniv',av:'EO',yrs:3,likes:11},
+   {k:'anniv',av:'EO',yrs:3,likes:11,fans:['NE','AD','CN']},
    {k:'m',av:'NE',t:'17:42',x:'Congratulations Emeka, three years of the studio running like clockwork.'},
    {k:'day',x:'Today'},
-   {k:'bday',av:'HY',likes:14},
+   {k:'bday',av:'HY',likes:14,fans:['AD','TA','NE']},
    {k:'rec',from:'CO',to:'TA',x:'Turned the Enugu shot list around in a day.',likes:6},
    {k:'m',av:'AD',t:'08:31',x:'Happy birthday Hauwa! Cake at the Abuja hub at 4?'},
    {k:'poll',av:'CO',q:'Team lunch on Friday: where?',opts:[['Jollof Joint, VI',7],['Bukka Hut',4],['Order in to the office',3]]}]},
@@ -3032,29 +3173,40 @@ var DMS=[
    {k:'m',av:'IC',t:'08:03',x:'Seen. Approving this morning.'}]},
  {p:'TA',on:1,t:'Yesterday',msgs:[
    {k:'m',av:'TA',t:'Yesterday 14:20',x:'Shot list uploaded. Quick one on the Enugu permits:'},
-   {k:'vn',av:'TA',t:'Yesterday 14:21',d:'0:24'},
+   {k:'vn',av:'TA',t:'Yesterday 14:21',d:'0:24',tr:'Hi Cynthia, quick one on the Enugu permits. The state office wants the letter on our letterhead and signed by you, not by me. If you can sign it today I will drop it off first thing tomorrow.'},
    {k:'m',av:'CO',t:'Yesterday 14:35',x:'Got it. I will call the state office in the morning.'}]},
  {p:'AD',t:'Yesterday',msgs:[{k:'file',av:'AD',t:'Yesterday 11:02',f:'mtn-sponsor-deck.pdf',s:'3.2 MB'},{k:'m',av:'AD',t:'Yesterday 11:02',x:'Sent the sponsor deck.'}]},
  {p:'BL',un:2,t:'Yesterday',msgs:[{k:'m',av:'BL',t:'Yesterday 10:15',x:'Can we move the Eko call?'},{k:'m',av:'BL',t:'Yesterday 10:16',x:'Thursday afternoon works for them.'}]},
  {p:'AO',t:'08/10',msgs:[{k:'m',av:'AO',t:'08/10 17:30',x:'Payroll preview ready for your review.'}]},
  {p:'HY',t:'Today',msgs:[{k:'m',av:'HY',t:'09:40',x:'Thank you for the birthday wishes!'}]}
 ];
-var CM={ch:1,dm:0,open:false,dmf:'all',q:'',dq:''};
+DMS.forEach(function(d){d.msgs.forEach(function(m){if(m.av===ME[0]&&!m.st)m.st='read'})});
+var CM={ch:1,dm:0,open:false,dmf:'all',q:'',dq:'',info:false,ctx:'c',s:{on:false,q:'',i:0}};
 var MREC={timer:null,sec:0,on:false};
 
 function lastOf(m){if(!m)return '';return m.k==='m'?m.x:m.k==='vn'?'Voice note':m.k==='file'?m.f:m.k==='ann'?m.title:
   m.k==='bday'?'Happy birthday, '+person(m.av)[1]:m.k==='anniv'?'Work anniversary, '+person(m.av)[1]:
   m.k==='rec'?person(m.from)[1]+' recognised '+person(m.to)[1]:m.k==='poll'?'Poll: '+m.q:''}
 
+function hl(text){var t=esc(text),q=CM.s&&CM.s.on?CM.s.q.trim():'';if(!q)return t;
+  var eq=esc(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');return t.replace(new RegExp(eq,'gi'),function(x){return '<mark class="hit">'+x+'</mark>'})}
 function wave(n){var h='';for(var i=0;i<(n||26);i++)h+='<i style="height:'+(5+((i*37)%17))+'px"></i>';return '<span class="wv">'+h+'</span>'}
 
 function postHTML(m,i,where){
   if(m.k==='day')return '<span class="tday">'+esc(m.x)+'</span>';
-  if(m.k==='bday'||m.k==='anniv'){var p=person(m.av),b=m.k==='bday';
-    return '<div class="celeb"><span class="big">'+esc(p[0])+'</span><div class="cbd"><div class="kk">'+(b?'Birthday':'Work anniversary')+'</div>'+
-      '<h4>'+(b?'Happy birthday, '+esc(p[1]):esc(p[1])+', '+m.yrs+' years at MyCity')+'</h4>'+
+  if(m.k==='bday'||m.k==='anniv'){var p=person(m.av),b=m.k==='bday',first=p[1].split(' ')[0];
+    var conf='',cols=['var(--yellow)','rgba(255,255,255,.85)','var(--c2)','var(--yellow)','var(--c4)'];
+    for(var c=0;c<16;c++)conf+='<i style="left:'+((c*6.3+3)%100)+'%;background:'+cols[c%5]+';animation-duration:'+(3.6+(c*7%5)*.7)+'s;animation-delay:-'+((c*1.3)%6)+'s"></i>';
+    var fans=(m.mine?[ME[0]]:[]).concat(m.fans||[]),names=fans.slice(0,2).map(function(a){return a===ME[0]?'You':person(a)[1].split(' ')[0]});
+    var more=m.likes-names.length,who=m.likes?names.join(', ')+(more>0?' and '+more+' other'+(more>1?'s':''):'')+' celebrated':'Be the first to celebrate';
+    return '<div class="celeb'+(b?'':' anniv')+'"><span class="cfx" aria-hidden="true">'+conf+'</span>'+
+      '<span class="pwrap"><span class="ring"><span class="big">'+esc(p[0])+'</span></span><span class="badge" aria-hidden="true">'+(b?'🎂':'🏆')+'</span></span>'+
+      '<div class="cbd"><span class="kk">'+(b?'Birthday':'Work Anniversary')+'</span>'+
+      '<h4>'+(b?'Happy birthday, <em>'+esc(first)+'</em>':'<em>'+m.yrs+' years</em> at MyCity, '+esc(first))+'</h4>'+
       '<p>'+esc(hashPick(p[1],b?BDAY:ANNIV))+'</p>'+
-      '<div class="cf"><button class="rx'+(m.mine?' on':'')+'" data-like="'+where+':'+i+'">🎉 Celebrate · '+m.likes+'</button><small>From everyone at MyCity</small></div></div></div>'}
+      '<div class="cf"><button class="rx'+(m.mine?' on':'')+'" data-like="'+where+':'+i+'">'+(b?'🎉':'👏')+' Celebrate · '+m.likes+'</button>'+
+      (fans.length?'<span class="who3">'+fans.slice(0,3).map(function(a){return '<span>'+esc(a)+'</span>'}).join('')+'</span>':'')+
+      '<small>'+esc(who)+'</small></div></div></div>'}
   if(m.k==='rec'){var f=person(m.from),t=person(m.to);
     return '<div class="recog"><div class="rh"><span class="av">'+esc(t[0])+'</span><span><b>'+esc(f[1])+'</b> recognised <b>'+esc(t[1])+'</b></span></div>'+
       '<q>'+esc(m.x)+'</q><button class="rx'+(m.mine?' on':'')+'" data-like="'+where+':'+i+'">👍 '+m.likes+'</button></div>'}
@@ -3065,12 +3217,20 @@ function postHTML(m,i,where){
   if(m.k==='ann'){var a=person(m.av);
     return '<div class="annmsg"><div class="ah">'+ic('flag')+esc(a[1])+' · '+esc(m.at)+'</div><h4>'+esc(m.title)+'</h4><p>'+esc(m.body)+'</p></div>'}
   var me=m.av===ME[0],pp=person(m.av),inner;
-  if(m.k==='vn')inner='<div class="vn"><span class="pl">'+ic('play')+'</span>'+wave()+'<em>'+esc(m.d)+'</em></div>';
+  if(m.k==='vn'){var secs=(function(d){var q=String(d).split(':');return (+q[0])*60+(+q[1])})(m.d)||1,bars='';
+    for(var b=0;b<26;b++)bars+='<i style="height:'+(5+((b*37)%17))+'px;animation-delay:'+(b*secs/26).toFixed(2)+'s"></i>';
+    inner='<div class="vn'+(m.playing?' playing':'')+'"><button class="pl" data-play="'+where+':'+i+'" aria-label="'+(m.playing?'Pause':'Play')+' voice note">'+ic(m.playing?'pause':'play')+'</button>'+
+      '<span class="wv">'+bars+'</span><em>'+esc(m.d)+'</em></div>'+
+      (m.trs==='shown'?'<p class="vtr">'+esc(m.tr||'')+'</p><button class="vtb" data-tr="'+where+':'+i+'">Hide Transcript</button>':
+       m.trs==='loading'?'<p class="vtr loading">Transcribing…</p>':
+       '<button class="vtb" data-tr="'+where+':'+i+'">'+ic('doc')+'Transcribe</button>')}
   else if(m.k==='file')inner='<div class="fpost">'+ic('doc')+'<span><b style="font-size:12.5px;display:block">'+esc(m.f)+'</b><span class="sub">'+esc(m.s)+'</span></span></div>';
-  else inner=esc(m.x);
+  else inner=hl(m.x);
   return '<div class="msg2'+(me?' me':'')+'"><span class="av">'+esc(pp[0])+'</span><div class="mb2">'+
-    '<div class="nm">'+(me?'':esc(pp[1]))+'<span>'+esc(m.t||'')+'</span></div><div class="bb">'+inner+'</div>'+
-    (me&&m.seen?'<div class="seen">'+esc(m.seen)+'</div>':'')+'</div></div>'}
+    '<div class="nm">'+(me?'':esc(pp[1]))+'<span>'+esc(m.t||'')+(me&&where==='d'?ticks(m.st):'')+'</span></div><div class="bb">'+inner+'</div>'+
+    '</div></div>'}
+function ticks(st){st=st||'sent';var lab={sent:'Sent',delivered:'Delivered',read:'Read'}[st];
+  return '<span class="tk '+st+'" title="'+lab+'" aria-label="'+lab+'">'+ic(st==='sent'?'tick':'ticks')+'</span>'}
 
 function chanRow(c,i){
   return '<button class="crow'+(i===CM.ch?' on':'')+(c.un?' un':'')+'" data-ch="'+i+'"><span class="hash">#</span>'+
@@ -3081,14 +3241,20 @@ function chanList(){
   CHANNELS.forEach(function(c,i){if(q&&c.n.indexOf(q)<0)return;if(c.pin)pinned+=chanRow(c,i);else rest+=chanRow(c,i)});
   return (pinned?'<div class="clgl">Pinned</div>'+pinned:'')+'<div class="clgl">Channels</div>'+(rest||'<p class="sub" style="padding:8px">No channel matches.</p>')}
 
+function searchBar(){if(!CM.s.on)return '';
+  return '<div class="tsearch" role="search"><input class="inp" id="tsq" placeholder="Search in this conversation" aria-label="Search in this conversation" value="'+esc(CM.s.q)+'" autocomplete="off">'+
+    '<span class="cnt" id="tscnt"></span><button class="iconbtn" id="tsprev" aria-label="Previous match">'+ic('up')+'</button>'+
+    '<button class="iconbtn" id="tsnext" aria-label="Next match" style="transform:rotate(180deg)">'+ic('up')+'</button>'+
+    '<button class="iconbtn" id="tsx" aria-label="Close search">'+ic('x')+'</button></div>'}
+function threadMsgs(){var list=CM.ctx==='d'?DMS[CM.dm].msgs:CHANNELS[CM.ch].msgs;return list.map(function(m,i){return postHTML(m,i,CM.ctx)}).join('')}
 function chanThread(){
   var c=CHANNELS[CM.ch],canPost=!c.ro||POSTERS[ME[0]];
   return '<div class="thread">'+
     '<div class="thd"><button class="iconbtn mback" data-cback aria-label="Back to channels">'+ic('left','ico')+'</button>'+
     '<button class="iconbtn mdraw" data-cdraw aria-label="Switch channel">'+ic('menu','ico')+'</button>'+
     '<span class="tt"><b># '+esc(c.n)+(c.ro?' '+pill('nt','Read only'):'')+'</b><span>'+c.mem+' members</span></span>'+
-    '<button class="iconbtn" data-cmenu aria-label="Channel menu">'+ic('dots','ico')+'</button></div>'+
-    '<div class="tbody" id="tbody">'+c.msgs.map(function(m,i){return postHTML(m,i,'c')}).join('')+'</div>'+
+    '<button class="iconbtn" data-cmenu aria-label="Channel menu">'+ic('dots','ico')+'</button></div>'+searchBar()+
+    '<div class="tbody" id="tbody">'+threadMsgs()+'</div>'+
     '<div class="tcomp">'+(canPost?
       '<button class="cbtn" id="plusbtn" aria-label="Add to message">'+ic('plus')+'</button>'+
       '<input class="inp" id="cmsg" placeholder="Message #'+esc(c.n)+'" aria-label="Message" autocomplete="off">'+
@@ -3096,11 +3262,11 @@ function chanThread(){
       '<span class="roline">'+ic('lock')+'Only People and the CEO post here</span>')+
     '</div></div>'}
 
-function channelsTab(){
+function channelsTab(){CM.ctx='c';
   return head('Channels',CHANNELS.length+' channels · 25 staff',[['New Channel',1,'newch']])+
     '<div class="chatwrap'+(CM.open?' full':'')+'"><div class="clist">'+
     '<div class="clsrch" style="padding-top:12px"><input class="inp" id="chq" placeholder="Search channels" aria-label="Search channels" value="'+esc(CM.q)+'"></div>'+
-    '<div class="clbody" id="clbody">'+chanList()+'</div></div>'+chanThread()+'</div>'}
+    '<div class="clbody" id="clbody">'+chanList()+'</div></div>'+splitter('cw')+chanThread()+'</div>'}
 
 /* direct messages */
 function dmRow(d,i){var p=person(d.p),l=d.msgs[d.msgs.length-1];
@@ -3114,10 +3280,12 @@ function dmList(){var q=CM.dq.toLowerCase(),h='';
 function dmThread(){var d=DMS[CM.dm],p=person(d.p);
   return '<div class="thread">'+
     '<div class="thd"><button class="iconbtn mback" data-cback aria-label="Back to conversations">'+ic('left','ico')+'</button>'+
+    '<button data-prof style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left" aria-label="View profile">'+
     '<span class="av" style="background:var(--accent-soft);color:var(--accent)">'+esc(p[0])+'</span>'+
-    '<span class="tt"><b>'+esc(p[1])+'</b><span>'+(d.on?'Online':'Last seen yesterday')+' · '+esc(p[2])+'</span></span>'+
-    '<button class="iconbtn" data-dmenu aria-label="Conversation menu">'+ic('dots','ico')+'</button></div>'+
-    '<div class="tbody" id="tbody">'+d.msgs.map(function(m,i){return postHTML(m,i,'d')}).join('')+'</div>'+
+    '<span class="tt"><b>'+esc(p[1])+'</b><span>'+(d.on?'Online':'Last seen yesterday')+' · '+esc(p[2])+'</span></span></button>'+
+    '<button class="iconbtn" data-tsearch aria-label="Search in conversation">'+ic('srch','ico')+'</button>'+
+    '<button class="iconbtn" data-dmenu aria-label="Conversation menu">'+ic('dots','ico')+'</button></div>'+searchBar()+
+    '<div class="tbody" id="tbody">'+threadMsgs()+'</div>'+
     '<div class="tcomp" id="dcomp">'+dmComposer()+'</div></div>'}
 function dmComposer(){
   if(MREC.on)return '<button class="cbtn" id="vcancel" aria-label="Cancel recording">'+ic('x')+'</button>'+
@@ -3127,13 +3295,62 @@ function dmComposer(){
     '<input class="inp" id="dmsg" placeholder="Message '+esc(person(DMS[CM.dm].p)[1].split(' ')[0])+'" aria-label="Message" autocomplete="off">'+
     '<button class="cbtn" id="vrec" aria-label="Record a voice note">'+ic('mic')+'</button>'+
     '<button class="cbtn pri" id="dsend" aria-label="Send">'+ic('send')+'</button>'}
+function dmPush(msg){var d=DMS[CM.dm];msg.av=ME[0];msg.t=nowHM();msg.st='sent';d.msgs.push(msg);d.t=nowHM();render();
+  setTimeout(function(){msg.st='delivered';refreshThread()},800);
+  if(d.on)setTimeout(function(){msg.st='read';refreshThread()},2600)}
+/* repaint only the messages: the composer keeps its focus and its text */
+function refreshThread(){var t=$('#tbody');if(!t||!$('.chatwrap'))return;var atEnd=t.scrollHeight-t.scrollTop-t.clientHeight<40;
+  t.innerHTML=threadMsgs();bindPosts();if(atEnd)t.scrollTop=t.scrollHeight}
 function fmtSec(s){return Math.floor(s/60)+':'+pad(s%60)}
-function dmTab(){var un=DMS.filter(function(d){return d.un}).length;
+function dmTab(){var un=DMS.filter(function(d){return d.un}).length;CM.ctx='d';
+  var side=CM.info&&window.innerWidth>760;
   return head('Direct Messages',un?un+' unread':'All caught up',[['New Message',1,'newdm']])+
-    '<div class="chatwrap'+(CM.open?' full':'')+'"><div class="clist">'+
+    '<div class="chatwrap'+(CM.open?' full':'')+(side?' info':'')+'"><div class="clist">'+
     '<div class="clsrch" style="padding-top:12px"><input class="inp" id="dmq" placeholder="Search people" aria-label="Search conversations" value="'+esc(CM.dq)+'"></div>'+
     '<div class="clfil"><button data-dmf="all"'+(CM.dmf==='all'?' class="on"':'')+'>All</button><button data-dmf="unread"'+(CM.dmf==='unread'?' class="on"':'')+'>Unread</button></div>'+
-    '<div class="clbody" id="clbody">'+dmList()+'</div></div>'+dmThread()+'</div>'}
+    '<div class="clbody" id="clbody">'+dmList()+'</div></div>'+splitter('cw')+dmThread()+(side?'<div class="infop">'+
+      '<div class="ihd"><h3>Profile</h3><button class="iconbtn" data-pclose aria-label="Close profile">'+ic('x','ico')+'</button></div>'+
+      '<div class="ibd">'+profileHTML(DMS[CM.dm])+'</div></div>':'')+'</div>'}
+function profileHTML(d){var f=profileOf(d.p),files=d.msgs.filter(function(m){return m.k==='file'}),vns=d.msgs.filter(function(m){return m.k==='vn'}).length;
+  var common=CHANNELS.filter(function(c,i){return c.mem>=25||c.msgs.some(function(m){return m.av===d.p})});
+  var si=-1;STAFF.forEach(function(x,i){if(x[0]===d.p)si=i});
+  return '<div class="pfh"><span class="pav">'+esc(f.av)+(d.on?'<i class="dot"></i>':'')+'</span><h2>'+esc(f.n)+'</h2>'+
+    '<p class="sub">'+esc(f.t)+'</p><p class="sub">'+(d.on?pill('ok','Online'):pill('nt','Last seen yesterday'))+'</p>'+
+    '<div class="pfacts"><button class="btn" data-pmsg>'+ic('msg')+'Message</button>'+
+    (si>=0?'<button class="btn" data-p360="'+si+'">'+ic('user')+'View in People</button>':'')+'</div></div>'+
+    '<div class="pfsec"><h4>Contact</h4>'+
+      '<div class="pfrow">'+ic('mail')+'<span>'+esc(f.e)+'</span></div>'+
+      (f.ph?'<div class="pfrow">'+ic('user')+'<span>'+esc(f.ph)+'</span></div>':'')+
+      '<div class="pfrow">'+ic('globe')+'<span>'+esc(f.site)+'</span></div>'+
+      '<div class="pfrow">'+ic('clock')+'<span>'+nowHM()+' in Lagos</span></div></div>'+
+    '<div class="pfsec"><h4>Shared in this conversation</h4>'+
+      (files.length?files.map(function(x){return '<div class="pfrow">'+ic('doc')+'<span>'+esc(x.f)+'</span><span class="sub">'+esc(x.s)+'</span></div>'}).join(''):'')+
+      (vns?'<div class="pfrow">'+ic('mic')+'<span>'+vns+' voice note'+(vns>1?'s':'')+'</span></div>':'')+
+      (!files.length&&!vns?'<p class="sub">Nothing shared yet.</p>':'')+'</div>'+
+    '<div class="pfsec"><h4>Channels in common</h4>'+common.map(function(c){return '<div class="pfrow"><b style="color:var(--ink-3)">#</b><span>'+esc(c.n)+'</span></div>'}).join('')+'</div>'+
+    '<div class="pfsec"><div class="tog" style="padding:0"><span style="font-size:13px">Mute notifications</span><span class="sw'+(d.mute?' on':'')+'" data-pmute role="switch" aria-checked="'+(d.mute?'true':'false')+'" tabindex="0"></span></div>'+
+    '<button class="btn" data-psearch style="margin-top:12px;width:100%;justify-content:center">'+ic('srch')+'Search in Conversation</button></div>'}
+function openProfile(){
+  if(window.innerWidth>760){CM.info=true;render();return}
+  openModal({title:'Profile',body:profileHTML(DMS[CM.dm]),foot:'<button class="btn pri" data-mx>Close</button>',onMount:function(m){bindProfile(m,true)}})}
+function bindProfile(scope,inModal){
+  $$('[data-pclose]',scope).forEach(function(b){b.onclick=function(){CM.info=false;render()}});
+  $$('[data-pmsg]',scope).forEach(function(b){b.onclick=function(){if(inModal)closeModal();var i=$('#dmsg');if(i)i.focus()}});
+  $$('[data-p360]',scope).forEach(function(b){b.onclick=function(){if(inModal)closeModal();cur={m:5,t:0,d:{k:'emp',i:+b.dataset.p360}};CM.open=false;render()}});
+  $$('[data-pmute]',scope).forEach(function(b){b.onclick=function(){var d=DMS[CM.dm];d.mute=!d.mute;b.classList.toggle('on',d.mute);
+    b.setAttribute('aria-checked',String(d.mute));toast(d.mute?'Muted '+person(d.p)[1]:'Notifications on for '+person(d.p)[1])}});
+  $$('[data-psearch]',scope).forEach(function(b){b.onclick=function(){if(inModal)closeModal();openSearch()}});
+}
+function openSearch(){CM.s={on:true,q:'',i:0};render();var q=$('#tsq');if(q)q.focus()}
+function runSearch(move){var t=$('#tbody');if(!t)return;
+  t.innerHTML=threadMsgs();bindPosts();
+  var hits=$$('mark.hit',t),n=hits.length,cnt=$('#tscnt');
+  if(!CM.s.q.trim()){if(cnt)cnt.textContent='';return}
+  if(!n){if(cnt)cnt.textContent='No match';return}
+  CM.s.i=((CM.s.i+(move||0))%n+n)%n;
+  hits[CM.s.i].classList.add('cur');
+  if(cnt)cnt.textContent=(CM.s.i+1)+' of '+n;
+  var h=hits[CM.s.i],top=h.getBoundingClientRect().top-t.getBoundingClientRect().top+t.scrollTop-t.clientHeight/2;t.scrollTop=Math.max(0,top)}
 
 /* announcements: the configuration and tracking side. Staff read them in #announcements. */
 var ANN=[
@@ -3142,6 +3359,14 @@ var ANN=[
  {title:'Saturday hours confirmed',body:'Saturdays are 09:00 to 15:00 for all departments. Clock in applies as on weekdays.',av:'CO',at:'01/10/2026',read:24},
  {title:'NDPA refresher due',body:'Everyone must complete the data protection refresher before 30 November.',av:'CO',at:'28/09/2026',read:23},
  {title:'Ember to Remember kicks off',body:'The 100 day calendar runs 22 September to 31 December. All hands on the Lagos leg from 14 October.',av:'IC',at:'22/09/2026',read:25}];
+var STAFF25=PEOPLE.concat([['KA','Kemi Adebayo','Content'],['OI','Obinna Ike','Engineering'],['FB','Funke Bello','Finance'],
+  ['YM','Yusuf Musa','Studio'],['TO','Tobi Ojo','Marketing & Sales'],['ZA','Zainab Abubakar','Support'],['DE','Damilola Eke','Operations & People'],
+  ['IU','Ibrahim Umar','Engineering'],['PN','Precious Nnaji','Content'],['RA','Rotimi Alade','Studio'],['GO','Grace Okon','Marketing & Sales'],
+  ['SA','Samuel Akpan','Support'],['BU','Blessing Udo','Finance'],['MO','Musa Olawale','Operations & People']]);
+/* who has read an announcement: the author first, then a fixed order per announcement */
+function readSplit(a){var h=0,t=a.title;for(var i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))>>>0;
+  var rest=STAFF25.filter(function(p){return p[0]!==a.av}),off=h%rest.length,order=[person(a.av)].concat(rest.slice(off),rest.slice(0,off));
+  return {read:a.sch?[]:order.slice(0,a.read),not:a.sch?[]:order.slice(a.read)}}
 function annTab(){
   var pub=ANN.filter(function(a){return !a.sch}),avg=Math.round(pub.reduce(function(s,a){return s+a.read},0)*100/(pub.length*25));
   return '<div class="phead"><div><h1>Announcements '+infoBtn('ann-help')+'</h1><p>Posted by People and the CEO · staff read them in #announcements</p></div>'+
@@ -3206,6 +3431,7 @@ function channelMenu(btn){var c=CHANNELS[CM.ch];
     ['Edit Members','user',function(){membersModal(true)}],
     ['Channel Details','info',function(){openModal({title:'#'+c.n,body:'<dl class="kv"><dt>Members</dt><dd>'+c.mem+'</dd><dt>Who can post</dt><dd>'+
       (c.ro?'People and the CEO':c.adminOnly?'Admins only':'Every member')+'</dd><dt>Visibility</dt><dd>Internal to MyCity</dd></dl>',foot:'<button class="btn pri" data-mx>Close</button>'})}],
+    ['Search in Channel','srch',openSearch],
     'sep',['Mute Notifications','bell',function(){toast('#'+c.n+' muted')}]])}
 
 function postToChannel(msg){var c=CHANNELS[CM.ch];msg.t=msg.t||nowHM();c.msgs.push(msg);c.last=lastOf(msg);c.t=nowHM();render()}
@@ -3256,14 +3482,18 @@ function newDmModal(){
       if(at<0){DMS.unshift({p:av,t:'Now',msgs:[]});at=0}
       CM.dm=at;CM.open=true;closeModal();render();setTimeout(function(){var i=$('#dmsg');if(i)i.focus()},40)})}})}
 
-function annModal(i){var a=ANN[i],p=person(a.av),un=PEOPLE.slice(2).filter(function(x,k){return k>=a.read-2});
+function annModal(i){var a=ANN[i],p=person(a.av),r=readSplit(a),pc=Math.round(a.read*100/25);
+  var lst=function(l,tone){return '<div class="plist" style="max-height:210px">'+l.map(function(x){return '<div class="prow"><span class="av">'+esc(x[0])+'</span>'+
+    '<span class="pn"><b>'+esc(x[1])+'</b><span>'+esc(x[2])+'</span></span>'+pill(tone==='ok'?'ok':'er',tone==='ok'?'Read':'Not read')+'</div>'}).join('')+'</div>'};
   openModal({title:a.title,body:'<p class="sub">'+(a.sch?'Goes out ':'Posted ')+esc(a.at)+' by '+esc(p[1])+'</p>'+
     '<p style="margin:10px 0 14px;font-size:13.5px;color:var(--ink-2)">'+esc(a.body)+'</p>'+
     (a.sch?pill('in','Scheduled. Not yet visible to staff'):
-      '<div class="ch" style="margin-bottom:6px"><h3>Read by '+a.read+' of 25</h3></div>'+mini(Math.round(a.read*4),Math.round(a.read*4)+'%')+
-      (a.read<25?'<p class="sub" style="margin:12px 0 6px">Not yet read</p><div class="plist">'+un.slice(0,25-a.read).map(function(x){return '<div class="prow"><span class="av">'+esc(x[0])+'</span><span class="pn"><b>'+esc(x[1])+'</b><span>'+esc(x[2])+'</span></span></div>'}).join('')+'</div>':'')),
-    foot:'<button class="btn pri" data-mx>Close</button>'})}
-
+      '<div class="ch" style="margin-bottom:6px"><h3>Read by '+a.read+' of 25</h3></div>'+mini(pc,pc+'%')+
+      '<div class="ch" style="margin:16px 0 6px"><h3>Not read · '+r.not.length+'</h3>'+(r.not.length?'<span class="right"><button class="btn" id="nudge" style="height:28px">'+ic('bell')+'Remind Them</button></span>':'')+'</div>'+
+      (r.not.length?lst(r.not,'er'):'<p class="sub">Everyone has read it.</p>')+
+      '<div class="ch" style="margin:16px 0 6px"><h3>Read · '+r.read.length+'</h3></div>'+lst(r.read,'ok')),
+    foot:'<button class="btn pri" data-mx>Close</button>',
+    onMount:function(m){var n=$('#nudge',m);if(n)n.onclick=function(){toast('Reminder sent to '+r.not.length+' '+(r.not.length>1?'people':'person'))}}})}
 function newAnnModal(){
   openModal({title:'New Announcement',wide:false,body:
     field('at','Headline','<input class="inp" id="at" placeholder="One line staff will read first">','Give it a headline')+
@@ -3307,7 +3537,12 @@ function composeModal(pre){pre=pre||{};
       '<button data-cmd="attach" title="Attach a file" aria-label="Attach a file">'+ic('clip')+'</button>'+
       '<span class="lkbox" id="lkbox"><input class="inp" id="lkurl" placeholder="https://" style="height:30px"><button class="btn" id="lkgo" style="height:30px">Add Link</button></span></div>'+
     '<div class="rte" id="rte" contenteditable="true" data-ph="Write your message" aria-label="Message body" role="textbox" aria-multiline="true">'+(pre.body||'')+'</div>'+
-    '<div class="atray" id="atray"></div>',
+    '<div class="atray" id="atray"></div>'+
+    '<div class="schedbox" id="schedbox"><div class="ch" style="margin-bottom:8px"><h3>'+ic('clock')+' Schedule Send</h3></div><div class="schedf">'+
+      field('sdate','Date (dd/mm/yyyy)','<input class="inp" id="sdate" placeholder="14/10/2026" inputmode="numeric" autocomplete="off">','A real date, today or later')+
+      field('stime','Time (24 hour)','<input class="inp" id="stime" placeholder="08:30" inputmode="numeric" autocomplete="off">','HH:MM, in Lagos time')+
+      '<div class="schedb"><button class="btn" id="scancel">Cancel</button><button class="btn pri" id="sgo">'+ic('clock')+'Schedule</button></div></div>'+
+      '<p class="fm" id="spast" style="display:none;color:var(--err);font-size:11.5px">That time has already passed.</p></div>',
     foot:'<span class="grow" id="mdraft"></span><button class="btn" id="mdiscard">Discard</button><button class="btn" id="msched">'+ic('clock')+'Schedule</button><button class="btn pri" id="msend">'+ic('send')+'Send</button>',
     onMount:function(m){
       var to=pre.to?[pre.to]:[],rte=$('#rte',m),sel=null,draftT=null;
@@ -3339,10 +3574,23 @@ function composeModal(pre){pre=pre||{};
         var bad=to.filter(function(a){return !good(a)});if(bad.length){toast(bad[0]+' is not an email address');return}
         var sub=$('#msub',m).value.trim()||'(no subject)';
         if(MAILROWS.Sent&&!when)MAILROWS.Sent.unshift([to[0],sub,nowHM(),0,rte.innerHTML||'<p></p>','CO','cynthia@mycityapp.io',null]);
+        if(MAILROWS.Drafts&&when)MAILROWS.Drafts.unshift([to[0],'Scheduled: '+sub,when.slice(0,5)+' '+when.slice(-5),0,rte.innerHTML||'<p></p>','CO','cynthia@mycityapp.io',null]);
         closeModal();if(M[cur.m].k==='mailbox')render();toast(when?'Scheduled for '+when:'Sent to '+to.join(', '))};
       $('#msend',m).onclick=function(){send()};
-      $('#msched',m).onclick=function(){popover(this,[['Tomorrow, 08:00','clock',function(){send('tomorrow 08:00')}],
-        ['Monday, 08:00','clock',function(){send('Monday 08:00')}]],true)};
+      var dmy=function(d){return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()};
+      var tmr=new Date();tmr.setDate(tmr.getDate()+1);var mon=new Date();mon.setDate(mon.getDate()+((8-mon.getDay())%7||7));
+      live('sdate',isDayFirst);live('stime',function(v){return /^([01]\d|2[0-3]):[0-5]\d$/.test(v)});
+      var box=$('#schedbox',m);
+      $('#msched',m).onclick=function(){popover(this,[['Tomorrow, '+dmy(tmr).slice(0,5)+' at 08:00','clock',function(){send(dmy(tmr)+' 08:00')}],
+        ['Monday, '+dmy(mon).slice(0,5)+' at 08:00','clock',function(){send(dmy(mon)+' 08:00')}],'sep',
+        ['Pick Date and Time','check',function(){box.classList.add('on');$('#sdate',m).focus();if(box.scrollIntoView)box.scrollIntoView({block:'nearest'})}]],true)};
+      $('#scancel',m).onclick=function(){box.classList.remove('on')};
+      $('#sgo',m).onclick=function(){var d=$('#sdate',m).value.trim(),t=$('#stime',m).value.trim(),okT=/^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+        $('#fw-sdate',m).classList.toggle('bad',!isDayFirst(d));$('#fw-stime',m).classList.toggle('bad',!okT);
+        if(!isDayFirst(d)||!okT)return;
+        var q=d.split('/'),hm=t.split(':'),at=new Date(+q[2],+q[1]-1,+q[0],+hm[0],+hm[1]);
+        if(at<=new Date()){$('#spast',m).style.display='block';return}
+        send(d+' '+t)};
     }})}
 function fileModalInline(m){var tray=$('#atray',m),f=['proposal-draft.pdf','620 KB'],id='u'+Date.now(),pc=0;
   tray.insertAdjacentHTML('beforeend','<span class="attchip" id="'+id+'"><span style="display:flex;gap:7px;align-items:center">'+ic('doc')+esc(f[0])+'<span class="sub">'+f[1]+'</span></span><span class="prog"><i style="width:0"></i></span></span>');
@@ -3353,17 +3601,45 @@ function fileModalInline(m){var tray=$('#atray',m),f=['proposal-draft.pdf','620 
 function bindInfo(scope){$$('[data-ib]',scope).forEach(function(b){b.onclick=function(e){e.stopPropagation();var t=$('#'+b.dataset.ib);
   var on=!t.classList.contains('on');t.classList.toggle('on',on);b.setAttribute('aria-expanded',String(on))}})}
 function scrollThread(){var t=$('#tbody');if(t)t.scrollTop=t.scrollHeight}
+function burst(btn,emoji){var r=btn.getBoundingClientRect();
+  for(var k=0;k<7;k++){var e=document.createElement('span');e.className='burst';e.textContent=emoji;
+    e.style.left=(r.left+r.width/2-10+(k-3)*6)+'px';e.style.top=(r.top-6)+'px';e.style.setProperty('--dx',((k-3)*14)+'px');
+    e.style.animationDelay=(k*40)+'ms';document.body.appendChild(e);(function(x){setTimeout(function(){x.remove()},1100)})(e)}}
+function bindPosts(){
+  $$('[data-play]').forEach(function(b){b.onclick=function(){var p=b.dataset.play.split(':'),m=(p[0]==='c'?CHANNELS[CM.ch]:DMS[CM.dm]).msgs[+p[1]];
+    m.playing=!m.playing;refreshThread();
+    if(m.playing){var q=String(m.d).split(':'),secs=(+q[0])*60+(+q[1]);clearTimeout(m._pt);m._pt=setTimeout(function(){m.playing=false;refreshThread()},secs*1000+200)}}});
+  $$('[data-tr]').forEach(function(b){b.onclick=function(){var p=b.dataset.tr.split(':'),m=(p[0]==='c'?CHANNELS[CM.ch]:DMS[CM.dm]).msgs[+p[1]];
+    if(m.trs==='shown'){m.trs='';refreshThread();return}
+    m.trs='loading';refreshThread();setTimeout(function(){m.trs='shown';refreshThread()},1300)}});
+  $$('[data-like]').forEach(function(b){b.onclick=function(){var p=b.dataset.like.split(':'),m=(p[0]==='c'?CHANNELS[CM.ch]:DMS[CM.dm]).msgs[+p[1]];
+    m.mine=!m.mine;m.likes+=m.mine?1:-1;if(m.mine)burst(b,(m.k==='rec'?'👍':m.k==='anniv'?'👏':'🎉'));
+    var keep=$('#tbody').scrollTop;render();$('#tbody').scrollTop=keep}});
+  $$('[data-vote]').forEach(function(b){b.onclick=function(){var p=b.dataset.vote.split(':'),m=CHANNELS[CM.ch].msgs[+p[1]],o=+p[2];
+    if(m.v!==undefined)m.opts[m.v][1]--;if(m.v===o){m.v=undefined}else{m.opts[o][1]++;m.v=o}
+    var keep=$('#tbody').scrollTop;render();$('#tbody').scrollTop=keep}});
+}
 function bindComm(){
   bindInfo(document);
-  scrollThread();
+  if(CM.s.on&&$('#tbody'))runSearch(0);else scrollThread();
+  bindPosts();
+  var pr=$('[data-prof]');if(pr)pr.onclick=openProfile;
+  var ts=$('[data-tsearch]');if(ts)ts.onclick=function(){if(CM.s.on){CM.s={on:false,q:'',i:0};render()}else openSearch()};
+  if($('.infop'))bindProfile($('.infop'),false);
+  var tsq=$('#tsq');if(tsq){
+    tsq.oninput=function(){CM.s.q=tsq.value;CM.s.i=0;runSearch(0)};
+    tsq.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();runSearch(e.shiftKey?-1:1)}
+      else if(e.key==='Escape'){e.stopPropagation();CM.s={on:false,q:'',i:0};render()}};
+    $('#tsprev').onclick=function(){runSearch(-1)};$('#tsnext').onclick=function(){runSearch(1)};
+    $('#tsx').onclick=function(){CM.s={on:false,q:'',i:0};render()}}
   var nc=$('#newch');if(nc)nc.onclick=newChannelModal;
   var nd=$('#newdm');if(nd)nd.onclick=newDmModal;
   var na=$('#newann');if(na)na.onclick=newAnnModal;
   $$('[data-an]').forEach(function(b){b.onclick=function(){annModal(+b.dataset.an)}});
-  $$('[data-ch]').forEach(function(b){b.onclick=function(){CM.ch=+b.dataset.ch;CM.open=true;CHANNELS[CM.ch].un=0;$('#drawer').classList.remove('on');render()}});
-  $$('[data-dm]').forEach(function(b){b.onclick=function(){CM.dm=+b.dataset.dm;CM.open=true;DMS[CM.dm].un=0;MREC.on=false;render()}});
+  $$('[data-ch]').forEach(function(b){b.onclick=function(){CM.ch=+b.dataset.ch;CM.open=true;CM.s={on:false,q:'',i:0};CHANNELS[CM.ch].un=0;$('#drawer').classList.remove('on');render()}});
+  $$('[data-dm]').forEach(function(b){b.onclick=function(){CM.dm=+b.dataset.dm;CM.open=true;CM.s={on:false,q:'',i:0};DMS[CM.dm].un=0;MREC.on=false;render()}});
   $$('[data-dmf]').forEach(function(b){b.onclick=function(){CM.dmf=b.dataset.dmf;render()}});
-  $$('[data-cback]').forEach(function(b){b.onclick=function(){CM.open=false;MREC.on=false;render()}});
+  $$('[data-cback]').forEach(function(b){b.onclick=function(){CM.open=false;MREC.on=false;CM.s={on:false,q:'',i:0};render()}});
   $$('[data-cdraw]').forEach(function(b){b.onclick=function(){var d=$('#drawer');
     d.innerHTML='<div class="dpane"><div class="clhd"><h3>Channels</h3><button class="iconbtn" id="dclose" aria-label="Close">'+ic('x','ico')+'</button></div><div class="clbody">'+chanList()+'</div></div>';
     d.classList.add('on');$('#dclose').onclick=function(){d.classList.remove('on')};
@@ -3371,8 +3647,8 @@ function bindComm(){
     $$('[data-ch]',d).forEach(function(r){r.onclick=function(){CM.ch=+r.dataset.ch;CHANNELS[CM.ch].un=0;d.classList.remove('on');render()}})}});
   var cm=$('[data-cmenu]');if(cm)cm.onclick=function(e){e.stopPropagation();channelMenu(cm)};
   var dm=$('[data-dmenu]');if(dm)dm.onclick=function(e){e.stopPropagation();var p=person(DMS[CM.dm].p);
-    popover(dm,[['View Profile','user',function(){toast('Opening '+p[1])}],['Search in Conversation','srch',function(){toast('Search in conversation')}],'sep',
-      ['Mute Notifications','bell',function(){toast('Muted '+p[1])}]])};
+    popover(dm,[['View Profile','user',openProfile],['Search in Conversation','srch',openSearch],'sep',
+      ['Mute Notifications','bell',function(){var d=DMS[CM.dm];d.mute=!d.mute;toast(d.mute?'Muted '+p[1]:'Notifications on for '+p[1])}]])};
   var chq=$('#chq');if(chq)chq.oninput=function(){CM.q=chq.value;$('#clbody').innerHTML=chanList();bindComm()};
   var dmq=$('#dmq');if(dmq)dmq.oninput=function(){CM.dq=dmq.value;$('#clbody').innerHTML=dmList();bindComm()};
   var pb=$('#plusbtn');if(pb)pb.onclick=function(e){e.stopPropagation();plusMenu(pb)};
@@ -3382,19 +3658,15 @@ function bindComm(){
       if(c.ro){postToChannel({k:'ann',av:ME[0],title:v,body:'',at:'Today'})}else postToChannel({k:'m',av:ME[0],x:v})})};
     cs.onclick=go;ci.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();go()}}}
   var ds=$('#dsend'),di=$('#dmsg');
-  if(di){var dgo=function(){send(di,function(v){var d=DMS[CM.dm];d.msgs.push({k:'m',av:ME[0],t:nowHM(),x:v,seen:'Delivered'});d.t=nowHM();render()})};
+  if(di){var dgo=function(){send(di,function(v){dmPush({k:'m',x:v})})};
     ds.onclick=dgo;di.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();dgo()}}}
-  var dp=$('#dplus');if(dp)dp.onclick=function(e){e.stopPropagation();popover(dp,[['Photo or Video','image',function(){fileModal(function(f){DMS[CM.dm].msgs.push({k:'file',av:ME[0],t:nowHM(),f:f[0],s:f[1]});render()})}],
-    ['Document','doc',function(){fileModal(function(f){DMS[CM.dm].msgs.push({k:'file',av:ME[0],t:nowHM(),f:f[0],s:f[1]});render()})}]],true)};
+  var dp=$('#dplus');if(dp)dp.onclick=function(e){e.stopPropagation();popover(dp,[['Photo or Video','image',function(){fileModal(function(f){dmPush({k:'file',f:f[0],s:f[1]})})}],
+    ['Document','doc',function(){fileModal(function(f){dmPush({k:'file',f:f[0],s:f[1]})})}]],true)};
   var vr=$('#vrec');if(vr)vr.onclick=function(){MREC.on=true;MREC.sec=0;$('#dcomp').innerHTML=dmComposer();bindComm();
     MREC.timer=setInterval(function(){MREC.sec++;var t=$('#vtime');if(t)t.textContent=fmtSec(MREC.sec);else{clearInterval(MREC.timer);MREC.timer=null}},1000)};
   var vc=$('#vcancel');if(vc)vc.onclick=function(){clearInterval(MREC.timer);MREC.timer=null;MREC.on=false;$('#dcomp').innerHTML=dmComposer();bindComm()};
   var vs=$('#vsend');if(vs)vs.onclick=function(){clearInterval(MREC.timer);MREC.timer=null;MREC.on=false;
-    DMS[CM.dm].msgs.push({k:'vn',av:ME[0],t:nowHM(),d:fmtSec(Math.max(1,MREC.sec)),seen:'Delivered'});render()};
-  $$('[data-like]').forEach(function(b){b.onclick=function(){var p=b.dataset.like.split(':'),m=(p[0]==='c'?CHANNELS[CM.ch]:DMS[CM.dm]).msgs[+p[1]];
-    m.mine=!m.mine;m.likes+=m.mine?1:-1;render()}});
-  $$('[data-vote]').forEach(function(b){b.onclick=function(){var p=b.dataset.vote.split(':'),m=CHANNELS[CM.ch].msgs[+p[1]],o=+p[2];
-    if(m.v!==undefined)m.opts[m.v][1]--;if(m.v===o){m.v=undefined}else{m.opts[o][1]++;m.v=o}render()}});
+    dmPush({k:'vn',d:fmtSec(Math.max(1,MREC.sec)),tr:'Okay, noted. I will sort it out and get back to you before the end of the day.'})};
 }
 function bindMail(){
   var c=$('#compose');if(c)c.onclick=function(){composeModal()};
@@ -3403,7 +3675,41 @@ function bindMail(){
       body:'<p><br></p><blockquote><p class="sub">'+esc(r[0])+' &lt;'+esc(r[6]||'')+'&gt; · '+esc(r[2])+'</p>'+(r[4]||'')+'</blockquote>'})}});
   var mb=$('[data-mback]');if(mb)mb.onclick=function(){MAILOPEN[M[cur.m].tabs[cur.t].n]=false;render()};
   bindInfo(document);
+  fitCheck();applySplit();bindSplit();
 }
+/* chats and the mailbox fill the page: their panes scroll on their own, so there is one scrollbar */
+var HIDEHEAD=false;
+function fitCheck(){var on=!!($('.chatwrap')||$('.mail2')),sc=$('#scroll');sc.classList.toggle('fit',on);
+  if(!on)HIDEHEAD=false;sc.classList.toggle('hidehead',on&&HIDEHEAD)}
+window.addEventListener('resize',fitCheck);
+/* Like scrolling a page: scroll down past the end of a pane and the header (title, New Message)
+   slides away so the conversation gets the full height; scroll up at the top of a pane, or over a
+   list that does not scroll, and it comes back. Desktop only; mobile already opens full screen. */
+$('#scroll').addEventListener('wheel',function(e){
+  if(!this.classList.contains('fit')||window.innerWidth<=760||Math.abs(e.deltaY)<4)return;
+  var pane=e.target.closest&&e.target.closest('.tbody,.clbody,.mlist,.mread,.ibd,.plist');
+  var top=!pane||pane.scrollTop<=0,end=!pane||pane.scrollTop+pane.clientHeight>=pane.scrollHeight-2;
+  if(e.deltaY>0&&end&&!HIDEHEAD){HIDEHEAD=true;this.classList.add('hidehead')}
+  else if(e.deltaY<0&&top&&HIDEHEAD){HIDEHEAD=false;this.classList.remove('hidehead')}},{passive:true});
+/* the list pane's width: drag the divider, or focus it and use the arrow keys; double click resets.
+   Remembered in this browser only (a convenience; nothing depends on it). */
+var SPLIT_DEF={cw:300,mw:330},SPLIT={cw:300,mw:330};
+try{var sv=JSON.parse(localStorage.getItem('mycity-split')||'{}');Object.keys(sv).forEach(function(k){if(typeof sv[k]==='number')SPLIT[k]=sv[k]})}catch(e){}
+function splitter(key){return '<div class="split" data-split="'+key+'" role="separator" aria-orientation="vertical" aria-label="Resize the list" tabindex="0" title="Drag to resize, double click to reset"></div>'}
+function applySplit(){var c=$('.chatwrap');if(c)c.style.setProperty('--lw',SPLIT.cw+'px');var m=$('.mail2');if(m)m.style.setProperty('--mw',SPLIT.mw+'px')}
+function saveSplit(){try{localStorage.setItem('mycity-split',JSON.stringify(SPLIT))}catch(e){}}
+function clampW(v){return Math.max(220,Math.min(560,Math.round(v)))}
+function bindSplit(){$$('[data-split]').forEach(function(h){var key=h.dataset.split;
+  h.setAttribute('aria-valuenow',String(SPLIT[key]));
+  h.onpointerdown=function(e){e.preventDefault();var left=h.parentElement.getBoundingClientRect().left;
+    document.body.classList.add('resizing');h.classList.add('on');
+    var mv=function(ev){SPLIT[key]=clampW(ev.clientX-left);applySplit()};
+    var up=function(){document.removeEventListener('pointermove',mv);document.removeEventListener('pointerup',up);
+      document.body.classList.remove('resizing');h.classList.remove('on');h.setAttribute('aria-valuenow',String(SPLIT[key]));saveSplit()};
+    document.addEventListener('pointermove',mv);document.addEventListener('pointerup',up)};
+  h.onkeydown=function(e){if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();
+    SPLIT[key]=clampW(SPLIT[key]+(e.key==='ArrowRight'?16:-16));applySplit();h.setAttribute('aria-valuenow',String(SPLIT[key]));saveSplit()};
+  h.ondblclick=function(){SPLIT[key]=SPLIT_DEF[key];applySplit();saveSplit()}})}
 
 /* ───── routing ───── */
 var cur={m:0,t:0,d:null};
