@@ -17,7 +17,12 @@ map, read §11 first.
 | `docs/MyCity-ERP-Documents/MILESTONES.md` | Scope, decisions A1 to A25, gates, schedule, each milestone's definition of done. **Binding** |
 | `docs/MyCity-ERP-Documents/REUSE_MAP.md` | Which donor file each piece comes from. Wins over MILESTONES where they disagree |
 | `docs/SYSTEM_ARCHITECTURE.md` | Servers, processes, request lifecycle, events, release pipeline |
-| `docs/BACKEND_STRUCTURE.md` | The M0 foundation in detail: shared layer, contract, numbering, documents, imports, AI |
+| `docs/BACKEND_STRUCTURE.md` | The M0 foundation in detail: shared layer, contract, numbering, documents, imports, AI, pagination, first administrator |
+| `docs/BACKEND_GUIDE.md` | **How to write backend code here**: layers, a worked endpoint, what to reuse, done checklist. Read before any backend change |
+| `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, ⓘ help, two shells. Read before any frontend change |
+| `docs/guides/<module>.md` | One engineering guide per feature: every screen it touches and how they relate. A change passes through its guide first |
+| `docs/PROGRESS.md` | The 85 screens and the M0 items, ticked as they are built, with a note per change |
+| `CLAUDE.md` | What an AI assistant reads first: which documents to read for a backend, frontend or full-stack task, and how to finish one |
 | `docs/MyCity-ERP-Documents/demo.html` | What the product looks like. UI and layout reference only, never a source for data or rules |
 
 Donor code: `C:\praxis-ls` and `C:\pixie-girl-hub`. Port from them; never copy a file without the
@@ -53,11 +58,12 @@ mycity-app/
 │   ├── ci-local.js           runs every CI gate locally, full report
 │   ├── gen/                  contract and .env.example generators
 │   ├── check/                the CI gates (§8)
+│   │   └── lib/changes.js    what a change touched (git diff vs main) and its trailers,
+│   │                         shared by check/progress.js, check/guides.js, check/readme-map.js
 │   ├── db/                   migrate, seed, backup, restore-drill, create-admin
 │   ├── import/               command-line import
 │   └── deploy/               deploy-gate, release-manifest, verify-staging, rollback
 ├── ops/
-│   ├── nginx/                one file per host
 │   ├── systemd/              four units + env templates
 │   ├── provision/            server packages
 │   ├── monitoring/           uptime probe (M11)
@@ -68,9 +74,22 @@ mycity-app/
 │   └── staging/              verify-staging suite, runs against the staging hosts
 ├── docs/
 │   ├── MyCity-ERP-Documents/ the client document pack
-│   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module
+│   ├── BACKEND_GUIDE.md      how to write backend code (read first)
+│   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
+│   ├── PROGRESS.md           85 screens + M0 items, updated with every change
+│   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
+│   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
+│   │                         proxy (the hosting panel's proxy settings), github-settings (TB applies)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
-└── .github/workflows/        ci.yml, release.yml, rollback.yml
+├── .github/
+│   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml
+│   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
+│   └── pull_request_template.md
+├── .claude/
+│   ├── settings.json         registers the Stop hook for everyone using Claude Code here
+│   └── hooks/stop-check.js   runs the process gates before Claude may finish a task
+├── package.json · package-lock.json · .nvmrc (Node 20) · eslint.config.js · jest.config.js
+└── CLAUDE.md                 what an AI assistant reads first
 ```
 
 **About `.gitkeep`.** Git does not track empty folders, so a folder with nothing in it would not
@@ -101,7 +120,7 @@ src/
 │   ├── errors.js · route-map.js
 │   ├── db/            tx · query-helpers · pg-types · effective-dated
 │   ├── crud/          resource (makeRepo / makeService / makeController / makeRouter)
-│   ├── http/          validate · paged · body-limits · respond
+│   ├── http/          validate · paged (THE pagination gate, 25 per page) · body-limits · respond
 │   ├── events/        emit · outbox · catalogue
 │   ├── workflow/      engine · conditions · definitions · approvers
 │   ├── access/        access.catalog (the permission module list)
@@ -454,6 +473,13 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 11. **Copy a person reads** (mail, PDFs, exports): no em dashes, Title Case for chrome.
 12. **Production data**: never seeded. Real records reach production by people using the product or
     through the import engine.
+13. **Pagination**: every list pages at 25 on the server through `shared/http/paged.js`
+    (`pageQuery`, `sendPaged`). No `LIMIT`/`OFFSET` in a repo, no page-size key in the contract or
+    the frontend, AI reads included. The one exception is `completeQuery()` with a
+    `// pagination:complete <reason>` marker (BACKEND_STRUCTURE §16).
+14. **No login without an employee.** The first administrator comes from `scripts/db/create-admin.js`
+    (full employee, login and role in one transaction); everyone else is created in the app
+    (BACKEND_STRUCTURE §17).
 
 ---
 
@@ -481,7 +507,23 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
-`check/ai-vendor-imports.js`, `check/shell.js`.
+`check/ai-vendor-imports.js`, `check/shell.js`, `check/pagination.js`.
+
+Process gates, from M0. They check that the work is recorded where the team reads it:
+
+| Gate | Script | Fails when |
+|---|---|---|
+| Progress | `scripts/check/progress.js` | Product code changed and `docs/PROGRESS.md` gained no dated note; or the file is malformed (85 rows, statuses, ticks, day-first dates, summary counts) |
+| Guides | `scripts/check/guides.js` | Code a guide covers changed and the guide gained no Change log line; or a guide lost a template section or is missing from the index |
+| README map | `scripts/check/readme-map.js` | A new file is neither where the map says files go nor named in this README |
+| CODEOWNERS | `scripts/check/codeowners.js` | A placeholder or invalid username, a path with one owner, a renamed path, or a module or guide with no owner line |
+
+The first two accept a reason instead, as a line in the PR description or a commit message:
+`Progress-unchanged: <reason>` or `Guide-unchanged: <reason>`.
+
+**Not built is not passed.** A gate whose script is still an empty file is reported as NOT BUILT
+and listed at the end of `npm run ci`; it checks nothing yet. `npm run ci:list` shows each gate's
+state. Once M0 is complete, CI runs with `CI_STRICT=1` and a NOT BUILT gate fails the build.
 
 **Run `npm run ci` before every push.** A single test file passing is not evidence about the suite.
 
@@ -491,7 +533,10 @@ Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check
 
 1. Branch from `main`: `m<N>/<short-name>` (for example `m3/query-rules`).
 2. PR title in Conventional Commits form: `feat(queries): raise a query on the third late arrival`.
-3. One approving review, not the author. All CI jobs green. `main` is protected with no bypass.
+3. One approving review, not the author, and from a code owner of every path the PR touches
+   (`.github/CODEOWNERS`). The `ci` check green. `main` is protected with no bypass, the
+   repository owner included (`docs/runbooks/github-settings.md`). Collaborators push branches and
+   open PRs; nobody pushes to `main`.
 4. Merge to `main` deploys to **staging** automatically, runs the staging verification, and seals the
    build.
 5. **Production** waits for an approver (GE or TB) who did not trigger the release, after testing on
@@ -507,7 +552,7 @@ Full detail: `docs/SYSTEM_ARCHITECTURE.md` §9.
 
 ```
 nvm use                      # Node 20 (.nvmrc)
-npm ci
+npm ci                       # exact versions from package-lock.json
 cp .env.example .env         # fill DB, Redis, JWT secrets
 npm run db:migrate           # against your local database
 npm run db:seed -- --build   # synthetic data; refuses on staging and production
@@ -519,6 +564,15 @@ npm run ci                   # before every push
 
 The seed command checks `APP_ENV`, the database name and the `system_marker` row, and refuses unless
 all three say this is not production.
+
+First login on a fresh local or staging database:
+
+```
+node scripts/db/create-admin.js --sample   # sample employee profile; asks email, role, password
+```
+
+On production, run it without `--sample` and enter the real person's details
+(BACKEND_STRUCTURE §17).
 
 ---
 
@@ -542,6 +596,6 @@ all three say this is not production.
 | GE | Godwin-Okoh Elisha | Architecture, schema, M0, M3, M7, M9; community and mailbox in M1 |
 | TB | Tom-Blake Asaah | Dashboard (M1), M4, M10, M11 |
 | LA | Love Adeola | Migrations and data (M0), attendance (M1), M5, M6 |
-| AJ | Adole Jerome | ESS (M1), M2, M8 |
+| AJ | Adole Jerome | Frontend foundation, ESS (M1), M2, M8 |
 
 Engineered by [JBS Praxis](https://jbspraxis.com).

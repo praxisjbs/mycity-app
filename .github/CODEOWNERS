@@ -1,0 +1,197 @@
+# CODEOWNERS · MyCity App ERP
+#
+# Who must approve a change, by path. With "Require review from Code Owners"
+# on the main branch rule, a PR touching a path below cannot merge until one of
+# that path's owners (not the author) approves.
+#
+# Rules this file keeps, checked by scripts/check/codeowners.js:
+#  - the LAST matching line wins, so general paths come first, specific last
+#  - every line has two owners: the owner, then a backup. GitHub does not
+#    count an author's own approval, so a single-owner path could never merge
+#    a PR opened by that owner
+#  - every module folder and every feature guide has its own line
+#  - usernames are real: GitHub silently ignores one it cannot resolve
+#
+# GE @swizfcodes · TB @tomblakeasaah196 · AJ @Ghosted34 · LA @LovedataX
+#
+# docs/PROGRESS.md has no owner on purpose: every PR edits it.
+
+# ── Foundation: shared code, contract core, config, tooling ─────────────────
+/src/                                              @swizfcodes @tomblakeasaah196
+/packages/                                         @swizfcodes @tomblakeasaah196
+/scripts/                                          @swizfcodes @tomblakeasaah196
+/ops/                                              @swizfcodes @tomblakeasaah196
+/.github/                                          @swizfcodes @tomblakeasaah196
+/.claude/                                          @swizfcodes @tomblakeasaah196
+/package.json                                      @swizfcodes @tomblakeasaah196
+/package-lock.json                                 @swizfcodes @tomblakeasaah196
+/eslint.config.js                                  @swizfcodes @tomblakeasaah196
+/jest.config.js                                    @swizfcodes @tomblakeasaah196
+/CLAUDE.md                                         @swizfcodes @tomblakeasaah196
+/README.MD                                         @swizfcodes @tomblakeasaah196
+
+# ── Data ────────────────────────────────────────────────────────────────────
+/migrations/                                       @swizfcodes @LovedataX
+/seeds/                                            @LovedataX @swizfcodes
+/templates/                                        @swizfcodes @LovedataX
+
+# ── Frontend ────────────────────────────────────────────────────────────────
+/app/                                              @Ghosted34 @tomblakeasaah196
+/public-app/                                       @Ghosted34 @tomblakeasaah196
+/assets/                                           @Ghosted34 @tomblakeasaah196
+
+# ── Engineering documents ───────────────────────────────────────────────────
+/docs/SYSTEM_ARCHITECTURE.md                       @swizfcodes @tomblakeasaah196
+/docs/BACKEND_STRUCTURE.md                         @swizfcodes @tomblakeasaah196
+/docs/BACKEND_GUIDE.md                             @swizfcodes @tomblakeasaah196
+/docs/FRONTEND_GUIDE.md                            @Ghosted34 @tomblakeasaah196
+/docs/MyCity-ERP-Documents/                        @swizfcodes @tomblakeasaah196
+/docs/runbooks/                                    @swizfcodes @tomblakeasaah196
+/docs/guides/README.md                             @swizfcodes @tomblakeasaah196
+/docs/guides/_TEMPLATE.md                          @swizfcodes @tomblakeasaah196
+# A new guide gets its line here when it is created: owner, then backup.
+
+
+# ── Modules: code and contract (README §5) ─────────────────────────────────
+
+# GE, backup TB
+/src/modules/access/                               @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/access.js               @swizfcodes @tomblakeasaah196
+/src/modules/agreements/                           @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/agreements.js           @swizfcodes @tomblakeasaah196
+/src/modules/announcements/                        @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/announcements.js        @swizfcodes @tomblakeasaah196
+/src/modules/audit/                                @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/audit.js                @swizfcodes @tomblakeasaah196
+/src/modules/community/                            @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/community.js            @swizfcodes @tomblakeasaah196
+/src/modules/documents/                            @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/documents.js            @swizfcodes @tomblakeasaah196
+/src/modules/identity/                             @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/identity.js             @swizfcodes @tomblakeasaah196
+/src/modules/imports/                              @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/imports.js              @swizfcodes @tomblakeasaah196
+/src/modules/integrations/                         @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/integrations.js         @swizfcodes @tomblakeasaah196
+/src/modules/interactions/                         @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/interactions.js         @swizfcodes @tomblakeasaah196
+/src/modules/leads/                                @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/leads.js                @swizfcodes @tomblakeasaah196
+/src/modules/mailbox/                              @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/mailbox.js              @swizfcodes @tomblakeasaah196
+/src/modules/notifications/                        @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/notifications.js        @swizfcodes @tomblakeasaah196
+/src/modules/organisation/                         @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/organisation.js         @swizfcodes @tomblakeasaah196
+/src/modules/partner_pipeline/                     @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/partner_pipeline.js     @swizfcodes @tomblakeasaah196
+/src/modules/partners/                             @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/partners.js             @swizfcodes @tomblakeasaah196
+/src/modules/partnership_analytics/                @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/partnership_analytics.js @swizfcodes @tomblakeasaah196
+/src/modules/proposals/                            @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/proposals.js            @swizfcodes @tomblakeasaah196
+/src/modules/queries/                              @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/queries.js              @swizfcodes @tomblakeasaah196
+/src/modules/query_rules/                          @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/query_rules.js          @swizfcodes @tomblakeasaah196
+/src/modules/sanctions/                            @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/sanctions.js            @swizfcodes @tomblakeasaah196
+/src/modules/security/                             @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/security.js             @swizfcodes @tomblakeasaah196
+/src/modules/settings/                             @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/settings.js             @swizfcodes @tomblakeasaah196
+/src/modules/templates/                            @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/templates.js            @swizfcodes @tomblakeasaah196
+/src/modules/users/                                @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/users.js                @swizfcodes @tomblakeasaah196
+/src/modules/workflow/                             @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/workflow.js             @swizfcodes @tomblakeasaah196
+
+# TB, backup GE
+/src/modules/ai_governance/                        @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/ai_governance.js        @tomblakeasaah196 @swizfcodes
+/src/modules/alerts/                               @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/alerts.js               @tomblakeasaah196 @swizfcodes
+/src/modules/assessments/                          @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/assessments.js          @tomblakeasaah196 @swizfcodes
+/src/modules/assistant/                            @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/assistant.js            @tomblakeasaah196 @swizfcodes
+/src/modules/candidates/                           @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/candidates.js           @tomblakeasaah196 @swizfcodes
+/src/modules/dashboard/                            @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/dashboard.js            @tomblakeasaah196 @swizfcodes
+/src/modules/interviews/                           @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/interviews.js           @tomblakeasaah196 @swizfcodes
+/src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
+/src/modules/reports/                              @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/reports.js              @tomblakeasaah196 @swizfcodes
+/src/modules/vacancies/                            @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/vacancies.js            @tomblakeasaah196 @swizfcodes
+
+# LA, backup GE
+/src/modules/attendance/                           @LovedataX @swizfcodes
+/packages/contract/schemas/attendance.js           @LovedataX @swizfcodes
+/src/modules/deductions/                           @LovedataX @swizfcodes
+/packages/contract/schemas/deductions.js           @LovedataX @swizfcodes
+/src/modules/devices/                              @LovedataX @swizfcodes
+/packages/contract/schemas/devices.js              @LovedataX @swizfcodes
+/src/modules/employment_contracts/                 @LovedataX @swizfcodes
+/packages/contract/schemas/employment_contracts.js @LovedataX @swizfcodes
+/src/modules/offers/                               @LovedataX @swizfcodes
+/packages/contract/schemas/offers.js               @LovedataX @swizfcodes
+/src/modules/onboarding/                           @LovedataX @swizfcodes
+/packages/contract/schemas/onboarding.js           @LovedataX @swizfcodes
+/src/modules/payroll/                              @LovedataX @swizfcodes
+/packages/contract/schemas/payroll.js              @LovedataX @swizfcodes
+/src/modules/payslips/                             @LovedataX @swizfcodes
+/packages/contract/schemas/payslips.js             @LovedataX @swizfcodes
+/src/modules/salary_structure/                     @LovedataX @swizfcodes
+/packages/contract/schemas/salary_structure.js     @LovedataX @swizfcodes
+/src/modules/signatures/                           @LovedataX @swizfcodes
+/packages/contract/schemas/signatures.js           @LovedataX @swizfcodes
+/src/modules/statutory/                            @LovedataX @swizfcodes
+/packages/contract/schemas/statutory.js            @LovedataX @swizfcodes
+/src/modules/talent_pool/                          @LovedataX @swizfcodes
+/packages/contract/schemas/talent_pool.js          @LovedataX @swizfcodes
+/src/modules/worksites/                            @LovedataX @swizfcodes
+/packages/contract/schemas/worksites.js            @LovedataX @swizfcodes
+
+# AJ, backup TB
+/src/modules/budgets/                              @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/budgets.js              @Ghosted34 @tomblakeasaah196
+/src/modules/calendar/                             @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/calendar.js             @Ghosted34 @tomblakeasaah196
+/src/modules/disbursements/                        @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/disbursements.js        @Ghosted34 @tomblakeasaah196
+/src/modules/ess/                                  @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/ess.js                  @Ghosted34 @tomblakeasaah196
+/src/modules/expense_categories/                   @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/expense_categories.js   @Ghosted34 @tomblakeasaah196
+/src/modules/expenses/                             @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/expenses.js             @Ghosted34 @tomblakeasaah196
+/src/modules/goals/                                @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/goals.js                @Ghosted34 @tomblakeasaah196
+/src/modules/kpis/                                 @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/kpis.js                 @Ghosted34 @tomblakeasaah196
+/src/modules/leave/                                @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/leave.js                @Ghosted34 @tomblakeasaah196
+/src/modules/requisitions/                         @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/requisitions.js         @Ghosted34 @tomblakeasaah196
+/src/modules/reviews/                              @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/reviews.js              @Ghosted34 @tomblakeasaah196
+/src/modules/targets/                              @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/targets.js              @Ghosted34 @tomblakeasaah196
+/src/modules/tasks/                                @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/tasks.js                @Ghosted34 @tomblakeasaah196
+/src/modules/workspace/                            @Ghosted34 @tomblakeasaah196
+/packages/contract/schemas/workspace.js            @Ghosted34 @tomblakeasaah196
+
+# The gates themselves: weakening a check needs GE or TB, whoever is not the author.
+/scripts/check/                                    @swizfcodes @tomblakeasaah196
+/scripts/ci-local.js                               @swizfcodes @tomblakeasaah196
+/.github/workflows/                                @swizfcodes @tomblakeasaah196
+/.github/CODEOWNERS                                @swizfcodes @tomblakeasaah196
+/.claude/settings.json                             @swizfcodes @tomblakeasaah196
+/.claude/hooks/                                    @swizfcodes @tomblakeasaah196
