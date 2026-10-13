@@ -3588,8 +3588,8 @@ function attStatusPill(v){
   var s=v.status;
   if(s==='Complete')return v.late?pill('wa','Late '+v.late+'m'):pill('ok','On time');
   if(s==='Clocked in')return v.late?pill(v.late>30?'er':'wa','Late '+v.late+'m'):pill('ok','Clocked in, on time');
-  if(s==='Missing clock-out'||s==='Missing clock-in'||s==='Attempt blocked'||s==='Unauthorized absence')return pill('er',s);
-  if(s==='Approved leave'||s==='Authorized absence'||s==='On leave')return pill('in',s);
+  if(s==='Missing clock-out'||s==='Missing clock-in'||s==='Attempt blocked'||s==='Unauthorised absence')return pill('er',s);
+  if(s==='Approved leave'||s==='Authorised absence'||s==='On leave')return pill('in',s);
   return pill('nt',s)}
 function attSessionsOf(id,date){return ATT.sessions.filter(function(s){return s.emp===id&&(!date||s.date===date)})}
 function attOpenSession(id,date){var r=null;attSessionsOf(id,date).forEach(function(s){var v=attSV(s);if(v.inE&&!v.outE&&!s.cls)r=s});return r}
@@ -4078,7 +4078,7 @@ function attTimeCell(v,kind){
   else if(eff)h=esc(eff.sys);
   else{var a=v.attempts.filter(function(e){return e.kind===kind})[0];h=a?'<span class="sub">Attempt '+esc(a.sys)+'</span>':'<span class="sub">None</span>'}
   if(exc)h+=' <span class="sub">+'+exc+' excluded</span>';return h}
-function attHours(v){if(v.status==='Approved leave'||v.status==='Authorized absence')return 'Paid';if(v.net==null)return 'None';return aDur(v.net)}
+function attHours(v){if(v.status==='Approved leave'||v.status==='Authorised absence')return 'Paid';if(v.net==null)return 'None';return aDur(v.net)}
 function attRecordPill(s,v){if(v.all.some(function(e){return e.source==='HR adjustment'||e.excluded}))return pill('in','Adjusted by People');
   if(s.cls)return pill('in','Classified');if(v.exceptions.length)return pill('wa','Exception');return pill('nt','Original')}
 function attPin(addr){var a=String(addr||'').toLowerCase(),hit=null;
@@ -4538,7 +4538,7 @@ function attPlan(c,f){
     case 'approve_loc':p.appr=true;var blk=base.filter(function(x){return x.result==='Needs approval'&&!x.superseded})[0];
       if(blk&&!(live&&live.inE)){var a=adj(blk.kind,blk.sys,blk);a.matched=blk.matched;a.device=blk.device;a.devStatus=blk.devStatus;p.add.push(a);p.sup.push(blk.id)}break;
     case 'attach_fa':p.appr=true;p.fa=f.fa;break;
-    case 'leave':p.cls='Approved leave';break;case 'auth_abs':p.cls='Authorized absence';break;case 'unauth_abs':p.cls='Unauthorized absence';break;
+    case 'leave':p.cls='Approved leave';break;case 'auth_abs':p.cls='Authorised absence';break;case 'unauth_abs':p.cls='Unauthorised absence';break;
     case 'exclude_dup':var ins=base.filter(function(x){return x.kind==='in'&&!x.superseded&&!x.excluded&&x.result!=='Needs approval'}).sort(function(a,b){return aMin(a.sys)-aMin(b.sys)});
       if(ins.length>1)p.exc.push(ins[ins.length-1].id);break;
     case 'reject':break;case 'info':p.status='More information requested';break;case 'escalate':p.status='Escalated';p.query=true;break;
