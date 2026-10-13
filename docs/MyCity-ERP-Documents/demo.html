@@ -4056,6 +4056,15 @@ function attMigrate(){var d=attDefaults();
 function attLoad(){var s=null;
   try{s=JSON.parse(localStorage.getItem(ATT_KEY)||'null')}catch(e){s=null}
   if(s&&s.v===1&&s.emps&&s.policies&&s.events){ATT=s;attMigrate();attSave()}else{attSeed();attMigrate();attSave()}}
+/* Clock actions made through the interactive demo last only until reload. This
+   keeps the seeded register intact while making every new presentation begin
+   with Clock in. The CO fallback clears a pre-marker Cynthia punch saved by an
+   earlier version of the demo. */
+function attResetInteractiveClock(){var gone={},legacy=!ATT.demo.interactiveClockReset;
+  ATT.sessions=ATT.sessions.filter(function(s){var drop=!!s.demoInteractive||(legacy&&s.emp==='CO'&&s.date===ATT_TODAY);if(drop)gone[s.id]=1;return !drop});
+  ATT.events=ATT.events.filter(function(e){return !e.demoInteractive&&!gone[e.ss]});
+  ATT.cases=ATT.cases.filter(function(c){return !gone[c.ss]});
+  ATT.demo.interactiveClockReset=true;attSave()}
 function attReset(){try{localStorage.removeItem(ATT_KEY)}catch(e){}attSeed();attMigrate();attSave();ATTUI.caseSel=null;ATTUI.cf={};ATTUI.filter='All'}
 
 /* ───── lookups ───── */
@@ -4271,6 +4280,7 @@ function attCommit(ev){
   else{var l=attSessionsOf(ev.emp,ev.date),last=l[l.length-1];if(last&&!last.cls){var v=attSV(last);if(!v.inE&&!v.outE)s=last}}
   if(!s){s={id:'SS-'+aNum(ATT.seq.ss++,4),emp:ev.emp,date:ev.date,arr:ev.arr,mode:ev.mode,expected:ev.expected,shift:ev.shift,
     evs:[],cls:null,excApproved:false};ATT.sessions.push(s)}
+  if(ev.demoInteractive)s.demoInteractive=true;
   s.evs.push(ev.id);ev.ss=s.id;
   if(ev.kind==='in'&&ok){s.mode=ev.mode;s.expected=ev.expected;s.arr=ev.arr}
   return s}
@@ -4599,6 +4609,7 @@ function attCkSubmit(){
   if(!can.ok){ck.stage='rejected';ck.reason=can.message;ck.offer='';attCkPaint();return}
   if((ck.kind==='in'&&attClockedToday(id))||(ck.kind==='out'&&!live)){ck.stage='rejected';ck.reason=ck.kind==='in'?'A clock-in already exists for today. Duplicate submissions are not allowed.':'There is no open clock-in to close. Refresh before trying again.';ck.offer='';attCkPaint();return}
   var R=attEvaluate(id,ATT_TODAY,time,attScenario(),ck.kind),ev=R.ev,nm=aName(id),kindTxt=ck.kind==='out'?'Clock-out':'Clock-in';
+  ev.demoInteractive=true;
   if(R.result==='Retry'){ck.retries++;attCkPaint();return}
   if(R.result==='Accepted'||R.result==='Accepted with warning'){
     var s=attCommit(ev),d=ev.devId?attDev(ev.devId):null;
@@ -5610,6 +5621,7 @@ function attBindPage(){
   $$('.sw[data-pk]').forEach(function(s){s.onclick=function(){var k=s.dataset.pk,d=attDraft();attPolSet(k,!d[k])}});
   attRcSync();attPaintPunch();attBellPaint()}
 attLoad();
+attResetInteractiveClock();
 document.addEventListener('click',attOnClick);
 document.addEventListener('change',attOnChange);
 document.addEventListener('keydown',attOnKey);
