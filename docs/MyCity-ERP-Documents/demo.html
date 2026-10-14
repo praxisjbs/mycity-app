@@ -3078,51 +3078,40 @@ var M=[
        ['People','View, edit','View, edit','View','View team','Own profile'],
        ['Performance','View all','View all','—','View team','Own KPIs'],
        ['Recruitment','View, edit','View, edit','—','View own vacancies','—']],'Permission Matrix')+'</div>'}},
-  {n:'Approvals',r:function(){return head('Approvals','Hierarchies as data. Changing one needs no deploy.',[['New hierarchy',1]])+
-    kpis([['Hierarchies','6'],['Active','5','ok'],['Awaiting a decision','1','warn'],['Steps, longest','3']])+
-    cards([['Expense under ₦500,000','Requester, line manager, Operations. Two steps.','<span class="pill ok"><i></i>Active</span>'],
-      ['Expense ₦500,000 and over','Requester, line manager, Operations, CEO. Three steps.','<span class="pill ok"><i></i>Active</span>'],
-      ['Leave request','Requester, line manager. One step.','<span class="pill ok"><i></i>Active</span>'],
-      ['Monthly targets','Managers, COO, Operations, CEO. Binding on CEO approval.','<span class="pill ok"><i></i>Active</span>'],
-      ['Payroll run','Operations, CEO or COO. One step.','<span class="pill wa"><i></i>Approver to confirm</span>'],
-      ['Consequence chain','Query, caution, warning, suspension, suspension without pay, dismissal.','<span class="pill ok"><i></i>Active</span>']])+
-    '<div class="grid g2" style="margin-top:12px">'+
-    '<div class="card"><div class="ch"><h3>Expense ₦500,000 and over</h3><span class="right">'+pill('ok','Active')+'</span></div>'+
-    '<div class="chain">'+[['Requester','done'],['Line manager','done'],['Operations','done'],['CEO','now'],['Disbursed','']].map(function(s,i){
+  {n:'Approvals',r:function(){return head('Approvals','',[['New Hierarchy',1]])+
+    kpis([['Hierarchies','6'],['Active','5','ok'],['Awaiting a Decision','1','warn'],['Longest Chain','3']])+
+    '<div class="grid g3">'+[['Expense Under ₦500,000','Requester, line manager, Operations. Two steps.','ok','Active'],
+      ['Expense ₦500,000 and Over','Requester, line manager, Operations, CEO. Three steps.','ok','Active'],
+      ['Leave Request','Requester, line manager. One step.','ok','Active'],
+      ['Monthly Targets','Managers, COO, Operations, CEO. Binding on CEO approval.','ok','Active'],
+      ['Payroll Run','Operations, CEO or COO. One step.','wa','Approver to confirm'],
+      ['Consequence Chain','Query, caution, warning, suspension, suspension without pay, dismissal.','ok','Active']].map(function(r){
+      return '<div class="tile"><h4>'+esc(r[0])+'</h4><p data-copy="content">'+esc(r[1])+'</p>'+
+        '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+pill(r[2],r[3])+'</div></div>'}).join('')+'</div>'+
+    '<div class="card"><div class="ch"><h3>Expense ₦500,000 and Over</h3><span class="right">'+pill('ok','Active')+'</span></div>'+
+    '<div class="chain">'+[['Requester','done'],['Line Manager','done'],['Operations','done'],['CEO','now'],['Disbursed','']].map(function(s,i){
       return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+'</div>'+
     '<dl class="kv" style="margin-top:14px;grid-template-columns:118px 1fr"><dt>Trigger</dt><dd>Amount at or above the category threshold</dd>'+
-    '<dt>Steps</dt><dd>Roles, not people. A role can be reassigned</dd>'+
-    '<dt>Deputies</dt><dd>Each step can name a deputy for leave</dd>'+
-    '<dt>Ageing</dt><dd>An alert at 3 days, escalation at 7</dd>'+
-    '<dt>In-flight</dt><dd>A request keeps the chain it started on, even if the hierarchy changes</dd></dl>'+
-    '<div style="display:flex;gap:8px;margin-top:13px;flex-wrap:wrap"><button class="btn">'+ic('plus')+'Add a step</button>'+
-    '<button class="btn">Reorder</button><button class="btn">Set deputies</button></div></div>'+
-    kvcard('Why hierarchies are data',[['The alternative','An if-statement per chain, in code'],
-      ['The problem','MyCity has not finished deciding. Payroll’s approver is still open'],
-      ['The design','A hierarchy is rows: steps, roles, thresholds, deputies'],
-      ['Changing one','Editing rows. No deploy, no release, no downtime'],
-      ['Who can','Operations and the CEO'],
-      ['Audit','Every change to a hierarchy is logged with the before and after']])+'</div>'}},
+    '<dt>Ageing</dt><dd>Alert at 3 days, escalation at 7</dd></dl>'+
+    '<div style="display:flex;gap:8px;margin-top:13px;flex-wrap:wrap"><button class="btn">'+ic('plus')+'Add Step</button>'+
+    '<button class="btn">Reorder Steps</button><button class="btn">Set Deputies</button></div>'+
+    details('<dl class="kv"><dt>Deputies</dt><dd>Each step can name one, for leave</dd>'+
+      '<dt>In-Flight Requests</dt><dd>Keep the chain they started on</dd></dl>')+'</div>'}},
   {n:'Attendance Policy',r:function(){return attPolicyTab()}},
-  {n:'Notifications',r:function(){return head('Notifications','Per category and transport',[['Save',1]])+
-    '<div class="grid g2">'+toggles('Email',[['Approvals pending','When something is waiting on you',1],['Leave requests','New and decided',1],
-      ['Payslip ready','When a run is locked',1],['Community messages','Keep these in app only',0]])+
-    toggles('Push and in app',[['Approvals pending','',1],['Task assigned to you','',1],['Query raised against you','',1],
-      ['Recognition received','',1],['Birthday and anniversary','',1]])+'</div>'+
-    '<div class="grid g2">'+
-    table([['Category'],['In app'],['Email'],['Who sets it']],[
+  {n:'Notifications',r:function(){return head('Notifications','',[['Save',1]])+
+    '<div class="grid g2">'+toggles('Email',[['Approvals Pending','',1],['Leave Requests','',1],
+      ['Payslip Ready','',1],['Community Messages','',0],['Daily Digest at 09:00','',1]])+
+    helpOn(toggles('Push and In App',[['Approvals Pending','',1],['Task Assigned to You','',1],['Query Raised Against You','',1],
+      ['Recognition Received','',1],['Birthday and Anniversary','',1]]),'Push and In App','Push reaches your phone once the app is installed on it.')+'</div>'+
+    helpOn(table([['Category'],['In App'],['Email'],['Set By']],[
       ['Approvals pending',pill('ok','On'),pill('ok','On'),'You'],
       ['Query raised against you',pill('ok','On'),pill('ok','On'),'Locked on'],
       ['Payslip ready',pill('ok','On'),pill('ok','On'),'You'],
       ['Task assigned',pill('ok','On'),pill('nt','Off'),'You'],
       ['Community message',pill('ok','On'),pill('nt','Off'),'You'],
       ['Announcement',pill('ok','On'),pill('ok','On'),'You'],
-      ['Alert cleared',pill('nt','Off'),pill('nt','Off'),'You']],'Every category')+
-    kvcard('What cannot be switched off',[['A query against you','You are told. There is no setting for it'],
-      ['A sanction decision','Same reason'],['An offer sent to you','You are a candidate, not a user'],
-      ['Everything else','Yours to set, per transport'],
-      ['Transports','In app and email. Push once the PWA is installed'],
-      ['Digest','Daily at 09:00 for anything holding you up']])+'</div>'}},
+      ['Alert cleared',pill('nt','Off'),pill('nt','Off'),'You']],'All Categories'),
+      'All Categories','Locked categories cannot be switched off: a query raised against you, or a sanction decision.')}},
   {n:'Appearance',r:function(){return head('Appearance','MyCityApp brand',[['Reset'],['Save',1]])+
     '<div class="grid g2">'+'<div class="card"><div class="ch"><h3>Palette</h3></div>'+
     [['Primary Yellow','#FFDF55'],['Yellow Tint','#FFEFAA'],['City Green','#014339'],['Deep Green','#01221D']].map(function(c){
