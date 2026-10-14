@@ -3050,29 +3050,26 @@ var M=[
       ['Public Site, Staging','<code>go.staging.mycityapp.io</code>']])+
     kvcard('Public Holidays, 2026',[['01 January','New Year’s Day'],['01 May','Workers’ Day'],
       ['12 June','Democracy Day'],['01 October','Independence Day'],['25 December','Christmas Day'],['26 December','Boxing Day']])+'</div>'}},
-  {n:'Users',r:function(){return head('Users','25 users · 3 pending invitation',[['Export'],['Invite user',1]])+
-    kpis([['Users','25'],['Active now','19'],['Pending invitation','3','warn'],['MFA enrolled','3','warn']])+
-    table([['User'],['Role'],['Last seen'],['MFA'],['Status']],
+  {n:'Users',r:function(){return head('Users','25 users · 3 pending invitation',[['Export'],['Invite User',1]])+
+    helpOn(kpis([['Users','25'],['Active Now','19'],['Pending Invitation','3','warn'],['MFA Enrolled','3','warn']]),
+      'Pending Invitation','An invitation expires after seven days and can be resent.')+
+    table([['User'],['Role'],['Last Seen'],['MFA'],['Status']],
       STAFF.slice(0,7).map(function(s,i){return [who(s[0],s[1],s[2]),['Operations','Staff','Finance','Engineering','Staff','Staff','Manager'][i],
         ['2 min ago','1 hour ago','20 min ago','3 hours ago','Yesterday','40 min ago','5 min ago'][i],
         i<3?pill('ok','On'):pill('nt','Off'),i===4?pill('wa','Invited'):pill('ok','Active')]}),'Users',
       '<span class="sub">Showing 7 of 25</span>')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    bars('Users by role',[['Staff',100,'15'],['Manager',33,'5'],['Operations',13,'2'],
-      ['Finance',13,'2'],['CEO',7,'1','var(--yellow)']],'A user has exactly one role. A role is a set of permissions, not a job title.')+
-    kvcard('A user is not an employee',[['Employee','A person on the payroll, with a record'],
-      ['User','A login. Most employees have one, not all'],
-      ['Why separate','A studio contractor needs a login and no payslip'],
-      ['Leaving','The employee record is kept. The login is disabled, never deleted'],
-      ['Disabled login','Keeps its audit trail, so history stays readable'],
-      ['Invitation','Expires after seven days and can be resent']])+'</div>'}},
-  {n:'Roles & Permissions',r:function(){return head('Roles & Permissions','5 layers: module, action, record scope, field, entity',[['New role',1]])+
-    table([['Role'],['Users','n'],['Modules','n'],['Record scope'],['Sensitive fields'],['']],[
+    '<div style="margin-top:12px">'+
+    helpOn(bars('Users by Role',[['Staff',100,'15'],['Manager',33,'5'],['Operations',13,'2'],
+      ['Finance',13,'2'],['CEO',7,'1','var(--yellow)']]),'Users by Role','Each user has exactly one role. A role is a set of permissions, not a job title.')+'</div>'}},
+  {n:'Roles & Permissions',r:function(){return head('Roles & Permissions','5 roles · 25 users',[['New Role',1]])+
+    helpOn(helpOn(table([['Role'],['Users','n'],['Modules','n'],['Record Scope'],['Sensitive Fields'],['']],[
       ['CEO','1','15','All','Visible','<button class="btn">Edit</button>'],
       ['Operations','2','15','All','Visible','<button class="btn">Edit</button>'],
       ['Finance','2','8','All','Visible','<button class="btn">Edit</button>'],
       ['Manager','5','10','Team','Masked','<button class="btn">Edit</button>'],
-      ['Staff','15','6','Own','Masked','<button class="btn">Edit</button>']],'Roles')+
+      ['Staff','15','6','Own','Masked','<button class="btn">Edit</button>']],'Roles'),
+      'Record Scope','Which records the role reaches: all of them, its team’s, or only the user’s own.'),
+      'Sensitive Fields','Salary and cost. Masked means this role never sees the values, on screens, in reports or through Praxis AI.')+
     '<div style="margin-top:12px">'+table([['Module'],['CEO'],['Operations'],['Finance'],['Manager'],['Staff']],
       [['Payroll','View, edit, approve','View, edit','View, edit','—','Own payslip'],
        ['Queries & Sanctions','View all','View all','—','View own raised','Own only'],
@@ -3080,24 +3077,7 @@ var M=[
        ['Expenses','Approve','Approve','Disburse','Approve team','Request'],
        ['People','View, edit','View, edit','View','View team','Own profile'],
        ['Performance','View all','View all','—','View team','Own KPIs'],
-       ['Recruitment','View, edit','View, edit','—','View own vacancies','—']],'Permission matrix')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
-    '<div class="card"><div class="ch"><h3>The five layers</h3></div>'+
-    [['Module','Can they see Payroll at all','ok'],['Action','View, create, edit, approve, export','ok'],
-     ['Record scope','All records, their team’s, or only their own','ok'],
-     ['Field','Salary and cost masked from Manager and Staff','ok'],
-     ['Entity','One company today. Built for more','nt']].map(function(r,i){
-      return '<div style="display:flex;gap:11px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">'+
-      '<b style="width:18px;flex:none;color:var(--accent);font-size:12px">'+(i+1)+'</b>'+
-      '<span style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600">'+esc(r[0])+'</div><div class="sub">'+esc(r[1])+'</div></span>'+
-      pill(r[2],r[2]==='ok'?'In use':'Dormant')+'</div>'}).join('')+
-    '<p class="sub" style="margin-top:11px">Every layer is enforced by the API. The screens hide what you cannot use, but hiding is not the control.</p></div>'+
-    kvcard('Field security in practice',[['Who sees salary','CEO, Operations, Finance. Nobody else'],
-      ['A Manager viewing their team','Sees the person, the KPIs, the attendance. Not the pay'],
-      ['Masked, not absent','The field is replaced, so the screen does not change shape'],
-      ['Praxis AI','Inherits the same mask. It cannot read what you cannot'],
-      ['Reports','Generated as the recipient, so a report cannot leak a field'],
-      ['Audit','A masked field read is still logged']])+'</div>'}},
+       ['Recruitment','View, edit','View, edit','—','View own vacancies','—']],'Permission Matrix')+'</div>'}},
   {n:'Approvals',r:function(){return head('Approvals','Hierarchies as data. Changing one needs no deploy.',[['New hierarchy',1]])+
     kpis([['Hierarchies','6'],['Active','5','ok'],['Awaiting a decision','1','warn'],['Steps, longest','3']])+
     cards([['Expense under ₦500,000','Requester, line manager, Operations. Two steps.','<span class="pill ok"><i></i>Active</span>'],
