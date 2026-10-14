@@ -266,6 +266,12 @@ async function crawlDemo(browser, width, target, errors) {
 
   const screens = [];
   const snap = async (name, kind) => {
+    // Settle entrance animations first: a modal fading in reads as invisible (opacity 0).
+    await page.evaluate(() => {
+      for (const a of document.getAnimations()) {
+        if (a.effect && a.effect.getComputedTiming().endTime !== Infinity) a.finish();
+      }
+    });
     const s = await page.evaluate(collect, target);
     screens.push({ target: target.id, width, screen: name, kind, ...s });
   };

@@ -90,9 +90,10 @@ function checkDemo() {
       const label = args[1];
       if (label && isPureLiteral(label)) {
         const t = clean(literalText(label));
+        const bare = t.replace(/\s*\(?optional\)?$/i, ""); // field() turns a trailing "(Optional)" into the tag
         if (/\*/.test(t)) add(at(pos), `label "${t}" has an asterisk; mark optional fields "Optional" instead (§8.2)`);
-        if (wordCount(t) > LIMITS.fieldLabel) add(at(pos), `label "${t}" is ${wordCount(t)} words (limit ${LIMITS.fieldLabel})`);
-        const w = titleCaseViolation(t.replace(/\bOptional$/, ""));
+        if (wordCount(bare) > LIMITS.fieldLabel) add(at(pos), `label "${t}" is ${wordCount(bare)} words (limit ${LIMITS.fieldLabel})`);
+        const w = titleCaseViolation(bare);
         if (w) add(at(pos), `label "${t}" is not Title Case ("${w}")`);
       }
       const err = name === "field" ? args[3] : null;
@@ -121,7 +122,8 @@ function checkDemo() {
           depth -= 1;
         } else if (c === "," && depth === 0) break;
       }
-      const expr = code.slice(m.index + m[0].length, i);
+      // An icon call, ic('send'), names a glyph, not a word on the button.
+      const expr = code.slice(m.index + m[0].length, i).replace(/\bic\(\s*(['"])[^'"]*\1\s*\)/g, "''");
       const html = literalText(expr);
       const buttons = [...html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/gi)].map((b) => clean(stripTags(b[1])));
       const rest = clean(stripTags(html.replace(/<button\b[^>]*>[\s\S]*?<\/button>/gi, " ")));

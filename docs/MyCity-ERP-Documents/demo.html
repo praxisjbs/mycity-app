@@ -1749,7 +1749,6 @@ function pagenote(n){return '<p class="sub mnote">'+n+' of '+n+'</p>';}
 function gate(what){return emptyb('lock','For Managers',what+' is for managers and the CEO.');}
 /* A help term on a column header (FRONTEND_GUIDE §5.2). table() writes header cells as plain
    text, so the term goes on the desktop header cell and on each phone card's label here. */
-function colHint(html,label,text){return html.replace(new RegExp('<(th|dt)>'+esc(label)+'</(?:th|dt)>','g'),function(m,t){return '<'+t+'>'+hint(label,text)+'</'+t+'>';});}
 /* Bar rows on Home are records (goals, people, pipeline stages), so they are marked as content
    like table cells; the shared bars() leaves them unmarked. */
 function hbars(title,rows,note){return bars(title,rows,note).replace(/<span class="(nm|vl)">/g,'<span class="$1" data-copy="content">');}
@@ -1927,7 +1926,7 @@ function homeAlerts(){var b=roleBar();
   return b+head('Alerts','',[['View Dismissed'],['Alert Rules',0,'h-rules'],['New Rule',1,'h-newrule']])+
   hkpis([['Open Alerts',''+l.length,'','','fl','al_open'],['Needs You','6','warn','','fl','al_needs'],['Overdue 7 Days +','3','err','','fl','al_overdue'],['Cleared This Week','9','ok','','fl','al_cleared']])+
   chips([['All '+l.length,1],['Attendance'],['Partnerships'],['Approvals'],['Documents'],['People'],['Budget']])+
-  colHint(table([['Alert'],['Trigger'],['Who Can Clear'],['Age'],['Over By'],['Severity']],
+  helpOn(table([['Alert'],['Trigger'],['Who Can Clear'],['Age'],['Over By'],['Severity']],
     l.map(function(a){return [esc(a[0]),esc(a[1]),esc(a[2]),esc(a[3]),'<span class="tover">'+esc(a[5])+'</span>',pill(a[4][0],a[4][1])];}),
     'Open Alerts',pill('wa',l.length+' open'),
     function(ri){return ' data-rule="alert:'+HALERTS.indexOf(l[ri])+'" style="cursor:pointer"';},null,[2,4]),'Over By',HOVERBY)+
@@ -3489,6 +3488,11 @@ var HT_N=0;
 function hintParts(term,text){var id='ht'+(++HT_N);
   return ['<button type="button" class="ht" aria-describedby="'+id+'">'+esc(term)+'</button>','<span class="htp" id="'+id+'" role="tooltip">'+esc(text)+'</span>']}
 function hint(term,text){var p=hintParts(term,text);return p[0]+p[1]}
+/* helpOn(html,label,text): the help term on a label a shared helper already drew (a card or KPI title,
+   a column header, a key in a key-value card), every place it appears. The popover sits beside a heading. */
+function helpOn(html,label,text){var l=esc(label).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return html.replace(new RegExp('<(h3|th|dt|span class="lab")>'+l+'</(h3|th|dt|span)>','g'),function(m,t,c){var p=hintParts(label,text);
+    return c==='h3'?'<h3>'+p[0]+'</h3>'+p[1]:'<'+t+'>'+p[0]+p[1]+'</'+c+'>'})}
 function infoBtn(id){return '<button type="button" class="ht ib" aria-describedby="'+id+'" aria-label="More information">'+ic('info')+'</button>'}
 function infoText(id,text){return '<span class="htp" id="'+id+'" role="tooltip">'+esc(text)+'</span>'}
 function details(body,label){return '<details class="dtl"><summary>'+ic('right')+esc(label||'Details')+'</summary><div class="dtl-b">'+body+'</div></details>'}
@@ -4965,7 +4969,7 @@ function attEssRequests(){
       h=attPermHome(id),ah=attActiveHome(id,ATT_TODAY),fa=attAssignmentFor(id,ATT_TODAY);
   return head('Work Location Requests','Temporary changes to where you clock in',[['New Request',1,'att-req-new']])+
     attActorStrip()+attAckBanner(id)+
-    colHint(kvcard('My Locations Today',[['Arrangement',pill('nt',e.arr)+' '+esc(ATT_PROFILE[e.arr])],
+    helpOn(kvcard('My Locations Today',[['Arrangement',pill('nt',e.arr)+' '+esc(ATT_PROFILE[e.arr])],
       ['Permanent Home',h?esc(h.address)+' · fixed 100 m geofence':'None on file'],
       ['Active Location',ah?esc(attFenceName(ah))+(ah.kind==='Temporary'?' · until '+esc(ah.to):''):esc(attSite(e.office||'mtn').name)],
       ['Field Assignment',fa?esc(fa.id+' · '+fa.name):'None today'],['Office',esc(attSite(e.office||'mtn').name)]]),
@@ -5032,7 +5036,7 @@ function attEssDevices(){
     '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>'+hp[0]+'</h3>'+hp[1]+'<span class="right">'+pill(en.length?'ok':'wa',en.length+' enrolled')+'</span></div>'+
     (en.length?en.map(function(d){return '<div class="nrow"><span class="nic ok">'+ic('lock')+'</span><span class="nb"><b>'+esc(d.name)+'</b><span class="sub">Enrolled since '+esc(d.first)+' · last punch '+esc(d.last)+'</span></span>'+pill('ok','Enrolled')+'</div>'}).join(''):
       '<p class="sub">No enrolled device yet.</p>')+'</div>'+
-    colHint(table([['Device'],['First Seen'],['Last Punch'],['Status'],['Note']],mine.map(function(d){return [esc(d.name),esc(d.first),esc(d.last),attDevPill(d.status),esc(d.note||'')]}),'All My Devices'),
+    helpOn(table([['Device'],['First Seen'],['Last Punch'],['Status'],['Note']],mine.map(function(d){return [esc(d.name),esc(d.first),esc(d.last),attDevPill(d.status),esc(d.note||'')]}),'All My Devices'),
       'Status',(attPolicy().settings.devBlockUnenrolled?'A new device is blocked until People enrols it.':'A new device is accepted with a warning until People reviews it.')+' A revoked or blocked device cannot clock in.')}
 function attDevPill(s){return pill({'Enrolled':'ok','New':'wa','Pending review':'wa','Blocked':'er','Revoked':'er','Verification unavailable':'nt'}[s]||'nt',s)}
 function attDevRegModal(){var ua=navigator.userAgent||'',b=/Edg\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome':/Firefox\//.test(ua)?'Firefox':/Safari\//.test(ua)?'Safari':'Browser',
@@ -5217,7 +5221,7 @@ function attEventModal(id){var s=attTodaySession(id),e=aEmp(id);
     foot:(cs.length?'<button class="btn" data-att="go-case" data-v="'+cs[0].id+'">Open '+cs[0].id+'</button>':'')+'<button class="btn pri" data-mx>Close</button>'})}
 
 function attFAView(){var pol=attPolicy().settings,list=ATT.assignments.slice().reverse();
-  return colHint(table([['Assignment'],['Employee or Team'],['Client, Event or Campaign'],['Approved Sites'],['Radius'],['Date'],['Valid'],['Approving Manager'],['Status'],['Note'],['']],
+  return helpOn(table([['Assignment'],['Employee or Team'],['Client, Event or Campaign'],['Approved Sites'],['Radius'],['Date'],['Valid'],['Approving Manager'],['Status'],['Note'],['']],
       list.map(function(a){var st=a.status;
         return ['<b>'+esc(a.id)+'</b><br>'+esc(a.name),esc(a.emps.map(aName).join(', '))+(a.team?'<br><span class="sub">'+esc(a.team)+'</span>':''),esc(a.client),
           a.sites.map(function(s){return esc(s.name)}).join('<br>'),a.sites.map(function(s){return s.radius+' m'}).join('<br>'),esc(a.date),esc(a.start+' to '+a.end),esc(a.approver),
@@ -5243,7 +5247,7 @@ function attFAModal(){var pol=attPolicy().settings;ATTUI.essReq={pin:null,pin2:n
     '</div></div>',foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="fa-save">Approve Assignment</button>'})}
 
 function attReqHRView(){var list=ATT.requests.slice().reverse();
-  return colHint(table([['Request'],['Employee'],['Type'],['Dates'],['Location'],['Radius','n'],['Reason'],['Status'],['']],list.map(function(r){var st=attReqState(r),act=st==='Awaiting manager'||st==='Awaiting HR';
+  return helpOn(table([['Request'],['Employee'],['Type'],['Dates'],['Location'],['Radius','n'],['Reason'],['Status'],['']],list.map(function(r){var st=attReqState(r),act=st==='Awaiting manager'||st==='Awaiting HR';
       return [esc(r.id),aWho(r.emp),esc(r.type),esc(r.from===r.to?r.from:r.from+' to '+r.to),esc(r.area),r.radius+' m',
         '<span class="clip" title="'+esc(r.reason)+'">'+esc(r.reason)+'</span>',attReqPill(st),
         act?'<button class="btn" data-att="req-decide" data-v="'+r.id+'">Review</button>':'<button class="btn" data-att="req-view" data-v="'+r.id+'">View</button>']}),
@@ -5462,7 +5466,7 @@ function attDevicesTab(){
   return head('Devices','Devices used to clock in',[['Edit Device Policy',0,'att-go-devpol']])+
     statstrip([['Enrolled',String(c['Enrolled']),'ok'],['New or Pending',String(c['Pending review']),c['Pending review']?'warn':''],['Blocked',String(c['Blocked']),c['Blocked']?'err':''],
       ['Revoked',String(c['Revoked'])],['Unverified',String(c['Verification unavailable'])]])+
-    '<div class="grid g23">'+colHint(table([['Employee'],['Device'],['First Seen'],['Last Punch'],['Next Punch'],['Status']],ATT.devices.map(function(d){var x=eff(d.status);
+    '<div class="grid g23">'+helpOn(table([['Employee'],['Device'],['First Seen'],['Last Punch'],['Next Punch'],['Status']],ATT.devices.map(function(d){var x=eff(d.status);
       return [aWho(d.emp),esc(d.name),esc(d.first),esc(d.last),pill(x[0],x[1]),attDevPill(d.status)]}),'Devices','',
       function(i){return ' class="rowlink" data-att="dev-sel" data-v="'+ATT.devices[i].id+'" tabindex="0"'},null,[1,4]),
       'Next Punch','What a punch from this device gets under attendance policy v'+attPolicy().v+'.')+
@@ -5505,7 +5509,7 @@ function attWorksitesTab(){
     kpis([['Office Worksites',String(ATT.sites.filter(function(s){return s.status==='Active'}).length)],['Approved Homes',String(ATT.homes.filter(function(h){return h.kind==='Permanent'&&h.status==='Active'}).length)],
       ['Field Sites Today',String(ATT.assignments.filter(function(a){return a.date===ATT_TODAY&&a.status==='Approved'}).reduce(function(n,a){return n+a.sites.length},0))],['Outside a Fence',String(k.out),k.out?'warn':'']])+
     attWsMap()+
-    '<div style="margin-top:12px">'+colHint(colHint(table([['Location'],['Type'],['Address'],['Radius'],['Assigned Employees'],['Attendance Today','n'],['Active Dates'],['Enforcement Mode'],['Status']],
+    '<div style="margin-top:12px">'+helpOn(helpOn(table([['Location'],['Type'],['Address'],['Radius'],['Assigned Employees'],['Attendance Today','n'],['Active Dates'],['Enforcement Mode'],['Status']],
       rows.map(function(r){return [r.n,esc(r.t),r.a,r.r,esc(r.emp),r.today,r.dates,esc(r.mode),pill(tone(r.st),r.st)]}),'All Locations','',
       function(i){return rows[i].click?' class="rowlink" data-att="home-detail" data-v="'+rows[i].click+'" tabindex="0"':''},'wide',[1,3]),
       'Address','A home shows its area only. People and the CEO can open the row for the full address.'),
@@ -5980,8 +5984,6 @@ function essSchedRows(){return essSched().map(function(s){return '<div class="sr
 /* ── help terms on ESS cards (FRONTEND_GUIDE §5.2): the term goes on the card title or a stat label,
    the text sits after the heading so it never joins the heading's name. Build a card once per use:
    each call gets its own help id. ── */
-function essTitleHint(html,title,text){var p=hintParts(title,text);return html.replace('<h3>'+esc(title)+'</h3>','<h3>'+p[0]+'</h3>'+p[1])}
-function essLabHint(html,label,text){var p=hintParts(label,text);return html.replace('<span class="lab">'+esc(label)+'</span>','<span class="lab">'+p[0]+p[1]+'</span>')}
 var ESS_HELP={
   emp:'Only People can change these, including your work schedule.',
   sched:'Lateness is measured against these hours.',
@@ -5999,8 +6001,8 @@ function essPersonal(){return kvcard('Personal',[['Full Name','Cynthia Osakunih'
 function essEmployment(){var c=kvcard('Employment',[['Job Title','Operations and People Lead'],['Department','Operations'],['Line Manager','Ifeoma Chukwu, CEO'],
     ['Start Date','02/05/2024'],['Employment Type','Full time'],['Work Arrangement','Hybrid'],['Status',pill('ok','Confirmed')]]);
   c=c.slice(0,-6)+'<div class="essched"><div class="ch" style="margin:0 0 4px"><h3>Work Schedule</h3><span class="right">'+pill('nt','Set by People')+'</span></div>'+essSchedRows()+'</div></div>';
-  return essTitleHint(essTitleHint(c,'Employment',ESS_HELP.emp),'Work Schedule',ESS_HELP.sched)}
-function essBank(){return essTitleHint(kvcard('Bank Details',[['Bank','Providus Bank'],['Account Name','Cynthia Osakunih'],['Account Number','••••  4417']]),'Bank Details',ESS_HELP.bank)}
+  return helpOn(helpOn(c,'Employment',ESS_HELP.emp),'Work Schedule',ESS_HELP.sched)}
+function essBank(){return helpOn(kvcard('Bank Details',[['Bank','Providus Bank'],['Account Name','Cynthia Osakunih'],['Account Number','••••  4417']]),'Bank Details',ESS_HELP.bank)}
 function essNok(){return kvcard('Next of Kin',[['Name','Chuka Osakunih'],['Relationship','Brother'],['Phone','+234 806 554 2210']])}
 function essHistory(){return tl('Record History',[['Bank details updated','14/08/2026','Logged. People were notified the same day.','hi'],
   ['Promoted to Operations and People Lead','01/07/2026','Grade moved from G4 to G5.','ok'],
@@ -6035,7 +6037,7 @@ var ESS_MOBILE_TABS=[
     var rk=rv.map(function(r){return mo('Review, '+r[0],kvcard(r[0],[['Your Rating',r[1]],['Manager, Ifeoma Chukwu',r[2]],['Second Level',r[3]],['Status',pill(r[4],r[5])]])+
       (r[4]==='ok'?'<div class="card" style="margin-top:12px"><div class="ch"><h3>Manager Comment</h3></div><p class="sub" data-copy="content">Strong quarter on partnerships. Expense turnaround still above the 2 day target.</p></div>':''))});
     return essHd('My Performance','October 2026 · set by Ifeoma Chukwu')+
-    essLabHint(statstrip([['KPI Score','71%'],['On Track','2 of 4'],['Weight Assigned','100%'],['Last Review','4.0 · Q3'],['Next Cycle','Opens 20/10']]),'KPI Score',ESS_HELP.kpi)+
+    helpOn(statstrip([['KPI Score','71%'],['On Track','2 of 4'],['Weight Assigned','100%'],['Last Review','4.0 · Q3'],['Next Cycle','Opens 20/10']]),'KPI Score',ESS_HELP.kpi)+
     icards([['target','My KPIs This Month','71% · 2 of 4 on track',kp],['up','Rolls Up To','5 levels, up to the CEO',up],
       ['check','My Reviews','Q3: self 4.2, manager 4.0','<div class="emlist">'+rv.map(function(r,i){return '<button class="emli" data-mo="'+rk[i]+'"><span><b>'+r[0]+'</b><span class="sub">Self '+r[1]+' · Manager '+r[2]+'</span></span>'+pill(r[4],r[5])+'</button>'}).join('')+'</div>']])+
     donly('<div class="grid g2">'+kp+up+'</div>'+
@@ -6095,9 +6097,9 @@ var ESS_MOBILE_TABS=[
       qc(sancK,'flag','Sanctions','2','Last on 29/08/2026','wa')+'</div>'}},
 
   {n:'My Documents',r:function(){
-    var docs=[['Employment contract','02/05/2024','ok','Signed','None'],['Data privacy acknowledgement','02/05/2024','ok','Signed','None'],
-      ['NDPA training certificate','11/01/2026','wa','Expiring','30/11/2026'],['Passport photograph','None','er','Missing','None'],
-      ['Bank verification number','02/05/2024','ok','Verified','None']];
+    var docs=[['Employment Contract','02/05/2024','ok','Signed','None'],['Data Privacy Acknowledgement','02/05/2024','ok','Signed','None'],
+      ['NDPA Training Certificate','11/01/2026','wa','Expiring','30/11/2026'],['Passport Photograph','None','er','Missing','None'],
+      ['Bank Verification Number','02/05/2024','ok','Verified','None']];
     var contract=paper(plogo('CON-0004')+
      '<h3>Contract of employment</h3>'+
      '<p style="color:#566662;font-size:11.5px;margin-top:3px">Between MyCity App Ltd and Cynthia Osakunih · Executed 02/05/2024</p>'+
@@ -6127,16 +6129,16 @@ var ESS_MOBILE_TABS=[
     var mfa=function(){return '<div class="card"><div class="ch"><h3>Two-Step Sign-In</h3></div>'+
       [['Authenticator App',ESS_HELP.mfaApp,1],['Email Code as Fallback',ESS_HELP.mfaMail,0]].map(function(t){
         return '<div class="tog"><div style="font-size:13px;font-weight:550">'+hint(t[0],t[1])+'</div><span class="sw'+(t[2]?' on':'')+'"></span></div>'}).join('')+'</div>'};
-    var pk=function(){return essTitleHint('<div class="card"><div class="ch"><h3>Passkeys</h3><span class="right">'+pill('ok','1 set up')+'</span></div>'+
+    var pk=function(){return helpOn('<div class="card"><div class="ch"><h3>Passkeys</h3><span class="right">'+pill('ok','1 set up')+'</span></div>'+
       '<div class="devrow"><span class="ic">'+ic('shield','ico')+'</span><span style="flex:1"><b>MacBook Pro, Touch ID</b><span class="sub" style="display:block">Added 02/09/2026 · used today</span></span></div>'+
       '<div style="margin-top:12px">'+bt('Add Passkey','toast',0,' data-msg="Follow the prompt on your device"','plus')+'</div></div>','Passkeys',ESS_HELP.passkey)};
-    var pin=function(){return essTitleHint('<div class="card"><div class="ch"><h3>PIN</h3><span class="right">'+pill('nt','Not set')+'</span></div>'+
+    var pin=function(){return helpOn('<div class="card"><div class="ch"><h3>PIN</h3><span class="right">'+pill('nt','Not set')+'</span></div>'+
       '<div>'+bt('Set PIN','',0,' data-mo="'+pinK+'"')+'</div></div>','PIN',ESS_HELP.pin)};
     var act=table([['When'],['Device'],['Where'],['Result']],[
       ['13/10/2026 08:04','MacBook Pro · Chrome','Victoria Island',pill('ok','Registered')],
       ['12/10/2026 17:22','Samsung Galaxy S23','Victoria Island',pill('ok','Registered')],
       ['12/10/2026 07:41','iPhone 13 · Safari','Lekki',pill('er','Unregistered, flagged')]],'Recent Sign-Ins');
-    var devC=function(){return essTitleHint('<div class="card"><div class="ch"><h3>Devices</h3><span class="right">'+pill('nt','Up to 3')+'</span></div>'+
+    var devC=function(){return helpOn('<div class="card"><div class="ch"><h3>Devices</h3><span class="right">'+pill('nt','Up to 3')+'</span></div>'+
       '<div>'+bt('Open My Devices','goTab',0,' data-tn="My Devices"','right')+'</div></div>','Devices',ESS_HELP.devices)};
     return essHd('My Security','')+
     icards([['shield','Password','Changed 14/08/2026',pw()],['check','Two-Step Sign-In','Authenticator on',mfa()],
