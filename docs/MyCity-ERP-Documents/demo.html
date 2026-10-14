@@ -415,8 +415,9 @@ tbody tr:last-child td{border-bottom:0}
    the Ask screen beside its suggestions on desktop, a 44 px send button */
 .aigrid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:12px;align-items:start}
 .aisend{width:44px;height:44px;padding:0;justify-content:center;border-radius:50%;flex:none}
+.ai-a .tcards{padding:0}
 @media(max-width:1180px){.aigrid{grid-template-columns:1fr}}
-@media(max-width:760px){.rnav button{min-height:44px;display:flex;align-items:center}}
+@media(max-width:760px){.rnav button,.task.aisug{min-height:44px;display:flex;align-items:center}}
 
 /* MISC */
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -2983,49 +2984,41 @@ var M=[
       ['Ember to Remember kicks off','22/09/2026','Posted by the CEO. Everyone.','ok']])+'</div>'}}]},
 
 {k:'ai',n:'Praxis AI',i:'spark',g:'SYSTEM',tabs:[
-  {n:'Ask',r:function(){return head('Praxis AI','Answers from your data, within your permissions')+
-    '<div class="card" style="max-width:840px"><div style="display:flex;flex-direction:column;gap:14px">'+
+  {n:'Ask',r:function(){var quiet=[['Eko Hotels','Bashir Lawal','34'],['Landmark Beach','Bashir Lawal','41'],['Enugu Tourism Board','Ngozi Eze','38'],['Kano Trade Council','Ngozi Eze','52']];
+    return head('Praxis AI')+
+    '<div class="aigrid"><div class="card"><div style="display:flex;flex-direction:column;gap:14px">'+
     '<div class="ai-q">Which partnerships have gone inactive, and who owns them?</div>'+
     '<div class="ai-a"><p style="font-size:13.5px">Four partnerships have had no recorded contact in over 30 days.</p>'+
-    '<div class="tscroll" style="margin-top:11px"><table><thead><tr><th>Partner</th><th>Owner</th><th class="num">Days quiet</th></tr></thead><tbody>'+
-    [['Eko Hotels','Bashir Lawal','34'],['Landmark Beach','Bashir Lawal','41'],['Enugu Tourism Board','Ngozi Eze','38'],['Kano Trade Council','Ngozi Eze','52']]
-      .map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td class="num">'+r[2]+'</td></tr>'}).join('')+
-    '</tbody></table></div><p style="font-size:13px;margin-top:11px;color:var(--ink-2)">Two sit with Bashir Lawal, who also has an open attendance query.</p>'+
+    '<div class="tscroll donly" style="margin-top:11px"><table><thead><tr><th>Partner</th><th>Owner</th><th class="num">Days Quiet</th></tr></thead><tbody>'+
+    quiet.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td class="num">'+r[2]+'</td></tr>'}).join('')+
+    '</tbody></table></div><div class="monly" style="margin-top:11px">'+tcards([['Partner'],['Owner'],['Days Quiet','n']],quiet)+'</div>'+
+    '<p style="font-size:13px;margin-top:11px;color:var(--ink-2)">Two sit with Bashir Lawal, who also has an open attendance query.</p>'+
     '<div class="src"><b>From</b><span class="srcchip">partnership ×4</span><span class="srcchip">interaction log</span><span class="srcchip">employee ×2</span></div></div>'+
     '<div class="ai-q">Create a follow up task for each of them</div>'+
     '<div class="ai-a"><p style="font-size:13.5px">I do not create records. I can take you to the right screen with the details filled in.</p>'+
-    '<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap"><button class="btn pri">'+ic('right')+'Open Tasks, 4 drafts ready</button><button class="btn">Not now</button></div>'+
-    '<p class="sub" style="margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)">Praxis AI reads. Every write happens in the module that owns it, by a person.</p></div></div>'+
-    '<div style="display:flex;gap:8px;margin-top:16px"><input class="inp" style="height:42px;border-radius:999px" placeholder="Ask about your operations" aria-label="Ask Praxis AI">'+
-    '<button class="btn pri" style="width:42px;height:42px;padding:0;justify-content:center;border-radius:50%">'+ic('send')+'</button></div></div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
-    '<div class="card"><div class="ch"><h3>Try asking</h3></div>'+
+    '<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap"><button class="btn pri">'+ic('right')+'Create 4 Tasks</button><button class="btn">Dismiss</button></div></div></div>'+
+    '<div style="display:flex;gap:8px;margin-top:16px"><input class="inp" style="height:44px;border-radius:999px" placeholder="Who is late?" aria-label="Ask Praxis AI">'+
+    '<button class="btn pri aisend" aria-label="Send">'+ic('send')+'</button></div></div>'+
+    '<div class="card"><div class="ch"><h3>Suggested Questions</h3></div>'+
     ['Who has overdue tasks, by department?','What is budget versus actual this month?',
      'Which candidates are waiting on panel feedback?','Who is due for confirmation in the next 30 days?',
      'Which contracts renew before March?','How many late arrivals this month, and by whom?'].map(function(q){
-      return '<button class="task" style="margin:0 0 6px"><b style="margin:0;font-weight:500">'+esc(q)+'</b></button>'}).join('')+'</div>'+
-    kvcard('What it can and cannot do',[['Reads','Any record you could open yourself'],
-      ['Never reads','A record your role cannot see. The answer is shorter, not wider'],
-      ['Writes','Nothing. Not one record, not ever'],
-      ['Cites','Which tables and how many rows it read, on every answer'],
-      ['Spend','Metered per month and visible in Settings'],
-      ['Model','Gemini, with the catalogue derived only from module manifests']])+'</div>'}},
-  {n:'History',r:function(){return head('History','Your questions, and what they read',[['Export'],['Clear history']])+
-    kpis([['Questions this month','84'],['Your questions','31'],['Spend','₦1,840'],['Monthly cap','₦25,000','ok']])+
-    table([['Question'],['Asked'],['Sources read'],['Tokens','n'],['Cost','n']],[
+      return '<button class="task aisug" style="margin:0 0 6px"><b style="margin:0;font-weight:500">'+esc(q)+'</b></button>'}).join('')+'</div></div>'}},
+  {n:'History',r:function(){return head('History','',[['Export'],['Clear History']])+
+    helpOn(kpis([['Questions This Month','84'],['Your Questions','31'],['Spend','₦1,840'],['Monthly Cap','₦25,000','ok']]),
+      'Monthly Cap','The most Praxis AI may spend in a month. Set in Settings, Integrations.')+
+    table([['Question'],['Asked'],['Sources Read'],['Tokens','n'],['Cost','n']],[
       ['Which partnerships have gone inactive?','09/10 09:12','partnership, interaction log, employee','2,140','₦18'],
       ['Who has overdue tasks?','09/10 08:40','task, employee','1,890','₦16'],
       ['What is budget versus actual this month?','08/10 16:22','expense, budget','2,610','₦22'],
       ['Which candidates are awaiting feedback?','08/10 11:05','applicant, interview round','1,740','₦15'],
       ['Who is due for confirmation?','07/10 09:30','employee','980','₦8'],
       ['How many late arrivals this month?','07/10 08:14','attendance, employee','1,420','₦12'],
-      ['Which contracts renew before March?','06/10 15:40','contract, partnership','1,180','₦10']],'Your questions')+
+      ['Which contracts renew before March?','06/10 15:40','contract, partnership','1,180','₦10']],'Your Questions',null,null,null,[1,4])+
     '<div class="grid g2" style="margin-top:12px">'+
-    areaChart('Spend per month, Naira',[420,780,1240,1610,1840],'Against a ₦25,000 monthly cap. At this rate the cap is not the constraint.')+
-    bars('What gets asked about',[['Partnerships',100,'26'],['Attendance',73,'19'],['Tasks',58,'15'],
-      ['Recruitment',46,'12'],['Expenses',35,'9'],['Payroll',12,'3','var(--yellow)']],
-      'Payroll is asked about least and is the most sensitive. That is the field security working, not disinterest.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Every turn is traced: the question, the tables read, the row counts, the tokens and the cost. Spend is capped per month and visible in Settings.</p>'}}]},
+    areaChart('Spend per Month, Naira',[420,780,1240,1610,1840],'Against a ₦25,000 monthly cap')+
+    bars('Questions by Module',[['Partnerships',100,'26'],['Attendance',73,'19'],['Tasks',58,'15'],
+      ['Recruitment',46,'12'],['Expenses',35,'9'],['Payroll',12,'3','var(--yellow)']])+'</div>'}}]},
 
 {k:'settings',n:'Settings',i:'cog',g:'SYSTEM',tabs:[
   {n:'Organisation',r:function(){return head('Organisation','MyCity App Ltd',[['Save',1]])+
