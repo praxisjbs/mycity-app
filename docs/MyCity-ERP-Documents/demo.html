@@ -2248,22 +2248,22 @@ var M=[
   {n:'Employees',r:function(){return attEmployeesTab()}},
   {n:'Organogram',r:function(){return og('builder')}},
   {n:'Attendance',r:function(){return attPeopleAttendance()}},
-  {n:'Leave',r:function(){return head('Leave','October 2026',[['Leave calendar'],['Record leave',1]])+
-    kpis([['On leave today','1'],['Pending approval','2','warn'],['Approved this month','4'],['Clashes','0','ok']])+
+  {n:'Leave',r:function(){return head('Leave','October 2026',[['Leave Calendar'],['Record Leave',1]])+
+    kpis([['On Leave Today','1'],['Pending Approval','2','warn'],['Approved This Month','4'],['Clashes','0','ok']])+
     '<div class="grid g23">'+table([['Employee'],['Type'],['From'],['To'],['Days','n'],['Status']],[
       [st(4),'Annual','09/10/2026','11/10/2026','3',pill('ok','Approved')],
       [st(2),'Annual','20/10/2026','24/10/2026','5',pill('wa','Pending')],
       [st(7),'Compassionate','14/10/2026','14/10/2026','1',pill('wa','Pending')],
       [st(0),'Annual','22/12/2026','31/12/2026','7',pill('ok','Approved')]],'Requests')+
-    '<div class="card"><div class="ch"><h3>Cover check, 20 to 24 October</h3></div>'+
-    '<p class="sub" style="margin-bottom:11px">Amara Okafor has requested five days. This is what is open in that week.</p>'+
+    helpOn('<div class="card"><div class="ch"><h3>Cover Check, 20 to 24 October</h3></div>'+
+    '<p class="sub" style="margin-bottom:11px" data-copy="content">Amara Okafor · Annual · 5 days</p>'+
     [['Finance cover','Nobody else in Finance','er','Conflict'],['October books','Due 05/11, not in the window','ok','Clear'],
      ['Disbursement logging','Cynthia Osakunih can cover','wa','Needs agreement'],
      ['Payroll run','Already submitted','ok','Clear']].map(function(r){
       return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">'+
       '<span style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600">'+esc(r[0])+'</div><div class="sub">'+esc(r[1])+'</div></span>'+
-      pill(r[2],r[3])+'</div>'}).join('')+
-    '<p class="sub" style="margin-top:11px">The clash check is advisory. The approver decides, and the reason is recorded either way.</p></div></div>'}},
+      pill(r[2],r[3])+'</div>'}).join('')+'</div>',
+      'Cover Check, 20 to 24 October','Advisory. It lists what falls due while the person is away; the approver decides.')+'</div>'}},
   {n:'Devices',r:function(){return attDevicesTab()}},
   {n:'Worksites',r:function(){return attWorksitesTab()}}]},
 
@@ -2354,77 +2354,69 @@ var M=[
        ['Not a Ranking','A prompt for a conversation']])}}]},
 
 {k:'queries',n:'Queries & Sanctions',i:'flag',g:'PEOPLE',cnt:'2',tabs:[
-  {n:'Queries',r:function(){return head('Queries','Managers see the queries they raised. People and the CEO see all.',[['My queries'],['Raise a query',1]])+
-    kpis([['Open','2','warn'],['Awaiting response','1'],['Closed this month','4','ok'],['Escalated','1','err']])+
-    table([['Employee'],['Subject'],['Raised by'],['Raised'],['Response'],['Status']],attQueryRows().concat([
+  {n:'Queries',r:function(){return head('Queries','',[['My Queries'],['Raise Query',1]])+
+    kpis([['Open','2','warn'],['Awaiting Response','1'],['Closed This Month','4','ok'],['Escalated','1','err']])+
+    table([['Employee'],['Subject'],['Raised By'],['Raised'],['Response'],['Status']],attQueryRows().concat([
       [st(1),'3 late arrivals in 30 days','System rule','07/10/2026','—',pill('wa','Awaiting response')],
       [st(5),'Missing clock-out on 08/10','Cynthia Osakunih','09/10/2026','—',pill('wa','Awaiting response')],
       [st(3),'Punch from unenrolled device','System rule','02/10/2026','Submitted 03/10',pill('ok','Closed, no action')],
-      [st(7),'Deadline missed, Enugu brief','Tolu Adeyemi','28/09/2026','Submitted 29/09',pill('nt','Closed, caution')]]),'All queries')+
+      [st(7),'Deadline missed, Enugu brief','Tolu Adeyemi','28/09/2026','Submitted 29/09',pill('nt','Closed, caution')]]),'All Queries')+
     '<div class="grid g2" style="margin-top:12px">'+
     '<div class="card"><div class="ch"><h3>QRY-0027 · Bashir Lawal</h3><span class="right">'+pill('wa','Awaiting response')+'</span></div>'+
     '<dl class="kv" style="grid-template-columns:116px 1fr"><dt>Subject</dt><dd>Three late arrivals in 30 days</dd>'+
-    '<dt>Raised by</dt><dd>A system rule, not a manager</dd><dt>Raised</dt><dd>07/10/2026 at 09:41</dd>'+
-    '<dt>Response due</dt><dd>09/10/2026 at 09:41</dd><dt>Instances</dt><dd>05/10 late 31m, 08/10 late 22m, 09/10 late 41m</dd>'+
+    '<dt>Raised By</dt><dd>System rule, Repeated lateness</dd><dt>Raised</dt><dd>07/10/2026 at 09:41</dd>'+
+    '<dt>Response Due</dt><dd>09/10/2026 at 09:41</dd><dt>Instances</dt><dd>05/10 late 31m, 08/10 late 22m, 09/10 late 41m</dd>'+
     '<dt>Letter</dt><dd>Query letter, sent by email and in app</dd></dl>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn">'+ic('doc')+'View letter</button>'+
-    '<button class="btn">Send reminder</button><button class="btn pri">Record a decision</button></div></div>'+
-    bars('Queries by reason, last 90 days',[['Lateness',100,'9'],['Missing clock-out',55,'5'],
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn">'+ic('doc')+'View Letter</button>'+
+    '<button class="btn">Send Reminder</button><button class="btn pri">Record Decision</button></div></div>'+
+    bars('Queries by Reason, 90 Days',[['Lateness',100,'9'],['Missing clock-out',55,'5'],
       ['Unenrolled device',33,'3'],['Deadline missed',22,'2'],['Absence without notice',11,'1']],
-      'Seventeen of twenty queries were raised by a rule rather than a person. That is the point of the rules.')+'</div>'}},
-  {n:'Rules',r:function(){return head('Rules','Automatic queries, configured not coded',[['New rule',1]])+
-    kpis([['Active rules','4'],['Draft','2'],['Fired this month','11'],['Queries raised','6']])+
-    cards([['Repeated lateness','Raises a query on the third late arrival in a rolling 30 days. Not the first.','<span class="pill ok"><i></i>Active</span><span class="pill nt">3 in 30 days</span>'],
-      ['Missing clock-out','Raises a query the morning after a punch with no matching clock-out.','<span class="pill ok"><i></i>Active</span>'],
-      ['Unenrolled device','Raises a query when someone punches from a device that is not enrolled.','<span class="pill ok"><i></i>Active</span>'],
-      ['Absence without notice','Raises a query after one full day absent with no approved leave.','<span class="pill ok"><i></i>Active</span>'],
-      ['Overdue task','Raises a query when a task is 5 working days past its date.','<span class="pill nt">Draft</span>'],
-      ['Missed monthly KPI','Raises a query when an individual KPI closes below 50%.','<span class="pill nt">Draft</span>']])+
-    '<div class="grid g2" style="margin-top:12px">'+
+      '17 of 20 raised by a rule')+'</div>'}},
+  {n:'Rules',r:function(){return head('Rules','',[['New Rule',1]])+
+    kpis([['Active Rules','4'],['Draft','2'],['Fired This Month','11'],['Queries Raised','6']])+
+    /* a rule's name and trigger are records People configured: content, not interface copy */
+    '<div class="grid g3">'+[['Repeated lateness','Third late arrival in a rolling 30 days',pill('ok','Active')+pill('nt','3 in 30 days')],
+      ['Missing clock-out','The morning after a punch with no clock-out',pill('ok','Active')],
+      ['Unenrolled device','A punch from a device that is not enrolled',pill('ok','Active')],
+      ['Absence without notice','One full day absent with no approved leave',pill('ok','Active')],
+      ['Overdue task','A task 5 working days past its date',pill('nt','Draft')],
+      ['Missed monthly KPI','An individual KPI closes below 50%',pill('nt','Draft')]].map(function(r){
+      return '<div class="tile"><h4 data-copy="content">'+esc(r[0])+'</h4><p data-copy="content">'+esc(r[1])+'</p>'+
+        '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+r[2]+'</div></div>'}).join('')+'</div>'+
+    '<div style="margin-top:12px">'+
     table([['Rule'],['Fired'],['Employee'],['Outcome']],[
       ['Repeated lateness','09/10 09:41',st(1),pill('wa','Query raised')],
       ['Missing clock-out','09/10 06:00',st(5),pill('wa','Query raised')],
       ['Unenrolled device','09/10 08:58',st(3),pill('nt','Warned, no query')],
       ['Repeated lateness','07/10 09:18','Cynthia Osakunih',pill('nt','Below threshold')],
-      ['Unenrolled device','02/10 08:12',st(3),pill('ok','Closed, no action')]],'Recent firings',
-      '<span class="sub">Last 7 days</span>')+
-    kvcard('What a rule is made of',[['Trigger','An event: a punch, a day ending, a task date passing'],
-      ['Threshold','A number and a window. "3 in 30 days"'],
-      ['Who it notifies','A role, not a person. The role can change'],
-      ['Letter','Which template to send, filled from the record'],
-      ['Chain','Which consequence step it opens, if any'],
-      ['Changing it','Editing a value. No deploy, no release']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">The threshold on each rule is a setting. Changing "3 in 30 days" needs no deploy.</p>'}},
-  {n:'Sanctions',r:function(){return head('Sanctions','The consequence chain · MyCity ladder',[['Chain settings'],['Issue sanction',1]])+
-    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>Bashir Lawal · 3 late arrivals in 30 days</h3><span class="right">'+pill('wa','In progress')+'</span></div>'+
-    '<div class="chain">'+[['Query raised','done'],['Awaiting response','now'],['Caution',''],['Warning',''],['Suspension',''],['Suspension without pay',''],['Dismissal','']].map(function(s,i){
-      return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">Adding or removing a step is configuration. A fine attaches to any step and reaches payroll as a pending deduction, used for property damage.</p></div>'+
-    kpis([['Active sanctions','2'],['Served','4'],['Financial, this year','₦57,500'],['Recovered','₦45,000','ok']])+
-    table([['Employee'],['Sanction'],['Reason'],['Issued by'],['Date'],['Financial'],['Status']],[
+      ['Unenrolled device','02/10 08:12',st(3),pill('ok','Closed, no action')]],'Recent Firings',
+      '<span class="sub">Last 7 days</span>')+'</div>'}},
+  {n:'Sanctions',r:function(){return head('Sanctions','',[['Chain Settings'],['Issue Sanction',1]])+
+    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>Bashir Lawal · Lateness</h3><span class="right">'+pill('wa','In progress')+'</span></div>'+
+    '<div class="chain" data-copy="content">'+[['Query Raised','done'],['Awaiting Response','now'],['Caution',''],['Warning',''],['Suspension',''],['Suspension Without Pay',''],['Dismissal','']].map(function(s,i){
+      return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+'</div></div>'+
+    helpOn(kpis([['Active Sanctions','2'],['Served','4'],['Financial, This Year','₦57,500'],['Recovered','₦45,000','ok']]),'Financial, This Year',
+      'Fines for property damage. A fine attaches to any step and reaches payroll as a pending deduction once Finance or Operations accepts it. An appeal holds it.')+
+    table([['Employee'],['Sanction'],['Reason'],['Issued By'],['Date'],['Financial'],['Status']],[
       [st(7),'Caution','Deadline missed, Enugu brief','Tolu Adeyemi','30/09/2026','—',pill('nt','Active')],
       [st(1),'Warning','Repeated lateness, August','Cynthia Osakunih','29/08/2026','₦12,500',pill('nt','Served')],
-      [st(3),'Fine','Damage to studio monitor','Cynthia Osakunih','14/07/2026','₦45,000',pill('ok','Recovered')]],'Sanction history')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    kvcard('How a fine reaches payroll',[['Issued','On any step of the chain, with an amount and a reason'],
-      ['Lands in','Payroll, Deductions, as pending acceptance'],
-      ['Who accepts','Finance or Operations. Never automatic'],
-      ['Spread','Can be split across runs, as the ₦45,000 was over two'],
-      ['If the employee appeals','The deduction holds until the appeal is decided'],
-      ['On the payslip','A single line: the reason, not the sanction wording']])+
-    tl('Chain activity',[['Query letter sent to Bashir Lawal','07/10/2026','By email and in app. Response due in 48 hours.','hi'],
+      [st(3),'Fine','Damage to studio monitor','Cynthia Osakunih','14/07/2026','₦45,000',pill('ok','Recovered')]],'Sanction History')+
+    '<div style="margin-top:12px">'+
+    tl('Chain Activity',[['Query letter sent to Bashir Lawal','07/10/2026','By email and in app. Response due in 48 hours.','hi'],
       ['Caution issued to Chidera Nwosu','30/09/2026','Response read first. Caution stands.'],
       ['Warning served on Bashir Lawal','29/08/2026','₦12,500 accepted into the August run.'],
       ['Fine fully recovered from Seyi Balogun','30/08/2026','₦45,000 across July and August.','ok']])+'</div>'}},
-  {n:'Letter Templates',r:function(){return head('Letter Templates','Seeded with MyCity wording. The system fills name, date and reason.',[['Preview'],['New template',1]])+
-    statstrip([['Templates','6'],['Active','3','ok'],['Awaiting sample','3','warn'],['Letters sent, 90d','14'],['Languages','English']])+
-    '<div class="grid g32">'+table([['Template'],['Used for'],['Status']],[
+  {n:'Letter Templates',r:function(){return head('Letter Templates','',[['Preview'],['New Template',1]])+
+    helpOn(statstrip([['Templates','6'],['Active','3','ok'],['Awaiting Sample','3','warn'],['Letters Sent, 90d','14'],['Languages','English']]),'Awaiting Sample',
+      'Waiting on a sample letter from MyCity, so the wording is theirs. Until it arrives, that step of the chain cannot send a letter.')+
+    '<div class="grid g32">'+helpOn(table([['Template'],['Used For'],['Status']],[
       ['Query letter','Any query raised',pill('ok','Active')],
       ['Caution letter','Caution stage',pill('ok','Active')],
       ['Warning letter','Warning stage',pill('ok','Active')],
       ['Suspension letter','Suspension',pill('wa','Awaiting sample')],
       ['Suspension without pay','Suspension without pay',pill('wa','Awaiting sample')],
-      ['Termination letter','Dismissal or termination',pill('wa','Awaiting sample')]],'Templates')+
+      ['Termination letter','Dismissal or termination',pill('wa','Awaiting sample')]],'Templates'),'Templates',
+      'The system fills the name, dates, hours and grace window from the record.')+
     paper(plogo('QRY-0027')+
      '<h3>Query: punctuality</h3>'+
      '<p style="color:#566662;font-size:11.5px;margin-top:3px">Private and confidential · 07 October 2026</p>'+
@@ -2433,10 +2425,8 @@ var M=[
      '<p>You are asked to respond in writing within forty-eight hours of this letter, setting out any explanation you wish to be considered. Your response will be read before any decision is taken.</p>'+
      '<p>Yours sincerely,</p>'+
      '<div class="sig" style="margin-top:12px">C. Osakunih</div>'+
-     '<p style="font-size:10.5px;color:#7E8D88;border-top:1px solid #D5DEDB;padding-top:4px;margin-top:2px">Cynthia Osakunih · Operations and People Lead</p>'+
-     '<div class="pfoot"><span>Fields filled from the record: name, dates, hours, grace window</span></div>',
-     'Query letter as it is sent. Everything in italics above came from the record, not from typing.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Three templates are waiting on sample letters from MyCity so the wording is theirs, not ours. Until a sample arrives, that step of the chain cannot send a letter.</p>'}}]},
+     '<p style="font-size:10.5px;color:#7E8D88;border-top:1px solid #D5DEDB;padding-top:4px;margin-top:2px">Cynthia Osakunih · Operations and People Lead</p>',
+     'Query Letter Preview')+'</div>'}}]},
 
 {k:'recruit',n:'Recruitment',i:'brief',g:'PEOPLE',cnt:'12',tabs:[
   {n:'Vacancies',r:function(){return head('Vacancies','4 open · 61 applicants',[['Careers page'],['New vacancy',1]])+
