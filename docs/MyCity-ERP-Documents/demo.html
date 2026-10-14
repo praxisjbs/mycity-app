@@ -2062,59 +2062,56 @@ var M=[
 
 {k:'workspace',n:'My Workspace',i:'check',g:'',cnt:'4',tabs:[
   {n:'Today',r:function(){return head('Today','Friday, 09/10/2026')+
-    kpis([['Due today','3'],['Overdue','1','err'],['Meetings','2'],['Clocked in','08:04','ok']])+
+    kpis([['Due Today','3'],['Overdue','1','err'],['Meetings','2'],['Clocked In','08:04','ok']])+
     '<div class="grid g2">'+
-    '<div class="card"><div class="ch"><h3>Your day</h3><span class="right">'+pill('er','1 overdue')+'</span></div>'+
+    '<div class="card"><div class="ch"><h3>Your Day</h3><span class="right">'+pill('er','1 overdue')+'</span></div>'+
     [['Confirm Ember to Remember venue list with MTN',pill('er','Overdue 2d')],
      ['Review Partnerships Associate shortlist',pill('wa','Due today')],
      ['Sign off October payroll preview',pill('wa','Due today')],
      ['Approve 5 expense requests',pill('nt','Due today')]].map(function(t){
       return '<button class="task"><b>'+esc(t[0])+'</b><span class="meta">'+t[1]+'<span class="av">CO</span></span></button>'}).join('')+'</div>'+
-    '<div class="card"><div class="ch"><h3>Set by your line manager</h3></div>'+
-    '<p class="sub" style="margin-bottom:10px">Your manager plans the week. You can add your own alongside.</p>'+
+    '<div class="card"><div class="ch"><h3>From Your Manager</h3></div>'+
     [['Close out Q4 departmental targets',pill('nt','Mon 12/10')],
      ['Onboarding pack for the Enugu hires',pill('nt','Thu 15/10')]].map(function(t){
       return '<button class="task"><b>'+esc(t[0])+'</b><span class="meta">'+t[1]+'<span class="av">IC</span></span></button>'}).join('')+
-    '<button class="btn" style="width:100%;justify-content:center;margin-top:4px">'+ic('plus')+'Add my own task</button></div></div>'+
+    '<button class="btn" style="width:100%;justify-content:center;margin-top:4px">'+ic('plus')+'Add Task</button></div></div>'+
     '<div class="grid g2">'+
     '<div class="card"><div class="ch"><h3>Diary</h3><span class="right sub">Africa/Lagos</span></div>'+
     [['09:30','Partnerships standup','30 min · #partnerships','in'],['11:00','MTN venue walkthrough','1 hour · Victoria Island','in'],
      ['14:00','Payroll preview with Amara','45 min · call','nt'],['16:30','Panel prep, Adaeze Nnamdi','30 min · call','nt']].map(function(d){
       return '<div style="display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)">'+
       '<b style="width:46px;flex:none;font-size:12.5px;font-weight:700">'+d[0]+'</b>'+
-      '<span style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600">'+esc(d[1])+'</div><div class="sub">'+esc(d[2])+'</div></span>'+
+      '<span style="flex:1;min-width:0" data-copy="content"><div style="font-size:12.5px;font-weight:600">'+esc(d[1])+'</div><div class="sub">'+esc(d[2])+'</div></span>'+
       pill(d[3],d[3]==='in'?'Confirmed':'Tentative')+'</div>'}).join('')+'</div>'+
-    tl('What moved while you were away',[
+    tl('Recent Activity',[
       ['Adedotun Oyinloye moved a task to In review','08:20','ProvidusBank logo on ticket email.','hi'],
       ['Tolu Adeyemi completed the Enugu shot list','Yesterday 16:40','','ok'],
       ['Ifeoma Chukwu approved the Content target','Yesterday 16:40','','ok'],
       ['Seyi Balogun commented on your task','Yesterday 11:02','"Assessment is ready to publish."']])+'</div>'}},
-  {n:'Tasks',r:function(){return head('Tasks','Click a card to move it along',[['My team'],['New task',1]])+
-    kpis([['Open','31'],['Due this week','12'],['Overdue','7','err'],['Completed, 30d','84','ok']])+
-    '<div id="board">'+boardHTML()+'</div>'+
-    '<p class="sub" style="margin-top:12px">A task can be linked to a KPI, a partnership or a vacancy. When it closes, the thing it was linked to moves with it.</p>'}},
-  {n:'Calendar',r:function(){return head('Calendar','October 2026',[['Today'],['New event',1]])+
+  {n:'Tasks',r:function(){return head('Tasks','',[['My Team'],['New Task',1]])+
+    kpis([['Open','31'],['Due This Week','12'],['Overdue','7','err'],['Completed, 30d','84','ok']])+
+    '<div id="board">'+boardHTML()+'</div>'}},
+  {n:'Calendar',r:function(){return head('Calendar','',[['Today'],['New Event',1]])+
     '<div class="grid g23">'+calendar()+
-    '<div class="card"><div class="ch"><h3>Coming up</h3></div>'+
+    '<div class="card"><div class="ch"><h3>Coming Up</h3></div>'+
     [['Mon 12','Q4 departmental targets close','Task'],['Tue 13','Panel interview, Adaeze Nnamdi','Interview'],
      ['Tue 13','MTN venue list due','Deadline'],['Wed 14','Ember to Remember, Lagos leg','Campaign'],
      ['Thu 15','Onboarding pack, Enugu hires','Task'],['Fri 16','Fatima Sani interview, 10:00','Interview'],
      ['Mon 20','Q4 review cycle opens','Cycle'],['Mon 20','Chiamaka Eze starts','Onboarding'],
      ['Thu 22','Enugu shoot, two days','Studio'],['Fri 24','Chidera Nwosu probation ends','Decision'],
      ['Tue 27','Payday','Payroll']].map(function(e){
-      return '<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">'+
+      return '<div data-copy="content" style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">'+
       '<b style="width:52px;flex:none;font-size:11.5px;color:var(--ink-3)">'+e[0]+'</b>'+
       '<span style="flex:1;min-width:0;font-size:12.5px">'+esc(e[1])+'</span>'+
-      '<span class="sub" style="flex:none">'+esc(e[2])+'</span></div>'}).join('')+
-    '<p class="sub" style="margin-top:11px">Leave, interviews, payday and campaign dates all land here. Nothing is typed twice.</p></div></div>'}},
+      '<span class="sub" style="flex:none">'+esc(e[2])+'</span></div>'}).join('')+'</div></div>'}},
   {n:'Analytics',r:function(){return head('Analytics','Your team, last 30 days')+
-    kpis([['Completion rate','78%','','up 6 points','up'],['Overdue','7','err'],['Avg completion','2.4 days'],['Open tasks','31']])+
-    '<div class="grid g2">'+areaChart('Tasks completed per week',[18,22,19,26,24,31])+
-    bars('Workload by person',[['Tolu Adeyemi',82,'9 open'],['Ngozi Eze',64,'7 open'],['Emeka Obi',55,'6 open'],['Chidera Nwosu',45,'5 open'],['Bashir Lawal',36,'4 open']])+'</div>'+
-    '<div class="grid g2">'+bars('Tasks by priority',[['Urgent',22,'7','var(--c4)'],['High',38,'12'],['Normal',66,'21'],['Low',25,'8']])+
-    table([['Reason a task is late'],['Count','n'],['Share']],[
+    kpis([['Completion Rate','78%','','up 6 points','up'],['Overdue','7','err'],['Avg Completion','2.4 days'],['Open Tasks','31']])+
+    '<div class="grid g2">'+areaChart('Tasks Completed per Week',[18,22,19,26,24,31])+
+    bars('Workload by Person',[['Tolu Adeyemi',82,'9 open'],['Ngozi Eze',64,'7 open'],['Emeka Obi',55,'6 open'],['Chidera Nwosu',45,'5 open'],['Bashir Lawal',36,'4 open']])+'</div>'+
+    '<div class="grid g2">'+bars('Tasks by Priority',[['Urgent',22,'7','var(--c4)'],['High',38,'12'],['Normal',66,'21'],['Low',25,'8']])+
+    table([['Reason'],['Count','n'],['Share']],[
       ['Waiting on somebody else','3',mini(43,'43%')],['Underestimated','2',mini(29,'29%')],
-      ['Deprioritised, not reassigned','1',mini(14,'14%')],['No reason recorded','1',mini(14,'14%')]],'Why the 7 are overdue')+'</div>'}}]},
+      ['Deprioritised, not reassigned','1',mini(14,'14%')],['No reason recorded','1',mini(14,'14%')]],'Overdue Tasks by Reason')+'</div>'}}]},
 
 {k:'ess',n:'Employee Self-Service',i:'user',g:'',tabs:[
   {n:'My Profile',r:function(){return head('My Profile','What People see, and what you can change yourself',[['Edit',1]])+
@@ -2332,111 +2329,90 @@ var M=[
   {n:'Worksites',r:function(){return attWorksitesTab()}}]},
 
 {k:'performance',n:'Performance',i:'target',g:'PEOPLE',tabs:[
-  {n:'Goals',r:function(){return head('Goals','Organisational and annual · set by the CEO and management',[['Export'],['New goal',1]])+
-    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>How goals cascade</h3></div>'+
-    '<div class="chain">'+[['Organisational','done'],['Annual','done'],['Monthly','done'],['Departmental','now'],['Individual KPI',''],['Weekly task','']].map(function(s,i){
-      return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+esc(s[0])+'</span>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">CEO sets organisational. Management sets annual and monthly. Unit heads set departmental. Department managers set individual KPIs. Line managers set the week.</p></div>'+
-    table([['Goal ID'],['Strategic theme'],['Goal'],['Success measure'],['Baseline'],['Owner'],['Status']],[
+  {n:'Goals',r:function(){return head('Goals','Organisational and annual · 2026',[['Export'],['New Goal',1]])+
+    table([['Goal ID'],['Strategic Theme'],['Goal'],['Success Measure'],['Baseline'],['Owner'],['Status']],[
       ['ORG-2026-01','Growth','Reach 2 million active residents','Monthly active users','1.1M','CEO',pill('ok','On track')],
       ['ORG-2026-02','Revenue','Partnership revenue of ₦180M','Signed partnership value','₦96M','CEO',pill('wa','At risk')],
       ['ORG-2026-03','Expansion','Operate in 12 Nigerian cities','Cities live','8','CEO',pill('ok','On track')],
       ['ORG-2026-04','Technology','Ship the operations platform','Milestones accepted','0 of 11','CTO',pill('ok','On track')],
-      ['ORG-2026-05','People','Build a 40 person team','Headcount','25','CEO',pill('ok','On track')]],'Organisational goals 2026')+
-    '<div style="margin-top:12px">'+table([['Annual goal'],['Rolls up to'],['Owner'],['Q4 cascade'],['Status']],[
+      ['ORG-2026-05','People','Build a 40 person team','Headcount','25','CEO',pill('ok','On track')]],'Organisational Goals 2026')+
+    '<div style="margin-top:12px">'+perfFoot(table([['Annual Goal'],['Rolls Up To'],['Owner'],['Q4 Cascade'],['Status']],[
       ['Operational readiness for 4 new cities','ORG-2026-03','Management','Enugu and Kano live',pill('ok','On track')],
       ['Sign 12 strategic partnerships','ORG-2026-02','Management','5 signed, 3 in review',pill('wa','At risk')],
       ['Platform handover complete','ORG-2026-04','Management','M11 by 18/12',pill('ok','On track')],
-      ['Grow the team to 40','ORG-2026-05','Management','4 vacancies open',pill('ok','On track')]],'Annual goals')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
-    bars('Progress against each organisational goal',[['Growth, 2M residents',55,'1.1M of 2M'],
+      ['Grow the team to 40','ORG-2026-05','Management','4 vacancies open',pill('ok','On track')]],'Annual Goals'),
+      [['Rolls Up To','The goal one level above'],['Organisational','Set by the CEO'],['Annual and Monthly','Set by management'],
+       ['Departmental','Set by unit heads'],['Individual KPI','Set by department managers'],['Weekly Task','Set by the line manager']])+'</div>'+
+    '<div style="margin-top:12px">'+
+    bars('Organisational Goal Progress',[['Growth, 2M residents',55,'1.1M of 2M'],
       ['Revenue, ₦180M',53,'₦96M of ₦180M','var(--c4)'],['Expansion, 12 cities',66,'8 of 12'],
-      ['Technology, 11 milestones',0,'0 of 11','var(--line-2)'],['People, 40 staff',62,'25 of 40']])+
-    kvcard('Why the cascade matters',[['The problem','A weekly task that nobody can trace to a company goal'],
-      ['The rule','Every level names the one above it. Nothing is orphaned'],
-      ['What staff see','Their own KPI, and the whole chain above it'],
-      ['What binds','Nothing until the CEO approves. Then it dispatches'],
-      ['Who sets the week','The line manager. The employee can still add their own']])+'</div>'}},
-  {n:'Targets',r:function(){return head('Targets','Monthly and departmental · October 2026',[['Previous month'],['Set targets',1]])+
-    kpis([['Departments','6'],['Approved','4','ok'],['Awaiting CEO','2','warn'],['Binding from','On approval']])+
-    chain([['Managers set','done'],['COO review','done'],['Operations review','now'],['CEO approval',''],['Binding','']],
-      'Nothing becomes binding until the CEO approves. Only then does it dispatch to staff.')+
-    '<div style="margin-top:12px">'+table([['Department'],['Target'],['Rolls up to'],['Set by'],['Measure'],['Status']],[
+      ['Technology, 11 milestones',0,'0 of 11','var(--line-2)'],['People, 40 staff',62,'25 of 40']])+'</div>'}},
+  {n:'Targets',r:function(){return head('Targets','Monthly and departmental · October 2026',[['Previous Month'],['Set Targets',1]])+
+    kpis([['Departments','6'],['Approved','4','ok'],['Awaiting CEO','2','warn'],['Binding From','On approval']])+
+    chain([['Managers Set','done'],['COO Review','done'],['Operations Review','now'],['CEO Approval',''],['Binding','']])+
+    '<div style="margin-top:12px">'+table([['Department'],['Target'],['Rolls Up To'],['Set By'],['Measure'],['Status']],[
       ['Operations','Reduce approval turnaround to 2 days','Operational readiness','Cynthia Osakunih','Average days',pill('wa','Awaiting CEO')],
       ['Marketing & Sales','8 new prospects, 3 proposals sent','Sign 12 partnerships','Ngozi Eze','Count',pill('wa','Awaiting CEO')],
       ['Content','24 pieces published for Ember to Remember','Reach 2M residents','Tolu Adeyemi','Count',pill('ok','Approved')],
       ['Engineering','Ship M1 and M2 to staging','Platform handover','Seyi Balogun','Milestones',pill('ok','Approved')],
       ['Studio','12 shoot days across Lagos and Enugu','Reach 2M residents','Emeka Obi','Days',pill('ok','Approved')],
-      ['Finance','Close October books by 05/11','Operational readiness','Amara Okafor','Date',pill('ok','Approved')]],'Departmental targets, October')+'</div>'+
+      ['Finance','Close October books by 05/11','Operational readiness','Amara Okafor','Date',pill('ok','Approved')]],'Departmental Targets, October')+'</div>'+
     '<div class="grid g2" style="margin-top:12px">'+
-    bars('September, how they landed',[['Content',104,'104% of target','var(--yellow)'],['Engineering',96,'96%'],
-      ['Finance',100,'100%'],['Operations',88,'88%'],['Studio',75,'75%'],['Marketing & Sales',62,'62%','var(--c4)']],
-      'A target that lands under 50% raises a query on the owner. That rule is currently a draft.')+
-    tl('October approval trail',[['Operations target submitted','06/10/2026 11:20','Cynthia Osakunih. With the CEO.','hi'],
+    bars('September Results',[['Content',104,'104% of target','var(--yellow)'],['Engineering',96,'96%'],
+      ['Finance',100,'100%'],['Operations',88,'88%'],['Studio',75,'75%'],['Marketing & Sales',62,'62%','var(--c4)']])+
+    tl('October Approval Trail',[['Operations target submitted','06/10/2026 11:20','Cynthia Osakunih. With the CEO.','hi'],
       ['Marketing target submitted','05/10/2026 16:40','Ngozi Eze. With the CEO.','hi'],
       ['Content target approved','06/10/2026 16:40','Ifeoma Chukwu. Dispatched to 5 staff.','ok'],
       ['Engineering target approved','06/10/2026 16:38','Ifeoma Chukwu.','ok'],
       ['Studio and Finance approved','05/10/2026 09:12','Ifeoma Chukwu.','ok']])+'</div>'}},
-  {n:'KPIs',r:function(){return head('KPIs','Individual monthly KPIs · set by department managers',[['By department'],['Assign KPIs',1]])+
-    kpis([['Staff with KPIs','23 / 25'],['Average weight','100%','ok'],['On track','17','ok'],['Behind','6','warn']])+
-    table([['Employee'],['KPI'],['Weight','n'],['Progress','n'],['Set by'],['Status']],[
+  {n:'KPIs',r:function(){return head('KPIs','Individual monthly KPIs · October 2026',[['By Department'],['Assign KPIs',1]])+
+    kpis([['Staff with KPIs','23 / 25'],['Average Weight','100%','ok'],['On Track','17','ok'],['Behind','6','warn']])+
+    table([['Employee'],['KPI'],['Weight','n'],['Progress','n'],['Set By'],['Status']],[
       [st(0),'24 pieces published','40%','18 of 24','Tolu Adeyemi',pill('ok','On track')],
       [st(1),'3 MOUs signed','35%','1 of 3','Ngozi Eze',pill('er','Behind')],
       [st(2),'Close books by 05/11','50%','In progress','Cynthia Osakunih',pill('ok','On track')],
       [st(6),'8 new prospects','30%','6 of 8','Cynthia Osakunih',pill('ok','On track')],
       [st(5),'12 shoot days','45%','7 of 12','Tolu Adeyemi',pill('wa','At risk')],
       [st(8),'Ember to Remember assets','40%','On track','Ngozi Eze',pill('ok','On track')],
-      [st(7),'12 pieces published','40%','7 of 12','Tolu Adeyemi',pill('wa','At risk')]],'This month')+
+      [st(7),'12 pieces published','40%','7 of 12','Tolu Adeyemi',pill('wa','At risk')]],'This Month')+
     '<div class="grid g2" style="margin-top:12px">'+
-    '<div class="card"><div class="ch"><h3>Weights must total 100%</h3><span class="right">'+pill('ok','All valid')+'</span></div>'+
-    '<p class="sub" style="margin-bottom:11px">Chidera Nwosu, four KPIs this month.</p>'+
+    '<div class="card"><div class="ch"><h3>KPI Weights, Chidera Nwosu</h3><span class="right">'+pill('ok','All valid')+'</span></div>'+
     [['12 pieces published','40%',40],['Enugu brief','20%',20],['Social copy','20%',20],['Probation objectives','20%',20]].map(function(r){
       return '<div style="display:flex;gap:10px;align-items:center;padding:7px 0"><span style="flex:1;font-size:12.5px">'+esc(r[0])+'</span>'+
       '<span class="mini" style="width:150px;flex:none"><span class="tr"><i style="width:'+(r[2]*2.5)+'%"></i></span><span>'+r[1]+'</span></span></div>'}).join('')+
     '<div style="display:flex;gap:10px;padding:9px 0 0;border-top:2px solid var(--line);margin-top:4px">'+
-    '<b style="flex:1;font-size:12.5px">Total</b><b style="font-size:12.5px;color:var(--ok)">100%</b></div>'+
-    '<p class="sub" style="margin-top:11px">The form will not save at 95% or 105%. It is a constraint, not a warning.</p></div>'+
-    table([['Where progress comes from'],['Counts','n']],[
+    '<b style="flex:1;font-size:12.5px">'+hint('Total','Each person’s KPI weights must total exactly 100%. The form will not save at 95% or 105%.')+'</b><b style="font-size:12.5px;color:var(--ok)">100%</b></div></div>'+
+    table([['Source'],['KPIs','n']],[
       ['Tasks linked to the KPI and closed','42'],['A figure entered by the manager','11'],
-      ['A date met or missed','6'],['Nothing linked yet','4']],'How 63 KPIs are measured')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Weights per employee total 100%. Progress counts automatically from tasks linked to the KPI.</p>'}},
-  {n:'Reviews',r:function(){return head('Reviews','Q4 2026 cycle opens 20/10/2026',[['Review form'],['Open cycle',1]])+
-    kpis([['Cycle','Q4 2026'],['Opens','20/10/2026'],['Last cycle','18 of 25'],['Average rating','3.9']])+
-    chain([['Employee self rating','now'],['Manager approval',''],['Second level',''],['People','']],
-      'The manager cannot see the form until the employee has submitted their own rating.')+
-    '<div style="margin-top:12px">'+table([['Employee'],['Cycle'],['Self rating','n'],['Manager','n'],['Second level'],['Status']],[
+      ['A date met or missed','6'],['Nothing linked yet','4']],'Progress Sources','<span class="sub">63 KPIs</span>')+'</div>'}},
+  {n:'Reviews',r:function(){return head('Reviews','Q4 2026 cycle opens 20/10/2026',[['Review Form'],['Open Cycle',1]])+
+    kpis([['Cycle','Q4 2026'],['Opens','20/10/2026'],['Last Cycle','18 of 25'],['Average Rating','3.9']])+
+    perfFoot(chain([['Employee Self Rating','now'],['Manager Approval',''],['Second Level',''],['People','']]),
+      [['Manager Approval','Opens only after the employee submits their own rating'],
+       ['Second Level','The manager’s own line manager approves']])+
+    '<div style="margin-top:12px">'+table([['Employee'],['Cycle'],['Self Rating','n'],['Manager','n'],['Second Level'],['Status']],[
       [st(0),'Q3 2026','4.2','4.0','Approved',pill('ok','Closed')],
       [st(1),'Q3 2026','3.6','3.2','Approved',pill('ok','Closed')],
       [st(2),'Q3 2026','4.5','4.4','Approved',pill('ok','Closed')],
       [st(8),'Q3 2026','4.1','4.0','Approved',pill('ok','Closed')],
       [st(6),'Q4 2026','—','—','—',pill('nt','Opens 20/10')],
-      [st(5),'Q4 2026','—','—','—',pill('nt','Opens 20/10')]],'Review history')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
-    '<div class="card"><div class="ch"><h3>Dictate your answer</h3><span class="right">'+pill('in','AI assisted')+'</span></div>'+
-    '<p class="sub" style="margin-bottom:10px">Speak instead of typing. The assistant tidies the wording against your goals. It does not change what you said.</p>'+
+      [st(5),'Q4 2026','—','—','—',pill('nt','Opens 20/10')]],'Review History')+'</div>'+
+    '<div class="card" style="margin-top:12px"><div class="ch"><h3>Voice Answer</h3><span class="right">'+pill('in','AI assisted')+'</span></div>'+
     '<div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px">'+
-    '<button class="btn pri" style="width:40px;height:40px;padding:0;justify-content:center;border-radius:50%">'+ic('spark')+'</button>'+
-    '<span class="sub">Tap to record your answer to "What went well this quarter?"</span></div>'+
-    '<div class="quote" style="margin-top:12px">"We closed the Providus sponsorship and got the Lagos venues confirmed, but I was slow on the Eko follow-up."</div>'+
-    '<p class="sub" style="margin-top:9px">Transcribed, then tidied. The original recording and the raw transcript are both kept.</p></div>'+
-    kvcard('What the form asks',[['Section 1','Rate each of your KPIs, with a comment'],
-      ['Section 2','What went well this quarter'],['Section 3','What did not, and why'],
-      ['Section 4','What support you need'],['Section 5','Your rating out of 5'],
-      ['Manager sees','All of it, only after you submit'],['Second level','The manager’s own line manager approves']])+'</div>'}},
+    '<button class="btn pri" aria-label="Record Answer" title="Record Answer" style="width:44px;height:44px;min-width:44px;flex:none;padding:0;justify-content:center;border-radius:50%">'+ic('spark')+'</button>'+
+    '<span style="font-size:12.5px;font-weight:600">What went well this quarter?</span></div>'+
+    '<div class="quote" style="margin-top:12px">"We closed the Providus sponsorship and got the Lagos venues confirmed, but I was slow on the Eko follow-up."</div></div>'}},
   {n:'Analytics',r:function(){return head('Analytics','Performance across the organisation')+
-    kpis([['Goals on track','11 of 14','ok'],['Reviews completed','18 of 25'],['Avg self rating','4.1'],['Avg manager rating','3.9']])+
-    '<div class="grid g2">'+areaChart('Goal completion by month',[52,58,61,67,71,78])+
-    bars('By department',[['Content',88,'88%'],['Engineering',81,'81%'],['Operations',76,'76%'],['Finance',72,'72%'],['Marketing & Sales',58,'58%','var(--c4)'],['Studio',66,'66%']])+'</div>'+
-    '<div class="grid g2">'+
-    table([['Department'],['Self','n'],['Manager','n'],['Gap','n']],[
+    kpis([['Goals on Track','11 of 14','ok'],['Reviews Completed','18 of 25'],['Avg Self Rating','4.1'],['Avg Manager Rating','3.9']])+
+    '<div class="grid g2">'+areaChart('Goal Completion by Month',[52,58,61,67,71,78])+
+    bars('Completion by Department',[['Content',88,'88%'],['Engineering',81,'81%'],['Operations',76,'76%'],['Finance',72,'72%'],['Marketing & Sales',58,'58%','var(--c4)'],['Studio',66,'66%']])+'</div>'+
+    perfFoot(table([['Department'],['Self','n'],['Manager','n'],['Gap','n']],[
       ['Content','4.3','4.0','−0.3'],['Finance','4.5','4.4','−0.1'],['Engineering','4.0','4.0','0.0'],
       ['Operations','4.1','3.9','−0.2'],['Marketing & Sales','4.0','3.6','−0.4'],['Studio','3.8','3.7','−0.1']],
-      'Self rating against manager rating','<span class="sub">Q3 2026</span>')+
-    kvcard('What the gap means',[['A small gap','Expected. People rate themselves a little higher'],
-      ['A wide gap','The KPI was not clear, or the conversation did not happen'],
-      ['A negative gap','Rare, and worth a conversation either way'],
-      ['Marketing at −0.4','The widest. Its October target is also the one at risk'],
-      ['Not a score','This is a prompt for a conversation, not a ranking']])+'</div>'}}]},
+      'Self vs Manager Rating','<span class="sub">Q3 2026</span>'),
+      [['Gap','Manager rating minus self rating'],['Small Gap','Expected: people rate themselves a little higher'],
+       ['Wide Gap','The KPI was unclear, or the conversation did not happen'],
+       ['Not a Ranking','A prompt for a conversation']])}}]},
 
 {k:'queries',n:'Queries & Sanctions',i:'flag',g:'PEOPLE',cnt:'2',tabs:[
   {n:'Queries',r:function(){return head('Queries','Managers see the queries they raised. People and the CEO see all.',[['My queries'],['Raise a query',1]])+
@@ -3539,12 +3515,17 @@ var TASKS=[['Confirm Ember to Remember venue list with MTN',0,'CO','er','Overdue
  ['Publish Partnerships Associate vacancy',3,'CO','ok','Done'],
  ['Onboard Hauwa Yusuf, Abuja hub',3,'CO','ok','Done'],
  ['Deliver MTN campaign assets',3,'AD','ok','Done']];
-function boardHTML(){var cols=[['To do','var(--ink-3)'],['In progress','var(--c2)'],['In review','var(--c3)'],['Done','var(--c1)']];
+function boardHTML(){var cols=[['To Do','var(--ink-3)'],['In Progress','var(--c2)'],['In Review','var(--c3)'],['Done','var(--c1)']];
   return '<div class="kb">'+cols.map(function(c,ci){
     var items=TASKS.map(function(t,i){return [t,i]}).filter(function(p){return p[0][1]===ci});
     return '<div class="kcol"><h4><i style="background:'+c[1]+'"></i>'+c[0]+'<em>'+items.length+'</em></h4>'+
       items.map(function(p){return '<button class="task" data-ti="'+p[1]+'"><b>'+esc(p[0][0])+'</b><span class="meta">'+
         pill(p[0][3],p[0][4])+'<span class="av">'+p[0][2]+'</span></span></button>'}).join('')+'</div>'}).join('')+'</div>'}
+/* Performance: one closed Details row (FRONTEND_GUIDE §5.2) at the foot of a card that table() or
+   chain() has already built; pairs are short label and value rows. */
+function perfFoot(card,pairs){var pad=card.indexOf('<div class="card pad0"')===0;
+  var body='<dl class="kv">'+pairs.map(function(p){return '<dt>'+esc(p[0])+'</dt><dd>'+esc(p[1])+'</dd>'}).join('')+'</dl>';
+  return card.replace(/<\/div>$/,(pad?'<div style="padding:0 14px 12px">':'')+details(body)+(pad?'</div>':'')+'</div>')}
 
 /* ═════════════ SHARED: modal (sheet on mobile), popover, inline help ═════════════
    openModal({title, body, foot, wide, full, onMount}) is the one modal every module
