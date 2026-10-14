@@ -2738,121 +2738,92 @@ var M=[
       ['June','5','2','2',mini(40,'40%')],['May','4','1','1',mini(25,'25%')]],'Last Six Months')+'</div>'}}]},
 
 {k:'expenses',n:'Expenses',i:'wallet',g:'BUSINESS',cnt:'5',tabs:[
-  {n:'My Requests',r:function(){return head('My Requests','Your own expense requests',[['New request',1]])+
-    kpis([['In flight','1','warn'],['Disbursed this year','₦1.42M'],['Average turnaround','3.1 days'],['Rejected','0','ok']])+
+  {n:'My Requests',r:function(){return head('My Requests','',[['New Request',1]])+
+    kpis([['In Flight','1','warn'],['Disbursed This Year','₦1.42M'],['Average Turnaround','3.1 days'],['Rejected','0','ok']])+
     chain([['Requested','done'],['Line manager','done'],['Operations','done'],['CEO','now'],['Disbursed','']],
-      'EXP-0118, your partner dinner request. It is with the CEO because it is over ₦500,000.')+
+      'EXP-0118 · Partner dinner, ProvidusBank')+
     '<div style="margin-top:12px">'+table([['Reference'],['Description'],['Amount','n'],['Submitted'],['Stage']],[
       ['EXP-0118','Partner dinner, ProvidusBank','₦412,000','06/10/2026',pill('in','With CEO')],
       ['EXP-0109','Team offsite catering','₦186,000','28/09/2026',pill('ok','Disbursed')],
       ['EXP-0101','Courier, Enugu documents','₦24,500','19/09/2026',pill('ok','Disbursed')],
-      ['EXP-0094','Stationery, Victoria Island','₦38,000','04/09/2026',pill('ok','Disbursed')]],'My requests')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
-    kvcard('What a request needs',[['Description','What it is for, in a sentence'],
-      ['Amount','In Naira. Always'],['Category','From the category list, which sets the threshold'],
-      ['Vendor invoice','Attached. The engine compresses it on the way up'],
-      ['Account details','Beneficiary bank and account, for the disbursement'],
-      ['Project','Optional. Links the spend to a campaign or a city']])+
-    tl('EXP-0118 history',[['With the CEO','06/10/2026 14:08','Six days at this stage. An approval ageing alert is open.','hi'],
+      ['EXP-0094','Stationery, Victoria Island','₦38,000','04/09/2026',pill('ok','Disbursed')]],'My Requests')+'</div>'+
+    '<div style="margin-top:12px">'+
+    tl('EXP-0118 History',[['With the CEO','06/10/2026 14:08','Six days at this stage. An approval ageing alert is open.','hi'],
       ['Approved by Operations','06/10/2026 11:40','Cynthia Osakunih.','ok'],
       ['Approved by line manager','06/10/2026 09:22','Ifeoma Chukwu.','ok'],
       ['Submitted','06/10/2026 08:50','₦412,000, events and activation.']])+'</div>'}},
-  {n:'Approvals',r:function(){return head('Approvals','Requests waiting on you',[['History']])+
-    kpis([['With you','3','warn'],['Total value','₦1.29M'],['Oldest','3 days'],['Approved this month','11','ok']])+
-    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>EXP-0122 · Ember to Remember, stage hire</h3><span class="right">'+pill('wa','₦820,000')+'</span></div>'+
+  {n:'Approvals',r:function(){return head('Approvals','',[['History']])+
+    kpis([['With You','3','warn'],['Total Value','₦1.29M'],['Oldest','3 days'],['Approved This Month','11','ok']])+
+    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>EXP-0122</h3><span class="right">'+pill('wa','₦820,000')+'</span></div>'+
     '<div class="chain" id="chain">'+[['Requested','done'],['Line manager','done'],['Operations','now'],['CEO',''],['Disbursed','']].map(function(s,i){
       return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'" data-step="'+i+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">Above ₦500,000 the CEO must co-approve. Vendor invoice attached, account details supplied.</p>'+
-    '<dl class="kv" style="margin-top:13px;grid-template-columns:118px 1fr"><dt>Requested by</dt><dd>Adedotun Oyinloye, Brand and Design Lead</dd>'+
-    '<dt>Category</dt><dd>Events and activation · threshold ₦500,000</dd>'+
-    '<dt>Beneficiary</dt><dd>Stagecraft Nigeria Ltd · GTBank · ••••3301</dd>'+
-    '<dt>Invoice</dt><dd>stagecraft-inv-4471.pdf · 740 KB</dd>'+
-    '<dt>Project</dt><dd>Ember to Remember, Lagos leg</dd></dl>'+
+    '<dl class="kv" style="margin-top:13px;grid-template-columns:118px 1fr"><dt>Description</dt><dd data-copy="content">Ember to Remember, stage hire</dd>'+
+    '<dt>Requested By</dt><dd data-copy="content">Adedotun Oyinloye, Brand and Design Lead</dd>'+
+    '<dt>'+hint('Category','At or above the category threshold, the CEO approves after Operations.')+'</dt><dd data-copy="content">Events and activation · threshold ₦500,000</dd>'+
+    '<dt>Beneficiary</dt><dd data-copy="content">Stagecraft Nigeria Ltd · GTBank · ••••3301</dd>'+
+    '<dt>Invoice</dt><dd data-copy="content">stagecraft-inv-4471.pdf · 740 KB</dd>'+
+    '<dt>Project</dt><dd data-copy="content">Ember to Remember, Lagos leg</dd></dl>'+
     '<div style="display:flex;gap:8px;margin-top:13px;flex-wrap:wrap"><button class="btn pri" id="approve">'+ic('ok')+'Approve as Operations</button>'+
-    '<button class="btn">Reject</button><button class="btn">'+ic('doc')+'View invoice</button></div></div>'+
+    '<button class="btn">Reject</button><button class="btn">'+ic('doc')+'View Invoice</button></div></div>'+
     table([['Reference'],['Description'],['Requester'],['Amount','n'],['Stage']],[
       ['EXP-0122','Ember to Remember, stage hire',st(8),'₦820,000',pill('wa','With you')],
       ['EXP-0121','Enugu city launch, transport',st(0),'₦345,000',pill('wa','With you')],
       ['EXP-0120','Studio equipment repair',st(5),'₦128,500',pill('wa','With you')],
       ['EXP-0118','Partner dinner, ProvidusBank',st(6),'₦412,000',pill('in','With CEO')],
       ['EXP-0117','Q4 content shoot, Lekki',st(7),'₦136,000',pill('ok','Approved')]],'Queue')}},
-  {n:'Requisitions',r:function(){return head('Requisitions','Approved requests grouped for the CEO',[['New requisition',1]])+
-    kpis([['With the CEO','1','err'],['Days waiting','6','err'],['Disbursed this year','₦14.8M'],['Average size','5 requests']])+
-    '<p class="sub" style="margin-bottom:12px">Operations selects approved requests and submits them as one requisition. The CEO approves the requisition, not each request.</p>'+
-    table([['Reference'],['Requests','n'],['Total','n'],['Submitted'],['Approved'],['Status']],[
+  {n:'Requisitions',r:function(){return head('Requisitions','',[['New Requisition',1]])+
+    kpis([['With the CEO','1','err'],['Days Waiting','6','err'],['Disbursed This Year','₦14.8M'],['Average Size','5 requests']])+
+    helpOn(table([['Reference'],['Requests','n'],['Total','n'],['Submitted'],['Approved'],['Status']],[
       ['REQ-0042','5','₦1,841,500','06/10/2026','—',pill('wa','With CEO · 6 days')],
       ['REQ-0041','7','₦2,214,000','22/09/2026','23/09/2026',pill('ok','Disbursed')],
-      ['REQ-0040','4','₦986,000','08/09/2026','09/09/2026',pill('ok','Disbursed')]],'Requisitions')+
-    '<div class="grid g2" style="margin-top:12px">'+table([['Included in REQ-0042'],['Requester'],['Amount','n']],[
+      ['REQ-0040','4','₦986,000','08/09/2026','09/09/2026',pill('ok','Disbursed')]],'Requisitions'),
+      'Requisitions','Approved requests Operations sends to the CEO as one decision. A request removed from it returns to the queue; once approved, each request is disbursed on its own.')+
+    '<div style="margin-top:12px">'+table([['Included in REQ-0042'],['Requester'],['Amount','n']],[
       ['EXP-0118 · Partner dinner, ProvidusBank','Ngozi Eze','₦412,000'],
       ['EXP-0117 · Q4 content shoot, Lekki','Chidera Nwosu','₦136,000'],
       ['EXP-0115 · Studio consumables','Emeka Obi','₦94,500'],
       ['EXP-0113 · Enugu site visit','Tolu Adeyemi','₦378,000'],
-      ['EXP-0112 · Vendor retainer, design','Adedotun Oyinloye','₦821,000']],'Contents','<b>₦1,841,500</b>')+
-    '<div class="card"><div class="ch"><h3>Why group them</h3></div>'+
-    '<p class="sub">The CEO was approving requests one at a time, which meant five notifications for one afternoon of spending and no view of the total.</p>'+
-    '<p class="sub" style="margin-top:9px">A requisition is one decision on one number, with the five requests visible underneath it.</p>'+
-    '<div class="quote" style="margin-top:12px">This one has been open for six days. The approval ageing rule raised a high severity alert, which is the only reason anybody knows.</div>'+
-    '<dl class="kv" style="margin-top:14px;grid-template-columns:118px 1fr"><dt>Who groups</dt><dd>Operations</dd>'+
-    '<dt>Who approves</dt><dd>The CEO. One decision</dd>'+
-    '<dt>Partial approval</dt><dd>Possible. A removed request returns to the queue</dd>'+
-    '<dt>After approval</dt><dd>Each request becomes disbursable on its own</dd></dl></div></div>'}},
-  {n:'Disbursements',r:function(){return head('Disbursements','Logged after the bank confirms',[['Export'],['Log disbursement',1]])+
-    kpis([['Settled this month','₦2.21M'],['Awaiting disbursement','5','warn'],['Average to pay','1.2 days'],['Missing reference','0','ok']])+
-    table([['Reference'],['Beneficiary'],['Bank'],['Amount','n'],['Bank reference'],['Date'],['Status']],[
+      ['EXP-0112 · Vendor retainer, design','Adedotun Oyinloye','₦821,000']],'Contents','<b>₦1,841,500</b>')+'</div>'}},
+  {n:'Disbursements',r:function(){return head('Disbursements','',[['Export'],['Log Disbursement',1]])+
+    kpis([['Settled This Month','₦2.21M'],['Awaiting Disbursement','5','warn'],['Average to Pay','1.2 days'],['Missing Reference','0','ok']])+
+    helpOn(table([['Reference'],['Beneficiary'],['Bank'],['Amount','n'],['Bank Reference'],['Date'],['Status']],[
       ['EXP-0109','Ikeja Catering Ltd','GTBank','₦186,000','FT26092812445','28/09/2026',pill('ok','Settled')],
       ['EXP-0112','Oyinloye Design Studio','GTBank','₦821,000','FT26092212401','22/09/2026',pill('ok','Settled')],
       ['EXP-0101','Red Star Express','Zenith','₦24,500','FT26091904411','19/09/2026',pill('ok','Settled')],
-      ['EXP-0098','Tolu Adeyemi','Providus','₦62,000','FT26091201902','12/09/2026',pill('ok','Settled')]],'Disbursements')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    areaChart('Disbursed per month',[1420000,986000,1680000,2214000,2210000],'Naira, settled only. A logged but unsettled transfer does not appear.')+
-    kvcard('Why a bank reference is mandatory',[['The rule','A disbursement cannot be saved without one'],
-      ['Enforced by','The database, not only the screen'],
-      ['Why','A disbursement with no reference cannot be traced back to a transfer'],
-      ['What it is not','This system does not move money. It records that money moved'],
-      ['Currency','All transfers in Naira. No multi-currency anywhere'],
-      ['Reconciliation','The reference is what the finance team matches against the statement']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">A bank reference is mandatory at disbursement. The database enforces it, not only the screen. All transfers in Naira.</p>'}},
-  {n:'Budgets',r:function(){return head('Budgets','2026 · no budget lines set',[['Import'],['Add budget line',1]])+
+      ['EXP-0098','Tolu Adeyemi','Providus','₦62,000','FT26091201902','12/09/2026',pill('ok','Settled')]],'Disbursements'),
+      'Bank Reference','The bank’s transfer reference. A disbursement cannot be saved without one; log it once the bank confirms. Finance matches it against the statement.')+
+    '<div style="margin-top:12px">'+
+    areaChart('Disbursed per Month',[1420000,986000,1680000,2214000,2210000],'Naira, settled transfers only.')+'</div>'}},
+  {n:'Budgets',r:function(){return head('Budgets','2026 · no budget lines set',[['Import'],['Add Budget Line',1]])+
     '<div class="card" style="margin-bottom:12px;background:var(--info-bg);border-color:transparent">'+
     '<div style="display:flex;gap:10px;align-items:flex-start"><span style="color:var(--info)">'+ic('alert')+'</span>'+
-    '<div><h3 style="font-size:13.5px;color:var(--info)">Showing example figures</h3>'+
-    '<p class="sub" style="color:var(--info);margin-top:4px">MyCity sets its operating expense budget from 2027. The screen is built and waiting. These numbers are illustrative.</p></div></div></div>'+
-    bars('Budget against actual, by department',[['Marketing & Sales',92,'₦2.3M of ₦2.5M','var(--c4)'],['Studio',61,'₦1.1M of ₦1.8M'],
+    '<div><h3 style="font-size:13.5px;color:var(--info)">Example Figures</h3>'+
+    '<p class="sub" style="color:var(--info);margin-top:4px">Operating expense budgets start in 2027.</p></div></div></div>'+
+    bars('Budget vs Actual',[['Marketing & Sales',92,'₦2.3M of ₦2.5M','var(--c4)'],['Studio',61,'₦1.1M of ₦1.8M'],
       ['Partnerships',44,'₦0.6M of ₦1.4M'],['Operations',22,'₦0.4M of ₦1.8M'],['Content',38,'₦0.3M of ₦0.8M']])+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Department'],['Budget','n'],['Actual','n'],['Variance','n'],['Status']],[
+    '<div style="margin-top:12px">'+
+    helpOn(table([['Department'],['Budget','n'],['Actual','n'],['Variance','n'],['Status']],[
       ['Marketing & Sales','₦2,500,000','₦2,300,000','₦200,000',pill('wa','92% used')],
       ['Studio','₦1,800,000','₦1,100,000','₦700,000',pill('ok','61% used')],
       ['Partnerships','₦1,400,000','₦600,000','₦800,000',pill('ok','44% used')],
       ['Operations','₦1,800,000','₦400,000','₦1,400,000',pill('ok','22% used')],
-      ['Content','₦800,000','₦300,000','₦500,000',pill('ok','38% used')]],'Example only',pill('in','Illustrative'))+
-    kvcard('Built and handed over empty',[['The ask','MyCity does not budget operating expense until 2027'],
-      ['The decision','Build it in M8 anyway, hand it over with no lines'],
-      ['Why','Adding budgets later means touching every expense path again'],
-      ['The threshold rule','Fires at 90% of a line. Dormant with no lines'],
-      ['Setting one up','Add a line per department and category, with a period'],
-      ['Who sees it','Finance and the CEO. Managers see their own department']])+'</div>'}},
-  {n:'Categories',r:function(){return head('Categories','Expense categories',[['New category',1]])+
-    kpis([['Categories','6'],['Spend this month','₦5.57M'],['Requests','58'],['Capital','1']])+
-    table([['Category'],['Type'],['Approval threshold','n'],['This month','n'],['Requests','n']],[
+      ['Content','₦800,000','₦300,000','₦500,000',pill('ok','38% used')]],'By Department',pill('in','Illustrative')),
+      'Status','Turns amber at 90% of a budget line, when the budget threshold alert fires.')+'</div>'}},
+  {n:'Categories',r:function(){return head('Categories','',[['New Category',1]])+
+    helpOn(kpis([['Categories','6'],['Spend This Month','₦5.57M'],['Requests','58'],['Capital','1']]),
+      'Capital','Capital spend is flagged separately for the books. It follows the same approval chain.')+
+    helpOn(table([['Category'],['Type'],['Approval Threshold','n'],['This Month','n'],['Requests','n']],[
       ['Travel and transport','Operating','₦200,000','₦723,000','14'],
       ['Events and activation','Operating','₦500,000','₦1,841,000','9'],
       ['Studio and production','Operating','₦300,000','₦1,106,000','11'],
       ['Office and admin','Operating','₦100,000','₦218,500','17'],
       ['Professional services','Operating','₦500,000','₦1,200,000','3'],
-      ['Equipment','Capital','₦250,000','₦486,000','4']],'Categories')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    bars('Spend by category, this month',[['Events and activation',100,'₦1.84M'],['Professional services',65,'₦1.20M'],
+      ['Equipment','Capital','₦250,000','₦486,000','4']],'Categories'),
+      'Approval Threshold','At or above this amount the CEO approves after the line manager and Operations. Below it, two approvals. A change applies to new requests only.')+
+    '<div style="margin-top:12px">'+
+    bars('Category Spend This Month',[['Events and activation',100,'₦1.84M'],['Professional services',65,'₦1.20M'],
       ['Studio and production',60,'₦1.11M'],['Travel and transport',39,'₦723k'],
-      ['Equipment',26,'₦486k'],['Office and admin',12,'₦219k','var(--yellow)']],
-      'Office and admin has the most requests and the least money. Its threshold is set accordingly.')+
-    kvcard('What a threshold does',[['Below it','Requester, line manager, Operations. Two steps'],
-      ['At or above it','Adds the CEO. Three steps'],
-      ['Set per category','Office and admin at ₦100,000, events at ₦500,000'],
-      ['Changing one','A setting. No deploy, and in-flight requests keep the chain they started on'],
-      ['Capital','Flagged separately for the books. It still follows the same chain'],
-      ['Why per category','₦300,000 of stationery is a problem. ₦300,000 of stage hire is a Tuesday']])+'</div>'}}]},
+      ['Equipment',26,'₦486k'],['Office and admin',12,'₦219k','var(--yellow)']])+'</div>'}}]},
 
 {k:'knowledge',n:'Knowledge Hub',i:'book',g:'SYSTEM',tabs:[
   {n:'Policies',r:function(){return head('Policies','HR and company policy',[['Search'],['New policy',1]])+
