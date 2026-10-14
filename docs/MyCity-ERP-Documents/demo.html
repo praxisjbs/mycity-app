@@ -3113,34 +3113,27 @@ var M=[
       ['Alert cleared',pill('nt','Off'),pill('nt','Off'),'You']],'All Categories'),
       'All Categories','Locked categories cannot be switched off: a query raised against you, or a sanction decision.')}},
   {n:'Appearance',r:function(){return head('Appearance','MyCityApp brand',[['Reset'],['Save',1]])+
-    '<div class="grid g2">'+'<div class="card"><div class="ch"><h3>Palette</h3></div>'+
+    '<div class="grid g3">'+helpOn('<div class="card"><div class="ch"><h3>Palette</h3></div>'+
     [['Primary Yellow','#FFDF55'],['Yellow Tint','#FFEFAA'],['City Green','#014339'],['Deep Green','#01221D']].map(function(c){
       return '<div style="display:flex;align-items:center;gap:11px;padding:7px 0"><i style="width:30px;height:30px;border-radius:8px;background:'+c[1]+';border:1px solid var(--line);flex:none"></i>'+
-      '<div style="flex:1"><div style="font-size:13px;font-weight:550">'+c[0]+'</div><div class="sub">'+c[1]+'</div></div></div>'}).join('')+
-    '<p class="sub" style="margin-top:9px">The four brand colours, unchanged. Everything else on screen is derived from them.</p></div>'+
-    kvcard('Typography and theme',[['Typeface','Geist'],['Money figures','Tabular figures, 2dp'],['Dates','Day first, 09/10/2026'],
-      ['Default theme','Follow the device'],['Logo','MyCityApp lockup'],['Favicon','Map pin mark']])+'</div>'+
-    '<div class="grid g2">'+
-    '<div class="card"><div class="ch"><h3>The dark theme is derived, not invented</h3><span class="right">'+pill('in','Try the moon icon')+'</span></div>'+
-    '<p class="sub" style="margin-bottom:11px">MyCity has no dark brand variant. Rather than pick colours, every dark surface sits on the brand’s own 171 degree hue.</p>'+
-    [['Background','#01110E','Deep Green, darkened'],['Card','#01221D','Deep Green exactly'],
-     ['Text','#E6EDEB','14.2 to 1 against the background'],['Muted text','#A9B8B4','8.2 to 1'],
-     ['Primary','#FFDF55','12.8 to 1. The brand yellow, unchanged']].map(function(r){
+      '<div style="flex:1"><div style="font-size:13px;font-weight:550">'+c[0]+'</div><div class="sub" data-copy="content">'+c[1]+'</div></div></div>'}).join('')+'</div>',
+      'Palette','The four brand colours. Every other colour on screen, in both themes, is derived from them.')+
+    helpOn(kvcard('Typography and Theme',[['Typeface','Geist'],['Default Theme','Follow the device'],['Logo','MyCityApp lockup'],['Favicon','Map pin mark']]),
+      'Typeface','Chosen from a vetted list.')+
+    helpOn('<div class="card"><div class="ch"><h3>Dark Theme</h3></div>'+
+    [['Background','#01110E',''],['Card','#01221D',''],['Text','#E6EDEB','14.2 to 1'],['Muted Text','#A9B8B4','8.2 to 1'],['Primary','#FFDF55','12.8 to 1']].map(function(r){
       return '<div style="display:flex;align-items:center;gap:11px;padding:6px 0;border-bottom:1px solid var(--line)">'+
       '<i style="width:24px;height:24px;border-radius:7px;background:'+r[1]+';border:1px solid var(--line);flex:none"></i>'+
       '<span style="flex:1;min-width:0;font-size:12.5px;font-weight:550">'+esc(r[0])+'</span>'+
-      '<span class="sub" style="flex:none">'+esc(r[2])+'</span></div>'}).join('')+
-    '<p class="sub" style="margin-top:11px">Every pair clears WCAG AA. The chart palette is separate per theme, because a colour that reads on white does not read on near-black.</p></div>'+
-    kvcard('What a tenant can change',[['Logo','Theirs, uploaded'],['Favicon','Theirs'],
-      ['The four colours','Theirs. Everything derives'],['Typeface','From a vetted list'],
-      ['Default theme','Light, dark, or follow the device'],
-      ['What they cannot','Break contrast. The build fails if a pair drops below AA']])+'</div>'}},
-  {n:'Documents & Numbering',r:function(){return head('Documents & Numbering','Reference formats and templates',[['Save',1]])+
-    statstrip([['Document types','7'],['Templates','9'],['Issued this year','118'],['Signed','32'],['Format','PREFIX-0000']])+
-    '<div class="grid g32">'+table([['Document'],['Prefix'],['Format'],['Next','n']],[
+      '<span class="sub" style="flex:none" data-copy="content">'+esc(r[1])+(r[2]?' · '+esc(r[2]):'')+'</span></div>'}).join('')+'</div>',
+      'Dark Theme','Derived from the brand colours, not set separately. Every text pair clears WCAG AA contrast against its background.')+'</div>'}},
+  {n:'Documents & Numbering',r:function(){return head('Documents & Numbering','',[['Save',1]])+
+    statstrip([['Document Types','7'],['Templates','9'],['Issued This Year','118'],['Signed','32'],['Format','PREFIX-0000']])+
+    '<div class="grid g32">'+helpOn(table([['Document'],['Prefix'],['Format'],['Next','n']],[
       ['Expense request','EXP','EXP-0000','0123'],['Requisition','REQ','REQ-0000','0043'],
       ['Offer letter','OFF','OFF-0000','0019'],['Employment contract','CON','CON-0000','0017'],
-      ['Proposal','PRO','PRO-0000','0031'],['MOU','MOU','MOU-0000','0012'],['Query','QRY','QRY-0000','0028']],'Numbering')+
+      ['Proposal','PRO','PRO-0000','0031'],['MOU','MOU','MOU-0000','0012'],['Query','QRY','QRY-0000','0028']],'Numbering'),
+      'Numbering','A number is issued when a document is created and never reused, even if the document is deleted.')+
     paper(plogo('MOU-0004')+
      '<h3>Memorandum of understanding</h3>'+
      '<p style="color:#566662;font-size:11.5px;margin-top:3px">Between MyCity App Ltd and MTN Nigeria Communications Plc · Executed 13/03/2025</p>'+
@@ -3152,50 +3145,38 @@ var M=[
      '<div><div class="sig">For MTN</div>'+
      '<div style="font-size:10px;color:#7E8D88;border-top:1px solid #D5DEDB;padding-top:4px;margin-top:2px">O. Adesanya · 02/04/2025</div></div></div>'+
      '<div class="pfoot"><span>Content hash verified</span><span>Artifact hash verified</span>'+
-     '<span style="margin-left:auto">go.mycityapp.io/verify/MOU-0004</span></div>',
-     'Every document type has a template like this. The engine fills it, numbers it and hashes it.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">A reference is issued at creation and never reused, even if the document is deleted. The sequence is a database object, so two people creating at once cannot collide.</p>'}},
-  {n:'Integrations',r:function(){return head('Integrations','Connected services')+
-    kpis([['Connected','4'],['Manual','1'],['Not in scope','1'],['Failures, 7 days','0','ok']])+
-    cards([['SMTP, mycityapp.io','Outbound mail for notifications and offer letters.','<span class="pill ok"><i></i>Connected</span>'],
-      ['IMAP mailbox','Staff mailboxes on the MyCity domain. No Google, no Microsoft.','<span class="pill ok"><i></i>Connected</span>'],
-      ['Gemini','The model behind Praxis AI. Spend capped monthly.','<span class="pill ok"><i></i>Connected</span>'],
-      ['Careers page','Vacancies publish to go.mycityapp.io.','<span class="pill ok"><i></i>Connected</span>'],
-      ['Google Sheets import','Download as xlsx and import. No API connection needed.','<span class="pill nt">Manual</span>'],
-      ['Payment gateway','Not in scope. Disbursement is logged, not executed.','<span class="pill nt">Not connected</span>']])+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Service'],['Last call'],['Volume, 7d','n'],['Failures','n'],['Status']],[
+     '<span style="margin-left:auto">go.mycityapp.io/verify/MOU-0004</span></div>')+'</div>'}},
+  {n:'Integrations',r:function(){return head('Integrations','')+
+    kpis([['Connected','4'],['Manual','1'],['Not Connected','1'],['Failures, 7 Days','0','ok']])+
+    '<div class="grid g3">'+[['SMTP, mycityapp.io','Outbound notification and offer mail.',pill('ok','Connected')],
+      ['IMAP Mailbox','Staff mailboxes on mycityapp.io.',pill('ok','Connected')],
+      ['Gemini','Praxis AI model. Spend capped monthly.',pill('ok','Connected')],
+      ['Careers Page','Vacancies publish to go.mycityapp.io.',pill('ok','Connected')],
+      ['Google Sheets Import','Download as xlsx, then import.',pill('nt','Manual')],
+      ['Payment Gateway','Disbursements are logged, not paid.',pill('nt','Not connected')]].map(function(c){
+      return '<div class="tile"><h4>'+esc(c[0])+'</h4><p class="donly">'+esc(c[1])+'</p>'+
+        '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+c[2]+'</div></div>'}).join('')+'</div>'+
+    '<div style="margin-top:12px">'+
+    table([['Service'],['Last Call'],['Volume, 7d','n'],['Failures','n'],['Status']],[
       ['SMTP','09/10 09:14','284','0',pill('ok','Healthy')],
       ['IMAP','09/10 09:21','1,842','0',pill('ok','Healthy')],
       ['Gemini','09/10 09:12','84','0',pill('ok','Healthy')],
-      ['Careers page','09/10 08:02','612','0',pill('ok','Healthy')]],'Health','<span class="sub">Last 7 days</span>')+
-    kvcard('Why the mailbox is ours',[['The ask','Staff mail on the MyCity domain, inside the platform'],
-      ['Not Google','No Workspace. No OAuth consent screen'],
-      ['Not Microsoft','No 365, no Graph API'],
-      ['How','SMTP out, IMAP in, against mycityapp.io'],
-      ['Sign in','An address and a password, the same as any other mailbox'],
-      ['What it means','No third party sees MyCity mail, and no vendor can withdraw it']])+'</div>'}},
-  {n:'Security',r:function(){return head('Security','Sessions, devices and access')+
-    kpis([['Active sessions','19'],['MFA enrolled','3 of 25','warn'],['Failed logins, 7 days','4'],['Devices','31']])+
-    '<div class="grid g2">'+toggles('Policy',[['Require MFA for CEO, Operations and Finance','',1],['Remember devices for 30 days','',1],
-      ['Sign out after 8 hours idle','',1],['Allow sign in from new countries','',0]])+
-    table([['User'],['Device'],['Started'],['']],[
+      ['Careers page','09/10 08:02','612','0',pill('ok','Healthy')]],'Health','<span class="sub">Last 7 days</span>')+'</div>'}},
+  {n:'Security',r:function(){return head('Security','')+
+    kpis([['Active Sessions','19'],['MFA Enrolled','3 of 25','warn'],['Failed Sign-Ins, 7 Days','4'],['Devices','31']])+
+    '<div class="grid g2">'+toggles('Policy',[['Require MFA for CEO, Operations and Finance','',1],['Remember Devices for 30 Days','',1],
+      ['Sign Out After 8 Hours Idle','',1],['Allow Sign-In From New Countries','',0]])+
+    helpOn(table([['User'],['Device'],['Started'],['']],[
       [who('CO','Cynthia Osakunih',''),'MacBook · Chrome','09/10 07:58','<button class="btn">End</button>'],
       [who('TA','Tolu Adeyemi',''),'iPhone · Safari','09/10 07:52','<button class="btn">End</button>'],
-      [who('SB','Seyi Balogun',''),'Pixel 7 · Chrome','09/10 08:58','<button class="btn">End</button>']],'Active sessions')+'</div>'+
-    '<div class="grid g2">'+
-    table([['When'],['Who'],['From'],['Outcome']],[
+      [who('SB','Seyi Balogun',''),'Pixel 7 · Chrome','09/10 08:58','<button class="btn">End</button>']],'Active Sessions'),
+      'Active Sessions','Ending a session signs that device out on its next request.')+'</div>'+
+    helpOn(table([['When'],['Who'],['From'],['Outcome']],[
       ['08/10 22:41','bashir@mycityapp.io','Lagos, Nigeria',pill('er','Wrong password')],
       ['08/10 22:40','bashir@mycityapp.io','Lagos, Nigeria',pill('er','Wrong password')],
       ['06/10 11:02','unknown@example.com','Unknown',pill('er','No such user')],
-      ['04/10 08:14','emeka@mycityapp.io','Lagos, Nigeria',pill('er','Wrong password')]],'Failed sign-ins',
-      '<span class="sub">Last 7 days</span>')+
-    kvcard('How a session works',[['Access token','In memory only. Never in local storage'],
-      ['Refresh token','An httpOnly cookie, so script cannot read it'],
-      ['Idle timeout','Eight hours, configurable'],
-      ['Ending one','Takes effect on the next request, not on the next page load'],
-      ['Failed attempts','Rate limited, then locked. Five in fifteen minutes'],
-      ['MFA','Required for the three privileged roles. Three of twenty-five have enrolled']])+'</div>'}},
+      ['04/10 08:14','emeka@mycityapp.io','Lagos, Nigeria',pill('er','Wrong password')]],'Failed Sign-Ins',
+      '<span class="sub">Last 7 days</span>'),'Failed Sign-Ins','Five failures within fifteen minutes lock the account.')}},
   {n:'Audit Log',r:function(){return attAuditTab()}}]},
 
 {k:'public',n:'Public Site',i:'globe',g:'SEPARATE APP',tabs:[
