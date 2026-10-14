@@ -215,6 +215,8 @@ async function demoSignIn(page, file) {
   await page.fill("#pass", "demo-password");
   await page.evaluate(() => document.querySelector("#lform").requestSubmit());
   await page.waitForSelector("#app.on", { timeout: 5000 });
+  // Measure with the real typeface (Geist), not a fallback that wraps differently.
+  await page.evaluate(() => document.fonts.ready.then(() => true));
   // The clock-in prompt opens about 700 ms after sign-in (attendance guide).
   await page.waitForSelector("#modal.on", { timeout: 2500 }).catch(() => null);
 }
