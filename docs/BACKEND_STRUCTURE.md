@@ -678,7 +678,7 @@ What it handles that a naive import does not:
 | 5 Migration idempotency | `check/migration-idempotency.js` (praxis); applied files hash-locked |
 | 6 Schema drift | `check/schema-drift.js`, `check/contract-columns.js` |
 | 7 Write routes validated | `check/route-contracts.js` (every route has a contract; writes have a body) |
-| 8 Five-second rule | frontend gate; backend half is `check/dashes.js` over templates |
+| 8 Five-second rule | `check/five-second.js` over every screen (FRONTEND_GUIDE §5); backend half is `check/dashes.js` over `src/` strings, templates and the manual |
 
 Pipeline guards, also from M0: `gen:contract --check`, `.env.example` matches schema, module
 catalogue equals enforced keys, every list paged at 25 (`check/pagination.js`, §16), public routes import no auth/rbac, numbering schemes exist for every

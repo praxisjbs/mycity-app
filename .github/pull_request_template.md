@@ -20,6 +20,20 @@ Branch: m<N>/<short-name>
 - [ ] Every list pages at 25 through `shared/http/paged.js`
 - [ ] Contract changed first; `npm run gen:contract` run; `contract.gen.ts` not edited by hand
 - [ ] Desktop and mobile both done (frontend changes)
+- [ ] Screen text in three tiers: nothing explaining how the system works, help only through help terms or a Details row, word limits met (gate 8, FRONTEND_GUIDE §5)
+- [ ] The feature guide's §10 lists what each screen shows open, behind help and on a phone
+- [ ] Forms only from `components/form/`, validated as filled (gate 12, FRONTEND_GUIDE §8)
+
+## Native app feel (frontend changes)
+
+<!--
+Gate 11 checks every screen at phone and desktop size. Say in a line each what you did; no
+screenshots needed. Write "No screen changed" if none did.
+
+Phone: bottom bar, cards instead of tables, sheets, main action at the bottom, what was left off.
+Desktop: tables, side panels, keyboard, hover help.
+Text: what moved behind a help term or Details row, what was cut as system text.
+-->
 
 ## Exemptions
 
