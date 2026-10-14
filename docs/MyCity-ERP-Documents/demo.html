@@ -1318,21 +1318,21 @@ function artHead(title,meta){return '<h2>'+esc(title)+'</h2><div class="meta">'+
 function emp360(i){var e=EMP[i]||EMP[0],s=STAFF[i]||STAFF[0],arr=ATT&&ATT.emps[s[0]]?ATT.emps[s[0]].arr:e.arr;
   return bk('Back to Employees')+
   prof({av:s[0],n:s[1],r:e.title+' · '+s[2],chips:pill(e.st[0],e.st[1])+pill('nt',arr)+pill('nt','Reports to '+e.mgr)+pill('nt','Since '+e.start),
-    acts:[['Raise a query'],['Message'],['Edit',1]]})+
-  statstrip([['Attendance, 30d',e.att],['KPI score',e.kpi],['Open tasks',e.tasks],['Leave left',e.leave],['Open queries',e.q,e.q==='0'?'ok':'warn']])+
+    acts:[['Raise Query'],['Message'],['Edit',1]]})+
+  statstrip([['Attendance, 30d',e.att],['KPI Score',e.kpi],['Open Tasks',e.tasks],['Leave Left',e.leave],['Open Queries',e.q,e.q==='0'?'ok':'warn']])+
   '<div class="grid g2">'+
-  kvcard('Employment',[['Job title',e.title],['Department',s[2]],['Grade',e.grade],['Line manager',e.mgr],
-    ['Start date',e.start],['Employment type','Full time'],['Work arrangement',esc(arr)],['Status',pill(e.st[0],e.st[1])]])+
-  kvcard('Contact and pay',[['Work email',e.email],['Phone',e.phone],['Gross monthly',e.pay],
-    ['Bank',e.bank],['Account','•••• '+e.acct],['Next of kin',e.nok]])+'</div>'+
+  kvcard('Employment',[['Job Title',e.title],['Department',s[2]],['Grade',e.grade],['Line Manager',e.mgr],
+    ['Start Date',e.start],['Employment Type','Full time'],['Work Arrangement',esc(arr)],['Status',pill(e.st[0],e.st[1])]])+
+  kvcard('Contact and Pay',[['Work Email',e.email],['Phone',e.phone],['Gross Monthly',e.pay],
+    ['Bank',e.bank],['Account','•••• '+e.acct],['Next of Kin',e.nok]])+'</div>'+
   attSetupCard(s[0])+
   '<div class="grid g2">'+
-  bars('KPIs this month',e.kpis,'Weighted to 100%. Progress counts from tasks linked to each KPI.')+
-  tl('Record activity',e.tlog)+'</div>'+
+  helpOn(bars('KPIs This Month',e.kpis),'KPIs This Month','Weighted to 100%. Progress counts from the tasks linked to each KPI.')+
+  tl('Record Activity',e.tlog)+'</div>'+
   '<div class="grid g2">'+
   attEmpSessions(s[0])+
   table([['Document'],['Status'],['Expires']],e.docs,'Documents')+'</div>'+
-  '<div style="margin-top:12px">'+table([['Subject'],['Raised by'],['Date'],['Outcome']],e.qlog,'Queries and sanctions',
+  '<div style="margin-top:12px">'+table([['Subject'],['Raised By'],['Date'],['Outcome']],e.qlog,'Queries and Sanctions',
     e.q==='0'?pill('ok','Nothing open'):pill('wa',e.q+' open'))+'</div>'}
 
 function partner360(i){var p=PARTNERS[i]||PARTNERS[0];
@@ -5122,19 +5122,19 @@ function attPrimary(id){var e=aEmp(id),o=attSite(e.office||'mtn'),h=attPermHome(
   return e.arr==='Remote'?(h?'Approved home · '+h.area:'No home on file'):e.arr==='Hybrid'?o.name+', home on remote days':e.arr==='Field'?'Field assignments, base '+o.name:o.name}
 function attEmployeesTab(){
   var cnt={};ATT_ARRS.forEach(function(a){cnt[a]=0});ATT_ORDER.forEach(function(k){cnt[aEmp(k).arr]++});
-  return head('Employees','25 staff · 6 departments · select a row for details and actions',[['Import'],['Add employee',1]])+
-    kpis([['Headcount','25'],['Confirmed','21','ok'],['On probation','3','warn'],['Attrition, 90 days','1']])+
-    statstrip(ATT_ARRS.map(function(a){return [a,String(cnt[a])+' in demo roster']}))+
-    table([['Employee'],['Department'],['Line manager'],['Arrangement'],['Attendance today'],['Employment status'],['']],
+  return head('Employees','25 staff · 6 departments',[['Import'],['Add Employee',1]])+
+    kpis([['Headcount','25'],['Confirmed','21','ok'],['On Probation','3','warn'],['Attrition, 90 Days','1']])+
+    statstrip(ATT_ARRS.map(function(a){return [a,String(cnt[a])]}))+
+    table([['Employee'],['Department'],['Line Manager'],['Arrangement'],['Attendance Today'],['Employment Status'],['']],
       STAFF.map(function(s,i){var id=s[0],e=aEmp(id),ss=attTodaySession(id),v=ss?attSV(ss):null,lv=attOnLeave(id,ATT_TODAY);
         return [who(id,s[1],s[2]),esc(s[2]),esc(aMgrName(id)),pill('nt',e.arr),v?attStatusPill(v):lv?pill('in','On leave'):pill('nt','Not clocked in'),
           e.status==='Suspended'?pill('er','Suspended'):i===7?pill('wa','Probation'):pill('ok','Active'),
-          '<button class="btn" data-att="emp-open" data-v="'+id+'">View details</button>']}),'All employees',
-      '<span class="sub">Showing 9 of 25 · sensitive home addresses appear only in the authorised details modal</span>',function(i){return ' class="rowlink" tabindex="0" data-att="emp-open" data-v="'+STAFF[i][0]+'"'})+
+          '<button class="btn" data-att="emp-open" data-v="'+id+'">View Details</button>']}),'All Employees',
+      '<span class="sub">9 of 25</span>',function(i){return ' class="rowlink" tabindex="0" data-att="emp-open" data-v="'+STAFF[i][0]+'"'})+
     '<div class="grid g2" style="margin-top:12px">'+
-    bars('Headcount by department',[['Marketing & Sales',100,'6'],['Content',83,'5'],['Operations',66,'4'],
-      ['Engineering',66,'4'],['Studio',50,'3'],['Support',50,'3']],'Six departments. A department is a setting, not a code change.')+
-    '<div class="card"><div class="ch"><h3>Needs a decision</h3><span class="right">'+pill('wa','3')+'</span></div>'+
+    bars('Headcount by Department',[['Marketing & Sales',100,'6'],['Content',83,'5'],['Operations',66,'4'],
+      ['Engineering',66,'4'],['Studio',50,'3'],['Support',50,'3']])+
+    '<div class="card"><div class="ch"><h3>Needs a Decision</h3><span class="right">'+pill('wa','3')+'</span></div>'+
     [['Chidera Nwosu','Probation ends 24/10/2026','Confirm or extend','wa'],
      ['Seyi Balogun','New device pending review','Enrol or reject','wa'],
      ['Bashir Lawal','Query open since 07/10','Awaiting his response','er']].map(function(r){
@@ -5142,53 +5142,56 @@ function attEmployeesTab(){
       '<span class="meta">'+pill(r[3],r[2])+'</span></button>'}).join('')+'</div></div>'}
 function attEmployeeModal(id){var e=aEmp(id),h=attPermHome(id),fa=attAssignmentFor(id,ATT_TODAY),ts=attTempStatus(id),idx=-1;
   STAFF.forEach(function(s,i){if(s[0]===id)idx=i});if(!e)return;
-  openModal({title:'Employee Details · '+e.name,wide:true,body:
-    '<div class="attban in">'+ic('lock','ico')+'<span>Home-address details are visible to authorised People users and are recorded in the audit trail when opened.</span></div>'+
+  var homeBtn=attHasHome(e)?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit Home</button>':'';
+  openModal({title:e.name,wide:true,body:
     '<div class="grid g2"><div class="card"><div class="ch"><h3>Employment</h3><span class="right">'+(e.status==='Suspended'?pill('er','Suspended'):pill('ok','Active'))+'</span></div>'+
-      '<dl class="kv"><dt>Employee</dt><dd>'+aWho(id,e.title)+'</dd><dt>Department</dt><dd>'+esc(e.dept)+'</dd><dt>Line manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
-      '<dt>Work arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary location</dt><dd>'+esc(attPrimary(id))+'</dd><dt>Assigned office</dt><dd>'+esc(attSite(e.office||'mtn').name)+'</dd></dl></div>'+
-    '<div class="card"><div class="ch"><h3>Attendance and location</h3></div><dl class="kv">'+
-      '<dt>Registered home</dt><dd>'+(h?esc(h.address):'Not on file')+'</dd><dt>Home coordinates</dt><dd>'+(h?esc(aCoord(h.lat,h.lng)):'Not captured')+'</dd>'+
-      '<dt>Home geofence</dt><dd>'+(h?'100 m · mandatory':'Not available')+'</dd><dt>Temporary location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
-      '<dt>Field assignment today</dt><dd>'+(fa?esc(fa.id+' · '+fa.name):'None')+'</dd><dt>Attendance profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+'</dd></dl></div></div>',
-    foot:'<button class="btn" data-mx>Close</button>'+(e.arr==='Remote'||e.arr==='Hybrid'?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit home</button>':'')+
-      '<button class="btn" data-att="arr-change" data-v="'+id+'">Change arrangement</button><button class="btn pri" data-att="emp-full" data-v="'+idx+'">Open full employee record</button>',
+      '<dl class="kv"><dt>Employee</dt><dd>'+aWho(id,e.title)+'</dd><dt>Department</dt><dd>'+esc(e.dept)+'</dd><dt>Line Manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
+      '<dt>Work Arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary Location</dt><dd>'+esc(attPrimary(id))+'</dd><dt>Assigned Office</dt><dd>'+esc(attSite(e.office||'mtn').name)+'</dd></dl></div>'+
+    '<div class="card"><div class="ch"><h3>Attendance and Location</h3></div><dl class="kv">'+
+      '<dt>Registered Home</dt><dd>'+(h?esc(h.address):'Not on file')+'</dd><dt>Home Coordinates</dt><dd>'+(h?esc(aCoord(h.lat,h.lng)):'Not captured')+'</dd>'+
+      '<dt>Home Geofence</dt><dd>'+(h?'100 m':'Not available')+'</dd><dt>Temporary Location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
+      '<dt>Field Assignment</dt><dd>'+(fa?esc(fa.id+' · '+fa.name):'None')+'</dd><dt>Attendance Profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+'</dd></dl></div></div>',
+    foot:'<button class="btn" data-mx>Close</button>'+homeBtn+
+      '<button class="btn" data-att="arr-change" data-v="'+id+'">Change Arrangement</button><button class="btn pri" data-att="emp-full" data-v="'+idx+'">Open Full Record</button>',
     onMount:function(){attAudit('Viewed approved home details',e.name+' · employee details','Masked','Full address shown','People employee modal');attSave()}})}
+function attHasHome(e){return e.arr==='Remote'||e.arr==='Hybrid'}
 function attSetupCard(id){var e=aEmp(id);if(!e)return '';
   var h=attPermHome(id),fa=attAssignmentFor(id,ATT_TODAY),ts=attTempStatus(id),o=attSite(e.office||'mtn'),P=attPolicy(),
       hist=ATT.audit.filter(function(a){return a.entity.indexOf(e.name)===0&&/arrangement|Home location|Temporary location|Viewed approved home/.test(a.action)});
-  return '<div class="grid g2"><div class="card"><div class="ch"><h3>Attendance setup</h3><span class="right">'+pill('nt',e.arr)+'</span></div>'+
-    '<dl class="kv"><dt>Work arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary work location</dt><dd>'+esc(attPrimary(id))+'</dd>'+
-    '<dt>Approved home</dt><dd>'+(h?esc('Approved home · '+h.area)+' <button class="btn" style="height:26px;margin-left:4px" data-att="home-reveal" data-v="'+id+'">Show full address</button>':'Not required for this arrangement')+'</dd>'+
-    '<dt>Home geofence radius</dt><dd>'+(h?h.radius+' m'+(h.just?' <span class="sub">'+esc(h.just)+'</span>':''):'None')+'</dd>'+
-    '<dt>Assigned office</dt><dd>'+esc(o.name)+' · '+o.radius+' m</dd><dt>Line manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
-    '<dt>Field assignment today</dt><dd>'+(fa?esc(fa.id+' · '+fa.name+', '+fa.start+' to '+fa.end):'None')+'</dd>'+
-    '<dt>Temporary location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
-    (e.arr==='Hybrid'&&e.sched?'<dt>Weekly schedule</dt><dd>'+['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){return d+' '+e.sched[d]}).join(' · ')+'</dd>':'')+
-    '<dt>Attendance profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+' · policy v'+P.v+'</dd></dl>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn pri" data-att="arr-change" data-v="'+id+'">Change arrangement</button>'+
-    (e.arr==='Remote'||e.arr==='Hybrid'?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit home geofence</button>':'')+'</div></div>'+
-    tl('Attendance setup history',hist.length?hist.slice(0,6).map(function(a,i){return [a.action+(a.before||a.after?': '+(a.before||'None')+' → '+(a.after||'None'):''),a.at+' · '+a.actor,a.reason,i===0?'hi':'ok']}):
-      [['No changes recorded yet','','Changes to the arrangement, home or temporary locations appear here.']])+'</div>'}
+  return '<div class="grid g2"><div class="card"><div class="ch"><h3>Attendance Setup</h3><span class="right">'+pill('nt',e.arr)+'</span></div>'+
+    '<dl class="kv"><dt>Work Arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary Location</dt><dd>'+esc(attPrimary(id))+'</dd>'+
+    '<dt>Approved Home</dt><dd>'+(h?esc('Approved home · '+h.area)+' <button class="btn" style="margin-left:4px" data-att="home-reveal" data-v="'+id+'">Show Address</button>':'Not required')+'</dd>'+
+    '<dt>Home Geofence</dt><dd>'+(h?h.radius+' m'+(h.just?' <span class="sub" data-copy="content">'+esc(h.just)+'</span>':''):'None')+'</dd>'+
+    '<dt>Assigned Office</dt><dd>'+esc(o.name)+' · '+o.radius+' m</dd><dt>Line Manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
+    '<dt>Field Assignment</dt><dd>'+(fa?esc(fa.id+' · '+fa.name+', '+fa.start+' to '+fa.end):'None')+'</dd>'+
+    '<dt>Temporary Location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
+    (e.arr==='Hybrid'&&e.sched?'<dt>Weekly Schedule</dt><dd>'+['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){return d+' '+e.sched[d]}).join(' · ')+'</dd>':'')+
+    '<dt>Attendance Profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+' · policy v'+P.v+'</dd></dl>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn pri" data-att="arr-change" data-v="'+id+'">Change Arrangement</button>'+
+    (attHasHome(e)?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit Home Geofence</button>':'')+'</div></div>'+
+    tl('Setup History',hist.length?hist.slice(0,6).map(function(a,i){return [a.action+(a.before||a.after?': '+(a.before||'None')+' → '+(a.after||'None'):''),a.at+' · '+a.actor,a.reason,i===0?'hi':'ok']}):
+      [['No changes yet','','']])+'</div>'}
 function attEmpSessions(id){var ss=attSessionsOf(id).slice().sort(function(a,b){return aCmp(b.date,a.date)}).slice(0,6);
   return table([['Date'],['In'],['Out'],['Location'],['Status']],ss.map(function(s){var v=attSV(s);
-    return [esc(s.date),attTimeCell(v,'in'),attTimeCell(v,'out'),esc((v.inE||v.outE||v.attempts[0]||{}).matched||s.expected),attStatusPill(v)]}),'Last punches')}
+    return [esc(s.date),attTimeCell(v,'in'),attTimeCell(v,'out'),esc((v.inE||v.outE||v.attempts[0]||{}).matched||s.expected),attStatusPill(v)]}),'Last Punches')}
 function attArrModal(id){var e=aEmp(id),sch=e.sched||{Mon:'Office',Tue:'Office',Wed:'Remote',Thu:'Office',Fri:'Office',Sat:'Remote'};
-  openModal({title:'Change Work Arrangement',body:'<p class="sub" style="margin-bottom:12px">'+esc(e.name)+' is <b>'+esc(e.arr)+'</b> today. The change applies from the next punch and is written to the audit log.</p>'+
-    '<div class="f"><label>Arrangement</label><div class="seg" role="group" aria-label="Arrangement">'+ATT_ARRS.map(function(a){return '<button type="button" data-att="arr-pick" data-v="'+a+'"'+(a===e.arr?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+a+'</button>'}).join('')+'</div></div>'+
-    '<div class="f" id="arr-sched"><label>Hybrid schedule</label><div class="tscroll"><table><tbody>'+['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){
-      return '<tr><td style="width:70px">'+d+'</td><td><select class="inp" data-sched="'+d+'" style="height:32px"><option'+(sch[d]==='Office'?' selected':'')+'>Office</option><option'+(sch[d]==='Remote'?' selected':'')+'>Remote</option></select></td></tr>'}).join('')+'</tbody></table></div></div>'+
-    field('arr-office','Assigned office','<select class="inp" id="arr-office">'+ATT.sites.filter(function(s){return s.status==='Active'}).map(function(s){return '<option value="'+s.id+'"'+(s.id===e.office?' selected':'')+'>'+esc(s.name)+'</option>'}).join('')+'</select>')+
-    field('arr-why','Reason','<input class="inp" id="arr-why" placeholder="For example, role moved to field work">','Give a reason'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="arr-save" data-v="'+id+'">Save change</button>',
+  var days=[['Mon','Monday'],['Tue','Tuesday'],['Wed','Wednesday'],['Thu','Thursday'],['Fri','Friday'],['Sat','Saturday']];
+  openModal({title:'Change Work Arrangement',body:'<style>.arr-days{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 10px}</style>'+
+    '<div style="margin-bottom:14px">'+aWho(id,e.title)+'</div>'+
+    choice('arr-pick','Arrangement',ATT_ARRS.map(function(a){return [a,a,'data-att="arr-pick"']}),e.arr)+
+    '<div id="arr-sched" class="arr-days">'+days.map(function(d){
+      return field('arr-d-'+d[0],d[1],'<select class="inp" id="arr-d-'+d[0]+'" data-sched="'+d[0]+'"><option'+(sch[d[0]]==='Office'?' selected':'')+'>Office</option><option'+(sch[d[0]]==='Remote'?' selected':'')+'>Remote</option></select>')}).join('')+'</div>'+
+    field('arr-office','Assigned Office','<select class="inp" id="arr-office">'+ATT.sites.filter(function(s){return s.status==='Active'}).map(function(s){return '<option value="'+s.id+'"'+(s.id===e.office?' selected':'')+'>'+esc(s.name)+'</option>'}).join('')+'</select>')+
+    field('arr-why','Reason','<input class="inp" id="arr-why">','Give a reason'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="arr-save" data-v="'+id+'">Save Arrangement</button>',
     onMount:function(m){ATTUI.arrPick=e.arr;$('#arr-sched').style.display=e.arr==='Hybrid'?'':'none'}})}
 function attHomeModal(id){var e=aEmp(id),h=attPermHome(id),pol=attPolicy().settings;ATTUI.essReq={pin:h?{area:h.area,lat:h.lat,lng:h.lng}:null};
-  openModal({title:'Edit Home Geofence',body:'<p class="sub" style="margin-bottom:12px">'+esc(e.name)+'. The old home is kept in history, never overwritten.</p>'+
-    field('hm-addr','Full address','<input class="inp" id="hm-addr" value="'+esc(h?h.address:'')+'">','Enter the address')+
-    '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="hm-addr">'+ic('target')+'Drop pin at address</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(ATTUI.essReq.pin)+'</div></div>'+
-    '<div class="attban in">'+ic('lock','ico')+'<span><b>100 m geofence</b><br>This radius is mandatory for registered and temporary home locations and cannot be changed.</span></div>'+
-    field('hm-just','Change reason','<input class="inp" id="hm-just" value="'+esc(h?h.just:'')+'" placeholder="For example, employee moved home">','Recorded in the audit trail'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="home-save" data-v="'+id+'">Save home</button>'})}
+  openModal({title:'Edit Home Geofence',body:'<div style="margin-bottom:14px">'+aWho(id,e.title)+'</div>'+
+    field('hm-addr','Full Address','<input class="inp" id="hm-addr" value="'+esc(h?h.address:'')+'">','Enter the address')+
+    '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="hm-addr">'+ic('target')+'Drop Pin</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(ATTUI.essReq.pin)+'</div></div>'+
+    '<dl class="kv" style="margin-bottom:14px"><dt>'+hint('Radius','Fixed at 100 m for registered and temporary homes. It cannot be changed.')+'</dt><dd>100 m</dd></dl>'+
+    field('hm-just','Change Reason','<input class="inp" id="hm-just" value="'+esc(h?h.just:'')+'">','Give a reason'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="home-save" data-v="'+id+'">Save Home</button>'})}
 
 /* ═════════════ PEOPLE → ATTENDANCE ═════════════ */
 function attRegisterRows(){return ATT_ORDER.map(function(id){var s=attTodaySession(id),v=s?attSV(s):null,lv=attOnLeave(id,ATT_TODAY);
