@@ -51,11 +51,14 @@ const GATES = [
   { id: "schema-drift", label: "6  Schema drift", script: "scripts/check/schema-drift.js" },
   { id: "contract-columns", label: "6  Contract keys are columns", script: "scripts/check/contract-columns.js" },
   { id: "route-contracts", label: "7  Write routes validated", script: "scripts/check/route-contracts.js" },
-  { id: "dashes", label: "8  Five-second rule (backend half) / 17 No dashes", script: "scripts/check/dashes.js" },
+  { id: "five-second", label: "8  Five-second rule (screen copy)", script: "scripts/check/five-second.js" },
   // Gates from M1 onward
   { id: "ai-manifest-coverage", label: "9  AI manifest coverage", script: "scripts/check/ai-manifest-coverage.js" },
   { id: "search-coverage", label: "10 Search coverage", script: "scripts/check/search-coverage.js" },
+  { id: "two-shells", label: "11 Two shells (phone and desktop)", script: "scripts/check/two-shells.js" },
+  { id: "forms", label: "12 Inline validation, one form system", script: "scripts/check/forms.js" },
   { id: "date-format", label: "15 Day-first dates", script: "scripts/check/date-format.js" },
+  { id: "dashes", label: "17 No dashes (and gate 8 backend copy)", script: "scripts/check/dashes.js" },
   { id: "ai-no-writes", label: "19 AI read manifest only", script: "scripts/check/ai-no-writes.js" },
   { id: "money", label: "20 Money", script: "scripts/check/money.js" },
   // Pipeline guards

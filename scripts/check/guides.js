@@ -12,6 +12,10 @@
  *      "Permissions".
  *    - Status is Draft, Agreed, Built or Accepted; Last changed and every
  *      Change log line carry a real day-first date.
+ *    - §10 On screen and mobile carries both tables, each with at least one
+ *      filled row: the content tiers (what is open, what is behind help, what
+ *      never reaches a screen) and the phone layout (FRONTEND_GUIDE §5, §7).
+ *      Without them a guide's rules get built as explainer cards.
  *
  * 2. FOLLOWED. A guide's header names the code it covers:
  *      | Backend modules | `attendance`, `devices` |
@@ -33,6 +37,11 @@ const INDEX = `${DIR}/README.md`;
 const TEMPLATE = `${DIR}/_TEMPLATE.md`;
 const STATUSES = ["Draft", "Agreed", "Built", "Accepted"];
 const LOG_LINE = /^- (\d{2}\/\d{2}\/\d{4}) · ([A-Z]{2}) · \S/;
+/** §10's two tables, by the first cells of their header rows. */
+const SCREEN_TABLES = [
+  ["| Screen | Open (tier 1) |", "content tiers"],
+  ["| Screen | First on a phone |", "phone layout"],
+];
 
 const problems = [];
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8").split(/\r?\n/);
@@ -89,6 +98,23 @@ for (const f of files) {
   const last = (header["Last changed"] || "").trim();
   if (header["Last changed"] !== undefined && !isDayFirstDate(last)) {
     problems.push(`${rel}: Last changed "${last}" is not a day-first date like 13/10/2026`);
+  }
+
+  const onScreen = lines.findIndex((l) => /^## \d+ · On screen and mobile/.test(l));
+  if (onScreen !== -1) {
+    let end = lines.findIndex((l, i) => i > onScreen && /^## /.test(l));
+    if (end === -1) end = lines.length;
+    const body = lines.slice(onScreen + 1, end);
+    for (const [head, what] of SCREEN_TABLES) {
+      const at = body.findIndex((l) => l.startsWith(head));
+      if (at === -1) {
+        problems.push(`${rel}: §10 has no ${what} table (header "${head} …", see ${TEMPLATE})`);
+        continue;
+      }
+      const rows = [];
+      for (let i = at + 2; i < body.length && body[i].startsWith("|"); i += 1) rows.push(body[i]);
+      if (!rows.some((r) => !/^\|\s*</.test(r))) problems.push(`${rel}: §10 ${what} table has no filled row (only the template's <placeholder>)`);
+    }
   }
 
   const logStart = lines.findIndex((l) => /^## \d+ · Change log/.test(l));

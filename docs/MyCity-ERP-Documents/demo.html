@@ -499,6 +499,53 @@ tbody tr:last-child td{border-bottom:0}
 .ihelp{display:none;font-size:12.5px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);
   border-radius:10px;padding:10px 12px;margin:-6px 0 14px;line-height:1.5}
 .ihelp.on{display:block}
+/* ═════ HELP TERM and DETAILS ROW (FRONTEND_GUIDE §5.2): the only two ways help appears.
+   A help term is the word itself, dotted underline; hover or focus opens it on desktop,
+   a tap opens it as a sheet on a phone. Details is one closed row at the foot of a card. */
+.ht{display:inline;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;text-align:inherit;padding:0;
+  background:none;border:0;cursor:help;text-decoration:underline dotted;text-decoration-color:var(--ink-3);
+  text-underline-offset:3px;text-decoration-thickness:1px}
+.ht.ib{text-decoration:none;cursor:pointer}
+.ht:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.htp{position:fixed;z-index:79;display:none;max-width:300px;background:var(--raised);color:var(--ink-2);
+  border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh-3);padding:10px 12px;font-size:12.5px;
+  font-weight:400;line-height:1.5;letter-spacing:0;text-transform:none;text-align:left;white-space:normal}
+.htp.on{display:block;animation:rise .14s ease-out}
+.dtl{border-top:1px solid var(--line);margin-top:12px}
+.dtl>summary{list-style:none;display:flex;align-items:center;gap:7px;cursor:pointer;padding:11px 0 1px;
+  font-size:12.5px;font-weight:600;color:var(--ink-2);min-height:24px}
+.dtl>summary::-webkit-details-marker{display:none}
+.dtl>summary svg{width:14px;height:14px;transition:transform .15s}
+.dtl[open]>summary svg{transform:rotate(90deg)}
+.dtl-b{padding-top:8px;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.dtl-b .kv{margin:0}
+.f>label .opt,.chk .opt{font-weight:500;color:var(--ink-3);margin-left:6px;font-size:11px}
+.f.bad .fm{display:flex;align-items:center;gap:6px}
+.f.bad .fm::before{content:"!";display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
+  border-radius:50%;background:var(--err);color:#fff;font-size:10.5px;font-weight:800;flex:none}
+.chk{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;cursor:pointer;margin:10px 0}
+.chk input{margin-top:2px;flex:none}
+.tcards{display:flex;flex-direction:column;gap:8px;padding:0 12px 12px}
+.card.pad0>.tcards:first-child{padding-top:12px}
+.tcard{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:var(--raised);min-width:0}
+.tcard .tch{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.tcard .tct{font-weight:650;font-size:13.5px;min-width:0}
+.tcard dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12.5px;margin:7px 0 0}
+.tcard dt{color:var(--ink-3)} .tcard dd{margin:0;text-align:right;min-width:0;overflow-wrap:anywhere}
+@media(max-width:760px){
+  .phead>div>p,.cap{display:none}
+  .htp.on{left:0!important;right:0;top:auto!important;bottom:0;max-width:none;border-radius:18px 18px 0 0;
+    padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));font-size:14px;box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+  .mft{gap:8px}
+  .mft .btn{flex:1 1 0;justify-content:center;min-height:46px}
+  .mft .btn.pri{flex:1 0 100%;order:9}
+  .btn,.chip,.tabbtn,.rolebtn,.seg button,.bk,.lnkb,.cbtn{min-height:44px}
+  .iconbtn{min-width:44px;min-height:44px}
+  .inp,select.inp,.fsel select{min-height:44px}
+  .dtl>summary{min-height:44px;padding-top:6px}
+  .grid.g4:has(>.kpi){grid-template-columns:repeat(2,1fr);gap:10px}
+  .grid.g4>.kpi b{font-size:21px}
+}
 .prog{height:6px;border-radius:99px;background:var(--surface);overflow:hidden;margin-top:6px}
 .prog i{display:block;height:100%;background:var(--green);border-radius:99px;transition:width .12s linear}
 
@@ -1139,8 +1186,20 @@ function head(t,s,acts){return '<div class="phead"><div><h1>'+esc(t)+'</h1>'+(s?
 function kpis(list){return '<div class="grid g4">'+list.map(function(k){
   return '<div class="card kpi"><span class="lab">'+esc(k[0])+'</span><b'+(k[2]?' style="color:var(--'+k[2]+')"':'')+'>'+esc(k[1])+'</b>'+
   (k[3]?'<span class="trend '+(k[4]||'fl')+'">'+esc(k[3])+'</span>':'')+'</div>'}).join('')+'</div>'}
-function table(cols,rows,title,right,ra,cls){
-  var h='<div class="card pad0">'+(title?'<div class="ch" style="padding:14px 14px 0;margin-bottom:10px"><h3>'+esc(title)+'</h3>'+(right?'<span class="right">'+right+'</span>':'')+'</div>':'')+
+/* A list is a table on desktop and a card list on a phone, from the same rows (FRONTEND_GUIDE §7).
+   The card's title is the first cell, a status pill sits top right, then up to two label and value
+   pairs; mob (optional) names the column indexes a phone card shows instead. */
+var PHONE=window.matchMedia('(max-width:760px)');
+function tcards(cols,rows,ra,mob){
+  return '<div class="tcards">'+rows.map(function(r,ri){
+    var st=-1;for(var i=r.length-1;i>0;i--){if(String(r[i]).indexOf('class="pill')>=0){st=i;break}}
+    var pick=mob||r.map(function(c,i){return i}).filter(function(i){return i>0&&i!==st&&String(r[i]).replace(/<[^>]*>/g,'').trim()!==''}).slice(0,2);
+    return '<div class="tcard"'+(ra?ra(ri):'')+'><div class="tch"><span class="tct" data-copy="content">'+r[0]+'</span>'+(st>0?r[st]:'')+'</div>'+
+      (pick.length?'<dl>'+pick.map(function(i){return '<dt>'+esc(cols[i]?cols[i][0]:'')+'</dt><dd data-copy="content">'+r[i]+'</dd>'}).join('')+'</dl>':'')+'</div>'}).join('')+'</div>'}
+function table(cols,rows,title,right,ra,cls,mob){
+  var h='<div class="card pad0">'+(title?'<div class="ch" style="padding:14px 14px 0;margin-bottom:10px"><h3>'+esc(title)+'</h3>'+(right?'<span class="right">'+right+'</span>':'')+'</div>':'')+'';
+  if(PHONE.matches)return h+tcards(cols,rows,ra,mob)+'</div>';
+  h+=
    '<div class="tscroll"><table'+(cls?' class="'+cls+'"':'')+'><thead><tr>'+cols.map(function(c){return '<th'+(c[1]==='n'?' class="num"':'')+'>'+esc(c[0])+'</th>'}).join('')+'</tr></thead><tbody>';
   rows.forEach(function(r,ri){h+='<tr'+(ra?ra(ri):'')+'>'+r.map(function(c,i){return '<td'+(cols[i]&&cols[i][1]==='n'?' class="num"':'')+'>'+c+'</td>'}).join('')+'</tr>'});
   return h+'</tbody></table></div></div>'}
@@ -1150,10 +1209,10 @@ function cards(list,cols){return '<div class="grid g'+(cols||3)+'">'+list.map(fu
   return '<div class="tile"><h4>'+esc(c[0])+'</h4><p>'+esc(c[1])+'</p>'+(c[2]?'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+c[2]+'</div>':'')+'</div>'}).join('')+'</div>'}
 function bars(title,rows,note){return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3></div>'+
   rows.map(function(r){return '<div class="stage"><span class="nm">'+esc(r[0])+'</span><span class="tr"><i style="width:'+r[1]+'%;background:'+(r[3]||'var(--c1)')+'"></i></span><span class="vl">'+esc(r[2])+'</span></div>'}).join('')+
-  (note?'<p class="sub" style="margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)">'+esc(note)+'</p>':'')+'</div>'}
+  (note?'<p class="sub cap" style="margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)">'+esc(note)+'</p>':'')+'</div>'}
 function chain(steps,note){return '<div class="card"><div class="chain">'+steps.map(function(s,i){
   return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+(s[1]||'')+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+
-  '</div>'+(note?'<p class="sub" style="margin-top:11px">'+esc(note)+'</p>':'')+'</div>'}
+  '</div>'+(note?'<p class="sub cap" style="margin-top:11px">'+esc(note)+'</p>':'')+'</div>'}
 function kvcard(title,pairs){return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3></div><dl class="kv">'+
   pairs.map(function(p){return '<dt>'+esc(p[0])+'</dt><dd>'+p[1]+'</dd>'}).join('')+'</dl></div>'}
 function toggles(title,list){return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3></div>'+
@@ -1179,7 +1238,7 @@ function areaChart(title,vals,note){
    '<polyline points="'+pts.join(' ')+'" fill="none" stroke="var(--c1)" stroke-width="2.5" stroke-linejoin="round"/>'+
    '<polygon points="0,'+(hgt-10)+' '+pts.join(' ')+' '+w+','+(hgt-10)+'" fill="var(--c1)" opacity=".12"/>'+
    vals.map(function(v,i){return '<circle cx="'+(i*step).toFixed(1)+'" cy="'+(hgt-10-(v/max)*(hgt-34)).toFixed(1)+'" r="3" fill="var(--c1)"/>'}).join('')+
-   '</svg></div>'+(note?'<p class="sub" style="margin-top:8px">'+esc(note)+'</p>':'')+'</div>'}
+   '</svg></div>'+(note?'<p class="sub cap" style="margin-top:8px">'+esc(note)+'</p>':'')+'</div>'}
 function donut(pct,label,sub){
   var c=2*Math.PI*42;
   return '<div class="card" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">'+
@@ -1188,11 +1247,7 @@ function donut(pct,label,sub){
   '<text x="55" y="52" text-anchor="middle" font-size="23" font-weight="700" fill="var(--ink)" letter-spacing="-1">'+pct+'%</text>'+
   '<text x="55" y="68" text-anchor="middle" font-size="9.5" fill="var(--ink-3)">'+esc(label)+'</text></svg>'+
   '<div style="min-width:0;flex:1"><p style="font-size:13px;color:var(--ink-2)">'+esc(sub)+'</p></div></div>'}
-function pub(title,body){return '<div class="offapp">'+ic('globe')+
-  '<span><b>This is not part of the ERP.</b> A separate application on a different origin, '+
-  '<code>go.mycityapp.io</code>. No sign in, no session cookie, no service worker, and none of the '+
-  'admin bundle. It is shown inside this demo only so you can see it.</span></div>'+
-  '<div class="pubwrap"><div class="pubnote">'+ic('globe')+'Public page · go.mycityapp.io</div>'+
+function pub(title,body){return '<div class="pubwrap"><div class="pubnote">'+ic('globe')+'Public page · go.mycityapp.io</div>'+
   '<div class="pubpage">'+body+'</div></div>'}
 
 /* ───── drill-down + 360 helpers ───── */
@@ -1206,7 +1261,7 @@ function statstrip(list){return '<div class="statstrip">'+list.map(function(s){
 function tl(title,items){return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3></div><div class="tl">'+
   items.map(function(i){return '<div class="it'+(i[3]?' '+i[3]:'')+'"><b>'+esc(i[0])+'</b><span>'+esc(i[1])+'</span>'+
   (i[2]?'<p>'+esc(i[2])+'</p>':'')+'</div>'}).join('')+'</div></div>'}
-function paper(body,note){return '<div class="paperwrap"><div class="papernote">'+ic('doc')+esc(note||'Rendered by the document engine. Downloads as PDF.')+'</div>'+
+function paper(body,note){return '<div class="paperwrap"><div class="papernote">'+ic('doc')+esc(note||'PDF Preview')+'</div>'+
   '<div class="paper">'+body+'</div></div>'}
 function plogo(ref){return '<div class="plogo"><svg viewBox="0 0 24 24" style="width:20px;height:20px;color:#014339"><use href="#i-pin"/></svg>'+
   '<b>MyCity App Ltd</b><em>'+esc(ref)+'</em></div>'}
@@ -1666,8 +1721,8 @@ function hkpis(list){return '<div class="grid g4">'+list.map(function(k){
     (k[5]?'<span class="dig">'+ic('right')+'</span>':'')+
     '<span class="lab">'+esc(k[0])+'</span><b'+(k[2]?' style="color:var(--'+k[2]+')"':'')+'>'+esc(k[1])+'</b>'+
     (k[3]?'<span class="trend '+(k[4]||'fl')+'">'+esc(k[3])+'</span>':'')+'</div>';}).join('')+'</div>';}
-function pagenote(n){return '<p class="sub mnote">Showing '+n+' of '+n+'. Lists page at 25, the system wide limit.</p>';}
-function gate(what){return emptyb('lock','Part of the command centre',what+' is for people who manage others, which is People, Operations and the CEO. Your Home shows your own work, attendance and goals.');}
+function pagenote(n){return '<p class="sub mnote">'+n+' of '+n+'</p>';}
+function gate(what){return emptyb('lock','For Managers',what+' is for managers and the CEO.');}
 
 /* ---- mock team: the nine named staff. The organisation has 25. ---- */
 /* [av, name, dept, mode, clockIn, [pillKey,label], kpi, openTasks, empIndex] */
@@ -3533,15 +3588,72 @@ function popover(anchor,items,above){
   setTimeout(function(){document.addEventListener('click',function off(e){
     if(!p.contains(e.target)){closePop();document.removeEventListener('click',off)}})},0);
 }
-/* An ⓘ that is a SIBLING of what it explains; the text stays in the DOM (gate 8). */
-function infoBtn(id){return '<button class="ib" data-ib="'+id+'" aria-expanded="false" aria-controls="'+id+'" aria-label="More information">'+ic('info')+'</button>'}
-function infoText(id,text){return '<p class="ihelp" id="'+id+'">'+esc(text)+'</p>'}
-function field(id,label,inner,msg){return '<div class="f" id="fw-'+id+'"><label for="'+id+'">'+esc(label)+'</label>'+inner+
+/* ═════ HELP (FRONTEND_GUIDE §5.2) ═════
+   hint(term, text): the help term. The word carries a dotted underline; hover or focus opens
+   the text on desktop, a tap opens it as a sheet on a phone. The text stays in the DOM and is
+   linked with aria-describedby, never inside a label or heading's name. At most 35 words.
+   infoBtn/infoText: the same popover from an icon, only where there is no word to attach to.
+   details(body): one closed Details row at the foot of a card. At most 60 words. */
+var HT_N=0;
+function hintParts(term,text){var id='ht'+(++HT_N);
+  return ['<button type="button" class="ht" aria-describedby="'+id+'">'+esc(term)+'</button>','<span class="htp" id="'+id+'" role="tooltip">'+esc(text)+'</span>']}
+function hint(term,text){var p=hintParts(term,text);return p[0]+p[1]}
+function infoBtn(id){return '<button type="button" class="ht ib" aria-describedby="'+id+'" aria-label="More information">'+ic('info')+'</button>'}
+function infoText(id,text){return '<span class="htp" id="'+id+'" role="tooltip">'+esc(text)+'</span>'}
+function details(body,label){return '<details class="dtl"><summary>'+ic('right')+esc(label||'Details')+'</summary><div class="dtl-b">'+body+'</div></details>'}
+(function(){var cur=null,timer=null;
+  function pop(b){return b&&document.getElementById(b.getAttribute('aria-describedby'))}
+  function hide(){clearTimeout(timer);if(cur){var p=pop(cur);if(p)p.classList.remove('on');cur=null}}
+  function show(b){var p=pop(b);if(!p)return;if(cur&&cur!==b)hide();cur=b;p.classList.add('on');
+    if(PHONE.matches){p.style.left='';p.style.top='';return}
+    var r=b.getBoundingClientRect(),w=p.offsetWidth,h=p.offsetHeight,top=r.bottom+6;
+    if(top+h>window.innerHeight-8)top=r.top-h-6;
+    p.style.left=Math.min(Math.max(8,r.left),window.innerWidth-w-8)+'px';p.style.top=Math.max(8,top)+'px'}
+  document.addEventListener('mouseover',function(e){if(PHONE.matches)return;
+    var b=e.target.closest&&e.target.closest('.ht');
+    if(b){clearTimeout(timer);if(cur!==b)timer=setTimeout(function(){show(b)},300);return}
+    if(e.target.closest&&e.target.closest('.htp.on')){clearTimeout(timer);return}
+    if(cur){clearTimeout(timer);timer=setTimeout(hide,200)}});
+  document.addEventListener('focusin',function(e){var b=e.target.closest&&e.target.closest('.ht');if(b&&!PHONE.matches)show(b)});
+  document.addEventListener('focusout',function(e){if(e.target.closest&&e.target.closest('.ht'))setTimeout(function(){if(cur&&document.activeElement!==cur)hide()},120)});
+  document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.ht');
+    if(b){e.preventDefault();e.stopPropagation();if(cur===b)hide();else{clearTimeout(timer);show(b)}return}
+    if(cur&&!(e.target.closest&&e.target.closest('.htp')))hide();
+    var s=e.target.closest&&e.target.closest('.dtl>summary');
+    if(s&&PHONE.matches){e.preventDefault();e.stopPropagation();var d=s.parentNode,c=d.closest('.card'),h=c&&c.querySelector('.ch h3');
+      openModal({title:h?h.textContent:'Details',body:'<div class="dtl-b">'+d.querySelector('.dtl-b').innerHTML+'</div>'})}},true);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&cur){hide();e.stopPropagation()}},true);
+  document.addEventListener('scroll',function(){if(cur&&!PHONE.matches)hide()},true);
+  PHONE.addEventListener('change',function(){hide();if($('#app').classList.contains('on'))render()})})();
+
+/* ═════ THE FORM HELPERS (FRONTEND_GUIDE §8): the only places a label or a raw field is written.
+   field(id, label, inner, error, help): label above, "(optional)" becomes an Optional tag,
+     error is at most 4 words and shows only when the field is marked, help makes the label a help term.
+   choice(id, label, options, on): a segmented choice for up to 5 options; option = value or [value, text, attrs].
+   check(id, label, on, attrs): a checkbox with its label.
+   fsel(label, attrs, optionsHtml): a filter select in a toolbar.
+   scripts/check/forms.js refuses a label or field written anywhere else. */
+function field(id,label,inner,msg,help){
+  var opt=/\s*\((optional)\)$/i.test(label),lab=label.replace(/\s*\((optional)\)$/i,''),hp=help?hintParts(lab,help):null;
+  return '<div class="f" id="fw-'+id+'"><label for="'+id+'">'+(hp?hp[0]:esc(lab))+(opt?'<span class="opt">Optional</span>':'')+'</label>'+(hp?hp[1]:'')+inner+
   (msg?'<p class="fm">'+esc(msg)+'</p>':'')+'</div>'}
-/* inline validation as the field is filled (gate 12): a mark on the field, never a dialog */
-function live(id,test){var el=$('#'+id),w=$('#fw-'+id);if(!el)return;
-  var run=function(){var v=el.value,ok=test(v);w.classList.toggle('bad',!ok&&v.length>0);w.classList.toggle('good',ok)};
-  el.addEventListener('input',run);run()}
+function choice(id,label,opts,on){
+  return '<div class="f" id="fw-'+id+'"><label id="'+id+'-l">'+esc(label)+'</label><div class="seg" role="group" aria-labelledby="'+id+'-l" id="'+id+'">'+
+    opts.map(function(o,i){var v=Array.isArray(o)?o[0]:o,t=Array.isArray(o)?o[1]:o,a=Array.isArray(o)&&o[2]?' '+o[2]:'',sel=on===undefined?i===0:v===on;
+      return '<button type="button" data-v="'+esc(v)+'"'+a+(sel?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+esc(t)+'</button>'}).join('')+'</div></div>'}
+function check(id,label,on,attrs){return '<label class="chk" for="'+id+'"><input type="checkbox" id="'+id+'"'+(on?' checked':'')+(attrs?' '+attrs:'')+'><span>'+esc(label)+'</span></label>'}
+function fsel(label,attrs,optionsHtml){return '<label class="fsel"><span>'+esc(label)+'</span><select class="inp" '+(attrs||'')+'>'+optionsHtml+'</select></label>'}
+/* Validation as the field is filled (gate 12), reward early and punish late: a field is checked
+   when the person leaves it or pauses typing for 600 ms; once marked it re-checks on every key,
+   so the mark clears the moment it is right. A mark on the field, never a dialog. */
+function live(id,test){var el=$('#'+id),w=$('#fw-'+id);if(!el||!w)return;var touched=false,t=null;
+  var run=function(show){var v=el.value,ok=test(v);
+    if(show){w.classList.toggle('bad',!ok&&v.length>0)}
+    w.classList.toggle('good',ok&&v.length>0&&!w.classList.contains('bad'))};
+  el.addEventListener('input',function(){clearTimeout(t);if(touched||w.classList.contains('bad'))run(true);
+    else t=setTimeout(function(){touched=true;run(true)},600)});
+  el.addEventListener('blur',function(){clearTimeout(t);touched=true;run(true)});
+  run(false)}
 function isDayFirst(v){var m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);if(!m)return false;
   var d=new Date(+m[3],+m[2]-1,+m[1]);return d.getDate()===+m[1]&&d.getMonth()===+m[2]-1}
 function nowHM(){var d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())}
@@ -4755,7 +4867,6 @@ function attCkPaint(){
       '<dt>Clock location</dt><dd>'+esc(x.label)+(x.sites[0]?' · '+x.sites[0].radius+' m':'')+(x.note?'<br><span class="sub">'+esc(x.note)+'</span>':'')+'</dd>'+
       (ck.kind==='out'&&outInfo&&outInfo.g>=0?'<dt>Clocked in</dt><dd>'+esc(outInfo.inT)+'</dd><dt>Time so far</dt><dd><b>'+aDur(outInfo.net)+'</b></dd>':'')+
       '<dt>Current time</dt><dd><b>'+esc(time)+'</b> <span class="sub">Africa/Lagos</span></dd></dl></div>'+
-      '<p class="sub" style="margin:12px 2px 0;display:flex;gap:7px;align-items:flex-start">'+ic('lock')+' Location is read only for this action and is not continuously tracked.</p>'+
       (ack&&!blockAck?'<p class="sub" style="margin:8px 2px 0">Policy v'+L.v+' still needs acknowledgment. You may clock in now and read it from Policy Updates afterward.</p>':'');
   }
   if(ck.stage==='exception'||ck.stage==='issue')h+='<div class="card"><div class="ch"><h3>'+(ck.stage==='exception'?'Add exception details':'Report a location issue')+'</h3></div>'+
@@ -4767,7 +4878,7 @@ function attCkPaint(){
     field('ck-devwhy','Reason (optional)','<input class="inp" id="ck-devwhy" placeholder="For example, replaced a broken phone">')+'</div>';
   $('#ckbody').innerHTML=h;
 
-  var f='<span class="sub grow">One time and location reading will be recorded.</span>',lab=ck.kind==='out'?'Clock Out':'Clock In';
+  var f='',lab=ck.kind==='out'?'Clock Out':'Clock In';
   if(ck.stage==='review'){f+='<button class="btn" data-mx>Not now</button>';
     if(blockAck)f+='<button class="btn pri" data-att="go-policy">View policy</button>';
     else if(R.result==='Retry'){if(ck.retries>=2)f+='<button class="btn" data-att="ck-issue">Report issue</button>';
