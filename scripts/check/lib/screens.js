@@ -143,7 +143,7 @@ function collect(cfg) {
       const t = slot === "modalFooter" ? footerText(el) : text(el) || String(el.textContent || "").replace(/\s+/g, " ").trim();
       if (!t) return;
       const r = el.getBoundingClientRect();
-      slots.push({ slot, text: t, visible: visible(el), top: Math.round(r.top), bottom: Math.round(r.bottom) });
+      slots.push({ slot, text: t, visible: visible(el), modal: !!el.closest("#modal"), top: Math.round(r.top), bottom: Math.round(r.bottom) });
     });
   }
 

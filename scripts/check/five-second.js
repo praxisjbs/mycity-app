@@ -147,6 +147,7 @@ run("five-second", async () => {
   const findings = [];
   for (const sc of result.screens) {
     for (const s of sc.slots) {
+      if (sc.kind === "modal" && !s.modal && s.slot !== "help") continue; // the page behind a modal is checked as its own screen
       for (const message of checkSlot(s, sc.width, sc.kind)) findings.push({ width: sc.width, screen: sc.screen, message });
     }
   }
