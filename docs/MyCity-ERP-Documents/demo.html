@@ -883,7 +883,10 @@ tr[data-att]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 @media(max-width:1180px){.rq{grid-template-columns:1fr}}
 @media(max-width:760px){.tscroll table.wide{min-width:980px}
   .draftbar{top:-14px}.pctl{max-width:150px}
-  .attk .g4{grid-template-columns:repeat(2,1fr)}.attk .kpi b{font-size:21px}.attk .grid{gap:8px;margin-bottom:8px}}
+  .attk .g4{grid-template-columns:repeat(2,1fr)}.attk .kpi b{font-size:21px}.attk .grid{gap:8px;margin-bottom:8px}
+  .attviews{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.attviews button{flex:none}
+  .fdet>summary{min-height:44px}}
+.attviews{margin-bottom:12px;max-width:640px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* ═════ HOME: role bar, clickable KPI cards, over-threshold chip ═════ */
 .rolebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
@@ -4468,7 +4471,7 @@ function attEvaluate(id,date,time,sc,kind){
       R={ev:ev,x:x,reasons:[],warn:[],late:0,offer:'',newDevice:false};
   var mode=pol[x.modeKey]||'warn';if(!x.enforced)mode='record';R.mode=mode;
   var inside=capture&&pt&&best.d!=null?best.d<=best.s.radius:true;
-  ev.matched=!capture?'Not captured (policy)':locFailure?'Unverified — no usable GPS evidence':inside?best.s.name:(attMatchAny(id,date,pt[0],pt[1])||'No approved location');
+  ev.matched=!capture?'Not captured (policy)':locFailure?'Unverified, no usable GPS evidence':inside?best.s.name:(attMatchAny(id,date,pt[0],pt[1])||'No approved location');
   /* 1. the clock */
   var t=aMin(time);
   if(kind==='in'&&t<aMin(pol.earliest)){R.result='Rejected';R.reasons.push('Before the earliest clock-in time of '+pol.earliest+'.');}
@@ -4577,49 +4580,49 @@ function attCommit(ev){
 /* ───── policy fields: one list drives the settings screen, the diff and the publish review ─────
    [key, label, help, type, options or range, arrangements affected, section] */
 var ATT_PF=[
- ['captureIn','Capture GPS on clock-in','Read once, at the moment of the punch. Never tracked.','bool',null,'all','loc'],
- ['captureOut','Capture GPS on clock-out','Read once, at the moment of the punch.','bool',null,'all','loc'],
- ['enforceRemote','Enforce remote home geofence','Remote days must be inside the approved home fence.','bool',null,['Remote','Hybrid'],'loc'],
- ['enforceHybrid','Enforce hybrid office geofence','Office days must be inside MTN Head Office.','bool',null,['Hybrid'],'loc'],
- ['allowField','Allow active field-assignment locations','An approved assignment overrides office or home for its day.','bool',null,['Field'],'loc'],
- ['allowTemp','Allow temporary approved locations','Approved temporary homes and client sites count as valid.','bool',null,['Remote','Hybrid','Office-only'],'loc'],
- ['recordAttempts','Record outside-geofence attempts','A blocked attempt stays on the record for review.','bool',null,'all','loc'],
- ['goodAcc','Good GPS accuracy','Metres or better. Up to the retry threshold, a warning shows.','num',[10,100],'all','loc'],
- ['retryAcc','Retry threshold','Worse than this, the employee retries before any fence decision.','num',[50,300],'all','loc'],
- ['radiusRemote','Remote home radius','Fixed at 100 metres for registered and approved temporary home locations.','lock',null,['Remote','Hybrid'],'loc'],
- ['radiusOffice','Default office radius','Metres. MTN Head Office uses 100.','num',[50,300],['Hybrid','Office-only'],'loc'],
- ['radiusField','Default field-assignment radius','Metres. 100 to 500 depending on venue size.','num',[100,500],['Field'],'loc'],
- ['modeRemote','Remote staff','Outside-geofence behaviour','mode',null,['Remote'],'rules'],
- ['modeHybrid','Hybrid staff','Outside-geofence behaviour','mode',null,['Hybrid'],'rules'],
- ['modeField','Field staff','Outside-geofence behaviour','mode',null,['Field'],'rules'],
- ['modeOffice','Office-only staff','Outside-geofence behaviour','mode',null,['Office-only'],'rules'],
- ['devRecord','Record devices on every punch','Kept even when nothing is enforced, so a later policy has history.','bool',null,'all','dev'],
- ['devWarnNew','Warn on a new device','Accept the punch and raise a device-review alert.','bool',null,'all','dev'],
- ['devRequireEnrol','Require device enrolment','A new device stays pending until People enrols it.','bool',null,'all','dev'],
- ['devBlockUnenrolled','Block unenrolled devices','Refuse the punch and offer an enrolment request.','bool',null,'all','dev'],
- ['devBlockRevoked','Block revoked devices','A revoked device cannot punch.','bool',null,'all','dev'],
- ['wkStart','Weekday start','Monday to Friday','time',null,'all','time'],
- ['wkEnd','Weekday end','Monday to Friday','time',null,'all','time'],
- ['satStart','Saturday start','Saturday','time',null,'all','time'],
- ['satEnd','Saturday end','Saturday','time',null,'all','time'],
- ['grace','Grace period','Minutes after the start that still count as on time.','num',[0,60],'all','time'],
- ['earliest','Earliest clock-in','A punch before this time is refused.','time',null,'all','time'],
- ['missingIn','Missing-clock-in check','','sel',['Flag at 11:00 the same day','Flag at the end of the day','Off'],'all','time'],
- ['missingOut','Missing-clock-out check','','sel',['Flag the next morning','Flag at midnight','Off'],'all','time'],
- ['breakRule','Break rule','','sel',['60 minutes unpaid after 6 hours','30 minutes unpaid after 5 hours','No automatic break'],'all','time'],
- ['overtimeApproval','Overtime needs approval','Time past the end of the shift is paid only once a manager approves it.','bool',null,'all','time'],
- ['overnight','Overnight shift handling','','sel',['Close at midnight and flag for review','Allow shifts across midnight'],'all','time'],
- ['deductionTiers','Deduction tiers','Apply the configured attendance deduction tiers. Turning this off preserves the tier configuration. No deduction is automatic.','bool',null,'all','tiers'],
- ['overtimeTiers','Overtime tiers','Apply configured overtime tiers after manager approval. Monetary rates are not yet configured by MyCity.','bool',null,'all','tiers'],
- ['autoExceptions','Automatically create attendance exceptions','A warned punch opens a reconciliation case.','bool',null,'all','exc'],
- ['lateThreshold','Repeated lateness threshold','','sel',['3 in 30 days','2 in 30 days','4 in 30 days'],'all','exc'],
- ['absenceThreshold','Absence-without-notice threshold','','sel',['1 working day','2 working days'],'all','exc'],
- ['missingOutRule','Missing-clock-out rule','','sel',['Reconcile first, query only if unexplained','Raise a query the next morning'],'all','exc'],
- ['newDeviceRule','New-device rule','','sel',['Device-review alert to People','Alert and raise a query'],'all','exc'],
- ['responsePeriod','Employee response period','','sel',['48 hours','72 hours','24 hours'],'all','exc'],
- ['escalation','Escalation path','','sel',['Line manager, then People, then CEO','People, then CEO'],'all','exc'],
- ['autoDeduct','Automatic deductions','Always off. No deduction enters payroll automatically. An authorised person must accept or waive it.','lock',null,'all','exc'],
- ['ackBlocksClockIn','Require acknowledgment before clock-in','Off means a strong reminder only. A pending acknowledgment never stops an urgent clock-in.','bool',null,'all','pub']];
+ ['captureIn','GPS on Clock-In','Read once, at the moment of the punch. Never tracked.','bool',null,'all','loc'],
+ ['captureOut','GPS on Clock-Out','Read once, at the moment of the punch.','bool',null,'all','loc'],
+ ['enforceRemote','Remote Home Geofence','Remote days must be inside the approved home fence.','bool',null,['Remote','Hybrid'],'loc'],
+ ['enforceHybrid','Hybrid Office Geofence','Office days must be inside MTN Head Office.','bool',null,['Hybrid'],'loc'],
+ ['allowField','Allow Field-Assignment Locations','An approved assignment overrides office or home for its day.','bool',null,['Field'],'loc'],
+ ['allowTemp','Allow Temporary Locations','Approved temporary homes and client sites count as valid.','bool',null,['Remote','Hybrid','Office-only'],'loc'],
+ ['recordAttempts','Record Outside Attempts','A blocked attempt outside a geofence stays on the record for review.','bool',null,'all','loc'],
+ ['goodAcc','Good GPS Accuracy','Metres or better. Up to the retry threshold, a warning shows.','num',[10,100],'all','loc'],
+ ['retryAcc','Retry Threshold','Worse than this, the employee retries before any fence decision.','num',[50,300],'all','loc'],
+ ['radiusRemote','Remote Home Radius','Fixed at 100 metres for registered and approved temporary home locations.','lock',null,['Remote','Hybrid'],'loc'],
+ ['radiusOffice','Default Office Radius','Metres. MTN Head Office uses 100.','num',[50,300],['Hybrid','Office-only'],'loc'],
+ ['radiusField','Default Field Radius','Metres. 100 to 500 depending on venue size.','num',[100,500],['Field'],'loc'],
+ ['modeRemote','Remote Staff','','mode',null,['Remote'],'rules'],
+ ['modeHybrid','Hybrid Staff','','mode',null,['Hybrid'],'rules'],
+ ['modeField','Field Staff','','mode',null,['Field'],'rules'],
+ ['modeOffice','Office-Only Staff','','mode',null,['Office-only'],'rules'],
+ ['devRecord','Record Devices on Punch','','bool',null,'all','dev'],
+ ['devWarnNew','Warn on New Device','Accept the punch and raise a device-review alert.','bool',null,'all','dev'],
+ ['devRequireEnrol','Require Device Enrolment','A new device stays pending until People enrols it.','bool',null,'all','dev'],
+ ['devBlockUnenrolled','Block Unenrolled Devices','Refuse the punch and offer an enrolment request.','bool',null,'all','dev'],
+ ['devBlockRevoked','Block Revoked Devices','','bool',null,'all','dev'],
+ ['wkStart','Weekday Start','','time',null,'all','time'],
+ ['wkEnd','Weekday End','','time',null,'all','time'],
+ ['satStart','Saturday Start','','time',null,'all','time'],
+ ['satEnd','Saturday End','','time',null,'all','time'],
+ ['grace','Grace Period','Minutes after the start that still count as on time.','num',[0,60],'all','time'],
+ ['earliest','Earliest Clock-In','A punch before this time is refused.','time',null,'all','time'],
+ ['missingIn','Missing Clock-In Check','','sel',['Flag at 11:00 the same day','Flag at the end of the day','Off'],'all','time'],
+ ['missingOut','Missing Clock-Out Check','','sel',['Flag the next morning','Flag at midnight','Off'],'all','time'],
+ ['breakRule','Break Rule','','sel',['60 minutes unpaid after 6 hours','30 minutes unpaid after 5 hours','No automatic break'],'all','time'],
+ ['overtimeApproval','Overtime Needs Approval','Time past the end of the shift is paid only once a manager approves it.','bool',null,'all','time'],
+ ['overnight','Overnight Shifts','','sel',['Close at midnight and flag for review','Allow shifts across midnight'],'all','time'],
+ ['deductionTiers','Deduction Tiers','Apply the configured attendance deduction tiers. Turning this off keeps the tier configuration. No deduction is automatic.','bool',null,'all','tiers'],
+ ['overtimeTiers','Overtime Tiers','Apply configured overtime tiers after manager approval. Monetary rates are not yet configured by MyCity.','bool',null,'all','tiers'],
+ ['autoExceptions','Open Exceptions Automatically','A warned punch opens a reconciliation case.','bool',null,'all','exc'],
+ ['lateThreshold','Repeated Lateness','','sel',['3 in 30 days','2 in 30 days','4 in 30 days'],'all','exc'],
+ ['absenceThreshold','Absence Without Notice','','sel',['1 working day','2 working days'],'all','exc'],
+ ['missingOutRule','Missing Clock-Out Rule','','sel',['Reconcile first, query only if unexplained','Raise a query the next morning'],'all','exc'],
+ ['newDeviceRule','New-Device Rule','','sel',['Device-review alert to People','Alert and raise a query'],'all','exc'],
+ ['responsePeriod','Response Period','How long an employee has to answer a query.','sel',['48 hours','72 hours','24 hours'],'all','exc'],
+ ['escalation','Escalation Path','','sel',['Line manager, then People, then CEO','People, then CEO'],'all','exc'],
+ ['autoDeduct','Automatic Deductions','Always off. No deduction enters payroll automatically. An authorised person must accept or waive it.','lock',null,'all','exc'],
+ ['ackBlocksClockIn','Acknowledge Before Clock-In','Off means a strong reminder only. A pending acknowledgment never stops an urgent clock-in.','bool',null,'all','pub']];
 function attPF(k){for(var i=0;i<ATT_PF.length;i++)if(ATT_PF[i][0]===k)return ATT_PF[i];return null}
 function attFmt(k,v){var f=attPF(k);if(!f)return String(v);
   if(k==='radiusRemote')return '100 m · fixed';if(f[3]==='bool'||f[3]==='lock')return v?'On':'Off';if(f[3]==='mode')return ATT_MODES[v]||v;
@@ -4821,7 +4824,7 @@ function attPaintPunch(){if(!ATT)return;var id=ATT.demo.actor,o=attOpenSession(i
   var can=attCanClock(id),done=!o&&attClockedToday(id);b.classList.toggle('out',!!o);b.disabled=!can.ok||done;b.title=!can.ok?can.message:done?'Attendance is complete for today':t+' as '+aName(id);b.setAttribute('aria-label',b.title)}
 function attOpenClock(){
   var id=ATT.demo.actor,can=attCanClock(id);
-  if(!can.ok){openModal({title:can.kind==='leave'?'Attendance unavailable while on leave':'Attendance unavailable',body:
+  if(!can.ok){openModal({title:can.kind==='leave'?'On Approved Leave':'Attendance Unavailable',body:
     '<div class="attban '+(can.kind==='leave'?'in':'er')+'">'+ic(can.kind==='leave'?'info':'alert','ico')+'<span><b>'+esc(aName(id))+'</b><br>'+esc(can.message)+'</span></div>',
     foot:'<button class="btn pri" data-mx>Close</button>'});return}
   /* A clock prompt represents a fresh reading. Demo presenter controls are
@@ -4845,10 +4848,10 @@ function attCkPaint(){
     outInfo={inT:v.inE.sys,g:g,brk:g>0?attBreak(g,pol):0,early:to<aMin(sh[1])?aMin(sh[1])-to:0,ot:to>aMin(sh[1])+30?to-aMin(sh[1]):0,end:sh[1]};outInfo.net=g-outInfo.brk}
 
   if(ck.stage==='blocked')h+=attResultBox('er','Attendance status','Pending People review',
-    'Your '+(ck.kind==='out'?'clock-out':'clock-in')+' attempt at '+esc(ck.att?ck.att.sys:time)+' was saved with its original evidence. '+
-    esc(ck.reason||'')+' It is not compliant until People decides '+esc(ck.caseId||'the case')+'.');
+    (ck.kind==='out'?'Clock-out':'Clock-in')+' attempt at '+esc(ck.att?ck.att.sys:time)+' saved. '+
+    esc(ck.reason||'')+(ck.caseId?' Case '+esc(ck.caseId)+' is open.':''));
   else if(ck.stage==='rejected')h+=attResultBox('er','Attendance status','Unable to '+(ck.kind==='out'?'clock out':'clock in'),
-    esc(ck.reason||'')+(ck.offer==='device'?' You can ask People to enrol this device.':''));
+    esc(ck.reason||''));
   else if(ck.stage==='review'){
     h+='<div style="text-align:center;padding:2px 0 15px"><span class="av" style="width:42px;height:42px;margin:0 auto 10px">'+esc(id)+'</span>'+
       '<h2 style="font-size:20px;margin-bottom:4px">'+(ck.kind==='out'?'Ready to finish for today?':'Ready to start your day?')+'</h2>'+
@@ -4860,31 +4863,30 @@ function attCkPaint(){
     else h+=attResultBox(R.result==='Accepted'?'ok':'wa','Location check',R.result==='Accepted'?'Location verified':'Attendance will be reviewed',
       ev.lat==null?'Location is not required by today’s policy.':R.result==='Accepted'?'You are within '+esc(ev.matched)+'.':esc(R.warn[0]||R.reasons[0]||'People will review this attendance.'));
     h+='<div class="card" style="margin:12px 0 0"><dl class="kv">'+
-      '<dt>Work arrangement</dt><dd>'+esc(e.arr)+' · '+esc(x.schedule||'')+'</dd>'+
+      '<dt>Work Arrangement</dt><dd>'+esc(e.arr)+' · '+esc(x.schedule||'')+'</dd>'+
       '<dt>Shift</dt><dd>'+esc(aShiftTxt(x.shift))+(pol.grace?' · '+pol.grace+' min grace':'')+'</dd>'+
-      '<dt>Clock location</dt><dd>'+esc(x.label)+(x.sites[0]?' · '+x.sites[0].radius+' m':'')+(x.note?'<br><span class="sub">'+esc(x.note)+'</span>':'')+'</dd>'+
-      (ck.kind==='out'&&outInfo&&outInfo.g>=0?'<dt>Clocked in</dt><dd>'+esc(outInfo.inT)+'</dd><dt>Time so far</dt><dd><b>'+aDur(outInfo.net)+'</b></dd>':'')+
-      '<dt>Current time</dt><dd><b>'+esc(time)+'</b> <span class="sub">Africa/Lagos</span></dd></dl></div>'+
-      (ack&&!blockAck?'<p class="sub" style="margin:8px 2px 0">Policy v'+L.v+' still needs acknowledgment. You may clock in now and read it from Policy Updates afterward.</p>':'');
+      '<dt>Clock Location</dt><dd>'+esc(x.label)+(x.sites[0]?' · '+x.sites[0].radius+' m':'')+(x.note?'<br><span class="sub">'+esc(x.note)+'</span>':'')+'</dd>'+
+      (ck.kind==='out'&&outInfo&&outInfo.g>=0?'<dt>Clocked In</dt><dd>'+esc(outInfo.inT)+'</dd><dt>Time So Far</dt><dd><b>'+aDur(outInfo.net)+'</b></dd>':'')+
+      '<dt>Current Time</dt><dd><b>'+esc(time)+'</b> <span class="sub">Africa/Lagos</span></dd></dl></div>'+
+      (ack&&!blockAck?'<p class="sub" style="margin:8px 2px 0">Policy v'+L.v+' still needs your acknowledgment.</p>':'');
   }
-  if(ck.stage==='exception'||ck.stage==='issue')h+='<div class="card"><div class="ch"><h3>'+(ck.stage==='exception'?'Add exception details':'Report a location issue')+'</h3></div>'+
-    '<p class="sub" style="margin-bottom:10px">'+(ck.stage==='exception'?'Explain why you were outside the approved location. People and your manager will review it.':'Explain why your location could not be verified after retrying.')+'</p>'+
-    field('ck-why','Explanation','<textarea class="inp" id="ck-why" placeholder="What happened, in a sentence or two"></textarea>','Write at least 10 characters')+
-    field('ck-evi','Supporting evidence label (optional)','<input class="inp" id="ck-evi" placeholder="For example, assignment message.jpg">')+'</div>';
-  if(ck.stage==='enrol')h+='<div class="card"><div class="ch"><h3>Request device enrolment</h3></div>'+
-    field('ck-dev','Device name','<input class="inp" id="ck-dev" value="'+esc(ev.device)+'">','Name the device')+
-    field('ck-devwhy','Reason (optional)','<input class="inp" id="ck-devwhy" placeholder="For example, replaced a broken phone">')+'</div>';
+  if(ck.stage==='exception'||ck.stage==='issue')h+='<div class="card"><div class="ch"><h3>'+(ck.stage==='exception'?'Exception Details':'Location Issue')+'</h3></div>'+
+    field('ck-why','Explanation','<textarea class="inp" id="ck-why"></textarea>','At least 10 characters')+
+    field('ck-evi','Evidence (Optional)','<input class="inp" id="ck-evi" placeholder="photo.jpg">')+'</div>';
+  if(ck.stage==='enrol')h+='<div class="card"><div class="ch"><h3>Device Enrolment</h3></div>'+
+    field('ck-dev','Device Name','<input class="inp" id="ck-dev" value="'+esc(ev.device)+'">','Name the device')+
+    field('ck-devwhy','Reason (Optional)','<input class="inp" id="ck-devwhy">')+'</div>';
   $('#ckbody').innerHTML=h;
 
   var f='',lab=ck.kind==='out'?'Clock Out':'Clock In';
-  if(ck.stage==='review'){f+='<button class="btn" data-mx>Not now</button>';
-    if(blockAck)f+='<button class="btn pri" data-att="go-policy">View policy</button>';
-    else if(R.result==='Retry'){if(ck.retries>=2)f+='<button class="btn" data-att="ck-issue">Report issue</button>';
-      f+='<button class="btn pri" data-att="ck-retry">'+ic('target')+'Retry location</button>'}
+  if(ck.stage==='review'){f+='<button class="btn" data-mx>Not Now</button>';
+    if(blockAck)f+='<button class="btn pri" data-att="go-policy">View Policy</button>';
+    else if(R.result==='Retry'){if(ck.retries>=2)f+='<button class="btn" data-att="ck-issue">Report Issue</button>';
+      f+='<button class="btn pri" data-att="ck-retry">'+ic('target')+'Retry Location</button>'}
     else if(R.result==='Rejected'||(outInfo&&outInfo.g<0))f+='<button class="btn pri" data-mx>Close</button>';
     else f+='<button class="btn pri" data-att="ck-submit">'+ic('clock')+lab+'</button>'}
-  else if(ck.stage==='blocked')f+='<button class="btn" data-mx>Close</button><button class="btn pri" data-att="ck-exc">Add details</button>';
-  else if(ck.stage==='rejected')f+='<button class="btn pri" data-mx>Close</button>'+(ck.offer==='device'?'<button class="btn" data-att="ck-enrol">Request device enrolment</button>':'');
+  else if(ck.stage==='blocked')f+='<button class="btn" data-mx>Close</button><button class="btn pri" data-att="ck-exc">Add Details</button>';
+  else if(ck.stage==='rejected')f+='<button class="btn pri" data-mx>Close</button>'+(ck.offer==='device'?'<button class="btn" data-att="ck-enrol">Request Enrolment</button>':'');
   else f+='<button class="btn" data-att="ck-back">Back</button><button class="btn pri" data-att="ck-send">'+ic('send')+'Send</button>';
   var ft=$('#modal .mft');if(ft)ft.innerHTML=f;
   $$('#modal [data-mx]').forEach(function(b){b.onclick=closeModal});
@@ -4922,7 +4924,7 @@ function attCkSubmit(){
     attAudit(ck.kind==='out'?'Clocked out':'Clocked in',nm+' · '+kindTxt+' '+time,'None',R.result+(R.late?', late '+R.late+'m':''),ev.expected+' · policy '+ev.policy,nm);
     attSave();closeModal();attPaintPunch();attBellPaint();render();
     toast(ck.kind==='out'?'Clocked out at '+time+(hrs?' · '+hrs+' recorded':''):
-      (R.result==='Accepted'?'Clocked in at '+time+' · '+ev.matched+(R.late?', late '+R.late+'m':''):'Clocked in with a warning'+(c?' · '+c.id+' opened':'')));
+      (R.result==='Accepted'?'Clocked in at '+time+(R.late?', late '+R.late+'m':''):'Clocked in with a warning'+(c?' · '+c.id+' opened':'')));
     return}
   /* blocked or rejected: the attempt is kept, the punch is not */
   if(pol.recordAttempts||R.result==='Rejected'){attCommit(ev);ck.att=ev}else ck.att={sys:time};
@@ -4964,31 +4966,29 @@ function attCkSend(){
   attNotify('HR',(ck.stage==='issue'?'Attendance issue':'Exception details')+', '+nm,c.id+' · '+why,'correction',null,c.id);
   if(e.mgr)attNotify(e.mgr,'For your recommendation: '+nm,c.id+' · '+type+'. '+why,'correction',null,c.id);
   attAudit(ck.stage==='issue'?'Attendance issue reported':'Exception requested',nm+' · '+c.id,'None','Awaiting HR',type,nm);
-  attSave();closeModal();attBellPaint();render();toast(c.id+' sent to People. Your manager is copied.')}
+  attSave();closeModal();attBellPaint();render();toast(c.id+' sent to People')}
 
 /* ═════════════ NOTIFICATIONS AND ALERTS (the bell) ═════════════ */
 function attViewer(){return ATT.demo.auth||ATT.demo.actor||'CO'}
 function attUnread(){var v=attViewer();return ATT.notes.filter(function(x){return !x.read&&(x.to===v||(v==='CO'&&x.to==='HR'))}).length}
 function attBellPaint(){var d=$('#bell .dotred');if(d)d.style.display=attUnread()?'':'none'}
 function attOpenBell(){openModal({title:'Notifications and Alerts',wide:true,body:'<div id="bellbody"></div>',
-  foot:'<button class="btn" data-att="bell-read">Mark all as read</button><button class="btn pri" data-mx>Done</button>',onMount:function(){attBellRender()}})}
+  foot:'<button class="btn" data-att="bell-read">Mark All Read</button><button class="btn pri" data-mx>Done</button>',onMount:function(){attBellRender()}})}
 function attBellRender(){var b=$('#bellbody');if(!b)return;
   var byTime=function(a,b){return (aDate(b.at.slice(0,10))-aDate(a.at.slice(0,10)))||(b.at.slice(11)>a.at.slice(11)?1:b.at.slice(11)<a.at.slice(11)?-1:0)};
   var viewer=attViewer(),isHR=viewer==='CO',v=ATTUI.bell;if(!isHR&&v!=='Notifications')v=ATTUI.bell='Notifications';
   var mine=ATT.notes.filter(function(n){return n.to===viewer||(isHR&&n.to==='HR')}),staff=isHR?ATT.notes.filter(function(n){return n.to!=='CO'&&n.to!=='HR'}):[],
-      al=isHR?ATT.alerts.filter(function(a){return a.open}):[],tabs=isHR?[['Notifications','Notifications · '+mine.length],['Alerts','Alerts · '+al.length],['Staff','Sent to staff · '+staff.length]]:[['Notifications','Notifications · '+mine.length]];
+      al=isHR?ATT.alerts.filter(function(a){return a.open}):[],tabs=isHR?[['Notifications','Notifications · '+mine.length],['Alerts','Alerts · '+al.length],['Staff','Sent to Staff · '+staff.length]]:[['Notifications','Notifications · '+mine.length]];
   var h='<div class="seg" role="tablist" aria-label="Show" style="margin-bottom:10px">'+tabs.map(function(t){
-    return '<button type="button" role="tab" aria-selected="'+(v===t[0])+'" data-att="bell-tab" data-v="'+t[0]+'"'+(v===t[0]?' class="on"':'')+'>'+esc(t[1])+'</button>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-bottom:10px">'+(v==='Alerts'?'An alert is an unresolved condition. It stays until someone with the right permission acts on it.':
-      v==='Staff'?'What employees were sent. In the product each person sees only their own.':'A notification is something that happened to you. Read once and gone.')+'</p>';
+    return '<button type="button" role="tab" aria-selected="'+(v===t[0])+'" data-att="bell-tab" data-v="'+t[0]+'"'+(v===t[0]?' class="on"':'')+'>'+esc(t[1])+'</button>'}).join('')+'</div>';
   if(v==='Alerts')h+=al.length?al.map(function(a){return '<div class="nrow"><span class="nic er">'+ic('alert')+'</span><span class="nb"><b>'+esc(a.title)+'</b>'+
       '<span class="sub">'+esc(a.trigger)+' · '+esc(a.at)+' · for '+esc(a.who)+'</span></span>'+pill(a.sev==='High'?'er':'wa',a.sev)+
-      (a.ref?'<button class="btn" data-att="alert-open" data-v="'+esc(a.ref)+'">Open</button>':'')+'</div>'}).join(''):emptyb('ok','No open alerts','Everything that needed action has been dealt with.');
+      (a.ref?'<button class="btn" data-att="alert-open" data-v="'+esc(a.ref)+'">Open</button>':'')+'</div>'}).join(''):emptyb('ok','No Open Alerts','Nothing needs action.');
   else{var list=(v==='Staff'?staff:mine).slice().sort(byTime);
     h+=list.length?list.slice(0,40).map(function(n){return '<div class="nrow'+(n.read?'':' un')+'"><span class="nic">'+ic(n.kind==='policy'?'doc':n.kind==='device'?'lock':n.kind==='punch'?'clock':'bell')+'</span>'+
       '<span class="nb"><b>'+esc(n.title)+(n.read?'':' <span class="sr">unread</span>')+'</b><span class="sub">'+esc(n.body)+'</span><span class="sub">'+esc(n.at)+' · to '+esc(n.to==='HR'?'People team':n.to==='CO'?'you':aName(n.to))+'</span></span>'+
       (v==='Staff'?'':'<button class="btn" data-att="note-open" data-v="'+esc(n.id)+'">Open</button>')+'</div>'}).join(''):
-      emptyb('bell','Nothing yet','New notifications appear here.')}
+      emptyb('bell','Nothing Yet','New notifications appear here.')}
   b.innerHTML=h}
 function attOpenNote(id){var n=null;ATT.notes.forEach(function(x){if(x.id===id)n=x});if(!n)return;
   var viewer=attViewer();if(!(n.to===viewer||(viewer==='CO'&&n.to==='HR')))return;n.read=true;attSave();attBellPaint();
@@ -5010,12 +5010,19 @@ var ATT_MONTHS=['January','February','March','April','May','June','July','August
 function aLong(d){var x=aDate(d);return x.getDate()+' '+ATT_MONTHS[x.getMonth()]+' '+x.getFullYear()}
 function attTabIndex(mk,name){for(var i=0;i<M.length;i++)if(M[i].k===mk){for(var j=0;j<M[i].tabs.length;j++)if(M[i].tabs[j].n===name)return [i,j];return [i,0]}return [0,0]}
 function attGo(mk,name,d){var p=attTabIndex(mk,name);cur={m:p[0],t:p[1],d:d||null};CM.open=false;closeModal();render()}
+/* a help term on a KPI card's label (FRONTEND_GUIDE §5.2); the text sits beside the label, never inside it */
+function attLabHint(html,label,text){var p=hintParts(label,text);return html.replace('<span class="lab">'+esc(label)+'</span>','<span class="lab">'+p[0]+'</span>'+p[1])}
+/* a before-and-after comparison: a table on desktop, label and value pairs on a phone (FRONTEND_GUIDE §7); cells are HTML */
+function attCompare(heads,rows){
+  if(PHONE.matches)return '<dl class="kv">'+rows.map(function(r){return '<dt>'+esc(r[0])+'</dt><dd>'+r.slice(1).map(function(c,i){return '<span class="sub">'+esc(heads[i])+':</span> '+c}).join('<br>')+'</dd>'}).join('')+'</dl>';
+  return '<div class="tscroll"><table><thead><tr><th></th>'+heads.map(function(h){return '<th>'+esc(h)+'</th>'}).join('')+'</tr></thead><tbody>'+
+    rows.map(function(r){return '<tr><td class="sub">'+esc(r[0])+'</td>'+r.slice(1).map(function(c){return '<td>'+c+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>'}
 function attActorStrip(){var id=ATT.demo.actor;if(id==='CO')return '';
-  return '<div class="attban in">'+ic('user','ico')+'<span><b>Viewing as '+esc(aName(id))+'.</b> Demo act-as, chosen in the Clock In panel. The attendance tabs here follow it.</span>'+
+  return '<div class="attban in">'+ic('user','ico')+'<span><b>Viewing as '+esc(aName(id))+'</b></span>'+
     '<button class="btn" data-att="actor-co">Back to Cynthia</button></div>'}
 function attAckBanner(id){if(!attAckPending(id))return '';var L=attLatest();
-  return '<div class="attban er" role="alert">'+ic('alert','ico')+'<span><b>Attendance policy v'+L.v+' needs your acknowledgment.</b> Effective '+esc(aLong(L.effective))+'. '+esc(L.summary)+'</span>'+
-    '<button class="btn pri" data-att="go-policy">Read and acknowledge</button></div>'}
+  return '<div class="attban er" role="alert">'+ic('alert','ico')+'<span><b>Policy v'+L.v+' needs your acknowledgment.</b> Effective '+esc(aLong(L.effective))+'. <span data-copy="content">'+esc(L.summary)+'</span></span>'+
+    '<button class="btn pri" data-att="go-policy">Acknowledge Policy</button></div>'}
 function attTimeCell(v,kind){
   var eff=kind==='in'?v.inE:v.outE,orig=v.all.filter(function(e){return e.kind===kind&&e.superseded})[0],
       exc=v.all.filter(function(e){return e.kind===kind&&e.excluded}).length,h='';
@@ -5030,7 +5037,7 @@ function attPin(addr){var a=String(addr||'').toLowerCase(),hit=null;
   ATT_AREAS.forEach(function(x){if(!hit&&a.indexOf(x[0])>=0)hit=x});
   var j=aHash(a),base=hit||['lagos island',6.45500,3.39400],p=aOffset(base[1],base[2],(j%60),j%360);
   return {area:base[0].replace(/\b\w/g,function(c){return c.toUpperCase()}),lat:p[0],lng:p[1],guessed:!hit}}
-function attPinSvg(p){if(!p)return '<div class="pinbox sub">No pin yet. Use Drop pin after typing the address.</div>';
+function attPinSvg(p){if(!p)return '<div class="pinbox sub">No pin yet</div>';
   return '<div class="pinbox"><svg viewBox="0 0 120 70" aria-hidden="true"><rect width="120" height="70" fill="var(--surface)"/>'+
     '<path d="M0 50 Q 40 40 70 52 T 120 46" fill="none" stroke="var(--line-2)" stroke-width="1"/><path d="M30 0 L 44 70 M 80 0 L 72 70" stroke="var(--line)" stroke-width="1"/>'+
     '<circle cx="60" cy="34" r="16" fill="var(--c1)" opacity=".14"/><path d="M60 18c-5 0-9 4-9 9 0 7 9 15 9 15s9-8 9-15c0-5-4-9-9-9z" fill="var(--c1)"/><circle cx="60" cy="27" r="3" fill="var(--raised)"/></svg>'+
@@ -5046,59 +5053,53 @@ function attEssAttendance(){
       days={},can=attCanClock(id),home=attPermHome(id);ss.forEach(function(s){days[s.date]=1});
   var hrs=vs.slice().reverse().filter(function(p){return p[1].net!=null}).map(function(p){return Math.round(p[1].net/6)/10});
   return '<div class="phead"><div><h1>My Attendance</h1><p>October 2026 · '+esc(e.name)+' · '+esc(e.arr)+'</p></div><div class="right">'+
-    '<button class="btn pri" data-att="punch-open"'+(can.ok?'':' disabled title="'+esc(can.message)+'"')+'>'+ic('clock')+(can.kind==='leave'?'On approved leave':open?'Clock out':'Clock in')+'</button></div></div>'+
+    '<button class="btn pri" data-att="punch-open"'+(can.ok?'':' disabled title="'+esc(can.message)+'"')+'>'+ic('clock')+(can.kind==='leave'?'On Leave':open?'Clock Out':'Clock In')+'</button></div></div>'+
     attActorStrip()+attAckBanner(id)+
-    kpis([['Days present',present.length+' / '+Object.keys(days).length],['On time',String(present.length-late),'ok'],['Late',String(late),late?'warn':''],['Open exceptions',String(openC),openC?'warn':'ok']])+
+    kpis([['Days Present',present.length+' / '+Object.keys(days).length],['On Time',String(present.length-late),'ok'],['Late',String(late),late?'warn':''],['Open Exceptions',String(openC),openC?'warn':'ok']])+
     '<div class="grid g23"><div class="card"><div class="ch"><h3>Today, '+esc(aLong(ATT_TODAY))+'</h3><span class="right">'+(tv?attStatusPill(tv):attOnLeave(id,ATT_TODAY)?pill('in','On leave'):pill('nt','Not clocked in'))+'</span></div>'+
-    '<dl class="kv"><dt>Expected location</dt><dd>'+esc(today?today.expected:x.label)+'</dd>'+(x.mode==='Remote'?'<dt>Registered home</dt><dd>'+(home?esc(home.address)+' · fixed 100 m geofence':'Missing — contact People')+'</dd>':'')+'<dt>Schedule</dt><dd>'+esc(x.schedule)+' · '+esc(aShiftTxt(x.shift))+'</dd>'+
-    '<dt>Clock in</dt><dd>'+(tv?attTimeCell(tv,'in'):'None')+'</dd><dt>Clock out</dt><dd>'+(tv?attTimeCell(tv,'out'):'None')+'</dd>'+
-    '<dt>Matched location</dt><dd>'+esc(tv&&tv.inE?tv.inE.matched:'Not yet')+'</dd>'+(tv&&tv.exceptions.length?'<dt>Exception</dt><dd>'+esc(tv.exceptions[0])+'</dd>':'')+'</dl>'+
-    '<p class="sub" style="margin-top:11px">The time recorded is the system time, not your phone’s clock.</p></div>'+
-    (hrs.length>1?areaChart('My net hours per day',hrs,'Saturdays run 09:00 to 15:00, so they show shorter.'):emptyb('chart','Not enough days yet','The chart appears after two complete days.'))+'</div>'+
-    table([['Date'],['Clock in'],['Clock out'],['Expected location'],['Matched location'],['Hours','n'],['Status'],['Record']],
+    '<dl class="kv"><dt>Expected Location</dt><dd>'+esc(today?today.expected:x.label)+'</dd>'+(x.mode==='Remote'?'<dt>Registered Home</dt><dd>'+(home?esc(home.address)+' · fixed 100 m geofence':'Missing, contact People')+'</dd>':'')+'<dt>Schedule</dt><dd>'+esc(x.schedule)+' · '+esc(aShiftTxt(x.shift))+'</dd>'+
+    '<dt>'+hint('Clock In','The time recorded is the system time, not your phone’s clock.')+'</dt><dd>'+(tv?attTimeCell(tv,'in'):'None')+'</dd><dt>Clock Out</dt><dd>'+(tv?attTimeCell(tv,'out'):'None')+'</dd>'+
+    '<dt>Matched Location</dt><dd>'+esc(tv&&tv.inE?tv.inE.matched:'Not yet')+'</dd>'+(tv&&tv.exceptions.length?'<dt>Exception</dt><dd>'+esc(tv.exceptions[0])+'</dd>':'')+'</dl></div>'+
+    (hrs.length>1?areaChart('Net Hours per Day',hrs,'Saturdays are shorter, 09:00 to 15:00.'):emptyb('chart','Not Enough Days Yet','Shows after two complete days.'))+'</div>'+
+    table([['Date'],['Clock In'],['Clock Out'],['Expected Location'],['Matched Location'],['Hours','n'],['Record'],['Status']],
       vs.map(function(p){var s=p[0],v=p[1],m=(v.inE||v.outE||v.attempts[0]||{}).matched||'None';
-        return [esc(s.date),attTimeCell(v,'in'),attTimeCell(v,'out'),esc(s.expected),esc(m),attHours(v),attStatusPill(v),attRecordPill(s,v)]}),
-      'My clock events','<button class="btn" data-att="toast" data-v="Month exported as XLSX (simulated)">Export month</button>')+
+        return [esc(s.date),attTimeCell(v,'in'),attTimeCell(v,'out'),esc(s.expected),esc(m),attHours(v),attRecordPill(s,v),attStatusPill(v)]}),
+      'My Clock Events','<button class="btn" data-att="toast" data-v="Month exported as XLSX (simulated)">Export Month</button>',null,null,[1,5])+
     (mine.length?'<div style="margin-top:12px">'+table([['Case'],['Type'],['Date'],['Status'],['Outcome']],mine.map(function(c){
-      return [esc(c.id),esc(c.type),esc(c.date),attCasePill(c.status),esc(c.outcome||'Pending')]}),'My corrections and exceptions')+'</div>':'')+
-    '<p class="sub" style="margin-top:12px">A correction never overwrites a punch. The original stays visible, struck through, with People’s adjustment beside it.</p>'}
+      return [esc(c.id),esc(c.type),esc(c.date),attCasePill(c.status),esc(c.outcome||'Pending')]}),'My Corrections')+'</div>':'')}
 
 function attEssRequests(){
   var id=ATT.demo.actor,e=aEmp(id),list=ATT.requests.filter(function(r){return r.emp===id}).slice().reverse(),
       h=attPermHome(id),ah=attActiveHome(id,ATT_TODAY),fa=attAssignmentFor(id,ATT_TODAY);
-  return head('Work Location Requests','Temporary changes to where you clock in · '+e.name,[['New request',1,'att-req-new']])+
+  return head('Work Location Requests','Temporary changes to where you clock in',[['New Request',1,'att-req-new']])+
     attActorStrip()+attAckBanner(id)+
-    '<div class="grid g2">'+kvcard('Where you clock in today',[['Arrangement',pill('nt',e.arr)+' '+esc(ATT_PROFILE[e.arr])],
-      ['Permanent home',h?esc(h.address)+' · fixed 100 m geofence':'None on file'],
-      ['Active location',ah?esc(attFenceName(ah))+(ah.kind==='Temporary'?' · until '+esc(ah.to):''):esc(attSite(e.office||'mtn').name)],
-      ['Field assignment today',fa?esc(fa.id+' · '+fa.name):'None'],['Office',esc(attSite(e.office||'mtn').name)]])+
-    '<div class="card"><div class="ch"><h3>How a request moves</h3></div>'+
-    '<div class="chain">'+[['Draft',''],['Awaiting manager',''],['Awaiting HR',''],['Approved','done'],['Expired','']].map(function(s,i){
-      return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+esc(s[0])+'</span>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">An approved temporary location is used by Clock In for its dates. When it ends, your permanent home applies again. Both stay in your history.</p></div></div>'+
-    (list.length?table([['Request'],['Type'],['Dates'],['Location'],['Radius','n'],['Status'],['']],list.map(function(r){var st=attReqState(r);
+    colHint(kvcard('My Locations Today',[['Arrangement',pill('nt',e.arr)+' '+esc(ATT_PROFILE[e.arr])],
+      ['Permanent Home',h?esc(h.address)+' · fixed 100 m geofence':'None on file'],
+      ['Active Location',ah?esc(attFenceName(ah))+(ah.kind==='Temporary'?' · until '+esc(ah.to):''):esc(attSite(e.office||'mtn').name)],
+      ['Field Assignment',fa?esc(fa.id+' · '+fa.name):'None today'],['Office',esc(attSite(e.office||'mtn').name)]]),
+      'Active Location','An approved temporary location is used for its dates. When it ends, your permanent home applies again.')+
+    '<div style="margin-top:12px">'+(list.length?table([['Request'],['Type'],['Dates'],['Location'],['Radius','n'],['Status'],['']],list.map(function(r){var st=attReqState(r);
       return [esc(r.id),esc(r.type),esc(r.from===r.to?r.from:r.from+' to '+r.to),esc(r.area),r.radius+' m',attReqPill(st),
-        st==='Draft'?'<button class="btn" data-att="req-submit" data-v="'+r.id+'">Submit</button>':'<button class="btn" data-att="req-view" data-v="'+r.id+'">View</button>']}),'My requests'):
-      emptyb('target','No requests yet','Use New request to ask for a temporary home, a one-day remote day, a client-site visit or an office-day exception.'))}
+        st==='Draft'?'<button class="btn" data-att="req-submit" data-v="'+r.id+'">Send Request</button>':'<button class="btn" data-att="req-view" data-v="'+r.id+'">View</button>']}),'My Requests',null,null,null,[2,6]):
+      emptyb('target','No Requests Yet','Use New Request to change location.'))+'</div>'}
 function attReqPill(st){return pill({'Draft':'nt','Awaiting manager':'wa','Awaiting HR':'wa','Approved':'ok','Rejected':'er','Expired':'nt'}[st]||'nt',st)}
 function attCasePill(st){return pill({'Awaiting HR':'wa','Awaiting manager':'wa','More information requested':'in','Resolved':'ok','Escalated':'er'}[st]||'nt',st)}
 var ATT_REQTYPES=['Temporary home-location change','One-day remote-work exception','Client-site visit','Field-assignment correction','Office-day exception'];
 function attReqModal(){
   var id=ATT.demo.actor,h=attPermHome(id);ATTUI.essReq={pin:null};
   openModal({title:'New Work Location Request',wide:true,body:
-    '<p class="sub" style="margin-bottom:12px">Submitting as <b>'+esc(aName(id))+'</b>. It goes to your line manager, then People.</p>'+
     '<div class="grid g2" style="margin-bottom:0"><div>'+
-    field('rq-type','Request type','<select class="inp" id="rq-type">'+ATT_REQTYPES.map(function(t){return '<option>'+esc(t)+'</option>'}).join('')+'</select>')+
-    '<div class="grid g2" style="margin-bottom:0">'+field('rq-from','Start date','<input class="inp" id="rq-from" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY" inputmode="numeric">','Use DD/MM/YYYY, today or later')+
-    field('rq-to','End date','<input class="inp" id="rq-to" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY" inputmode="numeric">','On or after the start date')+'</div>'+
-    field('rq-addr','Address','<input class="inp" id="rq-addr" placeholder="Street, area, city" value="">','Enter the address. Home locations use a mandatory 100 m geofence; approved client sites use the field-policy radius.')+
-    '<div class="f"><button type="button" class="btn" data-att="rq-pin">'+ic('target')+'Drop pin at address</button><span class="sub" style="margin-left:8px">Simulated map pin</span><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(null)+'</div></div>'+
+    field('rq-type','Request Type','<select class="inp" id="rq-type">'+ATT_REQTYPES.map(function(t){return '<option>'+esc(t)+'</option>'}).join('')+'</select>')+
+    '<div class="grid g2" style="margin-bottom:0">'+field('rq-from','Start Date','<input class="inp" id="rq-from" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY" inputmode="numeric">','Today or later')+
+    field('rq-to','End Date','<input class="inp" id="rq-to" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY" inputmode="numeric">','On or after start')+'</div>'+
+    field('rq-addr','Address','<input class="inp" id="rq-addr" placeholder="Street, area, city" value="">','Enter the address',
+      'Home and one-day remote locations use a 100 m geofence. Client and field sites use the field radius set by policy.')+
+    '<div class="f"><button type="button" class="btn" data-att="rq-pin">'+ic('target')+'Drop Pin</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(null)+'</div></div>'+
     '</div><div>'+
-    '<div class="attban in">'+ic('target','ico')+'<span><b>Radius is assigned by policy.</b><br>Home and one-day remote locations use 100 m. Client and field sites use the configured field radius.</span></div>'+
-    field('rq-why','Reason','<textarea class="inp" id="rq-why" placeholder="Why, in a sentence or two"></textarea>','Write at least 10 characters')+
-    field('rq-evi','Supporting evidence label (optional)','<input class="inp" id="rq-evi" placeholder="For example, tenancy letter.pdf">')+
+    field('rq-why','Reason','<textarea class="inp" id="rq-why"></textarea>','At least 10 characters')+
+    field('rq-evi','Evidence (Optional)','<input class="inp" id="rq-evi" placeholder="tenancy.pdf">')+
     '</div></div>',
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn" data-att="rq-save" data-v="draft">Save draft</button><button class="btn pri" data-att="rq-save" data-v="submit">'+ic('send')+'Submit</button>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn" data-att="rq-save" data-v="draft">Save Draft</button><button class="btn pri" data-att="rq-save" data-v="submit">Send Request</button>',
     onMount:function(){var t=$('#rq-type'),sync=function(){var one=t.value==='One-day remote-work exception'||t.value==='Office-day exception';
         $('#rq-to').disabled=one;if(one)$('#rq-to').value=$('#rq-from').value;
         if(one&&h&&!$('#rq-addr').value){$('#rq-addr').value='Approved home · '+h.area;ATTUI.essReq.pin={area:h.area,lat:h.lat,lng:h.lng};$('#rq-pinbox').innerHTML=attPinSvg(ATTUI.essReq.pin)}};
@@ -5122,7 +5123,7 @@ function attReqSave(mode){
   if(mode!=='draft'){var mg=aEmp(id).mgr;if(mg)attNotify(mg,'Location request to recommend, '+nm,t+', '+from+(to!==from?' to '+to:'')+'.','request');
     attNotify('HR','Location request submitted, '+nm,t+' · '+p.area+'. With the line manager first.','request');
     attAudit('Location request submitted',nm+' · '+r.id,'None','Awaiting manager',t,nm)}
-  attSave();closeModal();attBellPaint();render();toast(mode==='draft'?r.id+' saved as a draft':r.id+' submitted. With your manager first.')}
+  attSave();closeModal();attBellPaint();render();toast(mode==='draft'?r.id+' saved as a draft':r.id+' sent to your manager')}
 function attReqView(rid){var r=attReq(rid);if(!r)return;
   openModal({title:r.id+' · '+r.type,body:'<dl class="kv"><dt>Employee</dt><dd>'+esc(aName(r.emp))+'</dd><dt>Dates</dt><dd>'+esc(r.from+(r.to!==r.from?' to '+r.to:''))+'</dd>'+
     '<dt>Location</dt><dd>'+esc(r.area)+' · '+r.radius+' m<br><span class="sub">'+esc(aCoord(r.lat,r.lng))+'</span></dd><dt>Reason</dt><dd>'+esc(r.reason)+'</dd>'+
@@ -5132,24 +5133,23 @@ function attReqView(rid){var r=attReq(rid);if(!r)return;
     foot:'<button class="btn pri" data-mx>Close</button>'})}
 
 function attEssDevices(){
-  var id=ATT.demo.actor,mine=ATT.devices.filter(function(d){return d.emp===id}),en=mine.filter(function(d){return d.status==='Enrolled'});
-  return head('My Devices','Phones and laptops you clock in from · '+aName(id),[['Register this device',1,'att-dev-reg']])+
+  var id=ATT.demo.actor,mine=ATT.devices.filter(function(d){return d.emp===id}),en=mine.filter(function(d){return d.status==='Enrolled'}),
+      hp=hintParts('Approved Devices','A punch from an enrolled device is accepted without a device warning.');
+  return head('My Devices','Phones and laptops you clock in from',[['Register Device',1,'att-dev-reg']])+
     attActorStrip()+
-    '<div class="grid g2"><div class="card"><div class="ch"><h3>Approved devices</h3><span class="right">'+pill(en.length?'ok':'wa',en.length+' enrolled')+'</span></div>'+
+    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>'+hp[0]+'</h3>'+hp[1]+'<span class="right">'+pill(en.length?'ok':'wa',en.length+' enrolled')+'</span></div>'+
     (en.length?en.map(function(d){return '<div class="nrow"><span class="nic ok">'+ic('lock')+'</span><span class="nb"><b>'+esc(d.name)+'</b><span class="sub">Enrolled since '+esc(d.first)+' · last punch '+esc(d.last)+'</span></span>'+pill('ok','Enrolled')+'</div>'}).join(''):
-      '<p class="sub">No enrolled device. Register this one and People will review it.</p>')+
-    '<p class="sub" style="margin-top:10px">A punch from an enrolled device is accepted without a device warning.</p></div>'+
-    kvcard('How device checks work',[['Recorded','Every punch records the device, whatever the policy'],['New device',attPolicy().settings.devBlockUnenrolled?'Blocked until People enrols it':'Accepted with a warning, then reviewed by People'],
-      ['Revoked or blocked','Cannot punch'],['Tracking','None. The device is read only when you clock in or out']])+'</div>'+
-    table([['Device'],['First seen'],['Last punch'],['Status'],['Note']],mine.map(function(d){return [esc(d.name),esc(d.first),esc(d.last),attDevPill(d.status),esc(d.note||'')]}),'All my devices')}
+      '<p class="sub">No enrolled device yet.</p>')+'</div>'+
+    colHint(table([['Device'],['First Seen'],['Last Punch'],['Status'],['Note']],mine.map(function(d){return [esc(d.name),esc(d.first),esc(d.last),attDevPill(d.status),esc(d.note||'')]}),'All My Devices'),
+      'Status',(attPolicy().settings.devBlockUnenrolled?'A new device is blocked until People enrols it.':'A new device is accepted with a warning until People reviews it.')+' A revoked or blocked device cannot clock in.')}
 function attDevPill(s){return pill({'Enrolled':'ok','New':'wa','Pending review':'wa','Blocked':'er','Revoked':'er','Verification unavailable':'nt'}[s]||'nt',s)}
 function attDevRegModal(){var ua=navigator.userAgent||'',b=/Edg\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome':/Firefox\//.test(ua)?'Firefox':/Safari\//.test(ua)?'Safari':'Browser',
     os=/Android/.test(ua)?'Android':/iPhone|iPad/.test(ua)?'iOS':/Mac/.test(ua)?'macOS':/Windows/.test(ua)?'Windows':/Linux/.test(ua)?'Linux':'device';
-  openModal({title:'Register This Device',body:'<p class="sub" style="margin-bottom:12px">Registering as <b>'+esc(aName(ATT.demo.actor))+'</b>. People reviews the request before the device counts as enrolled.</p>'+
-    field('dv-name','Device name','<input class="inp" id="dv-name" value="This browser · '+esc(b)+' on '+esc(os)+'">','Name the device')+
-    '<label class="tog" style="border:0;justify-content:flex-start;gap:10px;cursor:pointer"><input type="checkbox" id="dv-ok"> <span style="font-size:12.5px">I use this device for work. MyCity may record its identifier on my clock events only.</span></label>'+
-    '<p class="fm" id="dv-okm" style="display:none;color:var(--err);font-size:11.5px">Tick the box to continue</p>',
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="dev-reg-send">Send for review</button>'})}
+  openModal({title:'Register This Device',body:
+    field('dv-name','Device Name','<input class="inp" id="dv-name" value="This browser · '+esc(b)+' on '+esc(os)+'">','Name the device')+
+    check('dv-ok','Used for Work',false)+
+    '<p class="fm" id="dv-okm" style="display:none;color:var(--err);font-size:11.5px">Tick to confirm</p>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="dev-reg-send">Send for Review</button>'})}
 
 function attEssPolicy(){
   var id=ATT.demo.actor,L=attLatest(),P=attPolicy(),a=ATT.acks[L.v]&&ATT.acks[L.v][id],affected=!!a;
@@ -5158,33 +5158,32 @@ function attEssPolicy(){
   return head('Policy Updates','Attendance policy · '+aName(id))+attActorStrip()+
     '<div class="annmsg" style="max-width:none;margin-bottom:12px"><div class="ah">'+ic('bell')+'Attendance policy updated · '+esc(L.published)+'</div>'+
     '<h4>Attendance policy updated</h4><p><b>Effective '+esc(aLong(L.effective))+'.</b> '+esc(L.summary)+'</p>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" data-att="pol-changes" data-v="'+L.v+'">View changes</button>'+
-    '<button class="btn" data-att="pol-full" data-v="'+L.v+'">Read full policy</button>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" data-att="pol-changes" data-v="'+L.v+'">View Changes</button>'+
+    '<button class="btn" data-att="pol-full" data-v="'+L.v+'">Read Full Policy</button>'+
     (affected&&L.ack&&!a.ack?'<button class="btn pri" data-att="pol-ack">'+ic('ok')+'Acknowledge</button>':'')+
-    '<button class="btn" data-att="pol-ask">Ask a question</button></div></div>'+
-    statstrip([['Current version','v'+L.v+(L.v!==P.v?' (scheduled)':'')],['Published',L.published.slice(0,10)],['Effective',L.effective],['In force today','v'+P.v],['Your acknowledgment',a&&a.ack?'Done':L.ack&&affected?'Pending':'Not needed',a&&a.ack?'ok':L.ack&&affected?'warn':'']])+
-    (L.v!==P.v?'<div class="attban in">'+ic('info','ico')+'<span>Version '+L.v+' takes effect on '+esc(aLong(L.effective))+'. Until then version '+P.v+' applies, and records before that date are never recalculated.</span></div>':'')+
+    '<button class="btn" data-att="pol-ask">Ask a Question</button></div></div>'+
+    statstrip([['Current Version','v'+L.v+(L.v!==P.v?' (scheduled)':'')],['Published',L.published.slice(0,10)],['Effective',L.effective],['In Force Today','v'+P.v],['Acknowledgment',a&&a.ack?'Done':L.ack&&affected?'Pending':'Not needed',a&&a.ack?'ok':L.ack&&affected?'warn':'']])+
+    (L.v!==P.v?'<div class="attban in">'+ic('info','ico')+'<span>Version '+L.v+' takes effect on '+esc(aLong(L.effective))+'. Until then version '+P.v+' applies.</span></div>':'')+
     '<div class="grid g2"><div class="card"><div class="ch"><h3>Acknowledgment</h3><span class="right">'+st+'</span></div>'+
     '<dl class="kv"><dt>Read</dt><dd>'+esc(a&&a.read?a.read:'Not yet')+'</dd><dt>Acknowledged</dt><dd>'+esc(a&&a.ack?a.ack:'Not yet')+'</dd>'+
-    '<dt>Affects</dt><dd>'+esc((L.arrs||ATT_ARRS).join(', '))+'</dd><dt>Clock-in while pending</dt><dd>'+(L.settings.ackBlocksClockIn?'Blocked until acknowledged':'Allowed, with a strong reminder')+'</dd></dl></div>'+
-    kvcard('Full policy, at a glance',[['Where',esc('Office days at MTN Head Office, '+L.settings.radiusOffice+' m. Remote days at your approved home, '+L.settings.radiusRemote+' m. Field days at approved assignment sites.')],
-      ['Outside a fence',esc('Remote: '+ATT_MODES[L.settings.modeRemote]+'. Hybrid: '+ATT_MODES[L.settings.modeHybrid]+'. Field: '+ATT_MODES[L.settings.modeField]+'. Office-only: '+ATT_MODES[L.settings.modeOffice]+'.')],
+    '<dt>Affects</dt><dd>'+esc((L.arrs||ATT_ARRS).join(', '))+'</dd><dt>Clock-In While Pending</dt><dd>'+(L.settings.ackBlocksClockIn?'Blocked until acknowledged':'Allowed, with a strong reminder')+'</dd></dl></div>'+
+    kvcard('Policy Summary',[['Where',esc('Office days at MTN Head Office, '+L.settings.radiusOffice+' m. Remote days at your approved home, '+L.settings.radiusRemote+' m. Field days at approved assignment sites.')],
+      ['Outside a Fence',esc('Remote: '+ATT_MODES[L.settings.modeRemote]+'. Hybrid: '+ATT_MODES[L.settings.modeHybrid]+'. Field: '+ATT_MODES[L.settings.modeField]+'. Office-only: '+ATT_MODES[L.settings.modeOffice]+'.')],
       ['GPS',esc('Read once per punch. '+L.settings.goodAcc+' m or better is good. Worse than '+L.settings.retryAcc+' m, you retry.')],
       ['Hours',esc('Weekdays '+L.settings.wkStart+' to '+L.settings.wkEnd+'. Saturday '+L.settings.satStart+' to '+L.settings.satEnd+'. Grace '+L.settings.grace+' minutes.')],
       ['Devices',esc(L.settings.devBlockUnenrolled?'Unenrolled devices are blocked.':'A new device is accepted with a warning and reviewed.')],
-      ['Deduction tiers',(L.settings.deductionTiers?'On':'Off')+'. Never automatic; a person accepts or waives each proposal.'],
-      ['Overtime tiers',(L.settings.overtimeTiers?'On':'Off')+'. Monetary rates are not configured.']])+'</div>'+
-    table([['Version'],['Published'],['Effective'],['Summary'],['Your acknowledgment'],['']],ATT.policies.slice().reverse().map(function(p){var x=ATT.acks[p.v]&&ATT.acks[p.v][id];
+      ['Deduction Tiers',(L.settings.deductionTiers?'On':'Off')+'. Never automatic; a person accepts or waives each proposal.'],
+      ['Overtime Tiers',(L.settings.overtimeTiers?'On':'Off')+'. Monetary rates are not configured.']])+'</div>'+
+    table([['Version'],['Published'],['Effective'],['Summary'],['Acknowledgment'],['']],ATT.policies.slice().reverse().map(function(p){var x=ATT.acks[p.v]&&ATT.acks[p.v][id];
       return ['v'+p.v,esc(p.published),esc(p.effective),esc(p.summary),x?(x.ack?pill('ok',x.ack):pill('wa','Pending')):pill('nt','Not affected'),
-        '<button class="btn" data-att="pol-full" data-v="'+p.v+'">Read</button>']}),'All versions')}
-function attPolSections(s){var sec=[['loc','Location verification'],['rules','Outside-geofence behaviour by arrangement'],['dev','Device verification'],['time','Time and attendance'],['tiers','Pay-impact tiers'],['exc','Exceptions and queries'],['pub','Publication']];
+        '<button class="btn" data-att="pol-full" data-v="'+p.v+'">Read</button>']}),'All Versions',null,null,null,[2,5])}
+function attPolSections(s){var sec=[['loc','Location Verification'],['rules','Outside-Geofence Behaviour'],['dev','Device Verification'],['time','Time and Attendance'],['tiers','Pay-Impact Tiers'],['exc','Exceptions and Queries'],['pub','Publication']];
   return sec.map(function(x){return '<details class="acc"'+(x[0]==='loc'?' open':'')+'><summary>'+esc(x[1])+'</summary><dl class="kv" style="padding:0 14px 13px">'+
     ATT_PF.filter(function(f){return f[6]===x[0]}).map(function(f){return '<dt>'+esc(f[1])+'</dt><dd>'+esc(attFmt(f[0],s[f[0]]))+'</dd>'}).join('')+'</dl></details>'}).join('')}
 function attPolChanges(v){var p=null,prev=null;ATT.policies.forEach(function(x,i){if(x.v===+v){p=x;prev=ATT.policies[i-1]||null}});if(!p)return;
   var keys=prev?attDiff(prev.settings,p.settings):[];
-  openModal({title:'What Changed in v'+p.v,wide:true,body:'<p class="sub" style="margin-bottom:10px">'+esc(p.summary)+'</p>'+
-    (keys.length?'<div class="tscroll"><table><thead><tr><th>Setting</th><th>Before, v'+(prev?prev.v:'')+'</th><th>Now, v'+p.v+'</th></tr></thead><tbody>'+keys.map(function(k){
-      return '<tr><td>'+esc(attPF(k)[1])+'</td><td>'+esc(attFmt(k,prev.settings[k]))+'</td><td><b>'+esc(attFmt(k,p.settings[k]))+'</b></td></tr>'}).join('')+'</tbody></table></div>':
+  openModal({title:'Changes in v'+p.v,wide:true,body:'<p class="sub" style="margin-bottom:10px" data-copy="content">'+esc(p.summary)+'</p>'+
+    (keys.length?attCompare(['Before, v'+(prev?prev.v:''),'Now, v'+p.v],keys.map(function(k){return [attPF(k)[1],esc(attFmt(k,prev.settings[k])),'<b>'+esc(attFmt(k,p.settings[k]))+'</b>']})):
       '<p class="sub">This is the first version on record.</p>'),foot:'<button class="btn pri" data-mx>Close</button>'})}
 function attPolFull(v){var p=null;ATT.policies.forEach(function(x){if(x.v===+v)p=x});if(!p)return;
   openModal({title:'Attendance Policy v'+p.v,wide:true,body:'<p class="sub" style="margin-bottom:10px">Published '+esc(p.published)+' by '+esc(p.by)+' · effective '+esc(aLong(p.effective))+'</p>'+attPolSections(p.settings),
@@ -5273,99 +5272,102 @@ function attKpis(){var rows=attRegisterRows(),k={inn:0,site:0,remote:0,field:0,l
   k.recon=attHrOpen();k.rows=rows;return k}
 function attFilterRow(r,f){
   if(f==='All')return true;if(f==='Remote'||f==='Hybrid'||f==='Field')return r.e.arr===f;if(f==='Office')return r.e.arr==='Office-only';
-  if(f==='Late')return !!(r.v&&r.v.late);if(f==='Outside geofence')return !!(r.v&&r.v.outside);
-  if(f==='Missing punch')return (!r.leave&&!(r.v&&r.v.inE))||r.cases.some(function(c){return /Missing clock/.test(c.type)});
-  if(f==='Needs reconciliation')return r.cases.length>0;return true}
+  if(f==='Late')return !!(r.v&&r.v.late);if(f==='Outside Geofence')return !!(r.v&&r.v.outside);
+  if(f==='Missing Punch')return (!r.leave&&!(r.v&&r.v.inE))||r.cases.some(function(c){return /Missing clock/.test(c.type)});
+  if(f==='Needs Reconciliation')return r.cases.length>0;return true}
 function attPeopleAttendance(){
   var k=attKpis(),n=ATT_ORDER.length,isHR=attViewer()==='CO'||attViewer()==='IC',view=isHR?ATTUI.view:'Manager View',body='';
   if(view==='Register')body=attRegisterView(k);else if(view==='Field Assignments')body=attFAView();
   else if(view==='Location Requests')body=attReqHRView();else body=attMgrView();
-  return '<div class="phead"><div><h1>Attendance '+infoBtn('att-help')+'</h1><p>'+esc(aLong(ATT_TODAY))+' · Africa/Lagos · '+(isHR?'demo roster of '+n+' of 25 staff':'manager team view')+'</p></div>'+
-    (isHR?'<div class="right"><button class="btn" data-att="punch-open">'+ic('clock')+'Clock In panel</button>'+
+  return '<div class="phead"><div><h1>Attendance</h1><p>'+esc(aLong(ATT_TODAY))+' · '+(isHR?n+' of 25 staff':'your team')+'</p></div>'+
+    (isHR?'<div class="right"><button class="btn donly" data-att="punch-open">'+ic('clock')+'Open Clock Panel</button>'+
     '<button class="btn pri" data-att="recon" aria-label="Reconcile, '+k.recon+' unresolved">'+ic('check')+'Reconcile <span class="cntb">'+k.recon+'</span></button></div>':'')+'</div>'+
-    infoText('att-help','Every figure here is computed from the clock events in this demo. Reconcile fixes what the record should say and never edits a punch. Possible policy breaches go to Queries & Sanctions, which is separate.')+
-    (isHR?'<div class="attk">'+kpis([['Clocked in',k.inn+' / '+n],['On site',String(k.site)],['Remote',String(k.remote)],['On assignment',String(k.field)]])+
-    kpis([['Late',String(k.late),k.late?'warn':''],['Outside geofence',String(k.out),k.out?'warn':''],['Missing clock-out',String(k.missOut),k.missOut?'err':''],['Needs reconciliation',String(k.recon),k.recon?'warn':'ok']])+'</div>'+
-    '<div class="seg" role="tablist" aria-label="Attendance views" style="margin-bottom:12px;max-width:640px">'+['Register','Field Assignments','Location Requests','Manager Preview'].map(function(t){
+    (isHR?'<div class="attk">'+kpis([['Clocked In',k.inn+' / '+n],['On Site',String(k.site)],['Remote',String(k.remote)],['On Assignment',String(k.field)]])+
+    attLabHint(kpis([['Late',String(k.late),k.late?'warn':''],['Outside Geofence',String(k.out),k.out?'warn':''],['Missing Clock-Out',String(k.missOut),k.missOut?'err':''],['Needs Reconciliation',String(k.recon),k.recon?'warn':'ok']]),
+      'Needs Reconciliation','Cases awaiting a People decision. Reconcile records the outcome as a new event; the original punch is never edited. Possible policy breaches go to Queries & Sanctions.')+'</div>'+
+    '<div class="seg attviews" role="tablist" aria-label="Attendance views">'+['Register','Field Assignments','Location Requests','Manager Preview'].map(function(t){
       return '<button type="button" role="tab" aria-selected="'+(t===view)+'" data-att="att-view" data-v="'+t+'"'+(t===view?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')+'</div>':'')+body}
 function attRegisterView(k){
   var f=ATTUI.filter,rows=k.rows.filter(function(r){return attFilterRow(r,f)}),
       ins=k.rows.filter(function(r){return r.v&&r.v.inE}).map(function(r){return aMin(r.v.inE.sys)}),
-      hours=[7,8,9,10,11,12,13,14,15,16].map(function(h){return ins.filter(function(t){return t<h*60+60}).length});
-  return '<div class="grid g23">'+areaChart('Clocked in by hour, today',hours,'From 07:00, cumulative. The grace period closes at '+aHM(aMin(attPolicy().settings.wkStart)+(+attPolicy().settings.grace))+'.')+
-    donut(Math.round(k.inn/ATT_ORDER.length*100),'clocked in',k.inn+' of '+ATT_ORDER.length+' in the demo roster have clocked in. '+k.late+' late, '+k.out+' outside a geofence, '+k.rows.filter(function(r){return r.leave}).length+' on approved leave.')+'</div>'+
-    '<div class="chips" role="group" aria-label="Filter">'+['All','Remote','Hybrid','Field','Office','Late','Outside geofence','Missing punch','Needs reconciliation'].map(function(c){
+      hours=[7,8,9,10,11,12,13,14,15,16].map(function(h){return ins.filter(function(t){return t<h*60+60}).length}),
+      lv=k.rows.filter(function(r){return r.leave}).length;
+  return '<div class="grid g23">'+areaChart('Clocked In by Hour',hours,'Cumulative from 07:00. Grace ends '+aHM(aMin(attPolicy().settings.wkStart)+(+attPolicy().settings.grace))+'.')+
+    donut(Math.round(k.inn/ATT_ORDER.length*100),'clocked in',k.inn+' of '+ATT_ORDER.length+' clocked in · '+k.late+' late · '+k.out+' outside a geofence · '+lv+' on leave')+'</div>'+
+    '<div class="chips" role="group" aria-label="Filter">'+['All','Remote','Hybrid','Field','Office','Late','Outside Geofence','Missing Punch','Needs Reconciliation'].map(function(c){
       var n=k.rows.filter(function(r){return attFilterRow(r,c)}).length;
       return '<button class="chip'+(c===f?' on':'')+'" data-att="att-filter" data-v="'+c+'" aria-pressed="'+(c===f)+'">'+esc(c)+' '+n+'</button>'}).join('')+'</div>'+
-    (rows.length?table([['Employee'],['Arrangement'],['Clock in'],['Clock out'],['Expected location'],['Actual or matched location'],['Device'],['Status'],['Exception']],
+    (rows.length?table([['Employee'],['Arrangement'],['Clock In'],['Clock Out'],['Expected Location'],['Matched Location'],['Device'],['Status'],['Exception']],
       rows.map(function(r){var v=r.v,last=v?(v.all[v.all.length-1]||{}):{},exc=v&&v.exceptions.length?v.exceptions[0]:'',c=r.cases[0];
         return [aWho(r.id),pill('nt',r.e.arr),v?attTimeCell(v,'in'):'<span class="sub">None</span>',v?attTimeCell(v,'out'):'<span class="sub">None</span>',
           esc(r.s?r.s.expected:attWhere(r.id,ATT_TODAY,{field:'on',day:'auto'}).label),esc(last.matched||'Not yet'),
           last.device?esc(last.device)+'<br>'+attDevPill(last.devStatus):'<span class="sub">None</span>',
           r.leave&&!(v&&v.inE)?pill('in','On leave'):v?attStatusPill(v):pill('nt','Not clocked in'),
-          (exc?'<span class="clip" title="'+esc(exc)+'">'+esc(exc)+'</span>':'')+(c?' '+pill('wa',c.id):(exc?'':'<span class="sub">None</span>'))]}),
-      'Today’s register','<span class="sub">Click a row for every recorded field</span>',function(i){return ' class="rowlink" data-att="att-row" data-v="'+rows[i].id+'" tabindex="0"'},'wide'):
-      emptyb('srch','Nobody matches this filter','Choose All to see the whole register.'))+
-    '<p class="sub" style="margin-top:12px">Reconcile decides what a day’s record should say: a missing clock-out, a punch outside a fence, a correction with a reason. The original punch is never overwritten.</p>'}
+          (exc?'<span class="clip" title="'+esc(exc)+'">'+esc(exc)+'</span>':'')+(c?(exc?'<br>':'')+'<b>'+esc(c.id)+'</b>':(exc?'':'<span class="sub">None</span>'))]}),
+      'Today’s Register','',function(i){return ' class="rowlink" data-att="att-row" data-v="'+rows[i].id+'" tabindex="0"'},'wide',[2,5]):
+      emptyb('srch','Nobody Matches This Filter','Choose All to see everyone.'))}
 function attEventModal(id){var s=attTodaySession(id),e=aEmp(id);
-  if(!s){openModal({title:aName(id)+' · Today',body:emptyb('clock','No clock events today',attOnLeave(id,ATT_TODAY)?'On approved leave.':'Nothing has been recorded yet.'),foot:'<button class="btn pri" data-mx>Close</button>'});return}
-  var v=attSV(s),evs=v.all,rows=[['Event',function(x){return (x.kind==='out'?'Clock-out':'Clock-in')}],['System time',function(x){return x.sys}],['Employee device time',function(x){return x.dev||'Not applicable'}],
-    ['Submitted GPS',function(x){return aCoord(x.lat,x.lng)}],['GPS accuracy',function(x){return x.acc==null?'Not captured':x.acc+' m'}],['Expected location',function(x){return x.expected}],
-    ['Matched worksite or assignment',function(x){return x.matched}],['Distance from expected',function(x){return aFmtDist(x.dist)}],['Device',function(x){return x.device}],
-    ['Device enrolment',function(x){return x.devStatus||'Not applicable'}],['Server result',function(x){return x.result+(x.superseded?' · superseded, kept':'')+(x.excluded?' · excluded':'')}],
-    ['Exception or warning',function(x){return x.exception||x.reason||'None'}],['Policy version',function(x){return x.policy}],['Source',function(x){return x.source+(x.by?' · '+x.by:'')}]];
+  if(!s){openModal({title:aName(id)+' · Today',body:emptyb('clock','No Clock Events Today',attOnLeave(id,ATT_TODAY)?'On approved leave.':'Nothing recorded yet.'),foot:'<button class="btn pri" data-mx>Close</button>'});return}
+  var v=attSV(s),evs=v.all,rows=[['Event',function(x){return (x.kind==='out'?'Clock-out':'Clock-in')}],['System Time',function(x){return x.sys}],['Device Time',function(x){return x.dev||'Not applicable'}],
+    ['Submitted GPS',function(x){return aCoord(x.lat,x.lng)}],['GPS Accuracy',function(x){return x.acc==null?'Not captured':x.acc+' m'}],['Expected Location',function(x){return x.expected}],
+    ['Matched Location',function(x){return x.matched}],['Distance',function(x){return aFmtDist(x.dist)}],['Device',function(x){return x.device}],
+    ['Device Enrolment',function(x){return x.devStatus||'Not applicable'}],['Result',function(x){return x.result+(x.superseded?' · superseded, kept':'')+(x.excluded?' · excluded':'')}],
+    ['Exception',function(x){return x.exception||x.reason||'None'}],['Policy Version',function(x){return x.policy}],['Source',function(x){return x.source+(x.by?' · '+x.by:'')}]];
   var cs=ATT.cases.filter(function(c){return c.ss===s.id});
-  openModal({title:aName(id)+' · '+s.date,wide:true,body:
-    '<dl class="kv" style="margin-bottom:12px"><dt>Work arrangement</dt><dd>'+esc(s.arr)+' · '+esc(s.mode)+'</dd><dt>Shift</dt><dd>'+esc(s.shift)+'</dd>'+
-    '<dt>Attendance status</dt><dd>'+attStatusPill(v)+'</dd><dt>Hours</dt><dd>'+attHours(v)+(v.brk?' after a '+v.brk+' minute break':'')+'</dd></dl>'+
+  /* a phone shows one card per event; a desktop compares the events side by side */
+  var evHtml=PHONE.matches?evs.map(function(x){return '<div class="card" style="margin-top:10px"><div class="ch"><h3 data-copy="content">'+esc(x.id)+'</h3></div><dl class="kv">'+
+      rows.map(function(r){return '<dt>'+esc(r[0])+'</dt><dd'+(x.superseded||x.excluded?' class="strike"':'')+'>'+esc(r[1](x))+'</dd>'}).join('')+'</dl></div>'}).join(''):
     '<div class="tscroll"><table><thead><tr><th>Field</th>'+evs.map(function(x){return '<th>'+esc(x.id)+'</th>'}).join('')+'</tr></thead><tbody>'+
-    rows.map(function(r){return '<tr><td class="sub">'+esc(r[0])+'</td>'+evs.map(function(x){return '<td'+(x.superseded||x.excluded?' class="strike"':'')+'>'+esc(r[1](x))+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>',
+    rows.map(function(r){return '<tr><td class="sub">'+esc(r[0])+'</td>'+evs.map(function(x){return '<td'+(x.superseded||x.excluded?' class="strike"':'')+'>'+esc(r[1](x))+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>';
+  openModal({title:aName(id)+' · '+s.date,wide:true,body:
+    '<dl class="kv" style="margin-bottom:12px"><dt>Work Arrangement</dt><dd>'+esc(s.arr)+' · '+esc(s.mode)+'</dd><dt>Shift</dt><dd>'+esc(s.shift)+'</dd>'+
+    '<dt>Status</dt><dd>'+attStatusPill(v)+'</dd><dt>Hours</dt><dd>'+attHours(v)+(v.brk?' after a '+v.brk+' minute break':'')+'</dd></dl>'+evHtml,
     foot:(cs.length?'<button class="btn" data-att="go-case" data-v="'+cs[0].id+'">Open '+cs[0].id+'</button>':'')+'<button class="btn pri" data-mx>Close</button>'})}
 
-function attFAView(){var pol=attPolicy().settings;
-  return '<div class="phead" style="margin-bottom:10px"><div><h1 style="font-size:15px">Field assignments</h1><p>An approved assignment overrides the office or home requirement for its day and time window.</p></div>'+
-    '<div class="right"><button class="btn pri" data-att="fa-new">'+ic('plus')+'Add field assignment</button></div></div>'+
-    table([['Assignment'],['Employee or team'],['Client, event or campaign'],['Approved sites'],['Radius'],['Date'],['Valid'],['Approving manager'],['Status'],['Note'],['']],
-      ATT.assignments.slice().reverse().map(function(a){var st=a.status;
+function attFAView(){var pol=attPolicy().settings,list=ATT.assignments.slice().reverse();
+  return colHint(table([['Assignment'],['Employee or Team'],['Client, Event or Campaign'],['Approved Sites'],['Radius'],['Date'],['Valid'],['Approving Manager'],['Status'],['Note'],['']],
+      list.map(function(a){var st=a.status;
         return ['<b>'+esc(a.id)+'</b><br>'+esc(a.name),esc(a.emps.map(aName).join(', '))+(a.team?'<br><span class="sub">'+esc(a.team)+'</span>':''),esc(a.client),
           a.sites.map(function(s){return esc(s.name)}).join('<br>'),a.sites.map(function(s){return s.radius+' m'}).join('<br>'),esc(a.date),esc(a.start+' to '+a.end),esc(a.approver),
           pill(st==='Approved'?'ok':st==='Completed'?'nt':st==='Rejected'?'er':'wa',st),esc(a.note||''),
-          st==='Awaiting manager'?'<button class="btn" data-att="fa-confirm" data-v="'+a.id+'">Approve</button>':'']}),'Assignments',
-      '<span class="sub">Default radius '+pol.radiusField+' m · 100 to 500 by venue</span>',null,'wide')}
+          st==='Awaiting manager'?'<button class="btn" data-att="fa-confirm" data-v="'+a.id+'">Approve</button>':'']}),'Field Assignments',
+      '<span class="sub">Default radius '+pol.radiusField+' m</span> <button class="btn pri" data-att="fa-new">'+ic('plus')+'Add Assignment</button>',null,'wide',[1,10]),
+    'Valid','An approved assignment replaces the office or home location for its day and this time window.')}
 function attFAModal(){var pol=attPolicy().settings;ATTUI.essReq={pin:null,pin2:null};
   openModal({title:'Add Field Assignment',wide:true,body:'<div class="grid g2" style="margin-bottom:0"><div>'+
-    field('fa-name','Assignment name','<input class="inp" id="fa-name" placeholder="For example, Ember to Remember venue check">','Name the assignment')+
+    field('fa-name','Assignment Name','<input class="inp" id="fa-name" placeholder="Venue check">','Name the assignment')+
     field('fa-emp','Employee','<select class="inp" id="fa-emp">'+ATT_ORDER.map(function(k){return '<option value="'+k+'"'+(k==='AD'?' selected':'')+'>'+esc(aName(k))+' · '+esc(aEmp(k).arr)+'</option>'}).join('')+'</select>')+
-    field('fa-team','Team (optional)','<input class="inp" id="fa-team" placeholder="For example, Ember to Remember crew">')+
-    field('fa-client','Client, event or campaign','<input class="inp" id="fa-client" placeholder="For example, MTN Nigeria · Ember to Remember">','Name the client, event or campaign')+
-    field('fa-note','Supporting note (optional)','<input class="inp" id="fa-note">')+
+    field('fa-team','Team (Optional)','<input class="inp" id="fa-team" placeholder="Events crew">')+
+    field('fa-client','Client, Event or Campaign','<input class="inp" id="fa-client" placeholder="MTN Nigeria">','Name the client')+
+    field('fa-note','Note (Optional)','<input class="inp" id="fa-note">')+
     '</div><div>'+
-    field('fa-addr','Site address','<input class="inp" id="fa-addr" placeholder="For example, Muri Okunola Park, Victoria Island">','Enter the site address')+
-    '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="fa-addr">'+ic('target')+'Drop pin</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(null)+'</div></div>'+
-    field('fa-rad','Geofence radius, metres','<input class="inp" id="fa-rad" type="number" min="100" max="500" value="'+pol.radiusField+'">','Between 100 and 500')+
-    field('fa-addr2','Second approved site (optional)','<input class="inp" id="fa-addr2" placeholder="Leave empty for one site">')+
-    '<div class="grid g3" style="margin-bottom:0">'+field('fa-date','Date','<input class="inp" id="fa-date" value="'+ATT_TODAY+'">','DD/MM/YYYY, today or later')+
-    field('fa-start','Valid from','<input class="inp" id="fa-start" type="time" value="08:00">')+field('fa-end','Valid to','<input class="inp" id="fa-end" type="time" value="17:00">','After the start')+'</div>'+
-    field('fa-appr','Approving manager','<select class="inp" id="fa-appr"><option>Cynthia Osakunih</option><option>Ngozi Eze</option><option>Ifeoma Chukwu</option></select>')+
-    '</div></div>',foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="fa-save">Approve assignment</button>'})}
+    field('fa-addr','Site Address','<input class="inp" id="fa-addr" placeholder="Street, area, city">','Enter the site address')+
+    '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="fa-addr">'+ic('target')+'Drop Pin</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(null)+'</div></div>'+
+    field('fa-rad','Radius in Metres','<input class="inp" id="fa-rad" type="number" min="100" max="500" value="'+pol.radiusField+'">','Between 100 and 500')+
+    field('fa-addr2','Second Site (Optional)','<input class="inp" id="fa-addr2" placeholder="Street, area, city">')+
+    '<div class="grid g3" style="margin-bottom:0">'+field('fa-date','Date','<input class="inp" id="fa-date" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY" inputmode="numeric">','Today or later')+
+    field('fa-start','Valid From','<input class="inp" id="fa-start" type="time" value="08:00">')+field('fa-end','Valid Until','<input class="inp" id="fa-end" type="time" value="17:00">','After the start')+'</div>'+
+    field('fa-appr','Approving Manager','<select class="inp" id="fa-appr"><option>Cynthia Osakunih</option><option>Ngozi Eze</option><option>Ifeoma Chukwu</option></select>')+
+    '</div></div>',foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="fa-save">Approve Assignment</button>'})}
 
 function attReqHRView(){var list=ATT.requests.slice().reverse();
-  return '<p class="sub" style="margin-bottom:10px">People approves or rejects. A request normally reaches People after the line manager, but People can decide at either stage. Approved locations are used by Clock In for their dates only.</p>'+
-    table([['Request'],['Employee'],['Type'],['Dates'],['Location'],['Radius','n'],['Reason'],['Status'],['']],list.map(function(r){var st=attReqState(r),act=st==='Awaiting manager'||st==='Awaiting HR';
-      return [esc(r.id),aWho(r.emp),esc(r.type),esc(r.from===r.to?r.from:r.from+' to '+r.to),esc(r.area)+'<br><span class="sub">Full address in the request</span>',r.radius+' m',
+  return colHint(table([['Request'],['Employee'],['Type'],['Dates'],['Location'],['Radius','n'],['Reason'],['Status'],['']],list.map(function(r){var st=attReqState(r),act=st==='Awaiting manager'||st==='Awaiting HR';
+      return [esc(r.id),aWho(r.emp),esc(r.type),esc(r.from===r.to?r.from:r.from+' to '+r.to),esc(r.area),r.radius+' m',
         '<span class="clip" title="'+esc(r.reason)+'">'+esc(r.reason)+'</span>',attReqPill(st),
-        act?'<span style="display:flex;gap:6px"><button class="btn" data-att="req-decide" data-v="'+r.id+'">Review</button></span>':'<button class="btn" data-att="req-view" data-v="'+r.id+'">View</button>']}),
-      'Work location requests','<span class="sub">'+list.filter(function(r){var s=attReqState(r);return s==='Awaiting manager'||s==='Awaiting HR'}).length+' awaiting a decision</span>',null,'wide')}
-function attReqDecideModal(rid){var r=attReq(rid);if(!r)return;var own=r.emp==='CO',old=attActiveHome(r.emp,r.from),e=aEmp(r.emp);
+        act?'<button class="btn" data-att="req-decide" data-v="'+r.id+'">Review</button>':'<button class="btn" data-att="req-view" data-v="'+r.id+'">View</button>']}),
+      'Location Requests','<span class="sub">'+list.filter(function(r){var s=attReqState(r);return s==='Awaiting manager'||s==='Awaiting HR'}).length+' awaiting a decision</span>',
+      function(i){var r=list[i],s=attReqState(r);return ' class="rowlink" data-att="'+(s==='Awaiting manager'||s==='Awaiting HR'?'req-decide':'req-view')+'" data-v="'+r.id+'" tabindex="0"'},'wide',[1,2]),
+    'Status','A request reaches People after the line manager, but People can decide at either stage.')}
+function attReqDecideModal(rid){var r=attReq(rid);if(!r)return;var own=r.emp==='CO',old=attActiveHome(r.emp,r.from),e=aEmp(r.emp),lab=own?'Approve as CEO':'Approve Request';
   openModal({title:'Review '+r.id,wide:true,body:
-    (own?'<div class="attban in">'+ic('info','ico')+'<span>This is your own request. You cannot approve it yourself. In the demo, approval is recorded as Ifeoma Chukwu (CEO).</span></div>':'')+
-    (r.status==='Awaiting manager'?'<div class="attban in">'+ic('info','ico')+'<span>The line manager has not recommended this yet. People can still decide.</span></div>':'')+
+    (own?'<div class="attban in">'+ic('info','ico')+'<span>Your own request. Approval is recorded as Ifeoma Chukwu.</span></div>':'')+
+    (r.status==='Awaiting manager'?'<div class="attban in">'+ic('info','ico')+'<span>No manager recommendation yet.</span></div>':'')+
     '<div class="grid g2" style="margin-bottom:0">'+kvcard('Request',[['Employee',esc(e.name)+' · '+esc(e.arr)],['Type',esc(r.type)],['Dates',esc(r.from+(r.to!==r.from?' to '+r.to:''))],
       ['Reason',esc(r.reason)],['Evidence',esc(r.evidence||'None')],['Manager',esc(r.mgrNote||'No recommendation yet')]])+
-    kvcard('Location, old and new',[['Current',esc(old?attFenceName(old)+' · '+old.radius+' m':attSite(e.office||'mtn').name)],['Requested',esc(r.area)+' · '+r.radius+' m'],
-      ['Full address',esc(r.address)],['Coordinates',esc(aCoord(r.lat,r.lng))],['After it ends','The permanent location applies again. Both stay in history.']])+'</div>'+
-    field('rd-note','Note to the employee (optional)','<input class="inp" id="rd-note">'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn" data-att="req-reject" data-v="'+r.id+'">Reject</button><button class="btn pri" data-att="req-approve" data-v="'+r.id+'">'+ic('ok')+(own?'Approve as Ifeoma Chukwu':'Approve')+'</button>'})}
+    kvcard('Location Change',[['Current',esc(old?attFenceName(old)+' · '+old.radius+' m':attSite(e.office||'mtn').name)],['Requested',esc(r.area)+' · '+r.radius+' m'],
+      ['Full Address',esc(r.address)],['Coordinates',esc(aCoord(r.lat,r.lng))]])+'</div>'+
+    field('rd-note','Note to Employee (Optional)','<input class="inp" id="rd-note">'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn" data-att="req-reject" data-v="'+r.id+'">Reject</button><button class="btn pri" data-att="req-approve" data-v="'+r.id+'">'+esc(lab)+'</button>'})}
 function attReqDecide(rid,ok){var r=attReq(rid);if(!r)return;var note=($('#rd-note')&&$('#rd-note').value||'').trim(),own=r.emp==='CO',by=own?'Ifeoma Chukwu':'Cynthia Osakunih',nm=aName(r.emp);
   r.status=ok?'Approved':'Rejected';r.hrNote=note;r.history.push([aStamp(),by,(ok?'Approved':'Rejected')+' by '+(own?'the CEO':'People')+(note?': '+note:'')]);
   if(ok&&r.type==='Temporary home-location change'){var old=attActiveHome(r.emp,r.from);
@@ -5373,42 +5375,38 @@ function attReqDecide(rid,ok){var r=attReq(rid);if(!r)return;var note=($('#rd-no
     attAudit('Temporary location approved',nm+' · '+r.id,old?attFenceName(old):'None','Temporary location · '+r.area+', '+r.from+' to '+r.to,r.reason,by)}
   else attAudit(ok?'Temporary location approved':'Temporary location rejected',nm+' · '+r.id,'Awaiting decision',ok?r.type+' · '+r.area:'Rejected',note||r.reason,by);
   attNotify(r.emp,'Temporary location '+(ok?'approved':'rejected'),r.type+', '+r.from+(r.to!==r.from?' to '+r.to:'')+'. '+(note||''),'request');
-  attSave();closeModal();attBellPaint();render();toast(r.id+(ok?' approved. Clock In will use it on its dates.':' rejected. The employee has been told.'))}
+  attSave();closeModal();attBellPaint();render();toast(r.id+(ok?' approved':' rejected'))}
 
 /* manager preview: the same data, seen through a line manager's narrower scope */
 function attMgrView(){
-  var mgr=attViewer(),team=ATT_ORDER.filter(function(k){return aEmp(k).mgr===mgr}),rows=attRegisterRows().filter(function(r){return team.indexOf(r.id)>=0}),
+  var mgr=attViewer(),isHR=mgr==='CO'||mgr==='IC',team=ATT_ORDER.filter(function(k){return aEmp(k).mgr===mgr}),rows=attRegisterRows().filter(function(r){return team.indexOf(r.id)>=0}),
       exp=rows.filter(function(r){return !r.leave}).length,inn=rows.filter(function(r){return r.v&&r.v.inE}).length,
       late=rows.filter(function(r){return r.v&&r.v.late}).length,rem=rows.filter(function(r){return r.e.arr==='Remote'||(r.s&&r.s.mode==='Remote')}).length,
       fld=rows.filter(function(r){return r.s&&r.s.mode==='Field'&&r.v.inE}).length,miss=rows.filter(function(r){return !r.leave&&!(r.v&&r.v.inE)}).length,
       reqs=ATT.requests.filter(function(q){return team.indexOf(q.emp)>=0&&q.status==='Awaiting manager'}),
       cs=ATT.cases.filter(function(c){return team.indexOf(c.emp)>=0&&c.status==='Awaiting manager'}),
       fas=ATT.assignments.filter(function(a){return a.status==='Awaiting manager'&&a.emps.some(function(x){return team.indexOf(x)>=0})});
-  return '<div class="attban in">'+ic('users','ico')+'<span><b>Manager view.</b> What '+esc(aName(mgr))+' sees as line manager of '+team.length+' people: '+esc(team.map(aName).join(', ')||'no linked reports')+'. Nothing outside this team is visible here.</span></div>'+
-    '<div class="attk">'+kpis([['Expected today',String(exp)],['Clocked in',String(inn)],['Late',String(late),late?'warn':''],['Remote',String(rem)]])+
-    kpis([['On assignment',String(fld)],['Missing punch',String(miss),miss?'err':''],['Pending location requests',String(reqs.length),reqs.length?'warn':''],['Corrections awaiting recommendation',String(cs.length),cs.length?'warn':'']])+'</div>'+
-    table([['Employee'],['Arrangement'],['Today'],['Expected location'],['Matched location']],rows.map(function(r){var v=r.v,last=v?(v.all[v.all.length-1]||{}):{};
-      return [aWho(r.id),pill('nt',r.e.arr),r.leave&&!(v&&v.inE)?pill('in','On leave'):v?attStatusPill(v):pill('nt','Not clocked in'),esc(r.s?r.s.expected:attWhere(r.id,ATT_TODAY,{field:'on',day:'auto'}).label),esc(last.matched||'Not yet')]}),'My team today')+
-    '<div class="grid g2" style="margin-top:12px"><div class="card"><div class="ch"><h3>Needs your recommendation</h3><span class="right">'+pill(cs.length+reqs.length+fas.length?'wa':'ok',String(cs.length+reqs.length+fas.length))+'</span></div>'+
-    fas.map(function(a){return '<div class="nrow"><span class="nic">'+ic('brief')+'</span><span class="nb"><b>Confirm field assignment · '+esc(a.id)+'</b><span class="sub">'+esc(a.emps.map(aName).join(', ')+' · '+a.name+' · '+a.date+', '+a.start+' to '+a.end)+'</span></span><button class="btn pri" data-att="fa-confirm" data-v="'+a.id+'">Confirm</button></div>'}).join('')+
+  return (isHR?'<div class="attban in">'+ic('users','ico')+'<span><b>Manager preview</b> · '+esc(aName(mgr))+', line manager of '+team.length+': '+esc(team.map(aName).join(', ')||'no linked reports')+'</span></div>':'')+
+    '<div class="attk">'+kpis([['Expected Today',String(exp)],['Clocked In',String(inn)],['Late',String(late),late?'warn':''],['Remote',String(rem)]])+
+    kpis([['On Assignment',String(fld)],['Missing Punch',String(miss),miss?'err':''],['Location Requests',String(reqs.length),reqs.length?'warn':''],['Corrections to Review',String(cs.length),cs.length?'warn':'']])+'</div>'+
+    table([['Employee'],['Arrangement'],['Expected Location'],['Matched Location'],['Today']],rows.map(function(r){var v=r.v,last=v?(v.all[v.all.length-1]||{}):{};
+      return [aWho(r.id),pill('nt',r.e.arr),esc(r.s?r.s.expected:attWhere(r.id,ATT_TODAY,{field:'on',day:'auto'}).label),esc(last.matched||'Not yet'),r.leave&&!(v&&v.inE)?pill('in','On leave'):v?attStatusPill(v):pill('nt','Not clocked in')]}),'My Team Today')+
+    '<div class="card" style="margin-top:12px"><div class="ch"><h3>Needs Your Recommendation</h3><span class="right">'+pill(cs.length+reqs.length+fas.length?'wa':'ok',String(cs.length+reqs.length+fas.length))+'</span></div>'+
+    fas.map(function(a){return '<div class="nrow"><span class="nic">'+ic('brief')+'</span><span class="nb"><b>Field assignment · '+esc(a.id)+'</b><span class="sub">'+esc(a.emps.map(aName).join(', ')+' · '+a.name+' · '+a.date+', '+a.start+' to '+a.end)+'</span></span><button class="btn pri" data-att="fa-confirm" data-v="'+a.id+'">Confirm</button></div>'}).join('')+
     reqs.map(function(q){return '<div class="nrow"><span class="nic">'+ic('target')+'</span><span class="nb"><b>'+esc(q.type)+' · '+esc(aName(q.emp))+'</b><span class="sub">'+esc(q.area+' · '+q.from+' to '+q.to+' · '+q.reason)+'</span></span><button class="btn" data-att="mgr-req" data-v="'+q.id+'">Recommend</button></div>'}).join('')+
-    cs.map(function(c){return '<div class="nrow"><span class="nic">'+ic('alert')+'</span><span class="nb"><b>'+esc(c.type)+' · '+esc(aName(c.emp))+'</b><span class="sub">'+esc(c.date+' · '+(c.expl||'No explanation yet'))+'</span></span><button class="btn" data-att="mgr-case" data-v="'+c.id+'">Review explanation</button></div>'}).join('')+
-    (cs.length+reqs.length+fas.length?'':'<p class="sub">Nothing is waiting on you.</p>')+'</div>'+
-    kvcard('What a manager can and cannot do',[['Can','Confirm field assignments, recommend temporary locations, review explanations, recommend corrections, escalate to People'],
-      ['Cannot change policy','Attendance policy belongs to People'],['Cannot edit a clock event','A recommendation goes to People, who decide'],
-      ['Cannot see','Employees outside the team'],['Cannot deduct pay','Payroll deductions are accepted only by Finance or Operations']])+'</div>'}
+    cs.map(function(c){return '<div class="nrow"><span class="nic">'+ic('alert')+'</span><span class="nb"><b>'+esc(c.type)+' · '+esc(aName(c.emp))+'</b><span class="sub">'+esc(c.date+' · '+(c.expl||'No explanation yet'))+'</span></span><button class="btn" data-att="mgr-case" data-v="'+c.id+'">Review Explanation</button></div>'}).join('')+
+    (cs.length+reqs.length+fas.length?'':'<p class="sub">Nothing is waiting on you.</p>')+'</div>'}
 function attMgrReqModal(qid){var q=attReq(qid);
   openModal({title:'Recommend '+q.id,body:'<dl class="kv"><dt>Employee</dt><dd>'+esc(aName(q.emp))+'</dd><dt>Request</dt><dd>'+esc(q.type)+'</dd><dt>Dates</dt><dd>'+esc(q.from+' to '+q.to)+'</dd>'+
     '<dt>Location</dt><dd>'+esc(q.area)+' · '+q.radius+' m</dd><dt>Reason</dt><dd>'+esc(q.reason)+'</dd></dl>'+
-    '<div style="margin-top:12px">'+field('mr-note','Your comment for People','<input class="inp" id="mr-note" placeholder="For example, I know about this and support it">','Add a comment')+'</div>',
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn" data-att="mgr-req-send" data-v="'+q.id+'" data-ok="0">Do not recommend</button><button class="btn pri" data-att="mgr-req-send" data-v="'+q.id+'" data-ok="1">Recommend</button>'})}
+    '<div style="margin-top:12px">'+field('mr-note','Comment for People','<input class="inp" id="mr-note">','Add a comment')+'</div>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn" data-att="mgr-req-send" data-v="'+q.id+'" data-ok="0">Do Not Recommend</button><button class="btn pri" data-att="mgr-req-send" data-v="'+q.id+'" data-ok="1">Recommend</button>'})}
 function attMgrCaseModal(cid){var c=attCase(cid);
-  openModal({title:'Review Explanation · '+c.id,wide:true,body:'<dl class="kv"><dt>Employee</dt><dd>'+esc(aName(c.emp))+'</dd><dt>Case</dt><dd>'+esc(c.type)+' · '+esc(c.date)+'</dd>'+
-    '<dt>Employee explanation</dt><dd>'+esc(c.expl||'None given')+'</dd></dl>'+
-    '<p class="sub" style="margin:12px 0">You recommend. People decides and records the outcome. You cannot change the clock event.</p>'+
-    field('mc-out','Recommended outcome','<select class="inp" id="mc-out">'+ATT_OUTCOMES.filter(function(o){return o[0]!=='unresolved'}).map(function(o){return '<option value="'+o[0]+'"'+(ATT_SUGGEST[c.type]===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select>')+
-    field('mc-note','Your comment','<textarea class="inp" id="mc-note" placeholder="What you know about this day"></textarea>','Write at least 10 characters'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn" data-att="mgr-case-send" data-v="'+c.id+'" data-ok="esc">Escalate to People</button><button class="btn pri" data-att="mgr-case-send" data-v="'+c.id+'" data-ok="rec">Recommend correction</button>'})}
+  openModal({title:'Review Explanation · '+c.id,wide:true,body:'<dl class="kv" style="margin-bottom:12px"><dt>Employee</dt><dd>'+esc(aName(c.emp))+'</dd><dt>Case</dt><dd>'+esc(c.type)+' · '+esc(c.date)+'</dd>'+
+    '<dt>Explanation</dt><dd>'+esc(c.expl||'None given')+'</dd></dl>'+
+    field('mc-out','Recommended Outcome','<select class="inp" id="mc-out">'+ATT_OUTCOMES.filter(function(o){return o[0]!=='unresolved'}).map(function(o){return '<option value="'+o[0]+'"'+(ATT_SUGGEST[c.type]===o[0]?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select>')+
+    field('mc-note','Your Comment','<textarea class="inp" id="mc-note"></textarea>','At least 10 characters'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn" data-att="mgr-case-send" data-v="'+c.id+'" data-ok="esc">Escalate to People</button><button class="btn pri" data-att="mgr-case-send" data-v="'+c.id+'" data-ok="rec">Recommend Correction</button>'})}
 
 /* ═════════════ RECONCILIATION QUEUE ═════════════ */
 var ATT_OUTCOMES=[['add_in','Add missing clock-in'],['add_out','Add missing clock-out'],['correct','Correct recorded time'],['approve_loc','Approve location exception'],
@@ -5418,7 +5416,7 @@ var ATT_SUGGEST={'Missing clock-out':'add_out','Missing clock-in':'add_in','Outs
   'Field location without a matching assignment':'attach_fa','Leave and attendance conflict':'leave','Employee-submitted correction':'correct','Duplicate punch':'exclude_dup',
   'Outside geofence':'approve_loc','Outside field assignment geofence':'approve_loc','Outside assignment time window':'approve_loc','GPS could not be verified':'add_in'};
 function attOutLabel(k){for(var i=0;i<ATT_OUTCOMES.length;i++)if(ATT_OUTCOMES[i][0]===k)return ATT_OUTCOMES[i][1];return k}
-var ATT_CF=[['type','Exception type'],['emp','Employee'],['dept','Department'],['arr','Work arrangement'],['date','Date'],['status','Status'],['payroll','Payroll impact']];
+var ATT_CF=[['type','Exception Type'],['emp','Employee'],['dept','Department'],['arr','Work Arrangement'],['date','Date'],['status','Status'],['payroll','Payroll Impact']];
 function attCaseVal(c,k){var e=aEmp(c.emp);return k==='emp'?e.name:k==='dept'?e.dept:k==='arr'?e.arr:c[k]}
 function attReconPage(){
   var all=ATT.cases,cf=ATTUI.cf,list=all.filter(function(c){return ATT_CF.every(function(f){return !cf[f[0]]||attCaseVal(c,f[0])===cf[f[0]]})});
@@ -5427,55 +5425,55 @@ function attReconPage(){
   var sel=attCase(ATTUI.caseSel);if(!sel||list.indexOf(sel)<0)sel=list[0]||null;ATTUI.caseSel=sel?sel.id:null;
   var resolvedToday=all.filter(function(c){return c.status==='Resolved'&&c.resolvedAt&&c.resolvedAt.indexOf(ATT_TODAY)===0}).length;
   return bk('Back to Attendance')+
-    '<div class="phead"><div><h1>Reconciliation Queue '+infoBtn('rq-help')+'</h1><p>'+attHrOpen()+' awaiting People · '+all.filter(function(c){return c.status==='Awaiting manager'}).length+' awaiting a manager</p></div>'+
-    '<div class="right"><button class="btn" data-att="paylock" aria-pressed="'+!!ATT.demo.payrollLocked+'">'+ic('lock')+'October payroll: '+(ATT.demo.payrollLocked?'locked':'not locked')+' (demo)</button></div></div>'+
-    infoText('rq-help','Reconciliation decides what the attendance record should say. It never edits a clock event: a correction is a new event, and the original stays visible. A possible policy breach goes to Queries & Sanctions, which is a separate process with its own letter and response.')+
-    statstrip([['Awaiting People',String(attHrOpen()),attHrOpen()?'warn':'ok'],['Awaiting a manager',String(all.filter(function(c){return c.status==='Awaiting manager'}).length)],
-      ['More information',String(all.filter(function(c){return c.status==='More information requested'}).length)],['Resolved today',String(resolvedToday),'ok'],['Total cases',String(all.length)]])+
+    '<div class="phead"><div><h1>Reconciliation Queue</h1><p>'+attHrOpen()+' awaiting People · '+all.filter(function(c){return c.status==='Awaiting manager'}).length+' awaiting a manager</p></div>'+
+    '<div class="right"><button class="btn" data-att="paylock" aria-pressed="'+!!ATT.demo.payrollLocked+'">'+ic('lock')+(ATT.demo.payrollLocked?'Unlock Payroll':'Lock Payroll')+'</button></div></div>'+
+    statstrip([['Awaiting People',String(attHrOpen()),attHrOpen()?'warn':'ok'],['Awaiting a Manager',String(all.filter(function(c){return c.status==='Awaiting manager'}).length)],
+      ['More Information',String(all.filter(function(c){return c.status==='More information requested'}).length)],['Resolved Today',String(resolvedToday),'ok'],['Total Cases',String(all.length)]])+
     '<details class="fdet"'+(window.innerWidth>760||Object.keys(cf).some(function(k){return cf[k]})?' open':'')+'><summary>Filters'+
       (Object.keys(cf).filter(function(k){return cf[k]}).length?' · '+Object.keys(cf).filter(function(k){return cf[k]}).length+' active':'')+'</summary>'+
     '<div class="filters" role="group" aria-label="Filter cases">'+ATT_CF.map(function(f){var vals={};all.forEach(function(c){vals[attCaseVal(c,f[0])]=1});
-      return '<label class="fsel"><span>'+esc(f[1])+'</span><select class="inp" data-attc="cf" data-k="'+f[0]+'"><option value="">All</option>'+Object.keys(vals).sort().map(function(v){
-        return '<option'+(cf[f[0]]===v?' selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label>'}).join('')+
-      '<button class="btn" data-att="cf-clear" style="align-self:flex-end">Clear filters</button></div></details>'+
+      return fsel(f[1],'data-attc="cf" data-k="'+f[0]+'"','<option value="">All</option>'+Object.keys(vals).sort().map(function(v){
+        return '<option'+(cf[f[0]]===v?' selected':'')+'>'+esc(v)+'</option>'}).join(''))}).join('')+
+      '<button class="btn" data-att="cf-clear" style="align-self:flex-end">Clear Filters</button></div></details>'+
     '<div class="rq"><div class="qlist" role="list">'+(list.length?list.map(function(c){
       return '<button class="qrow'+(sel&&c.id===sel.id?' on':'')+'" role="listitem" data-att="case-sel" data-v="'+c.id+'" aria-current="'+(sel&&c.id===sel.id)+'">'+
         '<span class="qtop"><b>'+esc(c.type)+'</b>'+attCasePill(c.status)+'</span>'+
         '<span class="sub">'+esc(c.id)+' · '+esc(aName(c.emp))+' · '+esc(c.date)+' · payroll: '+esc(c.payroll)+'</span></button>'}).join(''):
-      '<div style="padding:16px">'+emptyb('ok','No cases match','Clear the filters to see the whole queue.')+'</div>')+'</div>'+
-    '<div style="min-width:0">'+(sel?attCaseDetail(sel):emptyb('check','Nothing selected','Choose a case on the left.'))+'</div></div>'}
+      '<div style="padding:16px">'+emptyb('ok','No Cases Match','Clear the filters to see every case.')+'</div>')+'</div>'+
+    '<div style="min-width:0">'+(sel?attCaseDetail(sel):emptyb('check','Nothing Selected','Choose a case.'))+'</div></div>'}
 function attCaseDetail(c){
   var e=aEmp(c.emp),s=attSess(c.ss),v=s?attSV(s):null,evs=v?v.all:[],first=evs.filter(function(x){return x.source==='Punch'})[0]||evs[0]||{},
       fa=attAssignmentFor(c.emp,c.date)||(c.assignment?attFA(c.assignment):null),lv=attOnLeave(c.emp,c.date),done=c.status==='Resolved'||c.status==='Escalated';
-  var h='<div class="card"><div class="ch"><h3>'+esc(c.id)+' · '+esc(c.type)+'</h3><span class="right">'+attCasePill(c.status)+'</span></div>'+
-    '<dl class="kv"><dt>Employee and manager</dt><dd>'+esc(e.name)+' · '+esc(e.dept)+'<br><span class="sub">Line manager: '+esc(aMgrName(c.emp))+'</span></dd>'+
-    '<dt>Work arrangement</dt><dd>'+esc(e.arr)+(s?' · '+esc(s.mode)+' day':'')+'</dd><dt>Scheduled shift</dt><dd>'+esc(c.date)+' · '+esc(s?s.shift:aShiftTxt(aShift(c.date,attPolicy(c.date).settings)))+'</dd>'+
-    '<dt>Expected location</dt><dd>'+esc(s?s.expected:'Not recorded')+'</dd>'+
-    '<dt>Submitted GPS location</dt><dd>'+esc(aCoord(first.lat,first.lng))+'</dd><dt>Accuracy</dt><dd>'+esc(first.acc==null?'Not captured':first.acc+' m')+'</dd>'+
+  var h='<div class="card"><div class="ch"><h3 data-copy="content">'+esc(c.id)+' · '+esc(c.type)+'</h3><span class="right">'+attCasePill(c.status)+'</span></div>'+
+    '<dl class="kv"><dt>Employee</dt><dd>'+esc(e.name)+' · '+esc(e.dept)+'<br><span class="sub">Line manager: '+esc(aMgrName(c.emp))+'</span></dd>'+
+    '<dt>Work Arrangement</dt><dd>'+esc(e.arr)+(s?' · '+esc(s.mode)+' day':'')+'</dd><dt>Scheduled Shift</dt><dd>'+esc(c.date)+' · '+esc(s?s.shift:aShiftTxt(aShift(c.date,attPolicy(c.date).settings)))+'</dd>'+
+    '<dt>Expected Location</dt><dd>'+esc(s?s.expected:'Not recorded')+'</dd>'+
+    '<dt>Submitted GPS</dt><dd>'+esc(aCoord(first.lat,first.lng))+'</dd><dt>Accuracy</dt><dd>'+esc(first.acc==null?'Not captured':first.acc+' m')+'</dd>'+
     '<dt>Distance</dt><dd>'+esc(aFmtDist(first.dist))+'</dd><dt>Device</dt><dd>'+esc(first.device||'Not recorded')+(first.devStatus?' '+attDevPill(first.devStatus):'')+'</dd>'+
-    '<dt>Leave record</dt><dd>'+esc(c.leave||(lv?lv.type+' leave, '+lv.from+' to '+lv.to:'None'))+'</dd>'+
-    '<dt>Field assignment</dt><dd>'+esc(fa?fa.id+' · '+fa.name+', '+fa.start+' to '+fa.end:'None that day')+'</dd>'+
-    '<dt>Employee explanation</dt><dd>'+esc(c.expl||'None given')+(c.evidence?'<br><span class="sub">Evidence: '+esc(c.evidence)+'</span>':'')+'</dd>'+
-    '<dt>Manager comment</dt><dd>'+esc(c.mgrNote||'None yet')+'</dd><dt>Policy version</dt><dd>'+esc(first.policy||('v'+attPolicy(c.date).v))+' · in force on '+esc(c.date)+'</dd>'+
-    '<dt>Current result</dt><dd>'+(v?attStatusPill(v)+' · '+attHours(v):'No session')+'</dd></dl></div>';
-  h+=table([['Event'],['Kind'],['System time'],['Matched'],['Result'],['Source'],['Record']],evs.map(function(x){
+    '<dt>Leave Record</dt><dd>'+esc(c.leave||(lv?lv.type+' leave, '+lv.from+' to '+lv.to:'None'))+'</dd>'+
+    '<dt>Field Assignment</dt><dd>'+esc(fa?fa.id+' · '+fa.name+', '+fa.start+' to '+fa.end:'None that day')+'</dd>'+
+    '<dt>Explanation</dt><dd>'+esc(c.expl||'None given')+(c.evidence?'<br><span class="sub">Evidence: '+esc(c.evidence)+'</span>':'')+'</dd>'+
+    '<dt>Manager Comment</dt><dd>'+esc(c.mgrNote||'None yet')+'</dd><dt>Policy Version</dt><dd>'+esc(first.policy||('v'+attPolicy(c.date).v))+' · in force on '+esc(c.date)+'</dd>'+
+    '<dt>Current Result</dt><dd>'+(v?attStatusPill(v)+' · '+attHours(v):'No session')+'</dd></dl></div>';
+  h+=table([['Event'],['Kind'],['System Time'],['Matched'],['Result'],['Source'],['Record']],evs.map(function(x){
     return [esc(x.id),x.kind==='out'?'Clock-out':'Clock-in','<span'+(x.superseded||x.excluded?' class="strike"':'')+'>'+esc(x.sys)+'</span>',esc(x.matched),esc(x.result),esc(x.source),
-      x.superseded?pill('nt','Original, kept'):x.excluded?pill('nt','Excluded, kept'):x.source==='HR adjustment'?pill('in','Adjustment'):pill('ok','Original')]}),'Original clock events');
-  h+='<div style="margin-top:12px">'+tl('Event history',c.history.slice().reverse().map(function(x,i){return [x[2],x[0]+' · '+x[1],'',i===0?'hi':'ok']}))+'</div>';
+      x.superseded?pill('nt','Original, kept'):x.excluded?pill('nt','Excluded, kept'):x.source==='HR adjustment'?pill('in','Adjustment'):pill('ok','Original')]}),'Original Clock Events');
+  h+='<div style="margin-top:12px">'+tl('Event History',c.history.slice().reverse().map(function(x,i){return [x[2],x[0]+' · '+x[1],'',i===0?'hi':'ok']}))+'</div>';
   if(done)h+='<div class="card" style="margin-top:12px"><div class="ch"><h3>Resolution</h3><span class="right">'+attCasePill(c.status)+'</span></div><dl class="kv">'+
-    '<dt>Outcome</dt><dd>'+esc(c.outcome)+'</dd><dt>Reason</dt><dd>'+esc(c.reason)+'</dd>'+(c.note?'<dt>HR note</dt><dd>'+esc(c.note)+'</dd>':'')+
+    '<dt>Outcome</dt><dd>'+esc(c.outcome)+'</dd><dt>Reason</dt><dd>'+esc(c.reason)+'</dd>'+(c.note?'<dt>HR Note</dt><dd>'+esc(c.note)+'</dd>':'')+
     (c.evidence?'<dt>Evidence</dt><dd>'+esc(c.evidence)+'</dd>':'')+(c.query?'<dt>Query</dt><dd>'+esc(c.query)+' in Queries & Sanctions</dd>':'')+'<dt>Decided</dt><dd>'+esc(c.resolvedAt||'')+'</dd></dl></div>';
   else{var sug=ATT_SUGGEST[c.type]||'unresolved',fas=ATT.assignments.filter(function(a){return a.emps.indexOf(c.emp)>=0||a.date===c.date});
-    h+='<div class="card" style="margin-top:12px"><div class="ch"><h3>Decide the record</h3></div>'+
-      (c.status==='Awaiting manager'?'<div class="attban in" style="margin-bottom:12px">'+ic('info','ico')+'<span>The line manager has not recommended yet. People can still decide.</span></div>':'')+
-      field('rc-out','Outcome','<select class="inp" id="rc-out" data-attc="rc-out">'+ATT_OUTCOMES.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===sug?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select>')+
-      '<div class="grid g2" style="margin-bottom:0" id="rc-extra"><div class="f" id="fw-rc-time"><label for="rc-time">Time</label><input class="inp" id="rc-time" type="time" value="'+attSuggestTime(c,sug)+'"><p class="fm">Enter a time</p></div>'+
-      '<div class="f" id="fw-rc-which"><label for="rc-which">Which event</label><select class="inp" id="rc-which"><option value="out"'+(c.type==='Employee-submitted correction'?' selected':'')+'>Clock-out</option><option value="in">Clock-in</option></select></div>'+
-      '<div class="f" id="fw-rc-fa"><label for="rc-fa">Field assignment</label><select class="inp" id="rc-fa">'+(fas.length?'':'<option value="">No assignment on record</option>')+fas.map(function(a){return '<option value="'+a.id+'">'+esc(a.id+' · '+a.name+' · '+a.date)+'</option>'}).join('')+
-        '<option value="new">Raise a retrospective assignment for this site</option></select></div></div>'+
-      field('rc-why','Resolution reason','<textarea class="inp" id="rc-why" placeholder="Why this is the right record"></textarea>','A reason is required, at least 10 characters')+
-      '<div class="grid g2" style="margin-bottom:0">'+field('rc-note','HR note (optional)','<input class="inp" id="rc-note">')+field('rc-evi','Supporting evidence label (optional)','<input class="inp" id="rc-evi" placeholder="For example, dinner receipt.pdf">')+'</div>'+
-      '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn pri" data-att="rc-preview" data-v="'+c.id+'">Preview resolution</button></div></div>'}
+    h+='<div class="card" style="margin-top:12px"><div class="ch"><h3>Decide the Record</h3></div>'+
+      (c.status==='Awaiting manager'?'<div class="attban in" style="margin-bottom:12px">'+ic('info','ico')+'<span>No manager recommendation yet.</span></div>':'')+
+      field('rc-out','Outcome','<select class="inp" id="rc-out" data-attc="rc-out">'+ATT_OUTCOMES.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===sug?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select>','',
+        'A correction is a new event and the original stays visible. A possible policy breach goes to Queries & Sanctions, a separate process.')+
+      '<div class="grid g2" style="margin-bottom:0" id="rc-extra">'+field('rc-time','Time','<input class="inp" id="rc-time" type="time" value="'+attSuggestTime(c,sug)+'">','Enter a time')+
+      field('rc-which','Which Event','<select class="inp" id="rc-which"><option value="out"'+(c.type==='Employee-submitted correction'?' selected':'')+'>Clock-out</option><option value="in">Clock-in</option></select>')+
+      field('rc-fa','Field Assignment','<select class="inp" id="rc-fa">'+(fas.length?'':'<option value="">No assignment on record</option>')+fas.map(function(a){return '<option value="'+a.id+'">'+esc(a.id+' · '+a.name+' · '+a.date)+'</option>'}).join('')+
+        '<option value="new">New retrospective assignment</option></select>','Choose an assignment')+'</div>'+
+      field('rc-why','Resolution Reason','<textarea class="inp" id="rc-why"></textarea>','At least 10 characters')+
+      '<div class="grid g2" style="margin-bottom:0">'+field('rc-note','HR Note (Optional)','<input class="inp" id="rc-note">')+field('rc-evi','Evidence (Optional)','<input class="inp" id="rc-evi" placeholder="receipt.pdf">')+'</div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn pri" data-att="rc-preview" data-v="'+c.id+'">Preview Resolution</button></div></div>'}
   return h}
 function attSuggestTime(c,o){if(c.type==='Employee-submitted correction')return '19:30';if(o==='add_out')return '17:00';if(o==='add_in')return '08:00';
   var s=attSess(c.ss),a=s?attEvOf(s).filter(function(x){return x.result==='Needs approval'})[0]:null;return a?a.sys:'09:00'}
@@ -5516,7 +5514,7 @@ function attPayrollText(c,f,p){
   else t='No change to hours or pay.';
   return t+' '+(ATT.demo.payrollLocked?'October payroll is locked, so this lands in the next run as an adjustment line.':'October payroll is not locked, so the preview recalculates.')}
 function attQueryText(c,f,p){
-  if(p.query)return 'Opens QRY-'+aNum(ATT.seq.qry,4)+' in Queries & Sanctions. Reconciliation does not decide discipline.';
+  if(p.query)return 'Opens QRY-'+aNum(ATT.seq.qry,4)+' in Queries & Sanctions.';
   if(c.emp==='EO'&&c.date==='08/10/2026')return 'No query is opened or closed here. The open query "Missing clock-out on 08/10" stays with Queries & Sanctions.';
   return 'No query is opened or closed.'}
 function attReadForm(c){var f={o:$('#rc-out').value,time:$('#rc-time').value,which:$('#rc-which').value,fa:$('#rc-fa').value,
@@ -5528,17 +5526,16 @@ function attReadForm(c){var f={o:$('#rc-out').value,time:$('#rc-time').value,whi
   return ok?f:null}
 function attPreview(cid){var c=attCase(cid),f=attReadForm(c);if(!f)return;var p=attPlan(c,f);ATTUI.pending={c:cid,f:f};
   openModal({title:'Confirm Resolution · '+c.id,wide:true,body:
-    '<p class="sub" style="margin-bottom:12px">'+esc(aName(c.emp))+' · '+esc(c.type)+' · '+esc(c.date)+'. Nothing is saved until you confirm.</p>'+
-    '<div class="tscroll"><table><thead><tr><th></th><th>Original</th><th>Proposed</th></tr></thead><tbody>'+
-    '<tr><td class="sub">Outcome</td><td>'+esc(c.status)+'</td><td><b>'+esc(attOutLabel(f.o))+'</b>'+(f.o==='correct'||f.o==='add_in'||f.o==='add_out'?' · '+esc(f.time):'')+'</td></tr>'+
-    '<tr><td class="sub">Result</td><td>'+(p.before.status?attStatusPill(p.before):'None')+'</td><td>'+attStatusPill(p.after)+'</td></tr>'+
-    '<tr><td class="sub">Hours</td><td>'+attHours(p.before)+'</td><td><b>'+attHours(p.after)+'</b></td></tr>'+
-    '<tr><td class="sub">Exceptions</td><td>'+esc((p.before.exceptions||[]).length?(p.before.exceptions||[]).join('; '):'None')+'</td><td>'+esc(p.after.exceptions.length?p.after.exceptions.join('; '):'None')+'</td></tr>'+
-    '<tr><td class="sub">Case status</td><td>'+esc(c.status)+'</td><td>'+esc(p.status)+'</td></tr></tbody></table></div>'+
-    '<dl class="kv" style="margin-top:14px"><dt>Payroll impact</dt><dd>'+esc(attPayrollText(c,f,p))+'</dd><dt>Queries</dt><dd>'+esc(attQueryText(c,f,p))+'</dd>'+
-    '<dt>Original events</dt><dd>Kept and visible. '+(p.add.length?p.add.length+' adjustment event'+(p.add.length>1?'s are':' is')+' added.':'No event is added.')+'</dd>'+
-    '<dt>Reason</dt><dd>'+esc(f.why)+'</dd>'+(f.note?'<dt>HR note</dt><dd>'+esc(f.note)+'</dd>':'')+(f.evi?'<dt>Evidence</dt><dd>'+esc(f.evi)+'</dd>':'')+'</dl>',
-    foot:'<button class="btn" data-mx>Back</button><button class="btn pri" data-att="rc-confirm">'+ic('ok')+'Confirm resolution</button>'})}
+    '<p class="sub" style="margin-bottom:12px">'+esc(aName(c.emp))+' · '+esc(c.type)+' · '+esc(c.date)+'</p>'+attCompare(['Original','Proposed'],[
+      ['Outcome',esc(c.status),'<b>'+esc(attOutLabel(f.o))+'</b>'+(f.o==='correct'||f.o==='add_in'||f.o==='add_out'?' · '+esc(f.time):'')],
+      ['Result',p.before.status?attStatusPill(p.before):'None',attStatusPill(p.after)],
+      ['Hours',attHours(p.before),'<b>'+attHours(p.after)+'</b>'],
+      ['Exceptions',esc((p.before.exceptions||[]).length?(p.before.exceptions||[]).join('; '):'None'),esc(p.after.exceptions.length?p.after.exceptions.join('; '):'None')],
+      ['Case Status',esc(c.status),esc(p.status)]])+
+    '<dl class="kv" style="margin-top:14px"><dt>Payroll Impact</dt><dd>'+esc(attPayrollText(c,f,p))+'</dd><dt>Queries</dt><dd>'+esc(attQueryText(c,f,p))+'</dd>'+
+    '<dt>Original Events</dt><dd>Kept and visible. '+(p.add.length?p.add.length+' adjustment event'+(p.add.length>1?'s are':' is')+' added.':'No event is added.')+'</dd>'+
+    '<dt>Reason</dt><dd>'+esc(f.why)+'</dd>'+(f.note?'<dt>HR Note</dt><dd>'+esc(f.note)+'</dd>':'')+(f.evi?'<dt>Evidence</dt><dd>'+esc(f.evi)+'</dd>':'')+'</dl>',
+    foot:'<button class="btn" data-mx>Back</button><button class="btn pri" data-att="rc-confirm">Confirm Resolution</button>'})}
 function attApplyCase(){
   var pd=ATTUI.pending;if(!pd)return;var c=attCase(pd.c),f=pd.f,p=attPlan(c,f),s=attSess(c.ss),nm=aName(c.emp),before=p.before.status+', '+attHours(p.before);
   if(!s&&(p.add.length||p.cls)){s={id:'SS-'+aNum(ATT.seq.ss++,4),emp:c.emp,date:c.date,arr:aEmp(c.emp).arr,mode:'Office',expected:'',shift:aShiftTxt(aShift(c.date,attPolicy(c.date).settings)),evs:[],cls:null,excApproved:false};ATT.sessions.push(s);c.ss=s.id}
@@ -5561,7 +5558,7 @@ function attApplyCase(){
   attSave();ATTUI.pending=null;closeModal();attBellPaint();render();
   toast(p.status==='More information requested'?'More information requested from '+nm:
     p.status===c.status&&f.o==='unresolved'?'Left unresolved. Noted in the history.':
-    (ATT.demo.payrollLocked?'Resolved. Adjustment will be included in the next payroll.':'Resolved. Payroll preview updated.'))}
+    (ATT.demo.payrollLocked?'Resolved. Adjustment goes to next payroll.':'Resolved. Payroll preview updated.'))}
 
 /* ═════════════ PEOPLE → DEVICES ═════════════ */
 function attDevicesTab(){
@@ -5570,24 +5567,21 @@ function attDevicesTab(){
   var eff=function(st){if(!pol.devRecord)return ['nt','Accepted, device not recorded'];
     if(st==='Enrolled')return ['ok','Accepted'];if(st==='Blocked')return ['er','Blocked'];if(st==='Revoked')return pol.devBlockRevoked?['er','Blocked']:['wa','Accepted with warning'];
     if(st==='Verification unavailable')return ['wa','Accepted with warning'];return pol.devBlockUnenrolled?['er','Blocked']:pol.devWarnNew?['wa','Accepted with warning']:['ok','Accepted']};
-  return head('Devices','Devices used to clock in · demo roster',[['Device policy',0,'att-go-devpol']])+
-    statstrip([['Enrolled',String(c['Enrolled']),'ok'],['New or pending review',String(c['Pending review']),c['Pending review']?'warn':''],['Blocked',String(c['Blocked']),c['Blocked']?'err':''],
-      ['Revoked',String(c['Revoked'])],['Verification unavailable',String(c['Verification unavailable'])]])+
-    '<div class="grid g23">'+table([['Employee'],['Device'],['First seen'],['Last punch'],['Status'],['Effect on a punch']],ATT.devices.map(function(d){var x=eff(d.status);
-      return [aWho(d.emp),esc(d.name),esc(d.first),esc(d.last),attDevPill(d.status),pill(x[0],x[1])]}),'Devices','<span class="sub">Click a row to review</span>',
-      function(i){return ' class="rowlink" data-att="dev-sel" data-v="'+ATT.devices[i].id+'" tabindex="0"'})+
-    '<div class="card"><div class="ch"><h3>'+esc(aName(sel.emp))+' · '+esc(sel.name)+'</h3><span class="right">'+attDevPill(sel.status)+'</span></div>'+
-    '<dl class="kv"><dt>First seen</dt><dd>'+esc(sel.first)+'</dd><dt>Last punch</dt><dd>'+esc(sel.last)+'</dd><dt>Note</dt><dd>'+esc(sel.note||'None')+'</dd>'+
-    '<dt>Other devices</dt><dd>'+esc(ATT.devices.filter(function(d){return d.emp===sel.emp&&d.id!==sel.id}).map(function(d){return d.name+' ('+d.status.toLowerCase()+')'}).join(', ')||'None')+'</dd>'+
-    '<dt>Next punch</dt><dd>'+pill(eff(sel.status)[0],eff(sel.status)[1])+'</dd></dl>'+
+  return head('Devices','Devices used to clock in',[['Edit Device Policy',0,'att-go-devpol']])+
+    statstrip([['Enrolled',String(c['Enrolled']),'ok'],['New or Pending',String(c['Pending review']),c['Pending review']?'warn':''],['Blocked',String(c['Blocked']),c['Blocked']?'err':''],
+      ['Revoked',String(c['Revoked'])],['Unverified',String(c['Verification unavailable'])]])+
+    '<div class="grid g23">'+colHint(table([['Employee'],['Device'],['First Seen'],['Last Punch'],['Next Punch'],['Status']],ATT.devices.map(function(d){var x=eff(d.status);
+      return [aWho(d.emp),esc(d.name),esc(d.first),esc(d.last),pill(x[0],x[1]),attDevPill(d.status)]}),'Devices','',
+      function(i){return ' class="rowlink" data-att="dev-sel" data-v="'+ATT.devices[i].id+'" tabindex="0"'},null,[1,4]),
+      'Next Punch','What a punch from this device gets under attendance policy v'+attPolicy().v+'.')+
+    '<div class="card"><div class="ch"><h3 data-copy="content">'+esc(aName(sel.emp))+' · '+esc(sel.name)+'</h3><span class="right">'+attDevPill(sel.status)+'</span></div>'+
+    '<dl class="kv"><dt>First Seen</dt><dd>'+esc(sel.first)+'</dd><dt>Last Punch</dt><dd>'+esc(sel.last)+'</dd><dt>Note</dt><dd>'+esc(sel.note||'None')+'</dd>'+
+    '<dt>Other Devices</dt><dd>'+esc(ATT.devices.filter(function(d){return d.emp===sel.emp&&d.id!==sel.id}).map(function(d){return d.name+' ('+d.status.toLowerCase()+')'}).join(', ')||'None')+'</dd>'+
+    '<dt>Next Punch</dt><dd>'+pill(eff(sel.status)[0],eff(sel.status)[1])+'</dd></dl>'+
     '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">'+
-    (sel.status!=='Enrolled'?'<button class="btn pri" data-att="dev-act" data-v="Enrolled">'+ic('ok')+'Enrol this device</button>':'')+
+    (sel.status!=='Enrolled'?'<button class="btn pri" data-att="dev-act" data-v="Enrolled">'+ic('ok')+'Enrol Device</button>':'')+
     (sel.status==='Pending review'||sel.status==='New'?'<button class="btn" data-att="dev-act" data-v="Blocked">Reject</button>':'')+
-    (sel.status==='Enrolled'?'<button class="btn" data-att="dev-act" data-v="Revoked">Revoke</button><button class="btn" data-att="dev-act" data-v="Blocked">Block</button>':'')+'</div>'+
-    '<p class="sub" style="margin-top:11px">Devices register on every punch whether the policy is on or off, so it can be tightened later without losing history.</p></div></div>'+
-    '<div style="margin-top:12px">'+table([['Device state'],['What happens on a punch, under policy v'+attPolicy().v]],
-      [['Enrolled'],['New or pending review'],['Blocked'],['Revoked'],['Verification unavailable']].map(function(r){var x=eff(r[0]==='New or pending review'?'Pending review':r[0]);return [esc(r[0]),pill(x[0],x[1])]}),
-      'How the current device policy affects a punch')+'</div>'}
+    (sel.status==='Enrolled'?'<button class="btn" data-att="dev-act" data-v="Revoked">Revoke</button><button class="btn" data-att="dev-act" data-v="Blocked">Block</button>':'')+'</div></div></div>'}
 
 /* ═════════════ PEOPLE → WORKSITES ═════════════ */
 function attWsMap(){
@@ -5596,12 +5590,12 @@ function attWsMap(){
   ATT.homes.filter(function(h){return h.status==='Active'||attHomeState(h)==='Active'}).forEach(function(h){P(h.lat,h.lng,(h.kind==='Temporary'?'Temporary · ':'Home · ')+h.area,'home',h.radius)});
   ATT.assignments.filter(function(a){return a.date===ATT_TODAY&&a.status==='Approved'}).forEach(function(a){a.sites.forEach(function(s){P(s.lat,s.lng,a.id+' · '+s.name,'field',s.radius)})});
   var col={office:'var(--c1)',home:'var(--yellow)',field:'var(--c2)'};
-  return '<div class="card"><div class="ch"><h3>Lagos geofences today</h3><span class="right sub">Schematic, not to scale · homes masked</span></div><div class="gmap" style="height:300px"><svg viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Schematic map of Lagos geofences">'+
+  return '<div class="card donly"><div class="ch"><h3>Lagos Geofences Today</h3><span class="right sub">Not to scale</span></div><div class="gmap" style="height:300px"><svg data-copy="content" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Schematic map of Lagos geofences">'+
     '<rect width="1000" height="300" fill="var(--surface)"/><path d="M0 230 Q 250 205 500 240 T 1000 228 L1000 300 L0 300Z" fill="var(--c2)" opacity=".10"/>'+
     pts.map(function(p,i){var rr=Math.max(9,p.r/12);return '<circle cx="'+p.x.toFixed(0)+'" cy="'+p.y.toFixed(0)+'" r="'+rr.toFixed(0)+'" fill="'+col[p.k]+'" opacity=".18"/>'+
       '<circle cx="'+p.x.toFixed(0)+'" cy="'+p.y.toFixed(0)+'" r="5" fill="'+col[p.k]+'" stroke="var(--c1)" stroke-width="1.2"/>'+
       '<text x="'+(p.x+9).toFixed(0)+'" y="'+(p.y+(i%2?14:-7)).toFixed(0)+'" font-size="11" fill="var(--ink-2)">'+esc(p.l)+'</text>'}).join('')+
-    '</svg></div><div class="gleg"><span><i style="background:var(--c1)"></i>Office worksite</span><span><i style="background:var(--yellow)"></i>Approved home, masked</span><span><i style="background:var(--c2)"></i>Field assignment today</span></div></div>'}
+    '</svg></div><div class="gleg"><span><i style="background:var(--c1)"></i>Office</span><span><i style="background:var(--yellow)"></i>Home</span><span><i style="background:var(--c2)"></i>Field Assignment</span></div></div>'}
 function attWorksitesTab(){
   var pol=attPolicy().settings,k=attKpis(),todayAt=function(test){return ATT.sessions.filter(function(s){return s.date===ATT_TODAY&&attSV(s).inE&&test(s)}).length},
       rows=[],hrs=ATT.homes;
@@ -5610,105 +5604,99 @@ function attWorksitesTab(){
       today:String(todayAt(function(x){return x.expected===s.name})),dates:esc((s.from||'Not set')+(s.to?' to '+s.to:' onwards')),
       mode:'Hybrid: '+ATT_MODES[pol.modeHybrid]+' · Office-only: '+ATT_MODES[pol.modeOffice],st:s.status,click:''})});
   hrs.forEach(function(h){var st=attHomeState(h),tmp=h.kind==='Temporary';
-    rows.push({t:tmp?'Temporary location':'Approved home',n:'<b>'+esc((tmp?'Temporary location · ':'Approved home · ')+h.area)+'</b>',a:'<span class="sub">Masked · full address in the HR detail view</span>',r:h.radius+' m',emp:aName(h.emp),
+    rows.push({t:tmp?'Temporary location':'Approved home',n:'<b>'+esc((tmp?'Temporary location · ':'Approved home · ')+h.area)+'</b>',a:'<span class="sub">Masked</span>',r:h.radius+' m',emp:aName(h.emp),
       today:String(todayAt(function(x){return x.emp===h.emp&&x.expected===attFenceName(h)})),dates:esc(h.from+(h.to?' to '+h.to:' onwards')),mode:ATT_MODES[pol[ATT_MODEKEY[aEmp(h.emp).arr]]],st:st,click:h.id})});
   ATT.assignments.forEach(function(a){a.sites.forEach(function(s){rows.push({t:'Field assignment',n:'<b>'+esc(a.id)+' · '+esc(s.name)+'</b>',a:esc(s.address),r:s.radius+' m',emp:a.emps.map(aName).join(', '),
     today:String(a.date===ATT_TODAY?todayAt(function(x){return x.expected.indexOf(a.id)===0}):0),dates:esc(a.date+', '+a.start+' to '+a.end),mode:ATT_MODES[pol.modeField],st:a.status,click:''})})});
   var tone=function(s){return s==='Active'||s==='Approved'?'ok':s==='Expired'||s==='Retired'||s==='Completed'||s==='Superseded'?'nt':s==='Rejected'?'er':'wa'};
-  return head('Worksites','Geofenced locations · MTN Head Office is the principal worksite',[['Add field assignment',0,'att-fa-new'],['Add worksite',1,'att-ws-new']])+
-    kpis([['Office worksites',String(ATT.sites.filter(function(s){return s.status==='Active'}).length)],['Approved homes',String(ATT.homes.filter(function(h){return h.kind==='Permanent'&&h.status==='Active'}).length)],
-      ['Field sites today',String(ATT.assignments.filter(function(a){return a.date===ATT_TODAY&&a.status==='Approved'}).reduce(function(n,a){return n+a.sites.length},0))],['Outside any fence today',String(k.out),k.out?'warn':'']])+
+  return head('Worksites','Geofenced locations for clocking in',[['Add Assignment',0,'att-fa-new'],['Add Worksite',1,'att-ws-new']])+
+    kpis([['Office Worksites',String(ATT.sites.filter(function(s){return s.status==='Active'}).length)],['Approved Homes',String(ATT.homes.filter(function(h){return h.kind==='Permanent'&&h.status==='Active'}).length)],
+      ['Field Sites Today',String(ATT.assignments.filter(function(a){return a.date===ATT_TODAY&&a.status==='Approved'}).reduce(function(n,a){return n+a.sites.length},0))],['Outside a Fence',String(k.out),k.out?'warn':'']])+
     attWsMap()+
-    '<div style="margin-top:12px">'+table([['Location'],['Type'],['Address'],['Radius'],['Assigned employees'],['Attendance today','n'],['Active dates'],['Enforcement mode'],['Status']],
-      rows.map(function(r){return [r.n,esc(r.t),r.a,r.r,esc(r.emp),r.today,r.dates,esc(r.mode),pill(tone(r.st),r.st)]}),'All locations','<span class="sub">Click an approved home for the HR detail view</span>',
-      function(i){return rows[i].click?' class="rowlink" data-att="home-detail" data-v="'+rows[i].click+'" tabindex="0"':''},'wide')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+kvcard('How the geofence behaves, policy v'+attPolicy().v,[['Remote',ATT_MODES[pol.modeRemote]+' outside the approved home, fixed '+pol.radiusRemote+' m'],
-      ['Hybrid','MTN Head Office on office days, home on remote days. '+ATT_MODES[pol.modeHybrid]],['Field','An approved assignment overrides office and home. '+ATT_MODES[pol.modeField]],
-      ['Office-only',ATT_MODES[pol.modeOffice]+' outside the assigned office'],['Accuracy','Good at '+pol.goodAcc+' m or better. Worse than '+pol.retryAcc+' m, retry before any fence decision'],
-      ['Tracking','None. Location is read only at clock-in and clock-out']])+
-    kvcard('Why homes are masked',[['In this list','Area only: Approved home · Lekki'],['Full address','In the HR detail view, and each view is written to the audit log'],
-      ['Who can open it','People and the CEO. Managers see the area only'],['History','A changed home is superseded, never overwritten']])+'</div>'}
+    '<div style="margin-top:12px">'+colHint(colHint(table([['Location'],['Type'],['Address'],['Radius'],['Assigned Employees'],['Attendance Today','n'],['Active Dates'],['Enforcement Mode'],['Status']],
+      rows.map(function(r){return [r.n,esc(r.t),r.a,r.r,esc(r.emp),r.today,r.dates,esc(r.mode),pill(tone(r.st),r.st)]}),'All Locations','',
+      function(i){return rows[i].click?' class="rowlink" data-att="home-detail" data-v="'+rows[i].click+'" tabindex="0"':''},'wide',[1,3]),
+      'Address','A home shows its area only. People and the CEO can open the row for the full address.'),
+      'Enforcement Mode','What happens to a punch outside this fence, set per work arrangement in the attendance policy.')+'</div>'}
 function attHomeDetail(hid){var h=null;ATT.homes.forEach(function(x){if(x.id===hid)h=x});if(!h)return;
   attAudit('Viewed approved home address',aName(h.emp)+' · '+(h.kind==='Temporary'?'Temporary location':'Approved home'),'Masked','Full address shown','HR detail view');attSave();
   var hist=ATT.homes.filter(function(x){return x.emp===h.emp});
-  openModal({title:'HR Detail · '+aName(h.emp),wide:true,body:'<div class="attban in">'+ic('lock','ico')+'<span>Full home address. Visible to People and the CEO only. This view has been written to the audit log.</span></div>'+
-    '<dl class="kv"><dt>Location</dt><dd>'+esc(attFenceName(h))+'</dd><dt>Full address</dt><dd>'+esc(h.address)+'</dd><dt>Coordinates</dt><dd>'+esc(aCoord(h.lat,h.lng))+'</dd>'+
+  openModal({title:'HR Detail · '+aName(h.emp),wide:true,body:
+    '<dl class="kv"><dt>Location</dt><dd>'+esc(attFenceName(h))+'</dd><dt>Full Address</dt><dd>'+esc(h.address)+'</dd><dt>Coordinates</dt><dd>'+esc(aCoord(h.lat,h.lng))+'</dd>'+
     '<dt>Radius</dt><dd>'+h.radius+' m'+(h.just?' · '+esc(h.just):'')+'</dd><dt>Kind</dt><dd>'+esc(h.kind)+'</dd><dt>Dates</dt><dd>'+esc(h.from+(h.to?' to '+h.to:' onwards'))+'</dd><dt>Status</dt><dd>'+esc(attHomeState(h))+'</dd></dl>'+
-    '<div style="margin-top:12px">'+table([['Location'],['Kind'],['Dates'],['Radius'],['Status']],hist.map(function(x){return [esc(attFenceName(x)),esc(x.kind),esc(x.from+(x.to?' to '+x.to:' onwards')),x.radius+' m',esc(attHomeState(x))]}),'Location history')+'</div>',
+    '<div style="margin-top:12px">'+table([['Location'],['Kind'],['Dates'],['Radius'],['Status']],hist.map(function(x){return [esc(attFenceName(x)),esc(x.kind),esc(x.from+(x.to?' to '+x.to:' onwards')),x.radius+' m',esc(attHomeState(x))]}),'Location History')+'</div>',
     foot:'<button class="btn pri" data-mx>Close</button>'})}
 function attWsModal(){var pol=attPolicy().settings;ATTUI.essReq={pin:null};
-  openModal({title:'Add Worksite',body:field('ws-name','Worksite name','<input class="inp" id="ws-name" placeholder="For example, Enugu office">','Name the worksite')+
+  openModal({title:'Add Worksite',body:field('ws-name','Worksite Name','<input class="inp" id="ws-name" placeholder="Enugu Office">','Name the worksite')+
     field('ws-addr','Address','<input class="inp" id="ws-addr" placeholder="Street, area, city">','Enter the address')+
-    '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="ws-addr">'+ic('target')+'Drop pin</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(null)+'</div></div>'+
-    field('ws-rad','Radius, metres','<input class="inp" id="ws-rad" type="number" min="50" max="300" value="'+pol.radiusOffice+'">','Between 50 and 300'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="ws-save">Add worksite</button>'})}
+    '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="ws-addr">'+ic('target')+'Drop Pin</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(null)+'</div></div>'+
+    field('ws-rad','Radius in Metres','<input class="inp" id="ws-rad" type="number" min="50" max="300" value="'+pol.radiusOffice+'">','Between 50 and 300'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="ws-save">Add Worksite</button>'})}
 
 /* ═════════════ SETTINGS → ATTENDANCE POLICY: draft, review, publish ═════════════ */
 function attDraft(){return ATT.draft||attLatest().settings}
+/* a setting that applies at once (FRONTEND_GUIDE §8.1): no form; the row names it and the control carries the same name */
 function attCtl(f,val){var k=f[0];
   if(f[3]==='bool')return '<button type="button" class="sw'+(val?' on':'')+'" role="switch" aria-checked="'+!!val+'" aria-label="'+esc(f[1])+'" data-pk="'+k+'"></button>';
   if(f[3]==='lock')return '<span style="display:flex;align-items:center;gap:8px">'+pill('nt',k==='radiusRemote'?'100 m · fixed':'Always off')+ic('lock')+'</span>';
-  if(f[3]==='mode')return '<select class="inp pctl" data-attc="pk" data-k="'+k+'" aria-label="'+esc(f[1])+'">'+['record','warn','block'].map(function(m){return '<option value="'+m+'"'+(m===val?' selected':'')+'>'+esc(ATT_MODES[m])+'</option>'}).join('')+'</select>';
-  if(f[3]==='sel')return '<select class="inp pctl" data-attc="pk" data-k="'+k+'" aria-label="'+esc(f[1])+'">'+f[4].map(function(o){return '<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>';
-  if(f[3]==='time')return '<input class="inp pctl" type="time" data-attc="pk" data-k="'+k+'" value="'+esc(val)+'" aria-label="'+esc(f[1])+'">';
-  return '<input class="inp pctl" type="number" data-attc="pk" data-k="'+k+'" value="'+esc(val)+'" min="'+f[4][0]+'" max="'+f[4][1]+'" aria-label="'+esc(f[1])+'">'}
-function attPolCard(title,sec,note){var d=attDraft(),L=attLatest().settings;
+  if(f[3]==='mode')return '<select aria-label="'+esc(f[1])+'" class="inp pctl" data-attc="pk" data-k="'+k+'">'+['record','warn','block'].map(function(m){return '<option value="'+m+'"'+(m===val?' selected':'')+'>'+esc(ATT_MODES[m])+'</option>'}).join('')+'</select>';
+  if(f[3]==='sel')return '<select aria-label="'+esc(f[1])+'" class="inp pctl" data-attc="pk" data-k="'+k+'">'+f[4].map(function(o){return '<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select>';
+  if(f[3]==='time')return '<input aria-label="'+esc(f[1])+'" class="inp pctl" type="time" data-attc="pk" data-k="'+k+'" value="'+esc(val)+'">';
+  return '<input aria-label="'+esc(f[1])+'" class="inp pctl" type="number" data-attc="pk" data-k="'+k+'" value="'+esc(val)+'" min="'+f[4][0]+'" max="'+f[4][1]+'">'}
+function attPolCard(title,sec,foot){var d=attDraft(),L=attLatest().settings;
   return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3></div>'+ATT_PF.filter(function(f){return f[6]===sec}).map(function(f){var ch=String(d[f[0]])!==String(L[f[0]]);
-    return '<div class="tog'+(ch?' chg':'')+'" id="pkrow-'+f[0]+'"><div style="min-width:0"><div style="font-size:13px;font-weight:550">'+esc(f[1])+(ch?' '+pill('wa','Draft'):'')+'</div>'+
-      (f[2]?'<div class="sub">'+esc(f[2])+'</div>':'')+(ch?'<div class="sub">Published: '+esc(attFmt(f[0],L[f[0]]))+'</div>':'')+
+    return '<div class="tog'+(ch?' chg':'')+'" id="pkrow-'+f[0]+'"><div style="min-width:0"><div style="font-size:13px;font-weight:550">'+(f[2]?hint(f[1],f[2]):esc(f[1]))+(ch?' '+pill('wa','Draft'):'')+'</div>'+
+      (ch?'<div class="sub">Published: '+esc(attFmt(f[0],L[f[0]]))+'</div>':'')+
       '<p class="fm" style="display:none;color:var(--err);font-size:11.5px">'+(f[4]&&f[3]==='num'?'Between '+f[4][0]+' and '+f[4][1]:'Check this value')+'</p></div>'+attCtl(f,d[f[0]])+'</div>'}).join('')+
-    (note?'<p class="sub" style="margin-top:10px">'+esc(note)+'</p>':'')+'</div>'}
+    (foot||'')+'</div>'}
 function attPolicyTab(){
   var L=attLatest(),P=attPolicy(),keys=ATT.draft?attDiff(L.settings,ATT.draft):[],acks=ATT.acks[L.v]||{},ids=Object.keys(acks),
-      done=ids.filter(function(i){return acks[i].ack}).length,read=ids.filter(function(i){return acks[i].read}).length;
-  return '<div class="phead"><div><h1>Attendance Policy '+infoBtn('pol-help')+'</h1><p>Version '+P.v+' in force since '+esc(P.effective)+(L.v!==P.v?' · v'+L.v+' scheduled for '+esc(L.effective):'')+'</p></div>'+
-    '<div class="right"><button class="btn" data-att="reset">'+ic('alert')+'Reset attendance demo data</button></div></div>'+
-    infoText('pol-help','A change on this screen edits a draft. Nobody is notified and no punch is judged by it until the draft is published with an effective date. Older records are never recalculated.')+
-    (keys.length?'<div class="draftbar" role="status">'+ic('alert','ico')+'<span><b>Draft changes not yet published</b> · '+keys.length+' change'+(keys.length>1?'s':'')+'. Employees have not been told.</span>'+
-      '<span class="acts"><button class="btn" data-att="pol-discard">Discard changes</button><button class="btn" data-att="pol-review">Review changes</button><button class="btn pri" data-att="pol-publish">Publish policy</button></span></div>':
-      '<div class="draftbar ok" role="status">'+ic('ok','ico')+'<span>No draft changes. Version '+L.v+' is the latest published policy. Any change below starts a draft.</span><span class="acts"><button class="btn" disabled>Publish policy</button></span></div>')+
-    '<div class="grid g2">'+attPolCard('1 · Location verification','loc','Remote home locations are fixed at 100 m. MTN Head Office is 100 m; the field default is 200 m. Good GPS is 50 m or better; retry when worse than 100 m.')+
-    '<div>'+attPolCard('Outside-geofence behaviour, by arrangement','rules','Attendance rules by employee category. Block keeps the attempt on record and offers the employee an exception request.')+
-    '<div style="margin-top:12px">'+attPolCard('2 · Device verification','dev')+'</div></div></div>'+
-    '<div class="grid g2">'+attPolCard('3 · Time and attendance','time','Seeded values: weekdays 09:00 to 17:00, Saturday 09:00 to 15:00, 15 minute grace, missing clock-out flagged the next morning.')+
-    attPolCard('4 · Pay-impact tiers','tiers','Each toggle is independent. Switching one off stops that rule from applying but keeps every configured tier for later use.')+'</div>'+
-    '<div class="grid g2"><div class="card"><div class="ch"><h3>Configured tiers</h3></div>'+
-      '<h4 style="margin-bottom:6px">Deduction tiers</h4><div class="tscroll"><table><tbody>'+ATT.tiers.deduction.map(function(t){return '<tr><td>'+esc(t[0])+'</td><td>'+esc(t[1])+'</td></tr>'}).join('')+'</tbody></table></div>'+
-      '<h4 style="margin:14px 0 6px">Overtime tiers</h4><div class="tscroll"><table><tbody>'+ATT.tiers.overtime.map(function(t){return '<tr><td>'+esc(t[0])+'</td><td>'+esc(t[1])+'</td></tr>'}).join('')+'</tbody></table></div>'+
-      '<p class="sub" style="margin-top:10px">No overtime monetary rates are configured, so the demo records time and manager approval without inventing a payment rate.</p></div>'+
-    attPolCard('5 · Exceptions and queries','exc','No deduction enters payroll automatically. An authorised person must accept or waive it.')+'</div>'+
-    '<div class="grid g2">'+attPolCard('6 · Policy publication','pub')+
-    '<div class="card"><div class="ch"><h3>Acknowledgment report · v'+L.v+'</h3><span class="right">'+pill(done===ids.length?'ok':'wa',done+' of '+ids.length+' acknowledged')+'</span></div>'+
-    '<p class="sub" style="margin-bottom:8px">'+read+' read · '+done+' acknowledged · '+(ids.length-done)+' pending. Affects: '+esc((L.arrs||[]).join(', '))+'.</p>'+
-    '<div class="tscroll"><table><thead><tr><th>Employee</th><th>Read</th><th>Acknowledged</th></tr></thead><tbody>'+ids.map(function(i){var a=acks[i];
-      return '<tr><td>'+aWho(i,aEmp(i).arr)+'</td><td>'+(a.read?esc(a.read):pill('nt','Not read'))+'</td><td>'+(a.ack?pill('ok',a.ack):pill('wa','Pending'))+'</td></tr>'}).join('')+'</tbody></table></div></div></div>'+
-    table([['Version'],['Status'],['Published'],['Effective'],['Published by'],['Affects'],['Acknowledgment'],['Summary']],ATT.policies.slice().reverse().map(function(p){var a=ATT.acks[p.v]||{},n=Object.keys(a).length,d=Object.keys(a).filter(function(i){return a[i].ack}).length;
-      return ['v'+p.v,p.v===P.v?pill('ok','In force'):p.v>P.v?pill('in','Scheduled'):pill('nt','Archived'),esc(p.published),esc(p.effective),esc(p.by),esc((p.arrs||[]).join(', ')),p.ack?d+' of '+n:'Not required','<span class="clip" title="'+esc(p.summary)+'">'+esc(p.summary)+'</span>']}),'Policy versions')+
-    '<div class="card" style="margin-top:12px"><div class="ch"><h3>Reset attendance demo data</h3></div><p class="sub" style="margin-bottom:10px">Returns every attendance screen to the seeded scenarios: policy v4, the eight reconciliation cases, devices, requests and today’s register. Other modules are not affected.</p>'+
-    '<button class="btn" data-att="reset">'+ic('alert')+'Reset attendance demo data</button></div>'}
+      done=ids.filter(function(i){return acks[i].ack}).length,read=ids.filter(function(i){return acks[i].read}).length,
+      dh='A draft changes nothing until it is published with an effective date. Nobody is notified, and older records are never recalculated.';
+  return '<div class="phead"><div><h1>Attendance Policy</h1><p>Version '+P.v+' in force since '+esc(P.effective)+(L.v!==P.v?' · v'+L.v+' scheduled for '+esc(L.effective):'')+'</p></div></div>'+
+    (keys.length?'<div class="draftbar" role="status">'+ic('alert','ico')+'<span><b>'+keys.length+' '+hint(keys.length>1?'Draft Changes':'Draft Change',dh)+'</b> · not published</span>'+
+      '<span class="acts"><button class="btn" data-att="pol-discard">Discard Changes</button><button class="btn" data-att="pol-review">Review Changes</button><button class="btn pri" data-att="pol-publish">Publish Policy</button></span></div>':
+      '<div class="draftbar ok" role="status">'+ic('ok','ico')+'<span>No '+hint('draft',dh)+' changes</span></div>')+
+    '<div class="grid g2">'+attPolCard('Location Verification','loc')+
+    '<div>'+attPolCard('Outside-Geofence Behaviour','rules',details('<dl class="kv"><dt>Record only</dt><dd>Accepted and recorded</dd><dt>Warn and accept</dt><dd>Accepted with a warning</dd>'+
+      '<dt>Block</dt><dd>Kept on record; the employee can request an exception</dd></dl>'))+
+    '<div style="margin-top:12px">'+attPolCard('Device Verification','dev')+'</div></div></div>'+
+    '<div class="grid g2">'+attPolCard('Time and Attendance','time')+attPolCard('Pay-Impact Tiers','tiers')+'</div>'+
+    '<div class="grid g2"><div class="card"><div class="ch"><h3>Configured Tiers</h3></div>'+
+      '<h4 style="margin-bottom:6px">Deduction Tiers</h4><dl class="kv">'+ATT.tiers.deduction.map(function(t){return '<dt>'+esc(t[0])+'</dt><dd>'+esc(t[1])+'</dd>'}).join('')+'</dl>'+
+      '<h4 style="margin:14px 0 6px">Overtime Tiers</h4><dl class="kv">'+ATT.tiers.overtime.map(function(t){return '<dt>'+esc(t[0])+'</dt><dd>'+esc(t[1])+'</dd>'}).join('')+'</dl></div>'+
+    attPolCard('Exceptions and Queries','exc')+'</div>'+
+    '<div class="grid g2">'+attPolCard('Policy Publication','pub')+
+    table([['Employee'],['Read'],['Acknowledged']],ids.map(function(i){var a=acks[i];
+      return [aWho(i,aEmp(i).arr),a.read?esc(a.read):pill('nt','Not read'),a.ack?pill('ok',a.ack):pill('wa','Pending')]}),
+      'Acknowledgment Report · v'+L.v,pill('nt',read+' read')+' '+pill(done===ids.length?'ok':'wa',done+' of '+ids.length+' acknowledged'))+'</div>'+
+    '<div style="margin-top:12px">'+table([['Version'],['Status'],['Published'],['Effective'],['Published By'],['Affects'],['Acknowledgment'],['Summary']],ATT.policies.slice().reverse().map(function(p){var a=ATT.acks[p.v]||{},n=Object.keys(a).length,d=Object.keys(a).filter(function(i){return a[i].ack}).length;
+      return ['v'+p.v,p.v===P.v?pill('ok','In force'):p.v>P.v?pill('in','Scheduled'):pill('nt','Archived'),esc(p.published),esc(p.effective),esc(p.by),esc((p.arrs||[]).join(', ')),p.ack?d+' of '+n:'Not required','<span class="clip" title="'+esc(p.summary)+'">'+esc(p.summary)+'</span>']}),'Policy Versions',null,null,null,[2,3])+'</div>'+
+    '<div class="card" style="margin-top:12px"><div class="ch"><h3>Demo Data</h3></div>'+
+    '<button class="btn" data-att="reset">'+ic('alert')+'Reset Demo Data</button></div>'}
 function attPolSet(k,val){var f=attPF(k);if(!f||f[3]==='lock')return;
   if(f[3]==='num'){val=+val;if(isNaN(val)||val<f[4][0]||val>f[4][1]){var r=$('#pkrow-'+k);if(r){r.querySelector('.fm').style.display='block'}return}}
   var d=ATT.draft||aClone(attLatest().settings),before=attFmt(k,(ATT.draft||attLatest().settings)[k]);
-  if(k==='retryAcc'&&val<=d.goodAcc){var r2=$('#pkrow-'+k);if(r2){r2.querySelector('.fm').textContent='Must be worse than the good accuracy, '+d.goodAcc+' m';r2.querySelector('.fm').style.display='block'}return}
+  if(k==='retryAcc'&&val<=d.goodAcc){var r2=$('#pkrow-'+k);if(r2){r2.querySelector('.fm').textContent='Must exceed '+d.goodAcc+' m';r2.querySelector('.fm').style.display='block'}return}
   d[k]=val;ATT.draft=attDiff(attLatest().settings,d).length?d:null;
   attAudit('Policy draft changed','Attendance policy draft · '+f[1],before,attFmt(k,val),'Not published, nobody notified');
   attSave();var y=$('#scroll').scrollTop;render();$('#scroll').scrollTop=y}
 function attPolReview(publish){var L=attLatest(),d=ATT.draft;if(!d)return;var keys=attDiff(L.settings,d),arrs=attAffected(keys),
     n=ATT_ORDER.filter(function(id){return arrs.indexOf(aEmp(id).arr)>=0}).length;
-  var tbl='<div class="tscroll"><table><thead><tr><th>Setting</th><th>Old value, v'+L.v+'</th><th>New value, v'+(L.v+1)+'</th><th>Affects</th></tr></thead><tbody>'+keys.map(function(k){var f=attPF(k);
-    return '<tr><td>'+esc(f[1])+'</td><td>'+esc(attFmt(k,L.settings[k]))+'</td><td><b>'+esc(attFmt(k,d[k]))+'</b></td><td>'+esc(f[5]==='all'?'Everyone':f[5].join(', '))+'</td></tr>'}).join('')+'</tbody></table></div>';
-  if(!publish){openModal({title:'Review Draft Changes',wide:true,body:'<p class="sub" style="margin-bottom:10px">Draft against v'+L.v+'. Nothing has been sent.</p>'+tbl,
-    foot:'<button class="btn" data-mx>Close</button><button class="btn pri" data-att="pol-publish">Publish policy</button>'});return}
+  var tbl=attCompare(['Old, v'+L.v,'New, v'+(L.v+1),'Affects'],keys.map(function(k){var f=attPF(k);
+    return [f[1],esc(attFmt(k,L.settings[k])),'<b>'+esc(attFmt(k,d[k]))+'</b>',esc(f[5]==='all'?'Everyone':f[5].join(', '))]}));
+  if(!publish){openModal({title:'Review Draft Changes',wide:true,body:tbl,
+    foot:'<button class="btn" data-mx>Close</button><button class="btn pri" data-att="pol-publish">Publish Policy</button>'});return}
   openModal({title:'Publish Attendance Policy',wide:true,body:
-    statstrip([['Current version','v'+L.v],['New version','v'+(L.v+1)],['Affected arrangements',arrs.join(', ')||'None'],['Affected employees',n+' in the demo roster']])+tbl+
-    '<div class="grid g2" style="margin:14px 0 0">'+field('pp-eff','Effective date','<input class="inp" id="pp-eff" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY">','DD/MM/YYYY, today or later. Never backdated')+
-    '<div class="f"><label>Acknowledgment required</label><div class="seg" role="group" aria-label="Acknowledgment required"><button type="button" class="on" data-att="pp-ack" data-v="1" aria-pressed="true">Yes</button><button type="button" data-att="pp-ack" data-v="0" aria-pressed="false">No</button></div></div></div>'+
-    field('pp-sum','Employee-facing summary','<textarea class="inp" id="pp-sum" placeholder="What changes for employees, in plain words"></textarea>','Write a short summary, at least 15 characters')+
-    '<div class="f"><label>Notification channels</label><div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px"><label><input type="checkbox" checked disabled> In app, always</label><label><input type="checkbox" id="pp-mail" checked> Email</label></div></div>'+
-    '<div class="sub" style="margin-bottom:8px">Preview of what employees receive:</div><div class="annmsg" style="max-width:none"><div class="ah">'+ic('bell')+'Attendance policy updated</div><h4>Attendance policy updated</h4><p id="pp-prev">Effective '+esc(aLong(ATT_TODAY))+'. Your summary appears here.</p></div>'+
-    '<label style="display:flex;gap:9px;align-items:flex-start;margin-top:14px;font-size:12.5px"><input type="checkbox" id="pp-ok"> <span>I have reviewed the old and new values. Records before the effective date will not be recalculated.</span></label><p class="fm" id="pp-okm" style="display:none;color:var(--err);font-size:11.5px">Confirm you have reviewed the change</p>',
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="pol-confirm">'+ic('send')+'Publish v'+(L.v+1)+'</button>',
-    onMount:function(){ATTUI.ppAck=true;var up=function(){var e=$('#pp-eff').value,s=$('#pp-sum').value.trim();$('#pp-prev').textContent='Effective '+(aValidDate(e)?aLong(e):e)+'. '+(s||'Your summary appears here.')};
+    statstrip([['Current Version','v'+L.v],['New Version','v'+(L.v+1)],['Arrangements',arrs.join(', ')||'None'],['Employees',String(n)]])+tbl+
+    '<div style="margin-top:14px">'+field('pp-eff','Effective Date','<input class="inp" id="pp-eff" value="'+ATT_TODAY+'" placeholder="DD/MM/YYYY" inputmode="numeric">','Today or later',
+      'Records before this date keep the old policy and are never recalculated. The date cannot be in the past.')+
+    field('pp-sum','Employee Summary','<textarea class="inp" id="pp-sum"></textarea>','At least 15 characters')+
+    check('pp-ack','Require Acknowledgment',true)+check('pp-app','Notify In App',true,'disabled')+check('pp-mail','Notify by Email',true)+'</div>'+
+    '<div class="sub" style="margin:12px 0 8px">Employee Preview</div><div class="annmsg" style="max-width:none"><div class="ah">'+ic('bell')+'Attendance policy updated</div><h4>Attendance policy updated</h4><p id="pp-prev">Effective '+esc(aLong(ATT_TODAY))+'. Your summary appears here.</p></div>'+
+    check('pp-ok','Reviewed All Changes',false)+'<p class="fm" id="pp-okm" style="display:none;color:var(--err);font-size:11.5px">Tick to confirm</p>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="pol-confirm">Publish Policy</button>',
+    onMount:function(){var up=function(){var e=$('#pp-eff').value,s=$('#pp-sum').value.trim();$('#pp-prev').textContent='Effective '+(aValidDate(e)?aLong(e):e)+'. '+(s||'Your summary appears here.')};
       $('#pp-eff').addEventListener('input',up);$('#pp-sum').addEventListener('input',up);
       live('pp-eff',function(v){return aValidDate(v)&&aCmp(v,ATT_TODAY)>=0});live('pp-sum',function(v){return v.trim().length>=15})}})}
 function attPolPublish(){var L=attLatest(),d=ATT.draft,eff=$('#pp-eff').value.trim(),sum=$('#pp-sum').value.trim(),ok=true;
@@ -5716,7 +5704,7 @@ function attPolPublish(){var L=attLatest(),d=ATT.draft,eff=$('#pp-eff').value.tr
   if(sum.length<15){$('#fw-pp-sum').classList.add('bad');ok=false}
   $('#pp-okm').style.display=$('#pp-ok').checked?'none':'block';if(!$('#pp-ok').checked)ok=false;
   if(!ok)return;
-  var keys=attDiff(L.settings,d),arrs=attAffected(keys),v=L.v+1,ack=!!ATTUI.ppAck,ch=$('#pp-mail').checked?'In app, email':'In app';
+  var keys=attDiff(L.settings,d),arrs=attAffected(keys),v=L.v+1,ack=$('#pp-ack').checked,ch=$('#pp-mail').checked?'In app, email':'In app';
   ATT.policies.push({v:v,published:aStamp(),effective:eff,by:'Cynthia Osakunih',ack:ack,channels:ch,arrs:arrs,summary:sum,settings:aClone(d),changed:keys,prev:aClone(L.settings)});
   ATT.acks[v]={};ATT_ORDER.forEach(function(id){if(arrs.indexOf(aEmp(id).arr)<0)return;ATT.acks[v][id]={read:'',ack:''};
     attNotify(id,'Attendance policy updated','Effective '+aLong(eff)+'. '+sum,'policy');
@@ -5739,20 +5727,23 @@ function attAuditTab(){
   var mod=ATTUI.auditMod,all=ATT.audit.map(function(a){return [a.at,a.actor,a.action,a.entity,a.before,a.after,a.reason,a.mod]}).concat(ATT_STATIC_AUDIT);
   all.sort(function(a,b){var x=aDate(a[0].slice(0,10))-aDate(b[0].slice(0,10));return x?-x:(a[0]<b[0]?1:-1)});
   var map={'Everything':'','Attendance':'Attendance','Payroll':'Payroll','Queries':'Queries & Sanctions','Expenses':'Expenses','Partnerships':'Partnerships','Performance':'Performance','Praxis AI':'Praxis AI'},
-      list=all.filter(function(r){return !map[mod]||r[7]===map[mod]});
+      list=all.filter(function(r){return !map[mod]||r[7]===map[mod]}),
+      pages=Math.max(1,Math.ceil(list.length/25)),pg=Math.max(0,Math.min(ATTUI.auditPg||0,pages-1)),s0=pg*25;
+  ATTUI.auditPg=pg;
   var cell=function(v){return v?esc(v):'<span class="sub">None</span>'};
-  return head('Audit Log','Append only. Nobody can edit this.',[['Export']])+
-    kpis([['Entries today',String(184+ATT.audit.filter(function(a){return a.at.indexOf(ATT_TODAY)===0}).length)],['This month','4,912'],['Attendance entries',String(ATT.audit.length),''],['Retention','7 years']])+
+  return head('Audit Log','',[['Export']])+
+    attLabHint(kpis([['Entries Today',String(184+ATT.audit.filter(function(a){return a.at.indexOf(ATT_TODAY)===0}).length)],['This Month','4,912'],['Attendance Entries',String(ATT.audit.length),''],['Retention','7 years']]),
+      'Retention','Entries are append only: nobody can edit or delete one, an administrator included. After seven years they are archived, not purged.')+
     '<div class="chips" role="group" aria-label="Filter by module">'+Object.keys(map).map(function(c){return '<button class="chip'+(c===mod?' on':'')+'" data-att="audit-mod" data-v="'+c+'" aria-pressed="'+(c===mod)+'">'+esc(c)+'</button>'}).join('')+'</div>'+
-    table([['Date and time'],['Actor'],['Action'],['Entity'],['Before'],['After'],['Reason or reference'],['Module']],list.slice(0,60).map(function(r){
-      return [esc(r[0]),esc(r[1]),'<b>'+esc(r[2])+'</b>',esc(r[3]),cell(r[4]),cell(r[5]),cell(r[6]),esc(r[7])]}),'Recent entries','<span class="sub">Showing '+Math.min(60,list.length)+' of '+list.length+'</span>',null,'wide')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    bars('Entries by module, this month',[['People and attendance',100,'1,840'],['Expenses',48,'882'],['Performance',31,'571'],
+    table([['Date and Time'],['Actor'],['Action'],['Entity'],['Before'],['After'],['Reason or Reference'],['Module']],list.slice(s0,s0+25).map(function(r){
+      return [esc(r[0]),esc(r[1]),'<b>'+esc(r[2])+'</b>',esc(r[3]),cell(r[4]),cell(r[5]),cell(r[6]),esc(r[7])]}),'Recent Entries',null,null,'wide',[2,3])+
+    '<div class="pager"><span class="sub">'+(list.length?(s0+1)+' to '+Math.min(s0+25,list.length)+' of '+list.length:'0 entries')+'</span>'+
+      '<span class="right"><button class="btn" data-att="audit-pg" data-v="-1"'+(pg<=0?' disabled':'')+'>Previous</button><span class="sub">Page '+(pg+1)+' of '+pages+'</span>'+
+      '<button class="btn" data-att="audit-pg" data-v="1"'+(pg>=pages-1?' disabled':'')+'>Next</button></span></div>'+
+    '<div style="margin-top:12px">'+
+    bars('Entries by Module',[['People and attendance',100,'1,840'],['Expenses',48,'882'],['Performance',31,'571'],
       ['Queries & Sanctions',22,'404'],['Partnerships',19,'349'],['Payroll',11,'202'],['Settings',4,'74','var(--yellow)']],
-      'Attendance leads because every punch is an entry. That is the point: attendance is the most contested record in the system.')+
-    kvcard('What append only means',[['Written by','The database, on every state change'],['Editable','By nobody. There is no UPDATE path to this table'],
-      ['Deletable','By nobody, including an administrator'],['What is recorded','Who, what, which record, before, after, when, and why'],
-      ['What is not','The old and new values of a masked field'],['Retention','Seven years, then archived rather than purged']])+'</div>'}
+      'October 2026')+'</div>'}
 
 /* ═════════════ SMALL ADDITIONS TO EXISTING SCREENS ═════════════ */
 function attHomeKpi(){var k=attKpis();return [k.inn+' / '+ATT_ORDER.length,k.late+' late · demo roster']}
@@ -5763,7 +5754,7 @@ function attQueryRows(){return ATT.queries.map(function(q){return [aWho(q.emp),e
 /* ═════════════ WIRING: one delegated listener for every attendance control ═════════════ */
 var ATT_ACT={
   'punch-open':function(){attOpenClock()},
-  'ck-submit':function(b){if(ATTUI.ck.busy)return;ATTUI.ck.busy=true;b.disabled=true;b.innerHTML='Checking with the server';setTimeout(function(){ATTUI.ck.busy=false;attCkSubmit()},450)},
+  'ck-submit':function(b){if(ATTUI.ck.busy)return;ATTUI.ck.busy=true;b.disabled=true;b.innerHTML='Checking…';setTimeout(function(){ATTUI.ck.busy=false;attCkSubmit()},450)},
   'ck-retry':function(){ATTUI.ck.retries++;attCkPaint();toast('Location read again. Still '+ATT_ACCS.filter(function(x){return x[0]===ATT.demo.acc})[0][2]+' m.')},
   'ck-issue':function(){ATTUI.ck.stage='issue';attCkPaint()},'ck-exc':function(){ATTUI.ck.stage='exception';attCkPaint()},
   'ck-enrol':function(){ATTUI.ck.stage='enrol';attCkPaint()},'ck-back':function(){var c=ATTUI.ck;c.stage=c.att?(c.offer==='device'?'rejected':'blocked'):'review';attCkPaint()},
@@ -5834,19 +5825,20 @@ var ATT_ACT={
   'pol-discard':function(){var n=attDiff(attLatest().settings,ATT.draft||attLatest().settings).length;ATT.draft=null;
     attAudit('Policy draft discarded','Attendance policy draft',n+' change'+(n>1?'s':''),'None','Discarded before publishing');attSave();render();toast('Draft discarded. Nothing was published.')},
   'pol-review':function(){attPolReview(false)},'pol-publish':function(){attPolReview(true)},'pol-confirm':function(){attPolPublish()},
-  'pp-ack':function(b){ATTUI.ppAck=b.dataset.v==='1';$$('[data-att="pp-ack"]').forEach(function(x){var on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',String(on))})},
+
   'pol-changes':function(b){attPolChanges(b.dataset.v)},'pol-full':function(b){attPolFull(b.dataset.v)},
   'pol-ack':function(){var id=ATT.demo.actor,L=attLatest(),a=ATT.acks[L.v][id];a.ack=aStamp();if(!a.read)a.read=a.ack;
     attAudit('Employee policy acknowledgment',aName(id)+' · attendance policy v'+L.v,'Pending','Acknowledged '+a.ack,'Self-Service',aName(id));
-    attNotify('HR','Policy acknowledged, '+aName(id),'Attendance policy v'+L.v+' at '+a.ack+'.','policy');attSave();attBellPaint();render();toast('Acknowledged. People can see it in the report.')},
-  'pol-ask':function(){openModal({title:'Ask a Question About the Policy',body:field('pa-q','Your question','<textarea class="inp" id="pa-q" placeholder="What would you like People to clarify?"></textarea>','Write your question'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="pol-ask-send">'+ic('send')+'Send to People</button>'})},
+    attNotify('HR','Policy acknowledged, '+aName(id),'Attendance policy v'+L.v+' at '+a.ack+'.','policy');attSave();attBellPaint();render();toast('Policy acknowledged')},
+  'pol-ask':function(){openModal({title:'Policy Question',body:field('pa-q','Your Question','<textarea class="inp" id="pa-q"></textarea>','Write your question'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="pol-ask-send">Send Question</button>'})},
   'pol-ask-send':function(){var q=($('#pa-q').value||'').trim();if(q.length<5){$('#fw-pa-q').classList.add('bad');return}
     attNotify('HR','Policy question from '+aName(ATT.demo.actor),q,'policy');attSave();closeModal();attBellPaint();toast('Question sent to People')},
-  'audit-mod':function(b){ATTUI.auditMod=b.dataset.v;render()},
-  'reset':function(){openModal({title:'Reset Attendance Demo Data',body:'<p>This restores every attendance screen to the seeded scenarios. Clock events, cases, requests, devices, policy versions and acknowledgments made in this browser are removed.</p><p class="sub" style="margin-top:10px">Other modules are not affected. This cannot be undone.</p>',
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="reset-ok">Reset attendance demo data</button>'})},
-  'reset-ok':function(){attReset();closeModal();attPaintPunch();attBellPaint();render();toast('Attendance demo data restored to the seeded scenarios')}};
+  'audit-mod':function(b){ATTUI.auditMod=b.dataset.v;ATTUI.auditPg=0;render()},
+  'audit-pg':function(b){ATTUI.auditPg=(ATTUI.auditPg||0)+(+b.dataset.v);var y=$('#scroll').scrollTop;render();$('#scroll').scrollTop=y},
+  'reset':function(){openModal({title:'Reset Attendance Demo Data',body:'<p>Clock events, cases, requests, devices, policy versions and acknowledgments made in this browser are removed. This cannot be undone.</p>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="reset-ok">Reset Demo Data</button>'})},
+  'reset-ok':function(){attReset();closeModal();attPaintPunch();attBellPaint();render();toast('Attendance demo data restored')}};
 function attFASave(){
   var g=function(id){return ($('#'+id).value||'').trim()},bad=function(k){$('#fw-'+k).classList.add('bad');return false},ok=true,rad=+g('fa-rad'),date=g('fa-date');
   $$('#modal .f.bad').forEach(function(f){f.classList.remove('bad')});
@@ -5860,7 +5852,7 @@ function attFASave(){
   ATT.assignments.push(a);
   attAudit('Field assignment approved',aName(a.emps[0])+' · '+a.id,'None',sites.map(function(s){return s.name+', '+s.radius+' m'}).join('; ')+' · '+a.date+' '+a.start+' to '+a.end,'Approved by '+a.approver);
   attNotify(a.emps[0],'Field assignment approved',a.id+' · '+a.name+', '+a.date+' '+a.start+' to '+a.end+'.','assignment');
-  attSave();closeModal();attBellPaint();ATTUI.view='Field Assignments';render();toast(a.id+' approved. It overrides the usual location on '+a.date)}
+  attSave();closeModal();attBellPaint();ATTUI.view='Field Assignments';render();toast(a.id+' approved for '+a.date)}
 function attWsSave(){var nm=($('#ws-name').value||'').trim(),ad=($('#ws-addr').value||'').trim(),r=+$('#ws-rad').value,ok=true;
   if(!nm){$('#fw-ws-name').classList.add('bad');ok=false}if(!ad){$('#fw-ws-addr').classList.add('bad');ok=false}if(!(r>=50&&r<=300)){$('#fw-ws-rad').classList.add('bad');ok=false}if(!ok)return;
   var p=(ATTUI.essReq&&ATTUI.essReq.pin)||attPin(ad);
@@ -5872,7 +5864,7 @@ function attHomeSave(id){var e=aEmp(id),old=attPermHome(id),ad=($('#hm-addr').va
   if(old){old.status='Superseded';old.to=ATT_TODAY}
   ATT.homes.push({id:'HM-'+aNum(ATT.homes.length+1,3),emp:id,area:p.area||(old&&old.area)||'Lagos',address:ad,lat:p.lat,lng:p.lng,radius:r,kind:'Permanent',from:ATT_TODAY,to:'',status:'Active',just:j,by:'Cynthia Osakunih'});
   attAudit(old?'Home location changed':'Home location created',e.name+' · approved home',old?'Approved home · '+old.area+', '+old.radius+' m':'None','Approved home · '+(p.area||'')+', '+r+' m',j||'Default radius');
-  attNotify(id,'Approved home updated','Your clock-in home is now '+(p.area||'')+', '+r+' m.','location');attSave();closeModal();attBellPaint();render();toast('Home geofence saved. The previous one is kept in history.')}
+  attNotify(id,'Approved home updated','Your clock-in home is now '+(p.area||'')+', '+r+' m.','location');attSave();closeModal();attBellPaint();render();toast('Home geofence saved')}
 function attArrSave(id){var e=aEmp(id),a=ATTUI.arrPick||e.arr,why=($('#arr-why').value||'').trim();if(why.length<5){$('#fw-arr-why').classList.add('bad');return}
   var before=e.arr+(e.sched?' ('+['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){return d+' '+e.sched[d][0]}).join(' ')+')':''),sch=null;
   if(a==='Hybrid'){sch={};$$('[data-sched]').forEach(function(s){sch[s.dataset.sched]=s.value})}
@@ -5880,16 +5872,16 @@ function attArrSave(id){var e=aEmp(id),a=ATTUI.arrPick||e.arr,why=($('#arr-why')
   var after=a+(sch?' ('+['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){return d+' '+sch[d][0]}).join(' ')+')':'')+' · '+attSite(e.office).name;
   attAudit(before.indexOf(a)===0&&before!==after?'Work arrangement changed':'Work arrangement changed',e.name,before,after,why);
   attNotify(id,'Your work arrangement changed','You are now '+a+'. Clock In uses the new rules from your next punch.','location');
-  if(a!=='Field'&&a!=='Office-only'&&!attPermHome(id))toast('No approved home on file yet. Use Edit home geofence.');
+  if(a!=='Field'&&a!=='Office-only'&&!attPermHome(id))toast('No approved home on file yet');
   attSave();closeModal();attBellPaint();render();toast(e.name+' is now '+a)}
 function attIssueModal(){var id=ATT.demo.actor,ss=attSessionsOf(id).slice().reverse();
-  openModal({title:'Report an Attendance Issue',body:'<p class="sub" style="margin-bottom:12px">Reporting as <b>'+esc(aName(id))+'</b>. People reconciles it. Your original punch is never changed.</p>'+
+  openModal({title:'Report an Attendance Issue',body:
     field('is-day','Day','<select class="inp" id="is-day">'+ss.map(function(s){return '<option value="'+s.id+'">'+esc(s.date)+' · '+esc(attSV(s).status)+'</option>'}).join('')+'</select>')+
-    field('is-type','What is wrong','<select class="inp" id="is-type"><option>Missing clock-in</option><option>Missing clock-out</option><option>Wrong time</option><option>Wrong location</option></select>')+
-    field('is-time','Correct time (optional)','<input class="inp" id="is-time" type="time">')+
-    field('is-why','Explanation','<textarea class="inp" id="is-why" placeholder="What happened"></textarea>','Write at least 10 characters')+
-    field('is-evi','Supporting evidence label (optional)','<input class="inp" id="is-evi">'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="iss-send">'+ic('send')+'Submit correction</button>',onMount:function(){live('is-why',function(v){return v.trim().length>=10})}})}
+    field('is-type','Issue Type','<select class="inp" id="is-type"><option>Missing clock-in</option><option>Missing clock-out</option><option>Wrong time</option><option>Wrong location</option></select>')+
+    field('is-time','Correct Time (Optional)','<input class="inp" id="is-time" type="time">')+
+    field('is-why','Explanation','<textarea class="inp" id="is-why"></textarea>','At least 10 characters')+
+    field('is-evi','Evidence (Optional)','<input class="inp" id="is-evi" placeholder="photo.jpg">'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="iss-send">Send Correction</button>',onMount:function(){live('is-why',function(v){return v.trim().length>=10})}})}
 function attIssueSend(){var id=ATT.demo.actor,why=($('#is-why').value||'').trim();if(why.length<10){$('#fw-is-why').classList.add('bad');return}
   var s=attSess($('#is-day').value),t=$('#is-type').value,tm=$('#is-time').value;
   var c=attNewCase({type:'Employee-submitted correction',emp:id,date:s?s.date:ATT_TODAY,status:'Awaiting HR',payroll:'Possible',ss:s?s.id:'',evs:s?s.evs.slice():[],
