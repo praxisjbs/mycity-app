@@ -1,179 +1,175 @@
-# Attendance
+# Attendance · Engineering Guide
 
-This guide explains the end-to-end attendance workflow demonstrated in demo.html. The demo date is 9 October 2026 and all times are shown in Africa/Lagos.
+| | |
+|---|---|
+| Owner | LA |
+| Milestone | M1 |
+| Backend modules | `attendance` |
+| Frontend paths | `app/src/attendance/` |
+| Permission key(s) | `attendance` |
+| Screens (PROGRESS.md rows) | #9 My Attendance, #25 Attendance, #27 Devices, #28 Worksites, #73 Attendance Policy |
+| Status | Draft |
+| Last changed | 14/10/2026 |
 
-## 1. Roles and connected modules
+This guide records the attendance behaviour demonstrated in `docs/MyCity-ERP-Documents/demo.html`.
+The demo date is 9 October 2026 and its displayed times use Africa/Lagos.
 
-Attendance connects these parts of MyCity App:
+---
 
-- **Dashboard / header:** shows the employee's current Clock In or Clock Out action and opens the attendance modal.
-- **Employee Self-Service (ESS) → My Attendance:** shows today's expected location, shift, punches, matched location, hours, attendance status, and review cases.
-- **ESS → Work Location Requests:** lets an employee request a temporary home location, remote-day exception, client-site visit, field correction, or office-day exception.
-- **ESS → My Devices:** shows enrolled and pending devices used for attendance.
-- **ESS → Policy Updates:** shows published attendance policies and requests an acknowledgment when HR requires one.
-- **People → Attendance:** gives HR the daily register, field assignments, work-location requests, manager view, and Reconcile workflow.
-- **People → Employees:** shows an essential employee list and an authorised detail modal containing the attendance setup and registered home address.
-- **People → Devices:** lets HR enrol, block, or revoke devices.
-- **Settings → Attendance Policy:** controls location, device, time, exception, deduction-tier, overtime-tier, publication, and acknowledgment rules.
-- **Notifications and Alerts:** links a recipient to the relevant attendance record, request, device review, policy, or reconciliation case.
-- **Payroll / Deductions and Queries & Sanctions:** receive only reviewed outcomes. Attendance does not automatically deduct pay or decide discipline.
+## 1 · What it is for
 
-## 2. Employee clock-in workflow
+Attendance lets employees record the beginning and end of a workday from an approved location. It
+also gives line managers and People/HR a review trail for remote work, field assignments, missing
+punches, location exceptions and policy changes without overwriting the original evidence.
 
-1. The employee signs in.
-2. The app checks the employee record before showing any attendance action:
-   - A **suspended employee is denied access to the whole app**, including an existing in-app session or direct navigation.
-   - An employee on **approved leave covering today may use permitted app features but cannot clock in or out**.
-3. If the employee is eligible and has not clocked in today, the Clock In modal opens automatically.
-4. The modal identifies today's work arrangement, shift, expected location, geofence, applicable policy, device status, system time, and location-verification result.
-5. A fresh location reading is evaluated for that action. The app does not reuse the previous clock-in or clock-out coordinates.
-6. The employee confirms once. The action is protected from repeat clicks, and the attendance state is checked again before saving so a second clock-in cannot be created for an already open session.
-7. On success, ESS and the dashboard update immediately and the employee receives a notification that opens My Attendance.
+## 2 · Screens affected
 
-Clock Out uses the same workflow. It requires an open clock-in, takes a new location reading, shows gross time, break, net time, early departure or overtime, and prevents a duplicate or unmatched clock-out.
+| Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
+|---|---|---|---|---|
+| Clock In / Clock Out modal (`clock`) | Global header and sign-in | Active employees | Shift, expected location, verification result and current system time | Clock in or out, retry location, or provide exception details |
+| ESS · My Attendance (`my-attendance`) | Employee Self-Service | Employee, own scope | Today, history, hours, status and review references | Review own record and open relevant cases |
+| ESS · Work Location Requests (`work-location-requests`) | Employee Self-Service | Employee, own scope | Draft, pending, approved and expired requests | Request a temporary home, remote day, client visit or field correction |
+| ESS · My Devices (`my-devices`) | Employee Self-Service | Employee, own scope | Enrolled and pending attendance devices | Request device enrolment |
+| ESS · Policy Updates (`policy-updates`) | Employee Self-Service | Employee, own scope | Published versions, changes and acknowledgment | Read and acknowledge an attendance policy |
+| People · Employees (`employees`) | People | Authorised People users | Work arrangement and attendance setup | View or change arrangement and approved home geofence |
+| People · Attendance (`attendance`) | People | People/HR; managers see team scope | Register, assignments, requests and manager recommendations | Review a day, approve locations and open Reconcile |
+| People · Devices (`devices`) | People | Authorised People users | Device history and review state | Enrol, block or revoke a device |
+| People · Worksites (`worksites`) | People | Authorised People users | Offices, coordinates, radii and status | Add or retire a worksite |
+| Settings · Attendance Policy (`attendance-policy`) | Settings | Authorised People users | Draft and published attendance rules | Edit, review and publish a version |
+| Notifications and Alerts (`notifications`) | Global header | Recipient within their scope | Attendance events requiring information or action | Open the relevant record or review screen |
 
-## 3. Location selected for the day
+## 3 · How the screens relate
 
-The system selects the expected location in this order:
+1. People assigns an employee's work arrangement, schedule, office and approved home coordinates.
+2. At sign-in, an active employee without a clock-in sees the Clock In modal. A suspended employee
+   cannot enter the app; an employee on approved leave can enter permitted screens but cannot punch.
+3. The attendance service resolves the expected location from an effective field assignment,
+   approved location request, hybrid schedule, registered home or assigned office.
+4. A punch stores fresh location and device evidence and appears in ESS and the People register.
+5. A non-compliant or incomplete record creates a reconciliation case and actionable notifications.
+6. A manager may add a recommendation for their direct report. People/HR makes the final attendance
+   decision in Reconcile; the original punch remains visible beside any adjustment.
+7. Published policy changes notify affected employees and appear in ESS · Policy Updates.
 
-1. An approved field assignment for the date.
-2. An approved client-site or field-correction request.
-3. The employee's work arrangement and hybrid schedule.
-4. An approved work-location exception that is effective on the date.
-5. The normal office or registered home location.
+## 4 · Data
 
-An approved temporary home applies only from its start date through its end date. After expiry, the system automatically returns to the registered permanent home. Both locations remain in the history.
+| Table | Key columns | Notes |
+|---|---|---|
+| `attendance_session` | `session_id`, `employee_id`, `work_date`, `arrangement`, `expected_location_id`, `policy_version` | One calculated workday; points to immutable events |
+| `attendance_event` | `event_id`, `session_id`, `kind`, `server_at`, `device_at`, `latitude`, `longitude`, `accuracy_m`, `result` | Original clock evidence is append-only |
+| `attendance_location` | `location_id`, `employee_id`, `kind`, `address`, `latitude`, `longitude`, `radius_m`, `valid_from`, `valid_to`, `status` | Permanent and temporary home locations; home radius is 100 m |
+| `attendance_assignment` | `assignment_id`, `employee_id`, `date`, `starts_at`, `ends_at`, `sites`, `approver_id`, `status` | An approved field assignment overrides the normal location |
+| `attendance_location_request` | `request_id`, `employee_id`, `type`, `valid_from`, `valid_to`, `location`, `reason`, `status` | Carries employee request, manager recommendation and HR decision |
+| `attendance_case` | `case_id`, `session_id`, `type`, `status`, `employee_explanation`, `manager_note`, `outcome` | Reconciliation history and supporting evidence |
+| `attendance_policy_version` | `version`, `published_at`, `effective_from`, `settings`, `published_by` | Old records retain the version used when evaluated |
+| `attendance_policy_ack` | `version`, `employee_id`, `read_at`, `acknowledged_at` | Drives employee update and HR acknowledgment report |
 
-### Remote and WFH employees
+Migration file(s): to be assigned in the M1 attendance migration block.
 
-- The employee's registered home address and saved coordinates are the default location.
-- The geofence is **fixed at 100 metres** for clock-in and clock-out.
-- The same mandatory 100 m radius applies to an approved temporary home.
-- Employees cannot request a different home radius, and HR cannot edit it.
-- If the home coordinates are missing, the app does not fall back to an office and does not silently approve attendance. The employee sees an explicit failure and must contact People.
+## 5 · API
 
-### Hybrid employees
+| Method and path | Contract | Permission · scope | Paged | Notes |
+|---|---|---|---|---|
+| `POST /api/v1/attendance/punches` | Clock action and fresh evidence → punch result | `attendance` · own | no | Requires an idempotency key; server time is authoritative |
+| `GET /api/v1/attendance/me` | Date range → own sessions | `attendance` · own | yes, 25 | Supports month export separately |
+| `GET /api/v1/attendance/register` | Date, arrangement and status filters → register page | `attendance` · team/all | yes, 25 | Managers are restricted to direct reports |
+| `POST /api/v1/attendance/location-requests` | Temporary-location request → request | `attendance` · own | no | Employee cannot choose a home radius |
+| `POST /api/v1/attendance/location-requests/:id/recommendation` | Manager decision and note → request | `attendance` · team | no | Recommendation is advisory unless policy makes it mandatory |
+| `POST /api/v1/attendance/cases/:id/decision` | Reconciliation outcome → adjusted result | `attendance` · all | no | Appends an adjustment; never edits the source event |
+| `GET /api/v1/attendance/policies` | Published policy versions | `attendance` · own/all | yes, 25 | Own view contains only applicable versions |
 
-- Office days use the assigned office fence. MTN Head Office is configured at 100 m.
-- Remote days use the registered or currently approved temporary home at the fixed 100 m radius.
-- Being at home on a scheduled office day is treated as a location-and-schedule mismatch unless an effective exception has been approved.
+## 6 · Rules and calculations
 
-### Field employees and marketing assignments
+- A remote day uses the employee's active approved home coordinates and a mandatory 100 m fence.
+- An approved temporary home applies only from its start date through its end date; the permanent
+  home resumes automatically afterward.
+- An approved field assignment overrides the normal office or home for its approved date and window.
+- Distance is calculated between captured and approved coordinates; a result equal to the radius is
+  inside, and any greater distance is outside.
+- GPS accuracy of 50 m or better is good by default. Accuracy above 100 m requires a retry and does
+  not produce a compliant geofence decision.
+- Missing coordinates, denied permission or unavailable location are explicit unverified outcomes.
+- Duplicate clock-ins and clock-outs without an open clock-in are refused using server-side
+  idempotency and database uniqueness in production.
+- Deduction and overtime tiers are independent. Disabling one preserves its configured tiers.
+- Attendance never applies a monetary deduction or sanction automatically.
 
-- An approved assignment contains the employee, client or purpose, permitted site coordinates, date, time window, radius, approver, and reason.
-- The assignment location overrides the normal office or home for its approved period.
-- A client-site request or field-correction request can provide a temporary approved location.
-- When there is no active assignment, the employee's configured base rules apply; an off-site attempt is not silently treated as compliant.
+## 7 · Events, jobs and notifications
 
-## 4. Geofence and GPS decisions
+| Event / job | When | Does |
+|---|---|---|
+| `attendance.punched` | A punch commits | Updates own attendance and the authorised register; sends confirmation |
+| `attendance.review_required` | Evidence is non-compliant or incomplete | Creates a case and notifies People/HR and the employee |
+| `attendance.location_request.submitted` | Employee submits a request | Notifies the assigned line manager, then People/HR |
+| `attendance.location_request.decided` | People/HR approves or rejects | Notifies the employee and activates an approved location for its dates |
+| `attendance.policy.published` | A policy version is published | Notifies affected employees and creates acknowledgment rows |
+| Missing-punch checks | 11:00 same day / next morning per policy | Opens reconciliation cases without inventing punch times |
 
-The demo calculates straight-line distance between the captured coordinates and the approved coordinates. A punch is inside the fence when the calculated distance is less than or equal to the applicable radius. Exactly 100 m is therefore inside a 100 m home fence; anything greater is outside.
+Notification destinations are permission-aware and open the relevant request, device, policy or
+reconciliation record.
 
-The policy defines:
+## 8 · Permissions and visibility by role
 
-- **Good accuracy:** 50 m or better by default.
-- **Warning accuracy:** worse than 50 m but no worse than 100 m.
-- **Retry:** worse than 100 m. No geofence decision is made.
+| Role | Sees | Can do |
+|---|---|---|
+| Employee | Own attendance, requests, devices and policies | Clock, request a temporary location, acknowledge policy, explain a case |
+| Line manager | Attendance and pending recommendations for direct reports | Recommend a request or correction and confirm an assignment |
+| People / HR | Organisation register and attendance administration | Configure homes, approve requests, reconcile and publish policy |
+| CEO / authorised Operations | Organisation scope where explicitly granted | Review or decide without self-approving their own request |
+| Finance / Payroll | Reviewed pay-impact outcomes only | Accept or waive an authorised payroll proposal |
 
-The following conditions are always explicit:
+Full home addresses and coordinates are restricted to authorised People users. Register and map
+views show masked area labels. Every full-address view is audited.
 
-- **Permission denied:** coordinates are not captured and the attendance is rejected as unverified.
-- **Location unavailable:** no compliance decision is made; the employee is asked to retry.
-- **Insufficient accuracy:** the employee retries. After repeated failures, the modal can create a review case with an explanation and evidence label.
-- **Missing home coordinates:** the punch is rejected as unverified; the registered home must be corrected by People.
-- **Outside a mandatory fence:** the original attempt, coordinates, accuracy, distance, expected location, and device evidence are retained as non-compliant and pending HR review.
+## 9 · AI and search
 
-Unverified attendance is never labelled compliant.
+- **AI reads** (`attendance.ai.js`): own attendance for employees, team attendance for managers and
+  organisation summaries for authorised People users; every list is paged at 25.
+- **AI routes**: clock status opens ESS · My Attendance; pending reviews open People · Attendance or
+  Reconcile according to permission.
+- **Search** (`attendance.search.js`): employees, request references, assignment references,
+  reconciliation references and policy versions. Search results apply the same own/team/all scope.
+- AI does not create punches, approve exceptions, change policy or infer missing location evidence.
 
-## 5. Outside-geofence and exception workflow
+## 10 · Mobile
 
-1. The employee attempts to clock in or out.
-2. The system stores the original evidence as a non-compliant attempt.
-3. A reconciliation case is opened automatically as **Awaiting HR**.
-4. The employee sees the case reference and can add a concise explanation and supporting-evidence label in the modal.
-5. HR and the employee receive actionable notifications. A line manager may receive a recommendation request where applicable.
-6. Until HR decides, the attempt is shown as **Pending HR review** and is not payroll-ready.
-7. HR opens People → Attendance → Reconcile and compares:
-   - original system time and device time;
-   - captured coordinates and GPS accuracy;
-   - expected and matched locations;
-   - calculated distance and radius;
-   - work arrangement, schedule, assignment, request, and policy version;
-   - employee explanation, manager recommendation, and evidence.
-8. HR approves, rejects, requests more information, attaches a valid assignment, adjusts a missing or incorrect punch, or escalates the matter.
-9. The system keeps the original event and adds any HR adjustment. It records the decision, reviewer, timestamp, reason, evidence, and before/after result in the case and audit history.
-10. The employee receives an actionable outcome notification.
+- The global Clock In / Clock Out control remains reachable from the compact header.
+- Attendance modals become bottom sheets with safe-area padding and keyboard-accessible actions.
+- People · Attendance KPI cards use a two-column layout; charts stack vertically.
+- Register rows become touch-friendly employee cards showing status, punches, expected and matched
+  location, device and exception summary. Selecting a card opens the same full evidence modal.
+- Attendance view tabs and filters scroll horizontally without shrinking their labels.
+- Wider administrative tables retain horizontal touch scrolling with the first column kept visible.
 
-Reconcile does not erase source evidence, make an automatic deduction, or decide disciplinary action.
+## 11 · Edge cases
 
-## 6. Planned work-location exceptions
+- Suspended employee: terminate or reject the session and deny direct navigation and punches.
+- Approved leave: permit allowed app features but reject clock-in and clock-out with the leave dates.
+- Missing home coordinates: reject remote verification and direct the employee to People/HR.
+- GPS denied, unavailable or insufficiently accurate: never mark the punch compliant; retry or review.
+- Outside geofence: retain original evidence and show Pending HR review until a decision is recorded.
+- Temporary location expiry: revert to the permanent home automatically and retain both in history.
+- Duplicate submission or concurrent request: return the original idempotent result.
+- Offline: production behaviour is unresolved; the browser demo does not queue punches.
+- Demo reload: interactive demo punches reset so presentations start at Clock In; production records
+  must remain durable.
 
-Before working somewhere else, the employee uses ESS → Work Location Requests:
+## 12 · Donor code
 
-1. Select the request type and effective dates.
-2. Enter the permitted address and drop the simulated pin.
-3. Provide a reason and optional evidence label.
-4. Submit to the line manager, then HR.
-5. HR reviews the employee, location, coordinates, dates, reason, evidence, and manager recommendation.
-6. On approval, only the approved dates and location become valid.
-7. At the end of the approved period, the normal registered home or office becomes applicable automatically.
+| From | File | Change on the way in |
+|---|---|---|
+| MyCity attendance demo | `docs/MyCity-ERP-Documents/demo.html` | Replace localStorage, simulated GPS and front-end identity checks with authenticated APIs, trusted server time and durable evidence storage |
 
-Home requests always use 100 m. Client-site and field requests use the configured field radius; the employee does not choose a radius.
+No external donor attendance implementation has been approved for M1.
 
-## 7. HR policy configuration
+## 13 · Open questions
 
-Changes in Settings → Attendance Policy first create a draft. HR reviews the old and new values, supplies an effective date and employee-facing summary, then publishes a new version.
+- Which production geocoding and map provider will validate employee and worksite coordinates?
+- Must a line manager recommendation be mandatory before People/HR decides a location request?
+- What offline behaviour, if any, is acceptable for field employees?
+- Which monetary overtime and deduction rates will Finance approve? The demo intentionally defines none.
+- Which frontend feature path will replace the provisional `app/src/attendance/` path?
 
-On publication:
+## 14 · Change log
 
-- affected employees receive an in-app policy update;
-- the notification opens ESS → Policy Updates;
-- the employee sees the effective date, summary, full policy, and acknowledgment action;
-- acknowledgment progress appears to HR;
-- older attendance records retain the policy version used when they were created and are not recalculated.
-
-### Deduction tiers
-
-The Deduction tiers toggle controls whether the existing attendance deduction tiers can be proposed for future reviewed outcomes. Turning it off preserves the tier configuration. Automatic deductions remain disabled, and an authorised person must accept or waive every proposed deduction.
-
-### Overtime tiers
-
-The Overtime tiers toggle controls whether configured overtime-tier rules apply. Turning it off still retains recorded overtime time but does not apply a tier. Turning it on still requires the configured manager approval. MyCity has not supplied monetary overtime rates, so the demo records that calculation as pending instead of inventing a value.
-
-The two toggles are independent and persist with the published policy version.
-
-## 8. Manager workflow
-
-Managers see attendance only for their team in the manager view. They can:
-
-- see who is expected, clocked in, remote, assigned, late, or missing a punch;
-- review planned location requests and recommend approval or rejection;
-- review attendance cases and add a recommendation or escalate to People;
-- receive actionable notifications for requests and cases involving their team.
-
-Final attendance reconciliation and policy publication remain People/HR actions in this demo.
-
-## 9. Troubleshooting
-
-- **The Clock In modal does not open:** confirm the employee is active, not on approved leave today, and has not already clocked in.
-- **The app says the account is suspended:** People must reactivate the employee; refreshing or using a direct link does not bypass the restriction.
-- **Home coordinates are missing:** People should open the employee detail, edit the home location, enter the full address, and drop the pin.
-- **GPS permission is denied:** enable location permission for the browser or app, then retry.
-- **GPS is unavailable:** enable device location services, move to an open area or near a window, and retry.
-- **Accuracy is worse than the policy threshold:** retry until a usable reading is available; repeated failures can be sent to HR for review.
-- **The employee is outside the fence:** do not change the evidence. Add exception details to the automatically created case, or submit a planned work-location request before the next off-site workday.
-- **A temporary location is no longer selected:** check its end date. Expired approvals correctly revert to the permanent location.
-- **A notification does not open a record:** the destination is permission-aware. The signed-in user must have access to that employee or HR module.
-
-## 10. Demo limitations
-
-This is a browser-only functional demo, not a production attendance service:
-
-- State is stored in browser localStorage; it is device- and browser-specific and can be reset from Attendance Policy.
-- Authentication uses demo identities and front-end checks. Production must enforce suspension, leave, permissions, session invalidation, and attendance rules on a trusted server.
-- GPS scenarios, accuracy, device identity, maps, email delivery, server time, and uploads are simulated. A production build must use secure browser/mobile geolocation, trusted server timestamps, authenticated APIs, and durable evidence storage.
-- Coordinates are derived from demo data and simulated pins. No real geocoding service is called.
-- Notifications work inside the demo state; no push-notification or email provider is contacted.
-- The demo prevents duplicate submissions in the interface and rechecks local attendance state. Production also needs database uniqueness, transactions, idempotency keys, and concurrency controls.
-- Role visibility is demonstrated in attendance-specific views, but production authorization must be enforced for every API and record, not only hidden in the interface.
-- Payroll and query outcomes are explanatory integrations. The demo does not post money, run payroll, or impose a sanction.
+- 14/10/2026 · LA · Added the template metadata, engineering sections, mobile register behaviour and ownership-ready scope required by the guide check.
