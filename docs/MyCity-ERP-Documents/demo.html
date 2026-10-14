@@ -828,11 +828,35 @@ input.pctl[type=number]{width:96px;min-width:0}
 .pinbox{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--surface);font-size:12.5px}
 .pinbox svg{width:96px;height:56px;flex:none;border-radius:7px}
 .pinbox b{display:block}
+.att-mobile-register{display:none}
+.attm-row{width:100%;text-align:left;background:var(--raised);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:13px;box-shadow:var(--sh-1);color:var(--ink);display:block}
+.attm-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.attm-head,.attm-times,.attm-loc,.attm-foot{display:flex;align-items:flex-start;gap:10px}
+.attm-head{justify-content:space-between;margin-bottom:10px}.attm-head>.pill{flex:none}
+.attm-arr{display:block;margin-bottom:10px}
+.attm-times{padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.attm-times>span{flex:1;min-width:0}.attm-times small,.attm-loc small{display:block;color:var(--ink-3);font-size:9.5px;
+  letter-spacing:.08em;text-transform:uppercase;font-weight:650;margin-bottom:3px}
+.attm-time{display:block;font-size:14px;font-weight:650}.attm-loc{padding-top:10px}.attm-loc>span{flex:1;min-width:0;font-size:12px;line-height:1.45}
+.attm-foot{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-2);flex-wrap:wrap}
+.attm-foot>span{min-width:0;overflow-wrap:anywhere}
 tr[data-att]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 @media(max-width:1180px){.rq{grid-template-columns:1fr}}
 @media(max-width:760px){.tscroll table.wide{min-width:980px}
   .draftbar{top:-14px}.pctl{max-width:150px}
-  .attk .g4{grid-template-columns:repeat(2,1fr)}.attk .kpi b{font-size:21px}.attk .grid{gap:8px;margin-bottom:8px}}
+  .people-attendance .phead{align-items:flex-start}.people-attendance .phead .right{width:100%;margin-left:0}
+  .people-attendance .phead .right .btn{flex:1;justify-content:center}
+  .attk .g4{grid-template-columns:repeat(2,1fr)}.attk .kpi b{font-size:21px}.attk .grid{gap:8px;margin-bottom:8px}
+  .att-view-tabs{max-width:none!important;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+  .att-view-tabs::-webkit-scrollbar,.att-register-filters::-webkit-scrollbar{display:none}
+  .att-view-tabs button{flex:0 0 auto}
+  .att-register-filters{flex-wrap:nowrap;overflow-x:auto;margin-right:-14px;padding-right:14px;scrollbar-width:none}
+  .att-register-filters .chip{flex:0 0 auto}
+  .att-desktop-register{display:none}.att-mobile-register{display:grid;gap:10px}
+  .people-attendance .tscroll{overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+  .people-attendance .tscroll th:first-child,.people-attendance .tscroll td:first-child{position:sticky;left:0;z-index:1;background:var(--raised)}
+  .people-attendance .tscroll th:first-child{background:var(--surface)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* ═════ HOME: role bar, clickable KPI cards, over-threshold chip ═════ */
 .rolebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
@@ -4755,7 +4779,6 @@ function attCkPaint(){
       '<dt>Clock location</dt><dd>'+esc(x.label)+(x.sites[0]?' · '+x.sites[0].radius+' m':'')+(x.note?'<br><span class="sub">'+esc(x.note)+'</span>':'')+'</dd>'+
       (ck.kind==='out'&&outInfo&&outInfo.g>=0?'<dt>Clocked in</dt><dd>'+esc(outInfo.inT)+'</dd><dt>Time so far</dt><dd><b>'+aDur(outInfo.net)+'</b></dd>':'')+
       '<dt>Current time</dt><dd><b>'+esc(time)+'</b> <span class="sub">Africa/Lagos</span></dd></dl></div>'+
-      '<p class="sub" style="margin:12px 2px 0;display:flex;gap:7px;align-items:flex-start">'+ic('lock')+' Location is read only for this action and is not continuously tracked.</p>'+
       (ack&&!blockAck?'<p class="sub" style="margin:8px 2px 0">Policy v'+L.v+' still needs acknowledgment. You may clock in now and read it from Policy Updates afterward.</p>':'');
   }
   if(ck.stage==='exception'||ck.stage==='issue')h+='<div class="card"><div class="ch"><h3>'+(ck.stage==='exception'?'Add exception details':'Report a location issue')+'</h3></div>'+
@@ -4767,7 +4790,7 @@ function attCkPaint(){
     field('ck-devwhy','Reason (optional)','<input class="inp" id="ck-devwhy" placeholder="For example, replaced a broken phone">')+'</div>';
   $('#ckbody').innerHTML=h;
 
-  var f='<span class="sub grow">One time and location reading will be recorded.</span>',lab=ck.kind==='out'?'Clock Out':'Clock In';
+  var f='',lab=ck.kind==='out'?'Clock Out':'Clock In';
   if(ck.stage==='review'){f+='<button class="btn" data-mx>Not now</button>';
     if(blockAck)f+='<button class="btn pri" data-att="go-policy">View policy</button>';
     else if(R.result==='Retry'){if(ck.retries>=2)f+='<button class="btn" data-att="ck-issue">Report issue</button>';
@@ -5171,31 +5194,41 @@ function attPeopleAttendance(){
   var k=attKpis(),n=ATT_ORDER.length,isHR=attViewer()==='CO'||attViewer()==='IC',view=isHR?ATTUI.view:'Manager View',body='';
   if(view==='Register')body=attRegisterView(k);else if(view==='Field Assignments')body=attFAView();
   else if(view==='Location Requests')body=attReqHRView();else body=attMgrView();
-  return '<div class="phead"><div><h1>Attendance '+infoBtn('att-help')+'</h1><p>'+esc(aLong(ATT_TODAY))+' · Africa/Lagos · '+(isHR?'demo roster of '+n+' of 25 staff':'manager team view')+'</p></div>'+
+  return '<div class="people-attendance"><div class="phead"><div><h1>Attendance '+infoBtn('att-help')+'</h1><p>'+esc(aLong(ATT_TODAY))+' · Africa/Lagos · '+(isHR?'demo roster of '+n+' of 25 staff':'manager team view')+'</p></div>'+
     (isHR?'<div class="right"><button class="btn" data-att="punch-open">'+ic('clock')+'Clock In panel</button>'+
     '<button class="btn pri" data-att="recon" aria-label="Reconcile, '+k.recon+' unresolved">'+ic('check')+'Reconcile <span class="cntb">'+k.recon+'</span></button></div>':'')+'</div>'+
     infoText('att-help','Every figure here is computed from the clock events in this demo. Reconcile fixes what the record should say and never edits a punch. Possible policy breaches go to Queries & Sanctions, which is separate.')+
     (isHR?'<div class="attk">'+kpis([['Clocked in',k.inn+' / '+n],['On site',String(k.site)],['Remote',String(k.remote)],['On assignment',String(k.field)]])+
     kpis([['Late',String(k.late),k.late?'warn':''],['Outside geofence',String(k.out),k.out?'warn':''],['Missing clock-out',String(k.missOut),k.missOut?'err':''],['Needs reconciliation',String(k.recon),k.recon?'warn':'ok']])+'</div>'+
-    '<div class="seg" role="tablist" aria-label="Attendance views" style="margin-bottom:12px;max-width:640px">'+['Register','Field Assignments','Location Requests','Manager Preview'].map(function(t){
-      return '<button type="button" role="tab" aria-selected="'+(t===view)+'" data-att="att-view" data-v="'+t+'"'+(t===view?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')+'</div>':'')+body}
+    '<div class="seg att-view-tabs" role="tablist" aria-label="Attendance views" style="margin-bottom:12px;max-width:640px">'+['Register','Field Assignments','Location Requests','Manager Preview'].map(function(t){
+      return '<button type="button" role="tab" aria-selected="'+(t===view)+'" data-att="att-view" data-v="'+t+'"'+(t===view?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')+'</div>':'')+body+'</div>'}
+function attRegisterMobile(rows){
+  return '<div class="att-mobile-register" aria-label="Today’s attendance register">'+rows.map(function(r){
+    var v=r.v,last=v?(v.all[v.all.length-1]||{}):{},exc=v&&v.exceptions.length?v.exceptions[0]:'',c=r.cases[0],
+        status=r.leave&&!(v&&v.inE)?pill('in','On leave'):v?attStatusPill(v):pill('nt','Not clocked in'),
+        expected=r.s?r.s.expected:attWhere(r.id,ATT_TODAY,{field:'on',day:'auto'}).label;
+    return '<button type="button" class="attm-row" data-att="att-row" data-v="'+r.id+'" aria-label="Open attendance details for '+esc(aName(r.id))+'">'+
+      '<span class="attm-head">'+aWho(r.id,r.e.dept)+status+'</span><span class="attm-arr">'+pill('nt',r.e.arr)+'</span>'+
+      '<span class="attm-times"><span><small>Clock in</small><span class="attm-time">'+(v?attTimeCell(v,'in'):'None')+'</span></span><span><small>Clock out</small><span class="attm-time">'+(v?attTimeCell(v,'out'):'None')+'</span></span></span>'+
+      '<span class="attm-loc"><span><small>Expected</small>'+esc(expected)+'</span><span><small>Matched</small>'+esc(last.matched||'Not yet')+'</span></span>'+
+      '<span class="attm-foot"><span>'+(last.device?'Device: '+esc(last.device):'No device recorded')+'</span><span>'+(c?'Review '+esc(c.id):exc?esc(exc):'No exception')+'</span></span></button>'}).join('')+'</div>'}
 function attRegisterView(k){
   var f=ATTUI.filter,rows=k.rows.filter(function(r){return attFilterRow(r,f)}),
       ins=k.rows.filter(function(r){return r.v&&r.v.inE}).map(function(r){return aMin(r.v.inE.sys)}),
       hours=[7,8,9,10,11,12,13,14,15,16].map(function(h){return ins.filter(function(t){return t<h*60+60}).length});
   return '<div class="grid g23">'+areaChart('Clocked in by hour, today',hours,'From 07:00, cumulative. The grace period closes at '+aHM(aMin(attPolicy().settings.wkStart)+(+attPolicy().settings.grace))+'.')+
     donut(Math.round(k.inn/ATT_ORDER.length*100),'clocked in',k.inn+' of '+ATT_ORDER.length+' in the demo roster have clocked in. '+k.late+' late, '+k.out+' outside a geofence, '+k.rows.filter(function(r){return r.leave}).length+' on approved leave.')+'</div>'+
-    '<div class="chips" role="group" aria-label="Filter">'+['All','Remote','Hybrid','Field','Office','Late','Outside geofence','Missing punch','Needs reconciliation'].map(function(c){
+    '<div class="chips att-register-filters" role="group" aria-label="Filter">'+['All','Remote','Hybrid','Field','Office','Late','Outside geofence','Missing punch','Needs reconciliation'].map(function(c){
       var n=k.rows.filter(function(r){return attFilterRow(r,c)}).length;
       return '<button class="chip'+(c===f?' on':'')+'" data-att="att-filter" data-v="'+c+'" aria-pressed="'+(c===f)+'">'+esc(c)+' '+n+'</button>'}).join('')+'</div>'+
-    (rows.length?table([['Employee'],['Arrangement'],['Clock in'],['Clock out'],['Expected location'],['Actual or matched location'],['Device'],['Status'],['Exception']],
+    (rows.length?'<div class="att-desktop-register">'+table([['Employee'],['Arrangement'],['Clock in'],['Clock out'],['Expected location'],['Actual or matched location'],['Device'],['Status'],['Exception']],
       rows.map(function(r){var v=r.v,last=v?(v.all[v.all.length-1]||{}):{},exc=v&&v.exceptions.length?v.exceptions[0]:'',c=r.cases[0];
         return [aWho(r.id),pill('nt',r.e.arr),v?attTimeCell(v,'in'):'<span class="sub">None</span>',v?attTimeCell(v,'out'):'<span class="sub">None</span>',
           esc(r.s?r.s.expected:attWhere(r.id,ATT_TODAY,{field:'on',day:'auto'}).label),esc(last.matched||'Not yet'),
           last.device?esc(last.device)+'<br>'+attDevPill(last.devStatus):'<span class="sub">None</span>',
           r.leave&&!(v&&v.inE)?pill('in','On leave'):v?attStatusPill(v):pill('nt','Not clocked in'),
           (exc?'<span class="clip" title="'+esc(exc)+'">'+esc(exc)+'</span>':'')+(c?' '+pill('wa',c.id):(exc?'':'<span class="sub">None</span>'))]}),
-      'Today’s register','<span class="sub">Click a row for every recorded field</span>',function(i){return ' class="rowlink" data-att="att-row" data-v="'+rows[i].id+'" tabindex="0"'},'wide'):
+      'Today’s register','<span class="sub">Click a row for every recorded field</span>',function(i){return ' class="rowlink" data-att="att-row" data-v="'+rows[i].id+'" tabindex="0"'},'wide')+'</div>'+attRegisterMobile(rows):
       emptyb('srch','Nobody matches this filter','Choose All to see the whole register.'))+
     '<p class="sub" style="margin-top:12px">Reconcile decides what a day’s record should say: a missing clock-out, a punch outside a fence, a correction with a reason. The original punch is never overwritten.</p>'}
 function attEventModal(id){var s=attTodaySession(id),e=aEmp(id);
@@ -5561,13 +5594,13 @@ function attPolicyTab(){
     '<div class="grid g2">'+attPolCard('1 · Location verification','loc','Remote home locations are fixed at 100 m. MTN Head Office is 100 m; the field default is 200 m. Good GPS is 50 m or better; retry when worse than 100 m.')+
     '<div>'+attPolCard('Outside-geofence behaviour, by arrangement','rules','Attendance rules by employee category. Block keeps the attempt on record and offers the employee an exception request.')+
     '<div style="margin-top:12px">'+attPolCard('2 · Device verification','dev')+'</div></div></div>'+
-    '<div class="grid g2">'+attPolCard('3 · Time and attendance','time','Seeded values: weekdays 09:00 to 17:00, Saturday 09:00 to 15:00, 15 minute grace, missing clock-out flagged the next morning.')+
+    '<div class="grid g2">'+attPolCard('3 · Time and attendance','time')+
     attPolCard('4 · Pay-impact tiers','tiers','Each toggle is independent. Switching one off stops that rule from applying but keeps every configured tier for later use.')+'</div>'+
     '<div class="grid g2"><div class="card"><div class="ch"><h3>Configured tiers</h3></div>'+
       '<h4 style="margin-bottom:6px">Deduction tiers</h4><div class="tscroll"><table><tbody>'+ATT.tiers.deduction.map(function(t){return '<tr><td>'+esc(t[0])+'</td><td>'+esc(t[1])+'</td></tr>'}).join('')+'</tbody></table></div>'+
       '<h4 style="margin:14px 0 6px">Overtime tiers</h4><div class="tscroll"><table><tbody>'+ATT.tiers.overtime.map(function(t){return '<tr><td>'+esc(t[0])+'</td><td>'+esc(t[1])+'</td></tr>'}).join('')+'</tbody></table></div>'+
       '<p class="sub" style="margin-top:10px">No overtime monetary rates are configured, so the demo records time and manager approval without inventing a payment rate.</p></div>'+
-    attPolCard('5 · Exceptions and queries','exc','No deduction enters payroll automatically. An authorised person must accept or waive it.')+'</div>'+
+    attPolCard('5 · Exceptions and queries','exc')+'</div>'+
     '<div class="grid g2">'+attPolCard('6 · Policy publication','pub')+
     '<div class="card"><div class="ch"><h3>Acknowledgment report · v'+L.v+'</h3><span class="right">'+pill(done===ids.length?'ok':'wa',done+' of '+ids.length+' acknowledged')+'</span></div>'+
     '<p class="sub" style="margin-bottom:8px">'+read+' read · '+done+' acknowledged · '+(ids.length-done)+' pending. Affects: '+esc((L.arrs||[]).join(', '))+'.</p>'+
