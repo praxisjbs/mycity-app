@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MyCity ERP Demo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -875,6 +877,101 @@ tr[data-att]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .mnote{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
 .tover{display:inline-block;font-size:11px;font-weight:600;color:var(--warn);background:var(--warn-bg);border-radius:999px;padding:2px 9px;white-space:nowrap}
 @media(max-width:760px){.rolebar .rl-r{display:none}}
+
+/* ESS, 12/10 review: modals, mobile icon cards, toggles, avatar, security */
+.monly{display:none}
+@media(max-width:760px){.donly{display:none!important}.monly{display:block}}
+.click{cursor:pointer;text-align:left;width:100%;display:block}
+.card.click:hover{border-color:var(--ink-3)}
+.icards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.icard{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:13px;border:1px solid var(--line);
+  border-radius:var(--r-lg);background:var(--raised);text-align:left;box-shadow:var(--sh-1);min-height:100px;min-width:0}
+.icard .ic,.qcard .ic,.devrow .ic,.soon .ic{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;flex:none}
+.icard{position:relative}.icard:hover{border-color:var(--ink-3)}
+.icard .go{position:absolute;right:12px;top:14px;color:var(--ink-3)}.icard .go svg{width:15px;height:15px}
+.icards.all{grid-template-columns:repeat(3,1fr)}
+@media(max-width:1040px){.icards.all{grid-template-columns:repeat(2,1fr)}}
+.icard b{font-size:13px;font-weight:650} .icard>span:last-child{font-size:11.5px;color:var(--ink-3)}
+.emlist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--raised);overflow:hidden;margin-bottom:12px}
+.emli{display:flex;align-items:center;gap:10px;padding:12px 13px;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.emli:last-child{border-bottom:0}
+.emli>span:first-child{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.emli b{font-size:13px;font-weight:600}
+.emli svg{width:15px;height:15px;color:var(--ink-3);flex:none}
+.eseg{display:inline-flex;align-items:center;border:1px solid var(--line-2);border-radius:999px;overflow:hidden;height:34px;background:var(--bg)}
+.eseg button{height:100%;padding:0 12px;font-size:12.5px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px}
+.eseg button+button{border-left:1px solid var(--line)}
+.eseg button.on{background:var(--green);color:#fff}
+.eseg button.lab{pointer-events:none;min-width:120px;justify-content:center}
+.eseg button:disabled{opacity:.35;cursor:default}
+.eseg svg{width:14px;height:14px}
+.yrsel{height:100%;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--bg);padding:0 10px;font-size:12.5px;font-weight:650}
+.toolrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;margin-bottom:12px}
+.essbar{display:flex;align-items:center;gap:10px;justify-content:flex-end;margin-bottom:10px}
+.essbar .eseg{height:28px}.essbar .eseg button{font-size:11.5px;padding:0 10px}
+.pager{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.pager .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.btn:disabled{opacity:.4;cursor:default}
+.avbig{position:relative;overflow:visible!important}
+.avbig img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+.avplus{position:absolute;right:-7px;bottom:-7px;width:26px;height:26px;border-radius:50%;background:var(--yellow);color:var(--on-yellow);
+  border:2px solid var(--raised);display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-2)}
+.avplus svg{width:13px;height:13px}
+.elnk{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px;padding:0}
+.srow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.srow b{font-size:12.5px;width:84px}
+.statstrip>button{flex:1;min-width:128px;padding:12px 14px;border-right:1px solid var(--line);text-align:left;width:auto}
+.statstrip>button:hover{background:var(--accent-soft)}
+.statstrip>button .sub{display:block;margin-top:2px;color:var(--accent);font-weight:600}
+tr.sel td{background:var(--accent-soft)}
+.qcard{display:flex;flex-direction:column;gap:6px}
+.qcard .lab{font-size:11.5px;color:var(--ink-2);font-weight:600;margin-top:4px}
+.qcard b{font-size:25px;font-weight:700;letter-spacing:-.028em;line-height:1.05}
+.qcard .ic.wa{background:var(--warn-bg);color:var(--warn)} .qcard .ic.ok{background:var(--ok-bg);color:var(--ok)}
+.devrow{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--line)}
+.devrow b{font-size:13px;font-weight:600}
+.form{display:flex;flex-direction:column;gap:12px}
+.form label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.epinrow{display:flex;gap:8px}.epin{width:46px;height:50px;text-align:center;font-size:20px;font-weight:700}
+table.sched .soon{text-align:center;padding:30px 16px}
+.soon .ic{margin:0 auto 11px;width:46px;height:46px;border-radius:14px}
+.soon h3{font-size:16px}
+.soonl{list-style:none;padding:0;margin:16px auto;display:inline-flex;flex-direction:column;gap:7px;text-align:left;font-size:12.5px;color:var(--ink-2)}
+.soonl li{display:flex;gap:8px;align-items:center}.soonl svg{width:14px;height:14px;color:var(--ok);flex:none}
+@media(max-width:760px){.toolrow{justify-content:flex-start}.essbar{justify-content:flex-start}.qgrid{grid-template-columns:1fr}
+  .phead .right{margin-left:0}.frow{grid-template-columns:1fr}}
+
+.emlist.flat{border:0;border-radius:0;margin:0 -14px;border-top:1px solid var(--line)}
+.ch.wrap{flex-wrap:wrap;row-gap:8px}
+.mbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.avbig{cursor:pointer}
+.scrim{display:none}
+@media(max-width:760px){
+  .rail{display:flex!important;position:fixed;left:0;top:0;bottom:0;z-index:72;width:280px!important;max-width:84vw;
+    transform:translateX(-102%);transition:transform .22s ease;box-shadow:var(--sh-3)}
+  .app.navopen .rail{transform:none}
+  .app.slim .rail-top b,.app.slim .navlab,.app.slim .uinfo,.app.slim .navgrp,.app.slim .rail-by{opacity:1;pointer-events:auto}
+  .scrim{position:fixed;inset:0;z-index:71;background:rgba(1,17,14,.44)}
+  .app.navopen~.scrim{display:block}
+  .nav a{padding:11px 10px;font-size:14.5px}
+  .tabs{overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+  .icards.all{grid-template-columns:repeat(2,1fr)}
+}
+
+@media(max-width:760px){
+  .prof{flex-wrap:wrap}.prof .id{min-width:0;flex:1 1 180px}.prof .acts{width:100%}
+  .grid.kg{grid-template-columns:repeat(2,1fr);gap:10px}.grid.kg .kpi b{font-size:21px}
+  .grid.kg .trend{font-size:11px}
+}
+
+.essched{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.qcard.on{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+.eseg{display:inline-flex;align-items:center;border:1px solid var(--line-2);border-radius:999px;overflow:hidden;background:var(--bg)}
+.card.soon{display:flex;flex-direction:column;align-items:center;text-align:center}
+.card.soon .soonl{display:flex;margin:16px auto}
+@media(max-width:760px){.monly .grid.g4{grid-template-columns:repeat(2,1fr);gap:10px}.monly .grid.g4 .kpi b{font-size:21px}}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -1228,6 +1325,86 @@ var STAFF=[['TA','Tolu Adeyemi','Content'],['BL','Bashir Lawal','Marketing & Sal
  ['SB','Seyi Balogun','Engineering'],['HY','Hauwa Yusuf','Support'],['EO','Emeka Obi','Studio'],
  ['NE','Ngozi Eze','Marketing & Sales'],['CN','Chidera Nwosu','Content'],['AD','Adedotun Oyinloye','Marketing & Sales']];
 function st(i){return who(STAFF[i][0],STAFF[i][1],STAFF[i][2])}
+
+/* ───── organogram · one render, builder (People) and viewer (ESS) ───── */
+function og(mode){
+  var builder=mode==='builder';
+  var tree={av:'IC',n:'Ifeoma Chukwu',t:'Chief Executive Officer',d:'General Management',ceo:1,meta:'Since 2019 · Hybrid',children:[
+    {av:'CO',n:'Cynthia Osakunih',t:'Operations & People Lead',d:'Operations',meta:'Since 2024 · Hybrid',children:[
+      {av:'HY',n:'Hauwa Yusuf',t:'People & Support Officer',d:'Support',meta:'Since 2025 · On site'}]},
+    {av:'NE',n:'Ngozi Eze',t:'Head, Marketing & Sales',d:'Marketing & Sales',meta:'Since 2024 · Hybrid',children:[
+      {av:'BL',n:'Bashir Lawal',t:'Growth Officer',d:'Marketing & Sales',meta:'Since 2024 · Hybrid'},
+      {av:'AD',n:'Adedotun Oyinloye',t:'Growth Officer',d:'Marketing & Sales',meta:'Since 2025 · Remote',dotted:'Content Lead'}]},
+    {av:'TA',n:'Tolu Adeyemi',t:'Content Lead',d:'Content',meta:'Since 2024 · Hybrid',children:[
+      {av:'CN',n:'Chidera Nwosu',t:'Content Associate',d:'Content',meta:'On probation · Remote'},
+      {av:'EO',n:'Emeka Obi',t:'Studio Producer',d:'Studio',meta:'Since 2025 · On site'}]},
+    {av:'SB',n:'Seyi Balogun',t:'Engineering Lead',d:'Engineering',meta:'Since 2024 · Remote'},
+    {vacant:1,n:'Head, Finance',t:'Open role',d:'Finance',children:[
+      {av:'AO',n:'Amara Okafor',t:'Finance Officer',d:'Finance',meta:'Since 2024 · Hybrid'}]}]};
+  function cardOf(n){
+    if(n.vacant){return '<div class="og-n og-vac">'+
+      '<span class="og-av og-vacav">'+ic('plus')+'</span>'+
+      '<b>'+esc(n.n)+'</b><span class="og-t">Vacant · '+esc(n.d)+'</span>'+
+      (builder?'<button class="og-chip">'+ic('plus')+'Create vacancy</button>':'<span class="og-open">Open role</span>')+
+      '</div>';}
+    return '<div class="og-n'+(n.ceo?' og-ceo':'')+'" tabindex="0">'+
+      '<span class="og-av'+(n.ceo?' og-ceoav':'')+'">'+esc(n.av)+'</span>'+
+      '<b>'+esc(n.n)+'</b><span class="og-t">'+esc(n.t)+'</span>'+
+      '<span class="og-d">'+esc(n.d)+'</span>'+
+      (builder&&n.meta?'<span class="og-meta">'+esc(n.meta)+'</span>':'')+
+      (n.dotted?'<span class="og-dotted">Dotted line · '+esc(n.dotted)+'</span>':'')+
+      '</div>';}
+  function nodeOf(n){return '<li>'+cardOf(n)+(n.children&&n.children.length?'<ul>'+n.children.map(nodeOf).join('')+'</ul>':'')+'</li>';}
+  var css='<style>'+
+    '.ogt{overflow-x:auto;padding:10px 4px 6px}'+
+    '.ogt ul{display:flex;justify-content:center;position:relative;padding:26px 0 0;margin:0;list-style:none}'+
+    '.ogt li{display:flex;flex-direction:column;align-items:center;list-style:none;position:relative;padding:26px 12px 0}'+
+    '.ogt li::before,.ogt li::after{content:"";position:absolute;top:0;right:50%;border-top:2px solid var(--line-2);width:50%;height:26px}'+
+    '.ogt li::after{right:auto;left:50%;border-left:2px solid var(--line-2)}'+
+    '.ogt li:only-child::before,.ogt li:only-child::after{display:none}'+
+    '.ogt li:only-child{padding-top:0}'+
+    '.ogt li:first-child::before,.ogt li:last-child::after{border:0 none}'+
+    '.ogt li:last-child::before{border-right:2px solid var(--line-2);border-radius:0 7px 0 0}'+
+    '.ogt li:first-child::after{border-radius:7px 0 0 0}'+
+    '.ogt ul ul::before{content:"";position:absolute;top:0;left:50%;border-left:2px solid var(--line-2);width:0;height:26px}'+
+    '.ogt>ul{padding-top:0}.ogt>ul>li{padding-top:0}.ogt>ul>li::before,.ogt>ul>li::after{display:none}'+
+    '.og-n{position:relative;width:178px;background:var(--raised);border:1px solid var(--line);border-radius:13px;padding:11px 12px;box-shadow:var(--sh-1);text-align:center;transition:box-shadow .15s,border-color .15s}'+
+    '.og-n:hover{box-shadow:var(--sh-2);border-color:var(--line-2)}'+
+    '.og-av{width:42px;height:42px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13.5px;margin:0 auto 8px}'+
+    '.og-n b{display:block;font-size:13px;font-weight:650;line-height:1.25}'+
+    '.og-t{display:block;font-size:11px;color:var(--ink-2);margin-top:2px}'+
+    '.og-d{display:inline-block;margin-top:8px;font-size:10px;font-weight:650;padding:2px 9px;border-radius:999px;background:var(--surface);color:var(--ink-3);border:1px solid var(--line)}'+
+    '.og-meta{display:block;font-size:10px;color:var(--ink-3);margin-top:6px}'+
+    '.og-dotted{display:inline-block;margin-top:7px;font-size:9.5px;color:var(--ink-3);border:1px dashed var(--line-2);border-radius:999px;padding:1px 8px}'+
+    '.og-ceo{border-color:var(--yellow);box-shadow:0 0 0 2px var(--yellow-tint),var(--sh-1)}'+
+    '.og-ceoav{background:var(--yellow);color:var(--on-yellow)}'+
+    '.og-vac{border-style:dashed;background:transparent}'+
+    '.og-vacav{background:var(--surface);color:var(--ink-3);border:1px dashed var(--line-2)}'+
+    '.og-vacav svg{width:16px;height:16px}'+
+    '.og-open{display:inline-block;margin-top:8px;font-size:10px;font-weight:650;color:var(--ink-3);border:1px dashed var(--line-2);border-radius:999px;padding:2px 9px}'+
+    '.og-chip{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:10.5px;font-weight:650;color:var(--on-yellow);background:var(--yellow);border-radius:999px;padding:3px 10px}'+
+    '.og-chip svg{width:12px;height:12px}'+
+    '.og-legend{display:flex;flex-wrap:wrap;gap:16px;margin:2px 0 4px;font-size:11.5px;color:var(--ink-2)}'+
+    '.og-legend span{display:inline-flex;align-items:center;gap:7px}'+
+    '.og-legend i{width:22px;height:0;border-top:2px solid var(--line-2);display:inline-block}'+
+    '.og-legend i.dash{border-top-style:dashed}'+
+    '.og-legend i.ceo{width:13px;height:13px;border:0;border-radius:4px;background:var(--yellow)}'+
+    '.og-legend i.vac{width:13px;height:13px;border:1px dashed var(--line-2);border-radius:4px}'+
+    '</style>';
+  var acts=builder?[['Search'],['Expand all'],['Download PDF'],['Add role',1]]:[['Search'],['Download PDF']];
+  var sub=builder?'The live reporting structure · 12 seats · 11 filled · 1 open · drag a card to reassign'
+                 :'Who reports to whom across MyCity · read only · 12 seats · 11 filled';
+  var legend='<div class="og-legend">'+
+    '<span><i></i>Reporting line</span>'+
+    '<span><i class="dash"></i>Dotted line (matrix)</span>'+
+    '<span><i class="ceo"></i>CEO</span>'+
+    '<span><i class="vac"></i>Vacant seat</span></div>';
+  var note=builder
+    ? '<p class="sub" style="margin-top:12px">Drag a card onto a new manager to change its reporting line. Every change is written through People and recorded in the audit log, the same write the employee form uses. A vacant seat can be sent to Recruitment as a suggested vacancy. Salary, bank details and phone numbers are never shown here.</p>'
+    : '<p class="sub" style="margin-top:12px">Read only. Every employee sees the whole company here. Salary, bank details and phone numbers are never shown. On a phone this becomes a focus view: your manager, you and your reports, with tap to expand.</p>';
+  return head(builder?'Organogram':'Org Chart',sub,acts)+css+legend+
+    '<div class="card" style="padding:6px"><div class="ogt"><ul>'+nodeOf(tree)+'</ul></div></div>'+note;
+}
 
 /* ───── the 16 modules ───── */
 /* ───── 360 records ───── */
@@ -2026,7 +2203,8 @@ var M=[
      '<div class="pfoot">'+'<span>Content hash verified</span><span>Artifact hash verified</span>'+
      '<span style="margin-left:auto">go.mycityapp.io/verify/CON-0004</span></div>',
      'Click any row to preview it. Signed documents carry two hashes and a public verification link.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">A missing document on a confirmed employee does not block anything. On a new hire it blocks onboarding until it arrives.</p>'}}]},
+    '<p class="sub" style="margin-top:12px">A missing document on a confirmed employee does not block anything. On a new hire it blocks onboarding until it arrives.</p>'}},
+  {n:'Org Chart',r:function(){return og('viewer')}}]},
 
 {k:'community',n:'Staff Community',i:'msg',g:'WORK',cnt:'3',tabs:[
   {n:'Channels',r:function(){return channelsTab()}},
@@ -2099,6 +2277,7 @@ var M=[
 
 {k:'people',n:'People',i:'users',g:'PEOPLE',tabs:[
   {n:'Employees',r:function(){return attEmployeesTab()}},
+  {n:'Organogram',r:function(){return og('builder')}},
   {n:'Attendance',r:function(){return attPeopleAttendance()}},
   {n:'Leave',r:function(){return head('Leave','October 2026',[['Leave calendar'],['Record leave',1]])+
     kpis([['On leave today','1'],['Pending approval','2','warn'],['Approved this month','4'],['Clashes','0','ok']])+
@@ -5710,6 +5889,7 @@ function bind(){
   $$('.rnav button').forEach(function(c){c.onclick=function(){
     $$('.rnav button').forEach(function(x){x.classList.remove('on')});c.classList.add('on');
     toast('Opening: '+c.textContent)}});
+  if(M[cur.m].k==='home')bindHome();
   bindComm();bindMail();attBindPage();
 }
 $('#slim').onclick=function(){$('#app').classList.toggle('slim')};
@@ -5718,6 +5898,357 @@ $('#slim').onclick=function(){$('#app').classList.toggle('slim')};
 function pad(n){return (n<10?'0':'')+n}
 $('#punch').onclick=attOpenClock;
 $('#bell').onclick=attOpenBell;
+
+/* ───── ESS: state, modal system, data (12/10 review) ───── */
+var ESS={av:null,payY:2026,slipI:1};
+var MD={},mdn=0,MDCUR=null;
+var MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function essP2(n){return (n<10?'0':'')+n}
+function ngn(n,dp){return '₦'+n.toLocaleString('en-NG',dp?{minimumFractionDigits:2,maximumFractionDigits:2}:{})}
+function mo(title,html,sub){var k='m'+(++mdn);MD[k]={t:title,h:html,s:sub||''};return k}
+function mof(title,fn,sub){var k='m'+(++mdn);MD[k]={t:title,fn:fn,s:sub||''};return k}
+function mol(title,cols,rows,sub){var k='m'+(++mdn);MD[k]={t:title,cols:cols,rows:rows,p:0,s:sub||''};return k}
+function mbody(m){
+  if(m.fn)return m.fn();
+  if(m.rows){var pages=Math.max(1,Math.ceil(m.rows.length/25)),p=Math.min(m.p,pages-1),s=p*25;
+    return (m.rows.length?table(m.cols,m.rows.slice(s,s+25)):emptyb('ok','Nothing here','No records in this period.'))+
+      '<div class="pager"><span class="sub">'+(m.rows.length?(s+1)+' to '+Math.min(s+25,m.rows.length)+' of '+m.rows.length:'0 records')+'</span>'+
+      '<span class="right"><button class="btn" data-ess="pg" data-d="-1"'+(p<=0?' disabled':'')+'>Previous</button>'+
+      '<span class="sub">Page '+(p+1)+' of '+pages+'</span>'+
+      '<button class="btn" data-ess="pg" data-d="1"'+(p>=pages-1?' disabled':'')+'>Next</button></span></div>'}
+  return m.h}
+/* ESS popups go through the shared openModal() (one modal for the whole demo) */
+function openM(k){var m=MD[k];if(!m)return;MDCUR=k;
+  openModal({title:m.t,wide:1,body:(m.s?'<p class="sub" style="margin:-4px 0 12px">'+esc(m.s)+'</p>':'')+'<div id="essmb">'+mbody(m)+'</div>',onMount:bindM})}
+function refreshM(){var b=$('#essmb');if(MDCUR&&b){b.innerHTML=mbody(MD[MDCUR]);bindM($('#modal'))}}
+function closeM(){MDCUR=null;closeModal()}
+function bindM(m){$$('.sw',m||$('#modal')).forEach(function(s){s.onclick=function(){s.classList.toggle('on')}})}
+function essHd(t,s,right){return '<div class="phead"><div><h1>'+esc(t)+'</h1>'+(s?'<p>'+esc(s)+'</p>':'')+'</div>'+
+  (right?'<div class="right">'+right+'</div>':'')+'</div>'}
+function bt(label,act,pri,extra,icon){return '<button class="btn'+(pri?' pri':'')+'"'+(act?' data-ess="'+act+'"':'')+(extra||'')+'>'+
+  (icon?ic(icon):'')+esc(label)+'</button>'}
+/* KPI tile that opens a modal */
+function kpiC(list){return '<div class="grid g4 kg">'+list.map(function(k){
+  return '<button class="card kpi click"'+(k[4]?' data-mo="'+k[4]+'"':'')+'><span class="lab">'+esc(k[0])+'</span>'+
+  '<b'+(k[2]?' style="color:var(--'+k[2]+')"':'')+'>'+esc(k[1])+'</b>'+
+  (k[3]?'<span class="trend fl">'+esc(k[3])+'</span>':'')+'</button>'}).join('')+'</div>'}
+/* Mobile: icon cards that open modals instead of long stacked sections */
+function icards(list,all){return (all?'':'<div class="monly">')+'<div class="icards'+(all?' all':'')+'">'+list.map(function(s){
+  var k=s[4]||mo(s[1],s[3]);
+  return '<button class="icard" data-mo="'+k+'"><span class="ic">'+ic(s[0],'ico')+'</span><b>'+esc(s[1])+'</b><span>'+esc(s[2])+'</span><i class="go">'+ic('right')+'</i></button>'}).join('')+'</div>'+(all?'':'</div>')}
+function mlist(items){return '<div class="monly"><div class="emlist">'+items.map(function(i){
+  return '<button class="emli" data-mo="'+i[3]+'"><span><b>'+esc(i[0])+'</b><span class="sub">'+esc(i[1])+'</span></span>'+i[2]+ic('right')+'</button>'}).join('')+'</div></div>'}
+function donly(h){return '<div class="donly">'+h+'</div>'}
+/* ── payslip data ── */
+function slips(y){var out=[],base=y===2026?550000:y===2025?480000:420000,st=y===2024?5:1,en=y===2026?10:12;
+  for(var m=en;m>=st;m--){var ded=0,ref='';
+    if(y===2026&&m===8){ded=12500;ref='QRY-0011 · Repeated lateness, August 2026'}
+    if(y===2025&&m===3){ded=7500;ref='QRY-0004 · Missing clock-outs, March 2025'}
+    out.push({y:y,m:m,gross:base,ded:ded,net:base-ded,ref:ref,run:(y===2026&&m===10)})}
+  return out}
+function slipPaper(s){var g=s.gross;
+  return paper(plogo('PAYSLIP · '+MON[s.m-1].slice(0,3).toUpperCase()+'-'+s.y)+
+   '<h3>Payslip, '+MON[s.m-1]+' '+s.y+'</h3>'+
+   '<p style="color:#566662;font-size:11.5px;margin-top:3px">Cynthia Osakunih · Operations and People Lead · Paid 27/'+essP2(s.m)+'/'+s.y+'</p>'+
+   '<table><thead><tr><th>Earnings</th><th style="text-align:right">Amount</th></tr></thead><tbody>'+
+   [['Basic salary',.7],['Housing allowance',.15],['Transport allowance',.1],['Communication allowance',.05]].map(function(e){
+     return '<tr><td>'+e[0]+'</td><td style="text-align:right">'+ngn(g*e[1],1)+'</td></tr>'}).join('')+
+   '<tr class="tot"><td>Gross pay</td><td style="text-align:right">'+ngn(g,1)+'</td></tr></tbody></table>'+
+   '<table style="margin-top:14px"><thead><tr><th>Deductions</th><th style="text-align:right">Amount</th></tr></thead><tbody>'+
+   '<tr><td>Attendance and query deductions'+(s.ref?' ('+esc(s.ref.split(' · ')[0])+')':'')+'</td><td style="text-align:right">'+ngn(s.ded,1)+'</td></tr>'+
+   '<tr class="tot"><td>Net pay</td><td style="text-align:right">'+ngn(s.net,1)+'</td></tr></tbody></table>'+
+   '<p style="font-size:11px;color:#7E8D88;margin-top:14px">Paid to Providus Bank, account ending 4417.</p>'+
+   '<div class="pfoot"><span>Approved by Ifeoma Chukwu</span><span style="margin-left:auto">PAY-'+s.y+'-'+essP2(s.m)+'-014</span></div>',
+   'This is the document the engine produces. Downloads as PDF.')}
+function dedModal(){var rows=[];[2026,2025,2024].forEach(function(y){slips(y).forEach(function(s){
+    if(s.ded)rows.push([MON[s.m-1]+' '+s.y,ngn(s.ded),esc(s.ref.split(' · ')[1]),esc(s.ref.split(' · ')[0]),pill('nt','Upheld, deducted')])})});
+  return mo('Salary deductions',table([['Month'],['Amount','n'],['Reason'],['Query'],['Outcome']],rows)+
+    '<p class="sub" style="margin-top:12px">A deduction always starts as a query. It reaches your payslip only if the query is upheld. If it is waived, nothing is deducted.</p>'+
+    '<div style="margin-top:12px">'+bt('Open My Queries','goTab',0,' data-tn="My Queries"')+'</div>','Every month that carried a deduction, and the query behind it')}
+
+/* ── security ── */
+function pwForm(){return '<div class="form">'+
+  '<label>Current password<input class="inp" type="password" placeholder="••••••••"></label>'+
+  '<label>New password<input class="inp" type="password" placeholder="At least 12 characters"></label>'+
+  '<label>Confirm new password<input class="inp" type="password"></label>'+
+  '<p class="sub">Changing your password signs you out everywhere else.</p>'+
+  '<div>'+bt('Update password','pwsave',1)+'</div></div>'}
+function pinForm(){return '<div class="form"><p class="sub">A 4 to 6 digit PIN unlocks the app and confirms a clock-in on a registered device.</p>'+
+  '<div class="epinrow">'+[0,1,2,3].map(function(){return '<input class="inp epin" maxlength="1" inputmode="numeric">'}).join('')+'</div>'+
+  '<div>'+bt('Save PIN','pinsave',1)+'</div></div>'}
+
+/* ── work schedule ── */
+/* Work schedule: read from the attendance data (LA), the one source of who works where and when */
+function essSched(id){id=id||'CO';var D=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],K=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  try{var e=aEmp(id),pol=attPolicy().settings,h=attPermHome(id),office=attSite(e.office||'mtn').name;
+    return D.map(function(d,i){if(K[i]==='Sun')return [d,'Off','',''];
+      var mode=e.arr==='Remote'?'Remote':e.arr==='Hybrid'?((e.sched&&e.sched[K[i]])||'Office'):e.arr==='Field'?'Field':'Office';
+      var sat=K[i]==='Sat',st=sat?pol.satStart:pol.wkStart,en=sat?pol.satEnd:pol.wkEnd;
+      return [d,mode,st+' to '+en,mode==='Remote'?(h?'Home · '+h.area:'Home'):mode==='Field'?'Assigned site':office]})}
+  catch(x){return D.map(function(d,i){return i===6?[d,'Off','','']:[d,'Office',i===5?'09:00 to 15:00':'09:00 to 17:00','Office']})}}
+function essSchedRows(){return essSched().map(function(s){return '<div class="srow"><b>'+s[0]+'</b>'+
+  pill(s[1]==='Office'?'ok':s[1]==='Off'?'er':'nt',s[1])+'<span class="sub" style="margin-left:auto">'+(s[1]==='Off'?'Not working':esc(s[2]+' · '+s[3]))+'</span></div>'}).join('')}
+function schedCard(){return '<div class="card"><div class="ch"><h3>Work schedule</h3><span class="right">'+pill('nt','Set by People')+'</span></div>'+
+  essSchedRows()+'<p class="sub" style="margin-top:11px">Your days and hours as People set them. Lateness is measured against these hours, and approved leave days are never counted as absent.</p></div>'}
+
+/* ═════ ESS, MOBILE SHELL ONLY (12 Oct meeting) ═════
+   Desktop ESS is untouched: each tab's existing renderer still draws the desktop page.
+   On a phone the same tab draws ESS_MOBILE[tab] instead: icon cards that open the
+   shared modal, previews on tap, nothing hanging. Owner AJ. */
+var ESS_MOBILE_TABS=[
+  {n:'My Profile',r:function(){
+    var personal=kvcard('Personal',[['Full name','Cynthia Osakunih'],['Date of birth','14/03/1991'],['Phone','+234 803 221 4418'],
+      ['Work email','cynthia@mycityapp.io'],['Address','Lekki Phase 1, Lagos']]);
+    var employ=kvcard('Employment',[['Job title','Operations and People Lead'],['Department','Operations'],['Line manager','Ifeoma Chukwu, CEO'],
+      ['Start date','02/05/2024'],['Employment type','Full time'],['Work arrangement','Hybrid'],['Status',pill('ok','Confirmed')]])+
+      '<div style="height:12px"></div>'+schedCard();
+    var bank=kvcard('Bank, used for expense disbursement',[['Bank','Providus Bank'],['Account name','Cynthia Osakunih'],['Account number','••••  4417']]);
+    var nok=kvcard('Next of kin',[['Name','Chuka Osakunih'],['Relationship','Brother'],['Phone','+234 806 554 2210']]);
+    var can='<div class="card"><div class="ch"><h3>What you can change</h3></div>'+
+    [['Phone number','Immediately','ok'],['Address','Immediately','ok'],['Bank details','Logged, People notified','wa'],
+     ['Next of kin','Immediately','ok'],['Photo','Immediately','ok'],['Job title','Only People can','nt'],['Salary','Only People can','nt'],
+     ['Line manager','Only People can','nt'],['Work schedule','Only People can','nt']].map(function(r){
+      return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">'+
+      '<span style="flex:1;font-size:12.5px;font-weight:550">'+esc(r[0])+'</span>'+pill(r[2],r[1])+'</div>'}).join('')+
+    '<p class="sub" style="margin-top:11px">Every change to this record is written to the audit log with who made it.</p></div>';
+    var hist=tl('My record history',[['Bank details updated','14/08/2026','Logged. People were notified the same day.','hi'],
+      ['Promoted to Operations and People Lead','01/07/2026','Grade moved from G4 to G5.','ok'],
+      ['Phone number updated','22/03/2026',''],['Confirmed after probation','02/08/2024','','ok'],
+      ['Started at MyCity App Ltd','02/05/2024','','ok']]);
+    return essHd('My Profile','What People see, and what you can change yourself',bt('Edit','',1,'','plus'))+
+    '<div class="prof"><span class="big avbig'+(ESS.av?' has':'')+'" data-ess="avatar" title="'+(ESS.av?'Change photo':'Upload a photo')+'">'+
+      (ESS.av?'<img src="'+ESS.av+'" alt="Your photo">':'CO<button class="avplus" data-ess="avatar" aria-label="Upload a photo">'+ic('plus')+'</button>')+'</span>'+
+      '<span class="id"><h2>Cynthia Osakunih</h2><div class="role">Operations and People Lead · Operations</div>'+
+      '<div class="chips">'+pill('ok','Confirmed')+pill('nt','Hybrid')+pill('nt','G5 · Head')+pill('nt','Reports to Ifeoma Chukwu')+'</div></span>'+
+      '<span class="acts">'+bt('Download my data')+bt('Security','goTab',0,' data-tn="My Security"','shield')+'</span></div>'+
+    icards([['user','Personal','Phone, email, address',personal],['brief','Employment','Role, manager and your work schedule',employ],
+      ['wallet','Bank','Providus Bank · 4417',bank],['users','Next of kin','Chuka Osakunih, brother',nok],
+      ['check','What you can change','5 things you can change yourself',can],['doc','Record history','5 changes since 2024',hist]],1)}},
+
+  {n:'My Performance',r:function(){
+    var kp=bars('My KPIs this month',[['Partnership MOUs',75,'3 of 4'],['Staff onboarded',100,'2 of 2','var(--yellow)'],['Expense turnaround',60,'3.1 days'],['Policy refresh',40,'2 of 5']],
+      'Weighted. Your score updates as tasks against each KPI close.');
+    var up='<div class="card"><div class="ch"><h3>Rolls up to</h3></div><div class="tl">'+[['ORG-2026-03 · Scale to 12 cities','Organisational · set by the CEO','','hi'],
+      ['Operational readiness for 4 new cities','Annual · set by management',''],['Reduce approval turnaround to 2 days','Monthly · set by management',''],
+      ['Operations efficiency, Q4','Departmental · set by Cynthia Osakunih',''],['Expense turnaround, 3.1 days','Your KPI · 60% complete','','ok']].map(function(i){
+      return '<div class="it'+(i[3]?' '+i[3]:'')+'"><b>'+esc(i[0])+'</b><span>'+esc(i[1])+'</span></div>'}).join('')+'</div>'+
+      '<p class="sub" style="margin-top:11px">Five levels. You can see the whole chain above your own line.</p></div>';
+    var rv=[['Q3 2026','4.2','4.0','Approved','ok','Closed'],['Q2 2026','3.9','4.1','Approved','ok','Closed'],['Q1 2026','4.0','3.9','Approved','ok','Closed'],['Q4 2026','Not yet','Not yet','Not yet','wa','Opens 20/10']];
+    var rk=rv.map(function(r){return mo('Review, '+r[0],kvcard(r[0],[['Your rating',r[1]],['Manager, Ifeoma Chukwu',r[2]],['Second level',r[3]],['Status',pill(r[4],r[5])]])+
+      (r[1]!=='None'?'<div class="card" style="margin-top:12px"><div class="ch"><h3>Manager comment</h3></div><p class="sub">Strong quarter on partnerships. Expense turnaround still above the 2 day target.</p></div>':''))});
+    return essHd('My Performance','October 2026 · set by Ifeoma Chukwu')+
+    statstrip([['KPI score','71%'],['On track','2 of 4'],['Weight assigned','100%'],['Last review','4.0 · Q3'],['Next cycle','Opens 20/10']])+
+    '<div class="monly">'+icards([['target','My KPIs this month','71% · 2 of 4 on track',kp],['up','Rolls up to','5 levels, up to the CEO',up],
+      ['check','My reviews','Q3: self 4.2, manager 4.0','<div class="emlist">'+rv.map(function(r,i){return '<button class="emli" data-mo="'+rk[i]+'"><span><b>'+r[0]+'</b><span class="sub">Self '+r[1]+' · Manager '+r[2]+'</span></span>'+pill(r[4],r[5])+'</button>'}).join('')+'</div>']])+'</div>'+
+    donly('<div class="grid g2">'+kp+up+'</div>'+
+      table([['Cycle'],['Self rating'],['Manager'],['Second level'],['Status']],rv.map(function(r){return [r[0],r[1],r[2],r[3],pill(r[4],r[5])]}),'My reviews',
+        '<span class="sub">Click a review to open it</span>',function(i){return ' class="rowlink" data-mo="'+rk[i]+'"'}))}},
+
+  {n:'My Payslips',r:function(){
+    var y=ESS.payY,list=slips(y),paid=list.filter(function(s){return !s.run}),
+      g=paid.reduce(function(a,s){return a+s.gross},0),d=paid.reduce(function(a,s){return a+s.ded},0);
+    if(!list[ESS.slipI]||list[ESS.slipI].run)ESS.slipI=list[0].run?1:0;
+    var sel=list[ESS.slipI],dk=dedModal();
+    var yr='<span class="eseg"><button data-ess="payy" data-d="-1"'+(y<=2024?' disabled':'')+' aria-label="Previous year">‹</button>'+
+      '<select class="yrsel" data-chg="payy" aria-label="Year">'+[2026,2025,2024].map(function(v){return '<option'+(v===y?' selected':'')+'>'+v+'</option>'}).join('')+'</select>'+
+      '<button data-ess="payy" data-d="1"'+(y>=2026?' disabled':'')+' aria-label="Next year">›</button></span>';
+    var rows=list.map(function(s){return [MON[s.m-1]+' '+s.y,ngn(s.net),s.run?pill('wa','In the run'):s.ded?pill('wa','Paid, deduction'):pill('ok','Paid'),
+      s.run?'<span class="sub">On approval</span>':'<button class="btn">'+ic('doc')+'PDF</button>']});
+    return essHd('My Payslips',y===2026?'2026, year to date':y+'',yr+bt('Email me a copy','toast',0,' data-msg="Sent to cynthia@mycityapp.io"')+bt('Download all','',1))+
+    '<div class="statstrip">'+[['Gross',ngn(g)],['Net received',ngn(g-d)],['Payslips',paid.length+'']].map(function(s){
+      return '<div><span class="lab">'+s[0]+'</span><b>'+s[1]+'</b></div>'}).join('')+
+      '<button class="click" data-mo="'+dk+'"><span class="lab">Deductions</span><b style="color:var(--'+(d?'warn':'ok')+')">'+ngn(d)+'</b><span class="sub">View details</span></button>'+
+      (y===2026?'<div><span class="lab">Next payday</span><b>27/10/2026</b></div>':'')+'</div>'+
+    mlist(list.map(function(s){return [MON[s.m-1]+' '+s.y,'Net '+ngn(s.net),s.run?pill('wa','In the run'):s.ded?pill('wa','Deduction'):pill('ok','Paid'),
+      s.run?mo('October 2026','<div class="card">'+emptyb('clock','In this month\'s run','Your payslip appears here once the run is approved, normally on the 27th.')+'</div>'):mo('Payslip, '+MON[s.m-1]+' '+s.y,slipPaper(s)+'<div class="mbtns">'+bt('Email me a copy','toast',0,' data-msg="Sent to cynthia@mycityapp.io"','mail')+bt('Download PDF','toast',1,' data-msg="Downloading"','doc')+'</div>')]}))+
+    donly('<div class="grid g32">'+table([['Month'],['Net','n'],['Status'],['']],rows,'Payslips, '+y,'<span class="sub">Click a month to preview it</span>',
+      function(i){return list[i].run?'':' class="rowlink'+(i===ESS.slipI?' sel':'')+'" data-ess="slip" data-i="'+i+'"'})+
+      slipPaper(sel)+'</div>')}},
+
+  {n:'My Leave',r:function(){
+    var reqs=[['Annual','22/12/2026','24/12/2026','3','Ifeoma Chukwu','ok','Approved'],['Annual','05/08/2026','09/08/2026','5','Ifeoma Chukwu','ok','Taken'],
+      ['Compassionate','17/04/2026','17/04/2026','1','Ifeoma Chukwu','ok','Taken']];
+    var ent=[['Annual','20 days','6 taken, 3 booked, 11 left',55,'var(--c1)'],['Compassionate','5 days','1 taken, 4 left',20,'var(--c2)'],
+     ['Sick','10 days','0 taken, 10 left',0,'var(--c3)'],['Unpaid','On request','None taken',0,'var(--line-2)']];
+    var entC='<div class="card"><div class="ch"><h3>Entitlement</h3></div>'+ent.map(function(l){
+      return '<div style="padding:9px 0;border-bottom:1px solid var(--line)">'+
+      '<div style="display:flex;gap:8px;align-items:baseline"><b style="font-size:12.5px">'+esc(l[0])+'</b>'+
+      '<span class="sub" style="margin-left:auto">'+esc(l[1])+'</span></div>'+
+      '<div class="mini" style="margin-top:6px"><span class="tr"><i style="width:'+l[3]+'%;background:'+l[4]+'"></i></span></div>'+
+      '<div class="sub" style="margin-top:4px">'+esc(l[2])+'</div></div>'}).join('')+'</div>';
+    var rk=reqs.map(function(r){return mo(r[0]+' leave, '+r[1],kvcard('Request',[['Type',r[0]],['From',r[1]],['To',r[2]],['Days',r[3]],['Approver',r[4]],['Status',pill(r[5],r[6])]]))});
+    var form='<div class="form"><label>Type<select class="inp"><option>Annual</option><option>Compassionate</option><option>Sick</option><option>Unpaid</option></select></label>'+
+      '<div class="frow"><label>From<input class="inp" type="date"></label><label>To<input class="inp" type="date"></label></div>'+
+      '<label>Note, optional<input class="inp" placeholder="Anything your manager should know"></label>'+
+      '<div>'+bt('Send request','leavesub',1)+'</div></div>';
+    return essHd('My Leave','2026 entitlement',bt('Leave calendar','toast',0,' data-msg="Opening the team leave calendar"')+
+      bt('Request leave','',1,' data-mo="'+mo('Request leave',form)+'"','plus'))+
+    kpiC([['Entitlement','20 days','','Annual, 2026',mo('Entitlement',entC)],['Taken','6','','This year',mol('Leave taken, 2026',[['Type'],['From'],['To'],['Days','n']],reqs.slice(1).map(function(r){return r.slice(0,4)}))],
+      ['Approved upcoming','3','','22/12 to 24/12',rk[0]],['Remaining','11','ok','Annual days left',mo('Entitlement',entC)]])+
+    '<div class="monly">'+icards([['doc','My requests','3 this year · next on 22/12','<div class="emlist">'+reqs.map(function(r,i){return '<button class="emli" data-mo="'+rk[i]+'"><span><b>'+r[0]+' · '+r[3]+(r[3]==='1'?' day':' days')+'</b><span class="sub">'+r[1]+' to '+r[2]+'</span></span>'+pill(r[5],r[6])+'</button>'}).join('')+'</div>'],
+      ['clock','Entitlement','11 annual days left',entC]])+'</div>'+
+    donly('<div class="grid g23">'+table([['Type'],['From'],['To'],['Days','n'],['Approver'],['Status']],reqs.map(function(r){return [r[0],r[1],r[2],r[3],r[4],pill(r[5],r[6])]}),'My requests','',
+      function(i){return ' class="rowlink" data-mo="'+rk[i]+'"'})+entC+'</div>')}},
+
+  {n:'My Queries',r:function(){
+    var arch=[['Repeated lateness, August 2026','Ifeoma Chukwu','28/08/2026','Submitted 29/08',pill('nt','Upheld, sanction')],
+      ['Missing clock-out, 14/06/2026','System','15/06/2026','Submitted 15/06',pill('ok','Closed, no action')],
+      ['Missing clock-outs, March 2025','System','31/03/2025','Submitted 01/04',pill('nt','Upheld, sanction')]];
+    var sanc=[['Warning','Repeated lateness, August 2026','29/08/2026','₦12,500',pill('nt','Served')],
+      ['Caution','Missing clock-outs, March 2025','02/04/2025','₦7,500',pill('nt','Served')]];
+    var openK=mo('Open queries',emptyb('ok','No open queries','Nothing has been raised against you. If one is, you have 48 hours to respond.'));
+    var archK=mo('Archived queries',table([['Subject'],['Raised by'],['Date'],['Your response'],['Outcome']],arch)+
+      '<p class="sub" style="margin-top:12px">Most queries close with no action. Your response stays on the record next to the decision.</p>');
+    var sancK=mo('Sanctions',table([['Sanction'],['Reason'],['Date'],['Deduction','n'],['Status']],sanc)+
+      '<p class="sub" style="margin-top:12px">A deduction only follows a sanction that was upheld. It shows on that month\'s payslip.</p>');
+    var qc=function(k,icn,t,n,s,tone){return '<button class="card qcard click" data-mo="'+k+'"><span class="ic '+(tone||'')+'">'+ic(icn,'ico')+'</span>'+
+      '<span class="lab">'+t+'</span><b>'+n+'</b><span class="sub">'+s+'</span></button>'};
+    return essHd('My Queries','Queries raised against you, and their outcome')+
+    '<div class="grid g3 qgrid">'+qc(openK,'alert','Open queries','0','Nothing waiting on you','ok')+
+      qc(archK,'doc','Archived','3','1 closed with no action')+
+      qc(sancK,'flag','Sanctions','2','Last on 29/08/2026','wa')+'</div>'}},
+
+  {n:'My Documents',r:function(){
+    var docs=[['Employment contract','02/05/2024','ok','Signed','None'],['Data privacy acknowledgement','02/05/2024','ok','Signed','None'],
+      ['NDPA training certificate','11/01/2026','wa','Expiring','30/11/2026'],['Passport photograph','None','er','Missing','None'],
+      ['Bank verification number','02/05/2024','ok','Verified','None']];
+    var contract=paper(plogo('CON-0004')+
+     '<h3>Contract of employment</h3>'+
+     '<p style="color:#566662;font-size:11.5px;margin-top:3px">Between MyCity App Ltd and Cynthia Osakunih · Executed 02/05/2024</p>'+
+     '<p>This agreement sets out the terms on which you are employed as Operations and People Lead, reporting to the Chief Executive Officer.</p>'+
+     '<p><b>Hours.</b> As set in your individual work schedule, with a grace window of fifteen minutes.</p>'+
+     '<p><b>Remuneration.</b> A gross monthly salary of ₦550,000, payable on the twenty-seventh day of each month.</p>'+
+     '<p><b>Leave.</b> Twenty working days of paid annual leave in each calendar year.</p>'+
+     '<div style="display:flex;gap:30px;margin-top:20px"><div><div class="sig">C. Osakunih</div>'+
+     '<div style="font-size:10px;color:#7E8D88;border-top:1px solid #D5DEDB;padding-top:4px;margin-top:2px">Employee · 02/05/2024</div></div>'+
+     '<div><div class="sig">I. Chukwu</div>'+
+     '<div style="font-size:10px;color:#7E8D88;border-top:1px solid #D5DEDB;padding-top:4px;margin-top:2px">For MyCity App Ltd · 02/05/2024</div></div></div>'+
+     '<div class="pfoot"><span>Content hash verified</span><span>Artifact hash verified</span>'+
+     '<span style="margin-left:auto">go.mycityapp.io/verify/CON-0004</span></div>',
+     'Signed documents carry two hashes and a public verification link.');
+    var dk=docs.map(function(d,i){return i===0?mo(d[0],contract):mo(d[0],kvcard(d[0],[['Uploaded',d[1]],['Status',pill(d[2],d[3])],['Expires',d[4]]])+
+      (d[3]==='Missing'?'<div style="margin-top:12px">'+bt('Upload now','toast',1,' data-msg="Choose a file to upload"','plus')+'</div>':''))});
+    return essHd('My Documents','Your vault',bt('Upload','toast',1,' data-msg="Choose a file to upload"','plus'))+
+    statstrip([['Documents','5'],['Signed','2','ok'],['Verified','1','ok'],['Expiring','1','warn'],['Missing','1','err']])+
+    mlist(docs.map(function(d,i){return [d[0],d[1]==='None'?'Not uploaded':'Uploaded '+d[1],pill(d[2],d[3]),dk[i]]}))+
+    donly('<div class="grid g32">'+table([['Document'],['Uploaded'],['Status'],['Expires']],docs.map(function(d){return [d[0],d[1],pill(d[2],d[3]),d[4]]}),'Vault',
+      '<span class="sub">Click a row to open it</span>',function(i){return ' class="rowlink" data-mo="'+dk[i]+'"'})+contract+'</div>')}},
+
+  {n:'My Security',r:function(){
+    var pw='<div class="card"><div class="ch"><h3>Password</h3></div><p class="sub">Last changed 14/08/2026.</p>'+
+      '<div style="margin-top:12px">'+bt('Change password','',0,' data-mo="'+mo('Change password',pwForm())+'"')+'</div></div>';
+    var mfa=toggles('Two-step sign-in',[['Authenticator app','A 6 digit code at sign in, from any authenticator app',1],
+      ['Email code as a fallback','Used only if the app is unavailable',0]]);
+    var pk='<div class="card"><div class="ch"><h3>Passkeys</h3><span class="right">'+pill('ok','1 set up')+'</span></div>'+
+      '<div class="devrow"><span class="ic">'+ic('shield','ico')+'</span><span style="flex:1"><b>MacBook Pro, Touch ID</b><span class="sub" style="display:block">Added 02/09/2026 · used today</span></span></div>'+
+      '<div style="margin-top:12px">'+bt('Add a passkey','toast',0,' data-msg="Follow the prompt on your device"','plus')+'</div>'+
+      '<p class="sub" style="margin-top:11px">Sign in with your fingerprint or face instead of a password.</p></div>';
+    var pin='<div class="card"><div class="ch"><h3>PIN</h3><span class="right">'+pill('nt','Not set')+'</span></div>'+
+      '<p class="sub">A short PIN to unlock the app and confirm a clock-in on a registered device.</p>'+
+      '<div style="margin-top:12px">'+bt('Set a PIN','',0,' data-mo="'+mo('Set a PIN',pinForm())+'"')+'</div></div>';
+    var act=table([['When'],['Device'],['Where'],['Result']],[
+      ['13/10/2026 08:04','MacBook Pro · Chrome','Victoria Island',pill('ok','Registered')],
+      ['12/10/2026 17:22','Samsung Galaxy S23','Victoria Island',pill('ok','Registered')],
+      ['12/10/2026 07:41','iPhone 13 · Safari','Lekki',pill('er','Unregistered, flagged')]],'Recent sign-ins');
+    var devC='<div class="card"><div class="ch"><h3>Devices</h3><span class="right">'+pill('nt','Up to 3')+'</span></div>'+
+      '<p class="sub">The phones and laptops you clock in from are managed in My Devices. A clock-in from any other device is flagged to People.</p>'+
+      '<div style="margin-top:12px">'+bt('Open My Devices','goTab',0,' data-tn="My Devices"','right')+'</div></div>';
+    return essHd('My Security','How you sign in, and the devices you clock in from')+
+    icards([['shield','Password','Changed 14/08/2026',pw],['check','Two-step sign-in','Authenticator on',mfa],
+      ['spark','Passkeys','1 set up',pk],['grid','PIN','Not set',pin],['msg','Devices','Managed in My Devices',devC],['clock','Sign-in activity','1 flagged',act]])+
+    donly('<div class="grid g2">'+pw+mfa+'</div><div class="grid g2">'+pk+pin+'</div>'+
+      '<div class="grid g2">'+devC+act+'</div>')}}];
+var ESS_MOBILE={};ESS_MOBILE_TABS.forEach(function(t){ESS_MOBILE[t.n]=t.r});
+
+/* ═════ ESS, DESKTOP CHANGES (12 Oct meeting) and the M1 preview ═════ */
+function essbar(){return '<div class="essbar"><span class="sub">Prototype view</span><span class="eseg">'+
+  '<button data-ess="m1" data-v="0"'+(ESS.m1?'':' class="on"')+'>Full design</button>'+
+  '<button data-ess="m1" data-v="1"'+(ESS.m1?' class="on"':'')+'>As delivered at M1</button></span></div>'}
+var ESS_SOON={
+  'My Performance':['Milestone 2','23/10/2026',['Your KPIs for the month, weighted to 100%','The goal chain above your KPI, up to the CEO','Self rating first, then your manager, then a second approval']],
+  'My Payslips':['Milestone 6','27/11/2026',['A payslip for every approved run, as a PDF','Deductions, each linked to its query','Any past year, from your start date']],
+  'My Queries':['Milestone 3','30/10/2026',['Open queries with a 48 hour response window','Archived queries, with your response kept on record','Sanctions, and any deduction they carried']]};
+function soonPage(t){var s=ESS_SOON[t];return essHd(t,'Arrives with '+s[0])+
+  '<div class="card soon"><span class="ic">'+ic('clock','ico')+'</span>'+
+  '<div class="chips" style="justify-content:center;margin:0 0 8px">'+pill('wa',s[0]+' · '+s[1])+'</div>'+
+  '<h3>Coming Soon</h3><p class="sub" style="margin:6px auto 0;max-width:46ch">This tab opens when '+s[0]+' is delivered.</p>'+
+  '<ul class="soonl">'+s[2].map(function(w){return '<li>'+ic('ok')+esc(w)+'</li>'}).join('')+'</ul>'+
+  '<div><button class="btn" data-ess="m1" data-v="0">See the Full Design</button></div></div>'}
+var ESS_Q={arch:[['Repeated lateness, August 2026','Ifeoma Chukwu','28/08/2026','Submitted 29/08',['nt','Upheld, sanction']],
+    ['Missing clock-out, 14/06/2026','System','15/06/2026','Submitted 15/06',['ok','Closed, no action']],
+    ['Missing clock-outs, March 2025','System','31/03/2025','Submitted 01/04',['nt','Upheld, sanction']]],
+  sanc:[['Warning','Repeated lateness, August 2026','29/08/2026','₦12,500',['nt','Served']],
+    ['Caution','Missing clock-outs, March 2025','02/04/2025','₦7,500',['nt','Served']]]};
+var ESS_DESK={
+  'My Profile':function(){
+    var emp=kvcard('Employment',[['Job title','Operations and People Lead'],['Department','Operations'],['Line manager','Ifeoma Chukwu, CEO'],
+      ['Start date','02/05/2024'],['Employment type','Full time'],['Work arrangement','Hybrid'],['Status',pill('ok','Confirmed')]]);
+    emp=emp.slice(0,-6)+'<div class="essched"><div class="ch" style="margin:0 0 4px"><h3>Work schedule</h3><span class="right">'+pill('nt','Set by People')+'</span></div>'+essSchedRows()+'</div></div>';
+    return essHd('My Profile','What People see, and what you can change yourself',bt('Edit','',1,'','plus'))+
+    '<div class="prof"><span class="big avbig'+(ESS.av?' has':'')+'" data-ess="avatar" title="'+(ESS.av?'Change photo':'Upload a photo')+'">'+
+      (ESS.av?'<img src="'+ESS.av+'" alt="Your photo">':'CO<button class="avplus" data-ess="avatar" aria-label="Upload a photo">'+ic('plus')+'</button>')+'</span>'+
+      '<span class="id"><h2>Cynthia Osakunih</h2><div class="role">Operations and People Lead · Operations</div>'+
+      '<div class="chips">'+pill('ok','Confirmed')+pill('nt','Hybrid')+pill('nt','G5 · Head')+pill('nt','Reports to Ifeoma Chukwu')+'</div></span>'+
+      '<span class="acts">'+bt('Download my data')+bt('Change password','goTab',0,' data-tn="My Security"')+'</span></div>'+
+    '<div class="grid g2">'+kvcard('Personal',[['Full name','Cynthia Osakunih'],['Date of birth','14/03/1991'],['Phone','+234 803 221 4418'],
+      ['Work email','cynthia@mycityapp.io'],['Address','Lekki Phase 1, Lagos']])+emp+'</div>'+
+    '<div class="grid g2">'+kvcard('Bank, used for expense disbursement',[['Bank','Providus Bank'],['Account name','Cynthia Osakunih'],['Account number','••••  4417']])+
+    kvcard('Next of kin',[['Name','Chuka Osakunih'],['Relationship','Brother'],['Phone','+234 806 554 2210']])+'</div>'+
+    '<div class="grid g2">'+
+    '<div class="card"><div class="ch"><h3>What you can change</h3></div>'+
+    [['Phone number','Immediately','ok'],['Address','Immediately','ok'],['Bank details','Logged, People notified','wa'],
+     ['Next of kin','Immediately','ok'],['Photo','Immediately','ok'],['Job title','Only People can','nt'],['Salary','Only People can','nt'],
+     ['Line manager','Only People can','nt'],['Work schedule','Only People can','nt']].map(function(r){
+      return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">'+
+      '<span style="flex:1;font-size:12.5px;font-weight:550">'+esc(r[0])+'</span>'+pill(r[2],r[1])+'</div>'}).join('')+
+    '<p class="sub" style="margin-top:11px">Every change to this record is written to the audit log with who made it.</p></div>'+
+    tl('My record history',[['Bank details updated','14/08/2026','Logged. People were notified the same day.','hi'],
+      ['Promoted to Operations and People Lead','01/07/2026','Grade moved from G4 to G5.','ok'],
+      ['Phone number updated','22/03/2026',''],['Confirmed after probation','02/08/2024','','ok'],
+      ['Started at MyCity App Ltd','02/05/2024','','ok']])+'</div>'},
+  'My Leave':function(orig){return orig().replace('<p class="sub" style="margin-top:11px">Leave is approved by your line manager in one step. The calendar shows clashes before you submit.</p>','')},
+  'My Queries':function(){var sel=ESS.qSel||'open',
+    card=function(k,icn,t,n,s,tone){return '<button class="card qcard click'+(sel===k?' on':'')+'" data-ess="qsel" data-v="'+k+'"><span class="ic '+(tone||'')+'">'+ic(icn,'ico')+'</span>'+
+      '<span class="lab">'+t+'</span><b>'+n+'</b><span class="sub">'+s+'</span></button>'};
+    var body=sel==='open'?emptyb('ok','No open queries','Nothing has been raised against you. If one is, you have 48 hours to respond.'):
+      sel==='archived'?table([['Subject'],['Raised by'],['Date'],['Your response'],['Outcome']],ESS_Q.arch.map(function(r){return r.slice(0,4).concat([pill(r[4][0],r[4][1])])}),'Archived queries'):
+      table([['Sanction'],['Reason'],['Date'],['Deduction','n'],['Status']],ESS_Q.sanc.map(function(r){return r.slice(0,4).concat([pill(r[4][0],r[4][1])])}),'Sanctions');
+    return essHd('My Queries','Queries raised against you, and their outcome')+
+      '<div class="grid g3 qgrid">'+card('open','alert','Open Queries','0','Nothing waiting on you','ok')+card('archived','doc','Archived','3','1 closed with no action')+
+      card('sanctions','flag','Sanctions','2','Last on 29/08/2026','wa')+'</div>'+body}};
+/* Phone layout for LA's attendance tabs, built from her own page so her code stays the one source:
+   header, banners and stat cards stay on top; every card or table becomes an icon card that opens
+   it in the shared modal. Her buttons keep working there (her click handler is page-wide). */
+function essIconFor(t){t=t.toLowerCase();
+  return /today/.test(t)?'clock':/hour|chart/.test(t)?'chart':/clock event|punch/.test(t)?'clock':/exception|correction/.test(t)?'alert':
+    /device/.test(t)?'lock':/where|location/.test(t)?'pin':/request/.test(t)?'doc':/acknowledg/.test(t)?'check':/polic|version|glance/.test(t)?'book':/how/.test(t)?'info':'doc'}
+function essCardify(html){var box=document.createElement('div');box.innerHTML=html;var top='',cards=[];
+  Array.prototype.slice.call(box.children).forEach(function(el){var c=el.classList;
+    if(c.contains('phead')||c.contains('attban')||c.contains('annmsg')||c.contains('statstrip')||(c.contains('grid')&&c.contains('g4'))){top+=el.outerHTML;return}
+    if(el.tagName==='P'||(!el.querySelector('.ch h3')&&!c.contains('grid')&&!c.contains('card')&&!el.querySelector('.card'))){
+      if(cards.length)cards[cards.length-1][3]+=el.outerHTML;else top+=el.outerHTML;return}
+    var parts=c.contains('grid')?Array.prototype.slice.call(el.children):[el];
+    parts.forEach(function(p){var h=p.querySelector('.ch h3,h3'),t=h?h.textContent.trim():'Details',r=p.querySelector('.ch .right'),
+        rows=p.querySelectorAll('tbody tr').length,dd=p.querySelector('dd'),sub=r&&!r.querySelector('button')&&r.textContent.trim()?r.textContent.trim():
+        rows?rows+(rows===1?' record':' records'):dd?dd.textContent.trim():(function(){var q=p.querySelector('p.sub,p,.step');return q?q.textContent.trim():'Open'})();
+      if(sub.length>42)sub=sub.slice(0,40)+'…';
+      cards.push([essIconFor(t),t,sub,p.outerHTML])})});
+  return top+(cards.length?icards(cards,1):'')}
+/* Page-level footnotes removed from ESS (AJ, 13/10): a tab ends with its content, not a note */
+function essStripNotes(h){return h.replace(/<p class="sub" style="margin-top:12px">(A missing document on a confirmed employee|A correction never overwrites a punch)[^<]*<\/p>/g,'')}
+ESS_DESK['My Documents']=function(orig){return essStripNotes(orig())};
+/* tabs whose own renderer already draws both shells */
+var ESS_BOTH={'My Payslips':1,'My Security':1};
+(function(){var ess=M.filter(function(m){return m.k==='ess'})[0];if(!ess)return;
+  var LA={'My Attendance':1,'Work Location Requests':1,'My Devices':1,'Policy Updates':1};
+  if(!ess.tabs.some(function(t){return t.n==='My Security'}))ess.tabs.push({n:'My Security',r:function(){return ''}});
+  ess.tabs.forEach(function(t){var orig=t.r,mob=ESS_MOBILE[t.n];
+    if(LA[t.n]){t.r=function(){var h=essStripNotes(orig());return '<div class="donly">'+h+'</div><div class="monly">'+essCardify(h)+'</div>'};return}
+    t.r=function(){
+      if(ESS.m1&&ESS_SOON[t.n])return essbar()+soonPage(t.n);
+      if(ESS_BOTH[t.n])return essbar()+mob();
+      var d=ESS_DESK[t.n]?ESS_DESK[t.n](orig):orig();
+      return essbar()+'<div class="donly">'+d+'</div>'+(mob?'<div class="monly">'+mob()+'</div>':'')}})})();
 
 /* palette */
 var ITEMS=[];
@@ -5749,5 +6280,37 @@ document.addEventListener('keydown',function(e){
     pcur=Math.max(0,Math.min(shown.length-1,pcur+(e.key==='ArrowDown'?1:-1)));
     $$('#palres button').forEach(function(b,i){b.classList.toggle('cur',i===pcur)})}
   else if(e.key==='Enter'){e.preventDefault();ppick(pcur)}});
+/* ───── ESS actions: one delegated listener on data-ess ───── */
+document.body.insertAdjacentHTML('beforeend','<input type="file" id="avfile" accept="image/*" hidden>');
+var ACT={
+  pg:function(a){var m=MD[MDCUR];if(m&&m.rows){m.p=Math.max(0,m.p+(+a.dataset.d));refreshM()}},
+  toast:function(a){toast(a.dataset.msg||'Done')},
+  m1:function(a){ESS.m1=a.dataset.v==='1';render();toast(ESS.m1?'Showing ESS as delivered at Milestone 1':'Showing the full design')},
+  qsel:function(a){ESS.qSel=a.dataset.v;render()},
+  goTab:function(a){closeM();var t=M[cur.m].tabs.map(function(x){return x.n}).indexOf(a.dataset.tn);if(t<0)return;cur.t=t;cur.d=null;render()},
+  avatar:function(){$('#avfile').click()},
+  payy:function(a){var y=ESS.payY+(+a.dataset.d);if(y<2024||y>2026)return;ESS.payY=y;ESS.slipI=0;render()},
+  slip:function(a){ESS.slipI=+a.dataset.i;render()},
+  pwsave:function(){closeM();toast('Password updated. Other sessions signed out.')},
+  pinsave:function(){closeM();toast('PIN saved')},
+  leavesub:function(){closeM();toast('Request sent to Ifeoma Chukwu')}
+};
+document.addEventListener('click',function(e){
+  var a=e.target.closest('[data-ess]');
+  if(a&&!a.disabled&&ACT[a.dataset.ess]){e.preventDefault();ACT[a.dataset.ess](a,e);return}
+  var o=e.target.closest('[data-mo]');if(o){e.preventDefault();openM(o.dataset.mo)}});
+document.addEventListener('change',function(e){var t=e.target;
+  if(t.id==='avfile'&&t.files&&t.files[0]){var r=new FileReader();r.onload=function(){ESS.av=r.result;render();
+    $$('.rail-who .av').forEach(function(v){v.innerHTML='<img src="'+ESS.av+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'});
+    toast('Photo updated')};r.readAsDataURL(t.files[0]);t.value='';return}
+  if(t.dataset.chg==='payy'){ESS.payY=+t.value;ESS.slipI=0;render()}});
+
+/* mobile: the menu button opens the full rail as a drawer */
+(function(){var app=$('#app'),mq=window.matchMedia('(max-width:760px)');
+  document.body.insertAdjacentHTML('beforeend','<div class="scrim" id="scrim"></div>');
+  $('#slim').onclick=function(){if(mq.matches){app.classList.toggle('navopen')}else app.classList.toggle('slim')};
+  $('#scrim').onclick=function(){app.classList.remove('navopen')};
+  $('#nav').addEventListener('click',function(e){if(e.target.closest('a'))app.classList.remove('navopen')});
+  mq.addEventListener('change',function(){app.classList.remove('navopen')})})();
 })();
 </script>

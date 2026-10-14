@@ -21,7 +21,7 @@ map, read §11 first.
 | `docs/BACKEND_GUIDE.md` | **How to write backend code here**: layers, a worked endpoint, what to reuse, done checklist. Read before any backend change |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, ⓘ help, two shells. Read before any frontend change |
 | `docs/guides/<module>.md` | One engineering guide per feature: every screen it touches and how they relate. A change passes through its guide first |
-| `docs/PROGRESS.md` | The 85 screens and the M0 items, ticked as they are built, with a note per change |
+| `docs/PROGRESS.md` | The 86 screens and the M0 items, ticked as they are built, with a note per change |
 | `CLAUDE.md` | What an AI assistant reads first: which documents to read for a backend, frontend or full-stack task, and how to finish one |
 | `docs/MyCity-ERP-Documents/demo.html` | What the product looks like. UI and layout reference only, never a source for data or rules |
 
@@ -76,7 +76,7 @@ mycity-app/
 │   ├── MyCity-ERP-Documents/ the client document pack
 │   ├── BACKEND_GUIDE.md      how to write backend code (read first)
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
-│   ├── PROGRESS.md           85 screens + M0 items, updated with every change
+│   ├── PROGRESS.md           86 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
 │   │                         proxy (the hosting panel's proxy settings), github-settings (TB applies)
@@ -513,7 +513,7 @@ Process gates, from M0. They check that the work is recorded where the team read
 
 | Gate | Script | Fails when |
 |---|---|---|
-| Progress | `scripts/check/progress.js` | Product code changed and `docs/PROGRESS.md` gained no dated note; or the file is malformed (85 rows, statuses, ticks, day-first dates, summary counts) |
+| Progress | `scripts/check/progress.js` | Product code changed and `docs/PROGRESS.md` gained no dated note; or the file is malformed (86 rows, statuses, ticks, day-first dates, summary counts) |
 | Guides | `scripts/check/guides.js` | Code a guide covers changed and the guide gained no Change log line; or a guide lost a template section or is missing from the index |
 | README map | `scripts/check/readme-map.js` | A new file is neither where the map says files go nor named in this README |
 | CODEOWNERS | `scripts/check/codeowners.js` | A placeholder or invalid username, a path with one owner, a renamed path, or a module or guide with no owner line |
