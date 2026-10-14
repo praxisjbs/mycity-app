@@ -92,8 +92,8 @@ displays; those are read live from the owning modules' repositories, scoped by p
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `home_alert_rule` | `id`, `key`, `metric`, `scope`, `threshold`, `window_days`, `severity`, `permission_key`, `enabled`, `created_by` | A rule is data, not code: changing a number needs no deploy. `metric` names the signal (late arrivals, partnership inactivity, approval ageing, document expiry, budget threshold, recruitment SLA). `permission_key` is who may clear its alerts. |
-| `home_alert` | `id`, `rule_id`, `subject_type`, `subject_id`, `title`, `trigger`, `severity`, `raised_at`, `over_by`, `cleared_at`, `cleared_by` | One open alert per (rule, subject). `over_by` is how far past the threshold it has gone. Cleared alerts are kept for the audit trail and the "cleared this week" count. |
+| `home_alert_rule` | `home_alert_rule_id`, `key`, `metric`, `scope`, `threshold`, `window_days`, `severity`, `permission_key`, `enabled`, `created_by` | A rule is data, not code: changing a number needs no deploy. `metric` names the signal (late arrivals, partnership inactivity, approval ageing, document expiry, budget threshold, recruitment SLA). `permission_key` is who may clear its alerts, written `<module>.<action>` from the access catalogue (e.g. `people.approve`). |
+| `home_alert` | `home_alert_id`, `home_alert_rule_id`, `subject_type`, `subject_id`, `title`, `trigger`, `severity`, `raised_at`, `last_seen_at`, `over_by`, `escalated_at`, `cleared_at`, `cleared_by`, `outcome` (cleared or dismissed), `note` | One open alert per (rule, subject). `over_by` is how far past the threshold it has gone. Cleared alerts are kept for the audit trail and the "cleared this week" count. Raising, clearing and the 14-day escalation are `src/shared/alerts/alerts.js`; the columns it reads are in BACKEND_STRUCTURE §11.1. |
 | `home_report` | `id`, `key`, `name`, `source`, `filters` (jsonb), `schedule` (cron, nullable), `formats`, `recipients`, `reporting_line`, `permission_key`, `enabled`, `created_by` | A report definition. `source` names the query it runs (the same query the screen uses). `recipients` and `reporting_line` decide who receives it. |
 | `home_report_run` | `id`, `number`, `report_id`, `run_at`, `status`, `document_id`, `format`, `recipients` | One row per generation. `number` from `numbering.allocate()`. `document_id` points at the vaulted file. |
 
@@ -256,6 +256,7 @@ the catalogue's eligibility pattern so an alert inherits the clearing permission
 
 ## 14 · Change log
 
+- 14/10/2026 · GE · Alert tables aligned with the shared alert engine (`src/shared/alerts/alerts.js`): primary keys named `<table>_id`, `permission_key` written `<module>.<action>`, and `last_seen_at`, `escalated_at`, `outcome`, `note` added. No screen behaviour changed.
 - 13/10/2026 · TB · First draft for the real build. Written from the 02/09 discovery call and the
   two 12/10 meetings (kickoff and module demos), with attendance read from the shared roster per the
   13/10 review. Covers the four tabs (Overview, Team, Alerts, Reports), role-sensitivity, the alert

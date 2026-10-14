@@ -142,7 +142,9 @@ them, so `scripts/check/guides.js` holds frontend changes to their guide too. Ne
 
 ### 9.2 Routing, shell and permission filtering
 _To be written._ Tab slugs are the URL values in `docs/PROGRESS.md` and do not change when a label
-does.
+does. The one URL shape the backend produces for a screen or a record (notification bell, task
+panel, Home alerts, search, AI links) is `/<module>?tab=<tab>&id=<id>`, module key with `_` as `-`
+(`src/shared/route-map.js`); the router must honour it, and `id` opens that record.
 
 ### 9.3 Design tokens and theming (light, dark)
 _To be written._

@@ -151,6 +151,20 @@ function Paged(item) {
     .strict();
 }
 
+/* ------------------------------------------------------------------ *
+ * Bodies with nothing in them
+ * ------------------------------------------------------------------ */
+
+/**
+ * The body of a write that carries no data: `POST /expenses/:id/submit`. Every
+ * write route declares a body (http/route.js); this is the one to declare when
+ * the URL says it all. `.strict()`, so a stray field is refused, not ignored.
+ */
+const EmptyBody = z.object({}).strict();
+
+/** Path of a route addressed by one id: `/:id`. */
+const IdParams = z.object({ id: uuid }).strict();
+
 module.exports = {
   uuid,
   text,
@@ -165,4 +179,6 @@ module.exports = {
   PageQuery,
   PageMeta,
   Paged,
+  EmptyBody,
+  IdParams,
 };

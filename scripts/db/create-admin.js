@@ -4,10 +4,9 @@
  * Bootstrap an administrator: a COMPLETE employee, their login, and their role,
  * created together in one transaction through the same services the app uses.
  *
- * Why it is written this way (internal meeting, 12 October 2026). The praxis-ls
- * script inserted an `app_user` with an email and a password and nothing else.
- * The result was an account that could sign in but did not exist as an
- * employee: invisible in People, outside every reporting line, owning records
+ * Why it is written this way (internal meeting, 12 October 2026). A script that
+ * inserts an `app_user` with only an email and a password makes an account that
+ * can sign in but does not exist as an employee: invisible in People, outside every reporting line, owning records
  * nobody could trace to a person. With the repository public, a script that
  * mints such an account is also a back door anyone can read. So here:
  *
@@ -19,9 +18,9 @@
  *    person is created on screen (README §6.1).
  *  - The password is typed at a hidden prompt, twice. Never an argument (shell
  *    history, process list), never in a file.
- *  - An existing login is never overwritten. The praxis-ls `ON CONFLICT DO
- *    UPDATE SET password_hash` meant anyone able to run the script could take
- *    over any account by email.
+ *  - An existing login is never overwritten. An `ON CONFLICT DO UPDATE SET
+ *    password_hash` would let anyone able to run the script take over any
+ *    account by email.
  *  - It is a bootstrap. Once any active user holds the role, it refuses unless
  *    --allow-additional is given; everyone after the first is created in the
  *    app, by a person, under their own name in the audit log.

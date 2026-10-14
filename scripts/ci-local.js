@@ -68,6 +68,7 @@ const GATES = [
   { id: "ai-vendor-imports", label: "No AI vendor imports outside services/ai", script: "scripts/check/ai-vendor-imports.js" },
   { id: "shell", label: "Shell scripts LF and parse", script: "scripts/check/shell.js" },
   { id: "pagination", label: "Every list pages at 25", script: "scripts/check/pagination.js" },
+  { id: "provenance", label: "Code never names its origin project", script: "scripts/check/provenance.js" },
   // Process: the work is recorded where the team reads it
   { id: "progress", label: "PROGRESS.md updated and well formed", script: "scripts/check/progress.js" },
   { id: "guides", label: "Feature guides followed and complete", script: "scripts/check/guides.js" },

@@ -7,7 +7,9 @@
  *
  *  1. Backend SQL that writes its own LIMIT / OFFSET / FETCH FIRST instead of
  *     going through shared/http/paged.js. `LIMIT 1` (a single-row lookup) is
- *     allowed.
+ *     allowed, and so is a worker's batch claim that says so on the same line
+ *     with a SQL comment: `LIMIT $1 -- pagination:batch <why>`. A batch is
+ *     how much work one tick takes, never rows a person or the AI reads.
  *  2. A completeQuery() call without a `// pagination:complete <reason>`
  *     marker on one of the two lines above it.
  *  3. A page-size key (limit, offset, per_page, page_size, pageSize, perPage)
@@ -35,6 +37,7 @@ const FE_SIZE_KEY = /\b(per_page|page_size|pageSize|perPage)\b/;
 const FE_SIZE_CONST = /\b(const|let|var)\s+[A-Z_]*PAGE_SIZE\s*=/;
 const COMPLETE_CALL = /\bcompleteQuery\s*\(/;
 const COMPLETE_MARK = /\/\/\s*pagination:complete\s+\S/;
+const BATCH_MARK = /--\s*pagination:batch\s+\S/;
 
 /** @param {string} dir @param {(f: string) => boolean} want @returns {string[]} */
 function walk(dir, want) {
@@ -65,7 +68,8 @@ for (const file of backend) {
   src.forEach((raw, i) => {
     const line = code(raw);
     if (r !== PAGED_HELPER) {
-      if ((SQL_LIMIT.test(line) && !SQL_LIMIT_ONE.test(line)) || SQL_FETCH.test(line)) {
+      const batch = BATCH_MARK.test(line) && !/(\.routes|\.controller|\.ai)\.js$/.test(file);
+      if (((SQL_LIMIT.test(line) && !SQL_LIMIT_ONE.test(line)) || SQL_FETCH.test(line)) && !batch) {
         report(file, i + 1, "SQL LIMIT/OFFSET outside shared/http/paged.js; use pageQuery()");
       }
     }
