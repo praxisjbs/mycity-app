@@ -411,6 +411,13 @@ tbody tr:last-child td{border-bottom:0}
 .art li{margin-bottom:5px}
 .art blockquote{margin:14px 0 0;padding:11px 15px;border-left:3px solid var(--yellow);background:var(--surface);
   border-radius:0 9px 9px 0;font-size:12.5px;color:var(--ink-2)}
+/* Knowledge Hub, Praxis AI and Public Site, 14/10 screen conventions: 44 px article tabs on a phone,
+   the Ask screen beside its suggestions on desktop, a 44 px send button */
+.aigrid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:12px;align-items:start}
+.aisend{width:44px;height:44px;padding:0;justify-content:center;border-radius:50%;flex:none}
+.ai-a .tcards{padding:0}
+@media(max-width:1180px){.aigrid{grid-template-columns:1fr}}
+@media(max-width:760px){.rnav button,.task.aisug{min-height:44px;display:flex;align-items:center}}
 
 /* MISC */
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -1323,7 +1330,7 @@ function mail2(rows,sel,open){
 function reader(groups,sel,art){
   var nav='';
   groups.forEach(function(g){nav+='<div class="gl">'+esc(g[0])+'</div>'+
-    g[1].map(function(t){return '<button'+(t===sel?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')});
+    g[1].map(function(t){return '<button'+(t===sel?' class="on"':'')+'><span data-copy="content">'+esc(t)+'</span></button>'}).join('')});
   return '<div class="read"><div class="rnav">'+nav+'</div><div class="art">'+art+'</div></div>'}
 function artHead(title,meta){return '<h2>'+esc(title)+'</h2><div class="meta">'+meta+'</div>'}
 
@@ -2820,9 +2827,9 @@ var M=[
       ['Equipment',26,'₦486k'],['Office and admin',12,'₦219k','var(--yellow)']])+'</div>'}}]},
 
 {k:'knowledge',n:'Knowledge Hub',i:'book',g:'SYSTEM',tabs:[
-  {n:'Policies',r:function(){return head('Policies','HR and company policy',[['Search'],['New policy',1]])+
-    statstrip([['Policies','6 current'],['Archived','2'],['Reading now','Attendance, v4'],
-      ['Owner','Operations'],['Last updated','01/10/2026']])+
+  {n:'Policies',r:function(){return head('Policies','',[['Search'],['New Policy',1]])+
+    statstrip([['Policies','6 current'],['Archived','2'],['Reading Now','Attendance, v4','','dsk'],
+      ['Owner','Operations','','dsk'],['Last Updated','01/10/2026','','dsk']])+
     reader([['Current',['Employee handbook','Attendance and punctuality','Data protection, NDPA','Expense and procurement','Disciplinary procedure','Remote and hybrid working']],
       ['Archived',['Attendance policy v2','Handbook v2']]],'Attendance and punctuality',
       artHead('Attendance and punctuality',pill('ok','Current')+pill('nt','Version 4')+pill('nt','Updated 01/10/2026')+pill('nt','Owner: Operations'))+
@@ -2840,9 +2847,9 @@ var M=[
       '<h4>Deductions</h4><p>Where a decision results in a deduction, the tiers are ten percent of the day up to one hour, twenty percent up to two hours, and thirty percent up to three hours. Beyond three hours is treated as absence by decision, not automatically.</p>'+
       '<p>No deduction ever enters a payroll run by itself. Finance or Operations has to accept it.</p>'+
       '<h4>Missing a clock-out</h4><p>A punch with no matching clock-out is flagged the following morning and raises a query. Operations can reconcile the day instead, and the original punch is kept alongside the correction.</p>')}},
-  {n:'SOPs',r:function(){return head('SOPs','How to do things in the platform',[['Search'],['New SOP',1]])+
-    statstrip([['SOPs','8'],['Categories','5'],['Reading now','Raise an expense'],
-      ['Read this month','142'],['Average length','2 minutes']])+
+  {n:'SOPs',r:function(){return head('SOPs','',[['Search'],['New SOP',1]])+
+    statstrip([['SOPs','8'],['Categories','5'],['Reading Now','Raise an expense','','dsk'],
+      ['Read This Month','142'],['Average Length','2 minutes']])+
     reader([['Attendance',['How do I clock in from home?','How do I fix a missing clock-out?']],
       ['Money',['How do I raise an expense?','How do I log a disbursement?']],
       ['People',['How do I respond to a query?','How do I set my team’s KPIs?']],
@@ -2863,11 +2870,12 @@ var M=[
       '<p>Operations then groups approved requests into a requisition, so the CEO approves one number rather than five.</p>'+
       '<blockquote>You can see exactly where your request is at any time, and how long it has been sitting there. So can the approver.</blockquote>'+
       '<h4>If it is rejected</h4><p>You are told, with the reason. A rejected request can be corrected and resubmitted, and keeps its history.</p>')}},
-  {n:'FAQs',r:function(){return head('FAQs','Answered in a sentence or two',[['New FAQ',1]])+
-    statstrip([['Questions','12'],['Asked this month','84'],['Most asked','Lateness'],['Unanswered','2','warn'],['From Praxis AI','31']])+
-    '<div class="grid g32">'+
-    '<div>'+chips([['All 12',1],['Attendance 4'],['Payroll 3'],['Leave 2'],['Queries 2'],['Tasks 1']])+
-    accord([['Why was I marked late when I clocked in at 09:05?','The grace window is 15 minutes, so 09:15 is the cut off. If you clocked in at 09:05 and were still marked late, check which worksite you were inside. Raise it with Operations and it can be waived.',1],
+  {n:'FAQs',r:function(){return head('FAQs','',[['New FAQ',1]])+
+    helpOn(helpOn(statstrip([['Questions','12'],['Asked This Month','84'],['Most Asked','Lateness'],['Unanswered','2','warn'],['From Praxis AI','31']]),
+      'Unanswered','Questions waiting on a decision before an answer can be written.'),
+      'From Praxis AI','Questions this month that were asked of Praxis AI first.')+
+    chips([['All 12',1],['Attendance 4'],['Payroll 3'],['Leave 2'],['Queries 2'],['Tasks 1']])+
+    '<div data-copy="content">'+accord([['Why was I marked late when I clocked in at 09:05?','The grace window is 15 minutes, so 09:15 is the cut off. If you clocked in at 09:05 and were still marked late, check which worksite you were inside. Raise it with Operations and it can be waived.',1],
       ['Do Saturdays count towards lateness?','Yes. Saturday hours are 09:00 to 15:00 and the same grace window applies.'],
       ['When do I get my payslip?','Payslips appear in Employee Self-Service once the run is approved and locked, normally on the 27th.'],
       ['Who can see a query raised against me?','You, whoever raised it, People, and the CEO. Other managers cannot see it.'],
@@ -2878,95 +2886,77 @@ var M=[
       ['How do I see the goal my KPI rolls up to?','Employee Self-Service, My Performance. The whole chain above your KPI is shown.'],
       ['Who approves my leave?','Your line manager, in one step. The calendar shows clashes before you submit.'],
       ['Can I see another department’s targets?','Departmental targets are visible to everyone once the CEO approves them.'],
-      ['What is Praxis AI allowed to do?','Read, within your permissions. It never writes a record.']])+'</div>'+
-    kvcard('Where an FAQ comes from',[['Asked twice','A question asked twice goes on this list'],
-      ['From Praxis AI','Thirty-one of this month’s questions were asked of the assistant first'],
-      ['Who writes them','People and Operations'],
-      ['Length','A sentence or two. If it needs more, it is a policy or an SOP'],
-      ['Unanswered','Two sit in a queue waiting for a decision, not for wording'],
-      ['Search','Everything here is findable from ⌘K, in English']])+'</div>'}},
-  {n:'Training',r:function(){return head('Training','Resources and onboarding material',[['New resource',1]])+
-    kpis([['Resources','4'],['Completion','68%'],['Overdue','6','warn'],['Certificates issued','19']])+
-    cards([['Platform walkthrough','A 12 minute tour of the modules you will use every day.','<span class="pill nt">Video</span>'],
+      ['What is Praxis AI allowed to do?','Read, within your permissions. It never writes a record.']])+'</div>'}},
+  {n:'Training',r:function(){return head('Training','',[['New Resource',1]])+
+    kpis([['Resources','4'],['Completion','68%'],['Overdue','6','warn'],['Certificates Issued','19']])+
+    '<div class="grid g2">'+[['Platform walkthrough','A 12 minute tour of the modules you will use every day.','<span class="pill nt">Video</span>'],
       ['NDPA data protection','Annual refresher. Certificate issued on completion.','<span class="pill wa"><i></i>Due 30/11</span>'],
       ['Partnership pipeline training','For Marketing and Sales. How stages and lead owners work.','<span class="pill nt">Document</span>'],
-      ['Expense requests','How to raise, what to attach, and what the thresholds mean.','<span class="pill nt">Document</span>']],2)+
+      ['Expense requests','How to raise, what to attach, and what the thresholds mean.','<span class="pill nt">Document</span>']].map(function(c){
+      return '<div class="tile"><h4>'+esc(c[0])+'</h4><p data-copy="content">'+esc(c[1])+'</p><div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+c[2]+'</div></div>'}).join('')+'</div>'+
     '<div class="grid g2" style="margin-top:12px">'+
     table([['Resource'],['Assigned','n'],['Completed','n'],['Progress']],[
       ['Platform walkthrough','25','23',mini(92,'92%')],
       ['NDPA data protection','25','19',mini(76,'76%')],
       ['Partnership pipeline training','6','4',mini(67,'67%')],
       ['Expense requests','25','9',mini(36,'36%')]],'Completion','<span class="sub">Across 25 staff</span>')+
-    table([['Overdue'],['Resource'],['Due']],[
+    table([['Employee'],['Resource'],['Due']],[
       [st(1),'NDPA data protection','30/11/2026'],[st(5),'NDPA data protection','30/11/2026'],
       [st(7),'NDPA data protection','30/11/2026'],[st(0),'Expense requests','31/10/2026'],
-      [st(3),'Expense requests','31/10/2026'],[st(6),'Expense requests','31/10/2026']],'Who has not finished',
-      pill('wa','6 people'))+'</div>'+
-    '<p class="sub" style="margin-top:12px">The NDPA refresher issues a certificate into the employee’s document vault with an expiry date, which is what the expiry alert reads.</p>'}},
-  {n:'Announcements',r:function(){return head('Announcements','Also posted to the staff community',[['New announcement',1]])+
-    kpis([['Published','4'],['Scheduled','1'],['Average read','92%','ok'],['This quarter','7']])+
-    table([['Title'],['Posted by'],['Date'],['Audience'],['Read','n'],['Status']],[
+      [st(3),'Expense requests','31/10/2026'],[st(6),'Expense requests','31/10/2026']],'Not Finished',
+      pill('wa','6 people'))+'</div>'}},
+  {n:'Announcements',r:function(){return head('Announcements','',[['New Announcement',1]])+
+    helpOn(kpis([['Published','4'],['Scheduled','1'],['Average Read','92%','ok'],['This Quarter','7']]),
+      'Average Read','Share of staff who opened each published announcement, averaged.')+
+    helpOn(table([['Title'],['Posted by'],['Date'],['Audience'],['Read','n'],['Status']],[
       ['Ember to Remember kicks off','Ifeoma Chukwu','22/09/2026','Everyone','25 of 25',pill('ok','Published')],
       ['Saturday hours confirmed','Cynthia Osakunih','01/10/2026','Everyone','24 of 25',pill('ok','Published')],
       ['NDPA refresher due','Cynthia Osakunih','28/09/2026','Everyone','23 of 25',pill('ok','Published')],
       ['New faces in Enugu','People','06/10/2026','Everyone','19 of 25',pill('ok','Published')],
-      ['Q4 review cycle opens','People','—','Everyone','—',pill('nt','Scheduled 20/10')]],'Announcements')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    kvcard('The same announcement, two places',[['Here','The permanent record, with read counts'],
-      ['#announcements','The channel, read only, so it appears where people already are'],
-      ['Notification','In app, and by email if the person has that switched on'],
-      ['Who can post','People, and the CEO. Nobody else'],
-      ['Editing','A published announcement can be corrected. The edit is logged'],
-      ['Scheduling','Dated forward, like the Q4 cycle on 20 October']])+
+      ['Q4 review cycle opens','People','—','Everyone','—',pill('nt','Scheduled 20/10')]],'Announcements'),
+      'Announcements','Each one also posts to #announcements in Staff Community.')+
+    '<div class="donly" style="margin-top:12px">'+
     tl('Recent',[['New faces in Enugu','06/10/2026','Posted by People. Nineteen of twenty-five have read it.','hi'],
       ['Saturday hours confirmed','01/10/2026','Posted by Cynthia Osakunih. Twenty-four of twenty-five.','ok'],
       ['NDPA refresher due','28/09/2026','Posted by Cynthia Osakunih. Linked to the training resource.','ok'],
       ['Ember to Remember kicks off','22/09/2026','Posted by the CEO. Everyone.','ok']])+'</div>'}}]},
 
 {k:'ai',n:'Praxis AI',i:'spark',g:'SYSTEM',tabs:[
-  {n:'Ask',r:function(){return head('Praxis AI','Answers from your data, within your permissions')+
-    '<div class="card" style="max-width:840px"><div style="display:flex;flex-direction:column;gap:14px">'+
+  {n:'Ask',r:function(){var quiet=[['Eko Hotels','Bashir Lawal','34'],['Landmark Beach','Bashir Lawal','41'],['Enugu Tourism Board','Ngozi Eze','38'],['Kano Trade Council','Ngozi Eze','52']];
+    return head('Praxis AI')+
+    '<div class="aigrid"><div class="card"><div style="display:flex;flex-direction:column;gap:14px">'+
     '<div class="ai-q">Which partnerships have gone inactive, and who owns them?</div>'+
     '<div class="ai-a"><p style="font-size:13.5px">Four partnerships have had no recorded contact in over 30 days.</p>'+
-    '<div class="tscroll" style="margin-top:11px"><table><thead><tr><th>Partner</th><th>Owner</th><th class="num">Days quiet</th></tr></thead><tbody>'+
-    [['Eko Hotels','Bashir Lawal','34'],['Landmark Beach','Bashir Lawal','41'],['Enugu Tourism Board','Ngozi Eze','38'],['Kano Trade Council','Ngozi Eze','52']]
-      .map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td class="num">'+r[2]+'</td></tr>'}).join('')+
-    '</tbody></table></div><p style="font-size:13px;margin-top:11px;color:var(--ink-2)">Two sit with Bashir Lawal, who also has an open attendance query.</p>'+
+    '<div class="tscroll donly" style="margin-top:11px"><table><thead><tr><th>Partner</th><th>Owner</th><th class="num">Days Quiet</th></tr></thead><tbody>'+
+    quiet.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td class="num">'+r[2]+'</td></tr>'}).join('')+
+    '</tbody></table></div><div class="monly" style="margin-top:11px">'+tcards([['Partner'],['Owner'],['Days Quiet','n']],quiet)+'</div>'+
+    '<p style="font-size:13px;margin-top:11px;color:var(--ink-2)">Two sit with Bashir Lawal, who also has an open attendance query.</p>'+
     '<div class="src"><b>From</b><span class="srcchip">partnership ×4</span><span class="srcchip">interaction log</span><span class="srcchip">employee ×2</span></div></div>'+
     '<div class="ai-q">Create a follow up task for each of them</div>'+
     '<div class="ai-a"><p style="font-size:13.5px">I do not create records. I can take you to the right screen with the details filled in.</p>'+
-    '<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap"><button class="btn pri">'+ic('right')+'Open Tasks, 4 drafts ready</button><button class="btn">Not now</button></div>'+
-    '<p class="sub" style="margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)">Praxis AI reads. Every write happens in the module that owns it, by a person.</p></div></div>'+
-    '<div style="display:flex;gap:8px;margin-top:16px"><input class="inp" style="height:42px;border-radius:999px" placeholder="Ask about your operations" aria-label="Ask Praxis AI">'+
-    '<button class="btn pri" style="width:42px;height:42px;padding:0;justify-content:center;border-radius:50%">'+ic('send')+'</button></div></div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
-    '<div class="card"><div class="ch"><h3>Try asking</h3></div>'+
+    '<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap"><button class="btn pri">'+ic('right')+'Create 4 Tasks</button><button class="btn">Dismiss</button></div></div></div>'+
+    '<div style="display:flex;gap:8px;margin-top:16px"><input class="inp" style="height:44px;border-radius:999px" placeholder="Who is late?" aria-label="Ask Praxis AI">'+
+    '<button class="btn pri aisend" aria-label="Send">'+ic('send')+'</button></div></div>'+
+    '<div class="card"><div class="ch"><h3>Suggested Questions</h3></div>'+
     ['Who has overdue tasks, by department?','What is budget versus actual this month?',
      'Which candidates are waiting on panel feedback?','Who is due for confirmation in the next 30 days?',
      'Which contracts renew before March?','How many late arrivals this month, and by whom?'].map(function(q){
-      return '<button class="task" style="margin:0 0 6px"><b style="margin:0;font-weight:500">'+esc(q)+'</b></button>'}).join('')+'</div>'+
-    kvcard('What it can and cannot do',[['Reads','Any record you could open yourself'],
-      ['Never reads','A record your role cannot see. The answer is shorter, not wider'],
-      ['Writes','Nothing. Not one record, not ever'],
-      ['Cites','Which tables and how many rows it read, on every answer'],
-      ['Spend','Metered per month and visible in Settings'],
-      ['Model','Gemini, with the catalogue derived only from module manifests']])+'</div>'}},
-  {n:'History',r:function(){return head('History','Your questions, and what they read',[['Export'],['Clear history']])+
-    kpis([['Questions this month','84'],['Your questions','31'],['Spend','₦1,840'],['Monthly cap','₦25,000','ok']])+
-    table([['Question'],['Asked'],['Sources read'],['Tokens','n'],['Cost','n']],[
+      return '<button class="task aisug" style="margin:0 0 6px"><b style="margin:0;font-weight:500">'+esc(q)+'</b></button>'}).join('')+'</div></div>'}},
+  {n:'History',r:function(){return head('History','',[['Export'],['Clear History']])+
+    helpOn(kpis([['Questions This Month','84'],['Your Questions','31'],['Spend','₦1,840'],['Monthly Cap','₦25,000','ok']]),
+      'Monthly Cap','The most Praxis AI may spend in a month. Set in Settings, Integrations.')+
+    table([['Question'],['Asked'],['Sources Read'],['Tokens','n'],['Cost','n']],[
       ['Which partnerships have gone inactive?','09/10 09:12','partnership, interaction log, employee','2,140','₦18'],
       ['Who has overdue tasks?','09/10 08:40','task, employee','1,890','₦16'],
       ['What is budget versus actual this month?','08/10 16:22','expense, budget','2,610','₦22'],
       ['Which candidates are awaiting feedback?','08/10 11:05','applicant, interview round','1,740','₦15'],
       ['Who is due for confirmation?','07/10 09:30','employee','980','₦8'],
       ['How many late arrivals this month?','07/10 08:14','attendance, employee','1,420','₦12'],
-      ['Which contracts renew before March?','06/10 15:40','contract, partnership','1,180','₦10']],'Your questions')+
+      ['Which contracts renew before March?','06/10 15:40','contract, partnership','1,180','₦10']],'Your Questions',null,null,null,[1,4])+
     '<div class="grid g2" style="margin-top:12px">'+
-    areaChart('Spend per month, Naira',[420,780,1240,1610,1840],'Against a ₦25,000 monthly cap. At this rate the cap is not the constraint.')+
-    bars('What gets asked about',[['Partnerships',100,'26'],['Attendance',73,'19'],['Tasks',58,'15'],
-      ['Recruitment',46,'12'],['Expenses',35,'9'],['Payroll',12,'3','var(--yellow)']],
-      'Payroll is asked about least and is the most sensitive. That is the field security working, not disinterest.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Every turn is traced: the question, the tables read, the row counts, the tokens and the cost. Spend is capped per month and visible in Settings.</p>'}}]},
+    areaChart('Spend per Month, Naira',[420,780,1240,1610,1840],'Against a ₦25,000 monthly cap')+
+    bars('Questions by Module',[['Partnerships',100,'26'],['Attendance',73,'19'],['Tasks',58,'15'],
+      ['Recruitment',46,'12'],['Expenses',35,'9'],['Payroll',12,'3','var(--yellow)']])+'</div>'}}]},
 
 {k:'settings',n:'Settings',i:'cog',g:'SYSTEM',tabs:[
   {n:'Organisation',r:function(){return head('Organisation','MyCity App Ltd',[['Save',1]])+
@@ -3118,156 +3108,90 @@ var M=[
   {n:'Audit Log',r:function(){return attAuditTab()}}]},
 
 {k:'public',n:'Public Site',i:'globe',g:'SEPARATE APP',tabs:[
-  {n:'Careers',r:function(){return head('Careers','What a stranger sees at go.mycityapp.io/jobs')+
+  {n:'Careers',r:function(){return head('Careers','go.mycityapp.io/jobs')+
     pub('Careers','<div style="text-align:center;margin-bottom:22px"><div style="display:inline-flex;align-items:center;gap:9px;color:var(--green)">'+
     '<svg class="ico" viewBox="0 0 24 24" style="color:var(--green)"><use href="#i-pin"/></svg><b style="font-size:16px">MyCityApp</b></div>'+
-    '<h2 style="font-size:24px;margin-top:14px">Work with us</h2><p class="sub" style="margin-top:6px">Building the app that knows every Nigerian city.</p></div>'+
+    '<h2 style="font-size:24px;margin-top:14px">Work With Us</h2><p class="sub" style="margin-top:6px">Building the app that knows every Nigerian city.</p></div>'+
     [['Content Producer','Content · Lagos · Hybrid'],['Partnerships Associate','Marketing & Sales · Lagos · Hybrid'],
      ['Backend Engineer','Engineering · Remote']].map(function(v){
       return '<div style="border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:9px;display:flex;align-items:center;gap:12px">'+
       '<div style="flex:1;min-width:0"><div style="font-weight:650;font-size:14px">'+v[0]+'</div><div class="sub">'+v[1]+'</div></div>'+
-      '<button class="btn pri">View</button></div>'}).join('')+
-    '<p class="sub" style="text-align:center;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">A paused vacancy disappears from this list and keeps its link.</p>')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    kvcard('What is public, and what is not',[['Indexable','The careers list and each open vacancy. Readable slugs'],
-      ['Token only','Applying, an assessment, an offer to sign. Opaque, one person, not indexable'],
-      ['Never public','A candidate’s score, another applicant’s existence, any employee record'],
-      ['Served from','go.mycityapp.io, a separate application'],
-      ['Why separate','The public site holds no session and cannot read the ERP’s tables'],
-      ['Write only','An application writes. It never reads back']])+
-    table([['Public page'],['Reachable by'],['Reads'],['Writes']],[
-      ['Careers list','Anyone','Open vacancies','Nothing'],
-      ['Vacancy','A readable slug','That one vacancy','Nothing'],
-      ['Apply','A token','Nothing','One application'],
-      ['Assessment','A token','That candidate’s own answers','Their answers'],
-      ['Sign offer','A token','That one offer','One signature'],
-      ['Verify document','A reference','Two hashes','Nothing']],'The six public pages')+'</div>'}},
-  {n:'Vacancy',r:function(){return head('Vacancy','A readable slug, indexable. Tokens are for the private links')+
+      '<button class="btn pri">View Role</button></div>'}).join(''))}},
+  {n:'Vacancy',r:function(){return head('Vacancy','go.mycityapp.io/jobs/partnerships-associate')+
     pub('Vacancy','<h2 style="font-size:21px">Partnerships Associate</h2><p class="sub" style="margin-top:5px">Marketing &amp; Sales · Lagos, Nigeria · Hybrid, 4 days on site · ₦500,000 to ₦700,000</p>'+
-    '<div style="margin:16px 0;display:flex;gap:6px;flex-wrap:wrap">'+pill('nt','Full time')+pill('nt','3 month probation')+pill('nt','Reports to Operations')+'</div>'+
+    '<div style="margin:16px 0;display:flex;gap:6px;flex-wrap:wrap">'+pill('nt','Full time')+pill('nt','3 month probation')+pill('nt','Reports to Operations')+
+    pill('nt','19 applicants')+pill('nt','Closes when filled')+'</div>'+
     '<p style="font-size:13.5px;color:var(--ink-2);line-height:1.6">You will build and hold the relationships that put MyCityApp in front of millions of Nigerians. Working with brands, government and venues across Lagos and beyond.</p>'+
-    '<h4 style="margin-top:16px;font-size:13.5px">Must have</h4><p style="font-size:13px;color:var(--ink-2);margin-top:5px">A degree in management, marketing or business. Fluent English. Four years in partnerships or business development. Comfortable in a room with a commissioner and a brand manager on the same afternoon.</p>'+
-    '<h4 style="margin-top:16px;font-size:13.5px">Nice to have</h4><p style="font-size:13px;color:var(--ink-2);margin-top:5px">Experience in telecoms, banking or hospitality partnerships. A network in Lagos State government.</p>'+
-    '<h4 style="margin-top:16px;font-size:13.5px">How we hire</h4><p style="font-size:13px;color:var(--ink-2);margin-top:5px">Application, then two psychometric assessments and a case study, then a panel of three. We will tell you where you are at each step.</p>'+
-    '<button class="btn pri" style="width:100%;justify-content:center;height:42px;margin-top:20px">Apply for this role</button>'+
-    '<p class="sub" style="text-align:center;margin-top:12px">19 people have applied. Closes when filled.</p>')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    kvcard('How this page is reached',[['URL','go.mycityapp.io/jobs/partnerships-associate'],
-      ['Why a slug','A careers page exists to be found, shared and indexed. An opaque token is none of those'],
-      ['Enumeration','The slug is not a sequence. Guessing one for an unpublished role returns the same 404 as nonsense'],
-      ['If paused','The slug keeps working, so a bookmark and a shared link both survive'],
-      ['If filled','The page says so. It does not 404'],
-      ['Reads','This one vacancy. Nothing else in the system']])+
-    table([['Field on this page'],['Comes from']],[
-      ['Title, department, location','The vacancy record'],
-      ['Salary range','The grade band for the role'],
-      ['Must have, nice to have','Drafted by the wizard, edited by the hiring manager'],
-      ['How we hire','The assessment set attached to the vacancy'],
-      ['Applicant count','Live, from applications'],
-      ['Apply button','Mints a one-time token and opens the write-only form']],'Nothing here is typed twice')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Only the careers list and a vacancy carry readable addresses, because they are meant to be found. Apply, assessment and offer signing are reached by an opaque per-person token that is not indexable and cannot be walked.</p>'}},
-  {n:'Apply',r:function(){return head('Apply','Write only. The candidate never reads back their own score.')+
+    '<h4 style="margin-top:16px;font-size:13.5px">Must Have</h4><p style="font-size:13px;color:var(--ink-2);margin-top:5px">A degree in management, marketing or business. Fluent English. Four years in partnerships or business development. Comfortable in a room with a commissioner and a brand manager on the same afternoon.</p>'+
+    '<h4 style="margin-top:16px;font-size:13.5px">Nice to Have</h4><p style="font-size:13px;color:var(--ink-2);margin-top:5px">Experience in telecoms, banking or hospitality partnerships. A network in Lagos State government.</p>'+
+    '<h4 style="margin-top:16px;font-size:13.5px">How We Hire</h4><p style="font-size:13px;color:var(--ink-2);margin-top:5px">Application, then two psychometric assessments and a case study, then a panel of three. We will tell you where you are at each step.</p>'+
+    '<button class="btn pri" style="width:100%;justify-content:center;height:44px;margin-top:20px">Apply Now</button>')}},
+  {n:'Apply',r:function(){setTimeout(pubApplyLive,0);return head('Apply')+
     pub('Apply','<h2 style="font-size:20px">Apply: Partnerships Associate</h2>'+
-    '<div style="display:flex;flex-direction:column;gap:13px;margin-top:18px">'+
-    [['Full name','Adaeze Nnamdi'],['Email','adaeze.n@example.com'],['Phone','+234 802 114 9087'],['Years of experience','5']].map(function(f){
-      return '<div><label style="font-size:12.5px;font-weight:600;color:var(--ink-2);display:block;margin-bottom:5px">'+f[0]+'</label><input class="inp" value="'+f[1]+'"></div>'}).join('')+
-    '<div><label style="font-size:12.5px;font-weight:600;color:var(--ink-2);display:block;margin-bottom:5px">CV</label>'+
-    '<div style="border:1.5px dashed var(--line-2);border-radius:10px;padding:18px;text-align:center">'+ic('doc','ico')+
+    '<div style="margin-top:18px">'+
+    field('pa-name','Full Name','<input class="inp" id="pa-name" value="Adaeze Nnamdi" autocomplete="name">','Enter your name')+
+    field('pa-email','Email','<input class="inp" id="pa-email" type="email" value="adaeze.n@example.com" autocomplete="email">','Not a valid email')+
+    field('pa-phone','Phone','<input class="inp" id="pa-phone" type="tel" value="+234 802 114 9087" autocomplete="tel">','Not a valid number')+
+    field('pa-years','Years of Experience','<input class="inp" id="pa-years" inputmode="numeric" value="5" style="max-width:140px">','Enter a whole number')+
+    field('pa-cv','CV','<div id="pa-cv" style="border:1.5px dashed var(--line-2);border-radius:10px;padding:18px;text-align:center">'+ic('doc','ico')+
     '<div style="font-size:13px;margin-top:6px">adaeze-nnamdi-cv.pdf</div><div class="sub">1.2 MB · uploaded</div>'+
-    '<div class="mini" style="margin-top:9px;max-width:220px;margin-left:auto;margin-right:auto"><span class="tr"><i style="width:100%"></i></span><span>100%</span></div></div></div>'+
-    '<div><label style="font-size:12.5px;font-weight:600;color:var(--ink-2);display:block;margin-bottom:5px">Why this role?</label>'+
-    '<textarea class="inp" style="height:76px;padding:10px 12px" rows="3">I have spent four years opening doors for consumer brands in Lagos.</textarea></div>'+
-    '<button class="btn pri" style="width:100%;justify-content:center;height:42px">Submit application</button>'+
-    '<p class="sub" style="text-align:center">We will email you within five working days.</p></div>')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    kvcard('Why the upload looks like that',[['Preview','From the moment the picker closes, so a wrong file is obvious now'],
-      ['Percentage','0 to 100, then an explicit Upload complete'],
-      ['Compression','Before the bytes leave the device'],
-      ['Why it matters','A 12 MB phone photograph on a Lagos connection is indistinguishable from a frozen screen'],
-      ['What it prevents','Double uploads, and a CV nobody can open'],
-      ['Never','A bare file input. Every upload goes through the engine']])+
-    '<div class="card"><div class="ch"><h3>What happens after Submit</h3></div>'+
-    '<div class="chain">'+[['Application written','done'],['Screening score','now'],['A person reads it',''],['Assessment invitation',''],['Panel','']].map(function(st2,i){
-      return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+st2[1]+'">'+(st2[1]==='done'?ic('ok'):'')+esc(st2[0])+'</span>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">The form is write only. The candidate cannot read back their screening score, another applicant, or anything else in the system.</p>'+
-    '<div class="quote" style="margin-top:12px">The score is provisional until a person opens the CV. It ranks the queue. It never rejects anybody.</div></div></div>'}},
-  {n:'Assessment',r:function(){return head('Assessment','Timed, autosaved, resumable if the connection drops')+
+    '<div class="mini" style="margin-top:9px;max-width:220px;margin-left:auto;margin-right:auto"><span class="tr"><i style="width:100%"></i></span><span>100%</span></div></div>','Attach your CV')+
+    field('pa-why','Why This Role?','<textarea class="inp" id="pa-why" style="height:76px" rows="3">I have spent four years opening doors for consumer brands in Lagos.</textarea>','Tell us why')+
+    '<button class="btn pri" style="width:100%;justify-content:center;height:44px">Send Application</button></div>')+
+    '<div class="card" style="margin-top:12px"><div class="ch"><h3>Application Progress</h3></div><div class="chain">'+
+    [['Application Received','done'],['Screening','now','Provisional until a person opens the CV. It ranks the queue and never rejects anyone.'],
+     ['CV Review',''],['Assessment',''],['Panel','']].map(function(st2,i){
+      return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+st2[1]+'">'+(st2[1]==='done'?ic('ok'):'')+(st2[2]?hint(st2[0],st2[2]):esc(st2[0]))+'</span>'}).join('')+'</div></div>'}},
+  {n:'Assessment',r:function(){return head('Assessment')+
     pub('Assessment','<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">'+
-    '<div style="flex:1"><h2 style="font-size:18px">Partnership brief</h2><p class="sub">Case study · Question 3 of 6</p></div>'+
-    '<div style="text-align:right"><div style="font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--warn)">42:18</div><div class="sub">remaining</div></div></div>'+
+    '<div style="flex:1"><h2 style="font-size:18px">Partnership Brief</h2><p class="sub">Case study · Question 3 of 6</p></div>'+
+    '<div style="text-align:right"><div style="font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--warn)">42:18</div><div class="sub">'+
+    hint('Remaining','The timer keeps running if you close this tab. Open the link again to carry on from here.')+'</div></div></div>'+
     '<div style="height:5px;border-radius:99px;background:var(--surface);margin-bottom:20px;overflow:hidden"><i style="display:block;height:100%;width:50%;background:var(--c1);border-radius:99px"></i></div>'+
-    '<p style="font-size:14px;font-weight:600;line-height:1.5">A hotel group wants to list 40 properties on MyCityApp but will not pay a listing fee. Outline the partnership you would propose, and what MyCity gets.</p>'+
-    '<textarea class="inp" style="height:150px;padding:11px 13px;margin-top:14px" rows="6">I would structure it as a revenue share on bookings driven through the app rather than a flat fee...</textarea>'+
-    '<div style="display:flex;align-items:center;gap:10px;margin-top:14px"><span class="sub" style="flex:1">'+ic('ok')+' Saved 8 seconds ago</span>'+
-    '<button class="btn">Back</button><button class="btn pri">Next question</button></div>'+
-    '<p class="sub" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">The timer runs on the server. Closing this tab does not stop it, and reopening the link resumes exactly here.</p>')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Adaeze Nnamdi\u2019s set'],['Type'],['Duration'],['Status']],[
+    '<p style="font-size:14px;font-weight:600;line-height:1.5;margin-bottom:14px">A hotel group wants to list 40 properties on MyCityApp but will not pay a listing fee. Outline the partnership you would propose, and what MyCity gets.</p>'+
+    field('as-ans','Your Answer','<textarea class="inp" id="as-ans" style="height:150px;padding:11px 13px" rows="6">I would structure it as a revenue share on bookings driven through the app rather than a flat fee...</textarea>')+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="sub" style="flex:1">'+ic('ok')+' Saved 8 seconds ago</span>'+
+    '<button class="btn">Back</button><button class="btn pri">Next Question</button></div>')+
+    '<div style="margin-top:12px">'+
+    table([['Assessment'],['Type'],['Duration'],['Status']],[
       ['Numerical reasoning','Psychometric','25 min',pill('ok','Done · 84')],
       ['Situational judgement','Psychometric','20 min',pill('ok','Done · 84')],
-      ['Partnership brief','Case study','90 min',pill('wa','In progress')]],'Three assessments for this role')+
-    kvcard('What makes it survivable',[['Timer','Server side. Closing the tab does not stop it'],
-      ['Autosave','Every answer, every few seconds'],
-      ['Resume','The same link reopens exactly here, with the time that is left'],
-      ['If the power goes','Nothing is lost. This is Nigeria, not a hypothetical'],
-      ['Scoring','Automatic for psychometric. A person reads a case study'],
-      ['The candidate sees','That they finished. Never their score']])+'</div>'}},
-  {n:'Sign Offer',r:function(){return head('Sign Offer','Canvas signature, then the document locks')+
+      ['Partnership brief','Case study','90 min',pill('wa','In progress')]],'Adaeze Nnamdi’s Assessments')+'</div>'}},
+  {n:'Sign Offer',r:function(){return head('Sign Offer')+
     pub('Sign Offer','<div style="text-align:center;margin-bottom:18px"><div style="display:inline-flex;align-items:center;gap:9px;color:var(--green)">'+
     '<svg class="ico" viewBox="0 0 24 24" style="color:var(--green)"><use href="#i-pin"/></svg><b style="font-size:15px">MyCityApp</b></div></div>'+
-    '<h2 style="font-size:19px">Offer of employment</h2><p class="sub" style="margin-top:4px">Chiamaka Eze · Content Producer · Expires 22/10/2026</p>'+
+    '<h2 style="font-size:19px">Offer of Employment</h2><p class="sub" style="margin-top:4px">Chiamaka Eze · Content Producer · Expires 22/10/2026</p>'+
     '<div style="border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:14px;max-height:170px;overflow-y:auto;font-size:13px;color:var(--ink-2);line-height:1.6">'+
     '<p>Dear Chiamaka,</p><p style="margin-top:9px">We are pleased to offer you the position of Content Producer at MyCity App Ltd, reporting to the Head of Content, with a start date of 20 October 2026.</p>'+
     '<p style="margin-top:9px">Your gross monthly salary will be ₦480,000, subject to a probationary period of three months. Working hours are 09:00 to 17:00 Monday to Friday and 09:00 to 15:00 on Saturday.</p>'+
     '<p style="margin-top:9px">This offer is conditional upon satisfactory documentation.</p></div>'+
-    '<div style="margin-top:16px"><label style="font-size:12.5px;font-weight:600;color:var(--ink-2);display:block;margin-bottom:6px">Sign below</label>'+
-    '<div style="border:1.5px dashed var(--line-2);border-radius:10px;height:96px;display:flex;align-items:center;justify-content:center;background:var(--surface)">'+
-    '<svg viewBox="0 0 200 50" style="width:170px;height:44px"><path d="M12 36c14-20 22 4 32-8s14 12 26 2 18-16 28-4 16 10 28 2 22-14 32-6" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/></svg></div>'+
-    '<div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end"><button class="btn">Clear</button></div></div>'+
-    '<button class="btn pri" style="width:100%;justify-content:center;height:42px;margin-top:8px">Accept and sign</button>'+
-    '<p class="sub" style="text-align:center;margin-top:10px">Once signed, this document is locked and verifiable at go.mycityapp.io/verify</p>')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    '<div class="card"><div class="ch"><h3>What signing does</h3></div>'+
-    '<div class="tl">'+[['Signature captured','On a canvas, from the phone','','ok'],
-      ['Written into the document','Not stored beside it. Into it','','ok'],
-      ['Final PDF rendered','Once. The template is never applied again',''],
-      ['Two hashes stored','Of the payload, and of the stored bytes',''],
-      ['Document locked','No path in the system can change it',''],
-      ['Verification page live','go.mycityapp.io/verify/OFF-0018','']].map(function(i){
-      return '<div class="it'+(i[3]?' '+i[3]:'')+'"><b>'+esc(i[0])+'</b><span>'+esc(i[1])+'</span></div>'}).join('')+'</div></div>'+
-    kvcard('From the candidate\u2019s side',[['No account','A token in the link. No password, no sign up'],
-      ['On a phone','The canvas is the point. Nobody prints and scans'],
-      ['Expiry','22/10/2026. After that the link says so'],
-      ['Declining','A button. The reason is optional and recorded'],
-      ['What they keep','A PDF, and a verification link that outlives the offer'],
-      ['What they cannot see','Any other candidate, or anything else at MyCity']])+'</div>'}},
-  {n:'Verify Document',r:function(){return head('Verify Document','Two hashes, two verdicts')+
+    '<div style="margin-top:16px">'+field('so-sig','Signature','<div id="so-sig" style="border:1.5px dashed var(--line-2);border-radius:10px;height:96px;display:flex;align-items:center;justify-content:center;background:var(--surface)">'+
+    '<svg viewBox="0 0 200 50" style="width:170px;height:44px"><path d="M12 36c14-20 22 4 32-8s14 12 26 2 18-16 28-4 16 10 28 2 22-14 32-6" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/></svg></div>',null,
+    'Once signed, the offer is locked. Anyone with the reference can check it at go.mycityapp.io/verify.')+
+    '<div style="display:flex;gap:8px;margin-top:-6px;justify-content:flex-end"><button class="btn">Clear Signature</button></div></div>'+
+    '<button class="btn pri" style="width:100%;justify-content:center;height:44px;margin-top:12px">Sign Offer</button>'+
+    '<button class="btn" style="width:100%;justify-content:center;height:44px;margin-top:8px">Decline Offer</button>')}},
+  {n:'Verify Document',r:function(){return head('Verify Document','go.mycityapp.io/verify/OFF-0018')+
     pub('Verify','<div style="text-align:center"><div style="display:inline-flex;align-items:center;gap:9px;color:var(--green)">'+
     '<svg class="ico" viewBox="0 0 24 24" style="color:var(--green)"><use href="#i-pin"/></svg><b style="font-size:15px">MyCityApp</b></div>'+
     '<div style="width:58px;height:58px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:flex;align-items:center;justify-content:center;margin:18px auto 0">'+
     '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:28px;height:28px"><use href="#i-ok"/></svg></div>'+
-    '<h2 style="font-size:19px;margin-top:12px">Document verified</h2></div>'+
+    '<h2 style="font-size:19px;margin-top:12px">Document Verified</h2></div>'+
     '<dl class="kv" style="margin-top:20px;grid-template-columns:150px 1fr">'+
     '<dt>Document</dt><dd>Offer of employment, OFF-0018</dd>'+
-    '<dt>Signed by</dt><dd>Chiamaka Eze</dd>'+
-    '<dt>Signed on</dt><dd>07/10/2026 at 14:22 WAT</dd>'+
-    '<dt>Content hash</dt><dd>'+pill('ok','Matches')+'</dd>'+
-    '<dt>Artifact hash</dt><dd>'+pill('ok','Matches')+'</dd>'+
-    '<dt>Issued by</dt><dd>MyCity App Ltd</dd></dl>'+
-    '<p class="sub" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">The content hash confirms the wording. The artifact hash confirms the stored file. Both must match.</p>')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Content hash'],['Artifact hash'],['Verdict']],[
-      [pill('ok','Matches'),pill('ok','Matches'),pill('ok','Verified')],
-      [pill('ok','Matches'),pill('er','Differs'),pill('er','The stored file was altered')],
-      [pill('er','Differs'),pill('ok','Matches'),pill('er','The record was altered')],
-      [pill('er','Differs'),pill('er','Differs'),pill('er','Not this document')]],'Four possible outcomes')+
-    kvcard('Why two hashes',[['Content hash','Of the data the document was rendered from'],
-      ['Artifact hash','Of the bytes that went into the vault'],
-      ['One hash only','Cannot tell a changed record from a changed file'],
-      ['The rule','Callers hash the master the image engine returns, never the bytes they received'],
-      ['Who can verify','Anyone with the reference. No sign in'],
-      ['What is not shown','Anything except the document type, the signer and the two verdicts']])+'</div>'}}]}
+    '<dt>Signed By</dt><dd>Chiamaka Eze</dd>'+
+    '<dt>Signed On</dt><dd>07/10/2026 at 14:22 WAT</dd>'+
+    '<dt>'+hint('Content Hash','Checks the wording against the record it was issued from. If it differs, the record was altered.')+'</dt><dd>'+pill('ok','Matches')+'</dd>'+
+    '<dt>'+hint('Artifact Hash','Checks the stored file. If it differs, the file was altered after it was issued.')+'</dt><dd>'+pill('ok','Matches')+'</dd>'+
+    '<dt>Issued By</dt><dd>MyCity App Ltd</dd></dl>')}}]}
 ];
+
+/* Public Site · Apply: the fields check themselves as they are filled (FRONTEND_GUIDE §8.3) */
+function pubApplyLive(){live('pa-name',function(v){return v.trim().length>1});
+  live('pa-email',function(v){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.trim())});
+  live('pa-phone',function(v){return /^\+?[\d ]{10,16}$/.test(v.trim())});
+  live('pa-years',function(v){return /^\d{1,2}$/.test(v.trim())});
+  live('pa-why',function(v){return v.trim().length>9})}
 
 function bub(av,name,time,text){return '<div class="bub"><span class="av">'+av+'</span><div class="bd">'+
   '<span class="nm">'+esc(name)+'<span>'+esc(time)+'</span></span><p>'+esc(text)+'</p></div></div>'}
