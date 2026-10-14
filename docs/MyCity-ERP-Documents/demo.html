@@ -411,6 +411,12 @@ tbody tr:last-child td{border-bottom:0}
 .art li{margin-bottom:5px}
 .art blockquote{margin:14px 0 0;padding:11px 15px;border-left:3px solid var(--yellow);background:var(--surface);
   border-radius:0 9px 9px 0;font-size:12.5px;color:var(--ink-2)}
+/* Knowledge Hub, Praxis AI and Public Site, 14/10 screen conventions: 44 px article tabs on a phone,
+   the Ask screen beside its suggestions on desktop, a 44 px send button */
+.aigrid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:12px;align-items:start}
+.aisend{width:44px;height:44px;padding:0;justify-content:center;border-radius:50%;flex:none}
+@media(max-width:1180px){.aigrid{grid-template-columns:1fr}}
+@media(max-width:760px){.rnav button{min-height:44px;display:flex;align-items:center}}
 
 /* MISC */
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -1310,7 +1316,7 @@ function mail2(rows,sel,open){
 function reader(groups,sel,art){
   var nav='';
   groups.forEach(function(g){nav+='<div class="gl">'+esc(g[0])+'</div>'+
-    g[1].map(function(t){return '<button'+(t===sel?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')});
+    g[1].map(function(t){return '<button'+(t===sel?' class="on"':'')+'><span data-copy="content">'+esc(t)+'</span></button>'}).join('')});
   return '<div class="read"><div class="rnav">'+nav+'</div><div class="art">'+art+'</div></div>'}
 function artHead(title,meta){return '<h2>'+esc(title)+'</h2><div class="meta">'+meta+'</div>'}
 
@@ -2882,9 +2888,9 @@ var M=[
       ['Why per category','₦300,000 of stationery is a problem. ₦300,000 of stage hire is a Tuesday']])+'</div>'}}]},
 
 {k:'knowledge',n:'Knowledge Hub',i:'book',g:'SYSTEM',tabs:[
-  {n:'Policies',r:function(){return head('Policies','HR and company policy',[['Search'],['New policy',1]])+
-    statstrip([['Policies','6 current'],['Archived','2'],['Reading now','Attendance, v4'],
-      ['Owner','Operations'],['Last updated','01/10/2026']])+
+  {n:'Policies',r:function(){return head('Policies','',[['Search'],['New Policy',1]])+
+    statstrip([['Policies','6 current'],['Archived','2'],['Reading Now','Attendance, v4','','dsk'],
+      ['Owner','Operations','','dsk'],['Last Updated','01/10/2026','','dsk']])+
     reader([['Current',['Employee handbook','Attendance and punctuality','Data protection, NDPA','Expense and procurement','Disciplinary procedure','Remote and hybrid working']],
       ['Archived',['Attendance policy v2','Handbook v2']]],'Attendance and punctuality',
       artHead('Attendance and punctuality',pill('ok','Current')+pill('nt','Version 4')+pill('nt','Updated 01/10/2026')+pill('nt','Owner: Operations'))+
@@ -2902,9 +2908,9 @@ var M=[
       '<h4>Deductions</h4><p>Where a decision results in a deduction, the tiers are ten percent of the day up to one hour, twenty percent up to two hours, and thirty percent up to three hours. Beyond three hours is treated as absence by decision, not automatically.</p>'+
       '<p>No deduction ever enters a payroll run by itself. Finance or Operations has to accept it.</p>'+
       '<h4>Missing a clock-out</h4><p>A punch with no matching clock-out is flagged the following morning and raises a query. Operations can reconcile the day instead, and the original punch is kept alongside the correction.</p>')}},
-  {n:'SOPs',r:function(){return head('SOPs','How to do things in the platform',[['Search'],['New SOP',1]])+
-    statstrip([['SOPs','8'],['Categories','5'],['Reading now','Raise an expense'],
-      ['Read this month','142'],['Average length','2 minutes']])+
+  {n:'SOPs',r:function(){return head('SOPs','',[['Search'],['New SOP',1]])+
+    statstrip([['SOPs','8'],['Categories','5'],['Reading Now','Raise an expense','','dsk'],
+      ['Read This Month','142'],['Average Length','2 minutes']])+
     reader([['Attendance',['How do I clock in from home?','How do I fix a missing clock-out?']],
       ['Money',['How do I raise an expense?','How do I log a disbursement?']],
       ['People',['How do I respond to a query?','How do I set my team’s KPIs?']],
@@ -2925,11 +2931,12 @@ var M=[
       '<p>Operations then groups approved requests into a requisition, so the CEO approves one number rather than five.</p>'+
       '<blockquote>You can see exactly where your request is at any time, and how long it has been sitting there. So can the approver.</blockquote>'+
       '<h4>If it is rejected</h4><p>You are told, with the reason. A rejected request can be corrected and resubmitted, and keeps its history.</p>')}},
-  {n:'FAQs',r:function(){return head('FAQs','Answered in a sentence or two',[['New FAQ',1]])+
-    statstrip([['Questions','12'],['Asked this month','84'],['Most asked','Lateness'],['Unanswered','2','warn'],['From Praxis AI','31']])+
-    '<div class="grid g32">'+
-    '<div>'+chips([['All 12',1],['Attendance 4'],['Payroll 3'],['Leave 2'],['Queries 2'],['Tasks 1']])+
-    accord([['Why was I marked late when I clocked in at 09:05?','The grace window is 15 minutes, so 09:15 is the cut off. If you clocked in at 09:05 and were still marked late, check which worksite you were inside. Raise it with Operations and it can be waived.',1],
+  {n:'FAQs',r:function(){return head('FAQs','',[['New FAQ',1]])+
+    helpOn(helpOn(statstrip([['Questions','12'],['Asked This Month','84'],['Most Asked','Lateness'],['Unanswered','2','warn'],['From Praxis AI','31']]),
+      'Unanswered','Questions waiting on a decision before an answer can be written.'),
+      'From Praxis AI','Questions this month that were asked of Praxis AI first.')+
+    chips([['All 12',1],['Attendance 4'],['Payroll 3'],['Leave 2'],['Queries 2'],['Tasks 1']])+
+    '<div data-copy="content">'+accord([['Why was I marked late when I clocked in at 09:05?','The grace window is 15 minutes, so 09:15 is the cut off. If you clocked in at 09:05 and were still marked late, check which worksite you were inside. Raise it with Operations and it can be waived.',1],
       ['Do Saturdays count towards lateness?','Yes. Saturday hours are 09:00 to 15:00 and the same grace window applies.'],
       ['When do I get my payslip?','Payslips appear in Employee Self-Service once the run is approved and locked, normally on the 27th.'],
       ['Who can see a query raised against me?','You, whoever raised it, People, and the CEO. Other managers cannot see it.'],
@@ -2940,46 +2947,36 @@ var M=[
       ['How do I see the goal my KPI rolls up to?','Employee Self-Service, My Performance. The whole chain above your KPI is shown.'],
       ['Who approves my leave?','Your line manager, in one step. The calendar shows clashes before you submit.'],
       ['Can I see another department’s targets?','Departmental targets are visible to everyone once the CEO approves them.'],
-      ['What is Praxis AI allowed to do?','Read, within your permissions. It never writes a record.']])+'</div>'+
-    kvcard('Where an FAQ comes from',[['Asked twice','A question asked twice goes on this list'],
-      ['From Praxis AI','Thirty-one of this month’s questions were asked of the assistant first'],
-      ['Who writes them','People and Operations'],
-      ['Length','A sentence or two. If it needs more, it is a policy or an SOP'],
-      ['Unanswered','Two sit in a queue waiting for a decision, not for wording'],
-      ['Search','Everything here is findable from ⌘K, in English']])+'</div>'}},
-  {n:'Training',r:function(){return head('Training','Resources and onboarding material',[['New resource',1]])+
-    kpis([['Resources','4'],['Completion','68%'],['Overdue','6','warn'],['Certificates issued','19']])+
-    cards([['Platform walkthrough','A 12 minute tour of the modules you will use every day.','<span class="pill nt">Video</span>'],
+      ['What is Praxis AI allowed to do?','Read, within your permissions. It never writes a record.']])+'</div>'}},
+  {n:'Training',r:function(){return head('Training','',[['New Resource',1]])+
+    kpis([['Resources','4'],['Completion','68%'],['Overdue','6','warn'],['Certificates Issued','19']])+
+    '<div class="grid g2">'+[['Platform walkthrough','A 12 minute tour of the modules you will use every day.','<span class="pill nt">Video</span>'],
       ['NDPA data protection','Annual refresher. Certificate issued on completion.','<span class="pill wa"><i></i>Due 30/11</span>'],
       ['Partnership pipeline training','For Marketing and Sales. How stages and lead owners work.','<span class="pill nt">Document</span>'],
-      ['Expense requests','How to raise, what to attach, and what the thresholds mean.','<span class="pill nt">Document</span>']],2)+
+      ['Expense requests','How to raise, what to attach, and what the thresholds mean.','<span class="pill nt">Document</span>']].map(function(c){
+      return '<div class="tile"><h4>'+esc(c[0])+'</h4><p data-copy="content">'+esc(c[1])+'</p><div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+c[2]+'</div></div>'}).join('')+'</div>'+
     '<div class="grid g2" style="margin-top:12px">'+
     table([['Resource'],['Assigned','n'],['Completed','n'],['Progress']],[
       ['Platform walkthrough','25','23',mini(92,'92%')],
       ['NDPA data protection','25','19',mini(76,'76%')],
       ['Partnership pipeline training','6','4',mini(67,'67%')],
       ['Expense requests','25','9',mini(36,'36%')]],'Completion','<span class="sub">Across 25 staff</span>')+
-    table([['Overdue'],['Resource'],['Due']],[
+    table([['Employee'],['Resource'],['Due']],[
       [st(1),'NDPA data protection','30/11/2026'],[st(5),'NDPA data protection','30/11/2026'],
       [st(7),'NDPA data protection','30/11/2026'],[st(0),'Expense requests','31/10/2026'],
-      [st(3),'Expense requests','31/10/2026'],[st(6),'Expense requests','31/10/2026']],'Who has not finished',
-      pill('wa','6 people'))+'</div>'+
-    '<p class="sub" style="margin-top:12px">The NDPA refresher issues a certificate into the employee’s document vault with an expiry date, which is what the expiry alert reads.</p>'}},
-  {n:'Announcements',r:function(){return head('Announcements','Also posted to the staff community',[['New announcement',1]])+
-    kpis([['Published','4'],['Scheduled','1'],['Average read','92%','ok'],['This quarter','7']])+
-    table([['Title'],['Posted by'],['Date'],['Audience'],['Read','n'],['Status']],[
+      [st(3),'Expense requests','31/10/2026'],[st(6),'Expense requests','31/10/2026']],'Not Finished',
+      pill('wa','6 people'))+'</div>'}},
+  {n:'Announcements',r:function(){return head('Announcements','',[['New Announcement',1]])+
+    helpOn(kpis([['Published','4'],['Scheduled','1'],['Average Read','92%','ok'],['This Quarter','7']]),
+      'Average Read','Share of staff who opened each published announcement, averaged.')+
+    helpOn(table([['Title'],['Posted by'],['Date'],['Audience'],['Read','n'],['Status']],[
       ['Ember to Remember kicks off','Ifeoma Chukwu','22/09/2026','Everyone','25 of 25',pill('ok','Published')],
       ['Saturday hours confirmed','Cynthia Osakunih','01/10/2026','Everyone','24 of 25',pill('ok','Published')],
       ['NDPA refresher due','Cynthia Osakunih','28/09/2026','Everyone','23 of 25',pill('ok','Published')],
       ['New faces in Enugu','People','06/10/2026','Everyone','19 of 25',pill('ok','Published')],
-      ['Q4 review cycle opens','People','—','Everyone','—',pill('nt','Scheduled 20/10')]],'Announcements')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    kvcard('The same announcement, two places',[['Here','The permanent record, with read counts'],
-      ['#announcements','The channel, read only, so it appears where people already are'],
-      ['Notification','In app, and by email if the person has that switched on'],
-      ['Who can post','People, and the CEO. Nobody else'],
-      ['Editing','A published announcement can be corrected. The edit is logged'],
-      ['Scheduling','Dated forward, like the Q4 cycle on 20 October']])+
+      ['Q4 review cycle opens','People','—','Everyone','—',pill('nt','Scheduled 20/10')]],'Announcements'),
+      'Announcements','Each one also posts to #announcements in Staff Community.')+
+    '<div class="donly" style="margin-top:12px">'+
     tl('Recent',[['New faces in Enugu','06/10/2026','Posted by People. Nineteen of twenty-five have read it.','hi'],
       ['Saturday hours confirmed','01/10/2026','Posted by Cynthia Osakunih. Twenty-four of twenty-five.','ok'],
       ['NDPA refresher due','28/09/2026','Posted by Cynthia Osakunih. Linked to the training resource.','ok'],
