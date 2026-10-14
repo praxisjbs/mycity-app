@@ -1371,7 +1371,12 @@ var STAFF=[['TA','Tolu Adeyemi','Content'],['BL','Bashir Lawal','Marketing & Sal
  ['NE','Ngozi Eze','Marketing & Sales'],['CN','Chidera Nwosu','Content'],['AD','Adedotun Oyinloye','Marketing & Sales']];
 function st(i){return who(STAFF[i][0],STAFF[i][1],STAFF[i][2])}
 
-/* ───── organogram · one render, builder (People) and viewer (ESS) ───── */
+/* ───── organogram · one render, builder (People) and viewer (ESS) ─────
+   Desktop draws the whole tree; a phone draws a focus view (manager, the person, their direct
+   reports) and a tap on a card moves the focus (organogram guide §10). */
+var OGF={builder:null,viewer:null};
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-ogf]');if(!b)return;
+  OGF[b.dataset.ogm]=b.dataset.ogf;render();var s=$('#scroll');if(s)s.scrollTop=0});
 function og(mode){
   var builder=mode==='builder';
   var tree={av:'IC',n:'Ifeoma Chukwu',t:'Chief Executive Officer',d:'General Management',ceo:1,meta:'Since 2019 · Hybrid',children:[
@@ -1390,7 +1395,7 @@ function og(mode){
     if(n.vacant){return '<div class="og-n og-vac">'+
       '<span class="og-av og-vacav">'+ic('plus')+'</span>'+
       '<b>'+esc(n.n)+'</b><span class="og-t">Vacant · '+esc(n.d)+'</span>'+
-      (builder?'<button class="og-chip">'+ic('plus')+'Create vacancy</button>':'<span class="og-open">Open role</span>')+
+      (builder?'<button class="og-chip">'+ic('plus')+'Create Vacancy</button>':'<span class="og-open">Open role</span>')+
       '</div>';}
     return '<div class="og-n'+(n.ceo?' og-ceo':'')+'" tabindex="0">'+
       '<span class="og-av'+(n.ceo?' og-ceoav':'')+'">'+esc(n.av)+'</span>'+
@@ -1412,7 +1417,7 @@ function og(mode){
     '.ogt li:last-child::before{border-right:2px solid var(--line-2);border-radius:0 7px 0 0}'+
     '.ogt li:first-child::after{border-radius:7px 0 0 0}'+
     '.ogt ul ul::before{content:"";position:absolute;top:0;left:50%;border-left:2px solid var(--line-2);width:0;height:26px}'+
-    '.ogt>ul{padding-top:0}.ogt>ul>li{padding-top:0}.ogt>ul>li::before,.ogt>ul>li::after{display:none}'+
+    '.ogt>ul{padding-top:0;width:max-content;min-width:100%}.ogt>ul>li{padding-top:0}.ogt>ul>li::before,.ogt>ul>li::after{display:none}'+
     '.og-n{position:relative;width:178px;background:var(--raised);border:1px solid var(--line);border-radius:13px;padding:11px 12px;box-shadow:var(--sh-1);text-align:center;transition:box-shadow .15s,border-color .15s}'+
     '.og-n:hover{box-shadow:var(--sh-2);border-color:var(--line-2)}'+
     '.og-av{width:42px;height:42px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13.5px;margin:0 auto 8px}'+
@@ -1430,25 +1435,52 @@ function og(mode){
     '.og-chip{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:10.5px;font-weight:650;color:var(--on-yellow);background:var(--yellow);border-radius:999px;padding:3px 10px}'+
     '.og-chip svg{width:12px;height:12px}'+
     '.og-legend{display:flex;flex-wrap:wrap;gap:16px;margin:2px 0 4px;font-size:11.5px;color:var(--ink-2)}'+
-    '.og-legend span{display:inline-flex;align-items:center;gap:7px}'+
+    '.og-legend>span{display:inline-flex;align-items:center;gap:7px}'+
     '.og-legend i{width:22px;height:0;border-top:2px solid var(--line-2);display:inline-block}'+
     '.og-legend i.dash{border-top-style:dashed}'+
     '.og-legend i.ceo{width:13px;height:13px;border:0;border-radius:4px;background:var(--yellow)}'+
     '.og-legend i.vac{width:13px;height:13px;border:1px dashed var(--line-2);border-radius:4px}'+
+    '.ogf-sec{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:650;color:var(--ink-3);margin:16px 2px 8px}'+
+    '.ogf-c{min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--surface);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:11.5px;color:var(--ink-2)}'+
+    '.ogf-n{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;text-align:left;background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:var(--sh-1);margin-bottom:8px;color:inherit;font:inherit}'+
+    '.ogf-n .og-av{margin:0;flex:none}'+
+    '.ogf-b{flex:1;min-width:0}.ogf-b b{display:block;font-size:14px;font-weight:650}'+
+    '.ogf-b .og-dotted{margin-top:5px}'+
+    '.ogf-k{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:650;color:var(--ink-3);flex:none}'+
+    '.ogf-k svg,.ogf-n>svg{width:16px;height:16px;color:var(--ink-3);flex:none}'+
+    '.ogf-on{flex-wrap:wrap;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),var(--sh-1);padding:14px 12px}'+
+    '.ogf-on .og-av{width:52px;height:52px;font-size:16px}.ogf-on .ogf-b b{font-size:16px}'+
+    '.ogf-on .btn{width:100%;justify-content:center}'+
+    '.ogf-reset{margin-top:10px;width:100%;justify-content:center}'+
     '</style>';
-  var acts=builder?[['Search'],['Expand all'],['Download PDF'],['Add role',1]]:[['Search'],['Download PDF']];
-  var sub=builder?'The live reporting structure · 12 seats · 11 filled · 1 open · drag a card to reassign'
-                 :'Who reports to whom across MyCity · read only · 12 seats · 11 filled';
+  var sub='12 seats · 11 filled · 1 open';
+  if(PHONE.matches){
+    /* the focus view: who the focused person reports to, the person, their direct reports */
+    var idx={},par={},me=builder?'IC':((typeof attViewer==='function'&&attViewer())||'CO');
+    (function walk(n,p){n.id=n.vacant?'VAC-'+n.d:n.av;idx[n.id]=n;par[n.id]=p;(n.children||[]).forEach(function(c){walk(c,n.id)})})(tree,null);
+    if(!idx[me])me='IC';
+    var f=idx[OGF[mode]]||idx[me],up=par[f.id]?idx[par[f.id]]:null,kids=f.children||[];
+    var fcard=function(n,on){var k=(n.children||[]).length,
+      inner='<span class="og-av'+(n.ceo?' og-ceoav':'')+(n.vacant?' og-vacav':'')+'">'+(n.vacant?ic('plus'):esc(n.av))+'</span>'+
+        '<span class="ogf-b" data-copy="content"><b>'+esc(n.n)+'</b><span class="og-t">'+esc(n.vacant?'Vacant · '+n.d:n.t+' · '+n.d)+'</span>'+
+        (n.dotted?'<span class="og-dotted">Dotted line · '+esc(n.dotted)+'</span>':'')+'</span>';
+      if(on)return '<div class="ogf-n ogf-on'+(n.vacant?' og-vac':'')+'">'+inner+(builder&&n.vacant?'<button class="btn pri">'+ic('plus')+'Create Vacancy</button>':'')+'</div>';
+      return '<button type="button" class="ogf-n'+(n.vacant?' og-vac':'')+'" data-ogf="'+esc(n.id)+'" data-ogm="'+mode+'">'+inner+
+        (k?'<span class="ogf-k">'+k+ic('right')+'</span>':ic('right'))+'</button>'};
+    return head(builder?'Organogram':'Org Chart','',builder?[['Search'],['Add Role',1]]:[['Search']])+css+
+      (up?'<div class="ogf-sec">Reports To</div>'+fcard(up):'')+
+      fcard(f,1)+
+      (kids.length?'<div class="ogf-sec">Direct Reports<span class="ogf-c">'+kids.length+'</span></div>'+kids.map(function(c){return fcard(c)}).join(''):'')+
+      (f.id!==me?'<button type="button" class="btn ogf-reset" data-ogf="'+me+'" data-ogm="'+mode+'">'+ic(builder?'up':'user')+(builder?'Show CEO':'Show Me')+'</button>':'');
+  }
+  var acts=builder?[['Search'],['Expand All'],['Download PDF'],['Add Role',1]]:[['Search'],['Download PDF']];
   var legend='<div class="og-legend">'+
-    '<span><i></i>Reporting line</span>'+
-    '<span><i class="dash"></i>Dotted line (matrix)</span>'+
+    '<span><i></i>'+(builder?hint('Reporting Line','Drag a card onto a new manager to change its reporting line.'):'Reporting Line')+'</span>'+
+    '<span><i class="dash"></i>'+hint('Dotted Line','A second manager for matrix work. It does not change who approves leave, expenses or tasks.')+'</span>'+
     '<span><i class="ceo"></i>CEO</span>'+
-    '<span><i class="vac"></i>Vacant seat</span></div>';
-  var note=builder
-    ? '<p class="sub" style="margin-top:12px">Drag a card onto a new manager to change its reporting line. Every change is written through People and recorded in the audit log, the same write the employee form uses. A vacant seat can be sent to Recruitment as a suggested vacancy. Salary, bank details and phone numbers are never shown here.</p>'
-    : '<p class="sub" style="margin-top:12px">Read only. Every employee sees the whole company here. Salary, bank details and phone numbers are never shown. On a phone this becomes a focus view: your manager, you and your reports, with tap to expand.</p>';
+    '<span><i class="vac"></i>Vacant Seat</span></div>';
   return head(builder?'Organogram':'Org Chart',sub,acts)+css+legend+
-    '<div class="card" style="padding:6px"><div class="ogt"><ul>'+nodeOf(tree)+'</ul></div></div>'+note;
+    '<div class="card" style="padding:6px"><div class="ogt" data-copy="content"><ul>'+nodeOf(tree)+'</ul></div></div>';
 }
 
 /* ───── the 16 modules ───── */
@@ -6209,7 +6241,7 @@ var ESS_BOTH={'My Profile':1,'My Performance':1,'My Payslips':1,'My Leave':1,'My
       if(ESS.m1&&ESS_SOON[t.n])return essbar()+soonPage(t.n);
       if(ESS_BOTH[t.n])return essbar()+mob();
       var d=ESS_DESK[t.n]?ESS_DESK[t.n](orig):orig();
-      return essbar()+'<div class="donly">'+d+'</div>'+(mob?'<div class="monly">'+mob()+'</div>':'')}})})();
+      return essbar()+(mob?'<div class="donly">'+d+'</div><div class="monly">'+mob()+'</div>':d)}})})();
 
 /* palette */
 var ITEMS=[];
