@@ -87,10 +87,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | CI gates 1 to 8 and pipeline guards (scripts still empty, reported NOT BUILT) | GE | ☐ | |
 | Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | |
 | Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
+| Screen gates 8, 11, 12, 17: `five-second`, `two-shells`, `forms`, `dashes`; screen conventions in FRONTEND_GUIDE §5, §7, §8 | TB | ☑ | 14/10/2026 |
 | Frontend foundation (`app/`, `public-app/`): shell, design tokens, contract client, shared components | AJ | ☐ | |
 
 **Notes**
 
+- 14/10/2026 · TB · Screen gates built: gate 8 (three tiers of screen text, word limits, Title Case),
+  gate 11 (phone and desktop shells), gate 12 (one form system), gate 17 (no dashes in copy). They
+  render demo.html at 390 and 1440 px in Chromium and will read `app/` once it has a build.
+  MILESTONES gates 8, 11 and 12 amended; guide template §10 now lists content tiers and the phone
+  layout. Demo brought to the gates module by module; left: the groups still failing a gate.
 - 13/10/2026 · GE · CI wired: `npm run ci` runs every gate locally and in Actions; empty gates are
   reported NOT BUILT, not passed. Process gates and the Claude Stop hook added. Branch protection
   needs TB to apply the runbook; CODEOWNERS needs LA and AJ usernames.
