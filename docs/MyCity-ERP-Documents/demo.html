@@ -1287,10 +1287,10 @@ function bands(title,rows,note){
   var max=1300000;
   return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3><span class="right sub">₦0 to ₦1.3M</span></div>'+
   rows.map(function(r){var l=r[1]/max*100,w=(r[3]-r[1])/max*100,mid=(r[2]-r[1])/(r[3]-r[1])*100;
-    return '<div class="band"><span class="nm">'+esc(r[0])+'<em>'+esc(r[5])+'</em></span><span class="tr">'+
+    return '<div class="band"><span class="nm" data-copy="content">'+esc(r[0])+'<em>'+esc(r[5])+'</em></span><span class="tr">'+
     '<i style="left:'+l.toFixed(1)+'%;width:'+w.toFixed(1)+'%"></i>'+
     '<b style="left:'+(l+w*mid/100).toFixed(1)+'%"></b></span>'+
-    '<span class="vl">'+esc(r[4])+'</span></div>'}).join('')+
+    '<span class="vl" data-copy="content">'+esc(r[4])+'</span></div>'}).join('')+
   (note?'<p class="sub" style="margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)">'+esc(note)+'</p>':'')+'</div>'}
 
 /* ───── mailbox two pane ───── */
@@ -2516,32 +2516,28 @@ var M=[
       'Added','Kept for 24 months from this date, then removed. The candidate is told and can ask to leave sooner.')}}]},
 
 {k:'payroll',n:'Payroll',i:'wallet',g:'PEOPLE',tabs:[
-  {n:'Payroll Runs',r:function(){return head('Payroll Runs','October 2026',[['Previous runs'],['Run payroll',1]])+
-    kpis([['Staff in run','25'],['Gross','₦11.42M'],['Deductions','₦57,500','warn'],['Net','₦11.36M','ok']])+
-    chain([['Computed','done'],['Previewed','done'],['Submitted','now'],['Approved',''],['Locked',''],['Paid','']],
-      'A run is submitted to the CEO or COO for approval. Which of the two is still to be confirmed with MyCity.')+
-    '<div style="margin-top:12px">'+table([['Month'],['Staff','n'],['Gross','n'],['Net','n'],['Approved by'],['Status']],[
+  {n:'Payroll Runs',r:function(){return head('Payroll Runs','October 2026',[['Previous Runs'],['Run Payroll',1]])+
+    kpis([['Staff in Run','25'],['Gross','₦11.42M'],['Deductions','₦57,500','warn'],['Net','₦11.36M','ok']])+
+    chain([['Computed','done'],['Previewed','done'],['Submitted','now'],['Approved',''],['Locked',''],['Paid','']])+
+    '<div style="margin-top:12px">'+helpOn(table([['Month'],['Staff','n'],['Gross','n'],['Net','n'],['Approved By'],['Status']],[
       ['October 2026','25','₦11,420,000','₦11,362,500','—',pill('wa','Awaiting approval')],
       ['September 2026','25','₦11,420,000','₦11,420,000','Ifeoma Chukwu',pill('ok','Paid 27/09')],
       ['August 2026','24','₦10,970,000','₦10,957,500','Ifeoma Chukwu',pill('ok','Paid 27/08')],
-      ['July 2026','24','₦10,970,000','₦10,947,500','Ifeoma Chukwu',pill('ok','Paid 27/07')]],'Run history')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+areaChart('Net payroll by month',[10947500,10957500,11420000,11420000,11362500],
-      'The step in month three is two new hires, not a pay rise.')+
-    '<div class="card"><div class="ch"><h3>What locking does</h3></div>'+
-    '<dl class="kv" style="grid-template-columns:122px 1fr"><dt>Before approval</dt><dd>Figures recompute whenever attendance or a deduction changes</dd>'+
-    '<dt>On approval</dt><dd>The run is frozen. Payslips become visible to staff</dd>'+
-    '<dt>After locking</dt><dd>Nothing recomputes it. Not a policy change, not a corrected punch</dd>'+
-    '<dt>A correction</dt><dd>Goes in the next run as an adjustment line, with its reason</dd>'+
-    '<dt>Why</dt><dd>A payslip someone has already been paid against must never change</dd></dl>'+
-    '<div class="quote" style="margin-top:12px">Switching statutory items on recomputes future runs only. A locked run stays exactly as it was paid.</div></div></div>'}},
-  {n:'Payslips',r:function(){return head('Payslips','October 2026 preview',[['Email all'],['Download all',1]])+
-    statstrip([['Payslips','25'],['Gross','₦11,420,000'],['Deductions','₦57,500','warn'],['Net','₦11,362,500'],['Visible to staff','On approval']])+
+      ['July 2026','24','₦10,970,000','₦10,947,500','Ifeoma Chukwu',pill('ok','Paid 27/07')]],'Run History'),
+      'Status','Approval locks the run and shows payslips to staff. A later correction goes into the next run as an adjustment line.')+'</div>'+
+    '<div class="grid g2" style="margin-top:12px">'+areaChart('Net Payroll by Month',[10947500,10957500,11420000,11420000,11362500])+
+    kvcard('October Run',[['Submitted By','Amara Okafor'],['Submitted','08/10/2026 17:22'],['Approval',pill('wa','Awaiting approval')],['Payday','27/10/2026']])+'</div>'}},
+  {n:'Payslips',r:function(){return head('Payslips','October 2026 preview',[['Email All'],['Download All',1]])+
+    statstrip([['Payslips','25'],['Gross','₦11,420,000'],['Deductions','₦57,500','warn'],['Net','₦11,362,500'],['Visible to Staff','On approval']])+
     table([['Employee'],['Base','n'],['Allowances','n'],['Deductions','n'],['Net','n'],['']],
       STAFF.slice(0,6).map(function(s,i){var base=[480,420,460,620,380,400][i]*1000,al=[40,30,35,50,25,30][i]*1000,de=i===1?12500:0;
         return [who(s[0],s[1],s[2]),'₦'+base.toLocaleString(),'₦'+al.toLocaleString(),de?'₦'+de.toLocaleString():'—',
           '₦'+(base+al-de).toLocaleString(),'<button class="btn">'+ic('doc')+'PDF</button>']}),'Preview',
-      '<span class="sub">Showing 6 of 25</span>')+
-    '<div style="margin-top:12px">'+paper(plogo('PAY-2026-10-002')+
+      '<span class="sub">Showing 6 of 25</span>',null,null,[4,3])+
+    '<div class="monly" style="margin-top:12px">'+kvcard('Bashir Lawal, October',[['Basic Salary','₦294,000.00'],['Housing','₦63,000.00'],
+      ['Transport','₦42,000.00'],['Communication','₦21,000.00'],['Gross Pay','<b>₦420,000.00</b>'],
+      ['Lateness, QRY-0019','−₦12,500.00'],['Net Pay','<b>₦407,500.00</b>']]).replace('</h3></div>','</h3><span class="right">'+pill('wa','Preview')+'</span></div>')+'</div>'+
+    '<div class="donly" style="margin-top:12px">'+paper(plogo('PAY-2026-10-002')+
      '<h3>Payslip, October 2026</h3>'+
      '<p style="color:#566662;font-size:11.5px;margin-top:3px">Bashir Lawal · Partnerships Manager · G3 · Preview, not yet approved</p>'+
      '<table><thead><tr><th>Earnings</th><th style="text-align:right">Amount</th></tr></thead><tbody>'+
@@ -2553,74 +2549,59 @@ var M=[
      '<table style="margin-top:14px"><thead><tr><th>Deductions</th><th style="text-align:right">Amount</th></tr></thead><tbody>'+
      '<tr><td>Lateness, 3 instances (QRY-0019)</td><td style="text-align:right">₦12,500.00</td></tr>'+
      '<tr class="tot"><td>Net pay</td><td style="text-align:right">₦407,500.00</td></tr></tbody></table>'+
-     '<p style="font-size:11px;color:#7E8D88;margin-top:14px">The deduction line names its reason, not the sanction. No statutory item appears because advanced payroll is off.</p>'+
-     '<div class="pfoot"><span>'+ic('alert')+'Preview. Becomes visible to the employee on approval</span></div>',
-     'October preview for Bashir Lawal, the one payslip in this run carrying a deduction.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Bashir Lawal carries a ₦12,500 lateness deduction accepted into this run from Queries and Sanctions.</p>'}},
-  {n:'Salary Structure',r:function(){return head('Salary Structure','Grades and bands',[['History'],['Add grade',1]])+
-    kpis([['Grades','5'],['Staff placed','25'],['Below band minimum','0','ok'],['Above maximum','1','warn']])+
-    bands('Bands by grade',[['G1 · Entry',250000,300000,350000,'₦250k to ₦350k','3 staff'],
+     '<div class="pfoot"><span>'+ic('alert')+'Preview, awaiting approval</span></div>',
+     'Bashir Lawal · October Preview')+'</div>'}},
+  {n:'Salary Structure',r:function(){return head('Salary Structure','',[['History'],['Add Grade',1]])+
+    helpOn(kpis([['Grades','5'],['Staff Placed','25'],['Below Band Minimum','0','ok'],['Above Band Maximum','1','warn']]),
+      'Above Band Maximum','Flagged, not blocked. Pay above the band maximum is allowed and shows here for review.')+
+    helpOn(bands('Bands by Grade',[['G1 · Entry',250000,300000,350000,'₦250k to ₦350k','3 staff'],
       ['G2 · Officer',350000,420000,490000,'₦350k to ₦490k','9 staff'],
       ['G3 · Senior',480000,560000,640000,'₦480k to ₦640k','7 staff'],
       ['G4 · Lead',620000,720000,820000,'₦620k to ₦820k','4 staff'],
-      ['G5 · Head',850000,1000000,1200000,'₦850k to ₦1.2M','2 staff']],
-      'The tick is the midpoint. A new hire is normally placed between the minimum and the midpoint.')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Grade'],['Band'],['Minimum','n'],['Midpoint','n'],['Maximum','n'],['Staff','n']],[
+      ['G5 · Head',850000,1000000,1200000,'₦850k to ₦1.2M','2 staff']]),
+      'Bands by Grade','The bar runs from minimum to maximum and the tick is the midpoint. A new hire is normally placed between the two.')+
+    '<div style="margin-top:12px">'+
+    helpOn(table([['Grade'],['Band'],['Minimum','n'],['Midpoint','n'],['Maximum','n'],['Staff','n']],[
       ['G1','Entry','₦250,000','₦300,000','₦350,000','3'],
       ['G2','Officer','₦350,000','₦420,000','₦490,000','9'],
       ['G3','Senior','₦480,000','₦560,000','₦640,000','7'],
       ['G4','Lead','₦620,000','₦720,000','₦820,000','4'],
-      ['G5','Head','₦850,000','₦1,000,000','₦1,200,000','2']],'Grades')+
-    kvcard('What a band controls',[['Offers','A salary outside the band warns the recruiter'],
-      ['Reviews','A rating does not move a grade. A promotion does'],
-      ['Promotion','Changes the grade, which changes the band, which changes pay'],
-      ['Field security','Bands are masked from Manager and Staff roles'],
-      ['Effective dating','A band change applies from a date, never retrospectively'],
-      ['Above maximum','One person sits above G5. It is flagged, not blocked']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">Placeholder bands. MyCity has been asked for their real structure so these are replaced before M6 is demonstrated.</p>'}},
-  {n:'Deductions',r:function(){var tiers=attPolicy().settings.deductionTiers;return head('Deductions','Pending and applied · attendance tiers '+(tiers?'on':'off'),[['Rules'],['Add deduction',1]])+
-    kpis([['Pending acceptance','1','warn'],['Applied, October','₦62,500'],['Recovered this year','₦45,000','ok'],['Sources','3']])+
+      ['G5','Head','₦850,000','₦1,000,000','₦1,200,000','2']],'Grades'),
+      'Band','A band change applies from a chosen date, never backdated. An offer outside its band warns the recruiter.')+'</div>'}},
+  {n:'Deductions',r:function(){var tiers=attPolicy().settings.deductionTiers;return head('Deductions','Attendance tiers '+(tiers?'on':'off'),[['Rules'],['Add Deduction',1]])+
+    kpis([['Pending Acceptance','1','warn'],['Applied, October','₦62,500'],['Recovered This Year','₦45,000','ok'],['Sources','3']])+
     table([['Employee'],['Reason'],['Source'],['Amount','n'],['Month'],['Status']],[
       [st(1),'Lateness, 3 instances','Queries & Sanctions','₦12,500','October',pill('wa','Pending acceptance')],
       [st(3),'Studio monitor damage','Fine, sanction','₦45,000','July',pill('ok','Recovered')],
-      [st(2),'Salary advance repayment','Advance','₦50,000','October',pill('ok','Applied')]],'All deductions')+
+      [st(2),'Salary advance repayment','Advance','₦50,000','October',pill('ok','Applied')]],'All Deductions')+
     '<div class="grid g2" style="margin-top:12px">'+
     '<div class="card"><div class="ch"><h3>Pending: Bashir Lawal, ₦12,500</h3><span class="right">'+pill('wa','Needs acceptance')+'</span></div>'+
     '<div class="chain">'+[['Query closed','done'],['Warning served','done'],['Deduction raised','done'],['Accepted','now'],['In the run',''],['Applied','']].map(function(s,i){
       return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">Raised by the August warning. It has waited for a person since 29 August, which is correct: nothing deducts itself.</p>'+
+    '<dl class="kv" style="margin-top:12px"><dt>Raised By</dt><dd>August warning</dd><dt>Waiting Since</dt><dd>29/08/2026</dd></dl>'+
     '<div style="display:flex;gap:8px;margin-top:13px;flex-wrap:wrap"><button class="btn pri">'+ic('ok')+'Accept into October</button>'+
-    '<button class="btn">Spread over two runs</button><button class="btn">Waive</button></div></div>'+
-    kvcard('Deduction tiers, from attendance',[['Current policy',tiers?pill('ok','On · applies to future reviewed outcomes'):pill('nt','Off · configuration preserved')],['Up to 1 hour late','10% of the day'],['Up to 2 hours','20% of the day'],
-      ['Up to 3 hours','30% of the day'],['Beyond 3 hours','Treated as absence, by decision'],
-      ['Who sets these','Operations, in Settings. Still to be confirmed by MyCity'],
-      ['Automatic?','No. The figure is computed. A person accepts it']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">A deduction from a sanction never enters a run automatically. Someone has to accept it.</p>'}},
-  {n:'Statutory',r:function(){return head('Statutory','Advanced payroll · off by default',[['Rates'],['Switch on',1]])+
+    '<button class="btn">Spread Over 2 Runs</button><button class="btn">Waive</button></div></div>'+
+    helpOn(kvcard('Attendance Deduction Tiers',[['Current Policy',tiers?pill('ok','On'):pill('nt','Off')],['Up to 1 Hour Late','10% of the day'],['Up to 2 Hours','20% of the day'],
+      ['Up to 3 Hours','30% of the day'],['Beyond 3 Hours','Treated as absence, by decision']]),
+      'Current Policy','Set in Settings, Attendance Policy. Tiers apply to outcomes reviewed after they are switched on, and a person accepts or waives each one.')+'</div>'}},
+  {n:'Statutory',r:function(){var hp=hintParts('Advanced Payroll Off','Switching on recomputes future runs only. A locked run never changes.');
+    return head('Statutory','',[['Rates'],['Switch On',1]])+
     '<div class="card" style="margin-bottom:12px;background:var(--warn-bg);border-color:transparent">'+
     '<div style="display:flex;gap:10px;align-items:flex-start"><span style="color:var(--warn)">'+ic('alert')+'</span>'+
-    '<div><h3 style="font-size:13.5px;color:var(--warn)">Advanced payroll is off</h3>'+
-    '<p class="sub" style="color:var(--warn);margin-top:4px">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p></div></div></div>'+
+    '<div><h3 style="font-size:13.5px;color:var(--warn)">'+hp[0]+'</h3>'+hp[1]+
+    '<p class="sub" style="color:var(--warn);margin-top:4px">No statutory item appears on a payslip until switched on.</p></div></div></div>'+
     table([['Item'],['Type'],['Rate'],['Base'],['Status']],[
       ['PAYE','Employee','Progressive bands','Gross less relief, pension and NHF',pill('nt','Configured, off')],
       ['Pension, employee','Employee','8%','Basic, housing, transport',pill('nt','Configured, off')],
       ['Pension, employer','Employer','10%','Basic, housing, transport',pill('nt','Configured, off')],
       ['NHF','Employee','2.5%','Basic',pill('nt','Configured, off')],
       ['ITF','Employer','1%','Annual payroll',pill('nt','Configured, off')],
-      ['NSITF','Employer','1%','Annual payroll',pill('nt','Configured, off')]],'Nigerian statutory items')+
+      ['NSITF','Employer','1%','Annual payroll',pill('nt','Configured, off')]],'Nigerian Statutory Items')+
     '<div class="grid g2" style="margin-top:12px">'+
-    table([['PAYE band'],['Annual','n'],['Rate','n']],[
+    table([['PAYE Band'],['Annual','n'],['Rate','n']],[
       ['First','₦300,000','7%'],['Next','₦300,000','11%'],['Next','₦500,000','15%'],
       ['Next','₦500,000','19%'],['Next','₦1,600,000','21%'],['Above','₦3,200,000','24%']],
-      'Progressive bands, configured and dormant','<span class="sub">Effective dated</span>')+
-    kvcard('Why it is built but off',[['The ask','MyCity asked for simple payroll. Gross, deductions, net'],
-      ['The risk','Statutory payroll added later is a rewrite, not a setting'],
-      ['The answer','Build it now, configure it, leave it off'],
-      ['Switching on','Recomputes future runs only. A locked run never changes'],
-      ['Rates','Effective dated, so a rate change in 2027 does not rewrite 2026'],
-      ['Handover','Documented in the handover pack either way']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">Rates are effective dated. Switching this on recomputes future runs only, never a locked one.</p>'}}]},
+      'PAYE Bands','<span class="sub">'+hint('Effective Dated','A rate change applies from its date. Runs before that date keep the rates they were paid at.')+'</span>')+'</div>'}}]},
 
 {k:'partners',n:'Partnerships',i:'link',g:'BUSINESS',tabs:[
   {n:'Pipeline',r:function(){return head('Pipeline','23 active · 8 in discussion · 4 going quiet',[['Board'],['New partner',1]])+
