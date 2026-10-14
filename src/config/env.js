@@ -146,7 +146,8 @@ const ENTRIES = [
   ["MAIL_FROM", str("MyCity App <no-reply@mycityapp.io>"),
     { group: "Mail", doc: "From address for system mail. Its domain must pass SPF, DKIM and DMARC (services/mail/deliverability)." }],
   ["MAIL_REPLY_TO", str(""), { group: "Mail", doc: "Optional Reply-To for system mail (the support inbox)." }],
-  ["DKIM_SELECTOR", str("default"), { group: "Mail", doc: "DKIM selector the deliverability check looks up." }],
+  ["MAIL_RBL_HOSTS", str(""),
+    { group: "Mail", doc: "Comma-separated DNS blocklists the deliverability check looks the sending IP up in. Empty: Spamhaus ZEN, SpamCop and Barracuda.", example: "zen.spamhaus.org,bl.spamcop.net" }],
 
   // Rate limits (SYSTEM_ARCHITECTURE §3)
   ["RATE_LIMIT_STAFF_PER_MIN", int(600, { min: 10 }), { group: "Rate limits", doc: "Staff API requests per user per minute." }],

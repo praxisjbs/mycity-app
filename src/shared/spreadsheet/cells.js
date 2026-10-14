@@ -1,76 +1,223 @@
-"use strict";
 /**
- * Cell values in and out of spreadsheets, flattened one way everywhere, so a cell
- * cannot read two different ways in two places.
+ * Spreadsheet helpers: the pure primitives every spreadsheet artefact shares:
+ * cell unwrapping, sheet naming, formula-injection locking, colour conversion,
+ * the naira number format and timezone-correct date serials.
  *
- * In (reading a sheet): ExcelJS gives rich text, formulas, hyperlinks, errors and
- * dates as objects; cellValue() turns each into a plain value:
- *   rich text   → its text            formula     → its cached result
- *   hyperlink   → its display text    error (#N/A) → null
- *   date        → a JS Date (day-first-cells.js decides what date it is)
- *
- * Out (writing a sheet or a CSV): escapeFormula() stops spreadsheet formula injection.
- * A value a person typed ("=HYPERLINK(...)", "+234...", "@SUM") would run as a formula
- * when the export is opened in Excel; it is written with a leading apostrophe instead,
- * which Excel shows as text. Phone numbers stay readable ('+2348031234567).
+ * PURE ON PURPOSE. Nothing here touches a client, a workbook context or the DB:
+ * the builder (build.js), the CSV writer (csv.js), the parsers (parse.js) and
+ * the import engine all call these, so a primitive shared this widely must not
+ * grow opinions.
  */
+"use strict";
 
-/** The plain value of an ExcelJS cell value. */
-function plain(v) {
+/** Every wall-clock in this product is Lagos time (WAT, no daylight saving). */
+const TIMEZONE = "Africa/Lagos";
+
+/* ── Cell values ──────────────────────────────────────────────────────────── */
+
+/**
+ * Flatten one ExcelJS cell VALUE (not the cell) to a primitive-ish thing.
+ *
+ * Dates and numbers stay typed: that typing is the whole reason to prefer
+ * .xlsx over CSV for machine-read files. Formulas yield their cached result,
+ * rich text collapses to its runs, hyperlinks to their text. Returns null for
+ * empty cells so callers can pick their own blank sentinel.
+ */
+function cellRawValue(v) {
   if (v === null || v === undefined) return null;
   if (v instanceof Date) return v;
-  if (typeof v !== "object") return v;
-  if (Array.isArray(v.richText)) return v.richText.map((r) => r.text || "").join("");
-  if (Object.prototype.hasOwnProperty.call(v, "result")) return plain(v.result);
-  if (Object.prototype.hasOwnProperty.call(v, "text") && Object.prototype.hasOwnProperty.call(v, "hyperlink")) return plain(v.text);
-  if (Object.prototype.hasOwnProperty.call(v, "error")) return null;
-  if (Object.prototype.hasOwnProperty.call(v, "sharedFormula")) return null;
-  return null;
+  if (typeof v === "number" || typeof v === "string" || typeof v === "boolean") return v;
+  if (typeof v === "object") {
+    if (v.richText) return v.richText.map((t) => t.text).join("");
+    if (v.text !== null && v.text !== undefined) return v.text; // hyperlink / rich text
+    if (v.result !== undefined) return v.result; // formula's cached result
+    if (v.error) return ""; // #REF! etc.: an error is not a value
+    if (v.hyperlink !== undefined) return v.hyperlink; // link object with no text
+  }
+  return String(v);
 }
 
 /**
- * The plain value of an ExcelJS cell's `value` (cell.value: the getter lives on the
- * prototype, so pass the value, not the cell). Strings trimmed; empty → null.
+ * Unwrap an ExcelJS CELL for the import parser: null for blanks, ISO string
+ * for dates (import rows are plain, JSON-serialisable objects).
  */
-function cellValue(value) {
-  const v = plain(value);
-  if (typeof v === "string") {
-    const t = v.replace(/\u00a0/g, " ").trim();
-    return t === "" ? null : t;
-  }
+function cellValue(cell) {
+  const v = cellRawValue(cell ? cell.value : null);
+  if (v === null) return null;
+  if (v instanceof Date) return v.toISOString();
   return v;
 }
 
+/* ── Sheet names ──────────────────────────────────────────────────────────── */
+
+/**
+ * Sanitise + dedupe a sheet title: strip the characters Excel forbids in sheet
+ * names ([ ] : * ? / \), collapse whitespace, cap at 31 chars.
+ *
+ * `taken` (optional Set of lower-cased names already used in this workbook)
+ * makes the name unique by appending " (2)", " (3)"…; comparison is
+ * case-insensitive because Excel resolves sheet references that way. When
+ * `taken` is given the chosen name is ADDED to it, so consecutive calls for
+ * one workbook cannot collide.
+ */
+function sheetName(name, { fallback = "Sheet", taken } = {}) {
+  const clean =
+    String(name ?? "")
+      .replace(/[[\]:*?/\\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 31) || fallback;
+  if (!taken) return clean;
+  let out = clean;
+  let n = 2;
+  while (taken.has(out.toLowerCase())) {
+    const suffix = ` (${n})`;
+    out = `${clean.slice(0, 31 - suffix.length)}${suffix}`;
+    n += 1;
+  }
+  taken.add(out.toLowerCase());
+  return out;
+}
+
+/* ── Formula-injection lock ──────────────────────────────────────────────── */
+
+/**
+ * Excel/Sheets/LibreOffice treat a value that STARTS with = + - @, tab or CR
+ * as a formula when the file is opened. Cell contents in an ERP are
+ * user-supplied (names, notes, reasons), so `=HYPERLINK(...)` typed into a
+ * name field must not become live code on the reader's machine (OWASP "CSV
+ * Injection"). One leading apostrophe neutralises it while still displaying
+ * the original text; a phone number shows as '+2348031234567.
+ *
+ * STRINGS ONLY. A typed number/date/bool cannot be a formula, and prefixing
+ * one would turn a summable amount into text.
+ */
 const FORMULA_LEAD = /^[=+\-@\t\r]/;
 
-/** A value safe to write into a cell: a string that would start a formula is quoted. */
 function escapeFormula(v) {
   if (typeof v !== "string") return v;
   return FORMULA_LEAD.test(v) ? `'${v}` : v;
 }
 
+/* ── Colours ─────────────────────────────────────────────────────────────── */
+
 /**
- * A worksheet name Excel accepts: no []:*?/\, at most 31 characters, unique in `taken`.
- * @param {string} name
- * @param {Set<string>} [taken]  lower-cased names already used
+ * A hex colour (#RRGGBB, RRGGBB, #AARRGGBB, AARRGGBB) → Excel ARGB.
+ * Anything else → null so the caller falls back to its default rather than
+ * writing a fill Excel silently drops.
  */
-function sheetName(name, taken = new Set()) {
-  let base = String(name || "Sheet").replace(/[[\]:*?/\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, 31) || "Sheet";
-  if (base.toLowerCase() === "history") base = "History 1";
-  let candidate = base;
-  for (let i = 2; taken.has(candidate.toLowerCase()); i += 1) {
-    const suffix = ` (${i})`;
-    candidate = base.slice(0, 31 - suffix.length) + suffix;
-  }
-  taken.add(candidate.toLowerCase());
-  return candidate;
+function hexToArgb(hex) {
+  const m = /^#?([0-9a-f]{6}|[0-9a-f]{8})$/i.exec(String(hex || "").trim());
+  if (!m) return null;
+  const body = m[1].toUpperCase();
+  return body.length === 6 ? `FF${body}` : body;
 }
 
-/** "#RRGGBB" → "FFRRGGBB" (ExcelJS colours). */
-function argb(hex) {
-  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
-  if (!m) throw new Error(`cells: "${hex}" is not a colour`);
-  return `FF${m[1].toUpperCase()}`;
+/* ── Money format ────────────────────────────────────────────────────────── */
+
+/**
+ * The naira number format. The cell stays a raw number, so a column of amounts
+ * SUMs; the sign is a quoted literal, which every Excel build renders the same
+ * (unlike locale currency templates such as [$₦-...]).
+ */
+const MONEY_FORMAT = '"₦"#,##0.00;-"₦"#,##0.00';
+
+/* ── Dates ───────────────────────────────────────────────────────────────── */
+
+/**
+ * Wall-clock parts of an instant in a timezone, via Intl: never the host's
+ * own timezone, and never Date.toLocaleString's implicit one. A shift that
+ * ends at midnight in Lagos must not print 23:00 the previous day because the
+ * container runs in UTC.
+ */
+function wallClock(value, timezone = TIMEZONE) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type) => Number(parts.find((p) => p.type === type).value);
+  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour") % 24, minute: get("minute"), second: get("second") };
 }
 
-module.exports = { cellValue, escapeFormula, sheetName, argb, FORMULA_LEAD };
+/**
+ * An ExcelJS-writable Date for a spreadsheet cell, in Lagos time.
+ *
+ * ExcelJS serialises a Date with UTC arithmetic, and an Excel serial is
+ * timezone-less, so the instant must first be converted to the Lagos wall
+ * clock, then rebuilt as a fake-UTC Date. Writing the raw instant would
+ * silently display the container's UTC as if it were local time.
+ *
+ * `hasTime: false` (a calendar-date column) keeps only the wall date: a date
+ * column has no instant to shift, and 2026-08-20 must survive any timezone.
+ */
+function serialDate(value, { timezone = TIMEZONE, hasTime = true } = {}) {
+  if (value === null || value === undefined || value === "") return null;
+  // A bare YYYY-MM-DD is a calendar date already: no tz conversion applies.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value).trim());
+  if (m) return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  const wall = wallClock(value, timezone);
+  if (!wall) return null;
+  return hasTime
+    ? new Date(Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second))
+    : new Date(Date.UTC(wall.year, wall.month - 1, wall.day));
+}
+
+/** "14/10/2026 15:42" in Lagos time: cover and footer text, not a cell. */
+function formatInstant(value, timezone = TIMEZONE) {
+  const wall = wallClock(value, timezone);
+  if (!wall) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(wall.day)}/${p(wall.month)}/${wall.year} ${p(wall.hour)}:${p(wall.minute)}`;
+}
+
+/* ── Filenames ───────────────────────────────────────────────────────────── */
+
+/**
+ * Download filename with the date and, on staging, an unmistakable STAGING
+ * segment: a payroll-looking file named like a live one is a hazard the moment
+ * someone attaches it to a real email.
+ */
+function exportFilename({ base, env, extension, date = new Date() }) {
+  // Bound before any regex work: `base` can be a person-chosen report name.
+  const bounded = String(base || "export").slice(0, 80);
+  const safe = bounded
+    .replace(/[\\/:*?"<>|\r\n]+/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    // Trim the ends as two single-alternative anchored patterns (linear).
+    .replace(/^[.-]+/, "")
+    .replace(/[.-]+$/, "") || "export";
+  // The one date in this product that stays ISO on purpose: `/` is a path
+  // separator, and ISO makes a folder of exports sort into date order.
+  const stamp = date instanceof Date ? serialIso(date) : String(date);
+  return env === "staging" ? `${safe}-STAGING-${stamp}.${extension}` : `${safe}-${stamp}.${extension}`;
+}
+
+/** The Lagos calendar date of an instant, YYYY-MM-DD. */
+function serialIso(date) {
+  const w = wallClock(date);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${w.year}-${p(w.month)}-${p(w.day)}`;
+}
+
+module.exports = {
+  TIMEZONE,
+  MONEY_FORMAT,
+  FORMULA_LEAD,
+  cellRawValue,
+  cellValue,
+  sheetName,
+  escapeFormula,
+  hexToArgb,
+  serialDate,
+  formatInstant,
+  exportFilename,
+};

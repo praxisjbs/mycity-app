@@ -501,7 +501,7 @@ describeDb("documents, PDFs, mail and imports against Postgres", () => {
       const forClerk = await report.errorFile(pool, first.import_batch_id, people.eze);
       expect((await read(forClerk.buffer))[1][4]).toBeUndefined();
       const tpl = await report.template(registry.get("test_people"));
-      expect(tpl.filename).toMatch(/^test-people-import-template-\d{4}-\d{2}-\d{2}\.xlsx$/);
+      expect(tpl.filename).toMatch(/^test_people-import-template-\d{4}-\d{2}-\d{2}\.xlsx$/);
     });
   });
 

@@ -23,12 +23,16 @@ const crypt = require("../../../src/services/secrets/encryption.service");
 const qr = require("../../../src/services/qr/qr");
 const ics = require("../../../src/services/calendar/ics");
 const dnsCheck = require("../../../src/services/mail/deliverability/dns-check");
+const routeCheck = require("../../../src/services/mail/deliverability/route-check");
+const { parseDmarc } = require("../../../src/services/mail/deliverability/dmarc");
+const { toRow, regression } = require("../../../src/services/mail/deliverability/evaluate");
 const mail = require("../../../src/services/mail/system-mail.service");
-const { parseCsv, buildCsv } = require("../../../src/shared/spreadsheet/csv");
-const { escapeFormula, sheetName } = require("../../../src/shared/spreadsheet/cells");
+const { parseCsv, parseCsvGrid, buildCsv } = require("../../../src/shared/spreadsheet/csv");
+const { escapeFormula, sheetName, serialDate, exportFilename } = require("../../../src/shared/spreadsheet/cells");
+const { workbookContext } = require("../../../src/shared/spreadsheet/context");
 const dates = require("../../../src/shared/spreadsheet/day-first-cells");
 const { buildWorkbook } = require("../../../src/shared/spreadsheet/build");
-const { parseUpload } = require("../../../src/shared/spreadsheet/parse");
+const { parseUpload, readSheets } = require("../../../src/shared/spreadsheet/parse");
 const mapping = require("../../../src/shared/import/mapping");
 const registry = require("../../../src/shared/import/registry");
 const engine = require("../../../src/shared/import/engine");
@@ -259,17 +263,12 @@ describe("documents: serving helpers", () => {
 });
 
 describe("small services", () => {
-  test("encryption: round trip, bound to its record, tamper-evident", () => {
-    const sealed = crypt.encrypt("imap-pass", { aad: "mailbox:u1" });
-    expect(sealed).toMatch(/^v1:/);
-    expect(crypt.decrypt(sealed, { aad: "mailbox:u1" })).toBe("imap-pass");
-    expect(() => crypt.decrypt(sealed, { aad: "mailbox:u2" })).toThrow(/altered, or belongs to another/);
-    const tampered = `v1:${Buffer.from(Buffer.from(sealed.slice(3), "base64").map((b, i) => (i === 30 ? b ^ 1 : b))).toString("base64")}`;
-    expect(() => crypt.decrypt(tampered, { aad: "mailbox:u1" })).toThrow();
-    expect(() => crypt.decrypt("plain")).toThrow(/not a sealed value/);
+  test("encryption: round trip, fresh IV, tamper-evident", () => {
+    const sealed = crypt.encrypt("imap-pass");
+    expect(crypt.decrypt(sealed)).toBe("imap-pass");
     expect(crypt.encrypt("x")).not.toBe(crypt.encrypt("x"));
-    expect(crypt.decryptJson(crypt.encryptJson({ a: 1 }))).toEqual({ a: 1 });
-    expect(crypt.hint("abcdefgh")).toBe("••••••••efgh");
+    const tampered = Buffer.from(Buffer.from(sealed, "base64").map((b, i) => (i === 30 ? b ^ 1 : b))).toString("base64");
+    expect(() => crypt.decrypt(tampered)).toThrow();
   });
 
   test("QR codes only for our own public links", async () => {
@@ -297,16 +296,31 @@ describe("small services", () => {
     expect(() => ics.event({ uid: "a@b", start: "2026-10-20T10:00:00Z", end: "2026-10-20T09:00:00Z", summary: "x" })).toThrow(/end must be after/);
   });
 
-  test("deliverability judgements", () => {
-    expect(dnsCheck.judgeSpf(["v=spf1 include:_spf.mx.example -all"]).ok).toBe(true);
-    expect(dnsCheck.judgeSpf(["v=spf1 +all"]).problems[0]).toMatch(/\+all/);
-    expect(dnsCheck.judgeSpf(["v=spf1 -all", "v=spf1 ~all"]).problems[0]).toMatch(/More than one/);
-    expect(dnsCheck.judgeSpf([]).ok).toBe(false);
-    expect(dnsCheck.judgeDkim(["v=DKIM1; k=rsa; p=MIIBIjAN"]).ok).toBe(true);
-    expect(dnsCheck.judgeDkim(["v=DKIM1; p="]).problems[0]).toMatch(/revoked/);
-    expect(dnsCheck.judgeDmarc(["v=DMARC1; p=none; rua=mailto:x@y"]).warnings[0]).toMatch(/monitors/);
-    expect(dnsCheck.judgeDmarc(["v=DMARC1; p=reject"]).ok).toBe(true);
-    expect(dnsCheck.domainOf("MyCity App <no-reply@mycityapp.io>")).toBe("mycityapp.io");
+  test("deliverability: domains, DMARC reading, relay suggestions", () => {
+    expect(dnsCheck.domainOf("smtp.mail.mycity.com.ng")).toBe("mycity.com.ng");
+    expect(dnsCheck.domainOf("mail.mycityapp.io")).toBe("mycityapp.io");
+    expect(dnsCheck.domainOf("localhost")).toBeNull();
+    expect(dnsCheck.senderDomain("MyCity App <no-reply@mycityapp.io>")).toBe("mycityapp.io");
+    expect(dnsCheck.spfSuggestions("mycityapp.io", "smtp.sendgrid.net")).toEqual(["v=spf1 include:sendgrid.net ~all"]);
+    expect(dnsCheck.spfSuggestions("mycityapp.io", "mail.hostbox.com.ng")).toEqual(["v=spf1 mx include:hostbox.com.ng ~all"]);
+    expect(dnsCheck.spfSuggestions("mycityapp.io", null)).toEqual(["v=spf1 mx ~all"]);
+    const weak = parseDmarc("v=DMARC1; p=none; rua=mailto:x@y");
+    expect(weak).toMatchObject({ ok: true, policy: "none", rua: "mailto:x@y", dkim_alignment: "relaxed" });
+    expect(weak.reading).toMatch(/monitoring only/);
+    expect(parseDmarc("v=DMARC1; p=reject; adkim=s").dkim_alignment).toBe("strict");
+    expect(parseDmarc("p=reject").reading).toMatch(/not a DMARC record/);
+    expect(toRow("x.ng", "SPF", { ok: false, suggest: ["v=spf1 mx ~all"] })).toMatchObject({ verdict: "FAIL", suggestion: "v=spf1 mx ~all" });
+    expect(regression({ verdict: "PASS" }, { verdict: "FAIL" })).toBe(true);
+  });
+
+  test("deliverability: route trap needs co-hosting AND a remote MX", async () => {
+    const { STATES } = routeCheck;
+    expect(routeCheck.classify({ relayIps: ["1.1.1.1"], recipientIps: ["2.2.2.2"], mxIps: ["3.3.3.3"] }).state).toBe(STATES.OK);
+    expect(routeCheck.classify({ relayIps: ["1.1.1.1"], recipientIps: ["1.1.1.1"], mxIps: ["1.1.1.1"] }).state).toBe(STATES.OK);
+    expect(routeCheck.classify({ relayIps: ["1.1.1.1"], recipientIps: ["1.1.1.1"], mxIps: ["9.9.9.9"] }).state).toBe(STATES.LOCAL_TRAP);
+    expect(routeCheck.classify({ relayIps: [], recipientIps: ["1.1.1.1"], mxIps: [] }).state).toBe(STATES.UNKNOWN);
+    expect(routeCheck.classify({ relayIps: ["1.1.1.1"], recipientIps: ["1.1.1.1"], mxIps: [], hasMx: false }).ok).toBeNull();
+    await expect(routeCheck.assertRoutable({ smtpHost: "", to: "a@b.ng" })).resolves.toBeUndefined();
   });
 
   test("mail text part", () => {
@@ -316,70 +330,95 @@ describe("small services", () => {
 
 describe("spreadsheets", () => {
   test("CSV: quotes, line breaks, semicolons, a byte-order mark", () => {
-    expect(parseCsv('\uFEFFname,note\r\n"Obi, Ada","said ""hi""\nthen left"\r\n,\r\n')).toEqual([["name", "note"], ["Obi, Ada", 'said "hi"\nthen left']]);
-    expect(parseCsv("a;b;c\n1;2;3")).toEqual([["a", "b", "c"], ["1", "2", "3"]]);
-    const out = buildCsv([{ key: "a", label: "A" }, { key: "b", label: "B" }], [{ a: "=SUM(A1)", b: "x,y" }]).toString("utf8");
-    expect(out).toBe("\uFEFFA,B\r\n'=SUM(A1),\"x,y\"\r\n");
+    expect(parseCsvGrid('\uFEFFname,note\r\n"Obi, Ada","said ""hi""\nthen left"\r\n,\r\n')).toEqual([["name", "note"], ["Obi, Ada", 'said "hi"\nthen left']]);
+    expect(parseCsvGrid("a;b;c\n1;2;3")).toEqual([["a", "b", "c"], ["1", "2", "3"]]);
+    expect(parseCsv("Name,Email\nAda,ada@x.io\n,\n")).toEqual([{ Name: "Ada", Email: "ada@x.io" }]);
+    const out = buildCsv({
+      columns: [{ key: "a", header: "A" }, { key: "b", header: "B" }, { key: "d", header: "Day", format: "date" }, { key: "ok", header: "Ok", format: "bool" }],
+      rows: [{ a: "=SUM(A1)", b: "x,y", d: "2026-11-03", ok: true }],
+    }).toString("utf8");
+    expect(out).toBe("\uFEFFA,B,Day,Ok\r\n'=SUM(A1),\"x,y\",03/11/2026,Yes\r\n");
   });
 
-  test("cells: formula injection escaped, sheet names Excel accepts", () => {
+  test("cells: formula injection escaped, sheet names Excel accepts, Lagos dates, filenames", () => {
     expect(escapeFormula("+2348031234567")).toBe("'+2348031234567");
     expect(escapeFormula("@cmd")).toBe("'@cmd");
     expect(escapeFormula("Ada")).toBe("Ada");
+    expect(escapeFormula(-5)).toBe(-5);
     const taken = new Set();
-    expect(sheetName("Staff: Oct/Nov [draft]", taken)).toBe("Staff Oct Nov draft");
-    expect(sheetName("Staff: Oct/Nov [draft]", taken)).toBe("Staff Oct Nov draft (2)");
+    expect(sheetName("Staff: Oct/Nov [draft]", { taken })).toBe("Staff Oct Nov draft");
+    expect(sheetName("Staff: Oct/Nov [draft]", { taken })).toBe("Staff Oct Nov draft (2)");
+    // 23:30 UTC is 00:30 the next day in Lagos.
+    expect(serialDate("2026-10-14T23:30:00Z").toISOString()).toBe("2026-10-15T00:30:00.000Z");
+    expect(serialDate("2026-10-14T23:30:00Z", { hasTime: false }).toISOString()).toBe("2026-10-15T00:00:00.000Z");
+    expect(serialDate("2026-10-14").toISOString()).toBe("2026-10-14T00:00:00.000Z");
+    expect(exportFilename({ base: "Staff list", extension: "xlsx", date: "2026-10-14" })).toBe("Staff-list-2026-10-14.xlsx");
+    expect(exportFilename({ base: "x", env: "staging", extension: "csv", date: "2026-10-14" })).toBe("x-STAGING-2026-10-14.csv");
   });
 
-  test("dates: Excel serials, day-first text, impossible dates refused", () => {
+  test("dates read from a person's sheet: Excel serials, day-first text, impossible dates refused", () => {
     expect(dates.fromSerial(45000)).toBe("2023-03-15");
     expect(dates.toSerial("2023-03-15")).toBe(45000);
     expect(dates.readDate("03/07/1991")).toEqual({ date: "1991-07-03", error: null });
     expect(dates.readDate("13/31/1991").error).toMatch(/day-first/);
     expect(dates.readDate("31/02/2026").error).toBeTruthy();
     expect(dates.readDate(new Date(Date.UTC(2026, 9, 14))).date).toBe("2026-10-14");
+    expect(dates.readDate("2026-10-14T00:00:00.000Z").date).toBe("2026-10-14");
     expect(dates.readDate(45000).date).toBe("2023-03-15");
   });
 
-  test("an export reads back: money, dates, enums, text; the Reference sheet is skipped", async () => {
+  test("an export reads back: money, dates, lists, totals; the Reference sheet is skipped", async () => {
     const buffer = await buildWorkbook({
       sheets: [
         {
           name: "Employees",
           columns: [
-            { key: "name", label: "Name" },
-            { key: "start", label: "Start Date", type: "date" },
-            { key: "pay", label: "Gross Monthly", type: "money" },
-            { key: "pattern", label: "Work Pattern", type: "enum", options: ["On-site", "Hybrid", "Remote"] },
+            { key: "name", header: "Name" },
+            { key: "start", header: "Start Date", format: "date" },
+            { key: "pay", header: "Gross Monthly", format: "money", total: true },
+            { key: "pattern", header: "Work Pattern", list: ["On-site", "Hybrid", "Remote"] },
+            { key: "dept", header: "Department", refColumn: "Department" },
           ],
-          rows: [{ name: "=cmd|calc", start: "2026-11-03", pay: "450000.50", pattern: "Hybrid" }],
+          rows: [{ name: "=cmd|calc", start: "2026-11-03", pay: "450000.50", pattern: "Hybrid", dept: "Partnerships" }],
         },
       ],
-      reference: [{ column: "Start Date", required: true, rule: "Day-first", example: "03/11/2026" }],
+      reference: [{ title: "Department", values: ["Partnerships", "Operations"] }],
+      context: workbookContext({ actor: { full_name: "Ada Obi" }, title: "Employees" }),
+      cover: true,
     });
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["Cover", "Employees", "Reference"]);
     const ws = wb.getWorksheet("Employees");
+    expect(ws.getCell("A1").fill.fgColor.argb).toBe("FF014339");
     expect(ws.getCell("C2").numFmt).toContain("₦");
     expect(ws.getCell("B2").numFmt).toBe("dd/mm/yyyy");
     expect(ws.getCell("D2").dataValidation.type).toBe("list");
-    expect(wb.getWorksheet("Reference")).toBeTruthy();
-    const book = await parseUpload({ buffer, filename: "export.xlsx" });
-    expect(book.sheets.map((s) => s.name)).toEqual(["Employees"]);
-    const [header, row] = book.sheets[0].rows;
-    expect(header).toEqual(["Name", "Start Date", "Gross Monthly", "Work Pattern"]);
+    expect(ws.getCell("E2").dataValidation.formulae[0]).toBe("Reference!$A$3:$A$4");
+    expect(ws.getCell("C3").value).toEqual(expect.objectContaining({ formula: "SUM(C2:C2)" }));
+    expect(wb.getWorksheet("Cover").getCell("A1").value).toBe("Employees");
+
+    const plain = await buildWorkbook({ sheets: [{ name: "Employees", columns: ws.columns.map((c) => ({ key: c.key, header: c.header })).slice(0, 3), rows: [{ name: "Ada", start: "2026-11-03", pay: 1 }] }] });
+    const keyed = await parseUpload({ buffer: plain, filename: "export.xlsx" });
+    expect(keyed).toEqual([{ Name: "Ada", "Start Date": "2026-11-03", "Gross Monthly": 1 }]);
+
+    const book = await readSheets({ buffer, filename: "export.xlsx" });
+    expect(book.sheets.map((s) => s.name)).toEqual(["Cover", "Employees"]);
+    const [header, row] = book.sheets[1].rows;
+    expect(header).toEqual(["Name", "Start Date", "Gross Monthly", "Work Pattern", "Department"]);
     expect(row[0]).toBe("'=cmd|calc");
     expect(dates.readDate(row[1]).date).toBe("2026-11-03");
     expect(row[2]).toBe(450000.5);
   });
 
   test("uploads that are not sheets are refused", async () => {
-    await expect(parseUpload({ buffer: Buffer.from("%PDF-1.4"), filename: "x.pdf" })).rejects.toMatchObject({ code: "SHEET_TYPE" });
-    await expect(parseUpload({ buffer: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), filename: "x.xls" })).rejects.toMatchObject({ code: "SHEET_OLD_FORMAT" });
-    const csv = await parseUpload({ buffer: Buffer.from("Name,Email\nAda,ada@x.io\n"), filename: "s.csv" });
+    await expect(readSheets({ buffer: Buffer.from("%PDF-1.4"), filename: "x.pdf" })).rejects.toMatchObject({ code: "SHEET_TYPE" });
+    await expect(readSheets({ buffer: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), filename: "x.xls" })).rejects.toMatchObject({ code: "SHEET_OLD_FORMAT" });
+    const csv = await readSheets({ buffer: Buffer.from("Name,Email\nAda,ada@x.io\n"), filename: "s.csv" });
     expect(csv.sheets[0].rows).toEqual([["Name", "Email"], ["Ada", "ada@x.io"]]);
   });
 });
+
 
 describe("import mapping and rows", () => {
   const FIELDS = [

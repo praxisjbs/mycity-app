@@ -20,6 +20,10 @@
  *    byte with SMTP_SECURE on 465). Staging sends real mail too (A4), marked: the subject
  *    starts "[STAGING]" and the message carries a red banner, so nobody mistakes a test
  *    offer letter for a real one.
+ *    Before handing a message to the relay, each recipient domain is checked
+ *    (deliverability/route-check.js): a relay that hosts the domain's website but not its
+ *    mail would keep the message in a local mailbox and report success, so that send
+ *    fails with MAIL_ROUTE_TRAPPED instead.
  *  - SMTP_HOST empty (development, test): nothing leaves the machine. Messages are kept in
  *    memory (captured()) for tests and logged at debug.
  *
@@ -36,6 +40,7 @@ const { markdownToHtml } = require("../../shared/documents/markdown");
 const templates = require("../../shared/templates/template-store");
 const variables = require("../../shared/templates/variables");
 const storage = require("../storage/storage.service");
+const routeCheck = require("./deliverability/route-check");
 
 const EMAIL_RE = /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/;
 const MAX_RECIPIENTS = 50;
@@ -147,6 +152,9 @@ async function send(msg) {
   const cc = msg.cc ? addressList(msg.cc) : undefined;
   const first = Array.isArray(msg.to) ? msg.to[0] : msg.to;
   const recipient = msg.recipient || (typeof first === "object" ? first : { email: first });
+  // A relay that hosts a recipient's domain but not its mail would accept the message and
+  // keep it in a local mailbox: fail loudly instead (code MAIL_ROUTE_TRAPPED).
+  if (config.SMTP_HOST) await routeCheck.assertRoutable({ smtpHost: config.SMTP_HOST, to: [...to, ...(cc || [])].map((a) => (typeof a === "string" ? a : a.address)) });
   const rendered = await renderEmail(db, msg.template, msg.data || {}, { recipient });
   const info = await getTransport().sendMail({
     from: config.MAIL_FROM,

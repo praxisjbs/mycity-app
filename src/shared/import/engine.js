@@ -42,7 +42,7 @@ const { emit } = require("../events/emit");
 const { defineEvents } = require("../events/catalogue");
 const { pageQuery, TOTAL_COL } = require("../http/paged");
 const { readDate } = require("../spreadsheet/day-first-cells");
-const { parseUpload } = require("../spreadsheet/parse");
+const { readSheets } = require("../spreadsheet/parse");
 const vault = require("../documents/vault");
 const storage = require("../../services/storage/storage.service");
 const registry = require("./registry");
@@ -219,7 +219,7 @@ async function assertMay(client, user, imp) {
 async function sourceGrid(client, batch) {
   const doc = await vault.get(client, batch.document_id);
   if (!doc) throw new Error(`import ${batch.import_batch_id}: its source file record is gone`);
-  const book = await parseUpload({ buffer: await storage.get(doc.storage_key), filename: doc.original_name });
+  const book = await readSheets({ buffer: await storage.get(doc.storage_key), filename: doc.original_name });
   return book.sheets;
 }
 
@@ -241,7 +241,7 @@ async function createBatch(client, { importer_key: key, file, actor }) {
   const imp = importerOf(key);
   await assertMay(client, actor, imp);
   const id = crypto.randomUUID();
-  const book = await parseUpload({ buffer: file && file.buffer, filename: file && file.originalname });
+  const book = await readSheets({ buffer: file && file.buffer, filename: file && file.originalname });
   const doc = await vault.store(client, {
     file,
     purpose: "import_sheet",
