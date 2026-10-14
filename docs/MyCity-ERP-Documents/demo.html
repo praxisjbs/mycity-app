@@ -1331,21 +1331,21 @@ function artHead(title,meta){return '<h2>'+esc(title)+'</h2><div class="meta">'+
 function emp360(i){var e=EMP[i]||EMP[0],s=STAFF[i]||STAFF[0],arr=ATT&&ATT.emps[s[0]]?ATT.emps[s[0]].arr:e.arr;
   return bk('Back to Employees')+
   prof({av:s[0],n:s[1],r:e.title+' · '+s[2],chips:pill(e.st[0],e.st[1])+pill('nt',arr)+pill('nt','Reports to '+e.mgr)+pill('nt','Since '+e.start),
-    acts:[['Raise a query'],['Message'],['Edit',1]]})+
-  statstrip([['Attendance, 30d',e.att],['KPI score',e.kpi],['Open tasks',e.tasks],['Leave left',e.leave],['Open queries',e.q,e.q==='0'?'ok':'warn']])+
+    acts:[['Raise Query'],['Message'],['Edit',1]]})+
+  statstrip([['Attendance, 30d',e.att],['KPI Score',e.kpi],['Open Tasks',e.tasks],['Leave Left',e.leave],['Open Queries',e.q,e.q==='0'?'ok':'warn']])+
   '<div class="grid g2">'+
-  kvcard('Employment',[['Job title',e.title],['Department',s[2]],['Grade',e.grade],['Line manager',e.mgr],
-    ['Start date',e.start],['Employment type','Full time'],['Work arrangement',esc(arr)],['Status',pill(e.st[0],e.st[1])]])+
-  kvcard('Contact and pay',[['Work email',e.email],['Phone',e.phone],['Gross monthly',e.pay],
-    ['Bank',e.bank],['Account','•••• '+e.acct],['Next of kin',e.nok]])+'</div>'+
+  kvcard('Employment',[['Job Title',e.title],['Department',s[2]],['Grade',e.grade],['Line Manager',e.mgr],
+    ['Start Date',e.start],['Employment Type','Full time'],['Work Arrangement',esc(arr)],['Status',pill(e.st[0],e.st[1])]])+
+  kvcard('Contact and Pay',[['Work Email',e.email],['Phone',e.phone],['Gross Monthly',e.pay],
+    ['Bank',e.bank],['Account','•••• '+e.acct],['Next of Kin',e.nok]])+'</div>'+
   attSetupCard(s[0])+
   '<div class="grid g2">'+
-  bars('KPIs this month',e.kpis,'Weighted to 100%. Progress counts from tasks linked to each KPI.')+
-  tl('Record activity',e.tlog)+'</div>'+
+  helpOn(bars('KPIs This Month',e.kpis),'KPIs This Month','Weighted to 100%. Progress counts from the tasks linked to each KPI.')+
+  tl('Record Activity',e.tlog)+'</div>'+
   '<div class="grid g2">'+
   attEmpSessions(s[0])+
   table([['Document'],['Status'],['Expires']],e.docs,'Documents')+'</div>'+
-  '<div style="margin-top:12px">'+table([['Subject'],['Raised by'],['Date'],['Outcome']],e.qlog,'Queries and sanctions',
+  '<div style="margin-top:12px">'+table([['Subject'],['Raised By'],['Date'],['Outcome']],e.qlog,'Queries and Sanctions',
     e.q==='0'?pill('ok','Nothing open'):pill('wa',e.q+' open'))+'</div>'}
 
 function partner360(i){var p=PARTNERS[i]||PARTNERS[0];
@@ -1384,7 +1384,12 @@ var STAFF=[['TA','Tolu Adeyemi','Content'],['BL','Bashir Lawal','Marketing & Sal
  ['NE','Ngozi Eze','Marketing & Sales'],['CN','Chidera Nwosu','Content'],['AD','Adedotun Oyinloye','Marketing & Sales']];
 function st(i){return who(STAFF[i][0],STAFF[i][1],STAFF[i][2])}
 
-/* ───── organogram · one render, builder (People) and viewer (ESS) ───── */
+/* ───── organogram · one render, builder (People) and viewer (ESS) ─────
+   Desktop draws the whole tree; a phone draws a focus view (manager, the person, their direct
+   reports) and a tap on a card moves the focus (organogram guide §10). */
+var OGF={builder:null,viewer:null};
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-ogf]');if(!b)return;
+  OGF[b.dataset.ogm]=b.dataset.ogf;render();var s=$('#scroll');if(s)s.scrollTop=0});
 function og(mode){
   var builder=mode==='builder';
   var tree={av:'IC',n:'Ifeoma Chukwu',t:'Chief Executive Officer',d:'General Management',ceo:1,meta:'Since 2019 · Hybrid',children:[
@@ -1403,7 +1408,7 @@ function og(mode){
     if(n.vacant){return '<div class="og-n og-vac">'+
       '<span class="og-av og-vacav">'+ic('plus')+'</span>'+
       '<b>'+esc(n.n)+'</b><span class="og-t">Vacant · '+esc(n.d)+'</span>'+
-      (builder?'<button class="og-chip">'+ic('plus')+'Create vacancy</button>':'<span class="og-open">Open role</span>')+
+      (builder?'<button class="og-chip">'+ic('plus')+'Create Vacancy</button>':'<span class="og-open">Open role</span>')+
       '</div>';}
     return '<div class="og-n'+(n.ceo?' og-ceo':'')+'" tabindex="0">'+
       '<span class="og-av'+(n.ceo?' og-ceoav':'')+'">'+esc(n.av)+'</span>'+
@@ -1425,7 +1430,7 @@ function og(mode){
     '.ogt li:last-child::before{border-right:2px solid var(--line-2);border-radius:0 7px 0 0}'+
     '.ogt li:first-child::after{border-radius:7px 0 0 0}'+
     '.ogt ul ul::before{content:"";position:absolute;top:0;left:50%;border-left:2px solid var(--line-2);width:0;height:26px}'+
-    '.ogt>ul{padding-top:0}.ogt>ul>li{padding-top:0}.ogt>ul>li::before,.ogt>ul>li::after{display:none}'+
+    '.ogt>ul{padding-top:0;width:max-content;min-width:100%}.ogt>ul>li{padding-top:0}.ogt>ul>li::before,.ogt>ul>li::after{display:none}'+
     '.og-n{position:relative;width:178px;background:var(--raised);border:1px solid var(--line);border-radius:13px;padding:11px 12px;box-shadow:var(--sh-1);text-align:center;transition:box-shadow .15s,border-color .15s}'+
     '.og-n:hover{box-shadow:var(--sh-2);border-color:var(--line-2)}'+
     '.og-av{width:42px;height:42px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13.5px;margin:0 auto 8px}'+
@@ -1443,25 +1448,52 @@ function og(mode){
     '.og-chip{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:10.5px;font-weight:650;color:var(--on-yellow);background:var(--yellow);border-radius:999px;padding:3px 10px}'+
     '.og-chip svg{width:12px;height:12px}'+
     '.og-legend{display:flex;flex-wrap:wrap;gap:16px;margin:2px 0 4px;font-size:11.5px;color:var(--ink-2)}'+
-    '.og-legend span{display:inline-flex;align-items:center;gap:7px}'+
+    '.og-legend>span{display:inline-flex;align-items:center;gap:7px}'+
     '.og-legend i{width:22px;height:0;border-top:2px solid var(--line-2);display:inline-block}'+
     '.og-legend i.dash{border-top-style:dashed}'+
     '.og-legend i.ceo{width:13px;height:13px;border:0;border-radius:4px;background:var(--yellow)}'+
     '.og-legend i.vac{width:13px;height:13px;border:1px dashed var(--line-2);border-radius:4px}'+
+    '.ogf-sec{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:650;color:var(--ink-3);margin:16px 2px 8px}'+
+    '.ogf-c{min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--surface);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:11.5px;color:var(--ink-2)}'+
+    '.ogf-n{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;text-align:left;background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:var(--sh-1);margin-bottom:8px;color:inherit;font:inherit}'+
+    '.ogf-n .og-av{margin:0;flex:none}'+
+    '.ogf-b{flex:1;min-width:0}.ogf-b b{display:block;font-size:14px;font-weight:650}'+
+    '.ogf-b .og-dotted{margin-top:5px}'+
+    '.ogf-k{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:650;color:var(--ink-3);flex:none}'+
+    '.ogf-k svg,.ogf-n>svg{width:16px;height:16px;color:var(--ink-3);flex:none}'+
+    '.ogf-on{flex-wrap:wrap;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),var(--sh-1);padding:14px 12px}'+
+    '.ogf-on .og-av{width:52px;height:52px;font-size:16px}.ogf-on .ogf-b b{font-size:16px}'+
+    '.ogf-on .btn{width:100%;justify-content:center}'+
+    '.ogf-reset{margin-top:10px;width:100%;justify-content:center}'+
     '</style>';
-  var acts=builder?[['Search'],['Expand all'],['Download PDF'],['Add role',1]]:[['Search'],['Download PDF']];
-  var sub=builder?'The live reporting structure · 12 seats · 11 filled · 1 open · drag a card to reassign'
-                 :'Who reports to whom across MyCity · read only · 12 seats · 11 filled';
+  var sub='12 seats · 11 filled · 1 open';
+  if(PHONE.matches){
+    /* the focus view: who the focused person reports to, the person, their direct reports */
+    var idx={},par={},me=builder?'IC':((typeof attViewer==='function'&&attViewer())||'CO');
+    (function walk(n,p){n.id=n.vacant?'VAC-'+n.d:n.av;idx[n.id]=n;par[n.id]=p;(n.children||[]).forEach(function(c){walk(c,n.id)})})(tree,null);
+    if(!idx[me])me='IC';
+    var f=idx[OGF[mode]]||idx[me],up=par[f.id]?idx[par[f.id]]:null,kids=f.children||[];
+    var fcard=function(n,on){var k=(n.children||[]).length,
+      inner='<span class="og-av'+(n.ceo?' og-ceoav':'')+(n.vacant?' og-vacav':'')+'">'+(n.vacant?ic('plus'):esc(n.av))+'</span>'+
+        '<span class="ogf-b" data-copy="content"><b>'+esc(n.n)+'</b><span class="og-t">'+esc(n.vacant?'Vacant · '+n.d:n.t+' · '+n.d)+'</span>'+
+        (n.dotted?'<span class="og-dotted">Dotted line · '+esc(n.dotted)+'</span>':'')+'</span>';
+      if(on)return '<div class="ogf-n ogf-on'+(n.vacant?' og-vac':'')+'">'+inner+(builder&&n.vacant?'<button class="btn pri">'+ic('plus')+'Create Vacancy</button>':'')+'</div>';
+      return '<button type="button" class="ogf-n'+(n.vacant?' og-vac':'')+'" data-ogf="'+esc(n.id)+'" data-ogm="'+mode+'">'+inner+
+        (k?'<span class="ogf-k">'+k+ic('right')+'</span>':ic('right'))+'</button>'};
+    return head(builder?'Organogram':'Org Chart','',builder?[['Search'],['Add Role',1]]:[['Search']])+css+
+      (up?'<div class="ogf-sec">Reports To</div>'+fcard(up):'')+
+      fcard(f,1)+
+      (kids.length?'<div class="ogf-sec">Direct Reports<span class="ogf-c">'+kids.length+'</span></div>'+kids.map(function(c){return fcard(c)}).join(''):'')+
+      (f.id!==me?'<button type="button" class="btn ogf-reset" data-ogf="'+me+'" data-ogm="'+mode+'">'+ic(builder?'up':'user')+(builder?'Show CEO':'Show Me')+'</button>':'');
+  }
+  var acts=builder?[['Search'],['Expand All'],['Download PDF'],['Add Role',1]]:[['Search'],['Download PDF']];
   var legend='<div class="og-legend">'+
-    '<span><i></i>Reporting line</span>'+
-    '<span><i class="dash"></i>Dotted line (matrix)</span>'+
+    '<span><i></i>'+(builder?hint('Reporting Line','Drag a card onto a new manager to change its reporting line.'):'Reporting Line')+'</span>'+
+    '<span><i class="dash"></i>'+hint('Dotted Line','A second manager for matrix work. It does not change who approves leave, expenses or tasks.')+'</span>'+
     '<span><i class="ceo"></i>CEO</span>'+
-    '<span><i class="vac"></i>Vacant seat</span></div>';
-  var note=builder
-    ? '<p class="sub" style="margin-top:12px">Drag a card onto a new manager to change its reporting line. Every change is written through People and recorded in the audit log, the same write the employee form uses. A vacant seat can be sent to Recruitment as a suggested vacancy. Salary, bank details and phone numbers are never shown here.</p>'
-    : '<p class="sub" style="margin-top:12px">Read only. Every employee sees the whole company here. Salary, bank details and phone numbers are never shown. On a phone this becomes a focus view: your manager, you and your reports, with tap to expand.</p>';
+    '<span><i class="vac"></i>Vacant Seat</span></div>';
   return head(builder?'Organogram':'Org Chart',sub,acts)+css+legend+
-    '<div class="card" style="padding:6px"><div class="ogt"><ul>'+nodeOf(tree)+'</ul></div></div>'+note;
+    '<div class="card" style="padding:6px"><div class="ogt" data-copy="content"><ul>'+nodeOf(tree)+'</ul></div></div>';
 }
 
 /* ───── the 16 modules ───── */
@@ -2229,22 +2261,22 @@ var M=[
   {n:'Employees',r:function(){return attEmployeesTab()}},
   {n:'Organogram',r:function(){return og('builder')}},
   {n:'Attendance',r:function(){return attPeopleAttendance()}},
-  {n:'Leave',r:function(){return head('Leave','October 2026',[['Leave calendar'],['Record leave',1]])+
-    kpis([['On leave today','1'],['Pending approval','2','warn'],['Approved this month','4'],['Clashes','0','ok']])+
+  {n:'Leave',r:function(){return head('Leave','October 2026',[['Leave Calendar'],['Record Leave',1]])+
+    kpis([['On Leave Today','1'],['Pending Approval','2','warn'],['Approved This Month','4'],['Clashes','0','ok']])+
     '<div class="grid g23">'+table([['Employee'],['Type'],['From'],['To'],['Days','n'],['Status']],[
       [st(4),'Annual','09/10/2026','11/10/2026','3',pill('ok','Approved')],
       [st(2),'Annual','20/10/2026','24/10/2026','5',pill('wa','Pending')],
       [st(7),'Compassionate','14/10/2026','14/10/2026','1',pill('wa','Pending')],
       [st(0),'Annual','22/12/2026','31/12/2026','7',pill('ok','Approved')]],'Requests')+
-    '<div class="card"><div class="ch"><h3>Cover check, 20 to 24 October</h3></div>'+
-    '<p class="sub" style="margin-bottom:11px">Amara Okafor has requested five days. This is what is open in that week.</p>'+
+    helpOn('<div class="card"><div class="ch"><h3>Cover Check, 20 to 24 October</h3></div>'+
+    '<p class="sub" style="margin-bottom:11px" data-copy="content">Amara Okafor · Annual · 5 days</p>'+
     [['Finance cover','Nobody else in Finance','er','Conflict'],['October books','Due 05/11, not in the window','ok','Clear'],
      ['Disbursement logging','Cynthia Osakunih can cover','wa','Needs agreement'],
      ['Payroll run','Already submitted','ok','Clear']].map(function(r){
       return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)">'+
       '<span style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600">'+esc(r[0])+'</div><div class="sub">'+esc(r[1])+'</div></span>'+
-      pill(r[2],r[3])+'</div>'}).join('')+
-    '<p class="sub" style="margin-top:11px">The clash check is advisory. The approver decides, and the reason is recorded either way.</p></div></div>'}},
+      pill(r[2],r[3])+'</div>'}).join('')+'</div>',
+      'Cover Check, 20 to 24 October','Advisory. It lists what falls due while the person is away; the approver decides.')+'</div>'}},
   {n:'Devices',r:function(){return attDevicesTab()}},
   {n:'Worksites',r:function(){return attWorksitesTab()}}]},
 
@@ -2335,77 +2367,69 @@ var M=[
        ['Not a Ranking','A prompt for a conversation']])}}]},
 
 {k:'queries',n:'Queries & Sanctions',i:'flag',g:'PEOPLE',cnt:'2',tabs:[
-  {n:'Queries',r:function(){return head('Queries','Managers see the queries they raised. People and the CEO see all.',[['My queries'],['Raise a query',1]])+
-    kpis([['Open','2','warn'],['Awaiting response','1'],['Closed this month','4','ok'],['Escalated','1','err']])+
-    table([['Employee'],['Subject'],['Raised by'],['Raised'],['Response'],['Status']],attQueryRows().concat([
+  {n:'Queries',r:function(){return head('Queries','',[['My Queries'],['Raise Query',1]])+
+    kpis([['Open','2','warn'],['Awaiting Response','1'],['Closed This Month','4','ok'],['Escalated','1','err']])+
+    table([['Employee'],['Subject'],['Raised By'],['Raised'],['Response'],['Status']],attQueryRows().concat([
       [st(1),'3 late arrivals in 30 days','System rule','07/10/2026','—',pill('wa','Awaiting response')],
       [st(5),'Missing clock-out on 08/10','Cynthia Osakunih','09/10/2026','—',pill('wa','Awaiting response')],
       [st(3),'Punch from unenrolled device','System rule','02/10/2026','Submitted 03/10',pill('ok','Closed, no action')],
-      [st(7),'Deadline missed, Enugu brief','Tolu Adeyemi','28/09/2026','Submitted 29/09',pill('nt','Closed, caution')]]),'All queries')+
+      [st(7),'Deadline missed, Enugu brief','Tolu Adeyemi','28/09/2026','Submitted 29/09',pill('nt','Closed, caution')]]),'All Queries')+
     '<div class="grid g2" style="margin-top:12px">'+
     '<div class="card"><div class="ch"><h3>QRY-0027 · Bashir Lawal</h3><span class="right">'+pill('wa','Awaiting response')+'</span></div>'+
     '<dl class="kv" style="grid-template-columns:116px 1fr"><dt>Subject</dt><dd>Three late arrivals in 30 days</dd>'+
-    '<dt>Raised by</dt><dd>A system rule, not a manager</dd><dt>Raised</dt><dd>07/10/2026 at 09:41</dd>'+
-    '<dt>Response due</dt><dd>09/10/2026 at 09:41</dd><dt>Instances</dt><dd>05/10 late 31m, 08/10 late 22m, 09/10 late 41m</dd>'+
+    '<dt>Raised By</dt><dd>System rule, Repeated lateness</dd><dt>Raised</dt><dd>07/10/2026 at 09:41</dd>'+
+    '<dt>Response Due</dt><dd>09/10/2026 at 09:41</dd><dt>Instances</dt><dd>05/10 late 31m, 08/10 late 22m, 09/10 late 41m</dd>'+
     '<dt>Letter</dt><dd>Query letter, sent by email and in app</dd></dl>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn">'+ic('doc')+'View letter</button>'+
-    '<button class="btn">Send reminder</button><button class="btn pri">Record a decision</button></div></div>'+
-    bars('Queries by reason, last 90 days',[['Lateness',100,'9'],['Missing clock-out',55,'5'],
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn">'+ic('doc')+'View Letter</button>'+
+    '<button class="btn">Send Reminder</button><button class="btn pri">Record Decision</button></div></div>'+
+    bars('Queries by Reason, 90 Days',[['Lateness',100,'9'],['Missing clock-out',55,'5'],
       ['Unenrolled device',33,'3'],['Deadline missed',22,'2'],['Absence without notice',11,'1']],
-      'Seventeen of twenty queries were raised by a rule rather than a person. That is the point of the rules.')+'</div>'}},
-  {n:'Rules',r:function(){return head('Rules','Automatic queries, configured not coded',[['New rule',1]])+
-    kpis([['Active rules','4'],['Draft','2'],['Fired this month','11'],['Queries raised','6']])+
-    cards([['Repeated lateness','Raises a query on the third late arrival in a rolling 30 days. Not the first.','<span class="pill ok"><i></i>Active</span><span class="pill nt">3 in 30 days</span>'],
-      ['Missing clock-out','Raises a query the morning after a punch with no matching clock-out.','<span class="pill ok"><i></i>Active</span>'],
-      ['Unenrolled device','Raises a query when someone punches from a device that is not enrolled.','<span class="pill ok"><i></i>Active</span>'],
-      ['Absence without notice','Raises a query after one full day absent with no approved leave.','<span class="pill ok"><i></i>Active</span>'],
-      ['Overdue task','Raises a query when a task is 5 working days past its date.','<span class="pill nt">Draft</span>'],
-      ['Missed monthly KPI','Raises a query when an individual KPI closes below 50%.','<span class="pill nt">Draft</span>']])+
-    '<div class="grid g2" style="margin-top:12px">'+
+      '17 of 20 raised by a rule')+'</div>'}},
+  {n:'Rules',r:function(){return head('Rules','',[['New Rule',1]])+
+    kpis([['Active Rules','4'],['Draft','2'],['Fired This Month','11'],['Queries Raised','6']])+
+    /* a rule's name and trigger are records People configured: content, not interface copy */
+    '<div class="grid g3">'+[['Repeated lateness','Third late arrival in a rolling 30 days',pill('ok','Active')+pill('nt','3 in 30 days')],
+      ['Missing clock-out','The morning after a punch with no clock-out',pill('ok','Active')],
+      ['Unenrolled device','A punch from a device that is not enrolled',pill('ok','Active')],
+      ['Absence without notice','One full day absent with no approved leave',pill('ok','Active')],
+      ['Overdue task','A task 5 working days past its date',pill('nt','Draft')],
+      ['Missed monthly KPI','An individual KPI closes below 50%',pill('nt','Draft')]].map(function(r){
+      return '<div class="tile"><h4 data-copy="content">'+esc(r[0])+'</h4><p data-copy="content">'+esc(r[1])+'</p>'+
+        '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+r[2]+'</div></div>'}).join('')+'</div>'+
+    '<div style="margin-top:12px">'+
     table([['Rule'],['Fired'],['Employee'],['Outcome']],[
       ['Repeated lateness','09/10 09:41',st(1),pill('wa','Query raised')],
       ['Missing clock-out','09/10 06:00',st(5),pill('wa','Query raised')],
       ['Unenrolled device','09/10 08:58',st(3),pill('nt','Warned, no query')],
       ['Repeated lateness','07/10 09:18','Cynthia Osakunih',pill('nt','Below threshold')],
-      ['Unenrolled device','02/10 08:12',st(3),pill('ok','Closed, no action')]],'Recent firings',
-      '<span class="sub">Last 7 days</span>')+
-    kvcard('What a rule is made of',[['Trigger','An event: a punch, a day ending, a task date passing'],
-      ['Threshold','A number and a window. "3 in 30 days"'],
-      ['Who it notifies','A role, not a person. The role can change'],
-      ['Letter','Which template to send, filled from the record'],
-      ['Chain','Which consequence step it opens, if any'],
-      ['Changing it','Editing a value. No deploy, no release']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">The threshold on each rule is a setting. Changing "3 in 30 days" needs no deploy.</p>'}},
-  {n:'Sanctions',r:function(){return head('Sanctions','The consequence chain · MyCity ladder',[['Chain settings'],['Issue sanction',1]])+
-    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>Bashir Lawal · 3 late arrivals in 30 days</h3><span class="right">'+pill('wa','In progress')+'</span></div>'+
-    '<div class="chain">'+[['Query raised','done'],['Awaiting response','now'],['Caution',''],['Warning',''],['Suspension',''],['Suspension without pay',''],['Dismissal','']].map(function(s,i){
-      return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">Adding or removing a step is configuration. A fine attaches to any step and reaches payroll as a pending deduction, used for property damage.</p></div>'+
-    kpis([['Active sanctions','2'],['Served','4'],['Financial, this year','₦57,500'],['Recovered','₦45,000','ok']])+
-    table([['Employee'],['Sanction'],['Reason'],['Issued by'],['Date'],['Financial'],['Status']],[
+      ['Unenrolled device','02/10 08:12',st(3),pill('ok','Closed, no action')]],'Recent Firings',
+      '<span class="sub">Last 7 days</span>')+'</div>'}},
+  {n:'Sanctions',r:function(){return head('Sanctions','',[['Chain Settings'],['Issue Sanction',1]])+
+    '<div class="card" style="margin-bottom:12px"><div class="ch"><h3>Bashir Lawal · Lateness</h3><span class="right">'+pill('wa','In progress')+'</span></div>'+
+    '<div class="chain" data-copy="content">'+[['Query Raised','done'],['Awaiting Response','now'],['Caution',''],['Warning',''],['Suspension',''],['Suspension Without Pay',''],['Dismissal','']].map(function(s,i){
+      return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+'</div></div>'+
+    helpOn(kpis([['Active Sanctions','2'],['Served','4'],['Financial, This Year','₦57,500'],['Recovered','₦45,000','ok']]),'Financial, This Year',
+      'Fines for property damage. A fine attaches to any step and reaches payroll as a pending deduction once Finance or Operations accepts it. An appeal holds it.')+
+    table([['Employee'],['Sanction'],['Reason'],['Issued By'],['Date'],['Financial'],['Status']],[
       [st(7),'Caution','Deadline missed, Enugu brief','Tolu Adeyemi','30/09/2026','—',pill('nt','Active')],
       [st(1),'Warning','Repeated lateness, August','Cynthia Osakunih','29/08/2026','₦12,500',pill('nt','Served')],
-      [st(3),'Fine','Damage to studio monitor','Cynthia Osakunih','14/07/2026','₦45,000',pill('ok','Recovered')]],'Sanction history')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    kvcard('How a fine reaches payroll',[['Issued','On any step of the chain, with an amount and a reason'],
-      ['Lands in','Payroll, Deductions, as pending acceptance'],
-      ['Who accepts','Finance or Operations. Never automatic'],
-      ['Spread','Can be split across runs, as the ₦45,000 was over two'],
-      ['If the employee appeals','The deduction holds until the appeal is decided'],
-      ['On the payslip','A single line: the reason, not the sanction wording']])+
-    tl('Chain activity',[['Query letter sent to Bashir Lawal','07/10/2026','By email and in app. Response due in 48 hours.','hi'],
+      [st(3),'Fine','Damage to studio monitor','Cynthia Osakunih','14/07/2026','₦45,000',pill('ok','Recovered')]],'Sanction History')+
+    '<div style="margin-top:12px">'+
+    tl('Chain Activity',[['Query letter sent to Bashir Lawal','07/10/2026','By email and in app. Response due in 48 hours.','hi'],
       ['Caution issued to Chidera Nwosu','30/09/2026','Response read first. Caution stands.'],
       ['Warning served on Bashir Lawal','29/08/2026','₦12,500 accepted into the August run.'],
       ['Fine fully recovered from Seyi Balogun','30/08/2026','₦45,000 across July and August.','ok']])+'</div>'}},
-  {n:'Letter Templates',r:function(){return head('Letter Templates','Seeded with MyCity wording. The system fills name, date and reason.',[['Preview'],['New template',1]])+
-    statstrip([['Templates','6'],['Active','3','ok'],['Awaiting sample','3','warn'],['Letters sent, 90d','14'],['Languages','English']])+
-    '<div class="grid g32">'+table([['Template'],['Used for'],['Status']],[
+  {n:'Letter Templates',r:function(){return head('Letter Templates','',[['Preview'],['New Template',1]])+
+    helpOn(statstrip([['Templates','6'],['Active','3','ok'],['Awaiting Sample','3','warn'],['Letters Sent, 90d','14'],['Languages','English']]),'Awaiting Sample',
+      'Waiting on a sample letter from MyCity, so the wording is theirs. Until it arrives, that step of the chain cannot send a letter.')+
+    '<div class="grid g32">'+helpOn(table([['Template'],['Used For'],['Status']],[
       ['Query letter','Any query raised',pill('ok','Active')],
       ['Caution letter','Caution stage',pill('ok','Active')],
       ['Warning letter','Warning stage',pill('ok','Active')],
       ['Suspension letter','Suspension',pill('wa','Awaiting sample')],
       ['Suspension without pay','Suspension without pay',pill('wa','Awaiting sample')],
-      ['Termination letter','Dismissal or termination',pill('wa','Awaiting sample')]],'Templates')+
+      ['Termination letter','Dismissal or termination',pill('wa','Awaiting sample')]],'Templates'),'Templates',
+      'The system fills the name, dates, hours and grace window from the record.')+
     paper(plogo('QRY-0027')+
      '<h3>Query: punctuality</h3>'+
      '<p style="color:#566662;font-size:11.5px;margin-top:3px">Private and confidential · 07 October 2026</p>'+
@@ -2414,10 +2438,8 @@ var M=[
      '<p>You are asked to respond in writing within forty-eight hours of this letter, setting out any explanation you wish to be considered. Your response will be read before any decision is taken.</p>'+
      '<p>Yours sincerely,</p>'+
      '<div class="sig" style="margin-top:12px">C. Osakunih</div>'+
-     '<p style="font-size:10.5px;color:#7E8D88;border-top:1px solid #D5DEDB;padding-top:4px;margin-top:2px">Cynthia Osakunih · Operations and People Lead</p>'+
-     '<div class="pfoot"><span>Fields filled from the record: name, dates, hours, grace window</span></div>',
-     'Query letter as it is sent. Everything in italics above came from the record, not from typing.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Three templates are waiting on sample letters from MyCity so the wording is theirs, not ours. Until a sample arrives, that step of the chain cannot send a letter.</p>'}}]},
+     '<p style="font-size:10.5px;color:#7E8D88;border-top:1px solid #D5DEDB;padding-top:4px;margin-top:2px">Cynthia Osakunih · Operations and People Lead</p>',
+     'Query Letter Preview')+'</div>'}}]},
 
 {k:'recruit',n:'Recruitment',i:'brief',g:'PEOPLE',cnt:'12',tabs:[
   {n:'Vacancies',r:function(){return head('Vacancies','4 open · 61 applicants',[['Careers page'],['New vacancy',1]])+
@@ -5105,19 +5127,19 @@ function attPrimary(id){var e=aEmp(id),o=attSite(e.office||'mtn'),h=attPermHome(
   return e.arr==='Remote'?(h?'Approved home · '+h.area:'No home on file'):e.arr==='Hybrid'?o.name+', home on remote days':e.arr==='Field'?'Field assignments, base '+o.name:o.name}
 function attEmployeesTab(){
   var cnt={};ATT_ARRS.forEach(function(a){cnt[a]=0});ATT_ORDER.forEach(function(k){cnt[aEmp(k).arr]++});
-  return head('Employees','25 staff · 6 departments · select a row for details and actions',[['Import'],['Add employee',1]])+
-    kpis([['Headcount','25'],['Confirmed','21','ok'],['On probation','3','warn'],['Attrition, 90 days','1']])+
-    statstrip(ATT_ARRS.map(function(a){return [a,String(cnt[a])+' in demo roster']}))+
-    table([['Employee'],['Department'],['Line manager'],['Arrangement'],['Attendance today'],['Employment status'],['']],
+  return head('Employees','25 staff · 6 departments',[['Import'],['Add Employee',1]])+
+    kpis([['Headcount','25'],['Confirmed','21','ok'],['On Probation','3','warn'],['Attrition, 90 Days','1']])+
+    statstrip(ATT_ARRS.map(function(a){return [a,String(cnt[a])]}))+
+    table([['Employee'],['Department'],['Line Manager'],['Arrangement'],['Attendance Today'],['Employment Status'],['']],
       STAFF.map(function(s,i){var id=s[0],e=aEmp(id),ss=attTodaySession(id),v=ss?attSV(ss):null,lv=attOnLeave(id,ATT_TODAY);
         return [who(id,s[1],s[2]),esc(s[2]),esc(aMgrName(id)),pill('nt',e.arr),v?attStatusPill(v):lv?pill('in','On leave'):pill('nt','Not clocked in'),
           e.status==='Suspended'?pill('er','Suspended'):i===7?pill('wa','Probation'):pill('ok','Active'),
-          '<button class="btn" data-att="emp-open" data-v="'+id+'">View details</button>']}),'All employees',
-      '<span class="sub">Showing 9 of 25 · sensitive home addresses appear only in the authorised details modal</span>',function(i){return ' class="rowlink" tabindex="0" data-att="emp-open" data-v="'+STAFF[i][0]+'"'})+
+          '<button class="btn" data-att="emp-open" data-v="'+id+'">View Details</button>']}),'All Employees',
+      '<span class="sub">9 of 25</span>',function(i){return ' class="rowlink" tabindex="0" data-att="emp-open" data-v="'+STAFF[i][0]+'"'})+
     '<div class="grid g2" style="margin-top:12px">'+
-    bars('Headcount by department',[['Marketing & Sales',100,'6'],['Content',83,'5'],['Operations',66,'4'],
-      ['Engineering',66,'4'],['Studio',50,'3'],['Support',50,'3']],'Six departments. A department is a setting, not a code change.')+
-    '<div class="card"><div class="ch"><h3>Needs a decision</h3><span class="right">'+pill('wa','3')+'</span></div>'+
+    bars('Headcount by Department',[['Marketing & Sales',100,'6'],['Content',83,'5'],['Operations',66,'4'],
+      ['Engineering',66,'4'],['Studio',50,'3'],['Support',50,'3']])+
+    '<div class="card"><div class="ch"><h3>Needs a Decision</h3><span class="right">'+pill('wa','3')+'</span></div>'+
     [['Chidera Nwosu','Probation ends 24/10/2026','Confirm or extend','wa'],
      ['Seyi Balogun','New device pending review','Enrol or reject','wa'],
      ['Bashir Lawal','Query open since 07/10','Awaiting his response','er']].map(function(r){
@@ -5125,53 +5147,56 @@ function attEmployeesTab(){
       '<span class="meta">'+pill(r[3],r[2])+'</span></button>'}).join('')+'</div></div>'}
 function attEmployeeModal(id){var e=aEmp(id),h=attPermHome(id),fa=attAssignmentFor(id,ATT_TODAY),ts=attTempStatus(id),idx=-1;
   STAFF.forEach(function(s,i){if(s[0]===id)idx=i});if(!e)return;
-  openModal({title:'Employee Details · '+e.name,wide:true,body:
-    '<div class="attban in">'+ic('lock','ico')+'<span>Home-address details are visible to authorised People users and are recorded in the audit trail when opened.</span></div>'+
+  var homeBtn=attHasHome(e)?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit Home</button>':'';
+  openModal({title:e.name,wide:true,body:
     '<div class="grid g2"><div class="card"><div class="ch"><h3>Employment</h3><span class="right">'+(e.status==='Suspended'?pill('er','Suspended'):pill('ok','Active'))+'</span></div>'+
-      '<dl class="kv"><dt>Employee</dt><dd>'+aWho(id,e.title)+'</dd><dt>Department</dt><dd>'+esc(e.dept)+'</dd><dt>Line manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
-      '<dt>Work arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary location</dt><dd>'+esc(attPrimary(id))+'</dd><dt>Assigned office</dt><dd>'+esc(attSite(e.office||'mtn').name)+'</dd></dl></div>'+
-    '<div class="card"><div class="ch"><h3>Attendance and location</h3></div><dl class="kv">'+
-      '<dt>Registered home</dt><dd>'+(h?esc(h.address):'Not on file')+'</dd><dt>Home coordinates</dt><dd>'+(h?esc(aCoord(h.lat,h.lng)):'Not captured')+'</dd>'+
-      '<dt>Home geofence</dt><dd>'+(h?'100 m · mandatory':'Not available')+'</dd><dt>Temporary location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
-      '<dt>Field assignment today</dt><dd>'+(fa?esc(fa.id+' · '+fa.name):'None')+'</dd><dt>Attendance profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+'</dd></dl></div></div>',
-    foot:'<button class="btn" data-mx>Close</button>'+(e.arr==='Remote'||e.arr==='Hybrid'?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit home</button>':'')+
-      '<button class="btn" data-att="arr-change" data-v="'+id+'">Change arrangement</button><button class="btn pri" data-att="emp-full" data-v="'+idx+'">Open full employee record</button>',
+      '<dl class="kv"><dt>Employee</dt><dd>'+aWho(id,e.title)+'</dd><dt>Department</dt><dd>'+esc(e.dept)+'</dd><dt>Line Manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
+      '<dt>Work Arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary Location</dt><dd>'+esc(attPrimary(id))+'</dd><dt>Assigned Office</dt><dd>'+esc(attSite(e.office||'mtn').name)+'</dd></dl></div>'+
+    '<div class="card"><div class="ch"><h3>Attendance and Location</h3></div><dl class="kv">'+
+      '<dt>Registered Home</dt><dd>'+(h?esc(h.address):'Not on file')+'</dd><dt>Home Coordinates</dt><dd>'+(h?esc(aCoord(h.lat,h.lng)):'Not captured')+'</dd>'+
+      '<dt>Home Geofence</dt><dd>'+(h?'100 m':'Not available')+'</dd><dt>Temporary Location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
+      '<dt>Field Assignment</dt><dd>'+(fa?esc(fa.id+' · '+fa.name):'None')+'</dd><dt>Attendance Profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+'</dd></dl></div></div>',
+    foot:'<button class="btn" data-mx>Close</button>'+homeBtn+
+      '<button class="btn" data-att="arr-change" data-v="'+id+'">Change Arrangement</button><button class="btn pri" data-att="emp-full" data-v="'+idx+'">Open Full Record</button>',
     onMount:function(){attAudit('Viewed approved home details',e.name+' · employee details','Masked','Full address shown','People employee modal');attSave()}})}
+function attHasHome(e){return e.arr==='Remote'||e.arr==='Hybrid'}
 function attSetupCard(id){var e=aEmp(id);if(!e)return '';
   var h=attPermHome(id),fa=attAssignmentFor(id,ATT_TODAY),ts=attTempStatus(id),o=attSite(e.office||'mtn'),P=attPolicy(),
       hist=ATT.audit.filter(function(a){return a.entity.indexOf(e.name)===0&&/arrangement|Home location|Temporary location|Viewed approved home/.test(a.action)});
-  return '<div class="grid g2"><div class="card"><div class="ch"><h3>Attendance setup</h3><span class="right">'+pill('nt',e.arr)+'</span></div>'+
-    '<dl class="kv"><dt>Work arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary work location</dt><dd>'+esc(attPrimary(id))+'</dd>'+
-    '<dt>Approved home</dt><dd>'+(h?esc('Approved home · '+h.area)+' <button class="btn" style="height:26px;margin-left:4px" data-att="home-reveal" data-v="'+id+'">Show full address</button>':'Not required for this arrangement')+'</dd>'+
-    '<dt>Home geofence radius</dt><dd>'+(h?h.radius+' m'+(h.just?' <span class="sub">'+esc(h.just)+'</span>':''):'None')+'</dd>'+
-    '<dt>Assigned office</dt><dd>'+esc(o.name)+' · '+o.radius+' m</dd><dt>Line manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
-    '<dt>Field assignment today</dt><dd>'+(fa?esc(fa.id+' · '+fa.name+', '+fa.start+' to '+fa.end):'None')+'</dd>'+
-    '<dt>Temporary location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
-    (e.arr==='Hybrid'&&e.sched?'<dt>Weekly schedule</dt><dd>'+['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){return d+' '+e.sched[d]}).join(' · ')+'</dd>':'')+
-    '<dt>Attendance profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+' · policy v'+P.v+'</dd></dl>'+
-    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn pri" data-att="arr-change" data-v="'+id+'">Change arrangement</button>'+
-    (e.arr==='Remote'||e.arr==='Hybrid'?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit home geofence</button>':'')+'</div></div>'+
-    tl('Attendance setup history',hist.length?hist.slice(0,6).map(function(a,i){return [a.action+(a.before||a.after?': '+(a.before||'None')+' → '+(a.after||'None'):''),a.at+' · '+a.actor,a.reason,i===0?'hi':'ok']}):
-      [['No changes recorded yet','','Changes to the arrangement, home or temporary locations appear here.']])+'</div>'}
+  return '<div class="grid g2"><div class="card"><div class="ch"><h3>Attendance Setup</h3><span class="right">'+pill('nt',e.arr)+'</span></div>'+
+    '<dl class="kv"><dt>Work Arrangement</dt><dd>'+esc(e.arr)+'</dd><dt>Primary Location</dt><dd>'+esc(attPrimary(id))+'</dd>'+
+    '<dt>Approved Home</dt><dd>'+(h?esc('Approved home · '+h.area)+' <button class="btn" style="margin-left:4px" data-att="home-reveal" data-v="'+id+'">Show Address</button>':'Not required')+'</dd>'+
+    '<dt>Home Geofence</dt><dd>'+(h?h.radius+' m'+(h.just?' <span class="sub" data-copy="content">'+esc(h.just)+'</span>':''):'None')+'</dd>'+
+    '<dt>Assigned Office</dt><dd>'+esc(o.name)+' · '+o.radius+' m</dd><dt>Line Manager</dt><dd>'+esc(aMgrName(id))+'</dd>'+
+    '<dt>Field Assignment</dt><dd>'+(fa?esc(fa.id+' · '+fa.name+', '+fa.start+' to '+fa.end):'None')+'</dd>'+
+    '<dt>Temporary Location</dt><dd>'+pill(ts[0],ts[1])+'</dd>'+
+    (e.arr==='Hybrid'&&e.sched?'<dt>Weekly Schedule</dt><dd>'+['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){return d+' '+e.sched[d]}).join(' · ')+'</dd>':'')+
+    '<dt>Attendance Profile</dt><dd>'+esc(ATT_PROFILE[e.arr])+' · policy v'+P.v+'</dd></dl>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn pri" data-att="arr-change" data-v="'+id+'">Change Arrangement</button>'+
+    (attHasHome(e)?'<button class="btn" data-att="home-edit" data-v="'+id+'">Edit Home Geofence</button>':'')+'</div></div>'+
+    tl('Setup History',hist.length?hist.slice(0,6).map(function(a,i){return [a.action+(a.before||a.after?': '+(a.before||'None')+' → '+(a.after||'None'):''),a.at+' · '+a.actor,a.reason,i===0?'hi':'ok']}):
+      [['No changes yet','','']])+'</div>'}
 function attEmpSessions(id){var ss=attSessionsOf(id).slice().sort(function(a,b){return aCmp(b.date,a.date)}).slice(0,6);
   return table([['Date'],['In'],['Out'],['Location'],['Status']],ss.map(function(s){var v=attSV(s);
-    return [esc(s.date),attTimeCell(v,'in'),attTimeCell(v,'out'),esc((v.inE||v.outE||v.attempts[0]||{}).matched||s.expected),attStatusPill(v)]}),'Last punches')}
+    return [esc(s.date),attTimeCell(v,'in'),attTimeCell(v,'out'),esc((v.inE||v.outE||v.attempts[0]||{}).matched||s.expected),attStatusPill(v)]}),'Last Punches')}
 function attArrModal(id){var e=aEmp(id),sch=e.sched||{Mon:'Office',Tue:'Office',Wed:'Remote',Thu:'Office',Fri:'Office',Sat:'Remote'};
-  openModal({title:'Change Work Arrangement',body:'<p class="sub" style="margin-bottom:12px">'+esc(e.name)+' is <b>'+esc(e.arr)+'</b> today. The change applies from the next punch and is written to the audit log.</p>'+
-    '<div class="f"><label>Arrangement</label><div class="seg" role="group" aria-label="Arrangement">'+ATT_ARRS.map(function(a){return '<button type="button" data-att="arr-pick" data-v="'+a+'"'+(a===e.arr?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+a+'</button>'}).join('')+'</div></div>'+
-    '<div class="f" id="arr-sched"><label>Hybrid schedule</label><div class="tscroll"><table><tbody>'+['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){
-      return '<tr><td style="width:70px">'+d+'</td><td><select class="inp" data-sched="'+d+'" style="height:32px"><option'+(sch[d]==='Office'?' selected':'')+'>Office</option><option'+(sch[d]==='Remote'?' selected':'')+'>Remote</option></select></td></tr>'}).join('')+'</tbody></table></div></div>'+
-    field('arr-office','Assigned office','<select class="inp" id="arr-office">'+ATT.sites.filter(function(s){return s.status==='Active'}).map(function(s){return '<option value="'+s.id+'"'+(s.id===e.office?' selected':'')+'>'+esc(s.name)+'</option>'}).join('')+'</select>')+
-    field('arr-why','Reason','<input class="inp" id="arr-why" placeholder="For example, role moved to field work">','Give a reason'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="arr-save" data-v="'+id+'">Save change</button>',
+  var days=[['Mon','Monday'],['Tue','Tuesday'],['Wed','Wednesday'],['Thu','Thursday'],['Fri','Friday'],['Sat','Saturday']];
+  openModal({title:'Change Work Arrangement',body:'<style>.arr-days{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 10px}</style>'+
+    '<div style="margin-bottom:14px">'+aWho(id,e.title)+'</div>'+
+    choice('arr-pick','Arrangement',ATT_ARRS.map(function(a){return [a,a,'data-att="arr-pick"']}),e.arr)+
+    '<div id="arr-sched" class="arr-days">'+days.map(function(d){
+      return field('arr-d-'+d[0],d[1],'<select class="inp" id="arr-d-'+d[0]+'" data-sched="'+d[0]+'"><option'+(sch[d[0]]==='Office'?' selected':'')+'>Office</option><option'+(sch[d[0]]==='Remote'?' selected':'')+'>Remote</option></select>')}).join('')+'</div>'+
+    field('arr-office','Assigned Office','<select class="inp" id="arr-office">'+ATT.sites.filter(function(s){return s.status==='Active'}).map(function(s){return '<option value="'+s.id+'"'+(s.id===e.office?' selected':'')+'>'+esc(s.name)+'</option>'}).join('')+'</select>')+
+    field('arr-why','Reason','<input class="inp" id="arr-why">','Give a reason'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="arr-save" data-v="'+id+'">Save Arrangement</button>',
     onMount:function(m){ATTUI.arrPick=e.arr;$('#arr-sched').style.display=e.arr==='Hybrid'?'':'none'}})}
 function attHomeModal(id){var e=aEmp(id),h=attPermHome(id),pol=attPolicy().settings;ATTUI.essReq={pin:h?{area:h.area,lat:h.lat,lng:h.lng}:null};
-  openModal({title:'Edit Home Geofence',body:'<p class="sub" style="margin-bottom:12px">'+esc(e.name)+'. The old home is kept in history, never overwritten.</p>'+
-    field('hm-addr','Full address','<input class="inp" id="hm-addr" value="'+esc(h?h.address:'')+'">','Enter the address')+
-    '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="hm-addr">'+ic('target')+'Drop pin at address</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(ATTUI.essReq.pin)+'</div></div>'+
-    '<div class="attban in">'+ic('lock','ico')+'<span><b>100 m geofence</b><br>This radius is mandatory for registered and temporary home locations and cannot be changed.</span></div>'+
-    field('hm-just','Change reason','<input class="inp" id="hm-just" value="'+esc(h?h.just:'')+'" placeholder="For example, employee moved home">','Recorded in the audit trail'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="home-save" data-v="'+id+'">Save home</button>'})}
+  openModal({title:'Edit Home Geofence',body:'<div style="margin-bottom:14px">'+aWho(id,e.title)+'</div>'+
+    field('hm-addr','Full Address','<input class="inp" id="hm-addr" value="'+esc(h?h.address:'')+'">','Enter the address')+
+    '<div class="f"><button type="button" class="btn" data-att="rq-pin" data-v="hm-addr">'+ic('target')+'Drop Pin</button><div id="rq-pinbox" style="margin-top:8px">'+attPinSvg(ATTUI.essReq.pin)+'</div></div>'+
+    '<dl class="kv" style="margin-bottom:14px"><dt>'+hint('Radius','Fixed at 100 m for registered and temporary homes. It cannot be changed.')+'</dt><dd>100 m</dd></dl>'+
+    field('hm-just','Change Reason','<input class="inp" id="hm-just" value="'+esc(h?h.just:'')+'">','Give a reason'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" data-att="home-save" data-v="'+id+'">Save Home</button>'})}
 
 /* ═════════════ PEOPLE → ATTENDANCE ═════════════ */
 function attRegisterRows(){return ATT_ORDER.map(function(id){var s=attTodaySession(id),v=s?attSV(s):null,lv=attOnLeave(id,ATT_TODAY);
@@ -6224,7 +6249,7 @@ var ESS_BOTH={'My Profile':1,'My Performance':1,'My Payslips':1,'My Leave':1,'My
       if(ESS.m1&&ESS_SOON[t.n])return essbar()+soonPage(t.n);
       if(ESS_BOTH[t.n])return essbar()+mob();
       var d=ESS_DESK[t.n]?ESS_DESK[t.n](orig):orig();
-      return essbar()+'<div class="donly">'+d+'</div>'+(mob?'<div class="monly">'+mob()+'</div>':'')}})})();
+      return essbar()+(mob?'<div class="donly">'+d+'</div><div class="monly">'+mob()+'</div>':d)}})})();
 
 /* palette */
 var ITEMS=[];
