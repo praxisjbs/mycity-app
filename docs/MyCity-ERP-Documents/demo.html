@@ -1339,31 +1339,38 @@ function partner360(i){var p=PARTNERS[i]||PARTNERS[0];
   return bk('Back to Partners')+
   prof({av:p.av,y:1,n:p.n,r:p.ind+' · '+p.type+' partnership · Owner '+p.owner,
     chips:pill(p.st[0],p.st[1])+pill('nt',p.val+' value')+pill('nt','Since '+p.since)+pill(p.quiet>30?'er':'nt','Last contact '+p.last),
-    acts:[['Log interaction'],['New proposal'],['Edit partner',1]]})+
-  statstrip([['Partnership value',p.val],['Signed documents',p.docn],['Open tasks',p.tasks],
+    acts:[['Log Interaction'],['New Proposal'],['Edit Partner',1]]})+
+  statstrip([['Partnership Value',p.val],['Signed Documents',p.docn],['Open Tasks',p.tasks],
     ['Interactions, 90d',p.inter],['Renewal',p.renew]])+
   '<div class="grid g2">'+
-  kvcard('The organisation',[['Legal name',p.legal],['Industry',p.ind],['Partnership type',p.type],
-    ['Headquarters',p.hq],['Website',p.web],['Lead owner',p.owner],['Stage',pill(p.st[0],p.stage)]])+
-  kvcard('Primary contacts',p.contacts)+'</div>'+
+  kvcard('Organisation',[['Legal Name',p.legal],['Industry',p.ind],['Partnership Type',p.type],
+    ['Headquarters',p.hq],['Website',p.web],['Lead Owner',p.owner],['Stage',pill(p.st[0],p.stage)]])+
+  kvcard('Primary Contacts',p.contacts)+'</div>'+
   '<div class="grid g2">'+
-  '<div class="card"><div class="ch"><h3>Stage history</h3></div><div class="chain">'+
+  '<div class="card"><div class="ch"><h3>Stage History</h3></div><div class="chain">'+
   p.chain.map(function(s,n){return (n?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+(s[1]||'')+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+
   '</div><p class="sub" style="margin-top:11px">'+esc(p.chainnote)+'</p>'+
   '<div style="margin-top:13px;padding-top:12px;border-top:1px dashed var(--line)">'+
-  '<div class="sub" style="margin-bottom:8px;font-weight:650">Days at each stage</div>'+
+  '<div class="sub" style="margin-bottom:8px;font-weight:650">Days at Each Stage</div>'+
   p.chain.filter(function(c){return c[1]}).map(function(c,n){
     var d=[11,24,18,9,22,6,0,0][n]||0;
     return '<div style="display:flex;gap:10px;align-items:center;padding:4px 0">'+
     '<span style="flex:1;min-width:0;font-size:12px">'+esc(c[0])+'</span>'+
     mini(Math.min(100,d*4),(c[1]==='now'?d+' so far':d+' days'))+'</div>'}).join('')+
   '</div></div>'+
-  tl('Interaction log',p.tlog)+'</div>'+
+  tl('Interaction Log',p.tlog)+'</div>'+
   '<div class="grid g2">'+
   table([['Document'],['Type'],['Signed'],['Status']],p.docs,'Contracts and MOUs')+
-  table([['Deliverable'],['Owner'],['Due'],['Status']],p.deliv,'What we owe them')+'</div>'+
-  '<div class="grid g2">'+areaChart('Monthly in-app downloads attributed',p.dl,'Attributed from the partner’s own listing and campaign links.')+
-  bars('Value by line',p.lines,'Signed value against the MOU schedule.')+'</div>'}
+  table([['Deliverable'],['Owner'],['Due'],['Status']],p.deliv,'Deliverables')+'</div>'+
+  '<div class="grid g2">'+helpOn(areaChart('Attributed Downloads',p.dl),'Attributed Downloads','Monthly in-app downloads traced to the partner’s own listing and campaign links.')+
+  helpOn(bars('Value by Line',p.lines),'Value by Line','Signed value against the MOU schedule.')+'</div>'}
+/* A proposal's priced lines: a table on desktop, a list on a phone (FRONTEND_GUIDE §7). */
+function proLines(lines,total){var row='display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #EDF2F0';
+  return '<table class="donly"><thead><tr><th>Line</th><th style="text-align:right">Value</th></tr></thead><tbody>'+
+  lines.map(function(l){return '<tr><td>'+esc(l[0])+'</td><td style="text-align:right">'+esc(l[1])+'</td></tr>'}).join('')+
+  '<tr class="tot"><td>Total</td><td style="text-align:right">'+esc(total)+'</td></tr></tbody></table>'+
+  '<div class="monly" style="margin-top:10px;font-size:12px">'+lines.map(function(l){return '<div style="'+row+'"><span>'+esc(l[0])+'</span><b style="white-space:nowrap">'+esc(l[1])+'</b></div>'}).join('')+
+  '<div style="'+row+';font-weight:700;border-top:2px solid #014339;border-bottom:0"><span>Total</span><span>'+esc(total)+'</span></div></div>'}
 
 /* ───── shared data ───── */
 var STAFF=[['TA','Tolu Adeyemi','Content'],['BL','Bashir Lawal','Marketing & Sales'],['AO','Amara Okafor','Finance'],
@@ -2645,67 +2652,47 @@ var M=[
     '<p class="sub" style="margin-top:12px">Rates are effective dated. Switching this on recomputes future runs only, never a locked one.</p>'}}]},
 
 {k:'partners',n:'Partnerships',i:'link',g:'BUSINESS',tabs:[
-  {n:'Pipeline',r:function(){return head('Pipeline','23 active · 8 in discussion · 4 going quiet',[['Board'],['New partner',1]])+
-    kpis([['In the pipeline','31'],['Signed this year','5','ok'],['Signed value','₦41.6M'],['Going quiet','4','err']])+
+  {n:'Pipeline',r:function(){return head('Pipeline','23 active · 8 in discussion · 4 going quiet',[['Board'],['New Partner',1]])+
+    helpOn(kpis([['In the Pipeline','31'],['Signed This Year','5','ok'],['Signed Value','₦41.6M'],['Going Quiet','4','err']]),
+      'Going Quiet','No logged interaction for 30 days. An out-of-office auto-reply does not count as contact.')+
     bars('Stages',[['Prospect identified',100,'31'],['Initial contact',84,'26'],['Intro meeting scheduled',68,'21'],
       ['Intro meeting held',58,'18'],['Proposal sent',45,'14'],['Follow up',39,'12'],['Ongoing negotiation',32,'10'],
       ['Verbal approval',26,'8'],['Contract review',19,'6'],['Partnership signed',16,'5','var(--yellow)'],
-      ['Active partnership',74,'23','var(--c2)'],['On hold',10,'3','var(--line-2)']],
-      'Stages taken from the MyCity Partnerships Pipeline Tracker, unchanged.')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Partner'],['Stage'],['Days at stage','n'],['Owner'],['Action']],[
+      ['Active partnership',74,'23','var(--c2)'],['On hold',10,'3','var(--line-2)']])+
+    '<div style="margin-top:12px">'+
+    helpOn(table([['Partner'],['Stage'],['Days at Stage','n'],['Owner'],['Action']],[
       ['Kano Trade Council','Initial contact','52',st(6),pill('er','Decide or close')],
       ['Eko Hotels','Follow up','34',st(1),pill('er','Decide or close')],
       ['Landmark Beach','Proposal sent','41',st(1),pill('er','Chase')],
       ['Enugu Tourism Board','Intro meeting held','38',st(6),pill('er','Chase')],
       ['Lonart-DS','Proposal sent','12',st(1),pill('wa','Due in 2 days')],
-      ['Lagos State Govt','Contract review','6','Cynthia O.',pill('ok','Normal')]],'Longest at a stage',
-      pill('er','4 over 30 days'))+
-    kvcard('How the pipeline is kept honest',[['Ageing','Days at stage, not days since created'],
-      ['Inactivity rule','Thirty days with no logged interaction raises an alert'],
-      ['Follow-up task','Raised on the owner automatically, not on a manager'],
-      ['Escalation','High severity goes to the CEO after fourteen more days'],
-      ['What counts as contact','A logged interaction. An out-of-office auto-reply does not'],
-      ['Closing','A lost opportunity is closed with a reason, never deleted']])+'</div>'}},
-  {n:'Partners',r:function(){return head('Partners','The 360 opens from any row',[['Import'],['New partner',1]])+
-    kpis([['Active','23'],['Total value','₦96M'],['Renewals, 180 days','2','warn'],['Quiet over 30 days','2','err']])+
-    table([['Partner'],['Industry'],['Type'],['Stage'],['Owner'],['Value','n'],['Last contact']],
+      ['Lagos State Govt','Contract review','6','Cynthia O.',pill('ok','Normal')]],'Longest at a Stage',
+      pill('er','4 over 30 days')),'Days at Stage','Days since the partner entered this stage, not since the record was created.')+'</div>'}},
+  {n:'Partners',r:function(){return head('Partners','',[['Import'],['New Partner',1]])+
+    helpOn(kpis([['Active','23'],['Total Value','₦96M'],['Renewals, 180 Days','2','warn'],['Quiet Over 30 Days','2','err']]),
+      'Quiet Over 30 Days','No logged interaction for over 30 days. An out-of-office auto-reply does not count as contact.')+
+    table([['Partner'],['Industry'],['Type'],['Stage'],['Owner'],['Value','n'],['Last Contact']],
       PARTNERS.map(function(p){return [who(p.av,p.n,p.ind),p.ind,p.type,pill(p.st[0],p.st[1]),
-        p.owner.split(' ')[0]+' '+p.owner.split(' ')[1].charAt(0)+'.',p.val,p.last]}),'All partners',
-      '<span class="sub">Click a row for the 360</span>',function(i){return ' class="rowlink" data-dk="partner" data-di="'+i+'"'})+
-    '<div class="grid g2" style="margin-top:12px">'+
-    bars('Value by partnership type',[['Strategic',100,'₦18.4M'],['Sponsorship',72,'₦13.3M'],
-      ['Government',51,'₦9.4M'],['Media',20,'₦3.6M'],['Hospitality',15,'₦2.8M'],['Community',10,'₦1.9M','var(--yellow)']],
-      'Partnership types are configurable. MyCity asked for the type list and this analytics view in the same conversation.')+
-    '<div class="card"><div class="ch"><h3>What a 360 brings together</h3></div>'+
-    '<p class="sub" style="margin-bottom:11px">One partner, everything about them, on one page. Click any row above.</p>'+
-    [['The organisation','Legal name, industry, type, headquarters'],['Contacts','Who we deal with, and who introduced them'],
-     ['Stage history','Where they are, and how they got there'],['Interaction log','Every call, meeting and email, dated'],
-     ['Documents','Proposals, MOUs, contracts, with their signature state'],
-     ['Deliverables','What we owe them, who owns it, when it is due'],
-     ['Attribution','Downloads and value traced to their listing']].map(function(r){
-      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line)">'+
-      '<span style="color:var(--accent);margin-top:2px">'+ic('ok')+'</span>'+
-      '<span style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600">'+esc(r[0])+'</div><div class="sub">'+esc(r[1])+'</div></span></div>'}).join('')+'</div></div>'}},
-  {n:'Leads',r:function(){return head('Leads','Entered manually after a business development conversation',[['From website'],['New lead',1]])+
-    kpis([['New','9'],['Contacted','14'],['Qualified','7'],['Converted this month','3','ok']])+
-    table([['Lead'],['Source'],['Owner'],['Added'],['Next action'],['Status']],[
+        p.owner.split(' ')[0]+' '+p.owner.split(' ')[1].charAt(0)+'.',p.val,p.last]}),'All Partners',
+      '',function(i){return ' class="rowlink" data-dk="partner" data-di="'+i+'"'})+
+    '<div style="margin-top:12px">'+
+    bars('Value by Partnership Type',[['Strategic',100,'₦18.4M'],['Sponsorship',72,'₦13.3M'],
+      ['Government',51,'₦9.4M'],['Media',20,'₦3.6M'],['Hospitality',15,'₦2.8M'],['Community',10,'₦1.9M','var(--yellow)']])+'</div>'}},
+  {n:'Leads',r:function(){return head('Leads','',[['Import Website Leads'],['New Lead',1]])+
+    helpOn(helpOn(kpis([['New','9'],['Contacted','14'],['Qualified','7'],['Converted This Month','3','ok']]),
+      'Qualified','A budget, a decision maker and a reason to act now are all confirmed.'),
+      'Converted This Month','A converted lead becomes a partner at the Prospect stage and keeps its history.')+
+    table([['Lead'],['Source'],['Owner'],['Added'],['Next Action'],['Status']],[
       ['Zenith Bank · events sponsorship','BD conversation','Ngozi Eze','06/10/2026','Send one pager',pill('in','Qualified')],
       ['Terra Kulture · tourism listing','Referral','Bashir Lawal','04/10/2026','Book intro call',pill('nt','Contacted')],
       ['Ikeja City Mall · business listings','Website form','Ngozi Eze','02/10/2026','Qualify',pill('nt','New')],
       ['Air Peace · travel partnership','BD conversation','Bashir Lawal','28/09/2026','—',pill('er','Lost')],
       ['Nairobi Tourism Board · city launch','Inbound email','Cynthia Osakunih','20/09/2026','Proposal',pill('ok','Converted')]],'Leads')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    bars('Where leads come from',[['BD conversation',100,'14'],['Website form',43,'6'],
-      ['Referral',36,'5'],['Inbound email',29,'4'],['Event',21,'3']],
-      'The website form is the only automatic source. Everything else is somebody typing what happened in a room.')+
-    kvcard('Lead to partner',[['A lead','A conversation that might become something'],
-      ['Qualifying','Is there a budget, a decision maker and a reason now'],
-      ['Converting','Becomes a partner record at prospect stage, keeping its history'],
-      ['Losing','Closed with a reason. It stays searchable'],
-      ['Why not one object','A lead has no deliverables and no documents. Forcing them together made both worse']])+'</div>'}},
-  {n:'Proposals',r:function(){return head('Proposals','Generated from a short questionnaire',[['Templates'],['New proposal',1]])+
-    kpis([['Sent this year','14'],['Accepted','5','ok'],['Viewed, no reply','3','warn'],['Acceptance rate','36%']])+
+    '<div style="margin-top:12px">'+
+    bars('Lead Sources',[['BD conversation',100,'14'],['Website form',43,'6'],
+      ['Referral',36,'5'],['Inbound email',29,'4'],['Event',21,'3']])+'</div>'}},
+  {n:'Proposals',r:function(){return head('Proposals','',[['Templates'],['New Proposal',1]])+
+    kpis([['Sent This Year','14'],['Accepted','5','ok'],['Viewed, No Reply','3','warn'],['Acceptance Rate','36%']])+
     '<div class="grid g32">'+table([['Proposal'],['Partner'],['Value','n'],['Status']],[
       ['Ember to Remember headline sponsor','ProvidusBank','₦9.2M',pill('ok','Accepted')],
       ['Healthcare activation, 4 cities','Lonart-DS','₦4.1M',pill('wa','Viewed')],
@@ -2717,52 +2704,38 @@ var M=[
      '<p><b>What we propose.</b> A four-city health activation across Lagos, Abuja, Enugu and Port Harcourt, carried on the MyCityApp platform through the Ember to Remember campaign window.</p>'+
      '<p><b>What MyCity brings.</b> 1.1 million monthly active residents, in-app placement in the health and pharmacy categories, and eight physical activation days.</p>'+
      '<p><b>What we ask.</b> ₦4,100,000, payable half on signature and half on the first activation.</p>'+
-     '<table><thead><tr><th>Line</th><th style="text-align:right">Value</th></tr></thead><tbody>'+
-     '<tr><td>In-app category placement, 12 weeks</td><td style="text-align:right">₦2,400,000</td></tr>'+
-     '<tr><td>Eight activation days, four cities</td><td style="text-align:right">₦1,200,000</td></tr>'+
-     '<tr><td>Attribution reporting</td><td style="text-align:right">₦500,000</td></tr>'+
-     '<tr class="tot"><td>Total</td><td style="text-align:right">₦4,100,000</td></tr></tbody></table>'+
-     '<div class="pfoot"><span>Drafted by the assistant from six answers, then edited by Bashir Lawal</span></div>',
-     'Six questions in, this came out. A person edited it before it went anywhere.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Answer six questions and the assistant drafts the proposal. You edit it before it goes anywhere.</p>'}},
-  {n:'Contracts & MOUs',r:function(){return head('Contracts & MOUs','Draft to renewal',[['Templates'],['New contract',1]])+
-    kpis([['Active','2'],['In review','1','warn'],['Draft','1'],['Renewals, 180 days','2','warn']])+
+     proLines([['In-app category placement, 12 weeks','₦2,400,000'],['Eight activation days, four cities','₦1,200,000'],
+       ['Attribution reporting','₦500,000']],'₦4,100,000')+
+     '<div class="pfoot"><span>Drafted by the assistant from six answers, then edited by Bashir Lawal</span></div>')+'</div>'}},
+  {n:'Contracts & MOUs',r:function(){return head('Contracts & MOUs','',[['Templates'],['New Contract',1]])+
+    kpis([['Active','2'],['In Review','1','warn'],['Draft','1'],['Renewals, 180 Days','2','warn']])+
     chain([['Draft','done'],['Review','done'],['Approval','done'],['Sent','done'],['Viewed','done'],['Signed','now'],['Active',''],['Expiring',''],['Renewed','']])+
     '<div style="margin-top:12px">'+table([['Document'],['Partner'],['Type'],['Start'],['Renewal'],['Value','n'],['Status']],[
       ['Platform partnership MOU','MTN Nigeria','MOU','13/03/2025','13/03/2027','₦18.4M',pill('ok','Active')],
       ['Sponsorship agreement','ProvidusBank','Contract','22/09/2026','31/12/2026','₦9.2M',pill('ok','Active')],
       ['Data sharing MOU','Lagos State Govt','MOU','—','—','₦7.5M',pill('wa','In review')],
       ['Activation agreement','Lonart-DS','Contract','—','—','₦4.1M',pill('nt','Draft')]],'Contracts and MOUs')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Renewal'],['Partner'],['Due'],['Days','n'],['Owner']],[
+    '<div style="margin-top:12px">'+
+    helpOn(table([['Renewal'],['Partner'],['Due'],['Days','n'],['Owner']],[
       ['Sponsorship agreement','ProvidusBank','31/12/2026','83',st(6)],
-      ['Platform partnership MOU','MTN Nigeria','13/03/2027','153',st(8)]],'Renewal calendar',
-      '<span class="sub">Alert at 90 days</span>')+
-    kvcard('What happens at 90 days',[['Alert','Raised on the document owner, not on a manager'],
-      ['Task','Renewal paper, with the original MOU attached'],
-      ['Escalation','To the CEO at 30 days if nothing has moved'],
-      ['If it lapses','The partnership moves to Expiring, and stops counting in signed value'],
-      ['Renewing','Creates a new document that references the old one. The history stays']])+'</div>'}},
-  {n:'Analytics',r:function(){return head('Analytics','Monthly partnership performance by lead owner')+
-    kpis([['Prospects this month','9'],['Meetings held','14'],['Proposals sent','4'],['Signed','2','ok']])+
-    table([['Lead owner'],['Prospects','n'],['Meetings','n'],['Proposals','n'],['Signed','n'],['Active','n'],['Downloads','n']],[
+      ['Platform partnership MOU','MTN Nigeria','13/03/2027','153',st(8)]],'Renewal Calendar'),
+      'Renewal Calendar','The document owner is alerted 90 days before renewal. If nothing has moved by 30 days, it escalates to the CEO.')+'</div>'}},
+  {n:'Analytics',r:function(){return head('Analytics')+
+    kpis([['Prospects This Month','9'],['Meetings Held','14'],['Proposals Sent','4'],['Signed','2','ok']])+
+    table([['Lead Owner'],['Prospects','n'],['Meetings','n'],['Proposals','n'],['Signed','n'],['Active','n'],['Downloads','n']],[
       [who('NE','Ngozi Eze','Marketing & Sales'),'5','8','2','1','9','14,200'],
       [who('BL','Bashir Lawal','Partnerships'),'3','4','1','0','7','6,800'],
       [who('CO','Cynthia Osakunih','Operations'),'1','2','1','1','7','21,400']],'October 2026')+
-    '<div class="grid g2" style="margin-top:12px">'+areaChart('Signed partnerships per month',[1,2,1,3,2,2])+
-    bars('Downloads attributed by partner',[['MTN Nigeria',100,'18,200'],['ProvidusBank',50,'9,100'],
+    '<div class="grid g2" style="margin-top:12px">'+areaChart('Signed per Month',[1,2,1,3,2,2])+
+    helpOn(bars('Downloads by Partner',[['MTN Nigeria',100,'18,200'],['ProvidusBank',50,'9,100'],
       ['Filmhouse Cinemas',0,'0','var(--line-2)'],['Lagos State Govt',0,'0','var(--line-2)'],
-      ['Lonart-DS',0,'0','var(--line-2)']],'Only a live partnership attributes anything. Four of the seven have not started.')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
+      ['Lonart-DS',0,'0','var(--line-2)']]),'Downloads by Partner',
+      'In-app downloads traced to the partner’s own listing and campaign links. Only a live partnership attributes downloads.')+'</div>'+
+    '<div style="margin-top:12px">'+
     table([['Month'],['Prospects','n'],['Proposals','n'],['Signed','n'],['Conversion']],[
       ['October','9','4','2',mini(22,'22%')],['September','7','3','2',mini(29,'29%')],
       ['August','8','2','3',mini(38,'38%')],['July','6','3','1',mini(17,'17%')],
-      ['June','5','2','2',mini(40,'40%')],['May','4','1','1',mini(25,'25%')]],'Six months')+
-    kvcard('What this view answers',[['For the CEO','Is the ₦180M goal reachable at this rate'],
-      ['For Operations','Which owner is holding partnerships that are going quiet'],
-      ['For the owner','What is due from them this week'],
-      ['The honest answer','At ₦96M signed against ₦180M, no. The goal shows At risk for that reason'],
-      ['Downloads','Attributed from the partner’s own listing and campaign links']])+'</div>'}}]},
+      ['June','5','2','2',mini(40,'40%')],['May','4','1','1',mini(25,'25%')]],'Last Six Months')+'</div>'}}]},
 
 {k:'expenses',n:'Expenses',i:'wallet',g:'BUSINESS',cnt:'5',tabs:[
   {n:'My Requests',r:function(){return head('My Requests','Your own expense requests',[['New request',1]])+
