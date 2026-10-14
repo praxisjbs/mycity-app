@@ -899,12 +899,34 @@ input.pctl[type=number]{width:96px;min-width:0}
 .pinbox{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--surface);font-size:12.5px}
 .pinbox svg{width:96px;height:56px;flex:none;border-radius:7px}
 .pinbox b{display:block}
+.att-mobile-register{display:none}
+.attm-row{width:100%;text-align:left;background:var(--raised);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:13px;box-shadow:var(--sh-1);color:var(--ink);display:block}
+.attm-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.attm-head,.attm-times,.attm-loc,.attm-foot{display:flex;align-items:flex-start;gap:10px}
+.attm-head{justify-content:space-between;margin-bottom:10px}.attm-head>.pill{flex:none}
+.attm-arr{display:block;margin-bottom:10px}
+.attm-times{padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.attm-times>span{flex:1;min-width:0}.attm-times small,.attm-loc small{display:block;color:var(--ink-3);font-size:9.5px;
+  letter-spacing:.08em;text-transform:uppercase;font-weight:650;margin-bottom:3px}
+.attm-time{display:block;font-size:14px;font-weight:650}.attm-loc{padding-top:10px}.attm-loc>span{flex:1;min-width:0;font-size:12px;line-height:1.45}
+.attm-foot{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-2);flex-wrap:wrap}
+.attm-foot>span{min-width:0;overflow-wrap:anywhere}
 tr[data-att]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 @media(max-width:1180px){.rq{grid-template-columns:1fr}}
 @media(max-width:760px){.tscroll table.wide{min-width:980px}
   .draftbar{top:-14px}.pctl{max-width:150px}
+  .people-attendance .phead{align-items:flex-start}.people-attendance .phead .right{width:100%;margin-left:0}
+  .people-attendance .phead .right .btn{flex:1;justify-content:center}
   .attk .g4{grid-template-columns:repeat(2,1fr)}.attk .kpi b{font-size:21px}.attk .grid{gap:8px;margin-bottom:8px}
   .attviews{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.attviews button{flex:none}
+  .attviews::-webkit-scrollbar,.att-register-filters::-webkit-scrollbar{display:none}
+  .att-register-filters{flex-wrap:nowrap;overflow-x:auto;margin-right:-14px;padding-right:14px;scrollbar-width:none}
+  .att-register-filters .chip{flex:0 0 auto}
+  .att-desktop-register{display:none}.att-mobile-register{display:grid;gap:10px}
+  .people-attendance .tscroll{overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+  .people-attendance .tscroll th:first-child,.people-attendance .tscroll td:first-child{position:sticky;left:0;z-index:1;background:var(--raised)}
+  .people-attendance .tscroll th:first-child{background:var(--surface)}
   .fdet>summary{min-height:44px}}
 .attviews{margin-bottom:12px;max-width:640px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -4982,14 +5004,24 @@ function attPeopleAttendance(){
   var k=attKpis(),n=ATT_ORDER.length,isHR=attViewer()==='CO'||attViewer()==='IC',view=isHR?ATTUI.view:'Manager View',body='';
   if(view==='Register')body=attRegisterView(k);else if(view==='Field Assignments')body=attFAView();
   else if(view==='Location Requests')body=attReqHRView();else body=attMgrView();
-  return '<div class="phead"><div><h1>Attendance</h1><p>'+esc(aLong(ATT_TODAY))+' · '+(isHR?n+' of 25 staff':'your team')+'</p></div>'+
+  return '<div class="people-attendance"><div class="phead"><div><h1>Attendance</h1><p>'+esc(aLong(ATT_TODAY))+' · '+(isHR?n+' of 25 staff':'your team')+'</p></div>'+
     (isHR?'<div class="right"><button class="btn donly" data-att="punch-open">'+ic('clock')+'Open Clock Panel</button>'+
     '<button class="btn pri" data-att="recon" aria-label="Reconcile, '+k.recon+' unresolved">'+ic('check')+'Reconcile <span class="cntb">'+k.recon+'</span></button></div>':'')+'</div>'+
     (isHR?'<div class="attk">'+kpis([['Clocked In',k.inn+' / '+n],['On Site',String(k.site)],['Remote',String(k.remote)],['On Assignment',String(k.field)]])+
     attLabHint(kpis([['Late',String(k.late),k.late?'warn':''],['Outside Geofence',String(k.out),k.out?'warn':''],['Missing Clock-Out',String(k.missOut),k.missOut?'err':''],['Needs Reconciliation',String(k.recon),k.recon?'warn':'ok']]),
       'Needs Reconciliation','Cases awaiting a People decision. Reconcile records the outcome as a new event; the original punch is never edited. Possible policy breaches go to Queries & Sanctions.')+'</div>'+
     '<div class="seg attviews" role="tablist" aria-label="Attendance views">'+['Register','Field Assignments','Location Requests','Manager Preview'].map(function(t){
-      return '<button type="button" role="tab" aria-selected="'+(t===view)+'" data-att="att-view" data-v="'+t+'"'+(t===view?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')+'</div>':'')+body}
+      return '<button type="button" role="tab" aria-selected="'+(t===view)+'" data-att="att-view" data-v="'+t+'"'+(t===view?' class="on"':'')+'>'+esc(t)+'</button>'}).join('')+'</div>':'')+body+'</div>'}
+function attRegisterMobile(rows){
+  return '<div class="att-mobile-register" aria-label="Today’s attendance register">'+rows.map(function(r){
+    var v=r.v,last=v?(v.all[v.all.length-1]||{}):{},exc=v&&v.exceptions.length?v.exceptions[0]:'',c=r.cases[0],
+        status=r.leave&&!(v&&v.inE)?pill('in','On leave'):v?attStatusPill(v):pill('nt','Not clocked in'),
+        expected=r.s?r.s.expected:attWhere(r.id,ATT_TODAY,{field:'on',day:'auto'}).label;
+    return '<button type="button" class="attm-row" data-att="att-row" data-v="'+r.id+'" aria-label="Open attendance details for '+esc(aName(r.id))+'">'+
+      '<span class="attm-head">'+aWho(r.id,r.e.dept)+status+'</span><span class="attm-arr">'+pill('nt',r.e.arr)+'</span>'+
+      '<span class="attm-times"><span><small>Clock In</small><span class="attm-time">'+(v?attTimeCell(v,'in'):'None')+'</span></span><span><small>Clock Out</small><span class="attm-time">'+(v?attTimeCell(v,'out'):'None')+'</span></span></span>'+
+      '<span class="attm-loc"><span><small>Expected</small>'+esc(expected)+'</span><span><small>Matched</small>'+esc(last.matched||'Not yet')+'</span></span>'+
+      '<span class="attm-foot"><span>'+(last.device?'Device: '+esc(last.device):'No device recorded')+'</span><span>'+(c?'Review '+esc(c.id):exc?esc(exc):'No exception')+'</span></span></button>'}).join('')+'</div>'}
 function attRegisterView(k){
   var f=ATTUI.filter,rows=k.rows.filter(function(r){return attFilterRow(r,f)}),
       ins=k.rows.filter(function(r){return r.v&&r.v.inE}).map(function(r){return aMin(r.v.inE.sys)}),
@@ -4997,17 +5029,17 @@ function attRegisterView(k){
       lv=k.rows.filter(function(r){return r.leave}).length;
   return '<div class="grid g23">'+areaChart('Clocked In by Hour',hours,'Cumulative from 07:00. Grace ends '+aHM(aMin(attPolicy().settings.wkStart)+(+attPolicy().settings.grace))+'.')+
     donut(Math.round(k.inn/ATT_ORDER.length*100),'clocked in',k.inn+' of '+ATT_ORDER.length+' clocked in · '+k.late+' late · '+k.out+' outside a geofence · '+lv+' on leave')+'</div>'+
-    '<div class="chips" role="group" aria-label="Filter">'+['All','Remote','Hybrid','Field','Office','Late','Outside Geofence','Missing Punch','Needs Reconciliation'].map(function(c){
+    '<div class="chips att-register-filters" role="group" aria-label="Filter">'+['All','Remote','Hybrid','Field','Office','Late','Outside Geofence','Missing Punch','Needs Reconciliation'].map(function(c){
       var n=k.rows.filter(function(r){return attFilterRow(r,c)}).length;
       return '<button class="chip'+(c===f?' on':'')+'" data-att="att-filter" data-v="'+c+'" aria-pressed="'+(c===f)+'">'+esc(c)+' '+n+'</button>'}).join('')+'</div>'+
-    (rows.length?table([['Employee'],['Arrangement'],['Clock In'],['Clock Out'],['Expected Location'],['Matched Location'],['Device'],['Status'],['Exception']],
+    (rows.length?'<div class="att-desktop-register">'+table([['Employee'],['Arrangement'],['Clock In'],['Clock Out'],['Expected Location'],['Matched Location'],['Device'],['Status'],['Exception']],
       rows.map(function(r){var v=r.v,last=v?(v.all[v.all.length-1]||{}):{},exc=v&&v.exceptions.length?v.exceptions[0]:'',c=r.cases[0];
         return [aWho(r.id),pill('nt',r.e.arr),v?attTimeCell(v,'in'):'<span class="sub">None</span>',v?attTimeCell(v,'out'):'<span class="sub">None</span>',
           esc(r.s?r.s.expected:attWhere(r.id,ATT_TODAY,{field:'on',day:'auto'}).label),esc(last.matched||'Not yet'),
           last.device?esc(last.device)+'<br>'+attDevPill(last.devStatus):'<span class="sub">None</span>',
           r.leave&&!(v&&v.inE)?pill('in','On leave'):v?attStatusPill(v):pill('nt','Not clocked in'),
           (exc?'<span class="clip" title="'+esc(exc)+'">'+esc(exc)+'</span>':'')+(c?(exc?'<br>':'')+'<b>'+esc(c.id)+'</b>':(exc?'':'<span class="sub">None</span>'))]}),
-      'Today’s Register','',function(i){return ' class="rowlink" data-att="att-row" data-v="'+rows[i].id+'" tabindex="0"'},'wide',[2,5]):
+      'Today’s Register','',function(i){return ' class="rowlink" data-att="att-row" data-v="'+rows[i].id+'" tabindex="0"'},'wide',[2,5])+'</div>'+attRegisterMobile(rows):
       emptyb('srch','Nobody Matches This Filter','Choose All to see everyone.'))}
 function attEventModal(id){var s=attTodaySession(id),e=aEmp(id);
   if(!s){openModal({title:aName(id)+' · Today',body:emptyb('clock','No Clock Events Today',attOnLeave(id,ATT_TODAY)?'On approved leave.':'Nothing recorded yet.'),foot:'<button class="btn pri" data-mx>Close</button>'});return}

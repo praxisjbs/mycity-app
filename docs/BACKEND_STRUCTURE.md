@@ -102,7 +102,8 @@ src/
 │   ├── routes.js                     /api/health, /api/v1, /api/public/v1, /media (§5.4)
 │   ├── module-loader.js              discovers src/modules/*, mounts by declared surface
 │   ├── route.js                      route(router, method, path, contract, ...handlers) (§6)
-│   └── health.js
+│   ├── health.js
+│   └── static.js                     serves app/dist (hub.) and public-app/dist (go.); host path guard
 │
 ├── middleware/
 │   ├── async-safe.js
@@ -125,7 +126,7 @@ src/
 │   ├── events/        emit.js · outbox.js · catalogue.js
 │   ├── workflow/      engine.js · conditions.js · definitions.js · approvers.js
 │   ├── access/        access.catalog.js
-│   ├── rbac/          grants-cache.js · field-mask.js · scope.js
+│   ├── rbac/          grants-cache.js · field-mask.js · scope.js · sessions.js
 │   ├── money/         money.js
 │   ├── time/          lagos.js · working-week.js · day-first.js · recurrence.js
 │   ├── numbering/     numbering.js · schemes.js                                (§7)
@@ -205,7 +206,7 @@ src/
 | `shared/db/tx.js` | praxis | 121 | As is |
 | `shared/db/query-helpers.js` | praxis | 274 | As is, **except `page()`** (default 50, client limit to 200) and `TOTAL_COL`/`splitTotal`, which are not ported: paging lives only in `shared/http/paged.js` (§16) |
 | `shared/http/paged.js` | praxis `shared/http/paged.js` | 27 | **Rewritten** as the pagination gate: fixed 25, `pageQuery`, envelope in the body, `completeQuery` (§16) |
-| `shared/crud/resource.js` | praxis | 361 | No tenant pool; `scope: { ownColumn, teamColumn }` |
+| `shared/crud/resource.js` | praxis | 361 | No tenant pool; `scope: { column }` through `shared/rbac/scope`; lists through `paged.js`; routes through `route()` (`mountResource`) |
 | `shared/http/validate.js` | praxis | 182 | Schemas from `packages/contract` only |
 | `shared/events/emit.js` | praxis | 415 | **Reworked**: event_log + audit + outbox in one tx; inline workflow and fan-out removed |
 | `shared/events/outbox.js` | pixie `shared/outbox/outbox.js` | 210 | No `business` column |
@@ -213,6 +214,7 @@ src/
 | `shared/access/access.catalog.js` | pixie | 199 | MyCity's 15 module keys |
 | `shared/rbac/grants-cache.js` | praxis `shared/cache/identity-cache.js` | 456 | No tenant keying |
 | `shared/rbac/field-mask.js` | praxis | 131 | As is |
+| `shared/rbac/sessions.js` | praxis `shared/cache/session-store.js` | 100 | Redis index of live sessions in front of `user_session`; three-valued answer kept |
 | `shared/money/money.js` | pixie `utils/money.js` | 123 | NGN only |
 | `shared/time/lagos.js` | pixie `shared/hr_payroll/lagos-time.js` | 35 | As is |
 | `shared/numbering/*` | praxis `services/documents/numbering.service.js` | 216 | §7 |
@@ -248,13 +250,29 @@ Source: pixie `src/workflows/engine.js` (590), `conditions.js` (226), `default-d
 | Pixie | MyCity |
 |---|---|
 | Tables carry `business` | `workflow_definition / _instance / _decision`, no business column |
-| `emitter.emit(…)` inside the transaction | `outbox.enqueue(client, …)`: fires on commit, reaches the worker |
+| `emitter.emit(…)` inside the transaction | `emit(client, …)`: audited, and its outbox row fires after commit in the worker |
 | `conditions.toNumber()` via `Number()` | Money fields compared with `decimal.js` (gate 20) |
 | Approvers `role`, `position`, `user`; CEO = `owner` role | `role`, `user`, `manager_of_subject`; CEO = `app_user.is_ceo` |
 | `on_timeout` auto_approve allowed anywhere | Refused on a definition whose context carries money |
 
-Public API unchanged. M0 proves it with `test.threshold` (two stages, second when
-`amount >= 500000.00`).
+M0 proves it with `test.threshold` (two stages, second when `amount >= 500000.00`).
+
+What a definition is, as built (`shared/workflow/conditions.js` has the full shape):
+
+- `context` declares every field a condition reads and its type (`money`, `number`, `date`,
+  `text`, `uuid`, `boolean`). A request missing a declared field is refused rather than read as
+  zero, because zero would skip a stage meant for large amounts.
+- A stage is `{ key, name, approver | approvers, condition, sla_hours, on_timeout, on_approve,
+  on_reject }`. Approver types: `role` (role code), `user`, `manager_of_subject`, `ceo`.
+  `on_approve: complete` finishes at that stage; `on_reject: return` sends the request back to
+  the first stage instead of ending it.
+- Approvers are resolved when a stage starts and stored on the instance (`stage_approvers`), so
+  "My Approvals" is one read and a reorganisation does not move a request mid-stage. A subject
+  with no line manager goes to the CEO.
+- Nobody decides their own request (the CEO excepted). Reject and request changes need a reason.
+  The requester can withdraw (`cancel`) while it is pending.
+- An edit in Settings saves a new version; open instances keep the version they started on.
+- A module reacts with `workflow.onCompleted(definitionKey, name, fn)`, an outbox handler.
 
 ---
 
@@ -283,8 +301,12 @@ document_variant  document_id, kind (avif-320, webp-960, poster, opus…), stora
 - **Attachment is polymorphic** (`entity_type`, `entity_id`), resolved through the same route map
   tasks and notifications use, so an employee's documents, a query's letters and a partnership's MOU
   are one table and one download route.
-- **Sensitivity drives field masking**: `restricted` (payslips, bank letters, ID documents) is
-  readable only with the owning module's grant or by the subject themselves in ESS.
+- **Who reads a document** (`vault.canRead`): the CEO; the employee it is about
+  (`subject_employee_id`, their ESS view); whoever uploaded it; otherwise the `view` grant of the
+  module the record belongs to (route map), within scope. A `restricted` document (payslip, bank
+  letter, ID) also needs that module's `edit` grant, so view-only roles cannot open it. A module whose
+  records need a finer rule (a direct message's attachment) registers it with `vault.defineAccess()`.
+  A document the caller cannot read is a 404, never a 403. The full column list is in §11.1.
 
 ### 5.2 Upload
 
@@ -327,7 +349,7 @@ rendered to PNG at build; they are the only files served pre-auth.
 
 | Request | Path | Check |
 |---|---|---|
-| Staff opens a document | `GET /api/v1/documents/:id/content` | Module grant or subject-is-self; then nginx `X-Accel-Redirect` to an `internal` location, so Node checks and nginx streams |
+| Staff opens a document | `GET /api/v1/documents/:id/content` | Module grant or subject-is-self; then Node streams the file (range requests supported) |
 | Image in a list | `GET /api/v1/documents/:id/variant/:kind` | Same check, cached `private, max-age=300` |
 | Public candidate / signer | `GET /api/public/v1/<surface>/:token/document` | Token scope names the document; nothing else is reachable |
 | Verify a signed document | `GET /api/public/v1/verify/:number` | Returns type, signer, two verdicts. Never the file |
@@ -459,9 +481,9 @@ rather than back-filled.
 Every human-readable reference in the system comes from one allocator.
 
 ```
-numbering_scheme    doc_type (pk), prefix, padding, separator, reset (never|yearly),
-                    include_year, next_preview (computed), updated_by
-numbering_counter   doc_type, period (e.g. 2026, or 'all'), last_value
+numbering_scheme    doc_type (pk), prefix, padding (0 = no sequence part), separator,
+                    reset (never|yearly|monthly), include_period, updated_at, updated_by
+numbering_counter   doc_type, period ('all', '2026' or '2026-10'), last_value, pk (doc_type, period)
 ```
 
 ```js
@@ -559,11 +581,11 @@ upload (.xlsx, .csv, Google Sheets downloaded as .xlsx)
 ### 9.3 Tables and API
 
 ```
-import_batch          batch_id, number (IMP-0001), importer_key, document_id (source file),
+import_batch          import_batch_id, number (IMP-0001), importer_key, document_id (source file),
                       sheet, header_row, mapping jsonb, options jsonb, status
                       (uploaded|mapped|validated|previewed|committed|reverted|failed),
                       stats jsonb, created_by, committed_at, reverted_at
-import_row            batch_id, row_number, raw jsonb, values jsonb, status
+import_row            import_batch_id, row_number, raw jsonb, values jsonb, status
                       (ok|warning|error|duplicate|unchanged|skipped), problems jsonb,
                       action (create|update|none), target_id, before jsonb
 import_mapping_profile importer_key, name, header_signature, mapping jsonb, last_used_at
@@ -607,17 +629,18 @@ module.exports = {
     { key: "line_manager",   label: "Line Manager", type: "reference", ref: "employee",
                              by: ["staff_number", "work_email", "full_name"], pass: 2 },
     { key: "start_date",     label: "Start Date",   type: "date" },
-    { key: "date_of_birth",  label: "Date of Birth", type: "date", sensitivity: "personal" },
+    { key: "date_of_birth",  label: "Date of Birth", type: "date", mask: "employee.personal" },
     { key: "employment_type",label: "Employment Type", type: "enum" },
     { key: "work_pattern",   label: "Work Pattern", type: "enum" },  // on-site | hybrid | remote
     { key: "worksite",       label: "Worksite",     type: "reference", ref: "worksite", pass: 2 },
-    { key: "bank_name",      label: "Bank",         sensitivity: "restricted" },
-    { key: "account_number", label: "Account Number", sensitivity: "restricted" },
-    { key: "gross_monthly",  label: "Gross Monthly", type: "money", sensitivity: "restricted" },
+    { key: "bank_name",      label: "Bank",         mask: "employee.bank" },
+    { key: "account_number", label: "Account Number", mask: "employee.bank" },
+    { key: "gross_monthly",  label: "Gross Monthly", type: "money", mask: "employee.salary" },
     { key: "next_of_kin",    label: "Next of Kin" },
   ],
   options: { createLogins: false },   // M1 adds "create login and send invite" per row
-  write: (client, row, ctx) => employeeService.createOrUpdate(client, row, ctx),
+  // find, resolve, create, write, link, archive, restore: see shared/import/registry.js
+  write: (client, values, ctx) => employeeService.importRow(client, values, ctx),
 };
 ```
 
@@ -683,6 +706,56 @@ scripts LF and `bash -n`, `node --check` on every file.
 | 0090 | `security_store.sql` | `integration_secret`, `public_token` (hash, scope, subject, expires, used_at) |
 | 0095 | `ai.sql` | `ai_setting` (vendor, model, monthly cap, per-module switch), `ai_run`, `ai_run_step` (tokens, cost, latency, purpose, module, actor), `ai_catalogue` (synced from manifests), `ai_prompt_version` |
 | 0099 | `seed_reference.sql` | System roles, module catalogue rows, working week, numbering schemes, template defaults. **No people, no demo rows** |
+
+### 11.1 Columns the shared layer already reads
+
+The shared layer was written before these migrations (14 October), so it names the columns it
+depends on. A migration that names them differently changes the code in the same PR, or the code
+fails at the first query. Everything else in each table is the migration's call.
+
+| Table (migration) | Columns read or written by | |
+|---|---|---|
+| `app_user` (0010) | `user_id`, `employee_id` (NOT NULL), `email`, `status` (`active` / `suspended` / `left`), `is_ceo` | `shared/rbac/grants-cache` |
+| `user_session` (0010) | `session_id`, `user_id`, `killed_at`, `expires_at` | `middleware/auth` |
+| `role`, `user_role` (0020) | `role_id`, `code`; `user_id`, `role_id` | `shared/rbac/grants-cache` |
+| `permission` (0020) | `role_id`, `module_key`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_approve`, `can_export`, `scope` (`all` / `team` / `own`) | `middleware/rbac` |
+| `field_visibility` (0020) | `role_id`, `field_key`, `visibility` (`visible` / `masked`) | `shared/rbac/grants-cache` |
+| `capability`, `user_capability` (0020) | `capability_id`, `code`; `user_id`, `capability_id` | `middleware/rbac` (`requireCapability`) |
+| `idempotency_key` (0030) | `key` (PK), `method`, `path`, `request_hash`, `user_id`, `state` (`in_flight` / `completed`), `status_code`, `response_body` jsonb, `created_at`, `completed_at`, `expires_at` | `middleware/idempotency` |
+| `error_event` (0030) | `occurred_at`, `severity`, `origin`, `fingerprint`, `name`, `message`, `stack`, `route`, `request_id`, `user_id`, `release`, `extra` jsonb | `shared/observability/error-reporter` |
+| `employee` (0040) | `employee_id`, `first_name`, `last_name`, `line_manager_id` (team scope is the tree under it) | `shared/rbac/grants-cache` |
+| `schema_migration` (0002) | `name`, `applied_at` | `http/health` (migration head) |
+| `worksite` (0040) | `worksite_id`, `latitude`, `longitude`, `radius_m` | `shared/geo` (clock-in, M1) |
+| `working_week` (0050) | `weekday` (1 Monday to 7 Sunday), `is_working_day`, `starts_at`, `ends_at` | `shared/time/working-week` |
+| `public_holiday` (0050) | `holiday_date`, `name` | `shared/time/working-week` |
+| `numbering_scheme` (0055) | `doc_type` PK, `prefix`, `padding`, `separator`, `reset`, `include_period` | `shared/numbering` (§7); 0099 seeds one row per type in `shared/numbering/schemes.js` |
+| `numbering_counter` (0055) | `doc_type`, `period`, `last_value`, PRIMARY KEY (`doc_type`, `period`) | `shared/numbering` |
+| `entity_state_history` (0070) | `entity_state_history_id`, `entity_type`, `entity_id`, `from_state`, `to_state`, `actor_id`, `reason`, `changed_at` | `shared/state/state-history` |
+| `public_token` (0090) | `public_token_id`, `token_hash` UNIQUE, `scope`, `subject_type`, `subject_id`, `single_use`, `expires_at`, `used_at`, `revoked_at`, `created_by`, `created_at` | `shared/tokens`, `middleware/public-token` |
+| any effective-dated table | `effective_from` date NOT NULL, `effective_to` date NULL (exclusive; NULL = current), no overlap per key | `shared/db/effective-dated` |
+| `event_log` (0030) | `event_id` uuid PK, `event_key`, `module_key`, `entity_type`, `entity_id` **text**, `actor_user_id` NULL, `payload` jsonb, `request_id`, `import_batch_id` NULL, `occurred_at` | `shared/events/emit` |
+| `audit_ledger` (0030) | `event_id` FK, `occurred_at`, `actor_user_id`, `actor_name`, `actor_email`, `actor_ip`, `action`, `module_key`, `entity_type`, `entity_id` text, `before` jsonb, `after` jsonb, `changed_fields` text[], `is_sensitive`, `metadata` jsonb, `request_id`, `import_batch_id`; append-only trigger | `shared/events/emit` |
+| `event_outbox` (0030) | `outbox_id` uuid PK, `event_id` FK, `event_key`, `dedup_key` (UNIQUE where not null), `status` (`pending` / `processing` / `done` / `failed`), `attempts`, `max_attempts` (default 8), `next_attempt_at`, `completed_handlers` text[], `last_error`, `created_at`, `updated_at`, `processed_at`; index on `next_attempt_at` where pending | `shared/events/outbox` |
+| `notification` (0060) | `notification_id` uuid PK, `user_id`, `event_id` FK, `event_key`, `category`, `priority` (`normal` / `high`), `title`, `body`, `entity_type`, `entity_id` text, `channels` text[], `created_at`, `read_at`, `delivery_queued_at`; UNIQUE (`event_id`, `user_id`). No link column: the inbox derives it (`shared/route-map`). The bell shows rows whose `channels` include `in_app` | `shared/notifications/fanout` |
+| `notification_preference` (0060) | `user_id`, `category`, `channel` (`in_app` / `email` / `push`), `enabled`; PRIMARY KEY (`user_id`, `category`, `channel`) | `shared/notifications/fanout` |
+| `workflow_definition` (0070) | `workflow_definition_id` uuid PK, `key`, `version`, `module_key`, `name`, `description`, `context_types` jsonb, `stages` jsonb, `active`, `created_by`, `created_at`; UNIQUE (`key`, `version`) | `shared/workflow/definitions` |
+| `workflow_instance` (0070) | `workflow_instance_id` uuid PK, `workflow_definition_id` FK, `definition_key`, `module_key`, `entity_type`, `entity_id` text, `subject_employee_id`, `current_stage`, `state` (`pending` / `approved` / `rejected` / `cancelled` / `timeout_approved` / `timeout_rejected`), `context` jsonb, `stage_approvers` jsonb, `stage_entered_at`, `stage_due_at`, `opened_by`, `opened_at`, `completed_at`; UNIQUE (`entity_type`, `entity_id`) WHERE `state = 'pending'` | `shared/workflow/engine` |
+| `workflow_decision` (0070) | `workflow_decision_id` uuid PK, `workflow_instance_id` FK, `stage_key`, `actor_id` NULL, `decision` (`approve` / `reject` / `request_changes` / `cancel` / `timeout_approve` / `timeout_reject`), `reason`, `decided_at` (clock_timestamp, so two decisions in one transaction keep their order) | `shared/workflow/engine` |
+| `home_alert_rule` (Home, M1) | `home_alert_rule_id` uuid PK, `key` UNIQUE, `metric`, `threshold` numeric, `window_days`, `severity` (`low` / `medium` / `high`), `permission_key` (`"<module>.<action>"`, e.g. `people.approve`), `enabled` | `shared/alerts` |
+| `home_alert` (Home, M1) | `home_alert_id` uuid PK, `home_alert_rule_id` FK, `subject_type`, `subject_id` text, `title`, `trigger`, `severity`, `over_by` numeric, `raised_at`, `last_seen_at`, `escalated_at`, `cleared_at`, `cleared_by`, `outcome` (`cleared` / `dismissed`), `note`; UNIQUE (`home_alert_rule_id`, `subject_type`, `subject_id`) WHERE `cleared_at IS NULL` | `shared/alerts` |
+
+| `setting` (0050) | `key` PK, `value` jsonb. The letterhead and mail read `organisation.profile` (`name`, `address`, `phone`, `email`, `website`) | `shared/documents/generate` |
+| `document` (0080) | `document_id` uuid PK, `doc_type`, `title`, `original_name`, `storage_key` UNIQUE, `mime`, `bytes`, `content_hash` (NULL until rendered), `version`, `supersedes_id`, `is_current`, `entity_type`, `entity_id` text, `subject_employee_id`, `sensitivity` (`normal` / `personal` / `restricted`), `locked_at`, `expires_on`, `scan_status` (`clean` / `pending` / `infected` / `skipped`), `source` (`upload` / `generated` / `import`), `number` UNIQUE, `template_key`, `template_version`, `render_status` (NULL / `pending` / `done` / `failed`), `render_html`, `render_error`, `width`, `height`, `duration_ms`, `uploaded_by`, `created_at` | `shared/documents/vault`, `generate` |
+| `document_variant` (0080) | `document_variant_id`, `document_id`, `kind` (`webp-320`, `avif-960`, `opus`, `mp4-720`, `poster`), `storage_key` UNIQUE, `mime`, `bytes`, `width`, `height`, `created_at`; UNIQUE (`document_id`, `kind`) | `shared/documents/vault` |
+| `template_version` (0080) | `template_version_id`, `kind` (`document` / `email`), `key`, `version`, `subject`, `title`, `body`, `format` (`html` / `markdown`), `created_by`, `created_at`; UNIQUE (`kind`, `key`, `version`). Version 0 is the shipped file; no row for it | `shared/templates/template-store` |
+| `import_batch` (0085) | `import_batch_id` uuid PK, `number` UNIQUE, `importer_key`, `document_id`, `file_name`, `sheet`, `header_row`, `mapping` jsonb, `options` jsonb, `status` (`uploaded` / `mapped` / `previewed` / `committed` / `reverted` / `failed`), `stats` jsonb, `created_by`, `created_at`, `previewed_at`, `committed_at`, `committed_by`, `reverted_at`, `reverted_by` | `shared/import` |
+| `import_row` (0085) | `import_row_id`, `import_batch_id`, `row_number`, `raw` jsonb, `values` jsonb, `status` (`ok` / `warning` / `error` / `duplicate` / `unchanged` / `skipped`), `problems` jsonb, `action` (`create` / `update` / `none`), `target_id` text, `before` jsonb, `diff` jsonb; UNIQUE (`import_batch_id`, `row_number`) | `shared/import` |
+| `import_mapping_profile` (0085) | `import_mapping_profile_id`, `importer_key`, `name`, `header_signature`, `mapping` jsonb, `created_by`, `last_used_at`; UNIQUE (`importer_key`, `header_signature`) | `shared/import/mapping` |
+
+`entity_id` is text wherever a row points at "any record", because not every record's key is a
+uuid. `tests/integration/fixtures/shared-layer.sql` holds these columns as runnable DDL so the
+integration suite (`RUN_DB_TESTS=1`) proves the shared layer against Postgres; it is a test
+fixture, not a migration, and is deleted when the suite runs the real migrations.
 
 ---
 
@@ -926,7 +999,7 @@ truncating. It is never a list a person scrolls and never an AI read. Every call
 
 | Refused | Where |
 |---|---|
-| `LIMIT`/`OFFSET`/`FETCH FIRST` in SQL outside `paged.js` (`LIMIT 1` allowed) | `src/` |
+| `LIMIT`/`OFFSET`/`FETCH FIRST` in SQL outside `paged.js` (`LIMIT 1` allowed; a worker batch claim marked `LIMIT $1 -- pagination:batch <why>` on the same line is allowed, never in a route, controller or AI manifest) | `src/` |
 | `completeQuery()` without its marker | `src/` |
 | A page-size key | `packages/contract/schemas/` (except `common.js`), any `*.ai.js` |
 | A page-size parameter or a local `PAGE_SIZE` | `app/`, `public-app/` |

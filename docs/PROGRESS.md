@@ -97,6 +97,50 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   render demo.html at 390 and 1440 px in Chromium and will read `app/` once it has a build.
   MILESTONES gates 8, 11 and 12 amended; guide template §10 now lists content tiers and the phone
   layout. Every demo module now passes all four. Left: the crawler blind spots listed in PR #16.
+- 14/10/2026 · GE · Shared foundation, phase 4 of 6: files (`sniff` by bytes, per-purpose
+  `mime-policy`, `safe-name`, `hash`), `services/storage` (atomic, contained keys), the vault
+  (store, versions, lock, quarantine and scan, access rules, range downloads),
+  `services/media` (image profiles with metadata stripped, voice and video through ffmpeg,
+  clamd scan, reconcile), generated documents (`generate` queues HTML, the worker renders
+  through Chromium, stores, hashes, locks), the template language, template versions and
+  variables, Markdown, canonical hashing, spreadsheets (xlsx and CSV in and out, day-first dates,
+  formula escaping), the import engine (map, real preview, commit, revert, error file), system mail
+  (captured off servers, marked on staging), deliverability checks, encryption, QR and ICS.
+  Letterhead and mail layout templates written. 223 unit tests, 43 integration tests (with real
+  Chromium and ffmpeg). New env: media tools and SMTP (SMTP_HOST required on servers). Tables in
+  BACKEND_STRUCTURE §11.1 (LA). `web-push` stays for M6.
+- 14/10/2026 · GE · Shared foundation, phase 3 of 6: `events/{catalogue,emit,outbox}` (one `emit()`
+  writes event, audit and outbox in one statement; handlers run after commit with per-handler
+  retry), `workflow/{conditions,definitions,approvers,engine}` (test.threshold, versioned
+  definitions, no self-approval, timeouts, My Approvals), `rbac/field-mask`, `alerts`,
+  `notifications/{categories,fanout}`, `route-map` (links derived, never stored; checked against this
+  file's tabs) and `crud/resource`. Integration suite added (`tests/integration`, `RUN_DB_TESTS=1`,
+  27 tests against Postgres 16); 188 unit tests. Gates: pagination allows a marked worker batch
+  claim, numbering checks the resource kit's `docType`. Tables these read are in BACKEND_STRUCTURE
+  §11.1 (LA); Home's alert columns aligned in `docs/guides/home.md` (TB). `db.js` provenance line
+  removed again (it had come back on disk).
+- 14/10/2026 · GE · Shared foundation, phase 2 of 6: `shared/db/{query-helpers,effective-dated}`,
+  `money` (decimal.js, Naira, kobo-exact `allocate`), `time/{lagos,day-first,working-week,recurrence}`,
+  `numbering/{numbering,schemes}` (rollback-safe, gap-free), `geo`, `rules/window-counter`,
+  `state/state-history`, `dedup`, `tokens/public-token` and `middleware/public-token`. Gate built:
+  numbering-schemes. 155 unit tests; numbering under 20 concurrent saves, rollback, effective dating,
+  tokens and the working week also checked against real Postgres. `crud/resource.js` moves to phase 3
+  (it writes through `emit()`). New columns for LA in BACKEND_STRUCTURE §11.1.
+- 14/10/2026 · GE · Review of phase 1: the API now serves both frontend builds by host (`http/static.js`:
+  `app/dist` on hub., `public-app/dist` on go., SPA fallback, cache headers, a host guard that 404s
+  the other surface's API); the proxy only forwards (`docs/runbooks/proxy.md` rewritten). Code never
+  names the project it was ported from; `check/provenance.js` enforces it. Responses are
+  checked as the client receives them (dates as strings); path params reach `req.validated`. Suite
+  green on Node 20, 22 and 24.
+- 14/10/2026 · GE · Shared foundation, phase 1 of 6 (branch `m0/shared-foundation`): the app boots.
+  Written: `config/*` (env refuses an unsafe server boot), `app.js`, `server.js`, `http/*`
+  (`route()` enforces a contract and a permission on every route), every middleware except
+  `public-token`, `shared/http/{validate,respond,body-limits}`, `shared/db/{tx,pg-types}`,
+  `shared/rbac/{grants-cache,scope,sessions}`, `shared/access/access.catalog`, observability.
+  Gates now built: env-template, route-contracts, public-surface. 80 unit tests; the request path
+  also checked against a real Postgres 16 and Redis. Left: `worker.js` (phase 5), `public-token`
+  (phase 2). The columns this code reads are listed in BACKEND_STRUCTURE §11.1 for the 0010 to
+  0040 migrations (LA).
 - 13/10/2026 · GE · CI wired: `npm run ci` runs every gate locally and in Actions; empty gates are
   reported NOT BUILT, not passed. Process gates and the Claude Stop hook added. Branch protection
   needs TB to apply the runbook; CODEOWNERS needs LA and AJ usernames.

@@ -10,8 +10,8 @@
  *   throw new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422,
  *                      { work_email: ["is already in use"] });
  *
- * Ported from praxis-ls src/utils/errors.js; `details` is named `fields`
- * because in this codebase it is always a field → messages map.
+ * The fourth argument is `fields` because it is always a field → messages map,
+ * which the frontend shows under each input.
  */
 class AppError extends Error {
   /**

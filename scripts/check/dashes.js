@@ -45,10 +45,15 @@ function markupText(file, html) {
   }
 }
 
+/** A literal that is SQL: its `--` starts a comment (the pagination gate reads one), not copy. */
+const SQL = /\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|LIMIT|RETURNING|JOIN)\b/;
+const sqlComments = (v) => (SQL.test(v) ? v.replace(/--[^\n]*/g, "") : v);
+
 /** String literals of a script (HTML inside a literal is reduced to its text). */
 function scriptLiterals(file, code, base, whole) {
   for (const l of scan(code).literals) {
-    const text = /</.test(l.value) ? stripTags(l.value) : l.value;
+    const value = sqlComments(l.value);
+    const text = /</.test(value) ? stripTags(value) : value;
     for (const piece of text.split(/\s{2,}/)) {
       if (hasDash(piece)) add(file, lineOf(whole, base + l.start), piece);
     }

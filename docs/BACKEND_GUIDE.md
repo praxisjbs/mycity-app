@@ -107,17 +107,39 @@ module.exports = { basePath: "/things", surface: "staff", router };
 
 Actions are `view create edit delete approve export`. It is `edit`, never `update`.
 
+What `route()` does for you, and refuses (`src/http/route.js`; the process does not start with a
+broken route):
+
+- It puts `auth` first on every staff route; you never add it. It runs your handlers next
+  (`requirePermission`, `upload.single(...)`), then validates against the contract, then your last
+  handler. The controller reads `req.validated.body`, `.query`, `.params`.
+- Every schema must be exported from `packages/contract`; a local `z.object` is refused.
+- Every route declares `response` (or `no_content: true` for a 204). Every POST, PUT and PATCH
+  declares `body`; use `c.common.EmptyBody` when the URL says it all (`POST /:id/submit`).
+- A staff route needs `requirePermission(key, action)`, or `self: true` when it is about the
+  caller's own records and the service checks ownership (my notifications, my profile).
+  `anonymous: true` is for sign-in only.
+- `:id` and `:something_id` path parameters must be UUIDs; anything else is a 404.
+- Under `APP_ENV=test` every 2xx response is parsed with `response`, so a field the contract does
+  not declare fails your test.
+- Public routes use `publicRoute()` in `<module>.public.routes.js`: no auth, no permission check.
+
 ### 3.3 Controller
 
 ```js
 const { sendPaged } = require("../../shared/http/paged");
+const { created } = require("../../shared/http/respond");
+const { scopeOf } = require("../../shared/rbac/scope");
 const service = require("./things.service");
 
 module.exports = {
-  list: async (req, res) => sendPaged(res, await service.list(req.validated.query, req.scope)),
-  create: async (req, res) => res.status(201).json(await service.create(req.validated.body, req.user)),
+  list: async (req, res) => sendPaged(res, await service.list(req.validated.query, scopeOf(req))),
+  create: async (req, res) => created(res, await service.create(req.validated.body, req.user)),
 };
 ```
+
+`scopeOf(req)` is `{ scope, scope_ids, employee_id }` from `requirePermission`: `scope` is `all`,
+`team` or `own`; `scope_ids` is `null` for all, or the employee ids the caller may see.
 
 ### 3.4 Service
 
@@ -160,19 +182,26 @@ previews, pickers or the AI** (internal meeting 12 October; BACKEND_STRUCTURE §
 
 ```js
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
+const { scopeClause } = require("../../shared/rbac/scope");
 
 function list(client, query, scope) {
+  const params = [query.status ?? null, query.q ?? null];
+  const s = scopeClause(scope, { column: "t.owner_employee_id" }, params);   // "" for all
   return pageQuery(client,
     `SELECT t.thing_id, t.number, t.title, t.due_on, t.created_at, ${TOTAL_COL}
        FROM thing t
       WHERE ($1::text IS NULL OR t.status = $1)
         AND ($2::text IS NULL OR search_fold(t.title) LIKE '%' || search_fold($2) || '%')
-        AND ($3::uuid[] IS NULL OR t.owner_id = ANY($3))
+        ${s.and}
       ORDER BY t.due_on DESC, t.thing_id`,
-    [query.status ?? null, query.q ?? null, scope.ids ?? null],
+    params,
     query);
 }
 ```
+
+`scopeClause` is the one translation of `team` and `own` into SQL. A row whose owner column is
+NULL is visible only under `all`. For one record already loaded, `assertInScope(scope, owner_id)`
+answers 404 when it is outside the caller's scope.
 
 - Put `TOTAL_COL` in the SELECT list. End with an `ORDER BY` that is unique (finish on the primary
   key) or rows repeat and vanish between pages. Do not write `LIMIT` or `OFFSET`; `pageQuery`
@@ -223,6 +252,8 @@ where the person makes the change (A23).
 | You need | Use | Not |
 |---|---|---|
 | A transaction | `shared/db/tx.atomically(client, fn)` | `BEGIN` by hand |
+| Who is calling, and over which records | `req.user`, `scopeOf(req)`, `shared/rbac/scope.scopeClause` | Reading the token yourself; your own "my team" query |
+| A success response | `shared/http/respond` (`ok`, `created`, `noContent`) or `sendPaged` | Wrapping one record in `{ data }` |
 | A list | `shared/http/paged.pageQuery` + `sendPaged` | Your own `LIMIT`/`OFFSET`, a bare array |
 | Validation | Contract schema via `route()` | Hand checks in the controller |
 | An error the user should see | `throw new AppError(code, message, status, fields)` (`shared/errors.js`) | `res.status(400).send(...)`, raw `Error` |
@@ -230,17 +261,26 @@ where the person makes the change (A23).
 | Money | `shared/money` (`decimal.js`), `numeric(18,2)`, strings on the wire | `Number()`, `parseFloat`, `+` |
 | A date a person reads | `shared/time/day-first`; business dates from `shared/time/lagos` | `toLocaleDateString()` with no locale |
 | Working days | `shared/time/working-week` | A hard-coded Monday to Friday |
-| A file | `middleware/upload` + `shared/documents/vault`; store a `document_id` | A path column, a module file table |
+| A file | `middleware/upload.single(field, { purpose })` + `shared/documents/vault`; store a `document_id` | A path column, a module file table, a base64 field |
 | A PDF | `documents.generate()` (outbox → worker → Chromium) | Rendering in the request |
 | Mail | `services/mail/system-mail.service` via an outbox handler | nodemailer in a module |
 | Something to happen after save | An outbox handler in `<module>.events.js` | Doing it inside the transaction |
-| An approval | A workflow definition over `shared/workflow/engine` | Status flags and if-chains |
+| An event key | `defineEvents(module, { "thing.created": { summary } })` in `<module>.events.js` (`shared/events/catalogue`); use the constant it returns | A string typed at the call site |
+| Telling people something happened | `defineNotification(key, { to, title })` in `<module>.events.js` (`shared/notifications/fanout`) | Writing `notification` rows, or mailing from the service |
+| A link to a record (bell, task, alert, AI) | `shared/route-map.linkFor(type, id)` when it is shown | Storing a URL |
+| Restricted fields on the way out | `shared/rbac/field-mask.maskForUser` in the controller | Deleting keys by hand |
+| A plain register (list, get, create, edit, archive) | `shared/crud/resource` (`makeRepo`, `makeService`, `makeController`, `mountResource`) | Copying another module's six files |
+| An approval | A workflow definition over `shared/workflow/engine` (`openInstance` in the save's transaction, `onCompleted` to react) | Status flags and if-chains |
 | A rule like "3 late in 30 days" | `shared/rules/window-counter` | A bespoke counter |
 | An alert someone must clear | `shared/alerts` | A notification |
 | AI | `services/ai/llm.service.complete()` | A vendor SDK import (gate) |
 | Geofence maths | `shared/geo` | Haversine pasted into the module |
 | Realtime push | An outbox handler → `services/realtime/emitter` | `io.emit` from a controller |
-| A spreadsheet in or out | `shared/spreadsheet`, `shared/import` | A new xlsx library |
+| A spreadsheet in or out | `shared/spreadsheet` (`buildWorkbook`, `parseUpload`, `buildCsv`), `shared/import` (`defineImporter` in `<module>.import.js`) | A new xlsx library |
+| A document from a template | `defineDocType` + `defineVariables`, then `documents.generate()` in the transaction | Rendering HTML yourself, calling Chromium |
+| A calendar invite | `services/calendar/ics` (`attachment()` on system mail) | Writing ICS by hand |
+| A secret the system must read back (an IMAP password) | `services/secrets/encryption.service` with an `aad` naming its record | Storing it plain, or base64 |
+| A QR code on a document | `services/qr` (our public origin only) | A QR library in a module |
 
 ---
 

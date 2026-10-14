@@ -120,18 +120,18 @@ never creates a second copy of the concern inside a module.
 src/
 ├── server.js · worker.js · app.js
 ├── config/        env · logger · db · redis · request-context · build-info
-├── http/          routes · module-loader · route (contract-aware) · health
+├── http/          routes · module-loader · route (contract-aware) · health · static (serves both builds)
 ├── middleware/    async-safe · request-id · access-log · environment-marker · rate-limit ·
 │                  idempotency · auth · rbac · public-token · upload · error-handler
 ├── shared/
 │   ├── errors.js · route-map.js
 │   ├── db/            tx · query-helpers · pg-types · effective-dated
-│   ├── crud/          resource (makeRepo / makeService / makeController / makeRouter)
+│   ├── crud/          resource (makeRepo / makeService / makeController / mountResource)
 │   ├── http/          validate · paged (THE pagination gate, 25 per page) · body-limits · respond
 │   ├── events/        emit · outbox · catalogue
 │   ├── workflow/      engine · conditions · definitions · approvers
 │   ├── access/        access.catalog (the permission module list)
-│   ├── rbac/          grants-cache · field-mask · scope
+│   ├── rbac/          grants-cache · field-mask · scope · sessions
 │   ├── money/         money
 │   ├── time/          lagos · working-week · day-first · recurrence
 │   ├── numbering/     numbering · schemes
@@ -522,7 +522,8 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
-`check/ai-vendor-imports.js`, `check/shell.js`, `check/pagination.js`.
+`check/ai-vendor-imports.js`, `check/shell.js`, `check/pagination.js`, `check/provenance.js`
+(code and comments never name the project code came from; that lives in REUSE_MAP.md only).
 
 Process gates, from M0. They check that the work is recorded where the team reads it:
 

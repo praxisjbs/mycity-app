@@ -11,7 +11,7 @@ on:
     branches: [main]
     # `edited`: the process gates read trailers from the PR description
     # ("Progress-unchanged: <reason>"). Without this, fixing the description
-    # fires no event and the red run stands (lesson from praxis-ls CI).
+    # fires no event and the red run stands.
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]

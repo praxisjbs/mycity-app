@@ -364,7 +364,10 @@ because gates read them: `app/src/components/form/` (the only home of raw form e
 
 ### 9.2 Routing, shell and permission filtering
 _To be written._ Tab slugs are the URL values in `docs/PROGRESS.md` and do not change when a label
-does. The route list is what `scripts/check/two-shells.js` walks, so it must be exportable.
+does. The one URL shape the backend produces for a screen or a record (notification bell, task
+panel, Home alerts, search, AI links) is `/<module>?tab=<tab>&id=<id>`, module key with `_` as `-`
+(`src/shared/route-map.js`); the router must honour it, and `id` opens that record. The route list
+is what `scripts/check/two-shells.js` walks, so it must be exportable.
 
 ### 9.3 Design tokens and theming (light, dark)
 _To be written._

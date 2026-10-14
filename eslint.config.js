@@ -3,7 +3,7 @@
  * Gate 1: lint, backend side. `npm run lint` = `eslint --max-warnings 0 .`
  *
  * Zero warnings from the first commit, so there is never a baseline to argue
- * down later (praxis-ls carries 136). The frontend apps lint themselves with
+ * down later. The frontend apps lint themselves with
  * their own configs, so they are ignored here.
  */
 const js = require("@eslint/js");
