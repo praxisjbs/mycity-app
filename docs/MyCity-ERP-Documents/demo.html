@@ -780,7 +780,12 @@ mark.hit.cur{background:var(--yellow);color:var(--on-yellow);box-shadow:0 0 0 2p
 /* ═════ MAILBOX: rich text composer, mobile reader ═════ */
 .mback{display:none}
 .comp-row{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:6px 0;min-height:42px;flex-wrap:wrap}
-.comp-row>label{width:58px;flex:none;font-size:12px;color:var(--ink-3);font-weight:600}
+.comp-row>.cl{width:58px;flex:none;font-size:12px;color:var(--ink-3);font-weight:600}
+.comp-row.bad{border-bottom-color:var(--err)}
+.comp-row .cerr{display:none;font-size:11.5px;color:var(--err);font-weight:600}
+.comp-row.bad .cerr{display:inline}
+.tbar .mdraft{margin-left:auto;display:flex;align-items:center}
+.mft .btn.dng{background:var(--err);border-color:var(--err);color:#fff}
 .comp-row input{flex:1;min-width:120px;border:0;background:none;outline:none;height:30px;font-size:13.5px}
 .comp-row select{border:1px solid var(--line);border-radius:8px;background:var(--bg);height:30px;padding:0 8px}
 .comp-row .lnk{font-size:12px;font-weight:600;color:var(--accent)}
@@ -823,6 +828,14 @@ mark.hit.cur{background:var(--yellow);color:var(--on-yellow);box-shadow:0 0 0 2p
   .thd .mback,.thd .mdraw{display:flex}
   .tcomp{padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
   .msg2{max-width:90%}
+  .clfil button{flex:1;min-height:44px;font-size:13px}
+  .cbtn{width:44px;height:44px}
+  .tcomp .inp{height:44px}
+  .comp-row input,.comp-row select{height:44px}
+  .comp-row .lnk{min-height:44px;padding:0 6px}
+  .rchip{height:44px;padding-left:12px}
+  .rchip button{width:44px;height:44px}
+  .tbar button{min-width:44px;height:44px}
   .mail2.open .mread{position:fixed;inset:0;z-index:62;border-radius:0;border:0;overflow-y:auto;
     padding:12px 14px calc(20px + env(safe-area-inset-bottom,0px))}
   .mail2.open .mback{display:inline-flex;margin-bottom:10px}
@@ -3401,9 +3414,7 @@ function mailTab(name,dav,rows){
   return {n:name,r:function(){
     var sel=MAILSEL[name]||0, unread=rows.filter(function(r){return r[3]}).length,
         att=rows.reduce(function(a,r){return a+(r[7]?r[7].length:0)},0);
-    return '<div class="phead"><div><h1>'+esc(name)+' '+infoBtn('mail-help')+'</h1><p>'+rows.length+' messages'+(unread?' · '+unread+' unread':'')+'</p></div>'+
-      '<div class="right"><button class="btn" id="mrefresh">Refresh</button><button class="btn pri" id="compose">'+ic('plus')+'Compose</button></div></div>'+
-      infoText('mail-help','Custom domain only. No Google, no Microsoft. Signed in with an address and a password, the same as any other mailbox. Mail here sends and receives only; it is not linked to any other module.')+
+    return head(name,rows.length+' messages'+(unread?' · '+unread+' unread':''),[['Refresh',0,'mrefresh'],['Compose',1,'compose']])+
     statstrip([['Folder',name],['Messages',String(rows.length)],['Unread',String(unread),unread?'warn':'ok'],
       ['Attachments',String(att)],['Mailbox','cynthia@mycityapp.io','','dsk']])+
     mail2(rows,sel,MAILOPEN&&MAILOPEN[name])}}}
@@ -3682,15 +3693,15 @@ function ticks(st){st=st||'sent';var lab={sent:'Sent',delivered:'Delivered',read
 
 function chanRow(c,i){
   return '<button class="crow'+(i===CM.ch?' on':'')+(c.un?' un':'')+'" data-ch="'+i+'"><span class="hash">#</span>'+
-    '<span class="cb"><b>'+esc(c.n)+(c.ro?ic('lock'):'')+'</b><span>'+esc(c.last||(c.mem+' members'))+'</span></span>'+
-    '<span class="cr"><em>'+esc(c.t||'')+'</em>'+(c.un?'<i>'+c.un+'</i>':'')+'</span></button>'}
+    '<span class="cb" data-copy="content"><b>'+esc(c.n)+(c.ro?ic('lock'):'')+'</b><span>'+esc(c.last||(c.mem+' members'))+'</span></span>'+
+    '<span class="cr" data-copy="content"><em>'+esc(c.t||'')+'</em>'+(c.un?'<i>'+c.un+'</i>':'')+'</span></button>'}
 function chanList(){
   var q=CM.q.toLowerCase(),pinned='',rest='';
   CHANNELS.forEach(function(c,i){if(q&&c.n.indexOf(q)<0)return;if(c.pin)pinned+=chanRow(c,i);else rest+=chanRow(c,i)});
   return (pinned?'<div class="clgl">Pinned</div>'+pinned:'')+'<div class="clgl">Channels</div>'+(rest||'<p class="sub" style="padding:8px">No channel matches.</p>')}
 
 function searchBar(){if(!CM.s.on)return '';
-  return '<div class="tsearch" role="search"><input class="inp" id="tsq" placeholder="Search in this conversation" aria-label="Search in this conversation" value="'+esc(CM.s.q)+'" autocomplete="off">'+
+  return '<div class="tsearch" role="search"><input class="inp" id="tsq" aria-label="Search in this conversation" placeholder="Search messages" value="'+esc(CM.s.q)+'" autocomplete="off">'+
     '<span class="cnt" id="tscnt"></span><button class="iconbtn" id="tsprev" aria-label="Previous match">'+ic('up')+'</button>'+
     '<button class="iconbtn" id="tsnext" aria-label="Next match" style="transform:rotate(180deg)">'+ic('up')+'</button>'+
     '<button class="iconbtn" id="tsx" aria-label="Close search">'+ic('x')+'</button></div>'}
@@ -3705,7 +3716,7 @@ function chanThread(){
     '<div class="tbody" id="tbody">'+threadMsgs()+'</div>'+
     '<div class="tcomp">'+(canPost?
       '<button class="cbtn" id="plusbtn" aria-label="Add to message">'+ic('plus')+'</button>'+
-      '<input class="inp" id="cmsg" placeholder="Message #'+esc(c.n)+'" aria-label="Message" autocomplete="off">'+
+      '<input class="inp" id="cmsg" aria-label="Message" autocomplete="off" placeholder="Message #'+esc(c.n)+'">'+
       '<button class="cbtn pri" id="csend" aria-label="Send">'+ic('send')+'</button>':
       '<span class="roline">'+ic('lock')+'Only People and the CEO post here</span>')+
     '</div></div>'}
@@ -3718,9 +3729,9 @@ function channelsTab(){CM.ctx='c';
 
 /* direct messages */
 function dmRow(d,i){var p=person(d.p),l=d.msgs[d.msgs.length-1];
-  return '<button class="crow'+(i===CM.dm?' on':'')+(d.un?' un':'')+'" data-dm="'+i+'"><span class="av">'+esc(p[0])+(d.on?'<i class="dot"></i>':'')+'</span>'+
-    '<span class="cb"><b>'+esc(p[1])+'</b><span>'+(l&&l.av===ME[0]?'You: ':'')+esc(lastOf(l))+'</span></span>'+
-    '<span class="cr"><em>'+esc(d.t||'')+'</em>'+(d.un?'<i>'+d.un+'</i>':'')+'</span></button>'}
+  return '<button class="crow'+(i===CM.dm?' on':'')+(d.un?' un':'')+'" data-dm="'+i+'"><span class="av" data-copy="content">'+esc(p[0])+(d.on?'<i class="dot"></i>':'')+'</span>'+
+    '<span class="cb" data-copy="content"><b>'+esc(p[1])+'</b><span>'+(l&&l.av===ME[0]?'You: ':'')+esc(lastOf(l))+'</span></span>'+
+    '<span class="cr" data-copy="content"><em>'+esc(d.t||'')+'</em>'+(d.un?'<i>'+d.un+'</i>':'')+'</span></button>'}
 function dmList(){var q=CM.dq.toLowerCase(),h='';
   DMS.forEach(function(d,i){var p=person(d.p);
     if(CM.dmf==='unread'&&!d.un)return; if(q&&p[1].toLowerCase().indexOf(q)<0)return; h+=dmRow(d,i)});
@@ -3740,7 +3751,7 @@ function dmComposer(){
     '<span class="recbar"><i></i>Recording <span id="vtime">'+fmtSec(MREC.sec)+'</span></span>'+
     '<button class="cbtn pri" id="vsend" aria-label="Send voice note">'+ic('send')+'</button>';
   return '<button class="cbtn" id="dplus" aria-label="Attach">'+ic('clip')+'</button>'+
-    '<input class="inp" id="dmsg" placeholder="Message '+esc(person(DMS[CM.dm].p)[1].split(' ')[0])+'" aria-label="Message" autocomplete="off">'+
+    '<input class="inp" id="dmsg" aria-label="Message" autocomplete="off" placeholder="Message '+esc(person(DMS[CM.dm].p)[1].split(' ')[0])+'">'+
     '<button class="cbtn" id="vrec" aria-label="Record a voice note">'+ic('mic')+'</button>'+
     '<button class="cbtn pri" id="dsend" aria-label="Send">'+ic('send')+'</button>'}
 function dmPush(msg){var d=DMS[CM.dm];msg.av=ME[0];msg.t=nowHM();msg.st='sent';d.msgs.push(msg);d.t=nowHM();render();
@@ -3771,12 +3782,12 @@ function profileHTML(d){var f=profileOf(d.p),files=d.msgs.filter(function(m){ret
       (f.ph?'<div class="pfrow">'+ic('user')+'<span>'+esc(f.ph)+'</span></div>':'')+
       '<div class="pfrow">'+ic('globe')+'<span>'+esc(f.site)+'</span></div>'+
       '<div class="pfrow">'+ic('clock')+'<span>'+nowHM()+' in Lagos</span></div></div>'+
-    '<div class="pfsec"><h4>Shared in this conversation</h4>'+
+    '<div class="pfsec"><h4>Shared in Conversation</h4>'+
       (files.length?files.map(function(x){return '<div class="pfrow">'+ic('doc')+'<span>'+esc(x.f)+'</span><span class="sub">'+esc(x.s)+'</span></div>'}).join(''):'')+
       (vns?'<div class="pfrow">'+ic('mic')+'<span>'+vns+' voice note'+(vns>1?'s':'')+'</span></div>':'')+
       (!files.length&&!vns?'<p class="sub">Nothing shared yet.</p>':'')+'</div>'+
-    '<div class="pfsec"><h4>Channels in common</h4>'+common.map(function(c){return '<div class="pfrow"><b style="color:var(--ink-3)">#</b><span>'+esc(c.n)+'</span></div>'}).join('')+'</div>'+
-    '<div class="pfsec"><div class="tog" style="padding:0"><span style="font-size:13px">Mute notifications</span><span class="sw'+(d.mute?' on':'')+'" data-pmute role="switch" aria-checked="'+(d.mute?'true':'false')+'" tabindex="0"></span></div>'+
+    '<div class="pfsec"><h4>Channels in Common</h4>'+common.map(function(c){return '<div class="pfrow"><b style="color:var(--ink-3)">#</b><span>'+esc(c.n)+'</span></div>'}).join('')+'</div>'+
+    '<div class="pfsec"><div class="tog" style="padding:0"><span style="font-size:13px" id="pmute-l">Mute Notifications</span><span class="sw'+(d.mute?' on':'')+'" data-pmute role="switch" aria-labelledby="pmute-l" aria-checked="'+(d.mute?'true':'false')+'" tabindex="0"></span></div>'+
     '<button class="btn" data-psearch style="margin-top:12px;width:100%;justify-content:center">'+ic('srch')+'Search in Conversation</button></div>'}
 function openProfile(){
   if(window.innerWidth>760){CM.info=true;render();return}
@@ -3817,10 +3828,9 @@ function readSplit(a){var h=0,t=a.title;for(var i=0;i<t.length;i++)h=(h*31+t.cha
   return {read:a.sch?[]:order.slice(0,a.read),not:a.sch?[]:order.slice(a.read)}}
 function annTab(){
   var pub=ANN.filter(function(a){return !a.sch}),avg=Math.round(pub.reduce(function(s,a){return s+a.read},0)*100/(pub.length*25));
-  return '<div class="phead"><div><h1>Announcements '+infoBtn('ann-help')+'</h1><p>Posted by People and the CEO · staff read them in #announcements</p></div>'+
-    '<div class="right"><button class="btn pri" id="newann">'+ic('plus')+'New Announcement</button></div></div>'+
-    infoText('ann-help','Only People and the CEO can post. An announcement appears in #announcements, which is pinned and read only for everyone else, and as a notification. It can be scheduled. Read counts are visible to the poster only.')+
-    statstrip([['Published',String(pub.length)],['Scheduled',String(ANN.length-pub.length)],['Average read',avg+'%','ok'],['Audience','25 staff'],['This month','2','','dsk']])+
+  return head('Announcements','',[['New Announcement',1,'newann']])+
+    helpOn(statstrip([['Published',String(pub.length)],['Scheduled',String(ANN.length-pub.length)],['Average Read',avg+'%','ok'],['Audience','25 staff'],['This Month','2','','dsk']]),
+      'Average Read','Across published announcements, the share of the audience who have opened each one.')+
     '<div class="grid g2" style="margin-top:12px">'+ANN.map(function(a,i){var p=person(a.av);
       return '<button class="card annc" data-an="'+i+'"><div class="ch" style="margin-bottom:6px"><h3>'+esc(a.title)+'</h3><span class="right">'+
         (a.sch?pill('in','Scheduled'):pill(a.read===25?'ok':'nt',a.read+' of 25 read'))+'</span></div>'+
@@ -3829,7 +3839,7 @@ function annTab(){
 
 /* ───── community modals ───── */
 function picker(id,list,multi,sel){sel=sel||{};
-  return '<input class="inp" id="'+id+'-q" placeholder="Search by name or department" aria-label="Search people" style="margin-bottom:8px">'+
+  return '<input class="inp" aria-label="Search people" placeholder="Name or department" id="'+id+'-q" style="margin-bottom:8px">'+
     '<div class="plist" id="'+id+'">'+list.map(function(p){
       return '<button class="prow'+(sel[p[0]]?' on':'')+'" data-pk="'+p[0]+'" data-pdept="'+esc(p[2])+'"><span class="av">'+esc(p[0])+'</span>'+
         '<span class="pn"><b>'+esc(p[1])+'</b><span>'+esc(p[2])+'</span></span>'+(multi?'<span class="tick">'+ic('ok')+'</span>':'')+'</button>'}).join('')+'</div>'}
@@ -3843,42 +3853,40 @@ function picked(m,id){return $$('#'+id+' .prow.on',m).map(function(r){return r.d
 
 function newChannelModal(){
   openModal({title:'New Channel',body:
-    field('chn','Channel name','<input class="inp" id="chn" placeholder="e.g. abuja-hub" autocomplete="off">','Lower case letters, numbers and hyphens, 2 to 30 characters')+
-    field('chd','What is it for','<input class="inp" id="chd" placeholder="Optional">')+
-    '<div class="f"><label>Add whole departments</label><div class="chips" id="chdepts" style="margin:0">'+DEPTS.map(function(d){return '<button class="chip" data-dept="'+esc(d)+'">'+esc(d)+'</button>'}).join('')+'</div></div>'+
-    '<div class="f"><label>Add people <span class="sub" id="chcount">· 0 selected</span></label>'+picker('chpk',PEOPLE.slice(1),true)+'</div>'+
-    '<div class="f"><label>Who can post '+infoBtn('wp-help')+'</label>'+infoText('wp-help','Set when the channel is created. Everyone can read. Channels are internal to MyCity: there is no public link to join one.')+
-    '<div class="seg" id="chwho"><button class="on" data-w="all">Every member</button><button data-w="admins">Only admins</button></div></div>',
+    field('chn','Channel Name','<input class="inp" id="chn" placeholder="abuja-hub" autocomplete="off">','Not a valid name',
+      'Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name.')+
+    field('chd','Purpose (optional)','<input class="inp" id="chd" autocomplete="off">')+
+    field('chdepts','Departments (optional)','<div class="chips" id="chdepts" role="group" aria-label="Departments" style="margin:0">'+DEPTS.map(function(d){return '<button class="chip" data-dept="'+esc(d)+'">'+esc(d)+'</button>'}).join('')+'</div>')+
+    field('chpk-q','People (optional)',picker('chpk',PEOPLE.slice(1),true)+'<p class="sub" id="chcount" style="margin-top:6px">0 selected</p>')+
+    choice('chwho','Who Can Post',[['all','Every Member'],['admins','Admins Only']]),
     foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="chgo">Create Channel</button>',
     onMount:function(m){
       live('chn',function(v){return /^[a-z0-9][a-z0-9-]{1,29}$/.test(v)&&!CHANNELS.some(function(c){return c.n===v})});
-      var count=function(){$('#chcount',m).textContent='· '+picked(m,'chpk').length+' selected'};
+      var count=function(){$('#chcount',m).textContent=picked(m,'chpk').length+' selected'};
       bindPicker(m,'chpk',true,count);
       $$('#chdepts .chip',m).forEach(function(c){c.onclick=function(){c.classList.toggle('on');var on=c.classList.contains('on');
         $$('#chpk .prow',m).forEach(function(r){if(r.dataset.pdept===c.dataset.dept)r.classList.toggle('on',on)});count()}});
-      $$('#chwho button',m).forEach(function(b){b.onclick=function(){$$('#chwho button',m).forEach(function(x){x.classList.remove('on')});b.classList.add('on')}});
-      bindInfo(m);
       $('#chgo',m).onclick=function(){var n=$('#chn',m).value.trim();
         if(!/^[a-z0-9][a-z0-9-]{1,29}$/.test(n)||CHANNELS.some(function(c){return c.n===n})){$('#fw-chn',m).classList.add('bad');$('#chn',m).focus();return}
-        var mem=picked(m,'chpk').length+1,adm=$('#chwho .on',m).dataset.w==='admins';
+        var mem=picked(m,'chpk').length+1,adm=$('#chwho .on',m).dataset.v==='admins';
         CHANNELS.push({n:n,mem:mem,adminOnly:adm,last:'Channel created',t:nowHM(),msgs:[{k:'day',x:'Today'},
           {k:'m',av:ME[0],t:nowHM(),x:'Created #'+n+($('#chd',m).value?': '+$('#chd',m).value:'')+'.'}]});
         CM.ch=CHANNELS.length-1;CM.open=true;closeModal();render();toast('#'+n+' created with '+mem+' members')}}})}
 
 function membersModal(edit){var c=CHANNELS[CM.ch],list=PEOPLE.slice(0,Math.min(PEOPLE.length,c.mem));
-  openModal({title:(edit?'Edit Members':'Members')+' · #'+c.n,body:
-    '<p class="sub" style="margin-bottom:10px">'+c.mem+' members'+(c.mem>list.length?', showing '+list.length:'')+'</p>'+
+  openModal({title:edit?'Edit Members':'Channel Members',body:
+    '<p class="sub" style="margin-bottom:10px" data-copy="content">#'+esc(c.n)+' · '+c.mem+' members'+(c.mem>list.length?', showing '+list.length:'')+'</p>'+
     '<div class="plist">'+list.map(function(p,i){return '<div class="prow"><span class="av">'+esc(p[0])+'</span><span class="pn"><b>'+esc(p[1])+'</b><span>'+esc(p[2])+'</span></span>'+
       (i===0?pill('ok','Admin'):'')+(edit&&i>0?'<button class="btn" data-rm="'+p[0]+'" style="height:28px">Remove</button>':'')+'</div>'}).join('')+'</div>',
-    foot:edit?'<button class="btn" id="addmem">'+ic('plus')+'Add People</button><button class="btn pri" data-mx>Done</button>':'<button class="btn pri" data-mx>Close</button>',
+    foot:edit?'<button class="btn" id="addmem">'+ic('plus')+'Add People</button><button class="btn pri" data-mx>Close</button>':'<button class="btn pri" data-mx>Close</button>',
     onMount:function(m){$$('[data-rm]',m).forEach(function(b){b.onclick=function(){b.closest('.prow').remove();c.mem--;toast('Removed from #'+c.n)}});
-      var a=$('#addmem',m);if(a)a.onclick=function(){toast('Pick people or a whole department, as when creating a channel')}}})}
+      var a=$('#addmem',m);if(a)a.onclick=function(){toast('Pick people or a department')}}})}
 
 function channelMenu(btn){var c=CHANNELS[CM.ch];
   popover(btn,[['View Members','users',function(){membersModal(false)}],
     ['Edit Members','user',function(){membersModal(true)}],
-    ['Channel Details','info',function(){openModal({title:'#'+c.n,body:'<dl class="kv"><dt>Members</dt><dd>'+c.mem+'</dd><dt>Who can post</dt><dd>'+
-      (c.ro?'People and the CEO':c.adminOnly?'Admins only':'Every member')+'</dd><dt>Visibility</dt><dd>Internal to MyCity</dd></dl>',foot:'<button class="btn pri" data-mx>Close</button>'})}],
+    ['Channel Details','info',function(){openModal({title:'Channel Details',body:'<dl class="kv"><dt>Channel</dt><dd>#'+esc(c.n)+'</dd><dt>Members</dt><dd>'+c.mem+'</dd><dt>Who Can Post</dt><dd>'+
+      (c.ro?'People and the CEO':c.adminOnly?'Admins only':'Every member')+'</dd></dl>',foot:'<button class="btn pri" data-mx>Close</button>'})}],
     ['Search in Channel','srch',openSearch],
     'sep',['Mute Notifications','bell',function(){toast('#'+c.n+' muted')}]])}
 
@@ -3888,34 +3896,35 @@ function plusMenu(btn){
   popover(btn,[['Recognise a Colleague','thumb',recogniseModal],['Celebrate','flag',celebrateModal],
     ['Start a Poll','chart',pollModal],['Attach a File','clip',function(){fileModal(function(f){postToChannel({k:'file',av:ME[0],f:f[0],s:f[1]})})}]],true)}
 function recogniseModal(){
-  openModal({title:'Recognise a Colleague',body:'<div class="f"><label>Who</label>'+picker('rpk',PEOPLE.slice(1),false)+'</div>'+
-    field('rwhat','What did they do','<textarea class="inp" id="rwhat" placeholder="Optional. Leave it blank and a note is written for you."></textarea>'),
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="rgo">'+ic('thumb')+'Post</button>',
-    onMount:function(m){bindPicker(m,'rpk',false);$('#rgo',m).onclick=function(){var who=picked(m,'rpk')[0];
-      if(!who){toast('Choose who you are recognising');return}
+  openModal({title:'Recognise a Colleague',body:field('rpk-q','Colleague',picker('rpk',PEOPLE.slice(1),false),'Choose a colleague')+
+    field('rwhat','Note (optional)','<textarea class="inp" id="rwhat"></textarea>','','Leave it blank and a thank you note is written for you.'),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="rgo">'+ic('thumb')+'Post Recognition</button>',
+    onMount:function(m){bindPicker(m,'rpk',false,function(){$('#fw-rpk-q',m).classList.remove('bad')});$('#rgo',m).onclick=function(){var who=picked(m,'rpk')[0];
+      if(!who){$('#fw-rpk-q',m).classList.add('bad');$('#rpk-q',m).focus();return}
       var x=$('#rwhat',m).value.trim()||'Thank you for the great work this week.';
       closeModal();postToChannel({k:'rec',from:ME[0],to:who,x:x,likes:0});toast('Posted to #'+CHANNELS[CM.ch].n)}}})}
 function celebrateModal(){
-  openModal({title:'Celebrate',body:'<div class="f"><label>Who</label>'+picker('cpk',PEOPLE.slice(1),false)+'</div>'+
-    '<div class="f"><label>What</label><div class="seg" id="cwhat"><button class="on" data-c="bday">Birthday</button><button data-c="anniv">Work Anniversary</button></div></div>',
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="cgo">'+ic('flag')+'Post</button>',
-    onMount:function(m){bindPicker(m,'cpk',false);
-      $$('#cwhat button',m).forEach(function(b){b.onclick=function(){$$('#cwhat button',m).forEach(function(x){x.classList.remove('on')});b.classList.add('on')}});
-      $('#cgo',m).onclick=function(){var who=picked(m,'cpk')[0];if(!who){toast('Choose who you are celebrating');return}
-        var k=$('#cwhat .on',m).dataset.c;closeModal();postToChannel({k:k,av:who,yrs:2,likes:0})}}})}
+  openModal({title:'Celebrate',body:field('cpk-q','Colleague',picker('cpk',PEOPLE.slice(1),false),'Choose a colleague')+
+    choice('cwhat','Occasion',[['bday','Birthday'],['anniv','Work Anniversary']]),
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="cgo">'+ic('flag')+'Post Celebration</button>',
+    onMount:function(m){bindPicker(m,'cpk',false,function(){$('#fw-cpk-q',m).classList.remove('bad')});
+      $('#cgo',m).onclick=function(){var who=picked(m,'cpk')[0];if(!who){$('#fw-cpk-q',m).classList.add('bad');$('#cpk-q',m).focus();return}
+        var k=$('#cwhat .on',m).dataset.v;closeModal();postToChannel({k:k,av:who,yrs:2,likes:0})}}})}
 function pollModal(){
-  openModal({title:'Start a Poll',body:field('pq','Question','<input class="inp" id="pq" placeholder="Ask one question">','Ask a question')+
-    '<div class="f"><label>Options</label>'+[1,2,3,4].map(function(n){return '<input class="inp" data-po style="margin-bottom:6px" placeholder="Option '+n+(n>2?' (optional)':'')+'">'}).join('')+'</div>',
+  openModal({title:'Start a Poll',body:field('pq','Question','<input class="inp" id="pq" autocomplete="off">','Add a question')+
+    [1,2,3,4].map(function(n){return field('po'+n,'Option '+n+(n>2?' (optional)':''),'<input class="inp" id="po'+n+'" data-po autocomplete="off">',n>2?'':'Add an option')}).join(''),
     foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="pgo">'+ic('chart')+'Post Poll</button>',
     onMount:function(m){live('pq',function(v){return v.trim().length>3});
-      $('#pgo',m).onclick=function(){var q=$('#pq',m).value.trim(),o=$$('[data-po]',m).map(function(i){return i.value.trim()}).filter(Boolean);
-        if(q.length<4){$('#fw-pq',m).classList.add('bad');return} if(o.length<2){toast('Give at least two options');return}
+      live('po1',function(v){return v.trim().length>0});live('po2',function(v){return v.trim().length>0});
+      $('#pgo',m).onclick=function(){var q=$('#pq',m).value.trim(),o=$$('[data-po]',m).map(function(i){return i.value.trim()}).filter(Boolean),bad=null;
+        ['po1','po2'].forEach(function(id){var e=!$('#'+id,m).value.trim();$('#fw-'+id,m).classList.toggle('bad',e);if(e&&!bad)bad=id});
+        if(q.length<4){$('#fw-pq',m).classList.add('bad');bad='pq'}
+        if(bad){$('#'+bad,m).focus();return}
         closeModal();postToChannel({k:'poll',av:ME[0],q:q,opts:o.map(function(x){return [x,0]})})}}})}
 /* the upload engine shows a percentage; never a raw file input (gate 18) */
 function fileModal(done){
   var files=[['q4-content-calendar.xlsx','212 KB'],['enugu-permit-letter.pdf','480 KB'],['studio-floorplan.png','1.4 MB']];
-  openModal({title:'Attach a File',body:'<p class="sub" style="margin-bottom:10px">Files are stored in the vault and shared here.</p>'+
-    '<div class="plist">'+files.map(function(f,i){return '<button class="prow" data-fi="'+i+'">'+ic('doc')+'<span class="pn"><b>'+esc(f[0])+'</b><span>'+esc(f[1])+'</span></span></button>'}).join('')+'</div>'+
+  openModal({title:'Attach a File',body:'<div class="plist">'+files.map(function(f,i){return '<button class="prow" data-fi="'+i+'">'+ic('doc')+'<span class="pn"><b>'+esc(f[0])+'</b><span>'+esc(f[1])+'</span></span></button>'}).join('')+'</div>'+
     '<div id="upl" style="display:none;margin-top:12px"><div class="sub" id="upln"></div><div class="prog"><i id="uplb" style="width:0"></i></div></div>',
     foot:'<button class="btn" data-mx>Cancel</button>',
     onMount:function(m){$$('[data-fi]',m).forEach(function(b){b.onclick=function(){var f=files[+b.dataset.fi],pc=0;
@@ -3933,33 +3942,32 @@ function newDmModal(){
 function annModal(i){var a=ANN[i],p=person(a.av),r=readSplit(a),pc=Math.round(a.read*100/25);
   var lst=function(l,tone){return '<div class="plist" style="max-height:210px">'+l.map(function(x){return '<div class="prow"><span class="av">'+esc(x[0])+'</span>'+
     '<span class="pn"><b>'+esc(x[1])+'</b><span>'+esc(x[2])+'</span></span>'+pill(tone==='ok'?'ok':'er',tone==='ok'?'Read':'Not read')+'</div>'}).join('')+'</div>'};
-  openModal({title:a.title,body:'<p class="sub">'+(a.sch?'Goes out ':'Posted ')+esc(a.at)+' by '+esc(p[1])+'</p>'+
-    '<p style="margin:10px 0 14px;font-size:13.5px;color:var(--ink-2)">'+esc(a.body)+'</p>'+
-    (a.sch?pill('in','Scheduled. Not yet visible to staff'):
+  openModal({title:a.sch?'Scheduled Announcement':'Announcement Reads',body:'<div data-copy="content"><h4 style="font-size:15px">'+esc(a.title)+'</h4>'+
+    '<p class="sub" style="margin-top:3px">'+(a.sch?'Goes out ':'Posted ')+esc(a.at)+' by '+esc(p[1])+'</p>'+
+    '<p style="margin:10px 0 14px;font-size:13.5px;color:var(--ink-2)">'+esc(a.body)+'</p></div>'+
+    (a.sch?pill('in','Scheduled'):
       '<div class="ch" style="margin-bottom:6px"><h3>Read by '+a.read+' of 25</h3></div>'+mini(pc,pc+'%')+
-      '<div class="ch" style="margin:16px 0 6px"><h3>Not read · '+r.not.length+'</h3>'+(r.not.length?'<span class="right"><button class="btn" id="nudge" style="height:28px">'+ic('bell')+'Remind Them</button></span>':'')+'</div>'+
+      '<div class="ch" style="margin:16px 0 6px"><h3>Not Read · '+r.not.length+'</h3>'+(r.not.length?'<span class="right"><button class="btn" id="nudge" style="height:28px">'+ic('bell')+'Remind Them</button></span>':'')+'</div>'+
       (r.not.length?lst(r.not,'er'):'<p class="sub">Everyone has read it.</p>')+
       '<div class="ch" style="margin:16px 0 6px"><h3>Read · '+r.read.length+'</h3></div>'+lst(r.read,'ok')),
     foot:'<button class="btn pri" data-mx>Close</button>',
     onMount:function(m){var n=$('#nudge',m);if(n)n.onclick=function(){toast('Reminder sent to '+r.not.length+' '+(r.not.length>1?'people':'person'))}}})}
 function newAnnModal(){
   openModal({title:'New Announcement',wide:false,body:
-    field('at','Headline','<input class="inp" id="at" placeholder="One line staff will read first">','Give it a headline')+
-    field('ab','Message','<textarea class="inp" id="ab" placeholder="What staff need to know"></textarea>','Write the message')+
-    '<div class="f"><label>Audience</label><div class="seg" id="aaud"><button class="on" data-a="all">All Staff</button><button data-a="dept">Departments</button></div>'+
-    '<div class="chips" id="adepts" style="display:none;margin:8px 0 0">'+DEPTS.map(function(d){return '<button class="chip">'+esc(d)+'</button>'}).join('')+'</div></div>'+
-    '<div class="f"><label>When</label><div class="seg" id="awhen"><button class="on" data-w="now">Now</button><button data-w="later">Schedule</button></div></div>'+
-    '<div id="asch" style="display:none">'+field('ad','Date (dd/mm/yyyy)','<input class="inp" id="ad" placeholder="20/10/2026" inputmode="numeric">','Use day, month, year: 20/10/2026')+'</div>'+
-    '<p class="sub">'+ic('user')+' Posting as '+esc(ME[1])+'</p>',
-    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="ago">Publish</button>',
+    field('at','Headline','<input class="inp" id="at" autocomplete="off">','Add a headline')+
+    field('ab','Message','<textarea class="inp" id="ab"></textarea>','Write the message')+
+    choice('aaud','Audience',[['all','All Staff'],['dept','Departments']])+
+    '<div id="adeptw" style="display:none">'+field('adepts','Departments','<div class="chips" id="adepts" role="group" aria-label="Departments" style="margin:0">'+DEPTS.map(function(d){return '<button class="chip">'+esc(d)+'</button>'}).join('')+'</div>')+'</div>'+
+    choice('awhen','When',[['now','Now'],['later','Schedule']])+
+    '<div id="asch" style="display:none">'+field('ad','Publish Date','<input class="inp" id="ad" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off">','Not a real date')+'</div>',
+    foot:'<button class="btn" data-mx>Cancel</button><button class="btn pri" id="ago">Publish Announcement</button>',
     onMount:function(m){live('at',function(v){return v.trim().length>3});live('ab',function(v){return v.trim().length>3});live('ad',isDayFirst);
-      var seg=function(id,fn){$$('#'+id+' button',m).forEach(function(b){b.onclick=function(){$$('#'+id+' button',m).forEach(function(x){x.classList.remove('on')});b.classList.add('on');fn(b)}})};
-      seg('aaud',function(b){$('#adepts',m).style.display=b.dataset.a==='dept'?'':'none'});
-      seg('awhen',function(b){var l=b.dataset.w==='later';$('#asch',m).style.display=l?'':'none';$('#ago',m).textContent=l?'Schedule':'Publish'});
+      $$('#aaud button',m).forEach(function(b){b.onclick=function(){$('#adeptw',m).style.display=b.dataset.v==='dept'?'':'none'}});
+      $$('#awhen button',m).forEach(function(b){b.onclick=function(){var l=b.dataset.v==='later';$('#asch',m).style.display=l?'':'none';$('#ago',m).textContent=l?'Schedule Announcement':'Publish Announcement'}});
       $$('#adepts .chip',m).forEach(function(c){c.onclick=function(){c.classList.toggle('on')}});
-      $('#ago',m).onclick=function(){var t=$('#at',m).value.trim(),b=$('#ab',m).value.trim(),later=$('#awhen .on',m).dataset.w==='later',d=$('#ad',m).value.trim();
-        if(t.length<4){$('#fw-at',m).classList.add('bad');return} if(b.length<4){$('#fw-ab',m).classList.add('bad');return}
-        if(later&&!isDayFirst(d)){$('#fw-ad',m).classList.add('bad');return}
+      $('#ago',m).onclick=function(){var t=$('#at',m).value.trim(),b=$('#ab',m).value.trim(),later=$('#awhen .on',m).dataset.v==='later',d=$('#ad',m).value.trim();
+        if(t.length<4){$('#fw-at',m).classList.add('bad');$('#at',m).focus();return} if(b.length<4){$('#fw-ab',m).classList.add('bad');$('#ab',m).focus();return}
+        if(later&&!isDayFirst(d)){$('#fw-ad',m).classList.add('bad');$('#ad',m).focus();return}
         var today=new Date(),ds=pad(today.getDate())+'/'+pad(today.getMonth()+1)+'/'+today.getFullYear();
         ANN.unshift({title:t,body:b,av:ME[0],at:later?d+' 09:00':ds,sch:later?1:0,read:later?0:1});
         if(!later){CHANNELS[0].msgs.push({k:'ann',av:ME[0],title:t,body:b,at:ds});CHANNELS[0].last=t;CHANNELS[0].t=nowHM()}
@@ -3974,29 +3982,30 @@ function composeModal(pre){pre=pre||{};
     ['H','h2','Heading'],['•','insertUnorderedList','Bulleted list'],['1.','insertOrderedList','Numbered list'],['❝','blockquote','Quote'],'|',
     ['link','link','Link'],['Tx','removeFormat','Clear formatting']];
   openModal({title:pre.title||'New Message',wide:true,full:true,body:
-    '<div class="comp-row"><label>From</label><select id="mfrom" aria-label="From"><option>cynthia@mycityapp.io</option></select></div>'+
-    '<div class="comp-row" id="mto-row"><label for="mto">To</label><span id="mto-chips" style="display:contents"></span>'+
-      '<input id="mto" placeholder="Type an address, then Enter" autocomplete="off"><button class="lnk" id="mccb">Cc Bcc</button></div>'+
-    '<div class="comp-row" id="mcc-row" style="display:none"><label for="mcc">Cc</label><input id="mcc" autocomplete="off"></div>'+
-    '<div class="comp-row" id="mbcc-row" style="display:none"><label for="mbcc">Bcc</label><input id="mbcc" autocomplete="off"></div>'+
-    '<div class="comp-row"><label for="msub">Subject</label><input id="msub" value="'+esc(pre.sub||'')+'"></div>'+
+    '<div class="comp-row"><span class="cl" aria-hidden="true">From</span><select id="mfrom" aria-label="From"><option>cynthia@mycityapp.io</option></select></div>'+
+    '<div class="comp-row" id="mto-row"><span class="cl" aria-hidden="true">To</span><span id="mto-chips" style="display:contents"></span>'+
+      '<input id="mto" aria-label="To" placeholder="name@domain.com" autocomplete="off"><button class="lnk" id="mccb">Cc Bcc</button><span class="cerr" id="mto-err"></span></div>'+
+    '<div class="comp-row" id="mcc-row" style="display:none"><span class="cl" aria-hidden="true">Cc</span><input id="mcc" aria-label="Cc" autocomplete="off"></div>'+
+    '<div class="comp-row" id="mbcc-row" style="display:none"><span class="cl" aria-hidden="true">Bcc</span><input id="mbcc" aria-label="Bcc" autocomplete="off"></div>'+
+    '<div class="comp-row"><span class="cl" aria-hidden="true">Subject</span><input id="msub" aria-label="Subject" value="'+esc(pre.sub||'')+'"></div>'+
     '<div class="tbar" role="toolbar" aria-label="Formatting">'+tools.map(function(t){return t==='|'?'<span class="tsep"></span>':
       '<button data-cmd="'+t[1]+'" title="'+t[2]+'" aria-label="'+t[2]+'"'+(t[0]==='B'?' style="font-weight:800"':t[0]==='I'?' style="font-style:italic"':t[0]==='U'?' style="text-decoration:underline"':t[0]==='S'?' style="text-decoration:line-through"':'')+'>'+(t[0]==='link'?ic('link'):esc(t[0]))+'</button>'}).join('')+
-      '<button data-cmd="attach" title="Attach a file" aria-label="Attach a file">'+ic('clip')+'</button>'+
-      '<span class="lkbox" id="lkbox"><input class="inp" id="lkurl" placeholder="https://" style="height:30px"><button class="btn" id="lkgo" style="height:30px">Add Link</button></span></div>'+
+      '<button data-cmd="attach" title="Attach a file" aria-label="Attach a file">'+ic('clip')+'</button><span class="mdraft" id="mdraft" aria-live="polite"></span>'+
+      '<span class="lkbox" id="lkbox"><input class="inp" id="lkurl" aria-label="Link address" placeholder="https://" style="height:30px"><button class="btn" id="lkgo" style="height:30px">Add Link</button></span></div>'+
     '<div class="rte" id="rte" contenteditable="true" data-ph="Write your message" aria-label="Message body" role="textbox" aria-multiline="true">'+(pre.body||'')+'</div>'+
     '<div class="atray" id="atray"></div>'+
     '<div class="schedbox" id="schedbox"><div class="ch" style="margin-bottom:8px"><h3>'+ic('clock')+' Schedule Send</h3></div><div class="schedf">'+
-      field('sdate','Date (dd/mm/yyyy)','<input class="inp" id="sdate" placeholder="14/10/2026" inputmode="numeric" autocomplete="off">','A real date, today or later')+
-      field('stime','Time (24 hour)','<input class="inp" id="stime" placeholder="08:30" inputmode="numeric" autocomplete="off">','HH:MM, in Lagos time')+
-      '<div class="schedb"><button class="btn" id="scancel">Cancel</button><button class="btn pri" id="sgo">'+ic('clock')+'Schedule</button></div></div>'+
-      '<p class="fm" id="spast" style="display:none;color:var(--err);font-size:11.5px">That time has already passed.</p></div>',
-    foot:'<span class="grow" id="mdraft"></span><button class="btn" id="mdiscard">Discard</button><button class="btn" id="msched">'+ic('clock')+'Schedule</button><button class="btn pri" id="msend">'+ic('send')+'Send</button>',
+      field('sdate','Send Date','<input class="inp" id="sdate" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off">','Not a real date')+
+      field('stime','Send Time','<input class="inp" id="stime" placeholder="HH:MM" inputmode="numeric" autocomplete="off">','Not a valid time','Lagos time, on the 24 hour clock: 08:30, 17:45.')+
+      '<div class="schedb"><button class="btn" id="scancel">Cancel</button><button class="btn pri" id="sgo">'+ic('clock')+'Schedule Send</button></div></div></div>',
+    foot:'<button class="btn" id="mdiscard">Discard</button><button class="btn" id="msched">'+ic('clock')+'Schedule</button><button class="btn pri" id="msend">'+ic('send')+'Send</button>',
     onMount:function(m){
       var to=pre.to?[pre.to]:[],rte=$('#rte',m),sel=null,draftT=null;
       var good=function(a){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a)};
+      var toErr=function(t){$('#mto-row',m).classList.toggle('bad',!!t);$('#mto-err',m).textContent=t||''};
       var chips=function(){$('#mto-chips',m).innerHTML=to.map(function(a,i){return '<span class="rchip'+(good(a)?'':' bad')+'">'+esc(a)+'<button data-rmto="'+i+'" aria-label="Remove '+esc(a)+'">'+ic('x')+'</button></span>'}).join('');
-        $$('[data-rmto]',m).forEach(function(b){b.onclick=function(){to.splice(+b.dataset.rmto,1);chips()}})};
+        $$('[data-rmto]',m).forEach(function(b){b.onclick=function(){to.splice(+b.dataset.rmto,1);chips()}});
+        if($('#mto-row',m).classList.contains('bad')&&to.length&&to.every(good))toErr('')};
       chips();
       var add=function(){var v=$('#mto',m).value.replace(/[,;\s]+$/,'').trim();if(v){to.push(v);$('#mto',m).value='';chips()}};
       $('#mto',m).addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===','||e.key===';'){e.preventDefault();add()}
@@ -4015,29 +4024,34 @@ function composeModal(pre){pre=pre||{};
         if(c==='h2'||c==='blockquote')document.execCommand('formatBlock',false,c);else document.execCommand(c,false,null);saved()}});
       $('#lkgo',m).onclick=function(){var u=$('#lkurl',m).value.trim();if(!/^(https:\/\/|mailto:)/.test(u)){$('#lkurl',m).style.borderColor='var(--err)';return}
         restore();document.execCommand('createLink',false,u);$('#lkbox',m).classList.remove('on');$('#lkurl',m).value='';saved()};
-      $('#mdiscard',m).onclick=function(){var f=m.querySelector('.mft');f.innerHTML='<span class="grow">Discard this draft and its attachments?</span>'+
-        '<button class="btn" id="mkeep">Keep Editing</button><button class="btn pri" id="mdrop">Discard</button>';
-        $('#mkeep',m).onclick=function(){closeModal();composeModal(pre)};$('#mdrop',m).onclick=function(){closeModal();toast('Draft discarded')}};
-      var send=function(when){add();if(!to.length){$('#mto-row',m).style.borderColor='var(--err)';$('#mto',m).focus();toast('Add at least one recipient');return}
-        var bad=to.filter(function(a){return !good(a)});if(bad.length){toast(bad[0]+' is not an email address');return}
+      /* discarding asks once, in the footer, with buttons only (FRONTEND_GUIDE §8.4) */
+      var foot=m.querySelector('.mft'),footHTML=foot.innerHTML;
+      var bindFoot=function(){
+        $('#mdiscard',m).onclick=function(){foot.innerHTML='<button class="btn" id="mkeep">Keep Editing</button><button class="btn pri dng" id="mdrop">'+ic('x')+'Discard Draft</button>';
+          $('#mkeep',m).onclick=function(){foot.innerHTML=footHTML;bindFoot()};$('#mdrop',m).onclick=function(){closeModal();toast('Draft discarded')}};
+        $('#msend',m).onclick=function(){send()};
+        $('#msched',m).onclick=function(){popover(this,[['Tomorrow, '+dmy(tmr).slice(0,5)+' at 08:00','clock',function(){send(dmy(tmr)+' 08:00')}],
+          ['Monday, '+dmy(mon).slice(0,5)+' at 08:00','clock',function(){send(dmy(mon)+' 08:00')}],'sep',
+          ['Pick Date and Time','check',function(){box.classList.add('on');$('#sdate',m).focus();if(box.scrollIntoView)box.scrollIntoView({block:'nearest'})}]],true)}};
+      var send=function(when){add();if(!to.length){toErr('Add a recipient');$('#mto',m).focus();return}
+        var bad=to.filter(function(a){return !good(a)});if(bad.length){toErr('Not an email address');$('#mto',m).focus();return}
         var sub=$('#msub',m).value.trim()||'(no subject)';
         if(MAILROWS.Sent&&!when)MAILROWS.Sent.unshift([to[0],sub,nowHM(),0,rte.innerHTML||'<p></p>','CO','cynthia@mycityapp.io',null]);
         if(MAILROWS.Drafts&&when)MAILROWS.Drafts.unshift([to[0],'Scheduled: '+sub,when.slice(0,5)+' '+when.slice(-5),0,rte.innerHTML||'<p></p>','CO','cynthia@mycityapp.io',null]);
         closeModal();if(M[cur.m].k==='mailbox')render();toast(when?'Scheduled for '+when:'Sent to '+to.join(', '))};
-      $('#msend',m).onclick=function(){send()};
       var dmy=function(d){return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()};
       var tmr=new Date();tmr.setDate(tmr.getDate()+1);var mon=new Date();mon.setDate(mon.getDate()+((8-mon.getDay())%7||7));
       live('sdate',isDayFirst);live('stime',function(v){return /^([01]\d|2[0-3]):[0-5]\d$/.test(v)});
-      var box=$('#schedbox',m);
-      $('#msched',m).onclick=function(){popover(this,[['Tomorrow, '+dmy(tmr).slice(0,5)+' at 08:00','clock',function(){send(dmy(tmr)+' 08:00')}],
-        ['Monday, '+dmy(mon).slice(0,5)+' at 08:00','clock',function(){send(dmy(mon)+' 08:00')}],'sep',
-        ['Pick Date and Time','check',function(){box.classList.add('on');$('#sdate',m).focus();if(box.scrollIntoView)box.scrollIntoView({block:'nearest'})}]],true)};
+      var box=$('#schedbox',m),tmsg=$('#fw-stime .fm',m);
+      bindFoot();
+      $('#stime',m).addEventListener('input',function(){tmsg.textContent='Not a valid time'});
       $('#scancel',m).onclick=function(){box.classList.remove('on')};
       $('#sgo',m).onclick=function(){var d=$('#sdate',m).value.trim(),t=$('#stime',m).value.trim(),okT=/^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+        tmsg.textContent='Not a valid time';
         $('#fw-sdate',m).classList.toggle('bad',!isDayFirst(d));$('#fw-stime',m).classList.toggle('bad',!okT);
         if(!isDayFirst(d)||!okT)return;
         var q=d.split('/'),hm=t.split(':'),at=new Date(+q[2],+q[1]-1,+q[0],+hm[0],+hm[1]);
-        if(at<=new Date()){$('#spast',m).style.display='block';return}
+        if(at<=new Date()){tmsg.textContent='Time already passed';$('#fw-stime',m).classList.add('bad');$('#stime',m).focus();return}
         send(d+' '+t)};
     }})}
 function fileModalInline(m){var tray=$('#atray',m),f=['proposal-draft.pdf','620 KB'],id='u'+Date.now(),pc=0;
@@ -4118,6 +4132,7 @@ function bindComm(){
 }
 function bindMail(){
   var c=$('#compose');if(c)c.onclick=function(){composeModal()};
+  var rf=$('#mrefresh');if(rf)rf.onclick=function(){toast(M[cur.m].tabs[cur.t].n+' is up to date')};
   $$('[data-reply]').forEach(function(b){b.onclick=function(){var r=MAILROWS[M[cur.m].tabs[cur.t].n][+b.dataset.reply],fw=b.dataset.kind==='fw';
     composeModal({title:fw?'Forward':'Reply',to:fw?'':r[6],sub:(fw?'Fwd: ':'Re: ')+r[1].replace(/^(Re|Fwd): /,''),
       body:'<p><br></p><blockquote><p class="sub">'+esc(r[0])+' &lt;'+esc(r[6]||'')+'&gt; · '+esc(r[2])+'</p>'+(r[4]||'')+'</blockquote>'})}});
