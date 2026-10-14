@@ -96,7 +96,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   gate 11 (phone and desktop shells), gate 12 (one form system), gate 17 (no dashes in copy). They
   render demo.html at 390 and 1440 px in Chromium and will read `app/` once it has a build.
   MILESTONES gates 8, 11 and 12 amended; guide template §10 now lists content tiers and the phone
-  layout. Demo brought to the gates module by module; left: the groups still failing a gate.
+  layout. Every demo module now passes all four. Left: the crawler blind spots listed in PR #16.
 - 13/10/2026 · GE · CI wired: `npm run ci` runs every gate locally and in Actions; empty gates are
   reported NOT BUILT, not passed. Process gates and the Claude Stop hook added. Branch protection
   needs TB to apply the runbook; CODEOWNERS needs LA and AJ usernames.
