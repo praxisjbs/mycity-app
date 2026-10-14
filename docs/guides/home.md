@@ -9,7 +9,7 @@
 | Permission key(s) | `home` (view, every employee), `home.team` (roster and team attendance), `home.alerts` (see and clear, per the rule), `home.alerts.manage` (create and edit rules), `home.reports` (build, schedule and run reports) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 13/10/2026 |
+| Last changed | 14/10/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -46,7 +46,7 @@ control for data-driven oversight" (02/09/2026).
 |---|---|---|---|---|
 | Home · Overview (`overview`) | staff app | every employee, role-filtered | the role's KPI cards, its main chart, Need You, activity across the organisation today, the person's week; managers also see attendance and the partnership pipeline where their role owns it | read; click any KPI card to open its detail (the report model); export |
 | Home · Team (`team`) | staff app | managers, People and Operations, the CEO; a function lead sees their own people | the team roster with today's attendance (on site, remote, field, late, no clock-out, on leave) and team KPIs | read; click a KPI to list the people behind it; open a person; deep link to People · Attendance |
-| Home · Alerts (`alerts`) | staff app | anyone who holds a clearing permission a rule names | rules that have crossed a threshold and nobody has cleared, with severity, age and how far past the threshold (Over by) | filter; clear or dismiss an alert; create or edit an alert rule (with `home.alerts.manage`) |
+| Home · Alerts (`alerts`) | staff app | anyone who holds a clearing permission a rule names | rules that have crossed a threshold and nobody has cleared, with severity, age and how far past the threshold (Over By) | filter; clear or dismiss an alert; create or edit an alert rule (with `home.alerts.manage`) |
 | Home · Reports (`reports`) | staff app | managers and the CEO only; cards are filtered by the viewer's permissions | the reports the viewer may build or receive, scheduled and on demand, with each card tagged by audience | build a report, set filters and recipients, schedule it, run it now, download PDF or XLSX |
 | KPI detail modal (the report model) | any KPI card, every tab | the same scope as the card it opens from | the paged list behind the number, e.g. Clocked in today → on site / remote / late / no clock-out / on leave | page at 25; export; from Team, open a person |
 | Clock-in prompt | staff app, first sign-in of the day | the signing-in employee | a prompt to clock in (owned by Attendance, triggered from Home) | clock in, or dismiss |
@@ -135,6 +135,11 @@ permission check; repos honour scope.
   organisational-goals rollup; a plain member of staff sees a personal view (today's shift and
   clocking status, their own goal KPIs, upcoming leave, their week). **Need You** is present for
   every role; its contents are the items assigned to that person (kickoff, 01:08 to 01:18).
+- **Where the rest lives.** A Partnerships lead's own clocking is in My Attendance, not on their
+  Home. A member of staff's goals are set with their manager in Performance, and a goal's progress
+  counts from the tasks linked to it; their tasks and diary are in My Workspace; leave is requested
+  in My Attendance and approved by their manager. The CEO's organisation KPI is the departmental KPI
+  scores weighted together, shown beside it per department.
 - **A card inherits rights.** A KPI card renders only if the viewer can open the module it reads
   from; revoking a module retires its cards automatically (donor pattern, §12). A card never grants
   access its viewer does not already have.
@@ -142,15 +147,22 @@ permission check; repos honour scope.
   no recorded contact for more than D days", "a request ageing past D days", a document expiring
   within D days, spend past P percent of a budget. `over_by` is the current value minus the
   threshold (or days past). Severity is Low, Medium or High; a High alert escalates to the CEO after
-  14 days. Rules are editable data, so a number changes with no deploy.
+  14 days. Rules are editable data, so a number changes with no deploy. Every alert comes from
+  one rule; switching a rule off clears its open alerts and raises no new ones. A new rule is
+  evaluated from the next signal its owning module emits (§7).
 - **Reports are permission-gated before they render.** A report card appears only for a role that
   holds its permission, so a Partnerships lead never sees Daily attendance or Monthly expenses
   (kickoff, 01:12 to 01:13). A report is generated **as its recipient**, so it can never contain a
-  row the recipient could not open on screen.
+  row the recipient could not open on screen. The run history on Home · Reports is filtered the
+  same way. A paused report keeps its schedule but sends nothing until it is resumed. Every
+  generated file (PDF for reading, XLSX for working, day-first dates in both) is kept in the vault
+  and can be downloaded again (§4, §5).
 - **Attendance figures equal My Attendance.** The clocked-in count and its breakdown are read from
   the shared attendance roster, not recomputed, so Home and My Attendance never disagree.
-- **Long text lives behind an ⓘ icon button, inline** (CLAUDE.md). Chrome is Title Case; copy a
-  person reads uses no em dashes.
+- **What reaches a screen is decided in §10** (FRONTEND_GUIDE §5). Data, numbers and actions are
+  open; the little support a person needs to act is a help term on the word it explains, or one
+  Details row at the foot of a card; how the system works (this section and §3) is never on a
+  screen. Chrome is Title Case; copy a person reads uses no em dashes.
 
 ## 7 · Events, jobs and notifications
 
@@ -196,14 +208,46 @@ reaches a report the recipient could not see on screen. No login exists without 
   and KPI cards. Record types and their everyday words are declared here so ⌘K and the assistant can
   cite them (MILESTONES §18.2, gate 10).
 
-## 10 · Mobile
+## 10 · On screen and mobile
 
-Home has its own mobile shell, not the desktop shrunk (gate 11, CLAUDE.md). Bottom icon navigation;
-the role selector collapses to the account avatar; KPI cards stack and open the same report model as
-a bottom sheet; the Team roster becomes a list of people with status chips; Alerts and Reports are
-lists, with long text behind the ⓘ button as on desktop. Less text throughout, more icons, because
-the screen is small (kickoff, 01:19 to 01:21). The mobile build lands with the frontend foundation;
-coordinate the shell with AJ (frontend foundation) and the demo's mobile pass with GE.
+What each screen shows open, what sits behind help, and how it is laid out on a phone
+(FRONTEND_GUIDE §5, §7). **§3 and §6 are for engineers: nothing in them reaches a screen unless it
+is listed here as tier 1 or tier 2.** Tier 3 (how the system works, why it was built this way,
+reassurance nobody asked for) is never on a screen; say where it lives instead (this guide, the
+manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
+
+### 10.1 Content tiers
+
+| Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
+|---|---|---|---|
+| Home · Overview (`overview`) | Greeting and date (Operations adds the clocked-in count); the role's four KPI cards, each with a short trend line; the main chart (Operations: Attendance, 14 Working Days, with "Dips are Saturdays, a half day" on desktop, and the on-time donut "37 on time, 4 late, 7 absent this month"; CEO: Organisational Goals and the org KPI donut with its per-department figures; Partnerships: Partnership Pipeline and Monthly Signed Value; Staff: the day strip Shift Today, Clock-In, Where, Status, Hours Today); Need You; Partnership Pipeline with "4 with no contact in 30 days" on desktop; Goals This Quarter; Activity Today; Your Week; Staff: My Goals This Quarter and Upcoming Leave; Export, New | None | Why each role's dashboard leans on its own goals and why attendance is primary only for People and Operations: §6 Role resolution. Follow-ups raised automatically for quiet partnerships, and the late-arrival threshold behind the donut: §3 step 4, §6. How the CEO rollup is built, where a Partnerships lead's clocking lives, where staff goals are set and how they progress, how leave is approved, where tasks and the diary live: §6 Where the rest lives. Saturday hours: §11 |
+| Home · Team (`team`) | The scope (The whole organisation, or the lead's departments); Present Today, On Site, Remote, Flags; the Team Roster: employee, department, today's status pill, Clock-In, KPI, Open Tasks; Attendance This Month by person. A KPI card or a row opens its list or the person | None | Where the roster's figures come from and that they match My Attendance: §3 step 2, §6. Who the viewer may see: §8, §13 Team scope. "Click a KPI card to see who is on site": the cards carry a chevron; §3 step 3. The "How the team view reads" card is removed |
+| Home · Alerts (`alerts`) | Open Alerts, Needs You, Overdue 7 Days +, Cleared This Week; the category chips; the Open Alerts list: alert, trigger, Who Can Clear, age, Over By, severity; Alert Sources, 30 Days (desktop). A row opens the alert: trigger, who can clear, age, Over By, severity; Close, Edit Rule, Clear Alert. View Dismissed; Alert Rules (each rule with its switch); New Rule (Rule Name, Metric, Threshold, Window, Days, Severity; Cancel, Create Rule) | Help term on the Over By column header, and on each phone card's Over By label: "How far the alert is past its rule: +1 over 3 is one more than the 3 allowed. A deadline alert shows the days left instead." | That alerts are not notifications, escalation of High alerts to the CEO, clearing needing the permission the rule names, the audit entry on clearing: §3 step 4, §6, §7. Rules being numbers, not code, so a change needs no deploy: §4, §6. Switching a rule off, and a new rule's first run: §6, §7. The page subtitle, "Click a row to clear it" and the "Alerts are not notifications" card are removed |
+| Home · Reports (`reports`) | Scheduled, Paused, Runs This Month, Recipients; a card per report the role may see (name, schedule and contents, status, audience); Recent Runs for those reports only (report, last run, recipients, format); New Report | None | Permission gating and generation as the recipient, the shared queries, formats, email delivery and on-demand download, retention and re-download, what Paused means: §3 step 5, §4, §5, §6. The "How a report is built" card and the page subtitle are removed |
+| KPI detail modal (the report model) | The card's name as the title, the paged list behind the number, the page count. Clocked In Today adds "22 of 25 clocked in across the organisation" and groups On Site, Remote, Late, No Clock-Out Yesterday and On Leave | None | "Grouped the way the rules read them": §3 step 3. Paging at 25: §5 |
+| Clock-in prompt | Owned by Attendance: the attendance guide's §10 | The attendance guide's §10 | The attendance guide's §10 |
+| Attendance figures on Overview and Team | The clocked-in count, the on-time donut and the roster statuses, as in the rows above | None | That the figures are read from the shared roster and always equal My Attendance: §3 step 2, §6 |
+
+On a gated tab (Team, Alerts or Reports for a role without the permission) the screen shows the
+page title, a lock, "For Managers" and one line, "This tab is for managers and the CEO." (§11).
+The demo's Viewing As switcher is a demo device for showing each role; the real Home resolves the
+role from the signed-in employee (§6).
+
+### 10.2 Phone layout
+
+| Screen | First on a phone | Left off a phone | Main action | Navigation |
+|---|---|---|---|---|
+| Home · Overview (`overview`) | The greeting and New, the four KPI cards two to a row, then the role's main chart. Staff: the day strip (Shift Today, Clock-In, Status) before the KPI cards | Export; the date line and the chart captions; Staff: Where and Hours Today in the day strip | New, beside the greeting; a KPI card opens its report model as a bottom sheet | Bottom bar Home; the four tabs along the top. In the demo the role switcher collapses to one button naming the role in view, which opens the four roles as a sheet |
+| Home · Team (`team`) | The four KPI cards two to a row, then the roster as person cards: avatar, name and department, a status pill, Clock-In and KPI | The scope line; the Department and Open Tasks columns (department shows under the name; open tasks in the person's sheet) | Tap a person card or a KPI card: a bottom sheet | Bottom bar Home; the four tabs along the top |
+| Home · Alerts (`alerts`) | View Dismissed, Alert Rules, New Rule; the four KPI cards two to a row; the category chips; alert cards with a severity pill, Who Can Clear and Over By (a help term: a tap opens it as a sheet) | Alert Sources, 30 Days; the Trigger and Age columns (both in the alert's sheet) | Clear Alert, full width at the foot of the alert's sheet; New Rule opens the rule form as a sheet | Bottom bar Home; the four tabs along the top |
+| Home · Reports (`reports`) | New Report, the four KPI cards two to a row, then the report cards one to a row, then Recent Runs as run cards (report, last run, recipients) | The Format column of Recent Runs | New Report; a KPI card opens its list as a sheet | Bottom bar Home; the four tabs along the top |
+| KPI detail modal (the report model) | A bottom sheet: the title, then the list as cards (the first column as the card title, a status pill, two label and value pairs) | Columns beyond two per card | Close, at the top of the sheet | The sheet closes back to the tab |
+| Clock-in prompt | Owned by Attendance: the attendance guide's §10 | The attendance guide's §10 | Clock In | The attendance guide's §10 |
+| Attendance figures on Overview and Team | As in the Overview and Team rows | As in the Overview and Team rows | As in the Overview and Team rows | As in the Overview and Team rows |
+
+The phone shell itself (bottom bar, sheets, the top bar's search and Clock In) is the frontend
+foundation's (AJ, FRONTEND_GUIDE §7, §9.2); Home builds its phone layout on it, with less text and
+more icons than desktop (kickoff, 01:19 to 01:21).
 
 ## 11 · Edge cases
 
@@ -214,8 +258,8 @@ coordinate the shell with AJ (frontend foundation) and the demo's mobile pass wi
   all, rather than an empty one.
 - **A staff member on leave**: clocking is suppressed for the day and the person shows On leave on
   Team, not Absent; the clock-in prompt does not fire.
-- **A gated tab**: a staff member opening Team, Alerts or Reports sees a short "available to people
-  who manage others" state, not an empty screen or an error.
+- **A gated tab**: a staff member opening Team, Alerts or Reports sees the gated state (a lock,
+  "For Managers" and one line, §10.1), not an empty screen or an error.
 - **A KPI with nothing behind it**: the report model opens to an empty state, not a blank modal.
 - **A huge list**: everything pages at 25, including the report models and the Team roster.
 - **Timezone and Saturday**: attendance figures follow the attendance policy's working week;
@@ -237,7 +281,7 @@ Ported from `C:\praxis-ls` and `C:\pixie-girl-hub` per REUSE_MAP.md §2.1 (Dashb
 | praxis-ls | `src/modules/master/party-360.service.js` | The zero-data rendering pattern: every figure defaults to 0 and every collection to `[]`, so Home renders for a brand-new tenant |
 | praxis-ls | `src/modules/vault/report/` + `services/documents/templates` | Report and letter generation from a template; the report scheduler (cron, recipients) is net-new over it |
 
-The alert-rule engine (threshold rules, severity, Over by, escalation) is largely net-new, built on
+The alert-rule engine (threshold rules, severity, Over By, escalation) is largely net-new, built on
 the catalogue's eligibility pattern so an alert inherits the clearing permission the rule names.
 
 ## 13 · Open questions
@@ -252,7 +296,8 @@ the catalogue's eligibility pattern so an alert inherits the clearing permission
 - **Team scope.** Whether "team" means direct reports, the whole department, or a permission-defined
   set, per role. TB is handling the Team tab's commercial sign-off with the client; the tab is
   ratified into §18 (row #86) and is not blocked pending that conversation.
-- **Mobile shell.** The specific mobile layout lands with the frontend foundation (AJ).
+- **Mobile shell.** Home's phone layout is decided in §10.2; the shell it sits in (bottom bar,
+  sheets) lands with the frontend foundation (AJ).
 
 ## 14 · Change log
 
@@ -260,3 +305,8 @@ the catalogue's eligibility pattern so an alert inherits the clearing permission
   two 12/10 meetings (kickoff and module demos), with attendance read from the shared roster per the
   13/10 review. Covers the four tabs (Overview, Team, Alerts, Reports), role-sensitivity, the alert
   and report engines, and the Team tab now ratified into MILESTONES §18 as row #86.
+- 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the
+  demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7): the "How the team view reads",
+  "Alerts are not notifications" and "How a report is built" cards, captions and footnotes left the
+  screen, Over By became a help term, and the facts they carried that were missing here were added
+  to §6. §6 and §11 now point at help terms and §10 instead of an ⓘ button.
