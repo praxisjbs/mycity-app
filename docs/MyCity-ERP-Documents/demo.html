@@ -544,6 +544,8 @@ tbody tr:last-child td{border-bottom:0}
   .inp,select.inp,.fsel select{min-height:44px}
   .dtl>summary{min-height:44px;padding-top:6px}
   .acc summary{min-height:44px}
+  .srch,.punch{height:44px} .punch{min-width:44px;justify-content:center}
+  .pop button{min-height:44px}
   .sw[role=switch]{box-sizing:content-box;border:11px solid transparent;background-clip:padding-box;margin:-11px}
   .grid.g4:has(>.kpi){grid-template-columns:repeat(2,1fr);gap:10px}
   .grid.g4>.kpi b{font-size:21px}
@@ -1114,7 +1116,7 @@ table.sched .soon{text-align:center;padding:30px 16px}
     <header class="bar">
       <button class="iconbtn" id="slim" title="Collapse menu"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-menu"/></svg></button>
       <button class="srch" id="openpal"><svg class="ico-s" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-srch"/></svg>Search anything<kbd>⌘K</kbd></button>
-      <button class="punch" id="punch"><svg class="ico-s" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-clock"/></svg><span id="punchtxt">Clock in</span></button>
+      <button class="punch" id="punch"><svg class="ico-s" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-clock"/></svg><span id="punchtxt">Clock In</span></button>
       <button class="iconbtn" id="bell" title="Notifications" aria-label="Notifications and alerts"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-bell"/></svg><i class="dotred"></i></button>
       <button class="iconbtn" id="theme" title="Theme"><svg class="ico" id="themeico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-moon"/></svg></button>
     </header>
@@ -1217,7 +1219,7 @@ function pill(k,txt){return '<span class="pill '+k+'"><i></i>'+esc(txt)+'</span>
 function cards(list,cols){return '<div class="grid g'+(cols||3)+'">'+list.map(function(c){
   return '<div class="tile"><h4>'+esc(c[0])+'</h4><p>'+esc(c[1])+'</p>'+(c[2]?'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+c[2]+'</div>':'')+'</div>'}).join('')+'</div>'}
 function bars(title,rows,note){return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3></div>'+
-  rows.map(function(r){return '<div class="stage"><span class="nm">'+esc(r[0])+'</span><span class="tr"><i style="width:'+r[1]+'%;background:'+(r[3]||'var(--c1)')+'"></i></span><span class="vl">'+esc(r[2])+'</span></div>'}).join('')+
+  rows.map(function(r){return '<div class="stage"><span class="nm" data-copy="content">'+esc(r[0])+'</span><span class="tr"><i style="width:'+r[1]+'%;background:'+(r[3]||'var(--c1)')+'"></i></span><span class="vl" data-copy="content">'+esc(r[2])+'</span></div>'}).join('')+
   (note?'<p class="sub cap" style="margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)">'+esc(note)+'</p>':'')+'</div>'}
 function chain(steps,note){return '<div class="card"><div class="chain">'+steps.map(function(s,i){
   return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+(s[1]||'')+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+
@@ -3635,6 +3637,8 @@ function choice(id,label,opts,on){
   return '<div class="f" id="fw-'+id+'"><label id="'+id+'-l">'+esc(label)+'</label><div class="seg" role="group" aria-labelledby="'+id+'-l" id="'+id+'">'+
     opts.map(function(o,i){var v=Array.isArray(o)?o[0]:o,t=Array.isArray(o)?o[1]:o,a=Array.isArray(o)&&o[2]?' '+o[2]:'',sel=on===undefined?i===0:v===on;
       return '<button type="button" data-v="'+esc(v)+'"'+a+(sel?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+esc(t)+'</button>'}).join('')+'</div></div>'}
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.seg[role=group]>button');if(!b)return;
+  $$('button',b.parentNode).forEach(function(x){x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',x===b?'true':'false')})});
 function check(id,label,on,attrs){return '<label class="chk" for="'+id+'"><input type="checkbox" id="'+id+'"'+(on?' checked':'')+(attrs?' '+attrs:'')+'><span>'+esc(label)+'</span></label>'}
 function fsel(label,attrs,optionsHtml){return '<label class="fsel"><span>'+esc(label)+'</span><select class="inp" '+(attrs||'')+'>'+optionsHtml+'</select></label>'}
 /* Validation as the field is filled (gate 12), reward early and punish late: a field is checked
@@ -4812,7 +4816,7 @@ function attSeed(){
 function attScenario(){var d=ATT.demo,a=ATT_ACCS.filter(function(x){return x[0]===d.acc})[0]||ATT_ACCS[0];
   return {loc:d.loc,accM:a[2],device:d.device,field:d.field,day:d.day}}
 function attAckPending(id){var L=attLatest(),a=ATT.acks[L.v]&&ATT.acks[L.v][id];return !!(L.ack&&a&&!a.ack)}
-function attPaintPunch(){if(!ATT)return;var id=ATT.demo.actor,o=attOpenSession(id,ATT_TODAY),b=$('#punch'),t=(o?'Clock out':'Clock in');
+function attPaintPunch(){if(!ATT)return;var id=ATT.demo.actor,o=attOpenSession(id,ATT_TODAY),b=$('#punch'),t=(o?'Clock Out':'Clock In');
   $('#punchtxt').textContent=t+(id!=='CO'?' · '+aName(id).split(' ')[0]:'');
   var can=attCanClock(id),done=!o&&attClockedToday(id);b.classList.toggle('out',!!o);b.disabled=!can.ok||done;b.title=!can.ok?can.message:done?'Attendance is complete for today':t+' as '+aName(id);b.setAttribute('aria-label',b.title)}
 function attOpenClock(){

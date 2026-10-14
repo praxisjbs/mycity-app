@@ -106,13 +106,13 @@ for (const f of files) {
     if (end === -1) end = lines.length;
     const body = lines.slice(onScreen + 1, end);
     for (const [head, what] of SCREEN_TABLES) {
-      const at = body.findIndex((l) => l.startsWith(head));
-      if (at === -1) {
+      const headAt = body.findIndex((l) => l.startsWith(head));
+      if (headAt === -1) {
         problems.push(`${rel}: §10 has no ${what} table (header "${head} …", see ${TEMPLATE})`);
         continue;
       }
       const rows = [];
-      for (let i = at + 2; i < body.length && body[i].startsWith("|"); i += 1) rows.push(body[i]);
+      for (let i = headAt + 2; i < body.length && body[i].startsWith("|"); i += 1) rows.push(body[i]);
       if (!rows.some((r) => !/^\|\s*</.test(r))) problems.push(`${rel}: §10 ${what} table has no filled row (only the template's <placeholder>)`);
     }
   }

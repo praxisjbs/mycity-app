@@ -18,6 +18,7 @@ module.exports = [
       "app/**",
       "public-app/**",
       "docs/**",
+      ".claude/worktrees/**",
       "assets/**",
       "templates/**",
       "packages/contract/contract.gen.ts",
