@@ -1300,10 +1300,10 @@ function bands(title,rows,note){
   var max=1300000;
   return '<div class="card"><div class="ch"><h3>'+esc(title)+'</h3><span class="right sub">₦0 to ₦1.3M</span></div>'+
   rows.map(function(r){var l=r[1]/max*100,w=(r[3]-r[1])/max*100,mid=(r[2]-r[1])/(r[3]-r[1])*100;
-    return '<div class="band"><span class="nm">'+esc(r[0])+'<em>'+esc(r[5])+'</em></span><span class="tr">'+
+    return '<div class="band"><span class="nm" data-copy="content">'+esc(r[0])+'<em>'+esc(r[5])+'</em></span><span class="tr">'+
     '<i style="left:'+l.toFixed(1)+'%;width:'+w.toFixed(1)+'%"></i>'+
     '<b style="left:'+(l+w*mid/100).toFixed(1)+'%"></b></span>'+
-    '<span class="vl">'+esc(r[4])+'</span></div>'}).join('')+
+    '<span class="vl" data-copy="content">'+esc(r[4])+'</span></div>'}).join('')+
   (note?'<p class="sub" style="margin-top:11px;padding-top:10px;border-top:1px dashed var(--line)">'+esc(note)+'</p>':'')+'</div>'}
 
 /* ───── mailbox two pane ───── */
@@ -2442,25 +2442,24 @@ var M=[
      'Query Letter Preview')+'</div>'}}]},
 
 {k:'recruit',n:'Recruitment',i:'brief',g:'PEOPLE',cnt:'12',tabs:[
-  {n:'Vacancies',r:function(){return head('Vacancies','4 open · 61 applicants',[['Careers page'],['New vacancy',1]])+
-    kpis([['Open vacancies','4'],['Applicants','61'],['In interview','2'],['Offers out','1','warn']])+
-    table([['Role'],['Department'],['Openings','n'],['Location'],['Applicants','n'],['Published'],['Status']],[
+  {n:'Vacancies',r:function(){return head('Vacancies','4 open · 61 applicants',[['Careers Page'],['New Vacancy',1]])+
+    kpis([['Open Vacancies','4'],['Applicants','61'],['In Interview','2'],['Offers Out','1','warn']])+
+    helpOn(table([['Role'],['Department'],['Openings','n'],['Location'],['Applicants','n'],['Published'],['Status']],[
       ['Content Producer','Content','1','Lagos · Hybrid','24','22/09/2026',pill('ok','Open')],
       ['Partnerships Associate','Marketing & Sales','1','Lagos · Hybrid','19','25/09/2026',pill('ok','Open')],
       ['Backend Engineer','Engineering','2','Remote','14','28/09/2026',pill('ok','Open')],
-      ['Customer Support Lead','Support','1','Abuja · On site','4','05/10/2026',pill('wa','Paused')]],'Vacancies')+
+      ['Customer Support Lead','Support','1','Abuja · On site','4','05/10/2026',pill('wa','Paused')]],'Vacancies'),
+      'Status','A paused vacancy keeps its public link. Resuming it restores the same address.')+
     '<div class="grid g2" style="margin-top:12px">'+
-    bars('Funnel, all four vacancies',[['Applied',100,'61'],['Screened',72,'44'],['Assessed',51,'31'],
-      ['Shortlisted',21,'13'],['Interviewed',11,'7'],['Offered',3,'2','var(--yellow)']],
-      'Thirty of sixty-one dropped at screening. The AI score ranks them; a person decides.')+
-    table([['Role'],['Days open','n'],['Time at stage'],['Next step']],[
+    bars('Hiring Funnel',[['Applied',100,'61'],['Screened',72,'44'],['Assessed',51,'31'],
+      ['Shortlisted',21,'13'],['Interviewed',11,'7'],['Offered',3,'2','var(--yellow)']])+
+    table([['Role'],['Days Open','n'],['Time at Stage'],['Next Step']],[
       ['Content Producer','17','Offer, 2 days','Chiamaka Eze to sign by 22/10'],
       ['Partnerships Associate','14','Interview, 5 days','Third panellist to submit'],
       ['Backend Engineer','11','Assessment, 3 days','Fatima Sani interview 16/10'],
-      ['Customer Support Lead','4','Paused','Resume when Abuja hub is staffed']],'Where each one is')+'</div>'+
-    '<p class="sub" style="margin-top:12px">A paused vacancy keeps its public link, so resuming restores the same URL. Nothing a candidate bookmarked breaks.</p>'}},
-  {n:'Candidates',r:function(){return head('Candidates','Drag through the pipeline',[['All roles'],['Add candidate',1]])+
-    kpis([['Candidates','61'],['In the board','8'],['Awaiting a human','3','warn'],['Average score','71']])+
+      ['Customer Support Lead','4','Paused','Resume when Abuja hub is staffed']],'Vacancy Progress')+'</div>'}},
+  {n:'Candidates',r:function(){return head('Candidates','',[['All Roles'],['Add Candidate',1]])+
+    kpis([['Candidates','61'],['On the Board','8'],['Awaiting Review','3','warn'],['Average Score','71']])+
     board([['Applied','var(--c2)',[['Ifeanyi Madu',pill('nt','Content Producer')+pill('in','72%')],['Zainab Bello',pill('nt','Backend Engineer')+pill('in','68%')],['Kelechi Umeh',pill('nt','Partnerships')+pill('in','64%')]]],
       ['Shortlisted','var(--c3)',[['Fatima Sani',pill('nt','Backend Engineer')+pill('wa','In test')],['Olumide Craig',pill('nt','Content Producer')+pill('ok','Scored 81')]]],
       ['Interview','var(--c1)',[['Adaeze Nnamdi',pill('nt','Partnerships')+pill('wa','Panel 2 of 3')],['Yusuf Garba',pill('nt','Support Lead')+pill('ok','Panel done')]]],
@@ -2469,57 +2468,44 @@ var M=[
     '<div class="card"><div class="ch"><h3>Adaeze Nnamdi</h3><span class="right">'+pill('wa','Panel 2 of 3')+'</span></div>'+
     '<dl class="kv" style="grid-template-columns:120px 1fr"><dt>Role</dt><dd>Partnerships Associate</dd>'+
     '<dt>Applied</dt><dd>26/09/2026, from the careers page</dd>'+
-    '<dt>Screening score</dt><dd>78 '+pill('in','Provisional')+'</dd>'+
+    '<dt>'+hint('Screening Score','Provisional until a person opens the CV. Until then the score reads the application form only.')+'</dt><dd>78 '+pill('in','Provisional')+'</dd>'+
     '<dt>Assessments</dt><dd>Psychometric 84, case study 88</dd>'+
     '<dt>Interview</dt><dd>13/10/2026 at 11:00, three panellists</dd>'+
-    '<dt>Weighted total</dt><dd><b>82</b> of 100</dd></dl>'+
-    '<div class="quote" style="margin-top:12px">Provisional means the form was read and the CV was not. It becomes final when a person opens the document.</div></div>'+
-    bars('Score distribution, all 61 applicants',[['80 and above',18,'11'],['70 to 79',31,'19'],
-      ['60 to 69',26,'16'],['50 to 59',16,'10'],['Below 50',8,'5','var(--line-2)']],
-      'Screening reads the application form: years, location, salary expectation, must-have answers.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">AI screening scores carry a provisional flag until a human opens the CV. 72% means the form was read, not the résumé.</p>'}},
-  {n:'Assessments',r:function(){return head('Assessments','Psychometric, technical and case study',[['Question bank'],['New assessment',1]])+
-    kpis([['Assessments','5'],['Taken','31'],['Average score','71'],['Abandoned','2','warn']])+
-    table([['Assessment'],['Role'],['Type'],['Duration'],['Candidates','n'],['Avg score','n'],['Status']],[
+    '<dt>Weighted Total</dt><dd><b>82</b> of 100</dd></dl></div>'+
+    helpOn(bars('Score Distribution',[['80 and above',18,'11'],['70 to 79',31,'19'],
+      ['60 to 69',26,'16'],['50 to 59',16,'10'],['Below 50',8,'5','var(--line-2)']]),
+      'Score Distribution','Screening scores for all 61 applicants, read from the application form: years, location, salary expectation and must-have answers.')+'</div>'}},
+  {n:'Assessments',r:function(){return head('Assessments','',[['Question Bank'],['New Assessment',1]])+
+    kpis([['Assessments','5'],['Taken','31'],['Average Score','71'],['Abandoned','2','warn']])+
+    helpOn(table([['Assessment'],['Role'],['Type'],['Duration'],['Candidates','n'],['Average Score','n'],['Status']],[
       ['Numerical reasoning','All roles','Psychometric','25 min','31','68',pill('ok','Active')],
       ['Situational judgement','All roles','Psychometric','20 min','31','74',pill('ok','Active')],
       ['Node and SQL','Backend Engineer','Technical','60 min','9','61',pill('ok','Active')],
       ['Partnership brief','Partnerships Associate','Case study','90 min','7','79',pill('ok','Active')],
-      ['Content calendar','Content Producer','Case study','60 min','11','72',pill('ok','Active')]],'Assessments')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    bars('Average score by assessment',[['Partnership brief',79,'79'],['Situational judgement',74,'74'],
-      ['Content calendar',72,'72'],['Numerical reasoning',68,'68'],['Node and SQL',61,'61','var(--c4)']],
-      'Node and SQL is the hardest and the most discriminating. That is by design, not a problem to fix.')+
-    kvcard('How a candidate takes one',[['Where','On the public site, never inside the ERP'],
-      ['Timer','Server side. Closing the tab does not stop it'],
-      ['Autosave','Every answer, every few seconds'],
-      ['Resume','If the connection drops, they resume where they were'],
-      ['Scoring','Automatic for psychometric, by a person for case studies'],
-      ['The candidate sees','That they finished. Never their score']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">Timed, autosaved, and resumable if the candidate loses connection. Delivered on the public site, never inside the ERP.</p>'}},
-  {n:'Interviews',r:function(){return head('Interviews','Blind panel · Adaeze Nnamdi, Partnerships Associate',[['Schedule'],['Consolidate',1]])+
+      ['Content calendar','Content Producer','Case study','60 min','11','72',pill('ok','Active')]],'Assessments'),
+      'Type','Psychometric tests score themselves. A person scores each case study.')+
+    '<div style="margin-top:12px">'+
+    bars('Average Score by Assessment',[['Partnership brief',79,'79'],['Situational judgement',74,'74'],
+      ['Content calendar',72,'72'],['Numerical reasoning',68,'68'],['Node and SQL',61,'61','var(--c4)']])+'</div>'}},
+  {n:'Interviews',r:function(){return head('Interviews','Adaeze Nnamdi · Partnerships Associate',[['Schedule'],['Consolidate',1]])+
     '<div class="grid g2">'+
-    table([['Panellist'],['Submitted'],['Score','n']],[
+    helpOn(table([['Panellist'],['Submitted'],['Score','n']],[
       [who('CO','Cynthia Osakunih','Operations'),pill('ok','Submitted'),'84'],
-      [who('NE','Ngozi Eze','Marketing & Sales'),pill('ok','Submitted'),'<span style="color:var(--ink-3)">hidden</span>'],
-      [who('BO','Bode Oluwasanmi','Technology'),pill('wa','Pending'),'<span style="color:var(--ink-3)">—</span>']],'Panel',pill('wa','Open'))+
-    bars('Weighted scorecard',[['Screening',78,'15%'],['Psychometric',84,'15%'],['Technical',69,'25%'],['Case study',88,'20%'],['Interview',84,'25%','var(--yellow)']],
-      'Nobody sees another panellist’s score until the round closes. Private notes stay private permanently.')+'</div>'+
-    '<div style="margin-top:12px">'+table([['Candidate'],['Role'],['Date'],['Panel'],['Round']],[
+      [who('NE','Ngozi Eze','Marketing & Sales'),pill('ok','Submitted'),'<span style="color:var(--ink-3)">Hidden</span>'],
+      [who('BO','Bode Oluwasanmi','Technology'),pill('wa','Pending'),'<span style="color:var(--ink-3)">—</span>']],'Blind Panel',pill('wa','Open')),
+      'Blind Panel','Each score stays hidden until the round closes, so the first score cannot sway the rest. Private notes are never shown to anyone.')+
+    helpOn(bars('Weighted Scorecard',[['Screening',78,'15%'],['Psychometric',84,'15%'],['Technical',69,'25%'],['Case study',88,'20%'],['Interview',84,'25%','var(--yellow)']]),
+      'Weighted Scorecard','The bar is the candidate\'s score at each stage. The figure is that stage\'s weight in the total.')+'</div>'+
+    '<div class="grid g2" style="margin-top:12px">'+table([['Candidate'],['Role'],['Date'],['Panel'],['Round']],[
       ['Adaeze Nnamdi','Partnerships Associate','13/10/2026 11:00','3 panellists',pill('wa','2 of 3 submitted')],
       ['Yusuf Garba','Support Lead','08/10/2026 14:00','2 panellists',pill('ok','Closed')],
-      ['Fatima Sani','Backend Engineer','16/10/2026 10:00','3 panellists',pill('nt','Scheduled')]],'Upcoming and recent')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+
-    '<div class="card"><div class="ch"><h3>Why the panel is blind</h3></div>'+
-    '<p class="sub">The first panellist to submit sets the tone for everyone after them. Anchoring is well documented and it is invisible in the result.</p>'+
-    '<p class="sub" style="margin-top:9px">So a score is hidden until the round closes. Private notes are never shown to anyone, at any point, including after.</p>'+
-    '<div class="quote" style="margin-top:12px">Mechanically this is one WHERE predicate and a widened unique index. It costs almost nothing and it cannot be undone by a careless screen.</div></div>'+
-    tl('Round activity',[['Cynthia Osakunih submitted, 84','08/10/2026 16:40','Score sealed until the round closes.','ok'],
+      ['Fatima Sani','Backend Engineer','16/10/2026 10:00','3 panellists',pill('nt','Scheduled')]],'Upcoming and Recent')+
+    tl('Round Activity',[['Cynthia Osakunih submitted, 84','08/10/2026 16:40','Score sealed until the round closes.','ok'],
       ['Ngozi Eze submitted','08/10/2026 17:12','Score sealed.','ok'],
       ['Bode Oluwasanmi reminded','09/10/2026 09:00','Five days at this stage. Recruitment SLA alert raised.','hi'],
       ['Panel scheduled','02/10/2026','Three panellists, 13 October at 11:00.']])+'</div>'}},
-  {n:'Offers',r:function(){return head('Offers','Generated, sent, signed',[['Templates'],['New offer',1]])+
-    kpis([['Awaiting signature','1','warn'],['Signed, this year','11','ok'],['Declined','1'],['Average time to sign','2.4 days']])+
+  {n:'Offers',r:function(){return head('Offers','',[['Templates'],['New Offer',1]])+
+    kpis([['Awaiting Signature','1','warn'],['Signed This Year','11','ok'],['Declined','1'],['Average Time to Sign','2.4 days']])+
     '<div class="grid g32">'+table([['Candidate'],['Salary','n'],['Status']],[
       ['Chiamaka Eze','₦480,000',pill('wa','Awaiting signature')],
       ['Yusuf Garba','₦520,000',pill('nt','Draft')],
@@ -2535,70 +2521,58 @@ var M=[
      '<p>Yours sincerely,</p><div class="sig" style="margin-top:10px">C. Osakunih</div>'+
      '<p style="font-size:10.5px;color:#7E8D88;border-top:1px solid #D5DEDB;padding-top:4px;margin-top:2px">For MyCity App Ltd</p>'+
      '<div class="pfoot"><span>'+ic('clock')+'Awaiting signature</span><span style="margin-left:auto">go.mycityapp.io/sign/OFF-0018</span></div>',
-     'Offer letter OFF-0018, generated from the template and the vacancy. Not yet signed.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">The candidate signs on a canvas from their phone. The document locks, and the public verification page reports two verdicts: the payload and the stored bytes.</p>'}},
-  {n:'Onboarding',r:function(){return head('Onboarding','Documentation first, then onboarding',[['Checklist'],['Start onboarding',1]])+
-    kpis([['In progress','2'],['Blocked on documents','1','warn'],['Starting this month','2'],['Confirmed, 90d','3','ok']])+
-    chain([['Offer accepted','done'],['Documentation','now'],['Pre-onboarding',''],['Onboarding',''],['Confirmed','']],
-      'Onboarding does not open until the document checklist completes. That sequence was requested by MyCity.')+
-    '<div style="margin-top:12px">'+table([['New hire'],['Role'],['Start date'],['Documents'],['Stage']],[
+     'Offer Letter OFF-0018')+'</div>'}},
+  {n:'Onboarding',r:function(){return head('Onboarding','',[['Checklist'],['Start Onboarding',1]])+
+    kpis([['In Progress','2'],['Blocked on Documents','1','warn'],['Starting This Month','2'],['Confirmed, 90 Days','3','ok']])+
+    chain([['Offer accepted','done'],['Documentation','now'],['Pre-onboarding',''],['Onboarding',''],['Confirmed','']])+
+    '<div style="margin-top:12px">'+table([['New Hire'],['Role'],['Start Date'],['Documents'],['Stage']],[
       ['Chiamaka Eze','Content Producer','20/10/2026','4 of 7',pill('wa','Documentation')],
       ['Obinna Chukwu','Content Producer','01/10/2026','7 of 7',pill('ok','Onboarding')],
-      ['Hauwa Yusuf','Support','11/11/2024','7 of 7',pill('ok','Confirmed')]],'In progress')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+table([['Required document'],['Chiamaka Eze']],[
+      ['Hauwa Yusuf','Support','11/11/2024','7 of 7',pill('ok','Confirmed')]],'New Hires')+'</div>'+
+    '<div class="grid g2" style="margin-top:12px">'+table([['Required Document'],['Chiamaka Eze']],[
       ['Signed offer letter',pill('ok','Received')],['Employment contract',pill('ok','Received')],
       ['Valid ID',pill('ok','Received')],['Passport photograph',pill('ok','Received')],
       ['Bank verification number',pill('wa','Requested')],['Academic certificates',pill('wa','Requested')],
-      ['Data privacy acknowledgement',pill('er','Outstanding')]],'Document checklist',mini(57,'4 of 7'))+
-    '<div class="card"><div class="ch"><h3>Onboarding plan, once documents clear</h3></div>'+
+      ['Data privacy acknowledgement',pill('er','Outstanding')]],'Document Checklist',mini(57,'4 of 7'))+
+    helpOn('<div class="card"><div class="ch"><h3>Onboarding Plan</h3></div>'+
     '<div class="tl">'+[['Day 0, pre-onboarding','Account created, device issued, channels joined','','ok'],
       ['Day 1','Welcome, handbook, NDPA acknowledgement, clock in set up',''],
       ['Week 1','Platform walkthrough, meet the six departments',''],
       ['Week 2','First KPIs assigned by the department manager',''],
       ['Month 3','Probation decision: confirm or extend','']].map(function(i){
-      return '<div class="it'+(i[3]?' '+i[3]:'')+'"><b>'+esc(i[0])+'</b><span>'+esc(i[1])+'</span></div>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">The plan is a template per role. Tasks dispatch to the line manager, People and the new hire on the right day.</p></div></div>'}},
-  {n:'Talent Pool',r:function(){return head('Talent Pool','Good candidates, wrong moment',[['Export'],['Add to pool',1]])+
-    kpis([['In the pool','3'],['Invited back','1'],['Hired from the pool','1','ok'],['Average score','74']])+
-    '<div class="grid g23">'+table([['Candidate'],['Applied for'],['Score','n'],['Added'],['Reason'],['']],[
-      ['Ngozi Abiola','Content Producer','78','14/09/2026','Strong, role filled','<button class="btn">Invite to apply</button>'],
-      ['Tunde Fashola','Backend Engineer','74','02/09/2026','Senior for the level','<button class="btn">Invite to apply</button>'],
-      ['Blessing Okon','Partnerships Associate','71','28/08/2026','Relocating in 2027','<button class="btn">Invite to apply</button>']],'The pool')+
-    kvcard('What the pool is for',[['The problem','A good candidate is rejected and then forgotten'],
-      ['How they get here','A recruiter adds them with a reason, at rejection'],
-      ['What is kept','Their application, scores, notes and the reason'],
-      ['Consent','They are told, and can ask to be removed'],
-      ['Retention','Twenty-four months, then purged automatically'],
-      ['Inviting back','Sends a personal link to a new vacancy, pre-filled']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">One hire this year came from the pool. That is one vacancy that never needed advertising.</p>'}}]},
+      return '<div class="it'+(i[3]?' '+i[3]:'')+'"><b>'+esc(i[0])+'</b><span>'+esc(i[1])+'</span></div>'}).join('')+'</div></div>',
+      'Onboarding Plan','Starts once the document checklist is complete. Each step becomes a task for the line manager, People or the new hire on its day.')+'</div>'}},
+  {n:'Talent Pool',r:function(){return head('Talent Pool','',[['Export'],['Add to Pool',1]])+
+    kpis([['In the Pool','3'],['Invited Back','1'],['Hired from the Pool','1','ok'],['Average Score','74']])+
+    helpOn(table([['Candidate'],['Applied For'],['Score','n'],['Added'],['Reason'],['']],[
+      ['Ngozi Abiola','Content Producer','78','14/09/2026','Strong, role filled','<button class="btn">Invite to Apply</button>'],
+      ['Tunde Fashola','Backend Engineer','74','02/09/2026','Senior for the level','<button class="btn">Invite to Apply</button>'],
+      ['Blessing Okon','Partnerships Associate','71','28/08/2026','Relocating in 2027','<button class="btn">Invite to Apply</button>']],'Pool Candidates'),
+      'Added','Kept for 24 months from this date, then removed. The candidate is told and can ask to leave sooner.')}}]},
 
 {k:'payroll',n:'Payroll',i:'wallet',g:'PEOPLE',tabs:[
-  {n:'Payroll Runs',r:function(){return head('Payroll Runs','October 2026',[['Previous runs'],['Run payroll',1]])+
-    kpis([['Staff in run','25'],['Gross','₦11.42M'],['Deductions','₦57,500','warn'],['Net','₦11.36M','ok']])+
-    chain([['Computed','done'],['Previewed','done'],['Submitted','now'],['Approved',''],['Locked',''],['Paid','']],
-      'A run is submitted to the CEO or COO for approval. Which of the two is still to be confirmed with MyCity.')+
-    '<div style="margin-top:12px">'+table([['Month'],['Staff','n'],['Gross','n'],['Net','n'],['Approved by'],['Status']],[
+  {n:'Payroll Runs',r:function(){return head('Payroll Runs','October 2026',[['Previous Runs'],['Run Payroll',1]])+
+    kpis([['Staff in Run','25'],['Gross','₦11.42M'],['Deductions','₦57,500','warn'],['Net','₦11.36M','ok']])+
+    chain([['Computed','done'],['Previewed','done'],['Submitted','now'],['Approved',''],['Locked',''],['Paid','']])+
+    '<div style="margin-top:12px">'+helpOn(table([['Month'],['Staff','n'],['Gross','n'],['Net','n'],['Approved By'],['Status']],[
       ['October 2026','25','₦11,420,000','₦11,362,500','—',pill('wa','Awaiting approval')],
       ['September 2026','25','₦11,420,000','₦11,420,000','Ifeoma Chukwu',pill('ok','Paid 27/09')],
       ['August 2026','24','₦10,970,000','₦10,957,500','Ifeoma Chukwu',pill('ok','Paid 27/08')],
-      ['July 2026','24','₦10,970,000','₦10,947,500','Ifeoma Chukwu',pill('ok','Paid 27/07')]],'Run history')+'</div>'+
-    '<div class="grid g2" style="margin-top:12px">'+areaChart('Net payroll by month',[10947500,10957500,11420000,11420000,11362500],
-      'The step in month three is two new hires, not a pay rise.')+
-    '<div class="card"><div class="ch"><h3>What locking does</h3></div>'+
-    '<dl class="kv" style="grid-template-columns:122px 1fr"><dt>Before approval</dt><dd>Figures recompute whenever attendance or a deduction changes</dd>'+
-    '<dt>On approval</dt><dd>The run is frozen. Payslips become visible to staff</dd>'+
-    '<dt>After locking</dt><dd>Nothing recomputes it. Not a policy change, not a corrected punch</dd>'+
-    '<dt>A correction</dt><dd>Goes in the next run as an adjustment line, with its reason</dd>'+
-    '<dt>Why</dt><dd>A payslip someone has already been paid against must never change</dd></dl>'+
-    '<div class="quote" style="margin-top:12px">Switching statutory items on recomputes future runs only. A locked run stays exactly as it was paid.</div></div></div>'}},
-  {n:'Payslips',r:function(){return head('Payslips','October 2026 preview',[['Email all'],['Download all',1]])+
-    statstrip([['Payslips','25'],['Gross','₦11,420,000'],['Deductions','₦57,500','warn'],['Net','₦11,362,500'],['Visible to staff','On approval']])+
+      ['July 2026','24','₦10,970,000','₦10,947,500','Ifeoma Chukwu',pill('ok','Paid 27/07')]],'Run History'),
+      'Status','Approval locks the run and shows payslips to staff. A later correction goes into the next run as an adjustment line.')+'</div>'+
+    '<div class="grid g2" style="margin-top:12px">'+areaChart('Net Payroll by Month',[10947500,10957500,11420000,11420000,11362500])+
+    kvcard('October Run',[['Submitted By','Amara Okafor'],['Submitted','08/10/2026 17:22'],['Approval',pill('wa','Awaiting approval')],['Payday','27/10/2026']])+'</div>'}},
+  {n:'Payslips',r:function(){return head('Payslips','October 2026 preview',[['Email All'],['Download All',1]])+
+    statstrip([['Payslips','25'],['Gross','₦11,420,000'],['Deductions','₦57,500','warn'],['Net','₦11,362,500'],['Visible to Staff','On approval']])+
     table([['Employee'],['Base','n'],['Allowances','n'],['Deductions','n'],['Net','n'],['']],
       STAFF.slice(0,6).map(function(s,i){var base=[480,420,460,620,380,400][i]*1000,al=[40,30,35,50,25,30][i]*1000,de=i===1?12500:0;
         return [who(s[0],s[1],s[2]),'₦'+base.toLocaleString(),'₦'+al.toLocaleString(),de?'₦'+de.toLocaleString():'—',
           '₦'+(base+al-de).toLocaleString(),'<button class="btn">'+ic('doc')+'PDF</button>']}),'Preview',
-      '<span class="sub">Showing 6 of 25</span>')+
-    '<div style="margin-top:12px">'+paper(plogo('PAY-2026-10-002')+
+      '<span class="sub">Showing 6 of 25</span>',null,null,[4,3])+
+    '<div class="monly" style="margin-top:12px">'+kvcard('Bashir Lawal, October',[['Basic Salary','₦294,000.00'],['Housing','₦63,000.00'],
+      ['Transport','₦42,000.00'],['Communication','₦21,000.00'],['Gross Pay','<b>₦420,000.00</b>'],
+      ['Lateness, QRY-0019','−₦12,500.00'],['Net Pay','<b>₦407,500.00</b>']]).replace('</h3></div>','</h3><span class="right">'+pill('wa','Preview')+'</span></div>')+'</div>'+
+    '<div class="donly" style="margin-top:12px">'+paper(plogo('PAY-2026-10-002')+
      '<h3>Payslip, October 2026</h3>'+
      '<p style="color:#566662;font-size:11.5px;margin-top:3px">Bashir Lawal · Partnerships Manager · G3 · Preview, not yet approved</p>'+
      '<table><thead><tr><th>Earnings</th><th style="text-align:right">Amount</th></tr></thead><tbody>'+
@@ -2610,74 +2584,59 @@ var M=[
      '<table style="margin-top:14px"><thead><tr><th>Deductions</th><th style="text-align:right">Amount</th></tr></thead><tbody>'+
      '<tr><td>Lateness, 3 instances (QRY-0019)</td><td style="text-align:right">₦12,500.00</td></tr>'+
      '<tr class="tot"><td>Net pay</td><td style="text-align:right">₦407,500.00</td></tr></tbody></table>'+
-     '<p style="font-size:11px;color:#7E8D88;margin-top:14px">The deduction line names its reason, not the sanction. No statutory item appears because advanced payroll is off.</p>'+
-     '<div class="pfoot"><span>'+ic('alert')+'Preview. Becomes visible to the employee on approval</span></div>',
-     'October preview for Bashir Lawal, the one payslip in this run carrying a deduction.')+'</div>'+
-    '<p class="sub" style="margin-top:12px">Bashir Lawal carries a ₦12,500 lateness deduction accepted into this run from Queries and Sanctions.</p>'}},
-  {n:'Salary Structure',r:function(){return head('Salary Structure','Grades and bands',[['History'],['Add grade',1]])+
-    kpis([['Grades','5'],['Staff placed','25'],['Below band minimum','0','ok'],['Above maximum','1','warn']])+
-    bands('Bands by grade',[['G1 · Entry',250000,300000,350000,'₦250k to ₦350k','3 staff'],
+     '<div class="pfoot"><span>'+ic('alert')+'Preview, awaiting approval</span></div>',
+     'Bashir Lawal · October Preview')+'</div>'}},
+  {n:'Salary Structure',r:function(){return head('Salary Structure','',[['History'],['Add Grade',1]])+
+    helpOn(kpis([['Grades','5'],['Staff Placed','25'],['Below Band Minimum','0','ok'],['Above Band Maximum','1','warn']]),
+      'Above Band Maximum','Flagged, not blocked. Pay above the band maximum is allowed and shows here for review.')+
+    helpOn(bands('Bands by Grade',[['G1 · Entry',250000,300000,350000,'₦250k to ₦350k','3 staff'],
       ['G2 · Officer',350000,420000,490000,'₦350k to ₦490k','9 staff'],
       ['G3 · Senior',480000,560000,640000,'₦480k to ₦640k','7 staff'],
       ['G4 · Lead',620000,720000,820000,'₦620k to ₦820k','4 staff'],
-      ['G5 · Head',850000,1000000,1200000,'₦850k to ₦1.2M','2 staff']],
-      'The tick is the midpoint. A new hire is normally placed between the minimum and the midpoint.')+
-    '<div class="grid g2" style="margin-top:12px">'+
-    table([['Grade'],['Band'],['Minimum','n'],['Midpoint','n'],['Maximum','n'],['Staff','n']],[
+      ['G5 · Head',850000,1000000,1200000,'₦850k to ₦1.2M','2 staff']]),
+      'Bands by Grade','The bar runs from minimum to maximum and the tick is the midpoint. A new hire is normally placed between the two.')+
+    '<div style="margin-top:12px">'+
+    helpOn(table([['Grade'],['Band'],['Minimum','n'],['Midpoint','n'],['Maximum','n'],['Staff','n']],[
       ['G1','Entry','₦250,000','₦300,000','₦350,000','3'],
       ['G2','Officer','₦350,000','₦420,000','₦490,000','9'],
       ['G3','Senior','₦480,000','₦560,000','₦640,000','7'],
       ['G4','Lead','₦620,000','₦720,000','₦820,000','4'],
-      ['G5','Head','₦850,000','₦1,000,000','₦1,200,000','2']],'Grades')+
-    kvcard('What a band controls',[['Offers','A salary outside the band warns the recruiter'],
-      ['Reviews','A rating does not move a grade. A promotion does'],
-      ['Promotion','Changes the grade, which changes the band, which changes pay'],
-      ['Field security','Bands are masked from Manager and Staff roles'],
-      ['Effective dating','A band change applies from a date, never retrospectively'],
-      ['Above maximum','One person sits above G5. It is flagged, not blocked']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">Placeholder bands. MyCity has been asked for their real structure so these are replaced before M6 is demonstrated.</p>'}},
-  {n:'Deductions',r:function(){var tiers=attPolicy().settings.deductionTiers;return head('Deductions','Pending and applied · attendance tiers '+(tiers?'on':'off'),[['Rules'],['Add deduction',1]])+
-    kpis([['Pending acceptance','1','warn'],['Applied, October','₦62,500'],['Recovered this year','₦45,000','ok'],['Sources','3']])+
+      ['G5','Head','₦850,000','₦1,000,000','₦1,200,000','2']],'Grades'),
+      'Band','A band change applies from a chosen date, never backdated. An offer outside its band warns the recruiter.')+'</div>'}},
+  {n:'Deductions',r:function(){var tiers=attPolicy().settings.deductionTiers;return head('Deductions','Attendance tiers '+(tiers?'on':'off'),[['Rules'],['Add Deduction',1]])+
+    kpis([['Pending Acceptance','1','warn'],['Applied, October','₦62,500'],['Recovered This Year','₦45,000','ok'],['Sources','3']])+
     table([['Employee'],['Reason'],['Source'],['Amount','n'],['Month'],['Status']],[
       [st(1),'Lateness, 3 instances','Queries & Sanctions','₦12,500','October',pill('wa','Pending acceptance')],
       [st(3),'Studio monitor damage','Fine, sanction','₦45,000','July',pill('ok','Recovered')],
-      [st(2),'Salary advance repayment','Advance','₦50,000','October',pill('ok','Applied')]],'All deductions')+
+      [st(2),'Salary advance repayment','Advance','₦50,000','October',pill('ok','Applied')]],'All Deductions')+
     '<div class="grid g2" style="margin-top:12px">'+
     '<div class="card"><div class="ch"><h3>Pending: Bashir Lawal, ₦12,500</h3><span class="right">'+pill('wa','Needs acceptance')+'</span></div>'+
     '<div class="chain">'+[['Query closed','done'],['Warning served','done'],['Deduction raised','done'],['Accepted','now'],['In the run',''],['Applied','']].map(function(s,i){
       return (i?'<span class="arr">'+ic('right')+'</span>':'')+'<span class="step '+s[1]+'">'+(s[1]==='done'?ic('ok'):'')+esc(s[0])+'</span>'}).join('')+'</div>'+
-    '<p class="sub" style="margin-top:11px">Raised by the August warning. It has waited for a person since 29 August, which is correct: nothing deducts itself.</p>'+
+    '<dl class="kv" style="margin-top:12px"><dt>Raised By</dt><dd>August warning</dd><dt>Waiting Since</dt><dd>29/08/2026</dd></dl>'+
     '<div style="display:flex;gap:8px;margin-top:13px;flex-wrap:wrap"><button class="btn pri">'+ic('ok')+'Accept into October</button>'+
-    '<button class="btn">Spread over two runs</button><button class="btn">Waive</button></div></div>'+
-    kvcard('Deduction tiers, from attendance',[['Current policy',tiers?pill('ok','On · applies to future reviewed outcomes'):pill('nt','Off · configuration preserved')],['Up to 1 hour late','10% of the day'],['Up to 2 hours','20% of the day'],
-      ['Up to 3 hours','30% of the day'],['Beyond 3 hours','Treated as absence, by decision'],
-      ['Who sets these','Operations, in Settings. Still to be confirmed by MyCity'],
-      ['Automatic?','No. The figure is computed. A person accepts it']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">A deduction from a sanction never enters a run automatically. Someone has to accept it.</p>'}},
-  {n:'Statutory',r:function(){return head('Statutory','Advanced payroll · off by default',[['Rates'],['Switch on',1]])+
+    '<button class="btn">Spread Over 2 Runs</button><button class="btn">Waive</button></div></div>'+
+    helpOn(kvcard('Attendance Deduction Tiers',[['Current Policy',tiers?pill('ok','On'):pill('nt','Off')],['Up to 1 Hour Late','10% of the day'],['Up to 2 Hours','20% of the day'],
+      ['Up to 3 Hours','30% of the day'],['Beyond 3 Hours','Treated as absence, by decision']]),
+      'Current Policy','Set in Settings, Attendance Policy. Tiers apply to outcomes reviewed after they are switched on, and a person accepts or waives each one.')+'</div>'}},
+  {n:'Statutory',r:function(){var hp=hintParts('Advanced Payroll Off','Switching on recomputes future runs only. A locked run never changes.');
+    return head('Statutory','',[['Rates'],['Switch On',1]])+
     '<div class="card" style="margin-bottom:12px;background:var(--warn-bg);border-color:transparent">'+
     '<div style="display:flex;gap:10px;align-items:flex-start"><span style="color:var(--warn)">'+ic('alert')+'</span>'+
-    '<div><h3 style="font-size:13.5px;color:var(--warn)">Advanced payroll is off</h3>'+
-    '<p class="sub" style="color:var(--warn);margin-top:4px">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p></div></div></div>'+
+    '<div><h3 style="font-size:13.5px;color:var(--warn)">'+hp[0]+'</h3>'+hp[1]+
+    '<p class="sub" style="color:var(--warn);margin-top:4px">No statutory item appears on a payslip until switched on.</p></div></div></div>'+
     table([['Item'],['Type'],['Rate'],['Base'],['Status']],[
       ['PAYE','Employee','Progressive bands','Gross less relief, pension and NHF',pill('nt','Configured, off')],
       ['Pension, employee','Employee','8%','Basic, housing, transport',pill('nt','Configured, off')],
       ['Pension, employer','Employer','10%','Basic, housing, transport',pill('nt','Configured, off')],
       ['NHF','Employee','2.5%','Basic',pill('nt','Configured, off')],
       ['ITF','Employer','1%','Annual payroll',pill('nt','Configured, off')],
-      ['NSITF','Employer','1%','Annual payroll',pill('nt','Configured, off')]],'Nigerian statutory items')+
+      ['NSITF','Employer','1%','Annual payroll',pill('nt','Configured, off')]],'Nigerian Statutory Items')+
     '<div class="grid g2" style="margin-top:12px">'+
-    table([['PAYE band'],['Annual','n'],['Rate','n']],[
+    table([['PAYE Band'],['Annual','n'],['Rate','n']],[
       ['First','₦300,000','7%'],['Next','₦300,000','11%'],['Next','₦500,000','15%'],
       ['Next','₦500,000','19%'],['Next','₦1,600,000','21%'],['Above','₦3,200,000','24%']],
-      'Progressive bands, configured and dormant','<span class="sub">Effective dated</span>')+
-    kvcard('Why it is built but off',[['The ask','MyCity asked for simple payroll. Gross, deductions, net'],
-      ['The risk','Statutory payroll added later is a rewrite, not a setting'],
-      ['The answer','Build it now, configure it, leave it off'],
-      ['Switching on','Recomputes future runs only. A locked run never changes'],
-      ['Rates','Effective dated, so a rate change in 2027 does not rewrite 2026'],
-      ['Handover','Documented in the handover pack either way']])+'</div>'+
-    '<p class="sub" style="margin-top:12px">Rates are effective dated. Switching this on recomputes future runs only, never a locked one.</p>'}}]},
+      'PAYE Bands','<span class="sub">'+hint('Effective Dated','A rate change applies from its date. Runs before that date keep the rates they were paid at.')+'</span>')+'</div>'}}]},
 
 {k:'partners',n:'Partnerships',i:'link',g:'BUSINESS',tabs:[
   {n:'Pipeline',r:function(){return head('Pipeline','23 active · 8 in discussion · 4 going quiet',[['Board'],['New partner',1]])+
