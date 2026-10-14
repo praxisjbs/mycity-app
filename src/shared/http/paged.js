@@ -37,9 +37,8 @@
  *     "page": { "number": 2, "size": 25, "total": 312, "pages": 13, "has_next": true } }
  *
  * The total comes from COUNT(*) OVER() in the same query: one round trip, one
- * WHERE clause, so the count and the rows can never disagree (praxis-ls
- * query-helpers TOTAL_COL, kept). praxis-ls `page()` (default 50, client
- * limit up to 200) is deliberately NOT ported.
+ * WHERE clause, so the count and the rows can never disagree. There is no
+ * other paging helper anywhere, and no client-chosen page size.
  */
 const { AppError } = require("../errors");
 const { PAGE_SIZE } = require("../../../packages/contract/schemas/common");
@@ -164,9 +163,9 @@ function assertPage(result, label) {
 
 /**
  * The one exception: a set the caller MUST have whole, because acting on part
- * of it would be wrong. The permissions matrix is the example: praxis-ls loaded
- * it through a paged endpoint, an editor saw part of it, and saved over grants
- * they could not see.
+ * of it would be wrong. The permissions matrix is the example: loaded through a
+ * paged endpoint, an editor would see part of it and save over grants they
+ * could not see.
  *
  * This is never a list a person scrolls through. It is never sent to a table
  * on screen and never handed to the AI. Every call site carries a marker on

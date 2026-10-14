@@ -14,17 +14,16 @@ file was read in the checked-out tree on 12 October. Backend source layout is in
                          Internet
                             │
             ┌───────────────┴────────────────┐
-            │   nginx (TLS, Let's Encrypt)   │   one server, 18 GB RAM / 240 GB SSD
+            │ panel proxy (TLS only)         │   one server, 18 GB RAM / 240 GB SSD
             └──┬──────────┬──────────┬───────┘
      hub.mycityapp.io  go.mycityapp.io  hub.staging…  go.staging…
             │          │                │          │
    ┌────────▼──────────▼───────┐  ┌─────▼──────────▼──────────┐
    │ PRODUCTION                │  │ STAGING  (full parity)    │
    │                           │  │                           │
-   │ static: app/dist          │  │ static: app/dist          │
-   │ static: public-app/dist   │  │ static: public-app/dist   │
-   │                           │  │                           │
    │ mycity-api-prod   :7000   │  │ mycity-api-stg    :7100   │
+   │   app/dist        (hub.)  │  │   app/dist                │
+   │   public-app/dist (go.)   │  │   public-app/dist         │
    │   /api/v1/*     (staff)   │  │   /api/v1/*               │
    │   /api/public/v1/* (go.)  │  │   /api/public/v1/*        │
    │   /socket.io     (staff)  │  │   /socket.io              │
@@ -49,17 +48,18 @@ Four systemd units: `mycity-api-prod`, `mycity-worker-prod`, `mycity-api-stg`, `
 One codebase, one build, two running copies that differ only in their `.env`.
 
 The four virtual hosts are configured in the hosting panel's web server settings, not from files in
-the repository. What they must contain (path allow-list per host, body size, internal media location,
-WebSocket upgrade) is in `docs/runbooks/proxy.md`.
+the repository. The proxy terminates TLS and forwards every path to the environment's API process,
+which serves both frontend builds and the API and keeps the hosts apart itself (§3). What the proxy
+must contain (forwarded headers, body size, WebSocket upgrade) is in `docs/runbooks/proxy.md`.
 
 Installed on the server at M0 (`ops/provision`), so no later milestone is a server change: PostgreSQL
 16 with **pgvector** (M10), Redis, headless **Chromium** (PDFs), **ffmpeg** (voice notes, video),
 **ClamAV** `clamd` (stranger uploads, M4/M5), Geist fonts.
 
 **Files.** Each environment has a private media root, `/srv/mycity/<env>/media`, never in the
-release directory and never served directly. Node checks access, then hands the file to nginx with
-`X-Accel-Redirect` to an `internal` location, so permission is checked by the API and bytes are
-streamed by nginx. Details in BACKEND_STRUCTURE §5.
+release directory and never served directly. Node checks access, then streams the file itself
+(range requests supported), so no file is reachable without the permission check. Details in
+BACKEND_STRUCTURE §5.
 
 ---
 
@@ -88,28 +88,29 @@ host, and nothing prevents one: sessions are in Redis, jobs are in BullMQ, outbo
 | | Staff app | Public site |
 |---|---|---|
 | Host | `hub.mycityapp.io` | `go.mycityapp.io` |
-| Static | `app/dist` (PWA, service worker at `/`) | `public-app/dist` (no PWA, no service worker) |
+| Build, served by the API process | `app/dist` (PWA, service worker at `/`) | `public-app/dist` (no PWA, no service worker) |
 | API prefix | `/api/v1/*` | `/api/public/v1/*` |
 | Auth | Bearer access token (memory) + refresh cookie `HttpOnly; Secure; SameSite=Strict; Host-only` on `hub.` | None. Opaque per-person token in the URL |
 | CORS | Origin `hub.` only | Origin `go.` only, no credentials |
 | Rate limit | Per user | Per IP, stricter on writes |
 
-**nginx allow-lists the path per host.** `go.` proxies only `/api/public/` and serves its static build;
-any `/api/v1/` request on `go.` is a 404 at nginx and never reaches Node. `hub.` proxies `/api/v1/` and
-`/socket.io/`, and refuses `/api/public/`. Both surfaces are served by the same API process, but they
-are mounted from separate routers (§ BACKEND_STRUCTURE 4) and a public route cannot import the staff
-auth middleware because the module loader mounts by declared `surface`.
+**The API process allow-lists the path per host** (`src/http/static.js`). On `go.` only
+`/api/public/` and the public build are served; `/api/v1/` and `/socket.io/` are a 404. On `hub.`,
+`/api/public/` is a 404. A request under any other host name is a 404 on a server, except
+`/api/health`. Both surfaces are served by the same API process, but they are mounted from separate
+routers (BACKEND_STRUCTURE §2) and a public route cannot import the staff auth middleware because the
+module loader mounts by declared `surface` and `check/public-surface.js` refuses the import.
 
 The cookie is host-only on `hub.`, so a browser never sends it to `go.`. The service worker is
 registered at `hub.` scope, so it never controls `go.`. That is the separation A9 asks for, enforced
-by the browser and nginx rather than by a flag.
+by the browser and the host guard rather than by a flag.
 
 ---
 
 ## 4 · Request lifecycle (staff)
 
 ```
-nginx
+panel proxy (TLS only, forwards everything)
   → async-safe (patches Express 4 so async throws reach the error handler)
   → request-id            X-Request-Id in, echoed out
   → request-context       AsyncLocalStorage { requestId, userId }
@@ -400,7 +401,7 @@ seed guard.
 | # | Decision | Why |
 |---|---|---|
 | S1 | One `emit()` writes event_log + audit + outbox atomically; all follow-on work runs after commit in the worker | Removes Praxis's in-transaction fan-out and Pixie's pre-commit `EventEmitter` |
-| S2 | Public API on the same process, separate router, path allow-listed by nginx per host | A9 isolation without a fifth process |
+| S2 | Public API on the same process, separate router, path allow-listed per host by the API's host guard; the API also serves both frontend builds | A9 isolation without a fifth process, and no web server configuration to drift from the code |
 | S3 | Promotion copies the sealed staging tree; production never builds or installs | "What staging ran is what production runs" is then a file comparison, not a hope |
 | S4 | Production SSH key lives only in the `production` GitHub environment | Approval is a precondition for access, not a step in a script |
 | S5 | Forced-command `deploy-gate` on the server, key-scoped verbs | CI never holds a shell on the box |

@@ -42,7 +42,9 @@ State the type in your first message ("This is a full-stack change to My Attenda
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
 
 Donor code to port from lives in `C:\praxis-ls` and `C:\pixie-girl-hub`. `docs/MyCity-ERP-Documents/REUSE_MAP.md`
-says which file each piece comes from and what changes on the way in.
+says which file each piece comes from and what changes on the way in. **Ported code never says where
+it came from**: no project names, paths or "ported from" in code, comments, tests or config. A comment
+says what the code does and why. `scripts/check/provenance.js` fails the build otherwise.
 
 ## Step 3 · Which document wins
 

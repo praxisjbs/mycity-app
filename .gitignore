@@ -12,7 +12,7 @@ build/
 coverage/
 
 # Runtime files never live in the repo (BACKEND_STRUCTURE §1)
-media/
+/media/
 releases/
 *.log
 npm-debug.log*
