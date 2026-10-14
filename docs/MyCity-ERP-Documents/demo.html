@@ -3032,34 +3032,24 @@ var M=[
 
 {k:'settings',n:'Settings',i:'cog',g:'SYSTEM',tabs:[
   {n:'Organisation',r:function(){return head('Organisation','MyCity App Ltd',[['Save',1]])+
-    '<div class="grid g2">'+kvcard('Company',[['Legal name','MyCity App Ltd'],['Trading name','MyCityApp'],['Country','Nigeria'],
-      ['Currency','Naira (NGN)'],['Time zone','Africa/Lagos (UTC+1)'],['Financial year','January to December']])+
+    '<div class="grid g2">'+kvcard('Company',[['Legal Name','MyCity App Ltd'],['Trading Name','MyCityApp'],['Country','Nigeria'],
+      ['Currency','Naira (NGN)'],['Time Zone','Africa/Lagos (UTC+1)'],['Financial Year','January to December']])+
     kvcard('Departments',[['Operations','4 staff'],['Marketing &amp; Sales','6 staff'],['Content','5 staff'],
       ['Engineering','4 staff'],['Studio','3 staff'],['Support','3 staff']])+'</div>'+
-    '<div class="grid g2">'+
-    kvcard('Addresses',[['Admin, this app','<code>hub.mycityapp.io</code>'],
-      ['Public site','<code>go.mycityapp.io</code>'],
-      ['Staging, admin','<code>hub.staging.mycityapp.io</code>'],
-      ['Staging, public','<code>go.staging.mycityapp.io</code>'],
-      ['Why two hosts','A different origin shares no cookie, no storage and no service worker with this app']])+
-    kvcard('About this system',[['Product','MyCity App ERP'],['Version','1.0.0'],
-      ['Built by','<a href="https://jbspraxis.com" target="_blank" rel="noopener" style="color:var(--accent);font-weight:650">JBS Praxis</a>'],
-      ['Handover','18 December 2026'],['Support','Three months from handover'],
-      ['Source','Handed over in full, with the deployment runbook']])+'</div>'+
-    '<div class="card"><div class="ch"><h3>Working week</h3><span class="right sub">Per day, not a fixed pattern</span></div>'+
-    table([['Day'],['Working'],['Start'],['End'],['Grace']],[
+    '<div style="margin-bottom:12px">'+helpOn(helpOn(table([['Day'],['Working'],['Start'],['End'],['Grace']],[
       ['Monday',pill('ok','Yes'),'09:00','17:00','15 min'],['Tuesday',pill('ok','Yes'),'09:00','17:00','15 min'],
       ['Wednesday',pill('ok','Yes'),'09:00','17:00','15 min'],['Thursday',pill('ok','Yes'),'09:00','17:00','15 min'],
       ['Friday',pill('ok','Yes'),'09:00','17:00','15 min'],['Saturday',pill('ok','Yes'),'09:00','15:00','15 min'],
-      ['Sunday',pill('nt','No'),'—','—','—']])+
-    '<p class="sub" style="margin-top:11px">The payroll daily rate divides by these days, so changing the week changes every pro-rated figure.</p></div>'+
-    '<div class="grid g2">'+kvcard('Public holidays, 2026',[['01 January','New Year’s Day'],['01 May','Workers’ Day'],
-      ['12 June','Democracy Day'],['01 October','Independence Day'],['25 December','Christmas Day'],['26 December','Boxing Day']])+
-    kvcard('Why Saturday matters',[['The default','Most systems assume Monday to Friday'],
-      ['MyCity','Works Saturdays, 09:00 to 15:00'],
-      ['The consequence','A hard-coded five day week makes every Saturday an absence'],
-      ['The design','Each day carries its own working flag, hours and grace window'],
-      ['Downstream','Attendance, lateness, leave counting and the payroll daily rate all read this one table']])+'</div>'}},
+      ['Sunday',pill('nt','No'),'—','—','—']],'Working Week'),
+      'Working Week','Attendance, lateness, leave and the payroll daily rate all read these days. Changing the week changes every pro-rated figure.'),
+      'Grace','Minutes after the start time before a clock-in counts as late.')+'</div>'+
+    '<div class="grid g2">'+
+    kvcard('Addresses',[['Staff App','<code>hub.mycityapp.io</code>'],
+      ['Public Site','<code>go.mycityapp.io</code>'],
+      ['Staff App, Staging','<code>hub.staging.mycityapp.io</code>'],
+      ['Public Site, Staging','<code>go.staging.mycityapp.io</code>']])+
+    kvcard('Public Holidays, 2026',[['01 January','New Year’s Day'],['01 May','Workers’ Day'],
+      ['12 June','Democracy Day'],['01 October','Independence Day'],['25 December','Christmas Day'],['26 December','Boxing Day']])+'</div>'}},
   {n:'Users',r:function(){return head('Users','25 users · 3 pending invitation',[['Export'],['Invite user',1]])+
     kpis([['Users','25'],['Active now','19'],['Pending invitation','3','warn'],['MFA enrolled','3','warn']])+
     table([['User'],['Role'],['Last seen'],['MFA'],['Status']],
