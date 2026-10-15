@@ -54,7 +54,7 @@ export function MyAttendancePage() {
   const events = (
     <Table
       title="My Clock Events"
-      right={<Button onClick={() => toast(`${formatMonth(month)} exported as XLSX. It arrives in your Mailbox.`)}>Export Month</Button>}
+      right={<Button onClick={() => toast(`${formatMonth(month)} exported. It arrives in your Mailbox.`)}>Export Month</Button>}
       rows={list.rows}
       rowKey={(r) => r.event_id}
       loading={list.loading}

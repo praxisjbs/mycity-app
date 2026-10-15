@@ -75,7 +75,7 @@ export function MyProfilePage() {
           <div className="mt-[9px] flex flex-wrap gap-1.5">{p.chips.map((c) => <Pill key={c.text} tone={c.tone}>{c.text}</Pill>)}</div>
         </span>
         <span className="flex flex-wrap gap-[7px] max-md:w-full">
-          <Button onClick={() => toast("Your data export is being prepared. It arrives in your Mailbox.")}>Download My Data</Button>
+          <Button onClick={() => toast("Preparing your data export for your Mailbox.")}>Download My Data</Button>
           <Button icon="shield" onClick={() => navigate(hrefFor("ess", "my-security"))}>Security</Button>
         </span>
       </div>

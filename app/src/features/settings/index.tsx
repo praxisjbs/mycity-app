@@ -59,7 +59,7 @@ function OrganisationTab() {
       <PageHead
         title="Organisation"
         sub={d.legal_name}
-        actions={<Button variant="primary" disabled={!dirty || save.pending} onClick={async () => { try { await save.run({ body: { week: w } }); invalidate("/api/v1/settings"); setWeek(null); toast("Working week saved. Attendance and payroll read it from today"); } catch (e) { fail(e); } }}>Save</Button>}
+        actions={<Button variant="primary" disabled={!dirty || save.pending} onClick={async () => { try { await save.run({ body: { week: w } }); invalidate("/api/v1/settings"); setWeek(null); toast("Working week saved. Attendance and payroll use it"); } catch (e) { fail(e); } }}>Save</Button>}
       />
       <Grid cols={2}>
         <KvCard title="Company" items={[["Legal name", d.legal_name], ["Trading name", d.trading_name], ["Country", d.country], ["Currency", d.currency], ["Time zone", d.time_zone], ["Financial year", d.financial_year]]} />

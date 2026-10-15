@@ -310,7 +310,7 @@ function AddCandidate({ close, vacancies }: { close: () => void; vacancies: Vaca
       const c = await save.run({ body: f.values });
       invalidate("/api/v1/recruitment");
       close();
-      toast(`${c.name} added to Applied. They get a link to complete the form`);
+      toast(`${c.name} added. They get a form link`);
     } catch {
       f.setServerErrors(save.fields);
     }
@@ -382,7 +382,7 @@ function AssessmentForm({ close }: { close: () => void }) {
       await save.run({ body: { name: f.values.name.trim(), role: f.values.role, kind: f.values.kind as Assessment["kind"], duration_min: Number(f.values.duration_min) } });
       invalidate("/api/v1/recruitment/assessments");
       close();
-      toast("Assessment saved as a draft. Add questions from the bank");
+      toast("Assessment draft saved. Add questions from the bank");
     } catch {
       f.setServerErrors(save.fields);
     }
@@ -428,7 +428,7 @@ function Interviews({ id }: { id: string | null }) {
                 try {
                   await consolidate.run({ params: { id: x!.interview_id }, body: {} });
                   invalidate("/api/v1/recruitment/interviews");
-                  toast("Round closed. Scores are now visible to the panel");
+                  toast("Round closed. The panel now sees scores");
                 } catch (e) {
                   fail(e);
                 }
@@ -496,7 +496,7 @@ function ScheduleInterview({ close }: { close: () => void }) {
       await save.run({ body: { candidate_id: f.values.candidate_id, at: `${f.values.date}T${f.values.time}:00+01:00`, panel_ids: panel.map((p) => p.employee_id) } });
       invalidate("/api/v1/recruitment");
       close();
-      toast("Interview scheduled. Panellists get the invitation and the blind scorecard");
+      toast("Interview scheduled. Panellists get invites and scorecards");
     } catch {
       f.setServerErrors(save.fields);
     }
@@ -568,7 +568,7 @@ function OfferForm({ close }: { close: () => void }) {
       const o = await save.run({ body: f.values });
       invalidate("/api/v1/recruitment/offers");
       close();
-      toast(`${o.number} drafted. Review the letter, then send it to sign`);
+      toast(`${o.number} drafted. Review it, then send to sign`);
     } catch {
       f.setServerErrors(save.fields);
     }

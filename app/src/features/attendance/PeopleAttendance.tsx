@@ -200,7 +200,7 @@ function Assignments() {
   const ok = async (a: FieldAssignment) => {
     await approve.run({ params: { id: a.assignment_id }, body: {} });
     invalidate("/api/v1/attendance");
-    toast(`${a.number} approved. Clock In will use it for its window.`);
+    toast(`${a.number} approved. Clock In now uses it.`);
   };
   return (
     <>

@@ -431,7 +431,7 @@ function BudgetsTab() {
   const d = b.data;
   return (
     <>
-      <PageHead title="Budgets" sub={d ? `${d.year} · ${d.illustrative ? "no budget lines set" : `${d.lines.length} lines`}` : " "} actions={<Button variant="primary" icon="plus" onClick={() => toast("Budget lines open in 2027, when MyCity starts budgeting operating expense")}>Add Budget Line</Button>} />
+      <PageHead title="Budgets" sub={d ? `${d.year} · ${d.illustrative ? "no budget lines set" : `${d.lines.length} lines`}` : " "} actions={<Button variant="primary" icon="plus" onClick={() => toast("Budget lines open in 2027")}>Add Budget Line</Button>} />
       {d?.illustrative && (
         <div className="mb-3 flex items-start gap-2.5 rounded-card bg-info-soft p-[14px] text-info">
           <Icon name="alert" className="mt-0.5 flex-none" />

@@ -60,7 +60,7 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
     await save.run({ params: { employee_id: id }, body: { arrangement: arr, ...(arr === "Hybrid" && { schedule: sched }), office: site, reason: why.trim() } });
     invalidate("/api/v1/attendance", "/api/v1/employees");
     close();
-    toast(`${name} is now ${arr}. Applies from the next punch.`);
+    toast(`${name} is now ${arr} from the next punch.`);
   };
   return (
     <>

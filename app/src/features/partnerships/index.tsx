@@ -508,7 +508,7 @@ function ProposalForm({ close, partner }: { close: () => void; partner: string }
       const p = await save.run({ body: { ...f.values, weeks: Number(f.values.weeks) } });
       invalidate("/api/v1/partnerships/proposals");
       close();
-      toast(`${p.number} drafted. Read it and edit before it goes anywhere`);
+      toast(`${p.number} drafted. Read and edit it first`);
     } catch {
       f.setServerErrors(save.fields);
     }

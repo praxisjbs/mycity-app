@@ -53,7 +53,7 @@ export function MyQueriesPage() {
 function OpenQueries() {
   const list = usePaged("GET /api/v1/ess/queries", { filters: { view: "open" } });
   const modal = useModal();
-  if (!list.loading && !list.rows.length) return <EmptyState icon="ok" title="No open queries" text="Nothing has been raised against you. If one is, you have 48 hours to respond." />;
+  if (!list.loading && !list.rows.length) return <EmptyState icon="ok" title="No open queries" text="Nothing raised. You get 48 hours to respond." />;
   return (
     <>
       {list.rows.map((q) => (

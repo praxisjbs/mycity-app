@@ -25,7 +25,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
       <EmptyState
         icon="alert"
         title="This screen hit a problem"
-        text="Nothing was saved or lost. Try it again, or open another screen from the menu."
+        text="Nothing was saved or lost. Try again."
         action={<Button icon="right" onClick={() => this.setState({ error: null })}>Try Again</Button>}
       />
     );

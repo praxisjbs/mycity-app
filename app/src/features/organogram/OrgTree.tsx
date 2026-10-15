@@ -63,7 +63,7 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
     try {
       await move.run({ params: { id: node.employee_id }, body: { line_manager_id: target.employee_id, reason: "Moved on the organogram" } });
       invalidate("/api/v1/org-chart", "/api/v1/employees");
-      toast(`${node.display_name} now reports to ${target.display_name}. Logged in the audit trail.`);
+      toast(`${node.display_name} now reports to ${target.display_name}.`);
     } catch {
       toast(move.error?.fields.line_manager_id?.[0] ? `Not moved: ${move.error.fields.line_manager_id[0]}` : "Not moved");
     }

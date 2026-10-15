@@ -231,7 +231,7 @@ function TargetForm({ close, month }: { close: () => void; month: string }) {
       await save.run({ body: { month, ...f.values } });
       invalidate("/api/v1/performance/targets");
       close();
-      toast("Target submitted. It goes to the CEO for approval");
+      toast("Target sent to the CEO for approval");
     } catch {
       f.setServerErrors(save.fields);
     }
@@ -424,7 +424,7 @@ function Reviews() {
           <CardHeader title="Dictate Your Answer" right={<StatusPill s={{ tone: "info", text: "AI assisted" }} />} />
           <p className="mb-2.5 text-[11.5px] text-subtle-foreground">Speak instead of typing. The assistant tidies the wording against your goals. It does not change what you said.</p>
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3">
-            <Button variant="primary" className="size-10 justify-center rounded-full p-0" aria-label="Record an answer" onClick={() => toast("Dictation opens inside the review form when the cycle starts")}><Icon name="spark" /></Button>
+            <Button variant="primary" className="size-10 justify-center rounded-full p-0" aria-label="Record an answer" onClick={() => toast("Dictation opens when the review cycle starts")}><Icon name="spark" /></Button>
             <span className="text-[11.5px] text-subtle-foreground">Tap to record your answer to “What went well this quarter?”</span>
           </div>
           <Quote className="mt-3">“We closed the Providus sponsorship and got the Lagos venues confirmed, but I was slow on the Eko follow-up.”</Quote>

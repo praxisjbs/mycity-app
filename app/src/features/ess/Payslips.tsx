@@ -38,7 +38,7 @@ export function MyPayslipsPage() {
   );
   const openSlip = (r: PayslipRow) =>
     r.status === "in_run"
-      ? modal.open({ title: formatMonth(r.period), body: <EmptyState icon="clock" title="In this month’s run" text="Your payslip appears here once the run is approved, normally on the 27th." /> })
+      ? modal.open({ title: formatMonth(r.period), body: <EmptyState icon="clock" title="In this month’s run" text="It appears once the run is approved." /> })
       : modal.open({ title: `Payslip, ${formatMonth(r.period)}`, wide: true, body: <SlipPaper id={r.payslip_id} /> });
   return (
     <>
@@ -49,7 +49,7 @@ export function MyPayslipsPage() {
           <>
             {yearPicker}
             <Button onClick={() => sel && email.run({ params: { id: sel.payslip_id }, body: {} }).then(() => toast("Sent to your work email"))}>Email Me a Copy</Button>
-            <Button variant="primary" onClick={() => toast(`All ${s?.year} payslips are being zipped. The file arrives in your Mailbox.`)}>Download All</Button>
+            <Button variant="primary" onClick={() => toast(`Zipping ${s?.year} payslips. They arrive in Mailbox.`)}>Download All</Button>
           </>
         }
       />

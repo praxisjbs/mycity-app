@@ -239,7 +239,7 @@ function RuleForm({ close }: { close: () => void }) {
       await save.run({ body: { name: f.values.name, metric: f.values.metric, threshold: Number(f.values.threshold), window_days: Number(f.values.window_days), severity: f.values.severity as "medium" } });
       invalidate("/api/v1/home/alert-rules");
       close();
-      toast("Alert rule created. It runs on the next cycle.");
+      toast("Alert rule created. It runs next cycle.");
     } catch {
       f.setServerErrors(save.fields);
     }

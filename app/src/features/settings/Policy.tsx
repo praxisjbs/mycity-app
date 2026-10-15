@@ -174,7 +174,7 @@ function Review({ p, publish, close }: { p: AttendancePolicy; publish: boolean; 
       <ModalFoot>
         <Button onClick={close}>Close</Button>
         {publish && (
-          <Button variant="primary" disabled={summary.trim().length < 10 || pub.pending} onClick={async () => { try { const x = await pub.run({ body: { summary: summary.trim() } }); invalidate("/api/v1/attendance"); close(); toast(`Version ${x.version} published. Staff are asked to acknowledge it`); } catch (e) { toast(e instanceof ApiError ? e.message : "Could not publish"); } }}>
+          <Button variant="primary" disabled={summary.trim().length < 10 || pub.pending} onClick={async () => { try { const x = await pub.run({ body: { summary: summary.trim() } }); invalidate("/api/v1/attendance"); close(); toast(`Version ${x.version} published for staff to acknowledge`); } catch (e) { toast(e instanceof ApiError ? e.message : "Could not publish"); } }}>
             Publish v{p.version + 1}
           </Button>
         )}

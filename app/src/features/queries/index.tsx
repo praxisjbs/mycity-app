@@ -126,7 +126,7 @@ function RaiseQuery({ close }: { close: () => void }) {
       const q = await save.run({ body: { employee_id: who[0].employee_id, subject: f.values.subject.trim(), details: f.values.details.trim() } });
       invalidate("/api/v1/queries");
       close();
-      toast(`${q.number} raised. The letter goes to ${q.employee.display_name} by email and in app`);
+      toast(`${q.number} raised. Letter sent by email and app`);
     } catch (e) {
       f.setServerErrors(save.fields);
       if (e instanceof ApiError && !e.fields) toast(e.message);
@@ -259,7 +259,7 @@ function RuleForm({ close }: { close: () => void }) {
       const r = await save.run({ body: { name: f.values.name.trim(), trigger: f.values.trigger as RuleCreate["trigger"], count: Number(f.values.count), window_days: Number(f.values.window_days), template_id: f.values.template_id } });
       invalidate("/api/v1/queries/rules");
       close();
-      toast(`${r.name} saved as a draft. Activate it when ready`);
+      toast(`${r.name} saved as a draft`);
     } catch (e) {
       f.setServerErrors(save.fields);
       if (e instanceof ApiError && !e.fields) toast(e.message);
