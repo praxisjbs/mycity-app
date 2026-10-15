@@ -29,7 +29,8 @@ describe("DateField, DateRangeField, TimeField", () => {
         <DateField value="" onChange={() => undefined} />
       </Field>,
     );
-    expect(document.querySelector('input[type="date"]')).toBeNull();
+    // A typed day-first field, never the OS date picker.
+    expect((screen.getByLabelText("Start Date") as HTMLInputElement).type).toBe("text");
     await user.type(screen.getByLabelText("Start Date"), "31/02/2026");
     expect(screen.getByLabelText("Start Date")).toHaveAttribute("aria-invalid", "true");
   });

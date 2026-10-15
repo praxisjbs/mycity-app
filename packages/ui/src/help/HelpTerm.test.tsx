@@ -26,7 +26,7 @@ describe("HelpTerm", () => {
     expect(term.className).toContain("decoration-dotted");
     expect(term).toHaveAccessibleDescription(TEXT);
     const hidden = document.getElementById(term.getAttribute("aria-describedby") ?? "");
-    expect(hidden).toHaveClass("sr-only");
+    expect(hidden).toHaveAttribute("hidden");
     expect(hidden).toHaveAttribute("data-ui", "help");
     expect(hidden?.closest("label")).toBeNull();
     expect(screen.getByRole("textbox")).toHaveAccessibleName("Grace Period");

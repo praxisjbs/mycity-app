@@ -57,7 +57,7 @@ export function Chips<V extends string = string>({ options, value, onChange, sel
             data-ui="button"
             onClick={() => press(item.value)}
             className={cn(
-              "inline-flex h-7.5 flex-none items-center gap-1.5 rounded-full border px-3 text-xs font-semibold whitespace-nowrap transition-colors duration-(--dur-fast) disabled:opacity-40 phone:min-h-tap",
+              "inline-flex h-7.5 flex-none items-center gap-1.5 rounded-full border px-3 text-xs font-semibold whitespace-nowrap transition-colors duration-(--dur-fast) disabled:opacity-40 phone:min-h-tap phone:min-w-tap phone:justify-center",
               on
                 ? "border-secondary bg-secondary text-secondary-foreground"
                 : "border-border bg-card text-muted-foreground hover:border-subtle-foreground hover:text-foreground",

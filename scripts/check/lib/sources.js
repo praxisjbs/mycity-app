@@ -194,7 +194,7 @@ function frontendFiles() {
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (["node_modules", "dist", "build", ".vite", "coverage"].includes(e.name)) continue;
+      if (["node_modules", "dist", "dist-gallery", "build", ".vite", "coverage"].includes(e.name)) continue;
       const full = path.join(dir, e.name);
       if (e.isDirectory()) walk(full);
       else if (/\.(tsx|jsx|ts|js)$/.test(e.name) && !/\.(test|spec|d)\.[jt]sx?$/.test(e.name)) out.push(full);

@@ -11,7 +11,7 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { PersonPicker } from "@/components/form";
-import { Button, Meter, Quote, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, toast, cn, formatDate, formatDateTime, formatMonth, StatusPill, DateField, Field, FilterSelect, FormFooter, SelectField, TextField, useContractForm } from "@mycity/ui";
+import { Button, Meter, Quote, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, toast, cn, formatDate, formatDateTime, formatMonth, StatusPill, DateField, Field, FilterSelect, FormFooter, SelectField, TextField, useContractForm, IconButton } from "@mycity/ui";
 
 export default function Performance({ tab }: ModuleScreenProps) {
   if (tab === "targets") return <Targets />;
@@ -398,7 +398,7 @@ function Reviews() {
         <Card>
           <CardHeader title="Dictate Your Answer" right={<StatusPill s={{ tone: "info", text: "AI assisted" }} />} />
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3">
-            <Button variant="primary" className="size-10 max-md:size-11 justify-center rounded-full p-0" aria-label="Record an answer" onClick={() => toast("Dictation opens when the review cycle starts")}><Icon name="spark" /></Button>
+            <IconButton icon="spark" label="Record an answer" className="rounded-full bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" onClick={() => toast("Dictation opens when the review cycle starts")} />
             <span className="text-[11.5px] text-subtle-foreground">Tap to record your answer to “What went well this quarter?”</span>
           </div>
           <Quote className="mt-3">“We closed the Providus sponsorship and got the Lagos venues confirmed, but I was slow on the Eko follow-up.”</Quote>

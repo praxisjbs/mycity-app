@@ -346,7 +346,7 @@ function AppearanceTab() {
           </dl>
           <div className="mt-3 border-t border-border pt-3">
             <div className="mb-1.5 text-[12px] text-subtle-foreground">Default theme for everyone</div>
-            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved. A person's own choice still wins"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
+            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
           </div>
         </Card>
       </Grid>

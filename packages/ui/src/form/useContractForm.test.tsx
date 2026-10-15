@@ -79,7 +79,7 @@ describe("useContractForm", () => {
   it("puts a server 422's fields on the same marks", async () => {
     let api: { setServerErrors: (f: Record<string, string[]>) => void } | undefined;
     function Probe() {
-      const form = useContractForm(blank, organisation.EmployeeCreate!);
+      const form = useContractForm({ ...blank, work_email: "ada@mycityapp.io" }, organisation.EmployeeCreate!);
       api = form as never;
       return (
         <Field label="Work Email" {...form.status("work_email")}>

@@ -147,7 +147,7 @@ export function HelpSurface({ trigger, help, title, helpId, side = "top", align 
       </Radix.Root>
       {typeof document !== "undefined" &&
         createPortal(
-          <span id={id} data-ui="help" className="sr-only">
+          <span id={id} data-ui="help" hidden>
             {help}
           </span>,
           document.body,
