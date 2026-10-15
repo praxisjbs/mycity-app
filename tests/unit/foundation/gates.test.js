@@ -1,9 +1,10 @@
 "use strict";
 /**
  * The CI gates' judgement, tested on text and on throwaway folders rather than on the
- * repository: migration numbers, reversibility and idempotency, dashes, day-first
- * dates, money, the module catalogue, production environment references and shell
- * scripts, plus the source reader they share. Fixtures here are violations on purpose.
+ * repository: migration numbers, reversibility and idempotency, day-first dates, money,
+ * the module catalogue, production environment references and shell scripts, plus the
+ * source reader they share. Fixtures here are violations on purpose. Gate 17 (dashes)
+ * is tested with the screen gates (tests/unit/check-copy.test.js).
  */
 const fs = require("node:fs");
 const os = require("node:os");
@@ -15,7 +16,6 @@ const migrate = require("../../../scripts/db/migrate");
 const numbers = require("../../../scripts/check/migration-numbers");
 const idem = require("../../../scripts/check/migration-idempotency");
 const rev = require("../../../scripts/check/migration-reversibility");
-const dashes = require("../../../scripts/check/dashes");
 const dates = require("../../../scripts/check/date-format");
 const money = require("../../../scripts/check/money");
 const catalogue = require("../../../scripts/check/module-catalogue");
@@ -288,40 +288,6 @@ describe("migration reversibility", () => {
       "DROP FUNCTION IF EXISTS purge();",
     );
     expect(rev.review(inFunction, "1_a.sql")).toEqual([]);
-  });
-});
-
-describe("dashes", () => {
-  test("a dash in a string is copy; comments, SQL, flags and empty-value markers are not", () => {
-    const js = [
-      'throw new AppError("NOT_FOUND", "Leave not found — try again", 404);',
-      "// a comment — fine",
-      'const empty = "—";',
-      "const sql = `SELECT 1 FROM t LIMIT ${n} -- pagination:batch why`;",
-      'const hint = "Use --status to look";',
-      'const bad = "Ready -- go";',
-      "// @dash:keep the range comes from the person's own data",
-      'const range = "9–17";',
-      "const msg = `Hello ${name} – welcome`;",
-    ].join("\n");
-    expect(dashes.scanJs(js).map((h) => h.line)).toEqual([1, 6, 9]);
-  });
-
-  test("templates: front matter and text count; HTML comments and styles do not", () => {
-    const html = [
-      "---",
-      "subject: Your leave — approved",
-      "---",
-      "<!-- layout -- shared -->",
-      "<style>:root { --brand: #01221D; } a { color: var(--brand); }</style>",
-      '<p style="color: var(--muted)">Approved</p>',
-      "<p>See you Monday -- the team</p>",
-    ].join("\n");
-    expect(dashes.scanText(html).map((h) => h.line)).toEqual([2, 7]);
-  });
-
-  test("the repository's templates and code are clean", () => {
-    expect(dashes.check().problems).toEqual([]);
   });
 });
 

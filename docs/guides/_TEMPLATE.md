@@ -18,7 +18,7 @@ deleted, so a reader knows it was considered.
 The header table is read by `scripts/check/guides.js`: **Backend modules** and **Frontend paths**
 decide which code this guide covers. A change to that code must change this guide (and add a
 Change log line), or say `Guide-unchanged: <reason>` in the PR description. Keep all fourteen
-section headings; the check requires them.
+section headings and both §10 tables, each with at least one real row; the check requires them.
 
 ---
 
@@ -86,9 +86,25 @@ Restricted fields and who may see them.
 - **AI routes**: <intents that send the user to a screen, with prefill>.
 - **Search** (`<module>.search.js`): <record types and the words people use for them>.
 
-## 10 · Mobile
+## 10 · On screen and mobile
 
-<What differs on the mobile shell: layout, what is left off, how navigation works.>
+What each screen shows open, what sits behind help, and how it is laid out on a phone
+(FRONTEND_GUIDE §5, §7). **§3 and §6 are for engineers: nothing in them reaches a screen unless it
+is listed here as tier 1 or tier 2.** Tier 3 (how the system works, why it was built this way,
+reassurance nobody asked for) is never on a screen; say where it lives instead (this guide, the
+manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
+
+### 10.1 Content tiers
+
+| Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
+|---|---|---|---|
+| <Home · Alerts> | <the alert list: alert, trigger, who can clear, age, Over By, severity; Clear Alert, Alert Rules, New Rule> | <help term on Over By: how far past its threshold an alert has gone> | <"alerts are not notifications", escalation and audit mechanics: §3 and §6 here, the manual> |
+
+### 10.2 Phone layout
+
+| Screen | First on a phone | Left off a phone | Main action | Navigation |
+|---|---|---|---|---|
+| <Home · Alerts> | <four KPI cards two to a row, then alert cards with a severity pill> | <the Where Alerts Come From chart> | <Clear Alert, full width in the alert's sheet> | <bottom bar Home; the four tabs scroll sideways> |
 
 ## 11 · Edge cases
 

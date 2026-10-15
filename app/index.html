@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en-NG">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#01221D" />
+    <meta name="description" content="MyCity App staff workspace" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>MyCity App</title>
+    <script>
+      /* Staging is marked from the first paint (lib/environment.ts). */
+      if (/(^|\.)staging\./.test(location.hostname)) { document.documentElement.setAttribute("data-env", "staging"); var i = document.querySelector('link[rel="icon"]'); if (i) i.href = "/favicon-staging.svg"; }
+      /* Theme before first paint, so a dark-mode user never sees a white flash. */
+      try { var t = localStorage.getItem("mc-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 # MyCity App ERP — Technical Milestone Document
 
-**Version 1.4 · 12 October 2026 · Internal engineering document**
+**Version 1.5 · 14 October 2026 · Internal engineering document**
 
 Revised after the MyCity client requirements meeting of 10 October. Scope added there is absorbed
 with no Change Report; see §1.3 for what was added and where it lands. v1.2 added §18, the screen
@@ -8,7 +8,10 @@ inventory. v1.3 records it as approved, resolves the production hostnames, and c
 surface: it is a separate application, not a sixteenth module. v1.4 aligns this document with
 `REUSE_MAP.md`, which wins where the two disagree: the workflow engine is Pixie's, ported (A11).
 It also removes the write contract everywhere under A23, drops the entity permission layer (A2),
-corrects the gate references, and reconciles expense thresholds with the requisition (§13).
+corrects the gate references, and reconciles expense thresholds with the requisition (§13). v1.5
+widens gates 8, 11 and 12 (§3) into the screen content rule (three tiers, help terms, word limits),
+the checked two shells and one form system, after the 14 October review of the client demo, and
+gives each a script.
 
 Eleven contracted milestones plus M0, the foundation they stand on. For each: owner, window, scope,
 the exact donor files, what is net-new, and the demonstrable definition of done.
@@ -176,11 +179,11 @@ that gives them something to guard.
 | 5 | Migration idempotency | A migration that fails on second apply | M0 |
 | 6 | Schema drift | A query naming a column the schema lacks | M0 |
 | 7 | Write routes validated | A POST/PATCH/DELETE with no Zod validator | M0 |
-| 8 | **Five-second rule** | Supporting prose on the page instead of behind ⓘ; chrome not in Title Case | M0 |
+| 8 | **Five-second rule** | System explanations on a screen; support text open instead of behind a help term or Details row; a word limit broken; chrome not in Title Case | M0 |
 | 9 | **AI manifest coverage** | A module with records and no `<module>.ai.js` or written `// ai:none <reason>` | M1 |
 | 10 | **Search coverage** | A route, tab or record module with no `<module>.search.js` or `// search:none <reason>` | M1 |
-| 11 | **Two shells** | A desktop view that is a stretched mobile layout, or a mobile view that is a shrunk desktop one | M1 |
-| 12 | **Inline validation** | A form field whose error surfaces only on submit | M1 |
+| 11 | **Two shells** | A desktop view that is a stretched mobile layout, or a mobile view that is a shrunk desktop one: sideways scroll, the wrong navigation, a table or a sub-44 px target on a phone, a wordy first phone screen | M1 |
+| 12 | **Inline validation, one form system** | A form field whose error surfaces only on submit; a field, label or form built outside the shared form components | M1 |
 | 13 | Palette | A raw hex outside the §5.1/§5.2 tokens. Also `#FFCD05` and `#004F70`, which are in their CSS but are not brand | M1 |
 | 14 | Contrast | A text-on-surface pair below AA, **in both themes** — a chart series legible on white can be 1.49:1 on the dark card | M1 |
 | 15 | Day-first dates | `<input type="date">`, `toLocaleDateString()` with no locale, ISO on a human surface | M1 |
@@ -193,15 +196,29 @@ that gives them something to guard.
 **Gates 8, 11 and 12 are the ones agreed on 8 October** and they are the reason this product is not
 Praxis LS. Stated as rules a script can check:
 
-- **Gate 8.** A page carries what the operator must read to act. Anything explaining a single field
-  goes behind an ⓘ that is a **sibling** of what it explains, never a child — inside a `<label>` or
-  an `<h2>` its `aria-label` joins that element's accessible name. Hidden is not deleted: the text
-  stays in a visually hidden node and the control points at it with `aria-describedby`.
-- **Gate 11.** Mobile is a native-feeling application: cards, pills, sheets, a thumb-reachable
-  primary action. Desktop is desktop software: dense tables, keyboard navigation, multi-pane. The
-  gate renders both widths and fails a route that ships one layout scaled.
-- **Gate 12.** A field validates as it is filled. The signal is a mark on the field, not a sentence
-  under it and never a dialog. Submit-time-only validation fails.
+- **Gate 8.** A page carries what the operator must read to act; a person knows what the screen is
+  for within five seconds. Every piece of text is one of three tiers: **operational** (data,
+  status, actions) is open; **support** a person occasionally needs to act sits behind a **help
+  term** (the word itself, dotted underline; hover or focus on desktop, a tap and a sheet on a
+  phone) or a **Details** row closed by default; **system** text (how the product works, why it
+  was built this way, reassurance, footnotes) never reaches a screen and lives in the feature
+  guide or the manual. Hidden is not deleted: help text stays in the DOM, linked with
+  `aria-describedby`, never inside a label's or heading's accessible name. The limits are numbers
+  in `scripts/check/lib/copy.js` (page title 3 words, subtitle 8 and desktop only, card title 4,
+  button 3, toast 8, help 35, any sentence 20, first phone screen 40); FRONTEND_GUIDE §5 is the
+  full rule. Decided 14 October 2026 after the client-demo review: help terms replace the sibling ⓘ,
+  which stays only where there is no word to attach to.
+- **Gate 11.** Mobile is a native-feeling application: a bottom bar, cards not tables, sheets, a
+  thumb-reachable primary action, 44 px targets, no subtitles or chart captions, at most 40 words
+  of interface copy on the first screen. Desktop is desktop software: dense tables, keyboard
+  navigation, multi-pane, hover help. The gate renders every screen at both widths in Chromium and
+  fails a route that ships one layout scaled. Each feature guide's §10 carries the phone layout per
+  screen; the PR states the measures taken.
+- **Gate 12.** A field validates as it is filled: checked when the person leaves it or pauses,
+  re-checked on every key once marked. The signal is a mark on the field with at most four words,
+  not a sentence under it and never a dialog. Submit-time-only validation fails. Fields, labels and
+  forms come only from the shared form components with `useContractForm`, so the rule is
+  structural: a raw field written in a feature fails the gate (FRONTEND_GUIDE §8).
 
 **Gates 9 and 10 exist because retrofitting is archaeology.** The AI's tool catalogue is derived
 *only* from per-module manifests. A module written in M1 without one is invisible to the M10
@@ -281,7 +298,8 @@ every value its conditions compare. Pixie's `position` approvers and deputy fall
 
 **Design system.** Port the primitive **engineering** from `praxis-ls/client/src/components/ui/`
 (89 files) and rebuild the shell and visual language on MyCity's tokens. Primitives first:
-`field.tsx` + `info-hint.tsx` (gate 8), `date-field.tsx` / `datetime-field.tsx` (gate 15),
+`field.tsx` + `info-hint.tsx` (gate 8; the hint becomes the help term and the Details row,
+FRONTEND_GUIDE §5.2), `date-field.tsx` / `datetime-field.tsx` (gate 15),
 `image-upload.tsx` + `file-drop.tsx` (gate 18), `form.tsx`, `dialog.tsx` + `modal.tsx` (gate 16),
 `callout.tsx`, `kpi-tile.tsx`, `data-view.tsx`, `chart.tsx`, `otp-input.tsx`, `panel.tsx`. The
 primitives keep their Praxis engineering; they are re-skinned onto shadcn/ui role names so the
@@ -1222,7 +1240,7 @@ while CI is not, because a change to a shared service breaks suites you did not 
 
 ## 18 · Screen inventory
 
-Fifteen modules in the admin application, plus a separate public site of six pages. 86 screens in
+Fifteen modules in the admin application, plus a separate public site of six pages. 92 screens in
 all. This is the vocabulary the client sees, the vocabulary the ⌘K index is built from, and the
 vocabulary every later document uses. It is reproduced exactly in the prototype.
 
@@ -1230,7 +1248,7 @@ vocabulary every later document uses. It is reproduced exactly in the prototype.
 entry, a permission key and a line in the training material, so a rename after M9 means touching
 the route table, the registry, the permission catalogue and the knowledge base in one change.
 
-**Proposed additions, pending ratification (flagged 13/10/2026, TB).** A client request for a
+**Proposed additions (flagged 13/10/2026, TB; ratified 15/10/2026, below).** A client request for a
 clear, well-presented organogram adds two screens: **People · Organogram** (HR builder) and
 **Employee Self-Service · Org Chart** (read-only viewer for every member of staff), both drawing
 the live `line_manager_id` reporting tree, not a separate structure. This would take the inventory
@@ -1241,8 +1259,10 @@ ratifying it also updates the summary counts, the `SCREENS` constant in
 
 **Ratified 13/10/2026 (TB).** Home gains a fourth tab, **Team** (`team`), a managers-and-CEO roster and today’s attendance view that reads the live attendance roster. This is applied to the table above (Home now lists four tabs), taking the admin surface to 80 screens and the inventory to 86. It is reflected in the summary counts, the `SCREENS` constant in `scripts/check/progress.js`, and `docs/PROGRESS.md` (row #86). Its engineering shape is in `docs/guides/home.md`, with the built preview in `demo.html`. It reuses the `home` permission key, so the command menu and permission registry pick it up when the frontend foundation lands.
 
+**Ratified 15/10/2026 (TB).** Six screens join the inventory, taking the admin surface to 86 and the inventory to 92: **People · Organogram** (`organogram`) and **Employee Self-Service · Org Chart** (`org-chart`), the two proposed above; the three ESS attendance tabs built with the attendance work, **Work Location Requests** (`work-location-requests`), **My Devices** (`my-devices`) and **Policy Updates** (`policy-updates`); and **My Security** (`my-security`). All are M1. They are applied to the table above, the summary counts, the `SCREENS` constant in `scripts/check/progress.js`, `src/shared/route-map.js` and `docs/PROGRESS.md` (rows #87 to #92). They reuse the `ess` and `people` permission keys.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
-application, its own build, its own origin, listed below only because it carries six of the 86
+application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
 staff never navigates to it to do their job.
 
@@ -1250,10 +1270,10 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | (ungrouped) | **Home** | 4 | Overview · Team · Alerts · Reports | M1 |
 | (ungrouped) | **My Workspace** | 4 | Today · Tasks · Calendar · Analytics | M2 |
-| (ungrouped) | **Employee Self-Service** | 7 | My Profile · My Attendance · My Performance · My Payslips · My Leave · My Queries · My Documents | M1 |
+| (ungrouped) | **Employee Self-Service** | 12 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · Org Chart · My Security | M1 |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
-| People | **People** | 5 | Employees · Attendance · Leave · Devices · Worksites | M1 |
+| People | **People** | 6 | Employees · Organogram · Attendance · Leave · Devices · Worksites | M1 |
 | People | **Performance** | 5 | Goals · Targets · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
 | People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |

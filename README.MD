@@ -19,7 +19,7 @@ map, read §11 first.
 | `docs/SYSTEM_ARCHITECTURE.md` | Servers, processes, request lifecycle, events, release pipeline |
 | `docs/BACKEND_STRUCTURE.md` | The M0 foundation in detail: shared layer, contract, numbering, documents, imports, AI, pagination, first administrator |
 | `docs/BACKEND_GUIDE.md` | **How to write backend code here**: layers, a worked endpoint, what to reuse, done checklist. Read before any backend change |
-| `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, ⓘ help, two shells. Read before any frontend change |
+| `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
 | `docs/guides/<module>.md` | One engineering guide per feature: every screen it touches and how they relate. A change passes through its guide first |
 | `docs/PROGRESS.md` | The 86 screens and the M0 items, ticked as they are built, with a note per change |
 | `CLAUDE.md` | What an AI assistant reads first: which documents to read for a backend, frontend or full-stack task, and how to finish one |
@@ -60,8 +60,14 @@ mycity-app/
 │   ├── check/                the CI gates (§8)
 │   │   ├── lib/changes.js    what a change touched (git diff vs main) and its trailers,
 │   │   │                     shared by check/progress.js, check/guides.js, check/readme-map.js
-│   │   └── lib/source.js     reads JavaScript for the code gates: comments, strings, template
-│   │                         and regex literals told apart, line numbers kept
+│   │   ├── lib/copy.js       the screen copy rules: word LIMITS, word count, Title Case, explainer
+│   │   │                     titles, refused button labels (gates 8, 11, 12, 17; FRONTEND_GUIDE §5)
+│   │   ├── lib/screens.js    opens every screen of demo.html (and the app, once built) in Chromium at
+│   │   │                     phone and desktop size and records copy and layout (gates 8, 11)
+│   │   ├── lib/source.js     reads JavaScript for the backend code gates (date-format, money,
+│   │   │                     module-catalogue): comments, strings, template and regex literals apart
+│   │   └── lib/sources.js    string literals, call arguments and frontend files for the static halves
+│   │                         of check/five-second.js, check/forms.js, check/dashes.js
 │   ├── db/                   migrate, seed, backup, restore-drill, create-admin
 │   ├── import/               command-line import
 │   └── deploy/               deploy-gate, release-manifest, verify-staging, rollback
@@ -89,7 +95,8 @@ mycity-app/
 │   └── pull_request_template.md
 ├── .claude/
 │   ├── settings.json         registers the Stop hook for everyone using Claude Code here
-│   └── hooks/stop-check.js   runs the process gates before Claude may finish a task
+│   └── hooks/stop-check.js   runs the process gates before Claude may finish a task, and the
+│                             screen gates (8, 11, 12, 17) when app/, public-app/ or demo.html changed
 ├── package.json · package-lock.json · .nvmrc (Node 20) · eslint.config.js · jest.config.js
 └── CLAUDE.md                 what an AI assistant reads first
 ```
@@ -472,7 +479,10 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 9. **Public routes** (`*.public.routes.js`) never import `auth` or `rbac`; they read through an
    allow-listed shape and are reached by token, or by slug for careers and vacancies only.
 10. **Errors** are `AppError(code, message, status, fields)`. No SQL or stack trace reaches a client.
-11. **Copy a person reads** (mail, PDFs, exports): no em dashes, Title Case for chrome.
+11. **Copy a person reads** (screens, mail, PDFs, exports, API errors): no em dashes, Title Case for
+    chrome. On a screen, three tiers: operational content open, support text behind a help term
+    or a Details row, system explanations never; hard word limits (`scripts/check/lib/copy.js`,
+    FRONTEND_GUIDE §5).
 12. **Production data**: never seeded. Real records reach production by people using the product or
     through the import engine.
 13. **Pagination**: every list pages at 25 on the server through `shared/http/paged.js`
@@ -482,6 +492,9 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 14. **No login without an employee.** The first administrator comes from `scripts/db/create-admin.js`
     (full employee, login and role in one transaction); everyone else is created in the app
     (BACKEND_STRUCTURE §17).
+15. **One form system.** Every field in both apps comes from `src/components/form/` and validates
+    as it is filled from the contract schema (`useContractForm`); nobody writes a raw `<input>`,
+    `<label>` or `react-hook-form` call in a feature (FRONTEND_GUIDE §8, gate 12).
 
 ---
 
@@ -498,12 +511,14 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 | 5 Migration idempotency | M0 | `check/migration-idempotency.js` |
 | 6 Schema drift | M0 | `check/schema-drift.js`, `check/contract-columns.js` |
 | 7 Write routes validated | M0 | `check/route-contracts.js` |
-| 8 Five-second rule | M0 | frontend; backend half `check/dashes.js` |
+| 8 Five-second rule | M0 | `check/five-second.js` (every screen, phone and desktop, in Chromium); backend copy in `check/dashes.js` |
 | 9 AI manifest coverage | M1 | `check/ai-manifest-coverage.js` |
 | 10 Search coverage | M1 | `check/search-coverage.js` |
-| 11 to 14, 16, 18 | M1 | frontend gates |
+| 11 Two shells | M1 | `check/two-shells.js` (every screen, phone and desktop, in Chromium) |
+| 12 Inline validation, one form system | M1 | `check/forms.js` |
+| 13, 14, 16, 18 | M1 | frontend gates |
 | 15 Day-first dates | M1 | `check/date-format.js` |
-| 17 No dashes | M1 | `check/dashes.js` |
+| 17 No dashes | M1 | `check/dashes.js` (demo, both apps, `src/` strings, templates, the manual) |
 | 19 AI read manifest only | M4 | `check/ai-no-writes.js` |
 | 20 Money | M6 | `check/money.js` |
 
@@ -527,6 +542,10 @@ The first two accept a reason instead, as a line in the PR description or a comm
 **Not built is not passed.** A gate whose script is still an empty file is reported as NOT BUILT
 and listed at the end of `npm run ci`; it checks nothing yet. `npm run ci:list` shows each gate's
 state. Once M0 is complete, CI runs with `CI_STRICT=1` and a NOT BUILT gate fails the build.
+
+Gates 8 and 11 open every screen of `demo.html` (and the app, once it builds) in Chromium. CI
+installs it; locally run `npx playwright install chromium` once after `npm ci`. They take a
+`--screen=<Module>` filter (`node scripts/check/five-second.js --screen=Home`) while you work.
 
 **Run `npm run ci` before every push.** A single test file passing is not evidence about the suite.
 

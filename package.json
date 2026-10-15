@@ -27,6 +27,10 @@
     "gen:contract": "node scripts/gen/contract.js",
     "gen:env": "node scripts/gen/env-example.js",
     "check:pagination": "node scripts/check/pagination.js",
+    "check:five-second": "node scripts/check/five-second.js",
+    "check:two-shells": "node scripts/check/two-shells.js",
+    "check:forms": "node scripts/check/forms.js",
+    "check:dashes": "node scripts/check/dashes.js",
     "check:progress": "node scripts/check/progress.js",
     "check:guides": "node scripts/check/guides.js",
     "check:readme-map": "node scripts/check/readme-map.js",
@@ -66,6 +70,7 @@
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
     "jest": "^30.5.2",
+    "playwright": "1.56.1",
     "socket.io-client": "^4.8.4",
     "supertest": "^7.3.1"
   }

@@ -5,11 +5,11 @@
 | Owner | GE |
 | Milestone | M1 |
 | Backend modules | `mailbox` |
-| Frontend paths | To be set when the frontend foundation lands (AJ). |
+| Frontend paths | `app/src/features/mailbox/` |
 | Permission key(s) | `mailbox` |
 | Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash; connection under Settings · Integrations |
 | Status | Agreed |
-| Last changed | 13/10/2026 |
+| Last changed | 15/10/2026 |
 
 Sources: MILESTONES §6.5 and D6; REUSE_MAP §2.5; the internal workflow meeting of 12 October 2026.
 The demo (`demo.html`, Mailbox) was updated the same day with the composer described here.
@@ -43,12 +43,13 @@ password, as with any mail app.
    the password is stored encrypted in `integration_secret` under `mail_conn:<id>`, never on the
    connection row.
 2. **Sync**: the worker's `mail-sync` scheduler and the `mail-idle` loop (IMAP IDLE) pull new mail
-   into the six folders. New mail raises `mailbox.message.received` → notification.
+   into the six folders. New mail raises `mailbox.message.received` → notification. **Refresh** in
+   the page header asks for a sync now (`POST /connection/sync`).
 3. **Read**: opening a thread marks it read on the server too. Remote images are not loaded until the
    reader asks.
 4. **Compose / Reply / Forward**: the composer opens prefilled for Reply (To = sender, `Re:` subject,
    the original quoted) and Forward (`Fwd:`, original quoted, attachments carried). Drafts save as
-   the person types.
+   the person types; a Draft Saved pill at the end of the formatting bar confirms it.
 5. **Send**: `POST /messages` puts the message on the send queue (`send-queue`) → `email-send`
    delivers through SMTP → the message lands in Sent. Scheduled mail waits on the queue until its
    release time and can be cancelled until then. Schedule offers tomorrow 08:00, next Monday 08:00,
@@ -101,7 +102,10 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
   and Numbered lists, Quote, Link (`https://` or `mailto:` only), Clear formatting, attachments.
   Later from the donor if wanted: code, table, rule, image by https address, text colour,
   highlight, mail-safe fonts only.
-- **No native dialogs**: links are added in an inline field; discarding a draft asks inline.
+- **No native dialogs**: links are added in a field under the formatting bar. Discard turns the
+  footer into Keep Editing and a red Discard Draft, buttons only; discarding drops the draft and its
+  attachments.
+- Schedule send times are Lagos time on the 24 hour clock; the date is day-first.
 - HTML mail is sanitised; scripts never run; remote images load only on request.
 - Attachments: 25 MB each through the upload engine; types by the mime policy.
 - Spam bodies are not rendered.
@@ -132,11 +136,36 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 - **Search** (`mailbox.search.js`, ⌘K): the caller's own threads by sender and subject, through the
   donor's `search.js`. Never another person's mail.
 
-## 10 · Mobile
+## 10 · On screen and mobile
 
-- Folder tabs scroll horizontally; the list fills the screen.
-- Tapping a message opens the reader **full screen** with a Back button.
-- The composer opens **full screen**, with Send always reachable at the bottom.
+What each screen shows open, what sits behind help, and how it is laid out on a phone
+(FRONTEND_GUIDE §5, §7). **§3 and §6 are for engineers: nothing in them reaches a screen unless it
+is listed here as tier 1 or tier 2.** Tier 3 (how the system works, why it was built this way,
+reassurance nobody asked for) is never on a screen; say where it lives instead (this guide, the
+manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
+
+Email bodies, subjects, senders and attachments are content a person received or wrote, not
+interface copy; the copy rules apply to the chrome around them.
+
+### 10.1 Content tiers
+
+| Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
+|---|---|---|---|
+| Mailbox · Inbox (`inbox`) | "N messages · N unread" (desktop subtitle); Refresh, Compose; Folder, Messages, Unread, Attachments, Mailbox (desktop: the user's address); the message list (unread dot, sender, subject, time); the open message: sender avatar, subject, sender and address, time, Reply, Forward, the body, the attachments with their sizes | None | Custom domain only, no Google or Microsoft, signing in with an address and a password, sending and receiving only with no link to other modules: §1, §3 step 1 (the page's ⓘ text is removed). What Refresh does: §3 step 2 |
+| Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | As Inbox, for that folder. Drafts lists scheduled mail as "Scheduled: subject" with its release time | None | Scheduled mail waiting in Drafts until release: §3 step 5. Spam bodies not rendered: §6 |
+| Composer (modal; full screen on mobile) | New Message, Reply or Forward as the title; From (the user's address), To (address chips, each removable; Cc Bcc), Cc, Bcc, Subject; the formatting bar (Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link with its address field and Add Link, Clear Formatting, Attach a File) and a Draft Saved pill at its end; the body; attachments with their upload bar; Schedule Send (Send Date, DD/MM/YYYY; Send Time, HH:MM; Cancel, Schedule Send). Footer: Discard, Schedule (Tomorrow at 08:00, Monday at 08:00, Pick Date and Time), Send; after Discard, Keep Editing and Discard Draft. Errors of at most 4 words where they happen: "Add a recipient" and "Not an email address" on the To row, "Not a real date", "Not a valid time", "Time already passed" | Help term on Send Time: "Lagos time, on the 24 hour clock: 08:30, 17:45." | How drafts save: §3 step 4. Scheduled mail and its release: §3 step 5. Link addresses limited to `https://` and `mailto:`: §6. The discard question ("Discard this draft and its attachments?") and the "That time has already passed" sentence are removed: the Discard Draft button and the field error say it (§6) |
+| Settings · Integrations, mailbox connection | Owned by Settings · Integrations: that module's guide | That module's guide | How the connection is tested and where the password is kept: §3 step 1, §4 |
+| Notification bell | Owned by the frontend foundation (FRONTEND_GUIDE §9.6): the sender and subject; a tap opens the message | None | Which mail notifies: §7, Settings · Notifications |
+
+### 10.2 Phone layout
+
+| Screen | First on a phone | Left off a phone | Main action | Navigation |
+|---|---|---|---|---|
+| Mailbox · Inbox (`inbox`) | Refresh and Compose beside the title; four stat cards two to a row (Folder, Messages, Unread, Attachments); the message list, full width | The subtitle; the Mailbox address card; the reader beside the list; the resizable divider | Tap a message: the reader opens full screen with Back, Reply and Forward; Compose opens the composer full screen | Mailbox from the menu drawer (it is not on the bottom bar); the six folder tabs scroll sideways along the top |
+| Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | As Inbox | As Inbox | As Inbox | As Inbox |
+| Composer (modal; full screen on mobile) | A full screen sheet: From, To, Subject as compact 44 px rows; the formatting bar in two rows of 44 px buttons; the body | Nothing: the same fields as desktop | Send, full width at the bottom, with Discard and Schedule above it | Close at the top of the sheet; Discard asks once in the footer |
+| Settings · Integrations, mailbox connection | Owned by Settings | That module's guide | That module's guide | That module's guide |
+| Notification bell | The bell in the top bar; push on the phone | None | A tap opens the message in the full screen reader | The top bar |
 
 ## 11 · Edge cases
 
@@ -172,3 +201,5 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 - 13/10/2026 · GE · First version, from the 12 October internal workflow meeting and MILESTONES §6.5.
 - 13/10/2026 · GE · Schedule send at any date and time; independent panes with a resizable list (TB review).
 - 13/10/2026 · GE · Page header slides away while reading so the panes get the full height (TB review).
+- 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the page's ⓘ text (custom domain, no Google or Microsoft, not linked to other modules) left the screen for §1; the composer's labels became aria-labels on its compact rows, the schedule fields use the form helpers with a help term on Send Time, recipient and time errors sit on the field, the Draft Saved pill moved out of the footer and Discard asks with buttons only. §3 and §6 updated to match (Refresh, Draft Saved, discard, Lagos time).
+- 15/10/2026 · AJ · Six folders and the composer built in `app/` against the mock API (autosaved drafts, schedule, inline discard, sanitised reader); not wired yet.

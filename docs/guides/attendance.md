@@ -5,11 +5,11 @@
 | Owner | LA |
 | Milestone | M1 |
 | Backend modules | `attendance` |
-| Frontend paths | `app/src/attendance/` |
+| Frontend paths | `app/src/features/attendance/` |
 | Permission key(s) | `attendance` |
 | Screens (PROGRESS.md rows) | #9 My Attendance, #25 Attendance, #27 Devices, #28 Worksites, #73 Attendance Policy |
 | Status | Draft |
-| Last changed | 14/10/2026 |
+| Last changed | 15/10/2026 |
 
 This guide records the attendance behaviour demonstrated in `docs/MyCity-ERP-Documents/demo.html`.
 The demo date is 9 October 2026 and its displayed times use Africa/Lagos.
@@ -131,15 +131,44 @@ views show masked area labels. Every full-address view is audited.
   reconciliation references and policy versions. Search results apply the same own/team/all scope.
 - AI does not create punches, approve exceptions, change policy or infer missing location evidence.
 
-## 10 · Mobile
+## 10 · On screen and mobile
 
-- The global Clock In / Clock Out control remains reachable from the compact header.
-- Attendance modals become bottom sheets with safe-area padding and keyboard-accessible actions.
-- People · Attendance KPI cards use a two-column layout; charts stack vertically.
-- Register rows become touch-friendly employee cards showing status, punches, expected and matched
-  location, device and exception summary. Selecting a card opens the same full evidence modal.
-- Attendance view tabs and filters scroll horizontally without shrinking their labels.
-- Wider administrative tables retain horizontal touch scrolling with the first column kept visible.
+What each screen shows open, what sits behind help, and how it is laid out on a phone
+(FRONTEND_GUIDE §5, §7). §3 and §6 are for engineers; only what is listed here reaches a screen.
+
+### 10.1 Content tiers
+
+| Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
+|---|---|---|---|
+| Clock In / Clock Out modal | Shift, work arrangement, clock location and radius, current time, the verification result; Clock In or Clock Out, Retry Location, Report Issue, Not Now | None; the policy line says only that the latest version needs acknowledgment | "location is read only and not continuously tracked", "one time and location reading will be recorded", blocked and rejected stage explanations: §6 and §11 here |
+| ESS · My Attendance | Today, history, net hours, status and review references | Clock In row: the time is the system time, not the phone's clock | "a correction never overwrites a punch": §6 |
+| ESS · Work Location Requests | Active location, requests and their status; New Request | Active Location row: a temporary location applies for its dates, then the permanent home; request Address label: 100 m home radius against the field radius | "How a request moves" card, "goes to your line manager", the simulated map pin note: §3 |
+| ESS · My Devices | Approved devices and every device with its status; Register This Device | Approved Devices title: an enrolled device raises no warning; Status header: what new, revoked and blocked mean | "How device checks work" card, the People review and identifier sentences: §6 |
+| ESS · Policy Updates | Published versions, what changed, acknowledgment state; Acknowledge | None | "records before that date are never recalculated": §6 |
+| People · Employees (attendance setup) | Work arrangement, approved home geofence; Change Arrangement, Edit Home | None | Arrangement explanations: §6 |
+| People · Attendance | KPI cards, the view switch, register, field assignments, location requests, manager preview; Reconcile | Needs Reconciliation KPI: what reconciliation records and where breaches go; Valid header (assignments); Status header (requests); the Outcome field when deciding a record | The page explainer, "Click a row for every recorded field", the reconcile footnote, "What a manager can and cannot do": §3, §6, §8 |
+| People · Devices | Device list with first seen, last punch, next punch and status; Device Policy, Enrol Device | Next Punch header: the effect under the current policy | "How the current device policy affects a punch" card, "devices register on every punch": §6 |
+| People · Worksites | Office worksites, approved homes, field sites, outside-fence count, the location list; Add Field Assignment, Add Worksite | Address header: homes show the area only, People and the CEO open the full address; Enforcement Mode header | "How the geofence behaves" and "Why homes are masked" cards, the HR detail audit banner: §6, §8 |
+| Settings · Attendance Policy | The six setting groups, configured tiers, acknowledgment report, policy versions; Discard, Review and Publish Changes, Reset Demo Data | A help term on each setting's name; "draft" in the draft bar; the outside-geofence modes as a closed Details row; Effective Date: no recalculation, no backdating | Every card footnote (seeded values, independent toggles, no automatic deduction, no overtime rates), "Employees have not been told": §6, §13 |
+| Settings · Audit Log | Entries today and this month, attendance entries, recent entries | Retention KPI: append only, archived after seven years | "What append only means" card, the chart caption: §7 |
+| Notifications and Alerts | Each alert or notification and the record it opens | None | What an alert is, what staff were sent, what a notification is: §7 |
+
+### 10.2 Phone layout
+
+| Screen | First on a phone | Left off a phone | Main action | Navigation |
+|---|---|---|---|---|
+| Clock In / Clock Out modal | A full sheet: shift, location, current time, the result | Nothing | Clock In or Clock Out, full width at the foot | Opens from the top bar clock button |
+| ESS · My Attendance | Today's card, then history as cards | Subtitle, chart captions | None; a card opens its record | Bottom bar Work; ESS tabs scroll sideways |
+| ESS · Work Location Requests | The active location card, then request cards | Subtitle | New Request opens a full sheet | ESS tabs |
+| ESS · My Devices | Approved devices as cards | Subtitle | Register This Device | ESS tabs |
+| ESS · Policy Updates | The latest version card with its changes | Subtitle | Acknowledge, full width | ESS tabs |
+| People · Employees (attendance setup) | The employee sheet with arrangement and home | Nothing | Change Arrangement, Edit Home | From the Employees card list |
+| People · Attendance | KPI cards two to a row, the view switch scrolling sideways, filters scrolling sideways, then register cards per employee with status, clock in and out, expected and matched location, device and exception | Open Clock Panel (the top bar clock does the same), subtitle, chart captions | Reconcile, full width in the header | Bottom bar People; tapping a register card opens the full evidence |
+| People · Devices | Device cards with status | Subtitle | Enrol Device | People tabs |
+| People · Worksites | KPI cards, then location cards | The Lagos geofence map | Add Worksite | People tabs |
+| Settings · Attendance Policy | The draft bar, then setting groups with label and value pairs | Header Reset button, the raw tier tables | Publish Policy in the draft bar | Settings tabs |
+| Settings · Audit Log | KPI cards, then entry cards, 25 per page | Chart caption | None | Settings tabs; Previous and Next |
+| Notifications and Alerts | The bell sheet with the three tabs | Tab explanation lines | Open the record | Top bar bell |
 
 ## 11 · Edge cases
 
@@ -173,3 +202,5 @@ No external donor attendance implementation has been approved for M1.
 ## 14 · Change log
 
 - 14/10/2026 · LA · Added the template metadata, engineering sections, mobile register behaviour and ownership-ready scope required by the guide check.
+- 14/10/2026 · TB · §10 rewritten to the On screen and mobile shape (content tiers and phone layout) for the screen conventions in FRONTEND_GUIDE §5 and §7; the phone register cards from this guide are kept.
+- 15/10/2026 · AJ · Frontend built in `app/src/features/attendance/` and Settings · Attendance Policy (draft, review, publish, acknowledgement report) against the mock API; not wired yet.

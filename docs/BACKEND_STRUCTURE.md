@@ -689,17 +689,19 @@ What it handles that a naive import does not:
 | 5 Migration idempotency | `check/migration-idempotency.js` (praxis); applied files hash-locked |
 | 6 Schema drift | `check/schema-drift.js`, `check/contract-columns.js` |
 | 7 Write routes validated | `check/route-contracts.js` (every route has a contract; writes have a body) |
-| 8 Five-second rule | frontend gate; backend half is `check/dashes.js` over templates |
+| 8 Five-second rule | `check/five-second.js` over every screen (FRONTEND_GUIDE §5); backend half is `check/dashes.js` over `src/` strings, templates and the manual |
 
 Pipeline guards, also from M0: `gen:contract --check`, `.env.example` matches schema, module
 catalogue equals enforced keys, every list paged at 25 (`check/pagination.js`, §16), public routes import no auth/rbac, numbering schemes exist for every
 allocated type, only `release.yml`/`rollback.yml` reference the `production` environment, shell
 scripts LF and `bash -n`, `node --check` on every file.
 
-The code gates read JavaScript through `scripts/check/lib/source.js` (comments, strings, template
-literals and regex literals told apart, line numbers kept), so a pattern in a comment never fails
-a build and one in a string is not missed. Each takes a waiver only on the line or in the comment
-directly above, with a reason: `@dash:keep`, `@date-format:parts|foreign|filename`, `@money:ok`.
+The backend code gates (date-format, money, module-catalogue) read JavaScript through
+`scripts/check/lib/source.js` (comments, strings, template literals and regex literals told apart,
+line numbers kept), so a pattern in a comment never fails a build and one in a string is not
+missed. Each takes a waiver only on the line or in the comment directly above, with a reason:
+`@date-format:parts|foreign|filename`, `@money:ok`. Gate 17 (dashes) is shared with the screen
+gates and reads through `scripts/check/lib/sources.js`.
 The module catalogue gate lists catalogue keys no route enforces yet as a note; its CI entry gains
 `--exact` at M9, when every module's routes exist.
 

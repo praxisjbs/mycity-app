@@ -1,153 +1,116 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Gates 8 (backend half) and 17: no dashes in what a person reads (CLAUDE.md, README §8).
+ * Gate 17, no dashes in copy a person reads (FRONTEND_GUIDE §5.4, MILESTONES §3),
+ * and the backend half of gate 8: what the API, mail and PDFs say is copy too.
  *
- * An em dash in product copy is nearly always a sentence doing two jobs: a statement,
- * a dash, then the aside the writer could not drop. It reads as machine-written, and it
- * is the over-explaining the five-second rule removes. Use a colon when the second half
- * explains the first, a full stop for a second thought, a comma for an aside. If none
- * fits, it is two sentences, or the second half belongs behind an ⓘ.
+ * Refuses an em dash, an en dash or a spaced double hyphen in:
+ *   demo.html          string literals in its scripts and the text of its markup
+ *   app/, public-app/  source outside comments (JSX text and strings)
+ *   src/, packages/    string literals (errors, mail subjects, notifications,
+ *                      contract validation messages)
+ *   src/services/ai/prompts/  the prompt files: the model copies the style it is given
+ *   templates/         the text of mail and document templates
+ *   docs/manual/       the user manual
  *
- * What is scanned, because a person reads it:
- *   templates/**                    email and document templates (front matter included:
- *                                   the subject line is copy), import templates
- *   src/services/ai/prompts/**      prompts: the model copies the style it is given
- *   string literals in src/ and packages/   error messages, notification text, labels,
- *                                   validation messages, log lines
- * Comments and docs/ are not scanned.
+ * The one allowed dash is the empty-value marker, a value that is nothing but
+ * the dash, which the shared table and detail components draw (§6).
+ * Comments are code, not copy, and are skipped.
  *
- * What counts: an em dash, an en dash or a horizontal bar anywhere, and "--" used as
- * punctuation (" -- " or word--word). Not counted: a string that is only a dash (the
- * empty-value marker in a cell), "--" inside SQL (a comment there), CLI flags (--check),
- * CSS custom properties (var(--x)), HTML comments, and a line marked
- *   @dash:keep <reason>
- * on the line or in the comment directly above it (a value that genuinely is a dash).
- *
- * Usage: node scripts/check/dashes.js     exit 0 clean, 1 with the list
+ * Usage: node scripts/check/dashes.js     exit 0 ok, 1 problems
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { mask, waived, walk, relTo } = require("./lib/source");
+const { hasDash, clean } = require("./lib/copy");
+const { ROOT, readDemo, scan, stripTags, lineOf, frontendFiles, read } = require("./lib/sources");
 
-const ROOT = path.resolve(__dirname, "..", "..");
-const SELF = "scripts/check/dashes.js";
+const problems = [];
+const add = (file, line, text) => problems.push(`  ${file}:${line}: "${clean(text).slice(0, 90)}"`);
 
-const DASH = /[–—―]/;
-const DOUBLE = /(?:(?:^|\s)--(?:\s|$)|\w--\w)/;
-const KEEP = /@dash:keep\s+\S/;
-const SQL =
-  /\b(?:SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|WITH|LIMIT|CREATE|ALTER|DROP)\b/;
-
-/** A string that is only a dash, or a word wrapped in two: an empty-value marker, not copy. */
-const emptyValueGlyph = (t) =>
-  /^\s*[–—―]\s*$/.test(t) || /^\s*[–—―][^–—―]{0,24}[–—―]\s*$/.test(t);
-
-/** Does this piece of copy carry a dash? */
-function hasDash(text, { sql = false } = {}) {
-  if (emptyValueGlyph(text)) return false;
-  if (DASH.test(text)) return true;
-  if (sql || SQL.test(text)) return false;
-  const t = text
-    .replace(/var\(\s*--[\w-]+/g, "")
-    .replace(/(^|\s)--[a-z][\w-]*/gi, "$1");
-  return DOUBLE.test(t);
-}
-
-/**
- * Dashes in a JavaScript file's string literals.
- * @returns {Array<{line: number, text: string}>}
- */
-function scanJs(source) {
-  const m = mask(source);
-  const lines = String(source).split("\n");
-  const codeLines = m.code.split("\n");
-  const hits = [];
-  const whole = new Map();
-  for (const s of m.strings)
-    if (s.template !== undefined)
-      whole.set(s.template, `${whole.get(s.template) || ""} ${s.text}`);
-  for (const s of m.strings) {
-    const sql = s.template !== undefined && SQL.test(whole.get(s.template));
-    if (!hasDash(s.text, { sql })) continue;
-    const offset = s.text.search(/[–—―]|--/);
-    const line = m.lineOf(s.start + Math.max(offset, 0));
-    if (waived(lines, codeLines, line - 1, KEEP)) continue;
-    hits.push({ line, text: s.text.trim().slice(0, 90) });
+function walk(dir, test, out = []) {
+  const abs = path.join(ROOT, dir);
+  if (!fs.existsSync(abs)) return out;
+  for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+    if (e.name === "node_modules") continue;
+    const rel = `${dir}/${e.name}`;
+    if (e.isDirectory()) walk(rel, test, out);
+    else if (test(e.name)) out.push(rel);
   }
-  return hits;
+  return out;
 }
 
-/**
- * Dashes in a text file a person reads (HTML template, prompt, JSON). HTML comments,
- * <style> and <script> are blanked first; front matter rules (---) are not copy.
- * @returns {Array<{line: number, text: string}>}
- */
-function scanText(source) {
-  const keep = (s) => s.replace(/[^\n]/g, " ");
-  const text = String(source)
-    .replace(/\r\n/g, "\n")
-    .replace(/<!--[\s\S]*?-->/g, keep)
-    .replace(/<style\b[\s\S]*?<\/style>/gi, keep)
-    .replace(/<script\b[\s\S]*?<\/script>/gi, keep);
-  const lines = text.split("\n");
-  const original = String(source).replace(/\r\n/g, "\n").split("\n");
-  const hits = [];
+/** Text nodes of markup, one per line of output. */
+function markupText(file, html) {
+  const re = />([^<]+)</g;
+  for (let m = re.exec(html); m; m = re.exec(html)) {
+    if (hasDash(m[1])) add(file, lineOf(html, m.index), m[1]);
+  }
+}
+
+/** A literal that is SQL: its `--` starts a comment (the pagination gate reads one), not copy. */
+const SQL = /\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|LIMIT|RETURNING|JOIN)\b/;
+const sqlComments = (v) => (SQL.test(v) ? v.replace(/--[^\n]*/g, "") : v);
+
+/** String literals of a script (HTML inside a literal is reduced to its text). */
+function scriptLiterals(file, code, base, whole) {
+  for (const l of scan(code).literals) {
+    const value = sqlComments(l.value);
+    const text = /</.test(value) ? stripTags(value) : value;
+    for (const piece of text.split(/\s{2,}/)) {
+      if (hasDash(piece)) add(file, lineOf(whole, base + l.start), piece);
+    }
+  }
+}
+
+const demo = readDemo();
+if (demo) {
+  for (const s of demo.scripts) scriptLiterals(demo.file, s.code, s.offset, demo.html);
+  markupText(demo.file, demo.markup);
+}
+
+for (const file of frontendFiles()) {
+  const src = scan(read(file)).code; // comments blanked
+  const lines = src.split("\n");
   lines.forEach((l, i) => {
-    if (/^\s*-{3,}\s*$/.test(l)) return;
-    if (KEEP.test(original[i] || "") || KEEP.test(original[i - 1] || ""))
-      return;
-    if (hasDash(l, { sql: false }) && !/^\s*$/.test(l))
-      hits.push({ line: i + 1, text: l.trim().slice(0, 90) });
+    const pieces = l.split(/[<>{}"'`]/);
+    if (pieces.some((p) => hasDash(p))) add(file, i + 1, l);
   });
-  return hits;
 }
 
-const isJs = (n) =>
-  /\.(c|m)?js$/.test(n) && !/\.(test|spec)\.(c|m)?js$/.test(n);
-const isText = (n) => /\.(html?|txt|md|json)$/.test(n);
-
-/**
- * @param {{root?: string}} [opts]
- * @returns {{problems: string[], notes: string[], count: number}}
- */
-function check({ root = ROOT } = {}) {
-  const files = [
-    ...walk(path.join(root, "templates"), isText).map((f) => [f, scanText]),
-    ...walk(path.join(root, "src", "services", "ai", "prompts"), isText).map(
-      (f) => [f, scanText],
-    ),
-    ...["src", "packages"].flatMap((d) =>
-      walk(path.join(root, d), isJs).map((f) => [f, scanJs]),
-    ),
-  ];
-  const problems = [];
-  const seen = new Set();
-  for (const [file, scan] of files) {
-    const rel = relTo(root, file);
-    if (rel === SELF || seen.has(rel)) continue;
-    seen.add(rel);
-    for (const h of scan(fs.readFileSync(file, "utf8")))
-      problems.push(`${rel}:${h.line}  ${h.text}`);
-  }
-  return { problems, notes: [], count: seen.size };
+for (const file of walk("src", (n) => n.endsWith(".js") && !n.endsWith(".test.js"))) {
+  const code = read(file);
+  scriptLiterals(file, code, 0, code);
 }
 
-if (require.main === module) {
-  const { problems, count } = check();
-  if (!problems.length) {
-    console.log(
-      `dashes: ok (${count} files, no dashes in copy a person reads)`,
-    );
-    process.exit(0);
-  }
-  console.error('dashes: no em dashes or " -- " in copy a person reads\n');
-  for (const p of problems) console.error(`  - ${p}`);
-  console.error(
-    "\nUse a colon, a full stop or a comma; if none fits, it is two sentences.",
-  );
-  console.error("A value that genuinely is a dash: @dash:keep <reason>.");
+for (const file of walk("packages", (n) => n.endsWith(".js") && !n.endsWith(".test.js"))) {
+  const code = read(file);
+  scriptLiterals(file, code, 0, code);
+}
+
+for (const file of walk("src/services/ai/prompts", (n) => n.endsWith(".md"))) {
+  read(file)
+    .split("\n")
+    .forEach((l, i) => {
+      if (!/^-{3,}\s*$/.test(l) && hasDash(l)) add(file, i + 1, l);
+    });
+}
+
+for (const file of walk("templates", (n) => /\.(html|hbs|txt)$/.test(n))) {
+  const html = read(file).replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, " "));
+  markupText(file, `>${html}<`);
+}
+
+for (const file of walk("docs/manual", (n) => n.endsWith(".md"))) {
+  const text = read(file).replace(/```[\s\S]*?```/g, (c) => c.replace(/[^\n]/g, " "));
+  text.split("\n").forEach((l, i) => {
+    if (hasDash(l)) add(file, i + 1, l);
+  });
+}
+
+if (problems.length) {
+  console.error(`dashes: ${problems.length} problem(s): an em dash, en dash or double hyphen in copy\n`);
+  for (const p of problems) console.error(p);
+  console.error("\nUse a comma, a colon, a full stop or two sentences instead (FRONTEND_GUIDE §5.4).");
   process.exit(1);
 }
-
-module.exports = { check, scanJs, scanText, hasDash, emptyValueGlyph };
+console.log("dashes: ok");

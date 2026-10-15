@@ -46,6 +46,12 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Gates 8 and 11 open every screen at phone and desktop size
+      # (scripts/check/lib/screens.js). The browser matches the pinned
+      # playwright version in package-lock.json.
+      - name: Chromium for the screen gates
+        run: npx playwright install --with-deps chromium
+
       - name: All gates
         run: npm run ci
         env:

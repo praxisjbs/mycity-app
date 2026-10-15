@@ -155,9 +155,11 @@ plus round-trip and command-line tests in `tests/integration/worker.test.js` and
   was before that UP, then UP again, on a throwaway `mycity_revcheck_*` database (needs CREATEDB).
 - Gate 5 `migration-idempotency.js`: the guard rules, and a merged migration edited, renamed or
   deleted fails (git, through `check/lib/changes.js`).
-- Gates 8/17 `dashes.js`, 15 `date-format.js`, 20 `money.js`; guards `module-catalogue.js`
+- Gate 15 `date-format.js`, 20 `money.js`; gate 17 `dashes.js` is the screen gates' version from
+  main (merged 15 October), widened to `packages/` and the AI prompts; guards `module-catalogue.js`
   (unenforced keys are a note until `--exact` at M9), `production-environment-refs.js`, `shell.js`.
-- `check/lib/source.js`: the JavaScript reader they share (comments, strings, templates, regex).
+- `check/lib/source.js`: the JavaScript reader the backend gates share. The screen gates from
+  main have their own (`check/lib/sources.js`); folding the two together is a later tidy-up.
 - `migrate.js`: five-digit numbers (M10 10000, M11 11000) ordered by number, `migrate({until})`,
   and `--down` refuses an irreversible file.
 - `scripts/import/run.js`: list, template, upload, map, preview, errors, commit, revert, status,
@@ -260,8 +262,6 @@ Do not `npm install` inside `C:\mycity-app` from the device shell: it is Linux, 
   environment prefix (`mycity:<env>:socket.io`).
 - In the bench, `pkill -f "node src/..."` matches the shell running it and kills the command; stop
   a background process by its saved pid.
-- The dashes gate reads a template literal's pieces together, so `LIMIT ${n} -- pagination:batch`
-  inside SQL is a SQL comment, not a dash in copy.
 - Old leftovers on his machine he can delete: `coverage/claude-sync/`, `coverage/claude-restore/`,
   `.git/claude-sync.tgz`.
 
