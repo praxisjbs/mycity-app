@@ -1,0 +1,419 @@
+/**
+ * The one API client and its data hooks, shared by the staff app and the public
+ * site (FRONTEND_GUIDE §3, §4, §9.5). Each app binds it once to its own endpoint
+ * map and settings in src/api/client.ts and src/api/hooks.ts; screens import from
+ * those files and never from here.
+ *
+ *   const core = createApi<Endpoints>({ auth: { refreshPath: "/api/v1/auth/refresh" }, credentials: "include", cache: true });
+ *   core.api.call("GET /api/v1/employees/:id", { params: { id } });
+ *
+ * Every call is typed by its key ("METHOD /path") from the app's Endpoints map,
+ * the interim types today and packages/contract/contract.gen.ts as modules land.
+ * Lists are ALWAYS the server's pages: usePaged sends `page`, `q` and the list's
+ * own filters and shows `page.total`; nothing here filters, sorts or slices rows,
+ * and no page size is ever sent (the server's is fixed at 25).
+ *
+ * The mock transport is passed only by a laptop build (VITE_API_MODE=mock); a
+ * release build passes none, so it never carries the mock (F12, check/mock-free.js).
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+
+/* ───── wire types ───── */
+
+/** `page` on every list response (contract common.js PageMeta). */
+export interface PageMeta {
+  number: number;
+  size: number;
+  total: number;
+  pages: number;
+  has_next: boolean;
+}
+
+/** Every error body (the API's error handler). */
+export interface ErrorBody {
+  error: { code: string; message: string; fields?: Record<string, string[]>; reference?: string };
+  request_id?: string;
+}
+
+/** One endpoint's shapes. */
+export interface EndpointShape {
+  query: unknown;
+  body: unknown;
+  params: unknown;
+  response: unknown;
+}
+
+type Key<E> = keyof E & string;
+type Shape<E, K extends Key<E>> = E[K] extends EndpointShape ? E[K] : never;
+export type QueryOf<E, K extends Key<E>> = Shape<E, K>["query"];
+export type BodyOf<E, K extends Key<E>> = Shape<E, K>["body"];
+export type ParamsOf<E, K extends Key<E>> = Shape<E, K>["params"];
+export type ResponseOf<E, K extends Key<E>> = Shape<E, K>["response"];
+/** Keys whose response is a page envelope. */
+export type PagedKeyOf<E> = { [K in Key<E>]: ResponseOf<E, K> extends { data: unknown[]; page: unknown } ? K : never }[Key<E>];
+export type RowOf<E, K extends Key<E>> = ResponseOf<E, K> extends { data: Array<infer R> } ? R : never;
+
+/** What a transport receives: the method, the path with its params filled, the query, the body, the headers. */
+export interface RawRequest {
+  method: string;
+  path: string;
+  query: Record<string, unknown>;
+  body: unknown;
+  headers: Record<string, string>;
+}
+export interface RawResponse {
+  status: number;
+  body: unknown;
+}
+export type Transport = (req: RawRequest) => Promise<RawResponse>;
+
+/** An error from the API: its status, code, message, per-field messages after a 422, and the request id. */
+export class ApiError extends Error {
+  status: number;
+  code: string;
+  fields: Record<string, string[]>;
+  requestId?: string;
+  reference?: string;
+
+  constructor(status: number, body: ErrorBody | null) {
+    super(body?.error.message ?? "Something went wrong on our side. Try again.");
+    this.name = "ApiError";
+    this.status = status;
+    this.code = body?.error.code ?? (status === 0 ? "NETWORK" : "INTERNAL_ERROR");
+    this.fields = body?.error.fields ?? {};
+    this.requestId = body?.request_id;
+    this.reference = body?.error.reference;
+  }
+}
+
+export interface ApiConfig {
+  /** Staff only: a bearer token held in memory, and one refresh retry on a 401 through this path. */
+  auth?: { refreshPath: string };
+  /** include for the staff app (the refresh cookie), omit for the public site. */
+  credentials: RequestCredentials;
+  /** Keep the last answer per request, so returning to a screen shows it at once. */
+  cache?: boolean;
+  /** A laptop build's mock, loaded lazily; never passed by a release build. */
+  mock?: () => Promise<Transport>;
+  /** Sees every response's headers (the environment marker). */
+  onHeaders?: (headers: Headers) => void;
+  /** The network transport; fetch unless a test passes its own. */
+  transport?: Transport;
+}
+
+const OFFLINE: RawResponse = { status: 0, body: { error: { code: "NETWORK", message: "You appear to be offline. Check the connection and try again." } } };
+
+function fetchTransport(credentials: RequestCredentials, onHeaders?: (h: Headers) => void): Transport {
+  return async (req) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(req.query)) if (v !== undefined && v !== null && v !== "") qs.set(k, String(v));
+    let res: Response;
+    try {
+      res = await fetch(`${req.path}${qs.toString() ? `?${qs}` : ""}`, {
+        method: req.method,
+        headers: { Accept: "application/json", ...(req.body !== undefined ? { "Content-Type": "application/json" } : {}), ...req.headers },
+        body: req.body !== undefined ? JSON.stringify(req.body) : undefined,
+        credentials,
+      });
+    } catch {
+      return OFFLINE;
+    }
+    onHeaders?.(res.headers);
+    const text = res.status === 204 ? "" : await res.text();
+    let body: unknown;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = null;
+    }
+    return { status: res.status, body };
+  };
+}
+
+/** One GET's state. */
+export interface ApiResult<T> {
+  data: T | undefined;
+  error: ApiError | null;
+  loading: boolean;
+  reload: () => void;
+  /** Replace the data in place (after a write that returned the new record). */
+  set: (data: T) => void;
+}
+
+export interface PagedResult<R> {
+  rows: R[];
+  page: PageMeta | undefined;
+  loading: boolean;
+  error: ApiError | null;
+  pageNumber: number;
+  setPage: (n: number) => void;
+  /** Search text as typed; the request follows 250 ms later. */
+  q: string;
+  setQ: (q: string) => void;
+  reload: () => void;
+}
+
+export function createApi<E>(config: ApiConfig) {
+  type K0 = Key<E>;
+  let accessToken: string | null = null;
+  let onSessionEnded: (() => void) | null = null;
+  let refreshing: Promise<boolean> | null = null;
+  let mockTransport: Transport | null = null;
+  const network = config.transport ?? fetchTransport(config.credentials, config.onHeaders);
+
+  async function transport(req: RawRequest): Promise<RawResponse> {
+    if (config.mock) {
+      if (!mockTransport) mockTransport = await config.mock();
+      return mockTransport(req);
+    }
+    return network(req);
+  }
+
+  type Opts<K extends K0> = { query?: QueryOf<E, K>; body?: BodyOf<E, K>; params?: ParamsOf<E, K>; signal?: AbortSignal; idempotencyKey?: string };
+
+  function build<K extends K0>(key: K, opts: Opts<K>): RawRequest {
+    const space = key.indexOf(" ");
+    const params = (opts.params ?? {}) as Record<string, string>;
+    const path = key.slice(space + 1).replace(/:([a-z_]+)/g, (_, name: string) => {
+      const v = params[name];
+      if (v == null) throw new Error(`api.call(${key}): missing path param "${name}"`);
+      return encodeURIComponent(v);
+    });
+    return {
+      method: key.slice(0, space),
+      path,
+      query: (opts.query ?? {}) as Record<string, unknown>,
+      body: opts.body,
+      headers: {
+        ...(config.auth && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : {}),
+      },
+    };
+  }
+
+  /** Try the refresh cookie once. Concurrent 401s share one refresh. */
+  function refreshSession(): Promise<boolean> {
+    if (!config.auth) return Promise.resolve(false);
+    const refreshPath = config.auth.refreshPath;
+    if (!refreshing) {
+      refreshing = transport({ method: "POST", path: refreshPath, query: {}, body: {}, headers: {} })
+        .then((res) => {
+          const token = (res.body as { access_token?: string } | null)?.access_token;
+          accessToken = res.status === 200 && token ? token : null;
+          return accessToken !== null;
+        })
+        .finally(() => {
+          refreshing = null;
+        });
+    }
+    return refreshing;
+  }
+
+  async function call<K extends K0>(key: K, opts: Opts<K> = {}): Promise<ResponseOf<E, K>> {
+    let res = await transport(build(key, opts));
+    const isRefresh = !!config.auth && key.includes(config.auth.refreshPath.replace(/\/refresh$/, "/"));
+    if (res.status === 401 && config.auth && !isRefresh) {
+      if (await refreshSession()) res = await transport(build(key, opts));
+      else onSessionEnded?.();
+    }
+    if (res.status >= 200 && res.status < 300) return res.body as ResponseOf<E, K>;
+    throw new ApiError(res.status, res.body as ErrorBody | null);
+  }
+
+  const session = {
+    setToken(token: string | null) {
+      accessToken = token;
+    },
+    get token() {
+      return accessToken;
+    },
+    onEnded(fn: () => void) {
+      onSessionEnded = fn;
+    },
+  };
+
+  /* ───── reads, with a small cache and invalidation by path ───── */
+
+  type Listener = () => void;
+  const cache = new Map<string, unknown>();
+  const listeners = new Map<string, Set<Listener>>();
+  const cacheKey = (key: string, params: unknown, query: unknown) => JSON.stringify([key, params ?? null, query ?? null]);
+  const pathOf = (key: string, params: unknown) => {
+    const p = (params ?? {}) as Record<string, string>;
+    return key.slice(key.indexOf(" ") + 1).replace(/:([a-z_]+)/g, (_, n: string) => p[n] ?? "");
+  };
+  function subscribe(path: string, fn: Listener) {
+    let set = listeners.get(path);
+    if (!set) listeners.set(path, (set = new Set()));
+    set.add(fn);
+    return () => {
+      set.delete(fn);
+    };
+  }
+
+  /** Refetch everything whose path starts with one of these prefixes: invalidate("/api/v1/employees"). */
+  function invalidate(...prefixes: string[]) {
+    for (const [path, set] of listeners) {
+      if (prefixes.some((p) => path.startsWith(p))) set.forEach((fn) => fn());
+    }
+    for (const k of [...cache.keys()]) {
+      const path = JSON.parse(k)[0] as string;
+      if (prefixes.some((p) => path.slice(path.indexOf(" ") + 1).startsWith(p))) cache.delete(k);
+    }
+  }
+
+  /** One GET. Pass `enabled: false` to wait (a detail panel with no id yet). */
+  function useApi<K extends K0>(key: K, opts: { params?: ParamsOf<E, K>; query?: QueryOf<E, K>; enabled?: boolean } = {}): ApiResult<ResponseOf<E, K>> {
+    const { params, query, enabled = true } = opts;
+    const ck = cacheKey(key, params, query);
+    const cached = () => (config.cache ? (cache.get(ck) as ResponseOf<E, K> | undefined) : undefined);
+    const [state, setState] = useState<{ ck: string; data?: ResponseOf<E, K>; error: ApiError | null; loading: boolean }>(() => ({
+      ck,
+      data: cached(),
+      error: null,
+      loading: enabled && !(config.cache && cache.has(ck)),
+    }));
+    const [tick, setTick] = useState(0);
+    const reload = useCallback(() => setTick((t) => t + 1), []);
+
+    useEffect(() => {
+      if (!enabled) return;
+      let live = true;
+      setState((s) => ({ ck, data: s.ck === ck ? s.data : cached(), error: null, loading: true }));
+      const [k, p, q] = JSON.parse(ck) as [K, ParamsOf<E, K>, QueryOf<E, K>];
+      call(k, { params: p ?? undefined, query: q ?? undefined } as Opts<K>)
+        .then((data) => {
+          if (config.cache) cache.set(ck, data);
+          if (live) setState({ ck, data, error: null, loading: false });
+        })
+        .catch((e: unknown) => {
+          const error = e instanceof ApiError ? e : new ApiError(0, null);
+          if (live) setState((s) => ({ ck, data: s.data, error, loading: false }));
+        });
+      return () => {
+        live = false;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- `ck` is the serialised key, params and query
+    }, [ck, enabled, tick]);
+
+    useEffect(() => subscribe(pathOf(key, params), reload), [key, params, reload]);
+
+    const set = useCallback(
+      (data: ResponseOf<E, K>) => {
+        if (config.cache) cache.set(ck, data);
+        setState({ ck, data, error: null, loading: false });
+      },
+      [ck],
+    );
+
+    const fresh = state.ck === ck;
+    return {
+      data: fresh ? state.data : cached(),
+      error: fresh ? state.error : null,
+      loading: enabled && (fresh ? state.loading : true),
+      reload,
+      set,
+    };
+  }
+
+  type PagedKey = PagedKeyOf<E>;
+  type Filters<K extends K0> = Omit<NonNullable<QueryOf<E, K>>, "page" | "q">;
+
+  /** A server-paged list with search and filters. Changing q or a filter goes back to page 1. */
+  function usePaged<K extends PagedKey & K0>(key: K, opts: { params?: ParamsOf<E, K>; filters?: Filters<K>; enabled?: boolean } = {}): PagedResult<RowOf<E, K>> {
+    const [pageNumber, setPage] = useState(1);
+    const [q, setQText] = useState("");
+    const [qSent, setQSent] = useState("");
+    const filterKey = JSON.stringify(opts.filters ?? {});
+    const lastFilters = useRef(filterKey);
+
+    useEffect(() => {
+      const t = setTimeout(() => {
+        setQSent(q.trim());
+        setPage(1);
+      }, 250);
+      return () => clearTimeout(t);
+    }, [q]);
+
+    useEffect(() => {
+      if (lastFilters.current !== filterKey) {
+        lastFilters.current = filterKey;
+        setPage(1);
+      }
+    }, [filterKey]);
+
+    const query = { ...(opts.filters ?? {}), page: pageNumber, ...(qSent ? { q: qSent } : {}) } as QueryOf<E, K>;
+    const res = useApi(key, { params: opts.params, query, enabled: opts.enabled });
+    const body = res.data as { data: RowOf<E, K>[]; page: PageMeta } | undefined;
+    return { rows: body?.data ?? [], page: body?.page, loading: res.loading, error: res.error, pageNumber, setPage, q, setQ: setQText, reload: res.reload };
+  }
+
+  /** The same paged API for a phone: rows accumulate as the person scrolls, fetching page + 1 while has_next. */
+  function useInfinite<K extends PagedKey & K0>(key: K, opts: { params?: ParamsOf<E, K>; filters?: Filters<K>; q?: string; enabled?: boolean } = {}) {
+    const [pages, setPages] = useState<number>(1);
+    const resetKey = JSON.stringify([key, opts.params ?? null, opts.filters ?? {}, opts.q ?? ""]);
+    const [state, setState] = useState<{ reset: string; rows: RowOf<E, K>[]; page?: PageMeta; loading: boolean; error: ApiError | null }>({
+      reset: resetKey,
+      rows: [],
+      loading: false,
+      error: null,
+    });
+
+    useEffect(() => {
+      setPages(1);
+    }, [resetKey]);
+
+    useEffect(() => {
+      if (opts.enabled === false) return;
+      let live = true;
+      const [k, p, f, q] = JSON.parse(resetKey) as [K, ParamsOf<E, K>, Record<string, unknown>, string];
+      setState((s) => ({ ...s, loading: true }));
+      call(k, { params: p ?? undefined, query: { ...f, page: pages, ...(q ? { q } : {}) } } as Opts<K>)
+        .then((body) => {
+          const b = body as { data: RowOf<E, K>[]; page: PageMeta };
+          if (!live) return;
+          setState((s) => ({
+            reset: resetKey,
+            rows: pages === 1 || s.reset !== resetKey ? b.data : [...s.rows, ...b.data],
+            page: b.page,
+            loading: false,
+            error: null,
+          }));
+        })
+        .catch((e: unknown) => live && setState((s) => ({ ...s, loading: false, error: e instanceof ApiError ? e : new ApiError(0, null) })));
+      return () => {
+        live = false;
+      };
+    }, [resetKey, pages, opts.enabled]);
+
+    const more = useCallback(() => {
+      if (!state.loading && state.page?.has_next) setPages((n) => n + 1);
+    }, [state.loading, state.page]);
+
+    return { rows: state.reset === resetKey ? state.rows : [], page: state.page, loading: state.loading, error: state.error, more };
+  }
+
+  /** A write. `fields` holds the server's per-field messages after a 422, for the marks on the form. */
+  function useMutation<K extends K0>(key: K) {
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<ApiError | null>(null);
+    const run = useCallback(
+      async (opts: { params?: ParamsOf<E, K>; body?: BodyOf<E, K>; query?: QueryOf<E, K>; idempotencyKey?: string } = {}) => {
+        setPending(true);
+        setError(null);
+        try {
+          return await call(key, opts as Opts<K>);
+        } catch (e) {
+          setError(e instanceof ApiError ? e : new ApiError(0, null));
+          throw e;
+        } finally {
+          setPending(false);
+        }
+      },
+      [key],
+    );
+    return { run, pending, error, fields: error?.fields ?? {}, reset: () => setError(null) };
+  }
+
+  return { api: { call }, session, refreshSession, invalidate, useApi, usePaged, useInfinite, useMutation };
+}
