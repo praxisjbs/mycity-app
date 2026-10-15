@@ -33,7 +33,7 @@ export function NavList({ modules, current, slim, onNavigate }: { modules: Modul
               )}
             >
               <Icon name={m.icon} size="m" />
-              <span className={cn("transition-opacity", slim && "pointer-events-none opacity-0")}>{m.label}</span>
+              <span data-ui="nav-label" className={cn("transition-opacity", slim && "pointer-events-none opacity-0")}>{m.label}</span>
               {count ? (
                 <span className={cn("ml-auto rounded-full px-[7px] py-px text-[11px]", on ? "bg-on-primary-badge" : "bg-sidebar-badge", slim && "opacity-0")}>{count}</span>
               ) : null}

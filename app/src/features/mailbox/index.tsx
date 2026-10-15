@@ -6,7 +6,6 @@ import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/type
 import { Button, IconButton } from "@/components/ui/Button";
 import { Avatar, Banner, Pill, StatStrip } from "@/components/ui/data";
 import { Icon } from "@/components/ui/Icon";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { PageHead } from "@/components/ui/layout";
 import { Menu, type MenuItem } from "@/components/ui/Menu";
 import { useModal } from "@/components/ui/Modal";
@@ -19,7 +18,7 @@ import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Splitter, useSplit } from "@/features/community/Chat";
 import { Composer, type ComposeInit } from "./Composer";
-import { SearchBox } from "@/components/form";
+import { FormFooter, SearchBox } from "@/components/form";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
@@ -29,7 +28,6 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
   const mobile = useIsMobile();
   useFitPage(!mobile);
   const modal = useModal();
-  const info = useInfo();
   const conn = useApi("GET /api/v1/mailbox/connection");
   const list = usePaged("GET /api/v1/mailbox/threads", { filters: { folder } });
   const unread = useApi("GET /api/v1/mailbox/threads", { query: { folder, unread: true } });
@@ -54,7 +52,7 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
   return (
     <>
       <PageHead
-        title={<span className="inline-flex items-center gap-1.5">{NAMES[folder]} <InfoButton {...info} label="About the mailbox" /></span>}
+        title={NAMES[folder]}
         sub={`${total} message${total === 1 ? "" : "s"}${nUnread ? ` · ${nUnread} unread` : ""}`}
         actions={
           <>
@@ -64,7 +62,6 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
           </>
         }
       />
-      <InfoText {...info}>Custom domain only. No Google, no Microsoft. Signed in with an address and a password, the same as any other mailbox. Mail here sends and receives only; it is not linked to any other module.</InfoText>
       {conn.data?.status === "needs_reconnect" && <Banner tone="warn">The mail server refused the saved password. Reconnect under Settings, Integrations to keep receiving mail.</Banner>}
       <StatStrip items={[{ label: "Folder", value: NAMES[folder] }, { label: "Messages", value: total }, { label: "Unread", value: nUnread, tone: nUnread ? "warn" : "ok" }, { label: "Attachments", value: withFiles }, { label: "Mailbox", value: from, desktop: true }]} />
       <MailFrame
@@ -117,7 +114,7 @@ function MailFrame({ mobile, open, split, list, reader }: { mobile: boolean; ope
 
 function MailRow({ r, on, onClick }: { r: ThreadRow; on: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-start gap-[9px] border-b border-border px-[13px] py-[11px] text-left last:border-b-0", on ? "bg-accent" : "hover:bg-muted")}>
+    <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-start gap-[9px] border-b border-border px-[13px] py-[11px] text-left last:border-b-0", on ? "bg-accent" : "hover:bg-muted")}>
       <i className={cn("mt-[5px] size-[7px] flex-none rounded-full", r.unread ? "bg-primary" : "bg-transparent")} aria-label={r.unread ? "Unread" : undefined} />
       <span className="min-w-0 flex-1">
         <b className={cn("block truncate text-[12.5px]", r.unread ? "font-bold" : "font-[650]")}>{who(r.party)}</b>
@@ -216,7 +213,7 @@ function Reader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBack: () 
       <div className="flex items-start gap-3 border-b border-border pb-3.5 max-md:flex-wrap">
         <Avatar name={who(draft ? lastMsg.from : row.party)} size={38} />
         <span className="min-w-0 flex-1">
-          <h3 className="text-[15px] leading-[1.35] font-semibold">{thread.subject}</h3>
+          <h3 data-copy="content" className="text-[15px] leading-[1.35] font-semibold">{thread.subject}</h3>
           <p className="mt-1 text-[11.5px] text-subtle-foreground">
             {draft ? `To ${lastMsg.to.map((a) => a.address).join(", ") || "(no recipient)"}` : `${who(lastMsg.from)} <${lastMsg.from.address}>`} · {formatWhen(lastMsg.sent_at)}
           </p>
@@ -284,11 +281,11 @@ function EmptyFolder({ kind, count, close }: { kind: "spam" | "trash"; count: nu
       <p className="text-[13px] text-muted-foreground">
         {count} message{count === 1 ? "" : "s"} in {NAMES[kind]} will be deleted for good. This cannot be undone.
       </p>
-      <div className="-mx-[18px] mt-4 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button
           variant="primary"
-          disabled={busy}
+          busy={busy}
           onClick={async () => {
             setBusy(true);
             const r = await api.call("POST /api/v1/mailbox/folders/:kind/empty", { params: { kind }, body: {} });
@@ -299,7 +296,7 @@ function EmptyFolder({ kind, count, close }: { kind: "spam" | "trash"; count: nu
         >
           Empty {NAMES[kind]}
         </Button>
-      </div>
+      </FormFooter>
     </>
   );
 }

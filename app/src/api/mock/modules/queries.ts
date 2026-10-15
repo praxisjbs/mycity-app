@@ -19,7 +19,7 @@ const QUERIES: Q[] = [
   mk(12, "seyi", "Punch from unenrolled device", null, 12, "08:12", "Submitted the next day", S("ok", "Closed, no action"), ["Punch from a new phone"]),
   mk(11, "chidera", "Deadline missed, Enugu brief", "tolu", 16, "17:30", "Submitted the next day", S("neutral", "Closed, caution")),
   mk(10, "tobi", "Absence without notice", null, 21, "09:00", "Submitted in 2 days", S("err", "Escalated to warning")),
-  mk(9, "hauwa", "Missing clock-out", null, 25, "06:00", "Submitted the same day", S("ok", "Closed, no action")),
+  mk(9, "hauwa", "Missing Clock-Out", null, 25, "06:00", "Submitted the same day", S("ok", "Closed, no action")),
   mk(8, "yusuf", "2 late arrivals and one absence", "emeka", 33, "10:15", "Submitted the next day", S("ok", "Closed, no action")),
 ];
 const view = (q: Q, user: string): QueryDetail => {
@@ -35,7 +35,7 @@ route("GET /api/v1/queries/summary", (req) => {
   return ok({
     open: list.filter((q) => q.status.tone === "warn").length, awaiting_response: list.filter((q) => q.status.text === "Awaiting response").length,
     closed_this_month: list.filter((q) => q.status.text.startsWith("Closed")).length, escalated: list.filter((q) => q.status.tone === "err").length,
-    by_reason: [{ label: "Lateness", pct: 100, value: "9" }, { label: "Missing clock-out", pct: 55, value: "5" }, { label: "Unenrolled device", pct: 33, value: "3" }, { label: "Deadline missed", pct: 22, value: "2", emphasis: "warn" }, { label: "Absence without notice", pct: 11, value: "1" }],
+    by_reason: [{ label: "Lateness", pct: 100, value: "9" }, { label: "Missing Clock-Out", pct: 55, value: "5" }, { label: "Unenrolled Device", pct: 33, value: "3" }, { label: "Deadline Missed", pct: 22, value: "2", emphasis: "warn" }, { label: "Absence Without Notice", pct: 11, value: "1" }],
     by_reason_note: "Seventeen of twenty queries were raised by a rule rather than a person. That is the point of the rules.",
     focus_id: list.find((q) => q.status.tone === "warn")?.query_id ?? null,
   });
@@ -98,7 +98,7 @@ function letter(ref: string, first: string): LetterPreview {
 
 const RULES: Rule[] = [
   ["Repeated lateness", "Raises a query on the third late arrival in a rolling 30 days. Not the first.", "3 in 30 days", true],
-  ["Missing clock-out", "Raises a query the morning after a punch with no matching clock-out.", null, true],
+  ["Missing Clock-Out", "Raises a query the morning after a punch with no matching clock-out.", null, true],
   ["Unenrolled device", "Raises a query when someone punches from a device that is not enrolled.", null, true],
   ["Absence without notice", "Raises a query after one full day absent with no approved leave.", null, true],
   ["Overdue task", "Raises a query when a task is 5 working days past its date.", "5 working days", false],
@@ -106,7 +106,7 @@ const RULES: Rule[] = [
 ].map((r, i) => ({ rule_id: sid(`rule:${i}`), name: r[0] as string, description: r[1] as string, threshold: r[2] as string | null, status: r[3] ? S("ok", "Active") : S("neutral", "Draft") }));
 const FIRINGS: Firing[] = [
   ["Repeated lateness", 7, "09:41", "bashir", S("warn", "Query raised")],
-  ["Missing clock-out", 1, "06:00", "emeka", S("warn", "Query raised")],
+  ["Missing Clock-Out", 1, "06:00", "emeka", S("warn", "Query raised")],
   ["Unenrolled device", 1, "08:58", "seyi", S("neutral", "Warned, no query")],
   ["Repeated lateness", 3, "09:18", "cynthia", S("neutral", "Below threshold")],
   ["Unenrolled device", 12, "08:12", "seyi", S("ok", "Closed, no action")],
@@ -146,7 +146,7 @@ const SANCTIONS: SanctionRow[] = [
 route("GET /api/v1/queries/sanctions/summary", () =>
   ok({
     active: SANCTIONS.filter((s) => s.status.text === "Active").length, served: SANCTIONS.filter((s) => s.status.text !== "Active").length + 2, financial_this_year: "57500.00", recovered: "45000.00",
-    focus: { title: "Bashir Lawal · 3 late arrivals in 30 days", status: S("warn", "In progress"), chain: [{ label: "Query raised", state: "done" }, { label: "Awaiting response", state: "now" }, ...["Caution", "Warning", "Suspension", "Suspension without pay", "Dismissal"].map((label) => ({ label, state: null }))] },
+    focus: { title: "Bashir Lawal · 3 late arrivals in 30 days", status: S("warn", "In progress"), chain: [{ label: "Query Raised", state: "done" }, { label: "Awaiting Response", state: "now" }, ...["Caution", "Warning", "Suspension", "Suspension without pay", "Dismissal"].map((label) => ({ label, state: null }))] },
     activity: [
       { title: "Query letter sent to Bashir Lawal", when: at(7, "09:41"), text: "By email and in app. Response due in 48 hours.", tone: "hi" },
       { title: "Caution issued to Chidera Nwosu", when: at(15, "11:00"), text: "Response read first. Caution stands.", tone: null },

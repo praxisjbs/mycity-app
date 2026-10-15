@@ -241,3 +241,4 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
   vacancies, whole-company visibility for all staff, desktop tree with a distinct mobile focus view,
   seed from the staff spreadsheet, PDF and PNG export, internal only.
 - 15/10/2026 · AJ · Ratified as #92 and #91. Frontend built on mocks in `app/` (builder with drag to reassign, viewer, levels below two collapsed at start); not wired to the API yet.
+- 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: the ⓘ note under the chart is gone, the subtitle is shortened, and the chart is marked as content for gate 8.

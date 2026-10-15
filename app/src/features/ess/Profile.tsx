@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/Toast";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { formatDate, initials } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, FormRow, Input, rules, Upload, useForm } from "@/components/form";
+import { Field, FormFooter, rules, TextField, UploadField, useContractForm, Wizard } from "@/components/form";
 
 export function MyProfilePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/profile");
@@ -43,25 +43,24 @@ export function MyProfilePage() {
       {schedule}
     </Card>
   );
-  const bank = <Card><CardHeader title="Bank, Used for Expense Disbursement" /><KV items={[["Bank", p.bank.bank_name], ["Account name", p.bank.account_name], ["Account number", `•••• ${p.bank.account_last4}`]]} /></Card>;
+  const bank = <Card><CardHeader title="Bank Details" /><KV items={[["Bank", p.bank.bank_name], ["Account name", p.bank.account_name], ["Account number", `•••• ${p.bank.account_last4}`]]} /></Card>;
   const nok = <Card><CardHeader title="Next of Kin" /><KV items={[["Name", p.next_of_kin.name], ["Relationship", p.next_of_kin.relationship], ["Phone", p.next_of_kin.phone]]} /></Card>;
   const can = (
     <Card>
-      <CardHeader title="What You Can Change" />
+      <CardHeader title="Editable Fields" />
       {p.can_change.map((c) => (
         <div key={c.field} className="flex items-center gap-2.5 border-b border-border py-2">
           <span className="flex-1 text-[12.5px] font-[550]">{c.field}</span>
           <Pill tone={c.how.tone}>{c.how.text}</Pill>
         </div>
       ))}
-      <p className="mt-[11px] text-[11.5px] text-subtle-foreground">Every change to this record is written to the audit log with who made it.</p>
     </Card>
   );
   const history = <Card><CardHeader title="My Record History" /><Timeline items={p.history} /></Card>;
 
   return (
     <>
-      <PageHead title="My Profile" sub="What People see, and what you can change yourself" actions={<Button variant="primary" icon="plus" onClick={edit}>Edit</Button>} />
+      <PageHead title="My Profile" sub="Your record as People see it" actions={<Button variant="primary" icon="plus" onClick={edit}>Edit</Button>} />
       <div className="mb-3 flex flex-wrap items-start gap-4 rounded-card border border-border bg-card p-4 shadow-1 max-md:p-[14px]">
         <button type="button" onClick={photo} title={p.photo_url ? "Change photo" : "Upload a photo"} className="relative flex size-[62px] flex-none items-center justify-center rounded-sheet bg-secondary text-[21px] font-bold tracking-[-.02em] text-secondary-foreground max-md:size-[52px] max-md:text-[18px]">
           {initials(p.display_name)}
@@ -69,8 +68,8 @@ export function MyProfilePage() {
             <Icon name="plus" className="size-[13px]" />
           </span>
         </button>
-        <span className="min-w-0 flex-1 max-md:basis-[180px]">
-          <h2 className="text-[19px] tracking-[-.02em]">{p.display_name}</h2>
+        <span data-copy="content" className="min-w-0 flex-1 max-md:basis-[180px]">
+          <h2 data-copy="content" className="text-[19px] tracking-[-.02em]">{p.display_name}</h2>
           <div className="mt-0.5 text-[13px] text-muted-foreground">{p.job_title} · {p.department}</div>
           <div className="mt-[9px] flex flex-wrap gap-1.5">{p.chips.map((c) => <Pill key={c.text} tone={c.tone}>{c.text}</Pill>)}</div>
         </span>
@@ -85,7 +84,7 @@ export function MyProfilePage() {
           { icon: "brief", title: "Employment", sub: "Role, manager and your work schedule", body: employment },
           { icon: "wallet", title: "Bank", sub: `${p.bank.bank_name} · ${p.bank.account_last4}`, body: bank },
           { icon: "users", title: "Next of Kin", sub: p.next_of_kin.name, body: nok },
-          { icon: "check", title: "What You Can Change", sub: `${p.can_change.filter((c) => c.how.tone !== "neutral").length} things you can change yourself`, body: can },
+          { icon: "check", title: "Editable Fields", sub: `${p.can_change.filter((c) => c.how.tone !== "neutral").length} things you can change yourself`, body: can },
           { icon: "doc", title: "Record History", sub: `${p.history.length} changes`, body: history },
         ]}
       />
@@ -99,7 +98,7 @@ export function MyProfilePage() {
 }
 
 function EditProfile({ p, close }: { p: MyProfile; close: () => void }) {
-  const f = useForm(
+  const f = useContractForm(
     { phone: p.personal.phone, address: p.personal.address, next_of_kin_name: p.next_of_kin.name, next_of_kin_relationship: p.next_of_kin.relationship, next_of_kin_phone: p.next_of_kin.phone, bank_name: p.bank.bank_name, account_number: "" },
     { phone: (v) => (/^(\+?234|0)\d{10}$/.test(v.replace(/[\s\-().]/g, "")) ? null : "A Nigerian number"), address: rules.min(5, "Enter the address"), account_number: (v) => (!v || /^\d{10}$/.test(v) ? null : "10 digits") },
   );
@@ -120,33 +119,50 @@ function EditProfile({ p, close }: { p: MyProfile; close: () => void }) {
       await save.run({ body });
       invalidate("/api/v1/ess/profile");
       close();
-      toast(body.bank_name || body.account_number ? "Saved. People have been notified of the bank change." : "Saved");
+      toast(body.bank_name || body.account_number ? "Saved. People are told of the bank change." : "Saved");
     } catch {
       f.setServerErrors(save.fields);
     }
   };
   return (
-    <>
-      <FormRow>
-        <Field label="Phone" {...f.field("phone")}><Input inputMode="tel" {...f.field("phone")} /></Field>
-        <Field label="Address" {...f.field("address")}><Input {...f.field("address")} /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Next of Kin"><Input {...f.field("next_of_kin_name")} /></Field>
-        <Field label="Relationship"><Input {...f.field("next_of_kin_relationship")} /></Field>
-      </FormRow>
-      <Field label="Next of Kin Phone"><Input inputMode="tel" {...f.field("next_of_kin_phone")} /></Field>
-      <FormRow>
-        <Field label="Bank" info="A bank change is logged and People are notified the same day, because expenses are paid into it.">
-          <Input {...f.field("bank_name")} />
-        </Field>
-        <Field label="New Account Number" info="Leave it empty to keep the account you have." {...f.field("account_number")}><Input inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="Unchanged" /></Field>
-      </FormRow>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Save</Button>
-      </div>
-    </>
+    <Wizard
+      finish="Save Changes"
+      busy={save.pending}
+      onFinish={() => void submit()}
+      onCancel={close}
+      steps={[
+        {
+          title: "Contact",
+          check: () => f.check(["phone", "address"]),
+          body: (
+            <>
+              <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" {...f.field("phone")} /></Field>
+              <Field label="Address" {...f.field("address")}><TextField {...f.field("address")} /></Field>
+            </>
+          ),
+        },
+        {
+          title: "Next of Kin",
+          body: (
+            <>
+              <Field label="Name"><TextField {...f.field("next_of_kin_name")} /></Field>
+              <Field label="Relationship"><TextField {...f.field("next_of_kin_relationship")} /></Field>
+              <Field label="Phone"><TextField inputMode="tel" {...f.field("next_of_kin_phone")} /></Field>
+            </>
+          ),
+        },
+        {
+          title: "Bank",
+          check: () => f.check(["account_number"]),
+          body: (
+            <>
+              <Field label="Bank" info="A bank change is logged, and People are told the same day: expenses are paid into it."><TextField {...f.field("bank_name")} /></Field>
+              <Field label="New Account Number" optional info="Leave it empty to keep the account you have." {...f.field("account_number")}><TextField inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="Unchanged" /></Field>
+            </>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -156,7 +172,7 @@ function PhotoForm({ close }: { close: () => void }) {
   return (
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">A clear, recent photo. It shows on your profile, in Staff Community and on the org chart.</p>
-      <Upload
+      <UploadField
         purpose="avatar"
         accept="image/*"
         multiple={false}
@@ -169,9 +185,9 @@ function PhotoForm({ close }: { close: () => void }) {
           toast("Photo updated");
         }}
       />
-      <div className="-mx-[18px] mt-4 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button variant={done ? "primary" : "default"} onClick={close}>{done ? "Done" : "Cancel"}</Button>
-      </div>
+      </FormFooter>
     </>
   );
 }

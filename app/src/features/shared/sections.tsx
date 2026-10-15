@@ -7,7 +7,6 @@ import type { Tone } from "@/api/types/common";
 import "@/api/types/shared";
 import { Button } from "@/components/ui/Button";
 import { Bars, Chain, KV, Pill, Timeline } from "@/components/ui/data";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, CardHeader } from "@/components/ui/layout";
 import { Pager, Table, type Column } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
@@ -20,11 +19,9 @@ import { SearchBox } from "@/components/form";
  */
 
 export function KvCard({ title, items, info, right }: { title: string; items: Array<[ReactNode, ReactNode]>; info?: string; right?: ReactNode }) {
-  const i = useInfo();
   return (
     <Card>
-      <CardHeader title={title} right={right}>{info && <InfoButton {...i} label={`About ${title.toLowerCase()}`} />}</CardHeader>
-      {info && <InfoText {...i}>{info}</InfoText>}
+      <CardHeader title={title} help={info} right={right} />
       <KV items={items} />
     </Card>
   );
@@ -41,11 +38,9 @@ export function ChainCard({ steps, note, title }: { steps: Array<{ label: string
 }
 
 export function BarsCard({ title, rows, note, info, right }: { title: string; rows: BarRow[]; note?: string; info?: string; right?: ReactNode }) {
-  const i = useInfo();
   return (
     <Card>
-      <CardHeader title={title} right={right}>{info && <InfoButton {...i} label={`About ${title.toLowerCase()}`} />}</CardHeader>
-      {info && <InfoText {...i}>{info}</InfoText>}
+      <CardHeader title={title} help={info} right={right} />
       <Bars rows={toBars(rows)} note={note} />
     </Card>
   );
@@ -114,16 +109,11 @@ export function PagedTable<R>({
       loading={list.loading}
       error={list.error}
       onRowClick={onRowClick}
-      empty={empty ?? (list.q ? { title: "Nothing matches", text: "Try another search." } : undefined)}
+      empty={empty ?? (list.q ? { title: "Nothing Matches", text: "Try another search." } : undefined)}
       wide={wide}
       footer={<Pager page={list.page} onPage={list.setPage} noun={noun} nounPlural={nounPlural} />}
     />
   );
-}
-
-/** The buttons row at the bottom of a form in the modal. */
-export function ModalFoot({ children }: { children: ReactNode }) {
-  return <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap items-center justify-end gap-2 border-t border-border px-[18px] py-3">{children}</div>;
 }
 
 /** Department options from the organisation's own list (never typed into a screen). */

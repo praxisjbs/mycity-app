@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/Button";
 import { MonthCalendar } from "@/components/ui/Calendar";
 import { AreaChart } from "@/components/ui/charts";
 import { Avatar, Bars, KV, Mini, Pill, Timeline } from "@/components/ui/data";
-import { WithInfo } from "@/components/ui/Info";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows, Table, Toolbar } from "@/components/ui/Table";
@@ -18,7 +17,7 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { formatDate, monthName, todayIso } from "@/lib/format";
 import { useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { DateField, Field, FormRow, Input, PersonPicker, rules, SearchBox, SegBar, Select, Textarea, useForm } from "@/components/form";
+import { DateField, Field, FormFooter, PersonPicker, rules, SearchBox, SegBar, SelectField, TextAreaField, TextField, useContractForm } from "@/components/form";
 
 export default function Workspace({ tab }: ModuleScreenProps) {
   const [params, setParams] = useSearchParams();
@@ -68,10 +67,10 @@ function TaskDetail({ t, close }: { t: Task; close: () => void }) {
     <>
       <KV items={[["Number", t.number], ["Owner", t.owner.display_name], ["Set by", t.set_by?.display_name ?? "Themselves"], ["Due", t.due ? formatDate(t.due) : "No date"], ["Priority", t.priority[0].toUpperCase() + t.priority.slice(1)], ["Status", LABEL[t.status]], ...(t.linked ? ([["Linked to", t.linked.label]] as Array<[string, string]>) : [])]} />
       {t.description && <p className="mt-3 text-[12.5px] text-muted-foreground">{t.description}</p>}
-      <div className="-mx-[18px] mt-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Close</Button>
-        {NEXT[t.status] && <Button variant="primary" iconRight="right" disabled={patch.pending} onClick={() => move(NEXT[t.status]!)}>Move to {LABEL[NEXT[t.status]!]}</Button>}
-      </div>
+        {NEXT[t.status] && <Button variant="primary" iconRight="right" busy={patch.pending} onClick={() => move(NEXT[t.status]!)}>Move to {LABEL[NEXT[t.status]!]}</Button>}
+      </FormFooter>
     </>
   );
 }
@@ -94,10 +93,9 @@ function Today() {
           {!data.my_day.length && <p className="text-[11.5px] text-subtle-foreground">Nothing due today.</p>}
         </Card>
         <Card>
-          <CardHeader title="Set by Your Line Manager" />
-          <div className="mb-2.5"><WithInfo heading="How the Week Is Planned" label="About tasks set by your manager">Your manager plans the week. You can add your own alongside.</WithInfo></div>
+          <CardHeader title="Set by Your Manager" />
           {data.set_by_manager.map((t) => <TaskCard key={t.task_id} t={t} onClick={() => openTask(t)} />)}
-          <Button className="mt-1 w-full" icon="plus" onClick={() => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> })}>Add My Own Task</Button>
+          <Button className="mt-1 w-full" icon="plus" onClick={() => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> })}>Add Task</Button>
         </Card>
       </Grid>
       <Grid cols={2}>
@@ -112,7 +110,7 @@ function Today() {
           ))}
         </Card>
         <Card>
-          <CardHeader title="What Moved While You Were Away" />
+          <CardHeader title="Since You Were Away" />
           <Timeline items={data.activity} />
         </Card>
       </Grid>
@@ -158,9 +156,6 @@ function Tasks() {
           cards: cols[i].list.rows.map((t) => ({ key: t.task_id, title: t.title, meta: <Pill tone={t.due_pill.tone}>{t.due_pill.text}</Pill>, owner: t.owner.display_name, onClick: () => openTask(t) })),
         }))}
       />
-      <div className="mt-3">
-        <WithInfo heading="Linked Work" label="About linked tasks">A task can be linked to a KPI, a partnership or a vacancy. When it closes, the thing it was linked to moves with it.</WithInfo>
-      </div>
     </>
   );
 }
@@ -176,7 +171,7 @@ function usePagedColumn(status: TaskStatus, scope: "mine" | "team", q: string) {
 export function TaskForm({ close, title = "" }: { close: () => void; title?: string }) {
   const me = useMe();
   const [owner, setOwner] = useState<PersonRef[]>([]);
-  const f = useForm({ title, due: "", priority: "normal", description: "" }, { title: rules.min(3, "Name the task") });
+  const f = useContractForm({ title, due: "", priority: "normal", description: "" }, { title: rules.min(3, "Name the task") });
   const save = useMutation("POST /api/v1/tasks");
   const submit = async () => {
     if (!f.check()) return;
@@ -191,21 +186,19 @@ export function TaskForm({ close, title = "" }: { close: () => void; title?: str
   };
   return (
     <>
-      <Field label="Task" {...f.field("title")}><Input {...f.field("title")} placeholder="What needs doing" /></Field>
-      <FormRow>
-        <Field label="Due"><DateField {...f.field("due")} min={todayIso()} /></Field>
-        <Field label="Priority"><Select options={[["urgent", "Urgent"], ["high", "High"], ["normal", "Normal"], ["low", "Low"]]} {...f.field("priority")} /></Field>
-      </FormRow>
+      <Field label="Task" {...f.field("title")}><TextField {...f.field("title")} placeholder="What needs doing" /></Field>
+      <Field label="Due"><DateField {...f.field("due")} min={todayIso()} /></Field>
+      <Field label="Priority"><SelectField options={[["urgent", "Urgent"], ["high", "High"], ["normal", "Normal"], ["low", "Low"]]} {...f.field("priority")} /></Field>
       {me.manages_people && (
         <Field label="Assign To" info="Leave empty to keep it yourself. You can set tasks for the people who report to you.">
           <PersonPicker value={owner} onChange={setOwner} placeholder="Search your team" />
         </Field>
       )}
-      <Field label="Notes"><Textarea {...f.field("description")} /></Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <Field label="Notes"><TextAreaField {...f.field("description")} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Create Task</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Create Task</Button>
+      </FormFooter>
     </>
   );
 }
@@ -252,20 +245,18 @@ function CalendarTab() {
 }
 
 function EventForm({ close }: { close: () => void }) {
-  const f = useForm({ title: "", date: "", time: "", kind: "Meeting" }, { title: rules.required("Name the event"), date: rules.required("Pick a date") });
+  const f = useContractForm({ title: "", date: "", time: "", kind: "Meeting" }, { title: rules.required("Name the event"), date: rules.required("Pick a date") });
   const save = useMutation("POST /api/v1/calendar");
   return (
     <>
-      <Field label="Event" {...f.field("title")}><Input {...f.field("title")} /></Field>
-      <FormRow>
-        <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} /></Field>
-        <Field label="Time"><Input {...f.field("time")} placeholder="10:00" /></Field>
-      </FormRow>
-      <Field label="Kind"><Select options={[["Meeting", "Meeting"], ["Deadline", "Deadline"], ["Campaign", "Campaign"], ["Event", "Event"]]} {...f.field("kind")} /></Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <Field label="Event" {...f.field("title")}><TextField {...f.field("title")} /></Field>
+      <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} /></Field>
+      <Field label="Time"><TextField {...f.field("time")} placeholder="10:00" /></Field>
+      <Field label="Kind"><SelectField options={[["Meeting", "Meeting"], ["Deadline", "Deadline"], ["Campaign", "Campaign"], ["Event", "Event"]]} {...f.field("kind")} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={async () => { if (!f.check()) return; await save.run({ body: f.values }); invalidate("/api/v1/calendar"); close(); toast("Added to the calendar"); }}>Add Event</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={async () => { if (!f.check()) return; await save.run({ body: f.values }); invalidate("/api/v1/calendar"); close(); toast("Added to the calendar"); }}>Add Event</Button>
+      </FormFooter>
     </>
   );
 }
@@ -285,11 +276,11 @@ function Analytics() {
       <Grid cols={2}>
         <Card><CardHeader title="Tasks by Priority" /><Bars rows={data.priority.map((p) => ({ ...p, color: p.emphasis === "warn" ? "var(--chart-4)" : undefined }))} /></Card>
         <Table
-          title={`Why the ${data.kpis.find((k) => k.key === "over")?.value} Are Overdue`}
+          title="Overdue Reasons"
           rows={data.late_reasons}
           rowKey={(r) => r.reason}
           columns={[
-            { key: "r", label: "Reason a Task Is Late", render: (r) => r.reason },
+            { key: "r", label: "Reason", render: (r) => r.reason },
             { key: "c", label: "Count", align: "n", render: (r) => r.count },
             { key: "s", label: "Share", render: (r) => <Mini pct={r.pct} label={`${r.pct}%`} /> },
           ]}

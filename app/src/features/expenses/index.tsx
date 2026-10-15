@@ -7,7 +7,7 @@ import type { DocumentRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
-import { Chain, KV, Quote, Who } from "@/components/ui/data";
+import { Chain, KV, Who } from "@/components/ui/data";
 import { Icon } from "@/components/ui/Icon";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
@@ -17,9 +17,9 @@ import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatDate, formatDateTime, formatMoneyShort, todayIso } from "@/lib/format";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
+import { BarsCard, ExportButton, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AmountInput, DateField, Field, FormRow, Input, Select, Textarea, Upload, useForm } from "@/components/form";
+import { DateField, Field, FormFooter, MoneyField, rules, SelectField, TextAreaField, TextField, UploadField, useContractForm, Wizard } from "@/components/form";
 
 export default function Expenses({ tab, id }: ModuleScreenProps) {
   if (tab === "approvals") return <Approvals id={id} />;
@@ -54,7 +54,7 @@ function MyRequests({ id }: { id: string | null }) {
         rowKey={(r) => r.request_id}
         noun="request"
         onRowClick={(r) => setSel(r.request_id)}
-        empty={{ title: "No requests yet", text: "Raise one with New Request. It goes to your line manager first." }}
+        empty={{ title: "No Requests Yet", text: "Raise one with New Request. It goes to your line manager first." }}
         columns={[
           { key: "n", label: "Reference", render: (r) => <span className={cn(r.request_id === focus && "font-semibold")}>{r.number}</span> },
           { key: "t", label: "Description", render: (r) => r.title },
@@ -64,17 +64,6 @@ function MyRequests({ id }: { id: string | null }) {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        <KvCard
-          title="What a Request Needs"
-          items={[
-            ["Description", "What it is for, in a sentence"],
-            ["Amount", "In Naira. Always"],
-            ["Category", "From the category list"],
-            ["Vendor invoice", "Attached. The engine compresses it on the way up"],
-            ["Account details", "Beneficiary bank and account, for the disbursement"],
-            ["Project", "Optional. Links the spend to a campaign or a city"],
-          ]}
-        />
         {focus ? <History id={focus} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
@@ -103,10 +92,10 @@ function RequestForm({ close }: { close: () => void }) {
   const { me } = useAuth();
   const [invoice, setInvoice] = useState<DocumentRef | null>(null);
   const [tried, setTried] = useState(false);
-  const f = useForm({ title: "", category_id: "", amount: "", project: "", beneficiary_name: me?.display_name ?? "", bank: "", account_number: "" }, {
-    title: (v) => (v.trim().length < 6 ? "What it is for, in a sentence" : null),
+  const f = useContractForm({ title: "", category_id: "", amount: "", project: "", beneficiary_name: me?.display_name ?? "", bank: "", account_number: "" }, {
+    title: (v) => (v.trim().length < 6 ? "Say what it is" : null),
     category_id: (v) => (!v ? "Pick the category" : null),
-    amount: (v) => (!(Number(v) > 0) ? "Enter the amount in Naira" : null),
+    amount: (v) => (!(Number(v) > 0) ? "Enter the amount" : null),
     beneficiary_name: (v) => (!v.trim() ? "Who is paid" : null),
     bank: (v) => (!v ? "Pick the bank" : null),
     account_number: (v) => (!/^\d{10}$/.test(v) ? "Ten digits (NUBAN)" : null),
@@ -125,30 +114,49 @@ function RequestForm({ close }: { close: () => void }) {
     }
   };
   return (
-    <>
-      <Field label="Description" {...f.field("title")}><Input {...f.field("title")} placeholder="Courier to Enugu" /></Field>
-      <FormRow>
-        <Field label="Category" {...f.field("category_id")}><Select placeholder="Pick one" options={cats.rows.map((c) => [c.category_id, c.name])} {...f.field("category_id")} /></Field>
-        <Field label="Amount" {...f.field("amount")}><AmountInput {...f.field("amount")} /></Field>
-      </FormRow>
-      <Field label="Project (Optional)"><Input {...f.field("project")} placeholder="Campaign or city" /></Field>
-      <FormRow>
-        <Field label="Beneficiary" {...f.field("beneficiary_name")}><Input {...f.field("beneficiary_name")} /></Field>
-        <Field label="Bank" {...f.field("bank")}><Select placeholder="Pick the bank" options={BANKS} {...f.field("bank")} /></Field>
-      </FormRow>
-      <Field label="Account Number" {...f.field("account_number")}><Input {...f.field("account_number")} inputMode="numeric" onChange={(v) => f.set("account_number", v.replace(/\D/g, "").slice(0, 10))} placeholder="10 digits" /></Field>
-      <Field label="Vendor Invoice" state={tried && !invoice ? "bad" : undefined} message={tried && !invoice ? "Attach the invoice" : undefined}>
-        {invoice ? (
-          <span className="flex items-center gap-2 rounded-ctl border border-border bg-muted px-3 py-2 text-[12.5px]"><Icon name="doc" />{invoice.file_name}<span className="text-subtle-foreground">{formatBytes(invoice.size_bytes)}</span><button type="button" className="ml-auto text-accent-foreground underline" onClick={() => setInvoice(null)}>Replace</button></span>
-        ) : (
-          <Upload purpose="expense_invoice" accept=".pdf,image/*" multiple={false} compact onUploaded={(d) => setInvoice(d[0])} />
-        )}
-      </Field>
-      <ModalFoot>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" disabled={save.pending} onClick={submit}>Submit Request</Button>
-      </ModalFoot>
-    </>
+    <Wizard
+      finish="Send Request"
+      busy={save.pending}
+      onFinish={() => void submit()}
+      onCancel={close}
+      steps={[
+        {
+          title: "Request",
+          check: () => f.check(["title", "category_id", "amount"]),
+          body: (
+            <>
+              <Field label="Description" {...f.field("title")}><TextField {...f.field("title")} placeholder="Courier to Enugu" /></Field>
+              <Field label="Category" {...f.field("category_id")}><SelectField placeholder="Pick one" options={cats.rows.map((c) => [c.category_id, c.name])} {...f.field("category_id")} /></Field>
+              <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>
+              <Field label="Project" optional><TextField {...f.field("project")} placeholder="Campaign or city" /></Field>
+            </>
+          ),
+        },
+        {
+          title: "Payee",
+          check: () => f.check(["beneficiary_name", "bank", "account_number"]),
+          body: (
+            <>
+              <Field label="Beneficiary" {...f.field("beneficiary_name")}><TextField {...f.field("beneficiary_name")} /></Field>
+              <Field label="Bank" {...f.field("bank")}><SelectField placeholder="Pick the bank" options={BANKS} {...f.field("bank")} /></Field>
+              <Field label="Account Number" {...f.field("account_number")}><TextField {...f.field("account_number")} inputMode="numeric" onChange={(v) => f.set("account_number", v.replace(/\D/g, "").slice(0, 10))} placeholder="10 digits" /></Field>
+            </>
+          ),
+        },
+        {
+          title: "Invoice",
+          body: (
+          <Field label="Vendor Invoice" state={tried && !invoice ? "bad" : undefined} message={tried && !invoice ? "Attach the invoice" : undefined}>
+            {invoice ? (
+              <span className="flex items-center gap-2 rounded-ctl border border-border bg-muted px-3 py-2 text-[12.5px]"><Icon name="doc" />{invoice.file_name}<span className="text-subtle-foreground">{formatBytes(invoice.size_bytes)}</span><button type="button" className="ml-auto text-accent-foreground underline" onClick={() => setInvoice(null)}>Replace</button></span>
+            ) : (
+              <UploadField purpose="expense_invoice" accept=".pdf,image/*" multiple={false} compact onUploaded={(d) => setInvoice(d[0])} />
+            )}
+          </Field>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -170,7 +178,7 @@ function Approvals({ id }: { id: string | null }) {
         rowKey={(r) => r.request_id}
         noun="request"
         onRowClick={(r) => setSel(r.request_id)}
-        empty={{ title: "Nothing waiting on you", text: "Requests reach you as line manager or as Operations." }}
+        empty={{ title: "Nothing Waiting on You", text: "Requests reach you as line manager or as Operations." }}
         columns={[
           { key: "n", label: "Reference", render: (r) => <span className={cn(r.request_id === focus && "font-semibold")}>{r.number}</span> },
           { key: "t", label: "Description", render: (r) => r.title },
@@ -191,7 +199,7 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
   const x = d.data;
   return (
     <Card className="mb-3">
-      <CardHeader title={`${x.number} · ${x.title}`} right={<StatusPill s={{ tone: "warn", text: formatMoneyShort(x.amount) }} />} />
+      <CardHeader record title={`${x.number} · ${x.title}`} right={<StatusPill s={{ tone: "warn", text: formatMoneyShort(x.amount) }} />} />
       <Chain steps={x.chain.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
       <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{x.chain_note} Vendor invoice attached, account details supplied.</p>
       <div className="mt-[13px]">
@@ -207,7 +215,7 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
       </div>
       {x.can_approve && (
         <div className="mt-[13px] flex flex-wrap gap-2">
-          <Button variant="primary" icon="ok" disabled={approve.pending} onClick={async () => { try { await approve.run({ params: { id }, body: {} }); invalidate("/api/v1/expenses"); onDone(); toast(`${x.number} approved`); } catch (e) { fail(e); } }}>Approve as {x.approve_as}</Button>
+          <Button variant="primary" icon="ok" busy={approve.pending} onClick={async () => { try { await approve.run({ params: { id }, body: {} }); invalidate("/api/v1/expenses"); onDone(); toast(`${x.number} approved`); } catch (e) { fail(e); } }}>Approve as {x.approve_as}</Button>
           <Button onClick={() => modal.open({ title: `Reject ${x.number}`, body: (close) => <Reject id={id} close={close} onDone={onDone} /> })}>Reject</Button>
           {x.invoice && <Button icon="doc" onClick={() => toast(`${x.invoice!.file_name} opens from the vault once connected`)}>View Invoice</Button>}
         </div>
@@ -217,17 +225,18 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
 }
 
 function Reject({ id, close, onDone }: { id: string; close: () => void; onDone: () => void }) {
-  const [reason, setReason] = useState("");
+  const f = useContractForm({ reason: "" }, { reason: rules.min(6, "At least 6 characters") });
+  const reason = f.values.reason;
   const reject = useMutation("POST /api/v1/expenses/requests/:id/reject");
   return (
     <>
-      <Field label="Reason" info="The requester sees this.">
-        <Textarea value={reason} onChange={setReason} placeholder="Use approved vendors" />
+      <Field label="Reason" {...f.field("reason")} info="The requester sees this.">
+        <TextAreaField {...f.field("reason")} placeholder="Use approved vendors" />
       </Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={reason.trim().length < 6 || reject.pending} onClick={async () => { try { await reject.run({ params: { id }, body: { reason } }); invalidate("/api/v1/expenses"); close(); onDone(); toast("Rejected. The requester is told why"); } catch (e) { fail(e); } }}>Reject</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={reject.pending} onClick={async () => { if (!f.check()) return; try { await reject.run({ params: { id }, body: { reason } }); invalidate("/api/v1/expenses"); close(); onDone(); toast("Rejected. The requester is told why"); } catch (e) { fail(e); } }}>Reject</Button>
+      </FormFooter>
     </>
   );
 }
@@ -244,7 +253,6 @@ function Requisitions() {
     <>
       <PageHead title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Requisition", wide: true, body: (close) => <NewRequisition close={close} /> })}>New Requisition</Button>} />
       {s.data && <KpiTiles items={[{ label: "With the CEO", value: String(s.data.with_ceo), tone: s.data.with_ceo ? "err" : "ok" }, { label: "Days Waiting", value: String(s.data.days_waiting), tone: s.data.days_waiting > 3 ? "err" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Size", value: s.data.average_size }]} />}
-      <p className="mb-3 text-[11.5px] text-subtle-foreground">Operations selects approved requests and submits them as one requisition. The CEO approves the requisition, not each request.</p>
       <PagedTable<Requisition>
         title="Requisitions"
         list={list}
@@ -262,15 +270,6 @@ function Requisitions() {
       />
       <Grid cols={2} className="mt-3">
         {focus ? <RequisitionCard id={focus} /> : <Card><LoadingRows /></Card>}
-        <Card>
-          <CardHeader title="Why Group Them" />
-          <p className="text-[11.5px] text-subtle-foreground">The CEO was approving requests one at a time, which meant five notifications for one afternoon of spending and no view of the total.</p>
-          <p className="mt-[9px] text-[11.5px] text-subtle-foreground">A requisition is one decision on one number, with the requests visible underneath it.</p>
-          <Quote className="mt-3">An open requisition ages like any approval. The ageing rule raises an alert after three days.</Quote>
-          <div className="mt-3.5">
-            <KV items={[["Who groups", "Operations"], ["Who approves", "The CEO. One decision"], ["Partial approval", "Possible. A removed request returns to the queue"], ["After approval", "Each request becomes disbursable on its own"]]} />
-          </div>
-        </Card>
       </Grid>
     </>
   );
@@ -280,6 +279,7 @@ function RequisitionCard({ id }: { id: string }) {
   const d = useApi("GET /api/v1/expenses/requisitions/:id", { params: { id } });
   const approve = useMutation("POST /api/v1/expenses/requisitions/:id/approve");
   const [removed, setRemoved] = useState<string[]>([]);
+  const [tried, setTried] = useState(false);
   if (!d.data) return <Card>{d.error ? <ErrorBlock error={d.error} /> : <LoadingRows />}</Card>;
   const x = d.data;
   const kept = x.items.filter((i) => !removed.includes(i.request_id));
@@ -299,8 +299,9 @@ function RequisitionCard({ id }: { id: string }) {
       ]}
       footer={
         x.can_approve && (
-          <div className="flex justify-end border-t border-border px-[14px] py-2.5">
-            <Button variant="primary" icon="ok" disabled={!kept.length || approve.pending} onClick={async () => { try { await approve.run({ params: { id }, body: { remove_ids: removed } }); invalidate("/api/v1/expenses"); toast(`${x.number} approved${removed.length ? `, ${removed.length} returned to the queue` : ""}`); } catch (e) { fail(e); } }}>
+          <div className="flex items-center justify-end gap-3 border-t border-border px-[14px] py-2.5">
+            {tried && !kept.length && <span role="alert" className="mr-auto text-[12px] text-destructive">Keep at least one</span>}
+            <Button variant="primary" icon="ok" busy={approve.pending} onClick={async () => { if (!kept.length) return setTried(true); try { await approve.run({ params: { id }, body: { remove_ids: removed } }); invalidate("/api/v1/expenses"); toast(`${x.number} approved${removed.length ? `, ${removed.length} returned to the queue` : ""}`); } catch (e) { fail(e); } }}>
               Approve {kept.length} of {x.items.length}
             </Button>
           </div>
@@ -313,17 +314,17 @@ function RequisitionCard({ id }: { id: string }) {
 function NewRequisition({ close }: { close: () => void }) {
   const ready = usePaged("GET /api/v1/expenses/requests", { filters: { scope: "all", stage: "requisition" } });
   const [ids, setIds] = useState<string[]>([]);
+  const [tried, setTried] = useState(false);
   const save = useMutation("POST /api/v1/expenses/requisitions");
   const total = ready.rows.filter((r) => ids.includes(r.request_id)).reduce((a, r) => a + Math.round(Number(r.amount) * 100), 0);
   return (
     <>
-      <p className="mb-3 text-[12.5px] text-muted-foreground">Requests Operations has approved. Pick the ones to send to the CEO together.</p>
       <Table
         rows={ready.rows}
         rowKey={(r) => r.request_id}
         loading={ready.loading}
         onRowClick={(r) => setIds((l) => (l.includes(r.request_id) ? l.filter((v) => v !== r.request_id) : [...l, r.request_id]))}
-        empty={{ title: "Nothing ready", text: "Requests appear here once Operations approves them." }}
+        empty={{ title: "Nothing Ready", text: "Requests appear here once Operations approves them." }}
         columns={[
           { key: "c", label: "", render: (r) => <span className={cn("flex size-5 items-center justify-center rounded-full border", ids.includes(r.request_id) ? "border-secondary bg-secondary text-secondary-foreground" : "border-input")}>{ids.includes(r.request_id) && <Icon name="check" className="size-3" />}</span> },
           { key: "n", label: "Request", render: (r) => `${r.number} · ${r.title}` },
@@ -331,11 +332,13 @@ function NewRequisition({ close }: { close: () => void }) {
           { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
         ]}
       />
-      <ModalFoot>
-        <span className="mr-auto text-[12.5px]">{ids.length} selected · <b><Money value={`${Math.trunc(total / 100)}.${String(total % 100).padStart(2, "0")}`} /></b></span>
+      <p className={cn("mt-3 text-[12.5px]", tried && !ids.length ? "text-destructive" : "text-muted-foreground")} role={tried && !ids.length ? "alert" : undefined}>
+        {tried && !ids.length ? "Pick at least one request" : <>{ids.length} selected · <b><Money value={`${Math.trunc(total / 100)}.${String(total % 100).padStart(2, "0")}`} /></b></>}
+      </p>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={!ids.length || save.pending} onClick={async () => { try { const q = await save.run({ body: { request_ids: ids } }); invalidate("/api/v1/expenses"); close(); toast(`${q.number} sent to the CEO`); } catch (e) { fail(e); } }}>Send to CEO</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={async () => { if (!ids.length) return setTried(true); try { const q = await save.run({ body: { request_ids: ids } }); invalidate("/api/v1/expenses"); close(); toast(`${q.number} sent to the CEO`); } catch (e) { fail(e); } }}>Send to CEO</Button>
+      </FormFooter>
     </>
   );
 }
@@ -377,18 +380,7 @@ function Disbursements() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <AreaChart title="Disbursed per Month" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} note="Naira, settled only. A logged but unsettled transfer does not appear." /> : <Card><LoadingRows /></Card>}
-        <KvCard
-          title="Why a Bank Reference Is Mandatory"
-          items={[
-            ["The rule", "A disbursement cannot be saved without one"],
-            ["Enforced by", "The database, not only the screen"],
-            ["Why", "A disbursement with no reference cannot be traced back to a transfer"],
-            ["What it is not", "This system does not move money. It records that money moved"],
-            ["Currency", "All transfers in Naira. No multi-currency anywhere"],
-            ["Reconciliation", "The reference is what the finance team matches against the statement"],
-          ]}
-        />
+        {s.data ? <AreaChart title="Disbursed per Month" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );
@@ -396,7 +388,7 @@ function Disbursements() {
 
 function LogDisbursement({ close }: { close: () => void }) {
   const ready = usePaged("GET /api/v1/expenses/requests", { filters: { scope: "all", stage: "approved" } });
-  const f = useForm({ request_id: "", bank_reference: "", paid_on: todayIso() }, { request_id: (v) => (!v ? "Pick the approved request" : null), bank_reference: (v) => (!/^[A-Z0-9]{8,24}$/.test(v) ? "The bank's transfer reference" : null), paid_on: (v) => (!v ? "The date the bank confirmed" : null) });
+  const f = useContractForm({ request_id: "", bank_reference: "", paid_on: todayIso() }, { request_id: (v) => (!v ? "Pick the approved request" : null), bank_reference: (v) => (!/^[A-Z0-9]{8,24}$/.test(v) ? "The bank's transfer reference" : null), paid_on: (v) => (!v ? "Pick the bank date" : null) });
   const save = useMutation("POST /api/v1/expenses/disbursements");
   const submit = async () => {
     if (!f.check()) return;
@@ -411,15 +403,13 @@ function LogDisbursement({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Request" {...f.field("request_id")}><Select placeholder={ready.rows.length ? "Pick an approved request" : "Nothing awaiting disbursement"} options={ready.rows.map((r) => [r.request_id, `${r.number} · ${r.title} · ₦${Number(r.amount).toLocaleString("en-NG")}`])} {...f.field("request_id")} /></Field>
-      <FormRow>
-        <Field label="Bank Reference" {...f.field("bank_reference")}><Input {...f.field("bank_reference")} onChange={(v) => f.set("bank_reference", v.toUpperCase().replace(/\s/g, ""))} placeholder="FT26092812445" /></Field>
-        <Field label="Paid On" {...f.field("paid_on")}><DateField {...f.field("paid_on")} max={todayIso()} /></Field>
-      </FormRow>
-      <ModalFoot>
+      <Field label="Request" {...f.field("request_id")}><SelectField placeholder={ready.rows.length ? "Pick an approved request" : "Nothing awaiting disbursement"} options={ready.rows.map((r) => [r.request_id, `${r.number} · ${r.title} · ₦${Number(r.amount).toLocaleString("en-NG")}`])} {...f.field("request_id")} /></Field>
+      <Field label="Bank Reference" {...f.field("bank_reference")}><TextField {...f.field("bank_reference")} onChange={(v) => f.set("bank_reference", v.toUpperCase().replace(/\s/g, ""))} placeholder="FT26092812445" /></Field>
+      <Field label="Paid On" {...f.field("paid_on")}><DateField {...f.field("paid_on")} max={todayIso()} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Log Disbursement</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Log Disbursement</Button>
+      </FormFooter>
     </>
   );
 }
@@ -436,12 +426,12 @@ function BudgetsTab() {
         <div className="mb-3 flex items-start gap-2.5 rounded-card bg-info-soft p-[14px] text-info">
           <Icon name="alert" className="mt-0.5 flex-none" />
           <div>
-            <h3 className="text-[13.5px] font-semibold">Showing example figures</h3>
-            <p className="mt-1 text-[11.5px]">MyCity sets its operating expense budget from 2027. The screen is built and waiting. These numbers are illustrative.</p>
+            <h3 data-ui="title" className="text-[13.5px] font-semibold">Example Figures</h3>
+            <p className="mt-1 text-[11.5px]">Budgets start in 2027.</p>
           </div>
         </div>
       )}
-      {d ? <BarsCard title="Budget Against Actual, by Department" rows={d.lines.map((l) => ({ label: l.department, pct: l.pct, value: `${formatMoneyShort(l.actual)} of ${formatMoneyShort(l.budget)}`, ...(l.pct >= 90 ? { emphasis: "warn" as const } : {}) }))} /> : <Card><LoadingRows /></Card>}
+      {d ? <BarsCard title="Budget vs Actual" rows={d.lines.map((l) => ({ label: l.department, pct: l.pct, value: `${formatMoneyShort(l.actual)} of ${formatMoneyShort(l.budget)}`, ...(l.pct >= 90 ? { emphasis: "warn" as const } : {}) }))} /> : <Card><LoadingRows /></Card>}
       <Grid cols={2} className="mt-3">
         <Table
           title="Example Only"
@@ -455,17 +445,6 @@ function BudgetsTab() {
             { key: "a", label: "Actual", align: "n", render: (l) => <Money value={l.actual} />, desktop: true },
             { key: "v", label: "Variance", align: "n", render: (l) => <Money value={l.variance} />, desktop: true },
             { key: "s", label: "Status", render: (l) => <StatusPill s={l.status} /> },
-          ]}
-        />
-        <KvCard
-          title="Built and Handed Over Empty"
-          items={[
-            ["The ask", "MyCity does not budget operating expense until 2027"],
-            ["The decision", "Build it now anyway, hand it over with no lines"],
-            ["Why", "Adding budgets later means touching every expense path again"],
-            ["The threshold rule", "Fires at 90% of a line. Dormant with no lines"],
-            ["Setting one up", "Add a line per department and category, with a period"],
-            ["Who sees it", "Finance and the CEO. Managers see their own department"],
           ]}
         />
       </Grid>
@@ -498,24 +477,14 @@ function Categories() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Spend by Category, This Month" rows={s.data.by_category} /> : <Card><LoadingRows /></Card>}
-        <KvCard
-          title="What a Flag Does"
-          items={[
-            ["The chain", "The same for every request: line manager, Operations, requisition, CEO"],
-            ["Above the flag", "Marked for the CEO's attention inside the requisition"],
-            ["Set per category", "Office at ₦100,000, events at ₦500,000"],
-            ["Changing one", "A setting. No deploy, and in-flight requests are unaffected"],
-            ["Capital", "Flagged separately for the books. It still follows the same chain"],
-          ]}
-        />
+        {s.data ? <BarsCard title="Spend by Category" rows={s.data.by_category} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );
 }
 
 function CategoryForm({ close }: { close: () => void }) {
-  const f = useForm({ name: "", kind: "Operating", flag_above: "" }, { name: (v) => (!v.trim() ? "Name the category" : null), flag_above: (v) => (!(Number(v) > 0) ? "The amount above which it is flagged" : null) });
+  const f = useContractForm({ name: "", kind: "Operating", flag_above: "" }, { name: (v) => (!v.trim() ? "Name the category" : null), flag_above: (v) => (!(Number(v) > 0) ? "Enter the threshold" : null) });
   const save = useMutation("POST /api/v1/expenses/categories");
   const submit = async () => {
     if (!f.check()) return;
@@ -530,15 +499,13 @@ function CategoryForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><Input {...f.field("name")} placeholder="e.g. Training" /></Field>
-      <FormRow>
-        <Field label="Type"><Select options={[["Operating", "Operating"], ["Capital", "Capital"]]} {...f.field("kind")} /></Field>
-        <Field label="Flag Above" {...f.field("flag_above")}><AmountInput {...f.field("flag_above")} /></Field>
-      </FormRow>
-      <ModalFoot>
+      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Training" /></Field>
+      <Field label="Type"><SelectField options={[["Operating", "Operating"], ["Capital", "Capital"]]} {...f.field("kind")} /></Field>
+      <Field label="Flag Above" {...f.field("flag_above")}><MoneyField {...f.field("flag_above")} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Category</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Category</Button>
+      </FormFooter>
     </>
   );
 }

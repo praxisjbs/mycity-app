@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { Button } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/data";
@@ -10,7 +9,7 @@ import { toast } from "@/components/ui/Toast";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, Input, ToggleRow } from "@/components/form";
+import { Field, FormFooter, rules, TextField, ToggleRow, useContractForm } from "@/components/form";
 
 export function MySecurityPage() {
   const { data: s, error, reload } = useApi("GET /api/v1/ess/security");
@@ -34,8 +33,8 @@ export function MySecurityPage() {
   const mfa = (
     <Card>
       <CardHeader title="Two-Step Sign-In" />
-      <ToggleRow title="Authenticator app" text="A 6 digit code at sign in, from any authenticator app" checked={s.mfa_app} onChange={(v) => set({ mfa_app: v })} />
-      <ToggleRow title="Email code as a fallback" text="Used only if the app is unavailable" checked={s.mfa_email_fallback} onChange={(v) => set({ mfa_email_fallback: v })} />
+      <ToggleRow title="Authenticator App" text="A 6 digit code at sign in, from any authenticator app" checked={s.mfa_app} onChange={(v) => set({ mfa_app: v })} />
+      <ToggleRow title="Email Code Fallback" text="Used only if the app is unavailable" checked={s.mfa_email_fallback} onChange={(v) => set({ mfa_email_fallback: v })} />
     </Card>
   );
   const pk = (
@@ -61,7 +60,6 @@ export function MySecurityPage() {
   const dev = (
     <Card>
       <CardHeader title="Devices" right={<Pill>Up to 3</Pill>} />
-      <p className="text-[11.5px] text-subtle-foreground">The phones and laptops you clock in from are managed in My Devices. A clock-in from any other device is flagged to People.</p>
       <Button className="mt-3" iconRight="right" onClick={() => navigate(hrefFor("ess", "my-devices"))}>Open My Devices</Button>
     </Card>
   );
@@ -80,7 +78,7 @@ export function MySecurityPage() {
   );
   return (
     <>
-      <PageHead title="My Security" sub="How you sign in, and the devices you clock in from" />
+      <PageHead title="My Security" sub="Sign-in methods and clock-in devices" />
       <PhoneCards
         items={[
           { icon: "shield", title: "Password", sub: `Changed ${formatDate(s.password_changed_at)}`, body: pw },
@@ -101,41 +99,55 @@ export function MySecurityPage() {
 }
 
 function PasswordForm({ close }: { close: () => void }) {
-  const [cur, setCur] = useState("");
-  const [next, setNext] = useState("");
-  const [again, setAgain] = useState("");
+  const f = useContractForm(
+    { cur: "", next: "", again: "" },
+    { cur: rules.min(8, "At least 8 characters"), next: rules.min(12, "At least 12 characters"), again: (v, all) => (v !== all.next ? "Does not match" : null) },
+  );
   const save = useMutation("POST /api/v1/auth/password");
-  const nBad = next.length > 0 && next.length < 12;
-  const aBad = again.length > 0 && again !== next;
-  const ok = cur.length >= 8 && next.length >= 12 && again === next;
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ body: { current_password: f.values.cur, new_password: f.values.next } });
+      close();
+      toast("Password updated");
+    } catch {
+      /* the field shows why */
+    }
+  };
+  const cur = f.field("cur");
   return (
     <>
-      <Field label="Current Password" state={save.fields.current_password ? "bad" : undefined} message={save.fields.current_password?.[0]}><Input type="password" value={cur} onChange={setCur} autoComplete="current-password" /></Field>
-      <Field label="New Password" state={nBad ? "bad" : next ? "good" : undefined} message="At least 12 characters"><Input type="password" value={next} onChange={setNext} autoComplete="new-password" state={nBad ? "bad" : next ? "good" : undefined} /></Field>
-      <Field label="Confirm New Password" state={aBad ? "bad" : again ? "good" : undefined} message="Does not match"><Input type="password" value={again} onChange={setAgain} autoComplete="new-password" state={aBad ? "bad" : again ? "good" : undefined} /></Field>
-      <p className="text-[11.5px] text-subtle-foreground">Changing your password signs you out everywhere else.</p>
-      <div className="-mx-[18px] mt-3 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <Field label="Current Password" {...cur} state={save.fields.current_password ? "bad" : cur.state} message={save.fields.current_password?.[0] ?? cur.message}><TextField type="password" autoComplete="current-password" {...cur} /></Field>
+      <Field label="New Password" info="Changing it signs you out everywhere else." {...f.field("next")}><TextField type="password" autoComplete="new-password" {...f.field("next")} /></Field>
+      <Field label="Confirm New Password" {...f.field("again")}><TextField type="password" autoComplete="new-password" {...f.field("again")} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={!ok || save.pending} onClick={async () => { try { await save.run({ body: { current_password: cur, new_password: next } }); close(); toast("Password updated"); } catch { /* the field shows why */ } }}>Update Password</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Update Password</Button>
+      </FormFooter>
     </>
   );
 }
 
 function PinForm({ close }: { close: () => void }) {
-  const [pin, setPin] = useState("");
+  const f = useContractForm({ pin: "" }, { pin: (v) => (/^\d{4,6}$/.test(v) ? null : "4 to 6 digits") });
   const save = useMutation("POST /api/v1/auth/pin");
-  const ok = /^\d{4,6}$/.test(pin);
+  const pin = f.field("pin");
+  const submit = async () => {
+    if (!f.check()) return;
+    await save.run({ body: { pin: f.values.pin } });
+    invalidate("/api/v1/ess/security");
+    close();
+    toast("PIN saved");
+  };
   return (
     <>
-      <p className="mb-3 text-[11.5px] text-subtle-foreground">A 4 to 6 digit PIN unlocks the app and confirms a clock-in on a registered device.</p>
-      <Field label="PIN" state={pin ? (ok ? "good" : "bad") : undefined} message="4 to 6 digits">
-        <Input type="password" inputMode="numeric" maxLength={6} value={pin} onChange={(v) => setPin(v.replace(/\D/g, ""))} className="h-[50px] text-center text-[20px] font-bold tracking-[.4em]" state={pin ? (ok ? "good" : "bad") : undefined} />
+      <Field label="PIN" {...pin}>
+        <TextField type="password" inputMode="numeric" maxLength={6} {...pin} onChange={(v) => pin.onChange(v.replace(/\D/g, ""))} className="h-[50px] text-center text-[20px] font-bold tracking-[.4em]" />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={!ok || save.pending} onClick={async () => (await save.run({ body: { pin } }), invalidate("/api/v1/ess/security"), close(), toast("PIN saved"))}>Save PIN</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Save PIN</Button>
+      </FormFooter>
     </>
   );
 }

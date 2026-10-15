@@ -60,8 +60,8 @@ route("GET /api/v1/ess/performance", (req) => {
   return ok({
     period: new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
     set_by: m?.display_name ?? "The board",
-    stats: [{ label: "KPI score", value: "71%" }, { label: "On track", value: "2 of 4" }, { label: "Weight assigned", value: "100%" }, { label: "Last review", value: "4.0 · Q3" }, { label: "Next cycle", value: `Opens ${fmt(isoDaysAhead(6)).slice(0, 5)}` }],
-    kpis: [{ label: "Partnership MOUs", pct: 75, value: "3 of 4" }, { label: "Staff onboarded", pct: 100, value: "2 of 2", emphasis: "brand" as const }, { label: "Expense turnaround", pct: 60, value: "3.1 days" }, { label: "Policy refresh", pct: 40, value: "2 of 5" }],
+    stats: [{ label: "KPI Score", value: "71%" }, { label: "On Track", value: "2 of 4" }, { label: "Weight Assigned", value: "100%" }, { label: "Last Review", value: "4.0 · Q3" }, { label: "Next Cycle", value: `Opens ${fmt(isoDaysAhead(6)).slice(0, 5)}` }],
+    kpis: [{ label: "Partnership MOUs", pct: 75, value: "3 of 4" }, { label: "Staff Onboarded", pct: 100, value: "2 of 2", emphasis: "brand" as const }, { label: "Expense Turnaround", pct: 60, value: "3.1 days" }, { label: "Policy Refresh", pct: 40, value: "2 of 5" }],
     chain: [
       { title: "ORG-2026-03 · Scale to 12 cities", level: "Organisational · set by the CEO", top: true },
       { title: "Operational readiness for 4 new cities", level: "Annual · set by management" },
@@ -80,10 +80,10 @@ const ARCH = (user: string) =>
   user === "bashir" || user === "cynthia"
     ? [
         ["Repeated lateness, August", "Ifeoma Chukwu", 47, "Submitted the next day", "neutral", "Upheld, sanction"],
-        ["Missing clock-out", "System", 122, "Submitted the same day", "ok", "Closed, no action"],
+        ["Missing Clock-Out", "System", 122, "Submitted the same day", "ok", "Closed, no action"],
         ["Missing clock-outs, March 2025", "System", 562, "Submitted the next day", "neutral", "Upheld, sanction"],
       ]
-    : [["Missing clock-out", "System", 122, "Submitted the same day", "ok", "Closed, no action"]];
+    : [["Missing Clock-Out", "System", 122, "Submitted the same day", "ok", "Closed, no action"]];
 const OPEN = new Map<string, Array<{ query_id: string; number: string; subject: string; raised_by: string; date: string; response: string | null; outcome: { tone: "warn"; text: string }; respond_by: string | null }>>([
   ["bashir", [{ query_id: sid("q:bashir:open"), number: "QRY-0014", subject: "3 late arrivals in 30 days", raised_by: "System rule", date: isoDaysAgo(7), response: null, outcome: { tone: "warn", text: "Awaiting your response" }, respond_by: at(-1, "09:41") }]],
 ]);

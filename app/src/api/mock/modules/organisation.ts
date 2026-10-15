@@ -6,7 +6,7 @@ import { HISTORY, STATUS_PILL, TODAY } from "../data/attendance";
 const ARR: Record<string, string> = { hybrid: "Hybrid", remote: "Remote", on_site: "Office-only" };
 const arrangement = (p: MockPerson) => (p.user_key === "adedotun" || p.user_key === "grace" ? "Field" : ARR[p.work_pattern]);
 const statusPill = (p: MockPerson) =>
-  p.status === "suspended" ? { tone: "err" as const, text: "Suspended" } : p.status === "probation" ? { tone: "warn" as const, text: "Probation" } : p.status === "on_leave" ? { tone: "info" as const, text: "On leave" } : { tone: "ok" as const, text: "Active" };
+  p.status === "suspended" ? { tone: "err" as const, text: "Suspended" } : p.status === "probation" ? { tone: "warn" as const, text: "Probation" } : p.status === "on_leave" ? { tone: "info" as const, text: "On Leave" } : { tone: "ok" as const, text: "Active" };
 const full = (user: string) => ["operations", "ceo"].includes(SIGN_INS[user]?.view ?? "");
 
 const row = (p: MockPerson) => {
@@ -33,8 +33,8 @@ route("GET /api/v1/employees/summary", () => {
     kpis: [
       { key: "headcount", label: "Headcount", value: String(PEOPLE.length) },
       { key: "confirmed", label: "Confirmed", value: String(PEOPLE.filter((p) => p.status === "confirmed").length), tone: "ok" },
-      { key: "probation", label: "On probation", value: String(PEOPLE.filter((p) => p.status === "probation").length), tone: "warn" },
-      { key: "attrition", label: "Attrition, 90 days", value: "1" },
+      { key: "probation", label: "On Probation", value: String(PEOPLE.filter((p) => p.status === "probation").length), tone: "warn" },
+      { key: "attrition", label: "Attrition, 90 Days", value: "1" },
     ],
     arrangements: arrs.map((a) => ({ label: a, value: `${PEOPLE.filter((p) => arrangement(p) === a).length} staff` })),
     departments: counts.map(([label, n]) => ({ label, pct: Math.round((n / max) * 100), value: String(n) })),
@@ -62,14 +62,14 @@ function profile(p: MockPerson, viewer: string) {
     work_email: p.work_email, phone: p.phone, gross_monthly: canPay ? p.gross_monthly : null, bank_name: canPay ? p.bank_name : null, account_last4: canPay ? p.account_last4 : null, next_of_kin: p.next_of_kin,
     stats: [
       { label: "Attendance, 30d", value: `${onTime} / ${worked}`, tone: onTime < worked ? ("warn" as const) : undefined },
-      { label: "KPI score", value: `${t.kpi_pct}%` },
-      { label: "Open tasks", value: String(t.open_tasks) },
-      { label: "Leave left", value: `${8 + (PEOPLE.indexOf(p) % 9)} days` },
-      { label: "Open queries", value: isBashir ? "1" : "0", tone: isBashir ? ("warn" as const) : ("ok" as const) },
+      { label: "KPI Score", value: `${t.kpi_pct}%` },
+      { label: "Open Tasks", value: String(t.open_tasks) },
+      { label: "Leave Left", value: `${8 + (PEOPLE.indexOf(p) % 9)} days` },
+      { label: "Open Queries", value: isBashir ? "1" : "0", tone: isBashir ? ("warn" as const) : ("ok" as const) },
     ],
     kpis: isBashir
-      ? [{ label: "3 MOUs signed", pct: 33, value: "1 of 3", emphasis: "warn" as const }, { label: "Partner contact cadence", pct: 48, value: "11 of 23", emphasis: "warn" as const }, { label: "Proposals sent", pct: 50, value: "1 of 2" }, { label: "Pipeline added", pct: 70, value: "3 prospects" }]
-      : [{ label: "Quarter goal", pct: t.kpi_pct, value: `${t.kpi_pct}%` }, { label: "Tasks on time", pct: 80, value: "8 of 10" }, { label: "Reviews filed", pct: 50, value: "2 of 4" }, { label: "Training complete", pct: 100, value: "Done", emphasis: "brand" as const }],
+      ? [{ label: "3 MOUs Signed", pct: 33, value: "1 of 3", emphasis: "warn" as const }, { label: "Partner Contact Cadence", pct: 48, value: "11 of 23", emphasis: "warn" as const }, { label: "Proposals Sent", pct: 50, value: "1 of 2" }, { label: "Pipeline Added", pct: 70, value: "3 prospects" }]
+      : [{ label: "Quarter Goal", pct: t.kpi_pct, value: `${t.kpi_pct}%` }, { label: "Tasks on Time", pct: 80, value: "8 of 10" }, { label: "Reviews Filed", pct: 50, value: "2 of 4" }, { label: "Training Complete", pct: 100, value: "Done", emphasis: "brand" as const }],
     activity: isBashir
       ? [
           { title: "Query raised, 3 late arrivals in 30 days", when: `${isoDaysAgo(7).split("-").reverse().join("/")} 09:41`, text: "Raised by a system rule, not a manager. Awaiting his response.", tone: "hi" as const },
@@ -84,7 +84,7 @@ function profile(p: MockPerson, viewer: string) {
           { title: "Q3 review closed, 4.0 manager rating", when: isoDaysAgo(14).split("-").reverse().join("/"), tone: "ok" as const },
           { title: "Departmental target approved", when: isoDaysAgo(8).split("-").reverse().join("/") },
         ],
-    punches: rows.slice(0, 6).map((h) => ({ date: h.date, in: hm(h.clock_in_at), out: hm(h.clock_out_at), location: h.location, status: h.status === "late" ? { tone: "err" as const, text: `Late ${h.late_minutes}m` } : h.status === "leave" ? { tone: "info" as const, text: "On leave" } : h.status === "absent" ? { tone: "err" as const, text: "Absent" } : { tone: "ok" as const, text: h.status === "weekend" ? "Saturday" : "On time" } })),
+    punches: rows.slice(0, 6).map((h) => ({ date: h.date, in: hm(h.clock_in_at), out: hm(h.clock_out_at), location: h.location, status: h.status === "late" ? { tone: "err" as const, text: `Late ${h.late_minutes}m` } : h.status === "leave" ? { tone: "info" as const, text: "On Leave" } : h.status === "absent" ? { tone: "err" as const, text: "Absent" } : { tone: "ok" as const, text: h.status === "weekend" ? "Saturday" : "On Time" } })),
     documents: [
       { name: "Employment contract", status: { tone: "ok" as const, text: "Signed" }, expires: null, document: null },
       { name: "Valid ID", status: { tone: "ok" as const, text: "Verified" }, expires: null, document: null },
@@ -153,7 +153,7 @@ route("GET /api/v1/org-chart", (req) => {
     ...PEOPLE.filter((p) => p.status !== "suspended").map((p) => ({
       employee_id: p.employee_id, seat_id: seatOf(p.user_key)!, display_name: p.display_name, job_title: p.job_title, department: p.department,
       manager_seat_id: p.user_key === "amara" ? VACANT[0].seat_id : seatOf(p.manager), is_ceo: p.user_key === "ifeoma", vacant: false, dotted_line_to: DOTTED[p.user_key] ?? null,
-      meta: builder ? `Since ${p.start_date.slice(0, 4)} · ${ARR[p.work_pattern].replace("Office-only", "On site")}` : null,
+      meta: builder ? `Since ${p.start_date.slice(0, 4)} · ${ARR[p.work_pattern].replace("Office-only", "On Site")}` : null,
     })),
     ...VACANT.map((v) => ({ employee_id: null, seat_id: v.seat_id, display_name: v.display_name, job_title: v.job_title, department: v.department, manager_seat_id: seatOf(v.manager), is_ceo: false, vacant: true, dotted_line_to: null, meta: null })),
   ];
@@ -196,9 +196,9 @@ route("GET /api/v1/leave/summary", (req) => {
   const l = leaveScope(req.user!, req.query.scope);
   const today = isoDaysAgo(0);
   return ok({ kpis: [
-    { key: "today", label: "On leave today", value: String(l.filter((x) => x.status === "Approved" && x.from <= today && x.to >= today).length) },
-    { key: "pending", label: "Pending approval", value: String(l.filter((x) => x.status === "Pending").length), tone: "warn" },
-    { key: "month", label: "Approved this month", value: String(l.filter((x) => x.status === "Approved" && x.from.slice(0, 7) === today.slice(0, 7)).length) },
+    { key: "today", label: "On Leave Today", value: String(l.filter((x) => x.status === "Approved" && x.from <= today && x.to >= today).length) },
+    { key: "pending", label: "Pending Approval", value: String(l.filter((x) => x.status === "Pending").length), tone: "warn" },
+    { key: "month", label: "Approved This Month", value: String(l.filter((x) => x.status === "Approved" && x.from.slice(0, 7) === today.slice(0, 7)).length) },
     { key: "clash", label: "Clashes", value: "0", tone: "ok" },
   ] });
 });
@@ -243,7 +243,7 @@ route("GET /api/v1/leave/requests/:id/cover", (req) => {
   const p = byKey(l.key)!;
   const peers = PEOPLE.filter((x) => x.department === p.department && x !== p);
   return ok({
-    title: `Cover check, ${l.from.split("-").reverse().join("/")} to ${l.to.split("-").reverse().join("/")}`,
+    title: `Cover Check, ${l.from.split("-").reverse().join("/")} to ${l.to.split("-").reverse().join("/")}`,
     text: `${p.display_name} has requested ${l.days} day${l.days === 1 ? "" : "s"}. This is what is open in that window.`,
     rows: [
       { title: `${p.department} cover`, text: peers.length ? `${peers[0].display_name} is in that week` : `Nobody else in ${p.department}`, tone: peers.length ? "ok" : "err", result: peers.length ? "Clear" : "Conflict" },

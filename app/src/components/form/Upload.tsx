@@ -22,7 +22,7 @@ type Item = {
   error?: string;
 };
 
-export function Upload({
+export function UploadField({
   purpose,
   accept,
   multiple = true,

@@ -10,7 +10,7 @@ import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { formatDate } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, Input, Seg, Select } from "@/components/form";
+import { ChoiceField, Field, FormFooter, SelectField, TextField } from "@/components/form";
 
 /** The details modal from the Employees list: employment, and attendance and location (HR only). */
 export function EmployeeDetails({ id, close }: { id: string; close: () => void }) {
@@ -35,11 +35,11 @@ export function EmployeeDetails({ id, close }: { id: string; close: () => void }
           <KV items={[["Registered home", a.home_address ?? "Not on file"], ["Home geofence", a.home_radius_m ? `${a.home_radius_m} m · mandatory` : "Not available"], ["Temporary location", <Pill tone={a.temporary_location.tone}>{a.temporary_location.text}</Pill>], ["Field assignment today", a.field_assignment_today ?? "None"], ["Attendance profile", a.profile]]} />
         </Card>
       </Grid>
-      <div className="-mx-[18px] mt-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Close</Button>
         <Button onClick={() => modal.open({ title: "Change Work Arrangement", body: (c) => <ArrangementForm id={id} name={x.display_name} current={a.arrangement} schedule={a.schedule} office={a.office} close={c} /> })}>Change Arrangement</Button>
         <Button variant="primary" onClick={() => (close(), navigate(hrefFor("people", "employees", { id })))}>Open Full Record</Button>
-      </div>
+      </FormFooter>
     </>
   );
 }
@@ -54,8 +54,10 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
   const [why, setWhy] = useState("");
   const save = useMutation("PATCH /api/v1/attendance/setup/:employee_id");
   const sites = useApi("GET /api/v1/attendance/worksites", { query: { type: "Office" } });
+  const [tried, setTried] = useState(false);
   const bad = why.trim().length < 5;
   const submit = async () => {
+    setTried(true);
     if (bad) return;
     await save.run({ params: { employee_id: id }, body: { arrangement: arr, ...(arr === "Hybrid" && { schedule: sched }), office: site, reason: why.trim() } });
     invalidate("/api/v1/attendance", "/api/v1/employees");
@@ -68,7 +70,7 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
         {name} is <b>{current}</b> today. The change applies from the next punch and is written to the audit log.
       </p>
       <Field label="Arrangement">
-        <Seg value={arr} onChange={setArr} options={ARRS.map((a) => [a, a])} />
+        <ChoiceField value={arr} onChange={setArr} options={ARRS.map((a) => [a, a])} />
       </Field>
       {arr === "Hybrid" && (
         <Field label="Hybrid Schedule">
@@ -76,22 +78,22 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
             {DAYS.map((d) => (
               <div key={d} className="flex items-center gap-3 border-b border-border px-3 py-1.5 last:border-b-0">
                 <span className="w-[60px] text-[12.5px] font-semibold">{d}</span>
-                <Seg value={sched[d]} onChange={(v) => setSched((s) => ({ ...s, [d]: v }))} options={[["Office", "Office"], ["Remote", "Remote"]]} />
+                <ChoiceField value={sched[d]} onChange={(v) => setSched((s) => ({ ...s, [d]: v }))} options={[["Office", "Office"], ["Remote", "Remote"]]} />
               </div>
             ))}
           </div>
         </Field>
       )}
       <Field label="Assigned Office">
-        <Select value={site} onChange={setSite} options={(sites.data?.data ?? []).map((s) => [s.name, s.name])} />
+        <SelectField value={site} onChange={setSite} options={(sites.data?.data ?? []).map((s) => [s.name, s.name])} />
       </Field>
-      <Field label="Reason" state={why ? (bad ? "bad" : "good") : undefined} message="Give a reason">
-        <Input value={why} onChange={setWhy} placeholder="Moved to field" state={why ? (bad ? "bad" : "good") : undefined} />
+      <Field label="Reason" state={why || tried ? (bad ? "bad" : "good") : undefined} message="At least 5 characters">
+        <TextField value={why} onChange={setWhy} placeholder="Moved to field" state={why || tried ? (bad ? "bad" : "good") : undefined} />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={bad || save.pending} onClick={submit}>Save Change</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Save Change</Button>
+      </FormFooter>
     </>
   );
 }

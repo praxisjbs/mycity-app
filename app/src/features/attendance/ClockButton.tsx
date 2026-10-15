@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatDate, formatTime } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, Textarea } from "@/components/form";
+import { Field, FormFooter, rules, TextAreaField, useContractForm } from "@/components/form";
 
 /**
  * The top bar's Clock In / Clock Out button. The button only asks; the API
@@ -47,7 +47,7 @@ export function ClockButton({ compact }: { compact?: boolean }) {
       title={title}
       aria-label={title}
       className={cn(
-        "flex h-9 items-center gap-[7px] rounded-full text-[13px] font-semibold transition-[filter] hover:brightness-110 disabled:opacity-50",
+        "flex h-9 max-md:h-11 max-md:min-w-11 max-md:justify-center items-center gap-[7px] rounded-full text-[13px] font-semibold transition-[filter] hover:brightness-110 disabled:opacity-50",
         compact ? "px-[11px]" : "px-[14px]",
         out ? "on-primary bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
       )}
@@ -71,7 +71,7 @@ function ClockPanel({ close }: { close: () => void }) {
   const { data: t, loading } = useApi("GET /api/v1/attendance/me/today");
   const [stage, setStage] = useState<Stage>({ kind: "review" });
   const [busy, setBusy] = useState(false);
-  const [why, setWhy] = useState("");
+  const f = useContractForm({ why: "" }, { why: rules.min(10, "At least 10 characters") });
   const [fix, setFix] = useState<{ lat: number | null; lng: number | null; acc: number | null; note: string } | null>(null);
   const [now, setNow] = useState(() => new Date());
 
@@ -99,11 +99,11 @@ function ClockPanel({ close }: { close: () => void }) {
           <br />
           {t.unavailable_message}
         </Banner>
-        <Foot>
+        <FormFooter>
           <Button variant="primary" onClick={close}>
             Close
           </Button>
-        </Foot>
+        </FormFooter>
       </>
     );
   }
@@ -124,7 +124,7 @@ function ClockPanel({ close }: { close: () => void }) {
         if (res.result === "accepted") toast(kind === "in" ? "Clocked in" : "Clocked out");
       }
     } catch (e) {
-      setStage({ kind: "done", res: { result: "rejected", title: "Not recorded", message: (e as ApiError).message, event_id: null, case_number: null } });
+      setStage({ kind: "done", res: { result: "rejected", title: "Not Recorded", message: (e as ApiError).message, event_id: null, case_number: null } });
     } finally {
       setBusy(false);
     }
@@ -135,11 +135,11 @@ function ClockPanel({ close }: { close: () => void }) {
     return (
       <>
         <Result tone={r.result === "accepted" ? "ok" : r.result === "review" ? "warn" : "err"} label="Attendance status" title={r.title} text={r.message} />
-        <Foot>
+        <FormFooter>
           <Button variant="primary" onClick={close}>
             Done
           </Button>
-        </Foot>
+        </FormFooter>
       </>
     );
   }
@@ -149,18 +149,17 @@ function ClockPanel({ close }: { close: () => void }) {
       <>
         <Result tone="warn" label="Location check" title={stage.res.title} text={stage.res.message} />
         <Card className="mt-3">
-          <h3 className="mb-1 text-[13.5px]">Add Exception Details</h3>
-          <p className="mb-2.5 text-[11.5px] text-subtle-foreground">People and your manager will review it.</p>
-          <Field label="Explanation" state={why.trim().length >= 10 ? "good" : why ? "bad" : undefined} message="Write at least 10 characters">
-            <Textarea value={why} onChange={setWhy} placeholder="Phone battery died" state={why.trim().length >= 10 ? "good" : why ? "bad" : undefined} />
+          <h3 data-ui="title" className="mb-1 text-[13.5px]">Add Exception Details</h3>
+          <Field label="Explanation" {...f.field("why")}>
+            <TextAreaField {...f.field("why")} placeholder="Phone battery died" />
           </Field>
         </Card>
-        <Foot>
+        <FormFooter>
           <Button onClick={() => setStage({ kind: "done", res: stage.res })}>Skip</Button>
-          <Button variant="primary" icon="send" disabled={busy || why.trim().length < 10} onClick={() => submit(why.trim())}>
+          <Button variant="primary" icon="send" busy={busy} onClick={() => f.check() && void submit(f.values.why.trim())}>
             Send
           </Button>
-        </Foot>
+        </FormFooter>
       </>
     );
   }
@@ -171,19 +170,19 @@ function ClockPanel({ close }: { close: () => void }) {
         <span className="mx-auto mb-2.5 flex w-fit">
           <Avatar name={me.display_name} size={42} tone="brand" />
         </span>
-        <h2 className="mb-1 text-[20px]">{kind === "out" ? "Ready to finish for today?" : "Ready to start your day?"}</h2>
+        <h2 data-ui="title" className="mb-1 text-[20px]">{kind === "out" ? "Finish Your Day" : "Start Your Day"}</h2>
         <p className="text-[11.5px] text-subtle-foreground">
           {me.display_name} · {formatDate(t.date)}
         </p>
       </div>
       {blocked ? (
-        <Result tone="err" label="Action required" title="Attendance policy acknowledgment needed" text={`Read policy v${t.policy_ack_pending!.version} before clocking in.`} />
+        <Result tone="err" label="Action required" title="Attendance Policy Acknowledgment Needed" text={`Read policy v${t.policy_ack_pending!.version} before clocking in.`} />
       ) : !fix ? (
-        <Result tone="info" label="Location check" title="Finding your location" text="Allow location when your browser asks." icon="target" />
+        <Result tone="info" label="Location check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />
       ) : fix.lat == null ? (
-        <Result tone="warn" label="Location check" title="Attendance will be reviewed" text={`${fix.note} People will review this attendance.`} />
+        <Result tone="warn" label="Location check" title="Attendance Will Be Reviewed" text={`${fix.note} People will review this attendance.`} />
       ) : (
-        <Result tone="ok" label="Location check" title="Location found" text={`Accurate to about ${fix.acc} m. The server checks it against ${t.location_label}.`} />
+        <Result tone="ok" label="Location check" title="Location Found" text={`Accurate to about ${fix.acc} m. The server checks it against ${t.location_label}.`} />
       )}
       <Card className="mt-3">
         <KV
@@ -204,25 +203,22 @@ function ClockPanel({ close }: { close: () => void }) {
       {t.policy_ack_pending && !blocked && (
         <p className="mx-0.5 mt-2 text-[11.5px] text-subtle-foreground">Policy v{t.policy_ack_pending.version} still needs acknowledgment. Read it from Policy Updates afterwards.</p>
       )}
-      <Foot>
+      <FormFooter>
         <Button onClick={close}>Not Now</Button>
         {blocked ? (
           <Button variant="primary" onClick={() => (close(), navigate(hrefFor("ess", "policy-updates")))}>
             View Policy
           </Button>
         ) : (
-          <Button variant="primary" icon="clock" disabled={busy || !fix} onClick={() => submit()}>
+          <Button variant="primary" icon="clock" busy={busy || !fix} onClick={() => void submit()}>
             {kind === "out" ? "Clock Out" : "Clock In"}
           </Button>
         )}
-      </Foot>
+      </FormFooter>
     </>
   );
 }
 
 /** Actions at the foot of the panel, matching the modal footer. */
-function Foot({ children }: { children: React.ReactNode }) {
-  return <div className="-mx-[18px] mt-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">{children}</div>;
-}
 
 export type { AttendanceToday };

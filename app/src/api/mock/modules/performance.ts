@@ -65,11 +65,11 @@ route("GET /api/v1/performance/goals/summary", () =>
   ok({
     cascade: [step("Organisational", "done"), step("Annual", "done"), step("Monthly", "done"), step("Departmental", "now"), step("Individual KPI"), step("Weekly task")],
     progress: [
-      { label: "Growth, 2M residents", pct: 55, value: "1.1M of 2M" },
+      { label: "Growth, 2M Residents", pct: 55, value: "1.1M of 2M" },
       { label: "Revenue, ₦180M", pct: 53, value: "₦96M of ₦180M", emphasis: "warn" },
-      { label: "Expansion, 12 cities", pct: 66, value: "8 of 12" },
-      { label: "Technology, 11 milestones", pct: 0, value: "0 of 11" },
-      { label: "People, 40 staff", pct: 62, value: "25 of 40" },
+      { label: "Expansion, 12 Cities", pct: 66, value: "8 of 12" },
+      { label: "Technology, 11 Milestones", pct: 0, value: "0 of 11" },
+      { label: "People, 40 Staff", pct: 62, value: "25 of 40" },
     ],
   }),
 );
@@ -134,7 +134,7 @@ route("GET /api/v1/performance/kpis/summary", () => {
   const staff = new Set(KPIS.map((k) => k._m));
   return ok({
     with_kpis: staff.size, staff: PEOPLE.length, weights_valid: true, on_track: KPIS.filter((k) => k.status.tone === "ok").length, behind: KPIS.filter((k) => k.status.tone !== "ok").length,
-    sources: [{ label: "Tasks linked to the KPI and closed", count: 42 }, { label: "A figure entered by the manager", count: 11 }, { label: "A date met or missed", count: 6 }, { label: "Nothing linked yet", count: 4 }],
+    sources: [{ label: "Linked Tasks Closed", count: 42 }, { label: "Manager Entry", count: 11 }, { label: "Date Met or Missed", count: 6 }, { label: "Nothing Linked Yet", count: 4 }],
   });
 });
 route("GET /api/v1/performance/kpis", (req) => paged(KPIS.map(({ _m, ...k }) => (void _m, k)), req, { search: (k) => [k.employee.display_name, k.title], filters: { department: (k, v) => k.employee.department === v } }));

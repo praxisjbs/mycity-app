@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 
-/** Amount entry. Keeps what the person typed; the value sent is a two-place decimal string. */
-export function AmountInput({ value, onChange, onBlur, state, id }: { value: string; onChange: (v: string) => void; onBlur?: () => void; state?: "bad" | "good"; id?: string }) {
+/** Money entry (§8.2: through the money field, gate 20). Keeps what the person typed; the value sent is a two-place decimal string. */
+export function MoneyField({ value, onChange, onBlur, state, id }: { value: string; onChange: (v: string) => void; onBlur?: () => void; state?: "bad" | "good"; id?: string }) {
   return (
     <span className="relative flex items-center">
       <span className="pointer-events-none absolute left-3 text-muted-foreground">₦</span>
@@ -9,7 +9,7 @@ export function AmountInput({ value, onChange, onBlur, state, id }: { value: str
         id={id}
         inputMode="decimal"
         className={cn(
-          "h-9 w-full min-w-0 rounded-ctl border bg-background pr-3 pl-7 text-right tabular-nums outline-none focus:border-ring focus:shadow-[0_0_0_3px_var(--accent)]",
+          "h-9 w-full min-w-0 rounded-ctl border bg-background pr-3 pl-7 max-md:h-11 text-right tabular-nums outline-none focus:border-ring focus:shadow-[0_0_0_3px_var(--accent)]",
           state === "bad" ? "border-destructive" : state === "good" ? "border-success" : "border-input",
         )}
         value={value}
