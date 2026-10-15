@@ -87,13 +87,20 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | CI gates 1 to 8 and pipeline guards (scripts still empty, reported NOT BUILT) | GE | ☐ | |
 | Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | |
 | Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
+| Screen gates 8, 11, 12, 17: `five-second`, `two-shells`, `forms`, `dashes`; screen conventions in FRONTEND_GUIDE §5, §7, §8 | TB | ☑ | 14/10/2026 |
 | Frontend foundation (`app/`, `public-app/`): shell, design tokens, contract client, shared components | AJ | ☐ | |
 
 **Notes**
 
 - 15/10/2026 · AJ · `npm run contract:status` (in `app/`, FRONTEND_GUIDE §9.1): reports, for both apps, which modules still run on INTERIM types and which are ready to move to `contract.gen.ts`. Today 19 INTERIM files, 317 endpoints, none in the contract yet.
 - 15/10/2026 · AJ · Delivery plan in both apps (FRONTEND_GUIDE §9.2): production shows Coming Soon for any screen whose row here is not fully ticked, with its milestone and date from this file and MILESTONES §4 (the public site hides both from visitors); development, the demo build and staging get the demo's "Prototype View" switch: Full Design, or As Delivered at the current milestone (the earliest not past its demo day and not fully ticked; M1 today). This file is now read by the frontend build, so the table format (backticked slug, M column, three tick columns) must hold.
+- 15/10/2026 · AJ · Both apps pass gate 12 (`scripts/check/forms.js`): every field, the `<form>` and the field components moved to `components/form/` (FRONTEND_GUIDE §8.6, §9.4), imported from `@/components/form`; screens no longer write a raw form element; placeholders are short examples, with any instruction moved to the field's ⓘ. Left for the screen-conventions PR: the §8.6 names, `useContractForm` on `react-hook-form`, and Submit never disabled.
 - 15/10/2026 · AJ · Staging bar in both apps (MILESTONES §6): shown on a `staging.` host or when the API answers `X-Mycity-Environment: staging`; fixed above everything in `app/`, sticky in `public-app/`. Production renders nothing. The tab icon becomes the pin on amber (`favicon-staging.svg`) and the browser bar takes the staging amber (`theme-color`). Left from §6: the installed staff app's home-screen icon and splash colour come from the PWA manifest, which is fixed at build; varying them needs `src/http/static.js` to serve a staging manifest on `hub.staging` (GE).
+- 14/10/2026 · TB · Screen gates built: gate 8 (three tiers of screen text, word limits, Title Case),
+  gate 11 (phone and desktop shells), gate 12 (one form system), gate 17 (no dashes in copy). They
+  render demo.html at 390 and 1440 px in Chromium and will read `app/` once it has a build.
+  MILESTONES gates 8, 11 and 12 amended; guide template §10 now lists content tiers and the phone
+  layout. Every demo module now passes all four. Left: the crawler blind spots listed in PR #16.
 - 14/10/2026 · GE · Shared foundation, phase 4 of 6: files (`sniff` by bytes, per-purpose
   `mime-policy`, `safe-name`, `hash`), `services/storage` (atomic, contained keys), the vault
   (store, versions, lock, quarantine and scan, access rules, range downloads),

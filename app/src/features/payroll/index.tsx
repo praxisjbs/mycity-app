@@ -7,13 +7,10 @@ import type { PersonRef } from "@/api/types/common";
 import { Button } from "@/components/ui/Button";
 import { AreaChart, Bands } from "@/components/ui/charts";
 import { Banner, Chain, Quote, StatStrip, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Textarea, useForm } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
-import { AmountInput, Money } from "@/components/ui/Money";
-import { PersonPicker } from "@/components/ui/PersonPicker";
+import { Money } from "@/components/ui/Money";
 import { LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 
@@ -22,6 +19,7 @@ import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { AmountInput, DateField, Field, FormRow, Input, PersonPicker, Textarea, useForm } from "@/components/form";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
   if (tab === "payslips") return <Payslips />;
@@ -340,7 +338,7 @@ function Waive({ id, close }: { id: string; close: () => void }) {
   const waive = useMutation("POST /api/v1/payroll/deductions/:id/waive");
   return (
     <>
-      <Field label="Why It Is Waived" state={reason && reason.trim().length < 6 ? "bad" : undefined}><Textarea value={reason} onChange={setReason} placeholder="Kept on the record with the deduction" /></Field>
+      <Field label="Why It Is Waived" state={reason && reason.trim().length < 6 ? "bad" : undefined}><Textarea value={reason} onChange={setReason} placeholder="Damaged laptop" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={reason.trim().length < 6 || waive.pending} onClick={async () => { try { await waive.run({ params: { id }, body: { reason } }); invalidate("/api/v1/payroll"); close(); toast("Deduction waived"); } catch (e) { fail(e); } }}>Waive</Button>
@@ -370,7 +368,7 @@ function DeductionForm({ close }: { close: () => void }) {
   return (
     <>
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="Reason" {...f.field("reason")}><Input {...f.field("reason")} placeholder="e.g. Salary advance repayment" /></Field>
+      <Field label="Reason" {...f.field("reason")}><Input {...f.field("reason")} placeholder="Salary advance repayment" /></Field>
       <Field label="Amount" {...f.field("amount")}><AmountInput {...f.field("amount")} /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>

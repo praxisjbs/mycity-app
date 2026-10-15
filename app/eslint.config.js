@@ -54,7 +54,7 @@ export default tseslint.config(
   },
   {
     files: ["src/**/*.tsx"],
-    ignores: ["src/components/ui/Upload.tsx"],
+    ignores: ["src/components/form/Upload.tsx"],
     rules: {
       "no-restricted-syntax": [
         "error",

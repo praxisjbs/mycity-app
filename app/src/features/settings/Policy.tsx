@@ -7,7 +7,6 @@ import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
 import type { PolicyAck } from "@/api/types/settings";
 import { Button } from "@/components/ui/Button";
 import { Banner, Pill, Who } from "@/components/ui/data";
-import { Field, Switch, Textarea } from "@/components/ui/form";
 import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
@@ -16,6 +15,7 @@ import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { ModalFoot, PagedTable } from "@/features/shared/sections";
+import { Field, InlineInput, Switch, Textarea } from "@/components/form";
 
 const fmt = (s: PolicySetting) => (s.kind === "bool" ? (s.value ? "On" : "Off") : s.kind === "mode" ? String(s.value)[0].toUpperCase() + String(s.value).slice(1) : String(s.value));
 
@@ -133,12 +133,12 @@ function SettingRow({ s, changed, busy, onChange }: { s: PolicySetting; changed:
         </div>
       )}
       {(s.kind === "number" || s.kind === "time") && (
-        <input
+        <InlineInput
           className={cn("h-8 w-[76px] flex-none rounded-ctl border bg-background px-2 text-right text-[13px] outline-none", bad ? "border-destructive" : "border-input focus:border-ring")}
           inputMode="numeric"
           aria-label={s.label}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={setText}
           onBlur={commit}
           onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
         />
@@ -166,7 +166,7 @@ function Review({ p, publish, close }: { p: AttendancePolicy; publish: boolean; 
       {publish && (
         <div className="mt-3">
           <Field label="What Changed, for Staff" state={summary && summary.trim().length < 10 ? "bad" : undefined} message={summary && summary.trim().length < 10 ? "At least 10 characters" : undefined}>
-            <Textarea value={summary} onChange={setSummary} placeholder="One or two sentences staff will read in Policy Updates" />
+            <Textarea value={summary} onChange={setSummary} placeholder="Lateness rule changed" />
           </Field>
           <Banner tone="info" icon="bell">Everyone affected is notified and asked to acknowledge v{p.version + 1}. Records before today are not recalculated.</Banner>
         </div>

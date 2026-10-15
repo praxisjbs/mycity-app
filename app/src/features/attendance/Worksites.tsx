@@ -3,12 +3,12 @@ import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Worksite } from "@/api/types/attendance";
 import { Button } from "@/components/ui/Button";
 import { KV, Pill } from "@/components/ui/data";
-import { Field, Input, rules, useForm } from "@/components/ui/form";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
-import { Chips, Pager, SearchBox, Table, Toolbar } from "@/components/ui/Table";
+import { Chips, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
+import { Field, Input, rules, SearchBox, useForm } from "@/components/form";
 
 const COLOR: Record<Worksite["type"], string> = { Office: "var(--chart-1)", "Approved home": "var(--primary)", "Temporary location": "var(--primary)", "Field assignment": "var(--chart-2)" };
 
@@ -60,7 +60,7 @@ export function Worksites() {
       <KpiTiles items={[{ label: "Office worksites", value: String(count("Office")) }, { label: "Approved homes", value: String(count("Approved home")) }, { label: "Field sites today", value: String(count("Field assignment")) }, { label: "Outside any fence today", value: "1", tone: "warn" }]} />
       <FenceMap sites={map.rows} />
       <Toolbar className="mt-3">
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Search location or person" className="w-full md:w-[260px]" />
+        <SearchBox value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={type} onChange={setType} options={[["all", "All"], ["Office", "Offices"], ["Approved home", "Homes"], ["Temporary location", "Temporary"], ["Field assignment", "Field"]]} />
       <Table
@@ -113,7 +113,7 @@ function WorksiteForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Worksite Name" {...f.field("name")}><Input {...f.field("name")} placeholder="For example, Enugu office" /></Field>
+      <Field label="Worksite Name" {...f.field("name")}><Input {...f.field("name")} placeholder="Enugu Office" /></Field>
       <Field label="Address" {...f.field("address")} info="The address is turned into coordinates when saved; check the pin on the map before staff clock in there."><Input {...f.field("address")} placeholder="Street, area, city" /></Field>
       <Field label="Radius, Metres" {...f.field("radius_m")}><Input inputMode="numeric" {...f.field("radius_m")} /></Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">

@@ -8,17 +8,13 @@ import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Avatar, KV, Mini, Pill, StatStrip } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, Input, rules, Seg, Switch, Textarea, useForm } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, Grid, PageHead } from "@/components/ui/layout";
 import { Menu } from "@/components/ui/Menu";
 import { useModal } from "@/components/ui/Modal";
-import { PersonPicker } from "@/components/ui/PersonPicker";
-import { ErrorBlock, LoadingRows, SearchBox } from "@/components/ui/Table";
+import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { Upload } from "@/components/ui/Upload";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime, formatWhen, todayIso } from "@/lib/format";
 import { useIsMobile } from "@/lib/media";
@@ -26,6 +22,7 @@ import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { ChatFrame, Composer, Row, ThreadBody, ThreadSearch, useSplit, useThread } from "./Chat";
+import { DateField, Field, Input, PersonPicker, rules, SearchBox, Seg, Switch, Textarea, Upload, useForm } from "@/components/form";
 
 export default function Community({ tab }: ModuleScreenProps) {
   if (tab === "direct-messages") return <Direct />;
@@ -226,7 +223,7 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
           })}
         </div>
       </Field>
-      <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><PersonPicker multiple value={people} onChange={setPeople} placeholder="Search by name or department" /></Field>
+      <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><PersonPicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
       <Field label={<span className="inline-flex items-center gap-1">Who Can Post <InfoButton {...info} label="About who can post" /></span>}>
         <InfoText {...info}>Set when the channel is created. Everyone can read. Channels are internal to MyCity: there is no public link to join one.</InfoText>
         <Seg value={who} onChange={setWho} options={[["everyone", "Every Member"], ["admins", "Only Admins"]]} />
@@ -255,7 +252,7 @@ function Recognise({ channel, close, done }: { channel: Channel; close: () => vo
   return (
     <>
       <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are recognising" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="What Did They Do"><Textarea value={text} onChange={setText} placeholder="Optional. Leave it blank and a note is written for you." /></Field>
+      <Field label="What Did They Do (Optional)" info="Leave it blank and a note is written for you."><Textarea value={text} onChange={setText} placeholder="Led the launch" /></Field>
       <Foot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="thumb" disabled={save.pending} onClick={go}>Post</Button>
@@ -474,7 +471,7 @@ function NewMessage({ close, start }: { close: () => void; start: (p: PersonRef)
   }, [who, close, start]);
   return (
     <>
-      <PersonPicker value={who} onChange={setWho} placeholder="Search by name or department" />
+      <PersonPicker value={who} onChange={setWho} placeholder="Name or department" />
       <Foot><Button onClick={close}>Cancel</Button></Foot>
     </>
   );
@@ -625,8 +622,8 @@ function NewAnnouncement({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Headline" {...f.field("title")}><Input {...f.field("title")} placeholder="One line staff will read first" /></Field>
-      <Field label="Message" {...f.field("body")}><Textarea {...f.field("body")} placeholder="What staff need to know" /></Field>
+      <Field label="Headline" {...f.field("title")}><Input {...f.field("title")} placeholder="Office closed Friday" /></Field>
+      <Field label="Message" {...f.field("body")}><Textarea {...f.field("body")} placeholder="Details for staff" /></Field>
       <Field label="When"><Seg value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>
       {when === "later" && <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>}
       <p className="flex items-center gap-1.5 text-[11.5px] text-subtle-foreground"><Icon name="user" className="size-3.5" />Posting as {me?.display_name}</p>

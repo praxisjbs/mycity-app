@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { formatDate, todayIso } from "@/lib/format";
 import { useIsMobile } from "@/lib/media";
 import { Post } from "./Posts";
+import { InlineInput } from "@/components/form";
 
 /** List width, dragged by the divider and remembered on this device. */
 export function useSplit(key: string, initial: number) {
@@ -205,7 +206,7 @@ export function ThreadSearch({ t, onClose }: { t: ReturnType<typeof useThread>; 
   }, [v, t]);
   return (
     <div role="search" className="flex flex-none items-center gap-1.5 border-b border-border bg-muted px-3 py-2">
-      <input autoFocus className="h-8 min-w-0 flex-1 rounded-full border border-input bg-background px-3 outline-none focus:border-ring" placeholder="Search in this conversation" aria-label="Search in this conversation" value={v} onChange={(e) => setV(e.target.value)} />
+      <InlineInput autoFocus className="h-8 min-w-0 flex-1 rounded-full border border-input bg-background px-3 outline-none focus:border-ring" placeholder="Search messages" aria-label="Search in this conversation" value={v} onChange={setV} />
       <span className="min-w-[52px] text-center text-[11.5px] text-subtle-foreground">{t.q ? `${t.page?.total ?? 0} found` : ""}</span>
       <IconButton icon="x" label="Close search" size="sm" onClick={() => (t.setQ(""), onClose())} />
     </div>
@@ -247,13 +248,13 @@ export function Composer({ placeholder, onSend, plus, voice, readOnly }: { place
   return (
     <div className={base}>
       {plus?.(cbtn)}
-      <input
+      <InlineInput
         className="h-10 min-w-0 flex-1 rounded-full border border-input bg-muted px-[14px] outline-none focus:border-ring"
         placeholder={placeholder}
         aria-label="Message"
         autoComplete="off"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={setText}
         onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), void send())}
       />
       {voice && !text && <button type="button" className={cbtn} aria-label="Record a voice note" onClick={() => setRec(0)}><Icon name="mic" /></button>}

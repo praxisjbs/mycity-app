@@ -17,6 +17,7 @@ import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { Form, InlineInput } from "@/components/form";
 
 export default function Assistant({ tab }: ModuleScreenProps) {
   return tab === "history" ? <History /> : <Ask />;
@@ -99,10 +100,10 @@ function Ask() {
           ))}
           <div ref={end} />
         </div>
-        <form className="mt-4 flex gap-2" onSubmit={(e) => (e.preventDefault(), void ask(text))}>
-          <input className="h-[42px] min-w-0 flex-1 rounded-full border border-input bg-background px-4 text-[13.5px] outline-none focus:border-ring" placeholder="Ask about your operations" aria-label="Ask Praxis AI" value={text} onChange={(e) => setText(e.target.value)} />
+        <Form className="mt-4 flex gap-2" onSubmit={() => void ask(text)}>
+          <InlineInput className="h-[42px] min-w-0 flex-1 rounded-full border border-input bg-background px-4 text-[13.5px] outline-none focus:border-ring" placeholder="Ask a question" aria-label="Ask Praxis AI" value={text} onChange={setText} />
           <button type="submit" disabled={busy || text.trim().length < 4} aria-label="Ask" className="on-primary flex size-[42px] flex-none items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Icon name="send" /></button>
-        </form>
+        </Form>
         <p className="mt-2.5 text-[11.5px] text-subtle-foreground">Praxis AI reads. Every write happens in the module that owns it, by a person.</p>
       </Card>
       <Grid cols={2} className="mt-3">

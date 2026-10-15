@@ -86,10 +86,12 @@ track who has read them.
     server for a transcript, shows "Transcribing…" and then the text, which can be hidden again.
     The transcript is stored once per voice note, so the second person to ask gets it at once.
 12. **Announcement read tracking** (Announcements tab): each card shows its title, an "N of 25 read"
-    pill (or Scheduled), the body and who posted it. Clicking a card opens it: the posted line, the
-    body, "Read by N of 25" with its bar, and under that two lists, **Not read** (with a **Remind
-    Them** button that notifies only those people) and **Read**. The lists live in the modal only,
-    never on the card.
+    pill (or Scheduled), the body and who posted it. Clicking a card opens **Announcement Reads**
+    (**Scheduled Announcement** before it goes out): the headline, the posted line, the body, "Read
+    by N of 25" with its bar, and under that two lists, **Not Read** (with a **Remind Them** button
+    that notifies only those people) and **Read**. The lists live in the modal only, never on the
+    card. **Average Read** on the tab is the mean, across published announcements, of the share of
+    the audience who have opened each one.
 13. **Resizable list.** On desktop the divider between the list and the conversation can be dragged
     (or moved with the arrow keys; double click resets). The width is remembered per browser. The
     list and the conversation each scroll on their own; the page never scrolls behind them.
@@ -147,7 +149,12 @@ Posting to #announcements is gated by the `announcements.post` capability (BACKE
 
 - A user reads and writes only in channels they are a member of. Removed members lose the channel's
   history.
-- `post_policy` is chosen when a channel is created. #announcements is `people_ceo`.
+- `post_policy` is chosen when a channel is created and cannot be changed afterwards. #announcements
+  is `people_ceo`.
+- The author of a message, recognition, poll, channel or announcement is always the signed-in user.
+  Nobody posts on another person's behalf, so the forms do not ask or say who is posting.
+- A channel name is 2 to 30 characters of lower case letters, numbers and hyphens, starting with a
+  letter or number, and unique.
 - #announcements and #general are pinned, cannot be left, and cannot be deleted.
 - A recognition note left blank is written by the system ("Thank you for the great work this week").
   A recognition to oneself is refused.
@@ -191,14 +198,47 @@ Nobody, including People and the CEO, can read a direct message they are not par
 - **Search** (`community.search.js`, ⌘K): channels by name, announcements by title and body, the
   caller's own conversations by person. Words people use: chat, group, channel, notice, memo.
 
-## 10 · Mobile
+## 10 · On screen and mobile
 
-- Channels and Direct Messages open on the list. Tapping a channel or conversation opens it **full
-  screen**, covering the top bar, tabs and bottom bar, with a Back button to the list.
-- Inside a channel, a menu button opens a **side drawer** with the channel list to switch quickly.
-- The composer is **locked at the bottom**; the page itself does not scroll, only the messages.
-- Announcements tab: four KPI cards on mobile (**This Month** is desktop only).
-- Modals open as bottom sheets.
+What each screen shows open, what sits behind help, and how it is laid out on a phone
+(FRONTEND_GUIDE §5, §7). **§3 and §6 are for engineers: nothing in them reaches a screen unless it
+is listed here as tier 1 or tier 2.** Tier 3 (how the system works, why it was built this way,
+reassurance nobody asked for) is never on a screen; say where it lives instead (this guide, the
+manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
+
+Messages, announcements, recognitions, polls and celebration cards are content a person wrote or
+received, not interface copy; the copy rules apply to the chrome around them.
+
+### 10.1 Content tiers
+
+| Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
+|---|---|---|---|
+| Staff Community · Channels (`channels`) | "6 channels · 25 staff" (desktop subtitle); New Channel; Search Channels; Pinned and Channels, each row the channel name (a lock when read only), its last message, time and unread count; the open channel: name, member count, a Read Only pill, the ⋮ menu (View Members, Edit Members, Channel Details, Search in Channel, Mute Notifications), the messages and the celebration, recognition and poll cards (Celebrate, votes), the composer with ＋ (Recognise a Colleague, Celebrate, Start a Poll, Attach a File) and Send; where the user may not post, "Only People and the CEO post here" in place of the composer. New Channel: Channel Name, Purpose (Optional), Departments (Optional), People (Optional, with the count selected), Who Can Post (Every Member, Admins Only); Cancel, Create Channel. Channel Members and Edit Members (Remove, Add People, Close); Channel Details (Channel, Members, Who Can Post). Recognise a Colleague (Colleague, Note Optional; Post Recognition); Celebrate (Colleague, Occasion: Birthday or Work Anniversary; Post Celebration); Start a Poll (Question, Option 1 to 4, the last two Optional; Post Poll); Attach a File (the files, then the upload percentage). Field errors of at most 4 words on the field: "Not a valid name", "Choose a colleague", "Add a question", "Add an option" | Help term on Channel Name: "Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name." Help term on Note in Recognise a Colleague: "Leave it blank and a thank you note is written for you." | Who can post being fixed when the channel is created, that only members read a channel, that channels are internal with no join link: §3 step 5, §6 (the New Channel ⓘ text is removed, and so is the Visibility row of Channel Details). Files going to the vault: §4 (the "Files are stored in the vault" line is removed). Who posts: §6 |
+| Staff Community · Direct Messages (`direct-messages`) | "N unread" or "All caught up" (desktop subtitle); New Message; Search People; All and Unread; each conversation: avatar with the online dot, name, last message ("You:" when it was the user's), time, unread count; the open conversation: name, Online or Last Seen, department, search, ⋮ (View Profile, Search in Conversation, Mute Notifications), the messages with their ticks, voice notes (Play, Transcribe, Hide Transcript), the composer (Attach: Photo or Video, Document; record a voice note; Send). Profile: avatar, name, title, status pill, Message, View in People; Contact (work email, phone, worksite, local time); Shared in Conversation; Channels in Common; Mute Notifications; Search in Conversation. New Message: the person picker | None | What one tick, two grey and two blue mean: §3 step 10. Transcripts stored once per voice note: §3 step 11. The profile reading the employee record and showing no work details: §3 step 8. Search covering only the caller's own conversation: §3 step 9 |
+| Staff Community · Announcements (`announcements`) | New Announcement; Published, Scheduled, Average Read, Audience, This Month (desktop); a card per announcement: headline, a Scheduled or "N of 25 read" pill, the body, "Posted" or "Goes out" with the date and author. A card opens Announcement Reads (or Scheduled Announcement): headline, posted line, body, "Read by N of 25" with its bar, Not Read with Remind Them, Read; Close. New Announcement: Headline, Message, Audience (All Staff or Departments, then the department chips), When (Now or Schedule, then Publish Date, DD/MM/YYYY); Cancel, Publish Announcement (Schedule Announcement when scheduled) | Help term on Average Read: "Across published announcements, the share of the audience who have opened each one." | Who may post, #announcements being pinned and read only, the notification on publish, scheduling, read counts visible to the poster only: §3 step 2, §6, §7, §8 (the page subtitle "Posted by People and the CEO · staff read them in #announcements" and its ⓘ text are removed). "Not yet visible to staff" on the scheduled pill: §3 step 2. "Posting as" in the form: §6 |
+| #announcements channel | As Channels: the published announcements as cards (author, date, headline, body), newest last; the Read Only pill; for staff, "Only People and the CEO post here" in place of the composer | None | The `announcements.post` capability: §5, §8 |
+| Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub (M10): the same announcement records, read only | The M10 guide | The M10 guide. That it reads the same records, no second copy: §2 |
+| Notification bell and web push | Owned by the frontend foundation (FRONTEND_GUIDE §9.6): the sender and first line; a tap opens the conversation | None | Fan-out, muting and who is notified: §3 step 1, §7 |
+| People · Employees (employee record) | Owned by People: that module's guide | That module's guide | How birthdays and anniversaries become posts: §3 step 3, §6 |
+| Settings · Notifications (M6) | Owned by Settings (M6): the Community Messages category with in-app, push and email | The M6 guide | The M6 guide |
+| Mobile bottom bar "Chat" | The Chat icon and word; it opens Staff Community | None | FRONTEND_GUIDE §7 |
+
+### 10.2 Phone layout
+
+| Screen | First on a phone | Left off a phone | Main action | Navigation |
+|---|---|---|---|---|
+| Staff Community · Channels (`channels`) | New Channel beside the title; the search box; Pinned and Channels as full-width rows (channel name, last message, time, unread count) | The subtitle; the open channel beside the list (a channel opens full screen instead); the resizable divider | Tap a channel: it opens full screen over the top bar, tabs and bottom bar, with Back; the composer is locked at the bottom (44 px buttons) and only the messages scroll; ＋ opens Recognise, Celebrate, Poll and Attach as a menu, each form as a bottom sheet | Bottom bar Chat; the three tabs along the top; inside a channel the menu button opens the channel list as a side drawer; Back returns to the list |
+| Staff Community · Direct Messages (`direct-messages`) | New Message beside the title; the search box; All and Unread as a full-width two-part switch (44 px); the conversation rows | The subtitle; the profile column (View Profile opens it as a sheet); the resizable divider | Tap a conversation: it opens full screen with Back; Attach, the voice note button and Send at the bottom, 44 px | As Channels |
+| Staff Community · Announcements (`announcements`) | New Announcement under the title; four stat cards two to a row (Published, Scheduled, Average Read, Audience; Average Read's help opens as a sheet); the announcement cards one to a row | This Month | New Announcement opens the form as a bottom sheet, the primary full width; a card opens its reads as a sheet | Bottom bar Chat; the three tabs along the top |
+| #announcements channel | As Channels | As Channels | Staff read only; People and the CEO post from the composer | As Channels |
+| Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub | The M10 guide | The M10 guide | The M10 guide |
+| Notification bell and web push | The bell in the top bar; push on the phone | None | A tap opens the conversation full screen | The top bar |
+| People · Employees (employee record) | Owned by People | That module's guide | That module's guide | That module's guide |
+| Settings · Notifications (M6) | Owned by Settings | The M6 guide | The M6 guide | The M6 guide |
+| Mobile bottom bar "Chat" | Chat, third of the five bottom bar items | The desktop rail | Tap: Staff Community opens on Channels | The bottom bar (FRONTEND_GUIDE §7) |
+
+Every modal opens as a bottom sheet on a phone (FRONTEND_GUIDE §7); a form's errors sit on its
+fields, never in a toast.
 
 ## 11 · Edge cases
 
@@ -239,4 +279,5 @@ Nobody, including People and the CEO, can read a direct message they are not par
 - 13/10/2026 · GE · Added View Profile and Search in Conversation (TB review of the demo).
 - 13/10/2026 · GE · Added message ticks, voice note playback and transcription, read and not read lists on announcements, resizable list; removed work details from the profile (TB review).
 - 13/10/2026 · GE · Announcement cards back to the original design; read and not read lists moved into the card's modal. Page header slides away while reading a conversation (TB review).
+- 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the Announcements subtitle and ⓘ text, the New Channel ⓘ text, the vault line, the Visibility row and "Posting as" left the screen; the channel name rule and the blank note became help terms; Average Read gained a help term; every community form uses the form helpers with errors on the field. §3 step 12 names the reads modal and defines Average Read; §6 gained the channel name rule, the fixed post policy and who posts.
 - 15/10/2026 · AJ · Channels, Direct Messages and Announcements built in `app/` against the mock API (load older paging, voice notes, ticks, profile panel, read report); not wired yet.

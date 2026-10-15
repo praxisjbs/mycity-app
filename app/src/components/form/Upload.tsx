@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { formatBytes } from "@/lib/format";
 import { session } from "@/api/client";
 import type { DocumentRef } from "@/api/types/common";
-import { Icon } from "./Icon";
+import { Icon } from "@/components/ui/Icon";
 
 /**
  * The upload engine's front end (gate 18): the ONLY file input in the app.

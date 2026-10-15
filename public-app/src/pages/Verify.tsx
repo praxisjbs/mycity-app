@@ -4,10 +4,11 @@ import "@/api/types/public";
 import type { VerifyResult } from "@/api/types/public";
 import { Icon } from "@/components/Icon";
 import { Brand, Page } from "@/components/Layout";
-import { Button, Field, Input, Loading, Pill, Sub } from "@/components/ui";
+import { Button, Loading, Pill, Sub } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDate, formatTime } from "@/lib/format";
 import { useRouter } from "@/lib/router";
+import { Field, Form, Input } from "@/components/form";
 
 /**
  * Verify Document (#85): two hashes, two verdicts (A12). The content hash is
@@ -39,7 +40,7 @@ function Lookup({ initial = "", heading }: { initial?: string; heading?: ReactNo
   const [ref, setRef] = useState(initial);
   const clean = ref.trim().toUpperCase();
   return (
-    <form className="mx-auto mt-5 max-w-[380px]" onSubmit={(e) => (e.preventDefault(), clean && navigate(`/verify/${encodeURIComponent(clean)}`))}>
+    <Form className="mx-auto mt-5 max-w-[380px]" onSubmit={() => clean && navigate(`/verify/${encodeURIComponent(clean)}`)}>
       {heading ?? (
         <>
           <h1 className="text-center text-[19px]">Verify a Document</h1>
@@ -52,7 +53,7 @@ function Lookup({ initial = "", heading }: { initial?: string; heading?: ReactNo
       <Button type="submit" variant="primary" block className="mt-3" disabled={!clean}>
         Verify
       </Button>
-    </form>
+    </Form>
   );
 }
 

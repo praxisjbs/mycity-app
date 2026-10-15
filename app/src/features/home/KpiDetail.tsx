@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
 import { useApi, usePaged } from "@/api/hooks";
-import { Chips, ErrorBlock, LoadingRows, Pager, SearchBox, Table } from "@/components/ui/Table";
+import { Chips, ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { useModal } from "@/components/ui/Modal";
 import { useRouter } from "@/lib/router";
 import { Cell } from "./blocks";
 import type { KpiRow } from "@/api/types/home";
+import { SearchBox } from "@/components/form";
 
 /**
  * Every KPI card opens the records behind its number: GET /home/kpi/:key,

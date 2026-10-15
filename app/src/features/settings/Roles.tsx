@@ -6,13 +6,13 @@ import type { AccessCatalogue, RecordScope, Role, RoleAction, RoleBody, RoleDeta
 import { useMe } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Banner, Pill } from "@/components/ui/data";
-import { Field, Input, Seg, Switch } from "@/components/ui/form";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
+import { Field, Input, Seg, Switch } from "@/components/form";
 
 const ACTIONS: Array<[RoleAction, string]> = [["view", "View"], ["create", "Create"], ["edit", "Edit"], ["delete", "Delete"], ["approve", "Approve"], ["export", "Export"]];
 const SCOPES: Array<[RecordScope, string]> = [["all", "All"], ["team", "Team"], ["own", "Own"]];
@@ -168,7 +168,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
           <Input value={name} onChange={(v) => (setName(v), setErrors((x) => ({ ...x, name: [] })))} disabled={readOnly || role?.system} placeholder="e.g. Studio Lead" maxLength={40} />
         </Field>
         <Field label="What It Is For">
-          <Input value={description} onChange={setDescription} disabled={readOnly} placeholder="One line people will read on the Roles list" maxLength={140} />
+          <Input value={description} onChange={setDescription} disabled={readOnly} placeholder="Runs payroll" maxLength={140} />
         </Field>
       </Grid>
       {role && <p className="-mt-1.5 mb-3 text-[11.5px] text-subtle-foreground">{role.users} {role.users === 1 ? "user holds" : "users hold"} this role.</p>}

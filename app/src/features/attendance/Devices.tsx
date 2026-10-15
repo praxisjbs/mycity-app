@@ -4,11 +4,12 @@ import type { Device } from "@/api/types/attendance";
 import { Button } from "@/components/ui/Button";
 import { KV, Pill, StatStrip, Who } from "@/components/ui/data";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { Chips, Pager, SearchBox, Table, Toolbar } from "@/components/ui/Table";
+import { Chips, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { WithInfo } from "@/components/ui/Info";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
+import { SearchBox } from "@/components/form";
 
 export const DEVICE_TONE: Record<Device["status"], "ok" | "warn" | "err" | "neutral"> = { Enrolled: "ok", "Pending review": "warn", Blocked: "err", Revoked: "neutral", "Verification unavailable": "warn" };
 
@@ -32,7 +33,7 @@ export function Devices() {
       <PageHead title="Devices" sub="Devices used to clock in" actions={<Button onClick={() => navigate(hrefFor("settings", "attendance-policy"))}>Device Policy</Button>} />
       {summary.data && <StatStrip items={summary.data.counts} />}
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Search device or person" className="w-full md:w-[260px]" />
+        <SearchBox value={list.q} onChange={list.setQ} placeholder="Device or person" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending review", "Pending review"], ["Enrolled", "Enrolled"], ["Blocked", "Blocked"], ["Revoked", "Revoked"]]} />
       <Grid cols="1.4/1">

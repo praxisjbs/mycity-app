@@ -5,10 +5,11 @@ import "@/api/types/public";
 import type { AssessmentQuestion, AssessmentSession } from "@/api/types/public";
 import { Icon } from "@/components/Icon";
 import { Message, Page } from "@/components/Layout";
-import { Button, Loading, Notice, Sub, Textarea } from "@/components/ui";
+import { Button, Loading, Notice, Sub } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
 import { LinkProblem } from "./LinkProblem";
+import { Textarea } from "@/components/form";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const clock = (ms: number) => {

@@ -4,14 +4,12 @@ import { invalidate } from "@/api/hooks";
 import type { MailAttachment, MailDraftSave } from "@/api/types/mailbox";
 import { Button } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { Menu } from "@/components/ui/Menu";
 import { toast } from "@/components/ui/Toast";
-import { Upload } from "@/components/ui/Upload";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatDate, todayIso } from "@/lib/format";
+import { DateField, Field, InlineInput, InlineLabel, InlineSelect, Input, Upload } from "@/components/form";
 
 export interface ComposeInit {
   draft_id?: string;
@@ -51,20 +49,20 @@ function Recipients({ id, label, list, onChange, bad, right }: { id: string; lab
   };
   return (
     <div className={cn("flex min-h-[42px] flex-wrap items-center gap-2 border-b py-1.5", bad ? "border-destructive" : "border-border")}>
-      <label htmlFor={id} className="w-[58px] flex-none text-[12px] font-semibold text-subtle-foreground">{label}</label>
+      <InlineLabel htmlFor={id} className="w-[58px] flex-none text-[12px] font-semibold text-subtle-foreground">{label}</InlineLabel>
       {list.map((a, i) => (
         <span key={a + i} className={cn("inline-flex h-[26px] items-center gap-[5px] rounded-full pr-1 pl-2.5 text-[12.5px]", EMAIL.test(a) ? "bg-accent" : "bg-destructive-soft text-destructive")} title={EMAIL.test(a) ? undefined : "Not an email address"}>
           {a}
           <button type="button" aria-label={`Remove ${a}`} className="flex size-5 items-center justify-center rounded-full hover:bg-card" onClick={() => onChange(list.filter((_, j) => j !== i))}><Icon name="x" className="size-3" /></button>
         </span>
       ))}
-      <input
+      <InlineInput
         id={id}
         className="h-[30px] min-w-[120px] flex-1 border-0 bg-transparent text-[13.5px] outline-none"
-        placeholder={list.length ? "" : "Type an address, then Enter"}
+        placeholder={list.length ? "" : "name@example.com"}
         autoComplete="off"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={setText}
         onBlur={add}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === "," || e.key === ";") {
@@ -208,15 +206,15 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   return (
     <div className="flex min-h-full flex-col">
       <div className="flex min-h-[42px] items-center gap-2 border-b border-border py-1.5">
-        <label htmlFor="mfrom" className="w-[58px] flex-none text-[12px] font-semibold text-subtle-foreground">From</label>
-        <select id="mfrom" className="h-[30px] rounded-ctl border border-border bg-background px-2 text-[13px]" aria-label="From"><option>{from}</option></select>
+        <InlineLabel htmlFor="mfrom" className="w-[58px] flex-none text-[12px] font-semibold text-subtle-foreground">From</InlineLabel>
+        <InlineSelect id="mfrom" className="h-[30px] rounded-ctl border border-border bg-background px-2 text-[13px]" value={from} onChange={() => undefined} options={[from]} />
       </div>
       <Recipients id="mto" label="To" list={to} onChange={(v) => (setTo(v), setToBad(false), touch())} bad={toBad} right={!showCc && <button type="button" className="text-[12px] font-semibold text-accent-foreground" onClick={() => setShowCc(true)}>Cc Bcc</button>} />
       {showCc && <Recipients id="mcc" label="Cc" list={cc} onChange={(v) => (setCc(v), touch())} />}
       {showCc && <Recipients id="mbcc" label="Bcc" list={bcc} onChange={(v) => (setBcc(v), touch())} />}
       <div className="flex min-h-[42px] items-center gap-2 border-b border-border py-1.5">
-        <label htmlFor="msub" className="w-[58px] flex-none text-[12px] font-semibold text-subtle-foreground">Subject</label>
-        <input id="msub" className="h-[30px] min-w-0 flex-1 border-0 bg-transparent text-[13.5px] outline-none" value={subject} onChange={(e) => (setSubject(e.target.value), touch())} />
+        <InlineLabel htmlFor="msub" className="w-[58px] flex-none text-[12px] font-semibold text-subtle-foreground">Subject</InlineLabel>
+        <InlineInput id="msub" className="h-[30px] min-w-0 flex-1 border-0 bg-transparent text-[13.5px] outline-none" value={subject} onChange={(v) => (setSubject(v), touch())} />
       </div>
       <div className="flex flex-wrap items-center gap-0.5 border-b border-border py-[7px]" role="toolbar" aria-label="Formatting">
         {TOOLS.map((t, i) =>
@@ -236,7 +234,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
         />
         {linkOpen && (
           <span className="flex basis-full items-center gap-1.5 pt-1.5">
-            <input autoFocus className={cn("h-[30px] min-w-0 flex-1 rounded-ctl border bg-background px-2.5 text-[13px] outline-none", linkBad ? "border-destructive" : "border-input focus:border-ring")} placeholder="https://" aria-label="Link address" value={link} onChange={(e) => (setLink(e.target.value), setLinkBad(false))} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addLink())} />
+            <InlineInput autoFocus className={cn("h-[30px] min-w-0 flex-1 rounded-ctl border bg-background px-2.5 text-[13px] outline-none", linkBad ? "border-destructive" : "border-input focus:border-ring")} placeholder="https://" aria-label="Link address" value={link} onChange={(v) => (setLink(v), setLinkBad(false))} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addLink())} />
             <Button size="sm" onClick={addLink}>Add Link</Button>
             {linkBad && <span className="text-[11.5px] text-destructive">Starts with https:// or mailto:</span>}
           </span>
@@ -274,7 +272,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
               <DateField value={sched.date} onChange={(v) => setSched((s) => ({ ...s, date: v, past: false }))} min={todayIso()} />
             </Field>
             <Field label="Time (24 Hour)" htmlFor="stime" state={timeBad ? "bad" : undefined} message={timeBad ? "HH:MM, in Lagos time" : undefined} className="mb-0">
-              <input id="stime" inputMode="numeric" autoComplete="off" placeholder="08:30" className={cn("h-[38px] w-full rounded-ctl border bg-background px-3 text-[13px] outline-none", timeBad ? "border-destructive" : "border-input focus:border-ring")} value={sched.time} onChange={(e) => setSched((s) => ({ ...s, time: e.target.value.trim(), past: false }))} />
+              <Input id="stime" inputMode="numeric" autoComplete="off" placeholder="08:30" state={timeBad ? "bad" : undefined} value={sched.time} onChange={(v) => setSched((s) => ({ ...s, time: v.trim(), past: false }))} />
             </Field>
             <div className="flex justify-end gap-2 max-md:col-span-2">
               <Button onClick={() => setSched((s) => ({ ...s, open: false }))}>Cancel</Button>

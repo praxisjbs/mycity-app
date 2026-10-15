@@ -3,9 +3,9 @@ import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
 import { cn } from "@/lib/cn";
-import { Avatar } from "./data";
-import { Icon } from "./Icon";
-import { SearchBox } from "./Table";
+import { Avatar } from "@/components/ui/data";
+import { Icon } from "@/components/ui/Icon";
+import { SearchBox } from "./Search";
 
 /**
  * Pick people from the server (FRONTEND_GUIDE §4: never fetch "all" for a

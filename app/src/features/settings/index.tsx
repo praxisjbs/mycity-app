@@ -8,12 +8,10 @@ import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Chain, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Field, Select, Seg, Switch, Textarea } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
-import { PersonPicker } from "@/components/ui/PersonPicker";
 import { Chips, LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
@@ -24,6 +22,7 @@ import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill } fro
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AttendancePolicyTab } from "./Policy";
 import { Roles, useRoleOptions } from "./Roles";
+import { Field, InlineInput, PersonPicker, Seg, Select, Switch, Textarea } from "@/components/form";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -105,7 +104,7 @@ function TimeBox({ value, onChange, label }: { value: string; onChange: (v: stri
   const [t, setT] = useState(value);
   useEffect(() => setT(value), [value]);
   const ok = /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
-  return <input aria-label={label} inputMode="numeric" className={cn("h-8 w-[70px] rounded-ctl border bg-background px-2 text-[13px] outline-none", ok ? "border-input focus:border-ring" : "border-destructive")} value={t} onChange={(e) => setT(e.target.value)} onBlur={() => ok && t !== value && onChange(t)} />;
+  return <InlineInput aria-label={label} inputMode="numeric" className={cn("h-8 w-[70px] rounded-ctl border bg-background px-2 text-[13px] outline-none", ok ? "border-input focus:border-ring" : "border-destructive")} value={t} onChange={setT} onBlur={() => ok && t !== value && onChange(t)} />;
 }
 
 /* ───────────── Users ───────────── */
@@ -180,7 +179,7 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   return (
     <>
       <Field label="Role"><Select value={role} onChange={setRole} options={roles} /></Field>
-      {reason != null && <Field label="Why the Login Is Disabled"><Textarea value={reason} onChange={setReason} placeholder="Kept on the audit log" /></Field>}
+      {reason != null && <Field label="Why the Login Is Disabled"><Textarea value={reason} onChange={setReason} placeholder="Role changed" /></Field>}
       <ModalFoot>
         {u.status.text !== "Disabled" && (reason == null ? <Button className="mr-auto" onClick={() => setReason("")}>Disable Login</Button> : <Button className="mr-auto" variant="primary" disabled={reason.trim().length < 6} onClick={() => run(() => disable.run({ params: { id: u.user_id }, body: { reason } }), "Login disabled. The record and its history stay")}>Confirm Disable</Button>)}
         <Button onClick={close}>Cancel</Button>
@@ -274,7 +273,7 @@ function EditSteps({ h, close }: { h: Hierarchy; close: () => void }) {
         {steps.map((s, i) => (
           <div key={i} className="flex items-center gap-1.5">
             <b className="w-5 text-[12px] text-subtle-foreground">{i + 1}</b>
-            <input aria-label={`Step ${i + 1}`} className="h-9 min-w-0 flex-1 rounded-ctl border border-input bg-background px-3 text-[13px] outline-none focus:border-ring" value={s} onChange={(e) => setSteps(steps.map((x, j) => (j === i ? e.target.value : x)))} />
+            <InlineInput aria-label={`Step ${i + 1}`} className="h-9 min-w-0 flex-1 rounded-ctl border border-input bg-background px-3 text-[13px] outline-none focus:border-ring" value={s} onChange={(v) => setSteps(steps.map((x, j) => (j === i ? v : x)))} />
             <Button size="sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up"><Icon name="up" /></Button>
             <Button size="sm" disabled={i === steps.length - 1} onClick={() => move(i, 1)} aria-label="Move down"><Icon name="up" className="rotate-180" /></Button>
             <Button size="sm" aria-label={`Remove step ${i + 1}`} onClick={() => setSteps(steps.filter((_, j) => j !== i))}><Icon name="x" /></Button>

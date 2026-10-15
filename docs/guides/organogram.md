@@ -48,6 +48,11 @@ The organogram reads one tree and nobody keeps a second copy.
   vacancy. HR turns a suggestion into a real vacancy there; nothing is auto-created.
 - The read-only **ESS · Org Chart** renders the same tree for every employee, through the
   `org_chart` read capability, with the standard card and no restricted fields.
+- **People · Employees** also carries each employee's attendance setup (owned by the attendance
+  guide, `docs/MyCity-ERP-Documents/attendance-guide.md`). A change of work arrangement applies
+  from the employee's next punch; opening a registered home address, changing an arrangement and
+  changing a home are each written to the audit log, and a replaced home is kept in history, never
+  overwritten.
 
 ## 4 · Data
 
@@ -79,7 +84,10 @@ exemption, or a lazy-load-children scheme for very large orgs, with the backend 
 - A reporting line may **not** form a cycle (A reports to B who reports to A). The write rejects a
   change that would create one.
 - `dotted_manager_id` is an optional second relationship. It is drawn as a dashed connector or a
-  "Dotted line: <manager>" tag, never as the primary line, and it does not affect permission scope.
+  "Dotted line: <manager>" tag, never as the primary line, and it does not affect permission scope:
+  approvals of leave, expenses and tasks follow the solid line only (§1).
+- Departments are data (`department` rows, §4): adding or renaming one is a setting, never a code
+  change.
 - A **vacant seat** is a node with a role and department but no employee. It may have reports. It
   carries no person data and never shows a card field that implies one.
 - The viewer shows the **whole company**. The builder shows the whole company with edit affordances.
@@ -114,12 +122,31 @@ employee 360 and ESS · My Profile under their own rules, not here.
 - **Search** (`organisation.search.js`): a person by name or role reaches their node; words people
   use include "org chart", "organogram", "structure", "who is my manager", "reporting line".
 
-## 10 · Mobile
+## 10 · On screen and mobile
 
-The desktop tree is the star: a full top-down chart with collapse and expand, search-to-focus,
-zoom and pan. Mobile is its own shell, not the desktop tree shrunk: a **focus view** centred on one
-person showing their manager, themselves and their direct reports, with tap to expand up or down
-the chain, and a search to jump to anyone.
+What each screen shows open, what sits behind help, and how it is laid out on a phone
+(FRONTEND_GUIDE §5, §7). **§3 and §6 are for engineers: nothing in them reaches a screen unless it
+is listed here as tier 1 or tier 2.** Tier 3 (how the system works, why it was built this way,
+reassurance nobody asked for) is never on a screen; say where it lives instead (this guide, the
+manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
+
+### 10.1 Content tiers
+
+| Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
+|---|---|---|---|
+| People · Organogram (`organogram`) | Organogram; the seat count on desktop (12 seats · 11 filled · 1 open); Search, Expand All, Download PDF, Add Role; the legend (Reporting Line, Dotted Line, CEO, Vacant Seat); the whole tree. Each node card carries initials, name, title, the department chip, the since and arrangement line, a dotted-line tag where set, and Create Vacancy on a vacant seat. Node text is data | Help term on the legend's Reporting Line: "Drag a card onto a new manager to change its reporting line." Help term on Dotted Line: "A second manager for matrix work. It does not change who approves leave, expenses or tasks." | That a drag is the same employee write as the form and is audited: §3, §5. That a vacant seat becomes a suggested vacancy in Recruitment: §3. That salary, bank details and phone never show on a card: §6, §8. The subtitle "The live reporting structure … drag a card to reassign" and the footnote paragraph under the tree are removed |
+| ESS · Org Chart (`org-chart`) | Org Chart; the seat count on desktop; Search, Download PDF; the legend; the whole tree with the standard node card (no since and arrangement line; "Open role" on a vacant seat) | Help term on the legend's Dotted Line, the same text as the builder | "Read only", "Every employee sees the whole company here" and the restricted fields never shown: §6, §8. "On a phone this becomes a focus view": §10.2. The subtitle "Who reports to whom across MyCity · read only" and the footnote paragraph are removed |
+| Recruitment · Vacancies (`vacancies`) | Not in the demo yet. The suggested vacancies list: role title, department, reporting line; Create Vacancy | None | That nothing is auto-created from a seat, and the hand-off event: §3, §7 |
+| People · Employees (`employees`) | Employees; 25 staff · 6 departments on desktop; Import, Add Employee; Headcount, Confirmed, On Probation, Attrition, 90 Days; the count per work arrangement; All Employees (employee, department, Line Manager, arrangement, Attendance Today, Employment Status, View Details) with 9 of 25; Headcount by Department; Needs a Decision. A row opens the employee modal: Employment, Attendance and Location; Close, Edit Home, Change Arrangement, Open Full Record. The 360 behind Open Full Record | On the 360, help term on KPIs This Month: "Weighted to 100%. Progress counts from the tasks linked to each KPI." In Edit Home Geofence, help term on Radius: "Fixed at 100 m for registered and temporary homes. It cannot be changed." | "Select a row for details and actions": the rows carry View Details. "Sensitive home addresses appear only in the authorised details modal": attendance guide §1. "A department is a setting, not a code change": §6. The audit banner in the employee modal, "the change applies from the next punch and is written to the audit log", "the old home is kept in history": §3, attendance guide §3 |
+
+### 10.2 Phone layout
+
+| Screen | First on a phone | Left off a phone | Main action | Navigation |
+|---|---|---|---|---|
+| People · Organogram (`organogram`) | A focus view, not the tree shrunk: Search and Add Role; Reports To with the focused person's manager as a card; the focused person's card, larger and outlined; Direct Reports with a count, one card each showing its own report count. It starts on the CEO | The whole tree, the legend and its help terms, the seat count, Expand All, Download PDF, the since and arrangement line, and dragging to reassign (desktop only) | Tap a card to move the focus to that person; Show CEO returns to the top; on a focused vacant seat, Create Vacancy full width | Bottom bar People; the People tabs along the top |
+| ESS · Org Chart (`org-chart`) | The same focus view, starting on the signed-in employee: their manager, them, their direct reports | The whole tree, the legend, the seat count, Download PDF | Tap a card to move the focus; Show Me returns to the employee | Bottom bar; the ESS tabs along the top |
+| Recruitment · Vacancies (`vacancies`) | Not in the demo yet: suggested vacancies as cards (role title, department, a status pill) | The reporting line, shown in the card's sheet | Create Vacancy, full width at the foot of the sheet | Bottom bar; the Recruitment tabs along the top |
+| People · Employees (`employees`) | Import and Add Employee; the four KPI cards two to a row; the count per work arrangement; All Employees as person cards (name and department, Employment Status pill, Department, Line Manager) | The page subtitle; the Arrangement, Attendance Today and View Details columns (they show in the employee sheet) | Tap a person card: the employee modal as a bottom sheet, its buttons full width | Bottom bar People; the People tabs along the top |
 
 ## 11 · Edge cases
 
@@ -197,6 +224,12 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
 
 ## 14 · Change log
 
+- 14/10/2026 · TB · §10 rewritten as On screen and mobile with the content tiers and phone layout
+  tables, from the demo as built: the builder and viewer footnotes removed (tier 3, now pointing to
+  §3, §5, §6 and §8), the drag instruction and the dotted-line meaning moved to help terms on the
+  legend, and the phone focus view (manager, person, direct reports, tap to refocus) recorded.
+  Added to §3 the People · Employees attendance setup facts and to §6 that a dotted line never
+  changes approvals and that departments are data, so the removed screen text has a home.
 - 13/10/2026 · TB · Recorded the real seed reporting structure in §12.1 after a review note that
   the CTO (Bode Oluwasanmi) was missing from the preview: CEO over CTO over the back-end line, the
   Program Manager branch, and the two vacant seats with the marketing dotted-line matrix. Flagged

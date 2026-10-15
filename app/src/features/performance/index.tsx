@@ -8,19 +8,17 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
 import { Mini, Quote, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Select, useForm } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
-import { PersonPicker } from "@/components/ui/PersonPicker";
-import { FilterSelect, LoadingRows, Table, Toolbar } from "@/components/ui/Table";
+import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime, formatMonth } from "@/lib/format";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { DateField, Field, FilterSelect, FormRow, Input, PersonPicker, Select, useForm } from "@/components/form";
 
 export default function Performance({ tab }: ModuleScreenProps) {
   if (tab === "targets") return <Targets />;
@@ -127,7 +125,7 @@ function GoalForm({ close }: { close: () => void }) {
       <Field label="Level">
         <Select options={ceo ? [["organisational", "Organisational"], ["annual", "Annual"]] : [["annual", "Annual"]]} {...f.field("level")} />
       </Field>
-      <Field label="Goal" {...f.field("title")}><Input {...f.field("title")} placeholder="e.g. Operate in 12 Nigerian cities" /></Field>
+      <Field label="Goal" {...f.field("title")}><Input {...f.field("title")} placeholder="Operate in 12 cities" /></Field>
       {f.values.level === "organisational" ? (
         <>
           <Field label="Strategic Theme"><Input {...f.field("theme")} placeholder="Growth, Revenue, People" /></Field>
@@ -138,7 +136,7 @@ function GoalForm({ close }: { close: () => void }) {
         </>
       ) : (
         <Field label="Rolls Up To" {...f.field("rolls_up_to")}>
-          <Select placeholder="Pick the organisational goal" options={parents.rows.map((g) => [g.goal_id, `${g.code} · ${g.title}`])} {...f.field("rolls_up_to")} />
+          <Select placeholder="Organisational goal" options={parents.rows.map((g) => [g.goal_id, `${g.code} · ${g.title}`])} {...f.field("rolls_up_to")} />
         </Field>
       )}
       <p className="text-[11.5px] text-subtle-foreground">Saved as a draft. Nothing binds until the CEO approves.</p>
@@ -242,10 +240,10 @@ function TargetForm({ close, month }: { close: () => void; month: string }) {
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">For {formatMonth(month)}. It binds once the CEO approves.</p>
       <Field label="Department" {...f.field("department")}><Select options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
-      <Field label="Target" {...f.field("title")}><Input {...f.field("title")} placeholder="e.g. 8 new prospects, 3 proposals sent" /></Field>
+      <Field label="Target" {...f.field("title")}><Input {...f.field("title")} placeholder="8 new prospects" /></Field>
       <FormRow>
         <Field label="Measure" {...f.field("measure")}><Input {...f.field("measure")} placeholder="Count, days, date" /></Field>
-        <Field label="Rolls Up To" {...f.field("rolls_up_to")}><Select placeholder="Pick the annual goal" options={goals.rows.map((g) => [g.goal_id, g.title])} {...f.field("rolls_up_to")} /></Field>
+        <Field label="Rolls Up To" {...f.field("rolls_up_to")}><Select placeholder="Annual goal" options={goals.rows.map((g) => [g.goal_id, g.title])} {...f.field("rolls_up_to")} /></Field>
       </FormRow>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>

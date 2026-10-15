@@ -3,7 +3,6 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { MyQuery } from "@/api/types/ess";
 import { Button } from "@/components/ui/Button";
 import { Banner, EmptyState, KV, Pill } from "@/components/ui/data";
-import { Field, Textarea } from "@/components/ui/form";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
@@ -12,6 +11,7 @@ import { Pager, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { Field, Textarea } from "@/components/form";
 
 type View = "open" | "archived" | "sanctions";
 
@@ -79,7 +79,7 @@ function Respond({ q, close }: { q: MyQuery; close: () => void }) {
     <>
       <Banner tone="info" icon="info">Your response stays on the record next to the decision. Most queries close with no action.</Banner>
       <Field label="Your Response" state={text ? (ok ? "good" : "bad") : undefined} message={send.fields.response?.[0] ?? "Write at least 20 characters"}>
-        <Textarea value={text} onChange={setText} rows={6} state={text ? (ok ? "good" : "bad") : undefined} placeholder="What happened, in your own words" />
+        <Textarea value={text} onChange={setText} rows={6} state={text ? (ok ? "good" : "bad") : undefined} placeholder="Traffic on Ikorodu" />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

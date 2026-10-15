@@ -5,11 +5,11 @@ import "@/api/types/public";
 import type { ApplicationReceipt } from "@/api/types/public";
 import type { DocumentRef } from "@/api/types/common";
 import { Message, Page } from "@/components/Layout";
-import { Button, Field, Input, Loading, Notice, Sub, Textarea } from "@/components/ui";
-import { Upload } from "@/components/Upload";
+import { Button, Loading, Notice, Sub } from "@/components/ui";
 import { formatDate, formatTime } from "@/lib/format";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
+import { Field, Form, Input, Textarea, Upload } from "@/components/form";
 
 type Values = { full_name: string; email: string; phone: string; years: string; why: string };
 type Key = keyof Values | "cv";
@@ -96,7 +96,7 @@ export function Apply({ token }: { token: string }) {
       <Sub className="mt-1">
         This link is yours and works until {formatDate(link.data.expires_at)} at {formatTime(link.data.expires_at)}.
       </Sub>
-      <form className="mt-[18px] flex flex-col gap-[13px]" noValidate onSubmit={(e) => (e.preventDefault(), void submit())}>
+      <Form className="mt-[18px] flex flex-col gap-[13px]" onSubmit={() => void submit()}>
         <Field label="Full Name" htmlFor="full_name" state={state("full_name")} message={err("full_name")}>
           <Input id="full_name" autoComplete="name" value={v.full_name} onChange={set("full_name")} onBlur={blur("full_name")} state={state("full_name")} />
         </Field>
@@ -131,7 +131,7 @@ export function Apply({ token }: { token: string }) {
           {busy ? "Sending" : "Submit Application"}
         </Button>
         <Sub className="text-center">We will email you within five working days.</Sub>
-      </form>
+      </Form>
     </Page>
   );
 }

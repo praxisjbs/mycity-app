@@ -5,18 +5,14 @@ import type { EmployeeCreate, EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Bars, Pill, StatStrip, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Select, rules, useForm } from "@/components/ui/form";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
-import { AmountInput, toMoneyString } from "@/components/ui/Money";
-import { PersonPicker } from "@/components/ui/PersonPicker";
-import { FilterSelect, Pager, SearchBox, Table, Toolbar } from "@/components/ui/Table";
+import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { Upload } from "@/components/ui/Upload";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { hrefFor, useRouter } from "@/lib/router";
 import { EmployeeDetails } from "./EmployeeDetails";
+import { AmountInput, DateField, Field, FilterSelect, FormRow, Input, PersonPicker, rules, SearchBox, Select, toMoneyString, Upload, useForm } from "@/components/form";
 
 export function Employees() {
   const me = useMe();
@@ -49,7 +45,7 @@ export function Employees() {
       {summary.data && <KpiTiles items={summary.data.kpis} />}
       {summary.data && <StatStrip items={summary.data.arrangements.map((a) => ({ label: a.label, value: a.value }))} />}
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Search name, title, staff number" className="w-full md:w-[300px]" />
+        <SearchBox value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-[300px]" />
         <FilterSelect label="Department" value={department} onChange={setDepartment} options={[["all", "All departments"], ...depts.rows.map((d) => [d.name, d.name] as [string, string])]} />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={[["all", "Any status"], ["confirmed", "Active"], ["probation", "Probation"], ["on_leave", "On leave"], ["suspended", "Suspended"]]} />
       </Toolbar>
@@ -166,7 +162,7 @@ function AddEmployee({ close }: { close: () => void }) {
         <Field label="Work Pattern"><Select options={PATTERN} {...f.field("work_pattern")} /></Field>
       </FormRow>
       <Field label="Line Manager">
-        <PersonPicker value={manager} onChange={setManager} placeholder="Search for the manager" />
+        <PersonPicker value={manager} onChange={setManager} placeholder="Manager's name" />
       </Field>
       <details className="plus-marker mb-3 rounded-box border border-border">
         <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-[12.5px] font-[650] text-muted-foreground">Pay and Bank (restricted)</summary>

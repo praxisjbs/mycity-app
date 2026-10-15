@@ -10,7 +10,7 @@ import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { PageHead } from "@/components/ui/layout";
 import { Menu, type MenuItem } from "@/components/ui/Menu";
 import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows, SearchBox } from "@/components/ui/Table";
+import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatDateTime, formatWhen } from "@/lib/format";
@@ -19,6 +19,7 @@ import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Splitter, useSplit } from "@/features/community/Chat";
 import { Composer, type ComposeInit } from "./Composer";
+import { SearchBox } from "@/components/form";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");

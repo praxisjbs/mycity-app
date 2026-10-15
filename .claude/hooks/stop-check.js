@@ -11,6 +11,12 @@
  * instead of at review. CI runs the same checks for every PR, whoever or
  * whatever wrote it; this hook only makes Claude meet them first.
  *
+ * Screen gates. When the change touches either app or the demo (app/,
+ * public-app/, docs/MyCity-ERP-Documents/demo.html), the hook also runs the
+ * screen gates: five-second (8), two-shells (11), forms (12) and dashes (17)
+ * (FRONTEND_GUIDE §5, §7, §8). They are the conventions agreed on 8 October;
+ * a session that broke one does not get to stop.
+ *
  * Loop guard. If the checks still fail after Claude has been sent back twice
  * in a row in the same session, the hook lets it stop and prints the problems
  * to the user rather than looping. The count resets on a clean run.
@@ -26,6 +32,17 @@ const path = require("node:path");
 const ROOT = path.resolve(__dirname, "..", "..");
 const MAX_BLOCKS = 2;
 const CHECKS = ["progress", "guides", "readme-map"];
+const SCREEN_CHECKS = ["forms", "dashes", "five-second", "two-shells"];
+const TOUCHES_SCREENS = /^(app|public-app)\/|^docs\/MyCity-ERP-Documents\/demo\.html$/;
+
+function screensChanged() {
+  try {
+    const { changedFiles } = require(path.join(ROOT, "scripts", "check", "lib", "changes.js"));
+    return changedFiles().some((c) => TOUCHES_SCREENS.test(c.path));
+  } catch {
+    return false; // the process checks report a git problem themselves
+  }
+}
 
 let input = {};
 try {
@@ -54,7 +71,7 @@ const writeCount = (n) => {
 };
 
 const failures = [];
-for (const id of CHECKS) {
+for (const id of screensChanged() ? [...CHECKS, ...SCREEN_CHECKS] : CHECKS) {
   const script = path.join(ROOT, "scripts", "check", `${id}.js`);
   if (!fs.existsSync(script)) continue;
   const r = spawnSync(process.execPath, [script], { cwd: ROOT, encoding: "utf8" });

@@ -5,10 +5,11 @@ import "@/api/types/public";
 import type { OfferToSign } from "@/api/types/public";
 import { Brand, Message, Page } from "@/components/Layout";
 import { SignaturePad, type SignaturePadHandle } from "@/components/SignaturePad";
-import { Button, Field, Loading, Notice, Sub, Textarea } from "@/components/ui";
+import { Button, Loading, Notice, Sub } from "@/components/ui";
 import { formatDate, formatTime } from "@/lib/format";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
+import { Field, Textarea } from "@/components/form";
 
 /**
  * Sign Offer (#84): the candidate reads the same text that is in the PDF and

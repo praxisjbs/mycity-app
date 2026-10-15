@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/Button";
 import { Bars, Chain, KV, Pill, Timeline } from "@/components/ui/data";
 import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, CardHeader } from "@/components/ui/layout";
-import { Pager, SearchBox, Table, type Column } from "@/components/ui/Table";
+import { Pager, Table, type Column } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { toBars } from "@/features/home/blocks";
+import { SearchBox } from "@/components/form";
 
 /**
  * The building blocks the module screens share: the explanation card, the

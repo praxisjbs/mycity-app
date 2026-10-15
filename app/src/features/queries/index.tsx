@@ -7,12 +7,10 @@ import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Banner, Chain, KV, StatStrip, Who } from "@/components/ui/data";
-import { Field, FormRow, Input, Select, Textarea, useForm } from "@/components/ui/form";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
-import { AmountInput, Money } from "@/components/ui/Money";
+import { Money } from "@/components/ui/Money";
 import { Letter } from "@/features/shared/Letter";
-import { PersonPicker } from "@/components/ui/PersonPicker";
 import { Chips, ErrorBlock, LoadingRows } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { formatDate, formatDateTime, formatWhen } from "@/lib/format";
@@ -20,6 +18,7 @@ import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { AmountInput, Field, FormRow, Input, PersonPicker, Select, Textarea, useForm } from "@/components/form";
 
 export default function Queries({ tab, id }: ModuleScreenProps) {
   if (tab === "rules") return <Rules />;
@@ -137,8 +136,8 @@ function RaiseQuery({ close }: { close: () => void }) {
     <>
       <Banner tone="info" icon="info">The employee has 48 hours to respond in writing. Their response is read before any decision.</Banner>
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="Subject" {...f.field("subject")}><Input {...f.field("subject")} placeholder="e.g. Missing clock-out on Thursday" /></Field>
-      <Field label="What Happened" {...f.field("details")}><Textarea {...f.field("details")} placeholder="Dates, times and what the record shows" /></Field>
+      <Field label="Subject" {...f.field("subject")}><Input {...f.field("subject")} placeholder="Missing clock-out Thursday" /></Field>
+      <Field label="What Happened" {...f.field("details")}><Textarea {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="send" disabled={save.pending} onClick={submit}>Raise and Send Letter</Button>
@@ -173,7 +172,7 @@ function Decide({ id, hasResponse, close }: { id: string; hasResponse: boolean; 
           <AmountInput {...f.field("fine")} />
         </Field>
       )}
-      <Field label="Reason" {...f.field("note")}><Textarea {...f.field("note")} placeholder="What you read, and why this outcome" /></Field>
+      <Field label="Reason" {...f.field("note")}><Textarea {...f.field("note")} placeholder="Explanation accepted" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Record Decision</Button>
@@ -382,7 +381,7 @@ function IssueSanction({ close }: { close: () => void }) {
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
       <Field label="Sanction"><Select options={[["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"], ["fine", "Fine"]]} {...f.field("kind")} /></Field>
       {f.values.kind === "fine" && <Field label="Amount" {...f.field("amount")}><AmountInput {...f.field("amount")} /></Field>}
-      <Field label="Reason" {...f.field("reason")}><Textarea {...f.field("reason")} placeholder="The query it follows, or what happened" /></Field>
+      <Field label="Reason" {...f.field("reason")}><Textarea {...f.field("reason")} placeholder="Follows QRY-0042" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Issue</Button>
@@ -452,8 +451,8 @@ function TemplateForm({ close }: { close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="Name" {...f.field("name")}><Input {...f.field("name")} placeholder="e.g. Final warning letter" /></Field>
-        <Field label="Used For" {...f.field("used_for")}><Input {...f.field("used_for")} placeholder="Which step sends it" /></Field>
+        <Field label="Name" {...f.field("name")}><Input {...f.field("name")} placeholder="Final warning letter" /></Field>
+        <Field label="Used For" {...f.field("used_for")}><Input {...f.field("used_for")} placeholder="Step name" /></Field>
       </FormRow>
       <Field label="Letter" info="Use {name}, {date}, {reason} and {hours} where the record fills in. Everything else is sent as written." {...f.field("body")}>
         <Textarea {...f.field("body")} rows={8} placeholder="Dear {name}, ..." />

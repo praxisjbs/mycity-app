@@ -5,8 +5,6 @@ import { useMe } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
 import { Banner, Chain, EmptyState, KV, Pill } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Select, Textarea, rules, useForm } from "@/components/ui/form";
 import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
@@ -17,6 +15,7 @@ import { formatDate, formatDateTime, formatMonth, formatTime, todayIso } from "@
 import { hrefFor, useRouter } from "@/lib/router";
 import { DEVICE_TONE } from "./Devices";
 import { CASE_TONE, REQ_TONE } from "./PeopleAttendance";
+import { DateField, Field, FormRow, Input, rules, Select, Textarea, useForm } from "@/components/form";
 
 const STATUS: Record<AttendanceEvent["status"], { tone: "ok" | "warn" | "err" | "info" | "neutral"; text: string }> = {
   on_time: { tone: "ok", text: "On time" }, late: { tone: "warn", text: "Late" }, absent: { tone: "err", text: "Absent" }, leave: { tone: "info", text: "On leave" },
@@ -190,8 +189,8 @@ function RequestForm({ close }: { close: () => void }) {
         <Field label="To" {...f.field("to")}><DateField {...f.field("to")} min={f.values.from || todayIso()} /></Field>
       </FormRow>
       <Field label="Address" {...f.field("address")} info="Homes always use a fixed 100 m geofence. You cannot choose the radius."><Input {...f.field("address")} placeholder="Street, area, city" /></Field>
-      <Field label="Reason" {...f.field("reason")}><Textarea {...f.field("reason")} placeholder="Why, in a sentence or two" /></Field>
-      <Field label="Evidence Label"><Input {...f.field("evidence")} placeholder="Optional, for example, tenancy letter.pdf" /></Field>
+      <Field label="Reason" {...f.field("reason")}><Textarea {...f.field("reason")} placeholder="Visiting a client" /></Field>
+      <Field label="Evidence Label"><Input {...f.field("evidence")} placeholder="tenancy-letter.pdf" /></Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Submit Request</Button>
@@ -237,7 +236,7 @@ function DeviceForm({ close }: { close: () => void }) {
   return (
     <>
       <Field label="Device Name" state={name.trim() ? "good" : "bad"} message="Name the device"><Input value={name} onChange={setName} /></Field>
-      <Field label="Reason"><Input value={why} onChange={setWhy} placeholder="Optional, for example, replaced a broken phone" /></Field>
+      <Field label="Reason"><Input value={why} onChange={setWhy} placeholder="Replaced broken phone" /></Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={!name.trim() || save.pending} onClick={async () => { try { await save.run({ body: { name, reason: why } }); invalidate("/api/v1/attendance/devices"); close(); toast("Sent to People for review"); } catch { toast(save.error?.message ?? "Not registered"); } }}>Send for Review</Button>

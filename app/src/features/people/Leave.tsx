@@ -7,16 +7,14 @@ import { useMe } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { MonthCalendar } from "@/components/ui/Calendar";
 import { Pill, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Select, Textarea, rules, useForm } from "@/components/ui/form";
 import { WithInfo } from "@/components/ui/Info";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { Grow, useModal } from "@/components/ui/Modal";
-import { PersonPicker } from "@/components/ui/PersonPicker";
-import { Chips, LoadingRows, Pager, SearchBox, Table, Toolbar } from "@/components/ui/Table";
+import { Chips, LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { formatDate, monthName, todayIso } from "@/lib/format";
+import { DateField, Field, FormRow, PersonPicker, rules, SearchBox, Select, Textarea, useForm } from "@/components/form";
 
 export const LEAVE_TONE: Record<LeaveRequest["status"], "ok" | "warn" | "err" | "neutral"> = { Approved: "ok", Pending: "warn", Rejected: "err", Cancelled: "neutral" };
 export const LEAVE_TYPES: LeaveType[] = ["Annual", "Sick", "Compassionate", "Maternity", "Paternity", "Study", "Unpaid"];
@@ -50,7 +48,7 @@ export function PeopleLeave() {
       <Grid cols="1.4/1">
         <div className="min-w-0">
           <Toolbar>
-            <SearchBox value={list.q} onChange={list.setQ} placeholder="Search name or type" className="w-full md:w-[260px]" />
+            <SearchBox value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-[260px]" />
           </Toolbar>
           <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending", "Pending"], ["Approved", "Approved"], ["Rejected", "Rejected"]]} />
           <Table
@@ -165,7 +163,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
         <Field label="Last Day" {...f.field("to")}><DateField {...f.field("to")} min={f.values.from || undefined} /></Field>
       </FormRow>
       <Field label="Reason" {...f.field("reason")}>
-        <Textarea {...f.field("reason")} placeholder="A line for your manager" />
+        <Textarea {...f.field("reason")} placeholder="Family event" />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

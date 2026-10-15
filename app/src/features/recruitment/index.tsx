@@ -7,13 +7,10 @@ import type { PersonRef } from "@/api/types/common";
 import { Button } from "@/components/ui/Button";
 import { Board } from "@/components/ui/Board";
 import { Banner, KV, Mini, Pill, Quote, Timeline, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Select, Textarea, useForm } from "@/components/ui/form";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
-import { AmountInput, Money } from "@/components/ui/Money";
-import { PersonPicker } from "@/components/ui/PersonPicker";
-import { ErrorBlock, FilterSelect, LoadingRows, Table, Toolbar } from "@/components/ui/Table";
+import { Money } from "@/components/ui/Money";
+import { ErrorBlock, LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime, todayIso } from "@/lib/format";
@@ -22,6 +19,7 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import { Letter } from "@/features/shared/Letter";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { AmountInput, DateField, Field, FilterSelect, FormRow, Input, PersonPicker, Select, Textarea, useForm } from "@/components/form";
 
 export default function Recruitment({ tab, id }: ModuleScreenProps) {
   if (tab === "candidates") return <Candidates id={id} />;
@@ -157,7 +155,7 @@ function VacancyForm({ close }: { close: () => void }) {
         <Field label="Openings" {...f.field("openings")}><Input {...f.field("openings")} inputMode="numeric" onChange={(v) => f.set("openings", v.replace(/\D/g, "").slice(0, 2))} /></Field>
         <Field label="Closes On" {...f.field("closes_on")}><DateField {...f.field("closes_on")} min={todayIso()} /></Field>
       </FormRow>
-      <Field label="About the Role" {...f.field("description")}><Textarea {...f.field("description")} rows={5} placeholder="What the person will do, and what they need to bring" /></Field>
+      <Field label="About the Role" {...f.field("description")}><Textarea {...f.field("description")} rows={5} placeholder="Duties and requirements" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Publish Vacancy</Button>
@@ -276,7 +274,7 @@ function CandidateDetail({ id, close }: { id: string; close: () => void }) {
       {reject != null && (
         <div className="mt-3">
           <Field label="Why Not Progressed" state={!reject.trim() ? "bad" : undefined} message={!reject.trim() ? "For the record and the candidate's email" : undefined}>
-            <Textarea value={reject} onChange={setReject} placeholder="e.g. Strong, but the role needs more partnership experience" />
+            <Textarea value={reject} onChange={setReject} placeholder="Strong, needs partnerships" />
           </Field>
         </div>
       )}
@@ -396,7 +394,7 @@ function AssessmentForm({ close }: { close: () => void }) {
         <Field label="Type"><Select options={[["Psychometric", "Psychometric"], ["Technical", "Technical"], ["Case study", "Case Study"]]} {...f.field("kind")} /></Field>
         <Field label="Duration (Minutes)" {...f.field("duration_min")}><Input {...f.field("duration_min")} inputMode="numeric" onChange={(v) => f.set("duration_min", v.replace(/\D/g, "").slice(0, 3))} /></Field>
       </FormRow>
-      <Field label="Taken By"><Input {...f.field("role")} placeholder="All roles, or one role" /></Field>
+      <Field label="Taken By"><Input {...f.field("role")} placeholder="Any role" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Save Assessment</Button>
@@ -505,7 +503,7 @@ function ScheduleInterview({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Candidate" {...f.field("candidate_id")}><Select placeholder="Pick a shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
+      <Field label="Candidate" {...f.field("candidate_id")}><Select placeholder="Shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
       <FormRow>
         <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>
         <Field label="Time (24 Hour)" {...f.field("time")}><Input {...f.field("time")} inputMode="numeric" placeholder="10:00" /></Field>
@@ -577,7 +575,7 @@ function OfferForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Candidate" {...f.field("candidate_id")}><Select placeholder="Pick a candidate at interview" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
+      <Field label="Candidate" {...f.field("candidate_id")}><Select placeholder="Interviewed candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
       <Field label="Gross Monthly Salary" {...f.field("salary")}><AmountInput {...f.field("salary")} /></Field>
       <FormRow>
         <Field label="Start Date" {...f.field("start_date")}><DateField {...f.field("start_date")} min={todayIso()} /></Field>
@@ -701,7 +699,7 @@ function Invite({ p, close }: { p: PoolRow; close: () => void }) {
   return (
     <>
       <Banner tone="info" icon="send">{p.name} gets a personal link to the vacancy, with their earlier application pre-filled.</Banner>
-      <Field label="Vacancy"><Select value={vac} onChange={setVac} placeholder="Pick an open vacancy" options={vacs.rows.map((v) => [v.vacancy_id, v.title])} /></Field>
+      <Field label="Vacancy"><Select value={vac} onChange={setVac} placeholder="Open vacancy" options={vacs.rows.map((v) => [v.vacancy_id, v.title])} /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="send" disabled={!vac || invite.pending} onClick={async () => { try { await invite.run({ params: { id: p.pool_id }, body: { vacancy_id: vac } }); invalidate("/api/v1/recruitment/pool"); close(); toast(`Invitation sent to ${p.name}`); } catch (e) { fail(e); } }}>Send Invitation</Button>

@@ -4,13 +4,13 @@ import type { Arrangement } from "@/api/types/attendance";
 import "@/api/types/attendance";
 import { Button } from "@/components/ui/Button";
 import { Banner, KV, Pill, Timeline } from "@/components/ui/data";
-import { Field, Input, Seg, Select } from "@/components/ui/form";
 import { Card, CardHeader, Grid } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { formatDate } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
+import { Field, Input, Seg, Select } from "@/components/form";
 
 /** The details modal from the Employees list: employment, and attendance and location (HR only). */
 export function EmployeeDetails({ id, close }: { id: string; close: () => void }) {
@@ -86,7 +86,7 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
         <Select value={site} onChange={setSite} options={(sites.data?.data ?? []).map((s) => [s.name, s.name])} />
       </Field>
       <Field label="Reason" state={why ? (bad ? "bad" : "good") : undefined} message="Give a reason">
-        <Input value={why} onChange={setWhy} placeholder="For example, role moved to field work" state={why ? (bad ? "bad" : "good") : undefined} />
+        <Input value={why} onChange={setWhy} placeholder="Moved to field" state={why ? (bad ? "bad" : "good") : undefined} />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

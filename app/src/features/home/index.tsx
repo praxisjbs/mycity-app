@@ -4,7 +4,6 @@ import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Bars, KV, Pill, Tile } from "@/components/ui/data";
-import { Field, FormRow, Input, Select, ToggleRow, rules, useForm } from "@/components/ui/form";
 import { Card, Grid, PageHead } from "@/components/ui/layout";
 import { Grow, useModal } from "@/components/ui/Modal";
 import { Chips, ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
@@ -14,6 +13,7 @@ import { formatDateTime } from "@/lib/format";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Block, InfoCard, KpiRow, toBars } from "./blocks";
+import { Field, FormRow, Input, rules, Select, ToggleRow, useForm } from "@/components/form";
 
 export default function Home({ tab, id }: ModuleScreenProps) {
   if (tab === "team") return <Team />;
@@ -248,7 +248,7 @@ function RuleForm({ close }: { close: () => void }) {
     <>
       <FormRow>
         <Field label="Rule Name" {...f.field("name")} htmlFor="rn">
-          <Input id="rn" placeholder="3 late arrivals in 30 days" {...f.field("name")} />
+          <Input id="rn" placeholder="3 lates monthly" {...f.field("name")} />
         </Field>
         <Field label="Metric">
           <Select options={METRICS} {...f.field("metric")} />

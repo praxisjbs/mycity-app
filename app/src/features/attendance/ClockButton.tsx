@@ -5,7 +5,6 @@ import type { AttendanceToday, ClockResponse } from "@/api/types/attendance";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Avatar, Banner, KV, Result } from "@/components/ui/data";
-import { Field, Textarea } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { Card } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
@@ -13,6 +12,7 @@ import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatDate, formatTime } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
+import { Field, Textarea } from "@/components/form";
 
 /**
  * The top bar's Clock In / Clock Out button. The button only asks; the API
@@ -152,7 +152,7 @@ function ClockPanel({ close }: { close: () => void }) {
           <h3 className="mb-1 text-[13.5px]">Add Exception Details</h3>
           <p className="mb-2.5 text-[11.5px] text-subtle-foreground">People and your manager will review it.</p>
           <Field label="Explanation" state={why.trim().length >= 10 ? "good" : why ? "bad" : undefined} message="Write at least 10 characters">
-            <Textarea value={why} onChange={setWhy} placeholder="What happened, in a sentence or two" state={why.trim().length >= 10 ? "good" : why ? "bad" : undefined} />
+            <Textarea value={why} onChange={setWhy} placeholder="Phone battery died" state={why.trim().length >= 10 ? "good" : why ? "bad" : undefined} />
           </Field>
         </Card>
         <Foot>

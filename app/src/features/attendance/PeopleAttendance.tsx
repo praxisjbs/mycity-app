@@ -6,19 +6,17 @@ import { useMe } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { AreaChart, Donut } from "@/components/ui/charts";
 import { Banner, EmptyState, KV, Pill, StatStrip, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Seg, Select, Textarea, useForm, rules } from "@/components/ui/form";
 import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, CardHeader, Grid, MobileOnly, DesktopOnly } from "@/components/ui/layout";
 import { Grow, useModal } from "@/components/ui/Modal";
-import { PersonPicker } from "@/components/ui/PersonPicker";
 import { BackButton } from "@/components/ui/Profile";
-import { Chips, ErrorBlock, LoadingRows, Pager, SearchBox, Table, Toolbar } from "@/components/ui/Table";
+import { Chips, ErrorBlock, LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
 import { useSearchParams } from "@/lib/router";
+import { DateField, Field, FormRow, Input, PersonPicker, rules, SearchBox, Seg, Select, Textarea, useForm } from "@/components/form";
 
 type View = "register" | "assignments" | "requests" | "manager";
 const VIEWS: Array<[View, string]> = [["register", "Register"], ["assignments", "Field Assignments"], ["requests", "Location Requests"], ["manager", "Manager Preview"]];
@@ -94,7 +92,7 @@ function Register() {
         </Grid>
       )}
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Search name or location" className="w-full md:w-[260px]" />
+        <SearchBox value={list.q} onChange={list.setQ} placeholder="Name or location" className="w-full md:w-[260px]" />
       </Toolbar>
       {s && <Chips value={filter} onChange={setFilter} options={[["all", `All ${s.kpis[0].value.split(" / ")[1]}`], ...s.filters.map((f) => [f.value, `${f.label} ${f.count}`] as [string, string])]} />}
       <DesktopOnly>
@@ -265,12 +263,12 @@ function AssignmentForm({ close }: { close: () => void }) {
     <>
       <Grid cols={2} className="mb-0">
         <div>
-          <Field label="Assignment Name" {...f.field("name")}><Input {...f.field("name")} placeholder="For example, Ember to Remember venue check" /></Field>
+          <Field label="Assignment Name" {...f.field("name")}><Input {...f.field("name")} placeholder="Venue check" /></Field>
           <Field label="Client, Event or Campaign" {...f.field("client")}><Input {...f.field("client")} /></Field>
           <Field label="Employees"><PersonPicker multiple value={who} onChange={setWho} /></Field>
         </div>
         <div>
-          <Field label="Approved Site" {...f.field("site_name")}><Input {...f.field("site_name")} placeholder="Venue name and area" /></Field>
+          <Field label="Approved Site" {...f.field("site_name")}><Input {...f.field("site_name")} placeholder="Venue, area" /></Field>
           <Field label="Radius, Metres" {...f.field("radius_m")} info="100 m for a single building, up to 500 m for a park or an open venue."><Input inputMode="numeric" {...f.field("radius_m")} /></Field>
           <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} /></Field>
           <FormRow>
@@ -464,7 +462,7 @@ function Recommend({ r, close }: { r: LocationRequest; close: () => void }) {
     <>
       <KV items={[["Employee", r.employee.display_name], ["Request", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason]]} />
       <Field label="Your Comment for People" className="mt-3" state={note ? (note.trim().length < 3 ? "bad" : "good") : undefined} message="Add a comment">
-        <Input value={note} onChange={setNote} placeholder="For example, I know about this and support it" />
+        <Input value={note} onChange={setNote} placeholder="I support this" />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
@@ -496,7 +494,7 @@ function CaseRecommend({ c, close }: { c: ReconCase; close: () => void }) {
       <p className="my-3 text-[11.5px] text-subtle-foreground">You recommend. People decides and records the outcome. You cannot change the clock event.</p>
       <Field label="Recommended Outcome"><Select value={out} onChange={setOut} options={OUTCOMES.filter(([k]) => k !== "escalate")} /></Field>
       <Field label="Your Comment" state={note ? (note.trim().length < 10 ? "bad" : "good") : undefined} message="Write at least 10 characters">
-        <Textarea value={note} onChange={setNote} placeholder="What you know about this day" state={note ? (note.trim().length < 10 ? "bad" : "good") : undefined} />
+        <Textarea value={note} onChange={setNote} placeholder="Approved site visit" state={note ? (note.trim().length < 10 ? "bad" : "good") : undefined} />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
@@ -530,7 +528,7 @@ function Reconcile({ onBack }: { onBack: () => void }) {
       <InfoText {...info}>Reconciliation decides what the attendance record should say. It never edits a clock event: a correction is a new event, and the original stays visible. A possible policy breach goes to Queries & Sanctions, which is a separate process.</InfoText>
       <StatStrip items={[{ label: "Awaiting People", value: String(count("Awaiting HR")), tone: count("Awaiting HR") ? "warn" : "ok" }, { label: "Awaiting a manager", value: String(count("Awaiting manager")) }, { label: "More information", value: String(count("Awaiting employee")) }, { label: "Escalated", value: String(count("Escalated")), desktop: true }, { label: "Total cases", value: String(all.page?.total ?? 0) }]} />
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Search case, name or type" className="w-full md:w-[260px]" />
+        <SearchBox value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={status} onChange={setStatus} options={[["open", "Open"], ["Awaiting HR", "Awaiting People"], ["Awaiting manager", "Awaiting a manager"], ["Resolved", "Resolved"], ["all", "All"]]} />
       <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
@@ -589,7 +587,7 @@ function CaseDetail({ c }: { c: ReconCase }) {
             </Field>
           )}
           <Field label="Resolution Reason" state={bad || decide.fields.note ? "bad" : why ? "good" : undefined} message={decide.fields.note?.[0] ?? "At least 10 characters"}>
-            <Textarea value={why} onChange={setWhy} placeholder="Why this is the right record" state={bad ? "bad" : why ? "good" : undefined} />
+            <Textarea value={why} onChange={setWhy} placeholder="Matches gate log" state={bad ? "bad" : why ? "good" : undefined} />
           </Field>
           <div className="flex justify-end gap-2">
             <Grow />

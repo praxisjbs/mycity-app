@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import { formatCount } from "@/lib/format";
 import { BigButton } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { cn } from "@/lib/cn";
+import { Form, LoginField } from "@/components/form";
 import { useAuth } from "./AuthProvider";
 
 const vEmail = (v: string) => (!v.trim() ? "Enter your work email" : !v.includes("@") ? "Needs an @" : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? "Check the spelling" : "");
@@ -26,8 +26,7 @@ export function Login() {
   const eErr = vEmail(email);
   const pErr = vPass(pass);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
     setTouched({ email: true, pass: true });
     if (eErr || pErr) {
       setBuzz((n) => n + 1);
@@ -76,7 +75,7 @@ export function Login() {
       </div>
 
       <div className="flex items-center justify-center overflow-y-auto p-6">
-        <form className="w-full max-w-[380px]" noValidate onSubmit={submit}>
+        <Form className="w-full max-w-[380px]" onSubmit={() => void submit()}>
           <span className="mb-6 flex items-center gap-2.5 md:hidden">
             <Icon name="pin" className="size-7 text-secondary" />
             <b className="text-[17px] font-bold tracking-[-.015em]">MyCity App</b>
@@ -100,7 +99,7 @@ export function Login() {
             </div>
           )}
           {import.meta.env.VITE_API_MODE === "mock" && <MockAccounts onPick={(e) => (setEmail(e), setPass("demo1234"), setProblem(null))} />}
-        </form>
+        </Form>
       </div>
     </div>
   );
@@ -123,40 +122,6 @@ function SplashStats() {
           <span className="text-[12px] text-on-deep-faint">{l}</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function LoginField({ id, label, type, autoComplete, value, onChange, onBlur, error, good, buzz }: {
-  id: string; label: string; type: string; autoComplete: string; value: string; onChange: (v: string) => void; onBlur: () => void; error: string; good: boolean; buzz: number;
-}) {
-  return (
-    <div className="mt-[18px]">
-      <label htmlFor={id} className="mb-1.5 block text-[12.5px] font-semibold text-muted-foreground">
-        {label}
-      </label>
-      <div key={buzz} className={cn("relative flex items-center", buzz > 0 && "animate-buzz")}>
-        <input
-          id={id}
-          type={type}
-          autoComplete={autoComplete}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={onBlur}
-          aria-invalid={!!error || undefined}
-          aria-describedby={`e-${id}`}
-          className={cn(
-            "h-[46px] w-full rounded-box border-[1.5px] bg-background pr-[42px] pl-[14px] transition-[border-color,box-shadow] outline-none focus:border-ring focus:shadow-[0_0_0_3px_var(--accent)]",
-            error ? "border-destructive" : "border-input",
-          )}
-        />
-        {error && <Icon name="alert" className="pointer-events-none absolute right-3 text-destructive" />}
-        {!error && good && value && <Icon name="ok" className="pointer-events-none absolute right-3 text-success" />}
-      </div>
-      <p id={`e-${id}`} role="alert" className={cn("mt-1.5 items-center gap-[5px] text-[12.5px] text-destructive", error ? "flex" : "hidden")}>
-        <Icon name="alert" />
-        <span>{error}</span>
-      </p>
     </div>
   );
 }

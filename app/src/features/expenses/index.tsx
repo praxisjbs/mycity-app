@@ -8,20 +8,18 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
 import { Chain, KV, Quote, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Select, Textarea, useForm } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
-import { AmountInput, Money } from "@/components/ui/Money";
+import { Money } from "@/components/ui/Money";
 import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { Upload } from "@/components/ui/Upload";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatDate, formatDateTime, formatMoneyShort, todayIso } from "@/lib/format";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { AmountInput, DateField, Field, FormRow, Input, Select, Textarea, Upload, useForm } from "@/components/form";
 
 export default function Expenses({ tab, id }: ModuleScreenProps) {
   if (tab === "approvals") return <Approvals id={id} />;
@@ -128,12 +126,12 @@ function RequestForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Description" {...f.field("title")}><Input {...f.field("title")} placeholder="e.g. Courier, Enugu documents" /></Field>
+      <Field label="Description" {...f.field("title")}><Input {...f.field("title")} placeholder="Courier to Enugu" /></Field>
       <FormRow>
         <Field label="Category" {...f.field("category_id")}><Select placeholder="Pick one" options={cats.rows.map((c) => [c.category_id, c.name])} {...f.field("category_id")} /></Field>
         <Field label="Amount" {...f.field("amount")}><AmountInput {...f.field("amount")} /></Field>
       </FormRow>
-      <Field label="Project (Optional)"><Input {...f.field("project")} placeholder="A campaign or a city" /></Field>
+      <Field label="Project (Optional)"><Input {...f.field("project")} placeholder="Campaign or city" /></Field>
       <FormRow>
         <Field label="Beneficiary" {...f.field("beneficiary_name")}><Input {...f.field("beneficiary_name")} /></Field>
         <Field label="Bank" {...f.field("bank")}><Select placeholder="Pick the bank" options={BANKS} {...f.field("bank")} /></Field>
@@ -224,7 +222,7 @@ function Reject({ id, close, onDone }: { id: string; close: () => void; onDone: 
   return (
     <>
       <Field label="Reason" info="The requester sees this.">
-        <Textarea value={reason} onChange={setReason} placeholder="e.g. Use the approved vendor list" />
+        <Textarea value={reason} onChange={setReason} placeholder="Use approved vendors" />
       </Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>

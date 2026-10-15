@@ -3,15 +3,14 @@ import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { MyDocument } from "@/api/types/ess";
 import { Button } from "@/components/ui/Button";
 import { KV, Pill, StatStrip, TapList } from "@/components/ui/data";
-import { Field, Input } from "@/components/ui/form";
 import { Card, CardHeader, DesktopOnly, Grid, MobileOnly, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
 import { Pager, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { Upload } from "@/components/ui/Upload";
 import { useMe } from "@/auth/AuthProvider";
 import { formatDate } from "@/lib/format";
+import { Field, Input, Upload } from "@/components/form";
 
 export function MyDocumentsPage() {
   const list = usePaged("GET /api/v1/ess/documents");
@@ -82,7 +81,7 @@ function UploadForm({ name: initial, close }: { name: string; close: () => void 
   return (
     <>
       <Field label="What Is It" state={name ? "good" : undefined}>
-        <Input value={name} onChange={setName} placeholder="For example, NDPA training certificate" />
+        <Input value={name} onChange={setName} placeholder="NDPA certificate" />
       </Field>
       <Upload
         purpose="employee_document"

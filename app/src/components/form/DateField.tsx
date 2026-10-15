@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatDate, monthName, parseDayFirst, todayIso } from "@/lib/format";
-import { Icon } from "./Icon";
+import { Icon } from "@/components/ui/Icon";
 
 /**
  * Day-first date entry (gate 15): never <input type="date">, whose format

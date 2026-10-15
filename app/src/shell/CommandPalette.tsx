@@ -3,6 +3,7 @@ import { usePaged } from "@/api/hooks";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import { useRouter } from "@/lib/router";
+import { InlineInput } from "@/components/form";
 
 /**
  * ⌘K. Screens and records from the server's search registry, first page only
@@ -43,12 +44,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       <div role="dialog" aria-label="Search" className="w-full max-w-[560px] overflow-hidden rounded-sheet border border-glass-border bg-glass shadow-3 backdrop-blur-[18px]">
         <div className="flex items-center gap-2.5 border-b border-glass-border px-4 py-[14px]">
           <Icon name="srch" size="m" className="text-subtle-foreground" />
-          <input
+          <InlineInput
             ref={input}
             className="flex-1 border-0 bg-transparent text-[15px] outline-none"
-            placeholder="Search screens, people, partners, records"
+            placeholder="Screens, people, records"
             value={list.q}
-            onChange={(e) => (list.setQ(e.target.value), setCur(0))}
+            onChange={(v) => (list.setQ(v), setCur(0))}
             onKeyDown={onKey}
             aria-label="Search"
           />

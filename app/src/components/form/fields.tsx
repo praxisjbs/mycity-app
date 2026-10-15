@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
-import { Icon } from "./Icon";
-import { InfoButton, InfoText, useInfo } from "./Info";
+import { Icon } from "@/components/ui/Icon";
+import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 
 /**
  * Forms validate as they are filled (gate 12): a field is checked on every

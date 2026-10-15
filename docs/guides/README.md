@@ -8,6 +8,12 @@ changing behaviour: **a change to a feature passes through its guide first.**
 Start a new guide by copying `_TEMPLATE.md` to `<module>.md` (the backend module name, e.g.
 `attendance.md`). Keep it current: a guide that describes last month's behaviour is worse than none.
 
+**A guide is not screen copy.** Its rules (§3, §6) are written for engineers. What a person sees is
+decided in **§10 On screen and mobile**: per screen, what is open, what sits behind a help term or a
+Details row, what never reaches a screen and where it lives instead, and the phone layout
+(FRONTEND_GUIDE §5, §7). A sentence in §6 that turns up as a card on a screen is the bug this
+section exists to stop.
+
 | Guide | Feature | Owner | Milestone | Written |
 |---|---|---|---|---|
 | `home.md` | Home: Overview, Team, Alerts, Reports (role-sensitive dashboard, KPI catalogue, alert rules, scheduled reports) | TB | M1 | ☑ |

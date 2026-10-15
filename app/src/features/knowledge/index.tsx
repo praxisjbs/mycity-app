@@ -8,8 +8,6 @@ import type { ArticleKind, Block, Overdue, Resource } from "@/api/types/knowledg
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Accordion, Mini, Pill, StatStrip, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Seg, Select, Textarea, useForm } from "@/components/ui/form";
 import { Card, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ArticleBody, Reader } from "@/components/ui/Reader";
@@ -20,6 +18,7 @@ import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { KvCard, ModalFoot, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { DateField, Field, FormRow, Input, Seg, Select, Textarea, useForm } from "@/components/form";
 
 export default function Knowledge({ tab, id }: ModuleScreenProps) {
   if (tab === "sops") return <Articles kind="sop" id={id} />;

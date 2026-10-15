@@ -4,16 +4,15 @@ import type { MyProfile, ProfilePatch } from "@/api/types/ess";
 import "@/api/types/ess";
 import { Button } from "@/components/ui/Button";
 import { KV, Pill, Timeline } from "@/components/ui/data";
-import { Field, FormRow, Input, rules, useForm } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { Upload } from "@/components/ui/Upload";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { formatDate, initials } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
+import { Field, FormRow, Input, rules, Upload, useForm } from "@/components/form";
 
 export function MyProfilePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/profile");
@@ -141,7 +140,7 @@ function EditProfile({ p, close }: { p: MyProfile; close: () => void }) {
         <Field label="Bank" info="A bank change is logged and People are notified the same day, because expenses are paid into it.">
           <Input {...f.field("bank_name")} />
         </Field>
-        <Field label="New Account Number" {...f.field("account_number")}><Input inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="Leave empty to keep" /></Field>
+        <Field label="New Account Number" info="Leave it empty to keep the account you have." {...f.field("account_number")}><Input inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="Unchanged" /></Field>
       </FormRow>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

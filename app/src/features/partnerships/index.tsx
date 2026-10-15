@@ -7,14 +7,11 @@ import type { PersonRef } from "@/api/types/common";
 import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
 import { Chain, KV, Mini, Pill, StatStrip, Who } from "@/components/ui/data";
-import { DateField } from "@/components/ui/DateField";
-import { Field, FormRow, Input, Select, Textarea, useForm } from "@/components/ui/form";
 import { Icon } from "@/components/ui/Icon";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
-import { AmountInput, Money } from "@/components/ui/Money";
+import { Money } from "@/components/ui/Money";
 import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
-import { PersonPicker } from "@/components/ui/PersonPicker";
 import { BackButton, ProfileHeader } from "@/components/ui/Profile";
 import { Chips, ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
@@ -23,6 +20,7 @@ import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { AmountInput, DateField, Field, FormRow, Input, PersonPicker, Select, Textarea, useForm } from "@/components/form";
 
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   if (id && (tab === "partners" || tab === "pipeline")) return <Partner360View id={id} back={tab} />;
@@ -185,7 +183,7 @@ function PartnerForm({ close }: { close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="Partner" {...f.field("name")}><Input {...f.field("name")} placeholder="Name as people know it" /></Field>
+        <Field label="Partner" {...f.field("name")}><Input {...f.field("name")} placeholder="Zenith Bank" /></Field>
         <Field label="Legal Name"><Input {...f.field("legal_name")} placeholder="Optional" /></Field>
       </FormRow>
       <FormRow>
@@ -297,7 +295,7 @@ function LogInteraction({ id, close }: { id: string; close: () => void }) {
         <Field label="What"><Select options={[["call", "Call"], ["meeting", "Meeting"], ["email", "Email"], ["visit", "Visit"]]} {...f.field("kind")} /></Field>
         <Field label="When" {...f.field("happened_on")}><DateField {...f.field("happened_on")} max={todayIso()} /></Field>
       </FormRow>
-      <Field label="Summary" {...f.field("summary")}><Textarea {...f.field("summary")} placeholder="What was said or agreed, and what happens next" /></Field>
+      <Field label="Summary" {...f.field("summary")}><Textarea {...f.field("summary")} placeholder="Agreed a pilot" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Log</Button>
@@ -325,7 +323,7 @@ function MoveStage({ id, current, close }: { id: string; current: string; close:
   return (
     <>
       <Field label="Stage"><Select value={stage} onChange={setStage} options={opts(stages.data ?? [current])} /></Field>
-      <Field label={stage === "On hold" ? "Why It Is on Hold" : "Note (Optional)"}><Textarea value={reason} onChange={setReason} placeholder="Kept in the interaction log" /></Field>
+      <Field label={stage === "On hold" ? "Why It Is on Hold" : "Note (Optional)"}><Textarea value={reason} onChange={setReason} placeholder="Duplicate entry" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={stage === current || move.pending} onClick={go}>Move</Button>
@@ -411,9 +409,9 @@ function LeadForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Lead" {...f.field("title")}><Input {...f.field("title")} placeholder="e.g. Zenith Bank · events sponsorship" /></Field>
+      <Field label="Lead" {...f.field("title")}><Input {...f.field("title")} placeholder="Zenith events sponsorship" /></Field>
       <Field label="Source"><Select options={opts(["BD conversation", "Referral", "Inbound email", "Event", "Website form"])} {...f.field("source")} /></Field>
-      <Field label="Next Action"><Input {...f.field("next_action")} placeholder="e.g. Send one pager" /></Field>
+      <Field label="Next Action"><Input {...f.field("next_action")} placeholder="Send one pager" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Add Lead</Button>
@@ -427,7 +425,7 @@ function LoseLead({ id, close }: { id: string; close: () => void }) {
   const lose = useMutation("POST /api/v1/partnerships/leads/:id/lose");
   return (
     <>
-      <Field label="Why"><Textarea value={reason} onChange={setReason} placeholder="It stays searchable with this reason" /></Field>
+      <Field label="Why"><Textarea value={reason} onChange={setReason} placeholder="Partner withdrew" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={!reason.trim() || lose.pending} onClick={async () => { await lose.run({ params: { id }, body: { reason } }); invalidate("/api/v1/partnerships/leads"); close(); toast("Lead closed as lost"); }}>Close as Lost</Button>
@@ -519,8 +517,8 @@ function ProposalForm({ close, partner }: { close: () => void; partner: string }
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">Six answers. The assistant drafts; you edit before anything is sent.</p>
       <Field label="1 · Who Is It For" {...f.field("partner_id")}><Select placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
-      <Field label="2 · What We Propose" {...f.field("what")}><Textarea {...f.field("what")} placeholder="e.g. A four-city health activation carried on the platform" /></Field>
-      <Field label="3 · Why Now" {...f.field("why_now")}><Input {...f.field("why_now")} placeholder="e.g. It lines up with the campaign window" /></Field>
+      <Field label="2 · What We Propose" {...f.field("what")}><Textarea {...f.field("what")} placeholder="Four-city health activation" /></Field>
+      <Field label="3 · Why Now" {...f.field("why_now")}><Input {...f.field("why_now")} placeholder="Fits campaign window" /></Field>
       <FormRow>
         <Field label="4 · Cities" {...f.field("cities")}><Input {...f.field("cities")} /></Field>
         <Field label="5 · Weeks" {...f.field("weeks")}><Input {...f.field("weeks")} inputMode="numeric" onChange={(v) => f.set("weeks", v.replace(/\D/g, "").slice(0, 2))} /></Field>

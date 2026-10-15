@@ -2,8 +2,9 @@ import { usePaged } from "@/api/hooks";
 import "@/api/types/public";
 import type { VacancyCard } from "@/api/types/public";
 import { Brand, Message, Page } from "@/components/Layout";
-import { Button, Input, Loading, Sub } from "@/components/ui";
+import { Button, Loading, Sub } from "@/components/ui";
 import { Link, useRouter } from "@/lib/router";
+import { Input } from "@/components/form";
 
 export const PATTERN: Record<VacancyCard["work_pattern"], string> = { on_site: "On site", hybrid: "Hybrid", remote: "Remote" };
 /** "Content · Lagos · Hybrid", the demo's line under a role. Remote roles drop the city. */
@@ -23,7 +24,7 @@ export function Careers() {
       </div>
       {((list.page?.total ?? 0) > 8 || searching) && (
         <div className="mb-3">
-          <Input value={list.q} onChange={list.setQ} placeholder="Search roles, teams or cities" aria-label="Search roles" type="search" />
+          <Input value={list.q} onChange={list.setQ} placeholder="Role or city" aria-label="Search roles" type="search" />
         </div>
       )}
       {list.error ? (

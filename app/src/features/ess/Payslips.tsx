@@ -12,6 +12,7 @@ import { ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { formatDate, formatMoney, formatMonth } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
+import { InlineSelect } from "@/components/form";
 
 const statusPill = (r: PayslipRow) => (r.status === "in_run" ? <Pill tone="warn">In the run</Pill> : r.has_query_deduction ? <Pill tone="warn">Paid, deduction</Pill> : <Pill tone="ok">Paid</Pill>);
 
@@ -31,9 +32,7 @@ export function MyPayslipsPage() {
   const yearPicker = s && (
     <span className="inline-flex h-[34px] items-center overflow-hidden rounded-full border border-input bg-background">
       <button type="button" aria-label="Previous year" disabled={idx >= years.length - 1} onClick={() => setYear(String(years[idx + 1]))} className="h-full px-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-35">‹</button>
-      <select aria-label="Year" value={y} onChange={(e) => setYear(e.target.value)} className="h-full border-x border-border bg-background px-2.5 text-[12.5px] font-[650]">
-        {years.map((v) => <option key={v}>{v}</option>)}
-      </select>
+      <InlineSelect aria-label="Year" value={y ?? ""} onChange={setYear} options={years.map(String)} className="h-full border-x border-border bg-background px-2.5 text-[12.5px] font-[650]" />
       <button type="button" aria-label="Next year" disabled={idx <= 0} onClick={() => setYear(String(years[idx - 1]))} className="h-full px-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-35">›</button>
     </span>
   );
