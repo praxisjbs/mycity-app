@@ -145,7 +145,7 @@ export function Chain({ steps }: { steps: Array<{ label: ReactNode; state?: "don
 export function Tile({ title, text, children, className }: { title: ReactNode; text?: ReactNode; children?: ReactNode; className?: string }) {
   return (
     <div className={cn("rounded-xl border border-border bg-card p-[14px]", className)}>
-      <h4 data-ui="title" className="mb-[5px] text-[13px]">{title}</h4>
+      <h2 data-ui="title" className="mb-[5px] text-[13px]">{title}</h2>
       {text && <p className="text-[12px] text-muted-foreground">{text}</p>}
       {children && <div className="mt-2.5 flex flex-wrap gap-1.5">{children}</div>}
     </div>
@@ -180,7 +180,7 @@ export function Result({ tone, label, title, text, icon }: { tone: "ok" | "warn"
     >
       <Icon name={icon ?? (tone === "ok" ? "ok" : "alert")} size="m" className="mt-0.5" />
       <span>
-        {label && <span className="block text-[10.5px] font-[650] tracking-[.09em] uppercase opacity-85">{label}</span>}
+        {label && <span className="block text-[10.5px] font-[650] tracking-[.09em] uppercase">{label}</span>}
         <b className="block text-[15px] tracking-[-.01em]">{title}</b>
         {text && <p className="mt-0.5 text-[12.5px] text-muted-foreground">{text}</p>}
       </span>
@@ -218,7 +218,7 @@ export function Soon({ icon, title, text, bullets }: { icon: IconName; title: Re
       <span className="mx-auto mb-[11px] flex size-[46px] items-center justify-center rounded-[14px] bg-accent text-accent-foreground">
         <Icon name={icon} size="m" />
       </span>
-      <h3 data-ui="title" className="text-[16px]">{title}</h3>
+      <h2 data-ui="title" className="text-[16px]">{title}</h2>
       <p className="mt-1.5 max-w-[52ch] text-[12.5px] text-muted-foreground">{text}</p>
       {bullets && (
         <ul className="mx-auto my-4 flex list-none flex-col gap-[7px] p-0 text-left text-[12.5px] text-muted-foreground">

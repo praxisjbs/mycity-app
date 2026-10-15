@@ -5,7 +5,7 @@
  * @use A section of a page: a KPI group, a record's fields, a list, a chart. One idea per card.
  * @avoid Cards inside cards; an explainer card (a title starting How, Why or What is tier 3 and never reaches a screen); a list on a phone (a card list comes from DataView).
  * @phone Full width with the same padding; the actions in CardHeader keep their 44 px targets and wrap under the title when there is no room.
- * @a11y A plain container. CardHeader's title is a heading (h3 unless set) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it.
+ * @a11y A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it.
  * @status stable
  * @exports CardHeader
  * @example <Card><CardHeader title="Leave Requests" actions={<Button size="sm">View All</Button>} />...</Card>
@@ -51,7 +51,7 @@ export interface CardHeaderProps {
   actions?: ReactNode;
   /** The merged name for `actions`; kept so screens move by an import change. */
   right?: ReactNode;
-  /** The heading level; h3 unless the page's outline needs h2. */
+  /** The heading level; h2 (a section of the page) unless the card sits inside another section, where it is h3. */
   level?: 2 | 3 | 4;
   /** Anything else after the title (a pill, a count). */
   children?: ReactNode;
@@ -60,7 +60,7 @@ export interface CardHeaderProps {
 }
 
 /** A card's title row: the title (data-ui="title"), its help, and the card's actions on the right. */
-export function CardHeader({ title, help, record, actions, right, level = 3, children, className }: CardHeaderProps) {
+export function CardHeader({ title, help, record, actions, right, level = 2, children, className }: CardHeaderProps) {
   const H = `h${level}` as "h2" | "h3" | "h4";
   const end = actions ?? right;
   return (

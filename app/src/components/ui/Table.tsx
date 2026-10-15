@@ -52,31 +52,35 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
   const phoneCols = columns.filter((c) => !c.desktop);
   const [head, ...rest] = phoneCols;
   const cards = (
-    <div data-copy="content" className={cn("flex flex-col", loading && rows.length > 0 && "opacity-60 transition-opacity")}>
+    <div data-copy="content" aria-busy={loading || undefined} className={cn("flex flex-col", loading && rows.length > 0 && "opacity-60 transition-opacity")}>
       {rows.map((row, i) => {
         const k = rowKey(row);
-        const inner = (
-          <>
+        const headCell = head && cell(head.render(row, i));
+        /*
+         * A card that opens its row is one button stretched over the card (its first value
+         * names it); the other values let taps through to it, but a button among them (a PDF,
+         * a quick action) stays its own control, never a button inside a button.
+         */
+        return (
+          <div key={k} className={cn("relative flex w-full items-start gap-2.5 border-b border-border px-[14px] py-3 text-left last:border-b-0", selectedKey === k && "bg-muted")}>
             <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="text-[13px] font-semibold [overflow-wrap:anywhere]">{head && cell(head.render(row, i))}</span>
+              <span className="text-[13px] font-semibold [overflow-wrap:anywhere]">
+                {onRowClick ? (
+                  <button type="button" onClick={() => onRowClick(row)} className="text-left after:absolute after:inset-0 after:content-['']">
+                    {headCell}
+                  </button>
+                ) : (
+                  headCell
+                )}
+              </span>
               {rest.slice(0, 3).map((c) => (
-                <span key={c.key} className="flex min-w-0 items-baseline gap-2 text-[12px]">
+                <span key={c.key} className={cn("flex min-w-0 items-baseline gap-2 text-[12px]", onRowClick && "pointer-events-none relative [&_a]:pointer-events-auto [&_button]:pointer-events-auto")}>
                   <span className="flex-none text-subtle-foreground">{c.label}</span>
                   <span className="min-w-0 [overflow-wrap:anywhere]">{cell(c.render(row, i))}</span>
                 </span>
               ))}
             </span>
             {onRowClick && <Icon name="right" className="mt-0.5 size-[15px] flex-none text-subtle-foreground" />}
-          </>
-        );
-        const cls = cn("flex w-full items-start gap-2.5 border-b border-border px-[14px] py-3 text-left last:border-b-0", selectedKey === k && "bg-accent");
-        return onRowClick ? (
-          <button key={k} type="button" onClick={() => onRowClick(row)} className={cls}>
-            {inner}
-          </button>
-        ) : (
-          <div key={k} className={cls}>
-            {inner}
           </div>
         );
       })}
@@ -86,7 +90,7 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
     <>
       {(title || right) && <CardHeader title={title} right={right} className="mb-2.5 px-[14px] pt-[14px]" />}
       {mobile ? cards : (
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" tabIndex={0}>
         <table className={cn("w-full border-collapse text-[13px]", wide && "min-w-[1080px]")}>
           <thead>
             <tr>
@@ -99,12 +103,12 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
                     c.desktop && "max-md:hidden",
                   )}
                 >
-                  {c.label}
+                  {c.label || <span className="sr-only">Actions</span>}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className={cn(loading && rows.length > 0 && "opacity-60 transition-opacity")}>
+          <tbody aria-busy={loading || undefined} className={cn(loading && rows.length > 0 && "opacity-60 transition-opacity")}>
             {rows.map((row, i) => {
               const k = rowKey(row);
               return (
@@ -116,7 +120,7 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
                   className={cn(
                     "transition-colors hover:bg-muted [&:last-child>td]:border-b-0",
                     onRowClick && "cursor-pointer hover:bg-accent focus-visible:outline-offset-[-2px]",
-                    selectedKey === k && "[&>td]:bg-accent",
+                    selectedKey === k && "[&>td]:bg-muted",
                   )}
                 >
                   {columns.map((c) => (
@@ -145,7 +149,7 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
 
 export function LoadingRows({ count = 4 }: { count?: number }) {
   return (
-    <div className="space-y-2 p-[14px]" aria-busy="true" aria-label="Loading">
+    <div className="space-y-2 p-[14px]" role="status" aria-busy="true" aria-label="Loading">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="h-[18px] animate-pulse rounded-md bg-muted" style={{ width: `${90 - i * 12}%` }} />
       ))}

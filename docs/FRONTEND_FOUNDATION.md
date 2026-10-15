@@ -116,15 +116,15 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 
 ### PR 2 · Shell
 
-- [ ] Staff shell on `packages/ui`: desktop rail and top bar; phone top bar, bottom bar (F16), More sheet (F17), floating button (F18)
-- [ ] Sign-in, session (access token in memory, refresh cookie), sign-out, session expiry
-- [ ] Permission-aware navigation from `/me` grants; routes by the one URL shape (`/<module>?tab=<tab>&id=<id>`)
-- [ ] Command palette (⌘K) and search; notification bell; realtime (Socket.io) for the bell and presence
-- [ ] PWA: install, update prompt, offline shell page
-- [ ] Theme, density and staging bar; what opens where (F14)
-- [ ] Public site shell on `packages/ui`
-- [ ] Gallery served on staging only (F10): `src/http/static.js` refuses `/gallery` on production; release builds it
-- [ ] The app as a gated crawl target (gates 8, 11, a11y) on mock data in CI; `npm run new:screen`
+- [x] Staff shell on `packages/ui`: desktop rail and top bar; phone top bar, bottom bar (F16), More sheet (F17), floating button (F18)
+- [x] Sign-in, session (access token in memory, refresh cookie), sign-out, session expiry
+- [x] Permission-aware navigation from `/me` grants; routes by the one URL shape (`/<module>?tab=<tab>&id=<id>`)
+- [x] Command palette (⌘K) and search; notification bell; realtime (Socket.io) for the bell and presence
+- [x] PWA: install, update prompt, offline shell page
+- [x] Theme, density and staging bar; what opens where (F14)
+- [x] Public site shell on `packages/ui`
+- [x] Gallery served on staging only (F10): `src/http/static.js` refuses `/gallery` on production; release builds it
+- [x] The app as a gated crawl target (gates 8, 11, a11y) on mock data in CI; `npm run new:screen`
 
 ### PR 3 · Build kit
 
@@ -177,11 +177,27 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 | PR | Status | Branch · PR | Updated |
 |---|---|---|---|
 | 1 Ground | Done | `claude/nifty-ptolemy-4fb7gz` | 15/10/2026 |
-| 2 Shell | In progress | `m0/frontend-shell` | 15/10/2026 |
+| 2 Shell | Done | `m0/frontend-shell` | 15/10/2026 |
 | 3 Build kit | Not started | | |
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 15/10/2026 · TB · PR 2 (Shell) done. A Shell group in `packages/ui` (15 components: Brand,
+  StagingBar, ComingSoon, PublicPage and PageMessage, DesktopShell, PhoneShell, Rail, TopBar and
+  SearchButton, PhoneHeader, BottomBar, MoreSheet, FloatingButton, CommandPalette, NotificationRow,
+  ShellNotice) and the environment and delivery plan as one copy in `lib/`. The staff app's shell is
+  rebuilt on it and leaves the F4 exemptions: the rail and top bar; the phone top bar (the pin;
+  search, bell, avatar) over a title rail that slides away; the bottom bar (F16), More (F17) and the
+  floating button (F18, `useScreenAction`, Hide Here, a scrim behind the fan); ⌘K search; the bell
+  on realtime; sign-in, sign-out and the in-place session sheet; the PWA's update notice, Install
+  App and the second-visit banner, and the offline page. Both apps open screens by F14 (production
+  at all three ticks, staging at API, the switch only on the mock). The public site runs on
+  PublicPage, PageMessage, ComingSoon and the sticky StagingBar. `/gallery/` is served on the staff
+  host everywhere but production. The a11y gate crawls every app screen too; the screens' own axe
+  findings (heading order, contrast on selected rows, scroll regions, a nested button, table
+  headers, ARIA attributes) are fixed. `npm run new:screen` adds a screen everywhere it is listed.
+  Left: screens adopt `useScreenAction` for the fan's New action as their PRs touch them; presence
+  waits for M1 chat on the server; the release pipeline (GE) must carry `packages/ui/dist-gallery`.
 - 15/10/2026 · TB · PR 1 (Ground) done. `packages/ui` holds 87 components with headers, tests and
   gallery pages; `docs/COMPONENTS.md` is generated; both apps import every Ground part from
   `@mycity/ui` and their copies are gone. Merged with #20 (screen conventions): its screens and copy

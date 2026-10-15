@@ -245,8 +245,8 @@ role from the signed-in employee (§6).
 | Clock-in prompt | Owned by Attendance: the attendance guide's §10 | The attendance guide's §10 | Clock In | The attendance guide's §10 |
 | Attendance figures on Overview and Team | As in the Overview and Team rows | As in the Overview and Team rows | As in the Overview and Team rows | As in the Overview and Team rows |
 
-The phone shell itself (bottom bar, sheets, the top bar's search and Clock In) is the frontend
-foundation's (AJ, FRONTEND_GUIDE §7, §9.2); Home builds its phone layout on it, with less text and
+The phone shell itself (the top bar with search, the bell and the avatar; the bottom bar; More; the
+floating button with Clock In or Out; sheets) is the frontend foundation's (AJ, FRONTEND_GUIDE §7, §9.2); Home builds its phone layout on it, with less text and
 more icons than desktop (kickoff, 01:19 to 01:21).
 
 ## 11 · Edge cases
@@ -297,7 +297,7 @@ the catalogue's eligibility pattern so an alert inherits the clearing permission
   set, per role. TB is handling the Team tab's commercial sign-off with the client; the tab is
   ratified into §18 (row #86) and is not blocked pending that conversation.
 - **Mobile shell.** Home's phone layout is decided in §10.2; the shell it sits in (bottom bar,
-  sheets) lands with the frontend foundation (AJ).
+  More, the floating button, sheets) landed with frontend foundation PR 2 (Shell).
 
 ## 14 · Change log
 
@@ -313,3 +313,4 @@ the catalogue's eligibility pattern so an alert inherits the clearing permission
   to §6. §6 and §11 now point at help terms and §10 instead of an ⓘ button.
 - 15/10/2026 · AJ · Four tabs built in `app/` against the mock API; not wired yet.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: the three explainer cards are gone (as in the demo), card help is a help term on the title, KPI and card titles are Title Case, Team and Alerts subtitles shortened.
+- 15/10/2026 · AJ · Frontend foundation PR 2 (Shell): the phone shell Home sits in is built (top bar with search, the bell and the avatar; the bottom bar, More and the floating button); Clock In or Out is in the floating button on a phone. No Home screen changed.

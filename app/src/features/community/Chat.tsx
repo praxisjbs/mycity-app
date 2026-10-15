@@ -40,12 +40,15 @@ export function useSplit(key: string, initial: number) {
   return { w, start, nudge: (d: number) => setW((v) => Math.min(480, Math.max(220, v + d))) };
 }
 
-export function Splitter({ onPointerDown, nudge }: { onPointerDown: (e: RPointerEvent<HTMLDivElement>) => void; nudge: (d: number) => void }) {
+export function Splitter({ onPointerDown, nudge, value }: { onPointerDown: (e: RPointerEvent<HTMLDivElement>) => void; nudge: (d: number) => void; value: number }) {
   return (
     <div
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize the list"
+      aria-valuenow={value}
+      aria-valuemin={220}
+      aria-valuemax={480}
       tabIndex={0}
       onPointerDown={onPointerDown}
       onKeyDown={(e) => (e.key === "ArrowLeft" ? nudge(-20) : e.key === "ArrowRight" ? nudge(20) : undefined)}
@@ -70,7 +73,7 @@ export function ChatFrame({ list, thread, info, open, listWidth, split }: { list
   return (
     <div className="grid min-h-[380px] flex-1 gap-1" style={{ gridTemplateColumns: `${listWidth}px 8px minmax(0,1fr)${info ? " 300px" : ""}`, gridTemplateRows: "minmax(0,1fr)" }}>
       <div className="flex min-h-0 flex-col overflow-hidden rounded-card border border-border bg-card shadow-1">{list}</div>
-      <Splitter onPointerDown={split.start} nudge={split.nudge} />
+      <Splitter onPointerDown={split.start} nudge={split.nudge} value={split.w} />
       <div className="flex min-h-0 flex-col overflow-hidden rounded-card border border-border bg-card shadow-1">{thread}</div>
       {info}
     </div>
@@ -80,7 +83,7 @@ export function ChatFrame({ list, thread, info, open, listWidth, split }: { list
 /** A list row: a channel or a person. */
 export function Row({ on, unread, lead, title, sub, when, count, onClick }: { on: boolean; unread: boolean; lead: ReactNode; title: ReactNode; sub: string; when: string; count: number; onClick: () => void }) {
   return (
-    <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-center gap-2.5 rounded-box px-2 py-[9px] text-left max-md:min-h-11", on ? "bg-accent" : "hover:bg-muted")}>
+    <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-center gap-2.5 rounded-box px-2 py-[9px] text-left max-md:min-h-11", on ? "bg-muted shadow-[inset_3px_0_0_var(--primary)]" : "hover:bg-muted")}>
       {lead}
       <span className="min-w-0 flex-1">
         <b className={cn("flex items-center gap-[5px] truncate text-[13px]", unread ? "font-bold" : "font-semibold")}>{title}</b>

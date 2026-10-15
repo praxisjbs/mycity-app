@@ -5,7 +5,7 @@
  * @use Once, by the staff app's shell, above 760 px; it lays out the Rail, TopBar, Tabs and the screen it is given. A fit page (a chat, the mailbox) fills the height and only its panes scroll.
  * @avoid A phone (PhoneShell is the phone's own frame, gate 11); a screen laying out its own navigation; the public site (PublicPage).
  * @phone Never shown: at 760 px and below the shell renders PhoneShell instead.
- * @a11y The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the rail and the top bar carry their own landmarks and names.
+ * @a11y The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the rail and the tab strip are navigation landmarks, the top bar the banner, so nothing on screen sits outside a landmark.
  * @status stable
  * @example <DesktopShell rail={<Rail ... />} topBar={<TopBar ... />} tabs={<Tabs ... />}>{screen}</DesktopShell>
  */
@@ -61,7 +61,11 @@ export function DesktopShell({ rail, topBar, tabs, children, fit = false, notice
       {rail}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-muted">
         {topBar}
-        {tabs != null && <div className="flex-none border-b border-border bg-background px-4">{tabs}</div>}
+        {tabs != null && (
+          <nav aria-label="Screens" className="flex-none border-b border-border bg-background px-4">
+            {tabs}
+          </nav>
+        )}
         <div className="relative flex min-h-0 flex-1 flex-col">
           <Main
             data-ui="scroller"

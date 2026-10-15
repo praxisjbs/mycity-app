@@ -33,7 +33,7 @@ function Blocks({ blocks }: { blocks: Block[] }) {
   return (
     <>
       {blocks.map((b, i): ReactNode =>
-        b.type === "h" ? <h4 data-copy="content" key={i}>{b.text}</h4> : b.type === "quote" ? <blockquote key={i}><Rich text={b.text} /></blockquote> : b.type === "ul" ? <ul key={i}>{b.items.map((x, j) => <li key={j}><Rich text={x} /></li>)}</ul> : <p key={i}><Rich text={b.text} /></p>,
+        b.type === "h" ? <h3 data-copy="content" key={i}>{b.text}</h3> : b.type === "quote" ? <blockquote key={i}><Rich text={b.text} /></blockquote> : b.type === "ul" ? <ul key={i}>{b.items.map((x, j) => <li key={j}><Rich text={x} /></li>)}</ul> : <p key={i}><Rich text={b.text} /></p>,
       )}
     </>
   );
@@ -194,7 +194,7 @@ function Training() {
       <Grid cols={2}>
         {list.rows.map((r: Resource) => (
           <div key={r.resource_id} className="rounded-box border border-border bg-card p-[14px]">
-            <h4 data-copy="content" className="text-[13.5px] font-semibold">{r.title}</h4>
+            <h2 data-copy="content" className="text-[13.5px] font-semibold">{r.title}</h2>
             <p className="mt-1 text-[12.5px] text-muted-foreground">{r.description}</p>
             <div className="mt-2.5 flex flex-wrap gap-1.5"><Pill>{r.kind}</Pill>{r.due && <Pill tone="warn">Due {formatDate(r.due)}</Pill>}</div>
           </div>

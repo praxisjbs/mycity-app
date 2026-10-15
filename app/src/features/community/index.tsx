@@ -496,18 +496,18 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
         </div>
       </div>
       <div className={sec}>
-        <h4 data-ui="title" className={h4}>Contact</h4>
+        <h3 data-ui="title" className={h4}>Contact</h3>
         {line("mail", p.email)}
         {p.phone && line("user", p.phone)}
         {line("globe", p.location)}
         {line("clock", `${p.local_time} in Lagos`)}
       </div>
       <div className={sec}>
-        <h4 data-ui="title" className={h4}>Shared in this conversation</h4>
+        <h3 data-ui="title" className={h4}>Shared in this conversation</h3>
         {p.shared_files.length ? p.shared_files.map((f) => <div key={f.document_id}>{line("doc", f.file_name, f.size_bytes != null ? `${Math.round(f.size_bytes / 1024)} KB` : undefined)}</div>) : <p className="text-[11.5px] text-subtle-foreground">Nothing shared yet.</p>}
       </div>
       <div className={sec}>
-        <h4 data-ui="title" className={h4}>Channels in common</h4>
+        <h3 data-ui="title" className={h4}>Channels in common</h3>
         {p.shared_channels.map((n) => <div key={n} className="flex items-center gap-2.5 py-[5px] text-[13px]"><b className="text-subtle-foreground">#</b>{n}</div>)}
       </div>
       <div className={sec}>
@@ -544,7 +544,7 @@ function Announcements() {
           {list.rows.map((a) => (
             <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition-[box-shadow,transform] hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.title, body: (close) => <AnnouncementReads a={a} close={close} poster={poster} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
               <div className="mb-1.5 flex items-start gap-2">
-                <h3 data-copy="content" className="flex-1 text-[13.5px] font-semibold">{a.title}</h3>
+                <h2 data-copy="content" className="flex-1 text-[13.5px] font-semibold">{a.title}</h2>
                 {a.scheduled ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience ? "ok" : "neutral"}>{a.reads} of {a.audience} read</Pill>}
               </div>
               <p className="text-[13px] text-muted-foreground">{a.body}</p>

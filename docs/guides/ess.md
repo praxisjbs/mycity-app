@@ -45,13 +45,13 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | Three cards: Open Queries, Archived, Sanctions | Open each list; respond to an open query |
 | ESS · My Documents (`my-documents`) | Staff app | Every employee | Their vault: contracts, certificates, ID; signed, verified, expiring, missing | Upload a requested document, preview, download |
 | ESS · My Security (`my-security`) | Staff app | Every employee | Password, two-step sign-in, passkeys, PIN, recent sign-ins; a link to My Devices | Change password, switch two-step sign-in methods on or off, add a passkey, set a PIN, open My Devices |
-| Shell avatar (rail and top bar) | Staff app | Every employee | The photo from My Profile, or initials | |
+| Shell avatar (rail, phone top bar, More) | Staff app | Every employee | The photo from My Profile, or initials | |
 | People · Employees (employee record) | Staff app | People | The same employee record | Where People edit the fields an employee cannot |
 | People · Employees · Attendance setup | Staff app | People | Owned by LA: arrangement and weekly schedule | Where the work schedule shown in My Profile is set |
 | Payroll · Payslips (M6) | Staff app | Payroll | The payslips ESS shows | Approving a run is what makes a payslip visible in ESS |
 | Queries & Sanctions (M3) | Staff app | Managers, People, CEO | The queries and sanctions ESS shows | Raising and deciding them |
 | Settings · Security (M9) | Staff app | Admins | Organisation rules for passwords, two-step sign-in, sessions | The rules My Security follows |
-| Mobile bottom bar and menu | Staff app, phone | Every employee | ESS from the menu drawer | |
+| Mobile bottom bar and More | Staff app, phone | Every employee | Self-Service is the fourth place in the bottom bar (F16) | |
 
 ## 3 · How the screens relate
 
@@ -212,13 +212,13 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | ESS · My Queries (`my-queries`) | Open Queries, Archived, Sanctions: a count and one line each; the chosen list under them (desktop) or in a sheet (phone): "No Open Queries, Nothing is waiting on you."; Archived Queries (Subject, Raised By, Date, Your Response, Outcome); Sanctions (Sanction, Reason, Date, Deduction, Status) | None | The 48 hours to respond: §3 step 3 (an open query shows its own due time). "Most queries close with no action", the response kept beside the decision, disagreement read before the decision: §6. Who can see a query: §8. A deduction only after an upheld sanction: §3 step 3. The flowchart and the page subtitle are removed |
 | ESS · My Documents (`my-documents`) | Upload Document; Documents, Signed, Verified, Expiring, Missing; Vault (Document, Uploaded, Status, Expires); a row opens the document (Uploaded, Status, Expires; Upload Document on a missing one); the contract's PDF preview | None | "Signed documents carry two hashes and a public verification link": §6. A missing document blocks onboarding only for a new hire: §3 step 6, §11. The "Your vault" subtitle and "Click any row to preview it" are removed |
 | ESS · My Security (`my-security`) | Password (last changed; Change Password); Two-Step Sign-In (Authenticator App, Email Code as Fallback, each with its switch); Passkeys (count; each passkey with when it was added and last used; Add Passkey); PIN (Not set; Set PIN); Devices (Up to 3; Open My Devices); Recent Sign-Ins (When, Device, Where, Result). Change Password: Current Password, New Password, Confirm Password; Cancel, Update Password. Set PIN: New PIN (four digit boxes); Cancel, Save PIN | Help terms: Authenticator App, "A 6-digit code from any authenticator app, asked at sign-in."; Email Code as Fallback, "A code sent to your work email, used only when the app is unavailable."; Passkeys, "Sign in with your fingerprint or face instead of a password."; PIN, "A short PIN unlocks the app and confirms a clock-in on a registered device." (the New PIN label carries the same); Devices, "The phones and laptops you clock in from. A clock-in from any other device is flagged to People."; New Password, "At least 12 characters. Changing it signs you out on your other devices." | The page subtitle "How you sign in, and the devices you clock in from" is removed. Where devices are managed and the flag on others: §3 step 7. Organisation password and two-step rules: Settings · Security (M9) |
-| Shell avatar (rail and top bar) | The photo from My Profile, or initials | None | Where the photo is stored and who reads it: §3 step 1 |
+| Shell avatar (rail, phone top bar, More) | The photo from My Profile, or initials | None | Where the photo is stored and who reads it: §3 step 1 |
 | People · Employees (employee record) | Owned by People: that module's guide | That module's guide | That module's guide |
 | People · Employees · Attendance setup | Owned by LA: the attendance guide §3 | The attendance guide | The attendance guide §3 |
 | Payroll · Payslips (M6) | Owned by Payroll (M6 guide) | The M6 guide | The M6 guide |
 | Queries & Sanctions (M3) | Owned by Queries & Sanctions (M3 guide) | The M3 guide | The M3 guide |
 | Settings · Security (M9) | Owned by Settings (M9 guide) | The M9 guide | The M9 guide |
-| Mobile bottom bar and menu | Owned by the frontend foundation (FRONTEND_GUIDE §7, §9.2); ESS opens from the menu drawer | None | FRONTEND_GUIDE §7 |
+| Mobile bottom bar and More | Owned by the frontend foundation (FRONTEND_GUIDE §7, §9.2); Self-Service is a place in the bottom bar | None | FRONTEND_GUIDE §7 |
 
 On a tab whose module is not delivered yet (§6, Coming Soon) the screen shows the tab title, a clock
 icon, the milestone and date as a pill and "Coming Soon"; the demo adds View Full Design. What the
@@ -241,13 +241,13 @@ Coming Soon from the module's delivery state.
 | ESS · My Queries (`my-queries`) | The three cards, one to a row | The lists: each card opens its list as a sheet (archived queries and sanctions as cards) | Tap a card | As My Profile |
 | ESS · My Documents (`my-documents`) | Upload Document; the five stats; the documents as a list with a status pill | The contract preview beside the list: a document opens its preview or details as a sheet | Upload Document; on a missing document, Upload Document in its sheet | As My Profile |
 | ESS · My Security (`my-security`) | Icon cards two to a row: Password, Two-Step Sign-In, Passkeys, PIN, Devices, Sign-In Activity | Every card's detail, each in a sheet (Recent Sign-Ins as sign-in cards) | Change Password and Set PIN open their forms as full sheets, the primary full width | As My Profile |
-| Shell avatar (rail and top bar) | The avatar in the menu drawer's header | The rail itself (it opens as the drawer) | None | The menu button |
+| Shell avatar (rail, phone top bar, More) | The avatar at the right of the phone top bar; it opens More, whose top row is the person with Theme, Density and Settings | The rail itself | None | The phone top bar |
 | People · Employees (employee record) | Owned by People | That module's guide | That module's guide | That module's guide |
 | People · Employees · Attendance setup | Owned by LA | The attendance guide | The attendance guide | The attendance guide |
 | Payroll · Payslips (M6) | Owned by Payroll | The M6 guide | The M6 guide | The M6 guide |
 | Queries & Sanctions (M3) | Owned by Queries & Sanctions | The M3 guide | The M3 guide | The M3 guide |
 | Settings · Security (M9) | Owned by Settings | The M9 guide | The M9 guide | The M9 guide |
-| Mobile bottom bar and menu | Owned by the frontend foundation: the bottom bar, and the full module list from the menu as a drawer | The desktop rail | None | FRONTEND_GUIDE §7 |
+| Mobile bottom bar and More | Owned by the frontend foundation: the bottom bar (Home, Workspace, Community, Self-Service, More, F16) and More's launcher grid (F17) | The desktop rail | None | FRONTEND_GUIDE §7 |
 
 On desktop each tab shows its sections in full; a review, a request, a KPI card, a document, the
 Deductions figure and every form open the shared modal.
@@ -296,3 +296,4 @@ Deductions figure and every form open the shared modal.
 - 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the What You Can Change card, the descriptive page subtitles, the chart caption, the footnotes and the Coming Soon feature list left the screen; support text became help terms on the word it explains; the leave, password and PIN forms and a new Edit Profile form use the form helpers. §2 and §6 now match, §6 gained the facts the removed text carried, §8 says who sees a query, and the ⓘ line in §6 became help terms and the Details row.
 - 15/10/2026 · AJ · Five tabs ratified (#87 to #91). All twelve ESS tabs built in `app/` against the mock API, desktop and phone; not wired to the API yet.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: explainer cards and footnotes gone; Edit Profile is a three-step wizard; password, PIN, query response and device forms mark their fields on Submit instead of disabling it; Policy Updates shows the version and its changes as content.
+- 15/10/2026 · AJ · Frontend foundation PR 2 (Shell): Self-Service is a place in the phone's bottom bar (F16) and the avatar sits in the phone top bar, opening More (F17); the menu drawer is gone. §2 and §10 rows brought into line; no ESS screen changed.

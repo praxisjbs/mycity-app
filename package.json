@@ -30,6 +30,7 @@
     "gen:env": "node scripts/gen/env-example.js",
     "gen:components": "node scripts/gen/components.js",
     "new:component": "node scripts/new-component.js",
+    "new:screen": "node scripts/new-screen.js",
     "check:pagination": "node scripts/check/pagination.js",
     "check:five-second": "node scripts/check/five-second.js",
     "check:two-shells": "node scripts/check/two-shells.js",

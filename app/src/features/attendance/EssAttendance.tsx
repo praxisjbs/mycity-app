@@ -257,7 +257,7 @@ export function PolicyUpdatesPage() {
     <>
       <PageHeader title="Policy Updates" sub={`Attendance policy · ${me.display_name}`} />
       <div className="mb-3 rounded-card border border-border bg-background px-[15px] py-[13px]">
-        <h4 data-ui="title" className="text-[14.5px]">Policy v{p.version}</h4>
+        <h2 data-ui="title" className="text-[14.5px]">Policy v{p.version}</h2>
         <div data-copy="content">
           <p className="mt-[5px] text-[13px] leading-normal text-muted-foreground">{p.summary}</p>
           <ul className="mt-2 list-disc pl-5 text-[12.5px] text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>

@@ -182,7 +182,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | Use | A section of a page: a KPI group, a record's fields, a list, a chart. One idea per card. |
 | Avoid | Cards inside cards; an explainer card (a title starting How, Why or What is tier 3 and never reaches a screen); a list on a phone (a card list comes from DataView). |
 | Phone | Full width with the same padding; the actions in CardHeader keep their 44 px targets and wrap under the title when there is no room. |
-| Accessibility | A plain container. CardHeader's title is a heading (h3 unless set) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. |
+| Accessibility | A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. |
 | Status | stable |
 | Exports | `Card`, `CardHeader` |
 | Import | `import { Card, CardHeader } from "@mycity/ui";` |
@@ -208,7 +208,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | `record` | `boolean` |  | The title is record content (a person's name, a document number), not interface copy: the copy gates skip it. |
 | `actions` | `ReactNode` |  | What sits at the right: a small button, a menu, a pill or a count. |
 | `right` | `ReactNode` |  | The merged name for `actions`; kept so screens move by an import change. |
-| `level` | `2 \| 3 \| 4` |  | The heading level; h3 unless the page's outline needs h2. |
+| `level` | `2 \| 3 \| 4` |  | The heading level; h2 (a section of the page) unless the card sits inside another section, where it is h3. |
 | `children` | `ReactNode` |  | Anything else after the title (a pill, a count). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -484,7 +484,7 @@ Nothing to show, said plainly: a drawing, a title, one short line and at most on
 | Use | A list, a search or a page with nothing in it yet; a filter that matched nothing; a first visit. |
 | Avoid | An explanation of the feature (tier 3); more than one action; a screen that has data on it. |
 | Phone | Centred, the drawing at the smaller size; the action is full width within thumb reach. |
-| Accessibility | The title is a heading (data-ui="title"), at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
+| Accessibility | The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet; at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
 | Status | stable |
 | Exports | `EmptyState` |
 | Import | `import { EmptyState } from "@mycity/ui";` |
@@ -2124,7 +2124,7 @@ The staff app's desktop frame: the rail at the left, the top bar, the module's t
 | Use | Once, by the staff app's shell, above 760 px; it lays out the Rail, TopBar, Tabs and the screen it is given. A fit page (a chat, the mailbox) fills the height and only its panes scroll. |
 | Avoid | A phone (PhoneShell is the phone's own frame, gate 11); a screen laying out its own navigation; the public site (PublicPage). |
 | Phone | Never shown: at 760 px and below the shell renders PhoneShell instead. |
-| Accessibility | The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the rail and the top bar carry their own landmarks and names. |
+| Accessibility | The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the rail and the tab strip are navigation landmarks, the top bar the banner, so nothing on screen sits outside a landmark. |
 | Status | stable |
 | Exports | `DesktopShell` |
 | Import | `import { DesktopShell } from "@mycity/ui";` |
@@ -2367,7 +2367,7 @@ The desktop navigation: the pin and name, the modules the person may open groupe
 | Use | Once, in DesktopShell's rail slot. Items come from the module catalogue filtered by the person's grants; it collapses to icons (66 px) when the person asks, remembered per device by the app. |
 | Avoid | A phone (BottomBar and MoreSheet are the phone's navigation, gate 11); tabs inside a module (Tabs); actions (the top bar). |
 | Phone | Never shown on a phone; its items are still 44 px targets so the gallery's phone view passes. |
-| Accessibility | A navigation landmark named by `label`; the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu. |
+| Accessibility | The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu. |
 | Status | stable |
 | Exports | `Rail` |
 | Import | `import { Rail } from "@mycity/ui";` |

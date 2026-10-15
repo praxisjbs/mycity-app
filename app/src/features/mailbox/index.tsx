@@ -97,7 +97,7 @@ function MailFrame({ mobile, open, split, list, reader }: { mobile: boolean; ope
   return (
     <div className="grid min-h-[360px] flex-1 gap-1" style={{ gridTemplateColumns: `${split.w}px 8px minmax(0,1fr)`, gridTemplateRows: "minmax(0,1fr)" }}>
       <div className={pane}>{list}</div>
-      <Splitter onPointerDown={split.start} nudge={split.nudge} />
+      <Splitter onPointerDown={split.start} nudge={split.nudge} value={split.w} />
       <div className={cn(pane, "overflow-y-auto overscroll-contain")}>{reader}</div>
     </div>
   );
@@ -105,7 +105,7 @@ function MailFrame({ mobile, open, split, list, reader }: { mobile: boolean; ope
 
 function MailRow({ r, on, onClick }: { r: ThreadRow; on: boolean; onClick: () => void }) {
   return (
-    <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-start gap-[9px] border-b border-border px-[13px] py-[11px] text-left last:border-b-0", on ? "bg-accent" : "hover:bg-muted")}>
+    <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-start gap-[9px] border-b border-border px-[13px] py-[11px] text-left last:border-b-0", on ? "bg-muted shadow-[inset_3px_0_0_var(--primary)]" : "hover:bg-muted")}>
       <i className={cn("mt-[5px] size-[7px] flex-none rounded-full", r.unread ? "bg-primary" : "bg-transparent")} aria-label={r.unread ? "Unread" : undefined} />
       <span className="min-w-0 flex-1">
         <b className={cn("block truncate text-[12.5px]", r.unread ? "font-bold" : "font-[650]")}>{who(r.party)}</b>
@@ -204,7 +204,7 @@ function Reader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBack: () 
       <div className="flex items-start gap-3 border-b border-border pb-3.5 max-md:flex-wrap">
         <Avatar name={who(draft ? lastMsg.from : row.party)} size={38} />
         <span className="min-w-0 flex-1">
-          <h3 data-copy="content" className="text-[15px] leading-[1.35] font-semibold">{thread.subject}</h3>
+          <h2 data-copy="content" className="text-[15px] leading-[1.35] font-semibold">{thread.subject}</h2>
           <p className="mt-1 text-[11.5px] text-subtle-foreground">
             {draft ? `To ${lastMsg.to.map((a) => a.address).join(", ") || "(no recipient)"}` : `${who(lastMsg.from)} <${lastMsg.from.address}>`} · {formatWhen(lastMsg.sent_at)}
           </p>

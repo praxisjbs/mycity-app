@@ -5,7 +5,7 @@
  * @use Once, in DesktopShell's rail slot. Items come from the module catalogue filtered by the person's grants; it collapses to icons (66 px) when the person asks, remembered per device by the app.
  * @avoid A phone (BottomBar and MoreSheet are the phone's navigation, gate 11); tabs inside a module (Tabs); actions (the top bar).
  * @phone Never shown on a phone; its items are still 44 px targets so the gallery's phone view passes.
- * @a11y A navigation landmark named by `label`; the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu.
+ * @a11y The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu.
  * @status stable
  * @example <Rail items={items} current="people" onNavigate={navigate} account={{ name: "Cynthia Osakunih", subtitle: "Operations Manager", menu }} />
  */
@@ -68,8 +68,9 @@ const plain = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !
 export function Rail({ items, current, collapsed = false, onNavigate, account, brandName = "MyCity App", foot, label = "Modules" }: RailProps) {
   let lastGroup: string | undefined;
   return (
-    <div
+    <nav
       data-ui="desktop-nav"
+      aria-label={label}
       className={cn(
         "on-dark flex min-h-0 flex-none flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-(--dur)",
         collapsed ? "w-16.5" : "w-62",
@@ -78,7 +79,7 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
       <div className="flex min-h-14.5 flex-none items-center gap-2.5 px-4.5 pt-4 pb-3">
         <Brand tone="on-dark" size="m" name={collapsed ? undefined : brandName} />
       </div>
-      <nav aria-label={label} className="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-2.5 pt-0.5 pb-2.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-2.5 pt-0.5 pb-2.5">
         {items.map((item) => {
           const head = item.group && item.group !== lastGroup ? item.group : null;
           lastGroup = item.group;
@@ -118,7 +119,7 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
             </div>
           );
         })}
-      </nav>
+      </div>
       {(account || foot) && (
         <div className="flex flex-none flex-col gap-2 border-t border-sidebar-border p-2.5">
           {account && (
@@ -154,6 +155,6 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
           {foot != null && <div className={cn("pl-0.5 text-2xs whitespace-nowrap text-sidebar-muted", collapsed && "invisible")}>{foot}</div>}
         </div>
       )}
-    </div>
+    </nav>
   );
 }
