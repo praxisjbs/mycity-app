@@ -110,9 +110,9 @@ A Stop hook (`.claude/hooks/stop-check.js`) runs `check/progress.js`, `check/gui
 fix them rather than arguing with them. If one genuinely does not apply (a refactor that moves no
 screen, a test-only change), say so to the user and give the PR line to use:
 `Progress-unchanged: <reason>` or `Guide-unchanged: <reason>`. CI runs the same checks on every PR.
-When your change touches `app/`, `public-app/` or `demo.html`, the hook also runs the screen gates
-(`five-second`, `two-shells`, `forms`, `dashes`); they have no exemption line. Fix the screen. A
-change only in `packages/ui/` does not trigger them yet (FRONTEND_FOUNDATION §6); run them yourself.
+When your change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`, the hook also runs
+the screen gates (`components`, `palette`, `forms`, `dashes`, `five-second`, `two-shells`); they have
+no exemption line. Fix the screen.
 
 A task is not finished until:
 

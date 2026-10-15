@@ -83,36 +83,36 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 ### PR 1 · Ground
 
 **Workspace**
-- [ ] `packages/ui` (`@mycity/ui`): ESM, TypeScript strict, source consumed by both apps; Vitest with jsdom; its own ESLint config, which both apps extend
-- [ ] Root npm workspaces `packages/*`, `app`, `public-app`; one root lockfile (the apps' own lockfiles removed)
-- [ ] Vite in both apps resolves `@mycity/contract` (CommonJS) to one Zod instance (F15)
+- [x] `packages/ui` (`@mycity/ui`): ESM, TypeScript strict, source consumed by both apps; Vitest with jsdom; its own ESLint config, which both apps extend
+- [x] Root npm workspaces `packages/*`, `app`, `public-app`; one root lockfile (the apps' own lockfiles removed)
+- [x] Vite in both apps resolves `@mycity/contract` (CommonJS) to one Zod instance (F15)
 
 **Design system**
-- [ ] Tokens (F3), density (F5), base styles, Geist, Tailwind 4 theme, reduced motion
-- [ ] `cn`, formats (day-first dates, money from strings, counts), `useIsPhone` (760 px), theme and density per person, `data-ui` slot names the gates read
-- [ ] Primitives: Button, IconButton, Icon (Lucide), Card, PageHeader, layout (Stack, Inline, Grid, PhoneOnly, DesktopOnly), Pill, StatusPill, Avatar, Who, CountBadge, KeyValue, Banner, EmptyState with illustrations, EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money
-- [ ] Navigation primitives: Tabs, SegmentedControl, Chips
-- [ ] Overlays (F6, F7): Modal (centred on desktop, a bottom sheet on a phone, full-screen sheet for long forms), SidePanel, ConfirmDialog and `useConfirm`, Popover, Menu (an action sheet on a phone), Tooltip
-- [ ] Help: HelpTerm, InfoButton, Details (FRONTEND_GUIDE §5.2)
-- [ ] Toast (one API, word limit, Undo)
-- [ ] Form system (FRONTEND_GUIDE §8): `useContractForm`, Form, Field, TextField, PasswordField, NumberField, DateField, DateRangeField, TimeField, MoneyField, PhoneField, SelectField, ChoiceField, CheckboxField, SwitchField, Switch, TextAreaField, SearchInput, OtpField, FormFooter, FormError, Wizard, InlineInput and InlineSelect
-- [ ] Data client core: one `ApiError`, the typed call, `useApi`, `usePaged`, `useInfinite`, `useMutation`, `invalidate`, shared by both apps
+- [x] Tokens (F3), density (F5), base styles, Geist, Tailwind 4 theme, reduced motion
+- [x] `cn`, formats (day-first dates, money from strings, counts), `useIsPhone` (760 px), theme and density per person, `data-ui` slot names the gates read
+- [x] Primitives: Button, IconButton, Icon (Lucide), Card, PageHeader, layout (Stack, Inline, Grid, PhoneOnly, DesktopOnly), Pill, StatusPill, Avatar, Who, CountBadge, KeyValue, Banner, EmptyState with illustrations, EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money
+- [x] Navigation primitives: Tabs, SegmentedControl, Chips
+- [x] Overlays (F6, F7): Modal (centred on desktop, a bottom sheet on a phone, full-screen sheet for long forms), SidePanel, ConfirmDialog and `useConfirm`, Popover, Menu (an action sheet on a phone), Tooltip
+- [x] Help: HelpTerm, InfoButton, Details (FRONTEND_GUIDE §5.2)
+- [x] Toast (one API, word limit, Undo)
+- [x] Form system (FRONTEND_GUIDE §8): `useContractForm`, Form, Field, TextField, PasswordField, NumberField, DateField, DateRangeField, TimeField, MoneyField, PhoneField, SelectField, ChoiceField, CheckboxField, Switch, ToggleRow, TextAreaField, SearchInput, OtpField, FormFooter, FormError, Wizard, InlineInput and InlineSelect
+- [x] Data client core: one `ApiError`, the typed call, `useApi`, `usePaged`, `useInfinite`, `useMutation`, `invalidate`, shared by both apps
 
 **Catalogue and gallery**
-- [ ] `npm run gen:components` → `docs/COMPONENTS.md`; `npm run new:component` scaffolder
-- [ ] Gallery app (`npm run gallery`), every component in every state, both themes, both densities
+- [x] `npm run gen:components` → `docs/COMPONENTS.md`; `npm run new:component` scaffolder
+- [x] Gallery app (`npm run gallery`), every component in every state, both themes, both densities
 
 **Apps moved onto it**
-- [ ] `app/` and `public-app/` import every Ground component from `@mycity/ui`; their copies deleted
-- [ ] Remaining #18 components listed in §7 with the PR that moves them
+- [x] `app/` and `public-app/` import every Ground component from `@mycity/ui`; their copies deleted
+- [x] Remaining #18 components listed in §7 with the PR that moves them
 
 **Gates**
-- [ ] `components` (F8), `palette` (13), `contrast` (14), native dialogs (16), upload (18), `mock-free` release build (F12), `a11y` (axe on the gallery)
-- [ ] Screen gates crawl the gallery; the demo only when touched (F23); `packages/ui` covered by gates 8, 12, 17
-- [ ] Frontend typecheck, lint, test and build in `npm run ci`; the Stop hook runs the screen gates when `packages/ui/` changes
+- [x] `components` (F8), `palette` (13), `contrast` (14), native dialogs (16), upload (18), `mock-free` release build (F12), `a11y` (axe on the gallery)
+- [x] Screen gates crawl the gallery; the demo only when touched (F23); `packages/ui` covered by gates 8, 12, 17
+- [x] Frontend typecheck, lint, test and build in `npm run ci`; the Stop hook runs the screen gates when `packages/ui/` changes
 
 **Documents**
-- [ ] This playbook; FRONTEND_GUIDE, CLAUDE.md, README, PR template, CODEOWNERS, PROGRESS brought into line
+- [x] This playbook; FRONTEND_GUIDE, CLAUDE.md, README, PR template, CODEOWNERS, PROGRESS brought into line
 
 ### PR 2 · Shell
 
@@ -158,12 +158,19 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 
 | PR | Status | Branch · PR | Updated |
 |---|---|---|---|
-| 1 Ground | In progress | `claude/nifty-ptolemy-4fb7gz` | 15/10/2026 |
+| 1 Ground | Done | `claude/nifty-ptolemy-4fb7gz` | 15/10/2026 |
 | 2 Shell | Not started | | |
 | 3 Build kit | Not started | | |
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 15/10/2026 · TB · PR 1 (Ground) done. `packages/ui` holds 87 components with headers, tests and
+  gallery pages; `docs/COMPONENTS.md` is generated; both apps import every Ground part from
+  `@mycity/ui` and their copies are gone. Merged with #20 (screen conventions): its screens and copy
+  stay, and `@mycity/ui` takes its API where the screens use it (one `useContractForm(initial,
+  rules or schema)`, `Button busy`, `Wizard` steps `{title, body, check}`, `CardHeader help` and
+  `record`, `PageHeader help`). Gates 8 and 11 crawl the gallery and all 86 app screens; `npm run ci`
+  green bar the guides line, which the PR body carries. Left for PR 2 and PR 3: the §7 files.
 - 15/10/2026 · TB · Playbook written; decisions F1 to F24 agreed; PR 1 started.
 
 ---
