@@ -557,7 +557,8 @@ installs it; locally run `npx playwright install chromium` once after `npm ci`. 
 1. Branch from `main`: `m<N>/<short-name>` (for example `m3/query-rules`).
 2. PR title in Conventional Commits form: `feat(queries): raise a query on the third late arrival`.
 3. One approving review, not the author, and from a code owner of every path the PR touches
-   (`.github/CODEOWNERS`). The `ci` check green. `main` is protected with no bypass, the
+   (`.github/CODEOWNERS`). GE and TB are owners of every path, so either one's approval is enough;
+   a path's own owner (LA for data, AJ for the apps) is listed first. The `ci` check green. `main` is protected with no bypass, the
    repository owner included (`docs/runbooks/github-settings.md`). Collaborators push branches and
    open PRs; nobody pushes to `main`.
 4. Merge to `main` deploys to **staging** automatically, runs the staging verification, and seals the
