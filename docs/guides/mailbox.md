@@ -5,11 +5,11 @@
 | Owner | GE |
 | Milestone | M1 |
 | Backend modules | `mailbox` |
-| Frontend paths | To be set when the frontend foundation lands (AJ). |
+| Frontend paths | `app/src/features/mailbox/` |
 | Permission key(s) | `mailbox` |
 | Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash; connection under Settings · Integrations |
 | Status | Agreed |
-| Last changed | 13/10/2026 |
+| Last changed | 15/10/2026 |
 
 Sources: MILESTONES §6.5 and D6; REUSE_MAP §2.5; the internal workflow meeting of 12 October 2026.
 The demo (`demo.html`, Mailbox) was updated the same day with the composer described here.
@@ -172,3 +172,4 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 - 13/10/2026 · GE · First version, from the 12 October internal workflow meeting and MILESTONES §6.5.
 - 13/10/2026 · GE · Schedule send at any date and time; independent panes with a resizable list (TB review).
 - 13/10/2026 · GE · Page header slides away while reading so the panes get the full height (TB review).
+- 15/10/2026 · AJ · Six folders and the composer built in `app/` against the mock API (autosaved drafts, schedule, inline discard, sanitised reader); not wired yet.

@@ -1217,7 +1217,7 @@ while CI is not, because a change to a shared service breaks suites you did not 
 
 ## 18 · Screen inventory
 
-Fifteen modules in the admin application, plus a separate public site of six pages. 86 screens in
+Fifteen modules in the admin application, plus a separate public site of six pages. 92 screens in
 all. This is the vocabulary the client sees, the vocabulary the ⌘K index is built from, and the
 vocabulary every later document uses. It is reproduced exactly in the prototype.
 
@@ -1225,7 +1225,7 @@ vocabulary every later document uses. It is reproduced exactly in the prototype.
 entry, a permission key and a line in the training material, so a rename after M9 means touching
 the route table, the registry, the permission catalogue and the knowledge base in one change.
 
-**Proposed additions, pending ratification (flagged 13/10/2026, TB).** A client request for a
+**Proposed additions (flagged 13/10/2026, TB; ratified 15/10/2026, below).** A client request for a
 clear, well-presented organogram adds two screens: **People · Organogram** (HR builder) and
 **Employee Self-Service · Org Chart** (read-only viewer for every member of staff), both drawing
 the live `line_manager_id` reporting tree, not a separate structure. This would take the inventory
@@ -1236,8 +1236,10 @@ ratifying it also updates the summary counts, the `SCREENS` constant in
 
 **Ratified 13/10/2026 (TB).** Home gains a fourth tab, **Team** (`team`), a managers-and-CEO roster and today’s attendance view that reads the live attendance roster. This is applied to the table above (Home now lists four tabs), taking the admin surface to 80 screens and the inventory to 86. It is reflected in the summary counts, the `SCREENS` constant in `scripts/check/progress.js`, and `docs/PROGRESS.md` (row #86). Its engineering shape is in `docs/guides/home.md`, with the built preview in `demo.html`. It reuses the `home` permission key, so the command menu and permission registry pick it up when the frontend foundation lands.
 
+**Ratified 15/10/2026 (TB).** Six screens join the inventory, taking the admin surface to 86 and the inventory to 92: **People · Organogram** (`organogram`) and **Employee Self-Service · Org Chart** (`org-chart`), the two proposed above; the three ESS attendance tabs built with the attendance work, **Work Location Requests** (`work-location-requests`), **My Devices** (`my-devices`) and **Policy Updates** (`policy-updates`); and **My Security** (`my-security`). All are M1. They are applied to the table above, the summary counts, the `SCREENS` constant in `scripts/check/progress.js`, `src/shared/route-map.js` and `docs/PROGRESS.md` (rows #87 to #92). They reuse the `ess` and `people` permission keys.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
-application, its own build, its own origin, listed below only because it carries six of the 86
+application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
 staff never navigates to it to do their job.
 
@@ -1245,10 +1247,10 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | (ungrouped) | **Home** | 4 | Overview · Team · Alerts · Reports | M1 |
 | (ungrouped) | **My Workspace** | 4 | Today · Tasks · Calendar · Analytics | M2 |
-| (ungrouped) | **Employee Self-Service** | 7 | My Profile · My Attendance · My Performance · My Payslips · My Leave · My Queries · My Documents | M1 |
+| (ungrouped) | **Employee Self-Service** | 12 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · Org Chart · My Security | M1 |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
-| People | **People** | 5 | Employees · Attendance · Leave · Devices · Worksites | M1 |
+| People | **People** | 6 | Employees · Organogram · Attendance · Leave · Devices · Worksites | M1 |
 | People | **Performance** | 5 | Goals · Targets · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
 | People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |

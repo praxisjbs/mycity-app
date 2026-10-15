@@ -30,7 +30,7 @@ const path = require("node:path");
 const { ROOT, changedFiles, addedLines, trailer, isDayFirstDate } = require("./lib/changes");
 
 const FILE = "docs/PROGRESS.md";
-const SCREENS = 86;
+const SCREENS = 92;
 const STATUSES = ["Not started", "In progress", "Built", "On staging", "Accepted", "Dropped"];
 const NEEDS_ALL_TICKS = new Set(["Built", "On staging", "Accepted"]);
 const PRODUCT = [/^src\//, /^packages\/contract\/schemas\//, /^migrations\//, /^seeds\//, /^templates\//, /^app\//, /^public-app\//];

@@ -5,11 +5,11 @@
 | Owner | GE |
 | Milestone | M1 |
 | Backend modules | `community`, `announcements` |
-| Frontend paths | To be set when the frontend foundation lands (AJ). |
+| Frontend paths | `app/src/features/community/` |
 | Permission key(s) | `community` |
 | Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements; reads shared with #66 Knowledge Hub · Announcements (M10) |
 | Status | Agreed |
-| Last changed | 13/10/2026 |
+| Last changed | 15/10/2026 |
 
 Sources: MILESTONES §6.4 and A19, A20; REUSE_MAP §2.4; the internal workflow meeting of 12 October
 2026 (GE presenting, TB reviewing). The demo (`demo.html`, Staff Community) was updated the same day
@@ -239,3 +239,4 @@ Nobody, including People and the CEO, can read a direct message they are not par
 - 13/10/2026 · GE · Added View Profile and Search in Conversation (TB review of the demo).
 - 13/10/2026 · GE · Added message ticks, voice note playback and transcription, read and not read lists on announcements, resizable list; removed work details from the profile (TB review).
 - 13/10/2026 · GE · Announcement cards back to the original design; read and not read lists moved into the card's modal. Page header slides away while reading a conversation (TB review).
+- 15/10/2026 · AJ · Channels, Direct Messages and Announcements built in `app/` against the mock API (load older paging, voice notes, ticks, profile panel, read report); not wired yet.

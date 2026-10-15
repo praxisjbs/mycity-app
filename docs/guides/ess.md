@@ -5,11 +5,11 @@
 | Owner | AJ |
 | Milestone | M1 |
 | Backend modules | `ess` |
-| Frontend paths | To be set when the frontend foundation lands (AJ). |
+| Frontend paths | `app/src/features/ess/`, `app/src/features/attendance/EssAttendance.tsx` |
 | Permission key(s) | `ess` (always `own` scope) |
-| Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents; My Security (not yet in the approved inventory, see §13) |
+| Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security |
 | Status | Draft |
-| Last changed | 13/10/2026 |
+| Last changed | 15/10/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -233,3 +233,4 @@ On desktop the sections show in full; only the Deductions breakdown opens a moda
 - 13/10/2026 · AJ · First version, from the 12 October internal workflow meeting, MILESTONES §6.3 and the 13 October demo update.
 - 13/10/2026 · AJ · §10: phone layout for the four attendance tabs (icon cards that open the modal), built from LA's page.
 - 13/10/2026 · AJ · §6: page footnotes removed from ESS (My Documents, My Queries, My Attendance).
+- 15/10/2026 · AJ · Five tabs ratified (#87 to #91). All twelve ESS tabs built in `app/` against the mock API, desktop and phone; not wired to the API yet.

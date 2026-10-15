@@ -5,11 +5,11 @@
 | Owner | TB |
 | Milestone | M1 |
 | Backend modules | `home` |
-| Frontend paths | `app/src/features/home/` (not built yet; filled once the frontend structure exists) |
+| Frontend paths | `app/src/features/home/` |
 | Permission key(s) | `home` (view, every employee), `home.team` (roster and team attendance), `home.alerts` (see and clear, per the rule), `home.alerts.manage` (create and edit rules), `home.reports` (build, schedule and run reports) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 13/10/2026 |
+| Last changed | 15/10/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -261,3 +261,4 @@ the catalogue's eligibility pattern so an alert inherits the clearing permission
   two 12/10 meetings (kickoff and module demos), with attendance read from the shared roster per the
   13/10 review. Covers the four tabs (Overview, Team, Alerts, Reports), role-sensitivity, the alert
   and report engines, and the Team tab now ratified into MILESTONES §18 as row #86.
+- 15/10/2026 · AJ · Four tabs built in `app/` against the mock API; not wired yet.
