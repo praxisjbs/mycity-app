@@ -101,7 +101,7 @@ export function Employee360({ id }: { id: string }) {
         right={e.open_queries ? <Pill tone="warn">{`${e.open_queries} open`}</Pill> : <Pill tone="ok">Nothing open</Pill>}
         rows={e.queries}
         rowKey={(r) => r.subject}
-        empty={{ title: "No query has ever been raised", text: "A clean record." }}
+        empty={{ title: "No Queries Raised", text: "A clean record." }}
         columns={[
           { key: "s", label: "Subject", render: (r) => r.subject },
           { key: "r", label: "Raised By", render: (r) => r.raised_by },

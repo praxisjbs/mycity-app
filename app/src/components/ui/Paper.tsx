@@ -6,14 +6,16 @@ import { Icon } from "./Icon";
  * logo and a yellow rule (MILESTONES §5.3, brand intensity on partner-facing
  * documents). The real file is rendered by the document engine; this is its preview.
  */
-export function Paper({ children, note = "Rendered by the document engine. Downloads as PDF." }: { children: ReactNode; note?: ReactNode }) {
+export function Paper({ children, note }: { children: ReactNode; note?: ReactNode }) {
   return (
     <div className="rounded-card border border-border bg-muted px-4 py-5">
-      <div className="mb-[14px] flex items-center justify-center gap-[7px] text-[11.5px] text-subtle-foreground">
-        <Icon name="doc" />
-        {note}
-      </div>
-      <div className="mx-auto max-w-[620px] rounded-box border border-border bg-paper px-7 py-[26px] text-[12.5px] leading-[1.62] text-paper-ink shadow-2 max-md:px-4 max-md:py-[18px] [&_p]:mt-[9px]">
+      {note && (
+        <div className="mb-[14px] flex items-center justify-center gap-[7px] text-[11.5px] text-subtle-foreground">
+          <Icon name="doc" />
+          {note}
+        </div>
+      )}
+      <div data-copy="content" className="mx-auto max-w-[620px] rounded-box border border-border bg-paper px-7 py-[26px] text-[12.5px] leading-[1.62] text-paper-ink shadow-2 max-md:px-4 max-md:py-[18px] [&_p]:mt-[9px]">
         {children}
       </div>
     </div>

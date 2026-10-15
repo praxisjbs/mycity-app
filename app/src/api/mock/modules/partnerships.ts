@@ -38,7 +38,7 @@ function full(p: MockPartner): Partner360 {
     documents: live ? [{ title: "Partnership MOU", kind: "MOU", signed_on: p.since, status: S("ok", "Signed") }, { title: "Activation schedule", kind: "Schedule", signed_on: p.since, status: S("ok", "Signed") }] : p.stage === "Proposal sent" || p.stage === "Follow up" ? [{ title: "Partnership proposal", kind: "Proposal", signed_on: null, status: S("warn", "Viewed") }] : [],
     deliverables: (active ? [["Monthly attribution report", "adedotun", 6, S("ok", "On track")], ["Campaign placement refresh", "tolu", 12, S("warn", "In progress")]] : [["Decide: re-engage or close", p.owner, p.quiet_days > 30 ? -22 : 4, p.quiet_days > 30 ? S("err", "Overdue") : S("neutral", "Not started")]]).map(([title, owner, d, st]) => ({ title: title as string, owner: refKey(owner as string), due: isoDaysAhead(d as number), status: st as Status })),
     downloads: { labels: ["May", "Jun", "Jul", "Aug", "Sep", "Oct"], values: active ? [1200, 1900, 2600, 3100, 3900, Math.round(value / 100000)] : [0, 0, 0, 0, 0, 0] },
-    lines: active ? [{ label: "Platform placement", pct: 64, value: `${m(Math.round(value * 0.64))}` }, { label: "Activation days", pct: 36, value: `${m(Math.round(value * 0.36))}` }] : [{ label: p.type, pct: 0, value: `0.00 of ${p.value}`, emphasis: "warn" }],
+    lines: active ? [{ label: "Platform Placement", pct: 64, value: `${m(Math.round(value * 0.64))}` }, { label: "Activation Days", pct: 36, value: `${m(Math.round(value * 0.36))}` }] : [{ label: p.type, pct: 0, value: `0.00 of ${p.value}`, emphasis: "warn" }],
   };
 }
 
@@ -128,7 +128,7 @@ const LEADS: Lead[] = [
 ].map((l, i) => ({ lead_id: sid(`lead:${i}`), title: l[0] as string, source: l[1] as string, owner: refKey(l[2] as string), added_on: isoDaysAgo(l[3] as number), next_action: l[4] as string | null, status: l[5] as Status }));
 route("GET /api/v1/partnerships/leads/summary", () => {
   const n = (t: string) => LEADS.filter((l) => l.status.text === t).length;
-  return ok({ new: n("New"), contacted: n("Contacted"), qualified: n("Qualified"), converted_this_month: n("Converted"), sources: [{ label: "BD conversation", pct: 100, value: "14" }, { label: "Website form", pct: 43, value: "6" }, { label: "Referral", pct: 36, value: "5" }, { label: "Inbound email", pct: 29, value: "4" }, { label: "Event", pct: 21, value: "3" }] });
+  return ok({ new: n("New"), contacted: n("Contacted"), qualified: n("Qualified"), converted_this_month: n("Converted"), sources: [{ label: "BD Conversation", pct: 100, value: "14" }, { label: "Website Form", pct: 43, value: "6" }, { label: "Referral", pct: 36, value: "5" }, { label: "Inbound Email", pct: 29, value: "4" }, { label: "Event", pct: 21, value: "3" }] });
 });
 route("GET /api/v1/partnerships/leads", (req) => paged(LEADS, req, { search: (l) => [l.title, l.source, l.owner.display_name], filters: { status: (l, v) => l.status.text.toLowerCase() === v, source: (l, v) => l.source === v } }));
 route("POST /api/v1/partnerships/leads", (req) => {

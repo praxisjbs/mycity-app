@@ -100,6 +100,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         >
           <div
             ref={box}
+            data-ui="modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
@@ -111,7 +112,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             )}
           >
             <div className="flex flex-none items-center gap-2.5 border-b border-border py-[13px] pr-[14px] pl-[18px]">
-              <h3 id="modal-title" className="min-w-0 flex-1 text-[15px]">
+              <h3 id="modal-title" data-ui="title" className="min-w-0 flex-1 text-[15px]">
                 {spec.title}
               </h3>
               <IconButton icon="x" label="Close" size="sm" onClick={close} />
@@ -121,7 +122,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
               {typeof spec.body === "function" ? spec.body(close) : spec.body}
             </div>
             {spec.footer && (
-              <div className="flex flex-none flex-wrap items-center justify-end gap-2 border-t border-border px-[18px] py-3 max-md:pb-[calc(12px+env(safe-area-inset-bottom,0px))]">
+              <div data-ui="modal-footer" className="flex flex-none flex-wrap items-center justify-end gap-2 border-t border-border px-[18px] py-3 max-md:pb-[calc(12px+env(safe-area-inset-bottom,0px))]">
                 {typeof spec.footer === "function" ? spec.footer(close) : spec.footer}
               </div>
             )}

@@ -1,4 +1,4 @@
-import type { IconName } from "@/components/ui/icon-paths";
+import type { IconName } from "../components/ui/icon-paths";
 
 /**
  * Every module and tab in the staff app, in rail order.

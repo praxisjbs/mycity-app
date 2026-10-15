@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import type { BarRow, HomeBlock, KpiCell } from "@/api/types/home";
 import { Bars, Kpi, Mini, Pill, StatStrip, Timeline, Who } from "@/components/ui/data";
 import { AreaChart, Donut } from "@/components/ui/charts";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, CardHeader, Grid } from "@/components/ui/layout";
 import { Money } from "@/components/ui/Money";
 import { Table } from "@/components/ui/Table";
@@ -13,15 +12,11 @@ import { useKpiDetail } from "./KpiDetail";
 const barColor = (b: BarRow) => (b.emphasis === "warn" ? "var(--chart-4)" : b.emphasis === "brand" ? "var(--primary)" : undefined);
 export const toBars = (rows: BarRow[]) => rows.map((r) => ({ label: r.label, pct: r.pct, value: r.value, color: barColor(r) }));
 
-/** A card with a title and an optional ⓘ, the common frame of Home's blocks. */
+/** A card with a title, the common frame of Home's blocks. `info` makes the title a help term (§5.2). */
 export function InfoCard({ title, info, right, children }: { title: string; info?: string; right?: ReactNode; children: ReactNode }) {
-  const i = useInfo();
   return (
     <Card>
-      <CardHeader title={title} right={right}>
-        {info && <InfoButton {...i} label={`About ${title.toLowerCase()}`} />}
-      </CardHeader>
-      {info && <InfoText {...i}>{info}</InfoText>}
+      <CardHeader title={title} help={info} right={right} />
       {children}
     </Card>
   );
@@ -76,7 +71,7 @@ export function Block({ block }: { block: HomeBlock }) {
           rows={block.rows}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate(r.link)}
-          empty={{ title: "Nothing needs you", text: "Requests waiting on you appear here." }}
+          empty={{ title: "Nothing Needs You", text: "Requests waiting on you appear here." }}
           columns={
             block.variant === "requests"
               ? [

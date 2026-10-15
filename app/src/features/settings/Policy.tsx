@@ -7,15 +7,15 @@ import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
 import type { PolicyAck } from "@/api/types/settings";
 import { Button } from "@/components/ui/Button";
 import { Banner, Pill, Who } from "@/components/ui/data";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
+import { HelpTerm } from "@/components/ui/Help";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { ModalFoot, PagedTable } from "@/features/shared/sections";
-import { Field, InlineInput, Switch, Textarea } from "@/components/form";
+import { PagedTable } from "@/features/shared/sections";
+import { Field, FormFooter, InlineInput, rules, SwitchField, TextAreaField, useContractForm } from "@/components/form";
 
 const fmt = (s: PolicySetting) => (s.kind === "bool" ? (s.value ? "On" : "Off") : s.kind === "mode" ? String(s.value)[0].toUpperCase() + String(s.value).slice(1) : String(s.value));
 
@@ -26,7 +26,6 @@ const fmt = (s: PolicySetting) => (s.kind === "bool" ? (s.value ? "On" : "Off") 
  */
 export function AttendancePolicyTab() {
   const modal = useModal();
-  const info = useInfo();
   const cur = useApi("GET /api/v1/attendance/policies/current");
   const versions = usePaged("GET /api/v1/attendance/policies");
   const save = useMutation("PATCH /api/v1/attendance/policies/draft");
@@ -49,16 +48,16 @@ export function AttendancePolicyTab() {
   return (
     <>
       <PageHead
-        title={<span className="inline-flex items-center gap-1.5">Attendance Policy <InfoButton {...info} label="About the attendance policy" /></span>}
+        title="Attendance Policy"
+        help="A change edits a draft. Nobody is notified and no punch is judged by it until the draft is published."
         sub={`Version ${p.version} in force since ${formatDate(p.published_at)} · published by ${p.published_by}`}
       />
-      <InfoText {...info}>A change on this screen edits a draft. Nobody is notified and no punch is judged by it until the draft is published. Older records are never recalculated.</InfoText>
       {p.draft ? (
         <Banner
           tone="warn"
           actions={
             <>
-              <Button size="sm" disabled={discard.pending} onClick={async () => { await discard.run({ body: {} }); invalidate("/api/v1/attendance/policies"); toast("Draft discarded"); }}>Discard Changes</Button>
+              <Button size="sm" busy={discard.pending} onClick={async () => { await discard.run({ body: {} }); invalidate("/api/v1/attendance/policies"); toast("Draft discarded"); }}>Discard Changes</Button>
               <Button size="sm" onClick={() => review(false)}>Review Changes</Button>
               <Button size="sm" variant="primary" onClick={() => review(true)}>Publish Policy</Button>
             </>
@@ -67,7 +66,7 @@ export function AttendancePolicyTab() {
           <b>Draft changes not yet published</b> · {changed.size} change{changed.size === 1 ? "" : "s"}. Employees have not been told.
         </Banner>
       ) : (
-        <Banner tone="ok" icon="ok">No draft changes. Version {p.version} is the latest published policy. Any change below starts a draft.</Banner>
+        <Banner tone="ok" icon="ok">No draft. Version {p.version} is in force.</Banner>
       )}
       <Grid cols={2}>
         {sections.map((sec, i) => (
@@ -117,16 +116,15 @@ function SettingRow({ s, changed, busy, onChange }: { s: PolicySetting; changed:
   return (
     <div className={cn("flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0", changed && "-mx-[14px] bg-warning-soft px-[14px]")}>
       <div className="min-w-0">
-        <div className="text-[13px] font-[550]">{s.label}{changed && <Pill tone="warn" className="ml-1.5">Draft</Pill>}</div>
-        <div className="text-[11.5px] text-subtle-foreground">{s.help}</div>
+        <div className="text-[13px] font-[550]">{s.help ? <HelpTerm text={s.help}>{s.label}</HelpTerm> : s.label}{changed && <Pill tone="warn" className="ml-1.5">Draft</Pill>}</div>
         {bad && <div className="text-[11.5px] text-destructive">{bad}</div>}
       </div>
-      {s.kind === "bool" && <Switch checked={!!s.value} onChange={onChange} label={s.label} disabled={busy} />}
+      {s.kind === "bool" && <SwitchField checked={!!s.value} onChange={onChange} label={s.label} disabled={busy} />}
       {s.kind === "locked" && <Pill>{String(s.value)}</Pill>}
       {s.kind === "mode" && (
         <div className="flex flex-none overflow-hidden rounded-full border border-input" role="group" aria-label={s.label}>
           {(s.options ?? []).map((o) => (
-            <button key={o} type="button" aria-pressed={s.value === o} disabled={busy} onClick={() => s.value !== o && onChange(o)} className={cn("h-7 px-2.5 text-[11.5px] font-semibold", s.value === o ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>
+            <button key={o} type="button" aria-pressed={s.value === o} disabled={busy} onClick={() => s.value !== o && onChange(o)} className={cn("h-7 px-2.5 text-[11.5px] font-semibold max-md:h-11", s.value === o ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>
               {o[0].toUpperCase() + o.slice(1)}
             </button>
           ))}
@@ -134,7 +132,7 @@ function SettingRow({ s, changed, busy, onChange }: { s: PolicySetting; changed:
       )}
       {(s.kind === "number" || s.kind === "time") && (
         <InlineInput
-          className={cn("h-8 w-[76px] flex-none rounded-ctl border bg-background px-2 text-right text-[13px] outline-none", bad ? "border-destructive" : "border-input focus:border-ring")}
+          className={cn("h-8 w-[76px] max-md:h-11 flex-none rounded-ctl border bg-background px-2 text-right text-[13px] outline-none", bad ? "border-destructive" : "border-input focus:border-ring")}
           inputMode="numeric"
           aria-label={s.label}
           value={text}
@@ -148,7 +146,8 @@ function SettingRow({ s, changed, busy, onChange }: { s: PolicySetting; changed:
 }
 
 function Review({ p, publish, close }: { p: AttendancePolicy; publish: boolean; close: () => void }) {
-  const [summary, setSummary] = useState("");
+  const f = useContractForm({ summary: "" }, { summary: rules.min(10, "At least 10 characters") });
+  const summary = f.values.summary;
   const pub = useMutation("POST /api/v1/attendance/policies/publish");
   const rows = (p.draft?.changed_keys ?? []).map((k) => ({ key: k, old: p.settings.find((s) => s.key === k)!, next: p.draft!.settings.find((s) => s.key === k)! }));
   return (
@@ -165,20 +164,20 @@ function Review({ p, publish, close }: { p: AttendancePolicy; publish: boolean; 
       />
       {publish && (
         <div className="mt-3">
-          <Field label="What Changed, for Staff" state={summary && summary.trim().length < 10 ? "bad" : undefined} message={summary && summary.trim().length < 10 ? "At least 10 characters" : undefined}>
-            <Textarea value={summary} onChange={setSummary} placeholder="Lateness rule changed" />
+          <Field label="What Changed" {...f.field("summary")}>
+            <TextAreaField {...f.field("summary")} placeholder="Lateness rule changed" />
           </Field>
-          <Banner tone="info" icon="bell">Everyone affected is notified and asked to acknowledge v{p.version + 1}. Records before today are not recalculated.</Banner>
+          <Banner tone="info" icon="bell">Everyone affected is asked to acknowledge v{p.version + 1}.</Banner>
         </div>
       )}
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Close</Button>
         {publish && (
-          <Button variant="primary" disabled={summary.trim().length < 10 || pub.pending} onClick={async () => { try { const x = await pub.run({ body: { summary: summary.trim() } }); invalidate("/api/v1/attendance"); close(); toast(`Version ${x.version} published for staff to acknowledge`); } catch (e) { toast(e instanceof ApiError ? e.message : "Could not publish"); } }}>
+          <Button variant="primary" busy={pub.pending} onClick={async () => { if (!f.check()) return; try { const x = await pub.run({ body: { summary: summary.trim() } }); invalidate("/api/v1/attendance"); close(); toast(`Version ${x.version} published for staff to acknowledge`); } catch (e) { toast(e instanceof ApiError ? e.message : "Could not publish"); } }}>
             Publish v{p.version + 1}
           </Button>
         )}
-      </ModalFoot>
+      </FormFooter>
     </>
   );
 }

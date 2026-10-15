@@ -35,7 +35,7 @@ const ROWS: R[] = [
   ["Q3 people report", "done", "damilola", -10, "normal", "cynthia", null],
 ];
 const duePill = (status: TaskStatus, d: number | null) =>
-  status === "done" ? { tone: "ok" as const, text: "Done" } : d == null ? { tone: "neutral" as const, text: "No date" } : d < 0 ? { tone: "err" as const, text: `Overdue ${-d}d` } : d === 0 ? { tone: "warn" as const, text: "Due today" } : { tone: "neutral" as const, text: isoDaysAhead(d).split("-").reverse().slice(0, 2).join("/") };
+  status === "done" ? { tone: "ok" as const, text: "Done" } : d == null ? { tone: "neutral" as const, text: "No date" } : d < 0 ? { tone: "err" as const, text: `Overdue ${-d}d` } : d === 0 ? { tone: "warn" as const, text: "Due Today" } : { tone: "neutral" as const, text: isoDaysAhead(d).split("-").reverse().slice(0, 2).join("/") };
 const TASKS: Task[] = ROWS.map((r, i) => ({
   task_id: sid(`task:${i}`), number: `TSK-${String(400 - i).padStart(4, "0")}`, title: r[0], status: r[1], owner: refKey(r[2]), set_by: r[5] ? refKey(r[5]) : null,
   due: r[3] == null ? null : r[3] < 0 ? isoDaysAgo(-r[3]) : isoDaysAhead(r[3]), priority: r[4], linked: r[6] ? { kind: "partner", label: r[6], link: "/partnerships?tab=partners" } : null,
@@ -58,11 +58,11 @@ const scoped = (user: string, scope?: string) => {
 route("GET /api/v1/workspace/today", (req) => {
   const me = byKey(req.user)!.employee_id;
   const mine = TASKS.filter((t) => t.owner.employee_id === me && t.status !== "done");
-  const due = mine.filter((t) => t.due_pill.text === "Due today");
+  const due = mine.filter((t) => t.due_pill.text === "Due Today");
   const over = mine.filter((t) => t.due_pill.tone === "err");
   return ok({
     date: isoDaysAgo(0),
-    kpis: [{ key: "due", label: "Due today", value: String(due.length) }, { key: "over", label: "Overdue", value: String(over.length), tone: over.length ? "err" : undefined }, { key: "meet", label: "Meetings", value: "2" }, { key: "in", label: "Clocked in", value: "08:04", tone: "ok" }],
+    kpis: [{ key: "due", label: "Due Today", value: String(due.length) }, { key: "over", label: "Overdue", value: String(over.length), tone: over.length ? "err" : undefined }, { key: "meet", label: "Meetings", value: "2" }, { key: "in", label: "Clocked in", value: "08:04", tone: "ok" }],
     my_day: [...over, ...due].filter((t) => !t.set_by).slice(0, 6),
     set_by_manager: mine.filter((t) => t.set_by && t.set_by.employee_id !== me).slice(0, 6),
     diary: [
@@ -84,7 +84,7 @@ route("GET /api/v1/tasks/summary", (req) => {
   const open = l.filter((t) => t.status !== "done");
   return ok({ kpis: [
     { key: "open", label: "Open", value: String(open.length) },
-    { key: "week", label: "Due this week", value: String(open.filter((t) => t.due && t.due <= isoDaysAhead(6) && t.due >= isoDaysAgo(0)).length) },
+    { key: "week", label: "Due This Week", value: String(open.filter((t) => t.due && t.due <= isoDaysAhead(6) && t.due >= isoDaysAgo(0)).length) },
     { key: "over", label: "Overdue", value: String(open.filter((t) => t.due_pill.tone === "err").length), tone: "err" },
     { key: "done", label: "Completed, 30d", value: String(l.filter((t) => t.status === "done").length + 41), tone: "ok" },
   ] });
@@ -141,7 +141,7 @@ route("GET /api/v1/workspace/analytics", (req) => {
   const top = [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const max = top[0]?.[1] ?? 1;
   return ok({
-    kpis: [{ key: "rate", label: "Completion rate", value: "78%", trend: "up 6 points", dir: "up" }, { key: "over", label: "Overdue", value: String(open.filter((t) => t.due_pill.tone === "err").length), tone: "err" }, { key: "avg", label: "Avg completion", value: "2.4 days" }, { key: "open", label: "Open tasks", value: String(open.length) }],
+    kpis: [{ key: "rate", label: "Completion Rate", value: "78%", trend: "up 6 points", dir: "up" }, { key: "over", label: "Overdue", value: String(open.filter((t) => t.due_pill.tone === "err").length), tone: "err" }, { key: "avg", label: "Avg Completion", value: "2.4 days" }, { key: "open", label: "Open Tasks", value: String(open.length) }],
     completed_per_week: [18, 22, 19, 26, 24, 31],
     workload: top.map(([label, n]) => ({ label, pct: Math.round((n / max) * 100), value: `${n} open` })),
     priority: [["Urgent", 22, "7", "warn"], ["High", 38, "12"], ["Normal", 66, "21"], ["Low", 25, "8"]].map(([label, pct, value, e]) => ({ label: label as string, pct: pct as number, value: value as string, ...(e ? { emphasis: "warn" as const } : {}) })),

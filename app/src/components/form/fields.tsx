@@ -1,84 +1,27 @@
-import { useCallback, useMemo, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 import { Icon } from "@/components/ui/Icon";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
+import { HelpTerm } from "@/components/ui/Help";
 
 /**
- * Forms validate as they are filled (gate 12): a field is checked on every
- * change once it has been touched, and the signal is a mark on the field (its
- * border and an icon) with a few words, never a dialog and never only on submit.
- * The server's 422 `fields` land on the same marks.
+ * Label above the control, and its inline mark (§8.2, §8.3). `info` makes the
+ * label a help term (§5.2). An optional field carries an "Optional" tag after
+ * its label, never an asterisk: pass `optional`, or end a label with
+ * "(Optional)" and the tag is drawn from it.
  */
-type Validator<V> = (value: V, all: Record<string, unknown>) => string | null | undefined;
-
-export function useForm<T extends Record<string, unknown>>(initial: T, rules: Partial<{ [K in keyof T]: Validator<T[K]> }> = {}) {
-  const [values, setValues] = useState<T>(initial);
-  const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
-  const [server, setServer] = useState<Record<string, string[]>>({});
-
-  const errorOf = useCallback(
-    (k: keyof T): string | null => {
-      const rule = rules[k];
-      const local = rule ? rule(values[k], values) : null;
-      return local || server[k as string]?.[0] || null;
-    },
-    [rules, values, server],
-  );
-
-  const errors = useMemo(() => {
-    const out: Partial<Record<keyof T, string>> = {};
-    (Object.keys(values) as Array<keyof T>).forEach((k) => {
-      const e = errorOf(k);
-      if (e) out[k] = e;
-    });
-    return out;
-  }, [values, errorOf]);
-
-  const set = useCallback(<K extends keyof T>(k: K, v: T[K]) => {
-    setValues((s) => ({ ...s, [k]: v }));
-    setTouched((s) => ({ ...s, [k]: true }));
-    setServer((s) => {
-      if (!(k in s)) return s;
-      const next = { ...s };
-      delete next[k as string];
-      return next;
-    });
-  }, []);
-
-  /** Props for a field: its mark, message and change handler. */
-  const field = <K extends keyof T>(k: K) => ({
-    value: values[k],
-    onChange: (v: T[K]) => set(k, v),
-    onBlur: () => setTouched((s) => ({ ...s, [k]: true })),
-    state: (touched[k] || server[k as string] ? (errors[k] ? "bad" : values[k] !== "" && values[k] != null ? "good" : undefined) : undefined) as "bad" | "good" | undefined,
-    message: touched[k] || server[k as string] ? errors[k] : undefined,
-  });
-
-  /** Mark every field touched; true when the form is clean. */
-  const check = () => {
-    setTouched(Object.fromEntries(Object.keys(values).map((k) => [k, true])) as Partial<Record<keyof T, boolean>>);
-    return Object.keys(errors).length === 0;
-  };
-
-  return { values, setValues, set, field, errors, check, setServerErrors: setServer, valid: Object.keys(errors).length === 0 };
-}
-
-/** Label, the control, its ⓘ (optional) and its inline mark. */
-export function Field({ label, info, state, message, children, className, htmlFor }: { label: ReactNode; info?: ReactNode; state?: "bad" | "good"; message?: ReactNode; children: ReactNode; className?: string; htmlFor?: string }) {
-  const help = useInfo();
+export function Field({ label, info, optional, state, message, children, className, htmlFor }: { label: ReactNode; info?: ReactNode; optional?: boolean; state?: "bad" | "good"; message?: ReactNode; children: ReactNode; className?: string; htmlFor?: string }) {
+  let text = label;
+  let opt = optional;
+  if (typeof label === "string" && /\s*\(Optional\)$/.test(label)) {
+    text = label.replace(/\s*\(Optional\)$/, "");
+    opt = true;
+  }
   return (
     <div className={cn("mb-[14px]", className)} data-state={state}>
-      <span className="mb-1.5 flex items-center gap-1">
-        <label htmlFor={htmlFor} className="block text-[12px] font-semibold text-muted-foreground">
-          {label}
-        </label>
-        {info && <InfoButton {...help} label={`About ${typeof label === "string" ? label.toLowerCase() : "this field"}`} />}
-      </span>
-      {info && (
-        <InfoText {...help} className={help.open ? "mt-0" : undefined}>
-          {info}
-        </InfoText>
-      )}
+      <label htmlFor={htmlFor} className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+        <span>{info ? <HelpTerm text={info}>{text}</HelpTerm> : text}</span>
+        {opt && <span className="rounded-full bg-muted px-[7px] py-px text-[10.5px] font-semibold text-subtle-foreground">Optional</span>}
+      </label>
       {children}
       {state === "bad" && message && (
         <p className="mt-[5px] flex items-center gap-[5px] text-[11.5px] text-destructive" role="alert">
@@ -98,11 +41,11 @@ const control = (state?: "bad" | "good") =>
 
 type Ctl<V> = { value: V; onChange: (v: V) => void; onBlur?: () => void; state?: "bad" | "good" };
 
-export function Input({ value, onChange, onBlur, state, className, ...rest }: Ctl<string> & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
+export function TextField({ value, onChange, onBlur, state, className, ...rest }: Ctl<string> & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
   return (
     <span className="relative flex items-center">
       <input
-        className={cn(control(state), "h-9", state && "pr-9", className)}
+        className={cn(control(state), "h-9 max-md:h-11", state && "pr-9", className)}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
@@ -115,7 +58,7 @@ export function Input({ value, onChange, onBlur, state, className, ...rest }: Ct
   );
 }
 
-export function Textarea({ value, onChange, onBlur, state, className, ...rest }: Ctl<string> & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange">) {
+export function TextAreaField({ value, onChange, onBlur, state, className, ...rest }: Ctl<string> & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange">) {
   return (
     <textarea
       className={cn(control(state), "min-h-[84px] resize-y px-3 py-[9px] leading-normal", className)}
@@ -128,10 +71,10 @@ export function Textarea({ value, onChange, onBlur, state, className, ...rest }:
   );
 }
 
-export function Select({ value, onChange, onBlur, state, options, placeholder, className, ...rest }: Ctl<string> & { options: Array<[string, string]>; placeholder?: string } & Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">) {
+export function SelectField({ value, onChange, onBlur, state, options, placeholder, className, ...rest }: Ctl<string> & { options: Array<[string, string]>; placeholder?: string } & Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">) {
   return (
     <select
-      className={cn(control(state), "h-9", className)}
+      className={cn(control(state), "h-9 max-md:h-11", className)}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
@@ -152,8 +95,8 @@ export function Select({ value, onChange, onBlur, state, options, placeholder, c
   );
 }
 
-/** Segmented choice inside a form (one of a few). */
-export function Seg<V extends string>({ value, onChange, options, disabled }: { value: V; onChange: (v: V) => void; options: Array<[V, ReactNode]>; disabled?: V[] }) {
+/** One of up to five, as a segmented control (§8.2: more than five is a SelectField). */
+export function ChoiceField<V extends string>({ value, onChange, options, disabled }: { value: V; onChange: (v: V) => void; options: Array<[V, ReactNode]>; disabled?: V[] }) {
   return (
     <div className="flex flex-wrap gap-[3px] rounded-full border border-input p-[3px]" role="radiogroup">
       {options.map(([v, l]) => (
@@ -164,7 +107,7 @@ export function Seg<V extends string>({ value, onChange, options, disabled }: { 
           aria-checked={v === value}
           disabled={disabled?.includes(v)}
           onClick={() => onChange(v)}
-          className={cn("h-[30px] flex-1 rounded-full px-2.5 text-[12.5px] font-semibold whitespace-nowrap disabled:opacity-45", v === value ? "bg-secondary text-secondary-foreground" : "text-muted-foreground")}
+          className={cn("h-[30px] flex-1 rounded-full px-2.5 max-md:h-11 text-[12.5px] font-semibold whitespace-nowrap disabled:opacity-45", v === value ? "bg-secondary text-secondary-foreground" : "text-muted-foreground")}
         >
           {l}
         </button>
@@ -176,7 +119,7 @@ export function Seg<V extends string>({ value, onChange, options, disabled }: { 
 /** The compact segmented control in toolbars (view switchers, year pickers). */
 export function SegBar<V extends string>({ value, onChange, options, small }: { value: V; onChange: (v: V) => void; options: Array<[V, ReactNode]>; small?: boolean }) {
   return (
-    <div className={cn("inline-flex items-center overflow-hidden rounded-full border border-input bg-background", small ? "h-7" : "h-[34px]")} role="radiogroup">
+    <div className={cn("inline-flex items-center overflow-hidden rounded-full border border-input bg-background", small ? "h-7 max-md:h-[46px]" : "h-[34px] max-md:h-[46px]")} role="radiogroup">
       {options.map(([v, l], i) => (
         <button
           key={v}
@@ -198,8 +141,8 @@ export function SegBar<V extends string>({ value, onChange, options, small }: { 
   );
 }
 
-/** On or off. */
-export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+/** On or off, for a setting that applies at once (§8.1). Inside a form, a yes or no is a CheckboxField. */
+export function SwitchField({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
     <button
       type="button"
@@ -208,28 +151,25 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={cn("relative h-[22px] w-[38px] flex-none rounded-full transition-colors disabled:opacity-50", checked ? "bg-secondary" : "bg-border")}
+      className="group flex flex-none items-center justify-center disabled:opacity-50 max-md:size-11"
     >
-      <span className={cn("absolute top-[3px] left-[3px] size-4 rounded-full bg-white transition-transform", checked && "translate-x-4")} />
+      <span className={cn("relative h-[22px] w-[38px] rounded-full transition-colors", checked ? "bg-secondary" : "bg-border")}>
+        <span className={cn("absolute top-[3px] left-[3px] size-4 rounded-full bg-white transition-transform", checked && "translate-x-4")} />
+      </span>
     </button>
   );
 }
 
-/** A setting row: what it is, a line about it, and its switch. */
+/** A setting row: what it is (a help term when it needs a line about it) and its switch. Saves on change (§8.1). */
 export function ToggleRow({ title, text, checked, onChange, changed }: { title: ReactNode; text?: ReactNode; checked: boolean; onChange: (v: boolean) => void; changed?: boolean }) {
   return (
     <div className={cn("flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0", changed && "-mx-[14px] bg-warning-soft px-[14px]")}>
-      <div>
-        <div className="text-[13px] font-[550]">{title}</div>
-        {text && <div className="text-[11.5px] text-subtle-foreground">{text}</div>}
-      </div>
-      <Switch checked={checked} onChange={onChange} label={typeof title === "string" ? title : "Toggle"} />
+      <div className="text-[13px] font-[550]">{text ? <HelpTerm text={text}>{title}</HelpTerm> : title}</div>
+      <SwitchField checked={checked} onChange={onChange} label={typeof title === "string" ? title : "Toggle"} />
     </div>
   );
 }
 
-/** Two fields side by side on a desktop, stacked on a phone. */
-export const FormRow = ({ children }: { children: ReactNode }) => <div className="grid grid-cols-1 gap-x-2.5 md:grid-cols-2">{children}</div>;
 
 /** Common rules. Messages are a few words (gate 12). */
 export const rules = {
@@ -247,3 +187,34 @@ export const rules = {
     return /^\d{1,16}(\.\d{1,2})?$/.test(s) ? null : "Numbers only, up to 2 decimals";
   },
 };
+
+/** A Nigerian phone number: the country code is shown, digits only are kept. */
+export function PhoneField({ value, onChange, onBlur, state, id }: Ctl<string> & { id?: string }) {
+  return (
+    <span className="relative flex items-center">
+      <span className="pointer-events-none absolute left-3 text-[13px] text-muted-foreground">+234</span>
+      <input
+        id={id}
+        type="tel"
+        inputMode="tel"
+        autoComplete="tel-national"
+        placeholder="803 123 4567"
+        className={cn(control(state), "h-9 pl-[52px] max-md:h-11")}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value.replace(/[^\d ]/g, ""))}
+        onBlur={onBlur}
+        aria-invalid={state === "bad" || undefined}
+      />
+    </span>
+  );
+}
+
+/** Yes or no inside a form (§8.2). The whole row is the target. */
+export function CheckboxField({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode; disabled?: boolean }) {
+  return (
+    <label className="mb-[14px] flex min-h-9 cursor-pointer items-center gap-2.5 text-[13px] max-md:min-h-11">
+      <input type="checkbox" className="size-[18px] flex-none accent-(--secondary)" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <span>{label}</span>
+    </label>
+  );
+}

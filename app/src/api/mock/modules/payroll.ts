@@ -24,7 +24,7 @@ function totals(period: string) {
 function runRow(period: string): RunRow {
   const t = totals(period);
   const current = period === RUN.period;
-  const status = !current ? S("ok", `Paid 27/${period.slice(5)}`) : RUN.stage === "paid" ? S("ok", `Paid ${RUN.paid_on?.split("-").reverse().join("/")}`) : RUN.stage === "approved" ? S("info", "Approved, locked") : RUN.stage === "submitted" ? S("warn", "Awaiting approval") : S("neutral", "Computed");
+  const status = !current ? S("ok", `Paid 27/${period.slice(5)}`) : RUN.stage === "paid" ? S("ok", `Paid ${RUN.paid_on?.split("-").reverse().join("/")}`) : RUN.stage === "approved" ? S("info", "Approved, locked") : RUN.stage === "submitted" ? S("warn", "Awaiting Approval") : S("neutral", "Computed");
   return { run_id: sid(`run:${period}`), period, headcount: t.headcount, gross: money(t.gross), deductions: money(t.ded), net: money(t.gross - t.ded), approved_by: current ? RUN.approved_by : "Ifeoma Chukwu", status };
 }
 const periods = () => [...new Set(SLIPS.map((x) => x.period))].sort().reverse();
@@ -131,7 +131,7 @@ route("GET /api/v1/payroll/deductions/summary", () => {
   const f = pending[0];
   return ok({
     pending: pending.length, applied_this_period: money(applied), recovered_this_year: "45000.00", sources: new Set(DEDS.map((d) => d.source)).size, tiers_on: deductionTiersOn(),
-    focus: f ? { deduction_id: f.deduction_id, title: `Pending: ${f.employee.display_name}`, chain: [{ label: "Query closed", state: "done" }, { label: "Warning served", state: "done" }, { label: "Deduction raised", state: "done" }, { label: "Accepted", state: "now" }, { label: "In the run", state: null }, { label: "Applied", state: null }], note: "Raised by a sanction. It waits for a person, which is correct: nothing deducts itself." } : null,
+    focus: f ? { deduction_id: f.deduction_id, title: `Pending: ${f.employee.display_name}`, chain: [{ label: "Query Closed", state: "done" }, { label: "Warning Served", state: "done" }, { label: "Deduction Raised", state: "done" }, { label: "Accepted", state: "now" }, { label: "In the Run", state: null }, { label: "Applied", state: null }], note: "Raised by a sanction. It waits for a person, which is correct: nothing deducts itself." } : null,
   });
 });
 route("GET /api/v1/payroll/deductions", (req) => paged(DEDS, req, { search: (d) => [d.employee.display_name, d.reason, d.source], filters: { status: (d, v) => (v === "pending" ? d.status.text === "Pending acceptance" : d.status.text !== "Pending acceptance") } }));

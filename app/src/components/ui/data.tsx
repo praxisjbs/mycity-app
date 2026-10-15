@@ -17,7 +17,7 @@ const TONE = {
 /** Status pill: tone AND text, never colour alone. */
 export function Pill({ tone = "neutral", children, className, dot = true }: { tone?: Tone; children: ReactNode; className?: string; dot?: boolean }) {
   return (
-    <span className={cn("inline-flex items-center gap-[5px] rounded-full px-[9px] py-[3px] text-[11px] font-[650] whitespace-nowrap", TONE[tone], className)}>
+    <span data-copy="content" className={cn("inline-flex items-center gap-[5px] rounded-full px-[9px] py-[3px] text-[11px] font-[650] whitespace-nowrap", TONE[tone], className)}>
       {dot && <i className="size-[5px] flex-none rounded-full bg-current" />}
       {children}
     </span>
@@ -45,7 +45,7 @@ export function Avatar({ name, size = 27, tone = "soft", className, online }: { 
 /** Avatar, name and a second line. */
 export function Who({ name, sub, size = 27 }: { name: string; sub?: ReactNode; size?: number }) {
   return (
-    <span className="flex min-w-0 items-center gap-[9px]">
+    <span data-copy="content" className="flex min-w-0 items-center gap-[9px]">
       <Avatar name={name} size={size} />
       <span className="min-w-0">
         <b className="block truncate text-[13px] font-semibold">{name}</b>
@@ -77,9 +77,9 @@ export function Kpi({
   const click = opensOn === "phone" && !mobile ? undefined : onClick;
   const body = (
     <>
-      <span className="text-[11.5px] font-semibold text-muted-foreground">{label}</span>
+      <span data-ui="title" className="text-[11.5px] font-semibold text-muted-foreground">{label}</span>
       <b className={cn("mt-0.5 block text-[25px] leading-[1.05] font-bold tracking-[-.028em] max-md:text-[21px]", tone && INK[tone])}>{value}</b>
-      {trend && <span className={cn("mt-1.5 inline-flex items-center gap-[3px] text-[11.5px] font-[650]", TREND[trendDir])}>{trend}</span>}
+      {trend && <span data-ui="kpi-caption" className={cn("mt-1.5 inline-flex items-center gap-[3px] text-[11.5px] font-[650]", TREND[trendDir])}>{trend}</span>}
     </>
   );
   if (!click) return <Card className={className}>{body}</Card>;
@@ -100,14 +100,28 @@ export function Kpi({
   );
 }
 
-/** Label and value pairs (record cards). One column on a phone. */
+/**
+ * The empty-value marker (FRONTEND_GUIDE §5.4, §6): what the shared table and
+ * detail components draw for a value that is not set. Never "N/A", never
+ * "null", never a dash typed into copy.
+ */
+export function EmptyValue() {
+  return (
+    <span className="text-subtle-foreground" aria-label="Not set">
+      –
+    </span>
+  );
+}
+const isEmpty = (v: ReactNode) => v == null || v === "" || v === false;
+
+/** Label and value pairs (record cards). One column on a phone. A value that is not set shows the empty marker. */
 export function KV({ items }: { items: Array<[ReactNode, ReactNode]> }) {
   return (
     <dl className="grid grid-cols-1 items-baseline gap-x-4 gap-y-0.5 text-[13px] md:grid-cols-[minmax(0,160px)_minmax(0,1fr)] md:gap-y-[9px]">
       {items.map(([k, v], i) => (
         <div key={i} className="contents">
           <dt className="min-w-0 text-[12px] [overflow-wrap:anywhere] text-subtle-foreground">{k}</dt>
-          <dd className="m-0 min-w-0 font-[550] [overflow-wrap:anywhere] max-md:mb-2">{v}</dd>
+          <dd className="m-0 min-w-0 font-[550] [overflow-wrap:anywhere] max-md:mb-2">{isEmpty(v) ? <EmptyValue /> : v}</dd>
         </div>
       ))}
     </dl>
@@ -115,20 +129,21 @@ export function KV({ items }: { items: Array<[ReactNode, ReactNode]> }) {
 }
 
 /** A strip of labelled figures across the top of a record. Items marked `desktop` drop off on a phone. */
+/** A row of figures. On a phone at most four show, two to a row (gate 11). */
 export function StatStrip({ items }: { items: Array<{ label: string; value: ReactNode; tone?: Tone; desktop?: boolean; onClick?: () => void; action?: string }> }) {
   return (
     <div className="mb-3 flex flex-wrap overflow-hidden rounded-card border border-border bg-card">
       {items.map((s, i) => {
         const inner = (
           <>
-            <span className="text-[11px] font-semibold tracking-[.07em] text-subtle-foreground uppercase">{s.label}</span>
+            <span data-ui="title" className="text-[11px] font-semibold tracking-[.07em] text-subtle-foreground uppercase">{s.label}</span>
             <b className={cn("mt-[3px] block text-[17px] font-bold tracking-[-.02em]", s.tone && INK[s.tone])}>{s.value}</b>
             {s.action && <span className="mt-0.5 block text-[11.5px] font-semibold text-accent-foreground">{s.action}</span>}
           </>
         );
         const cls = cn(
           "min-w-[128px] flex-1 border-r border-border px-[14px] py-3 text-left last:border-r-0 max-md:min-w-[50%] max-md:border-b",
-          s.desktop && "max-md:hidden",
+          (s.desktop || i >= 4) && "max-md:hidden",
         );
         return s.onClick ? (
           <button key={i} type="button" className={cn(cls, "hover:bg-accent")} onClick={s.onClick}>
@@ -147,7 +162,7 @@ export function StatStrip({ items }: { items: Array<{ label: string; value: Reac
 /** Vertical timeline of events. `tone` marks the dot: hi is the yellow highlight. */
 export function Timeline({ items }: { items: Array<{ title: ReactNode; when: ReactNode; text?: ReactNode; tone?: "hi" | "ok" }> }) {
   return (
-    <div className="tl">
+    <div className="tl" data-copy="content">
       {items.map((it, i) => (
         <div key={i} className={cn("tl-dot relative pb-[14px] last:pb-0", it.tone)}>
           <b className="block text-[12.5px] font-semibold">{it.title}</b>
@@ -164,7 +179,7 @@ export function Bars({ rows, note }: { rows: Array<{ label: ReactNode; pct: numb
   return (
     <>
       {rows.map((r, i) => (
-        <div key={i} className="flex items-center gap-2.5 py-1.5">
+        <div key={i} data-copy="content" className="flex items-center gap-2.5 py-1.5">
           <span className="w-[132px] flex-none text-[12.5px] font-semibold max-md:w-[104px]">{r.label}</span>
           <span className="h-5 min-w-0 flex-1 overflow-hidden rounded-md bg-muted">
             <i className="block h-full rounded-md" style={{ width: `${Math.max(0, Math.min(100, r.pct))}%`, background: r.color ?? "var(--chart-1)" }} />
@@ -172,7 +187,7 @@ export function Bars({ rows, note }: { rows: Array<{ label: ReactNode; pct: numb
           <span className="w-[76px] flex-none text-right text-[12px] font-[650]">{r.value}</span>
         </div>
       ))}
-      {note && <p className="mt-[11px] border-t border-dashed border-border pt-2.5 text-[11.5px] text-subtle-foreground">{note}</p>}
+      {note && <p data-ui="chart-caption" className="mt-[11px] border-t border-dashed border-border pt-2.5 text-[11.5px] text-subtle-foreground max-md:hidden">{note}</p>}
     </>
   );
 }
@@ -192,7 +207,7 @@ export function Mini({ pct, label, color }: { pct: number; label: ReactNode; col
 /** An approval or stage chain: done, the current step, and what is still to come. */
 export function Chain({ steps }: { steps: Array<{ label: ReactNode; state?: "done" | "now" }> }) {
   return (
-    <div className="flex flex-wrap items-center gap-y-1.5">
+    <div data-copy="content" className="flex flex-wrap items-center gap-y-1.5">
       {steps.map((s, i) => (
         <span key={i} className="flex items-center">
           {i > 0 && (
@@ -221,7 +236,7 @@ export function Chain({ steps }: { steps: Array<{ label: ReactNode; state?: "don
 export function Tile({ title, text, children, className }: { title: ReactNode; text?: ReactNode; children?: ReactNode; className?: string }) {
   return (
     <div className={cn("rounded-xl border border-border bg-card p-[14px]", className)}>
-      <h4 className="mb-[5px] text-[13px]">{title}</h4>
+      <h4 data-ui="title" className="mb-[5px] text-[13px]">{title}</h4>
       {text && <p className="text-[12px] text-muted-foreground">{text}</p>}
       {children && <div className="mt-2.5 flex flex-wrap gap-1.5">{children}</div>}
     </div>
@@ -233,8 +248,8 @@ export function Accordion({ items }: { items: Array<{ title: ReactNode; body: Re
   return (
     <>
       {items.map((a, i) => (
-        <details key={i} open={a.open} className="plus-marker mb-2 overflow-hidden rounded-box border border-border bg-card">
-          <summary className="flex cursor-pointer items-center gap-2 px-[14px] py-[11px] text-[13px] font-semibold">{a.title}</summary>
+        <details key={i} data-copy="content" open={a.open} className="plus-marker mb-2 overflow-hidden rounded-box border border-border bg-card">
+          <summary className="flex cursor-pointer items-center gap-2 px-[14px] py-[11px] text-[13px] font-semibold max-md:min-h-11">{a.title}</summary>
           <div className="pr-[14px] pb-[13px] pl-[34px] text-[12.5px] text-muted-foreground">{a.body}</div>
         </details>
       ))}
@@ -244,7 +259,7 @@ export function Accordion({ items }: { items: Array<{ title: ReactNode; body: Re
 
 /** A quoted line with the yellow rule. */
 export function Quote({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("rounded-r-[9px] border-l-[3px] border-primary bg-muted px-[14px] py-[9px] text-[12.5px] text-muted-foreground", className)}>{children}</div>;
+  return <div data-copy="content" className={cn("rounded-r-[9px] border-l-[3px] border-primary bg-muted px-[14px] py-[9px] text-[12.5px] text-muted-foreground", className)}>{children}</div>;
 }
 
 /** Nothing to show, said plainly, with what to do about it. */
@@ -254,8 +269,8 @@ export function EmptyState({ icon = "ok", title, text, action, bare }: { icon?: 
       <span className="mx-auto mb-[11px] flex size-[46px] items-center justify-center rounded-[14px] bg-accent text-accent-foreground">
         <Icon name={icon} size="m" />
       </span>
-      <h3 className="text-[13.5px]">{title}</h3>
-      {text && <p className="mx-auto mt-[5px] max-w-[44ch] text-[11.5px] text-subtle-foreground">{text}</p>}
+      <h3 data-ui="title" className="text-[13.5px]">{title}</h3>
+      {text && <p data-ui="empty-text" className="mx-auto mt-[5px] max-w-[44ch] text-[11.5px] text-subtle-foreground">{text}</p>}
       {action && <div className="mt-3 flex justify-center gap-2">{action}</div>}
     </div>
   );
@@ -315,7 +330,7 @@ export function IconCard({ icon, title, text, onClick }: { icon: IconName; title
       <span className="flex size-[34px] flex-none items-center justify-center rounded-box bg-accent text-accent-foreground">
         <Icon name={icon} size="m" />
       </span>
-      <b className="text-[13px] font-[650]">{title}</b>
+      <b data-ui="title" className="text-[13px] font-[650]">{title}</b>
       {text && <span className="text-[11.5px] text-subtle-foreground">{text}</span>}
       <i className="absolute top-[14px] right-3 text-subtle-foreground">
         <Icon name="right" className="size-[15px]" />
@@ -331,7 +346,7 @@ export function IconCards({ children, cols = 2 }: { children: ReactNode; cols?: 
 /** A stacked list of tappable rows (mobile lists that open a sheet). */
 export function TapList({ items, flat }: { items: Array<{ key: string; title: ReactNode; sub?: ReactNode; right?: ReactNode; onClick?: () => void }>; flat?: boolean }) {
   return (
-    <div className={cn("mb-3 flex flex-col overflow-hidden bg-card", flat ? "-mx-[14px] border-t border-border" : "rounded-card border border-border")}>
+    <div data-copy="content" className={cn("mb-3 flex flex-col overflow-hidden bg-card", flat ? "-mx-[14px] border-t border-border" : "rounded-card border border-border")}>
       {items.map((it) => (
         <button key={it.key} type="button" onClick={it.onClick} className="flex w-full items-center gap-2.5 border-b border-border px-[13px] py-3 text-left last:border-b-0">
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -348,7 +363,7 @@ export function TapList({ items, flat }: { items: Array<{ key: string; title: Re
 
 /** A small clickable link styled as text. */
 export function TextLink({ className, ...rest }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" className={cn("p-0 font-semibold text-accent-foreground underline underline-offset-2", className)} {...rest} />;
+  return <button type="button" className={cn("inline p-0 font-semibold text-accent-foreground underline underline-offset-2", className)} {...rest} />;
 }
 
 /** "Coming in M6" style card for a screen whose module has not landed. */
@@ -358,7 +373,7 @@ export function Soon({ icon, title, text, bullets }: { icon: IconName; title: Re
       <span className="mx-auto mb-[11px] flex size-[46px] items-center justify-center rounded-[14px] bg-accent text-accent-foreground">
         <Icon name={icon} size="m" />
       </span>
-      <h3 className="text-[16px]">{title}</h3>
+      <h3 data-ui="title" className="text-[16px]">{title}</h3>
       <p className="mt-1.5 max-w-[52ch] text-[12.5px] text-muted-foreground">{text}</p>
       {bullets && (
         <ul className="mx-auto my-4 flex list-none flex-col gap-[7px] p-0 text-left text-[12.5px] text-muted-foreground">

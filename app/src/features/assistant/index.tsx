@@ -15,9 +15,9 @@ import { cn } from "@/lib/cn";
 import { formatDateTime, formatMoneyShort } from "@/lib/format";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
+import { BarsCard, ExportButton, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Form, InlineInput } from "@/components/form";
+import { Form, FormFooter, InlineInput } from "@/components/form";
 
 export default function Assistant({ tab }: ModuleScreenProps) {
   return tab === "history" ? <History /> : <Ask />;
@@ -89,7 +89,7 @@ function Ask() {
       <PageHead title="Praxis AI" sub="Answers from your data, within your permissions" />
       <Card className="max-w-[840px]">
         <div className="flex flex-col gap-3.5">
-          {!turns.length && <p className="py-6 text-center text-[12.5px] text-subtle-foreground">Ask about your operations. Every answer says what it read.</p>}
+          
           {turns.map((t, i) => (
             <div key={i} className="flex flex-col gap-3.5">
               <div className="ml-auto w-fit max-w-[78%] rounded-[12px_12px_4px_12px] border border-border bg-accent px-[13px] py-2.5 text-[13.5px]">{t.q}</div>
@@ -101,31 +101,22 @@ function Ask() {
           <div ref={end} />
         </div>
         <Form className="mt-4 flex gap-2" onSubmit={() => void ask(text)}>
-          <InlineInput className="h-[42px] min-w-0 flex-1 rounded-full border border-input bg-background px-4 text-[13.5px] outline-none focus:border-ring" placeholder="Ask a question" aria-label="Ask Praxis AI" value={text} onChange={setText} />
-          <button type="submit" disabled={busy || text.trim().length < 4} aria-label="Ask" className="on-primary flex size-[42px] flex-none items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Icon name="send" /></button>
+          <InlineInput className="h-[42px] max-md:h-11 min-w-0 flex-1 rounded-full border border-input bg-background px-4 text-[13.5px] outline-none focus:border-ring" placeholder="Ask a question" aria-label="Ask Praxis AI" value={text} onChange={setText} />
+          <button type="submit" disabled={busy || text.trim().length < 4} aria-label="Ask" className="on-primary flex size-[42px] max-md:size-11 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Icon name="send" /></button>
         </Form>
-        <p className="mt-2.5 text-[11.5px] text-subtle-foreground">Praxis AI reads. Every write happens in the module that owns it, by a person.</p>
       </Card>
       <Grid cols={2} className="mt-3">
         <Card>
           <CardHeader title="Try Asking" />
+          <div data-copy="content">
           {(sug.data ?? []).map((q) => (
-            <button key={q} type="button" disabled={busy} onClick={() => void ask(q)} className="mb-1.5 block w-full rounded-box border border-border bg-card px-3 py-2.5 text-left text-[12.5px] transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-2">
+            <button key={q} type="button" disabled={busy} onClick={() => void ask(q)} className="mb-1.5 block w-full rounded-box border border-border bg-card px-3 py-2.5 text-left max-md:min-h-11 text-[12.5px] transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-2">
               {q}
             </button>
           ))}
+          </div>
           {!sug.data && <LoadingRows />}
         </Card>
-        <KvCard
-          title="What It Can and Cannot Do"
-          items={[
-            ["Reads", "Any record you could open yourself"],
-            ["Never reads", "A record your role cannot see. The answer is shorter, not wider"],
-            ["Writes", "Nothing. Not one record, not ever"],
-            ["Cites", "Which tables and how many rows it read, on every answer"],
-            ["Spend", "Metered per month and visible in Settings"],
-          ]}
-        />
       </Grid>
     </>
   );
@@ -154,7 +145,7 @@ function History() {
         search="Search your questions"
         rowKey={(t) => t.turn_id}
         noun="question"
-        empty={{ title: "No questions yet", text: "What you ask Praxis AI is listed here with what it read." }}
+        empty={{ title: "No Questions Yet", text: "What you ask Praxis AI is listed here with what it read." }}
         columns={[
           { key: "q", label: "Question", render: (t) => t.question },
           { key: "a", label: "Asked", render: (t) => formatDateTime(t.asked_at) },
@@ -166,10 +157,9 @@ function History() {
       {s.data && (
         <Grid cols={2} className="mt-3">
           <AreaChart title="Spend per Month, Naira" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} note={`Against a ${formatMoneyShort(s.data.cap)} monthly cap.`} />
-          <BarsCard title="What Gets Asked About" rows={s.data.topics} note="Payroll is asked about least and is the most sensitive. That is the field security working, not disinterest." />
+          <BarsCard title="Questions by Topic" rows={s.data.topics} />
         </Grid>
       )}
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">Every turn is traced: the question, the tables read, the row counts, the tokens and the cost. Spend is capped per month and visible in Settings.</p>
     </>
   );
 }
@@ -179,10 +169,10 @@ function ClearHistory({ close }: { close: () => void }) {
   return (
     <>
       <p className="text-[13px] text-muted-foreground">Your questions and their answers are removed from this list. The spend record stays, for the monthly cap.</p>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={busy} onClick={async () => { setBusy(true); await api.call("DELETE /api/v1/ai/history"); invalidate("/api/v1/ai"); close(); toast("History cleared"); }}>Clear</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={busy} onClick={async () => { setBusy(true); await api.call("DELETE /api/v1/ai/history"); invalidate("/api/v1/ai"); close(); toast("History cleared"); }}>Clear</Button>
+      </FormFooter>
     </>
   );
 }

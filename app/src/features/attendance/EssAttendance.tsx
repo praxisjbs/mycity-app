@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AttendanceEvent, LocationRequestBody, LocationRequest } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
-import { Banner, Chain, EmptyState, KV, Pill } from "@/components/ui/data";
+import { Banner, EmptyState, KV, Pill } from "@/components/ui/data";
 import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
@@ -15,11 +14,11 @@ import { formatDate, formatDateTime, formatMonth, formatTime, todayIso } from "@
 import { hrefFor, useRouter } from "@/lib/router";
 import { DEVICE_TONE } from "./Devices";
 import { CASE_TONE, REQ_TONE } from "./PeopleAttendance";
-import { DateField, Field, FormRow, Input, rules, Select, Textarea, useForm } from "@/components/form";
+import { DateField, Field, FormFooter, rules, SelectField, TextAreaField, TextField, useContractForm } from "@/components/form";
 
 const STATUS: Record<AttendanceEvent["status"], { tone: "ok" | "warn" | "err" | "info" | "neutral"; text: string }> = {
-  on_time: { tone: "ok", text: "On time" }, late: { tone: "warn", text: "Late" }, absent: { tone: "err", text: "Absent" }, leave: { tone: "info", text: "On leave" },
-  review: { tone: "warn", text: "Under review" }, remote: { tone: "ok", text: "Remote" }, weekend: { tone: "ok", text: "Saturday" },
+  on_time: { tone: "ok", text: "On Time" }, late: { tone: "warn", text: "Late" }, absent: { tone: "err", text: "Absent" }, leave: { tone: "info", text: "On Leave" },
+  review: { tone: "warn", text: "Under Review" }, remote: { tone: "ok", text: "Remote" }, weekend: { tone: "ok", text: "Saturday" },
 };
 const hours = (m: number | null) => (m == null ? "None" : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`);
 
@@ -45,12 +44,11 @@ export function MyAttendancePage() {
   const chartRows = [...list.rows].reverse().filter((r) => r.worked_minutes != null);
   const todayCard = t && (
     <Card>
-      <CardHeader title={`Today, ${formatDate(t.date)}`} right={<Pill tone={t.state === "clocked_in" || t.state === "complete" ? "ok" : t.state === "unavailable" ? "info" : "neutral"}>{t.state === "clocked_in" ? "Clocked in" : t.state === "complete" ? "Complete" : t.state === "unavailable" ? "On leave" : "Not clocked in"}</Pill>} />
+      <CardHeader title={`Today, ${formatDate(t.date)}`} right={<Pill tone={t.state === "clocked_in" || t.state === "complete" ? "ok" : t.state === "unavailable" ? "info" : "neutral"}>{t.state === "clocked_in" ? "Clocked in" : t.state === "complete" ? "Complete" : t.state === "unavailable" ? "On Leave" : "Not clocked in"}</Pill>} />
       <KV items={[["Expected location", t.location_label], ["Schedule", `${t.work_pattern} · ${t.shift_start} to ${t.shift_end}`], ["Clock in", t.clock_in_at ? formatTime(t.clock_in_at) : "None"], ["Clock out", t.clock_out_at ? formatTime(t.clock_out_at) : "None"]]} />
-      <p className="mt-[11px] text-[11.5px] text-subtle-foreground">The time recorded is the system time, not your phone’s clock.</p>
     </Card>
   );
-  const chart = chartRows.length > 1 ? <AreaChart title="My Net Hours per Day" values={chartRows.map((r) => Math.round((r.worked_minutes ?? 0) / 6) / 10)} labels={chartRows.map((r) => formatDate(r.date))} note="Saturdays run 09:00 to 15:00, so they show shorter." /> : <EmptyState icon="chart" title="Not enough days yet" text="The chart appears after two complete days." />;
+  const chart = chartRows.length > 1 ? <AreaChart title="Net Hours per Day" values={chartRows.map((r) => Math.round((r.worked_minutes ?? 0) / 6) / 10)} labels={chartRows.map((r) => formatDate(r.date))} note="Saturdays run 09:00 to 15:00, so they show shorter." /> : <EmptyState icon="chart" title="Not Enough Days Yet" text="The chart appears after two complete days." />;
   const events = (
     <Table
       title="My Clock Events"
@@ -128,20 +126,15 @@ export function WorkLocationRequestsPage() {
     });
   return (
     <>
-      <PageHead title="Work Location Requests" sub={`Temporary changes to where you clock in · ${me.display_name}`} actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
+      <PageHead title="Work Location Requests" sub="Temporary clock-in locations" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
       <AckBanner />
       <Grid cols={2}>
         {s ? (
           <Card>
-            <CardHeader title="Where You Clock In Today" />
+            <CardHeader title="Your Location Today" />
             <KV items={[["Arrangement", <><Pill>{s.arrangement}</Pill> {s.profile.split(" · policy")[0]}</>], ["Permanent home", s.home_area ? `Approved home · ${s.home_area} · fixed 100 m geofence` : "None on file"], ["Temporary location", <Pill tone={s.temporary_location.tone}>{s.temporary_location.text}</Pill>], ["Field assignment today", s.field_assignment_today ?? "None"], ["Office", s.office]]} />
           </Card>
         ) : <Card><LoadingRows /></Card>}
-        <Card>
-          <CardHeader title="How a Request Moves" />
-          <Chain steps={[{ label: "Draft" }, { label: "Awaiting manager" }, { label: "Awaiting HR" }, { label: "Approved", state: "done" }, { label: "Expired" }]} />
-          <p className="mt-[11px] text-[11.5px] text-subtle-foreground">An approved temporary location is used by Clock In for its dates. When it ends, your permanent home applies again. Both stay in your history.</p>
-        </Card>
       </Grid>
       <Table
         title="My Requests"
@@ -149,7 +142,7 @@ export function WorkLocationRequestsPage() {
         rowKey={(r) => r.request_id}
         loading={list.loading}
         onRowClick={open}
-        empty={{ icon: "target", title: "No requests yet", text: "Use New Request to ask for a temporary home, a one-day remote day, a client-site visit or a correction." }}
+        empty={{ icon: "target", title: "No Requests Yet", text: "Use New Request to ask for a temporary home, a one-day remote day, a client-site visit or a correction." }}
         columns={[
           { key: "n", label: "Request", render: (r) => r.number },
           { key: "t", label: "Type", render: (r) => r.type },
@@ -165,7 +158,7 @@ export function WorkLocationRequestsPage() {
 }
 
 function RequestForm({ close }: { close: () => void }) {
-  const f = useForm(
+  const f = useContractForm(
     { type: "Remote day", from: "", to: "", address: "", reason: "", evidence: "" },
     { from: rules.required("Pick the first day"), to: (v, a) => (!v ? "Pick the last day" : v < (a.from as string) ? "Ends before it starts" : null), address: rules.min(6, "Enter the address"), reason: rules.min(10, "At least 10 characters") },
   );
@@ -183,18 +176,16 @@ function RequestForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Type"><Select options={TYPES} {...f.field("type")} /></Field>
-      <FormRow>
-        <Field label="From" {...f.field("from")}><DateField {...f.field("from")} min={todayIso()} /></Field>
-        <Field label="To" {...f.field("to")}><DateField {...f.field("to")} min={f.values.from || todayIso()} /></Field>
-      </FormRow>
-      <Field label="Address" {...f.field("address")} info="Homes always use a fixed 100 m geofence. You cannot choose the radius."><Input {...f.field("address")} placeholder="Street, area, city" /></Field>
-      <Field label="Reason" {...f.field("reason")}><Textarea {...f.field("reason")} placeholder="Visiting a client" /></Field>
-      <Field label="Evidence Label"><Input {...f.field("evidence")} placeholder="tenancy-letter.pdf" /></Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <Field label="Type"><SelectField options={TYPES} {...f.field("type")} /></Field>
+      <Field label="From" {...f.field("from")}><DateField {...f.field("from")} min={todayIso()} /></Field>
+      <Field label="To" {...f.field("to")}><DateField {...f.field("to")} min={f.values.from || todayIso()} /></Field>
+      <Field label="Address" {...f.field("address")} info="Homes always use a fixed 100 m geofence. You cannot choose the radius."><TextField {...f.field("address")} placeholder="Street, area, city" /></Field>
+      <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Visiting a client" /></Field>
+      <Field label="Evidence Label"><TextField {...f.field("evidence")} placeholder="tenancy-letter.pdf" /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Submit Request</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Submit Request</Button>
+      </FormFooter>
     </>
   );
 }
@@ -202,10 +193,10 @@ function RequestForm({ close }: { close: () => void }) {
 export function MyDevicesPage() {
   const modal = useModal();
   const list = usePaged("GET /api/v1/attendance/devices", { filters: { scope: "own" } });
-  const active = list.rows.filter((d) => d.status === "Enrolled" || d.status === "Pending review").length;
+  const active = list.rows.filter((d) => d.status === "Enrolled" || d.status === "Pending Review").length;
   return (
     <>
-      <PageHead title="My Devices" sub="The phones and laptops you clock in from, up to three" actions={<Button variant="primary" icon="plus" disabled={active >= 3} onClick={() => modal.open({ title: "Register This Device", body: (close) => <DeviceForm close={close} /> })}>Register This Device</Button>} />
+      <PageHead title="My Devices" sub="Phones and laptops you clock in from" actions={<Button variant="primary" icon="plus" disabled={active >= 3} onClick={() => modal.open({ title: "Register This Device", body: (close) => <DeviceForm close={close} /> })}>Register This Device</Button>} />
       <AckBanner />
       {active >= 3 && <Banner tone="info" icon="info">You have three devices. Ask People to remove one before registering another.</Banner>}
       <Table
@@ -213,7 +204,7 @@ export function MyDevicesPage() {
         rows={list.rows}
         rowKey={(d) => d.device_id}
         loading={list.loading}
-        empty={{ icon: "lock", title: "No devices yet", text: "The device you clock in from is recorded on your first punch." }}
+        empty={{ icon: "lock", title: "No Devices Yet", text: "The device you clock in from is recorded on your first punch." }}
         columns={[
           { key: "n", label: "Device", render: (d) => d.name },
           { key: "f", label: "First Seen", render: (d) => formatDate(d.first_seen) },
@@ -230,17 +221,16 @@ export function MyDevicesPage() {
 function DeviceForm({ close }: { close: () => void }) {
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const guess = `${/iPhone/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android phone" : /Mac/.test(ua) ? "Mac" : "This computer"} · ${/Edg\//.test(ua) ? "Edge" : /Chrome/.test(ua) ? "Chrome" : /Safari/.test(ua) ? "Safari" : "Browser"}`;
-  const [name, setName] = useState(guess);
-  const [why, setWhy] = useState("");
+  const f = useContractForm({ name: guess, why: "" }, { name: rules.required("Name the device") });
   const save = useMutation("POST /api/v1/attendance/devices");
   return (
     <>
-      <Field label="Device Name" state={name.trim() ? "good" : "bad"} message="Name the device"><Input value={name} onChange={setName} /></Field>
-      <Field label="Reason"><Input value={why} onChange={setWhy} placeholder="Replaced broken phone" /></Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <Field label="Device Name" {...f.field("name")}><TextField {...f.field("name")} /></Field>
+      <Field label="Reason" optional><TextField {...f.field("why")} placeholder="Replaced broken phone" /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={!name.trim() || save.pending} onClick={async () => { try { await save.run({ body: { name, reason: why } }); invalidate("/api/v1/attendance/devices"); close(); toast("Sent to People for review"); } catch { toast(save.error?.message ?? "Not registered"); } }}>Send for Review</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={async () => { if (!f.check()) return; try { await save.run({ body: { name: f.values.name, reason: f.values.why } }); invalidate("/api/v1/attendance/devices"); close(); toast("Sent to People for review"); } catch { toast(save.error?.message ?? "Not registered"); } }}>Send for Review</Button>
+      </FormFooter>
     </>
   );
 }
@@ -273,16 +263,15 @@ export function PolicyUpdatesPage() {
     <>
       <PageHead title="Policy Updates" sub={`Attendance policy · ${me.display_name}`} />
       <div className="mb-3 rounded-card border border-border bg-background px-[15px] py-[13px]">
-        <div className="mb-1.5 flex items-center gap-2 text-[11.5px] text-subtle-foreground">
-          <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-bell" /></svg>Attendance policy updated · {formatDateTime(p.published_at)}
+        <h4 data-ui="title" className="text-[14.5px]">Policy v{p.version}</h4>
+        <div data-copy="content">
+          <p className="mt-[5px] text-[13px] leading-normal text-muted-foreground">{p.summary}</p>
+          <ul className="mt-2 list-disc pl-5 text-[12.5px] text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>
         </div>
-        <h4 className="text-[14.5px]">Attendance Policy Updated</h4>
-        <p className="mt-[5px] text-[13px] leading-normal text-muted-foreground">{p.summary}</p>
-        <ul className="mt-2 list-disc pl-5 text-[12.5px] text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button onClick={read}>Read Full Policy</Button>
           {!p.acknowledged_at && (
-            <Button variant="primary" icon="ok" disabled={ack.pending} onClick={async () => (await ack.run({ params: { version: String(p.version) }, body: {} }), invalidate("/api/v1/attendance"), toast(`Policy v${p.version} acknowledged`))}>
+            <Button variant="primary" icon="ok" busy={ack.pending} onClick={async () => (await ack.run({ params: { version: String(p.version) }, body: {} }), invalidate("/api/v1/attendance"), toast(`Policy v${p.version} acknowledged`))}>
               Acknowledge
             </Button>
           )}
@@ -294,7 +283,7 @@ export function PolicyUpdatesPage() {
           <KV items={[["Current version", `v${p.version}`], ["Published", formatDate(p.published_at)], ["Published by", p.published_by], ["Clock-in while pending", p.settings.find((s) => s.key === "ack_blocks")?.value ? "Blocked until acknowledged" : "Allowed, with a reminder"]]} />
         </Card>
         <Card>
-          <CardHeader title="Full Policy, at a Glance" />
+          <CardHeader title="Full Policy" />
           <KV items={p.settings.filter((s) => ["grace", "mode_remote", "mode_office", "dev_warn_new", "late_rule"].includes(s.key)).map((s) => [s.label, String(typeof s.value === "boolean" ? (s.value ? "On" : "Off") : s.kind === "mode" ? { record: "Record only", warn: "Warn", block: "Block" }[s.value as string] : s.value)])} />
         </Card>
       </Grid>

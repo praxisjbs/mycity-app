@@ -30,7 +30,7 @@ export function MyPerformancePage() {
         </>
       ),
     });
-  const kpis = <Card><CardHeader title="My KPIs This Month" /><Bars rows={p.kpis.map((k) => ({ ...k, color: k.emphasis === "brand" ? "var(--primary)" : k.emphasis === "warn" ? "var(--chart-4)" : undefined }))} note="Weighted. Your score updates as tasks against each KPI close." /></Card>;
+  const kpis = <Card><CardHeader title="My KPIs This Month" /><Bars rows={p.kpis.map((k) => ({ ...k, color: k.emphasis === "brand" ? "var(--primary)" : k.emphasis === "warn" ? "var(--chart-4)" : undefined }))} note="Weighted by KPI" /></Card>;
   const chain = (
     <Card>
       <CardHeader title="Rolls Up To" />
@@ -42,7 +42,6 @@ export function MyPerformancePage() {
           </div>
         ))}
       </div>
-      <p className="mt-[11px] text-[11.5px] text-subtle-foreground">Five levels. You can see the whole chain above your own line.</p>
     </Card>
   );
   return (
@@ -65,7 +64,6 @@ export function MyPerformancePage() {
         <Grid cols={2}>{kpis}{chain}</Grid>
         <Table
           title="My Reviews"
-          right={<span className="text-[11.5px] text-subtle-foreground">Click a review to open it</span>}
           rows={p.reviews}
           rowKey={(r) => r.review_id}
           onRowClick={open}

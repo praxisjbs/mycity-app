@@ -9,7 +9,7 @@ import { Pager } from "@/components/ui/Table";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { useRouter } from "@/lib/router";
-import { Seg } from "@/components/form";
+import { ChoiceField } from "@/components/form";
 
 /**
  * The bell: things that happened to you. Read once and gone. Unresolved
@@ -35,10 +35,10 @@ function BellBody({ close }: { close: () => void }) {
   return (
     <>
       <div className="mb-2.5">
-        <Seg value={view} onChange={setView} options={[["all", "All"], ["unread", "Unread"]]} />
+        <ChoiceField value={view} onChange={setView} options={[["all", "All"], ["unread", "Unread"]]} />
       </div>
       {list.rows.length === 0 && !list.loading ? (
-        <EmptyState bare icon="bell" title="Nothing yet" text="New notifications appear here." />
+        <EmptyState bare icon="bell" title="Nothing Yet" text="New notifications appear here." />
       ) : (
         list.rows.map((n: Notification) => (
           <div key={n.notification_id} className="flex flex-wrap items-center gap-2.5 border-b border-border py-[9px] last:border-b-0">
@@ -69,7 +69,7 @@ function BellFoot({ close }: { close: () => void }) {
   const read = useMutation("POST /api/v1/notifications/read-all");
   return (
     <>
-      <Button disabled={read.pending} onClick={() => read.run({ body: {} }).then(() => invalidate("/api/v1/notifications"))}>
+      <Button busy={read.pending} onClick={() => read.run({ body: {} }).then(() => invalidate("/api/v1/notifications"))}>
         Mark All as Read
       </Button>
       <Button variant="primary" onClick={close}>

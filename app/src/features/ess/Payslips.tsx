@@ -30,15 +30,15 @@ export function MyPayslipsPage() {
   const years = s?.years ?? [];
   const idx = years.indexOf(Number(y));
   const yearPicker = s && (
-    <span className="inline-flex h-[34px] items-center overflow-hidden rounded-full border border-input bg-background">
-      <button type="button" aria-label="Previous year" disabled={idx >= years.length - 1} onClick={() => setYear(String(years[idx + 1]))} className="h-full px-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-35">‹</button>
+    <span className="inline-flex h-[34px] max-md:h-[46px] items-center overflow-hidden rounded-full border border-input bg-background">
+      <button type="button" aria-label="Previous year" disabled={idx >= years.length - 1} onClick={() => setYear(String(years[idx + 1]))} className="h-full px-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-35 max-md:min-w-11">‹</button>
       <InlineSelect aria-label="Year" value={y ?? ""} onChange={setYear} options={years.map(String)} className="h-full border-x border-border bg-background px-2.5 text-[12.5px] font-[650]" />
-      <button type="button" aria-label="Next year" disabled={idx <= 0} onClick={() => setYear(String(years[idx - 1]))} className="h-full px-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-35">›</button>
+      <button type="button" aria-label="Next year" disabled={idx <= 0} onClick={() => setYear(String(years[idx - 1]))} className="h-full px-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-35 max-md:min-w-11">›</button>
     </span>
   );
   const openSlip = (r: PayslipRow) =>
     r.status === "in_run"
-      ? modal.open({ title: formatMonth(r.period), body: <EmptyState icon="clock" title="In this month’s run" text="It appears once the run is approved." /> })
+      ? modal.open({ title: formatMonth(r.period), body: <EmptyState icon="clock" title="In This Month’s Run" text="It appears once the run is approved." /> })
       : modal.open({ title: `Payslip, ${formatMonth(r.period)}`, wide: true, body: <SlipPaper id={r.payslip_id} /> });
   return (
     <>
@@ -48,7 +48,7 @@ export function MyPayslipsPage() {
         actions={
           <>
             {yearPicker}
-            <Button onClick={() => sel && email.run({ params: { id: sel.payslip_id }, body: {} }).then(() => toast("Sent to your work email"))}>Email Me a Copy</Button>
+            <Button onClick={() => sel && email.run({ params: { id: sel.payslip_id }, body: {} }).then(() => toast("Sent to your work email"))}>Email a Copy</Button>
             <Button variant="primary" onClick={() => toast(`Zipping ${s?.year} payslips. They arrive in Mailbox.`)}>Download All</Button>
           </>
         }
@@ -82,7 +82,6 @@ export function MyPayslipsPage() {
         <Grid cols="1/1.5">
           <Table
             title={`Payslips, ${y ?? ""}`}
-            right={<span className="text-[11.5px] text-subtle-foreground">Click a month to preview it</span>}
             rows={list.rows}
             rowKey={(r) => r.payslip_id}
             loading={list.loading}
@@ -116,7 +115,7 @@ export function SlipPaper({ id }: { id: string }) {
       </div>
       <p className="!mt-[14px] text-[11px] text-paper-faint">Paid to {s.bank_name}, account ending {s.account_last4}.</p>
       <PaperFoot>
-        <span>{s.approved_by ? `Approved by ${s.approved_by}` : "Awaiting approval"}</span>
+        <span>{s.approved_by ? `Approved by ${s.approved_by}` : "Awaiting Approval"}</span>
         <span className="ml-auto">{s.number}</span>
       </PaperFoot>
     </Paper>
@@ -132,7 +131,7 @@ function Deductions() {
         rows={list.rows}
         rowKey={(r) => r.period}
         loading={list.loading}
-        empty={{ title: "No deductions", text: "Nothing has ever been deducted from your pay." }}
+        empty={{ title: "No Deductions", text: "Nothing has ever been deducted from your pay." }}
         columns={[
           { key: "m", label: "Month", render: (r) => formatMonth(r.period) },
           { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
@@ -142,7 +141,6 @@ function Deductions() {
         ]}
         footer={<Pager page={list.page} onPage={list.setPage} noun="deduction" />}
       />
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">A deduction always starts as a query. It reaches your payslip only if the query is upheld.</p>
       <Button className="mt-3" onClick={() => navigate(hrefFor("ess", "my-queries"))}>Open My Queries</Button>
     </>
   );
