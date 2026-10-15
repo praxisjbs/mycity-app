@@ -46,6 +46,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Gates 8 and 11 crawl the staff app's demo build (in-browser mock API);
+      # scripts/check/lib/screens.js builds it from these packages.
+      - name: Install the staff app
+        run: npm ci --prefix app
+
       # Gates 8 and 11 open every screen at phone and desktop size
       # (scripts/check/lib/screens.js). The browser matches the pinned
       # playwright version in package-lock.json.
@@ -58,8 +63,3 @@ jobs:
           # Set to "1" once M0 is complete: a gate whose script is still empty
           # then fails the run instead of being reported as NOT BUILT.
           CI_STRICT: "0"
-
-      # Gates 8 and 11 crawl the staff app's demo build (in-browser mock API);
-      # scripts/check/lib/screens.js builds it from these packages.
-      - name: Install the staff app
-        run: npm ci --prefix app
