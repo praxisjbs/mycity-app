@@ -29,7 +29,7 @@ describe("Icon", () => {
     const svgs = container.querySelectorAll("svg");
     expect(svgs).toHaveLength(ICON_NAMES.length);
     svgs.forEach((svg) => expect(svg).toHaveAttribute("stroke", "currentColor"));
-    expect(ICON_NAMES).toHaveLength(44);
+    expect(ICON_NAMES).toHaveLength(55);
   });
 
   it("lets a class override the size box", () => {

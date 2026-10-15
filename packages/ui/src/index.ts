@@ -17,3 +17,4 @@ export * from "./feedback";
 export * from "./form";
 export * from "./data";
 export * from "./illustrations";
+export * from "./shell";
