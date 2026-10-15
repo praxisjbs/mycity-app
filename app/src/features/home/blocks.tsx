@@ -6,7 +6,7 @@ import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, CardHeader, Grid } from "@/components/ui/layout";
 import { Money } from "@/components/ui/Money";
 import { Table } from "@/components/ui/Table";
-import { formatDate } from "@/lib/format";
+import { formatDate } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 import { useKpiDetail } from "./KpiDetail";
 

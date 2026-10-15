@@ -5,15 +5,13 @@ import "@/api/types/attendance";
 import "@/api/types/settings";
 import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
 import type { PolicyAck } from "@/api/types/settings";
-import { Button } from "@/components/ui/Button";
+import { Button, cn, formatDate, formatDateTime } from "@mycity/ui";
 import { Banner, Pill, Who } from "@/components/ui/data";
 import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDate, formatDateTime } from "@/lib/format";
 import { ModalFoot, PagedTable } from "@/features/shared/sections";
 import { Field, InlineInput, Switch, Textarea } from "@/components/form";
 

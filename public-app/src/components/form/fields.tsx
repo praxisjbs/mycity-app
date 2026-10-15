@@ -1,6 +1,5 @@
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
-import { cn } from "@/lib/cn";
-import { Icon } from "@/components/Icon";
+import { cn, Icon } from "@mycity/ui";
 
 /** Label, control and its inline mark (gate 12: a mark on the field, never a dialog). */
 export function Field({ label, htmlFor, state, message, children, hint }: { label: ReactNode; htmlFor?: string; state?: "bad" | "good"; message?: ReactNode; hint?: ReactNode; children: ReactNode }) {

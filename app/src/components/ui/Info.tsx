@@ -1,6 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
-import { cn } from "@/lib/cn";
-import { Icon } from "./Icon";
+import { cn, Icon } from "@mycity/ui";
 
 /**
  * Long text behind an ⓘ (gate 8, FRONTEND_GUIDE §5).

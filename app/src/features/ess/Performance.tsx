@@ -5,7 +5,7 @@ import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/l
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
-import { cn } from "@/lib/cn";
+import { cn } from "@mycity/ui";
 
 export function MyPerformancePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/performance");

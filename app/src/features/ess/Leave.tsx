@@ -1,7 +1,7 @@
 import { useApi, usePaged, useMutation, invalidate } from "@/api/hooks";
 import type { LeaveRequest } from "@/api/types/leave";
 import "@/api/types/leave";
-import { Button } from "@/components/ui/Button";
+import { Button, formatDate } from "@mycity/ui";
 import { Kpi, KV, Pill, TapList } from "@/components/ui/data";
 import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
@@ -10,7 +10,6 @@ import { Pager, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { LEAVE_TONE, LeaveForm } from "@/features/people/Leave";
-import { formatDate } from "@/lib/format";
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--input)"];
 

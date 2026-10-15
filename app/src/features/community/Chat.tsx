@@ -2,11 +2,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointer
 import { api } from "@/api/client";
 import type { Message, MessageCreate } from "@/api/types/community";
 import type { PageMeta } from "@/api/types/common";
-import { Button, IconButton } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
-import { cn } from "@/lib/cn";
-import { formatDate, todayIso } from "@/lib/format";
-import { useIsMobile } from "@/lib/media";
+import { Button, cn, formatDate, Icon, IconButton, todayIso, useIsMobile } from "@mycity/ui";
 import { Post } from "./Posts";
 import { InlineInput } from "@/components/form";
 

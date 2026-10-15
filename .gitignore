@@ -24,3 +24,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .claude/worktrees/
+
+# The component gallery build (npm -w @mycity/ui run build)
+dist-gallery/

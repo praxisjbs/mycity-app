@@ -1,10 +1,9 @@
 import { useEffect } from "react";
-import { IconSprite } from "@/components/Icon";
+import { Button } from "@mycity/ui";
 import { Message, Page } from "@/components/Layout";
 import { ComingSoon, ViewBar } from "@/components/Planned";
 import { StagingBar } from "@/components/StagingBar";
 import { useIsProduction, useScreenState } from "@/lib/plan";
-import { Button } from "@/components/ui";
 import { parse, RouterProvider, useRouter } from "@/lib/router";
 import { Apply } from "@/pages/Apply";
 import { Assessment } from "@/pages/Assessment";
@@ -17,7 +16,6 @@ import { Verify } from "@/pages/Verify";
 export function App() {
   return (
     <RouterProvider>
-      <IconSprite />
       <StagingBar />
       <Preview />
       <Routes />

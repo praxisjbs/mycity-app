@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
-import { cn } from "@/lib/cn";
-import { Icon } from "@/components/ui/Icon";
+import { cn, Icon } from "@mycity/ui";
 import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 
 /**

@@ -1,9 +1,7 @@
-import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format";
+import { Button, cn, formatDate, Icon } from "@mycity/ui";
 import { currentMilestone, milestone, useView } from "@/lib/plan";
-import { Icon } from "./Icon";
 import { Page } from "./Layout";
-import { Button, Pill, Sub } from "./ui";
+import { Pill, Sub } from "./ui";
 
 /** What each page will do, on its Coming Soon card. From the page as built and MILESTONES §9, §10. */
 const COMING: Record<string, string[]> = {

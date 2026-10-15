@@ -3,11 +3,9 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { AssessmentQuestion, AssessmentSession } from "@/api/types/public";
-import { Icon } from "@/components/Icon";
+import { Button, cn, formatDate, Icon } from "@mycity/ui";
 import { Message, Page } from "@/components/Layout";
-import { Button, Loading, Notice, Sub } from "@/components/ui";
-import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format";
+import { Loading, Notice, Sub } from "@/components/ui";
 import { LinkProblem } from "./LinkProblem";
 import { Textarea } from "@/components/form";
 

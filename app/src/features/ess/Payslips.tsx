@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PayslipRow } from "@/api/types/payroll";
 import "@/api/types/payroll";
-import { Button } from "@/components/ui/Button";
+import { Button, formatDate, formatMoney, formatMonth } from "@mycity/ui";
 import { EmptyState, Pill, TapList } from "@/components/ui/data";
 import { Card, DesktopOnly, Grid, MobileOnly, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
@@ -10,7 +10,6 @@ import { Money } from "@/components/ui/Money";
 import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
 import { ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { formatDate, formatMoney, formatMonth } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
 import { InlineSelect } from "@/components/form";
 

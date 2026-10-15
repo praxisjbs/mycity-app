@@ -1,0 +1,52 @@
+/*
+ * Element defaults for both apps: the typeface, body text at the density's
+ * size, the focus ring from --ring, slim scrollbars tinted for the theme, and
+ * no motion for a person who asked for none (F6).
+ */
+@import "@fontsource-variable/geist";
+
+@layer base {
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+  /* On the Deep Green panels the ring is the brand yellow, as in the dark theme. */
+  .on-dark :focus-visible { outline-color: var(--primary); }
+  h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -.016em; }
+  p { margin: 0; }
+  summary { list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  input::placeholder, textarea::placeholder { color: var(--subtle-foreground); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--sb); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--sb-hover); }
+  ::-webkit-scrollbar-button { display: none; }
+  @supports (-moz-appearance: none) { * { scrollbar-width: thin; scrollbar-color: var(--sb) transparent; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}

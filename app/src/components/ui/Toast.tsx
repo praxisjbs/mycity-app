@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { Icon } from "./Icon";
+import { Icon } from "@mycity/ui";
 
 /**
  * Short confirmations ("Saved", "Sent"). Never a native alert (gate 16).

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { IconCard, IconCards } from "@/components/ui/data";
-import type { IconName } from "@/components/ui/Icon";
+import { type IconName } from "@mycity/ui";
 import { MobileOnly } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 

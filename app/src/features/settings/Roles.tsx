@@ -4,13 +4,12 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
 import type { AccessCatalogue, RecordScope, Role, RoleAction, RoleBody, RoleDetail, RoleGrant } from "@/api/types/settings";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
+import { Button, cn } from "@mycity/ui";
 import { Banner, Pill } from "@/components/ui/data";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
 import { KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
 import { Field, Input, Seg, Switch } from "@/components/form";
 

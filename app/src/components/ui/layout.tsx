@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@mycity/ui";
 
 /** The raised panel every section sits in. */
 export function Card({ className, pad = true, ...rest }: HTMLAttributes<HTMLDivElement> & { pad?: boolean }) {

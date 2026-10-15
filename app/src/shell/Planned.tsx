@@ -1,9 +1,6 @@
-import { Button } from "@/components/ui/Button";
+import { Button, cn, formatDate, Icon } from "@mycity/ui";
 import { Pill } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
 import { Card, PageHead } from "@/components/ui/layout";
-import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format";
 import { currentMilestone, milestone, useView } from "@/lib/plan";
 import { COMING } from "./coming-soon";
 

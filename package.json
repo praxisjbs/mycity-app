@@ -10,7 +10,9 @@
     "node": ">=20.19 <21"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "app",
+    "public-app"
   ],
   "scripts": {
     "ci": "node scripts/ci-local.js",
@@ -26,6 +28,8 @@
     "db:create-admin": "node scripts/db/create-admin.js",
     "gen:contract": "node scripts/gen/contract.js",
     "gen:env": "node scripts/gen/env-example.js",
+    "gen:components": "node scripts/gen/components.js",
+    "new:component": "node scripts/new-component.js",
     "check:pagination": "node scripts/check/pagination.js",
     "check:five-second": "node scripts/check/five-second.js",
     "check:two-shells": "node scripts/check/two-shells.js",
@@ -34,7 +38,12 @@
     "check:progress": "node scripts/check/progress.js",
     "check:guides": "node scripts/check/guides.js",
     "check:readme-map": "node scripts/check/readme-map.js",
-    "check:codeowners": "node scripts/check/codeowners.js"
+    "check:codeowners": "node scripts/check/codeowners.js",
+    "gallery": "npm -w @mycity/ui run gallery",
+    "fe:typecheck": "npm run typecheck -w @mycity/ui -w @mycity/app -w @mycity/public-app",
+    "fe:lint": "npm run lint -w @mycity/ui -w @mycity/app -w @mycity/public-app",
+    "fe:test": "npm run test -w @mycity/ui -w @mycity/app -w @mycity/public-app",
+    "fe:build": "npm run build -w @mycity/ui -w @mycity/app -w @mycity/public-app"
   },
   "dependencies": {
     "@mycity/contract": "file:packages/contract",
@@ -68,6 +77,7 @@
     "globals": "^17.13.0",
     "jest": "^30.5.2",
     "playwright": "1.56.1",
-    "supertest": "^7.3.1"
+    "supertest": "^7.3.1",
+    "typescript": "5.9.3"
   }
 }

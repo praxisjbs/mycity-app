@@ -3,7 +3,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { FieldAssignment, LocationRequest, ReconCase, RegisterRow } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
+import { Button, cn, formatDate, Icon } from "@mycity/ui";
 import { AreaChart, Donut } from "@/components/ui/charts";
 import { Banner, EmptyState, KV, Pill, StatStrip, Who } from "@/components/ui/data";
 import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
@@ -13,8 +13,6 @@ import { BackButton } from "@/components/ui/Profile";
 import { Chips, ErrorBlock, LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format";
 import { useSearchParams } from "@/lib/router";
 import { DateField, Field, FormRow, Input, PersonPicker, rules, SearchBox, Seg, Select, Textarea, useForm } from "@/components/form";
 
@@ -437,7 +435,7 @@ function Row({ icon, title, sub, children }: { icon: "target" | "alert" | "brief
   return (
     <div className="flex flex-wrap items-center gap-2.5 border-b border-border py-[9px] last:border-b-0">
       <span className="flex size-[30px] flex-none items-center justify-center rounded-ctl bg-accent text-accent-foreground">
-        <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href={`#i-${icon}`} /></svg>
+        <Icon name={icon} />
       </span>
       <span className="flex min-w-[180px] flex-1 flex-col gap-0.5">
         <b className="text-[12.5px] font-semibold">{title}</b>

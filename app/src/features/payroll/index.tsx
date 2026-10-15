@@ -4,17 +4,15 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
 import type { Grade, PayrollDeduction, PayslipRow, RunRow } from "@/api/types/payroll";
 import type { PersonRef } from "@/api/types/common";
-import { Button } from "@/components/ui/Button";
+import { Button, formatMoneyShort, formatMonth, Icon, todayIso } from "@mycity/ui";
 import { AreaChart, Bands } from "@/components/ui/charts";
 import { Banner, Chain, Quote, StatStrip, Who } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { Money } from "@/components/ui/Money";
 import { LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 
-import { formatMoneyShort, formatMonth, todayIso } from "@/lib/format";
 import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill } from "@/features/shared/sections";

@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { cn } from "@/lib/cn";
+import { cn, IconButton } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
-import { IconButton } from "./Button";
 
 /**
  * THE modal (FRONTEND_GUIDE §8: one modal, used everywhere). On a phone it is a

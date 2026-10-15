@@ -2,7 +2,7 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AttendanceEvent, LocationRequestBody, LocationRequest } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
+import { Button, Icon, formatDate, formatDateTime, formatMonth, formatTime, todayIso } from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
 import { Banner, Chain, EmptyState, KV, Pill } from "@/components/ui/data";
 import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
@@ -11,7 +11,6 @@ import { ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PhoneCards } from "@/features/shared/PhoneCards";
-import { formatDate, formatDateTime, formatMonth, formatTime, todayIso } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
 import { DEVICE_TONE } from "./Devices";
 import { CASE_TONE, REQ_TONE } from "./PeopleAttendance";
@@ -274,7 +273,7 @@ export function PolicyUpdatesPage() {
       <PageHead title="Policy Updates" sub={`Attendance policy · ${me.display_name}`} />
       <div className="mb-3 rounded-card border border-border bg-background px-[15px] py-[13px]">
         <div className="mb-1.5 flex items-center gap-2 text-[11.5px] text-subtle-foreground">
-          <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-bell" /></svg>Attendance policy updated · {formatDateTime(p.published_at)}
+          <Icon name="bell" />Attendance policy updated · {formatDateTime(p.published_at)}
         </div>
         <h4 className="text-[14.5px]">Attendance Policy Updated</h4>
         <p className="mt-[5px] text-[13px] leading-normal text-muted-foreground">{p.summary}</p>

@@ -40,6 +40,7 @@ const bin = (pkg, rel) => path.join(ROOT, "node_modules", pkg, rel);
  * script  repo-relative script, run with node; empty file = NOT BUILT
  * args    extra arguments
  * tool    [package, bin path] for a dependency's CLI (eslint, jest)
+ * npm     an npm script to run (the frontend workspaces' typecheck, lint, test, build)
  */
 const GATES = [
   // Gates 1 to 8 (M0)
@@ -72,6 +73,13 @@ const GATES = [
   { id: "shell", label: "Shell scripts LF and parse", script: "scripts/check/shell.js" },
   { id: "pagination", label: "Every list pages at 25", script: "scripts/check/pagination.js" },
   { id: "provenance", label: "Code never names its origin project", script: "scripts/check/provenance.js" },
+  // Frontend: the design system and both apps (packages/ui, app, public-app)
+  { id: "components-catalogue", label: "Component catalogue is generated and current", script: "scripts/gen/components.js", args: ["--check"] },
+  { id: "components", label: "Every component documented, tested, in the gallery", script: "scripts/check/components.js" },
+  { id: "fe-typecheck", label: "Frontend typecheck", npm: "fe:typecheck" },
+  { id: "fe-lint", label: "Frontend lint", npm: "fe:lint" },
+  { id: "fe-test", label: "Frontend tests", npm: "fe:test" },
+  { id: "fe-build", label: "Frontend build (gallery, app, public site)", npm: "fe:build" },
   // Process: the work is recorded where the team reads it
   { id: "progress", label: "PROGRESS.md updated and well formed", script: "scripts/check/progress.js" },
   { id: "guides", label: "Feature guides followed and complete", script: "scripts/check/guides.js" },
@@ -85,7 +93,22 @@ function isEmpty(rel) {
   return fs.readFileSync(file, "utf8").trim() === "";
 }
 
+/** npm's own CLI, run with this node: the one that launched us, else the one installed beside node. */
+function npmCli() {
+  const candidates = [
+    process.env.npm_execpath,
+    path.join(path.dirname(process.execPath), "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js"),
+  ];
+  return candidates.find((f) => f && /npm-cli\.js$/.test(f) && fs.existsSync(f)) || null;
+}
+
 function command(gate) {
+  if (gate.npm) {
+    const cli = npmCli();
+    if (!cli) return { missing: "npm's CLI was not found beside node" };
+    return { argv: [cli, "run", gate.npm] };
+  }
   if (gate.tool) {
     const [pkg, rel] = gate.tool;
     const file = bin(pkg, rel);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { MyDocument } from "@/api/types/ess";
-import { Button } from "@/components/ui/Button";
+import { Button, formatDate } from "@mycity/ui";
 import { KV, Pill, StatStrip, TapList } from "@/components/ui/data";
 import { Card, CardHeader, DesktopOnly, Grid, MobileOnly, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
@@ -9,7 +9,6 @@ import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components
 import { Pager, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { useMe } from "@/auth/AuthProvider";
-import { formatDate } from "@/lib/format";
 import { Field, Input, Upload } from "@/components/form";
 
 export function MyDocumentsPage() {

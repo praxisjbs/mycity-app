@@ -1,12 +1,11 @@
 import { useApi } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
+import { Button, formatDate } from "@mycity/ui";
 import { Bars, KV, Pill, StatStrip, Timeline } from "@/components/ui/data";
 import { Card, CardHeader, Grid } from "@/components/ui/layout";
 import { Money } from "@/components/ui/Money";
 import { BackButton, ProfileHeader } from "@/components/ui/Profile";
 import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { formatDate } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
 import { AttendanceSetupCard } from "./EmployeeDetails";
 

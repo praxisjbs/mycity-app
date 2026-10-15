@@ -2,13 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailAttachment, MailDraftSave } from "@/api/types/mailbox";
-import { Button } from "@/components/ui/Button";
+import { Button, cn, formatBytes, formatDate, Icon, todayIso } from "@mycity/ui";
 import { Pill } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
 import { Menu } from "@/components/ui/Menu";
 import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatBytes, formatDate, todayIso } from "@/lib/format";
 import { DateField, Field, InlineInput, InlineLabel, InlineSelect, Input, Upload } from "@/components/form";
 
 export interface ComposeInit {

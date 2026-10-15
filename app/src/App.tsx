@@ -1,6 +1,6 @@
+import { Icon } from "@mycity/ui";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { Login } from "@/auth/Login";
-import { IconSprite } from "@/components/ui/Icon";
 import { ModalProvider } from "@/components/ui/Modal";
 import { Toasts } from "@/components/ui/Toast";
 import { RouterProvider } from "@/lib/router";
@@ -13,7 +13,6 @@ export function App() {
     <RouterProvider>
       <AuthProvider>
         <ModalProvider>
-          <IconSprite />
           <StagingBar />
           <Gate />
           <Toasts />
@@ -35,9 +34,7 @@ function Gate() {
 function Splash() {
   return (
     <div className="flex h-full items-center justify-center bg-deep" aria-busy="true" aria-label="Loading MyCity App">
-      <svg viewBox="0 0 24 24" className="size-12 animate-pulse text-primary" aria-hidden="true">
-        <use href="#i-pin" />
-      </svg>
+      <Icon name="pin" className="size-12 animate-pulse text-primary" />
     </div>
   );
 }

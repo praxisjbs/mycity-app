@@ -2,9 +2,8 @@ import { useState } from "react";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
-import { cn } from "@/lib/cn";
+import { cn, Icon } from "@mycity/ui";
 import { Avatar } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
 import { SearchBox } from "./Search";
 
 /**

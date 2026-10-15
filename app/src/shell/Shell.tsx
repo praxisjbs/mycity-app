@@ -1,16 +1,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMe, useAuth } from "@/auth/AuthProvider";
-import { IconButton } from "@/components/ui/Button";
+import { cn, Icon, IconButton, useIsMobile, useTheme } from "@mycity/ui";
 import { Avatar } from "@/components/ui/data";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { Icon } from "@/components/ui/Icon";
 import { Menu } from "@/components/ui/Menu";
 import { LoadingRows } from "@/components/ui/Table";
 import { ClockButton } from "@/features/attendance/ClockButton";
-import { cn } from "@/lib/cn";
-import { useIsMobile } from "@/lib/media";
 import { hrefFor, Link, moduleKeyOf, useRouter } from "@/lib/router";
-import { useTheme } from "@/lib/theme";
 import { useApi } from "@/api/hooks";
 import { visibleModules, visibleTabs } from "./access";
 import { MOBILE_BAR, moduleByKey, type ModuleDef, type TabDef } from "./catalogue";

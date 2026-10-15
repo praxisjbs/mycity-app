@@ -2,11 +2,9 @@ import { useState, type ReactNode } from "react";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { VerifyResult } from "@/api/types/public";
-import { Icon } from "@/components/Icon";
+import { Button, cn, formatDate, formatTime, Icon } from "@mycity/ui";
 import { Brand, Page } from "@/components/Layout";
-import { Button, Loading, Pill, Sub } from "@/components/ui";
-import { cn } from "@/lib/cn";
-import { formatDate, formatTime } from "@/lib/format";
+import { Loading, Pill, Sub } from "@/components/ui";
 import { useRouter } from "@/lib/router";
 import { Field, Form, Input } from "@/components/form";
 

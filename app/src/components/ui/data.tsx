@@ -1,8 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { cn } from "@/lib/cn";
-import { initials } from "@/lib/format";
-import { useIsMobile } from "@/lib/media";
-import { Icon, type IconName } from "./Icon";
+import { cn, Icon, type IconName, initials, useIsMobile } from "@mycity/ui";
 import { Card } from "./layout";
 import type { Tone } from "@/api/types/common";
 

@@ -1,5 +1,4 @@
-import { cn } from "@/lib/cn";
-import { Icon } from "@/components/ui/Icon";
+import { cn, Icon } from "@mycity/ui";
 
 /** The sign-in screen's larger field: label, control, its mark and a message that shakes on a failed try. */
 export function LoginField({ id, label, type, autoComplete, value, onChange, onBlur, error, good, buzz }: {

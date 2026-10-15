@@ -2,13 +2,12 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { Arrangement } from "@/api/types/attendance";
 import "@/api/types/attendance";
-import { Button } from "@/components/ui/Button";
+import { Button, formatDate } from "@mycity/ui";
 import { Banner, KV, Pill, Timeline } from "@/components/ui/data";
 import { Card, CardHeader, Grid } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { formatDate } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
 import { Field, Input, Seg, Select } from "@/components/form";
 

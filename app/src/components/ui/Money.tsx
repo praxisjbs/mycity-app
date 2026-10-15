@@ -1,5 +1,4 @@
-import { cn } from "@/lib/cn";
-import { formatMoney, formatMoneyShort, isNegative } from "@/lib/format";
+import { cn, formatMoney, formatMoneyShort, isNegative } from "@mycity/ui";
 
 /**
  * An amount as people read it: ₦1,250,000.00, right-aligned in tables, tabular

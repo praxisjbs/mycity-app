@@ -1,8 +1,6 @@
 import { useRef, useState, type DragEvent } from "react";
 import type { DocumentRef } from "@/api/types/common";
-import { cn } from "@/lib/cn";
-import { formatBytes } from "@/lib/format";
-import { Icon } from "@/components/Icon";
+import { cn, formatBytes, Icon } from "@mycity/ui";
 
 /**
  * The upload engine's front end on the public site (gate 18): the ONLY file

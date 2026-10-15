@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/cn";
-import { initials } from "@/lib/format";
-import { Icon } from "./Icon";
+import { cn, Icon, initials } from "@mycity/ui";
 
 /** "Back to Employees" above a record page. */
 export function BackButton({ label, onClick }: { label: string; onClick: () => void }) {

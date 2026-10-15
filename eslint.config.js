@@ -22,6 +22,7 @@ module.exports = [
       "assets/**",
       "templates/**",
       "packages/contract/contract.gen.ts",
+      "packages/ui/**",
       "**/*.min.js",
     ],
   },

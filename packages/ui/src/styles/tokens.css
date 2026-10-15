@@ -1,0 +1,257 @@
+/*
+ * MyCity design tokens. The ONLY file in the frontend with a hex value (gate 13).
+ *
+ * Role names are shadcn/ui's, so Tailwind reads them as bg-card,
+ * text-muted-foreground, border-input (theme.css maps each one). Values are
+ * MILESTONES §5.1 (light) and §5.2 (dark) exactly where given. Every other
+ * value is DERIVED and listed with its WCAG 2 contrast ratio, computed (not
+ * estimated) for the text pair it serves; AA is 4.5:1 for text.
+ *
+ * Light is :root (and any element marked [data-theme=light]). Dark is
+ * [data-theme=dark] on <html> or on any element (the gallery shows each state
+ * in a light and a dark frame side by side), and the device setting when the
+ * person has not chosen (data-theme absent or "system"). Density is
+ * [data-density=comfortable] over the compact default (F5). Theme and density
+ * are attributes on <html>, set before first paint by index.html and kept per
+ * person by lib/preferences.ts.
+ *
+ * Names the merged screens already use (subtle-foreground, deep, sidebar-*,
+ * glass, paper-*, on-deep-*) are kept alongside the SPEC names.
+ */
+
+:root,
+[data-theme="light"] {
+  /* ---- Brand (MILESTONES §5.1) ---- */
+  --primary: #FFDF55;                 /* fill only: 1.32:1 on white, never text */
+  --primary-foreground: #01221D;      /* 12.77:1 on primary */
+  --primary-tint: #FFEFAA;            /* derived, decorative halo; primary-foreground on it 14.57:1 */
+  --secondary: #014339;               /* City Green; 11.27:1 on white */
+  --secondary-foreground: #FFFFFF;    /* 11.27:1 on secondary */
+  --deep: #01221D;                    /* Deep Green panels */
+
+  /* ---- Surfaces and ink ---- */
+  --background: #FFFFFF;
+  --foreground: #09090B;              /* 19.90:1 on background; 18.99:1 on muted */
+  --card: #FFFFFF;
+  --card-foreground: #09090B;         /* 19.90:1 */
+  --popover: #FFFFFF;
+  --popover-foreground: #09090B;      /* 19.90:1 */
+  --muted: #F8FAFA;                   /* derived: the darkest brand-tinted surface on which muted-foreground keeps AA (4.61:1) */
+  --muted-foreground: #71717A;        /* 4.83:1 on background, 4.61:1 on muted, 4.56:1 or more on every *-soft.
+                                         4.18:1 on accent: never on accent; text on accent is accent-foreground */
+  --subtle-foreground: #6A6A72;       /* derived: placeholders, captions; the lightest grey that keeps AA on every light
+                                         surface: 5.36:1 on background, 5.12:1 on muted, 4.64:1 on accent, 5.06:1 or more on every *-soft */
+  --accent: #FFEFAA;                  /* active nav pill, selected row */
+  --accent-foreground: #014339;       /* derived: 9.76:1 on accent, 11.27:1 on background, 10.76:1 on muted */
+  --eyebrow: #98690C;                 /* 4.82:1 on background, 4.60:1 on muted */
+
+  /* ---- Lines and focus ---- */
+  --border: #E4E4E7;                  /* dividers only, decorative (1.27:1) */
+  --input: #71717A;                   /* control outlines, 4.83:1 on background */
+  --ring: #014339;                    /* focus ring on light, 11.27:1 on background */
+
+  /* ---- Sidebar (Deep Green in both themes) ---- */
+  --sidebar: #01221D;
+  --sidebar-foreground: #FFFFFF;      /* 16.83:1 on sidebar */
+  --sidebar-muted: #9FB3AE;           /* derived: 7.64:1 on sidebar, 5.62:1 on sidebar-accent */
+  --sidebar-accent: #013C33;          /* hover and selected item on the sidebar */
+  --sidebar-accent-foreground: #FFFFFF; /* 12.39:1 on sidebar-accent */
+  --sidebar-primary: #FFDF55;
+  --sidebar-primary-foreground: #01221D; /* 12.77:1 */
+  --sidebar-border: rgba(255, 255, 255, .10);
+  --sidebar-hover: rgba(255, 255, 255, .07);
+  --sidebar-badge: rgba(255, 255, 255, .14);
+  --on-primary-badge: rgba(1, 34, 29, .18);
+
+  /* ---- Status (MILESTONES §5.1), each with a derived soft tint ---- */
+  --success: #0D844C;                 /* 4.75:1 on background */
+  /* Each tint is the strongest one on which its status colour, muted-foreground and
+     subtle-foreground all keep 4.55:1 or more (a margin over AA, not the edge). */
+  --success-soft: #F7FBF9;            /* derived: success 4.55:1, muted-foreground 4.63:1, subtle-foreground 5.14:1 */
+  --warning: #A66105;                 /* 4.85:1 on background */
+  --warning-soft: #FBF8F4;            /* derived: warning 4.58:1, muted-foreground 4.56:1, subtle-foreground 5.06:1 */
+  --destructive: #DA1E10;             /* 5.03:1 on background; white on it 5.03:1 */
+  --destructive-soft: #FEF7F6;        /* derived: destructive 4.76:1, muted-foreground 4.57:1, subtle-foreground 5.07:1 */
+  --info: #1D4ED8;                    /* 6.70:1 on background */
+  --info-soft: #F7F8FE;               /* derived: info 6.32:1, muted-foreground 4.56:1, subtle-foreground 5.06:1 */
+
+  /* ---- Charts (MILESTONES §5.2, light series, each 4.8:1 or more on white) ---- */
+  --chart-1: #014339;
+  --chart-2: #0E7C6B;
+  --chart-3: #98690C;
+  --chart-4: #B54708;
+  --chart-5: #3538CD;
+  --chart-6: #9F1AB1;
+
+  /* ---- Overlays and depth ---- */
+  --scrim: rgba(1, 17, 14, .46);
+  --glass: rgba(255, 255, 255, .80);
+  --glass-border: rgba(10, 20, 18, .10);
+  --sb: rgba(10, 20, 18, .22);
+  --sb-hover: rgba(10, 20, 18, .36);
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, .05);
+  --shadow-2: 0 8px 14px rgba(16, 24, 40, .06);
+  --shadow-3: 0 20px 44px rgba(16, 24, 40, .14);
+
+  /* ---- Paper: generated documents are printed paper, the same in both themes ---- */
+  --paper: #FFFFFF;
+  --paper-foreground: #14201D;        /* derived: 16.75:1 on paper, 15.53:1 on paper-head */
+  --paper-ink: var(--paper-foreground);
+  --paper-heading: #0A1412;           /* derived: 18.72:1 on paper */
+  --paper-muted: #566662;             /* derived: 6.05:1 on paper, 5.61:1 on paper-head */
+  --paper-faint: #657470;             /* derived: 4.90:1 on paper, 4.55:1 on paper-head */
+  --paper-head: #F4F7F6;              /* table head band */
+  --paper-line: #E2E9E7;              /* decorative */
+  --paper-rule: #EDF2F0;              /* decorative */
+  --paper-dash: #D5DEDB;              /* decorative */
+  --paper-brand: #014339;             /* 11.27:1 on paper */
+  --paper-gold: #FFDF55;              /* fill only */
+
+  /* ---- Light ink on Deep Green panels, both themes ---- */
+  --on-deep: #FFFFFF;                 /* 16.83:1 on deep */
+  --on-deep-muted: #CCCFCE;           /* 10.73:1 */
+  --on-deep-faint: #9FB3AE;           /* 7.64:1 */
+  --on-deep-soft: #D7E2DF;            /* 12.69:1 */
+  --on-deep-dim: #B9C8C4;             /* 9.71:1 */
+
+  color-scheme: light;
+}
+
+/* Shape, density and motion: on <html> only, so a themed frame keeps the page's density. */
+:root {
+  /* ---- Shape ---- */
+  --radius: 0.5rem;
+
+  /* ---- Density (F5): compact is the default ---- */
+  --control-h: 36px;
+  --row-h: 40px;
+  --text-body: 14px;
+  --text-field: 14px;
+  --tap: 36px;
+
+  /* ---- Motion (F6) ---- */
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.32, .72, 0, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+}
+
+[data-density="comfortable"] {
+  --control-h: 40px;
+  --row-h: 48px;
+  --text-body: 15px;
+  --text-field: 15px;
+  --tap: 40px;
+}
+
+/*
+ * A phone: 16 px in fields (no zoom on focus) and 44 px targets, in either density.
+ * The density selector is listed too so that the phone sizes win over
+ * [data-density=comfortable] (equal specificity, later rule).
+ */
+@media (max-width: 760px) {
+  :root,
+  [data-density] {
+    --control-h: 44px;
+    --row-h: 44px;
+    --text-field: 16px;
+    --tap: 44px;
+  }
+  [data-density="comfortable"] {
+    --row-h: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+  }
+}
+
+/*
+ * Dark (MILESTONES §5.2): surfaces on the brand's own hue (171°). Written twice,
+ * identically: for a person who chose dark, and for the device setting when no
+ * choice is stored.
+ */
+[data-theme="dark"] {
+  --background: #01110E;
+  --foreground: #E6EDEB;              /* 16.25:1 on background, 14.17:1 on card */
+  --card: #01221D;
+  --card-foreground: #E6EDEB;         /* 14.17:1 */
+  --popover: #012B24;
+  --popover-foreground: #E6EDEB;      /* 12.88:1 */
+  --muted: #010C0A;                   /* derived: recessed surface; muted-foreground on it 9.64:1 */
+  --muted-foreground: #A9B8B4;        /* 8.18:1 on card, 6.02:1 on accent */
+  --subtle-foreground: #8EA09B;       /* derived: 7.03:1 on background, 6.13:1 on card, 5.58:1 on popover, 4.51:1 on accent */
+  --accent: #013C33;
+  --accent-foreground: #45C8B0;       /* derived: 5.98:1 on accent, 8.13:1 on card, 9.32:1 on background */
+  --eyebrow: #BD9743;                 /* derived, the eyebrow amber lightened: 6.15:1 on card, 4.52:1 on accent */
+  --border: #125A4D;
+  --input: #1A6B5C;                   /* 3.04:1 on background (a boundary, not text) */
+  --ring: #FFDF55;                    /* 14.65:1 on background */
+  --success: #32D583;                 /* 8.80:1 on card */
+  --success-soft: #042117;            /* derived: success on it 8.89:1 */
+  --warning: #FDB022;                 /* 9.14:1 on card */
+  --warning-soft: #241703;            /* derived: warning on it 9.52:1 */
+  --destructive: #F97066;             /* 6.04:1 on card */
+  --destructive-soft: #260D0B;        /* derived: destructive on it 6.58:1 */
+  --info: #84ADFF;                    /* 7.54:1 on card */
+  --info-soft: #081529;               /* derived: info on it 8.18:1 */
+  --chart-1: #45C8B0;
+  --chart-2: #FFDF55;
+  --chart-3: #7CC4FA;
+  --chart-4: #FF9B85;
+  --chart-5: #C3B5FD;
+  --chart-6: #E8D7A8;                 /* the dark series is 8:1 or more on the card */
+  --glass: rgba(1, 34, 29, .82);
+  --glass-border: rgba(255, 255, 255, .12);
+  --sb: rgba(255, 255, 255, .14);
+  --sb-hover: rgba(255, 255, 255, .26);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-2: 0 8px 14px rgba(0, 0, 0, .45);
+  --shadow-3: 0 20px 44px rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #01110E;
+    --foreground: #E6EDEB;
+    --card: #01221D;
+    --card-foreground: #E6EDEB;
+    --popover: #012B24;
+    --popover-foreground: #E6EDEB;
+    --muted: #010C0A;
+    --muted-foreground: #A9B8B4;
+    --subtle-foreground: #8EA09B;
+    --accent: #013C33;
+    --accent-foreground: #45C8B0;
+    --eyebrow: #BD9743;
+    --border: #125A4D;
+    --input: #1A6B5C;
+    --ring: #FFDF55;
+    --success: #32D583;
+    --success-soft: #042117;
+    --warning: #FDB022;
+    --warning-soft: #241703;
+    --destructive: #F97066;
+    --destructive-soft: #260D0B;
+    --info: #84ADFF;
+    --info-soft: #081529;
+    --chart-1: #45C8B0;
+    --chart-2: #FFDF55;
+    --chart-3: #7CC4FA;
+    --chart-4: #FF9B85;
+    --chart-5: #C3B5FD;
+    --chart-6: #E8D7A8;
+    --glass: rgba(1, 34, 29, .82);
+    --glass-border: rgba(255, 255, 255, .12);
+    --sb: rgba(255, 255, 255, .14);
+    --sb-hover: rgba(255, 255, 255, .26);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-2: 0 8px 14px rgba(0, 0, 0, .45);
+    --shadow-3: 0 20px 44px rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}

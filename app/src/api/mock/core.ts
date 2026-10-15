@@ -1,5 +1,5 @@
 import type { RawRequest, RawResponse } from "../client";
-import { todayIso } from "@/lib/format";
+import { todayIso } from "@mycity/ui";
 
 /**
  * The in-browser mock API. It answers with the backend's exact envelopes so the

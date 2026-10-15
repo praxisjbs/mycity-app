@@ -1,6 +1,5 @@
 import { useApi } from "@/api/hooks";
-import { Icon } from "@/components/ui/Icon";
-import { cn } from "@/lib/cn";
+import { cn, Icon } from "@mycity/ui";
 import { hrefFor, Link } from "@/lib/router";
 import type { ModuleDef } from "./catalogue";
 

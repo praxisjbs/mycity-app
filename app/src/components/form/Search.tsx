@@ -1,5 +1,4 @@
-import { cn } from "@/lib/cn";
-import { Icon } from "@/components/ui/Icon";
+import { cn, Icon } from "@mycity/ui";
 
 /** Search box for a list. The text goes to the server as `q`. */
 export function SearchBox({ value, onChange, placeholder = "Search", className, label }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; label?: string }) {

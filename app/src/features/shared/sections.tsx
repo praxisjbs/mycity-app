@@ -5,7 +5,7 @@ import "@/api/types/organisation";
 import type { BarRow } from "@/api/types/home";
 import type { Tone } from "@/api/types/common";
 import "@/api/types/shared";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@mycity/ui";
 import { Bars, Chain, KV, Pill, Timeline } from "@/components/ui/data";
 import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
 import { Card, CardHeader } from "@/components/ui/layout";

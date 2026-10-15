@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Worksite } from "@/api/types/attendance";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@mycity/ui";
 import { KV, Pill } from "@/components/ui/data";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/cn";
+import { cn } from "@mycity/ui";
 
 /** Amount entry. Keeps what the person typed; the value sent is a two-place decimal string. */
 export function AmountInput({ value, onChange, onBlur, state, id }: { value: string; onChange: (v: string) => void; onBlur?: () => void; state?: "bad" | "good"; id?: string }) {

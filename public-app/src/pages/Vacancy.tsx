@@ -3,8 +3,8 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import { Message, Page } from "@/components/Layout";
-import { Button, Loading, Notice, Pill, Sub } from "@/components/ui";
-import { formatMoney } from "@/lib/format";
+import { Button, formatMoney } from "@mycity/ui";
+import { Loading, Notice, Pill, Sub } from "@/components/ui";
 import { Link, useRouter } from "@/lib/router";
 import { PATTERN } from "./Careers";
 

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/cn";
-import { monthName } from "@/lib/format";
+import { cn, monthName } from "@mycity/ui";
 import { Card, CardHeader } from "./layout";
 
 export interface CalEvent {

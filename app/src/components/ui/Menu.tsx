@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Icon, type IconName } from "./Icon";
+import { Icon, type IconName } from "@mycity/ui";
 
 export type MenuItem = { label: ReactNode; icon?: IconName; onSelect: () => void; danger?: boolean } | "sep";
 

@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { useEnvironment } from "./environment";
-import { todayIso } from "./format";
+import { todayIso } from "@mycity/ui";
 
 /**
  * Which public pages are open, by the delivery plan (docs/PROGRESS.md and

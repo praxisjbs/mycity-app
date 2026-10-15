@@ -3,7 +3,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { EmployeeCreate, EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@mycity/ui";
 import { Bars, Pill, StatStrip, Who } from "@/components/ui/data";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";

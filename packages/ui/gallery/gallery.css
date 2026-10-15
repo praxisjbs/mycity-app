@@ -1,0 +1,3 @@
+/* The design system, plus the gallery's own files for Tailwind to scan. */
+@import "../src/styles/index.css";
+@source "./";

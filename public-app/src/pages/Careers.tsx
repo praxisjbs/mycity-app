@@ -2,7 +2,8 @@ import { usePaged } from "@/api/hooks";
 import "@/api/types/public";
 import type { VacancyCard } from "@/api/types/public";
 import { Brand, Message, Page } from "@/components/Layout";
-import { Button, Loading, Sub } from "@/components/ui";
+import { Button } from "@mycity/ui";
+import { Loading, Sub } from "@/components/ui";
 import { Link, useRouter } from "@/lib/router";
 import { Input } from "@/components/form";
 

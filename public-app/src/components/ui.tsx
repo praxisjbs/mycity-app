@@ -1,40 +1,11 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { cn } from "@/lib/cn";
-import { Icon, type IconName } from "./Icon";
+import type { ReactNode } from "react";
+import { cn, Icon, type IconName } from "@mycity/ui";
 
 /*
- * The few parts the public site needs (fields are in ./form), in the staff app's look
- * (app/src/components/ui). Copied, not imported: the two builds share no
- * file (FRONTEND_GUIDE §2, A9).
+ * The public site's remaining display parts (fields are in ./form). Button and
+ * Icon come from @mycity/ui; these move there in PR 1's display and feedback
+ * work (scripts/check/components.js, LEGACY).
  */
-
-type Variant = "default" | "primary" | "ghost";
-
-/** The pill button. `primary` is the yellow one: one per page. `block` fills the width (the demo's 42 px call to action). */
-export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; icon?: IconName; iconRight?: IconName; block?: boolean }>(function Button(
-  { variant = "default", icon, iconRight, block, className, children, type = "button", ...rest },
-  ref,
-) {
-  return (
-    <button
-      ref={ref}
-      type={type}
-      className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-full border font-semibold whitespace-nowrap transition-[background,border-color,filter] disabled:opacity-40",
-        block ? "h-[42px] w-full px-4 text-[13.5px]" : "h-[34px] px-[13px] text-[12.5px]",
-        variant === "primary" && "on-primary border-primary bg-primary text-primary-foreground hover:brightness-[.96]",
-        variant === "default" && "border-input bg-background hover:border-subtle-foreground hover:bg-muted",
-        variant === "ghost" && "border-transparent bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
-        className,
-      )}
-      {...rest}
-    >
-      {icon && <Icon name={icon} />}
-      {children}
-      {iconRight && <Icon name={iconRight} />}
-    </button>
-  );
-});
 
 const TONE = {
   ok: "bg-success-soft text-success",
