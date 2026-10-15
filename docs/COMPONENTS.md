@@ -57,6 +57,18 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Feedback | [ErrorBoundary](#errorboundary) | `ErrorBoundary` | Catches a crash in one screen so the rest of the app keeps working, and shows ErrorState with Try Again in its place. | stable |
 | Feedback | [ErrorState](#errorstate) | `ErrorState` | Something did not load: one line saying so, and Try Again. | stable |
 | Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere. | stable |
+| Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
+| Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
+| Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot. | stable |
+| Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel` | Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
+| Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
+| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
+| Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
+| Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row. | stable |
+| Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField` | Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField). | stable |
+| Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
+| Forms | [TextField](#textfield) | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` | The text input of the form system, with its typed relatives: password, whole number, phone and long text. | stable |
+| Forms | [Wizard](#wizard) | `Wizard` | A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result. | stable |
 
 ## Foundations
 
@@ -1439,6 +1451,516 @@ Where toasts appear: mounted once per app; toast(), toast.success(), toast.error
 <Toaster />
 toast("Rule created")
 toast.success("Alert cleared", { undo: () => restore(alert) })
+```
+
+## Forms
+
+### DateField
+
+Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField.
+
+| | |
+|---|---|
+| Use | Every date a person enters (gate 15); DateRangeField for a from and to pair (a report period); TimeField for a 24-hour time. |
+| Avoid | <input type="date"> (its format follows the browser's locale); a date shown and not entered (use formatDate). |
+| Phone | The calendar opens as a bottom sheet; days are 44 px targets; the keyboard is numeric. |
+| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. |
+| Status | stable |
+| Exports | `DateField`, `DateRangeField`, `TimeField` |
+| Import | `import { DateField, DateRangeField, TimeField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/DateField.tsx` |
+| Test | `packages/ui/src/form/DateField.test.tsx` |
+| Gallery | `packages/ui/src/form/DateField.gallery.tsx` (`npm run gallery`, `#/DateField`) |
+
+**DateField** props (`DateFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | ISO date (YYYY-MM-DD), or "" for none. |
+| `onChange` | `(iso: string) => void` | yes | Called with the ISO date, or "" when cleared. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `min` | `string` |  | The earliest date that may be picked, ISO. |
+| `max` | `string` |  | The latest date that may be picked, ISO. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id; the Field supplies one otherwise. |
+| `name` | `string` |  | The field's name, so a failed submit can focus it. |
+| `placeholder` | `string` |  | The format example; DD/MM/YYYY. |
+
+**DateRangeField** props (`DateRangeFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `DateRange` | yes | The period; "" for an end not chosen. |
+| `onChange` | `(value: DateRange) => void` | yes | Called with the period. |
+| `onBlur` | `() => void` |  | Called when the person leaves either end. |
+| `min` | `string` |  | The earliest date either end may take, ISO. |
+| `max` | `string` |  | The latest date either end may take, ISO. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+
+**TimeField** props (`TimeFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | 24-hour time HH:MM, Africa/Lagos, or "" for none. |
+| `onChange` | `(value: string) => void` | yes | Called with HH:MM once it is a real time, or "" when cleared. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id; the Field supplies one otherwise. |
+
+```tsx
+<DateField min={todayIso()} {...form.field("start_date")} />
+```
+
+### Field
+
+A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled.
+
+| | |
+|---|---|
+| Use | Around every control in a form: TextField, DateField, MoneyField, SelectField and the rest take their ids from it. |
+| Avoid | A hint sentence under the field (the control shows its own format; a label that needs explaining is a help term); an asterisk; a field built by hand. |
+| Phone | One column; labels stay above; the control is 44 px tall with 16 px text. |
+| Accessibility | The label names the control (or, with help, labels it by id beside the help term); the error is linked by aria-describedby and announced politely. |
+| Status | stable |
+| Exports | `Field`, `FormRow`, `FormError` |
+| Import | `import { Field, FormRow, FormError } from "@mycity/ui";` |
+| File | `packages/ui/src/form/Field.tsx` |
+| Test | `packages/ui/src/form/Field.test.tsx` |
+| Gallery | `packages/ui/src/form/Field.gallery.tsx` (`npm run gallery`, `#/Field`) |
+
+**Field** props (`FieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `ReactNode` | yes | Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the label as a help term (one or two sentences, at most 35 words). |
+| `info` | `ReactNode` |  | The merged name for `help`; kept so screens move by an import change. |
+| `optional` | `boolean` |  | Shows the Optional tag. A field with no tag is required. |
+| `state` | `FieldState` |  | The mark, from the form hook's status(name). |
+| `message` | `ReactNode` |  | The error, at most 4 words, shown when the state is bad. |
+| `children` | `ReactNode` | yes | The control. |
+| `htmlFor` | `string` |  | The control's id, when the caller sets it; one is made otherwise. |
+| `className` | `string` |  | Layout classes only. |
+
+**FormRow** props (`FormRowProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | Two fields: side by side on desktop, stacked on a phone. |
+
+**FormError** props (`FormErrorProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | One line: what failed that is not one field's fault (the server was unreachable). Nothing renders when empty. |
+
+```tsx
+<Field label="Work Email" {...form.status("work_email")}><TextField type="email" {...form.field("work_email")} /></Field>
+```
+
+### Form
+
+The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot.
+
+| | |
+|---|---|
+| Use | Around every set of fields; onSubmit comes from the form hook (form.submit(save) or a handler that calls form.check()). |
+| Avoid | A <form> written anywhere else (gate 12); text in a footer (buttons only); a disabled submit button. |
+| Phone | FormFooter puts the primary button full width at the bottom and the others above it. |
+| Accessibility | A real form element, so Enter submits and assistive technology announces it; FormFooter keeps the primary last in the tab order. |
+| Status | stable |
+| Exports | `Form`, `FormFooter` |
+| Import | `import { Form, FormFooter } from "@mycity/ui";` |
+| File | `packages/ui/src/form/Form.tsx` |
+| Test | `packages/ui/src/form/Form.test.tsx` |
+| Gallery | `packages/ui/src/form/Form.gallery.tsx` (`npm run gallery`, `#/Form`) |
+
+**Form** props (`FormProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `onSubmit` | `() => void` | yes | Called on submit (Enter in a single-line form, or the submit button). |
+| `children` | `ReactNode` | yes | The fields and the footer. |
+| `className` | `string` |  | Layout classes only. |
+| `id` | `string` |  | Its id, so a button outside it (a modal footer) can submit it with form={id}. |
+
+**FormFooter** props (`FormFooterProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | Buttons only: Cancel first, the primary (Verb Noun, the only filled one) last. |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<Form onSubmit={form.submit(save)}>…<FormFooter><Button>Cancel</Button><Button variant="primary" type="submit">Create Rule</Button></FormFooter></Form>
+```
+
+### InlineInput
+
+Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows.
+
+| | |
+|---|---|
+| Use | Only inside another shared component or widget that styles them itself; never as a form field. |
+| Avoid | A field in a form (use Field with TextField and the rest); a control with no label. |
+| Phone | The caller's widget decides its size; keep 16 px text so iOS never zooms. |
+| Accessibility | Every one needs a visible label or an aria-label; InlineLabel gives a widget a label it lays out itself. |
+| Status | stable |
+| Exports | `InlineInput`, `InlineSelect`, `InlineLabel` |
+| Import | `import { InlineInput, InlineSelect, InlineLabel } from "@mycity/ui";` |
+| File | `packages/ui/src/form/InlineInput.tsx` |
+| Test | `packages/ui/src/form/InlineInput.test.tsx` |
+| Gallery | `packages/ui/src/form/InlineInput.gallery.tsx` (`npm run gallery`, `#/InlineInput`) |
+
+**InlineInput** props (`InlineInputProps`, extends `Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The text. |
+| `onChange` | `(value: string) => void` | yes | Called on each key with the new text. |
+
+**InlineSelect** props (`InlineSelectProps`, extends `Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The chosen value. |
+| `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
+| `options` | `Array<string \| [string, string]>` | yes | Options as plain strings or [value, label] pairs. |
+
+**InlineLabel** props (`InlineLabelProps`)
+
+No props of its own.
+
+```tsx
+<InlineInput aria-label="Message" value={text} onChange={setText} />
+```
+
+### LoginField
+
+The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try.
+
+| | |
+|---|---|
+| Use | The sign-in and password reset screens only. |
+| Avoid | Any other form (use Field with TextField or PasswordField). |
+| Phone | 46 px tall with 16 px text; full width. |
+| Accessibility | The label is linked by htmlFor; the message is linked by aria-describedby and announced. |
+| Status | stable |
+| Exports | `LoginField` |
+| Import | `import { LoginField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/LoginField.tsx` |
+| Test | `packages/ui/src/form/LoginField.test.tsx` |
+| Gallery | `packages/ui/src/form/LoginField.gallery.tsx` (`npm run gallery`, `#/LoginField`) |
+
+**LoginField** props (`LoginFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | yes | The control's id. |
+| `label` | `string` | yes | Title Case, at most 4 words. |
+| `type` | `string` | yes | email, password or text. |
+| `autoComplete` | `string` | yes | username, current-password and so on. |
+| `value` | `string` | yes | The value. |
+| `onChange` | `(value: string) => void` | yes | Called on each key. |
+| `onBlur` | `() => void` | yes | Called when the person leaves the field. |
+| `error` | `string` | yes | The error, at most 4 words; empty when none. |
+| `good` | `boolean` | yes | Shows the tick when the value is right. |
+| `buzz` | `number` | yes | Bumped on each failed try: the field shakes once. |
+
+```tsx
+<LoginField id="email" label="Work Email" type="email" autoComplete="username" value={email} onChange={setEmail} onBlur={touch} error={err} good={ok} buzz={tries} />
+```
+
+### MoneyField
+
+An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float.
+
+| | |
+|---|---|
+| Use | Every amount a person enters (an expense, a salary, a threshold); turn what was typed into the wire value with toMoneyString. |
+| Avoid | A number field for money (gate 20); showing an amount (use Money). |
+| Phone | The decimal keypad; 16 px text; right-aligned figures. |
+| Accessibility | Labelled by its Field; the ₦ sign is visual, the label says it is an amount. |
+| Status | stable |
+| Exports | `MoneyField` |
+| Import | `import { MoneyField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/MoneyField.tsx` |
+| Test | `packages/ui/src/form/MoneyField.test.tsx` |
+| Gallery | `packages/ui/src/form/MoneyField.gallery.tsx` (`npm run gallery`, `#/MoneyField`) |
+
+**MoneyField** props (`MoneyFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | What the person typed ("250,000" or "250000.5"). |
+| `onChange` | `(value: string) => void` | yes | Called with what they type, digits, commas and one point only. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id; the Field supplies one otherwise. |
+| `name` | `string` |  | The field's name, so a failed submit can focus it. |
+
+```tsx
+<MoneyField {...form.field("amount")} />
+```
+
+### OtpField
+
+A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all.
+
+| | |
+|---|---|
+| Use | Sign-in verification and authenticator codes (Security, M9). |
+| Avoid | Any other number (use NumberField). |
+| Phone | Each box is 44 px; the one-time-code keyboard offers the code from a text message. |
+| Accessibility | A group named by its label; each box says which digit it is; autocomplete one-time-code on the first box. |
+| Status | stable |
+| Exports | `OtpField` |
+| Import | `import { OtpField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/OtpField.tsx` |
+| Test | `packages/ui/src/form/OtpField.test.tsx` |
+| Gallery | `packages/ui/src/form/OtpField.gallery.tsx` (`npm run gallery`, `#/OtpField`) |
+
+**OtpField** props (`OtpFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The digits typed so far. |
+| `onChange` | `(value: string) => void` | yes | Called with the digits; a full code has `length` of them. |
+| `label` | `string` | yes | Names the group: Title Case, at most 4 words. |
+| `length` | `number` |  | How many digits; 6. |
+| `state` | `FieldState` |  | The mark. |
+| `message` | `string` |  | Unused here (a Field around it shows it). |
+
+```tsx
+<OtpField label="Sign-In Code" value={code} onChange={setCode} />
+```
+
+### SearchInput
+
+The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row.
+
+| | |
+|---|---|
+| Use | Above every list that searches; FilterSelect for one of a list's server filters. |
+| Avoid | Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design. |
+| Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens the phone's own picker. |
+| Accessibility | The box is a searchbox named by its label (or its placeholder); FilterSelect's label is visible and linked. |
+| Status | stable |
+| Exports | `SearchInput`, `FilterSelect` |
+| Import | `import { SearchInput, FilterSelect } from "@mycity/ui";` |
+| File | `packages/ui/src/form/SearchInput.tsx` |
+| Test | `packages/ui/src/form/SearchInput.test.tsx` |
+| Gallery | `packages/ui/src/form/SearchInput.gallery.tsx` (`npm run gallery`, `#/SearchInput`) |
+
+**SearchInput** props (`SearchInputProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | What is typed; the list sends it as q (the list hook debounces it). |
+| `onChange` | `(value: string) => void` | yes | Called on each key. |
+| `placeholder` | `string` |  | A format example of at most 3 words; Search. |
+| `label` | `string` |  | Names the box for assistive technology; the placeholder otherwise. |
+| `className` | `string` |  | Layout classes only. |
+
+**FilterSelect** props (`FilterSelectProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The filter's name, Title Case, visible above it. |
+| `value` | `string` | yes | The chosen value; "" for all. |
+| `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
+| `options` | `ReadonlyArray<Option>` | yes | The filter's options. |
+
+```tsx
+<SearchInput label="Search Employees" placeholder="Name or Email" value={q} onChange={setQ} />
+```
+
+### SelectField
+
+Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField).
+
+| | |
+|---|---|
+| Use | SelectField for more than five options; ChoiceField for two to five, so every option is visible at once. |
+| Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch). |
+| Phone | SelectField opens the phone's own picker; ChoiceField segments are 44 px tall and wrap rather than scroll. |
+| Accessibility | SelectField is a native select labelled by its Field; ChoiceField is a radio group with arrow-key movement. |
+| Status | stable |
+| Exports | `SelectField`, `ChoiceField` |
+| Import | `import { SelectField, ChoiceField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/SelectField.tsx` |
+| Test | `packages/ui/src/form/SelectField.test.tsx` |
+| Gallery | `packages/ui/src/form/SelectField.gallery.tsx` (`npm run gallery`, `#/SelectField`) |
+
+**SelectField** props (`SelectFieldProps`, extends `Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange" | "onBlur">`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The chosen value; "" for none. |
+| `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `options` | `ReadonlyArray<Option>` | yes | The options. |
+| `placeholder` | `string` |  | A first, unchoosable line shown while nothing is chosen (Choose One). |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+
+**ChoiceField** props (`ChoiceFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `V` | yes | The chosen value. |
+| `onChange` | `(value: V) => void` | yes | Called with the chosen value. |
+| `onBlur` | `() => void` |  | Called when focus leaves the group. |
+| `options` | `ReadonlyArray<Option<V>>` | yes | Two to five options. |
+| `disabled` | `readonly V[]` |  | Values shown but not choosable (the merged `disabled`). |
+| `label` | `string` |  | Names the group when no Field label sits above it. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<ChoiceField options={[["remote", "Remote"], ["hybrid", "Hybrid"], ["on_site", "On Site"]]} {...form.field("work_pattern")} />
+```
+
+### Switch
+
+On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out.
+
+| | |
+|---|---|
+| Use | Switch when the change saves on its own (with a toast); CheckboxField when the form's own button saves it; ToggleRow for a list of settings. |
+| Avoid | A Switch inside a form that has a save button; a checkbox for something that applies at once. |
+| Phone | The switch and the checkbox sit in a 44 px tap area; ToggleRow keeps the words on the left, the switch on the right. |
+| Accessibility | Switch has role switch and needs a label; CheckboxField's label is its own; both work with Space. |
+| Status | stable |
+| Exports | `Switch`, `ToggleRow`, `CheckboxField` |
+| Import | `import { Switch, ToggleRow, CheckboxField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/Switch.tsx` |
+| Test | `packages/ui/src/form/Switch.test.tsx` |
+| Gallery | `packages/ui/src/form/Switch.gallery.tsx` (`npm run gallery`, `#/Switch`) |
+
+**Switch** props (`SwitchProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `checked` | `boolean` | yes | On or off. |
+| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `label` | `string` | yes | What it switches, for assistive technology when no visible label names it. |
+| `disabled` | `boolean` |  | Not switchable now. |
+| `className` | `string` |  | Layout classes only. |
+
+**ToggleRow** props (`ToggleRowProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | What the setting is, Title Case, at most 4 words. |
+| `text` | `ReactNode` |  | One short line about it, when the title is not enough. |
+| `checked` | `boolean` | yes | On or off. |
+| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `changed` | `boolean` |  | Marks a row changed but not yet published (a policy draft). |
+| `disabled` | `boolean` |  | Not switchable now. |
+
+**CheckboxField** props (`CheckboxFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `boolean` | yes | Ticked or not. |
+| `onChange` | `(value: boolean) => void` | yes | Called with the new state. |
+| `onBlur` | `() => void` |  | Called when the person leaves it. |
+| `label` | `ReactNode` | yes | Its own label, beside the box: a short phrase. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (a Field around it shows it). |
+| `disabled` | `boolean` |  | Not tickable now. |
+
+```tsx
+<ToggleRow title="Late Alerts" checked={on} onChange={save} />
+```
+
+### TextField
+
+The text input of the form system, with its typed relatives: password, whole number, phone and long text.
+
+| | |
+|---|---|
+| Use | Any typed value in a form, inside a Field, bound with form.field(name). |
+| Avoid | A date, an amount or a person (use DateField, MoneyField, PersonPicker); a raw <input> anywhere outside packages/ui/src/form (gate 12). |
+| Phone | 44 px tall with 16 px text so iOS never zooms; the keyboard matches the value (numeric, tel, email). |
+| Accessibility | Takes its id, label and error links from the Field around it; aria-invalid follows the mark; the mark is an icon plus words, never colour alone. |
+| Status | stable |
+| Exports | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` |
+| Import | `import { TextField, PasswordField, NumberField, PhoneField, TextAreaField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/TextField.tsx` |
+| Test | `packages/ui/src/form/TextField.test.tsx` |
+| Gallery | `packages/ui/src/form/TextField.gallery.tsx` (`npm run gallery`, `#/TextField`) |
+
+**TextField** props (`TextFieldProps`, extends `BoundProps`, `NativeInput`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `type` | `"text" \| "email" \| "url" \| "search"` |  | text, email, url or search. |
+
+**PasswordField** props (`PasswordFieldProps`, extends `BoundProps`, `NativeInput`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `autoComplete` | `"current-password" \| "new-password"` |  | new-password on sign-up and change, current-password on sign-in. |
+
+**NumberField** props (`NumberFieldProps`, extends `BoundProps`, `NativeInput`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `decimal` | `boolean` |  | Allow a decimal point. Off: whole numbers only. |
+
+**PhoneField** props (`PhoneFieldProps`, extends `BoundProps`, `NativeInput`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `countryCode` | `string` |  | The country code shown before the number. |
+
+**TextAreaField** props (`TextAreaFieldProps`, extends `BoundProps`, `Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange" | "onBlur">`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `rows` | `number` |  | Visible lines before it scrolls; 4. |
+
+```tsx
+<TextField type="email" placeholder="ada@mycity.app" {...form.field("work_email")} />
+```
+
+### Wizard
+
+A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result.
+
+| | |
+|---|---|
+| Use | More than six fields or more than one topic (FRONTEND_GUIDE §8.1): a vacancy, an employee, a policy. |
+| Avoid | Six fields or fewer (one modal form); steps that are not topics. |
+| Phone | Opens in a full-screen sheet; the indicator shows the step number and title; Next is full width at the bottom. |
+| Accessibility | The current step is announced; the indicator marks it with aria-current; focus moves to the step's heading when it changes. |
+| Status | stable |
+| Exports | `Wizard` |
+| Import | `import { Wizard } from "@mycity/ui";` |
+| File | `packages/ui/src/form/Wizard.tsx` |
+| Test | `packages/ui/src/form/Wizard.test.tsx` |
+| Gallery | `packages/ui/src/form/Wizard.gallery.tsx` (`npm run gallery`, `#/Wizard`) |
+
+**Wizard** props (`WizardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `steps` | `WizardStep[]` | yes | The steps, in order. |
+| `finishLabel` | `string` | yes | The last step's button: Verb Noun naming the result (Publish Vacancy). |
+| `onFinish` | `() => void` | yes | Called after the last step validates. |
+| `initialStep` | `number` |  | The step to start on (a draft resumed); 0. |
+| `onStepChange` | `(index: number) => void` |  | Called with the step index each time it changes, so a draft can remember it. |
+| `onCancel` | `() => void` |  | Cancel, shown on the first step instead of Back. |
+
+```tsx
+<Wizard steps={steps} finishLabel="Publish Vacancy" onFinish={publish} />
 ```
 
 ## Helpers
