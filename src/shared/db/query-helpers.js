@@ -28,7 +28,13 @@ const IDENT_RE = /^[a-z_][a-z0-9_]{0,62}$/;
 function ident(name, ctx) {
   if (typeof name !== "string" || !IDENT_RE.test(name)) {
     const shown = String(name).slice(0, 40);
-    if (ctx) throw new AppError("INVALID_FIELD", `"${shown}" is not a field here`, 422, { [shown]: ["is not a field here"] });
+    if (ctx)
+      throw new AppError(
+        "INVALID_FIELD",
+        `"${shown}" is not a field here`,
+        422,
+        { [shown]: ["is not a field here"] },
+      );
     throw new Error(`query-helpers: "${shown}" is not a valid identifier`);
   }
   return `"${name}"`;
@@ -37,7 +43,8 @@ function ident(name, ctx) {
 /** A table name, optionally schema-qualified ("public.employee"). */
 function table(name) {
   const parts = String(name).split(".");
-  if (parts.length > 2) throw new Error(`query-helpers: "${name}" is not a valid table name`);
+  if (parts.length > 2)
+    throw new Error(`query-helpers: "${name}" is not a valid table name`);
   return parts.map((p) => ident(p)).join(".");
 }
 
@@ -59,13 +66,18 @@ function assertWritable(keys, writable) {
 function jsonb(data, columns) {
   const out = { ...data };
   for (const col of columns) {
-    if (Object.prototype.hasOwnProperty.call(out, col)) out[col] = out[col] === null || out[col] === undefined ? null : JSON.stringify(out[col]);
+    if (Object.prototype.hasOwnProperty.call(out, col))
+      out[col] =
+        out[col] === null || out[col] === undefined
+          ? null
+          : JSON.stringify(out[col]);
   }
   return out;
 }
 
 /** Drop undefined values: a key that is absent means "not given", not NULL. */
-const defined = (data) => Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+const defined = (data) =>
+  Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
 
 /**
  * INSERT one row and return it.
@@ -74,12 +86,19 @@ const defined = (data) => Object.fromEntries(Object.entries(data).filter(([, v])
  * @param {object} data
  * @param {{writable?: string[]|Set<string>, returning?: string}} [opts]
  */
-async function insertOne(client, tableName, data, { writable = null, returning = "*" } = {}) {
+async function insertOne(
+  client,
+  tableName,
+  data,
+  { writable = null, returning = "*" } = {},
+) {
   const row = defined(data);
   const keys = Object.keys(row);
   assertWritable(keys, writable);
   if (keys.length === 0) {
-    const { rows } = await client.query(`INSERT INTO ${table(tableName)} DEFAULT VALUES RETURNING ${returning}`);
+    const { rows } = await client.query(
+      `INSERT INTO ${table(tableName)} DEFAULT VALUES RETURNING ${returning}`,
+    );
     return rows[0];
   }
   const cols = keys.map((k) => ident(k, "body")).join(", ");
@@ -97,7 +116,14 @@ async function insertOne(client, tableName, data, { writable = null, returning =
  * @param {{writable?: string[]|Set<string>, returning?: string, touch?: string}} [opts]
  *   touch  a timestamp column to set to now() on every update ("updated_at")
  */
-async function updateOne(client, tableName, pk, id, patch, { writable = null, returning = "*", touch = null } = {}) {
+async function updateOne(
+  client,
+  tableName,
+  pk,
+  id,
+  patch,
+  { writable = null, returning = "*", touch = null } = {},
+) {
   const row = defined(patch);
   const keys = Object.keys(row);
   if (keys.length === 0 && !touch) return getById(client, tableName, pk, id);
@@ -117,7 +143,13 @@ async function updateOne(client, tableName, pk, id, patch, { writable = null, re
  *   columns    a SELECT list written in code, never from input
  *   forUpdate  lock the row for the rest of the transaction
  */
-async function getById(client, tableName, pk, id, { columns = "*", forUpdate = false } = {}) {
+async function getById(
+  client,
+  tableName,
+  pk,
+  id,
+  { columns = "*", forUpdate = false } = {},
+) {
   const { rows } = await client.query(
     `SELECT ${columns} FROM ${table(tableName)} WHERE ${ident(pk)} = $1${forUpdate ? " FOR UPDATE" : ""}`,
     [id],
@@ -126,10 +158,28 @@ async function getById(client, tableName, pk, id, { columns = "*", forUpdate = f
 }
 
 /** One row by primary key, or a 404 with the record's name in the message. */
-async function getOr404(client, tableName, pk, id, label = "Record", opts = {}) {
+async function getOr404(
+  client,
+  tableName,
+  pk,
+  id,
+  label = "Record",
+  opts = {},
+) {
   const row = await getById(client, tableName, pk, id, opts);
   if (!row) throw new AppError("NOT_FOUND", `${label} not found`, 404);
   return row;
 }
 
-module.exports = { ident, table, assertWritable, jsonb, defined, insertOne, updateOne, getById, getOr404, IDENT_RE };
+module.exports = {
+  ident,
+  table,
+  assertWritable,
+  jsonb,
+  defined,
+  insertOne,
+  updateOne,
+  getById,
+  getOr404,
+  IDENT_RE,
+};

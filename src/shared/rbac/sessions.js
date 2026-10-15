@@ -78,4 +78,10 @@ async function removeAllSessions(userId) {
   if (redis) await redis.del(userKey(userId)).catch(() => {});
 }
 
-module.exports = { indexSession, isSessionActive, removeSession, listSessionIds, removeAllSessions };
+module.exports = {
+  indexSession,
+  isSessionActive,
+  removeSession,
+  listSessionIds,
+  removeAllSessions,
+};

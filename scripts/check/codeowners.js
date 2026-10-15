@@ -22,7 +22,8 @@ const path = require("node:path");
 const { ROOT } = require("./lib/changes");
 
 const FILE = ".github/CODEOWNERS";
-const OWNER = /^@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?|[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+)$/;
+const OWNER =
+  /^@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?|[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+)$/;
 const problems = [];
 
 const full = path.join(ROOT, FILE);
@@ -40,13 +41,23 @@ fs.readFileSync(full, "utf8")
     const [pattern, ...owners] = line.split(/\s+/);
     const at = `${FILE}:${i + 1}`;
     patterns.add(pattern);
-    if (owners.length < 2) problems.push(`${at}: ${pattern} needs at least two owners (an author cannot approve their own PR)`);
+    if (owners.length < 2)
+      problems.push(
+        `${at}: ${pattern} needs at least two owners (an author cannot approve their own PR)`,
+      );
     for (const o of owners) {
-      if (!OWNER.test(o)) problems.push(`${at}: "${o}" is not a GitHub username; replace it with the person's real @username`);
+      if (!OWNER.test(o))
+        problems.push(
+          `${at}: "${o}" is not a GitHub username; replace it with the person's real @username`,
+        );
     }
     if (!/[*?[]/.test(pattern)) {
-      const target = path.join(ROOT, pattern.replace(/^\//, "").replace(/\/$/, ""));
-      if (!fs.existsSync(target)) problems.push(`${at}: ${pattern} does not exist in the repository`);
+      const target = path.join(
+        ROOT,
+        pattern.replace(/^\//, "").replace(/\/$/, ""),
+      );
+      if (!fs.existsSync(target))
+        problems.push(`${at}: ${pattern} does not exist in the repository`);
     }
   });
 
@@ -54,15 +65,24 @@ const modulesDir = path.join(ROOT, "src", "modules");
 if (fs.existsSync(modulesDir)) {
   for (const m of fs.readdirSync(modulesDir, { withFileTypes: true })) {
     if (m.isDirectory() && !patterns.has(`/src/modules/${m.name}/`)) {
-      problems.push(`${FILE}: module src/modules/${m.name}/ has no owner line ("/src/modules/${m.name}/ @owner @backup")`);
+      problems.push(
+        `${FILE}: module src/modules/${m.name}/ has no owner line ("/src/modules/${m.name}/ @owner @backup")`,
+      );
     }
   }
 }
 const guidesDir = path.join(ROOT, "docs", "guides");
 if (fs.existsSync(guidesDir)) {
   for (const g of fs.readdirSync(guidesDir)) {
-    if (g.endsWith(".md") && g !== "README.md" && g !== "_TEMPLATE.md" && !patterns.has(`/docs/guides/${g}`)) {
-      problems.push(`${FILE}: guide docs/guides/${g} has no owner line ("/docs/guides/${g} @owner @backup")`);
+    if (
+      g.endsWith(".md") &&
+      g !== "README.md" &&
+      g !== "_TEMPLATE.md" &&
+      !patterns.has(`/docs/guides/${g}`)
+    ) {
+      problems.push(
+        `${FILE}: guide docs/guides/${g} has no owner line ("/docs/guides/${g} @owner @backup")`,
+      );
     }
   }
 }

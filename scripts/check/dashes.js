@@ -7,7 +7,9 @@
  * Refuses an em dash, an en dash or a spaced double hyphen in:
  *   demo.html          string literals in its scripts and the text of its markup
  *   app/, public-app/  source outside comments (JSX text and strings)
- *   src/               string literals (errors, mail subjects, notifications)
+ *   src/, packages/    string literals (errors, mail subjects, notifications,
+ *                      contract validation messages)
+ *   src/services/ai/prompts/  the prompt files: the model copies the style it is given
  *   templates/         the text of mail and document templates
  *   docs/manual/       the user manual
  *
@@ -78,6 +80,19 @@ for (const file of frontendFiles()) {
 for (const file of walk("src", (n) => n.endsWith(".js") && !n.endsWith(".test.js"))) {
   const code = read(file);
   scriptLiterals(file, code, 0, code);
+}
+
+for (const file of walk("packages", (n) => n.endsWith(".js") && !n.endsWith(".test.js"))) {
+  const code = read(file);
+  scriptLiterals(file, code, 0, code);
+}
+
+for (const file of walk("src/services/ai/prompts", (n) => n.endsWith(".md"))) {
+  read(file)
+    .split("\n")
+    .forEach((l, i) => {
+      if (!/^-{3,}\s*$/.test(l) && hasDash(l)) add(file, i + 1, l);
+    });
 }
 
 for (const file of walk("templates", (n) => /\.(html|hbs|txt)$/.test(n))) {

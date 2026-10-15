@@ -61,14 +61,23 @@ const approvers = require("./approvers");
 
 const DECISIONS = new Set(["approve", "reject", "request_changes"]);
 const NEEDS_REASON = new Set(["reject", "request_changes"]);
-const TERMINAL = new Set(["approved", "rejected", "cancelled", "timeout_approved", "timeout_rejected"]);
+const TERMINAL = new Set([
+  "approved",
+  "rejected",
+  "cancelled",
+  "timeout_approved",
+  "timeout_rejected",
+]);
 
 const COLUMNS = `workflow_instance_id, workflow_definition_id, definition_key, module_key, entity_type, entity_id,
   subject_employee_id, current_stage, state, context, stage_approvers, stage_entered_at, stage_due_at,
   opened_by, opened_at, completed_at`;
 
 function mustBeInTransaction(client, fn) {
-  if (!inTransaction(client)) throw new Error(`workflow.${fn} must run inside atomically(), on the caller's client`);
+  if (!inTransaction(client))
+    throw new Error(
+      `workflow.${fn} must run inside atomically(), on the caller's client`,
+    );
 }
 
 function actorId(actor) {
@@ -78,7 +87,9 @@ function actorId(actor) {
 
 /** The facts every workflow event carries; handlers and notifications read these. */
 function payloadOf(instance, def, extra = {}) {
-  const stage = instance.current_stage ? cond.stageByKey(def, instance.current_stage) : null;
+  const stage = instance.current_stage
+    ? cond.stageByKey(def, instance.current_stage)
+    : null;
   return {
     instance_id: instance.workflow_instance_id,
     definition_key: instance.definition_key,
@@ -86,7 +97,8 @@ function payloadOf(instance, def, extra = {}) {
     state: instance.state,
     stage: instance.current_stage,
     stage_name: stage ? stage.name : null,
-    stage_approvers: instance.state === "pending" ? instance.stage_approvers : [],
+    stage_approvers:
+      instance.state === "pending" ? instance.stage_approvers : [],
     subject_employee_id: instance.subject_employee_id,
     opened_by: instance.opened_by,
     ...extra,
@@ -107,20 +119,33 @@ async function decide(client, instance, stageKey, actor, decision, reason) {
   await client.query(
     `INSERT INTO workflow_decision (workflow_instance_id, stage_key, actor_id, decision, reason)
      VALUES ($1, $2, $3, $4, $5)`,
-    [instance.workflow_instance_id, stageKey, actorId(actor), decision, reason || null],
+    [
+      instance.workflow_instance_id,
+      stageKey,
+      actorId(actor),
+      decision,
+      reason || null,
+    ],
   );
 }
 
 /** Move a pending instance to a stage (resolving its approvers), or close it. */
 async function moveTo(client, instance, stage) {
-  const snapshot = await approvers.resolve(client, stage.approvers, { subject_employee_id: instance.subject_employee_id });
+  const snapshot = await approvers.resolve(client, stage.approvers, {
+    subject_employee_id: instance.subject_employee_id,
+  });
   const { rows } = await client.query(
     `UPDATE workflow_instance
         SET current_stage = $2, stage_approvers = $3::jsonb, stage_entered_at = now(),
             stage_due_at = now() + make_interval(hours => $4)
       WHERE workflow_instance_id = $1
       RETURNING ${COLUMNS}`,
-    [instance.workflow_instance_id, stage.key, JSON.stringify(snapshot), stage.sla_hours],
+    [
+      instance.workflow_instance_id,
+      stage.key,
+      JSON.stringify(snapshot),
+      stage.sla_hours,
+    ],
   );
   return rows[0];
 }
@@ -137,20 +162,33 @@ async function close(client, instance, state) {
 }
 
 async function lock(client, instanceId) {
-  const { rows } = await client.query(`SELECT ${COLUMNS} FROM workflow_instance WHERE workflow_instance_id = $1 FOR UPDATE`, [instanceId]);
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS} FROM workflow_instance WHERE workflow_instance_id = $1 FOR UPDATE`,
+    [instanceId],
+  );
   if (!rows[0]) throw new AppError("NOT_FOUND", "Approval not found", 404);
   return rows[0];
 }
 
 async function definitionOf(client, instance) {
-  const def = await definitions.findById(client, instance.workflow_definition_id);
-  if (!def) throw new Error(`workflow: definition ${instance.workflow_definition_id} of instance ${instance.workflow_instance_id} is gone`);
+  const def = await definitions.findById(
+    client,
+    instance.workflow_definition_id,
+  );
+  if (!def)
+    throw new Error(
+      `workflow: definition ${instance.workflow_definition_id} of instance ${instance.workflow_instance_id} is gone`,
+    );
   return def;
 }
 
 function assertPending(instance) {
   if (instance.state !== "pending") {
-    throw new AppError("WORKFLOW_CLOSED", `This approval is already ${instance.state.replace(/_/g, " ")}`, 409);
+    throw new AppError(
+      "WORKFLOW_CLOSED",
+      `This approval is already ${instance.state.replace(/_/g, " ")}`,
+      409,
+    );
   }
 }
 
@@ -160,7 +198,9 @@ function assertPending(instance) {
 
 /** Would this request need any approval? For a screen's "needs approval" hint. */
 async function requiresApproval(client, definitionKey, context) {
-  const def = (await definitions.findActive(client, definitionKey)) || definitions.getDefault(definitionKey);
+  const def =
+    (await definitions.findActive(client, definitionKey)) ||
+    definitions.getDefault(definitionKey);
   if (!def) return false;
   return cond.requiresApproval(def, context);
 }
@@ -172,12 +212,23 @@ async function requiresApproval(client, definitionKey, context) {
  *          context: object, actor: object|string|null}} opts
  * @returns {Promise<object>} the instance
  */
-async function openInstance(client, { definition_key: key, entity, subject_employee_id: subjectId = null, context = {}, actor }) {
+async function openInstance(
+  client,
+  {
+    definition_key: key,
+    entity,
+    subject_employee_id: subjectId = null,
+    context = {},
+    actor,
+  },
+) {
   mustBeInTransaction(client, "openInstance");
-  if (!entity || !entity.type || !entity.id) throw new Error("workflow.openInstance: entity { type, id } is required");
+  if (!entity || !entity.type || !entity.id)
+    throw new Error("workflow.openInstance: entity { type, id } is required");
   const def = await definitions.ensureActive(client, key);
   const problems = cond.contextProblems(def, context);
-  if (problems.length) throw new Error(`workflow.openInstance(${key}): ${problems.join("; ")}`);
+  if (problems.length)
+    throw new Error(`workflow.openInstance(${key}): ${problems.join("; ")}`);
 
   const first = cond.firstApplicableStage(def, context);
   let instance;
@@ -203,12 +254,19 @@ async function openInstance(client, { definition_key: key, entity, subject_emplo
     );
     instance = rows[0];
   } catch (err) {
-    if (err.code === "23505") throw new AppError("WORKFLOW_ALREADY_OPEN", "This record is already waiting for approval", 409);
+    if (err.code === "23505")
+      throw new AppError(
+        "WORKFLOW_ALREADY_OPEN",
+        "This record is already waiting for approval",
+        409,
+      );
     throw err;
   }
 
   if (!first) {
-    await record(client, instance, def, WORKFLOW.WORKFLOW_COMPLETED, actor, { auto: true });
+    await record(client, instance, def, WORKFLOW.WORKFLOW_COMPLETED, actor, {
+      auto: true,
+    });
     return instance;
   }
   instance = await moveTo(client, instance, first);
@@ -223,8 +281,15 @@ async function openInstance(client, { definition_key: key, entity, subject_emplo
 /** Back to the first applicable stage (request changes, or a stage set to return). */
 async function returnToStart(client, instance, def, actor, reason) {
   const first = cond.firstApplicableStage(def, instance.context);
-  const moved = await moveTo(client, instance, first || cond.stageByKey(def, instance.current_stage));
-  await record(client, moved, def, WORKFLOW.WORKFLOW_CHANGES_REQUESTED, actor, { from_stage: instance.current_stage, reason });
+  const moved = await moveTo(
+    client,
+    instance,
+    first || cond.stageByKey(def, instance.current_stage),
+  );
+  await record(client, moved, def, WORKFLOW.WORKFLOW_CHANGES_REQUESTED, actor, {
+    from_stage: instance.current_stage,
+    reason,
+  });
   return moved;
 }
 
@@ -235,42 +300,79 @@ async function returnToStart(client, instance, def, actor, reason) {
  *   actor is req.user (user_id, employee_id, role_ids, is_ceo)
  * @returns {Promise<object>} the instance after the decision
  */
-async function act(client, { instance_id: id, actor, decision, reason = null }) {
+async function act(
+  client,
+  { instance_id: id, actor, decision, reason = null },
+) {
   mustBeInTransaction(client, "act");
-  if (!DECISIONS.has(decision)) throw new AppError("INVALID_DECISION", `Unknown decision "${decision}"`, 422);
+  if (!DECISIONS.has(decision))
+    throw new AppError(
+      "INVALID_DECISION",
+      `Unknown decision "${decision}"`,
+      422,
+    );
   const why = typeof reason === "string" ? reason.trim() : "";
   if (NEEDS_REASON.has(decision) && !why) {
-    throw new AppError("REASON_REQUIRED", "Give a reason so the requester knows what to change", 422, { reason: ["is required"] });
+    throw new AppError(
+      "REASON_REQUIRED",
+      "Give a reason so the requester knows what to change",
+      422,
+      { reason: ["is required"] },
+    );
   }
 
   const instance = await lock(client, id);
   assertPending(instance);
   const def = await definitionOf(client, instance);
   const stage = cond.stageByKey(def, instance.current_stage);
-  if (!stage) throw new AppError("WORKFLOW_STAGE_MISSING", "This approval's stage no longer exists", 409);
-  if (!(await approvers.canAct(client, instance.stage_approvers, actor, instance))) {
-    throw new AppError("PERMISSION_DENIED", "You are not an approver for this stage", 403);
+  if (!stage)
+    throw new AppError(
+      "WORKFLOW_STAGE_MISSING",
+      "This approval's stage no longer exists",
+      409,
+    );
+  if (
+    !(await approvers.canAct(client, instance.stage_approvers, actor, instance))
+  ) {
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "You are not an approver for this stage",
+      403,
+    );
   }
 
   await decide(client, instance, stage.key, actor, decision, why || null);
 
-  if (decision === "request_changes" || (decision === "reject" && stage.on_reject === "return")) {
+  if (
+    decision === "request_changes" ||
+    (decision === "reject" && stage.on_reject === "return")
+  ) {
     return returnToStart(client, instance, def, actor, why);
   }
   if (decision === "reject") {
     const closed = await close(client, instance, "rejected");
-    await record(client, closed, def, WORKFLOW.WORKFLOW_COMPLETED, actor, { decided_stage: stage.key, reason: why });
+    await record(client, closed, def, WORKFLOW.WORKFLOW_COMPLETED, actor, {
+      decided_stage: stage.key,
+      reason: why,
+    });
     return closed;
   }
 
-  const next = stage.on_approve === "complete" ? null : cond.nextApplicableStage(def, instance.context, stage.key);
+  const next =
+    stage.on_approve === "complete"
+      ? null
+      : cond.nextApplicableStage(def, instance.context, stage.key);
   if (!next) {
     const closed = await close(client, instance, "approved");
-    await record(client, closed, def, WORKFLOW.WORKFLOW_COMPLETED, actor, { decided_stage: stage.key });
+    await record(client, closed, def, WORKFLOW.WORKFLOW_COMPLETED, actor, {
+      decided_stage: stage.key,
+    });
     return closed;
   }
   const moved = await moveTo(client, instance, next);
-  await record(client, moved, def, WORKFLOW.WORKFLOW_ADVANCED, actor, { from_stage: stage.key });
+  await record(client, moved, def, WORKFLOW.WORKFLOW_ADVANCED, actor, {
+    from_stage: stage.key,
+  });
   return moved;
 }
 
@@ -283,13 +385,30 @@ async function cancel(client, { instance_id: id, actor, reason = null }) {
   const instance = await lock(client, id);
   assertPending(instance);
   const uid = actorId(actor);
-  if (!(actor && actor.is_ceo === true) && (!uid || uid !== instance.opened_by)) {
-    throw new AppError("PERMISSION_DENIED", "Only the person who made the request can withdraw it", 403);
+  if (
+    !(actor && actor.is_ceo === true) &&
+    (!uid || uid !== instance.opened_by)
+  ) {
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "Only the person who made the request can withdraw it",
+      403,
+    );
   }
   const def = await definitionOf(client, instance);
-  await decide(client, instance, instance.current_stage, actor, "cancel", reason);
+  await decide(
+    client,
+    instance,
+    instance.current_stage,
+    actor,
+    "cancel",
+    reason,
+  );
   const closed = await close(client, instance, "cancelled");
-  await record(client, closed, def, WORKFLOW.WORKFLOW_CANCELLED, actor, { reason, withdrawn_from: instance.stage_approvers });
+  await record(client, closed, def, WORKFLOW.WORKFLOW_CANCELLED, actor, {
+    reason,
+    withdrawn_from: instance.stage_approvers,
+  });
   return closed;
 }
 
@@ -328,26 +447,54 @@ async function resolveTimeout(client, id) {
         WHERE workflow_instance_id = $1 RETURNING ${COLUMNS}`,
       [id, hours],
     );
-    await record(client, re[0], def, WORKFLOW.WORKFLOW_ESCALATED, null, { overdue_stage: instance.current_stage });
+    await record(client, re[0], def, WORKFLOW.WORKFLOW_ESCALATED, null, {
+      overdue_stage: instance.current_stage,
+    });
     return re[0];
   }
 
   if (policy === "auto_reject") {
-    await decide(client, instance, instance.current_stage, null, "timeout_reject", `No decision within ${stage.sla_hours} hours`);
+    await decide(
+      client,
+      instance,
+      instance.current_stage,
+      null,
+      "timeout_reject",
+      `No decision within ${stage.sla_hours} hours`,
+    );
     const closed = await close(client, instance, "timeout_rejected");
-    await record(client, closed, def, WORKFLOW.WORKFLOW_COMPLETED, null, { auto: true, decided_stage: instance.current_stage });
+    await record(client, closed, def, WORKFLOW.WORKFLOW_COMPLETED, null, {
+      auto: true,
+      decided_stage: instance.current_stage,
+    });
     return closed;
   }
 
-  await decide(client, instance, instance.current_stage, null, "timeout_approve", `No decision within ${stage.sla_hours} hours`);
-  const next = stage.on_approve === "complete" ? null : cond.nextApplicableStage(def, instance.context, stage.key);
+  await decide(
+    client,
+    instance,
+    instance.current_stage,
+    null,
+    "timeout_approve",
+    `No decision within ${stage.sla_hours} hours`,
+  );
+  const next =
+    stage.on_approve === "complete"
+      ? null
+      : cond.nextApplicableStage(def, instance.context, stage.key);
   if (!next) {
     const closed = await close(client, instance, "timeout_approved");
-    await record(client, closed, def, WORKFLOW.WORKFLOW_COMPLETED, null, { auto: true, decided_stage: stage.key });
+    await record(client, closed, def, WORKFLOW.WORKFLOW_COMPLETED, null, {
+      auto: true,
+      decided_stage: stage.key,
+    });
     return closed;
   }
   const moved = await moveTo(client, instance, next);
-  await record(client, moved, def, WORKFLOW.WORKFLOW_ADVANCED, null, { auto: true, from_stage: stage.key });
+  await record(client, moved, def, WORKFLOW.WORKFLOW_ADVANCED, null, {
+    auto: true,
+    from_stage: stage.key,
+  });
   return moved;
 }
 
@@ -357,7 +504,10 @@ async function resolveTimeout(client, id) {
  * @param {{db?: import("pg").Pool, limit?: number}} [opts]
  * @returns {Promise<{due: number, resolved: number, failed: number}>}
  */
-async function sweepTimeouts({ db = require("../../config/db").pool, limit = 200 } = {}) {
+async function sweepTimeouts({
+  db = require("../../config/db").pool,
+  limit = 200,
+} = {}) {
   const { rows } = await db.query(
     `SELECT workflow_instance_id FROM workflow_instance
       WHERE state = 'pending' AND stage_due_at <= now()
@@ -373,7 +523,10 @@ async function sweepTimeouts({ db = require("../../config/db").pool, limit = 200
       if (done) out.resolved += 1;
     } catch (err) {
       out.failed += 1;
-      require("../../config/logger").logger.error({ err, workflow_instance_id: id }, "workflow timeout failed");
+      require("../../config/logger").logger.error(
+        { err, workflow_instance_id: id },
+        "workflow timeout failed",
+      );
     } finally {
       client.release();
     }
@@ -400,7 +553,10 @@ async function findOpenInstance(client, entity) {
  * handful (one per stage, plus returns), never a list a person pages through.
  */
 async function getInstance(client, id) {
-  const { rows } = await client.query(`SELECT ${COLUMNS} FROM workflow_instance WHERE workflow_instance_id = $1`, [id]);
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS} FROM workflow_instance WHERE workflow_instance_id = $1`,
+    [id],
+  );
   if (!rows[0]) return null;
   const { rows: decisions } = await client.query(
     `SELECT workflow_decision_id, stage_key, actor_id, decision, reason, decided_at

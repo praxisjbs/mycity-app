@@ -9,4 +9,7 @@ process.env.APP_ENV = "test";
 process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || "silent";
 // Files a test stores go to a throwaway folder, never the repository's ./media.
-process.env.MEDIA_ROOT = require("node:path").join(require("node:os").tmpdir(), `mycity-test-media-${process.pid}`);
+process.env.MEDIA_ROOT = require("node:path").join(
+  require("node:os").tmpdir(),
+  `mycity-test-media-${process.pid}`,
+);

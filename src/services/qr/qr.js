@@ -21,11 +21,16 @@ function assertOwnUrl(text) {
     throw new Error("qr: give a URL");
   }
   const own = new URL(config.PUBLIC_ORIGIN);
-  if (u.origin !== own.origin) throw new Error(`qr: only ${own.origin} links are encoded`);
+  if (u.origin !== own.origin)
+    throw new Error(`qr: only ${own.origin} links are encoded`);
   return u.toString();
 }
 
-const OPTS = { errorCorrectionLevel: "M", margin: 2, color: { dark: "#01221D", light: "#FFFFFF" } };
+const OPTS = {
+  errorCorrectionLevel: "M",
+  margin: 2,
+  color: { dark: "#01221D", light: "#FFFFFF" },
+};
 
 /** SVG markup. */
 function svg(url, { width = 160 } = {}) {
@@ -39,7 +44,11 @@ function png(url, { width = 320 } = {}) {
 
 /** A data: URL of the PNG, for a template's <img src>. */
 function dataUrl(url, { width = 320 } = {}) {
-  return QRCode.toDataURL(assertOwnUrl(url), { ...OPTS, type: "image/png", width });
+  return QRCode.toDataURL(assertOwnUrl(url), {
+    ...OPTS,
+    type: "image/png",
+    width,
+  });
 }
 
 module.exports = { svg, png, dataUrl };

@@ -26,10 +26,13 @@
  * A module declares each type it generates once, beside its events:
  *
  *   defineDocType("query_letter", {
+ *     label: "Query letter",             // registered as a document type too (types.js)
+ *     module: "queries",                 // whose view grant governs reading it
  *     template: "query-letter",          // templates/documents/query-letter.html
  *     numbering: "letter",               // a key of shared/numbering/schemes.js, or null
  *     sensitivity: "personal",
  *     title: (data) => `Query: ${data.subject}`,
+ *     signable: false,                   // M5 offer letters and contracts: true
  *   });
  *   defineVariables("document", "query-letter", c.queries.QueryLetterVars);
  *
@@ -53,6 +56,7 @@ const { storageKey, displayName } = require("../files/safe-name");
 const templates = require("../templates/template-store");
 const variables = require("../templates/variables");
 const vault = require("./vault");
+const docTypes = require("./types");
 const storage = require("../../services/storage/storage.service");
 
 const ASSETS = path.resolve(__dirname, "..", "..", "..", "assets");
@@ -62,21 +66,53 @@ const SENSITIVITIES = new Set(["normal", "personal", "restricted"]);
 /**
  * @param {string} docType  snake_case
  * @param {{template: string, numbering?: string|null, sensitivity?: string, title: (data: object) => string,
- *          landscape?: boolean}} spec
+ *          landscape?: boolean, label?: string, module?: string|null, signable?: boolean, wet?: boolean}} spec
  */
 function defineDocType(docType, spec) {
-  if (!/^[a-z][a-z0-9_]{1,63}$/.test(docType)) throw new Error(`defineDocType: "${docType}" is snake_case`);
-  if (!spec || !/^[a-z][a-z0-9-]{1,63}$/.test(String(spec.template || ""))) throw new Error(`defineDocType(${docType}): template is a file key`);
-  if (spec.numbering && !SCHEMES[spec.numbering]) throw new Error(`defineDocType(${docType}): numbering "${spec.numbering}" is not in shared/numbering/schemes.js`);
-  if (spec.sensitivity && !SENSITIVITIES.has(spec.sensitivity)) throw new Error(`defineDocType(${docType}): sensitivity is normal, personal or restricted`);
-  if (typeof spec.title !== "function") throw new Error(`defineDocType(${docType}): title is (data) => string`);
-  if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec) throw new Error(`defineDocType: ${docType} is already defined`);
-  DOC_TYPES.set(docType, Object.freeze({ numbering: null, sensitivity: "normal", landscape: false, ...spec }));
+  if (!/^[a-z][a-z0-9_]{1,63}$/.test(docType))
+    throw new Error(`defineDocType: "${docType}" is snake_case`);
+  if (!spec || !/^[a-z][a-z0-9-]{1,63}$/.test(String(spec.template || "")))
+    throw new Error(`defineDocType(${docType}): template is a file key`);
+  if (spec.numbering && !SCHEMES[spec.numbering])
+    throw new Error(
+      `defineDocType(${docType}): numbering "${spec.numbering}" is not in shared/numbering/schemes.js`,
+    );
+  if (spec.sensitivity && !SENSITIVITIES.has(spec.sensitivity))
+    throw new Error(
+      `defineDocType(${docType}): sensitivity is normal, personal or restricted`,
+    );
+  if (typeof spec.title !== "function")
+    throw new Error(`defineDocType(${docType}): title is (data) => string`);
+  if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec)
+    throw new Error(`defineDocType: ${docType} is already defined`);
+  DOC_TYPES.set(
+    docType,
+    Object.freeze({
+      numbering: null,
+      sensitivity: "normal",
+      landscape: false,
+      ...spec,
+    }),
+  );
+  // One registry for every doc type, generated or uploaded: reading, signing and the
+  // template join all look the type up there.
+  docTypes.defineDocumentType(docType, {
+    label:
+      spec.label ||
+      docType.charAt(0).toUpperCase() + docType.slice(1).replace(/_/g, " "),
+    module: spec.module || null,
+    sensitivity: spec.sensitivity || "normal",
+    signable: spec.signable === true,
+    wet: spec.wet === true,
+  });
 }
 
 function specOf(docType) {
   const spec = DOC_TYPES.get(docType);
-  if (!spec) throw new Error(`documents.generate: "${docType}" is not defined; call defineDocType()`);
+  if (!spec)
+    throw new Error(
+      `documents.generate: "${docType}" is not defined; call defineDocType()`,
+    );
   return spec;
 }
 
@@ -89,16 +125,25 @@ let brandCache = null;
 /** Logo and font data URLs, read once per process. */
 function brand() {
   if (brandCache) return brandCache;
-  const logoFile = ["logo.png", "logo.jpg"].map((f) => path.join(ASSETS, "brand", f)).find((f) => fs.existsSync(f) && fs.statSync(f).size > 0);
-  const logo = logoFile ? `data:image/${logoFile.endsWith(".png") ? "png" : "jpeg"};base64,${fs.readFileSync(logoFile).toString("base64")}` : null;
+  const logoFile = ["logo.png", "logo.jpg"]
+    .map((f) => path.join(ASSETS, "brand", f))
+    .find((f) => fs.existsSync(f) && fs.statSync(f).size > 0);
+  const logo = logoFile
+    ? `data:image/${logoFile.endsWith(".png") ? "png" : "jpeg"};base64,${fs.readFileSync(logoFile).toString("base64")}`
+    : null;
   const fontDir = path.join(ASSETS, "fonts");
   const faces = fs.existsSync(fontDir)
     ? fs
         .readdirSync(fontDir)
         .filter((f) => /^Geist-(\w+)\.woff2$/.test(f))
         .map((f) => {
-          const weight = { Regular: 400, Medium: 500, SemiBold: 600, Bold: 700 }[/^Geist-(\w+)\./.exec(f)[1]] || 400;
-          const data = fs.readFileSync(path.join(fontDir, f)).toString("base64");
+          const weight =
+            { Regular: 400, Medium: 500, SemiBold: 600, Bold: 700 }[
+              /^Geist-(\w+)\./.exec(f)[1]
+            ] || 400;
+          const data = fs
+            .readFileSync(path.join(fontDir, f))
+            .toString("base64");
           return `@font-face{font-family:"Geist";font-weight:${weight};src:url(data:font/woff2;base64,${data}) format("woff2");}`;
         })
     : [];
@@ -113,7 +158,9 @@ function brand() {
 async function orgProfile(client) {
   let value = {};
   try {
-    const { rows } = await client.query("SELECT value FROM setting WHERE key = 'organisation.profile'");
+    const { rows } = await client.query(
+      "SELECT value FROM setting WHERE key = 'organisation.profile'",
+    );
     value = (rows[0] && rows[0].value) || {};
   } catch (err) {
     if (err.code !== "42P01") throw err;
@@ -154,16 +201,39 @@ function renderDocumentHtml(template, data, context) {
  *   date  the document's business date (numbering period, the date printed); default today in Lagos
  * @returns {Promise<object>} the document row, render_status "pending"
  */
-async function generate(client, { doc_type: docType, entity, subject_employee_id: subjectId = null, data, actor, date }) {
-  if (!inTransaction(client)) throw new Error("documents.generate must run inside atomically()");
+async function generate(
+  client,
+  {
+    doc_type: docType,
+    entity,
+    subject_employee_id: subjectId = null,
+    data,
+    actor,
+    date,
+  },
+) {
+  if (!inTransaction(client))
+    throw new Error("documents.generate must run inside atomically()");
   const spec = specOf(docType);
   const checked = variables.parseData("document", spec.template, data);
   const template = await templates.current(client, "document", spec.template);
-  const day = date ? lagos.assertDate(String(date).slice(0, 10), "date") : lagos.today();
-  const number = spec.numbering ? (await numbering.allocate(client, spec.numbering, { date: day })).number : null;
-  const title = String(spec.title(checked) || "").trim().slice(0, 200) || docType;
+  const day = date
+    ? lagos.assertDate(String(date).slice(0, 10), "date")
+    : lagos.today();
+  const number = spec.numbering
+    ? (await numbering.allocate(client, spec.numbering, { date: day })).number
+    : null;
+  const title =
+    String(spec.title(checked) || "")
+      .trim()
+      .slice(0, 200) || docType;
   const org = await orgProfile(client);
-  const html = renderDocumentHtml(template, checked, { org, number, today: day, doc: { title } });
+  const html = renderDocumentHtml(template, checked, {
+    org,
+    number,
+    today: day,
+    doc: { title },
+  });
 
   const id = crypto.randomUUID();
   const doc = await vault.insertRow(client, {
@@ -187,14 +257,24 @@ async function generate(client, { doc_type: docType, entity, subject_employee_id
     template_version: template.version,
     render_status: "pending",
     render_html: html,
-    uploaded_by: actor ? (typeof actor === "string" ? actor : actor.user_id || null) : null,
+    uploaded_by: actor
+      ? typeof actor === "string"
+        ? actor
+        : actor.user_id || null
+      : null,
   });
   await emit(client, {
     key: vault.EVENTS.DOCUMENT_RENDER_REQUESTED,
     entity: { type: "document", id },
     module: vault.moduleFor(entity.type),
     actor,
-    payload: { document_id: id, doc_type: docType, number, entity_type: entity.type, entity_id: String(entity.id) },
+    payload: {
+      document_id: id,
+      doc_type: docType,
+      number,
+      entity_type: entity.type,
+      entity_id: String(entity.id),
+    },
   });
   return doc;
 }
@@ -206,7 +286,10 @@ async function generate(client, { doc_type: docType, entity, subject_employee_id
  * @param {{db?: import("pg").Pool, renderPdf?: (html: string, opts: object) => Promise<Buffer>}} [opts]
  * @returns {Promise<object|null>} the rendered document, or null when there was nothing to do
  */
-async function renderPending(documentId, { db = require("../../config/db").pool, renderPdf = null } = {}) {
+async function renderPending(
+  documentId,
+  { db = require("../../config/db").pool, renderPdf = null } = {},
+) {
   const { rows } = await db.query(
     "SELECT document_id, doc_type, number, storage_key, render_status, render_html, entity_type FROM document WHERE document_id = $1",
     [documentId],
@@ -215,8 +298,17 @@ async function renderPending(documentId, { db = require("../../config/db").pool,
   if (!row || row.render_status !== "pending") return null;
   const spec = DOC_TYPES.get(row.doc_type) || { landscape: false };
   const toPdf = renderPdf || require("../../services/pdf/pdf.service").render;
-  const bytes = await toPdf(row.render_html, { footer: row.number, landscape: spec.landscape });
-  if (!Buffer.isBuffer(bytes) || bytes.subarray(0, 5).toString("latin1") !== "%PDF-") throw new Error("documents.renderPending: the renderer did not return a PDF");
+  const bytes = await toPdf(row.render_html, {
+    footer: row.number,
+    landscape: spec.landscape,
+  });
+  if (
+    !Buffer.isBuffer(bytes) ||
+    bytes.subarray(0, 5).toString("latin1") !== "%PDF-"
+  )
+    throw new Error(
+      "documents.renderPending: the renderer did not return a PDF",
+    );
 
   await storage.put(row.storage_key, bytes, { overwrite: true });
   const client = await db.connect();
@@ -235,7 +327,12 @@ async function renderPending(documentId, { db = require("../../config/db").pool,
         entity: { type: "document", id: documentId },
         module: vault.moduleFor(row.entity_type),
         actor: null,
-        payload: { document_id: documentId, doc_type: row.doc_type, number: row.number, content_hash: up[0].content_hash },
+        payload: {
+          document_id: documentId,
+          doc_type: row.doc_type,
+          number: row.number,
+          content_hash: up[0].content_hash,
+        },
       });
       return up[0];
     });
@@ -245,7 +342,11 @@ async function renderPending(documentId, { db = require("../../config/db").pool,
 }
 
 /** Mark a render as failed for good (the job's last attempt). */
-async function failRender(documentId, error, { db = require("../../config/db").pool } = {}) {
+async function failRender(
+  documentId,
+  error,
+  { db = require("../../config/db").pool } = {},
+) {
   const client = await db.connect();
   try {
     await atomically(client, async () => {
@@ -273,4 +374,14 @@ function __reset() {
   brandCache = null;
 }
 
-module.exports = { defineDocType, specOf, generate, renderPending, failRender, renderDocumentHtml, orgProfile, brand, __reset };
+module.exports = {
+  defineDocType,
+  specOf,
+  generate,
+  renderPending,
+  failRender,
+  renderDocumentHtml,
+  orgProfile,
+  brand,
+  __reset,
+};

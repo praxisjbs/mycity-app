@@ -35,24 +35,42 @@ const { AppError } = require("../errors");
  * @param {Record<string, string[]>} moves  state → states it may move to; terminal states map to []
  */
 function defineMachine(entityType, moves) {
-  if (!/^[a-z][a-z0-9_]*$/.test(entityType)) throw new Error("defineMachine: entity type is snake_case");
+  if (!/^[a-z][a-z0-9_]*$/.test(entityType))
+    throw new Error("defineMachine: entity type is snake_case");
   const states = new Set(Object.keys(moves));
   for (const [from, tos] of Object.entries(moves)) {
     for (const to of tos) {
-      if (!states.has(to)) throw new Error(`defineMachine(${entityType}): "${from}" moves to unknown state "${to}"`);
+      if (!states.has(to))
+        throw new Error(
+          `defineMachine(${entityType}): "${from}" moves to unknown state "${to}"`,
+        );
     }
   }
-  return Object.freeze({ entityType, states, moves: Object.freeze({ ...moves }) });
+  return Object.freeze({
+    entityType,
+    states,
+    moves: Object.freeze({ ...moves }),
+  });
 }
 
-const canMove = (machine, from, to) => Boolean(machine.moves[from] && machine.moves[from].includes(to));
+const canMove = (machine, from, to) =>
+  Boolean(machine.moves[from] && machine.moves[from].includes(to));
 
 /** Refuse a move the machine does not allow. A null `from` is the record's first state. */
 function assertMove(machine, from, to) {
-  if (!machine.states.has(to)) throw new AppError("INVALID_STATE", `"${to}" is not a ${machine.entityType} state`, 422);
+  if (!machine.states.has(to))
+    throw new AppError(
+      "INVALID_STATE",
+      `"${to}" is not a ${machine.entityType} state`,
+      422,
+    );
   if (from === null || from === undefined) return;
   if (!canMove(machine, from, to)) {
-    throw new AppError("MOVE_NOT_ALLOWED", `A ${machine.entityType.replace(/_/g, " ")} cannot move from ${from} to ${to}`, 409);
+    throw new AppError(
+      "MOVE_NOT_ALLOWED",
+      `A ${machine.entityType.replace(/_/g, " ")} cannot move from ${from} to ${to}`,
+      409,
+    );
   }
 }
 
@@ -63,7 +81,11 @@ function assertMove(machine, from, to) {
  * @param {object} machine  from defineMachine
  * @param {{entity_id: string, from: string|null, to: string, actor_id?: string|null, reason?: string|null}} move
  */
-async function transition(client, machine, { entity_id, from = null, to, actor_id = null, reason = null }) {
+async function transition(
+  client,
+  machine,
+  { entity_id, from = null, to, actor_id = null, reason = null },
+) {
   assertMove(machine, from, to);
   const { rows } = await client.query(
     `INSERT INTO entity_state_history (entity_type, entity_id, from_state, to_state, actor_id, reason, changed_at)
@@ -84,7 +106,12 @@ function stagesFrom(rows, now = new Date()) {
   return rows.map((r, i) => {
     const entered = new Date(r.changed_at);
     const left = rows[i + 1] ? new Date(rows[i + 1].changed_at) : null;
-    return { state: r.to_state, entered_at: entered, left_at: left, seconds: Math.max(0, Math.round(((left || now) - entered) / 1000)) };
+    return {
+      state: r.to_state,
+      entered_at: entered,
+      left_at: left,
+      seconds: Math.max(0, Math.round(((left || now) - entered) / 1000)),
+    };
   });
 }
 
@@ -100,4 +127,11 @@ function currentStageSince(paramIndex) {
            ORDER BY entity_id, changed_at DESC`;
 }
 
-module.exports = { defineMachine, canMove, assertMove, transition, stagesFrom, currentStageSince };
+module.exports = {
+  defineMachine,
+  canMove,
+  assertMove,
+  transition,
+  stagesFrom,
+  currentStageSince,
+};

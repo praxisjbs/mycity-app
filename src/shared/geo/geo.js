@@ -29,16 +29,30 @@ function isPoint(p) {
   if (!p) return false;
   const lat = Number(p.latitude);
   const lng = Number(p.longitude);
-  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
-    && p.latitude !== null && p.longitude !== null;
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180 &&
+    p.latitude !== null &&
+    p.longitude !== null
+  );
 }
 
 /** Great-circle distance in whole metres (haversine). */
 function distanceM(a, b) {
   const dLat = rad(b.latitude - a.latitude);
   const dLng = rad(b.longitude - a.longitude);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLng / 2) ** 2;
-  return Math.round(EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)));
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.latitude)) *
+      Math.cos(rad(b.latitude)) *
+      Math.sin(dLng / 2) ** 2;
+  return Math.round(
+    EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)),
+  );
 }
 
 /** The nearest worksite to a point: { worksite, distance_m }, or null when there are none. */
@@ -64,15 +78,37 @@ function insideFence(point, worksite) {
  * @returns {{recorded: boolean, is_offsite: boolean, worksite_id: string|null, distance_m: number|null,
  *            low_accuracy: boolean, reason: null|"no_location"|"no_worksites"|"outside_worksite"}}
  */
-function evaluateClockIn({ point, accuracy_m = null, worksites, maxAccuracyM = DEFAULT_MAX_ACCURACY_M }) {
+function evaluateClockIn({
+  point,
+  accuracy_m = null,
+  worksites,
+  maxAccuracyM = DEFAULT_MAX_ACCURACY_M,
+}) {
   if (!isPoint(point)) {
-    return { recorded: false, is_offsite: false, worksite_id: null, distance_m: null, low_accuracy: false, reason: "no_location" };
+    return {
+      recorded: false,
+      is_offsite: false,
+      worksite_id: null,
+      distance_m: null,
+      low_accuracy: false,
+      reason: "no_location",
+    };
   }
-  const low_accuracy = accuracy_m !== null && accuracy_m !== undefined && Number(accuracy_m) > maxAccuracyM;
+  const low_accuracy =
+    accuracy_m !== null &&
+    accuracy_m !== undefined &&
+    Number(accuracy_m) > maxAccuracyM;
   const best = nearest(point, worksites);
   if (!best) {
     // No worksite configured yet: nobody is off-site before offices are set up.
-    return { recorded: true, is_offsite: false, worksite_id: null, distance_m: null, low_accuracy, reason: "no_worksites" };
+    return {
+      recorded: true,
+      is_offsite: false,
+      worksite_id: null,
+      distance_m: null,
+      low_accuracy,
+      reason: "no_worksites",
+    };
   }
   const within = best.distance_m <= Number(best.worksite.radius_m);
   return {
@@ -85,4 +121,12 @@ function evaluateClockIn({ point, accuracy_m = null, worksites, maxAccuracyM = D
   };
 }
 
-module.exports = { distanceM, nearest, insideFence, isPoint, evaluateClockIn, DEFAULT_MAX_ACCURACY_M, EARTH_RADIUS_M };
+module.exports = {
+  distanceM,
+  nearest,
+  insideFence,
+  isPoint,
+  evaluateClockIn,
+  DEFAULT_MAX_ACCURACY_M,
+  EARTH_RADIUS_M,
+};

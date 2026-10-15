@@ -26,7 +26,9 @@ const metrics = require("../shared/observability/metrics");
 
 /** Origins one surface accepts. DEV_EXTRA_ORIGINS is emptied on servers by config/env.js. */
 function originsFor(primary) {
-  const extra = config.DEV_EXTRA_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
+  const extra = config.DEV_EXTRA_ORIGINS.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   return [primary, ...extra];
 }
 
@@ -43,8 +45,13 @@ function metricsRoute(router) {
   const expected = Buffer.from(`Bearer ${config.METRICS_TOKEN}`);
   router.get("/metrics", (req, res) => {
     const given = Buffer.from(String(req.headers.authorization || ""));
-    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
-      return res.status(404).json({ error: { code: "NOT_FOUND", message: "Not found" } });
+    if (
+      given.length !== expected.length ||
+      !crypto.timingSafeEqual(given, expected)
+    ) {
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "Not found" } });
     }
     res.type("text/plain; version=0.0.4").send(metrics.render());
   });
@@ -66,12 +73,19 @@ function buildRoutes(opts = {}) {
 
   const staff = express.Router();
   const pub = express.Router();
-  const report = mountModules({ staff, public: pub }, { strict: opts.strict, dir: opts.dir || undefined });
+  const report = mountModules(
+    { staff, public: pub },
+    { strict: opts.strict, dir: opts.dir || undefined },
+  );
 
   router.use(
     "/api/v1",
     surface("staff"),
-    cors({ origin: originsFor(config.STAFF_ORIGIN), credentials: true, maxAge: 600 }),
+    cors({
+      origin: originsFor(config.STAFF_ORIGIN),
+      credentials: true,
+      maxAge: 600,
+    }),
     rateLimit.staffLimiter,
     idempotency,
     staff,
@@ -80,7 +94,11 @@ function buildRoutes(opts = {}) {
   router.use(
     "/api/public/v1",
     surface("public"),
-    cors({ origin: originsFor(config.PUBLIC_ORIGIN), credentials: false, maxAge: 600 }),
+    cors({
+      origin: originsFor(config.PUBLIC_ORIGIN),
+      credentials: false,
+      maxAge: 600,
+    }),
     rateLimit.publicLimiter,
     rateLimit.publicWriteLimiter,
     pub,
@@ -89,4 +107,4 @@ function buildRoutes(opts = {}) {
   return { router, report };
 }
 
-module.exports = { buildRoutes };
+module.exports = { buildRoutes, originsFor };

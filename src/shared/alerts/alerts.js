@@ -69,8 +69,14 @@ const ALERT_COLUMNS = `home_alert_id, home_alert_rule_id, subject_type, subject_
 /** "people.approve" → ["people", "approve"]; throws on anything else. */
 function parsePermission(key) {
   const [module, action, extra] = String(key || "").split(".");
-  if (extra !== undefined || !catalog.isModule(module) || !catalog.isAction(action)) {
-    throw new Error(`alerts: permission_key "${key}" is not "<module>.<action>" from the access catalogue`);
+  if (
+    extra !== undefined ||
+    !catalog.isModule(module) ||
+    !catalog.isAction(action)
+  ) {
+    throw new Error(
+      `alerts: permission_key "${key}" is not "<module>.<action>" from the access catalogue`,
+    );
   }
   return [module, action];
 }
@@ -85,7 +91,8 @@ function parsePermission(key) {
 function evaluate(rule, value) {
   const v = Number(value);
   const t = Number(rule.threshold);
-  if (!Number.isFinite(v) || !Number.isFinite(t)) throw new Error("alerts.evaluate: value and threshold are numbers");
+  if (!Number.isFinite(v) || !Number.isFinite(t))
+    throw new Error("alerts.evaluate: value and threshold are numbers");
   const over = Math.round((v - t) * 100) / 100;
   return { breached: v >= t, over_by: over };
 }
@@ -127,13 +134,31 @@ function payloadOf(alert, rule, extra = {}) {
  *          trigger?: string, subject_employee_id?: string|null, actor?: object|null}} opts
  * @returns {Promise<{raised: boolean, created: boolean, alert: object|null}>}
  */
-async function raise(client, { rule, subject, value, title, trigger = null, subject_employee_id: subjectEmployeeId = null, actor = null }) {
-  if (!inTransaction(client)) throw new Error("alerts.raise must run inside atomically()");
-  if (!rule || !rule.home_alert_rule_id) throw new Error("alerts.raise: give the rule row (ruleByKey)");
+async function raise(
+  client,
+  {
+    rule,
+    subject,
+    value,
+    title,
+    trigger = null,
+    subject_employee_id: subjectEmployeeId = null,
+    actor = null,
+  },
+) {
+  if (!inTransaction(client))
+    throw new Error("alerts.raise must run inside atomically()");
+  if (!rule || !rule.home_alert_rule_id)
+    throw new Error("alerts.raise: give the rule row (ruleByKey)");
   if (!rule.enabled) return { raised: false, created: false, alert: null };
-  if (!subject || !subject.type || !subject.id) throw new Error("alerts.raise: subject { type, id } is required");
-  if (!title || !String(title).trim()) throw new Error("alerts.raise: title is required");
-  if (!SEVERITIES.includes(rule.severity)) throw new Error(`alerts.raise: rule ${rule.key} has severity "${rule.severity}"`);
+  if (!subject || !subject.type || !subject.id)
+    throw new Error("alerts.raise: subject { type, id } is required");
+  if (!title || !String(title).trim())
+    throw new Error("alerts.raise: title is required");
+  if (!SEVERITIES.includes(rule.severity))
+    throw new Error(
+      `alerts.raise: rule ${rule.key} has severity "${rule.severity}"`,
+    );
   parsePermission(rule.permission_key);
 
   const { breached, over_by: overBy } = evaluate(rule, value);
@@ -147,7 +172,15 @@ async function raise(client, { rule, subject, value, title, trigger = null, subj
      DO UPDATE SET over_by = EXCLUDED.over_by, title = EXCLUDED.title, trigger = EXCLUDED.trigger,
                    last_seen_at = now()
      RETURNING ${ALERT_COLUMNS}, (xmax = 0) AS created`,
-    [rule.home_alert_rule_id, subject.type, String(subject.id), String(title).trim(), trigger, rule.severity, overBy],
+    [
+      rule.home_alert_rule_id,
+      subject.type,
+      String(subject.id),
+      String(title).trim(),
+      trigger,
+      rule.severity,
+      overBy,
+    ],
   );
   const { created, ...alert } = rows[0];
   if (created) {
@@ -156,7 +189,9 @@ async function raise(client, { rule, subject, value, title, trigger = null, subj
       entity: { type: "home_alert", id: alert.home_alert_id },
       actor,
       after: alert,
-      payload: payloadOf(alert, rule, { subject_employee_id: subjectEmployeeId }),
+      payload: payloadOf(alert, rule, {
+        subject_employee_id: subjectEmployeeId,
+      }),
     });
   }
   return { raised: true, created, alert };
@@ -173,7 +208,10 @@ async function mayClear(client, user, rule) {
   if (!user || !user.user_id) return false;
   if (user.is_ceo === true) return true;
   const [module, action] = parsePermission(rule.permission_key);
-  const rows = await grantsCache.getGrants(client, { role_ids: user.role_ids || [], module });
+  const rows = await grantsCache.getGrants(client, {
+    role_ids: user.role_ids || [],
+    module,
+  });
   return Boolean(scopeFromGrants(rows, action));
 }
 
@@ -183,9 +221,18 @@ async function mayClear(client, user, rule) {
  * @param {{alert_id: string, actor: object, outcome?: "cleared"|"dismissed", note?: string|null}} opts
  * @returns {Promise<object>} the alert
  */
-async function clear(client, { alert_id: id, actor, outcome = "cleared", note = null }) {
-  if (!inTransaction(client)) throw new Error("alerts.clear must run inside atomically()");
-  if (!OUTCOMES.has(outcome)) throw new AppError("INVALID_OUTCOME", "An alert is cleared or dismissed", 422);
+async function clear(
+  client,
+  { alert_id: id, actor, outcome = "cleared", note = null },
+) {
+  if (!inTransaction(client))
+    throw new Error("alerts.clear must run inside atomically()");
+  if (!OUTCOMES.has(outcome))
+    throw new AppError(
+      "INVALID_OUTCOME",
+      "An alert is cleared or dismissed",
+      422,
+    );
   const { rows } = await client.query(
     `SELECT a.home_alert_id, a.home_alert_rule_id, a.subject_type, a.subject_id, a.title, a.trigger, a.severity,
             a.over_by, a.raised_at, a.last_seen_at, a.escalated_at, a.cleared_at, a.cleared_by, a.outcome, a.note,
@@ -196,7 +243,11 @@ async function clear(client, { alert_id: id, actor, outcome = "cleared", note = 
     [id],
   );
   if (!rows[0]) throw new AppError("NOT_FOUND", "Alert not found", 404);
-  const { rule_key: ruleKey, permission_key: permissionKey, ...before } = rows[0];
+  const {
+    rule_key: ruleKey,
+    permission_key: permissionKey,
+    ...before
+  } = rows[0];
   const rule = { key: ruleKey, permission_key: permissionKey };
   if (!(await mayClear(client, actor, rule))) {
     throw new AppError("PERMISSION_DENIED", "You cannot clear this alert", 403);
@@ -226,7 +277,11 @@ async function clear(client, { alert_id: id, actor, outcome = "cleared", note = 
  * @param {{db?: import("pg").Pool, days?: number, limit?: number}} [opts]
  * @returns {Promise<{escalated: number}>}
  */
-async function escalateAged({ db = require("../../config/db").pool, days = ESCALATE_AFTER_DAYS, limit = 200 } = {}) {
+async function escalateAged({
+  db = require("../../config/db").pool,
+  days = ESCALATE_AFTER_DAYS,
+  limit = 200,
+} = {}) {
   const { rows } = await db.query(
     `SELECT a.home_alert_id FROM home_alert a
       WHERE a.cleared_at IS NULL AND a.escalated_at IS NULL AND a.severity = 'high'
@@ -251,12 +306,20 @@ async function escalateAged({ db = require("../../config/db").pool, days = ESCAL
           [id],
         );
         if (!up[0]) return;
-        const { rule_key: ruleKey, permission_key: permissionKey, ...alert } = up[0];
+        const {
+          rule_key: ruleKey,
+          permission_key: permissionKey,
+          ...alert
+        } = up[0];
         await emit(client, {
           key: ALERTS.HOME_ALERT_ESCALATED,
           entity: { type: "home_alert", id },
           actor: null,
-          payload: payloadOf(alert, { key: ruleKey, permission_key: permissionKey }, { age_days: ageDays(alert) }),
+          payload: payloadOf(
+            alert,
+            { key: ruleKey, permission_key: permissionKey },
+            { age_days: ageDays(alert) },
+          ),
         });
         escalated += 1;
       });
@@ -267,4 +330,15 @@ async function escalateAged({ db = require("../../config/db").pool, days = ESCAL
   return { escalated };
 }
 
-module.exports = { SEVERITIES, ESCALATE_AFTER_DAYS, parsePermission, evaluate, ageDays, ruleByKey, raise, mayClear, clear, escalateAged };
+module.exports = {
+  SEVERITIES,
+  ESCALATE_AFTER_DAYS,
+  parsePermission,
+  evaluate,
+  ageDays,
+  ruleByKey,
+  raise,
+  mayClear,
+  clear,
+  escalateAged,
+};

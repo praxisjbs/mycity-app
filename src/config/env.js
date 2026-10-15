@@ -31,7 +31,9 @@ const bool = (def) =>
   z
     .string()
     .optional()
-    .transform((v) => (v === undefined || v === "" ? def : /^(1|true|yes|on)$/i.test(v)));
+    .transform((v) =>
+      v === undefined || v === "" ? def : /^(1|true|yes|on)$/i.test(v),
+    );
 
 const int = (def, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) =>
   z
@@ -46,11 +48,22 @@ const str = (def) =>
     .optional()
     .transform((v) => (v === undefined ? def : v.trim()));
 
+/** An amount in naira with two decimals ("450.00"); empty means the default. */
+const amount = (def) =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v.trim() === "" ? def : v.trim()))
+    .pipe(
+      z.string().regex(/^\d{1,12}\.\d{2}$/, "must be an amount like 450.00"),
+    );
+
 /** Development-only defaults. Refused on staging and production by value (see guard). */
 const DEV_SECRETS = Object.freeze({
   JWT_ACCESS_SECRET: "dev-access-secret-not-for-servers-0000000000",
   JWT_REFRESH_SECRET: "dev-refresh-secret-not-for-servers-000000000",
-  ENCRYPTION_KEY: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+  ENCRYPTION_KEY:
+    "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
 });
 
 /* ------------------------------------------------------------------ *
@@ -62,103 +75,430 @@ const DEV_SECRETS = Object.freeze({
 
 const ENTRIES = [
   // Runtime
-  ["APP_ENV", z.enum(["development", "test", "staging", "production"]).default("development"),
-    { group: "Runtime", doc: "Which environment this process is. Drives the markers, the seed guard and the server checks below." }],
-  ["NODE_ENV", z.enum(["development", "test", "production"]).default("development"),
-    { group: "Runtime", doc: "Must be production on staging and production servers." }],
-  ["PORT", int(8080, { min: 1, max: 65535 }),
-    { group: "Runtime", doc: "API listen port. Staging and production run on different ports behind the proxy." }],
-  ["LOG_LEVEL", z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
-    { group: "Runtime", doc: "Pino log level." }],
-  ["TRUST_PROXY_HOPS", int(1, { max: 5 }),
-    { group: "Runtime", doc: "Proxies in front of Node. 1 behind the hosting panel proxy; 0 only when Node is hit directly." }],
-  ["BUILD_SHA", str(""),
-    { group: "Runtime", doc: "Commit of the running release. Written by the deploy; empty on a laptop." }],
-  ["BUILD_TIME", str(""),
-    { group: "Runtime", doc: "When the release was built (ISO). Written by the deploy." }],
+  [
+    "APP_ENV",
+    z
+      .enum(["development", "test", "staging", "production"])
+      .default("development"),
+    {
+      group: "Runtime",
+      doc: "Which environment this process is. Drives the markers, the seed guard and the server checks below.",
+    },
+  ],
+  [
+    "NODE_ENV",
+    z.enum(["development", "test", "production"]).default("development"),
+    {
+      group: "Runtime",
+      doc: "Must be production on staging and production servers.",
+    },
+  ],
+  [
+    "PORT",
+    int(8080, { min: 1, max: 65535 }),
+    {
+      group: "Runtime",
+      doc: "API listen port. Staging and production run on different ports behind the proxy.",
+    },
+  ],
+  [
+    "LOG_LEVEL",
+    z
+      .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+      .default("info"),
+    { group: "Runtime", doc: "Pino log level." },
+  ],
+  [
+    "TRUST_PROXY_HOPS",
+    int(1, { max: 5 }),
+    {
+      group: "Runtime",
+      doc: "Proxies in front of Node. 1 behind the hosting panel proxy; 0 only when Node is hit directly.",
+    },
+  ],
+  [
+    "BUILD_SHA",
+    str(""),
+    {
+      group: "Runtime",
+      doc: "Commit of the running release. Written by the deploy; empty on a laptop.",
+    },
+  ],
+  [
+    "BUILD_TIME",
+    str(""),
+    {
+      group: "Runtime",
+      doc: "When the release was built (ISO). Written by the deploy.",
+    },
+  ],
 
   // Origins (SYSTEM_ARCHITECTURE §3)
-  ["STAFF_ORIGIN", z.string().url().default("http://localhost:5173"),
-    { group: "Origins", doc: "The staff app origin. CORS for /api/v1 and Socket.io allows this origin only.", example: "https://hub.mycityapp.io" }],
-  ["PUBLIC_ORIGIN", z.string().url().default("http://localhost:5174"),
-    { group: "Origins", doc: "The public site origin. CORS for /api/public/v1 allows this origin only, without credentials.", example: "https://go.mycityapp.io" }],
-  ["DEV_EXTRA_ORIGINS", str(""),
-    { group: "Origins", doc: "Development only: extra comma-separated origins allowed on both surfaces. Ignored on servers." }],
+  [
+    "STAFF_ORIGIN",
+    z.string().url().default("http://localhost:5173"),
+    {
+      group: "Origins",
+      doc: "The staff app origin. CORS for /api/v1 and Socket.io allows this origin only.",
+      example: "https://hub.mycityapp.io",
+    },
+  ],
+  [
+    "PUBLIC_ORIGIN",
+    z.string().url().default("http://localhost:5174"),
+    {
+      group: "Origins",
+      doc: "The public site origin. CORS for /api/public/v1 allows this origin only, without credentials.",
+      example: "https://go.mycityapp.io",
+    },
+  ],
+  [
+    "DEV_EXTRA_ORIGINS",
+    str(""),
+    {
+      group: "Origins",
+      doc: "Development only: extra comma-separated origins allowed on both surfaces. Ignored on servers.",
+    },
+  ],
 
   // Database
-  ["DATABASE_URL", str(""),
-    { group: "Database", doc: "Optional. postgres://user:pass@host:port/db. When set it wins over the DB_* values." }],
+  [
+    "DATABASE_URL",
+    str(""),
+    {
+      group: "Database",
+      doc: "Optional. postgres://user:pass@host:port/db. When set it wins over the DB_* values.",
+    },
+  ],
   ["DB_HOST", str("127.0.0.1"), { group: "Database", doc: "Postgres host." }],
-  ["DB_PORT", int(5432, { min: 1, max: 65535 }), { group: "Database", doc: "Postgres port." }],
-  ["DB_NAME", str("mycity_dev"),
-    { group: "Database", doc: "mycity_prod on production, mycity_stg on staging (checked at boot).", example: "mycity_dev" }],
-  ["DB_USER", str("mycity_dev"), { group: "Database", doc: "The environment's own app role. Never a superuser." }],
-  ["DB_PASSWORD", str(""), { group: "Database", doc: "Required on servers.", secret: true }],
-  ["DB_SSL", bool(false), { group: "Database", doc: "TLS to Postgres. Off for a local socket on the same server." }],
-  ["DB_POOL_MAX", int(20, { min: 1, max: 200 }), { group: "Database", doc: "Connections in the one pool, per process." }],
-  ["DB_STATEMENT_TIMEOUT_MS", int(30000, { min: 1000 }),
-    { group: "Database", doc: "A statement running longer than this is cancelled by Postgres." }],
-  ["DB_SLOW_QUERY_MS", int(500, { min: 1 }), { group: "Database", doc: "Queries slower than this are logged at warn." }],
+  [
+    "DB_PORT",
+    int(5432, { min: 1, max: 65535 }),
+    { group: "Database", doc: "Postgres port." },
+  ],
+  [
+    "DB_NAME",
+    str("mycity_dev"),
+    {
+      group: "Database",
+      doc: "mycity_prod on production, mycity_stg on staging (checked at boot).",
+      example: "mycity_dev",
+    },
+  ],
+  [
+    "DB_USER",
+    str("mycity_dev"),
+    {
+      group: "Database",
+      doc: "The environment's own app role. Never a superuser.",
+    },
+  ],
+  [
+    "DB_PASSWORD",
+    str(""),
+    { group: "Database", doc: "Required on servers.", secret: true },
+  ],
+  [
+    "DB_SSL",
+    bool(false),
+    {
+      group: "Database",
+      doc: "TLS to Postgres. Off for a local socket on the same server.",
+    },
+  ],
+  [
+    "DB_POOL_MAX",
+    int(20, { min: 1, max: 200 }),
+    {
+      group: "Database",
+      doc: "Connections in the API process's pool. 20 on production, 10 on staging.",
+    },
+  ],
+  [
+    "WORKER_DB_POOL_MAX",
+    int(10, { min: 2, max: 200 }),
+    {
+      group: "Database",
+      doc: "Connections in the worker process's pool. 10 on production, 5 on staging.",
+    },
+  ],
+  [
+    "DB_STATEMENT_TIMEOUT_MS",
+    int(30000, { min: 1000 }),
+    {
+      group: "Database",
+      doc: "A statement running longer than this is cancelled by Postgres.",
+    },
+  ],
+  [
+    "DB_SLOW_QUERY_MS",
+    int(500, { min: 1 }),
+    { group: "Database", doc: "Queries slower than this are logged at warn." },
+  ],
 
   // Redis (SYSTEM_ARCHITECTURE §1: db 0 production, db 1 staging)
-  ["REDIS_URL", z.string().default("redis://127.0.0.1:6379/2"),
-    { group: "Redis", doc: "redis://[:password@]host:port/db. Production uses db 0, staging db 1 (checked at boot); local defaults to db 2." }],
+  [
+    "REDIS_URL",
+    z.string().default("redis://127.0.0.1:6379/2"),
+    {
+      group: "Redis",
+      doc: "redis://[:password@]host:port/db. Production uses db 0, staging db 1 (checked at boot); local defaults to db 2.",
+    },
+  ],
 
   // Sign-in (SYSTEM_ARCHITECTURE §8)
-  ["JWT_ACCESS_SECRET", str(""),
-    { group: "Sign-in", doc: "Signs access tokens. At least 32 characters; different from the refresh secret.", secret: true }],
-  ["JWT_REFRESH_SECRET", str(""),
-    { group: "Sign-in", doc: "Signs refresh tokens. At least 32 characters.", secret: true }],
-  ["ACCESS_TOKEN_MIN", int(15, { min: 1, max: 60 }), { group: "Sign-in", doc: "Access token life in minutes." }],
-  ["REFRESH_TOKEN_DAYS", int(14, { min: 1, max: 90 }),
-    { group: "Sign-in", doc: "Refresh token life in days. Rotated on every use." }],
+  [
+    "JWT_ACCESS_SECRET",
+    str(""),
+    {
+      group: "Sign-in",
+      doc: "Signs access tokens. At least 32 characters; different from the refresh secret.",
+      secret: true,
+    },
+  ],
+  [
+    "JWT_REFRESH_SECRET",
+    str(""),
+    {
+      group: "Sign-in",
+      doc: "Signs refresh tokens. At least 32 characters.",
+      secret: true,
+    },
+  ],
+  [
+    "ACCESS_TOKEN_MIN",
+    int(15, { min: 1, max: 60 }),
+    { group: "Sign-in", doc: "Access token life in minutes." },
+  ],
+  [
+    "REFRESH_TOKEN_DAYS",
+    int(14, { min: 1, max: 90 }),
+    {
+      group: "Sign-in",
+      doc: "Refresh token life in days. Rotated on every use.",
+    },
+  ],
 
   // Secrets at rest
-  ["ENCRYPTION_KEY", str(""),
-    { group: "Secrets", doc: "64 hex characters (32 bytes). AES-256-GCM key for integration_secret (mailbox passwords).", secret: true }],
+  [
+    "ENCRYPTION_KEY",
+    str(""),
+    {
+      group: "Secrets",
+      doc: "64 hex characters (32 bytes). AES-256-GCM key for integration_secret (mailbox passwords).",
+      secret: true,
+    },
+  ],
 
   // Files
-  ["MEDIA_ROOT", str("./media"),
-    { group: "Files", doc: "Private media root for this environment.", example: "/srv/mycity/<prod|stg>/media" }],
+  [
+    "MEDIA_ROOT",
+    str("./media"),
+    {
+      group: "Files",
+      doc: "Private media root for this environment.",
+      example: "/srv/mycity/<prod|stg>/media",
+    },
+  ],
 
-  ["APP_DIST_DIR", str("app/dist"),
-    { group: "Files", doc: "The staff app build the API serves on the staff host. Relative to the release root." }],
-  ["PUBLIC_APP_DIST_DIR", str("public-app/dist"),
-    { group: "Files", doc: "The public site build the API serves on the public host. Relative to the release root." }],
+  [
+    "APP_DIST_DIR",
+    str("app/dist"),
+    {
+      group: "Files",
+      doc: "The staff app build the API serves on the staff host. Relative to the release root.",
+    },
+  ],
+  [
+    "PUBLIC_APP_DIST_DIR",
+    str("public-app/dist"),
+    {
+      group: "Files",
+      doc: "The public site build the API serves on the public host. Relative to the release root.",
+    },
+  ],
 
   // Media tools (ops/provision installs them; BACKEND_STRUCTURE §5)
-  ["CHROMIUM_PATH", str(""),
-    { group: "Media tools", doc: "Chromium for PDFs. Empty: the usual install paths are tried (/usr/bin/chromium, ...).", example: "/usr/bin/chromium" }],
-  ["FFMPEG_PATH", str("ffmpeg"), { group: "Media tools", doc: "ffmpeg, for voice notes and video." }],
-  ["FFPROBE_PATH", str("ffprobe"), { group: "Media tools", doc: "ffprobe, for media duration and size." }],
-  ["CLAMD_SOCKET", str(""),
-    { group: "Media tools", doc: "clamd's unix socket, for scanning files strangers upload. Empty: CLAMD_HOST and CLAMD_PORT.", example: "/run/clamav/clamd.ctl" }],
-  ["CLAMD_HOST", str("127.0.0.1"), { group: "Media tools", doc: "clamd TCP host, when no socket is set." }],
-  ["CLAMD_PORT", int(3310, { min: 1, max: 65535 }), { group: "Media tools", doc: "clamd TCP port, when no socket is set." }],
+  [
+    "CHROMIUM_PATH",
+    str(""),
+    {
+      group: "Media tools",
+      doc: "Chromium for PDFs. Empty: the usual install paths are tried (/usr/bin/chromium, ...).",
+      example: "/usr/bin/chromium",
+    },
+  ],
+  [
+    "FFMPEG_PATH",
+    str("ffmpeg"),
+    { group: "Media tools", doc: "ffmpeg, for voice notes and video." },
+  ],
+  [
+    "FFPROBE_PATH",
+    str("ffprobe"),
+    { group: "Media tools", doc: "ffprobe, for media duration and size." },
+  ],
+  [
+    "CLAMD_SOCKET",
+    str(""),
+    {
+      group: "Media tools",
+      doc: "clamd's unix socket, for scanning files strangers upload. Empty: CLAMD_HOST and CLAMD_PORT.",
+      example: "/run/clamav/clamd.ctl",
+    },
+  ],
+  [
+    "CLAMD_HOST",
+    str("127.0.0.1"),
+    { group: "Media tools", doc: "clamd TCP host, when no socket is set." },
+  ],
+  [
+    "CLAMD_PORT",
+    int(3310, { min: 1, max: 65535 }),
+    { group: "Media tools", doc: "clamd TCP port, when no socket is set." },
+  ],
 
   // System mail (A4: staging sends real mail, marked)
-  ["SMTP_HOST", str(""),
-    { group: "Mail", doc: "SMTP server for system mail. Empty in development and test: mail is captured, never sent. Required on servers." }],
-  ["SMTP_PORT", int(587, { min: 1, max: 65535 }), { group: "Mail", doc: "587 with STARTTLS, or 465 with SMTP_SECURE." }],
-  ["SMTP_SECURE", bool(false), { group: "Mail", doc: "TLS from the first byte (port 465). Off: STARTTLS is required." }],
+  [
+    "SMTP_HOST",
+    str(""),
+    {
+      group: "Mail",
+      doc: "SMTP server for system mail. Empty in development and test: mail is captured, never sent. Required on servers.",
+    },
+  ],
+  [
+    "SMTP_PORT",
+    int(587, { min: 1, max: 65535 }),
+    { group: "Mail", doc: "587 with STARTTLS, or 465 with SMTP_SECURE." },
+  ],
+  [
+    "SMTP_SECURE",
+    bool(false),
+    {
+      group: "Mail",
+      doc: "TLS from the first byte (port 465). Off: STARTTLS is required.",
+    },
+  ],
   ["SMTP_USER", str(""), { group: "Mail", doc: "SMTP account." }],
-  ["SMTP_PASSWORD", str(""), { group: "Mail", doc: "SMTP password.", secret: true }],
-  ["MAIL_FROM", str("MyCity App <no-reply@mycityapp.io>"),
-    { group: "Mail", doc: "From address for system mail. Its domain must pass SPF, DKIM and DMARC (services/mail/deliverability)." }],
-  ["MAIL_REPLY_TO", str(""), { group: "Mail", doc: "Optional Reply-To for system mail (the support inbox)." }],
-  ["DKIM_SELECTOR", str("default"), { group: "Mail", doc: "DKIM selector the deliverability check looks up." }],
+  [
+    "SMTP_PASSWORD",
+    str(""),
+    { group: "Mail", doc: "SMTP password.", secret: true },
+  ],
+  [
+    "MAIL_FROM",
+    str("MyCity App <no-reply@mycityapp.io>"),
+    {
+      group: "Mail",
+      doc: "From address for system mail. Its domain must pass SPF, DKIM and DMARC (services/mail/deliverability).",
+    },
+  ],
+  [
+    "MAIL_REPLY_TO",
+    str(""),
+    {
+      group: "Mail",
+      doc: "Optional Reply-To for system mail (the support inbox).",
+    },
+  ],
+  [
+    "MAIL_RBL_HOSTS",
+    str(""),
+    {
+      group: "Mail",
+      doc: "Comma-separated DNS blocklists the deliverability check looks the sending IP up in. Empty: Spamhaus ZEN, SpamCop and Barracuda.",
+      example: "zen.spamhaus.org,bl.spamcop.net",
+    },
+  ],
+
+  // AI (BACKEND_STRUCTURE §14). No key: every AI call uses the stub and is still recorded.
+  [
+    "GEMINI_API_KEY",
+    str(""),
+    {
+      group: "AI",
+      doc: 'Gemini API key. Empty: AI calls return the stub\'s placeholder (vendor "stub"), are recorded, and cost nothing.',
+      secret: true,
+    },
+  ],
+  [
+    "GEMINI_MODEL",
+    str("gemini-2.5-flash"),
+    {
+      group: "AI",
+      doc: "The Gemini model every AI call uses unless ai_setting names another.",
+    },
+  ],
+  [
+    "AI_REQUEST_TIMEOUT_MS",
+    int(60000, { min: 5000, max: 300000 }),
+    {
+      group: "AI",
+      doc: "How long one AI call may take before it is abandoned.",
+    },
+  ],
+  [
+    "AI_MAX_OUTPUT_TOKENS",
+    int(4096, { min: 256, max: 65536 }),
+    { group: "AI", doc: "Ceiling on one answer's length, in tokens." },
+  ],
+  [
+    "AI_INPUT_NGN_PER_MILLION",
+    amount("450.00"),
+    {
+      group: "AI",
+      doc: "Naira per million input tokens, for the spend ledger and the monthly cap. Default: Gemini 2.5 Flash list price at about 1,500 naira to the dollar. ai_setting overrides it.",
+    },
+  ],
+  [
+    "AI_OUTPUT_NGN_PER_MILLION",
+    amount("3750.00"),
+    {
+      group: "AI",
+      doc: "Naira per million output tokens. ai_setting overrides it.",
+    },
+  ],
 
   // Rate limits (SYSTEM_ARCHITECTURE §3)
-  ["RATE_LIMIT_STAFF_PER_MIN", int(600, { min: 10 }), { group: "Rate limits", doc: "Staff API requests per user per minute." }],
-  ["RATE_LIMIT_PUBLIC_PER_MIN", int(120, { min: 10 }), { group: "Rate limits", doc: "Public API requests per IP per minute." }],
-  ["RATE_LIMIT_PUBLIC_WRITES_PER_MIN", int(20, { min: 1 }),
-    { group: "Rate limits", doc: "Public API writes (applications, uploads) per IP per minute." }],
+  [
+    "RATE_LIMIT_STAFF_PER_MIN",
+    int(600, { min: 10 }),
+    { group: "Rate limits", doc: "Staff API requests per user per minute." },
+  ],
+  [
+    "RATE_LIMIT_PUBLIC_PER_MIN",
+    int(120, { min: 10 }),
+    { group: "Rate limits", doc: "Public API requests per IP per minute." },
+  ],
+  [
+    "RATE_LIMIT_PUBLIC_WRITES_PER_MIN",
+    int(20, { min: 1 }),
+    {
+      group: "Rate limits",
+      doc: "Public API writes (applications, uploads) per IP per minute.",
+    },
+  ],
 
   // Observability
-  ["ALERT_WEBHOOK_URL", str(""),
-    { group: "Observability", doc: "Where 5xx errors are posted. Empty: recorded in error_event and logged only.", secret: true }],
-  ["METRICS_TOKEN", str(""),
-    { group: "Observability", doc: "Bearer token for GET /api/metrics. Empty: the endpoint does not exist.", secret: true }],
+  [
+    "ALERT_WEBHOOK_URL",
+    str(""),
+    {
+      group: "Observability",
+      doc: "Where 5xx errors are posted. Empty: recorded in error_event and logged only.",
+      secret: true,
+    },
+  ],
+  [
+    "METRICS_TOKEN",
+    str(""),
+    {
+      group: "Observability",
+      doc: "Bearer token for GET /api/metrics. Empty: the endpoint does not exist.",
+      secret: true,
+    },
+  ],
 ];
 
 const KEYS = ENTRIES.map(([k]) => k);
@@ -217,16 +557,20 @@ function serverProblems(c) {
   if (c.JWT_ACCESS_SECRET && c.JWT_ACCESS_SECRET === c.JWT_REFRESH_SECRET) {
     out.push("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ");
   }
-  if (!/^[0-9a-f]{64}$/i.test(c.ENCRYPTION_KEY)) out.push("ENCRYPTION_KEY must be 64 hex characters");
-  else if (isServer && devValue("ENCRYPTION_KEY")) out.push("ENCRYPTION_KEY is the development value");
+  if (!/^[0-9a-f]{64}$/i.test(c.ENCRYPTION_KEY))
+    out.push("ENCRYPTION_KEY must be 64 hex characters");
+  else if (isServer && devValue("ENCRYPTION_KEY"))
+    out.push("ENCRYPTION_KEY is the development value");
 
   if (!isServer) return out;
 
-  if (c.NODE_ENV !== "production") out.push(`NODE_ENV must be production on ${c.APP_ENV}`);
+  if (c.NODE_ENV !== "production")
+    out.push(`NODE_ENV must be production on ${c.APP_ENV}`);
   if (!c.DB_PASSWORD) out.push("DB_PASSWORD is required");
 
   const expectedDb = c.APP_ENV === "production" ? "mycity_prod" : "mycity_stg";
-  if (c.DB_NAME !== expectedDb) out.push(`DB_NAME must be ${expectedDb} on ${c.APP_ENV} (is ${c.DB_NAME})`);
+  if (c.DB_NAME !== expectedDb)
+    out.push(`DB_NAME must be ${expectedDb} on ${c.APP_ENV} (is ${c.DB_NAME})`);
 
   const expectedRedisDb = c.APP_ENV === "production" ? 0 : 1;
   if (redisDbIndex(c.REDIS_URL) !== expectedRedisDb) {
@@ -234,11 +578,17 @@ function serverProblems(c) {
   }
 
   for (const k of ["STAFF_ORIGIN", "PUBLIC_ORIGIN"]) {
-    if (!c[k].startsWith("https://")) out.push(`${k} must be https on ${c.APP_ENV}`);
+    if (!c[k].startsWith("https://"))
+      out.push(`${k} must be https on ${c.APP_ENV}`);
   }
-  if (c.TRUST_PROXY_HOPS < 1) out.push("TRUST_PROXY_HOPS must be at least 1 behind the proxy");
-  if (!c.SMTP_HOST) out.push(`SMTP_HOST is required on ${c.APP_ENV} (A4: system mail is really sent)`);
-  if (!/<[^@\s]+@[^>\s]+>$|^[^@\s]+@[^@\s]+$/.test(c.MAIL_FROM)) out.push("MAIL_FROM must be an address, or Name <address>");
+  if (c.TRUST_PROXY_HOPS < 1)
+    out.push("TRUST_PROXY_HOPS must be at least 1 behind the proxy");
+  if (!c.SMTP_HOST)
+    out.push(
+      `SMTP_HOST is required on ${c.APP_ENV} (A4: system mail is really sent)`,
+    );
+  if (!/<[^@\s]+@[^>\s]+>$|^[^@\s]+@[^@\s]+$/.test(c.MAIL_FROM))
+    out.push("MAIL_FROM must be an address, or Name <address>");
   return out;
 }
 
@@ -266,7 +616,11 @@ function parseEnv(source) {
     try {
       Object.assign(c, dbFromUrl(c.DATABASE_URL));
     } catch {
-      return { config: null, problems: ["DATABASE_URL is not a valid URL"], misparsed };
+      return {
+        config: null,
+        problems: ["DATABASE_URL is not a valid URL"],
+        misparsed,
+      };
     }
   }
 
@@ -282,7 +636,12 @@ function parseEnv(source) {
 
 /** Short name used in Redis keys, queue prefixes and log lines. */
 function envShort(appEnv) {
-  return { production: "prod", staging: "stg", development: "dev", test: "test" }[appEnv];
+  return {
+    production: "prod",
+    staging: "stg",
+    development: "dev",
+    test: "test",
+  }[appEnv];
 }
 
 /* ------------------------------------------------------------------ *

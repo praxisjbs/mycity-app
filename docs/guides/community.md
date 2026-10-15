@@ -175,7 +175,7 @@ Posting to #announcements is gated by the `announcements.post` capability (BACKE
 | `announcement.published` | On publish, or when a scheduled one is released | Message in #announcements; notification and push to the audience |
 | `announcement-publish` (delayed job) | At `publish_at` | Releases a scheduled announcement (README §5.15) |
 | `celebrations` (scheduler + handler) | 05:00 Africa/Lagos daily | Birthday and anniversary cards in #general |
-| `media-derive`, `av-transcode`, `media-scan` | After an upload | Image variants, voice note to Opus, scan |
+| `av-transcode`, `media-scan` | After an upload | Voice note to Opus, video to MP4; a file from outside scanned. Image variants are made at upload; `media-derive` makes a file's variants again on request |
 
 ## 8 · Permissions and visibility by role
 
@@ -279,5 +279,6 @@ fields, never in a toast.
 - 13/10/2026 · GE · Added View Profile and Search in Conversation (TB review of the demo).
 - 13/10/2026 · GE · Added message ticks, voice note playback and transcription, read and not read lists on announcements, resizable list; removed work details from the profile (TB review).
 - 13/10/2026 · GE · Announcement cards back to the original design; read and not read lists moved into the card's modal. Page header slides away while reading a conversation (TB review).
+- 14/10/2026 · GE · §7 jobs aligned with the worker as built: image variants are made at upload, `media-derive` re-derives on request.
 - 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the Announcements subtitle and ⓘ text, the New Channel ⓘ text, the vault line, the Visibility row and "Posting as" left the screen; the channel name rule and the blank note became help terms; Average Read gained a help term; every community form uses the form helpers with errors on the field. §3 step 12 names the reads modal and defines Average Read; §6 gained the channel name rule, the fixed post policy and who posts.
 - 15/10/2026 · AJ · Channels, Direct Messages and Announcements built in `app/` against the mock API (load older paging, voice notes, ticks, profile panel, read report); not wired yet.

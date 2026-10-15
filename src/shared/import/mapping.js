@@ -39,7 +39,11 @@ function normalise(text) {
 
 /** Every normalised spelling that names a field. */
 function namesOf(field) {
-  return new Set([field.key, field.label, ...(field.aliases || [])].map(normalise).filter(Boolean));
+  return new Set(
+    [field.key, field.label, ...(field.aliases || [])]
+      .map(normalise)
+      .filter(Boolean),
+  );
 }
 
 /**
@@ -80,17 +84,29 @@ function autoMap(headerCells, fields) {
   const used = new Set();
   const columns = (headerCells || []).map((cell, index) => {
     const n = normalise(cell);
-    const field = n ? fields.find((f) => !used.has(f.key) && namesOf(f).has(n)) : null;
+    const field = n
+      ? fields.find((f) => !used.has(f.key) && namesOf(f).has(n))
+      : null;
     if (field) used.add(field.key);
-    return { index, header: cell === null || cell === undefined ? "" : String(cell), field: field ? field.key : null };
+    return {
+      index,
+      header: cell === null || cell === undefined ? "" : String(cell),
+      field: field ? field.key : null,
+    };
   });
   return { columns };
 }
 
 /** The set of normalised headers, order-free, hashed. */
 function headerSignature(headerCells) {
-  const set = [...new Set((headerCells || []).map(normalise).filter(Boolean))].sort();
-  return crypto.createHash("sha256").update(set.join("|")).digest("hex").slice(0, 32);
+  const set = [
+    ...new Set((headerCells || []).map(normalise).filter(Boolean)),
+  ].sort();
+  return crypto
+    .createHash("sha256")
+    .update(set.join("|"))
+    .digest("hex")
+    .slice(0, 32);
 }
 
 /**
@@ -103,11 +119,19 @@ function problemsOf(mapping, fields) {
   const seen = new Map();
   for (const c of (mapping && mapping.columns) || []) {
     if (!c.field) continue;
-    if (!keys.has(c.field)) out.push(`"${c.header}" is mapped to "${c.field}", which this import does not have`);
-    else if (seen.has(c.field)) out.push(`"${c.header}" and "${seen.get(c.field)}" are both mapped to ${fields.find((f) => f.key === c.field).label}`);
+    if (!keys.has(c.field))
+      out.push(
+        `"${c.header}" is mapped to "${c.field}", which this import does not have`,
+      );
+    else if (seen.has(c.field))
+      out.push(
+        `"${c.header}" and "${seen.get(c.field)}" are both mapped to ${fields.find((f) => f.key === c.field).label}`,
+      );
     else seen.set(c.field, c.header);
   }
-  for (const f of fields) if (f.required && !seen.has(f.key)) out.push(`No column is mapped to ${f.label}, which is required`);
+  for (const f of fields)
+    if (f.required && !seen.has(f.key))
+      out.push(`No column is mapped to ${f.label}, which is required`);
   return out;
 }
 
@@ -121,19 +145,32 @@ async function findProfile(client, importerKey, signature) {
 }
 
 /** Remember a confirmed mapping (upsert by signature). */
-async function saveProfile(client, { importer_key: key, name, signature, mapping, user_id: userId }) {
+async function saveProfile(
+  client,
+  { importer_key: key, name, signature, mapping, user_id: userId },
+) {
   await client.query(
     `INSERT INTO import_mapping_profile (importer_key, name, header_signature, mapping, created_by, last_used_at)
      VALUES ($1, $2, $3, $4::jsonb, $5, now())
      ON CONFLICT (importer_key, header_signature)
      DO UPDATE SET mapping = EXCLUDED.mapping, name = EXCLUDED.name, last_used_at = now()`,
-    [key, name || "Saved mapping", signature, JSON.stringify(mapping), userId || null],
+    [
+      key,
+      name || "Saved mapping",
+      signature,
+      JSON.stringify(mapping),
+      userId || null,
+    ],
   );
 }
 
 /** Apply a saved mapping to this file's header cells (columns may have moved). */
 function applyProfile(profile, headerCells) {
-  const byHeader = new Map((profile.columns || []).filter((c) => c.field).map((c) => [normalise(c.header), c.field]));
+  const byHeader = new Map(
+    (profile.columns || [])
+      .filter((c) => c.field)
+      .map((c) => [normalise(c.header), c.field]),
+  );
   return {
     columns: (headerCells || []).map((cell, index) => ({
       index,
@@ -143,4 +180,14 @@ function applyProfile(profile, headerCells) {
   };
 }
 
-module.exports = { normalise, detectHeaderRow, autoMap, headerSignature, problemsOf, findProfile, saveProfile, applyProfile, SCAN_ROWS };
+module.exports = {
+  normalise,
+  detectHeaderRow,
+  autoMap,
+  headerSignature,
+  problemsOf,
+  findProfile,
+  saveProfile,
+  applyProfile,
+  SCAN_ROWS,
+};

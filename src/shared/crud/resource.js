@@ -57,7 +57,14 @@
 const { pool: defaultPool } = require("../../config/db");
 const { AppError } = require("../errors");
 const { atomically } = require("../db/tx");
-const { ident, table: tableName, assertWritable, insertOne, updateOne, getById } = require("../db/query-helpers");
+const {
+  ident,
+  table: tableName,
+  assertWritable,
+  insertOne,
+  updateOne,
+  getById,
+} = require("../db/query-helpers");
 const { pageQuery, TOTAL_COL, sendPaged } = require("../http/paged");
 const { ok, created } = require("../http/respond");
 const { scopeOf, scopeClause } = require("../rbac/scope");
@@ -66,7 +73,8 @@ const { emit, withActor } = require("../events/emit");
 const numbering = require("../numbering/numbering");
 const { SCHEMES } = require("../numbering/schemes");
 
-const SORT_RE = /^[a-z_][a-z0-9_]*(\s+(asc|desc))?(\s+nulls\s+(first|last))?(\s*,\s*[a-z_][a-z0-9_]*(\s+(asc|desc))?(\s+nulls\s+(first|last))?)*$/i;
+const SORT_RE =
+  /^[a-z_][a-z0-9_]*(\s+(asc|desc))?(\s+nulls\s+(first|last))?(\s*,\s*[a-z_][a-z0-9_]*(\s+(asc|desc))?(\s+nulls\s+(first|last))?)*$/i;
 const COLUMNS_RE = /^[a-z_][a-z0-9_]*(\s*,\s*[a-z_][a-z0-9_]*)*$/i;
 
 function fail(msg) {
@@ -95,29 +103,44 @@ function makeRepo(cfg) {
   if (!cfg || !cfg.table || !cfg.pk) fail("table and pk are required");
   const table = tableName(cfg.table);
   const pk = ident(cfg.pk);
-  if (!COLUMNS_RE.test(String(cfg.columns || ""))) fail(`${cfg.table}: columns is a comma-separated list of column names`);
+  if (!COLUMNS_RE.test(String(cfg.columns || "")))
+    fail(`${cfg.table}: columns is a comma-separated list of column names`);
   const columnList = cfg.columns.split(",").map((c) => c.trim());
-  if (!columnList.includes(cfg.pk)) fail(`${cfg.table}: columns must include the primary key`);
+  if (!columnList.includes(cfg.pk))
+    fail(`${cfg.table}: columns must include the primary key`);
   const columns = columnList.map((c) => ident(c)).join(", ");
-  if (!Array.isArray(cfg.writable)) fail(`${cfg.table}: writable lists the columns a request may set ([] for none)`);
+  if (!Array.isArray(cfg.writable))
+    fail(
+      `${cfg.table}: writable lists the columns a request may set ([] for none)`,
+    );
   const writable = new Set(cfg.writable);
   for (const c of writable) ident(c);
   const search = (cfg.search || []).map((c) => ident(c));
-  const filters = Object.fromEntries(Object.entries(cfg.filters || {}).map(([k, c]) => [k, ident(c)]));
+  const filters = Object.fromEntries(
+    Object.entries(cfg.filters || {}).map(([k, c]) => [k, ident(c)]),
+  );
   const sorts = cfg.sort || {};
   for (const [name, frag] of Object.entries(sorts)) {
-    if (!SORT_RE.test(frag)) fail(`${cfg.table}: sort "${name}" is column names with asc/desc only`);
+    if (!SORT_RE.test(frag))
+      fail(`${cfg.table}: sort "${name}" is column names with asc/desc only`);
   }
   const defaultSort = cfg.defaultSort || Object.keys(sorts)[0] || null;
-  if (defaultSort && !sorts[defaultSort]) fail(`${cfg.table}: defaultSort "${defaultSort}" is not in sort`);
-  const scope = cfg.scope ? { column: `t.${ident(cfg.scope.column)}`, raw: cfg.scope.column } : null;
+  if (defaultSort && !sorts[defaultSort])
+    fail(`${cfg.table}: defaultSort "${defaultSort}" is not in sort`);
+  const scope = cfg.scope
+    ? { column: `t.${ident(cfg.scope.column)}`, raw: cfg.scope.column }
+    : null;
   const archive = cfg.archive || null;
-  if (archive && archive !== "hard" && !archive.column && !archive.active) fail(`${cfg.table}: archive is { column }, { active } or "hard"`);
+  if (archive && archive !== "hard" && !archive.column && !archive.active)
+    fail(`${cfg.table}: archive is { column }, { active } or "hard"`);
   const touch = cfg.touch || null;
 
   function archivedFilter(q) {
-    if (!archive || archive === "hard" || q.include_archived === true) return null;
-    return archive.column ? `t.${ident(archive.column)} IS NULL` : `t.${ident(archive.active)} = true`;
+    if (!archive || archive === "hard" || q.include_archived === true)
+      return null;
+    return archive.column
+      ? `t.${ident(archive.column)} IS NULL`
+      : `t.${ident(archive.active)} = true`;
   }
 
   return {
@@ -130,7 +153,11 @@ function makeRepo(cfg) {
       const af = archivedFilter(query);
       if (af) where.push(af);
       for (const [key, col] of Object.entries(filters)) {
-        if (query[key] !== undefined && query[key] !== null && query[key] !== "") {
+        if (
+          query[key] !== undefined &&
+          query[key] !== null &&
+          query[key] !== ""
+        ) {
           params.push(query[key]);
           where.push(`t.${col} = $${params.length}`);
         }
@@ -138,17 +165,30 @@ function makeRepo(cfg) {
       if (search.length && query.q) {
         params.push(query.q);
         const n = params.length;
-        where.push(`(${search.map((c) => `search_fold(t.${c}::text) LIKE '%' || search_fold($${n}) || '%'`).join(" OR ")})`);
+        where.push(
+          `(${search.map((c) => `search_fold(t.${c}::text) LIKE '%' || search_fold($${n}) || '%'`).join(" OR ")})`,
+        );
       }
       if (scope && s) {
         const sc = scopeClause(s, { column: scope.column }, params);
         if (sc.and) where.push(sc.and.replace(/^AND /, ""));
       }
-      const sortKey = query.sort && sorts[query.sort] ? query.sort : defaultSort;
+      const sortKey =
+        query.sort && sorts[query.sort] ? query.sort : defaultSort;
       if (query.sort && !sorts[query.sort]) {
-        throw new AppError("INVALID_SORT", `Cannot sort by "${query.sort}"`, 422, { sort: ["is not a sort option here"] });
+        throw new AppError(
+          "INVALID_SORT",
+          `Cannot sort by "${query.sort}"`,
+          422,
+          { sort: ["is not a sort option here"] },
+        );
       }
-      const order = sortKey ? `${sorts[sortKey].split(",").map((p) => `t.${p.trim()}`).join(", ")}, t.${pk}` : `t.${pk}`;
+      const order = sortKey
+        ? `${sorts[sortKey]
+            .split(",")
+            .map((p) => `t.${p.trim()}`)
+            .join(", ")}, t.${pk}`
+        : `t.${pk}`;
       const select = columnList.map((c) => `t.${ident(c)}`).join(", ");
       return pageQuery(
         client,
@@ -160,7 +200,10 @@ function makeRepo(cfg) {
 
     /** One row, or null (also null when outside the caller's scope). */
     async get(client, id, s = null, { forUpdate = false } = {}) {
-      const row = await getById(client, cfg.table, cfg.pk, id, { columns, forUpdate });
+      const row = await getById(client, cfg.table, cfg.pk, id, {
+        columns,
+        forUpdate,
+      });
       if (!row) return null;
       if (scope && s && s.scope !== "all") {
         const owner = row[scope.raw];
@@ -170,17 +213,29 @@ function makeRepo(cfg) {
     },
 
     insert(client, data) {
-      return insertOne(client, cfg.table, data, { writable, returning: columns });
+      return insertOne(client, cfg.table, data, {
+        writable,
+        returning: columns,
+      });
     },
 
     /** System-set columns (number, created_by) on insert; never from a request body. */
     insertTrusted(client, data, trusted) {
       assertWritable(Object.keys(data), writable);
-      return insertOne(client, cfg.table, { ...data, ...trusted }, { returning: columns });
+      return insertOne(
+        client,
+        cfg.table,
+        { ...data, ...trusted },
+        { returning: columns },
+      );
     },
 
     update(client, id, patch) {
-      return updateOne(client, cfg.table, cfg.pk, id, patch, { writable, returning: columns, touch });
+      return updateOne(client, cfg.table, cfg.pk, id, patch, {
+        writable,
+        returning: columns,
+        touch,
+      });
     },
 
     /** Archive (soft) or delete (hard), per cfg.archive. Returns the row after, or null when deleted. */
@@ -190,9 +245,14 @@ function makeRepo(cfg) {
         await client.query(`DELETE FROM ${table} WHERE ${pk} = $1`, [id]);
         return null;
       }
-      const set = archive.column ? `${ident(archive.column)} = now()` : `${ident(archive.active)} = false`;
+      const set = archive.column
+        ? `${ident(archive.column)} = now()`
+        : `${ident(archive.active)} = false`;
       const extra = touch ? `, ${ident(touch)} = now()` : "";
-      const { rows } = await client.query(`UPDATE ${table} SET ${set}${extra} WHERE ${pk} = $1 RETURNING ${columns}`, [id]);
+      const { rows } = await client.query(
+        `UPDATE ${table} SET ${set}${extra} WHERE ${pk} = $1 RETURNING ${columns}`,
+        [id],
+      );
       return rows[0] || null;
     },
   };
@@ -213,14 +273,24 @@ function makeRepo(cfg) {
  * @param {{connect: Function}} [opts.db]  the pool (tests pass their own)
  */
 function makeService(opts) {
-  const { repo, entity, events = {}, beforeCreate = null, beforeUpdate = null } = opts;
-  if (!repo || !repo.cfg) throw new Error("makeService: give the repo from makeRepo");
-  if (!/^[a-z][a-z0-9_]*$/.test(String(entity))) throw new Error("makeService: entity is snake_case");
+  const {
+    repo,
+    entity,
+    events = {},
+    beforeCreate = null,
+    beforeUpdate = null,
+  } = opts;
+  if (!repo || !repo.cfg)
+    throw new Error("makeService: give the repo from makeRepo");
+  if (!/^[a-z][a-z0-9_]*$/.test(String(entity)))
+    throw new Error("makeService: entity is snake_case");
   const db = opts.db || defaultPool;
   const pk = repo.cfg.pk;
   const numberCol = opts.numbering ? opts.numbering.column || "number" : null;
   if (opts.numbering && !SCHEMES[opts.numbering.docType]) {
-    throw new Error(`makeService(${entity}): docType "${opts.numbering.docType}" is not in shared/numbering/schemes.js`);
+    throw new Error(
+      `makeService(${entity}): docType "${opts.numbering.docType}" is not in shared/numbering/schemes.js`,
+    );
   }
 
   async function tx(fn) {
@@ -250,11 +320,24 @@ function makeService(opts) {
 
     create(data, actor) {
       return tx(async (client) => {
-        const input = beforeCreate ? await beforeCreate(data, { client, actor }) : data;
+        const input = beforeCreate
+          ? await beforeCreate(data, { client, actor })
+          : data;
         const trusted = {};
-        if (numberCol) trusted[numberCol] = (await numbering.allocate(client, opts.numbering.docType)).number;
-        const row = Object.keys(trusted).length ? await repo.insertTrusted(client, input, trusted) : await repo.insert(client, input);
-        if (events.created) await emit(client, { key: events.created, entity: ref(row), actor, after: row });
+        if (numberCol)
+          trusted[numberCol] = (
+            await numbering.allocate(client, opts.numbering.docType)
+          ).number;
+        const row = Object.keys(trusted).length
+          ? await repo.insertTrusted(client, input, trusted)
+          : await repo.insert(client, input);
+        if (events.created)
+          await emit(client, {
+            key: events.created,
+            entity: ref(row),
+            actor,
+            after: row,
+          });
         return row;
       });
     },
@@ -263,9 +346,18 @@ function makeService(opts) {
       return tx(async (client) => {
         const before = await repo.get(client, id, s, { forUpdate: true });
         if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
-        const input = beforeUpdate ? await beforeUpdate(patch, before, { client, actor }) : patch;
+        const input = beforeUpdate
+          ? await beforeUpdate(patch, before, { client, actor })
+          : patch;
         const row = await repo.update(client, id, input);
-        if (events.updated) await emit(client, { key: events.updated, entity: ref(before), actor, before, after: row });
+        if (events.updated)
+          await emit(client, {
+            key: events.updated,
+            entity: ref(before),
+            actor,
+            before,
+            after: row,
+          });
         return row;
       });
     },
@@ -275,7 +367,14 @@ function makeService(opts) {
         const before = await repo.get(client, id, s, { forUpdate: true });
         if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
         const after = await repo.archive(client, id);
-        if (events.archived) await emit(client, { key: events.archived, entity: ref(before), actor, before, after: after || undefined });
+        if (events.archived)
+          await emit(client, {
+            key: events.archived,
+            entity: ref(before),
+            actor,
+            before,
+            after: after || undefined,
+          });
         return after;
       });
     },
@@ -291,20 +390,59 @@ function makeService(opts) {
  * @param {{label?: string, mask?: boolean, db?: object}} [opts]
  *   mask  apply field masking to every read (default true)
  */
-function makeController(service, { label = "Record", mask = true, db = defaultPool } = {}) {
+function makeController(
+  service,
+  { label = "Record", mask = true, db = defaultPool } = {},
+) {
   const shown = (req, data) => (mask ? maskForUser(db, req.user, data) : data);
   const notFound = (err) => {
-    if (err && err.code === "NOT_FOUND") throw new AppError("NOT_FOUND", `${label} not found`, 404);
+    if (err && err.code === "NOT_FOUND")
+      throw new AppError("NOT_FOUND", `${label} not found`, 404);
     throw err;
   };
   return {
-    list: async (req, res) => sendPaged(res, await shown(req, await service.list(req.validated.query, scopeOf(req)))),
-    get: async (req, res) => ok(res, await shown(req, await service.get(req.validated.params.id, scopeOf(req)).catch(notFound))),
-    create: async (req, res) => created(res, await shown(req, await service.create(req.validated.body, withActor(req)))),
+    list: async (req, res) =>
+      sendPaged(
+        res,
+        await shown(req, await service.list(req.validated.query, scopeOf(req))),
+      ),
+    get: async (req, res) =>
+      ok(
+        res,
+        await shown(
+          req,
+          await service
+            .get(req.validated.params.id, scopeOf(req))
+            .catch(notFound),
+        ),
+      ),
+    create: async (req, res) =>
+      created(
+        res,
+        await shown(
+          req,
+          await service.create(req.validated.body, withActor(req)),
+        ),
+      ),
     update: async (req, res) =>
-      ok(res, await shown(req, await service.update(req.validated.params.id, req.validated.body, withActor(req), scopeOf(req)).catch(notFound))),
+      ok(
+        res,
+        await shown(
+          req,
+          await service
+            .update(
+              req.validated.params.id,
+              req.validated.body,
+              withActor(req),
+              scopeOf(req),
+            )
+            .catch(notFound),
+        ),
+      ),
     archive: async (req, res) => {
-      const row = await service.archive(req.validated.params.id, withActor(req), scopeOf(req)).catch(notFound);
+      const row = await service
+        .archive(req.validated.params.id, withActor(req), scopeOf(req))
+        .catch(notFound);
       return row ? ok(res, await shown(req, row)) : res.status(204).end();
     },
   };
@@ -328,12 +466,28 @@ function mountResource(router, { controller, module, contract, actions = {} }) {
   const { route } = require("../../http/route");
   const { requirePermission } = require("../../middleware/rbac");
   for (const verb of Object.keys(contract || {})) {
-    if (!VERBS[verb]) throw new Error(`mountResource: unknown verb "${verb}"; use ${Object.keys(VERBS).join(", ")}`);
+    if (!VERBS[verb])
+      throw new Error(
+        `mountResource: unknown verb "${verb}"; use ${Object.keys(VERBS).join(", ")}`,
+      );
   }
   for (const [verb, v] of Object.entries(VERBS)) {
     if (!contract[verb]) continue;
-    route(router, v.method, v.path, contract[verb], requirePermission(module, actions[verb] || v.action), controller[verb]);
+    route(
+      router,
+      v.method,
+      v.path,
+      contract[verb],
+      requirePermission(module, actions[verb] || v.action),
+      controller[verb],
+    );
   }
 }
 
-module.exports = { makeRepo, makeService, makeController, mountResource, VERBS };
+module.exports = {
+  makeRepo,
+  makeService,
+  makeController,
+  mountResource,
+  VERBS,
+};

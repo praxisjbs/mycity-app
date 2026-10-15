@@ -33,10 +33,16 @@ const DEFAULTS = Object.freeze({
     key: "test.threshold",
     module: "settings",
     name: "Threshold Test",
-    description: "Proves the approval engine: a line manager for every request, the CEO from ₦500,000.00.",
+    description:
+      "Proves the approval engine: a line manager for every request, the CEO from ₦500,000.00.",
     context: { amount: "money" },
     stages: [
-      { key: "manager", name: "Line Manager", approver: { type: "manager_of_subject" }, sla_hours: 48 },
+      {
+        key: "manager",
+        name: "Line Manager",
+        approver: { type: "manager_of_subject" },
+        sla_hours: 48,
+      },
       {
         key: "ceo",
         name: "CEO",
@@ -54,7 +60,8 @@ const DEFAULTS = Object.freeze({
  */
 function problemsOf(def) {
   const out = conditions.validateDefinition(def);
-  if (!def || !catalog.isModule(def.module)) out.push(`module "${def && def.module}" is not a module key`);
+  if (!def || !catalog.isModule(def.module))
+    out.push(`module "${def && def.module}" is not a module key`);
   return out;
 }
 
@@ -62,9 +69,14 @@ function problemsOf(def) {
 function assertValid(def) {
   const problems = problemsOf(def);
   if (problems.length) {
-    throw new AppError("WORKFLOW_DEFINITION_INVALID", `This approval route is not valid: ${problems.join("; ")}`, 422, {
-      stages: problems,
-    });
+    throw new AppError(
+      "WORKFLOW_DEFINITION_INVALID",
+      `This approval route is not valid: ${problems.join("; ")}`,
+      422,
+      {
+        stages: problems,
+      },
+    );
   }
   return def;
 }
@@ -121,16 +133,34 @@ async function findById(client, id) {
  */
 async function saveVersion(client, def, { created_by: createdBy = null } = {}) {
   assertValid(def);
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('workflow_definition:' || $1))", [def.key]);
-  const { rows: cur } = await client.query("SELECT COALESCE(max(version), 0) AS v FROM workflow_definition WHERE key = $1", [def.key]);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtext('workflow_definition:' || $1))",
+    [def.key],
+  );
+  const { rows: cur } = await client.query(
+    "SELECT COALESCE(max(version), 0) AS v FROM workflow_definition WHERE key = $1",
+    [def.key],
+  );
   const version = Number(cur[0].v) + 1;
-  await client.query("UPDATE workflow_definition SET active = false WHERE key = $1 AND active = true", [def.key]);
+  await client.query(
+    "UPDATE workflow_definition SET active = false WHERE key = $1 AND active = true",
+    [def.key],
+  );
   const { rows } = await client.query(
     `INSERT INTO workflow_definition
        (key, version, module_key, name, description, context_types, stages, active, created_by)
      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, true, $8)
      RETURNING workflow_definition_id, key, version, module_key, name, description, context_types, stages, active`,
-    [def.key, version, def.module, def.name, def.description || null, JSON.stringify(def.context || {}), JSON.stringify(def.stages), createdBy],
+    [
+      def.key,
+      version,
+      def.module,
+      def.name,
+      def.description || null,
+      JSON.stringify(def.context || {}),
+      JSON.stringify(def.stages),
+      createdBy,
+    ],
   );
   return fromRow(rows[0]);
 }
@@ -144,12 +174,29 @@ async function ensureActive(client, key) {
   if (found) return found;
   const spec = getDefault(key);
   if (!spec) {
-    throw new AppError("WORKFLOW_NOT_CONFIGURED", `There is no approval route "${key}". Set it up in Settings, Approvals.`, 409);
+    throw new AppError(
+      "WORKFLOW_NOT_CONFIGURED",
+      `There is no approval route "${key}". Set it up in Settings, Approvals.`,
+      409,
+    );
   }
   // Two first requests at once: the advisory lock in saveVersion serialises them, and
   // the second finds the first one's row.
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('workflow_definition:' || $1))", [key]);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtext('workflow_definition:' || $1))",
+    [key],
+  );
   return (await findActive(client, key)) || saveVersion(client, spec);
 }
 
-module.exports = { DEFAULTS, getDefault, problemsOf, assertValid, fromRow, findActive, findById, saveVersion, ensureActive };
+module.exports = {
+  DEFAULTS,
+  getDefault,
+  problemsOf,
+  assertValid,
+  fromRow,
+  findActive,
+  findById,
+  saveVersion,
+  ensureActive,
+};

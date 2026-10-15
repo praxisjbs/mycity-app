@@ -9,7 +9,7 @@
  *     vault.store(client, {
  *       file: readUpload(req),
  *       purpose: "document",
- *       doc_type: "employee_certificate",
+ *       doc_type: "employee_certificate",           // registered with defineDocumentType()
  *       entity: { type: "employee", id: employeeId },
  *       subject_employee_id: employeeId,           // whose document it is (ESS "self" access)
  *       sensitivity: "personal",                   // normal | personal | restricted
@@ -17,6 +17,7 @@
  *     }));
  *
  * What store() does, in order:
+ *   0. the doc type must be registered (shared/documents/types.js), or 422 UNKNOWN_DOC_TYPE;
  *   1. the type from the bytes (sniff), refused unless the purpose allows it (mime-policy);
  *   2. an image goes through the image pipeline (profile from the purpose), so the master
  *      is re-encoded, upright and stripped of GPS and other metadata;
@@ -34,7 +35,8 @@
  * bytes stay. A locked document (signed, sent, filed) cannot be superseded.
  *
  * Who may read a document (canRead): the CEO; the employee it is about; whoever uploaded
- * it; otherwise a `view` grant on the module the record belongs to (route map), within
+ * it; otherwise a `view` grant on the module that owns the document (its doc type's
+ * `module`, else the module of the record it belongs to, from the route map), within
  * scope (all, or the subject is in the caller's team, or is the caller). A `restricted`
  * document (payslip, bank letter, ID) also needs that module's `edit` grant, so view-only
  * roles cannot open them. A module whose records need a finer rule (a direct message's
@@ -48,8 +50,14 @@ const { AppError } = require("../errors");
 const { inTransaction } = require("../db/tx");
 const { sniff, typeForExt } = require("../files/sniff");
 const policy = require("../files/mime-policy");
+const { variantKey } = require("../files/variant-key");
+const docTypes = require("./types");
 const { sha256 } = require("../files/hash");
-const { displayName, storageKey, contentDisposition } = require("../files/safe-name");
+const {
+  displayName,
+  storageKey,
+  contentDisposition,
+} = require("../files/safe-name");
 const { emit } = require("../events/emit");
 const { defineEvents } = require("../events/catalogue");
 const routeMap = require("../route-map");
@@ -62,7 +70,9 @@ const EVENTS = defineEvents("settings", {
   "document.superseded": { summary: "A file was replaced by a new version" },
   "document.locked": { summary: "A document was locked" },
   "document.scanned": { summary: "A file from outside was scanned" },
-  "document.render_requested": { summary: "A document was queued for generation" },
+  "document.render_requested": {
+    summary: "A document was queued for generation",
+  },
   "document.generated": { summary: "A document was generated" },
   "document.render_failed": { summary: "A document could not be generated" },
 });
@@ -88,7 +98,11 @@ const AREA_FOR = Object.freeze({
   import_sheet: "imports",
 });
 
-const PROFILE_FOR = Object.freeze({ avatar: "avatar", photo: "photo", signature: "signature" });
+const PROFILE_FOR = Object.freeze({
+  avatar: "avatar",
+  photo: "photo",
+  signature: "signature",
+});
 
 /** entity_type → (client, user, doc) => Promise<boolean> */
 const ACCESS = new Map();
@@ -103,10 +117,22 @@ function actorId(actor) {
 }
 
 function checkMeta({ doc_type: docType, entity, sensitivity, source }) {
-  if (!DOC_TYPE_RE.test(String(docType || ""))) throw new Error(`vault: doc_type "${docType}" is snake_case`);
-  if (!entity || !/^[a-z][a-z0-9_]*$/.test(String(entity.type || "")) || !entity.id) throw new Error("vault: entity { type, id } is required");
-  if (!SENSITIVITIES.has(sensitivity)) throw new Error(`vault: sensitivity is normal, personal or restricted (got "${sensitivity}")`);
-  if (!SOURCES.has(source)) throw new Error(`vault: source is upload, generated or import (got "${source}")`);
+  if (!DOC_TYPE_RE.test(String(docType || "")))
+    throw new Error(`vault: doc_type "${docType}" is snake_case`);
+  if (
+    !entity ||
+    !/^[a-z][a-z0-9_]*$/.test(String(entity.type || "")) ||
+    !entity.id
+  )
+    throw new Error("vault: entity { type, id } is required");
+  if (!SENSITIVITIES.has(sensitivity))
+    throw new Error(
+      `vault: sensitivity is normal, personal or restricted (got "${sensitivity}")`,
+    );
+  if (!SOURCES.has(source))
+    throw new Error(
+      `vault: source is upload, generated or import (got "${source}")`,
+    );
 }
 
 async function insertRow(client, row) {
@@ -126,7 +152,15 @@ async function insertVariants(client, documentId, variants) {
        ON CONFLICT (document_id, kind) DO UPDATE
          SET storage_key = EXCLUDED.storage_key, mime = EXCLUDED.mime, bytes = EXCLUDED.bytes,
              width = EXCLUDED.width, height = EXCLUDED.height`,
-      [documentId, v.kind, v.key, v.mime, v.bytes, v.width || null, v.height || null],
+      [
+        documentId,
+        v.kind,
+        v.key,
+        v.mime,
+        v.bytes,
+        v.width || null,
+        v.height || null,
+      ],
     );
   }
 }
@@ -135,10 +169,17 @@ async function insertVariants(client, documentId, variants) {
 async function putVariants(documentId, variants) {
   const stored = [];
   for (const v of variants) {
-    const key = `derived/${documentId}/${v.kind}.${v.ext}`;
+    const key = variantKey(documentId, v.kind, v.ext);
     try {
       await storage.put(key, v.buffer, { overwrite: true });
-      stored.push({ kind: v.kind, key, mime: v.mime, bytes: v.buffer.length, width: v.width, height: v.height });
+      stored.push({
+        kind: v.kind,
+        key,
+        mime: v.mime,
+        bytes: v.buffer.length,
+        width: v.width,
+        height: v.height,
+      });
     } catch {
       /* a missing variant is a slower list, never a lost document */
     }
@@ -148,9 +189,20 @@ async function putVariants(documentId, variants) {
 
 /** Bytes in → { master buffer, type, variants, width, height }, through the image pipeline when it is one. */
 async function prepare(buffer, type, purpose) {
-  if (!images.isProcessable(type)) return { buffer, type, variants: [], width: null, height: null };
-  const out = await images.processImage(buffer, type, PROFILE_FOR[purpose] || "document");
-  return { buffer: out.master.buffer, type: out.master.type, variants: out.variants, width: out.master.width, height: out.master.height };
+  if (!images.isProcessable(type))
+    return { buffer, type, variants: [], width: null, height: null };
+  const out = await images.processImage(
+    buffer,
+    type,
+    PROFILE_FOR[purpose] || "document",
+  );
+  return {
+    buffer: out.master.buffer,
+    type: out.master.type,
+    variants: out.variants,
+    width: out.master.width,
+    height: out.master.height,
+  };
 }
 
 /**
@@ -159,10 +211,10 @@ async function prepare(buffer, type, purpose) {
  * @param {object} opts
  * @param {{buffer: Buffer, originalname: string}} opts.file   readUpload(req), or bytes the system made
  * @param {string} opts.purpose      an upload purpose (shared/http/body-limits.js)
- * @param {string} opts.doc_type     what the document is ("employee_certificate", "cv")
+ * @param {string} opts.doc_type     a registered doc type ("employee_certificate", "cv")
  * @param {{type: string, id: string}} opts.entity  the record it belongs to
  * @param {string} [opts.subject_employee_id]  the employee it is about
- * @param {"normal"|"personal"|"restricted"} [opts.sensitivity]
+ * @param {"normal"|"personal"|"restricted"} [opts.sensitivity]  default: the doc type's
  * @param {"upload"|"import"} [opts.source]
  * @param {boolean} [opts.stranger]  sent by someone outside (public surface): quarantine and scan
  * @param {string} [opts.title]
@@ -171,17 +223,40 @@ async function prepare(buffer, type, purpose) {
  * @returns {Promise<object>} the document row
  */
 async function store(client, opts) {
-  if (!inTransaction(client)) throw new Error("vault.store must run inside atomically()");
-  const { file, purpose, sensitivity = "normal", source = "upload", stranger = false } = opts;
+  if (!inTransaction(client))
+    throw new Error("vault.store must run inside atomically()");
+  const docType = docTypes.assertDocType(opts.doc_type);
+  const {
+    file,
+    purpose,
+    sensitivity = docType.sensitivity,
+    source = "upload",
+    stranger = false,
+  } = opts;
   checkMeta({ ...opts, sensitivity, source });
   if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
-    throw new AppError("FILE_REQUIRED", "Choose a file to upload", 422, { file: ["is empty"] });
+    throw new AppError("FILE_REQUIRED", "Choose a file to upload", 422, {
+      file: ["is empty"],
+    });
   }
-  const sniffed = policy.assertAllowed(purpose, sniff(file.buffer, file.originalname));
+  const sniffed = policy.assertAllowed(
+    purpose,
+    sniff(file.buffer, file.originalname),
+  );
 
   const id = crypto.randomUUID();
-  const ready = stranger ? { buffer: file.buffer, type: sniffed, variants: [], width: null, height: null } : await prepare(file.buffer, sniffed, purpose);
-  const key = stranger ? storageKey("quarantine", ready.type.ext) : storageKey(AREA_FOR[purpose] || "vault", ready.type.ext);
+  const ready = stranger
+    ? {
+        buffer: file.buffer,
+        type: sniffed,
+        variants: [],
+        width: null,
+        height: null,
+      }
+    : await prepare(file.buffer, sniffed, purpose);
+  const key = stranger
+    ? storageKey("quarantine", ready.type.ext)
+    : storageKey(AREA_FOR[purpose] || "vault", ready.type.ext);
   await storage.put(key, ready.buffer);
   const variants = await putVariants(id, ready.variants);
 
@@ -211,14 +286,22 @@ async function store(client, opts) {
 
   const needs = [];
   if (stranger) needs.push("scan");
-  else if (sniffed.kind === "audio" || sniffed.kind === "video") needs.push("av");
+  else if (sniffed.kind === "audio" || sniffed.kind === "video")
+    needs.push("av");
   await emit(client, {
     key: EVENTS.DOCUMENT_STORED,
     entity: { type: "document", id },
     module: moduleFor(opts.entity.type),
     actor: opts.actor,
     after: row,
-    payload: { document_id: id, doc_type: row.doc_type, kind: sniffed.kind, needs, entity_type: row.entity_type, entity_id: row.entity_id },
+    payload: {
+      document_id: id,
+      doc_type: row.doc_type,
+      kind: sniffed.kind,
+      needs,
+      entity_type: row.entity_type,
+      entity_id: row.entity_id,
+    },
   });
   return row;
 }
@@ -229,14 +312,34 @@ async function store(client, opts) {
  * @param {import("pg").PoolClient} client  inside atomically()
  * @param {{document_id: string, file: object, purpose: string, actor: object, title?: string}} opts
  */
-async function supersede(client, { document_id: oldId, file, purpose, actor, title }) {
-  if (!inTransaction(client)) throw new Error("vault.supersede must run inside atomically()");
-  const { rows } = await client.query(`SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`, [oldId]);
+async function supersede(
+  client,
+  { document_id: oldId, file, purpose, actor, title },
+) {
+  if (!inTransaction(client))
+    throw new Error("vault.supersede must run inside atomically()");
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`,
+    [oldId],
+  );
   const old = rows[0];
   if (!old) throw new AppError("NOT_FOUND", "Document not found", 404);
-  if (old.locked_at) throw new AppError("DOCUMENT_LOCKED", "This document is locked and cannot be replaced", 409);
-  if (!old.is_current) throw new AppError("DOCUMENT_SUPERSEDED", "A newer version of this document already exists", 409);
-  await client.query("UPDATE document SET is_current = false WHERE document_id = $1", [oldId]);
+  if (old.locked_at)
+    throw new AppError(
+      "DOCUMENT_LOCKED",
+      "This document is locked and cannot be replaced",
+      409,
+    );
+  if (!old.is_current)
+    throw new AppError(
+      "DOCUMENT_SUPERSEDED",
+      "A newer version of this document already exists",
+      409,
+    );
+  await client.query(
+    "UPDATE document SET is_current = false WHERE document_id = $1",
+    [oldId],
+  );
   const next = await store(client, {
     file,
     purpose,
@@ -256,18 +359,29 @@ async function supersede(client, { document_id: oldId, file, purpose, actor, tit
     entity: { type: "document", id: next.document_id },
     module: moduleFor(old.entity_type),
     actor,
-    payload: { document_id: next.document_id, supersedes_id: oldId, version: next.version },
+    payload: {
+      document_id: next.document_id,
+      supersedes_id: oldId,
+      version: next.version,
+    },
   });
   return next;
 }
 
 /** Lock a document (signed, sent, filed). Idempotent: locking twice changes nothing. */
 async function lock(client, documentId, actor) {
-  if (!inTransaction(client)) throw new Error("vault.lock must run inside atomically()");
-  const { rows } = await client.query(`SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`, [documentId]);
+  if (!inTransaction(client))
+    throw new Error("vault.lock must run inside atomically()");
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`,
+    [documentId],
+  );
   if (!rows[0]) throw new AppError("NOT_FOUND", "Document not found", 404);
   if (rows[0].locked_at) return rows[0];
-  const { rows: up } = await client.query(`UPDATE document SET locked_at = now() WHERE document_id = $1 RETURNING ${COLUMNS}`, [documentId]);
+  const { rows: up } = await client.query(
+    `UPDATE document SET locked_at = now() WHERE document_id = $1 RETURNING ${COLUMNS}`,
+    [documentId],
+  );
   await emit(client, {
     key: EVENTS.DOCUMENT_LOCKED,
     entity: { type: "document", id: documentId },
@@ -279,7 +393,10 @@ async function lock(client, documentId, actor) {
 }
 
 async function get(client, documentId) {
-  const { rows } = await client.query(`SELECT ${COLUMNS} FROM document WHERE document_id = $1`, [documentId]);
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS} FROM document WHERE document_id = $1`,
+    [documentId],
+  );
   return rows[0] || null;
 }
 
@@ -301,7 +418,8 @@ async function variantOf(client, documentId, kind) {
  * @param {(client, user, doc) => Promise<boolean>} fn
  */
 function defineAccess(entityType, fn) {
-  if (ACCESS.has(entityType) && ACCESS.get(entityType) !== fn) throw new Error(`vault.defineAccess: ${entityType} already has a rule`);
+  if (ACCESS.has(entityType) && ACCESS.get(entityType) !== fn)
+    throw new Error(`vault.defineAccess: ${entityType} already has a rule`);
   ACCESS.set(entityType, fn);
 }
 
@@ -310,16 +428,22 @@ async function canRead(client, user, doc) {
   const rule = ACCESS.get(doc.entity_type);
   if (rule) return Boolean(await rule(client, user, doc));
   if (user.is_ceo === true) return true;
-  if (doc.subject_employee_id && doc.subject_employee_id === user.employee_id) return true;
+  if (doc.subject_employee_id && doc.subject_employee_id === user.employee_id)
+    return true;
   if (doc.uploaded_by && doc.uploaded_by === user.user_id) return true;
 
-  const module = routeMap.moduleOf(doc.entity_type);
+  const owner = docTypes.typeOf(doc.doc_type);
+  const module = (owner && owner.module) || routeMap.moduleOf(doc.entity_type);
   if (!module) return false;
   const { scopeFromGrants } = require("../../middleware/rbac");
-  const rows = await grantsCache.getGrants(client, { role_ids: user.role_ids || [], module });
+  const rows = await grantsCache.getGrants(client, {
+    role_ids: user.role_ids || [],
+    module,
+  });
   const scope = scopeFromGrants(rows, "view");
   if (!scope) return false;
-  if (doc.sensitivity === "restricted" && !scopeFromGrants(rows, "edit")) return false;
+  if (doc.sensitivity === "restricted" && !scopeFromGrants(rows, "edit"))
+    return false;
   if (scope === "all") return true;
   if (!doc.subject_employee_id) return false;
   if (scope === "own") return doc.subject_employee_id === user.employee_id;
@@ -330,7 +454,8 @@ async function canRead(client, user, doc) {
 /** The document, or a 404 when it does not exist OR the caller may not read it. */
 async function getReadable(client, user, documentId) {
   const doc = await get(client, documentId);
-  if (!doc || !(await canRead(client, user, doc))) throw new AppError("NOT_FOUND", "Document not found", 404);
+  if (!doc || !(await canRead(client, user, doc)))
+    throw new AppError("NOT_FOUND", "Document not found", 404);
   return doc;
 }
 
@@ -363,17 +488,48 @@ function parseRange(header, size) {
  * @param {{variant?: object|null, inline?: boolean}} [opts]
  */
 async function serve(req, res, doc, { variant = null, inline = false } = {}) {
-  if (doc.scan_status === "pending") throw new AppError("DOCUMENT_SCANNING", "This file is still being checked. Try again in a minute.", 409);
-  if (doc.scan_status === "infected") throw new AppError("DOCUMENT_INFECTED", "This file failed its virus check and cannot be opened.", 410);
-  if (doc.render_status === "pending") throw new AppError("DOCUMENT_RENDERING", "This document is still being generated.", 409);
-  if (doc.render_status === "failed") throw new AppError("DOCUMENT_RENDER_FAILED", "This document could not be generated.", 410);
+  if (doc.scan_status === "pending")
+    throw new AppError(
+      "DOCUMENT_SCANNING",
+      "This file is still being checked. Try again in a minute.",
+      409,
+    );
+  if (doc.scan_status === "infected")
+    throw new AppError(
+      "DOCUMENT_INFECTED",
+      "This file failed its virus check and cannot be opened.",
+      410,
+    );
+  if (doc.render_status === "pending")
+    throw new AppError(
+      "DOCUMENT_RENDERING",
+      "This document is still being generated.",
+      409,
+    );
+  if (doc.render_status === "failed")
+    throw new AppError(
+      "DOCUMENT_RENDER_FAILED",
+      "This document could not be generated.",
+      410,
+    );
 
   const key = variant ? variant.storage_key : doc.storage_key;
-  const mime = variant ? variant.mime : doc.mime;
+  // Served as its stored type only if that type is on an allow-list; anything else is
+  // inert application/octet-stream and always a download (mime-policy.servedType).
+  const mime = policy.servedType(variant ? variant.mime : doc.mime);
+  const inlineOk =
+    mime !== policy.FALLBACK_TYPE && (inline || Boolean(variant));
   const meta = await storage.stat(key);
-  if (!meta) throw new AppError("FILE_MISSING", "The file for this document is missing", 410);
+  if (!meta)
+    throw new AppError(
+      "FILE_MISSING",
+      "The file for this document is missing",
+      410,
+    );
 
-  const range = req.headers.range ? parseRange(req.headers.range, meta.bytes) : null;
+  const range = req.headers.range
+    ? parseRange(req.headers.range, meta.bytes)
+    : null;
   if (range === "unsatisfiable") {
     res.status(416).set("Content-Range", `bytes */${meta.bytes}`).end();
     return;
@@ -383,14 +539,23 @@ async function serve(req, res, doc, { variant = null, inline = false } = {}) {
     "X-Content-Type-Options": "nosniff",
     "Accept-Ranges": "bytes",
     "Cache-Control": variant ? "private, max-age=300" : "private, no-store",
-    "Content-Disposition": contentDisposition(variant ? `${doc.original_name}` : doc.original_name, { inline: inline || Boolean(variant) }),
+    "Content-Disposition": contentDisposition(doc.original_name, {
+      inline: inlineOk,
+    }),
   });
-  if (mime !== "application/pdf") res.set("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self'; media-src 'self'");
+  if (mime !== "application/pdf")
+    res.set(
+      "Content-Security-Policy",
+      "sandbox; default-src 'none'; img-src 'self'; media-src 'self'",
+    );
   if (doc.content_hash && !variant) res.set("ETag", `"${doc.content_hash}"`);
 
   const { stream } = await storage.open(key, range || {});
   if (range) {
-    res.status(206).set({ "Content-Range": `bytes ${range.start}-${range.end}/${meta.bytes}`, "Content-Length": String(range.end - range.start + 1) });
+    res.status(206).set({
+      "Content-Range": `bytes ${range.start}-${range.end}/${meta.bytes}`,
+      "Content-Length": String(range.end - range.start + 1),
+    });
   } else {
     res.status(200).set("Content-Length", String(meta.bytes));
   }
@@ -416,19 +581,30 @@ async function serve(req, res, doc, { variant = null, inline = false } = {}) {
  * @param {{clean: boolean, signature?: string}} verdict
  */
 async function completeScan(client, documentId, verdict) {
-  if (!inTransaction(client)) throw new Error("vault.completeScan must run inside atomically()");
-  const { rows } = await client.query(`SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`, [documentId]);
+  if (!inTransaction(client))
+    throw new Error("vault.completeScan must run inside atomically()");
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`,
+    [documentId],
+  );
   const doc = rows[0];
   if (!doc || doc.scan_status !== "pending") return doc || null;
 
   if (!verdict.clean) {
-    const { rows: up } = await client.query(`UPDATE document SET scan_status = 'infected' WHERE document_id = $1 RETURNING ${COLUMNS}`, [documentId]);
+    const { rows: up } = await client.query(
+      `UPDATE document SET scan_status = 'infected' WHERE document_id = $1 RETURNING ${COLUMNS}`,
+      [documentId],
+    );
     await emit(client, {
       key: EVENTS.DOCUMENT_SCANNED,
       entity: { type: "document", id: documentId },
       module: moduleFor(doc.entity_type),
       actor: null,
-      payload: { document_id: documentId, clean: false, signature: verdict.signature || null },
+      payload: {
+        document_id: documentId,
+        clean: false,
+        signature: verdict.signature || null,
+      },
     });
     return up[0];
   }
@@ -443,7 +619,15 @@ async function completeScan(client, documentId, verdict) {
     `UPDATE document SET scan_status = 'clean', storage_key = $2, mime = $3, bytes = $4, content_hash = $5,
             width = $6, height = $7
       WHERE document_id = $1 RETURNING ${COLUMNS}`,
-    [documentId, key, ready.type.mime, ready.buffer.length, sha256(ready.buffer), ready.width, ready.height],
+    [
+      documentId,
+      key,
+      ready.type.mime,
+      ready.buffer.length,
+      sha256(ready.buffer),
+      ready.width,
+      ready.height,
+    ],
   );
   await insertVariants(client, documentId, variants);
   await emit(client, {
@@ -451,14 +635,19 @@ async function completeScan(client, documentId, verdict) {
     entity: { type: "document", id: documentId },
     module: moduleFor(doc.entity_type),
     actor: null,
-    payload: { document_id: documentId, clean: true, quarantine_key: doc.storage_key },
+    payload: {
+      document_id: documentId,
+      clean: true,
+      quarantine_key: doc.storage_key,
+    },
   });
   return up[0];
 }
 
 /** Record transcoded audio/video variants and the duration (av-transcode job). */
 async function completeAv(client, documentId, derived) {
-  if (!inTransaction(client)) throw new Error("vault.completeAv must run inside atomically()");
+  if (!inTransaction(client))
+    throw new Error("vault.completeAv must run inside atomically()");
   await insertVariants(client, documentId, derived.variants);
   await client.query(
     "UPDATE document SET duration_ms = COALESCE($2, duration_ms), width = COALESCE($3, width), height = COALESCE($4, height) WHERE document_id = $1",

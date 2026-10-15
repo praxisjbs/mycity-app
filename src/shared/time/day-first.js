@@ -14,10 +14,25 @@
  */
 const { assertDate, dateOf, timeOf, isDate } = require("./lagos");
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
-  "October", "November", "December"];
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
-const toDate = (value) => (value instanceof Date ? dateOf(value) : assertDate(String(value).slice(0, 10)));
+const toDate = (value) =>
+  value instanceof Date
+    ? dateOf(value)
+    : assertDate(String(value).slice(0, 10));
 
 /** "dd/mm/yyyy" from a business date or an instant. */
 function formatDate(value) {
@@ -30,7 +45,10 @@ function formatDate(value) {
 function formatDateTime(value) {
   if (value === null || value === undefined || value === "") return "";
   const at = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(at.getTime())) throw new TypeError(`formatDateTime: not a date/time: ${JSON.stringify(value)}`);
+  if (Number.isNaN(at.getTime()))
+    throw new TypeError(
+      `formatDateTime: not a date/time: ${JSON.stringify(value)}`,
+    );
   return `${formatDate(dateOf(at))} ${timeOf(at)}`;
 }
 
@@ -65,4 +83,11 @@ function parseDayFirst(text) {
   return isDate(iso) ? iso : null;
 }
 
-module.exports = { formatDate, formatDateTime, formatLongDate, formatMonth, parseDayFirst, MONTHS };
+module.exports = {
+  formatDate,
+  formatDateTime,
+  formatLongDate,
+  formatMonth,
+  parseDayFirst,
+  MONTHS,
+};

@@ -31,12 +31,7 @@ const optionalText = (max = 2000) =>
  * ------------------------------------------------------------------ */
 
 /** Lower-cased and trimmed, so `Ada@MyCity.io` and `ada@mycity.io` are one user. */
-const email = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .max(254)
-  .email();
+const email = z.string().trim().toLowerCase().max(254).email();
 
 /**
  * Nigerian numbers normalised to E.164 (+234XXXXXXXXXX).
@@ -53,7 +48,10 @@ const phone = z
     else if (/^234\d{10}$/.test(digits)) national = digits.slice(3);
     else if (/^0\d{10}$/.test(digits)) national = digits.slice(1);
     else {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "must be a Nigerian phone number" });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "must be a Nigerian phone number",
+      });
       return z.NEVER;
     }
     return `+234${national}`;
@@ -79,7 +77,9 @@ const isoDate = z
  * Money is a decimal STRING with exactly two places (gate 20). Never a JS
  * number on the wire. numeric(18,2) holds 16 integer digits.
  */
-const money = z.string().regex(/^-?\d{1,16}\.\d{2}$/, "must be an amount like 1250000.00");
+const money = z
+  .string()
+  .regex(/^-?\d{1,16}\.\d{2}$/, "must be an amount like 1250000.00");
 
 /* ------------------------------------------------------------------ *
  * Pagination: the one rule for every list in the system
@@ -116,7 +116,9 @@ const LIST_CONTROLS = { page, q };
 function listQuery(filters = {}) {
   for (const key of Object.keys(filters)) {
     if (key in LIST_CONTROLS) {
-      throw new Error(`listQuery: "${key}" is a standard list control and cannot be redefined`);
+      throw new Error(
+        `listQuery: "${key}" is a standard list control and cannot be redefined`,
+      );
     }
   }
   return z.object({ ...LIST_CONTROLS, ...filters }).strict();

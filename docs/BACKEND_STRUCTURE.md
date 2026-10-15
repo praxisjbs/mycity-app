@@ -130,10 +130,10 @@ src/
 │   ├── money/         money.js
 │   ├── time/          lagos.js · working-week.js · day-first.js · recurrence.js
 │   ├── numbering/     numbering.js · schemes.js                                (§7)
-│   ├── files/         sniff.js · mime-policy.js · hash.js · safe-name.js        (§5)
-│   ├── documents/     vault.js · generate.js · render.js · markdown.js · canonical.js (§5)
+│   ├── files/         sniff.js · mime-policy.js · hash.js · safe-name.js · variant-key.js (§5)
+│   ├── documents/     vault.js · types.js · generate.js · render.js · markdown.js · canonical.js (§5)
 │   ├── templates/     template-store.js · variables.js                          (§5.5)
-│   ├── spreadsheet/   parse.js · build.js · csv.js · cells.js · day-first-cells.js (§9)
+│   ├── spreadsheet/   parse.js · build.js · csv.js · cells.js · context.js · day-first-cells.js (§9)
 │   ├── import/        engine.js · mapping.js · registry.js · report.js · revert.js (§9)
 │   ├── tokens/        public-token.js (32-byte, hashed at rest, expiring)
 │   ├── rules/         window-counter.js (N events in a rolling window, M3 and M7)
@@ -218,17 +218,23 @@ src/
 | `shared/money/money.js` | pixie `utils/money.js` | 123 | NGN only |
 | `shared/time/lagos.js` | pixie `shared/hr_payroll/lagos-time.js` | 35 | As is |
 | `shared/numbering/*` | praxis `services/documents/numbering.service.js` | 216 | §7 |
-| `shared/files/*`, `shared/documents/*` | praxis `modules/vault/document_vault/` | 2,009 | §5. Keep the mime allow-list, attachment variants, content hash on the stored master; drop the attachment outbox (our outbox covers it) |
+| `shared/files/*`, `shared/documents/*` | praxis `modules/vault/document_vault/` | 2,009 | §5. Keep the mime allow-list (also at serve time), the doc-type registry (`types.js`: reader module, signing ceiling, no QES tier), one function naming derived files (`variant-key.js`), content hash on the stored master; drop the attachment outbox (our outbox covers it) |
 | `shared/spreadsheet/*` | praxis `services/spreadsheet/` | 1,458 | Drop tenant workbook context; MyCity brand header; day-first cells |
 | `shared/dedup/dedup.js` | praxis `master/_shared/dedup.service.js` | 189 | Generic: scorer takes signal definitions, not client/supplier tables |
 | `shared/search/*` | praxis `services/search/` | 305 | English only |
-| `services/media/image-pipeline.js` | praxis `services/image-pipeline.service.js` + `media-compression.service.js` | 878 | Local storage only; profiles kept |
+| `services/media/image-pipeline.js` | praxis `services/image-pipeline.service.js` + `media-compression.service.js` | 878 | Local storage only; profiles kept with enhancement on photo and avatar; metadata always stripped; no brand profile (brand images come from `assets/brand/`) |
 | `services/media/av-pipeline.js` | pixie `jobs/processors/media.ffmpeg.js` | | Voice note → Opus, video → H.264 MP4, poster frame |
-| `services/media/reconcile.js` | praxis `jobs/handlers/media-reconcile` | | Orphan file sweep |
-| `services/mail/deliverability/*` | praxis `modules/mail/deliverability` | 468 | As is |
+| `services/media/reconcile.js` | praxis `jobs/handlers/media-reconcile` | | Orphan file sweep. The donor sweeps its attachment outbox and deletes; ours moves orphans aside and never deletes |
+| `services/mail/deliverability/*` | praxis `modules/mail/deliverability` + `mail/mail/dns-check.js` | 662 | DMARC, PTR, RBL, evaluate, route check as is; no tenant table (`check.js` composes); `MAIL_RBL_HOSTS` |
 | `services/pdf/*` | praxis `pdf.service.js`, `chromium.js` | 262 | Fonts from `assets/fonts` |
 | `services/storage/storage.service.js` | praxis | 335 | Local driver only |
 | `services/secrets/encryption.service.js` | praxis | 42 | As is |
+| `jobs/cron-lock.js` | praxis and pixie `jobs/cron-lock.js` | 84 | As is; our pool, key `mycity:cron:<name>`; wraps every scheduler tick |
+| `jobs/queues.js` | praxis `jobs/queue.js` + `queue-producer.js` | 96 | One producer; prefix `mycity:<env>`; only declared queues; finished-job replacement opt-in |
+| `jobs/registry.js`, `worker.js` | praxis `jobs/workers.js`; pixie `jobs/worker.js` (outbox loop) | 1,635 | No tenants; schedulers as files on BullMQ job schedulers; one `schedule` queue; events files discovered, then `markReady()`; heartbeat for readiness |
+| `jobs/handlers/{email-send,notification-deliver,pdf-render}` | praxis `jobs/handlers/` | 112 | No tenant connection; permanent failures fail at once; emails sent recorded on the job |
+| `realtime/socket.js`, `services/realtime/emitter.js` | pixie `config/socket.js`, `realtime/emitter.js`, `realtime/socket-auth.js`; praxis `realtime/index.js` | 811 | Staff host only; HTTP sign-in rules; rooms `user:`, `session:`, `channel:`; environment-prefixed pub/sub key |
+| `scripts/db/migrate.js` | praxis `services/platform/migrator.js` | 321 | One database; `-- UP`/`-- DOWN`; a changed applied file is refused; advisory lock |
 | `services/ai/llm.service.js`, `vendors/*` | praxis `services/ai/llm.service.js` | 710 | Gemini only; pixie's `resolveVendor` rule: no key configured returns the stub, never throws |
 | `services/ai/redact.js` | praxis `services/ai/redact.js` | 205 | As is, plus MyCity's restricted fields |
 | `services/ai/governance.js` | praxis `modules/ai/governance/` | 605 | Monthly spend cap, per-module switch; no tenant keying |
@@ -236,6 +242,8 @@ src/
 | `shared/ai/registry.js`, `catalogue-sync.js` | praxis `services/ai/action-registrar.js` | 335 | **Reads only** (A23): `write` entries rejected at load |
 | `shared/ai/authorise.js` | praxis `services/ai/action-authz.js` | 200 | Checks the caller's grant and scope before any read runs |
 | `shared/ai/cite.js` | praxis `services/ai/answer-sources.js` | 309 | Citations through the route map |
+| `services/ai/structured.js`, `vendors/stub.js` | praxis `action-registrar.js` (Zod to JSON Schema) | | Constraints carried to the model; the stub answers with a placeholder of the schema's shape |
+| `services/ai/transcription.js` | (seam) | | Governance, ledger and stub in M0; the Gemini audio call is M2 |
 
 **Not ported:** `tenant-context.js`, `host-tenent-resolver.js`, `platform-auth.js` (521 loc, A2);
 `api-version.js`; `public-head.js`; `feature-gate.js` (A4); praxis `services/workflow/executor`;
@@ -377,13 +385,16 @@ const doc = await documents.generate(client, {
   new version; a generated document records the template version it used.
 - **Variables are declared**: each template has a variable schema in `packages/contract`; rendering
   with a missing variable fails before anything is numbered or stored.
-- **Markdown → HTML is one renderer** (`shared/documents/markdown.js`, pixie
-  `recruitment.render.js` model): the same HTML feeds the web view and the PDF, so what a candidate
-  reads on screen is what they sign (M5).
+- **Markdown → HTML is one renderer** (`shared/documents/markdown.js`, ported from pixie
+  `recruitment.render.js`): every line is escaped first, then a whitelist of forms applied, so no raw
+  tag survives. The same HTML feeds the web view and the PDF, so what a candidate reads on screen is
+  what they sign (M5). `stripTrailingAcceptanceBlock` removes a drafted signature block, because the
+  document appends the one execution block itself.
 - **Day-first dates and `₦1,250,000.00` money** are the only formatters templates can call (gate 15).
 - **Letterhead**: City Green logo from the vector master, yellow rule, support footer (MILESTONES §5.3).
-- **Hashing**: `content_hash` over the stored PDF bytes; `canonical.js` gives the `content_hash`
-  over the canonical payload that M5's signatures need (A12).
+- **Hashing**: `content_hash` over the stored PDF bytes (the artifact hash); `canonical.js` gives the
+  content hash over a versioned per-doc-type payload that M5's signatures need (A12). A builder's
+  fields and key order never change; a change is a new version, and a golden test pins each digest.
 
 ---
 
@@ -685,6 +696,15 @@ catalogue equals enforced keys, every list paged at 25 (`check/pagination.js`, �
 allocated type, only `release.yml`/`rollback.yml` reference the `production` environment, shell
 scripts LF and `bash -n`, `node --check` on every file.
 
+The backend code gates (date-format, money, module-catalogue) read JavaScript through
+`scripts/check/lib/source.js` (comments, strings, template literals and regex literals told apart,
+line numbers kept), so a pattern in a comment never fails a build and one in a string is not
+missed. Each takes a waiver only on the line or in the comment directly above, with a reason:
+`@date-format:parts|foreign|filename`, `@money:ok`. Gate 17 (dashes) is shared with the screen
+gates and reads through `scripts/check/lib/sources.js`.
+The module catalogue gate lists catalogue keys no route enforces yet as a note; its CI entry gains
+`--exact` at M9, when every module's routes exist.
+
 ---
 
 ## 11 · M0 migrations
@@ -704,7 +724,7 @@ scripts LF and `bash -n`, `node --check` on every file.
 | 0080 | `documents.sql` | `document`, `document_variant`, `template`, `template_version` |
 | 0085 | `imports.sql` | `import_batch`, `import_row`, `import_mapping_profile` |
 | 0090 | `security_store.sql` | `integration_secret`, `public_token` (hash, scope, subject, expires, used_at) |
-| 0095 | `ai.sql` | `ai_setting` (vendor, model, monthly cap, per-module switch), `ai_run`, `ai_run_step` (tokens, cost, latency, purpose, module, actor), `ai_catalogue` (synced from manifests), `ai_prompt_version` |
+| 0095 | `ai.sql` | `ai_setting` (vendor, model, monthly cap, per-module switch), `ai_run`, `ai_run_step` (tokens, cost, latency, purpose, module, actor), `ai_catalogue` (synced from manifests). Prompts are files with a `version:` front matter, recorded on each run; `ai_prompt_version` waits for prompt editing in Settings, if MyCity wants it |
 | 0099 | `seed_reference.sql` | System roles, module catalogue rows, working week, numbering schemes, template defaults. **No people, no demo rows** |
 
 ### 11.1 Columns the shared layer already reads
@@ -724,7 +744,8 @@ fails at the first query. Everything else in each table is the migration's call.
 | `idempotency_key` (0030) | `key` (PK), `method`, `path`, `request_hash`, `user_id`, `state` (`in_flight` / `completed`), `status_code`, `response_body` jsonb, `created_at`, `completed_at`, `expires_at` | `middleware/idempotency` |
 | `error_event` (0030) | `occurred_at`, `severity`, `origin`, `fingerprint`, `name`, `message`, `stack`, `route`, `request_id`, `user_id`, `release`, `extra` jsonb | `shared/observability/error-reporter` |
 | `employee` (0040) | `employee_id`, `first_name`, `last_name`, `line_manager_id` (team scope is the tree under it) | `shared/rbac/grants-cache` |
-| `schema_migration` (0002) | `name`, `applied_at` | `http/health` (migration head) |
+| `schema_migration` (0002) | `name` text PK (the file name without `.sql`), `sha256` text NOT NULL, `applied_at` timestamptz NOT NULL DEFAULT now(). `scripts/db/migrate.js` creates it with exactly this DDL when it is missing, so 0002 must declare it `IF NOT EXISTS` with the same columns | `scripts/db/migrate.js`, `http/health` (migration head) |
+| `system_marker` (0002) | `environment` text NOT NULL (`production` / `staging` / `development` / `test`), one row, written when the database is created (ops/provision on servers, by hand locally) | `scripts/db/seed.js` (refuses unless it exists and is not production) |
 | `worksite` (0040) | `worksite_id`, `latitude`, `longitude`, `radius_m` | `shared/geo` (clock-in, M1) |
 | `working_week` (0050) | `weekday` (1 Monday to 7 Sunday), `is_working_day`, `starts_at`, `ends_at` | `shared/time/working-week` |
 | `public_holiday` (0050) | `holiday_date`, `name` | `shared/time/working-week` |
@@ -751,6 +772,10 @@ fails at the first query. Everything else in each table is the migration's call.
 | `import_batch` (0085) | `import_batch_id` uuid PK, `number` UNIQUE, `importer_key`, `document_id`, `file_name`, `sheet`, `header_row`, `mapping` jsonb, `options` jsonb, `status` (`uploaded` / `mapped` / `previewed` / `committed` / `reverted` / `failed`), `stats` jsonb, `created_by`, `created_at`, `previewed_at`, `committed_at`, `committed_by`, `reverted_at`, `reverted_by` | `shared/import` |
 | `import_row` (0085) | `import_row_id`, `import_batch_id`, `row_number`, `raw` jsonb, `values` jsonb, `status` (`ok` / `warning` / `error` / `duplicate` / `unchanged` / `skipped`), `problems` jsonb, `action` (`create` / `update` / `none`), `target_id` text, `before` jsonb, `diff` jsonb; UNIQUE (`import_batch_id`, `row_number`) | `shared/import` |
 | `import_mapping_profile` (0085) | `import_mapping_profile_id`, `importer_key`, `name`, `header_signature`, `mapping` jsonb, `created_by`, `last_used_at`; UNIQUE (`importer_key`, `header_signature`) | `shared/import/mapping` |
+| `ai_setting` (0095) | `ai_setting_id`, `enabled` boolean, `vendor` (`gemini` / `stub`), `model`, `disabled_modules` text[] (module keys whose AI is off), `monthly_cap_ngn` numeric(18,2) NULL (no cap), `input_ngn_per_million`, `output_ngn_per_million` numeric(18,2) NULL (NULL: the environment's prices), `updated_by`, `updated_at`. The newest row wins; no row: environment defaults | `services/ai/governance` |
+| `ai_run` (0095) | `run_id` uuid PK, `purpose`, `module_key`, `actor_user_id`, `vendor`, `model`, `prompt_key`, `prompt_version` int, `prompt_sha`, `status` (`running` / `ok` / `failed` / `refused`), `provisional` boolean, `error_code`, `error`, `request_id`, `started_at`, `finished_at` | `services/ai/ledger` |
+| `ai_run_step` (0095) | `ai_run_step_id`, `run_id` FK, `step_no`, `kind` (`completion` / `retry` / `transcription`), `vendor`, `model`, `input_tokens`, `output_tokens` int, `input_ngn_per_million`, `output_ngn_per_million`, `cost_ngn` numeric(18,2), `latency_ms`, `finish_reason`, `outcome` (`ok` / `invalid` / `failed`), `error`, `created_at`; UNIQUE (`run_id`, `step_no`); index on `created_at` (the month's spend is summed from tokens × prices, rounded once) | `services/ai/ledger`, `governance` |
+| `ai_catalogue` (0095) | `key` PK, `kind` (`read` / `route`), `module_key`, `description`, `permission` (`people.view`), `params_schema` jsonb, `screen`, `path`, `build_sha`, `synced_at` | `shared/ai/catalogue-sync` |
 
 `entity_id` is text wherever a row points at "any record", because not every record's key is a
 uuid. `tests/integration/fixtures/shared-layer.sql` holds these columns as runnable DDL so the
@@ -889,16 +914,19 @@ module.exports = defineManifest({
       params: c.organisation.EmployeeListQuery,       // Zod from packages/contract
       permission: ["people", "view"],
       run: (client, params, actor) => repo.list(client, params, actor.scope),
-      cite: (row) => ({ type: "employee", id: row.employee_id }),   // → route map URL
+      cite: (row) => ({ type: "employee", id: row.employee_id, label: row.full_name }), // → route map URL
     },
   ],
   routes: [                                           // A23: writes are routed, never executed
-    { intent: "add an employee", screen: "employees.new", prefill: c.organisation.EmployeeCreate },
+    { intent: "add an employee", screen: "people.employees", params: { action: "new" },
+      prefill: c.organisation.EmployeeCreate },       // screen is "<module>.<tab>" from route-map SCREENS
   ],
 });
 ```
 
-`defineManifest()` validates the shape at load. It **rejects a `write` key** (A23). `reads[].run`
+`defineManifest()` validates the shape at load. It **rejects a `write` key** (A23), and any other
+write-shaped key (`writes`, `actions`, `executor`, `execute`, `mutations`). A read needs the `view`
+grant; its `params` and a route's `prefill` must be schemas exported from `packages/contract`. `reads[].run`
 receives the caller's own scope, so a manifest read returns exactly what the same person would see on
 screen; field masking is applied to its rows by `authorise.js` before the model sees them.
 

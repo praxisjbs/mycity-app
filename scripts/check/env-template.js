@@ -16,10 +16,14 @@ const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 
 const env = { PATH: process.env.PATH, MYCITY_SKIP_DOTENV: "1" };
-const r = spawnSync(process.execPath, [path.join(__dirname, "..", "gen", "env-example.js"), "--check"], {
-  env,
-  encoding: "utf8",
-});
+const r = spawnSync(
+  process.execPath,
+  [path.join(__dirname, "..", "gen", "env-example.js"), "--check"],
+  {
+    env,
+    encoding: "utf8",
+  },
+);
 process.stdout.write(r.stdout || "");
 process.stderr.write(r.stderr || "");
 process.exit(r.status === 0 ? 0 : 1);
