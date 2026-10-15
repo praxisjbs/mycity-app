@@ -137,10 +137,10 @@ src/
 │   ├── money/         money
 │   ├── time/          lagos · working-week · day-first · recurrence
 │   ├── numbering/     numbering · schemes
-│   ├── files/         sniff · mime-policy · hash · safe-name
+│   ├── files/         sniff · mime-policy · hash · safe-name · variant-key
 │   ├── documents/     vault · generate · render · markdown · canonical
 │   ├── templates/     template-store · variables
-│   ├── spreadsheet/   parse · build · csv · cells · day-first-cells
+│   ├── spreadsheet/   parse · build · csv · cells · day-first-cells · context
 │   ├── import/        engine · mapping · registry · report · revert
 │   ├── tokens/        public-token
 │   ├── rules/         window-counter
@@ -156,7 +156,8 @@ src/
 │   ├── storage/       storage.service
 │   ├── media/         image-pipeline · av-pipeline · scan · reconcile
 │   ├── pdf/           chromium · pdf.service
-│   ├── mail/          system-mail.service · deliverability/{route-check, dns-check}
+│   ├── mail/          system-mail.service · deliverability/{check, route-check, dns-check,
+│   │                  dmarc, ptr, rbl, evaluate}
 │   ├── secrets/       encryption.service
 │   ├── ai/            llm.service · governance · ledger · redact · structured · transcription ·
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
