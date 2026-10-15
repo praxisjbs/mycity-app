@@ -11,8 +11,8 @@ import { useModal } from "@/components/ui/Modal";
 import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
-import { KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
-import { Field, Input, Seg, Switch } from "@/components/form";
+import { KvCard, PagedTable } from "@/features/shared/sections";
+import { ChoiceField, Field, FormFooter, SwitchField, TextField } from "@/components/form";
 
 const ACTIONS: Array<[RoleAction, string]> = [["view", "View"], ["create", "Create"], ["edit", "Edit"], ["delete", "Delete"], ["approve", "Approve"], ["export", "Export"]];
 const SCOPES: Array<[RecordScope, string]> = [["all", "All"], ["team", "Team"], ["own", "Own"]];
@@ -79,7 +79,6 @@ export function Roles() {
               <Pill tone="ok">In use</Pill>
             </div>
           ))}
-          <p className="mt-[11px] text-[11.5px] text-subtle-foreground">Every layer is enforced by the API. The screens hide what you cannot use, but hiding is not the control. There is no entity layer: MyCity is one company.</p>
         </Card>
         <KvCard
           title="Field Security in Practice"
@@ -132,9 +131,12 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
     });
   const setScope = (mod: string, scope: RecordScope) => setGrants((all) => ({ ...all, [mod]: { ...all[mod], scope } }));
   const granted = Object.values(grants).filter((g) => g.actions.includes("view")).length;
-  const nameBad = name.trim().length > 0 && (name.trim().length < 2 || name.trim().length > 40);
+  const [tried, setTried] = useState(false);
+  const nameBad = (tried || name.trim().length > 0) && (name.trim().length < 2 || name.trim().length > 40);
 
   const save = async () => {
+    setTried(true);
+    if (nameBad || name.trim().length < 2 || !granted) return;
     const body: RoleBody = { name: name.trim(), description: description.trim(), grants: Object.values(grants).filter((g) => g.actions.length), visible_fields: fields };
     try {
       const r = role ? await update.run({ params: { id: role.role_id }, body }) : await create.run({ body });
@@ -164,17 +166,16 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
       {role?.locked && <Banner tone="info" icon="lock">The CEO role holds every permission and cannot be changed.</Banner>}
       {!canManage && !role?.locked && <Banner tone="info" icon="lock">Operations and the CEO change roles. You can see this one.</Banner>}
       <Grid cols={2}>
-        <Field label="Role Name" state={errors.name || nameBad ? "bad" : undefined} message={errors.name?.[0] ?? (nameBad ? "Between 2 and 40 characters" : role?.system && !readOnly ? "A built-in role keeps its name" : undefined)}>
-          <Input value={name} onChange={(v) => (setName(v), setErrors((x) => ({ ...x, name: [] })))} disabled={readOnly || role?.system} placeholder="e.g. Studio Lead" maxLength={40} />
+        <Field label="Role Name" state={errors.name || nameBad ? "bad" : undefined} message={errors.name?.[0] ?? (nameBad ? "Between 2 and 40 characters" : undefined)}>
+          <TextField value={name} onChange={(v) => (setName(v), setErrors((x) => ({ ...x, name: [] })))} disabled={readOnly || role?.system} placeholder="e.g. Studio Lead" maxLength={40} />
         </Field>
         <Field label="What It Is For">
-          <Input value={description} onChange={setDescription} disabled={readOnly} placeholder="Runs payroll" maxLength={140} />
+          <TextField value={description} onChange={setDescription} disabled={readOnly} placeholder="Runs payroll" maxLength={140} />
         </Field>
       </Grid>
       {role && <p className="-mt-1.5 mb-3 text-[11.5px] text-subtle-foreground">{role.users} {role.users === 1 ? "user holds" : "users hold"} this role.</p>}
 
-      <h4 className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Modules, Actions and Record Scope</h4>
-      <p className="mb-2 text-[11.5px] text-subtle-foreground">Every other action needs View. Record scope limits which records the actions reach.</p>
+      <h4 data-ui="title" className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Modules, Actions and Record Scope</h4>
       {errors.grants?.[0] && <p className="mb-2 text-[11.5px] text-destructive">{errors.grants[0]}</p>}
       <div className="mb-4 overflow-hidden rounded-card border border-border">
         {cat.modules.map((m) => {
@@ -207,7 +208,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
                 {!on ? (
                   <span className="text-[11.5px] text-subtle-foreground">No access</span>
                 ) : m.scoped ? (
-                  readOnly ? <Pill>{SCOPES.find(([v]) => v === g.scope)![1]} records</Pill> : <Seg value={g.scope} onChange={(v) => setScope(m.key, v)} options={SCOPES} />
+                  readOnly ? <Pill>{SCOPES.find(([v]) => v === g.scope)![1]} records</Pill> : <ChoiceField value={g.scope} onChange={(v) => setScope(m.key, v)} options={SCOPES} />
                 ) : (
                   <span className="text-[11.5px] text-subtle-foreground">Not record scoped</span>
                 )}
@@ -217,8 +218,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
         })}
       </div>
 
-      <h4 className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Sensitive Fields</h4>
-      <p className="mb-2 text-[11.5px] text-subtle-foreground">Masked unless switched on. A masked field shows as hidden, so the screen keeps its shape.</p>
+      <h4 data-ui="title" className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Sensitive Fields</h4>
       <div className="mb-1 overflow-hidden rounded-card border border-border">
         {cat.fields.map((f) => (
           <div key={f.key} className="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5 last:border-b-0">
@@ -226,24 +226,25 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
               <div className="text-[12.5px] font-semibold">{f.label}</div>
               <div className="text-[11.5px] text-subtle-foreground">{f.help}</div>
             </span>
-            <Switch checked={fields.includes(f.key)} disabled={readOnly} label={`${f.label} visible`} onChange={(v) => setFields((x) => (v ? [...x, f.key] : x.filter((k) => k !== f.key)))} />
+            <SwitchField checked={fields.includes(f.key)} disabled={readOnly} label={`${f.label} visible`} onChange={(v) => setFields((x) => (v ? [...x, f.key] : x.filter((k) => k !== f.key)))} />
           </div>
         ))}
       </div>
 
-      <ModalFoot>
+      {tried && !granted && <p role="alert" className="mt-3 text-[12px] text-destructive">Grant at least one module</p>}
+      <FormFooter>
         {role && !role.system && canManage && (confirmDelete ? (
-          <Button className="mr-auto" variant="primary" disabled={busy} onClick={del}>Confirm Delete</Button>
+          <Button className="mr-auto" variant="primary" busy={busy} onClick={del}>Confirm Delete</Button>
         ) : (
-          <Button className="mr-auto" disabled={busy} onClick={() => setConfirmDelete(true)}>Delete Role</Button>
+          <Button className="mr-auto" busy={busy} onClick={() => setConfirmDelete(true)}>Delete Role</Button>
         ))}
         <Button onClick={close}>{readOnly ? "Close" : "Cancel"}</Button>
         {!readOnly && (
-          <Button variant="primary" disabled={busy || name.trim().length < 2 || nameBad || !granted} onClick={save}>
+          <Button variant="primary" busy={busy} onClick={() => void save()}>
             {role ? "Save Role" : "Create Role"}
           </Button>
         )}
-      </ModalFoot>
+      </FormFooter>
     </>
   );
 }

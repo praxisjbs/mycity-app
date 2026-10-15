@@ -33,7 +33,7 @@ export function MyLeavePage() {
           </Card>
           {r.status === "Pending" && (
             <div className="mt-3 flex justify-end">
-              <Button disabled={cancel.pending} onClick={async () => (await cancel.run({ params: { id: r.leave_id }, body: {} }), invalidate("/api/v1/leave"), close(), toast(`${r.number} cancelled`))}>
+              <Button busy={cancel.pending} onClick={async () => (await cancel.run({ params: { id: r.leave_id }, body: {} }), invalidate("/api/v1/leave"), close(), toast(`${r.number} cancelled`))}>
                 Cancel This Request
               </Button>
             </div>
@@ -63,7 +63,7 @@ export function MyLeavePage() {
       rowKey={(r) => r.leave_id}
       loading={list.loading}
       onRowClick={open}
-      empty={{ title: "No leave requested yet", text: "Use Request Leave to ask your manager." }}
+      empty={{ title: "No Leave Requested Yet", text: "Use Request Leave to ask your manager." }}
       columns={[
         { key: "t", label: "Type", render: (r) => r.type },
         { key: "f", label: "From", render: (r) => formatDate(r.from) },

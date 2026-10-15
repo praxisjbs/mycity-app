@@ -9,6 +9,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Chain, Pill, StatStrip, Who } from "@/components/ui/data";
 import { Icon } from "@/components/ui/Icon";
+import { HelpTerm } from "@/components/ui/Help";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
@@ -18,11 +19,11 @@ import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime, formatWhen } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill } from "@/features/shared/sections";
+import { BarsCard, ExportButton, KvCard, PagedTable, StatusPill } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AttendancePolicyTab } from "./Policy";
 import { Roles, useRoleOptions } from "./Roles";
-import { Field, InlineInput, PersonPicker, Seg, Select, Switch, Textarea } from "@/components/form";
+import { ChoiceField, Field, FormFooter, InlineInput, PersonPicker, SelectField, SwitchField, TextAreaField } from "@/components/form";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -59,7 +60,7 @@ function OrganisationTab() {
       <PageHead
         title="Organisation"
         sub={d.legal_name}
-        actions={<Button variant="primary" disabled={!dirty || save.pending} onClick={async () => { try { await save.run({ body: { week: w } }); invalidate("/api/v1/settings"); setWeek(null); toast("Working week saved. Attendance and payroll use it"); } catch (e) { fail(e); } }}>Save</Button>}
+        actions={dirty && <Button variant="primary" busy={save.pending} onClick={async () => { try { await save.run({ body: { week: w } }); invalidate("/api/v1/settings"); setWeek(null); toast("Working week saved. Attendance and payroll use it"); } catch (e) { fail(e); } }}>Save</Button>}
       />
       <Grid cols={2}>
         <KvCard title="Company" items={[["Legal name", d.legal_name], ["Trading name", d.trading_name], ["Country", d.country], ["Currency", d.currency], ["Time zone", d.time_zone], ["Financial year", d.financial_year]]} />
@@ -67,7 +68,7 @@ function OrganisationTab() {
       </Grid>
       <Grid cols={2}>
         <KvCard title="Addresses" items={d.hosts.map(([k, v]) => [k, k.startsWith("Why") ? v : <code key={k} className="text-[12px]">{v}</code>])} />
-        <KvCard title="About This System" items={d.about.map(([k, v]) => [k, v === "JBS Praxis" ? <a key={k} href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer" className="font-[650] text-accent-foreground">{v}</a> : v])} />
+        <KvCard title="System" items={d.about.map(([k, v]) => [k, v === "JBS Praxis" ? <a key={k} href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer" className="font-[650] text-accent-foreground">{v}</a> : v])} />
       </Grid>
       <Table
         title="Working Week"
@@ -76,25 +77,14 @@ function OrganisationTab() {
         rowKey={(r) => r.day}
         columns={[
           { key: "d", label: "Day", render: (r) => <b>{r.day}</b> },
-          { key: "w", label: "Working", render: (r) => <Switch checked={r.working} label={`${r.day} is a working day`} onChange={(v) => edit(w.indexOf(r), { working: v, start: v ? r.start ?? "09:00" : null, end: v ? r.end ?? "17:00" : null, grace_min: v ? r.grace_min ?? 10 : null })} /> },
+          { key: "w", label: "Working", render: (r) => <SwitchField checked={r.working} label={`${r.day} is a working day`} onChange={(v) => edit(w.indexOf(r), { working: v, start: v ? r.start ?? "09:00" : null, end: v ? r.end ?? "17:00" : null, grace_min: v ? r.grace_min ?? 10 : null })} /> },
           { key: "s", label: "Start", render: (r) => (r.working ? <TimeBox value={r.start ?? ""} label={`${r.day} start`} onChange={(v) => edit(w.indexOf(r), { start: v })} /> : "None") },
           { key: "e", label: "End", render: (r) => (r.working ? <TimeBox value={r.end ?? ""} label={`${r.day} end`} onChange={(v) => edit(w.indexOf(r), { end: v })} /> : "None") },
           { key: "g", label: "Grace", render: (r) => (r.grace_min != null ? `${r.grace_min} min` : "None"), desktop: true },
         ]}
-        footer={<p className="px-[14px] py-2.5 text-[11.5px] text-subtle-foreground">The payroll daily rate divides by these days, so changing the week changes every pro-rated figure. The grace window lives in Attendance Policy.</p>}
       />
       <Grid cols={2} className="mt-3">
         <KvCard title={`Public Holidays, ${d.holidays[0]?.date.slice(0, 4) ?? ""}`} items={d.holidays.map((h) => [formatDate(h.date).slice(0, 5), h.name])} />
-        <KvCard
-          title="Why Saturday Matters"
-          items={[
-            ["The default", "Most systems assume Monday to Friday"],
-            ["MyCity", "Works Saturdays, 09:00 to 15:00"],
-            ["The consequence", "A hard-coded five day week makes every Saturday an absence"],
-            ["The design", "Each day carries its own working flag, hours and grace window"],
-            ["Downstream", "Attendance, lateness, leave counting and the payroll daily rate all read this one table"],
-          ]}
-        />
       </Grid>
     </>
   );
@@ -104,7 +94,7 @@ function TimeBox({ value, onChange, label }: { value: string; onChange: (v: stri
   const [t, setT] = useState(value);
   useEffect(() => setT(value), [value]);
   const ok = /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
-  return <InlineInput aria-label={label} inputMode="numeric" className={cn("h-8 w-[70px] rounded-ctl border bg-background px-2 text-[13px] outline-none", ok ? "border-input focus:border-ring" : "border-destructive")} value={t} onChange={setT} onBlur={() => ok && t !== value && onChange(t)} />;
+  return <InlineInput aria-label={label} inputMode="numeric" className={cn("h-8 w-[70px] max-md:h-11 rounded-ctl border bg-background px-2 text-[13px] outline-none", ok ? "border-input focus:border-ring" : "border-destructive")} value={t} onChange={setT} onBlur={() => ok && t !== value && onChange(t)} />;
 }
 
 /* ───────────── Users ───────────── */
@@ -143,18 +133,7 @@ function Users() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Users by Role" rows={s.data.by_role} note="A user has exactly one role. A role is a set of permissions, not a job title." /> : <Card><LoadingRows /></Card>}
-        <KvCard
-          title="A User Is Not an Employee"
-          items={[
-            ["Employee", "A person on the payroll, with a record"],
-            ["User", "A login. Most employees have one, not all"],
-            ["Why separate", "A studio contractor needs a login and no payslip"],
-            ["Leaving", "The employee record is kept. The login is disabled, never deleted"],
-            ["Disabled login", "Keeps its audit trail, so history stays readable"],
-            ["Invitation", "Expires after seven days and can be resent"],
-          ]}
-        />
+        {s.data ? <BarsCard title="Users by Role" rows={s.data.by_role} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );
@@ -164,6 +143,8 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   const roles = useRoleOptions();
   const [role, setRole] = useState(u.role);
   const [reason, setReason] = useState<string | null>(null);
+  const [tried, setTried] = useState<"role" | "disable" | null>(null);
+  const reasonBad = reason != null && reason.trim().length < 6;
   const setR = useMutation("POST /api/v1/settings/users/:id/role");
   const disable = useMutation("POST /api/v1/settings/users/:id/disable");
   const run = async (fn: () => Promise<unknown>, msg: string) => {
@@ -178,13 +159,17 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   };
   return (
     <>
-      <Field label="Role"><Select value={role} onChange={setRole} options={roles} /></Field>
-      {reason != null && <Field label="Why the Login Is Disabled"><Textarea value={reason} onChange={setReason} placeholder="Role changed" /></Field>}
-      <ModalFoot>
-        {u.status.text !== "Disabled" && (reason == null ? <Button className="mr-auto" onClick={() => setReason("")}>Disable Login</Button> : <Button className="mr-auto" variant="primary" disabled={reason.trim().length < 6} onClick={() => run(() => disable.run({ params: { id: u.user_id }, body: { reason } }), "Login disabled. The record and its history stay")}>Confirm Disable</Button>)}
+      <Field label="Role" state={tried === "role" && role === u.role ? "bad" : undefined} message="Pick another role"><SelectField value={role} onChange={setRole} options={roles} /></Field>
+      {reason != null && (
+        <Field label="Why the Login Is Disabled" state={tried === "disable" && reasonBad ? "bad" : undefined} message="At least 6 characters">
+          <TextAreaField value={reason} onChange={setReason} placeholder="Role changed" state={tried === "disable" && reasonBad ? "bad" : undefined} />
+        </Field>
+      )}
+      <FormFooter>
+        {u.status.text !== "Disabled" && (reason == null ? <Button className="mr-auto" onClick={() => setReason("")}>Disable Login</Button> : <Button className="mr-auto" busy={disable.pending} onClick={() => (reasonBad ? setTried("disable") : run(() => disable.run({ params: { id: u.user_id }, body: { reason } }), "Login disabled"))}>Confirm Disable</Button>)}
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={role === u.role || setR.pending} onClick={() => run(() => setR.run({ params: { id: u.user_id }, body: { role } }), `${u.person.display_name} is now ${role}`)}>Save Role</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={setR.pending} onClick={() => (role === u.role ? setTried("role") : run(() => setR.run({ params: { id: u.user_id }, body: { role } }), `${u.person.display_name} is now ${role}`))}>Save Role</Button>
+      </FormFooter>
     </>
   );
 }
@@ -193,16 +178,16 @@ function Invite({ close }: { close: () => void }) {
   const roles = useRoleOptions();
   const [who, setWho] = useState<PersonRef[]>([]);
   const [role, setRole] = useState("Staff");
+  const [tried, setTried] = useState(false);
   const inv = useMutation("POST /api/v1/settings/users/invite");
   return (
     <>
-      <Field label="Employee"><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="Role"><Select value={role} onChange={setRole} options={roles} /></Field>
-      <p className="text-[11.5px] text-subtle-foreground">They get an email to set a password. The invitation expires after seven days.</p>
-      <ModalFoot>
+      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message="Pick the employee"><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Role"><SelectField value={role} onChange={setRole} options={roles} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" disabled={!who.length || inv.pending} onClick={async () => { try { await inv.run({ body: { employee_id: who[0].employee_id, role } }); invalidate("/api/v1/settings/users"); close(); toast(`Invitation sent to ${who[0].display_name}`); } catch (e) { fail(e); } }}>Send Invitation</Button>
-      </ModalFoot>
+        <Button variant="primary" icon="send" busy={inv.pending} onClick={async () => { if (!who.length) return setTried(true); try { await inv.run({ body: { employee_id: who[0].employee_id, role } }); invalidate("/api/v1/settings/users"); close(); toast(`Invitation sent to ${who[0].display_name}`); } catch (e) { fail(e); } }}>Send Invitation</Button>
+      </FormFooter>
     </>
   );
 }
@@ -222,7 +207,7 @@ function Approvals() {
       <Grid cols={3}>
         {list.rows.map((x) => (
           <button key={x.hierarchy_id} type="button" onClick={() => setSel(x.hierarchy_id)} className={cn("rounded-box border bg-card p-[14px] text-left transition-shadow hover:shadow-2", x.hierarchy_id === h?.hierarchy_id ? "border-secondary shadow-[0_0_0_1px_var(--secondary)]" : "border-border")}>
-            <h4 className="text-[13.5px] font-semibold">{x.name}</h4>
+            <h4 data-copy="content" className="text-[13.5px] font-semibold">{x.name}</h4>
             <p className="mt-1 text-[12.5px] text-muted-foreground">{x.description}</p>
             <div className="mt-2.5"><StatusPill s={x.status} /></div>
           </button>
@@ -242,17 +227,6 @@ function Approvals() {
               <Button icon="plus" onClick={() => modal.open({ title: `Steps · ${h.name}`, body: (close) => <EditSteps h={h} close={close} /> })}>Edit Steps</Button>
             </div>
           </Card>
-          <KvCard
-            title="Why Hierarchies Are Data"
-            items={[
-              ["The alternative", "An if-statement per chain, in code"],
-              ["The problem", "MyCity has not finished deciding. Payroll’s approver is still open"],
-              ["The design", "A hierarchy is rows: steps, roles, thresholds, deputies"],
-              ["Changing one", "Editing rows. No deploy, no release, no downtime"],
-              ["Who can", "Operations and the CEO"],
-              ["Audit", "Every change to a hierarchy is logged with the before and after"],
-            ]}
-          />
         </Grid>
       )}
     </>
@@ -281,11 +255,10 @@ function EditSteps({ h, close }: { h: Hierarchy; close: () => void }) {
         ))}
       </div>
       <Button size="sm" icon="plus" className="mt-2" onClick={() => setSteps([...steps, ""])}>Add a Step</Button>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">In-flight requests keep the chain they started on. The change is logged with the before and after.</p>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={async () => { try { await save.run({ params: { id: h.hierarchy_id }, body: { steps } }); invalidate("/api/v1/settings/approvals"); close(); toast(`${h.name} updated`); } catch (e) { if (e instanceof ApiError && e.fields) toast(Object.values(e.fields)[0][0]); else fail(e); } }}>Save Steps</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={async () => { try { await save.run({ params: { id: h.hierarchy_id }, body: { steps } }); invalidate("/api/v1/settings/approvals"); close(); toast(`${h.name} updated`); } catch (e) { if (e instanceof ApiError && e.fields) toast(Object.values(e.fields)[0][0]); else fail(e); } }}>Save Steps</Button>
+      </FormFooter>
     </>
   );
 }
@@ -306,7 +279,7 @@ function Notifications() {
   const rows = n.data ?? [];
   return (
     <>
-      <PageHead title="Notifications" sub="Per category and transport. Saved as you change them." />
+      <PageHead title="Notifications" sub="Per category and transport, saved as you change" />
       <Grid cols={2}>
         {(["email", "in_app"] as const).map((t) => (
           <Card key={t}>
@@ -314,8 +287,8 @@ function Notifications() {
             {!n.data && <LoadingRows />}
             {rows.map((r) => (
               <div key={r.key} className="flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0">
-                <div><div className="text-[13px] font-[550]">{r.label}</div>{r.help && <div className="text-[11.5px] text-subtle-foreground">{r.help}</div>}</div>
-                <Switch checked={r[t]} disabled={r.locked || save.pending} label={`${r.label}, ${t === "email" ? "email" : "in app"}`} onChange={(v) => void set(r.key, { in_app: r.in_app, email: r.email, [t]: v })} />
+                <div className="text-[13px] font-[550]">{r.help ? <HelpTerm text={r.help}>{r.label}</HelpTerm> : r.label}</div>
+                <SwitchField checked={r[t]} disabled={r.locked || save.pending} label={`${r.label}, ${t === "email" ? "email" : "in app"}`} onChange={(v) => void set(r.key, { in_app: r.in_app, email: r.email, [t]: v })} />
               </div>
             ))}
           </Card>
@@ -331,16 +304,6 @@ function Notifications() {
             { key: "i", label: "In App", render: (r) => <Pill tone={r.in_app ? "ok" : "neutral"}>{r.in_app ? "On" : "Off"}</Pill> },
             { key: "e", label: "Email", render: (r) => <Pill tone={r.email ? "ok" : "neutral"}>{r.email ? "On" : "Off"}</Pill> },
             { key: "w", label: "Who Sets It", render: (r) => (r.locked ? "Locked on" : "You") },
-          ]}
-        />
-        <KvCard
-          title="What Cannot Be Switched Off"
-          items={[
-            ["A query against you", "You are told. There is no setting for it"],
-            ["A sanction decision", "Same reason"],
-            ["Everything else", "Yours to set, per transport"],
-            ["Transports", "In app and email. Push once the app is installed"],
-            ["Digest", "Daily at 09:00 for anything holding you up"],
           ]}
         />
       </Grid>
@@ -376,12 +339,11 @@ function AppearanceTab() {
         <Card>
           <CardHeader title="Palette" />
           {d.palette.map((c) => (
-            <div key={c.name} className="flex items-center gap-[11px] py-[7px]">
+            <div key={c.name} data-copy="content" className="flex items-center gap-[11px] py-[7px]">
               <i className="size-[30px] flex-none rounded-lg border border-border" style={{ background: `var(${c.token})` }} />
               <div className="flex-1"><div className="text-[13px] font-[550]">{c.name}</div><div className="text-[11.5px] text-subtle-foreground">{vals[c.token]}</div></div>
             </div>
           ))}
-          <p className="mt-[9px] text-[11.5px] text-subtle-foreground">The four brand colours, unchanged. Everything else on screen is derived from them.</p>
         </Card>
         <Card>
           <CardHeader title="Typography and Theme" />
@@ -392,14 +354,13 @@ function AppearanceTab() {
           </dl>
           <div className="mt-3 border-t border-border pt-3">
             <div className="mb-1.5 text-[12px] text-subtle-foreground">Default theme for everyone</div>
-            <Seg value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved. A person's own choice still wins"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
+            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved. A person's own choice still wins"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
           </div>
         </Card>
       </Grid>
       <Grid cols={2}>
         <Card>
-          <CardHeader title="The Dark Theme Is Derived, Not Invented" right={<Pill tone="info">Try the moon icon</Pill>} />
-          <p className="mb-[11px] text-[11.5px] text-subtle-foreground">MyCity has no dark brand variant. Rather than pick colours, every dark surface sits on the brand’s own green hue. Values below are the theme you are looking at.</p>
+          <CardHeader title="Dark Theme" />
           {d.dark.map((r) => (
             <div key={r.name} className="flex items-center gap-[11px] border-b border-border py-1.5 last:border-b-0">
               <i className="size-6 flex-none rounded-[7px] border border-border" style={{ background: `var(${r.token})` }} />
@@ -408,17 +369,6 @@ function AppearanceTab() {
             </div>
           ))}
         </Card>
-        <KvCard
-          title="What a Tenant Can Change"
-          items={[
-            ["Logo", "Theirs, uploaded"],
-            ["Favicon", "Theirs"],
-            ["The four colours", "Theirs. Everything derives"],
-            ["Typeface", "From a vetted list"],
-            ["Default theme", "Light, dark, or follow the device"],
-            ["What they cannot", "Break contrast. The build fails if a pair drops below AA"],
-          ]}
-        />
       </Grid>
     </>
   );
@@ -459,7 +409,6 @@ function NumberingTab() {
           <PaperFoot><span>Content hash verified</span><span>Artifact hash verified</span><span className="ml-auto">go.mycityapp.io/verify/MOU-0004</span></PaperFoot>
         </Paper>
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">A reference is issued at creation and never reused, even if the document is deleted. The sequence is a database object, so two people creating at once cannot collide.</p>
     </>
   );
 }
@@ -477,7 +426,7 @@ function Integrations() {
       <Grid cols={3}>
         {(d?.items ?? []).map((x) => (
           <div key={x.key} className="rounded-box border border-border bg-card p-[14px]">
-            <h4 className="text-[13.5px] font-semibold">{x.name}</h4>
+            <h4 data-copy="content" className="text-[13.5px] font-semibold">{x.name}</h4>
             <p className="mt-1 text-[12.5px] text-muted-foreground">{x.text}</p>
             <div className="mt-2.5"><StatusPill s={x.status} /></div>
           </div>
@@ -496,17 +445,6 @@ function Integrations() {
             { key: "v", label: "Volume, 7d", align: "n", render: (h) => h.volume_7d.toLocaleString("en-NG") },
             { key: "f", label: "Failures", align: "n", render: (h) => h.failures },
             { key: "st", label: "Status", render: (h) => <StatusPill s={h.status} /> },
-          ]}
-        />
-        <KvCard
-          title="Why the Mailbox Is Ours"
-          items={[
-            ["The ask", "Staff mail on the MyCity domain, inside the platform"],
-            ["Not Google", "No Workspace. No OAuth consent screen"],
-            ["Not Microsoft", "No 365, no Graph API"],
-            ["How", "SMTP out, IMAP in, against mycityapp.io"],
-            ["Sign in", "An address and a password, the same as any other mailbox"],
-            ["What it means", "No third party sees MyCity mail, and no vendor can withdraw it"],
           ]}
         />
       </Grid>
@@ -533,7 +471,7 @@ function Security() {
           {d?.rules.map((r) => (
             <div key={r.key} className="flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0">
               <div className="text-[13px] font-[550]">{r.label}</div>
-              <Switch checked={r.on} label={r.label} disabled={save.pending} onChange={async (v) => { try { await save.run({ body: { [r.key]: v } }); invalidate("/api/v1/settings/security"); toast(`${r.label}: ${v ? "on" : "off"}`); } catch (e) { fail(e); } }} />
+              <SwitchField checked={r.on} label={r.label} disabled={save.pending} onChange={async (v) => { try { await save.run({ body: { [r.key]: v } }); invalidate("/api/v1/settings/security"); toast(`${r.label}: ${v ? "on" : "off"}`); } catch (e) { fail(e); } }} />
             </div>
           ))}
         </Card>
@@ -562,17 +500,6 @@ function Security() {
             { key: "e", label: "Who", render: (x) => x.email },
             { key: "p", label: "From", render: (x) => x.place, desktop: true },
             { key: "o", label: "Outcome", render: (x) => <StatusPill s={x.outcome} /> },
-          ]}
-        />
-        <KvCard
-          title="How a Session Works"
-          items={[
-            ["Access token", "In memory only. Never in local storage"],
-            ["Refresh token", "An httpOnly cookie, so script cannot read it"],
-            ["Idle timeout", "Eight hours, configurable"],
-            ["Ending one", "Takes effect on the next request, not on the next page load"],
-            ["Failed attempts", "Rate limited, then locked. Five in fifteen minutes"],
-            ["MFA", "Required for the three privileged roles"],
           ]}
         />
       </Grid>
@@ -612,18 +539,7 @@ function Audit() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Entries by Module, This Month" rows={s.data.by_module} note="Attendance leads because every punch is an entry. That is the point: attendance is the most contested record in the system." /> : <Card><LoadingRows /></Card>}
-        <KvCard
-          title="What Append Only Means"
-          items={[
-            ["Written by", "The database, on every state change"],
-            ["Editable", "By nobody. There is no UPDATE path to this table"],
-            ["Deletable", "By nobody, including an administrator"],
-            ["What is recorded", "Who, what, which record, before, after, when, and why"],
-            ["What is not", "The old and new values of a masked field"],
-            ["Retention", "Seven years, then archived rather than purged"],
-          ]}
-        />
+        {s.data ? <BarsCard title="Entries by Module" rows={s.data.by_module} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );

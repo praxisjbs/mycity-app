@@ -54,7 +54,7 @@ export function DateField({ value, onChange, onBlur, state, min, max, id, placeh
           inputMode="numeric"
           autoComplete="off"
           className={cn(
-            "h-9 w-full min-w-0 rounded-ctl border bg-background pr-10 pl-3 outline-none focus:border-ring focus:shadow-[0_0_0_3px_var(--accent)]",
+            "h-9 w-full min-w-0 rounded-ctl border bg-background pr-10 max-md:h-11 pl-3 outline-none focus:border-ring focus:shadow-[0_0_0_3px_var(--accent)]",
             shown === "bad" ? "border-destructive" : shown === "good" ? "border-success" : "border-input",
           )}
           placeholder={placeholder}
@@ -114,7 +114,7 @@ function MonthPicker({ value, min, max, onPick }: { value: string; min?: string;
               disabled={!!off}
               onClick={() => onPick(d)}
               className={cn(
-                "h-8 rounded-md text-[12.5px] disabled:opacity-30",
+                "h-8 rounded-md text-[12.5px] disabled:opacity-30 max-md:h-11",
                 d === value ? "bg-secondary font-bold text-secondary-foreground" : "hover:bg-accent",
                 d === today && d !== value && "font-bold text-accent-foreground",
               )}

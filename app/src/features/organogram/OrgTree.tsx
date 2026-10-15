@@ -6,7 +6,6 @@ import { Icon } from "@/components/ui/Icon";
 import { Card, PageHead } from "@/components/ui/layout";
 import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
-import { WithInfo } from "@/components/ui/Info";
 import { cn } from "@/lib/cn";
 import { initials } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
@@ -145,7 +144,7 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
     <>
       <PageHead
         title={builder ? "Organogram" : "Org Chart"}
-        sub={data ? (builder ? `The live reporting structure · ${data.seats} seats · ${data.filled} filled · ${data.seats - data.filled} open` : `Who reports to whom across MyCity · read only · ${data.seats} seats · ${data.filled} filled`) : " "}
+        sub={data ? (builder ? `Reporting lines · ${data.seats} seats · ${data.filled} filled · ${data.seats - data.filled} open` : `Reporting lines · ${data.seats} seats · ${data.filled} filled`) : " "}
         actions={
           <>
             <SearchBox value={q} onChange={setQ} placeholder="Search the chart" className="w-[200px]" />
@@ -161,15 +160,8 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
         <span className="inline-flex items-center gap-[7px]"><i className="inline-block size-[13px] rounded border border-dashed border-input" />Vacant seat</span>
       </div>
       <Card className="p-1.5">
-        {!data ? <LoadingRows count={5} /> : <div ref={scroller} className="ogt"><ul>{roots.map(node)}</ul></div>}
+        {!data ? <LoadingRows count={5} /> : <div ref={scroller} className="ogt" data-copy="content"><ul>{roots.map(node)}</ul></div>}
       </Card>
-      <div className="mt-3">
-        <WithInfo heading={builder ? "Changing the Structure" : "About This Chart"} label="About the organogram">
-          {builder
-            ? "Drag a card onto a new manager to change its reporting line. Every change is written through People and recorded in the audit log, the same write the employee form uses. A vacant seat can be sent to Recruitment as a suggested vacancy."
-            : "Read only. Every employee sees the whole company here. Salary, bank details and phone numbers are never shown."}
-        </WithInfo>
-      </div>
     </>
   );
 }

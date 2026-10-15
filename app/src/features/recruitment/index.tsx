@@ -6,7 +6,7 @@ import type { Assessment, Candidate, InterviewRow, OfferRow, OnboardingRow, Pool
 import type { PersonRef } from "@/api/types/common";
 import { Button } from "@/components/ui/Button";
 import { Board } from "@/components/ui/Board";
-import { Banner, KV, Mini, Pill, Quote, Timeline, Who } from "@/components/ui/data";
+import { KV, Mini, Pill, Quote, Timeline, Who } from "@/components/ui/data";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { useModal } from "@/components/ui/Modal";
 import { Money } from "@/components/ui/Money";
@@ -16,10 +16,10 @@ import { cn } from "@/lib/cn";
 import { formatDate, formatDateTime, todayIso } from "@/lib/format";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import { Letter } from "@/features/shared/Letter";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AmountInput, DateField, Field, FilterSelect, FormRow, Input, PersonPicker, Select, Textarea, useForm } from "@/components/form";
+import { ChoiceField, DateField, Field, FilterSelect, FormFooter, MoneyField, PersonPicker, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@/components/form";
 
 export default function Recruitment({ tab, id }: ModuleScreenProps) {
   if (tab === "candidates") return <Candidates id={id} />;
@@ -73,9 +73,9 @@ function Vacancies() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Funnel, All Vacancies" rows={s.data.funnel} note={s.data.funnel_note} /> : <Card><LoadingRows /></Card>}
+        {s.data ? <BarsCard title="Funnel, All Vacancies" rows={s.data.funnel} /> : <Card><LoadingRows /></Card>}
         <Table
-          title="Where Each One Is"
+          title="Vacancy Stages"
           rows={list.rows}
           rowKey={(v) => v.vacancy_id}
           loading={list.loading}
@@ -88,7 +88,6 @@ function Vacancies() {
           ]}
         />
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">A paused vacancy keeps its public link, so resuming restores the same URL. Nothing a candidate bookmarked breaks.</p>
     </>
   );
 }
@@ -111,23 +110,23 @@ function VacancyDetail({ v, close }: { v: Vacancy; close: () => void }) {
   return (
     <>
       <KV items={[["Department", v.department], ["Openings", v.openings], ["Location", v.location], ["Applicants", v.applicants], ["Published", formatDate(v.published_on)], ["Status", <StatusPill key="s" s={v.status} />], ["Public link", v.public_url], ["Next step", v.next_step]]} />
-      <ModalFoot>
-        <Button onClick={flip} disabled={pause.pending || resume.pending}>{v.paused ? "Resume" : "Pause"}</Button>
+      <FormFooter>
+        <Button onClick={flip} busy={pause.pending || resume.pending}>{v.paused ? "Resume" : "Pause"}</Button>
         <Button variant="primary" onClick={() => (close(), navigate(`/recruitment?tab=candidates&vacancy=${v.vacancy_id}`))}>See Candidates</Button>
-      </ModalFoot>
+      </FormFooter>
     </>
   );
 }
 
 function VacancyForm({ close }: { close: () => void }) {
   const depts = useDepartmentOptions("Pick the department");
-  const f = useForm({ title: "", department: "", openings: "1", location: "Lagos", arrangement: "hybrid", closes_on: "", description: "" }, {
+  const f = useContractForm({ title: "", department: "", openings: "1", location: "Lagos", arrangement: "hybrid", closes_on: "", description: "" }, {
     title: (v) => (v.trim().length < 3 ? "Name the role" : null),
     department: (v) => (!v ? "Pick the department" : null),
     openings: (v) => (!(Number(v) >= 1) ? "At least one" : null),
-    location: (v) => (!v.trim() ? "Where is the role based" : null),
+    location: (v) => (!v.trim() ? "Pick a location" : null),
     closes_on: (v) => (!v ? "Pick the closing date" : null),
-    description: (v) => (v.trim().length < 40 ? "Describe the role (40 characters or more)" : null),
+    description: (v) => (v.trim().length < 40 ? "At least 40 characters" : null),
   });
   const save = useMutation("POST /api/v1/recruitment/vacancies");
   const submit = async () => {
@@ -142,25 +141,37 @@ function VacancyForm({ close }: { close: () => void }) {
     }
   };
   return (
-    <>
-      <FormRow>
-        <Field label="Role" {...f.field("title")}><Input {...f.field("title")} placeholder="e.g. Content Producer" /></Field>
-        <Field label="Department" {...f.field("department")}><Select options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Location" {...f.field("location")}><Input {...f.field("location")} /></Field>
-        <Field label="Arrangement"><Select options={[["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]} {...f.field("arrangement")} /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Openings" {...f.field("openings")}><Input {...f.field("openings")} inputMode="numeric" onChange={(v) => f.set("openings", v.replace(/\D/g, "").slice(0, 2))} /></Field>
-        <Field label="Closes On" {...f.field("closes_on")}><DateField {...f.field("closes_on")} min={todayIso()} /></Field>
-      </FormRow>
-      <Field label="About the Role" {...f.field("description")}><Textarea {...f.field("description")} rows={5} placeholder="Duties and requirements" /></Field>
-      <ModalFoot>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Publish Vacancy</Button>
-      </ModalFoot>
-    </>
+    <Wizard
+      finish="Publish Vacancy"
+      busy={save.pending}
+      onFinish={() => void submit()}
+      onCancel={close}
+      steps={[
+        {
+          title: "Role",
+          check: () => f.check(["title", "department", "location"]),
+          body: (
+            <>
+              <Field label="Role" {...f.field("title")}><TextField {...f.field("title")} placeholder="e.g. Content Producer" /></Field>
+              <Field label="Department" {...f.field("department")}><SelectField options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
+              <Field label="Location" {...f.field("location")}><TextField {...f.field("location")} /></Field>
+              <Field label="Arrangement"><ChoiceField value={f.values.arrangement} onChange={(v) => f.set("arrangement", v)} options={[["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]} /></Field>
+            </>
+          ),
+        },
+        {
+          title: "Details",
+          check: () => f.check(["openings", "closes_on", "description"]),
+          body: (
+            <>
+              <Field label="Openings" {...f.field("openings")}><TextField {...f.field("openings")} inputMode="numeric" onChange={(v) => f.set("openings", v.replace(/\D/g, "").slice(0, 2))} /></Field>
+              <Field label="Closes On" {...f.field("closes_on")}><DateField {...f.field("closes_on")} min={todayIso()} /></Field>
+              <Field label="About the Role" {...f.field("description")}><TextAreaField {...f.field("description")} rows={5} placeholder="Duties and requirements" /></Field>
+            </>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -222,9 +233,8 @@ function Candidates({ id }: { id: string | null }) {
       />
       <Grid cols={2} className="mt-3">
         {focus ? <CandidateCard id={focus} /> : <Card><LoadingRows /></Card>}
-        {s.data ? <BarsCard title="Score Distribution, All Applicants" rows={s.data.distribution} note={s.data.distribution_note} /> : <Card><LoadingRows /></Card>}
+        {s.data ? <BarsCard title="Score Distribution, All Applicants" rows={s.data.distribution} /> : <Card><LoadingRows /></Card>}
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">AI screening scores carry a provisional flag until a human opens the CV. A provisional score means the form was read, not the résumé.</p>
     </>
   );
 }
@@ -256,6 +266,7 @@ function CandidateDetail({ id, close }: { id: string; close: () => void }) {
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
   const pool = useMutation("POST /api/v1/recruitment/candidates/:id/pool");
   const [reject, setReject] = useState<string | null>(null);
+  const [tried, setTried] = useState(false);
   if (!c.data) return c.error ? <ErrorBlock error={c.error} /> : <LoadingRows />;
   const d = c.data;
   const go = async (stage: Stage) => {
@@ -273,36 +284,36 @@ function CandidateDetail({ id, close }: { id: string; close: () => void }) {
       <KV items={[["Role", d.vacancy.title], ["Stage", STAGE_LABEL[d.stage]], ["Email", d.email], ["Score", d.score ?? "Not scored"], ["Assessments", d.assessments ?? "Not taken"], ["Interview", d.interview ?? "Not scheduled"]]} />
       {reject != null && (
         <div className="mt-3">
-          <Field label="Why Not Progressed" state={!reject.trim() ? "bad" : undefined} message={!reject.trim() ? "For the record and the candidate's email" : undefined}>
-            <Textarea value={reject} onChange={setReject} placeholder="Strong, needs partnerships" />
+          <Field label="Why Not Progressed" info="It goes on the record and in the candidate's email." state={tried && !reject.trim() ? "bad" : undefined} message="Give a reason">
+            <TextAreaField value={reject} onChange={setReject} placeholder="Strong, needs partnerships" />
           </Field>
         </div>
       )}
-      <ModalFoot>
+      <FormFooter>
         {reject == null ? (
           <>
             {d.stage !== "rejected" && d.stage !== "hired" && <Button className="mr-auto" onClick={() => setReject("")}>Not Progressing</Button>}
             {d.stage === "rejected" && (
-              <Button className="mr-auto" disabled={pool.pending} onClick={async () => { await pool.run({ params: { id }, body: { reason: "Strong, wrong moment" } }); invalidate("/api/v1/recruitment/pool"); close(); toast(`${d.name} added to the talent pool`); }}>Add to Talent Pool</Button>
+              <Button className="mr-auto" busy={pool.pending} onClick={async () => { await pool.run({ params: { id }, body: { reason: "Strong, wrong moment" } }); invalidate("/api/v1/recruitment/pool"); close(); toast(`${d.name} added to the talent pool`); }}>Add to Talent Pool</Button>
             )}
             {d.next_stages.filter((x) => x !== "rejected").map((x) => (
-              <Button key={x} variant="primary" disabled={move.pending} onClick={() => go(x)}>Move to {STAGE_LABEL[x]}</Button>
+              <Button key={x} variant="primary" busy={move.pending} onClick={() => go(x)}>Move to {STAGE_LABEL[x]}</Button>
             ))}
             {!d.next_stages.length && <Button onClick={close}>Close</Button>}
           </>
         ) : (
           <>
             <Button onClick={() => setReject(null)}>Back</Button>
-            <Button variant="primary" disabled={!reject.trim() || move.pending} onClick={() => go("rejected")}>Confirm</Button>
+            <Button variant="primary" busy={move.pending} onClick={() => (reject.trim() ? go("rejected") : setTried(true))}>Confirm</Button>
           </>
         )}
-      </ModalFoot>
+      </FormFooter>
     </>
   );
 }
 
 function AddCandidate({ close, vacancies }: { close: () => void; vacancies: Vacancy[] }) {
-  const f = useForm({ name: "", email: "", vacancy_id: "" }, { name: (v) => (v.trim().length < 3 ? "Enter the full name" : null), email: (v) => (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? "Enter a valid email" : null), vacancy_id: (v) => (!v ? "Pick the vacancy" : null) });
+  const f = useContractForm({ name: "", email: "", vacancy_id: "" }, { name: (v) => (v.trim().length < 3 ? "Enter the full name" : null), email: (v) => (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? "Enter a valid email" : null), vacancy_id: (v) => (!v ? "Pick the vacancy" : null) });
   const save = useMutation("POST /api/v1/recruitment/candidates");
   const submit = async () => {
     if (!f.check()) return;
@@ -317,13 +328,13 @@ function AddCandidate({ close, vacancies }: { close: () => void; vacancies: Vaca
   };
   return (
     <>
-      <Field label="Full Name" {...f.field("name")}><Input {...f.field("name")} /></Field>
-      <Field label="Email" {...f.field("email")}><Input {...f.field("email")} type="email" /></Field>
-      <Field label="Vacancy" {...f.field("vacancy_id")}><Select placeholder="Pick the vacancy" options={vacancies.filter((v) => !v.paused).map((v) => [v.vacancy_id, v.title])} {...f.field("vacancy_id")} /></Field>
-      <ModalFoot>
+      <Field label="Full Name" {...f.field("name")}><TextField {...f.field("name")} /></Field>
+      <Field label="Email" {...f.field("email")}><TextField {...f.field("email")} type="email" /></Field>
+      <Field label="Vacancy" {...f.field("vacancy_id")}><SelectField placeholder="Pick the vacancy" options={vacancies.filter((v) => !v.paused).map((v) => [v.vacancy_id, v.title])} {...f.field("vacancy_id")} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Candidate</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Candidate</Button>
+      </FormFooter>
     </>
   );
 }
@@ -356,25 +367,14 @@ function Assessments() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Average Score by Assessment" rows={s.data.by_assessment} note={s.data.by_assessment_note} /> : <Card><LoadingRows /></Card>}
-        <KvCard
-          title="How a Candidate Takes One"
-          items={[
-            ["Where", "On the public site, never inside the ERP"],
-            ["Timer", "Server side. Closing the tab does not stop it"],
-            ["Autosave", "Every answer, every few seconds"],
-            ["Resume", "If the connection drops, they resume where they were"],
-            ["Scoring", "Automatic for psychometric, by a person for case studies"],
-            ["The candidate sees", "That they finished. Never their score"],
-          ]}
-        />
+        {s.data ? <BarsCard title="Average Score by Assessment" rows={s.data.by_assessment} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );
 }
 
 function AssessmentForm({ close }: { close: () => void }) {
-  const f = useForm({ name: "", role: "All roles", kind: "Psychometric", duration_min: "30" }, { name: (v) => (v.trim().length < 3 ? "Name the assessment" : null), duration_min: (v) => (!(Number(v) >= 5) ? "At least 5 minutes" : null) });
+  const f = useContractForm({ name: "", role: "All roles", kind: "Psychometric", duration_min: "30" }, { name: (v) => (v.trim().length < 3 ? "Name the assessment" : null), duration_min: (v) => (!(Number(v) >= 5) ? "At least 5 minutes" : null) });
   const save = useMutation("POST /api/v1/recruitment/assessments");
   const submit = async () => {
     if (!f.check()) return;
@@ -389,16 +389,14 @@ function AssessmentForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><Input {...f.field("name")} placeholder="e.g. Verbal reasoning" /></Field>
-      <FormRow>
-        <Field label="Type"><Select options={[["Psychometric", "Psychometric"], ["Technical", "Technical"], ["Case study", "Case Study"]]} {...f.field("kind")} /></Field>
-        <Field label="Duration (Minutes)" {...f.field("duration_min")}><Input {...f.field("duration_min")} inputMode="numeric" onChange={(v) => f.set("duration_min", v.replace(/\D/g, "").slice(0, 3))} /></Field>
-      </FormRow>
-      <Field label="Taken By"><Input {...f.field("role")} placeholder="Any role" /></Field>
-      <ModalFoot>
+      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Verbal reasoning" /></Field>
+      <Field label="Type"><SelectField options={[["Psychometric", "Psychometric"], ["Technical", "Technical"], ["Case study", "Case Study"]]} {...f.field("kind")} /></Field>
+      <Field label="Duration (Minutes)" {...f.field("duration_min")}><TextField {...f.field("duration_min")} inputMode="numeric" onChange={(v) => f.set("duration_min", v.replace(/\D/g, "").slice(0, 3))} /></Field>
+      <Field label="Taken By"><TextField {...f.field("role")} placeholder="Any role" /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Save Assessment</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Save Assessment</Button>
+      </FormFooter>
     </>
   );
 }
@@ -452,7 +450,7 @@ function Interviews({ id }: { id: string | null }) {
               { key: "n", label: "Score", align: "n", render: (p) => (p.sealed ? <span className="text-subtle-foreground">Hidden</span> : (p.score ?? <span className="text-subtle-foreground">None</span>)) },
             ]}
           />
-          <BarsCard title="Weighted Scorecard" rows={x.scorecard} note="Nobody sees another panellist’s score until the round closes. Private notes stay private permanently." />
+          <BarsCard title="Weighted Scorecard" rows={x.scorecard} />
         </Grid>
       )}
       <div className="mt-3">
@@ -472,11 +470,6 @@ function Interviews({ id }: { id: string | null }) {
         />
       </div>
       <Grid cols={2} className="mt-3">
-        <Card>
-          <CardHeader title="Why the Panel Is Blind" />
-          <p className="text-[11.5px] text-subtle-foreground">The first panellist to submit sets the tone for everyone after them. Anchoring is well documented and it is invisible in the result.</p>
-          <p className="mt-[9px] text-[11.5px] text-subtle-foreground">So a score is hidden until the round closes. Private notes are never shown to anyone, at any point, including after.</p>
-        </Card>
         {x ? <TrailCard title="Round Activity" items={x.activity.map((a) => ({ ...a, when: formatDateTime(a.when) }))} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
@@ -487,7 +480,7 @@ function ScheduleInterview({ close }: { close: () => void }) {
   const cands = usePaged("GET /api/v1/recruitment/candidates", { filters: { stage: "shortlisted" } });
   const [panel, setPanel] = useState<PersonRef[]>([]);
   const [tried, setTried] = useState(false);
-  const f = useForm({ candidate_id: "", date: "", time: "10:00" }, { candidate_id: (v) => (!v ? "Pick the candidate" : null), date: (v) => (!v ? "Pick the day" : null), time: (v) => (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? "HH:MM, 24 hour" : null) });
+  const f = useContractForm({ candidate_id: "", date: "", time: "10:00" }, { candidate_id: (v) => (!v ? "Pick the candidate" : null), date: (v) => (!v ? "Pick the day" : null), time: (v) => (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? "HH:MM, 24 hour" : null) });
   const save = useMutation("POST /api/v1/recruitment/interviews");
   const submit = async () => {
     setTried(true);
@@ -503,16 +496,14 @@ function ScheduleInterview({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Candidate" {...f.field("candidate_id")}><Select placeholder="Shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
-      <FormRow>
-        <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>
-        <Field label="Time (24 Hour)" {...f.field("time")}><Input {...f.field("time")} inputMode="numeric" placeholder="10:00" /></Field>
-      </FormRow>
+      <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
+      <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>
+      <Field label="Time (24 Hour)" {...f.field("time")}><TextField {...f.field("time")} inputMode="numeric" placeholder="10:00" /></Field>
       <Field label="Panel" state={tried && !panel.length ? "bad" : undefined} message={tried && !panel.length ? "Add at least one panellist" : undefined}><PersonPicker multiple value={panel} onChange={setPanel} /></Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Schedule</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Schedule</Button>
+      </FormFooter>
     </>
   );
 }
@@ -548,19 +539,18 @@ function Offers() {
           {letter.data ? <Letter l={letter.data} note={`Offer letter ${letter.data.reference}, generated from the template and the vacancy.`} /> : <Card><LoadingRows count={6} /></Card>}
           {shown?.status.text === "Draft" && (
             <div className="mt-2 flex justify-end">
-              <Button variant="primary" icon="send" disabled={send.pending} onClick={async () => { try { await send.run({ params: { id: shown.offer_id }, body: {} }); invalidate("/api/v1/recruitment/offers"); toast(`${shown.number} sent to ${shown.candidate} to sign`); } catch (e) { fail(e); } }}>Send to Sign</Button>
+              <Button variant="primary" icon="send" busy={send.pending} onClick={async () => { try { await send.run({ params: { id: shown.offer_id }, body: {} }); invalidate("/api/v1/recruitment/offers"); toast(`${shown.number} sent to ${shown.candidate} to sign`); } catch (e) { fail(e); } }}>Send to Sign</Button>
             </div>
           )}
         </div>
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">The candidate signs on a canvas from their phone. The document locks, and the public verification page reports two verdicts: the payload and the stored bytes.</p>
     </>
   );
 }
 
 function OfferForm({ close }: { close: () => void }) {
   const cands = usePaged("GET /api/v1/recruitment/candidates", { filters: { stage: "interview" } });
-  const f = useForm({ candidate_id: "", salary: "", start_date: "", expires_on: "" }, { candidate_id: (v) => (!v ? "Pick the candidate" : null), salary: (v) => (!(Number(v) > 0) ? "Enter the gross monthly salary" : null), start_date: (v) => (!v ? "Pick the start date" : null), expires_on: (v) => (!v ? "Pick when it expires" : null) });
+  const f = useContractForm({ candidate_id: "", salary: "", start_date: "", expires_on: "" }, { candidate_id: (v) => (!v ? "Pick the candidate" : null), salary: (v) => (!(Number(v) > 0) ? "Enter the salary" : null), start_date: (v) => (!v ? "Pick the start date" : null), expires_on: (v) => (!v ? "Pick when it expires" : null) });
   const save = useMutation("POST /api/v1/recruitment/offers");
   const submit = async () => {
     if (!f.check()) return;
@@ -575,16 +565,14 @@ function OfferForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Candidate" {...f.field("candidate_id")}><Select placeholder="Interviewed candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
-      <Field label="Gross Monthly Salary" {...f.field("salary")}><AmountInput {...f.field("salary")} /></Field>
-      <FormRow>
-        <Field label="Start Date" {...f.field("start_date")}><DateField {...f.field("start_date")} min={todayIso()} /></Field>
-        <Field label="Offer Expires" {...f.field("expires_on")}><DateField {...f.field("expires_on")} min={todayIso()} /></Field>
-      </FormRow>
-      <ModalFoot>
+      <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Interviewed candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
+      <Field label="Gross Monthly Salary" {...f.field("salary")}><MoneyField {...f.field("salary")} /></Field>
+      <Field label="Start Date" {...f.field("start_date")}><DateField {...f.field("start_date")} min={todayIso()} /></Field>
+      <Field label="Offer Expires" {...f.field("expires_on")}><DateField {...f.field("expires_on")} min={todayIso()} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Draft Offer</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Draft Offer</Button>
+      </FormFooter>
     </>
   );
 }
@@ -633,15 +621,14 @@ function Onboarding() {
             footer={
               x.documents_done < x.documents_total && (
                 <div className="flex justify-end border-t border-border px-[14px] py-2.5">
-                  <Button size="sm" icon="bell" disabled={remind.pending} onClick={async () => { await remind.run({ params: { id: x.onboarding_id }, body: {} }); toast(`Reminder sent to ${x.name} for ${x.documents_total - x.documents_done} documents`); }}>Remind {x.name.split(" ")[0]}</Button>
+                  <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { await remind.run({ params: { id: x.onboarding_id }, body: {} }); toast(`Reminder sent to ${x.name} for ${x.documents_total - x.documents_done} documents`); }}>Remind {x.name.split(" ")[0]}</Button>
                 </div>
               )
             }
           />
           <Card>
-            <CardHeader title="Onboarding Plan, Once Documents Clear" />
+            <CardHeader title="Onboarding Plan" />
             <Timeline items={x.plan.map((p) => ({ title: p.title, when: p.text, tone: p.done ? "ok" : undefined }))} />
-            <p className="mt-[11px] text-[11.5px] text-subtle-foreground">The plan is a template per role. Tasks dispatch to the line manager, People and the new hire on the right day.</p>
           </Card>
         </Grid>
       )}
@@ -676,17 +663,6 @@ function Pool() {
             { key: "x", label: "", render: (p) => (p.invited ? <Pill tone="ok">Invited</Pill> : <Button size="sm" onClick={() => modal.open({ title: `Invite ${p.name}`, body: (close) => <Invite p={p} close={close} /> })}>Invite to Apply</Button>) },
           ]}
         />
-        <KvCard
-          title="What the Pool Is For"
-          items={[
-            ["The problem", "A good candidate is rejected and then forgotten"],
-            ["How they get here", "A recruiter adds them with a reason, at rejection"],
-            ["What is kept", "Their application, scores, notes and the reason"],
-            ["Consent", "They are told, and can ask to be removed"],
-            ["Retention", "Twenty-four months, then purged automatically"],
-            ["Inviting back", "Sends a personal link to a new vacancy, pre-filled"],
-          ]}
-        />
       </Grid>
     </>
   );
@@ -695,15 +671,15 @@ function Pool() {
 function Invite({ p, close }: { p: PoolRow; close: () => void }) {
   const vacs = usePaged("GET /api/v1/recruitment/vacancies", { filters: { status: "open" } });
   const [vac, setVac] = useState("");
+  const [tried, setTried] = useState(false);
   const invite = useMutation("POST /api/v1/recruitment/pool/:id/invite");
   return (
     <>
-      <Banner tone="info" icon="send">{p.name} gets a personal link to the vacancy, with their earlier application pre-filled.</Banner>
-      <Field label="Vacancy"><Select value={vac} onChange={setVac} placeholder="Open vacancy" options={vacs.rows.map((v) => [v.vacancy_id, v.title])} /></Field>
-      <ModalFoot>
+      <Field label="Vacancy" state={tried && !vac ? "bad" : undefined} message="Pick a vacancy"><SelectField value={vac} onChange={setVac} placeholder="Open vacancy" options={vacs.rows.map((v) => [v.vacancy_id, v.title])} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" disabled={!vac || invite.pending} onClick={async () => { try { await invite.run({ params: { id: p.pool_id }, body: { vacancy_id: vac } }); invalidate("/api/v1/recruitment/pool"); close(); toast(`Invitation sent to ${p.name}`); } catch (e) { fail(e); } }}>Send Invitation</Button>
-      </ModalFoot>
+        <Button variant="primary" icon="send" busy={invite.pending} onClick={async () => { if (!vac) return setTried(true); try { await invite.run({ params: { id: p.pool_id }, body: { vacancy_id: vac } }); invalidate("/api/v1/recruitment/pool"); close(); toast(`Invitation sent to ${p.name}`); } catch (e) { fail(e); } }}>Send Invitation</Button>
+      </FormFooter>
     </>
   );
 }

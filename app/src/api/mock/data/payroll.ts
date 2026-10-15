@@ -70,10 +70,10 @@ export function earnings(gross: number) {
   const housing = Math.round(gross * 0.15);
   const transport = Math.round(gross * 0.1);
   return [
-    { label: "Basic salary", amount: s(basic) },
-    { label: "Housing allowance", amount: s(housing) },
-    { label: "Transport allowance", amount: s(transport) },
-    { label: "Communication allowance", amount: s(gross - basic - housing - transport) },
+    { label: "Basic Salary", amount: s(basic) },
+    { label: "Housing Allowance", amount: s(housing) },
+    { label: "Transport Allowance", amount: s(transport) },
+    { label: "Communication Allowance", amount: s(gross - basic - housing - transport) },
   ];
 }
 

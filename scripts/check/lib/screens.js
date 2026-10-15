@@ -1,5 +1,5 @@
 "use strict";
-/* global document, window, getComputedStyle */
+/* global document, window, getComputedStyle, PopStateEvent */
 /**
  * Opens every screen in Chromium at phone and desktop size and records what a
  * person sees: the copy in each slot (page title, card titles, buttons,
@@ -11,23 +11,34 @@
  *   demo   docs/MyCity-ERP-Documents/demo.html: signs in, walks every module
  *          and tab in the navigation, the detail pages a row opens, and the
  *          modals a KPI card, an action or a row opens (desktop).
- *   app    the staff app, once it has a build and an exportable route list
- *          (FRONTEND_GUIDE §9.2). Until then it is reported as not built.
+ *   app    the staff app's demo build (app/dist, `npm run build:demo` in app/:
+ *          the in-browser mock API, so no server or database). Built here when
+ *          it is missing or older than app/src (needs `npm ci` in app/ once). Signs in, then
+ *          opens every module and tab in app/dist/screens.json, the route list
+ *          the build writes from the shell's catalogue (FRONTEND_GUIDE §9.2).
+ *          The shared components mark their copy with data-ui slots (§9.4).
  *
  * One crawl serves both gates: the result is cached in the OS temp folder,
- * keyed by a hash of the demo and this file, so the second gate reuses it.
+ * keyed by a hash of the demo, the app build and this file, so the second
+ * gate reuses it.
+ *
+ * MYCITY_SCREEN_TARGETS=app (or demo) crawls one target only, for a quicker
+ * loop while fixing a screen; CI always crawls both.
  *
  * Needs Playwright and Chromium: `npm ci`, then once `npx playwright install
  * chromium` (CI does this). Set MYCITY_CHROMIUM to use a browser binary of
  * your own. A crawl that cannot start fails the gate; it never passes it.
  */
+const { spawnSync } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
+const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const DEMO = "docs/MyCity-ERP-Documents/demo.html";
+const APP_DIST = "app/dist";
 
 const WIDTHS = {
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
@@ -89,9 +100,47 @@ const DEMO_TARGET = {
   scroller: "#scroll",
   desktopNav: ".rail",
   phoneNav: "#mob",
+  modal: "#modal",
+  /** Help terms inside a sentence or heading: exempt from the 44 px tap rule (§7). */
+  inlineHelp: ".ht",
   /** What a click on these opens is swept for modal copy (desktop). */
   modalOpeners: "[data-hk], [data-mo], [data-rule], .phead .right .btn",
   maxOpenersPerScreen: 12,
+};
+
+/**
+ * The staff app. Its shared components carry the slots as data-ui attributes
+ * (FRONTEND_GUIDE §9.4); content a person wrote is marked data-copy="content".
+ * Prototype-only chrome (the view switch, never on production) is marked
+ * data-ui-ignore and is not part of a screen.
+ */
+const APP_TARGET = {
+  id: "app",
+  dist: APP_DIST,
+  account: { email: "cynthia@mycityapp.io", password: "demo1234" },
+  slots: {
+    pageTitle: "[data-ui=page-title]",
+    pageSubtitle: "[data-ui=page-subtitle]",
+    title: "[data-ui=title]",
+    kpiCaption: "[data-ui=kpi-caption]",
+    button: "[data-ui=button]",
+    header: "[data-ui=page] th, [data-ui=modal] th",
+    chartCaption: "[data-ui=chart-caption]",
+    emptyText: "[data-ui=empty-text]",
+    help: "[data-ui=help]",
+    details: "[data-ui=details]",
+    modalFooter: "[data-ui=modal-footer]",
+    prose: "[data-ui=page] p, [data-ui=page] dd, [data-ui=page] li, [data-ui=modal] p, [data-ui=modal] dd, [data-ui=modal] li",
+    nav: "[data-ui=nav-label]",
+  },
+  content: ["[data-copy=content]", "td", "[data-ui-ignore]"],
+  interactive: "#root a[href], #root button, #root [role=button], #root input:not([type=hidden]), #root select, #root textarea, #root summary",
+  page: "[data-ui=page]",
+  scroller: "[data-ui=scroller]",
+  desktopNav: "[data-ui=desktop-nav]",
+  phoneNav: "[data-ui=phone-nav]",
+  modal: "[data-ui=modal]",
+  inlineHelp: "[data-ui=help-term]",
 };
 
 function hashOf(files) {
@@ -143,7 +192,7 @@ function collect(cfg) {
       const t = slot === "modalFooter" ? footerText(el) : text(el) || String(el.textContent || "").replace(/\s+/g, " ").trim();
       if (!t) return;
       const r = el.getBoundingClientRect();
-      slots.push({ slot, text: t, visible: visible(el), modal: !!el.closest("#modal"), top: Math.round(r.top), bottom: Math.round(r.bottom) });
+      slots.push({ slot, text: t, visible: visible(el), modal: !!el.closest(cfg.modal), top: Math.round(r.top), bottom: Math.round(r.bottom) });
     });
   }
 
@@ -171,7 +220,7 @@ function collect(cfg) {
 
   const taps = [];
   document.querySelectorAll(cfg.interactive).forEach((el) => {
-    if (!visible(el) || el.closest(contentSel) || el.closest(".ht")) return;
+    if (!visible(el) || el.closest(contentSel) || el.closest(cfg.inlineHelp)) return;
     if (getComputedStyle(el).display === "inline") return;
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) return;
@@ -345,13 +394,123 @@ async function crawlDemo(browser, width, target, errors) {
   return { screens, skippedOpeners };
 }
 
+/* ───── app driver ───── */
+
+/** The newest change under a folder (or a file), in ms. */
+function newest(p) {
+  if (!fs.existsSync(p)) return 0;
+  const st = fs.statSync(p);
+  if (!st.isDirectory()) return st.mtimeMs;
+  return fs.readdirSync(p).reduce((m, f) => Math.max(m, newest(path.join(p, f))), st.mtimeMs);
+}
+
+/**
+ * The staff app's demo build, made when it is missing or older than the app's
+ * source, so the gates always read the app as it is now. Needs the app's
+ * packages (`npm ci` in app/; CI installs them).
+ */
+function ensureAppBuild() {
+  const app = path.join(ROOT, "app");
+  if (!fs.existsSync(app)) return false;
+  const built = path.join(ROOT, APP_DIST, "screens.json");
+  const source = Math.max(newest(path.join(app, "src")), newest(path.join(app, "index.html")), newest(path.join(app, "vite.config.ts")), newest(path.join(app, "package.json")), newest(path.join(ROOT, "docs", "PROGRESS.md")));
+  const mock = () => {
+    try {
+      return JSON.parse(fs.readFileSync(built, "utf8")).api_mode === "mock";
+    } catch {
+      return false;
+    }
+  };
+  // A production build in app/dist talks to the real API; the crawl needs the demo build.
+  if (fs.existsSync(built) && fs.statSync(built).mtimeMs >= source && mock()) return true;
+  if (!fs.existsSync(path.join(app, "node_modules"))) {
+    throw new Error("app/ has no packages installed. Run `npm ci` in app/ (CI does this), then the gate again.");
+  }
+  const r = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build:demo"], { cwd: app, encoding: "utf8", shell: process.platform === "win32" });
+  if (r.status !== 0) throw new Error(`app/ did not build (npm run build:demo):\n${String(r.stdout || "").slice(-1500)}${String(r.stderr || "").slice(-800)}`);
+  return true;
+}
+
+const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json" };
+
+/** Serve a built single-page app on a free local port: files as they are, every other path gets index.html. */
+function serve(dir) {
+  const root = path.join(ROOT, dir);
+  const server = http.createServer((req, res) => {
+    const url = decodeURIComponent(new URL(req.url, "http://x").pathname);
+    let file = path.join(root, url);
+    if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(root, "index.html");
+    res.writeHead(200, { "content-type": MIME[path.extname(file)] || "application/octet-stream" });
+    fs.createReadStream(file).pipe(res);
+  });
+  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve({ server, origin: `http://127.0.0.1:${server.address().port}` })));
+}
+
+/** The app is settled when nothing on the page is loading and nothing is animating in. */
+async function appSettle(page) {
+  await page.waitForFunction(() => !document.querySelector("[data-ui=page] [aria-busy=true], [data-ui=modal] [aria-busy=true]"), null, { timeout: 4000 }).catch(() => null);
+  await page.waitForTimeout(150);
+  await page.evaluate(() => {
+    for (const a of document.getAnimations()) {
+      if (a.effect && a.effect.getComputedTiming().endTime !== Infinity) a.finish();
+    }
+  });
+}
+
+async function crawlApp(browser, width, target, origin, list, errors) {
+  // No service worker: every screen is served fresh from the build.
+  const ctx = await browser.newContext({ ...WIDTHS[width], serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(8000);
+  let where = "sign-in";
+  page.on("pageerror", (e) => errors.push({ width, screen: where, message: String(e.message).split("\n")[0] }));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push({ width, screen: where, message: msg.text().split("\n")[0] });
+  });
+  page.on("dialog", (d) => {
+    errors.push({ width, screen: where, message: `native ${d.type()} dialog opened (gate 16)` });
+    d.dismiss().catch(() => null);
+  });
+
+  await page.goto(`${origin}/`);
+  await page.fill("#email", target.account.email);
+  await page.fill("#pass", target.account.password);
+  await page.press("#pass", "Enter");
+  await page.waitForSelector(target.page, { timeout: 8000 });
+  await page.evaluate(() => document.fonts.ready.then(() => true));
+
+  const screens = [];
+  for (const s of list) {
+    where = `${s.module_label} · ${s.tab_label} [app]`;
+    // Move inside the app (a reload would sign out: the session lives in memory).
+    await page.evaluate((to) => {
+      window.history.pushState(null, "", to);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }, s.path);
+    await appSettle(page);
+    // A prompt that opens by itself (the clock-in prompt) is its own view; the screen is read without it.
+    if (await page.$(target.modal)) {
+      screens.push({ target: target.id, width, screen: `${where} › opened by itself`, kind: "modal", ...(await page.evaluate(collect, target)) });
+      await page.keyboard.press("Escape");
+      await appSettle(page);
+    }
+    screens.push({ target: target.id, width, screen: where, kind: "screen", ...(await page.evaluate(collect, target)) });
+  }
+  await ctx.close();
+  return { screens };
+}
+
 /**
  * Crawl every target at both widths. Returns
  *   { checked: [ids], notBuilt: [notes], screens: [...], errors: [...], notes: [...] }
  */
 async function crawl() {
-  const files = [path.join(ROOT, DEMO), __filename, path.join(__dirname, "copy.js")];
-  const cacheFile = path.join(os.tmpdir(), `mycity-screens-${hashOf(files)}.json`);
+  const only = (process.env.MYCITY_SCREEN_TARGETS || "demo,app").split(",").map((t) => t.trim());
+  if (only.includes("app")) ensureAppBuild();
+  const appList = path.join(ROOT, APP_DIST, "screens.json");
+  const appIndex = path.join(ROOT, APP_DIST, "index.html");
+  const files = [path.join(ROOT, DEMO), appList, appIndex, __filename, path.join(__dirname, "copy.js")];
+  const cacheFile = path.join(os.tmpdir(), `mycity-screens-${hashOf(files)}-${only.join("+")}.json`);
   if (fs.existsSync(cacheFile)) {
     try {
       return JSON.parse(fs.readFileSync(cacheFile, "utf8"));
@@ -363,7 +522,7 @@ async function crawl() {
   const result = { checked: [], notBuilt: [], screens: [], errors: [], notes: [] };
   const browser = await launch();
   try {
-    if (fs.existsSync(path.join(ROOT, DEMO))) {
+    if (only.includes("demo") && fs.existsSync(path.join(ROOT, DEMO))) {
       for (const width of Object.keys(WIDTHS)) {
         const r = await crawlDemo(browser, width, DEMO_TARGET, result.errors);
         result.screens.push(...r.screens);
@@ -371,10 +530,26 @@ async function crawl() {
       }
       result.checked.push("demo.html");
     }
+    if (!only.includes("app")) {
+      result.notes.push("app/ not crawled (MYCITY_SCREEN_TARGETS)");
+    } else if (fs.existsSync(appList) && fs.existsSync(appIndex)) {
+      const list = JSON.parse(fs.readFileSync(appList, "utf8")).screens;
+      const { server, origin } = await serve(APP_DIST);
+      try {
+        for (const width of Object.keys(WIDTHS)) {
+          const r = await crawlApp(browser, width, APP_TARGET, origin, list, result.errors);
+          result.screens.push(...r.screens);
+        }
+      } finally {
+        server.close();
+      }
+      result.checked.push("app/");
+    } else {
+      throw new Error("app/ did not produce dist/screens.json. Run `npm run build:demo` in app/ and read its output.");
+    }
   } finally {
     await browser.close();
   }
-  result.notBuilt.push("app/: no build and route list yet (FRONTEND_GUIDE §9.2); add its target here when it lands");
 
   fs.writeFileSync(cacheFile, JSON.stringify(result));
   return result;
@@ -426,4 +601,4 @@ function run(gate, body) {
   });
 }
 
-module.exports = { crawl, summarise, finish, run, collect, WIDTHS, DEMO_TARGET, ROOT };
+module.exports = { crawl, summarise, finish, run, collect, WIDTHS, DEMO_TARGET, APP_TARGET, ROOT };

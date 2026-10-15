@@ -10,7 +10,7 @@ import { Pager, Table } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { useMe } from "@/auth/AuthProvider";
 import { formatDate } from "@/lib/format";
-import { Field, Input, Upload } from "@/components/form";
+import { Field, TextField, UploadField } from "@/components/form";
 
 export function MyDocumentsPage() {
   const list = usePaged("GET /api/v1/ess/documents");
@@ -55,7 +55,6 @@ export function MyDocumentsPage() {
         <Grid cols="1/1.5">
           <Table
             title="Vault"
-            right={<span className="text-[11.5px] text-subtle-foreground">Click a row to open it</span>}
             rows={list.rows}
             rowKey={(d) => d.document_ref_id}
             loading={list.loading}
@@ -81,9 +80,9 @@ function UploadForm({ name: initial, close }: { name: string; close: () => void 
   return (
     <>
       <Field label="What Is It" state={name ? "good" : undefined}>
-        <Input value={name} onChange={setName} placeholder="NDPA certificate" />
+        <TextField value={name} onChange={setName} placeholder="NDPA certificate" />
       </Field>
-      <Upload
+      <UploadField
         purpose="employee_document"
         accept=".pdf,image/*"
         multiple={false}

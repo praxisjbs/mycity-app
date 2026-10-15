@@ -377,7 +377,7 @@ app/
   src/
     main.tsx  App.tsx         entry; providers (auth, router, modal, toasts)
     styles/index.css          the only place colours exist: tokens, light and dark, keyframes, utilities
-    lib/                      cn, format (dates, money, counts), media (useIsMobile), theme, router
+    lib/                      cn, format (dates, money, counts), media (useIsMobile), theme, router, routes (screen URLs)
     api/
       client.ts               fetch, bearer token in memory, one refresh retry, ApiError
       endpoints.ts  hooks.ts  typed endpoint map; useApi, usePaged, useInfinite, useMutation, invalidate
@@ -386,7 +386,7 @@ app/
     auth/                     AuthProvider (useAuth, useMe), Login
     shell/                    catalogue (modules and tab slugs), access, screens (lazy per module),
                               Shell (desktop rail and mobile bar), Nav, CommandPalette, Bell, UpdatePrompt
-    components/form/          the form system: every field and the one <form> (§8.6, §9.4)
+    components/form/          the form system: useContractForm, every field, FormFooter, Wizard (§8.6, §9.4)
     components/ui/            shared components (§9.4)
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
@@ -443,9 +443,18 @@ No router library (React Router 7+ needs React 19). `lib/router.tsx` owns one UR
 builds it. `hrefFor`, `useRouter`, `useSearchParams` and `Link` are all there is. `id` opens a
 record (a 360, a query, an expense) in place.
 
-Tab slugs are the URL values in `docs/PROGRESS.md` and do not change when a label does. The route
-list is what `scripts/check/two-shells.js` walks, so it must be exportable: `shell/catalogue.ts`
-exports `MODULES` (each module's key and tab slugs).
+Tab slugs are the URL values in `docs/PROGRESS.md` and do not change when a label does.
+
+**The route list the screen gates read.** `shell/catalogue.ts` exports `MODULES` (each module's key,
+label and tab slugs) and `lib/routes.ts` builds each screen's URL. At build time `vite.config.ts`
+writes them into the build as `dist/screens.json` (every module and tab, its labels and its path).
+`scripts/check/lib/screens.js` builds the demo version of the app when its build is missing or
+older than `app/src` (it needs `npm ci` in `app/` once; CI does that), serves it, signs in with the
+mock Operations account and opens every screen at phone and desktop size for gates 8 and 11. It
+reads the copy from the shared components' `data-ui` slots (§9.4) and skips anything marked
+`data-copy="content"` or `data-ui-ignore` (the prototype view switch, which never ships to
+production). `MYCITY_SCREEN_TARGETS=app node scripts/check/two-shells.js` crawls the app alone, for
+a quicker loop while fixing a screen.
 
 `shell/catalogue.ts` lists the fifteen modules and their tab slugs in the order of MILESTONES §18
 and `src/shared/route-map.js`; `shell/access.ts` filters modules by the `view` grant and tabs by
@@ -496,48 +505,57 @@ stored. No raw hex anywhere else (gate 13). Typeface Geist (`@fontsource-variabl
 ### 9.4 Shared components
 
 Tailwind only, no component library. Fields live in `components/form/` (§8.6), imported from
-`@/components/form`; everything else in `components/ui/`:
+`@/components/form`; everything else in `components/ui/`.
 
 | `components/form/` | Gives |
 |---|---|
+| `useContractForm.ts` | `useContractForm(initial, schema)` on `react-hook-form`: checked when a field is left or after a 600 ms pause, then on every keystroke; `check(keys?)` marks every problem, focuses the first and returns whether it is clean; `setServerErrors` puts a 422's `fields` on the same marks. Pass the module's contract schema (anything with `safeParse`); until its schemas land, pass INTERIM rules (one function per field, an error of at most 4 words) |
 | `Form.tsx` | `Form`: the one `<form>`; Enter submits, browser bubbles off |
-| `fields.tsx` | `useForm` (inline validation, server 422 fields), `Field`, `Input`, `Textarea`, `Select`, `Seg`, `SegBar`, `Switch`, `ToggleRow`, `FormRow`, `rules` |
+| `fields.tsx` | `Field` (label above, `Optional` tag from `optional` or a label ending "(Optional)", `info` makes the label a help term), `TextField`, `TextAreaField`, `SelectField`, `ChoiceField` (up to five options), `SwitchField` (a setting that saves at once), `CheckboxField` (yes or no in a form), `PhoneField` (+234), `SegBar`, `ToggleRow`, `rules` |
 | `DateField.tsx` | day-first date entry with a picker; never `type="date"` |
-| `MoneyField.tsx` | `AmountInput` (₦, kept as typed), `toMoneyString` (the wire string) |
-| `Upload.tsx` | the only file input: progress per file; `trigger` for a composer button |
+| `MoneyField.tsx` | `MoneyField` (₦, kept as typed), `toMoneyString` (the wire string) |
+| `Upload.tsx` | `UploadField`: the only file input, progress per file; `trigger` for a composer button |
 | `PersonPicker.tsx` | search and pick one or more people |
 | `Search.tsx` | `SearchBox` (sent as `q`), `FilterSelect` |
+| `Footer.tsx` | `FormFooter`: buttons only; Cancel left and the primary right on desktop, the primary full width at the bottom on a phone. Put the primary last |
+| `Wizard.tsx` | `Wizard`: a form of more than six fields or more than one topic; one topic per step, a step indicator, Back and Next, the last step's button names the result. A step does not advance until its `check` passes |
 | `LoginField.tsx` | the sign-in screen's larger field |
 | `Inline.tsx` | `InlineInput`, `InlineSelect`, `InlineLabel`: unstyled controls for a field built into a larger widget (chat message box, command palette, mail composer rows, a number cell in a settings list). No validation; each needs a label or an `aria-label`. A field in a form uses `fields.tsx` |
 
-Today's names against §8.6: `Input` is `TextField`, `Select` is `SelectField`, `Seg` is
-`ChoiceField`, `Switch` is `SwitchField`, `Textarea` is `TextAreaField`, `AmountInput` is
-`MoneyField`, `Upload` is `UploadField`, `useForm` stands in for `useContractForm` until the
-contract schemas exist. Renaming them is part of the screen-conventions work below.
+**Submit is never disabled** (§8.3). `Button`'s `busy` ignores clicks while a request is in
+flight but keeps the button enabled and reachable; a form shows what is wrong on its fields when
+Submit is pressed, never by disabling it. A choice that is not a field (pick at least one row) says
+so in one line above the footer.
 
 | `components/ui/` | Gives |
-
-| File | Gives |
 |---|---|
-| `Button.tsx` | `Button`, `IconButton`, `BigButton` |
-| `layout.tsx` | `Card`, `CardHeader`, `PageHead`, `Grid`, `MobileOnly`, `DesktopOnly` |
-| `data.tsx` | `Pill`, `Avatar`, `Who`, `Kpi`, `KV`, `StatStrip`, `Timeline`, `Bars`, `Mini`, `Chain`, `Accordion`, `Banner`, `EmptyState`, `TapList` and others |
-| `Table.tsx` | `Table`, `Pager`, `Toolbar`, `Chips`, `LoadingRows`, `ErrorBlock` |
+| `Button.tsx` | `Button` (`busy` while saving), `IconButton`, `BigButton` |
+| `layout.tsx` | `Card`, `CardHeader` (`help` makes the title a help term; `record` marks a title that is a record's own name as content), `PageHead` (`help`; the subtitle is desktop only), `Grid`, `MobileOnly`, `DesktopOnly` |
+| `Help.tsx` | `HelpTerm` (§5.2: the dotted word; hover or Tab on desktop, a bottom sheet on a phone; text hidden in the DOM for `aria-describedby`), `HelpIcon` (only where there is no word), `Details` (one closed row at a card's foot) |
+| `data.tsx` | `Pill`, `Avatar`, `Who`, `Kpi`, `KV`, `StatStrip` (four at most on a phone), `Timeline`, `Bars`, `Mini`, `Chain`, `Accordion`, `Banner`, `EmptyState`, `EmptyValue` (the empty-value marker), `TapList` and others |
+| `Table.tsx` | `Table`: the data view, a table on desktop and a card list on a phone from the same rows and columns (§7: never a visible table on a phone); `Pager`, `Toolbar`, `Chips`, `LoadingRows`, `ErrorBlock`. A cell with no value shows the empty-value marker |
 | `Modal.tsx` | the one modal (`useModal`); a bottom sheet on a phone, full screen with `full` |
 | `Money.tsx` | `Money` (₦ with kobo, from the string) |
-| `Info.tsx` | the ⓘ toggle and its text |
 | `Menu.tsx`, `Toast.tsx`, `Board.tsx` (drag between columns), `Calendar.tsx`, `charts.tsx` (`AreaChart`, `Donut`, `Bands`), `Paper.tsx` (documents), `Profile.tsx` (360 header), `Reader.tsx` (articles) | |
 
 `features/shared/sections.tsx` adds the screen-level blocks: `PagedTable` (server page, search,
-pager), `KvCard`, `ChainCard`, `BarsCard`, `TrailCard`, `StatusPill`, `ExportButton`, `ModalFoot`.
+pager), `KvCard`, `ChainCard`, `BarsCard`, `TrailCard`, `StatusPill`, `ExportButton`.
 
-**Still to build for the screen conventions** (§5, §8): `HelpTerm` and `Details` (§5.2) to replace
-the ⓘ toggle, a data view that is a table on desktop and a card list on a phone, an empty state
-with illustration, an empty-value marker, the `data-ui` slot markers the screen gates read, and
-`data-copy="content"` on every component that shows content a person wrote (messages, mail,
-articles, document previews; §5.3). In `components/form/`: the §8.6 names, `PhoneField`,
-`CheckboxField`, `FormFooter`, `Wizard` and `useContractForm` on `react-hook-form` with the contract
-schemas, and Submit never disabled (§8.3: a disabled Submit still appears in a few forms).
+**What the screen gates read** (gates 8 and 11, §9.2). The shared components carry the copy slots
+as `data-ui` attributes: `page-title`, `page-subtitle`, `title` (card, section, modal and KPI
+titles), `kpi-caption`, `button` (buttons, tabs, filter chips), `chart-caption`, `empty-text`,
+`help`, `details`, `modal-footer`, `nav-label`; the shell marks `page`, `scroller`, `desktop-nav`,
+`phone-nav` and `modal`, and a help term is `help-term`. Anything a person wrote or received is
+marked `data-copy="content"` and is not counted: messages and chat lists, mail rows, announcements,
+articles and documents, timelines, chains, bars, pills, people and record names (`CardHeader
+record`), the org chart and the phone card list. A heading written by hand in a feature carries
+`data-ui="title"` or `data-copy="content"`, so the gate sees it. On a phone, every button, chip,
+tab, input and switch is at least 44 × 44 px.
+
+**Still to build** (§5.5): the one icon set (Lucide, `lucide-react`; the app still draws the demo's
+icon sprite) and the illustration set in `app/src/assets/illustrations/` for empty states, first
+run and success. The screen gates crawl as the Operations account; a screen only Staff or the CEO
+see is held to the same rules by review until the crawl signs in as them too.
 
 ### 9.5 Data fetching, caching and the API client
 

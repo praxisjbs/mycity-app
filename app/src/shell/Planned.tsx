@@ -17,9 +17,9 @@ export function ViewBar() {
   const delivered = view !== "full";
   const now = currentMilestone();
   return (
-    <div className="mb-2.5 flex items-center gap-2.5">
+    <div data-ui-ignore="prototype view switch" className="mb-2.5 flex items-center gap-2.5">
       <span className="text-[11.5px] text-subtle-foreground">Prototype View</span>
-      <span className="inline-flex h-7 items-center overflow-hidden rounded-full border border-input bg-background">
+      <span className="inline-flex h-7 items-center overflow-hidden max-md:h-11 rounded-full border border-input bg-background">
         <button
           type="button"
           aria-pressed={!delivered}
@@ -64,7 +64,7 @@ export function ComingSoon({ moduleKey, tab, label, m, production }: { moduleKey
             {ms?.demo ? ` · ${formatDate(ms.demo)}` : ""}
           </Pill>
         </div>
-        <h3 className="text-[16px]">Coming Soon</h3>
+        <h3 data-ui="title" className="text-[16px]">Coming Soon</h3>
         <p className="mx-auto mt-1.5 max-w-[46ch] text-[12.5px] text-subtle-foreground">
           This screen opens when {name}
           {ms?.name ? `, ${ms.name},` : ""} is delivered.

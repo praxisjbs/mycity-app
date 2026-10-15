@@ -61,7 +61,7 @@ route("POST /api/v1/recruitment/vacancies", (req) => {
   if (!b.closes_on) f.closes_on = ["Pick the closing date"];
   if (!b.description || String(b.description).trim().length < 40) f.description = ["Describe the role (40 characters or more)"];
   if (Object.keys(f).length) return invalid(f);
-  const arr = { on_site: "On site", hybrid: "Hybrid", remote: "Remote" }[String(b.arrangement)] ?? "Hybrid";
+  const arr = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" }[String(b.arrangement)] ?? "Hybrid";
   const v: Vacancy = { vacancy_id: sid(`vac:new:${VAC.length}`), title: String(b.title).trim(), department: String(b.department), openings: Number(b.openings), location: `${b.location} · ${arr}`, applicants: 0, published_on: isoDaysAgo(0), paused: false, status: S("ok", "Open"), days_open: 0, stage_note: "Published today", next_step: "Applications open on the careers page", public_url: `go.mycityapp.io/jobs/${slug(String(b.title))}` };
   VAC.unshift(v);
   return created(v);
@@ -80,7 +80,7 @@ route("POST /api/v1/recruitment/vacancies/:id/resume", flip(false));
 route("GET /api/v1/recruitment/candidates/summary", () =>
   ok({
     candidates: 61, in_board: CANDS.filter((c) => ["applied", "shortlisted", "interview", "offer"].includes(c.stage)).length, awaiting_human: CANDS.filter((c) => c.score_provisional).length, average_score: 71,
-    distribution: [{ label: "80 and above", pct: 18, value: "11" }, { label: "70 to 79", pct: 31, value: "19" }, { label: "60 to 69", pct: 26, value: "16" }, { label: "50 to 59", pct: 16, value: "10" }, { label: "Below 50", pct: 8, value: "5", emphasis: "warn" }],
+    distribution: [{ label: "80 and Above", pct: 18, value: "11" }, { label: "70 to 79", pct: 31, value: "19" }, { label: "60 to 69", pct: 26, value: "16" }, { label: "50 to 59", pct: 16, value: "10" }, { label: "Below 50", pct: 8, value: "5", emphasis: "warn" }],
     distribution_note: "Screening reads the application form: years, location, salary expectation, must-have answers.",
   }),
 );
@@ -145,7 +145,7 @@ const INT: InterviewDetail[] = [
   { candidate: "Fatima Sani", role: "Backend Engineer", at: at(-2, "10:00"), panel_size: 3, round: S("neutral", "Scheduled"), panel: [{ panellist: refKey("seyi"), submitted: false, score: null, sealed: false }, { panellist: refKey("obinna"), submitted: false, score: null, sealed: false }, { panellist: refKey("cynthia"), submitted: false, score: null, sealed: false }] },
 ].map((x, i) => ({
   interview_id: sid(`int:${i}`), ...x,
-  scorecard: [{ label: "Screening", pct: 78, value: "15%" }, { label: "Psychometric", pct: 84, value: "15%" }, { label: "Technical", pct: 69, value: "25%" }, { label: "Case study", pct: 88, value: "20%" }, { label: "Interview", pct: 84, value: "25%", emphasis: "brand" as const }],
+  scorecard: [{ label: "Screening", pct: 78, value: "15%" }, { label: "Psychometric", pct: 84, value: "15%" }, { label: "Technical", pct: 69, value: "25%" }, { label: "Case Study", pct: 88, value: "20%" }, { label: "Interview", pct: 84, value: "25%", emphasis: "brand" as const }],
   activity: [
     { title: "Cynthia Osakunih submitted, 84", when: at(6, "16:40"), text: "Score sealed until the round closes.", tone: "ok" as const },
     { title: "Ngozi Eze submitted", when: at(6, "17:12"), text: "Score sealed.", tone: "ok" as const },
@@ -244,7 +244,7 @@ const ONB: OnboardingDetail[] = [
     plan: [["Day 0, pre-onboarding", "Account created, device issued, channels joined"], ["Day 1", "Welcome, handbook, NDPA acknowledgement, clock in set up"], ["Week 1", "Platform walkthrough, meet the six departments"], ["Week 2", "First KPIs assigned by the department manager"], ["Month 3", "Probation decision: confirm or extend"]].map(([title, text], k) => ({ title, text, done: done === DOCS.length ? k < (i === 2 ? 5 : 3) : k === 0 && false })),
   };
 });
-route("GET /api/v1/recruitment/onboarding/summary", () => ok({ in_progress: ONB.filter((o) => o.stage.text !== "Confirmed").length, blocked: ONB.filter((o) => o.documents_done < o.documents_total).length, starting_this_month: 2, confirmed_90d: 3, chain: [{ label: "Offer accepted", state: "done" }, { label: "Documentation", state: "now" }, { label: "Pre-onboarding", state: null }, { label: "Onboarding", state: null }, { label: "Confirmed", state: null }], focus_id: ONB[0].onboarding_id }));
+route("GET /api/v1/recruitment/onboarding/summary", () => ok({ in_progress: ONB.filter((o) => o.stage.text !== "Confirmed").length, blocked: ONB.filter((o) => o.documents_done < o.documents_total).length, starting_this_month: 2, confirmed_90d: 3, chain: [{ label: "Offer Accepted", state: "done" }, { label: "Documentation", state: "now" }, { label: "Pre-Onboarding", state: null }, { label: "Onboarding", state: null }, { label: "Confirmed", state: null }], focus_id: ONB[0].onboarding_id }));
 route("GET /api/v1/recruitment/onboarding", (req) => paged(ONB.map(({ checklist, plan, ...r }) => (void checklist, void plan, r)), req, { search: (o) => [o.name, o.role] }));
 route("GET /api/v1/recruitment/onboarding/:id", (req) => {
   const o = ONB.find((x) => x.onboarding_id === req.params.id);

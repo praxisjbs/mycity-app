@@ -1,11 +1,14 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useIsMobile } from "@/lib/media";
 import { formatCount } from "@/lib/format";
 import type { ApiError } from "@/api/client";
 import type { PageMeta } from "@/api/types/common";
 import { Button } from "./Button";
 import { CardHeader } from "./layout";
-import { EmptyState } from "./data";
+import { EmptyState, EmptyValue } from "./data";
+
+const cell = (v: ReactNode) => (v == null || v === "" ? <EmptyValue /> : v);
 import { Icon } from "./Icon";
 
 export interface Column<R> {
@@ -30,15 +33,19 @@ interface TableProps<R> {
   loading?: boolean;
   error?: ApiError | null;
   empty?: { title: ReactNode; text?: ReactNode; icon?: Parameters<typeof EmptyState>[0]["icon"] };
-  /** Wide tables scroll sideways on a phone instead of squeezing. */
+  /** A wide table scrolls inside its card on a narrow desktop instead of squeezing. */
   wide?: boolean;
   footer?: ReactNode;
   bare?: boolean;
 }
 
 /**
- * The dense desktop table. It shows exactly the rows it is given: the server's
- * page. It never sorts, filters or slices them (FRONTEND_GUIDE §4).
+ * The shared data view (FRONTEND_GUIDE §7, §9.4): a dense table on desktop and
+ * a card list on a phone, from the same rows and columns. On a phone the first
+ * column is the card's title and the next three that are not `desktop` become
+ * label and value pairs; there is never a visible <table> (gate 11). It shows
+ * exactly the rows it is given: the server's page. It never sorts, filters or
+ * slices them (FRONTEND_GUIDE §4).
  */
 export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, selectedKey, loading, error, empty, wide, footer, bare }: TableProps<R>) {
   const onKey = (e: KeyboardEvent<HTMLTableRowElement>, row: R) => {
@@ -47,11 +54,46 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
       onRowClick(row);
     }
   };
+  const mobile = useIsMobile();
+  const phoneCols = columns.filter((c) => !c.desktop);
+  const [head, ...rest] = phoneCols;
+  const cards = (
+    <div data-copy="content" className={cn("flex flex-col", loading && rows.length > 0 && "opacity-60 transition-opacity")}>
+      {rows.map((row, i) => {
+        const k = rowKey(row);
+        const inner = (
+          <>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="text-[13px] font-semibold [overflow-wrap:anywhere]">{head && cell(head.render(row, i))}</span>
+              {rest.slice(0, 3).map((c) => (
+                <span key={c.key} className="flex min-w-0 items-baseline gap-2 text-[12px]">
+                  <span className="flex-none text-subtle-foreground">{c.label}</span>
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{cell(c.render(row, i))}</span>
+                </span>
+              ))}
+            </span>
+            {onRowClick && <Icon name="right" className="mt-0.5 size-[15px] flex-none text-subtle-foreground" />}
+          </>
+        );
+        const cls = cn("flex w-full items-start gap-2.5 border-b border-border px-[14px] py-3 text-left last:border-b-0", selectedKey === k && "bg-accent");
+        return onRowClick ? (
+          <button key={k} type="button" onClick={() => onRowClick(row)} className={cls}>
+            {inner}
+          </button>
+        ) : (
+          <div key={k} className={cls}>
+            {inner}
+          </div>
+        );
+      })}
+    </div>
+  );
   const body = (
     <>
       {(title || right) && <CardHeader title={title} right={right} className="mb-2.5 px-[14px] pt-[14px]" />}
+      {mobile ? cards : (
       <div className="overflow-x-auto">
-        <table className={cn("w-full border-collapse text-[13px] max-md:min-w-[560px]", wide && "min-w-[1080px] max-md:min-w-[980px]")}>
+        <table className={cn("w-full border-collapse text-[13px]", wide && "min-w-[1080px]")}>
           <thead>
             <tr>
               {columns.map((c) => (
@@ -85,7 +127,7 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
                 >
                   {columns.map((c) => (
                     <td key={c.key} className={cn("border-b border-border px-3 py-[9px]", c.align === "n" && "text-right", c.desktop && "max-md:hidden", c.className)}>
-                      {c.render(row, i)}
+                      {cell(c.render(row, i))}
                     </td>
                   ))}
                 </tr>
@@ -94,6 +136,7 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
           </tbody>
         </table>
       </div>
+      )}
       {rows.length === 0 && loading && <LoadingRows />}
       {rows.length === 0 && !loading && error && <ErrorBlock error={error} />}
       {rows.length === 0 && !loading && !error && (
@@ -181,9 +224,10 @@ export function Chips<V extends string>({ value, onChange, options, className }:
           key={v}
           type="button"
           aria-pressed={v === value}
+          data-ui="button"
           onClick={() => onChange(v)}
           className={cn(
-            "inline-flex h-[30px] flex-none items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold",
+            "inline-flex h-[30px] flex-none items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold max-md:h-11 max-md:min-w-11 max-md:justify-center",
             v === value ? "border-secondary bg-secondary text-secondary-foreground" : "border-border bg-card text-muted-foreground hover:border-subtle-foreground hover:text-foreground",
           )}
         >

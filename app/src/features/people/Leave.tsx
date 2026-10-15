@@ -7,14 +7,13 @@ import { useMe } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { MonthCalendar } from "@/components/ui/Calendar";
 import { Pill, Who } from "@/components/ui/data";
-import { WithInfo } from "@/components/ui/Info";
 import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
 import { Grow, useModal } from "@/components/ui/Modal";
 import { Chips, LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { formatDate, monthName, todayIso } from "@/lib/format";
-import { DateField, Field, FormRow, PersonPicker, rules, SearchBox, Select, Textarea, useForm } from "@/components/form";
+import { DateField, Field, FormFooter, PersonPicker, rules, SearchBox, SelectField, TextAreaField, useContractForm } from "@/components/form";
 
 export const LEAVE_TONE: Record<LeaveRequest["status"], "ok" | "warn" | "err" | "neutral"> = { Approved: "ok", Pending: "warn", Rejected: "err", Cancelled: "neutral" };
 export const LEAVE_TYPES: LeaveType[] = ["Annual", "Sick", "Compassionate", "Maternity", "Paternity", "Study", "Unpaid"];
@@ -103,16 +102,11 @@ function CoverCard({ leave, onDone }: { leave: LeaveRequest; onDone: () => void 
           <Pill tone={r.tone}>{r.result}</Pill>
         </div>
       ))}
-      <div className="mt-[11px]">
-        <WithInfo heading="Advisory Only" label="About the cover check">
-          The clash check is advisory. The approver decides, and the reason is recorded either way.
-        </WithInfo>
-      </div>
       {leave.status === "Pending" && (
         <div className="mt-3 flex gap-2">
           <Grow />
-          <Button disabled={decide.pending} onClick={() => act(false)}>Reject</Button>
-          <Button variant="primary" icon="ok" disabled={decide.pending} onClick={() => act(true)}>Approve</Button>
+          <Button busy={decide.pending} onClick={() => act(false)}>Reject</Button>
+          <Button variant="primary" icon="ok" busy={decide.pending} onClick={() => act(true)}>Approve</Button>
         </div>
       )}
     </Card>
@@ -135,7 +129,7 @@ function LeaveCalendar() {
 /** Request leave (ESS), or record it for someone (People). */
 export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: boolean }) {
   const [who, setWho] = useState<PersonRef[]>([]);
-  const f = useForm({ type: "Annual", from: "", to: "", reason: "" }, { from: rules.required("Pick the first day"), to: (v, all) => (!v ? "Pick the last day" : all.from && v < (all.from as string) ? "Ends before it starts" : null), reason: rules.required("Give a short reason") });
+  const f = useContractForm({ type: "Annual", from: "", to: "", reason: "" }, { from: rules.required("Pick the first day"), to: (v, all) => (!v ? "Pick the last day" : all.from && v < (all.from as string) ? "Ends before it starts" : null), reason: rules.required("Give a short reason") });
   const save = useMutation("POST /api/v1/leave/requests");
   const submit = async () => {
     if (!f.check() || (onBehalf && !who.length)) return;
@@ -156,19 +150,19 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
         </Field>
       )}
       <Field label="Leave Type">
-        <Select options={LEAVE_TYPES.map((t) => [t, t])} {...f.field("type")} />
+        <SelectField options={LEAVE_TYPES.map((t) => [t, t])} {...f.field("type")} />
       </Field>
-      <FormRow>
+      <>
         <Field label="First Day" {...f.field("from")}><DateField {...f.field("from")} /></Field>
         <Field label="Last Day" {...f.field("to")}><DateField {...f.field("to")} min={f.values.from || undefined} /></Field>
-      </FormRow>
+      </>
       <Field label="Reason" {...f.field("reason")}>
-        <Textarea {...f.field("reason")} placeholder="Family event" />
+        <TextAreaField {...f.field("reason")} placeholder="Family event" />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>{onBehalf ? "Record Leave" : "Send Request"}</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={submit}>{onBehalf ? "Record Leave" : "Send Request"}</Button>
+      </FormFooter>
     </>
   );
 }

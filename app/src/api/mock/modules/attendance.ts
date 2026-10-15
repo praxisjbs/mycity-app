@@ -79,10 +79,10 @@ route("GET /api/v1/attendance/me/summary", (req) => {
   const mins = worked.reduce((a, h) => a + (h.worked_minutes ?? 0), 0);
   return ok({
     kpis: [
-      { key: "days", label: "Days worked", value: `${worked.length} / ${mine.length}` },
-      { key: "ontime", label: "On time", value: `${worked.length ? Math.round(((worked.length - late.length) / worked.length) * 100) : 100}%`, tone: late.length ? "warn" : "ok", sub: `${late.length} late` },
-      { key: "hours", label: "Hours this month", value: `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m` },
-      { key: "review", label: "Under review", value: String(CASES.filter((c) => c.employee.employee_id === byKey(req.user)!.employee_id && c.status !== "Resolved").length), tone: "warn" },
+      { key: "days", label: "Days Worked", value: `${worked.length} / ${mine.length}` },
+      { key: "ontime", label: "On Time", value: `${worked.length ? Math.round(((worked.length - late.length) / worked.length) * 100) : 100}%`, tone: late.length ? "warn" : "ok", sub: `${late.length} late` },
+      { key: "hours", label: "Hours This Month", value: `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m` },
+      { key: "review", label: "Under Review", value: String(CASES.filter((c) => c.employee.employee_id === byKey(req.user)!.employee_id && c.status !== "Resolved").length), tone: "warn" },
     ],
     open_cases: CASES.filter((c) => c.employee.employee_id === byKey(req.user)!.employee_id && c.status !== "Resolved"),
   });
@@ -92,7 +92,7 @@ route("GET /api/v1/attendance/me/summary", (req) => {
  * Register (People · Attendance)
  * ------------------------------------------------------------------ */
 const DEVICES_SEED: Array<[string, string, string]> = [
-  ["seyi", "Pixel 7 · Chrome", "Pending review"], ["seyi", "MacBook Air · Safari", "Enrolled"], ["bashir", "iPhone 13 · Safari", "Enrolled"], ["cynthia", "iPhone 14 · Safari", "Enrolled"],
+  ["seyi", "Pixel 7 · Chrome", "Pending Review"], ["seyi", "MacBook Air · Safari", "Enrolled"], ["bashir", "iPhone 13 · Safari", "Enrolled"], ["cynthia", "iPhone 14 · Safari", "Enrolled"],
   ["tolu", "Galaxy S22 · Chrome", "Enrolled"], ["emeka", "Tecno Camon 20 · Chrome", "Enrolled"], ["amara", "ThinkPad · Edge", "Enrolled"], ["chidera", "iPhone 11 · Safari", "Enrolled"],
   ["adedotun", "Pixel 6 · Chrome", "Enrolled"], ["musa", "Infinix Hot 12 · Chrome", "Revoked"], ["kemi", "Galaxy A54 · Chrome", "Verification unavailable"], ["obinna", "Unknown Android · Chrome", "Blocked"],
 ];
@@ -104,7 +104,7 @@ const EFFECT = (status: string): { tone: "ok" | "warn" | "err" | "neutral"; text
 function registerRows(scopeKeys: Set<string> | null) {
   return TODAY.filter((t) => !scopeKeys || scopeKeys.has(t.person.user_key)).map((t) => {
     const arr = arrOf(t.person.user_key);
-    const dev = DEVICES.find((d) => d.key === t.person.user_key && (d.status === "Pending review" || d.status === "Enrolled"));
+    const dev = DEVICES.find((d) => d.key === t.person.user_key && (d.status === "Pending Review" || d.status === "Enrolled"));
     const cs = CASES.find((c) => c.employee.employee_id === t.person.employee_id && c.status !== "Resolved" && c.date === isoDaysAgo(0));
     const exception = t.status === "late" ? `Late by ${t.late_min} minutes` : t.status === "new_device" ? "New device, warned" : t.status === "no_clockout" ? "No clock-out yesterday" : null;
     return {
@@ -115,7 +115,7 @@ function registerRows(scopeKeys: Set<string> | null) {
       expected_location: arr === "Remote" ? "Approved home" : arr === "Field" ? "Field assignment FA-0031" : t.person.worksite,
       matched_location: t.clock_in ? (arr === "Remote" || t.mode === "Remote" ? "Approved home · inside 100 m" : t.person.worksite) : null,
       device: t.clock_in ? (dev?.name ?? "iPhone · Safari") : null,
-      device_status: t.clock_in ? { tone: dev?.status === "Pending review" ? ("warn" as const) : ("ok" as const), text: dev?.status ?? "Enrolled" } : null,
+      device_status: t.clock_in ? { tone: dev?.status === "Pending Review" ? ("warn" as const) : ("ok" as const), text: dev?.status ?? "Enrolled" } : null,
       status: STATUS_PILL[t.status],
       exception,
       case_number: cs?.number ?? null,
@@ -128,8 +128,8 @@ const scopeSet = (user: string, scope?: string) =>
 
 const FILTERS: Array<[string, string, (f: string[]) => boolean]> = [
   ["Remote", "Remote", (f) => f[0] === "Remote"], ["Hybrid", "Hybrid", (f) => f[0] === "Hybrid"], ["Field", "Field", (f) => f[0] === "Field"],
-  ["Office", "Office", (f) => f[0] === "Office-only"], ["late", "Late", (f) => f[1] === "late"], ["missing", "Missing punch", (f) => f.includes("missing")],
-  ["recon", "Needs reconciliation", (f) => f[2] === "recon"],
+  ["Office", "Office", (f) => f[0] === "Office-only"], ["late", "Late", (f) => f[1] === "late"], ["missing", "Missing Punch", (f) => f.includes("missing")],
+  ["recon", "Needs Reconciliation", (f) => f[2] === "recon"],
 ];
 
 route("GET /api/v1/attendance/summary", (req) => {
@@ -144,13 +144,13 @@ route("GET /api/v1/attendance/summary", (req) => {
     scope: req.query.scope === "team" ? "team" : "all",
     kpis: [
       { key: "in", label: "Clocked in", value: `${inn} / ${n}` },
-      { key: "site", label: "On site", value: String(rows.filter((r) => r.clock_in && r.matched_location && !r.matched_location.startsWith("Approved home")).length) },
+      { key: "site", label: "On Site", value: String(rows.filter((r) => r.clock_in && r.matched_location && !r.matched_location.startsWith("Approved home")).length) },
       { key: "remote", label: "Remote", value: String(rows.filter((r) => r.matched_location?.startsWith("Approved home")).length) },
-      { key: "field", label: "On assignment", value: String(rows.filter((r) => r.arrangement === "Field" && r.clock_in).length) },
+      { key: "field", label: "On Assignment", value: String(rows.filter((r) => r.arrangement === "Field" && r.clock_in).length) },
       { key: "late", label: "Late", value: String(late), tone: late ? "warn" : undefined },
-      { key: "out", label: "Outside geofence", value: "1", tone: "warn" },
-      { key: "missout", label: "Missing clock-out", value: String(CASES.filter((c) => c.type === "Missing clock-out" && c.status !== "Resolved").length), tone: "err" },
-      { key: "recon", label: "Needs reconciliation", value: String(recon), tone: recon ? "warn" : "ok" },
+      { key: "out", label: "Outside Geofence", value: "1", tone: "warn" },
+      { key: "missout", label: "Missing Clock-Out", value: String(CASES.filter((c) => c.type === "Missing Clock-Out" && c.status !== "Resolved").length), tone: "err" },
+      { key: "recon", label: "Needs Reconciliation", value: String(recon), tone: recon ? "warn" : "ok" },
     ],
     hours,
     on_time_pct: Math.round((inn / Math.max(1, n)) * 100),
@@ -175,7 +175,7 @@ route("GET /api/v1/attendance/register/:employee_id", (req) => {
     ? [{
         event_number: `EV-${String(3000 + PEOPLE.indexOf(p)).padStart(5, "0")}`, kind: "in" as const, system_time: t.clock_in, device_time: t.clock_in, gps: "6.4474, 3.4216", accuracy_m: 14,
         expected: arr === "Remote" ? "Approved home" : p.worksite, matched: arr === "Remote" ? "Approved home" : p.worksite, distance: "38 m", device: "iPhone · Safari",
-        device_status: t.status === "new_device" ? "Pending review" : "Enrolled", result: t.status === "late" ? "Accepted, late" : "Accepted", exception: t.status === "late" ? `Late by ${t.late_min} minutes` : null,
+        device_status: t.status === "new_device" ? "Pending Review" : "Enrolled", result: t.status === "late" ? "Accepted, late" : "Accepted", exception: t.status === "late" ? `Late by ${t.late_min} minutes` : null,
         policy_version: `v${POLICY.current.version}`, source: "Employee device", superseded: false,
       }]
     : [];
@@ -276,21 +276,21 @@ route("POST /api/v1/attendance/location-requests/:id/decision", (req) => {
  * Reconciliation cases
  * ------------------------------------------------------------------ */
 const SUGGEST: Record<string, string> = {
-  "Missing clock-out": "add_out", "Missing clock-in": "add_in", "Outside home geofence": "approve_loc", "Field location without a matching assignment": "attach_fa",
-  "Leave and attendance conflict": "leave", "Employee-submitted correction": "correct", "Duplicate punch": "exclude_dup", "GPS could not be verified": "add_in", "Outside geofence": "approve_loc",
+  "Missing Clock-Out": "add_out", "Missing clock-in": "add_in", "Outside home geofence": "approve_loc", "Field location without a matching assignment": "attach_fa",
+  "Leave and attendance conflict": "leave", "Employee-submitted correction": "correct", "Duplicate punch": "exclude_dup", "GPS could not be verified": "add_in", "Outside Geofence": "approve_loc",
 };
 function mkCase(key: string, daysBack: number, type: string, status: string, explanation: string | null, n = CASES_SEQ++) {
   const p = byKey(key)!;
   return {
     case_id: sid(`case:${n}`), number: `ATT-${String(140 + n).padStart(4, "0")}`, employee: ref(p)!, department: p.department, arrangement: arrOf(key), date: isoDaysAgo(daysBack), type,
-    status: status as ReconCase["status"], explanation, manager_note: null as string | null, payroll_impact: (type === "Missing clock-out" ? "Possible deduction" : "None") as ReconCase["payroll_impact"], suggested_outcome: SUGGEST[type] ?? "info",
+    status: status as ReconCase["status"], explanation, manager_note: null as string | null, payroll_impact: (type === "Missing Clock-Out" ? "Possible deduction" : "None") as ReconCase["payroll_impact"], suggested_outcome: SUGGEST[type] ?? "info",
     evidence: [["Expected", p.work_pattern === "remote" ? "Approved home, 100 m" : `${p.worksite}, 120 m`], ["Recorded", type.includes("geofence") ? "1.4 km from the fence" : type.includes("clock-out") ? "Clock-in 08:22, no clock-out" : "See the event trail"], ["Device", "Enrolled"], ["Policy", `v${POLICY_START}`]] as Array<[string, string]>,
   };
 }
 let CASES_SEQ = 0;
 const POLICY_START = 4;
 const CASES = [
-  mkCase("emeka", 1, "Missing clock-out", "Awaiting HR", "Left for the Enugu recce at 15:30 and forgot to clock out."),
+  mkCase("emeka", 1, "Missing Clock-Out", "Awaiting HR", "Left for the Enugu recce at 15:30 and forgot to clock out."),
   mkCase("chidera", 0, "Outside home geofence", "Awaiting manager", "Working from my aunt's place while the flat is repaired. Request LR-0058 is in."),
   mkCase("grace", 2, "Field location without a matching assignment", "Awaiting HR", "Was at the Ikeja City Mall activation with Bashir."),
   mkCase("seyi", 0, "Duplicate punch", "Awaiting HR", null),
@@ -341,10 +341,10 @@ route("GET /api/v1/attendance/devices/summary", () => {
   const n = (s: string) => DEVICES.filter((d) => d.status === s).length;
   return ok({
     counts: [
-      { label: "Enrolled", value: String(n("Enrolled")), tone: "ok" }, { label: "New or pending review", value: String(n("Pending review")), tone: n("Pending review") ? "warn" : undefined },
-      { label: "Blocked", value: String(n("Blocked")), tone: n("Blocked") ? "err" : undefined }, { label: "Revoked", value: String(n("Revoked")) }, { label: "Verification unavailable", value: String(n("Verification unavailable")) },
+      { label: "Enrolled", value: String(n("Enrolled")), tone: "ok" }, { label: "New or Pending", value: String(n("Pending Review")), tone: n("Pending Review") ? "warn" : undefined },
+      { label: "Blocked", value: String(n("Blocked")), tone: n("Blocked") ? "err" : undefined }, { label: "Revoked", value: String(n("Revoked")) }, { label: "Verification Unavailable", value: String(n("Verification unavailable")) },
     ],
-    effects: ["Enrolled", "Pending review", "Blocked", "Revoked", "Verification unavailable"].map((s) => ({ state: s === "Pending review" ? "New or pending review" : s, effect: EFFECT(s) })),
+    effects: ["Enrolled", "Pending Review", "Blocked", "Revoked", "Verification unavailable"].map((s) => ({ state: s === "Pending Review" ? "New or Pending" : s, effect: EFFECT(s) })),
     policy_version: POLICY.current.version,
   });
 });
@@ -352,7 +352,7 @@ route("POST /api/v1/attendance/devices", (req) => {
   const mine = DEVICES.filter((d) => d.key === req.user && d.status !== "Revoked" && d.status !== "Blocked");
   if (mine.length >= 3) return fail(409, "DEVICE_LIMIT", "You already have three devices. Remove one first.");
   if (!String(req.body.name ?? "").trim()) return invalid({ name: ["Name the device"] });
-  const d = { device_id: sid(`dev:${Date.now()}`), key: req.user!, name: String(req.body.name), status: "Pending review" as Device["status"], first_seen: new Date().toISOString(), last_punch: null as unknown as string, note: (req.body.reason as string) || null };
+  const d = { device_id: sid(`dev:${Date.now()}`), key: req.user!, name: String(req.body.name), status: "Pending Review" as Device["status"], first_seen: new Date().toISOString(), last_punch: null as unknown as string, note: (req.body.reason as string) || null };
   DEVICES.unshift(d);
   return created(devOut(d));
 });
@@ -378,7 +378,7 @@ const SITES = [
   ["FA-0031 · Muri Okunola Park", "Field assignment", "Muri Okunola Park, Victoria Island", 200, "Adedotun Oyinloye, Grace Okon", 680, 250],
 ].map((s, i) => ({
   location_id: sid(`ws:${i}`), name: s[0] as string, type: s[1] as "Office", address: s[2] as string, radius_m: s[3] as number, assigned: s[4] as string,
-  attendance_today: [9, 4, 2, 1, 1, 1, 0, 2, 0][i], dates: s[1] === "Field assignment" ? `Today, 10:00 to 16:00` : s[1] === "Temporary location" ? "Pending approval" : "Onwards",
+  attendance_today: [9, 4, 2, 1, 1, 1, 0, 2, 0][i], dates: s[1] === "Field assignment" ? `Today, 10:00 to 16:00` : s[1] === "Temporary location" ? "Pending Approval" : "Onwards",
   mode: s[1] === "Office" ? "Hybrid: warn · Office-only: block" : s[1] === "Field assignment" ? "Warn" : "Warn", status: s[1] === "Temporary location" ? "Pending" : "Active",
   status_tone: (s[1] === "Temporary location" ? "warn" : "ok") as "ok", map: { x: s[5] as number, y: s[6] as number },
 }));
@@ -399,21 +399,21 @@ route("POST /api/v1/attendance/worksites", (req) => {
  * Policy: versions, a draft, publishing, acknowledgment
  * ------------------------------------------------------------------ */
 const SETTINGS: PolicySetting[] = [
-  { key: "wk_start", section: "Working day", label: "Shift start", help: "The default start time. A person's schedule can differ.", kind: "time", value: "09:00" },
-  { key: "grace", section: "Working day", label: "Grace period, minutes", help: "Minutes after the start before a clock-in counts as late.", kind: "number", value: 10, min: 0, max: 60 },
-  { key: "sat_half", section: "Working day", label: "Saturday half day, 09:00 to 15:00", help: "The working week is set per day (A22).", kind: "bool", value: true },
-  { key: "late_rule", section: "Lateness", label: "Late arrivals before a query", help: "How many late arrivals in 30 days raise a query automatically in Queries & Sanctions.", kind: "number", value: 3, min: 1, max: 10 },
-  { key: "mode_remote", section: "Location verification", label: "Remote, outside the approved home", help: "What happens when a remote employee clocks in outside the 100 m home geofence.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
-  { key: "mode_hybrid", section: "Location verification", label: "Hybrid, outside the day's location", help: "Office days check the office, remote days check the home.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
-  { key: "mode_office", section: "Location verification", label: "Office-only, outside the office", help: "Office-only staff must be inside their assigned office geofence.", kind: "mode", value: "block", options: ["record", "warn", "block"] },
-  { key: "mode_field", section: "Location verification", label: "Field, outside the assignment", help: "An approved field assignment overrides office and home for its window.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
-  { key: "radius_remote", section: "Location verification", label: "Home geofence radius", help: "Fixed at 100 m for registered and temporary homes.", kind: "locked", value: "100 m · fixed" },
-  { key: "good_acc", section: "Location verification", label: "Good GPS accuracy, metres", help: "A reading at or better than this is used as it is.", kind: "number", value: 50, min: 10, max: 200 },
-  { key: "dev_record", section: "Devices", label: "Record the device on every punch", help: "Devices are recorded so the policy can be tightened later without losing history.", kind: "bool", value: true },
-  { key: "dev_warn_new", section: "Devices", label: "Warn on a new device", help: "Accept the punch from an unenrolled device with a warning, and send it for review.", kind: "bool", value: true },
-  { key: "dev_block_unenrolled", section: "Devices", label: "Block unenrolled devices", help: "Refuse punches from a device People have not enrolled.", kind: "bool", value: false },
-  { key: "deduction_tiers", section: "Payroll", label: "Lateness deduction tiers", help: "When on, reviewed late arrivals carry a computed deduction (10%, 20%, 30% of the day by the hour). A person still accepts each one in Payroll.", kind: "bool", value: false },
-  { key: "ack_blocks", section: "Acknowledgment", label: "A new version must be read before clocking in", help: "When on, Clock In waits until the employee acknowledges the latest version.", kind: "bool", value: false },
+  { key: "wk_start", section: "Working Day", label: "Shift Start", help: "The default start time. A person's schedule can differ.", kind: "time", value: "09:00" },
+  { key: "grace", section: "Working Day", label: "Grace Minutes", help: "Minutes after the start before a clock-in counts as late.", kind: "number", value: 10, min: 0, max: 60 },
+  { key: "sat_half", section: "Working Day", label: "Saturday Half Day", help: "The working week is set per day (A22).", kind: "bool", value: true },
+  { key: "late_rule", section: "Lateness", label: "Lates Before a Query", help: "How many late arrivals in 30 days raise a query automatically in Queries & Sanctions.", kind: "number", value: 3, min: 1, max: 10 },
+  { key: "mode_remote", section: "Location Verification", label: "Remote Outside Home", help: "What happens when a remote employee clocks in outside the 100 m home geofence.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
+  { key: "mode_hybrid", section: "Location Verification", label: "Hybrid Outside Location", help: "Office days check the office, remote days check the home.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
+  { key: "mode_office", section: "Location Verification", label: "Office-Only Outside Office", help: "Office-only staff must be inside their assigned office geofence.", kind: "mode", value: "block", options: ["record", "warn", "block"] },
+  { key: "mode_field", section: "Location Verification", label: "Field Outside Assignment", help: "An approved field assignment overrides office and home for its window.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
+  { key: "radius_remote", section: "Location Verification", label: "Home Geofence Radius", help: "Fixed at 100 m for registered and temporary homes.", kind: "locked", value: "100 m · fixed" },
+  { key: "good_acc", section: "Location Verification", label: "GPS Accuracy, Metres", help: "A reading at or better than this is used as it is.", kind: "number", value: 50, min: 10, max: 200 },
+  { key: "dev_record", section: "Devices", label: "Record Device on Punch", help: "Devices are recorded so the policy can be tightened later without losing history.", kind: "bool", value: true },
+  { key: "dev_warn_new", section: "Devices", label: "Warn on New Device", help: "Accept the punch from an unenrolled device with a warning, and send it for review.", kind: "bool", value: true },
+  { key: "dev_block_unenrolled", section: "Devices", label: "Block Unenrolled Devices", help: "Refuse punches from a device People have not enrolled.", kind: "bool", value: false },
+  { key: "deduction_tiers", section: "Payroll", label: "Lateness Deduction Tiers", help: "When on, reviewed late arrivals carry a computed deduction (10%, 20%, 30% of the day by the hour). A person still accepts each one in Payroll.", kind: "bool", value: false },
+  { key: "ack_blocks", section: "Acknowledgment", label: "Read Before Clock-In", help: "When on, Clock In waits until the employee acknowledges the latest version.", kind: "bool", value: false },
 ];
 const POLICY = {
   current: {
@@ -423,7 +423,7 @@ const POLICY = {
   } as AttendancePolicy,
   acknowledged: new Set(["cynthia", "ifeoma", "tolu", "bashir", "seyi"]),
   history: [
-    { version: 3, published_at: at(48, "10:00"), published_by: "Cynthia Osakunih", summary: "Device recording switched on for everyone.", changes: ["Record the device on every punch"] },
+    { version: 3, published_at: at(48, "10:00"), published_by: "Cynthia Osakunih", summary: "Device recording switched on for everyone.", changes: ["Record Device on Punch"] },
     { version: 2, published_at: at(96, "09:30"), published_by: "Cynthia Osakunih", summary: "Field assignments introduced.", changes: ["An approved field assignment overrides office and home"] },
     { version: 1, published_at: at(140, "12:00"), published_by: "Ifeoma Chukwu", summary: "First attendance policy.", changes: ["Geofenced clock-in for every arrangement"] },
   ],
