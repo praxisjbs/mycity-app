@@ -148,7 +148,25 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 3. How should a phone feel? Native, drag to dismiss (F6).
 4. Where does the gallery live? Staging only (F10).
 
-**PR 2 · Shell**: _asked at the start of its session._
+**PR 2 · Shell** (15/10/2026, TB)
+
+1. Where do the shell's frame parts live? In `packages/ui`, a **Shell** group: the rail, top bars,
+   bottom bar, More, the floating button, the command palette, the notification row, the staging
+   bar, Coming Soon and the public page frame are data-free components with header, test and
+   gallery page; each app keeps only its wiring (catalogue, grants, session, routes).
+2. What happens when a session expires mid-work? A **sign-in sheet opens in place**, over the
+   screen, which stays underneath with any half-filled form; signing in again carries on where the
+   person was. Another account signing in reloads at Home.
+3. What does the phone top bar hold? **The pin alone** (no word) at the left; search, the bell and
+   the person's avatar at the right (the avatar opens their row: theme, density, settings, sign
+   out). Under it a **title rail**: the module's name as one large line (shortened when long) over
+   the tab chips. Scrolling down slides the title away and keeps the tabs; scrolling up brings it
+   back.
+4. How is installing the app offered? An **Install App** action in More and the desktop account
+   menu, and a **one-time banner** from a person's second signed-in visit, on a phone and on
+   desktop, with Install App and Not Now (Not Now holds for 30 days on that device). Neither shows
+   once the app is installed (opened as an installed app, or the browser reports it installed). On
+   an iPhone, Install App opens a sheet with the Add to Home Screen steps.
 
 **PR 3 · Build kit**: _asked at the start of its session._
 
@@ -159,7 +177,7 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 | PR | Status | Branch · PR | Updated |
 |---|---|---|---|
 | 1 Ground | Done | `claude/nifty-ptolemy-4fb7gz` | 15/10/2026 |
-| 2 Shell | Not started | | |
+| 2 Shell | In progress | `m0/frontend-shell` | 15/10/2026 |
 | 3 Build kit | Not started | | |
 
 **Notes** (newest first; date · initials · what was done · what is left)
