@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { installOverlayTestEnv } from "../overlay/test-env";
 import { setViewport } from "../testing/viewport";
@@ -49,11 +50,35 @@ describe("PhoneShell", () => {
     const { container } = render(frame());
     const main = screen.getByRole("main");
     const fab = container.querySelector("[data-fab]")!;
+    Object.defineProperty(main, "clientHeight", { value: 500, configurable: true });
+    Object.defineProperty(main, "scrollHeight", { value: 2000, configurable: true });
     scrollTo(main, 200);
     expect(fab).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByText("Employee Self-Service").parentElement).toHaveAttribute("aria-hidden", "true");
     scrollTo(main, 120);
     expect(fab).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("does not bounce the title back when the page is pulled up at its bottom edge", () => {
+    setViewport(390);
+    render(frame());
+    const main = screen.getByRole("main");
+    Object.defineProperty(main, "clientHeight", { value: 500, configurable: true });
+    Object.defineProperty(main, "scrollHeight", { value: 900, configurable: true });
+    scrollTo(main, 400);
+    expect(screen.getByText("Employee Self-Service").parentElement).toHaveAttribute("aria-hidden", "true");
+    // The title slid away, the page grew by 20 px, and the browser pulled it back to its bottom edge.
+    Object.defineProperty(main, "clientHeight", { value: 520, configurable: true });
+    scrollTo(main, 380);
+    expect(screen.getByText("Employee Self-Service").parentElement).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("dims the page behind the floating button's open fan", async () => {
+    setViewport(390);
+    const { container } = render(frame());
+    expect(container.querySelector("[data-fan-scrim]")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Quick Actions" }));
+    expect(container.querySelector("[data-fan-scrim]")).not.toBeNull();
   });
 
   it("a fit page hides the floating button so it never covers a composer", () => {

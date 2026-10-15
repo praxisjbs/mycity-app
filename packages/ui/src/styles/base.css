@@ -54,6 +54,10 @@
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+/* The soft yellow glow on the Deep Green sign-in panel. */
+@utility glow-primary {
+  background: radial-gradient(circle, color-mix(in oklab, var(--primary) 16%, transparent), transparent 66%);
+}
 @utility pt-safe {
   padding-top: env(safe-area-inset-top, 0px);
 }

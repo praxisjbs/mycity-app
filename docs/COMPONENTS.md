@@ -2288,7 +2288,7 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 |---|---|
 | Use | Once, by the staff app's shell, at 760 px and below; it lays out PhoneHeader, the screen, FloatingButton and BottomBar, and tells them which way the page scrolls. |
 | Avoid | Desktop (DesktopShell); a screen drawing its own bottom bar or floating button; the public site (PublicPage). |
-| Phone | The whole point: a native app frame. The page keeps clear space under its content for the floating button (F18), so the button never hides data, and only the page scrolls. |
+| Phone | The whole point: a native app frame. The page keeps clear space under its content for the floating button (F18), so the button never hides data, and only the page scrolls. While the button's fan is open the page dims behind it. |
 | Accessibility | The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the bottom bar is the Main navigation. |
 | Status | stable |
 | Exports | `PhoneShell` |

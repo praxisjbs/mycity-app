@@ -1,31 +1,64 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useMe, useAuth } from "@/auth/AuthProvider";
-import { cn, Icon, IconButton, useIsMobile, useTheme, Avatar, ErrorBoundary, Menu } from "@mycity/ui";
-import { LoadingRows } from "@/components/ui/Table";
-import { ClockButton } from "@/features/attendance/ClockButton";
-import { hrefFor, Link, moduleKeyOf, useRouter } from "@/lib/router";
+import {
+  Avatar,
+  BottomBar,
+  DesktopShell,
+  ErrorBoundary,
+  IconButton,
+  PhoneHeader,
+  PhoneShell,
+  Rail,
+  SearchButton,
+  Skeleton,
+  Tabs,
+  TopBar,
+  useDensity,
+  useIsPhone,
+  useTheme,
+  type MenuItem,
+} from "@mycity/ui";
 import { useApi } from "@/api/hooks";
-import { visibleModules, visibleTabs } from "./access";
-import { MOBILE_BAR, moduleByKey, type ModuleDef, type TabDef } from "./catalogue";
-import { CommandPalette } from "./CommandPalette";
-import { useBell } from "./Bell";
-import { NavList } from "./Nav";
-import { FitContext } from "./layout-context";
-import { SCREENS } from "./screens";
-import { ComingSoon, ViewBar } from "./Planned";
+import { useAuth, useMe } from "@/auth/AuthProvider";
+import { ClockButton, useClockPrompt } from "@/features/attendance/ClockButton";
 import { useScreenState } from "@/lib/plan";
+import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
+import { visibleModules, visibleTabs } from "./access";
+import { BellButton } from "./Bell";
+import { moduleByKey, type ModuleDef, type TabDef } from "./catalogue";
+import { Fab } from "./Fab";
+import { FitContext } from "./layout-context";
+import { More } from "./More";
+import { bottomItems, bottomKey, railItems } from "./nav";
+import { ShellNotices, useInstallApp } from "./Notices";
+import { OfflinePage, useOnline } from "./offline";
+import { PlannedScreen, ViewBar } from "./Planned";
+import { noteVisit, usePwa } from "./pwa";
+import { SCREENS } from "./screens";
+import { ScreenActionProvider } from "./screen-action";
+import { Search } from "./Search";
 
 /**
- * The staff app's frame. Two shells, not one layout scaled (gate 11):
- *   desktop  Deep Green rail, top bar, tab strip, dense content
- *   mobile   compact top bar, scrolling tabs, bottom icon bar, menu drawer
- * Both render the same screens from the same route.
+ * The staff app's frame, on the Shell group of @mycity/ui. Two shells, not one
+ * layout scaled (gate 11), chosen by useIsPhone (760 px):
+ *
+ *   desktop  DesktopShell: the Rail (collapsible, remembered in mc-rail), the
+ *            TopBar (search, clock, bell), the module's tabs, the page
+ *   phone    PhoneShell: PhoneHeader (the pin; search, bell, the avatar that
+ *            opens More; the module's name over its tabs), the page, the
+ *            FloatingButton (F18) and the BottomBar (F16) with More (F17)
+ *
+ * Navigation comes from the /me grants (access.ts) and the one URL shape,
+ * /<module>?tab=<tab>&id=<id> (lib/router.tsx). An unknown module or tab, or
+ * one the person may not open, lands on the first allowed screen. What a
+ * screen shows before its milestone is the delivery plan's call (F14,
+ * lib/plan.ts). ⌘K or Ctrl K opens search anywhere.
  */
 export function Shell() {
   const me = useMe();
-  const mobile = useIsMobile();
+  const phone = useIsPhone();
   const { location, navigate } = useRouter();
   const modules = useMemo(() => visibleModules(me), [me]);
+  const { data: badges } = useApi("GET /api/v1/notifications/badges");
 
   const key = location.module ? moduleKeyOf(location.module) : null;
   const mod = moduleByKey(key);
@@ -41,13 +74,14 @@ export function Shell() {
   }, [allowed, tab, location, modules, me, navigate]);
 
   const [fit, setFit] = useState(false);
-  const [palette, setPalette] = useState(false);
+  const [search, setSearch] = useState(false);
+  const openSearch = useCallback(() => setSearch(true), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPalette((p) => !p);
+        setSearch((s) => !s);
       }
     };
     document.addEventListener("keydown", onKey);
@@ -58,13 +92,27 @@ export function Shell() {
     document.title = allowed && tab ? `${tab.label} · ${allowed.label} · MyCity App` : "MyCity App";
   }, [allowed, tab]);
 
+  useEffect(() => noteVisit(), []);
+  useClockPrompt();
+
   const page = allowed && tab ? <ModulePage mod={allowed} tab={tab} id={location.id} /> : null;
-  const frame = { modules, mod: allowed, tabs, tab, page, fit, openPalette: () => setPalette(true) };
+  const strip =
+    allowed && tab ? (
+      <Tabs
+        label={allowed.label}
+        value={tab.slug}
+        onValueChange={(slug) => navigate(hrefFor(allowed.key, slug))}
+        items={tabs.map((t) => ({ value: t.slug, label: t.label, href: hrefFor(allowed.key, t.slug) }))}
+      />
+    ) : undefined;
+  const frame: FrameProps = { modules, mod: allowed, tab, tabs: strip, page, fit, badges, openSearch, path: `${location.path}?tab=${tab?.slug ?? ""}` };
 
   return (
     <FitContext.Provider value={useCallback((f: boolean) => setFit(f), [])}>
-      {mobile ? <MobileShell {...frame} /> : <DesktopShell {...frame} />}
-      {palette && <CommandPalette onClose={() => setPalette(false)} />}
+      <ScreenActionProvider>
+        {phone ? <PhoneFrame {...frame} /> : <DesktopFrame {...frame} />}
+        <Search open={search} onClose={() => setSearch(false)} />
+      </ScreenActionProvider>
     </FitContext.Provider>
   );
 }
@@ -72,245 +120,159 @@ export function Shell() {
 interface FrameProps {
   modules: ModuleDef[];
   mod: ModuleDef | null;
-  tabs: TabDef[];
   tab: TabDef | undefined;
+  tabs: ReactNode;
   page: ReactNode;
   fit: boolean;
-  openPalette: () => void;
+  badges: Record<string, number> | undefined;
+  openSearch: () => void;
+  /** The screen in view (path and tab): a new one resets the scroll and Hide Here. */
+  path: string;
 }
 
-function readSlim() {
+const RAIL_KEY = "mc-rail";
+function readCollapsed() {
   try {
-    return localStorage.getItem("mc-rail") === "slim";
+    return localStorage.getItem(RAIL_KEY) === "slim";
   } catch {
     return false;
   }
 }
 
-function DesktopShell({ modules, mod, tabs, tab, page, fit, openPalette }: FrameProps) {
-  const [slim, setSlim] = useState(readSlim);
+function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: FrameProps) {
+  const me = useMe();
+  const { navigate } = useRouter();
+  const menu = useAccountMenu();
+  const [collapsed, setCollapsed] = useState(readCollapsed);
   const toggle = () =>
-    setSlim((s) => {
+    setCollapsed((c) => {
       try {
-        localStorage.setItem("mc-rail", s ? "wide" : "slim");
+        localStorage.setItem(RAIL_KEY, c ? "wide" : "slim");
       } catch {
         /* a per-device convenience; fine to lose */
       }
-      return !s;
+      return !c;
     });
   return (
-    <div className="grid h-full grid-cols-[auto_1fr] grid-rows-[minmax(0,100%)]">
-      <aside data-ui="desktop-nav" className={cn("on-dark flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200", slim ? "w-[66px]" : "w-[248px]")}>
-        <RailTop slim={slim} />
-        <NavList modules={modules} current={mod?.key ?? null} slim={slim} />
-        <RailFoot slim={slim} />
-      </aside>
-      <div className="flex min-h-0 min-w-0 flex-col bg-muted">
-        <header className="flex min-h-[58px] flex-none items-center gap-2.5 border-b border-border bg-background px-4">
-          <IconButton icon="menu" label={slim ? "Expand menu" : "Collapse menu"} onClick={toggle} />
-          <SearchPill onClick={openPalette} />
-          <ClockButton />
-          <BellButton />
-          <ThemeButton />
-        </header>
-        <TabStrip mod={mod} tabs={tabs} tab={tab} />
-        <FitMain fit={fit}>{page}</FitMain>
-      </div>
-    </div>
+    <DesktopShell
+      fit={fit}
+      rail={
+        <Rail
+          items={railItems(modules, badges)}
+          current={mod?.key ?? null}
+          collapsed={collapsed}
+          onNavigate={navigate}
+          account={{ name: me.display_name, subtitle: me.job_title, photo: me.photo_url, menu }}
+          foot={
+            <>
+              Engineered by{" "}
+              <a className="font-semibold text-primary no-underline hover:underline" href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer">
+                JBS Praxis
+              </a>
+            </>
+          }
+        />
+      }
+      topBar={
+        <TopBar
+          start={<IconButton icon="panel" label={collapsed ? "Expand Menu" : "Collapse Menu"} onClick={toggle} />}
+          search={<SearchButton onClick={openSearch} />}
+          actions={
+            <>
+              <ClockButton />
+              <BellButton />
+            </>
+          }
+        />
+      }
+      tabs={tabs}
+      notice={<ShellNotices />}
+    >
+      {page}
+    </DesktopShell>
   );
 }
 
-function MobileShell({ modules, mod, tabs, tab, page, openPalette }: FrameProps) {
-  const [drawer, setDrawer] = useState(false);
-  const me = useMe();
-  const bar = MOBILE_BAR.filter((b) => me.grants[b.key]?.includes("view"));
-  return (
-    <div className="flex h-full flex-col bg-muted">
-      <header className="pt-safe flex min-h-[58px] flex-none items-center gap-2 border-b border-border bg-background px-3">
-        <IconButton icon="menu" label="Open menu" onClick={() => setDrawer(true)} />
-        <SearchPill onClick={openPalette} compact />
-        <ClockButton compact />
-        <BellButton />
-        <ThemeButton />
-      </header>
-      <TabStrip mod={mod} tabs={tabs} tab={tab} />
-      <main data-ui="scroller" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-[14px] pt-[14px] pb-[90px]">
-        <div data-ui="page">{page}</div>
-      </main>
-      <nav data-ui="phone-nav" className="on-dark pb-safe fixed inset-x-0 bottom-0 z-50 flex border-t border-sidebar-border bg-sidebar px-1 pt-1.5" aria-label="Main">
-        {bar.map((b) => {
-          const on = mod?.key === b.key;
-          return (
-            <Link
-              key={b.key}
-              to={hrefFor(b.key)}
-              aria-current={on ? "page" : undefined}
-              className={cn("mb-1.5 flex min-h-[52px] flex-1 flex-col items-center justify-center gap-[3px] rounded-box px-0.5 py-[7px] text-[10px] font-semibold no-underline", on ? "text-primary [&_svg]:[stroke-width:2.1]" : "text-sidebar-muted")}
-            >
-              <Icon name={b.icon} size="m" />
-              <span data-ui="nav-label">{b.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-      {drawer && (
-        <>
-          <div className="fixed inset-0 z-[71] bg-scrim" onClick={() => setDrawer(false)} />
-          <aside className="on-dark pt-safe fixed top-(--env-bar) bottom-0 left-0 z-[72] flex w-[280px] max-w-[84vw] animate-slide-in flex-col bg-sidebar text-sidebar-foreground shadow-3" aria-label="Menu">
-            <RailTop />
-            <NavList modules={modules} current={mod?.key ?? null} onNavigate={() => setDrawer(false)} />
-            <RailFoot />
-          </aside>
-        </>
-      )}
-    </div>
-  );
-}
-
-function RailTop({ slim }: { slim?: boolean }) {
-  return (
-    <div className="flex min-h-[58px] flex-none items-center gap-2.5 px-4 pt-4 pb-3">
-      <Icon name="pin" className="size-6 text-primary" />
-      <b className={cn("text-[14.5px] font-bold tracking-[-.015em] whitespace-nowrap transition-opacity", slim && "opacity-0")}>MyCity App</b>
-    </div>
-  );
-}
-
-function RailFoot({ slim }: { slim?: boolean }) {
-  const me = useMe();
+/** The desktop account menu: the person's own screens, theme, density, Install App, Sign Out. */
+function useAccountMenu(): MenuItem[] {
   const { signOut } = useAuth();
   const { navigate } = useRouter();
-  return (
-    <div className="flex flex-none flex-col gap-2 border-t border-sidebar-border p-2.5">
-      <Menu
-        align="start"
-        trigger={(p) => (
-          <button {...p} type="button" className="flex min-w-0 items-center gap-2.5 rounded-ctl text-left hover:bg-sidebar-hover" title={slim ? me.display_name : undefined}>
-            <Avatar name={me.display_name} size={32} tone="brand" />
-            <span className={cn("min-w-0 leading-tight transition-opacity", slim && "opacity-0")}>
-              <b className="block truncate text-[12.5px] font-semibold">{me.display_name}</b>
-              <span className="text-[11px] text-sidebar-muted">{me.job_title}</span>
-            </span>
-          </button>
-        )}
-        items={[
-          { label: "My Profile", icon: "user", onSelect: () => navigate(hrefFor("ess", "my-profile")) },
-          { label: "My Security", icon: "shield", onSelect: () => navigate(hrefFor("ess", "my-security")) },
-          "sep",
-          { label: "Sign Out", icon: "lock", onSelect: () => void signOut() },
-        ]}
-      />
-      <span className={cn("pl-0.5 text-[10.5px] whitespace-nowrap text-sidebar-muted transition-opacity", slim && "opacity-0")}>
-        Engineered by{" "}
-        <a className="font-semibold text-primary no-underline hover:underline" href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer">
-          JBS Praxis
-        </a>
-      </span>
-    </div>
-  );
-}
-
-function SearchPill({ onClick, compact }: { onClick: () => void; compact?: boolean }) {
-  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn("flex h-9 max-md:h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-border bg-muted px-3 text-[13px] text-subtle-foreground hover:border-input", !compact && "max-w-[380px]")}
-    >
-      <Icon name="srch" />
-      <span className="truncate">Search anything</span>
-      {!compact && <kbd className="ml-auto rounded-[5px] border border-border bg-background px-[5px] py-px font-sans text-[11px]">{mac ? "⌘K" : "Ctrl K"}</kbd>}
-    </button>
-  );
-}
-
-function BellButton() {
-  const { data } = useApi("GET /api/v1/notifications", { query: { unread: true } });
-  const open = useBell();
-  return <IconButton icon="bell" label="Notifications and alerts" dot={!!data?.page.total} onClick={open} />;
-}
-
-function ThemeButton() {
   const { theme, toggle } = useTheme();
-  return <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Light theme" : "Dark theme"} onClick={toggle} />;
+  const density = useDensity();
+  const { canInstall } = usePwa();
+  const installApp = useInstallApp();
+  return [
+    { label: "My Profile", icon: "user", onSelect: () => navigate(hrefFor("ess", "my-profile")) },
+    { label: "My Security", icon: "shield", onSelect: () => navigate(hrefFor("ess", "my-security")) },
+    "sep",
+    { label: theme === "dark" ? "Light Theme" : "Dark Theme", icon: theme === "dark" ? "sun" : "moon", onSelect: toggle },
+    { label: density.density === "compact" ? "Comfortable Density" : "Compact Density", icon: "rows", onSelect: density.toggle },
+    ...(canInstall ? [{ label: "Install App", icon: "download" as const, onSelect: installApp }] : []),
+    "sep",
+    { label: "Sign Out", icon: "logout", onSelect: () => void signOut() },
+  ];
 }
 
-function TabStrip({ mod, tabs, tab }: { mod: ModuleDef | null; tabs: TabDef[]; tab: TabDef | undefined }) {
-  const { location } = useRouter();
-  if (!mod) return <div className="h-[43px] flex-none border-b border-border bg-background" />;
+function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }: FrameProps) {
+  const me = useMe();
+  const { navigate } = useRouter();
+  const [more, setMore] = useState(false);
   return (
-    <div className="no-scrollbar flex flex-none gap-0.5 overflow-x-auto border-b border-border bg-background px-4 max-md:px-3" role="tablist" aria-label={mod.label}>
-      {tabs.map((t) => {
-        const on = t.slug === tab?.slug && !location.id;
-        const sel = t.slug === tab?.slug;
-        return (
-          <Link
-            key={t.slug}
-            to={hrefFor(mod.key, t.slug)}
-            role="tab"
-            data-ui="button"
-            aria-selected={sel}
-            className={cn(
-              "-mb-px border-b-2 px-3 py-[11px] text-[13px] whitespace-nowrap no-underline transition-colors max-md:py-[13px]",
-              on ? "border-primary font-[650] text-foreground" : "border-transparent font-[550] text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t.label}
-          </Link>
-        );
-      })}
-    </div>
+    <>
+      <PhoneShell
+        pageKey={path}
+        fit={fit}
+        header={
+          <PhoneHeader
+            title={mod?.label}
+            homeHref={hrefFor("home")}
+            onNavigate={navigate}
+            tabs={tabs}
+            actions={
+              <>
+                <IconButton icon="srch" label="Search" onClick={openSearch} />
+                <BellButton />
+                <button type="button" aria-label="Your Account" aria-haspopup="dialog" aria-expanded={more} onClick={() => setMore(true)} className="flex size-tap items-center justify-center rounded-full">
+                  <Avatar name={me.display_name} src={me.photo_url} size="sm" tone="brand" />
+                </button>
+              </>
+            }
+          />
+        }
+        bottomBar={<BottomBar items={bottomItems(modules, badges, () => setMore(true), more)} current={more ? "more" : bottomKey(mod?.key ?? null)} onNavigate={navigate} />}
+        fab={<Fab page={path} />}
+        notice={<ShellNotices />}
+      >
+        {page}
+      </PhoneShell>
+      <More open={more} onClose={() => setMore(false)} modules={modules} badges={badges} current={mod?.key ?? null} onSearch={openSearch} />
+    </>
   );
 }
 
 /**
- * A fit page (chat, mailbox) does not scroll. Scrolling down past the end of a
- * pane slides the page header away so the panes get the full height; scrolling
- * up at the top of a pane, or over something that does not scroll, brings it back.
- */
-function FitMain({ fit, children }: { fit: boolean; children: ReactNode }) {
-  const [hide, setHide] = useState(false);
-  useEffect(() => {
-    if (!fit) setHide(false);
-  }, [fit]);
-  const onWheel = (e: React.WheelEvent<HTMLElement>) => {
-    if (!fit || Math.abs(e.deltaY) < 4) return;
-    let pane: HTMLElement | null = e.target as HTMLElement;
-    while (pane && pane !== e.currentTarget && !(pane.scrollHeight > pane.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(pane).overflowY))) pane = pane.parentElement;
-    const scrolls = pane && pane !== e.currentTarget;
-    const top = !scrolls || pane!.scrollTop <= 0;
-    const end = !scrolls || pane!.scrollTop + pane!.clientHeight >= pane!.scrollHeight - 2;
-    if (e.deltaY > 0 && end && !hide) setHide(true);
-    else if (e.deltaY < 0 && top && hide) setHide(false);
-  };
-  return (
-    <main data-ui="scroller" onWheel={onWheel} className={cn("min-h-0 flex-1 overflow-x-hidden px-4", fit ? "flex flex-col overflow-y-hidden pb-4" : "overflow-y-auto pt-[18px] pb-11", fit && (hide ? "pt-2.5" : "pt-[18px]"))}>
-      <div data-ui="page" className={cn("mx-auto w-full max-w-[1340px]", fit && "fit-page flex min-h-0 flex-1 flex-col", hide && "hidehead")}>{children}</div>
-    </main>
-  );
-}
-
-/**
- * One screen, as the delivery plan allows (lib/plan.ts): on production, Coming
- * Soon until its PROGRESS row is ticked; elsewhere, the prototype view switch
- * above it, and Coming Soon when the view is set before its milestone.
+ * One screen, as the delivery plan allows (F14): Coming Soon before its
+ * milestone opens it; in mock mode (laptops and CI) the Prototype View switch
+ * above it. With no connection, the offline page instead.
  */
 function ModulePage({ mod, tab, id }: { mod: ModuleDef; tab: TabDef; id: string | null }) {
   const Screen = SCREENS[mod.key];
   const state = useScreenState(mod.key, tab.slug);
+  const online = useOnline();
+  if (!online) return <OfflinePage />;
   return (
     <>
-      {!state.production && <ViewBar />}
+      {state.rule === "mock" && <ViewBar />}
       {state.open ? (
         <ErrorBoundary key={`${mod.key}:${tab.slug}`}>
-          <Suspense fallback={<LoadingRows count={6} />}>
+          <Suspense fallback={<Skeleton lines={6} />}>
             <Screen tab={tab.slug} id={id} />
           </Suspense>
         </ErrorBoundary>
       ) : (
-        <ComingSoon moduleKey={mod.key} tab={tab.slug} label={tab.label} m={state.plan?.m ?? "M11"} production={state.production} />
+        <PlannedScreen moduleKey={mod.key} tab={tab.slug} label={tab.label} m={state.screen?.m ?? "M11"} mock={state.rule === "mock"} />
       )}
     </>
   );
 }
+

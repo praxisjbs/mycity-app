@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
-import { BigButton, formatCount, Icon, Form, LoginField } from "@mycity/ui";
+import { Banner, BigButton, Brand, Button, formatCount, Form, LoginField } from "@mycity/ui";
 import { useAuth } from "./AuthProvider";
 
-const vEmail = (v: string) => (!v.trim() ? "Enter your work email" : !v.includes("@") ? "Needs an @" : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? "Check the spelling" : "");
-const vPass = (v: string) => (!v ? "Enter your password" : v.length < 8 ? "At least 8 characters" : "");
+export const vEmail = (v: string) => (!v.trim() ? "Enter your work email" : !v.includes("@") ? "Needs an @" : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? "Check the spelling" : "");
+export const vPass = (v: string) => (!v ? "Enter your password" : v.length < 8 ? "At least 8 characters" : "");
 
 /**
  * Sign in. Brand intensity is high here (MILESTONES §5.3): the Deep Green art
- * panel and the yellow button. Fields validate as they are typed once touched.
+ * panel with the pin, and the yellow button. Fields validate as they are typed
+ * once touched. On a phone the art panel is left off: the pin, the form, done.
  */
 export function Login() {
   const { signIn } = useAuth();
@@ -17,7 +18,7 @@ export function Login() {
   const [pass, setPass] = useState("");
   const [touched, setTouched] = useState({ email: false, pass: false });
   const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<{ tone: "err"; title: string; text: string } | null>(null);
+  const [problem, setProblem] = useState<{ title: string; text: string } | null>(null);
   const [buzz, setBuzz] = useState(0);
 
   const eErr = vEmail(email);
@@ -37,11 +38,7 @@ export function Login() {
     } catch (err) {
       const a = err as ApiError;
       setPass("");
-      setProblem(
-        a.code === "ACCOUNT_SUSPENDED"
-          ? { tone: "err", title: "Account suspended.", text: a.message }
-          : { tone: "err", title: a.status === 0 ? "Offline." : "Not signed in.", text: a.message },
-      );
+      setProblem({ title: a.code === "ACCOUNT_SUSPENDED" ? "Account suspended." : a.status === 0 ? "Offline." : "Not signed in.", text: a.message });
       document.getElementById("pass")?.focus();
     } finally {
       setBusy(false);
@@ -49,21 +46,18 @@ export function Login() {
   };
 
   return (
-    <div className="fixed inset-x-0 top-(--env-bar) bottom-0 z-[60] grid grid-cols-1 bg-background md:grid-cols-[1.05fr_.95fr]">
-      <div className="on-dark relative hidden flex-col overflow-hidden bg-deep p-[clamp(28px,4vw,56px)] text-on-deep md:flex">
-        <div className="pointer-events-none absolute -right-[200px] -bottom-[200px] size-[560px] rounded-full bg-[radial-gradient(circle,rgba(255,223,85,.16),rgba(255,223,85,0)_66%)]" />
-        <span className="relative flex items-center gap-2.5">
-          <Icon name="pin" className="size-7 text-primary" />
-          <b className="text-[17px] font-bold tracking-[-.015em]">MyCity App</b>
-        </span>
-        <h1 className="relative mt-auto max-w-[14ch] text-[clamp(26px,3.4vw,42px)] leading-[1.08]">
+    <div className="fixed inset-x-0 top-(--env-bar) bottom-0 z-50 grid grid-cols-1 bg-background desk:grid-cols-2">
+      <div className="on-dark relative hidden flex-col overflow-hidden bg-deep p-14 text-on-deep desk:flex">
+        <div className="pointer-events-none absolute -right-50 -bottom-50 size-140 rounded-full glow-primary" />
+        <Brand tone="on-dark" size="l" name="MyCity App" className="relative" />
+        <h1 className="relative mt-auto max-w-sm text-4xl leading-tight">
           Every city.
           <br />
           One <em className="text-primary not-italic">operations</em> platform.
         </h1>
-        <p className="relative mt-4 max-w-[40ch] text-[15px] text-on-deep-muted">People, work, finance, partnerships and reporting, connected through configurable workflows.</p>
+        <p className="relative mt-4 max-w-md text-md text-on-deep-muted">People, work, finance, partnerships and reporting, connected through configurable workflows.</p>
         <SplashStats />
-        <p className="relative mt-[22px] text-[15px] text-on-deep-muted">
+        <p className="relative mt-6 text-md text-on-deep-muted">
           Engineered by{" "}
           <a className="font-semibold text-primary no-underline hover:underline" href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer">
             JBS Praxis
@@ -72,28 +66,22 @@ export function Login() {
       </div>
 
       <div className="flex items-center justify-center overflow-y-auto p-6">
-        <Form className="w-full max-w-[380px]" onSubmit={() => void submit()}>
-          <span className="mb-6 flex items-center gap-2.5 md:hidden">
-            <Icon name="pin" className="size-7 text-secondary" />
-            <b className="text-[17px] font-bold tracking-[-.015em]">MyCity App</b>
-          </span>
-          <h2 className="text-[24px]">Sign In</h2>
-          <p className="mt-1.5 text-muted-foreground">Welcome back. Use your MyCity work address.</p>
+        <Form className="w-full max-w-95" onSubmit={() => void submit()}>
+          <Brand size="l" name="MyCity App" className="mb-6 desk:hidden" />
+          <h2 className="text-3xl">Sign In</h2>
+          <p className="mt-1.5 text-muted-foreground">Use your MyCity work address.</p>
 
           <LoginField id="email" label="Work Email" type="email" autoComplete="username" value={email} onChange={(v) => (setEmail(v), setProblem(null))} onBlur={() => setTouched((t) => ({ ...t, email: true }))} error={touched.email ? eErr : ""} good={!eErr} buzz={touched.email && eErr ? buzz : 0} />
           <LoginField id="pass" label="Password" type="password" autoComplete="current-password" value={pass} onChange={setPass} onBlur={() => setTouched((t) => ({ ...t, pass: true }))} error={touched.pass ? pErr : ""} good={!pErr} buzz={touched.pass && pErr ? buzz : 0} />
 
-          <BigButton type="submit" icon="right" disabled={busy}>
-            {busy ? "Signing In" : "Sign In"}
+          <BigButton type="submit" icon="right" busy={busy}>
+            Sign In
           </BigButton>
 
           {problem && (
-            <div role="alert" className="mt-4 flex items-start gap-2 rounded-box bg-destructive-soft px-3 py-2.5 text-[12.5px] text-destructive">
-              <Icon name="lock" className="mt-px" />
-              <span>
-                <b>{problem.title}</b> {problem.text}
-              </span>
-            </div>
+            <Banner tone="err" icon="lock" className="mt-4 mb-0">
+              <b>{problem.title}</b> {problem.text}
+            </Banner>
           )}
           {import.meta.env.VITE_API_MODE === "mock" && <MockAccounts onPick={(e) => (setEmail(e), setPass("demo1234"), setProblem(null))} />}
         </Form>
@@ -115,8 +103,8 @@ function SplashStats() {
     <div className="relative mt-7 mb-auto flex flex-wrap gap-7">
       {stats.map(([n, l]) => (
         <div key={l}>
-          <b className="block text-[22px] font-bold tracking-[-.02em] text-primary">{formatCount(n)}</b>
-          <span className="text-[12px] text-on-deep-faint">{l}</span>
+          <b className="block text-2xl font-bold tracking-tight text-primary">{formatCount(n)}</b>
+          <span className="text-xs text-on-deep-faint">{l}</span>
         </div>
       ))}
     </div>
@@ -133,16 +121,13 @@ function MockAccounts({ onPick }: { onPick: (email: string) => void }) {
     ["musa@mycityapp.io", "Suspended"],
   ];
   return (
-    <div className="mt-4 rounded-box border border-border bg-muted px-3 py-2.5 text-[12.5px] text-muted-foreground">
-      <span className="mb-1.5 flex items-center gap-2">
-        <Icon name="info" className="text-accent-foreground" />
-        <b className="text-foreground">Mock API</b>
-      </span>
+    <div className="mt-4 rounded-box border border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground" data-ui-ignore="mock accounts">
+      <b className="mb-1.5 block text-foreground">Mock API</b>
       <span className="flex flex-wrap gap-1.5">
         {accounts.map(([e, l]) => (
-          <button key={e} type="button" onClick={() => onPick(e)} className="rounded-full border border-border bg-card px-2.5 py-1 text-[11.5px] font-semibold hover:border-subtle-foreground">
+          <Button key={e} size="sm" onClick={() => onPick(e)}>
             {l}
-          </button>
+          </Button>
         ))}
       </span>
     </div>

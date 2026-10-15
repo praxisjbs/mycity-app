@@ -18,6 +18,9 @@ export const ShellScrollContext = createContext<ShellScroll>({ direction: "up", 
 
 export const useShellScroll = (): ShellScroll => useContext(ShellScrollContext);
 
+/** The floating button tells the phone shell its fan is open, so the shell dims the page behind it. */
+export const FanContext = createContext<(open: boolean) => void>(() => undefined);
+
 /** Movement under this many pixels is a wobble, not a direction. */
 const STEP = 8;
 
@@ -26,10 +29,14 @@ export function useScrollDirection() {
   const [state, setState] = useState<ShellScroll>({ direction: "up", atTop: true });
   const last = useRef(0);
   const onScroll = useCallback((e: UIEvent<HTMLElement>) => {
-    const top = e.currentTarget.scrollTop;
+    const el = e.currentTarget;
+    const top = el.scrollTop;
     const delta = top - last.current;
     if (Math.abs(delta) < STEP && top > STEP) return;
     last.current = top;
+    // At the bottom edge, a move up is the browser pulling the page back as the header slid away
+    // and the page grew, not the person scrolling up: taking it as one would bounce the header.
+    if (delta < 0 && top > STEP && top + el.clientHeight >= el.scrollHeight - 2) return;
     const next: ShellScroll = { direction: delta > 0 && top > STEP ? "down" : "up", atTop: top <= STEP };
     setState((s) => (s.direction === next.direction && s.atTop === next.atTop ? s : next));
   }, []);

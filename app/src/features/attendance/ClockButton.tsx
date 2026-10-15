@@ -8,28 +8,37 @@ import { hrefFor, useRouter } from "@/lib/router";
 import { Button, Avatar, Banner, KeyValue, Icon, Card, useModal, toast, cn, formatDate, formatTime, Field, FormFooter, rules, TextAreaField, useContractForm } from "@mycity/ui";
 
 /**
- * The top bar's Clock In / Clock Out button. The button only asks; the API
- * decides (location, device, shift, policy acknowledgment) and answers with an
- * outcome the panel shows. After sign-in the panel opens by itself for anyone
- * who has not clocked in today.
+ * Clocking in and out, for the shell: the desktop top bar's ClockButton and the
+ * phone's floating button (F18) both use useClock. The button only asks; the
+ * API decides (location, device, shift, policy acknowledgment) and answers with
+ * an outcome the panel shows.
  */
-export function ClockButton({ compact }: { compact?: boolean }) {
+export function useClock() {
   const { data: today } = useApi("GET /api/v1/attendance/me/today");
-  const { justSignedIn, clearJustSignedIn } = useAuth();
   const openPanel = useClockPanel();
-  const open = useCallback(() => openPanel(today?.state === "clocked_in" ? "Clock Out" : "Clock In"), [openPanel, today?.state]);
+  const out = today?.state === "clocked_in";
+  const done = today?.state === "complete";
+  const unavailable = today?.state === "unavailable";
+  const label = out ? "Clock Out" : "Clock In";
+  const open = useCallback(() => openPanel(out ? "Clock Out" : "Clock In"), [openPanel, out]);
+  return { today, out, done, unavailable, label, open, ready: !!today && !done };
+}
 
+/** After sign-in, the clock panel opens by itself for anyone who has not clocked in today. The shell calls it once. */
+export function useClockPrompt() {
+  const { today, open } = useClock();
+  const { justSignedIn, clearJustSignedIn } = useAuth();
   useEffect(() => {
     if (justSignedIn && today) {
       clearJustSignedIn();
       if (today.state === "not_clocked") setTimeout(() => open(), 700);
     }
   }, [justSignedIn, today, clearJustSignedIn, open]);
+}
 
-  const out = today?.state === "clocked_in";
-  const done = today?.state === "complete";
-  const unavailable = today?.state === "unavailable";
-  const label = out ? "Clock Out" : "Clock In";
+/** The desktop top bar's Clock In / Clock Out button. */
+export function ClockButton({ compact }: { compact?: boolean }) {
+  const { today, out, done, unavailable, label, open } = useClock();
   const title = unavailable ? (today?.unavailable_message ?? "Attendance unavailable") : done ? "Attendance is complete for today" : label;
 
   return (

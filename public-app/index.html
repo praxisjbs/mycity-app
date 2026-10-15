@@ -7,7 +7,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>Careers · MyCity App</title>
     <script>
-      /* Staging is marked from the first paint (lib/environment.ts). */
+      /* Staging is marked from the first paint (lib/environment.ts in @mycity/ui). */
       if (/(^|\.)staging\./.test(location.hostname)) { document.documentElement.setAttribute("data-env", "staging"); var i = document.querySelector('link[rel="icon"]'); if (i) i.href = "/favicon-staging.svg"; }
       /* Theme before first paint: the visitor's own toggle if they set one, otherwise the device. */
       try { var t = localStorage.getItem("mc-public-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}

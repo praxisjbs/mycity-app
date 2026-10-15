@@ -9,10 +9,10 @@
  * @status stable
  * @example <FloatingButton actions={[{ key: "clock", label: "Clock In", icon: "clock", onSelect: clockIn }]} onHideHere={hideHere} />
  */
-import { useEffect, useId, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { cn } from "../lib/cn";
 import { Icon, type IconName } from "../icons/Icon";
-import { useShellScroll } from "./scroll";
+import { FanContext, useShellScroll } from "./scroll";
 
 /** One action in the fan. */
 export interface FabAction {
@@ -80,6 +80,13 @@ export function FloatingButton({ actions, onHideHere, hidden = false, label = "Q
   const root = useRef<HTMLDivElement>(null);
   const main = useRef<HTMLButtonElement>(null);
   const fan = useId();
+  const setFanOpen = useContext(FanContext);
+
+  // The phone shell dims the page behind an open fan.
+  useEffect(() => {
+    setFanOpen(open);
+    return () => setFanOpen(false);
+  }, [open, setFanOpen]);
 
   useEffect(() => {
     if (away) setOpen(false);
