@@ -5,17 +5,9 @@ import "@/api/types/attendance";
 import "@/api/types/settings";
 import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
 import type { PolicyAck } from "@/api/types/settings";
-import { Button } from "@/components/ui/Button";
-import { Banner, Pill, Who } from "@/components/ui/data";
-import { HelpTerm } from "@/components/ui/Help";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
 import { LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDate, formatDateTime } from "@/lib/format";
 import { PagedTable } from "@/features/shared/sections";
-import { Field, FormFooter, InlineInput, rules, SwitchField, TextAreaField, useContractForm } from "@/components/form";
+import { Button, Banner, Pill, Who, HelpTerm, Card, CardHeader, Grid, PageHeader, useModal, toast, cn, formatDate, formatDateTime, Field, FormFooter, InlineInput, rules, Switch, TextAreaField, useContractForm } from "@mycity/ui";
 
 const fmt = (s: PolicySetting) => (s.kind === "bool" ? (s.value ? "On" : "Off") : s.kind === "mode" ? String(s.value)[0].toUpperCase() + String(s.value).slice(1) : String(s.value));
 
@@ -31,7 +23,7 @@ export function AttendancePolicyTab() {
   const save = useMutation("PATCH /api/v1/attendance/policies/draft");
   const discard = useMutation("POST /api/v1/attendance/policies/draft/discard");
   const p = cur.data;
-  if (!p) return (<><PageHead title="Attendance Policy" /><Card><LoadingRows count={8} /></Card></>);
+  if (!p) return (<><PageHeader title="Attendance Policy" /><Card><LoadingRows count={8} /></Card></>);
   const settings = p.draft?.settings ?? p.settings;
   const changed = new Set(p.draft?.changed_keys ?? []);
   const sections = [...new Set(settings.map((s) => s.section))];
@@ -47,7 +39,7 @@ export function AttendancePolicyTab() {
     modal.open({ title: publish ? "Publish Policy" : "Review Draft Changes", wide: true, body: (close) => <Review p={p} publish={publish} close={close} /> });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Attendance Policy"
         help="A change edits a draft. Nobody is notified and no punch is judged by it until the draft is published."
         sub={`Version ${p.version} in force since ${formatDate(p.published_at)} · published by ${p.published_by}`}
@@ -116,10 +108,10 @@ function SettingRow({ s, changed, busy, onChange }: { s: PolicySetting; changed:
   return (
     <div className={cn("flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0", changed && "-mx-[14px] bg-warning-soft px-[14px]")}>
       <div className="min-w-0">
-        <div className="text-[13px] font-[550]">{s.help ? <HelpTerm text={s.help}>{s.label}</HelpTerm> : s.label}{changed && <Pill tone="warn" className="ml-1.5">Draft</Pill>}</div>
+        <div className="text-[13px] font-[550]">{s.help ? <HelpTerm help={s.help}>{s.label}</HelpTerm> : s.label}{changed && <Pill tone="warn" className="ml-1.5">Draft</Pill>}</div>
         {bad && <div className="text-[11.5px] text-destructive">{bad}</div>}
       </div>
-      {s.kind === "bool" && <SwitchField checked={!!s.value} onChange={onChange} label={s.label} disabled={busy} />}
+      {s.kind === "bool" && <Switch checked={!!s.value} onChange={onChange} label={s.label} disabled={busy} />}
       {s.kind === "locked" && <Pill>{String(s.value)}</Pill>}
       {s.kind === "mode" && (
         <div className="flex flex-none overflow-hidden rounded-full border border-input" role="group" aria-label={s.label}>

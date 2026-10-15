@@ -1,15 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { OrgNode } from "@/api/types/organisation";
-import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
-import { Card, PageHead } from "@/components/ui/layout";
-import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { initials } from "@/lib/format";
+import { LoadingRows } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { SearchBox } from "@/components/form";
+import { Button, Icon, Card, PageHeader, ErrorState, toast, cn, initials, SearchInput } from "@mycity/ui";
 
 /**
  * The live reporting tree (docs/guides/organogram.md). One render, two modes:
@@ -139,15 +133,15 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
     );
   };
 
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   return (
     <>
-      <PageHead
+      <PageHeader
         title={builder ? "Organogram" : "Org Chart"}
         sub={data ? (builder ? `Reporting lines · ${data.seats} seats · ${data.filled} filled · ${data.seats - data.filled} open` : `Reporting lines · ${data.seats} seats · ${data.filled} filled`) : " "}
         actions={
           <>
-            <SearchBox value={q} onChange={setQ} placeholder="Search the chart" className="w-[200px]" />
+            <SearchInput value={q} onChange={setQ} placeholder="Search the chart" className="w-[200px]" />
             {builder && <Button onClick={() => setCollapsed(new Set())}>Expand All</Button>}
             <Button icon="doc" onClick={() => toast("PDF queued. It arrives in your Mailbox.")}>Download PDF</Button>
           </>

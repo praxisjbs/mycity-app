@@ -43,13 +43,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # One install for the backend and the workspaces (packages/*, app,
+      # public-app): gates 8 and 11 build the staff app's mock build from it.
       - name: Install
         run: npm ci
-
-      # Gates 8 and 11 crawl the staff app's demo build (in-browser mock API);
-      # scripts/check/lib/screens.js builds it from these packages.
-      - name: Install the staff app
-        run: npm ci --prefix app
 
       # Gates 8 and 11 open every screen at phone and desktop size
       # (scripts/check/lib/screens.js). The browser matches the pinned

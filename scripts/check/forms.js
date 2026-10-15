@@ -8,10 +8,11 @@
  * every field validates as it is filled (useContractForm, mode onTouched) and
  * looks and behaves the same everywhere. This gate refuses:
  *
- * app/ and public-app/ source
+ * packages/ui/src, app/src and public-app/src
  *   - a raw <form>, <input>, <select>, <textarea> or <label> outside
- *     src/components/form/
- *   - importing react-hook-form outside src/components/form/
+ *     packages/ui/src/form/ (and the #18 form files on LEGACY in
+ *     check/components.js, until they move there)
+ *   - importing react-hook-form outside the same places
  *   - a native date input (gate 15 too), an instruction as a placeholder,
  *     a Submit or OK button
  *
@@ -29,6 +30,7 @@
  */
 const { LIMITS, wordCount, titleCaseViolation, bannedButton, clean } = require("./lib/copy");
 const { readDemo, scan, callArgs, literalText, isPureLiteral, stripTags, lineOf, functionRanges, frontendFiles, read } = require("./lib/sources");
+const { LEGACY } = require("./components");
 
 /** The demo's form helpers: the only places a label or a raw field may be written. */
 const DEMO_FORM_HELPERS = ["field", "choice", "check", "fsel"];
@@ -139,16 +141,27 @@ function checkDemo() {
   }
 }
 
+/**
+ * Where a raw form element and react-hook-form may be written: the form system
+ * in packages/ui/src/form/, and the #18 form files still in the apps until they
+ * move there (LEGACY in check/components.js, components/form/ entries only).
+ */
+const FORM_HOME = /^packages\/ui\/src\/form\//;
+const LEGACY_FORM_FILES = new Set(LEGACY.map(([file]) => file).filter((f) => /^(app|public-app)\/src\/components\/form\//.test(f)));
+const formHome = (file) => FORM_HOME.test(file) || LEGACY_FORM_FILES.has(file);
+
 function checkApps() {
   for (const file of frontendFiles()) {
-    const inForm = /^(app|public-app)\/src\/components\/form\//.test(file);
+    const inForm = formHome(file);
     const src = scan(read(file)).code;
     const line = (i) => `${file}:${src.slice(0, i).split("\n").length}`;
     if (!inForm) {
       const raw = /<(form|input|select|textarea|label)\b/g;
-      for (let m = raw.exec(src); m; m = raw.exec(src)) add(line(m.index), `raw <${m[1]}> outside src/components/form/ (§8.6)`);
+      for (let m = raw.exec(src); m; m = raw.exec(src)) {
+        add(line(m.index), `raw <${m[1]}> outside packages/ui/src/form/; use a field from @mycity/ui (docs/COMPONENTS.md, Forms; §8.6)`);
+      }
       const rhf = /from\s+["']react-hook-form["']|require\(\s*["']react-hook-form["']\s*\)/g;
-      for (let m = rhf.exec(src); m; m = rhf.exec(src)) add(line(m.index), "react-hook-form imported outside src/components/form/; use useContractForm (§8.6)");
+      for (let m = rhf.exec(src); m; m = rhf.exec(src)) add(line(m.index), "react-hook-form imported outside packages/ui/src/form/; use useContractForm from @mycity/ui (§8.6)");
     }
     const date = /type=["']date["']/g;
     for (let m = date.exec(src); m; m = date.exec(src)) add(line(m.index), "native date input; use DateField (§8.2, gate 15)");
@@ -170,7 +183,8 @@ checkApps();
 if (problems.length) {
   console.error(`forms: ${problems.length} problem(s)\n`);
   for (const p of problems) console.error(p);
-  console.error("\nRules: docs/FRONTEND_GUIDE.md §8 (one form system).");
+  console.error("\nRules: docs/FRONTEND_GUIDE.md §8 (one form system). Fields: docs/COMPONENTS.md (Forms);");
+  console.error("a field that does not exist yet is added to packages/ui/src/form with npm run new:component.");
   process.exit(1);
 }
 console.log(`forms: ok (demo.html and ${frontendFiles().length} frontend file(s))`);

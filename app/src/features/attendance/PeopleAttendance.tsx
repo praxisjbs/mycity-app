@@ -3,19 +3,14 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { FieldAssignment, LocationRequest, ReconCase, RegisterRow } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
 import { AreaChart, Donut } from "@/components/ui/charts";
-import { Banner, EmptyState, KV, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, MobileOnly, DesktopOnly } from "@/components/ui/layout";
-import { Grow, useModal } from "@/components/ui/Modal";
+import { StatStrip } from "@/components/ui/data";
 import { BackButton } from "@/components/ui/Profile";
-import { Chips, ErrorBlock, LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format";
 import { useSearchParams } from "@/lib/router";
-import { ChoiceField, DateField, Field, FormFooter, PersonPicker, rules, SearchBox, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@/components/form";
+import { PersonPicker } from "@/components/form";
+import { Button, Banner, EmptyState, KeyValue, Pill, Who, Card, CardHeader, Grid, PhoneOnly, DesktopOnly, Grow, useModal, Chips, ErrorState, toast, cn, formatDate, ChoiceField, DateField, Field, FormFooter, rules, SearchInput, SelectField, TextAreaField, TextField, useContractForm, Wizard, Icon } from "@mycity/ui";
 
 type View = "register" | "assignments" | "requests" | "manager";
 const VIEWS: Array<[View, string]> = [["register", "Register"], ["assignments", "Field Assignments"], ["requests", "Location Requests"], ["manager", "Manager Preview"]];
@@ -50,7 +45,7 @@ export function PeopleAttendance() {
           </div>
         )}
       </div>
-      {summary.error && <ErrorBlock error={summary.error} onRetry={summary.reload} />}
+      {summary.error && <ErrorState error={summary.error} onRetry={summary.reload} />}
       {summary.data && hr && (
         <>
           <KpiTiles items={summary.data.kpis.slice(0, 4)} mobileCols={2} />
@@ -84,7 +79,7 @@ function Register() {
         </Grid>
       )}
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Name or location" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or location" className="w-full md:w-[260px]" />
       </Toolbar>
       {s && <Chips value={filter} onChange={setFilter} options={[["all", `All ${s.kpis[0].value.split(" / ")[1]}`], ...s.filters.map((f) => [f.value, `${f.label} ${f.count}`] as [string, string])]} />}
       <DesktopOnly>
@@ -111,7 +106,7 @@ function Register() {
           footer={<Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" />}
         />
       </DesktopOnly>
-      <MobileOnly>
+      <PhoneOnly>
         <div className="grid gap-2.5">
           {list.rows.map((r) => (
             <button key={r.employee.employee_id} type="button" onClick={() => open(r)} className="block w-full rounded-card border border-border bg-card p-[13px] text-left shadow-1">
@@ -137,14 +132,14 @@ function Register() {
           {list.rows.length === 0 && !list.loading && <EmptyState icon="srch" title="Nobody Matches This Filter" text="Choose All to see the whole register." />}
           <Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" className="px-0" />
         </div>
-      </MobileOnly>
+      </PhoneOnly>
     </>
   );
 }
 
 function DayDetailView({ id }: { id: string }) {
   const { data, error } = useApi("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: id } });
-  if (error) return <ErrorBlock error={error} />;
+  if (error) return <ErrorState error={error} />;
   if (!data) return <LoadingRows />;
   if (!data.events.length) return <EmptyState bare icon="clock" title="No Clock Events Today" text={data.status.text === "On Leave" ? "On approved leave." : "Nothing has been recorded yet."} />;
   type Ev = (typeof data.events)[number];
@@ -157,7 +152,7 @@ function DayDetailView({ id }: { id: string }) {
   return (
     <>
       <div className="mb-3">
-        <KV items={[["Work arrangement", data.arrangement], ["Shift", data.shift], ["Attendance status", <Pill tone={data.status.tone}>{data.status.text}</Pill>], ["Hours", data.hours]]} />
+        <KeyValue items={[["Work arrangement", data.arrangement], ["Shift", data.shift], ["Attendance status", <Pill tone={data.status.tone}>{data.status.text}</Pill>], ["Hours", data.hours]]} />
       </div>
       <div className="overflow-x-auto rounded-card border border-border">
         <table className="w-full border-collapse text-[13px]">
@@ -348,11 +343,11 @@ function RequestDecision({ r, close }: { r: LocationRequest; close: () => void }
       <Grid cols={2} className="mb-0">
         <Card>
           <CardHeader title="Request" />
-          <KV items={[["Employee", r.employee.display_name], ["Type", r.type], ["Dates", r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Reason", r.reason], ["Evidence", r.evidence ?? "None"], ["Manager", r.manager_note ?? "No recommendation yet"]]} />
+          <KeyValue items={[["Employee", r.employee.display_name], ["Type", r.type], ["Dates", r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Reason", r.reason], ["Evidence", r.evidence ?? "None"], ["Manager", r.manager_note ?? "No recommendation yet"]]} />
         </Card>
         <Card>
           <CardHeader title="Location, Old and New" />
-          <KV items={[["Requested", `${r.area} · ${r.radius_m} m`], ["Full address", r.address ?? "Not needed for this type"], ["After it ends", "The permanent location applies again. Both stay in history."], ["Status", <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill>]]} />
+          <KeyValue items={[["Requested", `${r.area} · ${r.radius_m} m`], ["Full address", r.address ?? "Not needed for this type"], ["After it ends", "The permanent location applies again. Both stay in history."], ["Status", <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill>]]} />
         </Card>
       </Grid>
       {open && (
@@ -426,7 +421,7 @@ function Row({ icon, title, sub, children }: { icon: "target" | "alert" | "brief
   return (
     <div className="flex flex-wrap items-center gap-2.5 border-b border-border py-[9px] last:border-b-0">
       <span className="flex size-[30px] flex-none items-center justify-center rounded-ctl bg-accent text-accent-foreground">
-        <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href={`#i-${icon}`} /></svg>
+        <Icon name={icon} />
       </span>
       <span className="flex min-w-[180px] flex-1 flex-col gap-0.5">
         <b className="text-[12.5px] font-semibold">{title}</b>
@@ -449,7 +444,7 @@ function Recommend({ r, close }: { r: LocationRequest; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Employee", r.employee.display_name], ["Request", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason]]} />
+      <KeyValue items={[["Employee", r.employee.display_name], ["Request", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason]]} />
       <Field label="Your Comment for People" className="mt-3" state={note ? (note.trim().length < 3 ? "bad" : "good") : undefined} message="Add a comment">
         <TextField value={note} onChange={setNote} placeholder="I support this" />
       </Field>
@@ -479,7 +474,7 @@ function CaseRecommend({ c, close }: { c: ReconCase; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Employee", c.employee.display_name], ["Case", `${c.type} · ${formatDate(c.date)}`], ["Employee explanation", c.explanation ?? "None given"]]} />
+      <KeyValue items={[["Employee", c.employee.display_name], ["Case", `${c.type} · ${formatDate(c.date)}`], ["Employee explanation", c.explanation ?? "None given"]]} />
       <Field label="Recommended Outcome"><SelectField value={out} onChange={setOut} options={OUTCOMES.filter(([k]) => k !== "escalate")} /></Field>
       <Field label="Your Comment" {...f.field("note")}>
         <TextAreaField {...f.field("note")} placeholder="Approved site visit" />
@@ -511,7 +506,7 @@ function Reconcile({ onBack }: { onBack: () => void }) {
       </div>
       <StatStrip items={[{ label: "Awaiting People", value: String(count("Awaiting HR")), tone: count("Awaiting HR") ? "warn" : "ok" }, { label: "Awaiting a Manager", value: String(count("Awaiting manager")) }, { label: "More Information", value: String(count("Awaiting employee")) }, { label: "Escalated", value: String(count("Escalated")), desktop: true }, { label: "Total Cases", value: String(all.page?.total ?? 0) }]} />
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={status} onChange={setStatus} options={[["open", "Open"], ["Awaiting HR", "Awaiting People"], ["Awaiting manager", "Awaiting a manager"], ["Resolved", "Resolved"], ["all", "All"]]} />
       <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
@@ -560,7 +555,7 @@ function CaseDetail({ c }: { c: ReconCase }) {
     <>
       <Card>
         <CardHeader record title={`${c.number} · ${c.type}`} right={<Pill tone={CASE_TONE[c.status]}>{c.status}</Pill>} />
-        <KV items={[["Employee", `${c.employee.display_name} · ${c.department}`], ["Work arrangement", c.arrangement], ["Date", formatDate(c.date)], ...c.evidence, ["Employee explanation", c.explanation ?? "None given"], ["Manager comment", c.manager_note ?? "None yet"], ["Payroll impact", c.payroll_impact]]} />
+        <KeyValue items={[["Employee", `${c.employee.display_name} · ${c.department}`], ["Work arrangement", c.arrangement], ["Date", formatDate(c.date)], ...c.evidence, ["Employee explanation", c.explanation ?? "None given"], ["Manager comment", c.manager_note ?? "None yet"], ["Payroll impact", c.payroll_impact]]} />
       </Card>
       {!done && (
         <Card className="mt-3">

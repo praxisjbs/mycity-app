@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Icon } from "./Icon";
+import { Icon } from "@mycity/ui";
 
 /**
  * A generated document as it will print: white paper in both themes, City Green

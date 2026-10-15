@@ -1,11 +1,10 @@
 import { useCallback, useState } from "react";
 import { useApi, usePaged } from "@/api/hooks";
-import { Chips, ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
-import { useModal } from "@/components/ui/Modal";
+import { LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { Cell } from "./blocks";
 import type { KpiRow } from "@/api/types/home";
-import { SearchBox } from "@/components/form";
+import { Chips, ErrorState, useModal, SearchInput } from "@mycity/ui";
 
 /**
  * Every KPI card opens the records behind its number: GET /home/kpi/:key,
@@ -22,7 +21,7 @@ function KpiDetail({ kpiKey, close }: { kpiKey: string; close: () => void }) {
   const [group, setGroup] = useState("all");
   const list = usePaged("GET /api/v1/home/kpi/:key", { params: { key: kpiKey }, filters: group === "all" ? {} : { group } });
 
-  if (meta.error) return <ErrorBlock error={meta.error} />;
+  if (meta.error) return <ErrorState error={meta.error} />;
   if (!meta.data) return <LoadingRows />;
   const m = meta.data;
   const total = m.groups.reduce((a, g) => a + g.count, 0);
@@ -36,7 +35,7 @@ function KpiDetail({ kpiKey, close }: { kpiKey: string; close: () => void }) {
           options={[["all", `All ${total}`], ...m.groups.map((g) => [g.value, `${g.label} ${g.count}`] as [string, string])]}
         />
       )}
-      {(list.page?.total ?? 0) > 8 && <SearchBox className="mb-3" value={list.q} onChange={list.setQ} placeholder="Search this list" />}
+      {(list.page?.total ?? 0) > 8 && <SearchInput className="mb-3" value={list.q} onChange={list.setQ} placeholder="Search this list" />}
       <Table
         rows={list.rows}
         rowKey={(r) => r.id}

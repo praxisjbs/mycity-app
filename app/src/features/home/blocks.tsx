@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
 import type { BarRow, HomeBlock, KpiCell } from "@/api/types/home";
-import { Bars, Kpi, Mini, Pill, StatStrip, Timeline, Who } from "@/components/ui/data";
+import { Bars, Kpi, StatStrip, Timeline } from "@/components/ui/data";
 import { AreaChart, Donut } from "@/components/ui/charts";
-import { Card, CardHeader, Grid } from "@/components/ui/layout";
-import { Money } from "@/components/ui/Money";
 import { Table } from "@/components/ui/Table";
-import { formatDate } from "@/lib/format";
 import { useRouter } from "@/lib/router";
 import { useKpiDetail } from "./KpiDetail";
+import { Meter, Pill, Who, Card, CardHeader, Grid, Money, formatDate } from "@mycity/ui";
 
 const barColor = (b: BarRow) => (b.emphasis === "warn" ? "var(--chart-4)" : b.emphasis === "brand" ? "var(--primary)" : undefined);
 export const toBars = (rows: BarRow[]) => rows.map((r) => ({ label: r.label, pct: r.pct, value: r.value, color: barColor(r) }));
@@ -142,6 +140,6 @@ export function Cell({ cell }: { cell: KpiCell }) {
     case "over":
       return <span className="inline-block rounded-full bg-warning-soft px-[9px] py-0.5 text-[11px] font-semibold whitespace-nowrap text-warning">{cell.text}</span>;
     case "bar":
-      return <Mini pct={cell.pct} label={cell.text} />;
+      return <Meter pct={cell.pct} label={cell.text} />;
   }
 }

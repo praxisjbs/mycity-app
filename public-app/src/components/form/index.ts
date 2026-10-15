@@ -1,7 +1,5 @@
 /**
- * The public site's form system (FRONTEND_GUIDE §8.6): the only folder where a
- * raw <form>, <input>, <textarea> or <label> may be written (gate 12).
+ * What remains of the public site's own form folder until PR 3 moves it into
+ * packages/ui: the upload field. Every other field comes from @mycity/ui.
  */
-export { Form } from "./Form";
-export { Field, Input, Textarea } from "./fields";
 export { Upload } from "./Upload";

@@ -2,10 +2,7 @@ import { useState } from "react";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
-import { cn } from "@/lib/cn";
-import { Avatar } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { SearchBox } from "./Search";
+import { cn, Icon, Avatar, SearchInput } from "@mycity/ui";
 
 /**
  * Pick people from the server (FRONTEND_GUIDE §4: never fetch "all" for a
@@ -33,7 +30,7 @@ export function PersonPicker({ value, onChange, multiple, placeholder = "Search 
           ))}
         </div>
       )}
-      <SearchBox value={list.q} onChange={(q) => (list.setQ(q), setOpen(true))} placeholder={placeholder} className="mb-2" />
+      <SearchInput value={list.q} onChange={(q) => (list.setQ(q), setOpen(true))} placeholder={placeholder} className="mb-2" />
       {(open || !value.length) && (
         <div className="max-h-[250px] overflow-y-auto rounded-xl border border-border">
           {list.rows.map((r) => {

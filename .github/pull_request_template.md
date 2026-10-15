@@ -22,7 +22,9 @@ Branch: m<N>/<short-name>
 - [ ] Desktop and mobile both done (frontend changes)
 - [ ] Screen text in three tiers: nothing explaining how the system works, help only through help terms or a Details row, word limits met (gate 8, FRONTEND_GUIDE §5)
 - [ ] The feature guide's §10 lists what each screen shows open, behind help and on a phone
-- [ ] Forms only from `components/form/`, validated as filled (gate 12, FRONTEND_GUIDE §8)
+- [ ] Forms only from the form system in `@mycity/ui` (`packages/ui/src/form/`), validated as filled (gate 12, FRONTEND_GUIDE §8)
+- [ ] Shared components only from `@mycity/ui`; a new one added with `npm run new:component` (header, test, gallery page) in `packages/ui`, never in a feature; `docs/COMPONENTS.md` regenerated (`npm run gen:components`)
+- [ ] Styling tokens only: no hex, no arbitrary value, no inline `style` (F4, FRONTEND_GUIDE §9.3)
 
 ## Native app feel (frontend changes)
 

@@ -6,22 +6,14 @@ import "@/api/types/organisation";
 import type { Announcement, Channel, Conversation, MessageCreate } from "@/api/types/community";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, IconButton } from "@/components/ui/Button";
-import { Avatar, KV, Mini, Pill, StatStrip } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { Card, Grid, PageHead } from "@/components/ui/layout";
-import { Menu } from "@/components/ui/Menu";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDate, formatDateTime, formatWhen, todayIso } from "@/lib/format";
-import { useIsMobile } from "@/lib/media";
+import { StatStrip } from "@/components/ui/data";
+import { LoadingRows } from "@/components/ui/Table";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { ChatFrame, Composer, Row, ThreadBody, ThreadSearch, useSplit, useThread } from "./Chat";
-import { ChoiceField, DateField, Field, FormFooter, PersonPicker, rules, SearchBox, SwitchField, TextAreaField, TextField, UploadField, useContractForm } from "@/components/form";
+import { PersonPicker, UploadField } from "@/components/form";
+import { Button, IconButton, Avatar, KeyValue, Meter, Pill, Icon, Card, Grid, PageHeader, Menu, useModal, ErrorState, toast, cn, formatDate, formatDateTime, formatWhen, todayIso, useIsMobile, ChoiceField, DateField, Field, FormFooter, rules, SearchInput, Switch, TextAreaField, TextField, useContractForm } from "@mycity/ui";
 
 export default function Community({ tab }: ModuleScreenProps) {
   if (tab === "direct-messages") return <Direct />;
@@ -91,9 +83,9 @@ function Channels() {
 
   const listPane = (
     <>
-      <div className="flex-none px-3 pt-3 pb-2"><SearchBox value={list.q} onChange={list.setQ} placeholder="Search channels" /></div>
+      <div className="flex-none px-3 pt-3 pb-2"><SearchInput value={list.q} onChange={list.setQ} placeholder="Search channels" /></div>
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 max-md:overflow-visible">
-        {list.error ? <ErrorBlock error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={5} /> : (
+        {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={5} /> : (
           <>
             {pinned.length > 0 && <><Group>Pinned</Group>{pinned.map(row)}</>}
             <Group>Channels</Group>
@@ -115,7 +107,7 @@ function Channels() {
           trigger={(p) => <IconButton {...p} icon="dots" label="Channel menu" />}
           items={[
             { label: "View Members", icon: "users", onSelect: () => modal.open({ title: `Members · #${current.name}`, body: (close) => <Members c={current} close={close} /> }) },
-            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: `#${current.name}`, body: (close) => <><KV items={[["Members", current.members], ["Who can post", current.read_only ? "People and the CEO" : "Every member"], ["Visibility", "Internal to MyCity"]]} /><FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter></> }) },
+            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: `#${current.name}`, body: (close) => <><KeyValue items={[["Members", current.members], ["Who can post", current.read_only ? "People and the CEO" : "Every member"], ["Visibility", "Internal to MyCity"]]} /><FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter></> }) },
             { label: "Search in Channel", icon: "srch", onSelect: () => setSearching(true) },
             "sep",
             { label: "Mute Notifications", icon: "bell", onSelect: () => void api.call("POST /api/v1/community/channels/:id/mute", { params: { id: current.channel_id }, body: {} }).then(() => toast(`#${current.name} muted`)) },
@@ -149,7 +141,7 @@ function Channels() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Channels"
         sub={list.page ? `${list.page.total} channels` : " "}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Channel", body: (close) => <NewChannel close={close} onMade={(c) => (list.reload(), pick(c))} /> })}>New Channel</Button>}
@@ -163,7 +155,7 @@ function Members({ c, close }: { c: Channel; close: () => void }) {
   const list = usePaged("GET /api/v1/community/channels/:id/members", { params: { id: c.channel_id } });
   return (
     <>
-      <SearchBox value={list.q} onChange={list.setQ} placeholder="Search members" className="mb-2" />
+      <SearchInput value={list.q} onChange={list.setQ} placeholder="Search members" className="mb-2" />
       <p className="mb-2 text-[11.5px] text-subtle-foreground">{c.members} members{list.page && list.page.total > list.rows.length ? `, showing ${list.rows.length}` : ""}</p>
       <PeopleList people={list.rows} />
       {list.page?.has_next && <Button size="sm" className="mt-2" onClick={() => list.setPage(list.pageNumber + 1)}>Next Page</Button>}
@@ -374,14 +366,14 @@ function Direct() {
 
   const listPane = (
     <>
-      <div className="flex-none px-3 pt-3 pb-2"><SearchBox value={list.q} onChange={list.setQ} placeholder="Search people" label="Search conversations" /></div>
+      <div className="flex-none px-3 pt-3 pb-2"><SearchInput value={list.q} onChange={list.setQ} placeholder="Search people" label="Search conversations" /></div>
       <div className="flex flex-none gap-1 px-3 pb-2" role="group" aria-label="Show">
         {(["all", "unread"] as const).map((v) => (
           <button key={v} type="button" aria-pressed={filter === v} onClick={() => setFilter(v)} className={cn("h-[26px] max-md:h-11 max-md:min-w-11 rounded-full px-[11px] text-[11.5px] font-[650]", filter === v ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>{v === "all" ? "All" : "Unread"}</button>
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 max-md:overflow-visible">
-        {list.error ? <ErrorBlock error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <LoadingRows count={5} /> : list.rows.map((c) => (
+        {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <LoadingRows count={5} /> : list.rows.map((c) => (
           <Row
             key={c.conversation_id}
             on={c.conversation_id === current?.conversation_id && (!mobile || open)}
@@ -446,7 +438,7 @@ function Direct() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Direct Messages"
         sub={unread ? `${unread} unread` : "All caught up"}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Message", body: (close) => <NewMessage close={close} start={start} /> })}>New Message</Button>}
@@ -477,7 +469,7 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
   const card = useApi("GET /api/v1/community/people/:user_id/card", { params: { user_id: c.person.employee_id } });
   const [mute, setMute] = useState(false);
   const p = card.data;
-  if (card.error) return <ErrorBlock error={card.error} onRetry={card.reload} />;
+  if (card.error) return <ErrorState error={card.error} onRetry={card.reload} />;
   if (!p) return <LoadingRows count={4} />;
   const sec = "border-b border-border py-3.5 last:border-b-0";
   const h4 = "mb-2 text-[10.5px] font-[650] tracking-[.12em] text-subtle-foreground uppercase";
@@ -519,7 +511,7 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
         {p.shared_channels.map((n) => <div key={n} className="flex items-center gap-2.5 py-[5px] text-[13px]"><b className="text-subtle-foreground">#</b>{n}</div>)}
       </div>
       <div className={sec}>
-        <div className="flex items-center justify-between text-[13px]">Mute notifications<SwitchField checked={mute} onChange={(v) => (setMute(v), toast(v ? `Muted ${p.person.display_name}` : `Notifications on for ${p.person.display_name}`))} label="Mute notifications" /></div>
+        <div className="flex items-center justify-between text-[13px]">Mute notifications<Switch checked={mute} onChange={(v) => (setMute(v), toast(v ? `Muted ${p.person.display_name}` : `Notifications on for ${p.person.display_name}`))} label="Mute notifications" /></div>
         <Button icon="srch" className="mt-3 w-full justify-center" onClick={onSearch}>Search in Conversation</Button>
       </div>
     </div>
@@ -541,13 +533,13 @@ function Announcements() {
   }, [list.rows]);
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Announcements"
         sub="Posted by People and the CEO"
         actions={poster && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Announcement", body: (close) => <NewAnnouncement close={close} /> })}>New Announcement</Button>}
       />
       <StatStrip items={[{ label: "Published", value: stats.pub }, { label: "Scheduled", value: stats.sch }, { label: "Average Read", value: `${stats.avg}%`, tone: "ok" }, { label: "Audience", value: `${stats.audience} staff` }, { label: "This Month", value: stats.month, desktop: true }]} />
-      {list.error ? <ErrorBlock error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
+      {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
         <Grid cols={2} className="mt-3">
           {list.rows.map((a) => (
             <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition-[box-shadow,transform] hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.title, body: (close) => <AnnouncementReads a={a} close={close} poster={poster} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
@@ -578,7 +570,7 @@ function AnnouncementReads({ a, close, poster }: { a: Announcement; close: () =>
       {a.scheduled ? <Pill tone="info">Scheduled. Not yet visible to staff</Pill> : poster && (
         <>
           <h3 data-ui="title" className="mb-1.5 text-[13.5px] font-semibold">Read by {a.reads} of {a.audience}</h3>
-          <Mini pct={pct} label={`${pct}%`} />
+          <Meter pct={pct} label={`${pct}%`} />
           <div className="mt-4 mb-1.5 flex items-center gap-2">
             <h3 data-ui="title" className="flex-1 text-[13.5px] font-semibold">Not Read · {nNot}</h3>
             {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { const r = await remind.run({ params: { id: a.announcement_id }, body: {} }); toast(`Reminder sent to ${r.reminded} ${r.reminded === 1 ? "person" : "people"}`); }}>Remind Them</Button>}

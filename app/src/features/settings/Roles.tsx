@@ -4,15 +4,9 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
 import type { AccessCatalogue, RecordScope, Role, RoleAction, RoleBody, RoleDetail, RoleGrant } from "@/api/types/settings";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
-import { Banner, Pill } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { KvCard, PagedTable } from "@/features/shared/sections";
-import { ChoiceField, Field, FormFooter, SwitchField, TextField } from "@/components/form";
+import { Button, Banner, Pill, Card, CardHeader, Grid, PageHeader, useModal, ErrorState, toast, cn, ChoiceField, Field, FormFooter, Switch, TextField } from "@mycity/ui";
 
 const ACTIONS: Array<[RoleAction, string]> = [["view", "View"], ["create", "Create"], ["edit", "Edit"], ["delete", "Delete"], ["approve", "Approve"], ["export", "Export"]];
 const SCOPES: Array<[RecordScope, string]> = [["all", "All"], ["team", "Team"], ["own", "Own"]];
@@ -39,7 +33,7 @@ export function Roles() {
     modal.open({ title: r ? r.name : "New Role", wide: true, full: true, body: (close) => <RoleEditor roleId={r?.role_id ?? null} canManage={canManage} close={close} /> });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Roles & Permissions"
         sub="Four layers: module, action, record scope, field"
         actions={canManage ? <Button variant="primary" icon="plus" onClick={() => open(null)}>New Role</Button> : undefined}
@@ -99,8 +93,8 @@ export function Roles() {
 function RoleEditor({ roleId, canManage, close }: { roleId: string | null; canManage: boolean; close: () => void }) {
   const cat = useApi("GET /api/v1/settings/roles/catalogue");
   const role = useApi("GET /api/v1/settings/roles/:id", { params: { id: roleId ?? "" }, enabled: !!roleId });
-  if (cat.error) return <ErrorBlock error={cat.error} />;
-  if (roleId && role.error) return <ErrorBlock error={role.error} />;
+  if (cat.error) return <ErrorState error={cat.error} />;
+  if (roleId && role.error) return <ErrorState error={role.error} />;
   if (!cat.data || (roleId && !role.data)) return <LoadingRows count={8} />;
   return <RoleForm cat={cat.data} role={roleId ? role.data! : null} canManage={canManage} close={close} />;
 }
@@ -226,7 +220,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
               <div className="text-[12.5px] font-semibold">{f.label}</div>
               <div className="text-[11.5px] text-subtle-foreground">{f.help}</div>
             </span>
-            <SwitchField checked={fields.includes(f.key)} disabled={readOnly} label={`${f.label} visible`} onChange={(v) => setFields((x) => (v ? [...x, f.key] : x.filter((k) => k !== f.key)))} />
+            <Switch checked={fields.includes(f.key)} disabled={readOnly} label={`${f.label} visible`} onChange={(v) => setFields((x) => (v ? [...x, f.key] : x.filter((k) => k !== f.key)))} />
           </div>
         ))}
       </div>

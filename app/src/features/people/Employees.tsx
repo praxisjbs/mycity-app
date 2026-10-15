@@ -3,16 +3,13 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { EmployeeCreate, EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
-import { Bars, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
+import { Bars, StatStrip } from "@/components/ui/data";
 import { Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { hrefFor, useRouter } from "@/lib/router";
 import { EmployeeDetails } from "./EmployeeDetails";
-import { DateField, Field, FilterSelect, MoneyField, PersonPicker, PhoneField, rules, SearchBox, SelectField, TextField, toMoneyString, UploadField, useContractForm, Wizard, type WizardStep } from "@/components/form";
+import { PersonPicker, UploadField } from "@/components/form";
+import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, toast, DateField, Field, FilterSelect, MoneyField, PhoneField, rules, SearchInput, SelectField, TextField, toMoneyString, useContractForm, Wizard, type WizardStep } from "@mycity/ui";
 
 export function Employees() {
   const me = useMe();
@@ -28,7 +25,7 @@ export function Employees() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Employees"
         sub={summary.data ? `${summary.data.kpis[0].value} staff · ${summary.data.departments.length} departments` : " "}
         actions={
@@ -45,7 +42,7 @@ export function Employees() {
       {summary.data && <KpiTiles items={summary.data.kpis} />}
       {summary.data && <StatStrip items={summary.data.arrangements.map((a) => ({ label: a.label, value: a.value }))} />}
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-[300px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-[300px]" />
         <FilterSelect label="Department" value={department} onChange={setDepartment} options={[["all", "All departments"], ...depts.rows.map((d) => [d.name, d.name] as [string, string])]} />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={[["all", "Any status"], ["confirmed", "Active"], ["probation", "Probation"], ["on_leave", "On Leave"], ["suspended", "Suspended"]]} />
       </Toolbar>

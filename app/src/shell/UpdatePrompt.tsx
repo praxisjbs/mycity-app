@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
+import { Button, Icon } from "@mycity/ui";
 
 /**
  * PWA (staff app only). The service worker caches the app shell so it opens

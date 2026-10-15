@@ -1,16 +1,14 @@
 import { useApi } from "@/api/hooks";
 import type { MyPerformance } from "@/api/types/ess";
-import { Bars, KV, Pill, StatStrip, TapList } from "@/components/ui/data";
-import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
+import { Bars, StatStrip, TapList } from "@/components/ui/data";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
-import { cn } from "@/lib/cn";
+import { cn, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState } from "@mycity/ui";
 
 export function MyPerformancePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/performance");
   const modal = useModal();
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!p) return <LoadingRows count={6} />;
   const open = (r: MyPerformance["reviews"][number]) =>
     modal.open({
@@ -19,7 +17,7 @@ export function MyPerformancePage() {
         <>
           <Card>
             <CardHeader title={r.cycle} />
-            <KV items={[["Your rating", r.self ?? "Not yet"], ["Manager", r.manager ?? "Not yet"], ["Second level", r.second ?? "Not yet"], ["Status", <Pill tone={r.status.tone}>{r.status.text}</Pill>]]} />
+            <KeyValue items={[["Your rating", r.self ?? "Not yet"], ["Manager", r.manager ?? "Not yet"], ["Second level", r.second ?? "Not yet"], ["Status", <Pill tone={r.status.tone}>{r.status.text}</Pill>]]} />
           </Card>
           {r.manager_comment && (
             <Card className="mt-3">
@@ -46,7 +44,7 @@ export function MyPerformancePage() {
   );
   return (
     <>
-      <PageHead title="My Performance" sub={`${p.period} · set by ${p.set_by}`} />
+      <PageHeader title="My Performance" sub={`${p.period} · set by ${p.set_by}`} />
       <StatStrip items={p.stats} />
       <PhoneCards
         items={[

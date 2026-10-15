@@ -5,19 +5,15 @@ import type { Task, TaskStatus } from "@/api/types/workspace";
 import "@/api/types/workspace";
 import { useMe } from "@/auth/AuthProvider";
 import { Board } from "@/components/ui/Board";
-import { Button } from "@/components/ui/Button";
 import { MonthCalendar } from "@/components/ui/Calendar";
 import { AreaChart } from "@/components/ui/charts";
-import { Avatar, Bars, KV, Mini, Pill, Timeline } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Bars, Timeline } from "@/components/ui/data";
+import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { formatDate, monthName, todayIso } from "@/lib/format";
 import { useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { DateField, Field, FormFooter, PersonPicker, rules, SearchBox, SegBar, SelectField, TextAreaField, TextField, useContractForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
+import { Button, Avatar, KeyValue, Meter, Pill, Card, CardHeader, Grid, PageHeader, useModal, ErrorState, toast, formatDate, monthName, todayIso, DateField, Field, FormFooter, rules, SearchInput, SegmentedControl, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
 
 export default function Workspace({ tab }: ModuleScreenProps) {
   const [params, setParams] = useSearchParams();
@@ -65,7 +61,7 @@ function TaskDetail({ t, close }: { t: Task; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Number", t.number], ["Owner", t.owner.display_name], ["Set by", t.set_by?.display_name ?? "Themselves"], ["Due", t.due ? formatDate(t.due) : "No date"], ["Priority", t.priority[0].toUpperCase() + t.priority.slice(1)], ["Status", LABEL[t.status]], ...(t.linked ? ([["Linked to", t.linked.label]] as Array<[string, string]>) : [])]} />
+      <KeyValue items={[["Number", t.number], ["Owner", t.owner.display_name], ["Set by", t.set_by?.display_name ?? "Themselves"], ["Due", t.due ? formatDate(t.due) : "No date"], ["Priority", t.priority[0].toUpperCase() + t.priority.slice(1)], ["Status", LABEL[t.status]], ...(t.linked ? ([["Linked to", t.linked.label]] as Array<[string, string]>) : [])]} />
       {t.description && <p className="mt-3 text-[12.5px] text-muted-foreground">{t.description}</p>}
       <FormFooter>
         <Button onClick={close}>Close</Button>
@@ -79,12 +75,12 @@ function Today() {
   const { data, error, reload } = useApi("GET /api/v1/workspace/today");
   const openTask = useTaskDetail();
   const modal = useModal();
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <LoadingRows count={8} />;
   const over = data.my_day.filter((t) => t.due_pill.tone === "err").length;
   return (
     <>
-      <PageHead title="Today" sub={new Date(data.date).toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" }).replace(",", ",")} />
+      <PageHeader title="Today" sub={new Date(data.date).toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" }).replace(",", ",")} />
       <KpiTiles items={data.kpis} mobileCols={2} />
       <Grid cols={2}>
         <Card>
@@ -135,18 +131,18 @@ function Tasks() {
   const openTask = useTaskDetail();
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Tasks"
         sub="Click a card to move it along"
         actions={
           <>
-            {me.manages_people && <SegBar value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
+            {me.manages_people && <SegmentedControl value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
             <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> })}>New Task</Button>
           </>
         }
       />
       {summary.data && <KpiTiles items={summary.data.kpis} mobileCols={2} />}
-      <Toolbar><SearchBox value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-[260px]" /></Toolbar>
+      <Toolbar><SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-[260px]" /></Toolbar>
       <Board
         columns={COLS.map(([status, label, color], i) => ({
           key: status,
@@ -213,7 +209,7 @@ function CalendarTab() {
   const upcoming = list.rows.filter((e) => e.date >= now);
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Calendar"
         sub={`${monthName(ym[1])} ${ym[0]}`}
         actions={
@@ -263,11 +259,11 @@ function EventForm({ close }: { close: () => void }) {
 
 function Analytics() {
   const { data, error, reload } = useApi("GET /api/v1/workspace/analytics");
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <LoadingRows count={8} />;
   return (
     <>
-      <PageHead title="Analytics" sub="Your team, last 30 days" />
+      <PageHeader title="Analytics" sub="Your team, last 30 days" />
       <KpiTiles items={data.kpis} mobileCols={2} />
       <Grid cols={2}>
         <AreaChart title="Tasks Completed per Week" values={data.completed_per_week} />
@@ -282,7 +278,7 @@ function Analytics() {
           columns={[
             { key: "r", label: "Reason", render: (r) => r.reason },
             { key: "c", label: "Count", align: "n", render: (r) => r.count },
-            { key: "s", label: "Share", render: (r) => <Mini pct={r.pct} label={`${r.pct}%`} /> },
+            { key: "s", label: "Share", render: (r) => <Meter pct={r.pct} label={`${r.pct}%`} /> },
           ]}
         />
       </Grid>

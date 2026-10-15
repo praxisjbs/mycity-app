@@ -3,15 +3,11 @@ import { api } from "@/api/client";
 import { useApi, type PagedResult } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { BarRow } from "@/api/types/home";
-import type { Tone } from "@/api/types/common";
 import "@/api/types/shared";
-import { Button } from "@/components/ui/Button";
-import { Bars, Chain, KV, Pill, Timeline } from "@/components/ui/data";
-import { Card, CardHeader } from "@/components/ui/layout";
+import { Bars, Chain, Timeline } from "@/components/ui/data";
 import { Pager, Table, type Column } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 import { toBars } from "@/features/home/blocks";
-import { SearchBox } from "@/components/form";
+import { Button, KeyValue, Card, CardHeader, toast, SearchInput } from "@mycity/ui";
 
 /**
  * The building blocks the module screens share: the explanation card, the
@@ -22,7 +18,7 @@ export function KvCard({ title, items, info, right }: { title: string; items: Ar
   return (
     <Card>
       <CardHeader title={title} help={info} right={right} />
-      <KV items={items} />
+      <KeyValue items={items} />
     </Card>
   );
 }
@@ -54,9 +50,6 @@ export function TrailCard({ title, items }: { title: string; items: Array<{ titl
     </Card>
   );
 }
-
-/** A status the API words and tones; the screen only draws it. */
-export const StatusPill = ({ s }: { s: { tone: Tone; text: string } | null | undefined }) => (s ? <Pill tone={s.tone}>{s.text}</Pill> : null);
 
 /** Export goes to the worker; the file arrives in the Mailbox (FRONTEND_GUIDE §4: never a client-side dump of rows). */
 export function ExportButton({ source, filters, label = "Export" }: { source: string; filters?: Record<string, unknown>; label?: string }) {
@@ -98,7 +91,7 @@ export function PagedTable<R>({
       right={
         (search || right) && (
           <span className="flex flex-wrap items-center justify-end gap-2">
-            {search && <SearchBox value={list.q} onChange={list.setQ} placeholder={search} className="w-[220px] max-md:w-full" />}
+            {search && <SearchInput value={list.q} onChange={list.setQ} placeholder={search} className="w-[220px] max-md:w-full" />}
             {right}
           </span>
         )

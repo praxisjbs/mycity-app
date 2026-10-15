@@ -4,16 +4,11 @@ import type { PersonRef } from "@/api/types/common";
 import type { LeaveRequest, LeaveType } from "@/api/types/leave";
 import "@/api/types/leave";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
 import { MonthCalendar } from "@/components/ui/Calendar";
-import { Pill, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { Grow, useModal } from "@/components/ui/Modal";
-import { Chips, LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { formatDate, monthName, todayIso } from "@/lib/format";
-import { DateField, Field, FormFooter, PersonPicker, rules, SearchBox, SelectField, TextAreaField, useContractForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
+import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, Grow, useModal, Chips, toast, formatDate, monthName, todayIso, DateField, Field, FormFooter, rules, SearchInput, SelectField, TextAreaField, useContractForm } from "@mycity/ui";
 
 export const LEAVE_TONE: Record<LeaveRequest["status"], "ok" | "warn" | "err" | "neutral"> = { Approved: "ok", Pending: "warn", Rejected: "err", Cancelled: "neutral" };
 export const LEAVE_TYPES: LeaveType[] = ["Annual", "Sick", "Compassionate", "Maternity", "Paternity", "Study", "Unpaid"];
@@ -29,7 +24,7 @@ export function PeopleLeave() {
   const now = todayIso();
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Leave"
         sub={`${monthName(Number(now.slice(5, 7)) - 1)} ${now.slice(0, 4)}`}
         actions={
@@ -47,7 +42,7 @@ export function PeopleLeave() {
       <Grid cols="1.4/1">
         <div className="min-w-0">
           <Toolbar>
-            <SearchBox value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-[260px]" />
+            <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-[260px]" />
           </Toolbar>
           <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending", "Pending"], ["Approved", "Approved"], ["Rejected", "Rejected"]]} />
           <Table

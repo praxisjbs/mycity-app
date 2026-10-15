@@ -2,18 +2,12 @@ import { useEffect, useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
-import { Bars, KV, Pill, Tile } from "@/components/ui/data";
-import { Card, Grid, PageHead } from "@/components/ui/layout";
-import { Grow, useModal } from "@/components/ui/Modal";
-import { Chips, ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { Who } from "@/components/ui/data";
-import { formatDateTime } from "@/lib/format";
+import { Bars, Tile } from "@/components/ui/data";
+import { LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Block, InfoCard, KpiRow, toBars } from "./blocks";
-import { Field, FormFooter, rules, SelectField, TextField, ToggleRow, useContractForm } from "@/components/form";
+import { Button, KeyValue, Pill, Card, Grid, PageHeader, Grow, useModal, Chips, ErrorState, toast, Who, formatDateTime, Field, FormFooter, rules, SelectField, TextField, ToggleRow, useContractForm } from "@mycity/ui";
 
 export default function Home({ tab, id }: ModuleScreenProps) {
   if (tab === "team") return <Team />;
@@ -26,12 +20,12 @@ function Overview() {
   const { data, error, reload } = useApi("GET /api/v1/home/overview");
   const { navigate } = useRouter();
   const me = useMe();
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <LoadingRows count={8} />;
   const canNew = me.grants.workspace?.includes("create");
   return (
     <>
-      <PageHead
+      <PageHeader
         title={data.greeting}
         sub={data.subtitle}
         actions={
@@ -57,10 +51,10 @@ function Team() {
   const [status, setStatus] = useState("all");
   const list = usePaged("GET /api/v1/home/team", { filters: status === "all" ? {} : { status } });
   const { navigate } = useRouter();
-  if (summary.error) return <ErrorBlock error={summary.error} onRetry={summary.reload} />;
+  if (summary.error) return <ErrorState error={summary.error} onRetry={summary.reload} />;
   return (
     <>
-      <PageHead title="Team" sub={`Who is in and where${summary.data ? ` · ${summary.data.scope_label}` : ""}`} />
+      <PageHeader title="Team" sub={`Who is in and where${summary.data ? ` · ${summary.data.scope_label}` : ""}`} />
       {summary.data && <KpiRow items={summary.data.kpis} />}
       <Chips
         value={status}
@@ -117,7 +111,7 @@ function Alerts({ openId }: { openId: string | null }) {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Alerts"
         sub="Thresholds crossed and not yet cleared"
         actions={
@@ -183,7 +177,7 @@ function AlertDetail({ alert, close }: { alert: HomeAlert; close: () => void }) 
         <Pill tone="warn">{`Over ${alert.over_by}`}</Pill>
       </div>
       <Card>
-        <KV items={[["Trigger", alert.trigger], ["Who can clear", alert.who_clears], ["Raised", formatDateTime(alert.raised_at)], ["Over threshold", alert.over_by]]} />
+        <KeyValue items={[["Trigger", alert.trigger], ["Who can clear", alert.who_clears], ["Raised", formatDateTime(alert.raised_at)], ["Over threshold", alert.over_by]]} />
       </Card>
       <FormFooter>
         {alert.link && <Button onClick={() => (close(), navigate(alert.link!))}>Open Record</Button>}
@@ -205,7 +199,7 @@ function RuleList() {
     list.reload();
     toast(enabled ? "Rule enabled" : "Rule disabled, its alerts stop");
   };
-  if (list.error) return <ErrorBlock error={list.error} />;
+  if (list.error) return <ErrorState error={list.error} />;
   return (
     <>
       {list.rows.map((r) => (
@@ -279,9 +273,9 @@ function Reports() {
   };
   return (
     <>
-      <PageHead title="Reports" sub="Scheduled and on demand · Managers and the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Report", body: (close) => <ReportForm close={close} /> })}>New Report</Button>} />
+      <PageHeader title="Reports" sub="Scheduled and on demand · Managers and the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Report", body: (close) => <ReportForm close={close} /> })}>New Report</Button>} />
       {summary.data && <KpiRow items={summary.data.kpis} />}
-      {reports.error && <ErrorBlock error={reports.error} onRetry={reports.reload} />}
+      {reports.error && <ErrorState error={reports.error} onRetry={reports.reload} />}
       <Grid cols={3}>
         {reports.rows.map((r) => (
           <Tile key={r.home_report_id} title={r.name} text={r.cadence}>

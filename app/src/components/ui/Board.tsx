@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { cn } from "@/lib/cn";
-import { Avatar } from "./data";
+import { cn, Avatar } from "@mycity/ui";
 
 export interface BoardCard {
   key: string;

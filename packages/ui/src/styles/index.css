@@ -1,0 +1,10 @@
+/*
+ * The whole design system in one import, for the gallery and tests. An app's
+ * own stylesheet imports the same three files after tailwindcss and adds an
+ * @source for the package (app/src/styles/index.css).
+ */
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./theme.css";
+@import "./base.css";
+@source "..";

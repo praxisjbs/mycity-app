@@ -1,9 +1,4 @@
-import { Button } from "@/components/ui/Button";
-import { Pill } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { Card, PageHead } from "@/components/ui/layout";
-import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/format";
+import { Button, cn, formatDate, Icon, Pill, Card, PageHeader } from "@mycity/ui";
 import { currentMilestone, milestone, useView } from "@/lib/plan";
 import { COMING } from "./coming-soon";
 
@@ -53,7 +48,7 @@ export function ComingSoon({ moduleKey, tab, label, m, production }: { moduleKey
   const lines = COMING[`${moduleKey}/${tab}`] ?? [];
   return (
     <>
-      <PageHead title={label} sub={`Arrives with ${name}`} />
+      <PageHeader title={label} sub={`Arrives with ${name}`} />
       <Card className="flex flex-col items-center py-8 text-center">
         <span className="mb-[11px] flex size-[46px] items-center justify-center rounded-[14px] bg-accent text-accent-foreground">
           <Icon name="clock" size="m" />

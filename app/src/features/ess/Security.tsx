@@ -1,22 +1,15 @@
 import { invalidate, useApi, useMutation } from "@/api/hooks";
-import { Button } from "@/components/ui/Button";
-import { Pill } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
-import { formatDate, formatDateTime } from "@/lib/format";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, FormFooter, rules, TextField, ToggleRow, useContractForm } from "@/components/form";
+import { Button, Pill, Icon, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, formatDate, formatDateTime, Field, FormFooter, rules, ToggleRow, useContractForm, PasswordField } from "@mycity/ui";
 
 export function MySecurityPage() {
   const { data: s, error, reload } = useApi("GET /api/v1/ess/security");
   const patch = useMutation("PATCH /api/v1/ess/security");
   const modal = useModal();
   const { navigate } = useRouter();
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!s) return <LoadingRows count={6} />;
   const set = async (body: { mfa_app?: boolean; mfa_email_fallback?: boolean }) => {
     await patch.run({ body });
@@ -78,7 +71,7 @@ export function MySecurityPage() {
   );
   return (
     <>
-      <PageHead title="My Security" sub="Sign-in methods and clock-in devices" />
+      <PageHeader title="My Security" sub="Sign-in methods and clock-in devices" />
       <PhoneCards
         items={[
           { icon: "shield", title: "Password", sub: `Changed ${formatDate(s.password_changed_at)}`, body: pw },
@@ -117,9 +110,9 @@ function PasswordForm({ close }: { close: () => void }) {
   const cur = f.field("cur");
   return (
     <>
-      <Field label="Current Password" {...cur} state={save.fields.current_password ? "bad" : cur.state} message={save.fields.current_password?.[0] ?? cur.message}><TextField type="password" autoComplete="current-password" {...cur} /></Field>
-      <Field label="New Password" info="Changing it signs you out everywhere else." {...f.field("next")}><TextField type="password" autoComplete="new-password" {...f.field("next")} /></Field>
-      <Field label="Confirm New Password" {...f.field("again")}><TextField type="password" autoComplete="new-password" {...f.field("again")} /></Field>
+      <Field label="Current Password" {...cur} state={save.fields.current_password ? "bad" : cur.state} message={save.fields.current_password?.[0] ?? cur.message}><PasswordField autoComplete="current-password" {...cur} /></Field>
+      <Field label="New Password" info="Changing it signs you out everywhere else." {...f.field("next")}><PasswordField autoComplete="new-password" {...f.field("next")} /></Field>
+      <Field label="Confirm New Password" {...f.field("again")}><PasswordField autoComplete="new-password" {...f.field("again")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Update Password</Button>
@@ -142,7 +135,7 @@ function PinForm({ close }: { close: () => void }) {
   return (
     <>
       <Field label="PIN" {...pin}>
-        <TextField type="password" inputMode="numeric" maxLength={6} {...pin} onChange={(v) => pin.onChange(v.replace(/\D/g, ""))} className="h-[50px] text-center text-[20px] font-bold tracking-[.4em]" />
+        <PasswordField inputMode="numeric" maxLength={6} {...pin} onChange={(v) => pin.onChange(v.replace(/\D/g, ""))} className="h-[50px] text-center text-[20px] font-bold tracking-[.4em]" />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

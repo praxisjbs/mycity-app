@@ -5,20 +5,13 @@ import "@/api/types/performance";
 import type { Goal, GoalLevel, KpiAssignment, ReviewRow, Target } from "@/api/types/performance";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
-import { Mini, Quote, Who } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
 import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDate, formatDateTime, formatMonth } from "@/lib/format";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { DateField, Field, FilterSelect, FormFooter, PersonPicker, SelectField, TextField, useContractForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
+import { Button, Meter, Quote, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, toast, cn, formatDate, formatDateTime, formatMonth, StatusPill, DateField, Field, FilterSelect, FormFooter, SelectField, TextField, useContractForm, IconButton } from "@mycity/ui";
 
 export default function Performance({ tab }: ModuleScreenProps) {
   if (tab === "targets") return <Targets />;
@@ -39,7 +32,7 @@ function Goals() {
   const annual = usePaged("GET /api/v1/performance/goals", { filters: { level: "annual" } });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Goals"
         sub="Organisational and annual, set by management"
         actions={
@@ -153,7 +146,7 @@ function Targets() {
   const current = s.data?.month;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Targets"
         sub={`Monthly and departmental · ${formatMonth(m)}`}
         actions={
@@ -251,7 +244,7 @@ function Kpis() {
   const assign = (p?: PersonRef) => modal.open({ title: "Assign KPIs", body: (close) => <AssignKpis close={close} initial={p} /> });
   return (
     <>
-      <PageHead title="KPIs" sub="Individual monthly KPIs · set by department managers" actions={<Button variant="primary" icon="plus" onClick={() => assign()}>Assign KPIs</Button>} />
+      <PageHeader title="KPIs" sub="Individual monthly KPIs · set by department managers" actions={<Button variant="primary" icon="plus" onClick={() => assign()}>Assign KPIs</Button>} />
       {s.data && <KpiTiles items={[{ label: "Staff With KPIs", value: `${s.data.with_kpis} / ${s.data.staff}` }, { label: "Weights", value: s.data.weights_valid ? "100%" : "Check", tone: s.data.weights_valid ? "ok" : "err" }, { label: "On Track", value: String(s.data.on_track), tone: "ok" }, { label: "Behind or At Risk", value: String(s.data.behind), tone: "warn" }]} />}
       <Toolbar>
         <FilterSelect label="Department" value={dept} onChange={setDept} options={depts} />
@@ -296,7 +289,7 @@ function WeightsCard({ p, onEdit }: { p: PersonRef; onEdit: () => void }) {
       {k.data?.items.map((r) => (
         <div key={r.kpi_id} className="flex items-center gap-2.5 py-[7px]">
           <span className="flex-1 text-[12.5px]">{r.title}</span>
-          <span className="w-[150px] flex-none"><Mini pct={Math.min(100, r.weight_pct * 2.5)} label={`${r.weight_pct}%`} /></span>
+          <span className="w-[150px] flex-none"><Meter pct={Math.min(100, r.weight_pct * 2.5)} label={`${r.weight_pct}%`} /></span>
         </div>
       ))}
       <div className="mt-1 flex gap-2.5 border-t-2 border-border pt-[9px]">
@@ -370,7 +363,7 @@ function Reviews() {
   const list = usePaged("GET /api/v1/performance/reviews");
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Reviews"
         sub={s.data ? `${s.data.cycle} cycle opens ${formatDate(s.data.opens_on)}` : " "}
         actions={
@@ -405,7 +398,7 @@ function Reviews() {
         <Card>
           <CardHeader title="Dictate Your Answer" right={<StatusPill s={{ tone: "info", text: "AI assisted" }} />} />
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3">
-            <Button variant="primary" className="size-10 max-md:size-11 justify-center rounded-full p-0" aria-label="Record an answer" onClick={() => toast("Dictation opens when the review cycle starts")}><Icon name="spark" /></Button>
+            <IconButton icon="spark" label="Record an answer" className="rounded-full bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" onClick={() => toast("Dictation opens when the review cycle starts")} />
             <span className="text-[11.5px] text-subtle-foreground">Tap to record your answer to “What went well this quarter?”</span>
           </div>
           <Quote className="mt-3">“We closed the Providus sponsorship and got the Lagos venues confirmed, but I was slow on the Eko follow-up.”</Quote>
@@ -458,11 +451,11 @@ function CycleForm({ close }: { close: () => void }) {
 
 function Analytics() {
   const a = useApi("GET /api/v1/performance/analytics");
-  if (!a.data) return (<><PageHead title="Analytics" sub="Performance across the organisation" /><Card><LoadingRows count={6} /></Card></>);
+  if (!a.data) return (<><PageHeader title="Analytics" sub="Performance across the organisation" /><Card><LoadingRows count={6} /></Card></>);
   const d = a.data;
   return (
     <>
-      <PageHead title="Analytics" sub="Performance across the organisation" />
+      <PageHeader title="Analytics" sub="Performance across the organisation" />
       <KpiTiles items={[{ label: "Goals On Track", value: d.goals_on_track, tone: "ok" }, { label: "Reviews Completed", value: d.reviews_completed }, { label: "Avg Self Rating", value: d.average_self }, { label: "Avg Manager Rating", value: d.average_manager }]} />
       <Grid cols={2}>
         <AreaChart title="Goal Completion by Month" values={d.completion.values} labels={d.completion.labels} />

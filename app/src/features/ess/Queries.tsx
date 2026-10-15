@@ -1,17 +1,8 @@
 import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { MyQuery } from "@/api/types/ess";
-import { Button } from "@/components/ui/Button";
-import { EmptyState, KV, Pill } from "@/components/ui/data";
-import { Icon, type IconName } from "@/components/ui/Icon";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
 import { Pager, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDate, formatDateTime } from "@/lib/format";
-import { Field, FormFooter, rules, TextAreaField, useContractForm } from "@/components/form";
+import { Button, EmptyState, KeyValue, Pill, Icon, type IconName, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, cn, formatDate, formatDateTime, Field, FormFooter, rules, TextAreaField, useContractForm } from "@mycity/ui";
 
 type View = "open" | "archived" | "sanctions";
 
@@ -35,7 +26,7 @@ export function MyQueriesPage() {
   );
   return (
     <>
-      <PageHead title="My Queries" sub="Queries raised against you, and their outcome" />
+      <PageHeader title="My Queries" sub="Queries raised against you, and their outcome" />
       {s.data && (
         <Grid cols={3}>
           {card("open", "alert", "Open Queries", s.data.open, s.data.open ? "Waiting on your response" : "Nothing waiting on you", s.data.open ? "warn" : "ok")}
@@ -59,7 +50,7 @@ function OpenQueries() {
       {list.rows.map((q) => (
         <Card key={q.query_id} className="mb-3">
           <CardHeader record title={`${q.number} · ${q.subject}`} right={<Pill tone={q.outcome.tone}>{q.outcome.text}</Pill>} />
-          <KV items={[["Raised by", q.raised_by], ["Raised on", formatDate(q.date)], ["Respond by", q.respond_by ? formatDateTime(q.respond_by) : "None"], ["Your response", q.response ?? "Not yet"]]} />
+          <KeyValue items={[["Raised by", q.raised_by], ["Raised on", formatDate(q.date)], ["Respond by", q.respond_by ? formatDateTime(q.respond_by) : "None"], ["Your response", q.response ?? "Not yet"]]} />
           {!q.response && (
             <div className="mt-3 flex justify-end">
               <Button variant="primary" icon="send" onClick={() => modal.open({ title: `Respond to ${q.number}`, body: (close) => <Respond q={q} close={close} /> })}>Respond</Button>

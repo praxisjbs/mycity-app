@@ -4,22 +4,16 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
 import type { Grade, PayrollDeduction, PayslipRow, RunRow } from "@/api/types/payroll";
 import type { PersonRef } from "@/api/types/common";
-import { Button } from "@/components/ui/Button";
 import { AreaChart, Bands } from "@/components/ui/charts";
-import { Banner, Chain, StatStrip, Who } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
+import { Chain, StatStrip } from "@/components/ui/data";
 import { LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 
-import { formatMoneyShort, formatMonth, todayIso } from "@/lib/format";
 import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { ChainCard, ExportButton, KvCard, PagedTable, StatusPill } from "@/features/shared/sections";
+import { ChainCard, ExportButton, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { DateField, Field, FormFooter, MoneyField, PersonPicker, rules, TextAreaField, TextField, useContractForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
+import { Button, Banner, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, formatMoneyShort, formatMonth, todayIso, StatusPill, DateField, Field, FormFooter, MoneyField, rules, TextAreaField, TextField, useContractForm } from "@mycity/ui";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
   if (tab === "payslips") return <Payslips />;
@@ -51,7 +45,7 @@ function Runs() {
   };
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Payroll Runs"
         sub={c ? formatMonth(c.period) : " "}
         actions={
@@ -105,7 +99,7 @@ function Payslips() {
   const locked = c && c.stage !== "awaiting_approval" && c.stage !== "review";
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Payslips"
         sub={c ? `${formatMonth(c.period)} ${locked ? "run" : "preview"}` : " "}
         actions={
@@ -151,7 +145,7 @@ function Structure() {
   const pct = (m: string) => (Number(m) / scale) * 100;
   return (
     <>
-      <PageHead title="Salary Structure" sub="Grades and bands" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Grade", body: (close) => <GradeForm close={close} /> })}>Add Grade</Button>} />
+      <PageHeader title="Salary Structure" sub="Grades and bands" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Grade", body: (close) => <GradeForm close={close} /> })}>Add Grade</Button>} />
       {s.data && <KpiTiles items={[{ label: "Grades", value: String(s.data.grades) }, { label: "Staff Placed", value: String(s.data.placed) }, { label: "Below Band Minimum", value: String(s.data.below_minimum), tone: s.data.below_minimum ? "warn" : "ok" }, { label: "Above Maximum", value: String(s.data.above_maximum), tone: s.data.above_maximum ? "warn" : "ok" }]} />}
       {list.rows.length > 0 && (
         <Bands
@@ -237,7 +231,7 @@ function Deductions() {
   };
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Deductions"
         sub={`Pending and applied · attendance tiers ${s.data?.tiers_on ? "on" : "off"}`}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Deduction", body: (close) => <DeductionForm close={close} /> })}>Add Deduction</Button>}
@@ -345,7 +339,7 @@ function StatutoryTab() {
   const d = s.data;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Statutory"
         sub={`Advanced payroll · ${d?.enabled ? "on" : "off by default"}`}
         actions={!d?.enabled && <Button variant="primary" onClick={() => modal.open({ title: "Switch On Advanced Payroll", body: (close) => <Enable close={close} /> })}>Switch On</Button>}

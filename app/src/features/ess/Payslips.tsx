@@ -2,17 +2,11 @@ import { useState } from "react";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PayslipRow } from "@/api/types/payroll";
 import "@/api/types/payroll";
-import { Button } from "@/components/ui/Button";
-import { EmptyState, Pill, TapList } from "@/components/ui/data";
-import { Card, DesktopOnly, Grid, MobileOnly, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
+import { Button, formatDate, formatMoney, formatMonth, EmptyState, Pill, Card, DesktopOnly, Grid, PhoneOnly, PageHeader, useModal, Money, ErrorState, toast, InlineSelect } from "@mycity/ui";
+import { TapList } from "@/components/ui/data";
 import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
-import { ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { formatDate, formatMoney, formatMonth } from "@/lib/format";
+import { LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { InlineSelect } from "@/components/form";
 
 const statusPill = (r: PayslipRow) => (r.status === "in_run" ? <Pill tone="warn">In the run</Pill> : r.has_query_deduction ? <Pill tone="warn">Paid, deduction</Pill> : <Pill tone="ok">Paid</Pill>);
 
@@ -26,7 +20,7 @@ export function MyPayslipsPage() {
   const modal = useModal();
   const email = useMutation("POST /api/v1/payslips/:id/email");
   const s = summary.data;
-  if (summary.error) return <ErrorBlock error={summary.error} onRetry={summary.reload} />;
+  if (summary.error) return <ErrorState error={summary.error} onRetry={summary.reload} />;
   const years = s?.years ?? [];
   const idx = years.indexOf(Number(y));
   const yearPicker = s && (
@@ -42,7 +36,7 @@ export function MyPayslipsPage() {
       : modal.open({ title: `Payslip, ${formatMonth(r.period)}`, wide: true, body: <SlipPaper id={r.payslip_id} /> });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="My Payslips"
         sub={s ? (s.next_payday ? `${s.year}, year to date` : String(s.year)) : " "}
         actions={
@@ -74,10 +68,10 @@ export function MyPayslipsPage() {
           )}
         </div>
       )}
-      <MobileOnly>
+      <PhoneOnly>
         <TapList items={list.rows.map((r) => ({ key: r.payslip_id, title: formatMonth(r.period), sub: `Net ${formatMoney(r.net)}`, right: statusPill(r), onClick: () => openSlip(r) }))} />
         <Pager page={list.page} onPage={list.setPage} noun="payslip" className="px-0" />
-      </MobileOnly>
+      </PhoneOnly>
       <DesktopOnly>
         <Grid cols="1/1.5">
           <Table

@@ -3,16 +3,9 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi } from "@/api/hooks";
 import type { AttendanceToday, ClockResponse } from "@/api/types/attendance";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
-import { Avatar, Banner, KV, Result } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { Card } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDate, formatTime } from "@/lib/format";
+import { Result } from "@/components/ui/data";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, FormFooter, rules, TextAreaField, useContractForm } from "@/components/form";
+import { Button, Avatar, Banner, KeyValue, Icon, Card, useModal, toast, cn, formatDate, formatTime, Field, FormFooter, rules, TextAreaField, useContractForm } from "@mycity/ui";
 
 /**
  * The top bar's Clock In / Clock Out button. The button only asks; the API
@@ -185,7 +178,7 @@ function ClockPanel({ close }: { close: () => void }) {
         <Result tone="ok" label="Location check" title="Location Found" text={`Accurate to about ${fix.acc} m. The server checks it against ${t.location_label}.`} />
       )}
       <Card className="mt-3">
-        <KV
+        <KeyValue
           items={[
             ["Work arrangement", t.work_pattern],
             ["Shift", `${t.shift_start} to ${t.shift_end}${t.grace_minutes ? ` · ${t.grace_minutes} min grace` : ""}`],

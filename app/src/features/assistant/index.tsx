@@ -3,21 +3,13 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/knowledge";
 import type { AiAnswer, AiTurn } from "@/api/types/knowledge";
-import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { Icon } from "@/components/ui/Icon";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
 import { LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDateTime, formatMoneyShort } from "@/lib/format";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ExportButton, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Form, FormFooter, InlineInput } from "@/components/form";
+import { Button, Card, CardHeader, Grid, PageHeader, Icon, useModal, Money, toast, cn, formatDateTime, formatMoneyShort, Form, FormFooter, InlineInput } from "@mycity/ui";
 
 export default function Assistant({ tab }: ModuleScreenProps) {
   return tab === "history" ? <History /> : <Ask />;
@@ -86,7 +78,7 @@ function Ask() {
   };
   return (
     <>
-      <PageHead title="Praxis AI" sub="Answers from your data, within your permissions" />
+      <PageHeader title="Praxis AI" sub="Answers from your data, within your permissions" />
       <Card className="max-w-[840px]">
         <div className="flex flex-col gap-3.5">
           
@@ -128,7 +120,7 @@ function History() {
   const list = usePaged("GET /api/v1/ai/history");
   return (
     <>
-      <PageHead
+      <PageHeader
         title="History"
         sub="Your questions, and what they read"
         actions={

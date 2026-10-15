@@ -2,14 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailAttachment, MailDraftSave } from "@/api/types/mailbox";
-import { Button } from "@/components/ui/Button";
-import { Pill } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { Menu } from "@/components/ui/Menu";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatBytes, formatDate, todayIso } from "@/lib/format";
-import { DateField, Field, InlineInput, InlineLabel, InlineSelect, TextField, UploadField } from "@/components/form";
+import { UploadField } from "@/components/form";
+import { Button, Pill, Icon, Menu, toast, cn, formatBytes, formatDate, todayIso, DateField, Field, InlineInput, InlineLabel, InlineSelect, TextField } from "@mycity/ui";
 
 export interface ComposeInit {
   draft_id?: string;

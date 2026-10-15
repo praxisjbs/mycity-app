@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useRef, forwardRef, type PointerEvent } from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@mycity/ui";
 
 export interface SignaturePadHandle {
   clear: () => void;

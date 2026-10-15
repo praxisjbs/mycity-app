@@ -15,7 +15,7 @@ below are how you learn it. **Follow the steps in order on every task.**
 | Type | It touches |
 |---|---|
 | **Backend** | `src/`, `migrations/`, `seeds/`, `scripts/`, `packages/contract/`, `templates/` |
-| **Frontend** | `app/`, `public-app/` |
+| **Frontend** | `app/`, `public-app/`, `packages/ui/` |
 | **Full stack** | Both. Most screen work is full stack |
 | **Docs only** | `docs/`, `README.MD`, this file |
 | **Ops** | `ops/`, `.github/workflows/`, `scripts/deploy/` |
@@ -28,7 +28,9 @@ State the type in your first message ("This is a full-stack change to My Attenda
 
 1. `docs/PROGRESS.md`: find the screen(s) or foundation item. Note the row number and status.
 2. `docs/guides/<module>.md` if it exists: the screens this feature touches and how they relate.
-   If your task changes behaviour the guide describes, **update the guide first** and say so.
+   Guides are **full-stack** (backend, schemas, API, events, permissions and screens): read all of
+   it, whatever the task type. If your task changes behaviour the guide describes, **update the
+   guide first** and say so.
 3. The milestone's section of `docs/MyCity-ERP-Documents/MILESTONES.md`.
 
 **Then by type:**
@@ -36,7 +38,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 | Type | Read |
 |---|---|
 | Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules |
-| Frontend | `docs/FRONTEND_GUIDE.md` in full. The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
+| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F24, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
@@ -50,9 +52,12 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 
 1. `MILESTONES.md` is binding for scope and decisions A1 to A25.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
-3. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
-4. `README.MD` is the map of every file.
-5. `demo.html` is a visual reference only. Never take data, field names or rules from it.
+3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
+   frontend gates), decisions F1 to F24 in `docs/FRONTEND_FOUNDATION.md` §3 win over
+   `MILESTONES.md`, `FRONTEND_GUIDE.md` and `demo.html` (decided with TB, 15/10/2026).
+4. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
+5. `README.MD` is the map of every file.
+6. `demo.html` is a visual reference only. Never take data, field names or rules from it.
 
 If two documents disagree in a way that matters to your task, stop and say so. Do not pick one
 silently.
@@ -85,9 +90,16 @@ silently.
   40. Title Case chrome, Verb Noun buttons, Lucide icons, no em dashes in copy a person reads.
 - **Two shells** (gate 11): mobile is a native-feeling app (bottom bar, cards not tables, sheets,
   44 px targets, less text), desktop is desktop software. Never one layout scaled.
-- **One form system** (gate 12): fields only from `components/form/` (`useContractForm`), labels
-  above, Optional tags, errors of at most 4 words on the field as it is filled, buttons only in a
-  footer. Nobody builds their own field.
+- **Components only from `@mycity/ui`** (`packages/ui`, listed in `docs/COMPONENTS.md`). A missing
+  one is added in `packages/ui` with `npm run new:component` (header, test and gallery page), never
+  inside a feature; nothing new goes in `app/src/components/` or `public-app/src/components/`.
+- **Styling is tokens only** (F4): token classes and the named layout and spacing scales. No hex,
+  no arbitrary value, no inline `style`. Colours exist only in `packages/ui/src/styles/tokens.css`.
+- **The mock never ships** (F12 to F14): the in-browser mock is for laptops and CI only, never in a
+  release build. Staging shows its seed, production only live data.
+- **One form system** (gate 12): fields only from `packages/ui/src/form/` (`useContractForm` with the
+  module's schema, or INTERIM rules until it exists), labels above, Optional tags, errors of at
+  most 4 words on the field as it is filled, buttons only in a footer. Nobody builds their own field.
 - **Migrations**: in your milestone's number block, `-- UP` and `-- DOWN`, idempotent, never edit
   a merged one.
 
@@ -98,8 +110,9 @@ A Stop hook (`.claude/hooks/stop-check.js`) runs `check/progress.js`, `check/gui
 fix them rather than arguing with them. If one genuinely does not apply (a refactor that moves no
 screen, a test-only change), say so to the user and give the PR line to use:
 `Progress-unchanged: <reason>` or `Guide-unchanged: <reason>`. CI runs the same checks on every PR.
-When your change touches `app/`, `public-app/` or `demo.html`, the hook also runs the screen gates
-(`five-second`, `two-shells`, `forms`, `dashes`); they have no exemption line. Fix the screen.
+When your change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`, the hook also runs
+the screen gates (`components`, `palette`, `forms`, `dashes`, `five-second`, `two-shells`); they have
+no exemption line. Fix the screen.
 
 A task is not finished until:
 

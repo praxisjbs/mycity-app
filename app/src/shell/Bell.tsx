@@ -1,15 +1,9 @@
 import { useState } from "react";
 import { useMutation, usePaged, invalidate } from "@/api/hooks";
 import type { Notification } from "@/api/types/identity";
-import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/data";
-import { Icon, type IconName } from "@/components/ui/Icon";
-import { useModal } from "@/components/ui/Modal";
 import { Pager } from "@/components/ui/Table";
-import { cn } from "@/lib/cn";
-import { formatDateTime } from "@/lib/format";
 import { useRouter } from "@/lib/router";
-import { ChoiceField } from "@/components/form";
+import { Button, EmptyState, Icon, type IconName, useModal, cn, formatDateTime, ChoiceField } from "@mycity/ui";
 
 /**
  * The bell: things that happened to you. Read once and gone. Unresolved

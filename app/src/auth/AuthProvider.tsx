@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError, refreshSession, session } from "@/api/client";
 import type { Me } from "@/api/types/identity";
-import { toast } from "@/components/ui/Toast";
+import { toast } from "@mycity/ui";
 
 /**
  * Who is signed in. The access token lives in memory only (api/client.ts);
