@@ -34,7 +34,7 @@ function Goals() {
     <>
       <PageHeader
         title="Goals"
-        sub="Organisational and annual · set by the CEO and management"
+        sub="Organisational and annual goals"
         actions={
           <>
             <ExportButton source="performance.goals" />

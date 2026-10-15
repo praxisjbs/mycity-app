@@ -4,7 +4,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/partnerships";
 import type { Contract, Lead, PartnerRow, Proposal, ProposalDoc, Renewal } from "@/api/types/partnerships";
 import type { PersonRef } from "@/api/types/common";
-import { Button, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, Icon, todayIso, KeyValue, Meter, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
+import { Button, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, todayIso, KeyValue, Meter, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
 import { Chain, StatStrip } from "@/components/ui/data";
 import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
@@ -130,27 +130,9 @@ function Partners() {
           { key: "l", label: "Last Contact", render: (p) => (p.last_contact_days === 0 ? "Today" : `${p.last_contact_days} days ago`) },
         ]}
       />
-      <Grid cols={2} className="mt-3">
+      <div className="mt-3">
         {s.data ? <BarsCard title="Value by Partnership Type" rows={s.data.by_type} note="Partnership types are configurable in Settings." /> : <Card><LoadingRows /></Card>}
-        <Card>
-          <CardHeader title="What a 360 Brings Together" />
-          <p className="mb-[11px] text-[11.5px] text-subtle-foreground">One partner, everything about them, on one page. Pick any row above.</p>
-          {[
-            ["The organisation", "Legal name, industry, type, headquarters"],
-            ["Contacts", "Who we deal with, and who introduced them"],
-            ["Stage history", "Where they are, and how they got there"],
-            ["Interaction log", "Every call, meeting and email, dated"],
-            ["Documents", "Proposals, MOUs, contracts, with their signature state"],
-            ["Deliverables", "What we owe them, who owns it, when it is due"],
-            ["Attribution", "Downloads and value traced to their listing"],
-          ].map(([t, x]) => (
-            <div key={t} className="flex items-start gap-2.5 border-b border-border py-[7px] last:border-b-0">
-              <Icon name="ok" className="mt-0.5 text-accent-foreground" />
-              <span className="min-w-0 flex-1"><div className="text-[12.5px] font-semibold">{t}</div><div className="text-[11.5px] text-subtle-foreground">{x}</div></span>
-            </div>
-          ))}
-        </Card>
-      </Grid>
+      </div>
     </>
   );
 }

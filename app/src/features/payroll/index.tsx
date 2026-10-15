@@ -4,7 +4,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
 import type { Grade, PayrollDeduction, PayslipRow, RunRow } from "@/api/types/payroll";
 import type { PersonRef } from "@/api/types/common";
-import { Button, formatMoneyShort, formatMonth, Icon, todayIso, Banner, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, TextAreaField, useForm } from "@mycity/ui";
+import { Button, formatMoneyShort, formatMonth, Icon, todayIso, Banner, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart, Bands } from "@/components/ui/charts";
 import { Chain, StatStrip } from "@/components/ui/data";
 import { LoadingRows, Table } from "@/components/ui/Table";
@@ -79,34 +79,13 @@ function Runs() {
           { key: "st", label: "Status", render: (r) => <StatusPill s={r.status} /> },
         ]}
       />
-      <Grid cols={2} className="mt-3">
+      <div className="mt-3">
         {s.data ? <AreaChart title="Net Payroll by Month" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} note={s.data.trend_note} /> : <Card><LoadingRows /></Card>}
-        <Card>
-          <CardHeader title="What Locking Does" />
-          <KvCardBody />
-          <Quote className="mt-3">Switching statutory items on recomputes future runs only. A locked run stays exactly as it was paid.</Quote>
-        </Card>
-      </Grid>
+      </div>
     </>
   );
 }
 
-function KvCardBody() {
-  const rows: Array<[string, string]> = [
-    ["Before approval", "Figures recompute whenever attendance or a deduction changes"],
-    ["On approval", "The run is frozen. Payslips become visible to staff"],
-    ["After locking", "Nothing recomputes it. Not a policy change, not a corrected punch"],
-    ["A correction", "Goes in the next run as an adjustment line, with its reason"],
-    ["Why", "A payslip someone has already been paid against must never change"],
-  ];
-  return (
-    <dl className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-[13px] md:grid-cols-[122px_minmax(0,1fr)] md:gap-y-[9px]">
-      {rows.map(([k, v]) => (
-        <div key={k} className="contents"><dt className="text-[12px] text-subtle-foreground">{k}</dt><dd className="font-[550] max-md:mb-2">{v}</dd></div>
-      ))}
-    </dl>
-  );
-}
 
 /* ───────────── Payslips ───────────── */
 

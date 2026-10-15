@@ -116,7 +116,7 @@ function Alerts({ openId }: { openId: string | null }) {
     <>
       <PageHeader
         title="Alerts"
-        sub="Rules that have crossed a threshold and nobody has cleared yet"
+        sub="Thresholds crossed and not yet cleared"
         actions={
           manage && (
             <>

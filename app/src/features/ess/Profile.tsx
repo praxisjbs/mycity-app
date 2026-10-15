@@ -2,7 +2,7 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { MyProfile, ProfilePatch } from "@/api/types/ess";
 import "@/api/types/ess";
-import { Button, formatDate, Icon, initials, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, Field, FormRow, TextField, rules, useForm } from "@mycity/ui";
+import { Button, formatDate, Icon, initials, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, Field, FormRow, TextField, rules, useForm , HelpTerm} from "@mycity/ui";
 import { Timeline } from "@/components/ui/data";
 import { LoadingRows } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
@@ -38,25 +38,24 @@ export function MyProfilePage() {
       {schedule}
     </Card>
   );
-  const bank = <Card><CardHeader title="Bank, Used for Expense Disbursement" /><KeyValue items={[["Bank", p.bank.bank_name], ["Account name", p.bank.account_name], ["Account number", `•••• ${p.bank.account_last4}`]]} /></Card>;
+  const bank = <Card><CardHeader title={<HelpTerm help="Used for expense disbursement.">Bank Details</HelpTerm>} /><KeyValue items={[["Bank", p.bank.bank_name], ["Account name", p.bank.account_name], ["Account number", `•••• ${p.bank.account_last4}`]]} /></Card>;
   const nok = <Card><CardHeader title="Next of Kin" /><KeyValue items={[["Name", p.next_of_kin.name], ["Relationship", p.next_of_kin.relationship], ["Phone", p.next_of_kin.phone]]} /></Card>;
   const can = (
     <Card>
-      <CardHeader title="What You Can Change" />
+      <CardHeader title="Editable Fields" />
       {p.can_change.map((c) => (
         <div key={c.field} className="flex items-center gap-2.5 border-b border-border py-2">
           <span className="flex-1 text-[12.5px] font-[550]">{c.field}</span>
           <Pill tone={c.how.tone}>{c.how.text}</Pill>
         </div>
       ))}
-      <p className="mt-[11px] text-[11.5px] text-subtle-foreground">Every change to this record is written to the audit log with who made it.</p>
     </Card>
   );
   const history = <Card><CardHeader title="My Record History" /><Timeline items={p.history} /></Card>;
 
   return (
     <>
-      <PageHeader title="My Profile" sub="What People see, and what you can change yourself" actions={<Button variant="primary" icon="plus" onClick={edit}>Edit</Button>} />
+      <PageHeader title="My Profile" sub="Your employee record" actions={<Button variant="primary" icon="plus" onClick={edit}>Edit</Button>} />
       <div className="mb-3 flex flex-wrap items-start gap-4 rounded-card border border-border bg-card p-4 shadow-1 max-md:p-[14px]">
         <button type="button" onClick={photo} title={p.photo_url ? "Change photo" : "Upload a photo"} className="relative flex size-[62px] flex-none items-center justify-center rounded-sheet bg-secondary text-[21px] font-bold tracking-[-.02em] text-secondary-foreground max-md:size-[52px] max-md:text-[18px]">
           {initials(p.display_name)}

@@ -538,7 +538,7 @@ function Announcements() {
     <>
       <PageHeader
         title="Announcements"
-        sub="Posted by People and the CEO · staff read them in #announcements"
+        sub="Posted by People and the CEO"
         actions={poster && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Announcement", body: (close) => <NewAnnouncement close={close} /> })}>New Announcement</Button>}
       />
       <StatStrip items={[{ label: "Published", value: stats.pub }, { label: "Scheduled", value: stats.sch }, { label: "Average Read", value: `${stats.avg}%`, tone: "ok" }, { label: "Audience", value: `${stats.audience} staff` }, { label: "This Month", value: stats.month, desktop: true }]} />

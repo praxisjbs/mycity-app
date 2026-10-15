@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Worksite } from "@/api/types/attendance";
-import { Button, KeyValue, Pill, Card, CardHeader, Grid, PageHeader, useModal, Chips, toast, Field, TextField, rules, SearchInput, useForm } from "@mycity/ui";
+import { Button, Pill, Card, CardHeader, PageHeader, useModal, Chips, toast, Field, TextField, rules, SearchInput, useForm, HelpTerm } from "@mycity/ui";
 import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 
@@ -48,8 +48,8 @@ export function Worksites() {
   return (
     <>
       <PageHeader
-        title="Worksites"
-        sub="Geofenced locations · MTN Head Office is the principal worksite"
+        title={<HelpTerm help="Location is read only at clock-in and clock-out. Lists show a home's area only, and opening a full address is logged.">Worksites</HelpTerm>}
+        sub="Geofenced clock-in locations"
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Worksite", body: (close) => <WorksiteForm close={close} /> })}>Add Worksite</Button>}
       />
       <KpiTiles items={[{ label: "Office worksites", value: String(count("Office")) }, { label: "Approved homes", value: String(count("Approved home")) }, { label: "Field sites today", value: String(count("Field assignment")) }, { label: "Outside any fence today", value: "1", tone: "warn" }]} />
@@ -78,16 +78,6 @@ export function Worksites() {
         ]}
         footer={<Pager page={list.page} onPage={list.setPage} noun="location" />}
       />
-      <Grid cols={2} className="mt-3">
-        <Card>
-          <CardHeader title="How the Geofence Behaves" />
-          <KeyValue items={[["Remote", "Warned outside the approved home, fixed 100 m"], ["Hybrid", "The office on office days, home on remote days"], ["Field", "An approved assignment overrides office and home"], ["Office-only", "Blocked outside the assigned office"], ["Tracking", "None. Location is read only at clock-in and clock-out"]]} />
-        </Card>
-        <Card>
-          <CardHeader title="Why Homes Are Masked" />
-          <KeyValue items={[["In this list", "Area only: Approved home · Lekki"], ["Full address", "In the HR detail view, and each view is logged"], ["Who can open it", "People and the CEO. Managers see the area only"], ["History", "A changed home is superseded, never overwritten"]]} />
-        </Card>
-      </Grid>
     </>
   );
 }

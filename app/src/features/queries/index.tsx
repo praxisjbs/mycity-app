@@ -39,7 +39,7 @@ function QueriesTab({ id }: { id: string | null }) {
     <>
       <PageHeader
         title="Queries"
-        sub="Managers see the queries they raised. People and the CEO see all."
+        sub="Queries in your scope"
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Raise a Query", body: (close) => <RaiseQuery close={close} /> })}>Raise a Query</Button>}
       />
       {s.data && <KpiTiles items={[{ label: "Open", value: String(s.data.open), tone: s.data.open ? "warn" : "ok" }, { label: "Awaiting Response", value: String(s.data.awaiting_response) }, { label: "Closed This Month", value: String(s.data.closed_this_month), tone: "ok" }, { label: "Escalated", value: String(s.data.escalated), tone: s.data.escalated ? "err" : undefined }]} />}
@@ -398,7 +398,7 @@ function Templates() {
     <>
       <PageHeader
         title="Letter Templates"
-        sub="Seeded with MyCity wording. The system fills name, date and reason."
+        sub="Wording used in issued letters"
         actions={
           <>
             <Button icon="doc" disabled={!preview.data} onClick={() => preview.data && modal.open({ title: shown!.name, wide: true, body: <Letter l={preview.data} /> })}>Preview</Button>

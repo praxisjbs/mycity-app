@@ -73,7 +73,7 @@ export function MySecurityPage() {
   );
   return (
     <>
-      <PageHeader title="My Security" sub="How you sign in, and the devices you clock in from" />
+      <PageHeader title="My Security" sub="Sign-in methods and devices" />
       <PhoneCards
         items={[
           { icon: "shield", title: "Password", sub: `Changed ${formatDate(s.password_changed_at)}`, body: pw },

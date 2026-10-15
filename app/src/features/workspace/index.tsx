@@ -89,7 +89,7 @@ function Today() {
           {!data.my_day.length && <p className="text-[11.5px] text-subtle-foreground">Nothing due today.</p>}
         </Card>
         <Card>
-          <CardHeader title="Set by Your Line Manager" />
+          <CardHeader title="From Your Manager" />
           {data.set_by_manager.map((t) => <TaskCard key={t.task_id} t={t} onClick={() => openTask(t)} />)}
           <Button className="mt-1 w-full" icon="plus" onClick={() => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> })}>Add My Own Task</Button>
         </Card>
@@ -106,7 +106,7 @@ function Today() {
           ))}
         </Card>
         <Card>
-          <CardHeader title="What Moved While You Were Away" />
+          <CardHeader title="Recent Activity" />
           <Timeline items={data.activity} />
         </Card>
       </Grid>

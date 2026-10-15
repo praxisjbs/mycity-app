@@ -5,7 +5,7 @@ import "@/api/types/expenses";
 import type { Category, Disbursement, ExpenseRow, Requisition } from "@/api/types/expenses";
 import type { DocumentRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, cn, formatBytes, formatDate, formatDateTime, formatMoneyShort, Icon, todayIso, KeyValue, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
+import { Button, cn, formatBytes, formatDate, formatDateTime, formatMoneyShort, Icon, todayIso, KeyValue, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
 import { Chain } from "@/components/ui/data";
 import { LoadingRows, Table } from "@/components/ui/Table";
@@ -253,18 +253,9 @@ function Requisitions() {
           { key: "st", label: "Status", render: (r) => <StatusPill s={r.status} /> },
         ]}
       />
-      <Grid cols={2} className="mt-3">
+      <div className="mt-3">
         {focus ? <RequisitionCard id={focus} /> : <Card><LoadingRows /></Card>}
-        <Card>
-          <CardHeader title="Why Group Them" />
-          <p className="text-[11.5px] text-subtle-foreground">The CEO was approving requests one at a time, which meant five notifications for one afternoon of spending and no view of the total.</p>
-          <p className="mt-[9px] text-[11.5px] text-subtle-foreground">A requisition is one decision on one number, with the requests visible underneath it.</p>
-          <Quote className="mt-3">An open requisition ages like any approval. The ageing rule raises an alert after three days.</Quote>
-          <div className="mt-3.5">
-            <KeyValue items={[["Who groups", "Operations"], ["Who approves", "The CEO. One decision"], ["Partial approval", "Possible. A removed request returns to the queue"], ["After approval", "Each request becomes disbursable on its own"]]} />
-          </div>
-        </Card>
-      </Grid>
+      </div>
     </>
   );
 }

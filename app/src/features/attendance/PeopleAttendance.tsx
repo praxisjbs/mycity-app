@@ -3,7 +3,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { FieldAssignment, LocationRequest, ReconCase, RegisterRow } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, Icon, Banner, EmptyState, KeyValue, Pill, Who, Card, CardHeader, Grid, PhoneOnly, DesktopOnly, Grow, useModal, Chips, ErrorState, toast, DateField, Field, FormRow, TextField, rules, SearchInput, ChoiceField, SelectField, TextAreaField, useForm } from "@mycity/ui";
+import { Button, cn, formatDate, Icon, Banner, EmptyState, KeyValue, Pill, Who, Card, CardHeader, Grid, PhoneOnly, DesktopOnly, Grow, useModal, Chips, ErrorState, toast, DateField, Field, FormRow, TextField, rules, SearchInput, ChoiceField, SelectField, TextAreaField, useForm , HelpTerm} from "@mycity/ui";
 import { AreaChart, Donut } from "@/components/ui/charts";
 import { StatStrip } from "@/components/ui/data";
 import { BackButton } from "@/components/ui/Profile";
@@ -386,9 +386,8 @@ function ManagerView() {
         empty={{ title: "Nobody reports to you", text: "Your direct reports appear here." }}
         footer={<Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" />}
       />
-      <Grid cols={2} className="mt-3">
-        <Card>
-          <CardHeader title="Needs Your Recommendation" right={<Pill tone={waiting ? "warn" : "ok"}>{String(waiting)}</Pill>} />
+      <Card className="mt-3">
+          <CardHeader title={<HelpTerm help="You recommend and People decide. You cannot change policy, edit a clock event or see staff outside your team.">Needs Your Recommendation</HelpTerm>} right={<Pill tone={waiting ? "warn" : "ok"}>{String(waiting)}</Pill>} />
           {reqs.rows.map((q) => (
             <Row key={q.request_id} icon="target" title={`${q.type} · ${q.employee.display_name}`} sub={`${q.area} · ${formatDate(q.from)} to ${formatDate(q.to)} · ${q.reason}`}>
               <Button onClick={() => modal.open({ title: `Recommend ${q.number}`, body: (close) => <Recommend r={q} close={close} /> })}>Recommend</Button>
@@ -400,12 +399,7 @@ function ManagerView() {
             </Row>
           ))}
           {!waiting && <p className="text-[11.5px] text-subtle-foreground">Nothing is waiting on you.</p>}
-        </Card>
-        <Card>
-          <CardHeader title="What a Manager Can and Cannot Do" />
-          <KeyValue items={[["Can", "Confirm field assignments, recommend temporary locations, review explanations, recommend corrections"], ["Cannot change policy", "Attendance policy belongs to People"], ["Cannot edit a clock event", "A recommendation goes to People, who decide"], ["Cannot see", "Employees outside the team"]]} />
-        </Card>
-      </Grid>
+      </Card>
     </>
   );
 }

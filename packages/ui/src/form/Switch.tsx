@@ -34,17 +34,17 @@ export interface SwitchProps {
 
 export function Switch({ checked, onChange, label, disabled, className }: SwitchProps) {
   return (
-    <span className={cn("inline-flex min-h-tap min-w-tap items-center justify-center", className)}>
-      <RadixSwitch.Root
-        checked={checked}
-        onCheckedChange={onChange}
-        aria-label={label}
-        disabled={disabled}
-        className="relative h-5.5 w-9.5 flex-none rounded-full bg-border transition-colors disabled:opacity-50 data-[state=checked]:bg-secondary"
-      >
+    <RadixSwitch.Root
+      checked={checked}
+      onCheckedChange={onChange}
+      aria-label={label}
+      disabled={disabled}
+      className={cn("group inline-flex min-h-tap min-w-tap flex-none items-center justify-center rounded-ctl disabled:opacity-50", className)}
+    >
+      <span className="flex h-5.5 w-9.5 items-center rounded-full bg-border transition-colors group-data-[state=checked]:bg-secondary">
         <RadixSwitch.Thumb className="block size-4 translate-x-0.75 rounded-full bg-background shadow-1 transition-transform data-[state=checked]:translate-x-4.75" />
-      </RadixSwitch.Root>
-    </span>
+      </span>
+    </RadixSwitch.Root>
   );
 }
 
@@ -98,7 +98,7 @@ export function CheckboxField({ value, onChange, onBlur, label, state, message: 
   const ids = useControlIds("check");
   const a = useFieldControl({ id: ids.id, state });
   return (
-    <span className="flex min-h-tap items-center gap-2.5">
+    <span className="flex min-h-tap items-center">
       <Checkbox.Root
         id={ids.id}
         checked={value}
@@ -107,14 +107,18 @@ export function CheckboxField({ value, onChange, onBlur, label, state, message: 
         disabled={disabled}
         aria-describedby={a["aria-describedby"]}
         aria-invalid={a["aria-invalid"]}
-        className={cn(
-          "flex size-4.5 flex-none items-center justify-center rounded-sm border bg-background disabled:opacity-50 data-[state=checked]:border-secondary data-[state=checked]:bg-secondary data-[state=checked]:text-secondary-foreground",
-          a.state === "bad" ? "border-destructive" : "border-input",
-        )}
+        className="group -ml-3 flex min-h-tap min-w-tap flex-none items-center justify-center rounded-ctl disabled:opacity-50"
       >
-        <Checkbox.Indicator>
-          <Icon name="ok" size="s" />
-        </Checkbox.Indicator>
+        <span
+          className={cn(
+            "flex size-4.5 items-center justify-center rounded-sm border bg-background group-data-[state=checked]:border-secondary group-data-[state=checked]:bg-secondary group-data-[state=checked]:text-secondary-foreground",
+            a.state === "bad" ? "border-destructive" : "border-input",
+          )}
+        >
+          <Checkbox.Indicator>
+            <Icon name="ok" size="s" />
+          </Checkbox.Indicator>
+        </span>
       </Checkbox.Root>
       <label htmlFor={ids.id} className="text-sm">
         {label}

@@ -35,7 +35,7 @@ export function SearchInput({ value, onChange, placeholder = "Search", label, cl
       <Icon name="srch" size="s" className="text-subtle-foreground" />
       <input
         type="search"
-        className="min-w-0 flex-1 border-0 bg-transparent outline-none"
+        className="h-tap min-w-0 flex-1 border-0 bg-transparent outline-none"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

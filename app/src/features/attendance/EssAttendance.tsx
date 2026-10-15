@@ -2,7 +2,7 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AttendanceEvent, LocationRequestBody, LocationRequest } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, Icon, formatDate, formatDateTime, formatMonth, formatTime, todayIso, Banner, EmptyState, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, DateField, Field, FormRow, TextField, rules, SelectField, TextAreaField, useForm } from "@mycity/ui";
+import { Button, Icon, formatDate, formatDateTime, formatMonth, formatTime, todayIso, Banner, EmptyState, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, DateField, Field, FormRow, TextField, rules, SelectField, TextAreaField, useForm , HelpTerm} from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
 import { Chain } from "@/components/ui/data";
 import { LoadingRows, Pager, Table } from "@/components/ui/Table";
@@ -128,14 +128,13 @@ export function WorkLocationRequestsPage() {
       <Grid cols={2}>
         {s ? (
           <Card>
-            <CardHeader title="Where You Clock In Today" />
+            <CardHeader title="Today's Clock-In" />
             <KeyValue items={[["Arrangement", <><Pill>{s.arrangement}</Pill> {s.profile.split(" · policy")[0]}</>], ["Permanent home", s.home_area ? `Approved home · ${s.home_area} · fixed 100 m geofence` : "None on file"], ["Temporary location", <Pill tone={s.temporary_location.tone}>{s.temporary_location.text}</Pill>], ["Field assignment today", s.field_assignment_today ?? "None"], ["Office", s.office]]} />
           </Card>
         ) : <Card><LoadingRows /></Card>}
         <Card>
-          <CardHeader title="How a Request Moves" />
+          <CardHeader title={<HelpTerm help="An approved location is used for its dates. When it ends, your permanent home applies again.">Request Stages</HelpTerm>} />
           <Chain steps={[{ label: "Draft" }, { label: "Awaiting manager" }, { label: "Awaiting HR" }, { label: "Approved", state: "done" }, { label: "Expired" }]} />
-          <p className="mt-[11px] text-[11.5px] text-subtle-foreground">An approved temporary location is used by Clock In for its dates. When it ends, your permanent home applies again. Both stay in your history.</p>
         </Card>
       </Grid>
       <Table
@@ -200,7 +199,7 @@ export function MyDevicesPage() {
   const active = list.rows.filter((d) => d.status === "Enrolled" || d.status === "Pending review").length;
   return (
     <>
-      <PageHeader title="My Devices" sub="The phones and laptops you clock in from, up to three" actions={<Button variant="primary" icon="plus" disabled={active >= 3} onClick={() => modal.open({ title: "Register This Device", body: (close) => <DeviceForm close={close} /> })}>Register This Device</Button>} />
+      <PageHeader title="My Devices" sub="Up to three devices" actions={<Button variant="primary" icon="plus" disabled={active >= 3} onClick={() => modal.open({ title: "Register This Device", body: (close) => <DeviceForm close={close} /> })}>Register This Device</Button>} />
       <AckBanner />
       {active >= 3 && <Banner tone="info" icon="info">You have three devices. Ask People to remove one before registering another.</Banner>}
       <Table
@@ -289,7 +288,7 @@ export function PolicyUpdatesPage() {
           <KeyValue items={[["Current version", `v${p.version}`], ["Published", formatDate(p.published_at)], ["Published by", p.published_by], ["Clock-in while pending", p.settings.find((s) => s.key === "ack_blocks")?.value ? "Blocked until acknowledged" : "Allowed, with a reminder"]]} />
         </Card>
         <Card>
-          <CardHeader title="Full Policy, at a Glance" />
+          <CardHeader title="Policy Summary" />
           <KeyValue items={p.settings.filter((s) => ["grace", "mode_remote", "mode_office", "dev_warn_new", "late_rule"].includes(s.key)).map((s) => [s.label, String(typeof s.value === "boolean" ? (s.value ? "On" : "Off") : s.kind === "mode" ? { record: "Record only", warn: "Warn", block: "Block" }[s.value as string] : s.value)])} />
         </Card>
       </Grid>

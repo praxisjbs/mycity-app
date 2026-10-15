@@ -4,7 +4,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/recruitment";
 import type { Assessment, Candidate, InterviewRow, OfferRow, OnboardingRow, PoolRow, Stage, Vacancy } from "@/api/types/recruitment";
 import type { PersonRef } from "@/api/types/common";
-import { Button, cn, formatDate, formatDateTime, todayIso, Banner, KeyValue, Meter, Pill, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FilterSelect, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
+import { Button, cn, formatDate, formatDateTime, todayIso, Banner, KeyValue, Meter, Pill, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FilterSelect, FormRow, TextField, SelectField, TextAreaField, useForm , HelpTerm} from "@mycity/ui";
 import { Board } from "@/components/ui/Board";
 import { Timeline } from "@/components/ui/data";
 import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
@@ -465,14 +465,9 @@ function Interviews({ id }: { id: string | null }) {
           ]}
         />
       </div>
-      <Grid cols={2} className="mt-3">
-        <Card>
-          <CardHeader title="Why the Panel Is Blind" />
-          <p className="text-[11.5px] text-subtle-foreground">The first panellist to submit sets the tone for everyone after them. Anchoring is well documented and it is invisible in the result.</p>
-          <p className="mt-[9px] text-[11.5px] text-subtle-foreground">So a score is hidden until the round closes. Private notes are never shown to anyone, at any point, including after.</p>
-        </Card>
+      <div className="mt-3">
         {x ? <TrailCard title="Round Activity" items={x.activity.map((a) => ({ ...a, when: formatDateTime(a.when) }))} /> : <Card><LoadingRows /></Card>}
-      </Grid>
+      </div>
     </>
   );
 }
@@ -633,9 +628,8 @@ function Onboarding() {
             }
           />
           <Card>
-            <CardHeader title="Onboarding Plan, Once Documents Clear" />
+            <CardHeader title={<HelpTerm help="Starts once documents clear. Tasks go to the line manager, People and the new hire on the day.">Onboarding Plan</HelpTerm>} />
             <Timeline items={x.plan.map((p) => ({ title: p.title, when: p.text, tone: p.done ? "ok" : undefined }))} />
-            <p className="mt-[11px] text-[11.5px] text-subtle-foreground">The plan is a template per role. Tasks dispatch to the line manager, People and the new hire on the right day.</p>
           </Card>
         </Grid>
       )}

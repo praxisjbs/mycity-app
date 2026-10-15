@@ -299,7 +299,7 @@ function Notifications() {
   const rows = n.data ?? [];
   return (
     <>
-      <PageHeader title="Notifications" sub="Per category and transport. Saved as you change them." />
+      <PageHeader title="Notifications" sub="Per category and transport" />
       <Grid cols={2}>
         {(["email", "in_app"] as const).map((t) => (
           <Card key={t}>
@@ -385,14 +385,13 @@ function AppearanceTab() {
           </dl>
           <div className="mt-3 border-t border-border pt-3">
             <div className="mb-1.5 text-[12px] text-subtle-foreground">Default theme for everyone</div>
-            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved. A person's own choice still wins"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
+            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
           </div>
         </Card>
       </Grid>
       <Grid cols={2}>
         <Card>
-          <CardHeader title="The Dark Theme Is Derived, Not Invented" right={<Pill tone="info">Try the moon icon</Pill>} />
-          <p className="mb-[11px] text-[11.5px] text-subtle-foreground">MyCity has no dark brand variant. Rather than pick colours, every dark surface sits on the brand’s own green hue. Values below are the theme you are looking at.</p>
+          <CardHeader title="Dark Theme" />
           {d.dark.map((r) => (
             <div key={r.name} className="flex items-center gap-[11px] border-b border-border py-1.5 last:border-b-0">
               <i className="size-6 flex-none rounded-[7px] border border-border" style={{ background: `var(${r.token})` }} />
