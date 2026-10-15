@@ -1,0 +1,335 @@
+#!/usr/bin/env bash
+# deploy-gate · the only thing CI may run on the server (SYSTEM_ARCHITECTURE §9.2 to §9.7).
+#
+# mycity-deploy's authorized_keys forces every connection into this script and says which key
+# connected (ops/ssh/authorized_keys.template):
+#
+#   command="/srv/mycity/bin/deploy-gate --key=staging",...      CI's staging key
+#   command="/srv/mycity/bin/deploy-gate --key=production",...   CI's production key
+#
+# What the caller asked for arrives in SSH_ORIGINAL_COMMAND. Each key may do only this:
+#
+#   staging key      stage <sha>              release tarball on stdin; install, dump, migrate,
+#                                             switch, restart, wait for readiness on that sha
+#                    seal <sha> <run-id>      after verify-staging passed: write STAGING_VERIFIED
+#                    status
+#   production key   promote <sha> <run-id>   the sealed staging tree, byte for byte, to production
+#                    rollback production <sha>  switch production back to a release still on disk
+#                    status
+#
+# Anything else is refused. A leaked staging key cannot touch production, even typed by hand.
+#
+# Installed root-owned at /srv/mycity/bin/deploy-gate by ops/provision/provision.sh. Runs as
+# mycity-deploy; sudo only for restarting the four units and running Node as an environment's
+# user (/etc/sudoers.d/mycity-deploy). The DG_* variables below exist for the tests: sshd does not
+# pass a client's environment through, so a remote caller cannot set them.
+
+set -euo pipefail
+umask 022
+
+ROOT="${DG_ROOT:-/srv/mycity}"
+STATE="${DG_HOME:-$HOME}"
+USE_SUDO="${DG_SUDO:-1}"
+SYSTEMCTL="${DG_SYSTEMCTL:-/usr/bin/systemctl}"
+NODE="${DG_NODE:-/usr/bin/node}"
+NPM="${DG_NPM:-npm}"
+PG_DUMP="${DG_PG_DUMP:-pg_dump}"
+READY_TIMEOUT="${DG_READY_TIMEOUT:-120}"
+MAX_UPLOAD=$((1024 * 1024 * 1024))
+KEEP_RELEASES=5
+KEEP_DUMPS=10
+SEAL_MAX_AGE_DAYS=7
+declare -A PORT=([stg]="${DG_PORT_STG:-7100}" [prod]="${DG_PORT_PROD:-7000}")
+declare -A HOST=([stg]=hub.staging.mycityapp.io [prod]=hub.mycityapp.io)
+SEAL=STAGING_VERIFIED
+
+LOG="$STATE/deploy-gate.log"
+say() { printf '[deploy-gate] %s\n' "$*" | tee -a "$LOG" >&2; }
+die() {
+  say "REFUSED: $*"
+  exit 1
+}
+
+# ---------------------------------------------------------------------------------------
+# Who is calling, and what they asked for
+
+KEY=""
+case "${1:-}" in
+  --key=staging) KEY=staging ;;
+  --key=production) KEY=production ;;
+  *) die "no --key: this runs only as an authorized_keys forced command" ;;
+esac
+
+read -r -a WORDS <<<"${SSH_ORIGINAL_COMMAND:-}"
+CMD="${WORDS[0]:-}"
+is_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
+is_run() { [[ "$1" =~ ^[0-9]{1,20}$ ]]; }
+
+case "$KEY:$CMD" in
+  staging:stage)
+    if ! { [[ ${#WORDS[@]} -eq 2 ]] && is_sha "${WORDS[1]}"; }; then die "usage: stage <40-character sha>"; fi ;;
+  staging:seal)
+    if ! { [[ ${#WORDS[@]} -eq 3 ]] && is_sha "${WORDS[1]}" && is_run "${WORDS[2]}"; }; then die "usage: seal <sha> <run-id>"; fi ;;
+  production:promote)
+    if ! { [[ ${#WORDS[@]} -eq 3 ]] && is_sha "${WORDS[1]}" && is_run "${WORDS[2]}"; }; then die "usage: promote <sha> <run-id>"; fi ;;
+  production:rollback)
+    if ! { [[ ${#WORDS[@]} -eq 3 && "${WORDS[1]}" == production ]] && is_sha "${WORDS[2]}"; }; then die "usage: rollback production <sha>"; fi ;;
+  *:status)
+    if [[ ${#WORDS[@]} -ne 1 ]]; then die "usage: status"; fi ;;
+  *) die "the $KEY key may not run '${SSH_ORIGINAL_COMMAND:-}'" ;;
+esac
+
+# One deploy at a time, on either environment: two runs interleaving a migration and a restart
+# is how a database ends up ahead of its code.
+exec 9>"$STATE/deploy-gate.lock"
+flock -w 600 9 || die "another deploy has held the lock for 10 minutes"
+say "$KEY key: ${SSH_ORIGINAL_COMMAND:-}"
+
+# ---------------------------------------------------------------------------------------
+# Helpers
+
+as_env_user() { # env command...
+  if [[ "$USE_SUDO" == 1 ]]; then sudo -n -u "mycity-$1" "${@:2}"; else "${@:2}"; fi
+}
+
+# The lock's descriptor is closed for the restart, so nothing the restart leaves running can
+# hold the deploy lock after this script has finished.
+restart() { # env
+  local u
+  for u in "mycity-api-$1.service" "mycity-worker-$1.service"; do
+    if [[ "$USE_SUDO" == 1 ]]; then sudo -n "$SYSTEMCTL" restart "$u" 9>&-; else "$SYSTEMCTL" restart "$u" 9>&-; fi
+  done
+}
+
+# One value from an environment's .env, as written (no quotes are used in those files).
+env_value() { # env key
+  sed -n "s/^$2=//p" "$ROOT/$1/shared/.env" | tail -n 1
+}
+
+current_sha() { # env
+  local link
+  link="$(readlink "$ROOT/$1/current" 2>/dev/null || true)"
+  if [[ -n "$link" ]]; then basename "$link"; fi
+}
+
+switch_to() { # env sha
+  ln -sfn "$ROOT/$1/releases/$2" "$ROOT/$1/current.next"
+  mv -Tf "$ROOT/$1/current.next" "$ROOT/$1/current"
+}
+
+# A hash of the whole release tree, node_modules included: every file's content and every
+# symlink's target, in a fixed order. The seal file itself is left out.
+tree_hash() { # dir
+  (
+    cd "$1"
+    {
+      find . -type f ! -path "./$SEAL" -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
+      find . -type l -print0 | LC_ALL=C sort -z |
+        while IFS= read -r -d '' l; do printf 'link %s -> %s\n' "$l" "$(readlink "$l")"; done
+    } | sha256sum | cut -d' ' -f1
+  )
+}
+
+# Readiness must report this exact build before a deploy counts.
+wait_ready() { # env sha
+  local deadline=$((SECONDS + READY_TIMEOUT)) body=""
+  while ((SECONDS < deadline)); do
+    body="$(curl -fsS --max-time 3 "http://127.0.0.1:${PORT[$1]}/api/health/ready" 2>/dev/null || true)"
+    if [[ -n "$body" ]] && jq -e --arg sha "$2" '.ok == true and .build.sha == $sha' >/dev/null 2>&1 <<<"$body"; then
+      say "$1 ready on ${2:0:12} ($(jq -r .status <<<"$body"))"
+      return 0
+    fi
+    sleep 2
+  done
+  say "$1 did not report ready on ${2:0:12} within ${READY_TIMEOUT}s. Last answer: ${body:-none}"
+  return 1
+}
+
+predeploy_dump() { # env sha
+  local dir="$ROOT/backups/$1" file
+  file="$dir/predeploy-$(date -u +%Y%m%dT%H%M%SZ)-${2:0:12}.dump"
+  PGPASSWORD="$(env_value "$1" DB_PASSWORD)" "$PG_DUMP" --format=custom --no-owner \
+    --host="$(env_value "$1" DB_HOST)" --port="$(env_value "$1" DB_PORT)" \
+    --username="$(env_value "$1" DB_USER)" --file="$file" "$(env_value "$1" DB_NAME)" ||
+    die "pg_dump of $(env_value "$1" DB_NAME) failed; nothing was changed"
+  say "dump: $file"
+  # Keep the newest few; the nightly backups keep the long history.
+  find "$dir" -maxdepth 1 -name 'predeploy-*.dump' -printf '%T@ %p\n' | sort -rn |
+    tail -n +$((KEEP_DUMPS + 1)) | cut -d' ' -f2- | xargs -r rm -f
+  LAST_DUMP="$file"
+}
+
+migrate() { # env sha
+  (cd "$ROOT/$1/releases/$2" &&
+    as_env_user "$1" "$NODE" --env-file="$ROOT/$1/shared/.env" scripts/db/migrate.js --deploy-gate) ||
+    die "migrations failed on $1; the failing file applied nothing (each runs in a transaction). Code not switched"
+  # The AI catalogue follows the release's manifests. The worker syncs it at boot as well, so a
+  # failure here is reported, not fatal.
+  (cd "$ROOT/$1/releases/$2" &&
+    as_env_user "$1" "$NODE" --env-file="$ROOT/$1/shared/.env" src/shared/ai/catalogue-sync.js) ||
+    say "warning: the AI catalogue sync failed on $1; the worker retries at boot"
+}
+
+# Switch, restart, and go back to the previous release if the new one does not come up.
+go_live() { # env sha
+  local prev
+  prev="$(current_sha "$1")"
+  switch_to "$1" "$2"
+  restart "$1"
+  if wait_ready "$1" "$2"; then return 0; fi
+  if [[ -n "$prev" && "$prev" != "$2" && -d "$ROOT/$1/releases/$prev" ]]; then
+    say "switching $1 back to ${prev:0:12}"
+    switch_to "$1" "$prev"
+    restart "$1"
+    wait_ready "$1" "$prev" || say "the previous release did not come up either: look at journalctl -u mycity-api-$1"
+  fi
+  die "$1 stayed on ${prev:0:12}. Migrations of ${2:0:12} are applied; if the old code cannot run on them, restore ${LAST_DUMP:-the pre-deploy dump}"
+}
+
+prune() { # env
+  local keep cur
+  cur="$(current_sha "$1")"
+  keep="$(find "$ROOT/$1/releases" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@ %f\n' |
+    sort -rn | head -n "$KEEP_RELEASES" | cut -d' ' -f2)"
+  find "$ROOT/$1/releases" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' |
+    while read -r r; do
+      if [[ "$r" != "$cur" ]] && ! grep -qx "$r" <<<"$keep"; then
+        rm -rf "${ROOT:?}/$1/releases/$r"
+        say "pruned $1 release ${r:0:12}"
+      fi
+    done
+}
+
+# ---------------------------------------------------------------------------------------
+# Commands
+
+stage() {
+  local sha="$1" rel="$ROOT/stg/releases/$1" incoming
+  if [[ -d "$rel" ]]; then
+    say "${sha:0:12} is already unpacked on staging; using it"
+    cat >/dev/null # drain the upload
+  else
+    incoming="$ROOT/stg/releases/.incoming-$sha-$$"
+    rm -rf "$incoming"
+    mkdir -p "$incoming"
+    trap 'rm -rf "$incoming"' EXIT
+    head -c "$MAX_UPLOAD" | tar -xz -C "$incoming" --no-same-owner ||
+      die "the upload is not a readable release tarball"
+    [[ -s "$incoming/RELEASE" && -s "$incoming/SHA256SUMS" ]] || die "the tarball has no RELEASE or SHA256SUMS"
+    [[ "$(jq -r .sha "$incoming/RELEASE")" == "$sha" ]] || die "the tarball was built from another commit"
+    (cd "$incoming" && sha256sum --quiet --strict -c SHA256SUMS) || die "files do not match SHA256SUMS"
+    say "unpacked and checked; installing production dependencies"
+    (cd "$incoming" && "$NPM" ci --omit=dev --no-audit --no-fund --loglevel=error >&2) || die "npm ci failed"
+    # npm has been seen to crash ("Exit handler never called") and still exit 0, so check the
+    # result instead of trusting the exit code: every production dependency must resolve.
+    (cd "$incoming" && "$NODE" -e '
+      const deps = Object.keys(require("./package.json").dependencies || {});
+      const fs = require("node:fs");
+      const missing = deps.filter((d) => !fs.existsSync("node_modules/" + d + "/package.json"));
+      if (missing.length) { console.error("not installed: " + missing.join(", ")); process.exit(1); }
+    ') || die "npm ci did not install every dependency"
+    # Readable by everyone who can reach it: the environment's own directory (mode 750, its
+    # group) is what keeps other users out, and production reads these same files through
+    # hard links. A tarball made on Windows can carry 0700 modes otherwise.
+    chmod -R u=rwX,go=rX "$incoming"
+    mv "$incoming" "$rel"
+    trap - EXIT
+  fi
+  predeploy_dump stg "$sha"
+  migrate stg "$sha"
+  go_live stg "$sha"
+  prune stg
+  say "staging runs ${sha:0:12}"
+}
+
+seal() {
+  local sha="$1" run="$2" rel="$ROOT/stg/releases/$1"
+  [[ "$(current_sha stg)" == "$sha" ]] || die "staging runs $(current_sha stg | cut -c1-12), not ${sha:0:12}"
+  wait_ready stg "$sha" || die "staging is not ready on ${sha:0:12}"
+  # Hash first: the file below must not exist yet while the tree is hashed.
+  local tree
+  tree="$(tree_hash "$rel")"
+  {
+    printf 'sha=%s\n' "$sha"
+    printf 'tree_sha256=%s\n' "$tree"
+    printf 'verified_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'run=%s\n' "$run"
+  } >"$rel/$SEAL.next"
+  mv -f "$rel/$SEAL.next" "$rel/$SEAL"
+  say "sealed ${sha:0:12} (run $run)"
+}
+
+seal_value() { # file key
+  sed -n "s/^$2=//p" "$1" | head -n 1
+}
+
+# 21 December to 5 January, Lagos dates: production is frozen; staging keeps deploying.
+frozen() {
+  local md
+  md="${DG_TODAY:-$(TZ=Africa/Lagos date +%m%d)}"
+  md=$((10#$md))
+  ((md >= 1221 || md <= 105))
+}
+
+promote() {
+  local sha="$1" run="$2" src="$ROOT/stg/releases/$1" dst="$ROOT/prod/releases/$1" seal_file verified age
+  seal_file="$src/$SEAL"
+  [[ -s "$seal_file" ]] || die "${sha:0:12} was never sealed on staging (verify-staging did not pass)"
+  [[ "$(seal_value "$seal_file" sha)" == "$sha" ]] || die "the seal names another commit"
+  [[ "$(current_sha stg)" == "$sha" ]] ||
+    die "staging has moved on to $(current_sha stg | cut -c1-12); approve that release instead"
+  verified="$(date -u -d "$(seal_value "$seal_file" verified_at)" +%s 2>/dev/null)" || die "the seal has no valid date"
+  age=$((($(date -u +%s) - verified) / 86400))
+  ((age < SEAL_MAX_AGE_DAYS)) || die "the seal is $age days old (limit $SEAL_MAX_AGE_DAYS); deploy to staging again"
+  [[ "$(tree_hash "$src")" == "$(seal_value "$seal_file" tree_sha256)" ]] ||
+    die "the staging tree changed after it was sealed"
+  if frozen; then die "production is frozen from 21 December to 5 January"; fi
+
+  if [[ -d "$dst" ]]; then
+    [[ "$(tree_hash "$dst")" == "$(seal_value "$seal_file" tree_sha256)" ]] ||
+      die "$dst exists and differs from the sealed tree"
+  else
+    # Hard links: production runs the very files staging verified. Nothing rebuilt or reinstalled.
+    cp -al "$src" "$dst.incoming-$$"
+    mv "$dst.incoming-$$" "$dst"
+  fi
+  say "production tree is the sealed staging tree (run $run)"
+  predeploy_dump prod "$sha"
+  migrate prod "$sha"
+  go_live prod "$sha"
+  local code
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -H "Host: ${HOST[prod]}" \
+    "http://127.0.0.1:${PORT[prod]}/api/health")"
+  [[ "$code" == 200 ]] || say "WARNING: read-only smoke on ${HOST[prod]} answered $code"
+  prune prod
+  say "production runs ${sha:0:12}"
+}
+
+rollback() {
+  local sha="$1"
+  [[ -d "$ROOT/prod/releases/$sha" ]] || die "${sha:0:12} is not on the server any more (the last $KEEP_RELEASES are kept)"
+  [[ "$(current_sha prod)" != "$sha" ]] || die "production already runs ${sha:0:12}"
+  say "rolling production back to ${sha:0:12}. The database is not rolled back: if the newer release migrated, restore its pre-deploy dump"
+  go_live prod "$sha"
+  say "production runs ${sha:0:12}"
+}
+
+status() {
+  local e s
+  for e in stg prod; do
+    s="$(current_sha "$e")"
+    printf '%s\tcurrent=%s' "$e" "${s:-none}"
+    if [[ "$e" == stg && -n "$s" && -s "$ROOT/stg/releases/$s/$SEAL" ]]; then
+      printf '\tsealed_at=%s' "$(seal_value "$ROOT/stg/releases/$s/$SEAL" verified_at)"
+    fi
+    printf '\treleases=%s\n' "$(find "$ROOT/$e/releases" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f ' 2>/dev/null | sed 's/\([0-9a-f]\{12\}\)[0-9a-f]*/\1/g')"
+  done
+}
+
+case "$CMD" in
+  stage) stage "${WORDS[1]}" ;;
+  seal) seal "${WORDS[1]}" "${WORDS[2]}" ;;
+  promote) promote "${WORDS[1]}" "${WORDS[2]}" ;;
+  rollback) rollback "${WORDS[2]}" ;;
+  status) status ;;
+esac

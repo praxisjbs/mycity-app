@@ -67,10 +67,10 @@ mycity-erp/
 **Runtime files never live in the repo.** Per environment, on the server:
 
 ```
-/srv/mycity/<prod|stg>/
-├── releases/<sha>/          code
+/srv/mycity/<prod|stg>/           owned by mycity-deploy (deploy-gate switches current)
+├── releases/<sha>/          code, with RELEASE, BUILD.env, SHA256SUMS (+ STAGING_VERIFIED on staging)
 ├── current -> releases/<sha>
-├── shared/.env
+├── shared/.env              root's, readable by the environment's group only
 └── media/                   private, mode 750, owned by mycity-<env>
     ├── vault/<yyyy>/<mm>/<uuid>.<ext>          documents (masters)
     ├── derived/<uuid>/<w>.<avif|webp>          image derivatives

@@ -54,12 +54,12 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
 | Packages | PostgreSQL 16 + pgvector, Redis 7, ffmpeg, ClamAV (signatures fetched first), nginx, certbot, fonts; Geist from `assets/fonts` when it is there |
 | Chrome | `google-chrome-stable` for PDFs (`CHROMIUM_PATH`). Ubuntu's own Chromium is a snap, which cannot run as a service user under `/srv` |
 | Users | `mycity-prod`, `mycity-stg` run the services and cannot read each other's files; `mycity-deploy` is CI's only login |
-| Files | `/srv/mycity/<prod\|stg>/{releases, shared/.env, media}`, `/srv/mycity/bin`, `/srv/mycity/backups/<env>` (BACKEND_STRUCTURE §1) |
+| Files | `/srv/mycity/<prod\|stg>/{releases, shared/.env, media}`, `/srv/mycity/bin`, `/srv/mycity/backups/<env>` (BACKEND_STRUCTURE §1). The environment folder belongs to `mycity-deploy` (it switches `current`); `shared/` stays root's |
 | PostgreSQL | `mycity_prod` owned by `mycity_prod_app`, `mycity_stg` by `mycity_stg_app`; only that role may connect; pgcrypto, citext, pg_trgm, unaccent and vector created by the superuser (pgvector is not a trusted extension, so the app role could not); memory sized from the RAM |
 | Redis | Local only, password, `noeviction` (BullMQ loses jobs otherwise), append-only file; db 0 production, db 1 staging |
 | `.env` | `/srv/mycity/<env>/shared/.env` from `ops/systemd/<env>.env.template`, secrets generated on the server. **Written once, never overwritten** |
 | systemd | The four units, enabled. Each is skipped until its environment has a release, so nothing crash-loops before the first deploy |
-| Deploy | `sudo` for `mycity-deploy` limited to restarting the four units and running Node as an environment's user; `authorized_keys` with forced commands when the keys are given; `deploy-gate` installed once it is written |
+| Deploy | `sudo` for `mycity-deploy` limited to restarting the four units and running Node as an environment's user; `authorized_keys` with forced commands when the keys are given; `deploy-gate` installed into `/srv/mycity/bin` |
 | Firewall | SSH (whatever port `sshd` uses), 80 and 443 only |
 | nginx | `ops/nginx/` installed, the default site removed, a certificate per host whose DNS is ready, renewals reload nginx |
 
@@ -76,9 +76,8 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
    `sudo ufw status` shows only SSH, 80 and 443; `curl -sI http://hub.staging.mycityapp.io`
    gives a 301 to https.
 
-The first release, the deploy keys and `deploy-gate` belong to the release pipeline
-(SYSTEM_ARCHITECTURE §9), which is not built yet. Until then the units stay skipped and the hosts
-answer 502 over https.
+The deploy keys and the first release: `docs/runbooks/deploy.md`. Until the first release the
+units stay skipped and the hosts answer 502 over https.
 
 ## 5 · Changing the server later
 

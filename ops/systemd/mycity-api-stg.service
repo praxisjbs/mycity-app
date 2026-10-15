@@ -15,6 +15,8 @@ User=mycity-stg
 Group=mycity-stg
 WorkingDirectory=/srv/mycity/stg/current
 EnvironmentFile=/srv/mycity/stg/shared/.env
+# The release's own BUILD_SHA and BUILD_TIME (scripts/deploy/release-manifest.js).
+EnvironmentFile=-/srv/mycity/stg/current/BUILD.env
 Environment=MYCITY_PROCESS=mycity-api
 # Chromium writes its profile and crash database under HOME; the private /tmp is the
 # only writable place besides the media root.

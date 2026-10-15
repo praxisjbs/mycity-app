@@ -166,6 +166,23 @@ plus round-trip and command-line tests in `tests/integration/worker.test.js` and
   history, as the person named by `--as`; commit and revert on staging or production ask for the
   environment name (or `--yes`).
 
+### 3.5b Release pipeline (15 October; not committed)
+
+- `scripts/deploy/deploy-gate`: bash, forced command of both deploy keys (`--key=staging` stages
+  and seals; `--key=production` promotes and rolls back; both may ask `status`). Tarball on stdin,
+  checked against `SHA256SUMS`; `npm ci --omit=dev` then every dependency confirmed present (npm
+  crashed once and exited 0); pre-deploy `pg_dump`; migrations and the AI catalogue sync as the
+  environment's user (`node --env-file=shared/.env`); `current` switched; units restarted;
+  readiness must report the sha, else switched back. Seal = tree hash of the release (written
+  after hashing). Promote = seal checks, freeze window, hard links (`cp -al`). One lock for all.
+  `DG_*` variables exist only for tests (sshd passes no client environment).
+- `release-manifest.js` (assemble, check), `verify-staging.js` (HTTPS checks; six PENDING checks
+  wait for modules), `rollback.sh`, `release.yml`, `rollback.yml`.
+- Server changes, need a provisioning re-run: `/srv/mycity/<env>` owned by `mycity-deploy`;
+  units add `EnvironmentFile=-.../current/BUILD.env` (BUILD_SHA no longer goes in `.env`).
+- Tested in the cloud with the server's users, modes and sudoers and real Postgres and Redis
+  (`docs/runbooks/deploy.md` §4); `tests/unit/foundation/deploy.test.js` (9 tests).
+
 ### 3.6 Test state (15 October, Node 20, cloud bench)
 
 387 tests pass (305 unit, 82 integration against Postgres 16 and Redis, real Chromium and
@@ -199,8 +216,10 @@ only), real SMTP delivery, web push (M6).
 - Gate 6 (`schema-drift.js`, `contract-columns.js`), still empty; both need the M0 migrations.
   `ci.yml` has no Postgres service yet, so in CI the integration tests and gate 4's round trip do
   not run; add one (with `RUN_DB_TESTS=1` and `DATABASE_URL`) once the migrations exist.
-  `release.yml` and `rollback.yml` are empty. Release pipeline,
-  `deploy-gate`, staging seal, production approval (SYSTEM_ARCHITECTURE §9).
+  The release pipeline is built (15 October, in the cloud while he was away; see below). Before the
+  first release: `docs/runbooks/deploy.md` §1 (two deploy keys, GitHub environments and
+  variables, re-run provisioning with the keys), DNS and mail. `backup.sh` and `restore-drill.js`
+  (nightly dumps, the restore rehearsal) are still empty.
 - Server 108.181.196.53 (fresh Ubuntu 24.04, 15 October): `ops/provision/provision.sh`, the four
   systemd units, both env templates, the nginx files and the deploy `authorized_keys` template are
   written (not yet run on the server; tested in the cloud: shellcheck, nginx config and live

@@ -161,7 +161,10 @@ usermod -aG mycity-prod,mycity-stg mycity-deploy
 install -d -m 755 -o root -g root /srv/mycity /srv/mycity/bin
 install -d -m 750 -o mycity-deploy -g mycity-deploy /srv/mycity/backups
 for e in "${ENVS[@]}"; do
-  install -d -m 750 -o root -g "mycity-$e" "/srv/mycity/$e" "/srv/mycity/$e/shared"
+  # deploy-gate switches the environment's `current` link, so it owns the environment's folder;
+  # shared/ (the .env) stays root's, readable by the environment's group.
+  install -d -m 750 -o mycity-deploy -g "mycity-$e" "/srv/mycity/$e"
+  install -d -m 750 -o root -g "mycity-$e" "/srv/mycity/$e/shared"
   install -d -m 2750 -o mycity-deploy -g "mycity-$e" "/srv/mycity/$e/releases"
   install -d -m 750 -o "mycity-$e" -g "mycity-$e" "/srv/mycity/$e/media"
   install -d -m 700 -o mycity-deploy -g mycity-deploy "/srv/mycity/backups/$e"

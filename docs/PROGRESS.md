@@ -85,13 +85,22 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | GitHub settings applied by TB (`docs/runbooks/github-settings.md`) | TB | ☐ | |
 | CODEOWNERS usernames: GE `@swizfcodes`, TB `@tomblakeasaah196`, AJ `@Ghosted34`, LA `@LovedataX` | GE | ☑ | 13/10/2026 |
 | CI gates 1 to 8 and pipeline guards (gate 6, schema-drift and contract-columns, still empty, reported NOT BUILT) | GE | ☐ | 15/10/2026 |
-| Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | |
+| Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | 15/10/2026 |
 | Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
 | Screen gates 8, 11, 12, 17: `five-second`, `two-shells`, `forms`, `dashes`; screen conventions in FRONTEND_GUIDE §5, §7, §8 | TB | ☑ | 14/10/2026 |
 | Frontend foundation (`app/`, `public-app/`): shell, design tokens, contract client, shared components | AJ | ☐ | |
 
 **Notes**
 
+- 15/10/2026 · GE · Release pipeline built: `deploy-gate` (stage, seal, promote, rollback, status;
+  each deploy key forced to its own commands), `release-manifest.js` (release tarball with
+  `RELEASE`, `BUILD.env`, `SHA256SUMS`), `verify-staging.js`, `rollback.sh`, `release.yml` (build,
+  staging, verify and seal, approval, promote, tag) and `rollback.yml`. Exercised end to end in a
+  cloud copy of the server layout. Server fixes: the environment folder belongs to `mycity-deploy`,
+  the units read the release's `BUILD.env`. Runbooks: `deploy.md`, `rollback.md`. Left: the
+  one-time setup in `deploy.md` §1 (keys, GitHub environments), re-running provisioning, then the
+  first release once DNS and mail are in; the checks waiting for modules (sign-in, RBAC, workflow,
+  PDF, mail, Playwright); nightly backups (`backup.sh`, `restore-drill.js`).
 - 15/10/2026 · GE · Server 108.181.196.53 (Ubuntu 24.04): `ops/provision/provision.sh` takes a fresh
   install to a ready server (Node 20, PostgreSQL 16 + pgvector, Redis, Chrome, ffmpeg, ClamAV,
   nginx + Let's Encrypt, firewall), with the two environments' users, databases, `.env` files and
