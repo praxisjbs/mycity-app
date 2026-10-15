@@ -1,0 +1,11 @@
+# ~mycity-deploy/.ssh/authorized_keys (SYSTEM_ARCHITECTURE §9.5).
+#
+# CI never gets a shell. Each key may only run deploy-gate, and the forced command tells
+# deploy-gate which key called it: the staging key can stage and seal, the production key
+# can promote and roll back production, nothing else. A leaked staging key cannot touch
+# production even with a hand-typed command.
+#
+# Installed by ops/provision/provision.sh when STAGING_DEPLOY_KEY and PROD_DEPLOY_KEY are set
+# (the public halves of the two keys whose private halves are GitHub environment secrets).
+command="/srv/mycity/bin/deploy-gate --key=staging",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding @@STAGING_DEPLOY_KEY@@
+command="/srv/mycity/bin/deploy-gate --key=production",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding @@PROD_DEPLOY_KEY@@

@@ -14,7 +14,7 @@ file was read in the checked-out tree on 12 October. Backend source layout is in
                          Internet
                             │
             ┌───────────────┴────────────────┐
-            │ panel proxy (TLS only)         │   one server, 18 GB RAM / 240 GB SSD
+            │ nginx (TLS only)               │   one server, 18 GB RAM / 240 GB SSD
             └──┬──────────┬──────────┬───────┘
      hub.mycityapp.io  go.mycityapp.io  hub.staging…  go.staging…
             │          │                │          │
@@ -47,8 +47,9 @@ file was read in the checked-out tree on 12 October. Backend source layout is in
 Four systemd units: `mycity-api-prod`, `mycity-worker-prod`, `mycity-api-stg`, `mycity-worker-stg`.
 One codebase, one build, two running copies that differ only in their `.env`.
 
-The four virtual hosts are configured in the hosting panel's web server settings, not from files in
-the repository. The proxy terminates TLS and forwards every path to the environment's API process,
+The four virtual hosts are nginx files in the repository (`ops/nginx/`), installed with everything
+else by `ops/provision/provision.sh` on Ubuntu 24.04 (decided 15 October 2026; the server,
+108.181.196.53, came bare, so the earlier plan of a hosting panel was dropped). The proxy terminates TLS and forwards every path to the environment's API process,
 which serves both frontend builds and the API and keeps the hosts apart itself (§3). What the proxy
 must contain (forwarded headers, body size, WebSocket upgrade) is in `docs/runbooks/proxy.md`.
 
@@ -110,7 +111,7 @@ by the browser and the host guard rather than by a flag.
 ## 4 · Request lifecycle (staff)
 
 ```
-panel proxy (TLS only, forwards everything)
+nginx (TLS only, forwards everything)
   → async-safe (patches Express 4 so async throws reach the error handler)
   → request-id            X-Request-Id in, echoed out
   → request-context       AsyncLocalStorage { requestId, userId }
@@ -326,12 +327,13 @@ production.
 CI never gets a shell. The `mycity-deploy` user's `authorized_keys` carries a forced command:
 
 ```
-command="/srv/mycity/bin/deploy-gate",no-pty,no-port-forwarding,no-agent-forwarding <staging key>
-command="/srv/mycity/bin/deploy-gate",no-pty,no-port-forwarding,no-agent-forwarding <prod key>
+command="/srv/mycity/bin/deploy-gate --key=staging",no-pty,no-port-forwarding,no-agent-forwarding <staging key>
+command="/srv/mycity/bin/deploy-gate --key=production",no-pty,no-port-forwarding,no-agent-forwarding <prod key>
 ```
 
 `deploy-gate` reads `SSH_ORIGINAL_COMMAND`, accepts only `stage <sha>`, `seal <sha>`, `promote <sha>`,
-`rollback <env> <sha>`, and checks **which key** called it. The staging key can stage and seal and
+`rollback <env> <sha>`, and checks **which key** called it (the `--key=` its forced command
+passes; `ops/ssh/authorized_keys.template`). The staging key can stage and seal and
 nothing else. The prod key can promote and roll back production and nothing else. A leaked staging
 key cannot touch production even with a hand-typed command.
 

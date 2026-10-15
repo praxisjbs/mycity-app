@@ -201,10 +201,15 @@ only), real SMTP delivery, web push (M6).
   not run; add one (with `RUN_DB_TESTS=1` and `DATABASE_URL`) once the migrations exist.
   `release.yml` and `rollback.yml` are empty. Release pipeline,
   `deploy-gate`, staging seal, production approval (SYSTEM_ARCHITECTURE §9).
-- Server: four subdomains, TLS (`docs/runbooks/proxy.md`). GitHub settings by TB.
+- Server 108.181.196.53 (fresh Ubuntu 24.04, 15 October): `ops/provision/provision.sh`, the four
+  systemd units, both env templates, the nginx files and the deploy `authorized_keys` template are
+  written (not yet run on the server; tested in the cloud: shellcheck, nginx config and live
+  proxying, env files against `config/env.js`). He runs it: `docs/runbooks/server-setup.md`. DNS A
+  records for the four hosts are his to add. The proxy is nginx from `ops/nginx/` now, not a
+  hosting panel. GitHub settings by TB.
 - `assets/brand` and `assets/fonts` are empty, so PDFs show the text wordmark.
 - M3 and later letter templates are empty (each milestone writes its own). Web push waits for M6.
-- systemd or PM2 for the four processes is still open (§5.3); the worker is one entry point either way.
+- systemd it is (decided 15 October); the units are in `ops/systemd/`.
 
 ---
 
@@ -213,7 +218,7 @@ only), real SMTP delivery, web push (M6).
 1. A14: MILESTONES says the generic importer lands in M7; the engine was built in M0. One-line
    amendment offered.
 2. The 15 permission keys in README §5.2 were proposed, not confirmed.
-3. systemd (in the docs) or PM2 (his usual) for the four processes.
+3. Settled 15 October: systemd, and nginx from the repository instead of a hosting panel.
 4. Numbering prefixes in BACKEND_STRUCTURE §7 are proposals for MyCity to confirm.
 5. REUSE_MAP §1.3 public-site wording contradicts A9; he said leave it.
 6. Client pack: maintenance price contradiction (₦500,000 vs ₦300,000 a year); M11 "training on

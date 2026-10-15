@@ -1,13 +1,15 @@
 # Runbook · Reverse proxy settings
 
-The four virtual hosts are configured in the **hosting panel's** web server settings, not from
-files in this repository (decided 12 October 2026). This page is the
-list of what those settings must contain. The proxy is deliberately thin: TLS, forwarding,
-WebSocket upgrade and the body limit. Everything else (which paths a host answers, the frontend
-builds, caching, protected files) is in the API, where it is tested and versioned with the code.
+The four virtual hosts are nginx files in this repository: `ops/nginx/mycity.conf` (everything
+the hosts share) and one file per host. `ops/provision/provision.sh` installs them, gets each
+host's Let's Encrypt certificate once its DNS points at the server, and enables it
+(`docs/runbooks/server-setup.md`). The proxy is deliberately thin: TLS, forwarding, WebSocket
+upgrade and the body limit. Everything else (which paths a host answers, the frontend builds,
+caching, protected files) is in the API, where it is tested and versioned with the code.
 
-Apply the same settings on staging and production. Check them after any panel change, and before
-the first production deploy, with the checks in §5.
+Change the files here, not on the server, then re-run the provisioning script (or copy the file
+and `sudo nginx -t && sudo systemctl reload nginx`). Check with §5 after any change, and before
+the first production deploy.
 
 ---
 
@@ -20,7 +22,9 @@ the first production deploy, with the checks in §5.
 | `hub.staging.mycityapp.io` | `127.0.0.1:7100` |
 | `go.staging.mycityapp.io` | `127.0.0.1:7100` |
 
-TLS on all four (Let's Encrypt), HTTP redirected to HTTPS, HSTS on.
+TLS on all four (Let's Encrypt, renewed by `certbot.timer`, nginx reloaded by a deploy hook),
+HTTP redirected to HTTPS, HSTS on. Any other name, and the bare IP, gets no answer: port 80 closes
+the connection, port 443 refuses the TLS handshake.
 
 The proxy serves no files and allow-lists no paths. The API process serves both frontend builds
 (`app/dist` on `hub.`, `public-app/dist` on `go.`, SPA fallback, cache headers) and refuses a path on

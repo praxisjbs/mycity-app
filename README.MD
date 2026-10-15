@@ -73,7 +73,8 @@ mycity-app/
 │   └── deploy/               deploy-gate, release-manifest, verify-staging, rollback
 ├── ops/
 │   ├── systemd/              four units + env templates
-│   ├── provision/            server packages
+│   ├── provision/            provision.sh: a fresh Ubuntu 24.04 to a ready server (runbooks/server-setup.md)
+│   ├── nginx/                mycity.conf (shared) + one file per host (runbooks/proxy.md)
 │   ├── monitoring/           uptime probe (M11)
 │   └── ssh/                  authorized_keys template for the deploy user
 ├── tests/
@@ -87,7 +88,7 @@ mycity-app/
 │   ├── PROGRESS.md           86 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
-│   │                         proxy (the hosting panel's proxy settings), github-settings (TB applies)
+│   │                         proxy (nginx settings), server-setup (provisioning), github-settings
 │   └── manual/               user manual, one file per module (M11, written as each ships)
 ├── .github/
 │   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml

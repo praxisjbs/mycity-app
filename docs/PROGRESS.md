@@ -92,6 +92,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 15/10/2026 · GE · Server 108.181.196.53 (Ubuntu 24.04): `ops/provision/provision.sh` takes a fresh
+  install to a ready server (Node 20, PostgreSQL 16 + pgvector, Redis, Chrome, ffmpeg, ClamAV,
+  nginx + Let's Encrypt, firewall), with the two environments' users, databases, `.env` files and
+  directories; the four systemd units, the nginx files and the deploy key template. Proxy is nginx
+  from `ops/nginx/` (no hosting panel); processes run under systemd. Runbook:
+  `docs/runbooks/server-setup.md`. Left: DNS for the four hosts, running it, mail settings, then the
+  release pipeline (`deploy-gate`, `release.yml`) for the first deploy.
 - 15/10/2026 · GE · CI gates, first group. Gate 3 migration numbers (unique, in the milestone's
   block, a new file in its branch's block), gate 4 reversibility (a DOWN or `-- IRREVERSIBLE:
   <reason>`, DOWN names what UP creates, `-- DESTRUCTIVE: <reason>` on destructive steps, and UP,

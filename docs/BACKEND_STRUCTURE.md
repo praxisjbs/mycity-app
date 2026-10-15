@@ -13,7 +13,9 @@ carries every module's `.ai.js` (§14), and the position on offline and sync (§
 
 **Amended 13 October 2026** after the internal meeting of 12 October: the system-wide pagination
 rule (§16), how the first administrator is created (§17), AI reads paged (§14.3), and the reverse
-proxy configured in the hosting panel rather than from `ops/nginx/` (§1, §5.2).
+proxy configured in the hosting panel rather than from `ops/nginx/` (§1, §5.2). **Reversed 15 October
+2026**: the server is a bare Ubuntu 24.04, so the proxy is nginx from `ops/nginx/`, installed by
+`ops/provision/provision.sh`.
 
 Donor line counts are from the checked-out trees on 12 October. `praxis` = `praxis-ls`, `pixie` =
 `pixie-girl-hub`.
@@ -52,7 +54,7 @@ mycity-erp/
 │   ├── provision/           server packages: postgres 16 + pgvector, redis, chromium,
 │   │                        ffmpeg, clamav, fonts
 │   └── ssh/                 authorized_keys template for mycity-deploy
-│                            (proxy: hosting panel, settings in docs/runbooks/proxy.md)
+│   └── nginx/               mycity.conf (shared) + one file per host; docs/runbooks/proxy.md
 ├── tests/
 │   ├── unit/
 │   ├── integration/         real Postgres + Redis, RUN_DB_TESTS=1
@@ -330,7 +332,7 @@ multipart (memory, 25 MB hard cap; per-type caps tighter)
   → document row, inside the caller's transaction
 ```
 
-The proxy → Express → multer size chain is set once in the hosting panel's proxy settings
+The proxy → Express → multer size chain is set once in `ops/nginx/mycity.conf`
 (`client_max_body_size 30m`, `docs/runbooks/proxy.md`) and `middleware/upload.js`, the "works locally, fails live 413" pixie documents in
 `docs/UPLOAD_SIZE_LIMITS.md`.
 
