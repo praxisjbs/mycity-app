@@ -23,12 +23,20 @@ const QUIET = /^\/api\/health(\/|$)/;
 function record(req, res) {
   try {
     const route = metrics.templatePath(req.originalUrl || req.url);
-    metrics.inc("mycity_http_requests_total", { method: req.method, route, status: String(res.statusCode) }, 1,
-      "HTTP requests by method, templated route and status.");
+    metrics.inc(
+      "mycity_http_requests_total",
+      { method: req.method, route, status: String(res.statusCode) },
+      1,
+      "HTTP requests by method, templated route and status.",
+    );
     const ms = Number(res.responseTime || 0);
     if (ms > 0) {
-      metrics.observe("mycity_http_request_duration_seconds", ms / 1000, { method: req.method, route },
-        "HTTP request duration in seconds.");
+      metrics.observe(
+        "mycity_http_request_duration_seconds",
+        ms / 1000,
+        { method: req.method, route },
+        "HTTP request duration in seconds.",
+      );
     }
   } catch {
     /* metrics never break a request */
@@ -44,7 +52,9 @@ function accessLog() {
       if (res.statusCode >= 400) return "warn";
       return "info";
     },
-    autoLogging: { ignore: (req) => QUIET.test(req.url || "") && logger.level !== "debug" },
+    autoLogging: {
+      ignore: (req) => QUIET.test(req.url || "") && logger.level !== "debug",
+    },
     customSuccessMessage(req, res) {
       record(req, res);
       return `${req.method} ${req.originalUrl || req.url} ${res.statusCode}`;

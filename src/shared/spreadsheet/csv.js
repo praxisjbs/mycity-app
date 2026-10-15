@@ -62,7 +62,9 @@ function buildCsv({ columns, rows = [], context } = {}) {
   for (const row of rows) {
     lines.push(
       columns
-        .map((c, i) => csvCell(csvText(specs[i].coerce(row[c.key]), specs[i].fmt)))
+        .map((c, i) =>
+          csvCell(csvText(specs[i].coerce(row[c.key]), specs[i].fmt)),
+        )
         .join(","),
     );
   }
@@ -104,7 +106,9 @@ function detectDelimiter(text) {
  * @returns {string[][]}
  */
 function parseCsvGrid(input, { delimiter } = {}) {
-  let text = Buffer.isBuffer(input) ? input.toString("utf8") : String(input ?? "");
+  let text = Buffer.isBuffer(input)
+    ? input.toString("utf8")
+    : String(input ?? "");
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // strip BOM
   if (text.length > CSV_MAX_CHARS) throw tooLarge();
   const d = delimiter || detectDelimiter(text);
@@ -142,7 +146,11 @@ function parseCsvGrid(input, { delimiter } = {}) {
     } else field += ch;
   }
   if (field !== "" || row.length) endRow(); // flush trailing field/row
-  while (grid.length && grid[grid.length - 1].every((c) => String(c ?? "").trim() === "")) grid.pop();
+  while (
+    grid.length &&
+    grid[grid.length - 1].every((c) => String(c ?? "").trim() === "")
+  )
+    grid.pop();
   return grid;
 }
 
@@ -169,4 +177,10 @@ function parseCsv(input) {
   return out;
 }
 
-module.exports = { buildCsv, parseCsv, parseCsvGrid, detectDelimiter, CSV_MAX_CHARS };
+module.exports = {
+  buildCsv,
+  parseCsv,
+  parseCsvGrid,
+  detectDelimiter,
+  CSV_MAX_CHARS,
+};

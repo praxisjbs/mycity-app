@@ -168,7 +168,7 @@ Posting to #announcements is gated by the `announcements.post` capability (BACKE
 | `announcement.published` | On publish, or when a scheduled one is released | Message in #announcements; notification and push to the audience |
 | `announcement-publish` (delayed job) | At `publish_at` | Releases a scheduled announcement (README §5.15) |
 | `celebrations` (scheduler + handler) | 05:00 Africa/Lagos daily | Birthday and anniversary cards in #general |
-| `media-derive`, `av-transcode`, `media-scan` | After an upload | Image variants, voice note to Opus, scan |
+| `av-transcode`, `media-scan` | After an upload | Voice note to Opus, video to MP4; a file from outside scanned. Image variants are made at upload; `media-derive` makes a file's variants again on request |
 
 ## 8 · Permissions and visibility by role
 
@@ -239,3 +239,4 @@ Nobody, including People and the CEO, can read a direct message they are not par
 - 13/10/2026 · GE · Added View Profile and Search in Conversation (TB review of the demo).
 - 13/10/2026 · GE · Added message ticks, voice note playback and transcription, read and not read lists on announcements, resizable list; removed work details from the profile (TB review).
 - 13/10/2026 · GE · Announcement cards back to the original design; read and not read lists moved into the card's modal. Page header slides away while reading a conversation (TB review).
+- 14/10/2026 · GE · §7 jobs aligned with the worker as built: image variants are made at upload, `media-derive` re-derives on request.

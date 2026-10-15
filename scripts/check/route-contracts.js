@@ -29,14 +29,24 @@ const ROOT = path.resolve(__dirname, "..", "..");
 try {
   const { buildApp } = require(path.join(ROOT, "src", "app"));
   const { report } = buildApp({ strict: true, accessLog: false });
-  const writes = report.routes.filter((r) => ["POST", "PUT", "PATCH"].includes(r.method)).length;
+  const writes = report.routes.filter((r) =>
+    ["POST", "PUT", "PATCH"].includes(r.method),
+  ).length;
   console.log(
     `route-contracts: ok (${report.mounted.length} modules, ${report.routes.length} routes, ${writes} writes, all with contracts)`,
   );
   process.exit(0);
 } catch (err) {
-  console.error("route-contracts: a module does not load with a valid contract\n");
-  console.error(`  ${String(err && err.message).split("\n").join("\n  ")}`);
-  console.error("\nEvery route is defined with route() or publicRoute(). See docs/BACKEND_GUIDE.md §3.2.");
+  console.error(
+    "route-contracts: a module does not load with a valid contract\n",
+  );
+  console.error(
+    `  ${String(err && err.message)
+      .split("\n")
+      .join("\n  ")}`,
+  );
+  console.error(
+    "\nEvery route is defined with route() or publicRoute(). See docs/BACKEND_GUIDE.md §3.2.",
+  );
   process.exit(1);
 }

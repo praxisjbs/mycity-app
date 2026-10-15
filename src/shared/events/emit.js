@@ -66,7 +66,8 @@ const ENTITY_TYPE_RE = /^[a-z][a-z0-9_]*$/;
 const PAYLOAD_MAX_BYTES = 16 * 1024;
 
 /** A key naming a credential. Matched on the key name, at any depth. */
-const CREDENTIAL_KEY = /(password|passwd|secret|token|api_key|private_key|_hash$|_enc$|^otp$|mfa)/i;
+const CREDENTIAL_KEY =
+  /(password|passwd|secret|token|api_key|private_key|_hash$|_enc$|^otp$|mfa)/i;
 
 /**
  * jsonb parameters are always stringified here. node-postgres turns a JS array
@@ -83,16 +84,27 @@ function redact(value, depth = 0) {
   const out = {};
   for (const [k, v] of Object.entries(value)) {
     if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
-    out[k] = CREDENTIAL_KEY.test(k) && v !== null && v !== undefined ? "<redacted>" : redact(v, depth + 1);
+    out[k] =
+      CREDENTIAL_KEY.test(k) && v !== null && v !== undefined
+        ? "<redacted>"
+        : redact(v, depth + 1);
   }
   return out;
 }
 
-const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+const same = (a, b) =>
+  JSON.stringify(a === undefined ? null : a) ===
+  JSON.stringify(b === undefined ? null : b);
 
 /** Top-level keys whose value differs between before and after, sorted. */
 function changedFields(before, after) {
-  if (!before || !after || typeof before !== "object" || typeof after !== "object") return null;
+  if (
+    !before ||
+    !after ||
+    typeof before !== "object" ||
+    typeof after !== "object"
+  )
+    return null;
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
   return [...keys].filter((k) => !same(before[k], after[k])).sort();
 }
@@ -103,10 +115,17 @@ function changedFields(before, after) {
  */
 function actorOf(actor) {
   if (actor === undefined) {
-    return { user_id: requestContext.getUserId(), name: null, email: null, ip: null };
+    return {
+      user_id: requestContext.getUserId(),
+      name: null,
+      email: null,
+      ip: null,
+    };
   }
-  if (actor === null) return { user_id: null, name: null, email: null, ip: null };
-  if (typeof actor === "string") return { user_id: actor, name: null, email: null, ip: null };
+  if (actor === null)
+    return { user_id: null, name: null, email: null, ip: null };
+  if (typeof actor === "string")
+    return { user_id: actor, name: null, email: null, ip: null };
   return {
     user_id: actor.user_id || null,
     name: actor.display_name || actor.name || null,
@@ -124,18 +143,34 @@ function withActor(req) {
 }
 
 function check(event) {
-  if (!event || typeof event !== "object") throw new Error("emit: give an event object");
+  if (!event || typeof event !== "object")
+    throw new Error("emit: give an event object");
   if (!event.key) {
     // A missing key is a caller bug (usually a misspelt constant). Saying so here
     // beats a NOT NULL violation that reads like a problem with the user's input.
-    throw new Error(`emit: key is required (entity ${event.entity ? event.entity.type : "?"})`);
+    throw new Error(
+      `emit: key is required (entity ${event.entity ? event.entity.type : "?"})`,
+    );
   }
   const entry = catalogue.require(event.key);
   const entity = event.entity;
-  if (!entity || !ENTITY_TYPE_RE.test(String(entity.type || "")) || entity.id === undefined || entity.id === null || entity.id === "") {
-    throw new Error(`emit(${event.key}): entity { type, id } is required; type is snake_case`);
+  if (
+    !entity ||
+    !ENTITY_TYPE_RE.test(String(entity.type || "")) ||
+    entity.id === undefined ||
+    entity.id === null ||
+    entity.id === ""
+  ) {
+    throw new Error(
+      `emit(${event.key}): entity { type, id } is required; type is snake_case`,
+    );
   }
-  if (event.payload !== undefined && (event.payload === null || typeof event.payload !== "object" || Array.isArray(event.payload))) {
+  if (
+    event.payload !== undefined &&
+    (event.payload === null ||
+      typeof event.payload !== "object" ||
+      Array.isArray(event.payload))
+  ) {
     throw new Error(`emit(${event.key}): payload is an object`);
   }
   return entry;
@@ -150,13 +185,17 @@ function check(event) {
 async function emit(client, event) {
   const entry = check(event);
   if (!inTransaction(client)) {
-    throw new Error(`emit(${event.key}) must run inside atomically(): the event commits or rolls back with the change`);
+    throw new Error(
+      `emit(${event.key}) must run inside atomically(): the event commits or rolls back with the change`,
+    );
   }
 
   const payload = event.payload || {};
   const payloadJson = JSON.stringify(payload);
   if (Buffer.byteLength(payloadJson) > PAYLOAD_MAX_BYTES) {
-    throw new Error(`emit(${event.key}): payload is over ${PAYLOAD_MAX_BYTES} bytes; carry ids, not rows`);
+    throw new Error(
+      `emit(${event.key}): payload is over ${PAYLOAD_MAX_BYTES} bytes; carry ids, not rows`,
+    );
   }
 
   const actor = actorOf(event.actor);
@@ -208,8 +247,20 @@ async function emit(client, event) {
     ],
   );
 
-  metrics.inc("mycity_events_emitted_total", { module: moduleKey }, 1, "Events emitted, by module.");
+  metrics.inc(
+    "mycity_events_emitted_total",
+    { module: moduleKey },
+    1,
+    "Events emitted, by module.",
+  );
   return rows[0];
 }
 
-module.exports = { emit, withActor, redact, changedFields, actorOf, PAYLOAD_MAX_BYTES };
+module.exports = {
+  emit,
+  withActor,
+  redact,
+  changedFields,
+  actorOf,
+  PAYLOAD_MAX_BYTES,
+};

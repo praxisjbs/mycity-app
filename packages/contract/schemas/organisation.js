@@ -10,14 +10,28 @@
  * the organisation module in M0.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, email, phone, isoDate, money } = require("./common");
+const {
+  uuid,
+  text,
+  optionalText,
+  email,
+  phone,
+  isoDate,
+  money,
+} = require("./common");
 
 /**
  * PROPOSED values, to confirm with MyCity (Cynthia). Most MyCity staff are
  * engaged as contractors or consultants (internal workflow meeting,
  * 12 October 2026), so both are first-class values, not "other".
  */
-const EMPLOYMENT_TYPES = ["full_time", "part_time", "contractor", "consultant", "intern"];
+const EMPLOYMENT_TYPES = [
+  "full_time",
+  "part_time",
+  "contractor",
+  "consultant",
+  "intern",
+];
 
 /** MILESTONES §6.2: remote, hybrid and on-site are work patterns on the employee. */
 const WORK_PATTERNS = ["on_site", "hybrid", "remote"];
@@ -26,7 +40,11 @@ const EmploymentType = z.enum(EMPLOYMENT_TYPES);
 const WorkPattern = z.enum(WORK_PATTERNS);
 
 /** Staff number as issued by numbering ("MCA-0001"). Optional on create: allocated when absent. */
-const staffNumber = z.string().trim().toUpperCase().regex(/^[A-Z]{2,5}-\d{3,6}$/, "must look like MCA-0001");
+const staffNumber = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{2,5}-\d{3,6}$/, "must look like MCA-0001");
 
 /** The fields every employee has, whoever creates them and however. */
 const employeeCore = {
@@ -46,7 +64,11 @@ const employeeCore = {
 /** Restricted fields (field-masked, BACKEND_STRUCTURE §9.4). Optional on create. */
 const employeeRestricted = {
   bank_name: optionalText(100),
-  account_number: z.string().trim().regex(/^\d{10}$/, "must be a 10-digit NUBAN").optional(),
+  account_number: z
+    .string()
+    .trim()
+    .regex(/^\d{10}$/, "must be a 10-digit NUBAN")
+    .optional(),
   gross_monthly: money.optional(),
 };
 
@@ -76,7 +98,11 @@ const AdminBootstrap = z
         department_name: text(100),
       })
       .strict(),
-    role_code: z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_]{1,49}$/, "must be a role code"),
+    role_code: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z][a-z0-9_]{1,49}$/, "must be a role code"),
     is_ceo: z.boolean().default(false),
   })
   .strict();

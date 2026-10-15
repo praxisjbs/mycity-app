@@ -58,7 +58,8 @@ async function initRedis() {
 
 /** The shared client. Throws before initRedis(); callers that may run without Redis use tryClient(). */
 function getClient() {
-  if (!client) throw new Error("redis not initialised; call initRedis() at boot");
+  if (!client)
+    throw new Error("redis not initialised; call initRedis() at boot");
   return client;
 }
 
@@ -81,9 +82,20 @@ function createConnection(label) {
 }
 
 async function closeRedis() {
-  await Promise.allSettled([client && client.quit(), ...[...extras].map((c) => c.quit())]);
+  await Promise.allSettled([
+    client && client.quit(),
+    ...[...extras].map((c) => c.quit()),
+  ]);
   extras.clear();
   client = null;
 }
 
-module.exports = { initRedis, getClient, tryClient, createConnection, closeRedis, rkey, REDIS_PREFIX };
+module.exports = {
+  initRedis,
+  getClient,
+  tryClient,
+  createConnection,
+  closeRedis,
+  rkey,
+  REDIS_PREFIX,
+};

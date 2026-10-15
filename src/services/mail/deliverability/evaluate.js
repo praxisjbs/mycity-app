@@ -13,7 +13,11 @@ function toRow(domain, record, check, { selector = null } = {}) {
     selector: selector || check.selector || null,
     verdict,
     value: valueOf(check),
-    suggestion: check.hint || check.reading || (check.suggest && check.suggest[0]) || null,
+    suggestion:
+      check.hint ||
+      check.reading ||
+      (check.suggest && check.suggest[0]) ||
+      null,
   };
 }
 
@@ -23,10 +27,17 @@ function valueOf(check) {
   if (check.raw) return check.raw;
   if (check.names) return check.names.join(", ");
   if (Array.isArray(check.records)) {
-    return check.records.map((r) => (r.host ? `${r.priority} ${r.host}` : r)).join(", ");
+    return check.records
+      .map((r) => (r.host ? `${r.priority} ${r.host}` : r))
+      .join(", ");
   }
   if (check.listings) {
-    return check.listings.filter((l) => l.listed).map((l) => l.host).join(", ") || "not listed";
+    return (
+      check.listings
+        .filter((l) => l.listed)
+        .map((l) => l.host)
+        .join(", ") || "not listed"
+    );
   }
   return null;
 }

@@ -62,7 +62,8 @@ const STATES = {
 /** DNS codes that mean "no such record" rather than "could not look up". */
 const NO_RECORD = new Set(["ENOTFOUND", "ENODATA", "NXDOMAIN"]);
 
-const asList = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x) : []);
+const asList = (v) =>
+  Array.isArray(v) ? v.filter((x) => typeof x === "string" && x) : [];
 const overlap = (a, b) => asList(a).some((x) => asList(b).includes(x));
 
 /**
@@ -81,36 +82,60 @@ function classify({ relayIps, recipientIps, mxIps, hasMx = true } = {}) {
   const mx = asList(mxIps);
 
   if (!relay.length) {
-    return { state: STATES.UNKNOWN, ok: null, reason: "The relay host could not be resolved to an IP." };
+    return {
+      state: STATES.UNKNOWN,
+      ok: null,
+      reason: "The relay host could not be resolved to an IP.",
+    };
   }
   // A domain with no MX at all is not this check's business — it is either
   // broken or mail-less, and either way local delivery is not what is wrong.
   if (!hasMx) {
-    return { state: STATES.UNKNOWN, ok: null, reason: "The recipient domain publishes no MX record." };
+    return {
+      state: STATES.UNKNOWN,
+      ok: null,
+      reason: "The recipient domain publishes no MX record.",
+    };
   }
   if (!recipient.length) {
-    return { state: STATES.UNKNOWN, ok: null, reason: "The recipient domain could not be resolved to an IP." };
+    return {
+      state: STATES.UNKNOWN,
+      ok: null,
+      reason: "The recipient domain could not be resolved to an IP.",
+    };
   }
   // Not co-hosted: the relay has no reason to think it owns this domain.
   if (!overlap(relay, recipient)) {
-    return { state: STATES.OK, ok: true, reason: "The relay does not host this domain, so it will route by MX." };
+    return {
+      state: STATES.OK,
+      ok: true,
+      reason: "The relay does not host this domain, so it will route by MX.",
+    };
   }
   // Co-hosted AND the relay is itself the mail exchanger — local delivery is the
   // correct answer here, not a trap.
   if (mx.length && overlap(relay, mx)) {
-    return { state: STATES.OK, ok: true, reason: "The relay is this domain's own mail server." };
+    return {
+      state: STATES.OK,
+      ok: true,
+      reason: "The relay is this domain's own mail server.",
+    };
   }
   if (!mx.length) {
-    return { state: STATES.UNKNOWN, ok: null, reason: "The recipient's MX hosts could not be resolved to IPs." };
+    return {
+      state: STATES.UNKNOWN,
+      ok: null,
+      reason: "The recipient's MX hosts could not be resolved to IPs.",
+    };
   }
   return {
     state: STATES.LOCAL_TRAP,
     ok: false,
     reason:
-      "The relay hosts this domain but its mail is delivered elsewhere. Mail relayed through this "
-      + "server is being delivered to a local mailbox instead of the domain's real mail server: "
-      + "accepted, never delivered, and never bounced. Set this domain's mail routing on the relay "
-      + "to a REMOTE mail exchanger.",
+      "The relay hosts this domain but its mail is delivered elsewhere. Mail relayed through this " +
+      "server is being delivered to a local mailbox instead of the domain's real mail server: " +
+      "accepted, never delivered, and never bounced. Set this domain's mail routing on the relay " +
+      "to a REMOTE mail exchanger.",
   };
 }
 
@@ -130,10 +155,13 @@ async function mxAddresses(domain) {
   try {
     records = await dns.resolveMx(domain);
   } catch (err) {
-    if (NO_RECORD.has(err && err.code)) return { hasMx: false, hosts: [], ips: [] };
+    if (NO_RECORD.has(err && err.code))
+      return { hasMx: false, hosts: [], ips: [] };
     return { hasMx: null, hosts: [], ips: [] };
   }
-  const hosts = (records || []).map((r) => String(r.exchange || "").toLowerCase()).filter(Boolean);
+  const hosts = (records || [])
+    .map((r) => String(r.exchange || "").toLowerCase())
+    .filter(Boolean);
   if (!hosts.length) return { hasMx: false, hosts: [], ips: [] };
   const ips = (await Promise.all(hosts.map(resolve4))).flat();
   return { hasMx: true, hosts, ips };
@@ -147,9 +175,16 @@ async function mxAddresses(domain) {
  * asking them to trust it.
  */
 async function checkRoute({ smtpHost, recipientDomain } = {}) {
-  const domain = String(recipientDomain || "").trim().toLowerCase().replace(/^.*@/, "");
+  const domain = String(recipientDomain || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^.*@/, "");
   if (!smtpHost || !domain) {
-    return { ...classify({}), smtp_host: smtpHost || null, domain: domain || null };
+    return {
+      ...classify({}),
+      smtp_host: smtpHost || null,
+      domain: domain || null,
+    };
   }
   const [relayIps, recipientIps, mx] = await Promise.all([
     resolve4(smtpHost),
@@ -228,7 +263,9 @@ async function checkRouteCached({ smtpHost, recipientDomain }) {
  * got this wrong too — on `a<b" <x@y.ng>` it returned `b" <x@y.ng`.
  */
 const addressOf = (raw) => {
-  const s = String(raw || "").trim().toLowerCase();
+  const s = String(raw || "")
+    .trim()
+    .toLowerCase();
   const open = s.lastIndexOf("<");
   if (open === -1) return s;
   const close = s.indexOf(">", open + 1);
@@ -237,12 +274,14 @@ const addressOf = (raw) => {
 
 const domainsOf = (to) => {
   const list = Array.isArray(to) ? to : String(to || "").split(",");
-  return [...new Set(
-    list
-      .map(addressOf)
-      .map((a) => a.split("@")[1])
-      .filter(Boolean),
-  )];
+  return [
+    ...new Set(
+      list
+        .map(addressOf)
+        .map((a) => a.split("@")[1])
+        .filter(Boolean),
+    ),
+  ];
 };
 
 /**
@@ -263,11 +302,11 @@ async function assertRoutable({ smtpHost, to }) {
     }
     if (verdict.state !== STATES.LOCAL_TRAP) continue;
     const err = new Error(
-      `Mail to ${domain} cannot be delivered through ${smtpHost}. That server hosts `
-      + `${domain} and would deliver this message to a local mailbox on itself instead of `
-      + `sending it to the domain's real mail server (${verdict.mx_hosts.join(", ") || "its MX"}). `
-      + "The message has NOT been sent. Set that domain's mail routing on the relay to a remote "
-      + "mail exchanger, or send through a relay that does not host it.",
+      `Mail to ${domain} cannot be delivered through ${smtpHost}. That server hosts ` +
+        `${domain} and would deliver this message to a local mailbox on itself instead of ` +
+        `sending it to the domain's real mail server (${verdict.mx_hosts.join(", ") || "its MX"}). ` +
+        "The message has NOT been sent. Set that domain's mail routing on the relay to a remote " +
+        "mail exchanger, or send through a relay that does not host it.",
     );
     err.code = "MAIL_ROUTE_TRAPPED";
     err.details = {
@@ -285,4 +324,11 @@ function _resetCache() {
   cache.clear();
 }
 
-module.exports = { STATES, classify, checkRoute, checkRouteCached, assertRoutable, _resetCache };
+module.exports = {
+  STATES,
+  classify,
+  checkRoute,
+  checkRouteCached,
+  assertRoutable,
+  _resetCache,
+};

@@ -207,15 +207,20 @@ Realtime is best effort; everything that changes state goes through the outbox.
 | Queue / schedule | Process | Purpose | From |
 |---|---|---|---|
 | outbox dispatch (poll 1s) | worker | Post-commit consumers | Pixie `shared/outbox` |
-| `email` | worker | System mail via SMTP, staging-marked | Praxis `jobs/handlers/email-send` |
-| `pdf` | worker | Chromium render | Praxis `services/pdf.service.js`, `chromium.js` |
+| `email-send` | worker | System mail via SMTP, staging-marked | Praxis `jobs/handlers/email-send` |
+| `pdf-render` | worker | Chromium render | Praxis `services/pdf.service.js`, `chromium.js` |
 | `notification-deliver` | worker | Push + email fan-out | Praxis `jobs/handlers/notification-deliver` |
 | `workflow-timeout` (every 5 min) | worker | Applies stage `on_timeout` | Pixie engine `resolveTimeout` |
 | `celebrations` (05:00 Lagos) | worker | Birthday, anniversary posts (M1) | new |
 | `mail-sync`, IMAP IDLE | worker | Mailbox (M1) | Praxis `jobs/mail-*` |
 
-BullMQ prefix `mycity:prod` / `mycity:stg` on separate Redis logical DBs. Schedulers take a Redis
-lock (Praxis `jobs/cron-lock.js`) so a restart overlap cannot double-fire.
+BullMQ prefix `mycity:prod` / `mycity:stg` on separate Redis logical DBs. Queue names are the handler
+file names (`jobs/registry.js` lists them all; README §5.15 by milestone). Schedulers are BullMQ job
+schedulers on one `schedule` queue, so a tick starts once across processes, and each tick runs under a
+Postgres advisory lock (Praxis `jobs/cron-lock.js`) so a slow run and the next tick, or two workers
+during a restart, never overlap. The outbox dispatch is the exception: a one-second timer in every
+worker, safe because its claim is `SKIP LOCKED`. The worker writes a heartbeat to Redis every 30
+seconds; `/api/health/ready` reports `worker` degraded when none is fresh.
 
 ---
 

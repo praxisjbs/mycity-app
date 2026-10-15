@@ -60,7 +60,8 @@ function absPath(key) {
 
 function toBuffer(value) {
   if (Buffer.isBuffer(value)) return value;
-  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  if (ArrayBuffer.isView(value) && !(value instanceof DataView))
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
   return null;
 }
 
@@ -71,11 +72,18 @@ function toBuffer(value) {
  */
 async function put(key, value, { overwrite = false } = {}) {
   const buffer = toBuffer(value);
-  if (!buffer) throw new AppError("BAD_STORAGE_BUFFER", "Only binary data can be stored", 400);
-  if (buffer.length > MAX_BYTES) throw new AppError("STORAGE_LIMIT", "This file is too large to store", 413);
+  if (!buffer)
+    throw new AppError(
+      "BAD_STORAGE_BUFFER",
+      "Only binary data can be stored",
+      400,
+    );
+  if (buffer.length > MAX_BYTES)
+    throw new AppError("STORAGE_LIMIT", "This file is too large to store", 413);
   const full = absPath(key);
   await fsp.mkdir(path.dirname(full), { recursive: true, mode: 0o750 });
-  if (!overwrite && fs.existsSync(full)) throw new Error(`storage.put: ${key} already exists`);
+  if (!overwrite && fs.existsSync(full))
+    throw new Error(`storage.put: ${key} already exists`);
   const tmp = `${full}.${crypto.randomBytes(6).toString("hex")}.part`;
   try {
     await fsp.writeFile(tmp, buffer, { mode: 0o640 });
@@ -91,9 +99,11 @@ async function put(key, value, { overwrite = false } = {}) {
 async function putFile(key, sourceAbs, { overwrite = false } = {}) {
   const full = absPath(key);
   const { size } = await fsp.stat(sourceAbs);
-  if (size > MAX_BYTES) throw new AppError("STORAGE_LIMIT", "This file is too large to store", 413);
+  if (size > MAX_BYTES)
+    throw new AppError("STORAGE_LIMIT", "This file is too large to store", 413);
   await fsp.mkdir(path.dirname(full), { recursive: true, mode: 0o750 });
-  if (!overwrite && fs.existsSync(full)) throw new Error(`storage.putFile: ${key} already exists`);
+  if (!overwrite && fs.existsSync(full))
+    throw new Error(`storage.putFile: ${key} already exists`);
   try {
     await fsp.rename(sourceAbs, full);
   } catch (err) {
@@ -136,7 +146,12 @@ async function stat(key) {
 async function open(key, { start, end } = {}) {
   const full = absPath(key);
   const s = await fsp.stat(full).catch((err) => {
-    if (err.code === "ENOENT") throw new AppError("FILE_MISSING", "The file for this document is missing", 410);
+    if (err.code === "ENOENT")
+      throw new AppError(
+        "FILE_MISSING",
+        "The file for this document is missing",
+        410,
+      );
     throw err;
   });
   const opts = start === undefined ? {} : { start, end };
@@ -148,7 +163,8 @@ async function move(fromKey, toKey) {
   const from = absPath(fromKey);
   const to = absPath(toKey);
   await fsp.mkdir(path.dirname(to), { recursive: true, mode: 0o750 });
-  if (fs.existsSync(to)) throw new Error(`storage.move: ${toKey} already exists`);
+  if (fs.existsSync(to))
+    throw new Error(`storage.move: ${toKey} already exists`);
   await fsp.rename(from, to);
   return { key: toKey };
 }
@@ -183,4 +199,19 @@ async function health() {
   }
 }
 
-module.exports = { put, putFile, get, exists, stat, open, move, remove, scratch, health, absPath, assertKey, root, MAX_BYTES };
+module.exports = {
+  put,
+  putFile,
+  get,
+  exists,
+  stat,
+  open,
+  move,
+  remove,
+  scratch,
+  health,
+  absPath,
+  assertKey,
+  root,
+  MAX_BYTES,
+};

@@ -24,7 +24,8 @@ const { pool } = require("../config/db");
 const { AppError } = require("../shared/errors");
 const publicToken = require("../shared/tokens/public-token");
 
-const notFound = () => new AppError("NOT_FOUND", "This link is not valid or has expired", 404);
+const notFound = () =>
+  new AppError("NOT_FOUND", "This link is not valid or has expired", 404);
 
 /**
  * @param {string} scope   "<thing>.<action>", the one thing this route does
@@ -32,7 +33,9 @@ const notFound = () => new AppError("NOT_FOUND", "This link is not valid or has 
  */
 function requirePublicToken(scope, { param = "token" } = {}) {
   if (!/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(scope || "")) {
-    throw new Error(`requirePublicToken: scope is "<thing>.<action>", got ${JSON.stringify(scope)}`);
+    throw new Error(
+      `requirePublicToken: scope is "<thing>.<action>", got ${JSON.stringify(scope)}`,
+    );
   }
   const mw = async function publicTokenCheck(req, _res, next) {
     const raw = req.params[param];

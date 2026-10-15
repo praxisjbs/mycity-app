@@ -43,37 +43,148 @@ const bin = (pkg, rel) => path.join(ROOT, "node_modules", pkg, rel);
  */
 const GATES = [
   // Gates 1 to 8 (M0)
-  { id: "lint", label: "1  Lint", tool: ["eslint", "bin/eslint.js"], args: ["--max-warnings", "0", "."] },
-  { id: "test", label: "2  Tests, whole suite", tool: ["jest", "bin/jest.js"], args: ["--ci"] },
-  { id: "migration-numbers", label: "3  Migration numbering", script: "scripts/check/migration-numbers.js" },
-  { id: "migration-reversibility", label: "4  Migration reversibility", script: "scripts/check/migration-reversibility.js" },
-  { id: "migration-idempotency", label: "5  Migration idempotency", script: "scripts/check/migration-idempotency.js" },
-  { id: "schema-drift", label: "6  Schema drift", script: "scripts/check/schema-drift.js" },
-  { id: "contract-columns", label: "6  Contract keys are columns", script: "scripts/check/contract-columns.js" },
-  { id: "route-contracts", label: "7  Write routes validated", script: "scripts/check/route-contracts.js" },
-  { id: "dashes", label: "8  Five-second rule (backend half) / 17 No dashes", script: "scripts/check/dashes.js" },
+  {
+    id: "lint",
+    label: "1  Lint",
+    tool: ["eslint", "bin/eslint.js"],
+    args: ["--max-warnings", "0", "."],
+  },
+  {
+    id: "test",
+    label: "2  Tests, whole suite",
+    tool: ["jest", "bin/jest.js"],
+    args: ["--ci"],
+  },
+  {
+    id: "migration-numbers",
+    label: "3  Migration numbering",
+    script: "scripts/check/migration-numbers.js",
+  },
+  {
+    id: "migration-reversibility",
+    label: "4  Migration reversibility",
+    script: "scripts/check/migration-reversibility.js",
+  },
+  {
+    id: "migration-idempotency",
+    label: "5  Migration idempotency",
+    script: "scripts/check/migration-idempotency.js",
+  },
+  {
+    id: "schema-drift",
+    label: "6  Schema drift",
+    script: "scripts/check/schema-drift.js",
+  },
+  {
+    id: "contract-columns",
+    label: "6  Contract keys are columns",
+    script: "scripts/check/contract-columns.js",
+  },
+  {
+    id: "route-contracts",
+    label: "7  Write routes validated",
+    script: "scripts/check/route-contracts.js",
+  },
+  {
+    id: "dashes",
+    label: "8  Five-second rule (backend half) / 17 No dashes",
+    script: "scripts/check/dashes.js",
+  },
   // Gates from M1 onward
-  { id: "ai-manifest-coverage", label: "9  AI manifest coverage", script: "scripts/check/ai-manifest-coverage.js" },
-  { id: "search-coverage", label: "10 Search coverage", script: "scripts/check/search-coverage.js" },
-  { id: "date-format", label: "15 Day-first dates", script: "scripts/check/date-format.js" },
-  { id: "ai-no-writes", label: "19 AI read manifest only", script: "scripts/check/ai-no-writes.js" },
+  {
+    id: "ai-manifest-coverage",
+    label: "9  AI manifest coverage",
+    script: "scripts/check/ai-manifest-coverage.js",
+  },
+  {
+    id: "search-coverage",
+    label: "10 Search coverage",
+    script: "scripts/check/search-coverage.js",
+  },
+  {
+    id: "date-format",
+    label: "15 Day-first dates",
+    script: "scripts/check/date-format.js",
+  },
+  {
+    id: "ai-no-writes",
+    label: "19 AI read manifest only",
+    script: "scripts/check/ai-no-writes.js",
+  },
   { id: "money", label: "20 Money", script: "scripts/check/money.js" },
   // Pipeline guards
-  { id: "contract", label: "Contract is generated and current", script: "scripts/gen/contract.js", args: ["--check"] },
-  { id: "env-template", label: ".env.example matches the schema", script: "scripts/check/env-template.js" },
-  { id: "module-catalogue", label: "Module catalogue equals enforced keys", script: "scripts/check/module-catalogue.js" },
-  { id: "public-surface", label: "Public routes import no auth", script: "scripts/check/public-surface.js" },
-  { id: "numbering-schemes", label: "Numbering schemes exist", script: "scripts/check/numbering-schemes.js" },
-  { id: "production-environment-refs", label: "Only release/rollback reach production", script: "scripts/check/production-environment-refs.js" },
-  { id: "ai-vendor-imports", label: "No AI vendor imports outside services/ai", script: "scripts/check/ai-vendor-imports.js" },
-  { id: "shell", label: "Shell scripts LF and parse", script: "scripts/check/shell.js" },
-  { id: "pagination", label: "Every list pages at 25", script: "scripts/check/pagination.js" },
-  { id: "provenance", label: "Code never names its origin project", script: "scripts/check/provenance.js" },
+  {
+    id: "contract",
+    label: "Contract is generated and current",
+    script: "scripts/gen/contract.js",
+    args: ["--check"],
+  },
+  {
+    id: "env-template",
+    label: ".env.example matches the schema",
+    script: "scripts/check/env-template.js",
+  },
+  {
+    id: "module-catalogue",
+    label: "Module catalogue equals enforced keys",
+    script: "scripts/check/module-catalogue.js",
+  },
+  {
+    id: "public-surface",
+    label: "Public routes import no auth",
+    script: "scripts/check/public-surface.js",
+  },
+  {
+    id: "numbering-schemes",
+    label: "Numbering schemes exist",
+    script: "scripts/check/numbering-schemes.js",
+  },
+  {
+    id: "production-environment-refs",
+    label: "Only release/rollback reach production",
+    script: "scripts/check/production-environment-refs.js",
+  },
+  {
+    id: "ai-vendor-imports",
+    label: "No AI vendor imports outside services/ai",
+    script: "scripts/check/ai-vendor-imports.js",
+  },
+  {
+    id: "shell",
+    label: "Shell scripts LF and parse",
+    script: "scripts/check/shell.js",
+  },
+  {
+    id: "pagination",
+    label: "Every list pages at 25",
+    script: "scripts/check/pagination.js",
+  },
+  {
+    id: "provenance",
+    label: "Code never names its origin project",
+    script: "scripts/check/provenance.js",
+  },
   // Process: the work is recorded where the team reads it
-  { id: "progress", label: "PROGRESS.md updated and well formed", script: "scripts/check/progress.js" },
-  { id: "guides", label: "Feature guides followed and complete", script: "scripts/check/guides.js" },
-  { id: "readme-map", label: "New files are on the README map", script: "scripts/check/readme-map.js" },
-  { id: "codeowners", label: "CODEOWNERS complete and valid", script: "scripts/check/codeowners.js" },
+  {
+    id: "progress",
+    label: "PROGRESS.md updated and well formed",
+    script: "scripts/check/progress.js",
+  },
+  {
+    id: "guides",
+    label: "Feature guides followed and complete",
+    script: "scripts/check/guides.js",
+  },
+  {
+    id: "readme-map",
+    label: "New files are on the README map",
+    script: "scripts/check/readme-map.js",
+  },
+  {
+    id: "codeowners",
+    label: "CODEOWNERS complete and valid",
+    script: "scripts/check/codeowners.js",
+  },
 ];
 
 function isEmpty(rel) {
@@ -86,7 +197,8 @@ function command(gate) {
   if (gate.tool) {
     const [pkg, rel] = gate.tool;
     const file = bin(pkg, rel);
-    if (!fs.existsSync(file)) return { missing: `${pkg} is not installed; run npm ci` };
+    if (!fs.existsSync(file))
+      return { missing: `${pkg} is not installed; run npm ci` };
     return { argv: [file, ...(gate.args || [])] };
   }
   if (isEmpty(gate.script)) return { notBuilt: true };
@@ -96,7 +208,11 @@ function command(gate) {
 if (has("list")) {
   for (const g of GATES) {
     const c = command(g);
-    const state = c.notBuilt ? "not built" : c.missing ? "missing tool" : "ready";
+    const state = c.notBuilt
+      ? "not built"
+      : c.missing
+        ? "missing tool"
+        : "ready";
     console.log(`${g.id.padEnd(28)} ${g.label.padEnd(52)} ${state}`);
   }
   process.exit(0);
@@ -117,11 +233,20 @@ for (const gate of GATES) {
   }
   process.stdout.write(`▸ ${gate.label} … `);
   const started = Date.now();
-  const r = spawnSync(process.execPath, c.argv, { cwd: ROOT, encoding: "utf8", env: process.env, maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(process.execPath, c.argv, {
+    cwd: ROOT,
+    encoding: "utf8",
+    env: process.env,
+    maxBuffer: 64 * 1024 * 1024,
+  });
   const secs = ((Date.now() - started) / 1000).toFixed(1);
   const ok = r.status === 0;
   console.log(`${ok ? "ok" : "FAILED"} (${secs}s)`);
-  results.push({ gate, status: ok ? "PASS" : "FAIL", output: `${r.stdout || ""}${r.stderr || ""}`.trim() });
+  results.push({
+    gate,
+    status: ok ? "PASS" : "FAIL",
+    output: `${r.stdout || ""}${r.stderr || ""}`.trim(),
+  });
   if (!ok && FAST) break;
 }
 
@@ -136,8 +261,12 @@ for (const r of failed) {
 
 console.log("\n════ Summary ════");
 console.log(`passed     ${passed.length}`);
-console.log(`failed     ${failed.length}${failed.length ? `: ${failed.map((r) => r.gate.id).join(", ")}` : ""}`);
-console.log(`not built  ${notBuilt.length}${notBuilt.length ? `: ${notBuilt.map((r) => r.gate.id).join(", ")}` : ""}`);
+console.log(
+  `failed     ${failed.length}${failed.length ? `: ${failed.map((r) => r.gate.id).join(", ")}` : ""}`,
+);
+console.log(
+  `not built  ${notBuilt.length}${notBuilt.length ? `: ${notBuilt.map((r) => r.gate.id).join(", ")}` : ""}`,
+);
 if (notBuilt.length) {
   console.log(
     STRICT

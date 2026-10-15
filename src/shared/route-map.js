@@ -36,21 +36,66 @@ const catalog = require("./access/access.catalog");
 const SCREENS = Object.freeze({
   home: ["overview", "alerts", "reports", "team"],
   workspace: ["today", "tasks", "calendar", "analytics"],
-  ess: ["my-profile", "my-attendance", "my-performance", "my-payslips", "my-leave", "my-queries", "my-documents"],
+  ess: [
+    "my-profile",
+    "my-attendance",
+    "my-performance",
+    "my-payslips",
+    "my-leave",
+    "my-queries",
+    "my-documents",
+  ],
   community: ["channels", "direct-messages", "announcements"],
   mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash"],
   people: ["employees", "attendance", "leave", "devices", "worksites"],
   performance: ["goals", "targets", "kpis", "reviews", "analytics"],
   queries: ["queries", "rules", "sanctions", "letter-templates"],
-  recruitment: ["vacancies", "candidates", "assessments", "interviews", "offers", "onboarding", "talent-pool"],
-  payroll: ["payroll-runs", "payslips", "salary-structure", "deductions", "statutory"],
-  partnerships: ["pipeline", "partners", "leads", "proposals", "contracts-and-mous", "analytics"],
-  expenses: ["my-requests", "approvals", "requisitions", "disbursements", "budgets", "categories"],
+  recruitment: [
+    "vacancies",
+    "candidates",
+    "assessments",
+    "interviews",
+    "offers",
+    "onboarding",
+    "talent-pool",
+  ],
+  payroll: [
+    "payroll-runs",
+    "payslips",
+    "salary-structure",
+    "deductions",
+    "statutory",
+  ],
+  partnerships: [
+    "pipeline",
+    "partners",
+    "leads",
+    "proposals",
+    "contracts-and-mous",
+    "analytics",
+  ],
+  expenses: [
+    "my-requests",
+    "approvals",
+    "requisitions",
+    "disbursements",
+    "budgets",
+    "categories",
+  ],
   knowledge: ["policies", "sops", "faqs", "training", "announcements"],
   praxis_ai: ["ask", "history"],
   settings: [
-    "organisation", "users", "roles-and-permissions", "approvals", "attendance-policy", "notifications",
-    "appearance", "documents-and-numbering", "integrations", "security", "audit-log",
+    "organisation",
+    "users",
+    "roles-and-permissions",
+    "approvals",
+    "attendance-policy",
+    "notifications",
+    "appearance",
+    "documents-and-numbering",
+    "integrations",
+    "security",
+    "audit-log",
   ],
 });
 
@@ -81,24 +126,48 @@ const ENTITY_ROUTES = Object.freeze({
   mail_message: screen("mailbox", "inbox"),
 
   // People
-  employee: { ...screen("people", "employees"), self: screen("ess", "my-profile") },
+  employee: {
+    ...screen("people", "employees"),
+    self: screen("ess", "my-profile"),
+  },
   import_batch: screen("people", "employees"),
-  attendance_record: { ...screen("people", "attendance"), self: screen("ess", "my-attendance") },
-  attendance_exception: { ...screen("people", "attendance"), self: screen("ess", "my-attendance") },
-  leave_request: { ...screen("people", "leave"), self: screen("ess", "my-leave") },
+  attendance_record: {
+    ...screen("people", "attendance"),
+    self: screen("ess", "my-attendance"),
+  },
+  attendance_exception: {
+    ...screen("people", "attendance"),
+    self: screen("ess", "my-attendance"),
+  },
+  leave_request: {
+    ...screen("people", "leave"),
+    self: screen("ess", "my-leave"),
+  },
   device: { ...screen("people", "devices"), self: screen("ess", "my-profile") },
   worksite: screen("people", "worksites"),
 
   // Performance
-  goal: { ...screen("performance", "goals"), self: screen("ess", "my-performance") },
-  target: { ...screen("performance", "targets"), self: screen("ess", "my-performance") },
+  goal: {
+    ...screen("performance", "goals"),
+    self: screen("ess", "my-performance"),
+  },
+  target: {
+    ...screen("performance", "targets"),
+    self: screen("ess", "my-performance"),
+  },
   kpi: screen("performance", "kpis"),
-  review: { ...screen("performance", "reviews"), self: screen("ess", "my-performance") },
+  review: {
+    ...screen("performance", "reviews"),
+    self: screen("ess", "my-performance"),
+  },
 
   // Queries & Sanctions
   query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") },
   query_rule: screen("queries", "rules"),
-  sanction: { ...screen("queries", "sanctions"), self: screen("ess", "my-queries") },
+  sanction: {
+    ...screen("queries", "sanctions"),
+    self: screen("ess", "my-queries"),
+  },
   letter_template: screen("queries", "letter-templates"),
 
   // Recruitment
@@ -107,12 +176,18 @@ const ENTITY_ROUTES = Object.freeze({
   assessment: screen("recruitment", "assessments"),
   interview: screen("recruitment", "interviews"),
   offer: screen("recruitment", "offers"),
-  onboarding: { ...screen("recruitment", "onboarding"), self: screen("ess", "my-documents") },
+  onboarding: {
+    ...screen("recruitment", "onboarding"),
+    self: screen("ess", "my-documents"),
+  },
   talent_pool_entry: screen("recruitment", "talent-pool"),
 
   // Payroll
   payroll_run: screen("payroll", "payroll-runs"),
-  payslip: { ...screen("payroll", "payslips"), self: screen("ess", "my-payslips") },
+  payslip: {
+    ...screen("payroll", "payslips"),
+    self: screen("ess", "my-payslips"),
+  },
   salary_structure: screen("payroll", "salary-structure"),
   deduction: screen("payroll", "deductions"),
   statutory_return: screen("payroll", "statutory"),
@@ -127,7 +202,10 @@ const ENTITY_ROUTES = Object.freeze({
   agreement: screen("partnerships", "contracts-and-mous"),
 
   // Expenses
-  expense: { ...screen("expenses", "approvals"), self: screen("expenses", "my-requests") },
+  expense: {
+    ...screen("expenses", "approvals"),
+    self: screen("expenses", "my-requests"),
+  },
   requisition: screen("expenses", "requisitions"),
   disbursement: screen("expenses", "disbursements"),
   budget: screen("expenses", "budgets"),
@@ -159,13 +237,19 @@ const moduleSlug = (key) => key.replace(/_/g, "-");
 /** Refuse a route to a screen that does not exist, when this file loads. */
 function check() {
   for (const [module, tabs] of Object.entries(SCREENS)) {
-    if (!catalog.isModule(module)) throw new Error(`route-map: SCREENS names "${module}", which is not a module key`);
-    if (new Set(tabs).size !== tabs.length) throw new Error(`route-map: ${module} lists a tab twice`);
+    if (!catalog.isModule(module))
+      throw new Error(
+        `route-map: SCREENS names "${module}", which is not a module key`,
+      );
+    if (new Set(tabs).size !== tabs.length)
+      throw new Error(`route-map: ${module} lists a tab twice`);
   }
   for (const [type, r] of Object.entries(ENTITY_ROUTES)) {
     for (const s of [r, r.self].filter(Boolean)) {
       if (!SCREENS[s.module] || !SCREENS[s.module].includes(s.tab)) {
-        throw new Error(`route-map: ${type} opens ${s.module} / ${s.tab}, which is not a screen`);
+        throw new Error(
+          `route-map: ${type} opens ${s.module} / ${s.tab}, which is not a screen`,
+        );
       }
     }
   }
@@ -181,11 +265,13 @@ check();
  * @returns {string}
  */
 function screenPath(module, tab, { id = null, params = {} } = {}) {
-  if (!SCREENS[module] || !SCREENS[module].includes(tab)) throw new Error(`route-map: ${module} / ${tab} is not a screen`);
+  if (!SCREENS[module] || !SCREENS[module].includes(tab))
+    throw new Error(`route-map: ${module} / ${tab} is not a screen`);
   const q = new URLSearchParams({ tab });
   if (id !== null && id !== undefined && id !== "") q.set("id", String(id));
   for (const [k, v] of Object.entries(params)) {
-    if (k === "tab" || k === "id") throw new Error(`route-map: "${k}" is set by screenPath itself`);
+    if (k === "tab" || k === "id")
+      throw new Error(`route-map: "${k}" is set by screenPath itself`);
     if (v !== undefined && v !== null) q.set(k, String(v));
   }
   return `/${moduleSlug(module)}?${q.toString()}`;
@@ -200,10 +286,16 @@ function screenPath(module, tab, { id = null, params = {} } = {}) {
  */
 function linkFor(entityType, entityId, { self = false } = {}) {
   const r = ENTITY_ROUTES[entityType];
-  if (!r || entityId === null || entityId === undefined || entityId === "") return null;
+  if (!r || entityId === null || entityId === undefined || entityId === "")
+    return null;
   const target = self && r.self ? r.self : r;
   const id = String(entityId);
-  return { module: target.module, tab: target.tab, id, path: screenPath(target.module, target.tab, { id }) };
+  return {
+    module: target.module,
+    tab: target.tab,
+    id,
+    path: screenPath(target.module, target.tab, { id }),
+  };
 }
 
 /** The module a record belongs to (its staff view), or null. Used to check the viewer may open it. */
@@ -212,6 +304,15 @@ function moduleOf(entityType) {
   return r ? r.module : null;
 }
 
-const hasRoute = (entityType) => Object.prototype.hasOwnProperty.call(ENTITY_ROUTES, entityType);
+const hasRoute = (entityType) =>
+  Object.prototype.hasOwnProperty.call(ENTITY_ROUTES, entityType);
 
-module.exports = { SCREENS, ENTITY_ROUTES, moduleSlug, screenPath, linkFor, moduleOf, hasRoute };
+module.exports = {
+  SCREENS,
+  ENTITY_ROUTES,
+  moduleSlug,
+  screenPath,
+  linkFor,
+  moduleOf,
+  hasRoute,
+};

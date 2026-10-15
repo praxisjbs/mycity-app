@@ -35,21 +35,33 @@ const MAX_SHEETS = 100;
 const MAX_ROWS = 100000;
 const MAX_COLS = 256;
 
-const tooLarge = (what) => new AppError("SHEET_TOO_LARGE", `This file is too large to import: ${what}.`, 413);
+const tooLarge = (what) =>
+  new AppError(
+    "SHEET_TOO_LARGE",
+    `This file is too large to import: ${what}.`,
+    413,
+  );
 
 async function loadWorkbook(buffer) {
-  if (buffer && buffer.length > XLSX_MAX_BYTES) throw tooLarge(`over ${XLSX_MAX_BYTES / 1024 / 1024} MB`);
+  if (buffer && buffer.length > XLSX_MAX_BYTES)
+    throw tooLarge(`over ${XLSX_MAX_BYTES / 1024 / 1024} MB`);
   const wb = new ExcelJS.Workbook();
   try {
     await wb.xlsx.load(buffer);
   } catch {
-    throw new AppError("SHEET_UNREADABLE", "This spreadsheet could not be read. Open it in Excel, save it again as .xlsx, and retry.", 422);
+    throw new AppError(
+      "SHEET_UNREADABLE",
+      "This spreadsheet could not be read. Open it in Excel, save it again as .xlsx, and retry.",
+      422,
+    );
   }
-  if (wb.worksheets.length > MAX_SHEETS) throw tooLarge(`more than ${MAX_SHEETS} sheets`);
+  if (wb.worksheets.length > MAX_SHEETS)
+    throw tooLarge(`more than ${MAX_SHEETS} sheets`);
   return wb;
 }
 
-const isGuidance = (ws) => ws.name.trim().toLowerCase() === REFERENCE_SHEET.toLowerCase();
+const isGuidance = (ws) =>
+  ws.name.trim().toLowerCase() === REFERENCE_SHEET.toLowerCase();
 
 /**
  * Parse an uploaded workbook into { sheetName: rows[] }, where each row is an
@@ -74,7 +86,8 @@ async function parseWorkbook(buffer) {
     ws.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
       total += 1;
-      if (total > MAX_ROWS) throw tooLarge(`more than ${MAX_ROWS.toLocaleString("en-NG")} rows`);
+      if (total > MAX_ROWS)
+        throw tooLarge(`more than ${MAX_ROWS.toLocaleString("en-NG")} rows`);
       const obj = {};
       let any = false;
       row.eachCell({ includeEmpty: false }, (cell, col) => {
@@ -125,7 +138,11 @@ async function parseUpload({ buffer, filename = "" }) {
 function trimGrid(rows) {
   const out = rows.map((r) => {
     let end = r.length;
-    while (end > 0 && (r[end - 1] === null || r[end - 1] === undefined || r[end - 1] === "")) end -= 1;
+    while (
+      end > 0 &&
+      (r[end - 1] === null || r[end - 1] === undefined || r[end - 1] === "")
+    )
+      end -= 1;
     return r.slice(0, end);
   });
   while (out.length && out[out.length - 1].length === 0) out.pop();
@@ -147,18 +164,26 @@ async function xlsxGrids(buffer) {
   for (const ws of wb.worksheets) {
     if (ws.state && ws.state !== "visible") continue;
     if (isGuidance(ws)) continue;
-    if (ws.columnCount > MAX_COLS) throw tooLarge(`more than ${MAX_COLS} columns on "${ws.name}"`);
+    if (ws.columnCount > MAX_COLS)
+      throw tooLarge(`more than ${MAX_COLS} columns on "${ws.name}"`);
     const rows = [];
     ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
       total += 1;
-      if (total > MAX_ROWS) throw tooLarge(`more than ${MAX_ROWS.toLocaleString("en-NG")} rows`);
+      if (total > MAX_ROWS)
+        throw tooLarge(`more than ${MAX_ROWS.toLocaleString("en-NG")} rows`);
       const cells = [];
       row.eachCell({ includeEmpty: true }, (cell, col) => {
-        if (col <= MAX_COLS) cells[col - 1] = gridCell(cellRawValue(cell.value));
+        if (col <= MAX_COLS)
+          cells[col - 1] = gridCell(cellRawValue(cell.value));
       });
-      rows[rowNumber - 1] = Array.from(cells, (v) => (v === undefined ? null : v));
+      rows[rowNumber - 1] = Array.from(cells, (v) =>
+        v === undefined ? null : v,
+      );
     });
-    sheets.push({ name: ws.name, rows: trimGrid(Array.from(rows, (r) => r || [])) });
+    sheets.push({
+      name: ws.name,
+      rows: trimGrid(Array.from(rows, (r) => r || [])),
+    });
   }
   return sheets;
 }
@@ -169,11 +194,17 @@ async function xlsxGrids(buffer) {
  * @returns {Promise<{format: "xlsx"|"csv", sheets: Array<{name: string, rows: Array<Array<*>>}>}>}
  */
 async function readSheets({ buffer, filename = "" }) {
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new AppError("FILE_REQUIRED", "The file is empty", 422);
-  if (buffer.length > XLSX_MAX_BYTES) throw tooLarge(`over ${XLSX_MAX_BYTES / 1024 / 1024} MB`);
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0)
+    throw new AppError("FILE_REQUIRED", "The file is empty", 422);
+  if (buffer.length > XLSX_MAX_BYTES)
+    throw tooLarge(`over ${XLSX_MAX_BYTES / 1024 / 1024} MB`);
   const type = sniff(buffer, filename);
-  if (type.ext === "xlsx") return { format: "xlsx", sheets: await xlsxGrids(buffer) };
-  if (type.ext === "csv" || (type.kind === "text" && /\.csv$/i.test(filename))) {
+  if (type.ext === "xlsx")
+    return { format: "xlsx", sheets: await xlsxGrids(buffer) };
+  if (
+    type.ext === "csv" ||
+    (type.kind === "text" && /\.csv$/i.test(filename))
+  ) {
     let rows;
     try {
       rows = parseCsvGrid(buffer);
@@ -181,11 +212,23 @@ async function readSheets({ buffer, filename = "" }) {
       if (err.code === "SHEET_TOO_LARGE") throw tooLarge("over 5 MB of text");
       throw err;
     }
-    if (rows.length > MAX_ROWS) throw tooLarge(`more than ${MAX_ROWS.toLocaleString("en-NG")} rows`);
-    if (rows.some((r) => r.length > MAX_COLS)) throw tooLarge(`more than ${MAX_COLS} columns`);
-    return { format: "csv", sheets: [{ name: "CSV", rows: trimGrid(rows.map((r) => r.map(gridCell))) }] };
+    if (rows.length > MAX_ROWS)
+      throw tooLarge(`more than ${MAX_ROWS.toLocaleString("en-NG")} rows`);
+    if (rows.some((r) => r.length > MAX_COLS))
+      throw tooLarge(`more than ${MAX_COLS} columns`);
+    return {
+      format: "csv",
+      sheets: [
+        { name: "CSV", rows: trimGrid(rows.map((r) => r.map(gridCell))) },
+      ],
+    };
   }
-  if (type.kind === "legacy_office") throw new AppError("SHEET_OLD_FORMAT", "This is an old .xls file. Save it as .xlsx and upload it again.", 415);
+  if (type.kind === "legacy_office")
+    throw new AppError(
+      "SHEET_OLD_FORMAT",
+      "This is an old .xls file. Save it as .xlsx and upload it again.",
+      415,
+    );
   throw new AppError("SHEET_TYPE", "Upload an .xlsx or .csv file.", 415);
 }
 

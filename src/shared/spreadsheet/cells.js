@@ -26,7 +26,8 @@ const TIMEZONE = "Africa/Lagos";
 function cellRawValue(v) {
   if (v === null || v === undefined) return null;
   if (v instanceof Date) return v;
-  if (typeof v === "number" || typeof v === "string" || typeof v === "boolean") return v;
+  if (typeof v === "number" || typeof v === "string" || typeof v === "boolean")
+    return v;
   if (typeof v === "object") {
     if (v.richText) return v.richText.map((t) => t.text).join("");
     if (v.text !== null && v.text !== undefined) return v.text; // hyperlink / rich text
@@ -144,7 +145,14 @@ function wallClock(value, timezone = TIMEZONE) {
     hour12: false,
   }).formatToParts(d);
   const get = (type) => Number(parts.find((p) => p.type === type).value);
-  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour") % 24, minute: get("minute"), second: get("second") };
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour") % 24,
+    minute: get("minute"),
+    second: get("second"),
+  };
 }
 
 /**
@@ -162,11 +170,21 @@ function serialDate(value, { timezone = TIMEZONE, hasTime = true } = {}) {
   if (value === null || value === undefined || value === "") return null;
   // A bare YYYY-MM-DD is a calendar date already: no tz conversion applies.
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value).trim());
-  if (m) return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (m)
+    return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   const wall = wallClock(value, timezone);
   if (!wall) return null;
   return hasTime
-    ? new Date(Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second))
+    ? new Date(
+        Date.UTC(
+          wall.year,
+          wall.month - 1,
+          wall.day,
+          wall.hour,
+          wall.minute,
+          wall.second,
+        ),
+      )
     : new Date(Date.UTC(wall.year, wall.month - 1, wall.day));
 }
 
@@ -188,17 +206,20 @@ function formatInstant(value, timezone = TIMEZONE) {
 function exportFilename({ base, env, extension, date = new Date() }) {
   // Bound before any regex work: `base` can be a person-chosen report name.
   const bounded = String(base || "export").slice(0, 80);
-  const safe = bounded
-    .replace(/[\\/:*?"<>|\r\n]+/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    // Trim the ends as two single-alternative anchored patterns (linear).
-    .replace(/^[.-]+/, "")
-    .replace(/[.-]+$/, "") || "export";
+  const safe =
+    bounded
+      .replace(/[\\/:*?"<>|\r\n]+/g, "-")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      // Trim the ends as two single-alternative anchored patterns (linear).
+      .replace(/^[.-]+/, "")
+      .replace(/[.-]+$/, "") || "export";
   // The one date in this product that stays ISO on purpose: `/` is a path
   // separator, and ISO makes a folder of exports sort into date order.
   const stamp = date instanceof Date ? serialIso(date) : String(date);
-  return env === "staging" ? `${safe}-STAGING-${stamp}.${extension}` : `${safe}-${stamp}.${extension}`;
+  return env === "staging"
+    ? `${safe}-STAGING-${stamp}.${extension}`
+    : `${safe}-${stamp}.${extension}`;
 }
 
 /** The Lagos calendar date of an instant, YYYY-MM-DD. */

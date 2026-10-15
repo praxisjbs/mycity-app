@@ -33,10 +33,15 @@ async function resolveIpv4(host) {
  * @param {{smtpHost?: string|null, ip?: string|null}} [opts]
  * @returns {Promise<{domain: string, rows: object[], checked_at: string}>}
  */
-async function checkOne(domain, { smtpHost = config.SMTP_HOST || null, ip = null } = {}) {
+async function checkOne(
+  domain,
+  { smtpHost = config.SMTP_HOST || null, ip = null } = {},
+) {
   const base = await dnsCheck.checkDomain(domain, { smtpHost });
   const sendingIp = ip || (await resolveIpv4(smtpHost));
-  const ptr = sendingIp ? await checkPtr(sendingIp) : { ok: null, hint: "No sending IP to check PTR against." };
+  const ptr = sendingIp
+    ? await checkPtr(sendingIp)
+    : { ok: null, hint: "No sending IP to check PTR against." };
   const rbl = sendingIp
     ? await checkRbl(sendingIp, { hosts: hostsFrom(config.MAIL_RBL_HOSTS) })
     : { ok: null, hint: "No sending IP to check RBLs against." };
@@ -44,7 +49,9 @@ async function checkOne(domain, { smtpHost = config.SMTP_HOST || null, ip = null
   const rows = [
     toRow(base.domain, "MX", base.mx),
     toRow(base.domain, "SPF", base.spf),
-    toRow(base.domain, "DKIM", base.dkim, { selector: base.dkim && base.dkim.selector }),
+    toRow(base.domain, "DKIM", base.dkim, {
+      selector: base.dkim && base.dkim.selector,
+    }),
     toRow(base.domain, "DMARC", base.dmarc),
     toRow(base.domain, "PTR", ptr),
     toRow(base.domain, "RBL", rbl),

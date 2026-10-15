@@ -27,37 +27,109 @@ const { parseDmarc } = require("./dmarc");
 const NO_RECORD = new Set(["ENOTFOUND", "ENODATA", "NXDOMAIN"]);
 
 const DKIM_SELECTORS = [
-  "default", "dkim", "google", "selector1", "selector2", "s1", "s2", "k1",
-  "mail", "smtp", "email", "cpanel", "x",
+  "default",
+  "dkim",
+  "google",
+  "selector1",
+  "selector2",
+  "s1",
+  "s2",
+  "k1",
+  "mail",
+  "smtp",
+  "email",
+  "cpanel",
+  "x",
 ];
 
 /** Known relays → SPF include + where DKIM gets enabled (their dashboard). */
 const RELAYS = [
-  { match: /sendgrid/i, include: "sendgrid.net", dkimHint: "Enable DKIM in SendGrid → Settings → Sender Authentication, then verify again." },
-  { match: /amazonses|amazonaws/i, include: "amazonses.com", dkimHint: "Verify the domain in SES and enable Easy DKIM, then verify again." },
-  { match: /mailgun/i, include: "mailgun.org", dkimHint: "Publish the DKIM record Mailgun shows under Sending → Domains." },
-  { match: /mailjet/i, include: "spf.mailjet.com", dkimHint: "Validate the domain in Mailjet. SPF and DKIM values are under Domain authentication." },
-  { match: /mandrill|mailchimp/i, include: "spf.mandrillapp.com", dkimHint: "Verify the sending domain in Mandrill and enable DKIM." },
-  { match: /postmark/i, include: "spf.mtasv.net", dkimHint: "Add a Sender Signature in Postmark and copy its DKIM record to DNS." },
-  { match: /zoho|zillum/i, include: "zoho.com", dkimHint: "Zoho Mail publishes DKIM automatically for its domains. Check the admin console, then verify again." },
-  { match: /outlook|office365|protection\.outlook/i, include: "spf.protection.outlook.com", dkimHint: "Enable DKIM for the domain in Microsoft 365 (Defender → Email authentication), then verify again." },
-  { match: /google|gmail/i, include: "_spf.google.com", dkimHint: "Generate DKIM in Google Workspace (Apps → Gmail → Authenticate email); its selector is 'google'." },
+  {
+    match: /sendgrid/i,
+    include: "sendgrid.net",
+    dkimHint:
+      "Enable DKIM in SendGrid → Settings → Sender Authentication, then verify again.",
+  },
+  {
+    match: /amazonses|amazonaws/i,
+    include: "amazonses.com",
+    dkimHint:
+      "Verify the domain in SES and enable Easy DKIM, then verify again.",
+  },
+  {
+    match: /mailgun/i,
+    include: "mailgun.org",
+    dkimHint: "Publish the DKIM record Mailgun shows under Sending → Domains.",
+  },
+  {
+    match: /mailjet/i,
+    include: "spf.mailjet.com",
+    dkimHint:
+      "Validate the domain in Mailjet. SPF and DKIM values are under Domain authentication.",
+  },
+  {
+    match: /mandrill|mailchimp/i,
+    include: "spf.mandrillapp.com",
+    dkimHint: "Verify the sending domain in Mandrill and enable DKIM.",
+  },
+  {
+    match: /postmark/i,
+    include: "spf.mtasv.net",
+    dkimHint:
+      "Add a Sender Signature in Postmark and copy its DKIM record to DNS.",
+  },
+  {
+    match: /zoho|zillum/i,
+    include: "zoho.com",
+    dkimHint:
+      "Zoho Mail publishes DKIM automatically for its domains. Check the admin console, then verify again.",
+  },
+  {
+    match: /outlook|office365|protection\.outlook/i,
+    include: "spf.protection.outlook.com",
+    dkimHint:
+      "Enable DKIM for the domain in Microsoft 365 (Defender → Email authentication), then verify again.",
+  },
+  {
+    match: /google|gmail/i,
+    include: "_spf.google.com",
+    dkimHint:
+      "Generate DKIM in Google Workspace (Apps → Gmail → Authenticate email); its selector is 'google'.",
+  },
 ];
 
-const relayFor = (host) => RELAYS.find((r) => r.match.test(String(host || ""))) || null;
+const relayFor = (host) =>
+  RELAYS.find((r) => r.match.test(String(host || ""))) || null;
 
 /**
  * Second-level suffixes under which a registrable domain has THREE labels
  * ("mycity.com.ng", not "com.ng"). Nigerian registrations live under these.
  */
-const SECOND_LEVEL = new Set(["com.ng", "org.ng", "net.ng", "gov.ng", "edu.ng", "name.ng", "sch.ng", "mil.ng", "co.uk", "org.uk", "co.za"]);
+const SECOND_LEVEL = new Set([
+  "com.ng",
+  "org.ng",
+  "net.ng",
+  "gov.ng",
+  "edu.ng",
+  "name.ng",
+  "sch.ng",
+  "mil.ng",
+  "co.uk",
+  "org.uk",
+  "co.za",
+]);
 
 /** The registrable domain of a hostname: last two labels, or three under a second-level suffix. */
 const domainOf = (host) => {
-  const parts = String(host || "").toLowerCase().split(".").filter(Boolean);
+  const parts = String(host || "")
+    .toLowerCase()
+    .split(".")
+    .filter(Boolean);
   if (parts.length < 2) return null;
   const lastTwo = parts.slice(-2).join(".");
-  return SECOND_LEVEL.has(lastTwo) && parts.length >= 3 ? parts.slice(-3).join(".") : lastTwo;
+  return SECOND_LEVEL.has(lastTwo) && parts.length >= 3
+    ? parts.slice(-3).join(".")
+    : lastTwo;
 };
 
 /** Strip the left-most label ("mail.x.ng" → "x.ng"); null when already bare. */
@@ -79,14 +151,30 @@ async function checkMx(domain) {
   try {
     const recs = await dns.resolveMx(domain);
     if (!recs.length) {
-      return { ok: false, records: [], hint: `The domain has no MX records. Add MX records at your DNS host (${domain}) so mail servers accept it as a sender domain.` };
+      return {
+        ok: false,
+        records: [],
+        hint: `The domain has no MX records. Add MX records at your DNS host (${domain}) so mail servers accept it as a sender domain.`,
+      };
     }
-    return { ok: true, records: recs.map((r) => ({ host: r.exchange, priority: r.priority })) };
+    return {
+      ok: true,
+      records: recs.map((r) => ({ host: r.exchange, priority: r.priority })),
+    };
   } catch (err) {
     if (NO_RECORD.has(err.code)) {
-      return { ok: false, records: [], hint: `No MX records on ${domain}. Sending via a relay can work without MX, but the domain won't receive mail. Add MX records to make it a full mailbox domain.` };
+      return {
+        ok: false,
+        records: [],
+        hint: `No MX records on ${domain}. Sending via a relay can work without MX, but the domain won't receive mail. Add MX records to make it a full mailbox domain.`,
+      };
     }
-    return { ok: null, records: [], error: err.code || err.message, hint: "MX check couldn't complete right now. Tick the box below once you've added MX records." };
+    return {
+      ok: null,
+      records: [],
+      error: err.code || err.message,
+      hint: "MX check couldn't complete right now. Tick the box below once you've added MX records.",
+    };
   }
 }
 
@@ -94,7 +182,8 @@ function spfSuggestions(domain, smtpHost) {
   const relay = relayFor(smtpHost);
   if (relay && relay.include) return [`v=spf1 include:${relay.include} ~all`];
   const smtpDomain = domainOf(smtpHost);
-  if (smtpDomain && smtpDomain !== domain) return [`v=spf1 mx include:${smtpDomain} ~all`];
+  if (smtpDomain && smtpDomain !== domain)
+    return [`v=spf1 mx include:${smtpDomain} ~all`];
   return ["v=spf1 mx ~all"];
 }
 
@@ -103,7 +192,11 @@ async function checkSpf(domain, smtpHost) {
   try {
     result = await readTxt(domain);
   } catch (err) {
-    return { ok: null, error: err.code || err.message, hint: "SPF check couldn't complete right now. Tick the box below once you've published the record." };
+    return {
+      ok: null,
+      error: err.code || err.message,
+      hint: "SPF check couldn't complete right now. Tick the box below once you've published the record.",
+    };
   }
 
   let where = domain;
@@ -131,7 +224,10 @@ async function checkSpf(domain, smtpHost) {
       ok: true,
       record: spf.join(""),
       domain: where,
-      note: where !== domain ? `Found on ${where} (applies to ${domain} too)` : undefined,
+      note:
+        where !== domain
+          ? `Found on ${where} (applies to ${domain} too)`
+          : undefined,
     };
   }
   return {
@@ -153,16 +249,25 @@ async function checkDkim(domain, smtpHost) {
   const found = results.find((r) => r.status === "fulfilled" && r.value);
   if (found) {
     const { sel, txts } = found.value;
-    return { ok: true, selector: sel, record: txts.map((t) => t.join("")).join("") };
+    return {
+      ok: true,
+      selector: sel,
+      record: txts.map((t) => t.join("")).join(""),
+    };
   }
   const failures = results.filter((r) => r.status === "rejected");
   if (failures.length === DKIM_SELECTORS.length) {
     const first = failures[0].reason;
-    return { ok: null, error: (first && (first.code || first.message)) || "lookup failed", hint: "DKIM check couldn't complete right now. Tick the box below once your provider has published the key." };
+    return {
+      ok: null,
+      error: (first && (first.code || first.message)) || "lookup failed",
+      hint: "DKIM check couldn't complete right now. Tick the box below once your provider has published the key.",
+    };
   }
-  const hint = relay && relay.dkimHint
-    ? relay.dkimHint
-    : `No DKIM key found under the common selectors. Enable DKIM at your mail provider, or publish a TXT record at <selector>._domainkey.${domain} with the key your provider gives you (template: v=DKIM1; k=rsa; p=<public key>).`;
+  const hint =
+    relay && relay.dkimHint
+      ? relay.dkimHint
+      : `No DKIM key found under the common selectors. Enable DKIM at your mail provider, or publish a TXT record at <selector>._domainkey.${domain} with the key your provider gives you (template: v=DKIM1; k=rsa; p=<public key>).`;
   return { ok: false, selector: null, record: null, hint };
 }
 
@@ -178,7 +283,12 @@ async function checkDmarc(domain) {
       };
     }
     const parsed = parseDmarc(rec);
-    return { ok: parsed.ok, record: parsed.raw, reading: parsed.reading, parsed };
+    return {
+      ok: parsed.ok,
+      record: parsed.raw,
+      reading: parsed.reading,
+      parsed,
+    };
   } catch (err) {
     const code = err && err.code;
     if (code === "ENOTFOUND" || code === "ENODATA" || code === "NXDOMAIN") {
@@ -187,7 +297,11 @@ async function checkDmarc(domain) {
         hint: `No DMARC record at _dmarc.${domain}. Add a TXT record starting with v=DMARC1; p=none to start monitoring.`,
       };
     }
-    return { ok: null, error: code || err.message, hint: "DMARC check could not complete right now." };
+    return {
+      ok: null,
+      error: code || err.message,
+      hint: "DMARC check could not complete right now.",
+    };
   }
 }
 
@@ -197,8 +311,14 @@ async function checkDmarc(domain) {
  * services/mail/deliverability/check.js).
  */
 async function checkDomain(domain, { smtpHost = null } = {}) {
-  const clean = String(domain || "").trim().toLowerCase();
-  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(clean)) {
+  const clean = String(domain || "")
+    .trim()
+    .toLowerCase();
+  if (
+    !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(
+      clean,
+    )
+  ) {
     throw new Error("Not a domain name");
   }
   const [mx, spf, dkim, dmarc] = await Promise.all([
@@ -224,4 +344,11 @@ function senderDomain(from) {
   return m ? m[1].toLowerCase() : null;
 }
 
-module.exports = { checkDomain, checkDmarc, DKIM_SELECTORS, domainOf, senderDomain, spfSuggestions };
+module.exports = {
+  checkDomain,
+  checkDmarc,
+  DKIM_SELECTORS,
+  domainOf,
+  senderDomain,
+  spfSuggestions,
+};

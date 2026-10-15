@@ -23,10 +23,21 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..", "..");
-const SKIP_DIRS = new Set(["node_modules", "dist", "build", "coverage", ".git"]);
+const SKIP_DIRS = new Set([
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  ".git",
+]);
 
 const PAGED_HELPER = path.join("src", "shared", "http", "paged.js");
-const CONTRACT_COMMON = path.join("packages", "contract", "schemas", "common.js");
+const CONTRACT_COMMON = path.join(
+  "packages",
+  "contract",
+  "schemas",
+  "common.js",
+);
 
 const SQL_LIMIT = /\b(limit|offset)\s+(\$\{|\$\d+|\d+)/i;
 const SQL_LIMIT_ONE = /\blimit\s+1\b(?!\d)/i;
@@ -68,30 +79,54 @@ for (const file of backend) {
   src.forEach((raw, i) => {
     const line = code(raw);
     if (r !== PAGED_HELPER) {
-      const batch = BATCH_MARK.test(line) && !/(\.routes|\.controller|\.ai)\.js$/.test(file);
-      if (((SQL_LIMIT.test(line) && !SQL_LIMIT_ONE.test(line)) || SQL_FETCH.test(line)) && !batch) {
-        report(file, i + 1, "SQL LIMIT/OFFSET outside shared/http/paged.js; use pageQuery()");
+      const batch =
+        BATCH_MARK.test(line) &&
+        !/(\.routes|\.controller|\.ai)\.js$/.test(file);
+      if (
+        ((SQL_LIMIT.test(line) && !SQL_LIMIT_ONE.test(line)) ||
+          SQL_FETCH.test(line)) &&
+        !batch
+      ) {
+        report(
+          file,
+          i + 1,
+          "SQL LIMIT/OFFSET outside shared/http/paged.js; use pageQuery()",
+        );
       }
     }
     if (COMPLETE_CALL.test(line) && r !== PAGED_HELPER) {
       const above = [src[i - 1] || "", src[i - 2] || ""];
       if (!above.some((l) => COMPLETE_MARK.test(l))) {
-        report(file, i + 1, "completeQuery() without `// pagination:complete <reason>` above it");
+        report(
+          file,
+          i + 1,
+          "completeQuery() without `// pagination:complete <reason>` above it",
+        );
       }
     }
     if (/\.ai\.js$/.test(file) && SIZE_KEY.test(line)) {
-      report(file, i + 1, "page-size key in an AI manifest; AI reads page at 25 through PageQuery");
+      report(
+        file,
+        i + 1,
+        "page-size key in an AI manifest; AI reads page at 25 through PageQuery",
+      );
     }
   });
 }
 
 /* 3: contract */
-const schemas = walk(path.join(ROOT, "packages", "contract", "schemas"), (f) => f.endsWith(".js"));
+const schemas = walk(path.join(ROOT, "packages", "contract", "schemas"), (f) =>
+  f.endsWith(".js"),
+);
 for (const file of schemas) {
   if (rel(file) === CONTRACT_COMMON) continue;
   lines(file).forEach((raw, i) => {
     if (SIZE_KEY.test(code(raw))) {
-      report(file, i + 1, "page-size key in the contract; lists use listQuery() from common.js");
+      report(
+        file,
+        i + 1,
+        "page-size key in the contract; lists use listQuery() from common.js",
+      );
     }
   });
 }
@@ -106,10 +141,18 @@ for (const file of frontend) {
   lines(file).forEach((raw, i) => {
     const line = code(raw);
     if (FE_SIZE_PARAM.test(line) || FE_SIZE_KEY.test(line)) {
-      report(file, i + 1, "frontend sends or names a page size; the API pages at 25, send `page` only");
+      report(
+        file,
+        i + 1,
+        "frontend sends or names a page size; the API pages at 25, send `page` only",
+      );
     }
     if (FE_SIZE_CONST.test(line)) {
-      report(file, i + 1, "frontend declares its own PAGE_SIZE; import it from @mycity/contract");
+      report(
+        file,
+        i + 1,
+        "frontend declares its own PAGE_SIZE; import it from @mycity/contract",
+      );
     }
   });
 }
@@ -117,7 +160,11 @@ for (const file of frontend) {
 if (problems.length) {
   console.error(`pagination: ${problems.length} problem(s)\n`);
   for (const p of problems) console.error(`  ${p}`);
-  console.error("\nEvery list pages at 25 through src/shared/http/paged.js. See docs/BACKEND_STRUCTURE.md §16.");
+  console.error(
+    "\nEvery list pages at 25 through src/shared/http/paged.js. See docs/BACKEND_STRUCTURE.md §16.",
+  );
   process.exit(1);
 }
-console.log(`pagination: ok (${backend.length} backend, ${schemas.length} contract, ${frontend.length} frontend files)`);
+console.log(
+  `pagination: ok (${backend.length} backend, ${schemas.length} contract, ${frontend.length} frontend files)`,
+);

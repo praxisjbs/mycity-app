@@ -13,10 +13,11 @@
  * letter can always be traced to the exact wording that produced it, and "back to the
  * default" is saving the default as a new version.
  *
- * A file may open with a front matter block:
+ * A file may open with a front matter block (quote a value that holds {{ }}, so an
+ * editor's YAML formatter leaves it alone):
  *
  *   ---
- *   subject: Your payslip for {{ month period }}
+ *   subject: "Your payslip for {{ month period }}"
  *   title: Payslip
  *   ---
  *   <p>Dear {{ recipient.first_name }}, ...</p>
@@ -48,8 +49,10 @@ const FORMATS = new Set(["html", "markdown"]);
 const fileCache = new Map();
 
 function checkKind(kind, key) {
-  if (!DIRS[kind]) throw new Error(`templates: kind is document or email (got "${kind}")`);
-  if (!KEY_RE.test(String(key || ""))) throw new Error(`templates: "${key}" is not a template key`);
+  if (!DIRS[kind])
+    throw new Error(`templates: kind is document or email (got "${kind}")`);
+  if (!KEY_RE.test(String(key || "")))
+    throw new Error(`templates: "${key}" is not a template key`);
 }
 
 /** Split "---\nsubject: x\n---\nbody" into { meta, body }. */
@@ -59,7 +62,9 @@ function frontMatter(text) {
   const meta = {};
   for (const line of m[1].split(/\r?\n/)) {
     const kv = /^([a-z_]+):\s*(.*)$/.exec(line.trim());
-    if (kv) meta[kv[1]] = kv[2];
+    // A quoted value is YAML's way of keeping `{{ }}` as text (a YAML formatter turns an
+    // unquoted `{{ title }}` into a mapping); the quotes are not part of the value.
+    if (kv) meta[kv[1]] = kv[2].replace(/^(["'])(.*)\1$/, "$2");
   }
   return { meta, body: text.slice(m[0].length) };
 }
@@ -83,7 +88,15 @@ function shipped(kind, key) {
     text && text.trim()
       ? (() => {
           const { meta, body } = frontMatter(text);
-          return Object.freeze({ kind, key, version: 0, subject: meta.subject || null, title: meta.title || null, body, format: "html" });
+          return Object.freeze({
+            kind,
+            key,
+            version: 0,
+            subject: meta.subject || null,
+            title: meta.title || null,
+            body,
+            format: "html",
+          });
         })()
       : null;
   fileCache.set(id, out);
@@ -93,7 +106,10 @@ function shipped(kind, key) {
 /** The layout a kind renders inside (letterhead for documents, the mail frame for email). */
 function layout(kind) {
   const t = shipped(kind, LAYOUTS[kind]);
-  if (!t) throw new Error(`templates: the ${kind} layout templates/${DIRS[kind]}/${LAYOUTS[kind]}.html is missing or empty`);
+  if (!t)
+    throw new Error(
+      `templates: the ${kind} layout templates/${DIRS[kind]}/${LAYOUTS[kind]}.html is missing or empty`,
+    );
   return t;
 }
 
@@ -113,7 +129,12 @@ async function current(client, kind, key) {
   );
   if (rows[0]) return rows[0];
   const def = shipped(kind, key);
-  if (!def) throw new AppError("TEMPLATE_MISSING", `There is no "${key}" template.`, 500);
+  if (!def)
+    throw new AppError(
+      "TEMPLATE_MISSING",
+      `There is no "${key}" template.`,
+      500,
+    );
   return def;
 }
 
@@ -135,26 +156,51 @@ async function version(client, kind, key, v) {
  * @param {{created_by?: string|null}} [opts]
  */
 async function saveVersion(client, t, { created_by: createdBy = null } = {}) {
-  if (!inTransaction(client)) throw new Error("templates.saveVersion must run inside atomically()");
+  if (!inTransaction(client))
+    throw new Error("templates.saveVersion must run inside atomically()");
   checkKind(t.kind, t.key);
-  if (t.key === LAYOUTS[t.kind]) throw new AppError("TEMPLATE_NOT_EDITABLE", "The layout carries the brand and is not edited here.", 409);
+  if (t.key === LAYOUTS[t.kind])
+    throw new AppError(
+      "TEMPLATE_NOT_EDITABLE",
+      "The layout carries the brand and is not edited here.",
+      409,
+    );
   const format = t.format || "markdown";
-  if (!FORMATS.has(format)) throw new Error(`templates: format is html or markdown (got "${format}")`);
-  for (const [field, source] of [["body", t.body], ["subject", t.subject || ""], ["title", t.title || ""]]) {
+  if (!FORMATS.has(format))
+    throw new Error(`templates: format is html or markdown (got "${format}")`);
+  for (const [field, source] of [
+    ["body", t.body],
+    ["subject", t.subject || ""],
+    ["title", t.title || ""],
+  ]) {
     try {
       parse(source);
     } catch (err) {
-      if (err instanceof TemplateError) throw new AppError("TEMPLATE_INVALID", err.message, 422, { [field]: [err.message] });
+      if (err instanceof TemplateError)
+        throw new AppError("TEMPLATE_INVALID", err.message, 422, {
+          [field]: [err.message],
+        });
       throw err;
     }
     variables.assertTemplate(t.kind, t.key, source);
   }
-  await client.query("SELECT pg_advisory_xact_lock(hashtext('template:' || $1 || ':' || $2))", [t.kind, t.key]);
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtext('template:' || $1 || ':' || $2))",
+    [t.kind, t.key],
+  );
   const { rows } = await client.query(
     `INSERT INTO template_version (kind, key, version, subject, title, body, format, created_by)
      SELECT $1, $2, COALESCE(max(version), 0) + 1, $3, $4, $5, $6, $7 FROM template_version WHERE kind = $1 AND key = $2
      RETURNING kind, key, version, subject, title, body, format`,
-    [t.kind, t.key, t.subject || null, t.title || null, t.body, format, createdBy],
+    [
+      t.kind,
+      t.key,
+      t.subject || null,
+      t.title || null,
+      t.body,
+      format,
+      createdBy,
+    ],
   );
   return rows[0];
 }
@@ -175,4 +221,15 @@ function __clearCache() {
   fileCache.clear();
 }
 
-module.exports = { ROOT, LAYOUTS, frontMatter, shipped, layout, current, version, saveVersion, shippedKeys, __clearCache };
+module.exports = {
+  ROOT,
+  LAYOUTS,
+  frontMatter,
+  shipped,
+  layout,
+  current,
+  version,
+  saveVersion,
+  shippedKeys,
+  __clearCache,
+};

@@ -24,9 +24,12 @@ const path = require("node:path");
 
 process.env.MYCITY_SKIP_DOTENV = "1";
 const ROOT = path.resolve(__dirname, "..", "..");
-const { SCHEMES, validateScheme } = require(path.join(ROOT, "src", "shared", "numbering", "schemes"));
+const { SCHEMES, validateScheme } = require(
+  path.join(ROOT, "src", "shared", "numbering", "schemes"),
+);
 
-const CALL = /\b(?:numbering\.)?(allocate|preview)\(\s*[A-Za-z_$][\w$]*\s*,\s*([^,)]+)/g;
+const CALL =
+  /\b(?:numbering\.)?(allocate|preview)\(\s*[A-Za-z_$][\w$]*\s*,\s*([^,)]+)/g;
 const SELF = path.join("src", "shared", "numbering");
 const DOC_TYPE = /\b(?:docType|numbering)\s*:\s*([^,{}\n]+)/g;
 /** Files that forward a type their caller gave; the caller's docType is checked instead. */
@@ -48,11 +51,15 @@ function walk(dir, out = []) {
 
 const problems = [];
 for (const [type, scheme] of Object.entries(SCHEMES)) {
-  for (const p of validateScheme(scheme)) problems.push(`schemes.js: ${type}: ${p}`);
+  for (const p of validateScheme(scheme))
+    problems.push(`schemes.js: ${type}: ${p}`);
 }
 
 let calls = 0;
-for (const file of [...walk(path.join(ROOT, "src")), ...walk(path.join(ROOT, "scripts"))]) {
+for (const file of [
+  ...walk(path.join(ROOT, "src")),
+  ...walk(path.join(ROOT, "scripts")),
+]) {
   const rel = path.relative(ROOT, file);
   if (rel.startsWith(SELF)) continue;
   const src = fs.readFileSync(file, "utf8");
@@ -64,16 +71,28 @@ for (const file of [...walk(path.join(ROOT, "src")), ...walk(path.join(ROOT, "sc
       if (FORWARDERS.has(rel) || m[1].trim() === "null") continue;
       calls += 1;
       const lit = /^["'`]([a-z_]+)["'`]$/.exec(m[1].trim());
-      if (!lit) problems.push(`${rel}:${i + 1}  docType is computed (${m[1].trim()}); give the type as a string literal`);
-      else if (!SCHEMES[lit[1]]) problems.push(`${rel}:${i + 1}  "${lit[1]}" has no scheme in src/shared/numbering/schemes.js`);
+      if (!lit)
+        problems.push(
+          `${rel}:${i + 1}  docType is computed (${m[1].trim()}); give the type as a string literal`,
+        );
+      else if (!SCHEMES[lit[1]])
+        problems.push(
+          `${rel}:${i + 1}  "${lit[1]}" has no scheme in src/shared/numbering/schemes.js`,
+        );
     }
     for (const m of code.matchAll(CALL)) {
       if (FORWARDERS.has(rel)) continue;
       calls += 1;
       const arg = m[2].trim();
       const lit = /^["'`]([a-z_]+)["'`]$/.exec(arg);
-      if (!lit) problems.push(`${rel}:${i + 1}  ${m[1]}() with a computed type (${arg}); pass the type as a string literal`);
-      else if (!SCHEMES[lit[1]]) problems.push(`${rel}:${i + 1}  "${lit[1]}" has no scheme in src/shared/numbering/schemes.js`);
+      if (!lit)
+        problems.push(
+          `${rel}:${i + 1}  ${m[1]}() with a computed type (${arg}); pass the type as a string literal`,
+        );
+      else if (!SCHEMES[lit[1]])
+        problems.push(
+          `${rel}:${i + 1}  "${lit[1]}" has no scheme in src/shared/numbering/schemes.js`,
+        );
     }
   });
 }
@@ -81,7 +100,11 @@ for (const file of [...walk(path.join(ROOT, "src")), ...walk(path.join(ROOT, "sc
 if (problems.length) {
   console.error(`numbering-schemes: ${problems.length} problem(s)\n`);
   for (const p of problems) console.error(`  ${p}`);
-  console.error("\nAdd the type to src/shared/numbering/schemes.js and to the seed migration. BACKEND_STRUCTURE §7.");
+  console.error(
+    "\nAdd the type to src/shared/numbering/schemes.js and to the seed migration. BACKEND_STRUCTURE §7.",
+  );
   process.exit(1);
 }
-console.log(`numbering-schemes: ok (${Object.keys(SCHEMES).length} schemes, ${calls} allocation call(s))`);
+console.log(
+  `numbering-schemes: ok (${Object.keys(SCHEMES).length} schemes, ${calls} allocation call(s))`,
+);

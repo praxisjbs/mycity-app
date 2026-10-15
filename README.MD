@@ -58,8 +58,10 @@ mycity-app/
 │   ├── ci-local.js           runs every CI gate locally, full report
 │   ├── gen/                  contract and .env.example generators
 │   ├── check/                the CI gates (§8)
-│   │   └── lib/changes.js    what a change touched (git diff vs main) and its trailers,
-│   │                         shared by check/progress.js, check/guides.js, check/readme-map.js
+│   │   ├── lib/changes.js    what a change touched (git diff vs main) and its trailers,
+│   │   │                     shared by check/progress.js, check/guides.js, check/readme-map.js
+│   │   └── lib/source.js     reads JavaScript for the code gates: comments, strings, template
+│   │                         and regex literals told apart, line numbers kept
 │   ├── db/                   migrate, seed, backup, restore-drill, create-admin
 │   ├── import/               command-line import
 │   └── deploy/               deploy-gate, release-manifest, verify-staging, rollback

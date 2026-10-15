@@ -6,7 +6,11 @@
  */
 "use strict";
 
-const DEFAULT_HOSTS = ["zen.spamhaus.org", "bl.spamcop.net", "b.barracudacentral.org"];
+const DEFAULT_HOSTS = [
+  "zen.spamhaus.org",
+  "bl.spamcop.net",
+  "b.barracudacentral.org",
+];
 
 function reverseIpv4(ip) {
   const parts = String(ip || "").split(".");
@@ -16,7 +20,10 @@ function reverseIpv4(ip) {
 
 function hostsFrom(envList) {
   if (!envList) return DEFAULT_HOSTS.slice();
-  return String(envList).split(",").map((s) => s.trim()).filter(Boolean);
+  return String(envList)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -28,7 +35,12 @@ function hostsFrom(envList) {
 async function checkRbl(ip, { hosts = DEFAULT_HOSTS, resolve } = {}) {
   const rev = reverseIpv4(ip);
   if (!rev) {
-    return { ok: null, ip, listings: [], hint: "RBL checks need an IPv4 sending address." };
+    return {
+      ok: null,
+      ip,
+      listings: [],
+      hint: "RBL checks need an IPv4 sending address.",
+    };
   }
   const lookup = resolve || defaultResolve;
   const listings = [];
@@ -36,7 +48,8 @@ async function checkRbl(ip, { hosts = DEFAULT_HOSTS, resolve } = {}) {
     const name = `${rev}.${host}`;
     try {
       const addrs = await lookup(name);
-      if (addrs && addrs.length) listings.push({ host, listed: true, records: addrs });
+      if (addrs && addrs.length)
+        listings.push({ host, listed: true, records: addrs });
       else listings.push({ host, listed: false, records: [] });
     } catch (err) {
       const code = err && err.code;

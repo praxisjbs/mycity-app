@@ -17,7 +17,8 @@
  */
 const { AppError } = require("../errors");
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * ZodError → { "work_email": ["is already in use"], "lines.0.amount": [...] }
@@ -30,7 +31,8 @@ function fieldsOf(zodError, prefix = "") {
   for (const i of zodError.issues) {
     const at = i.path.join(".");
     if (i.code === "unrecognized_keys") {
-      for (const k of i.keys) add(`${prefix}${at ? `${at}.` : ""}${k}`, "is not allowed");
+      for (const k of i.keys)
+        add(`${prefix}${at ? `${at}.` : ""}${k}`, "is not allowed");
     } else {
       add(`${prefix}${at}`, i.message);
     }
@@ -49,15 +51,34 @@ function validator(parts) {
       const schema = parts[where];
       if (!schema) {
         // No params schema: the path's own params, already UUID-checked by route().
-        out[where] = where === "body" ? undefined : where === "params" ? { ...req.params } : {};
+        out[where] =
+          where === "body"
+            ? undefined
+            : where === "params"
+              ? { ...req.params }
+              : {};
         continue;
       }
       // A multipart request's text fields arrive in req.body as strings: the schema coerces.
-      const parsed = schema.safeParse(req[where] === undefined && where === "body" ? {} : req[where]);
+      const parsed = schema.safeParse(
+        req[where] === undefined && where === "body" ? {} : req[where],
+      );
       if (parsed.success) out[where] = parsed.data;
-      else fields = { ...(fields || {}), ...fieldsOf(parsed.error, where === "body" ? "" : `${where}.`) };
+      else
+        fields = {
+          ...(fields || {}),
+          ...fieldsOf(parsed.error, where === "body" ? "" : `${where}.`),
+        };
     }
-    if (fields) return next(new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, fields));
+    if (fields)
+      return next(
+        new AppError(
+          "VALIDATION_FAILED",
+          "Check the highlighted fields",
+          422,
+          fields,
+        ),
+      );
     req.validated = out;
     return next();
   };
@@ -73,7 +94,8 @@ function uuidParams(names) {
   return function uuidParamGuard(req, _res, next) {
     for (const n of names) {
       const v = req.params[n];
-      if (v !== undefined && !UUID_RE.test(v)) return next(new AppError("NOT_FOUND", "Not found", 404));
+      if (v !== undefined && !UUID_RE.test(v))
+        return next(new AppError("NOT_FOUND", "Not found", 404));
     }
     return next();
   };

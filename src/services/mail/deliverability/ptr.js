@@ -11,7 +11,10 @@ async function checkPtr(ip, { reverse } = {}) {
     const names = await lookup(ip);
     if (!names || !names.length) {
       return {
-        ok: false, verdict: "FAIL", ip, names: [],
+        ok: false,
+        verdict: "FAIL",
+        ip,
+        names: [],
         hint: `No PTR record for ${ip}. Ask the host to publish reverse DNS that matches the SMTP HELO name.`,
       };
     }
@@ -20,11 +23,20 @@ async function checkPtr(ip, { reverse } = {}) {
     const code = err && err.code;
     if (code === "ENOTFOUND" || code === "ENODATA" || code === "NXDOMAIN") {
       return {
-        ok: false, verdict: "FAIL", ip, names: [],
+        ok: false,
+        verdict: "FAIL",
+        ip,
+        names: [],
         hint: `No PTR record for ${ip}. Ask the host to publish reverse DNS that matches the SMTP HELO name.`,
       };
     }
-    return { ok: null, verdict: "UNKNOWN", ip, names: [], error: code || err.message };
+    return {
+      ok: null,
+      verdict: "UNKNOWN",
+      ip,
+      names: [],
+      error: code || err.message,
+    };
   }
 }
 

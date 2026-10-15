@@ -13,9 +13,9 @@ const { sha256, sameHash } = require("../../../src/shared/files/hash");
 const storage = require("../../../src/services/storage/storage.service");
 const images = require("../../../src/services/media/image-pipeline");
 const scan = require("../../../src/services/media/scan");
-const { markdownToHtml, markdownToText } = require("../../../src/shared/documents/markdown");
+const { markdownToHtml, markdownToText, stripTrailingAcceptanceBlock } = require("../../../src/shared/documents/markdown");
 const { render, parse, variablesOf } = require("../../../src/shared/documents/render");
-const { canonicalize, canonicalHash } = require("../../../src/shared/documents/canonical");
+const canonical = require("../../../src/shared/documents/canonical");
 const vault = require("../../../src/shared/documents/vault");
 const variables = require("../../../src/shared/templates/variables");
 const templates = require("../../../src/shared/templates/template-store");
@@ -209,6 +209,16 @@ describe("markdown and the template language", () => {
     expect(markdownToText("# Title\n**bold** [link](https://x.y)")).toBe("Title\nbold link (https://x.y)");
   });
 
+  test("markdown blocks: headings, lists, tables, rules; a drafted signature block is dropped", () => {
+    expect(markdownToHtml("# Offer\n\nDear *Ada*,\n\n- Basic: `450,000`\n- Leave\n\n1. one\n2. two\n\n| Item | Amount |\n|---|---|\n| Basic | 1 |\n\n---\nend")).toBe(
+      "<h1>Offer</h1>\n<p>Dear <em>Ada</em>,</p>\n<ul><li>Basic: <code>450,000</code></li><li>Leave</li></ul>\n<ol><li>one</li><li>two</li></ol>\n" +
+        "<table><tr><th>Item</th><th>Amount</th></tr><tr><td>Basic</td><td>1</td></tr></table>\n<hr />\n<p>end</p>",
+    );
+    expect(markdownToHtml("| <b>x</b> |\n|---|\n| y |")).toContain("<th>&lt;b&gt;x&lt;/b&gt;</th>");
+    expect(stripTrailingAcceptanceBlock("Body.\nTo accept, please sign below.\n\n**Accepted and Agreed**\n______\nDate:")).toBe("Body.\nTo accept, please sign below.");
+    expect(stripTrailingAcceptanceBlock("No block here.")).toBe("No block here.");
+  });
+
   test("values are escaped; house formats; if, else, each", () => {
     const out = render(
       "{{ name }}|{{ money amt }}|{{ date d }}|{{ longdate d }}|{{#if flag}}Y{{else}}N{{/if}}|{{#each items}}{{ @number }}.{{ label }}={{ money amount }};{{/each}}",
@@ -244,11 +254,60 @@ describe("markdown and the template language", () => {
     expect(() => parse(templates.layout("email").body)).not.toThrow();
   });
 
-  test("canonical form: one spelling per value", () => {
-    expect(canonicalize({ b: 1, a: "e\u0301", c: undefined, d: [true, null] })).toBe('{"a":"é","b":1,"d":[true,null]}');
-    expect(canonicalHash({ x: "1", y: "2" })).toBe(canonicalHash({ y: "2", x: "1" }));
-    expect(() => canonicalize({ amount: 12.5 })).toThrow(/as strings/);
-    expect(canonicalize({ at: new Date("2026-10-14T10:00:00Z") })).toBe('{"at":"2026-10-14T10:00:00.000Z"}');
+  test("canonical signature payloads: fixed key order, money as strings, versioned, Map lookup", () => {
+    const contract = {
+      number: "CON-0001", date: "2026-10-14", employee: "Ada Obi", job_title: "Analyst",
+      contract_type: "permanent", start_date: "2026-11-01", gross_salary: "450000",
+      probation_months: 3, clauses: [{ heading: "Duties", body: "not hashed" }, "Leave"],
+    };
+    const payload = canonical.canonical("EMPLOYMENT_CONTRACT", contract);
+    expect(Object.keys(payload)).toEqual(["v", "type", "number", "date", "employee", "job_title", "contract_type",
+      "start_date", "end_date", "currency", "gross_salary", "probation_months", "clauses"]);
+    expect(payload).toMatchObject({ currency: "NGN", gross_salary: "450000.00", clauses: ["Duties", "Leave"] });
+    // Golden: changing this builder changes this digest, and every signed contract would read as amended.
+    expect(canonical.hash("EMPLOYMENT_CONTRACT", contract)).toBe("d163b22321b5fa17288458a335887564ab34d732fe6d9d4c8cf3dabcc29ab231");
+    // "450000" and "450000.004" are the same figure on the page, so the same hash.
+    expect(canonical.hash("EMPLOYMENT_CONTRACT", { ...contract, gross_salary: "450000.004" })).toBe(canonical.hash("EMPLOYMENT_CONTRACT", contract));
+    expect(canonical.build("EMPLOYMENT_CONTRACT", contract)).toMatchObject({ version: 1, hash: canonical.hash("EMPLOYMENT_CONTRACT", contract) });
+    expect(canonical.diff(payload, canonical.canonical("EMPLOYMENT_CONTRACT", { ...contract, gross_salary: "500000" })))
+      .toEqual([{ field: "gross_salary", before: "450000.00", after: "500000.00" }]);
+    expect(() => canonical.hash("constructor", {})).toThrow(expect.objectContaining({ code: "NO_CANONICAL_PAYLOAD" }));
+    expect(() => canonical.hash("EMPLOYMENT_CONTRACT", contract, 2)).toThrow(expect.objectContaining({ code: "UNKNOWN_PAYLOAD_VERSION" }));
+    expect(canonical.isSignable("EMPLOYMENT_CONTRACT")).toBe(true);
+    expect(canonical.isSignable("toString")).toBe(false);
+  });
+});
+
+describe("document types, served types, derived file names", () => {
+  const types = require("../../../src/shared/documents/types");
+  const mimePolicy = require("../../../src/shared/files/mime-policy");
+  const { variantKey } = require("../../../src/shared/files/variant-key");
+
+  test("a doc type is registered once, with a reader module and a signing ceiling", () => {
+    const spec = types.defineDocumentType("unit_offer_letter", { label: "Offer letter", module: "recruitment", sensitivity: "personal", signable: true });
+    expect(spec).toMatchObject({ module: "recruitment", sensitivity: "personal", signable: true, wet: false });
+    expect(types.defineDocumentType("unit_offer_letter", { label: "Offer letter", module: "recruitment", sensitivity: "personal", signable: true })).toBe(spec);
+    expect(() => types.defineDocumentType("unit_offer_letter", { label: "Offer", module: "settings" })).toThrow(/already defined/);
+    expect(() => types.defineDocumentType("unit_x", { label: "X", wet: true })).toThrow(/needs signable/);
+    expect(types.signatureCeiling("unit_offer_letter")).toEqual({ signable: true, wet: false });
+    expect(types.signatureCeiling("constructor")).toEqual({ signable: false, wet: false });
+    expect(() => types.assertDocType("unit_ofer_letter")).toThrow(expect.objectContaining({ code: "UNKNOWN_DOC_TYPE" }));
+    expect(types.typeOf("import_source")).toMatchObject({ sensitivity: "restricted", module: null });
+  });
+
+  test("only allow-listed types are served as themselves", () => {
+    expect(mimePolicy.servedType("application/pdf")).toBe("application/pdf");
+    expect(mimePolicy.servedType("text/html")).toBe("application/octet-stream");
+    expect(mimePolicy.servedType("image/svg+xml")).toBe("application/octet-stream");
+    expect(mimePolicy.servedType(undefined)).toBe("application/octet-stream");
+  });
+
+  test("derived files have one name, built one way", () => {
+    const id = "0b9a6f3e-2c1d-4e5f-8a7b-9c0d1e2f3a4b";
+    expect(variantKey(id, "webp-640", "webp")).toBe(`derived/${id}/webp-640.webp`);
+    expect(variantKey(id, "voice", "ogg")).toBe(`derived/${id}/voice.ogg`);
+    expect(() => variantKey("../etc", "x", "jpg")).toThrow();
+    expect(() => variantKey(id, "../x", "jpg")).toThrow();
   });
 });
 
@@ -398,7 +457,7 @@ describe("spreadsheets", () => {
     expect(ws.getCell("C3").value).toEqual(expect.objectContaining({ formula: "SUM(C2:C2)" }));
     expect(wb.getWorksheet("Cover").getCell("A1").value).toBe("Employees");
 
-    const plain = await buildWorkbook({ sheets: [{ name: "Employees", columns: ws.columns.map((c) => ({ key: c.key, header: c.header })).slice(0, 3), rows: [{ name: "Ada", start: "2026-11-03", pay: 1 }] }] });
+    const plain = await buildWorkbook({ sheets: [{ name: "Employees", columns: [{ key: "name", header: "Name" }, { key: "start", header: "Start Date" }, { key: "pay", header: "Gross Monthly" }], rows: [{ name: "Ada", start: "2026-11-03", pay: 1 }] }] });
     const keyed = await parseUpload({ buffer: plain, filename: "export.xlsx" });
     expect(keyed).toEqual([{ Name: "Ada", "Start Date": "2026-11-03", "Gross Monthly": 1 }]);
 

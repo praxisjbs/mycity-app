@@ -21,7 +21,8 @@ const lagos = require("../time/lagos");
 const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
 
 const pad = (n) => String(n).padStart(2, "0");
-const isoOfUtc = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+const isoOfUtc = (d) =>
+  `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 
 /** Excel serial → "YYYY-MM-DD", or null when it is not a plausible date. */
 function fromSerial(serial) {
@@ -46,28 +47,39 @@ function toSerial(iso) {
  * @returns {{date: string|null, error: string|null}}  date "YYYY-MM-DD"
  */
 function readDate(value) {
-  if (value === null || value === undefined || value === "") return { date: null, error: null };
+  if (value === null || value === undefined || value === "")
+    return { date: null, error: null };
   if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) return { date: null, error: "is not a date" };
+    if (Number.isNaN(value.getTime()))
+      return { date: null, error: "is not a date" };
     return { date: isoOfUtc(value), error: null };
   }
   if (typeof value === "number") {
     const iso = fromSerial(value);
-    return iso ? { date: iso, error: null } : { date: null, error: "is not a date" };
+    return iso
+      ? { date: iso, error: null }
+      : { date: null, error: "is not a date" };
   }
   const text = String(value).trim();
   // An Excel date cell, as cells.cellValue() hands it on: midnight UTC of the day.
-  if (/^\d{4}-\d{2}-\d{2}T00:00:00(\.000)?Z$/.test(text)) return readDate(text.slice(0, 10));
+  if (/^\d{4}-\d{2}-\d{2}T00:00:00(\.000)?Z$/.test(text))
+    return readDate(text.slice(0, 10));
   if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    return lagos.isDate(text) ? { date: text, error: null } : { date: null, error: "is not a real date" };
+    return lagos.isDate(text)
+      ? { date: text, error: null }
+      : { date: null, error: "is not a real date" };
   }
   if (/^\d+(\.\d+)?$/.test(text)) {
     const iso = fromSerial(Number(text));
-    return iso ? { date: iso, error: null } : { date: null, error: "is not a date" };
+    return iso
+      ? { date: iso, error: null }
+      : { date: null, error: "is not a date" };
   }
   try {
     const iso = dayFirst.parseDayFirst(text);
-    return iso ? { date: iso, error: null } : { date: null, error: "should be day-first, like 03/07/1991" };
+    return iso
+      ? { date: iso, error: null }
+      : { date: null, error: "should be day-first, like 03/07/1991" };
   } catch (err) {
     return { date: null, error: err.message || "is not a date" };
   }

@@ -91,11 +91,18 @@ function parseArgs(argv) {
     if (!m) throw new Error(`Unknown argument "${raw}"`);
     args[m[1]] = m[2] === undefined ? true : m[2];
   }
-  const known = new Set(["from", "sample", "allow-additional", "dry-run", "help"]);
+  const known = new Set([
+    "from",
+    "sample",
+    "allow-additional",
+    "dry-run",
+    "help",
+  ]);
   for (const k of Object.keys(args)) {
     if (!known.has(k)) throw new Error(`Unknown option --${k}`);
   }
-  if (args.from && args.sample) throw new Error("--from and --sample cannot be used together");
+  if (args.from && args.sample)
+    throw new Error("--from and --sample cannot be used together");
   return args;
 }
 
@@ -104,7 +111,11 @@ function parseArgs(argv) {
  * ------------------------------------------------------------------ */
 
 function makeTerminal() {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: true,
+  });
   let muted = false;
   // Echo nothing while a password is typed. The prompt itself is written before muting.
   rl._writeToOutput = (s) => {
@@ -114,7 +125,9 @@ function makeTerminal() {
   const ask = (question, { fallback } = {}) =>
     new Promise((resolve) => {
       const hint = fallback ? ` [${fallback}]` : "";
-      rl.question(`${question}${hint}: `, (a) => resolve(a.trim() || fallback || ""));
+      rl.question(`${question}${hint}: `, (a) =>
+        resolve(a.trim() || fallback || ""),
+      );
     });
 
   const askHidden = (question) =>
@@ -143,8 +156,14 @@ const FIELDS = [
   ["job_title", "Job title"],
   ["department_name", "Department"],
   ["start_date", "Start date (YYYY-MM-DD)"],
-  ["employment_type", `Employment type (${contract.organisation.EMPLOYMENT_TYPES.join(", ")})`],
-  ["work_pattern", `Work pattern (${contract.organisation.WORK_PATTERNS.join(", ")})`],
+  [
+    "employment_type",
+    `Employment type (${contract.organisation.EMPLOYMENT_TYPES.join(", ")})`,
+  ],
+  [
+    "work_pattern",
+    `Work pattern (${contract.organisation.WORK_PATTERNS.join(", ")})`,
+  ],
   ["date_of_birth", "Date of birth (YYYY-MM-DD, optional)"],
   ["staff_number", "Staff number (optional, issued automatically when blank)"],
   ["next_of_kin", "Next of kin (optional)"],
@@ -181,13 +200,17 @@ async function chooseRole(term, roles) {
 }
 
 async function askCeo(term) {
-  const a = (await term.ask("Is this person the CEO? (yes/no)", { fallback: "no" })).toLowerCase();
+  const a = (
+    await term.ask("Is this person the CEO? (yes/no)", { fallback: "no" })
+  ).toLowerCase();
   return a === "yes" || a === "y";
 }
 
 async function askPassword(term) {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const p1 = await term.askHidden(`Password (at least ${MIN_PASSWORD} characters)`);
+    const p1 = await term.askHidden(
+      `Password (at least ${MIN_PASSWORD} characters)`,
+    );
     if (p1.length < MIN_PASSWORD) {
       console.log(`  Too short. At least ${MIN_PASSWORD} characters.`);
       continue;
@@ -205,7 +228,9 @@ async function askPassword(term) {
 function validate(payload) {
   const parsed = contract.organisation.AdminBootstrap.safeParse(payload);
   if (parsed.success) return parsed.data;
-  const lines = parsed.error.issues.map((i) => `  ${i.path.join(".") || "(payload)"}: ${i.message}`);
+  const lines = parsed.error.issues.map(
+    (i) => `  ${i.path.join(".") || "(payload)"}: ${i.message}`,
+  );
   const err = new Error(`The details are not valid:\n${lines.join("\n")}`);
   err.validation = true;
   throw err;
@@ -235,14 +260,23 @@ async function createAdmin(client, input, password, opts = {}) {
   const { employee: e, role_code, is_ceo } = data;
 
   if (typeof password !== "string" || password.length < MIN_PASSWORD) {
-    throw new AppError("WEAK_PASSWORD", `Password must be at least ${MIN_PASSWORD} characters`, 422);
+    throw new AppError(
+      "WEAK_PASSWORD",
+      `Password must be at least ${MIN_PASSWORD} characters`,
+      422,
+    );
   }
 
   // Two people running this at once must not both pass the checks below.
   await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [LOCK_KEY]);
 
   const role = await access.findRoleByCode(client, role_code);
-  if (!role) throw new AppError("ROLE_NOT_FOUND", `There is no role "${role_code}" on this database`, 404);
+  if (!role)
+    throw new AppError(
+      "ROLE_NOT_FOUND",
+      `There is no role "${role_code}" on this database`,
+      404,
+    );
 
   const holders = await access.countActiveUsersWithRole(client, role.role_id);
   if (holders > 0 && !opts.allowAdditional) {
@@ -255,7 +289,11 @@ async function createAdmin(client, input, password, opts = {}) {
   }
 
   if (is_ceo && (await identity.findCeo(client))) {
-    throw new AppError("CEO_EXISTS", "A CEO is already recorded. There can be only one.", 409);
+    throw new AppError(
+      "CEO_EXISTS",
+      "A CEO is already recorded. There can be only one.",
+      409,
+    );
   }
 
   if (await identity.findUserByEmail(client, e.work_email)) {
@@ -268,29 +306,56 @@ async function createAdmin(client, input, password, opts = {}) {
   }
 
   // Reuse the employee when staff were imported before the first login was made.
-  let employee = await organisation.findEmployeeByWorkEmail(client, e.work_email);
+  let employee = await organisation.findEmployeeByWorkEmail(
+    client,
+    e.work_email,
+  );
   let employeeCreated = false;
 
   if (employee) {
     if (await identity.findUserByEmployeeId(client, employee.employee_id)) {
-      throw new AppError("LOGIN_EXISTS", `Employee ${employee.number} already has a login`, 409);
+      throw new AppError(
+        "LOGIN_EXISTS",
+        `Employee ${employee.number} already has a login`,
+        409,
+      );
     }
   } else {
-    let department = await organisation.findDepartmentByName(client, e.department_name);
-    if (!department) department = await organisation.createDepartment(client, { name: e.department_name }, ACTOR);
+    let department = await organisation.findDepartmentByName(
+      client,
+      e.department_name,
+    );
+    if (!department)
+      department = await organisation.createDepartment(
+        client,
+        { name: e.department_name },
+        ACTOR,
+      );
 
     const { department_name, ...fields } = e;
-    const body = contract.organisation.EmployeeCreate.parse({ ...fields, department_id: department.department_id });
+    const body = contract.organisation.EmployeeCreate.parse({
+      ...fields,
+      department_id: department.department_id,
+    });
     employee = await organisation.createEmployee(client, body, ACTOR);
     employeeCreated = true;
   }
 
   const user = await identity.createUserForEmployee(
     client,
-    { employee_id: employee.employee_id, email: e.work_email, password, is_ceo },
+    {
+      employee_id: employee.employee_id,
+      email: e.work_email,
+      password,
+      is_ceo,
+    },
     ACTOR,
   );
-  await access.assignRole(client, { user_id: user.user_id, role_id: role.role_id }, ACTOR);
+  await access.assignRole(
+    client,
+    { user_id: user.user_id, role_id: role.role_id },
+    ACTOR,
+  );
 
   return { employee, user, role, employee_created: employeeCreated };
 }
@@ -302,7 +367,12 @@ async function createAdmin(client, input, password, opts = {}) {
 function usage() {
   const src = fs.readFileSync(__filename, "utf8");
   const block = src.slice(src.indexOf("/**"), src.indexOf(" */") + 3);
-  console.log(block.replace(/^\/\*\*|\*\/$/g, "").replace(/^ \* ?/gm, "").trim());
+  console.log(
+    block
+      .replace(/^\/\*\*|\*\/$/g, "")
+      .replace(/^ \* ?/gm, "")
+      .trim(),
+  );
 }
 
 async function main() {
@@ -310,14 +380,18 @@ async function main() {
   if (args.help) return usage();
 
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    throw new Error("Run this in an interactive terminal. Seeds and tests call createAdmin() directly.");
+    throw new Error(
+      "Run this in an interactive terminal. Seeds and tests call createAdmin() directly.",
+    );
   }
 
   const { config } = require("../../src/config/env");
   const env = config.APP_ENV;
   if (!env) throw new Error("APP_ENV is not set; is this the server's .env?");
   if (args.sample && env === "production") {
-    throw new Error("--sample is refused on production. The production administrator is a real person.");
+    throw new Error(
+      "--sample is refused on production. The production administrator is a real person.",
+    );
   }
 
   const { pool } = require("../../src/config/db");
@@ -349,9 +423,13 @@ async function main() {
 
     const e = data.employee;
     console.log("\nAbout to create:");
-    console.log(`  ${e.first_name} ${e.last_name} <${e.work_email}>, ${e.job_title}, ${e.department_name}`);
+    console.log(
+      `  ${e.first_name} ${e.last_name} <${e.work_email}>, ${e.job_title}, ${e.department_name}`,
+    );
     console.log(`  role ${data.role_code}${data.is_ceo ? ", CEO" : ""}`);
-    console.log(`  database environment ${env}${args["dry-run"] ? " (dry run, nothing kept)" : ""}`);
+    console.log(
+      `  database environment ${env}${args["dry-run"] ? " (dry run, nothing kept)" : ""}`,
+    );
 
     const typed = await term.ask(`\nType "${env}" to continue`);
     if (typed !== env) {
@@ -362,19 +440,27 @@ async function main() {
     const ROLLBACK = Symbol("dry-run");
     let result;
     try {
-      await requestContext.run({ requestId: randomUUID(), userId: null, surface: "script" }, () =>
-        atomically(client, async () => {
-          result = await createAdmin(client, data, password, { allowAdditional: Boolean(args["allow-additional"]) });
-          if (args["dry-run"]) throw ROLLBACK;
-        }),
+      await requestContext.run(
+        { requestId: randomUUID(), userId: null, surface: "script" },
+        () =>
+          atomically(client, async () => {
+            result = await createAdmin(client, data, password, {
+              allowAdditional: Boolean(args["allow-additional"]),
+            });
+            if (args["dry-run"]) throw ROLLBACK;
+          }),
       );
     } catch (err) {
       if (err !== ROLLBACK) throw err;
     }
 
     const { employee, user, role, employee_created } = result;
-    console.log(`\n${args["dry-run"] ? "Dry run passed. Rolled back; nothing was kept." : "Done."}`);
-    console.log(`  employee ${employee.number} ${employee_created ? "(created)" : "(existing, login added)"}`);
+    console.log(
+      `\n${args["dry-run"] ? "Dry run passed. Rolled back; nothing was kept." : "Done."}`,
+    );
+    console.log(
+      `  employee ${employee.number} ${employee_created ? "(created)" : "(existing, login added)"}`,
+    );
     console.log(`  login    ${user.email}`);
     console.log(`  role     ${role.code}`);
   } finally {

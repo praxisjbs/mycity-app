@@ -68,29 +68,79 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Item | Owner | Done | Updated |
 |---|---|---|---|
 | Server: 4 subdomains, TLS, proxy settings per `docs/runbooks/proxy.md` | GE | ☐ | |
-| Root config: `package.json`, `.nvmrc`, `.gitignore`, `.gitattributes`, ESLint, Jest | GE | ☐ | |
-| `src/config/*`, `app.js`, `server.js`, `worker.js`, `http/*`, `middleware/*` | GE | ☐ | |
-| Shared core: `db`, `crud`, `http`, `errors`, `events`, `workflow`, `numbering`, `money`, `time`, `access`, `rbac` | GE | ☐ | |
+| Root config: `package.json`, `.nvmrc`, `.gitignore`, `.gitattributes`, ESLint, Jest | GE | ☑ | 14/10/2026 |
+| `src/config/*`, `app.js`, `server.js`, `worker.js`, `http/*`, `middleware/*` | GE | ☑ | 14/10/2026 |
+| Shared core: `db`, `crud`, `http`, `errors`, `events`, `workflow`, `numbering`, `money`, `time`, `access`, `rbac` | GE | ☑ | 14/10/2026 |
 | Pagination gate: `shared/http/paged.js`, `common.js` page schemas, `check/pagination.js` (§16) | GE | ☑ | 13/10/2026 |
-| Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☐ | |
+| Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☑ | 14/10/2026 |
 | M0 migrations 0001 to 0099 | LA | ☐ | |
 | Staging seed data | LA | ☐ | |
 | Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE | ☐ | |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
-| Documents, media, uploads, PDF generation | GE | ☐ | |
-| Import engine + staff importer; real staff sheet imported on staging | GE · LA | ☐ | |
-| AI foundation: `services/ai`, manifests, registry, gate 9 | GE | ☐ | |
+| Documents, media, uploads, PDF generation | GE | ☑ | 14/10/2026 |
+| Import engine + staff importer; real staff sheet imported on staging | GE · LA | ☐ | 15/10/2026 |
+| AI foundation: `services/ai`, manifests, registry, gate 9 | GE | ☑ | 15/10/2026 |
 | CI wiring: `package.json`, lockfile, ESLint, Jest, `ci-local.js`, `ci.yml` | GE | ☑ | 13/10/2026 |
 | Process gates: progress, guides, README map, CODEOWNERS; PR template; Claude Stop hook | GE | ☑ | 13/10/2026 |
 | GitHub settings applied by TB (`docs/runbooks/github-settings.md`) | TB | ☐ | |
 | CODEOWNERS usernames: GE `@swizfcodes`, TB `@tomblakeasaah196`, AJ `@Ghosted34`, LA `@LovedataX` | GE | ☑ | 13/10/2026 |
-| CI gates 1 to 8 and pipeline guards (scripts still empty, reported NOT BUILT) | GE | ☐ | |
+| CI gates 1 to 8 and pipeline guards (gate 6, schema-drift and contract-columns, still empty, reported NOT BUILT) | GE | ☐ | 15/10/2026 |
 | Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | |
 | Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
 | Frontend foundation (`app/`, `public-app/`): shell, design tokens, contract client, shared components | AJ | ☐ | |
 
 **Notes**
 
+- 15/10/2026 · GE · CI gates, first group. Gate 3 migration numbers (unique, in the milestone's
+  block, a new file in its branch's block), gate 4 reversibility (a DOWN or `-- IRREVERSIBLE:
+  <reason>`, DOWN names what UP creates, `-- DESTRUCTIVE: <reason>` on destructive steps, and UP,
+  DOWN, UP on a throwaway database when RUN_DB_TESTS=1), gate 5 idempotency (and a merged migration
+  never edited, by git), gates 8/17 no dashes in what a person reads, gate 15 day-first dates
+  (backend formats only through `shared/time`), gate 20 money, and the guards: module catalogue,
+  production environment references, shell scripts LF and parse, every JavaScript file parses.
+  `migrate.js`: five-digit numbers for M10 and M11, ordered by number; `--down` refuses an
+  irreversible file. `scripts/import/run.js`: list, template, upload, map, preview, errors, commit,
+  revert, as a named person. Left: gate 6 (schema-drift, contract-columns); the catalogue gate's
+  `--exact` at M9; a Postgres service in `ci.yml` so the round trip and integration tests run in CI;
+  the real staff sheet on staging.
+- 15/10/2026 · GE · Shared foundation, phase 6 of 6: AI and search. `services/ai`: `complete()` through
+  governance (switch, per-module switch, monthly cap in naira), redaction (Nigerian identifiers,
+  restricted fields), prompt files, Gemini (or the stub with no key), structured output against the
+  contract with one corrective retry, and the ledger (`ai_run`, `ai_run_step`, cost from tokens);
+  transcription's seam (Gemini audio in M2). `shared/ai`: `defineManifest` (reads and routes only,
+  A23), registry, `authorise` (caller's grant and scope, pages of 25, masking, citations), catalogue
+  sync (worker boot and deploy). `shared/search`: providers, registry, ⌘K service (grant first, scope,
+  pages of 25, typo matching). `rbac.scopeFor` for non-route callers. Gates built: 9, 10 (backend
+  half), 19, AI vendor imports. New env: `GEMINI_*`, `AI_*`. 22 unit and 16 integration tests. Left:
+  migration 0095 (LA: ai tables in BACKEND_STRUCTURE §11.1), the M10 assistant, the screen-registry
+  half of gate 10 (AJ), per-module manifests and providers with the modules.
+- 14/10/2026 · GE · Shared foundation, phase 5 of 6: the worker. `worker.js` (loads the shared and
+  module events files and importers before `markReady()`, then consumers, schedules, a heartbeat that
+  /api/health/ready reads), `jobs/{queues,registry,cron-lock}` (BullMQ, prefix `mycity:<env>`, one
+  run per tick under a Postgres lock), the eight M0 handlers and five schedulers (outbox every
+  second in process; workflow timeouts, alert ageing, media reconcile, import cleanup), outbox
+  triggers (document stored or render requested queues the scan, transcode or PDF job), Socket.io
+  on the API (staff host only, HTTP sign-in rules, `user:` and `session:` rooms, closed at token
+  expiry or session end) and the realtime emitter the worker publishes through, `db:migrate`,
+  `db:seed` (three production checks) and `gen:contract` (contract gate now built). New: the
+  notification email template, `WORKER_DB_POOL_MAX`, `import.expired`; Chromium no longer calls out; quoted template front matter.
+  New packages: bullmq, socket.io, @socket.io/redis-adapter and redis-emitter (socket.io-client for
+  tests): run `npm install`. 27 unit and 18 integration tests added, one starting the real worker
+  process and rendering a PDF through it. Left: phase 6 (AI and search); migrations 0001 to 0099
+  (LA: `schema_migration` and `system_marker` columns in BACKEND_STRUCTURE §11.1); web push (M6).
+- 14/10/2026 · GE · M0 table brought up to date with phases 1 to 4. Ticked: root config, the shared
+  core, and documents, media, uploads and PDF generation. Partly done, so not ticked: the app
+  entry points (`worker.js` is phase 5), the contract package (`common.js` and `http/route.js`
+  are built; the `gen:contract` generator is phase 5), and imports (the engine is built; the staff
+  importer lands with the imports and organisation modules, then the staging import). Next:
+  phase 5, the worker, jobs, realtime and the db and gen scripts.
+- 14/10/2026 · GE · Reuse pass on phases 3 and 4 (REUSE_MAP §1.4 records every change on the
+  way in): deliverability (DMARC, PTR, RBL, route check; system mail refuses a trapped route),
+  encryption as is, spreadsheets with a workbook context and live totals, photo enhancement,
+  a doc-type register (`documents/types.js`: reader module, signing ceiling) that `vault.store`
+  enforces, served types limited to the allow-list, one name for derived files, versioned
+  canonical signature payloads, and an escape-first Markdown renderer (`marked` removed).
+  272 tests (228 unit, 44 integration) and `npm run ci` pass on Node 20.
 - 14/10/2026 · GE · Shared foundation, phase 4 of 6: files (`sniff` by bytes, per-purpose
   `mime-policy`, `safe-name`, `hash`), `services/storage` (atomic, contained keys), the vault
   (store, versions, lock, quarantine and scan, access rules, range downloads),

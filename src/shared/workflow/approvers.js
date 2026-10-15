@@ -34,13 +34,19 @@ const { pool: defaultPool } = require("../../config/db");
 /** Role codes for a set of role ids. */
 async function roleCodesOf(client, roleIds) {
   if (!roleIds || roleIds.length === 0) return [];
-  const { rows } = await client.query("SELECT code FROM role WHERE role_id = ANY($1::uuid[]) ORDER BY code", [roleIds]);
+  const { rows } = await client.query(
+    "SELECT code FROM role WHERE role_id = ANY($1::uuid[]) ORDER BY code",
+    [roleIds],
+  );
   return rows.map((r) => r.code);
 }
 
 async function lineManagerOf(client, employeeId) {
   if (!employeeId) return null;
-  const { rows } = await client.query("SELECT line_manager_id FROM employee WHERE employee_id = $1", [employeeId]);
+  const { rows } = await client.query(
+    "SELECT line_manager_id FROM employee WHERE employee_id = $1",
+    [employeeId],
+  );
   return rows[0] ? rows[0].line_manager_id : null;
 }
 
@@ -51,14 +57,23 @@ async function lineManagerOf(client, employeeId) {
  * @param {{subject_employee_id?: string|null}} subject
  * @returns {Promise<Array<{type: string, value?: string, via?: string}>>}
  */
-async function resolve(client, approvers, { subject_employee_id: subjectId = null } = {}) {
+async function resolve(
+  client,
+  approvers,
+  { subject_employee_id: subjectId = null } = {},
+) {
   const out = [];
   for (const a of approvers) {
-    if (a.type === "role" || a.type === "user") out.push({ type: a.type, value: a.value });
+    if (a.type === "role" || a.type === "user")
+      out.push({ type: a.type, value: a.value });
     else if (a.type === "ceo") out.push({ type: "ceo" });
     else if (a.type === "manager_of_subject") {
       const manager = await lineManagerOf(client, subjectId);
-      out.push(manager ? { type: "employee", value: manager, via: "manager_of_subject" } : { type: "ceo", via: "no_line_manager" });
+      out.push(
+        manager
+          ? { type: "employee", value: manager, via: "manager_of_subject" }
+          : { type: "ceo", via: "no_line_manager" },
+      );
     } else {
       throw new Error(`workflow: unknown approver type "${a.type}"`);
     }
@@ -85,8 +100,13 @@ async function canAct(client, snapshot, user, instance = {}) {
   if (user.is_ceo === true) return true;
   if (instance.opened_by && instance.opened_by === user.user_id) return false;
   const list = snapshot || [];
-  if (list.some((a) => a.type === "user" && a.value === user.user_id)) return true;
-  if (user.employee_id && list.some((a) => a.type === "employee" && a.value === user.employee_id)) return true;
+  if (list.some((a) => a.type === "user" && a.value === user.user_id))
+    return true;
+  if (
+    user.employee_id &&
+    list.some((a) => a.type === "employee" && a.value === user.employee_id)
+  )
+    return true;
   const wanted = list.filter((a) => a.type === "role").map((a) => a.value);
   if (wanted.length === 0) return false;
   const held = await roleCodesOf(client, user.role_ids || []);
@@ -102,7 +122,12 @@ async function canAct(client, snapshot, user, instance = {}) {
  * @param {Array} params
  */
 function waitingOnClause(alias, user, roleCodes, params) {
-  params.push(user.user_id, user.employee_id || null, roleCodes, user.is_ceo === true);
+  params.push(
+    user.user_id,
+    user.employee_id || null,
+    roleCodes,
+    user.is_ceo === true,
+  );
   const n = params.length;
   return `(${alias}.opened_by IS DISTINCT FROM $${n - 3}::uuid OR $${n}::boolean)
     AND EXISTS (
@@ -122,10 +147,16 @@ function waitingOnClause(alias, user, roleCodes, params) {
  * @param {{exclude?: string|null}} [opts]  the requester, who is never asked to approve
  * @returns {Promise<string[]>}
  */
-async function recipients(client = defaultPool, snapshot = [], { exclude = null } = {}) {
+async function recipients(
+  client = defaultPool,
+  snapshot = [],
+  { exclude = null } = {},
+) {
   const roles = snapshot.filter((a) => a.type === "role").map((a) => a.value);
   const users = snapshot.filter((a) => a.type === "user").map((a) => a.value);
-  const employees = snapshot.filter((a) => a.type === "employee").map((a) => a.value);
+  const employees = snapshot
+    .filter((a) => a.type === "employee")
+    .map((a) => a.value);
   const ceo = snapshot.some((a) => a.type === "ceo");
   const { rows } = await client.query(
     `SELECT DISTINCT u.user_id
@@ -145,4 +176,11 @@ async function recipients(client = defaultPool, snapshot = [], { exclude = null 
   return rows.map((r) => r.user_id);
 }
 
-module.exports = { resolve, canAct, waitingOnClause, recipients, roleCodesOf, lineManagerOf };
+module.exports = {
+  resolve,
+  canAct,
+  waitingOnClause,
+  recipients,
+  roleCodesOf,
+  lineManagerOf,
+};

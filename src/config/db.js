@@ -27,7 +27,10 @@ const pool = new Pool({
   user: config.DB_USER,
   password: config.DB_PASSWORD || undefined,
   ssl: config.DB_SSL ? { rejectUnauthorized: true } : false,
-  max: config.DB_POOL_MAX,
+  max:
+    PROCESS_NAME === "mycity-worker"
+      ? config.WORKER_DB_POOL_MAX
+      : config.DB_POOL_MAX,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
   statement_timeout: config.DB_STATEMENT_TIMEOUT_MS,

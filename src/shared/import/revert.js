@@ -36,63 +36,95 @@ async function changedSince(client, batch, entityType, ids) {
  * @param {{actor: object, db?: import("pg").Pool}} opts
  * @returns {Promise<{batch: object, archived: number, restored: number}>}
  */
-async function revert(batchId, { actor, db = require("../../config/db").pool }) {
+async function revert(
+  batchId,
+  { actor, db = require("../../config/db").pool },
+) {
   const client = await db.connect();
   try {
-    return await requestContext.run({ ...(requestContext.get() || {}), importBatchId: batchId }, () =>
-      atomically(client, async () => {
-        const batch = await engine.loadBatch(client, batchId, { forUpdate: true });
-        if (batch.status !== "committed") throw new AppError("IMPORT_NOT_COMMITTED", `Only a committed import can be reverted; this one is ${batch.status}`, 409);
-        const imp = engine.importerOf(batch.importer_key);
-        await engine.assertMay(client, actor, imp);
+    return await requestContext.run(
+      { ...(requestContext.get() || {}), importBatchId: batchId },
+      () =>
+        atomically(client, async () => {
+          const batch = await engine.loadBatch(client, batchId, {
+            forUpdate: true,
+          });
+          if (batch.status !== "committed")
+            throw new AppError(
+              "IMPORT_NOT_COMMITTED",
+              `Only a committed import can be reverted; this one is ${batch.status}`,
+              409,
+            );
+          const imp = engine.importerOf(batch.importer_key);
+          await engine.assertMay(client, actor, imp);
 
-        // pagination:complete every row the batch wrote must be undone, or none
-        const { rows } = await require("../http/paged").completeQuery(
-          client,
-          `SELECT row_number, action, target_id, "before" FROM import_row
+          // pagination:complete every row the batch wrote must be undone, or none
+          const { rows } = await require("../http/paged").completeQuery(
+            client,
+            `SELECT row_number, action, target_id, "before" FROM import_row
             WHERE import_batch_id = $1 AND action IN ('create', 'update') AND status IN ('ok', 'warning')
             ORDER BY row_number DESC`,
-          [batchId],
-          { label: "import rows to revert", ceiling: 100000 },
-        );
-        const changed = await changedSince(client, batch, imp.entity, rows.map((r) => r.target_id));
-        const blocked = [];
-        for (const r of rows) {
-          if (changed.has(r.target_id)) blocked.push(`row ${r.row_number} was changed after the import`);
-          else if (imp.isReferenced && (await imp.isReferenced(client, r.target_id))) blocked.push(`row ${r.row_number} is now used elsewhere`);
-        }
-        if (blocked.length) {
-          throw new AppError("IMPORT_REVERT_BLOCKED", `This import cannot be reverted: ${blocked.slice(0, 5).join("; ")}${blocked.length > 5 ? ` and ${blocked.length - 5} more` : ""}.`, 409, {
-            rows: blocked,
-          });
-        }
-
-        const ctx = { actor, batch, importer: imp, reverting: true };
-        let archived = 0;
-        let restored = 0;
-        for (const r of rows) {
-          if (r.action === "create") {
-            await imp.archive(client, r.target_id, ctx);
-            archived += 1;
-          } else {
-            await imp.restore(client, r.target_id, r.before, ctx);
-            restored += 1;
+            [batchId],
+            { label: "import rows to revert", ceiling: 100000 },
+          );
+          const changed = await changedSince(
+            client,
+            batch,
+            imp.entity,
+            rows.map((r) => r.target_id),
+          );
+          const blocked = [];
+          for (const r of rows) {
+            if (changed.has(r.target_id))
+              blocked.push(`row ${r.row_number} was changed after the import`);
+            else if (
+              imp.isReferenced &&
+              (await imp.isReferenced(client, r.target_id))
+            )
+              blocked.push(`row ${r.row_number} is now used elsewhere`);
           }
-        }
-        const { rows: up } = await client.query(
-          `UPDATE import_batch SET status = 'reverted', reverted_at = now(), reverted_by = $2
+          if (blocked.length) {
+            throw new AppError(
+              "IMPORT_REVERT_BLOCKED",
+              `This import cannot be reverted: ${blocked.slice(0, 5).join("; ")}${blocked.length > 5 ? ` and ${blocked.length - 5} more` : ""}.`,
+              409,
+              {
+                rows: blocked,
+              },
+            );
+          }
+
+          const ctx = { actor, batch, importer: imp, reverting: true };
+          let archived = 0;
+          let restored = 0;
+          for (const r of rows) {
+            if (r.action === "create") {
+              await imp.archive(client, r.target_id, ctx);
+              archived += 1;
+            } else {
+              await imp.restore(client, r.target_id, r.before, ctx);
+              restored += 1;
+            }
+          }
+          const { rows: up } = await client.query(
+            `UPDATE import_batch SET status = 'reverted', reverted_at = now(), reverted_by = $2
             WHERE import_batch_id = $1 RETURNING ${engine.BATCH_COLUMNS}`,
-          [batchId, actor ? actor.user_id : null],
-        );
-        await emit(client, {
-          key: engine.EVENTS.IMPORT_REVERTED,
-          entity: { type: "import_batch", id: batchId },
-          module: imp.permission[0],
-          actor,
-          payload: { import_batch_id: batchId, importer_key: imp.key, archived, restored },
-        });
-        return { batch: up[0], archived, restored };
-      }),
+            [batchId, actor ? actor.user_id : null],
+          );
+          await emit(client, {
+            key: engine.EVENTS.IMPORT_REVERTED,
+            entity: { type: "import_batch", id: batchId },
+            module: imp.permission[0],
+            actor,
+            payload: {
+              import_batch_id: batchId,
+              importer_key: imp.key,
+              archived,
+              restored,
+            },
+          });
+          return { batch: up[0], archived, restored };
+        }),
     );
   } finally {
     client.release();

@@ -17,6 +17,7 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 const { config } = require("../../config/env");
 const storage = require("../storage/storage.service");
+const { variantKey } = require("../../shared/files/variant-key");
 
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_SECONDS = 15 * 60;
@@ -52,19 +53,40 @@ function run(bin, args, { timeoutMs = RUN_TIMEOUT_MS } = {}) {
     child.on("close", (code, signal) => {
       clearTimeout(timer);
       if (code === 0) resolve(out);
-      else reject(new Error(`${path.basename(bin)} ${signal ? `was stopped (${signal})` : `exited ${code}`}: ${err.slice(-600)}`));
+      else
+        reject(
+          new Error(
+            `${path.basename(bin)} ${signal ? `was stopped (${signal})` : `exited ${code}`}: ${err.slice(-600)}`,
+          ),
+        );
     });
   });
 }
 
 /** Duration, size and which streams a file has. */
 async function probe(absPath) {
-  const json = await run(config.FFPROBE_PATH, ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", absPath], {
-    timeoutMs: 60_000,
-  });
+  const json = await run(
+    config.FFPROBE_PATH,
+    [
+      "-v",
+      "error",
+      "-print_format",
+      "json",
+      "-show_format",
+      "-show_streams",
+      absPath,
+    ],
+    {
+      timeoutMs: 60_000,
+    },
+  );
   const meta = JSON.parse(json || "{}");
   const streams = meta.streams || [];
-  const video = streams.find((s) => s.codec_type === "video" && !(s.disposition && s.disposition.attached_pic));
+  const video = streams.find(
+    (s) =>
+      s.codec_type === "video" &&
+      !(s.disposition && s.disposition.attached_pic),
+  );
   const audio = streams.find((s) => s.codec_type === "audio");
   const seconds = Number(meta.format && meta.format.duration);
   return {
@@ -76,24 +98,69 @@ async function probe(absPath) {
   };
 }
 
-const ffmpeg = (args) => run(config.FFMPEG_PATH, ["-hide_banner", "-nostdin", "-y", ...args]);
+const ffmpeg = (args) =>
+  run(config.FFMPEG_PATH, ["-hide_banner", "-nostdin", "-y", ...args]);
 
 async function toOpus(inAbs, outAbs) {
-  await ffmpeg(["-i", inAbs, "-t", String(MAX_SECONDS), "-vn", "-ac", "1", "-c:a", "libopus", "-b:a", "32k", "-application", "voip", outAbs]);
+  await ffmpeg([
+    "-i",
+    inAbs,
+    "-t",
+    String(MAX_SECONDS),
+    "-vn",
+    "-ac",
+    "1",
+    "-c:a",
+    "libopus",
+    "-b:a",
+    "32k",
+    "-application",
+    "voip",
+    outAbs,
+  ]);
 }
 
 async function toMp4(inAbs, outAbs) {
   await ffmpeg([
-    "-i", inAbs, "-t", String(MAX_SECONDS),
-    "-vf", "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2",
-    "-c:v", "libx264", "-preset", "veryfast", "-crf", "24", "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", outAbs,
+    "-i",
+    inAbs,
+    "-t",
+    String(MAX_SECONDS),
+    "-vf",
+    "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "24",
+    "-pix_fmt",
+    "yuv420p",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "96k",
+    "-movflags",
+    "+faststart",
+    outAbs,
   ]);
 }
 
 async function posterFrame(inAbs, outAbs, durationMs) {
   const at = durationMs && durationMs > 2000 ? 1 : 0;
-  await ffmpeg(["-ss", String(at), "-i", inAbs, "-frames:v", "1", "-vf", "scale='min(960,iw)':-2", "-q:v", "4", outAbs]);
+  await ffmpeg([
+    "-ss",
+    String(at),
+    "-i",
+    inAbs,
+    "-frames:v",
+    "1",
+    "-vf",
+    "scale='min(960,iw)':-2",
+    "-q:v",
+    "4",
+    outAbs,
+  ]);
 }
 
 /**
@@ -111,25 +178,35 @@ async function derive({ document_id: id, storage_key: key, kind }) {
     if (kind === "audio" || !info.has_video) {
       const out = path.join(dir, "voice.ogg");
       await toOpus(input, out);
-      const k = `derived/${id}/voice.ogg`;
+      const k = variantKey(id, "voice", "ogg");
       const { bytes } = await storage.putFile(k, out, { overwrite: true });
       variants.push({ kind: "opus", key: k, mime: "audio/ogg", bytes });
     } else {
       const out = path.join(dir, "video.mp4");
       await toMp4(input, out);
-      const k = `derived/${id}/video.mp4`;
+      const k = variantKey(id, "video", "mp4");
       const { bytes } = await storage.putFile(k, out, { overwrite: true });
       variants.push({ kind: "mp4-720", key: k, mime: "video/mp4", bytes });
       const still = path.join(dir, "poster.jpg");
       await posterFrame(input, still, info.duration_ms);
-      const pk = `derived/${id}/poster.jpg`;
+      const pk = variantKey(id, "poster", "jpg");
       const p = await storage.putFile(pk, still, { overwrite: true });
-      variants.push({ kind: "poster", key: pk, mime: "image/jpeg", bytes: p.bytes });
+      variants.push({
+        kind: "poster",
+        key: pk,
+        mime: "image/jpeg",
+        bytes: p.bytes,
+      });
     }
   } finally {
     await cleanup();
   }
-  return { duration_ms: info.duration_ms, width: info.width, height: info.height, variants };
+  return {
+    duration_ms: info.duration_ms,
+    width: info.width,
+    height: info.height,
+    variants,
+  };
 }
 
 /** Readiness: both binaries answer. */

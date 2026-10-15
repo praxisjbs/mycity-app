@@ -34,7 +34,13 @@ const BRAND = Object.freeze({
  * @param {Date|string} [opts.generatedAt]
  * @param {{name?: string, address?: string, phone?: string, email?: string, website?: string}} [opts.org]
  */
-function workbookContext({ actor = null, title = null, filters = null, generatedAt = new Date(), org = null } = {}) {
+function workbookContext({
+  actor = null,
+  title = null,
+  filters = null,
+  generatedAt = new Date(),
+  org = null,
+} = {}) {
   const actorName = actor ? actor.full_name || actor.name || null : null;
   return {
     brand: { ...BRAND, name: (org && org.name) || BRAND.name },

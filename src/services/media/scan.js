@@ -23,7 +23,12 @@ const CHUNK = 64 * 1024;
 const TIMEOUT_MS = 60_000;
 
 function connect() {
-  return config.CLAMD_SOCKET ? net.createConnection({ path: config.CLAMD_SOCKET }) : net.createConnection({ host: config.CLAMD_HOST, port: config.CLAMD_PORT });
+  return config.CLAMD_SOCKET
+    ? net.createConnection({ path: config.CLAMD_SOCKET })
+    : net.createConnection({
+        host: config.CLAMD_HOST,
+        port: config.CLAMD_PORT,
+      });
 }
 
 /** Parse clamd's one-line answer: "stream: OK" or "stream: <name> FOUND". */
@@ -53,9 +58,14 @@ function scanStream(input) {
       input.destroy();
       fn(v);
     };
-    const timer = setTimeout(() => done(reject, new Error("clamd did not answer in time")), TIMEOUT_MS);
+    const timer = setTimeout(
+      () => done(reject, new Error("clamd did not answer in time")),
+      TIMEOUT_MS,
+    );
 
-    sock.on("error", (err) => done(reject, new Error(`clamd is not reachable: ${err.message}`)));
+    sock.on("error", (err) =>
+      done(reject, new Error(`clamd is not reachable: ${err.message}`)),
+    );
     sock.on("data", (d) => {
       reply += d;
     });
@@ -113,7 +123,11 @@ function health() {
     });
     sock.on("end", () => {
       clearTimeout(timer);
-      resolve(reply.replace(/\0/g, "").trim() === "PONG" ? { status: "up" } : { status: "degraded", error: "unexpected reply" });
+      resolve(
+        reply.replace(/\0/g, "").trim() === "PONG"
+          ? { status: "up" }
+          : { status: "degraded", error: "unexpected reply" },
+      );
     });
   });
 }

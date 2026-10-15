@@ -23,7 +23,15 @@ const { logger } = require("../../config/logger");
 const storage = require("../storage/storage.service");
 const lagos = require("../../shared/time/lagos");
 
-const AREAS = ["vault", "generated", "comms", "avatars", "imports", "quarantine", "derived"];
+const AREAS = [
+  "vault",
+  "generated",
+  "comms",
+  "avatars",
+  "imports",
+  "quarantine",
+  "derived",
+];
 const GRACE_MS = 24 * 60 * 60 * 1000;
 const BATCH = 500;
 
@@ -56,14 +64,28 @@ async function known(db, keys) {
  * @param {{db?: import("pg").Pool, now?: Date, dryRun?: boolean}} [opts]
  * @returns {Promise<{scanned: number, orphans: number, moved: string[], missing: number, missing_sample: string[], scratch_removed: number}>}
  */
-async function run({ db = require("../../config/db").pool, now = new Date(), dryRun = false } = {}) {
+async function run({
+  db = require("../../config/db").pool,
+  now = new Date(),
+  dryRun = false,
+} = {}) {
   const root = storage.root();
-  const out = { scanned: 0, orphans: 0, moved: [], missing: 0, missing_sample: [], scratch_removed: 0 };
+  const out = {
+    scanned: 0,
+    orphans: 0,
+    moved: [],
+    missing: 0,
+    missing_sample: [],
+    scratch_removed: 0,
+  };
   const stamp = lagos.dateOf(now);
 
   const settle = async (batch) => {
     if (batch.length === 0) return;
-    const have = await known(db, batch.map((f) => f.key));
+    const have = await known(
+      db,
+      batch.map((f) => f.key),
+    );
     for (const f of batch) {
       if (have.has(f.key)) continue;
       out.orphans += 1;
@@ -95,7 +117,9 @@ async function run({ db = require("../../config/db").pool, now = new Date(), dry
 
   // Scratch folders left by a job that died.
   try {
-    for (const e of await fsp.readdir(path.join(root, "tmp"), { withFileTypes: true })) {
+    for (const e of await fsp.readdir(path.join(root, "tmp"), {
+      withFileTypes: true,
+    })) {
       const abs = path.join(root, "tmp", e.name);
       const s = await fsp.stat(abs).catch(() => null);
       if (s && now.getTime() - s.mtimeMs > GRACE_MS && !dryRun) {
@@ -127,7 +151,11 @@ async function run({ db = require("../../config/db").pool, now = new Date(), dry
     after = rows[rows.length - 1].id;
   }
 
-  if (out.orphans || out.missing) logger.warn({ ...out, moved: out.moved.length }, "media reconcile found differences");
+  if (out.orphans || out.missing)
+    logger.warn(
+      { ...out, moved: out.moved.length },
+      "media reconcile found differences",
+    );
   return out;
 }
 

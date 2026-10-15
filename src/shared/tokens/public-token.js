@@ -37,7 +37,8 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 const SCOPE_RE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 const MAX_TTL_HOURS = 24 * 90;
 
-const hash = (token) => crypto.createHash("sha256").update(token, "utf8").digest("hex");
+const hash = (token) =>
+  crypto.createHash("sha256").update(token, "utf8").digest("hex");
 
 /** True for something shaped like a token (cheap check before touching the database). */
 const looksLikeToken = (t) => typeof t === "string" && TOKEN_RE.test(t);
@@ -48,20 +49,50 @@ const looksLikeToken = (t) => typeof t === "string" && TOKEN_RE.test(t);
  *          single_use?: boolean, created_by?: string|null}} p
  * @returns {Promise<{token: string, public_token_id: string, expires_at: Date}>}  the token is shown once, never stored
  */
-async function issue(client, { scope, subject_type, subject_id, ttl_hours, single_use = false, created_by = null }) {
-  if (!SCOPE_RE.test(scope || "")) throw new Error(`public token: scope is "<thing>.<action>", got ${JSON.stringify(scope)}`);
-  if (!Number.isInteger(ttl_hours) || ttl_hours < 1 || ttl_hours > MAX_TTL_HOURS) {
+async function issue(
+  client,
+  {
+    scope,
+    subject_type,
+    subject_id,
+    ttl_hours,
+    single_use = false,
+    created_by = null,
+  },
+) {
+  if (!SCOPE_RE.test(scope || ""))
+    throw new Error(
+      `public token: scope is "<thing>.<action>", got ${JSON.stringify(scope)}`,
+    );
+  if (
+    !Number.isInteger(ttl_hours) ||
+    ttl_hours < 1 ||
+    ttl_hours > MAX_TTL_HOURS
+  ) {
     throw new Error(`public token: ttl_hours must be 1 to ${MAX_TTL_HOURS}`);
   }
-  if (!subject_type || !subject_id) throw new Error("public token: name the record it opens");
+  if (!subject_type || !subject_id)
+    throw new Error("public token: name the record it opens");
   const token = crypto.randomBytes(TOKEN_BYTES).toString("base64url");
   const { rows } = await client.query(
     `INSERT INTO public_token (token_hash, scope, subject_type, subject_id, single_use, expires_at, created_by, created_at)
      VALUES ($1, $2, $3, $4, $5, now() + make_interval(hours => $6), $7, now())
      RETURNING public_token_id, expires_at`,
-    [hash(token), scope, subject_type, subject_id, single_use, ttl_hours, created_by],
+    [
+      hash(token),
+      scope,
+      subject_type,
+      subject_id,
+      single_use,
+      ttl_hours,
+      created_by,
+    ],
   );
-  return { token, public_token_id: rows[0].public_token_id, expires_at: rows[0].expires_at };
+  return {
+    token,
+    public_token_id: rows[0].public_token_id,
+    expires_at: rows[0].expires_at,
+  };
 }
 
 /**
@@ -102,4 +133,12 @@ async function revokeFor(client, { subject_type, subject_id, scope = null }) {
   return rowCount;
 }
 
-module.exports = { issue, resolve, consume, revokeFor, looksLikeToken, hash, MAX_TTL_HOURS };
+module.exports = {
+  issue,
+  resolve,
+  consume,
+  revokeFor,
+  looksLikeToken,
+  hash,
+  MAX_TTL_HOURS,
+};

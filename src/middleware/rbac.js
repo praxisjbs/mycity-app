@@ -46,22 +46,31 @@ const COLUMN = Object.freeze({
 
 function checkSpec(where, key, action) {
   if (!catalog.isModule(key)) {
-    throw new Error(`${where}: "${key}" is not a permission key (shared/access/access.catalog.js)`);
+    throw new Error(
+      `${where}: "${key}" is not a permission key (shared/access/access.catalog.js)`,
+    );
   }
   if (!catalog.isAction(action)) {
-    throw new Error(`${where}: "${action}" is not an action; use one of ${catalog.ACTIONS.join(", ")}`);
+    throw new Error(
+      `${where}: "${action}" is not an action; use one of ${catalog.ACTIONS.join(", ")}`,
+    );
   }
 }
 
 function requireUser(req) {
-  if (!req.user) throw new AppError("AUTH_REQUIRED", "Sign in to continue", 401);
+  if (!req.user)
+    throw new AppError("AUTH_REQUIRED", "Sign in to continue", 401);
 }
 
 /** Widest scope among the grant rows that allow `action`, or null when none does. */
 function scopeFromGrants(rows, action) {
   let scope = null;
   for (const row of rows) {
-    if (row[COLUMN[action]] === true) scope = catalog.widerScope(scope, catalog.isScope(row.scope) ? row.scope : "own");
+    if (row[COLUMN[action]] === true)
+      scope = catalog.widerScope(
+        scope,
+        catalog.isScope(row.scope) ? row.scope : "own",
+      );
   }
   return scope;
 }
@@ -81,9 +90,21 @@ async function settle(req, key, action, scope) {
 }
 
 function deny(req, label, labels) {
-  metrics.inc("mycity_rbac_denials_total", labels, 1, "Permission denials by module and action.");
-  logger.warn({ user_id: req.user.user_id, permission: label }, "permission denied");
-  return new AppError("PERMISSION_DENIED", "You do not have access to this", 403);
+  metrics.inc(
+    "mycity_rbac_denials_total",
+    labels,
+    1,
+    "Permission denials by module and action.",
+  );
+  logger.warn(
+    { user_id: req.user.user_id, permission: label },
+    "permission denied",
+  );
+  return new AppError(
+    "PERMISSION_DENIED",
+    "You do not have access to this",
+    403,
+  );
 }
 
 /**
@@ -99,7 +120,10 @@ function requirePermission(key, action) {
       await settle(req, key, action, "all");
       return next();
     }
-    const rows = await grantsCache.getGrants(pool, { role_ids: req.user.role_ids, module: key });
+    const rows = await grantsCache.getGrants(pool, {
+      role_ids: req.user.role_ids,
+      module: key,
+    });
     const scope = scopeFromGrants(rows, action);
     if (!scope) throw deny(req, `${key}.${action}`, { module: key, action });
     await settle(req, key, action, scope);
@@ -117,8 +141,10 @@ function requirePermission(key, action) {
  * @param {Array<[string, string]>} specs  [[key, action], ...]
  */
 function requireAnyPermission(specs) {
-  if (!Array.isArray(specs) || specs.length === 0) throw new Error("requireAnyPermission: give [key, action] pairs");
-  for (const [key, action] of specs) checkSpec("requireAnyPermission", key, action);
+  if (!Array.isArray(specs) || specs.length === 0)
+    throw new Error("requireAnyPermission: give [key, action] pairs");
+  for (const [key, action] of specs)
+    checkSpec("requireAnyPermission", key, action);
 
   const mw = async function anyPermissionCheck(req, _res, next) {
     requireUser(req);
@@ -129,14 +155,25 @@ function requireAnyPermission(specs) {
     let best = null;
     let bestSpec = null;
     for (const [key, action] of specs) {
-      const rows = await grantsCache.getGrants(pool, { role_ids: req.user.role_ids, module: key });
+      const rows = await grantsCache.getGrants(pool, {
+        role_ids: req.user.role_ids,
+        module: key,
+      });
       const scope = scopeFromGrants(rows, action);
-      if (scope && catalog.widerScope(best, scope) === scope && scope !== best) {
+      if (
+        scope &&
+        catalog.widerScope(best, scope) === scope &&
+        scope !== best
+      ) {
         best = scope;
         bestSpec = [key, action];
       }
     }
-    if (!best) throw deny(req, specs.map(([k, a]) => `${k}.${a}`).join(" or "), { module: "any", action: "any" });
+    if (!best)
+      throw deny(req, specs.map(([k, a]) => `${k}.${a}`).join(" or "), {
+        module: "any",
+        action: "any",
+      });
     await settle(req, bestSpec[0], bestSpec[1], best);
     return next();
   };
@@ -151,13 +188,18 @@ function requireAnyPermission(specs) {
  * @param {string} code
  */
 function requireCapability(code) {
-  if (!code || typeof code !== "string") throw new Error("requireCapability: give a capability code");
+  if (!code || typeof code !== "string")
+    throw new Error("requireCapability: give a capability code");
   return async function capabilityCheck(req, _res, next) {
     requireUser(req);
     if (req.user.is_ceo === true) return next();
     const held = await grantsCache.getCapabilities(pool, req.user.user_id);
     if (!held.includes(code)) {
-      throw new AppError("CAPABILITY_REQUIRED", "This needs an authority you do not hold", 403);
+      throw new AppError(
+        "CAPABILITY_REQUIRED",
+        "This needs an authority you do not hold",
+        403,
+      );
     }
     return next();
   };
@@ -167,7 +209,8 @@ function requireCapability(code) {
 function requireCeo() {
   return function ceoCheck(req, _res, next) {
     requireUser(req);
-    if (req.user.is_ceo !== true) throw new AppError("PERMISSION_DENIED", "Only the CEO can do this", 403);
+    if (req.user.is_ceo !== true)
+      throw new AppError("PERMISSION_DENIED", "Only the CEO can do this", 403);
     return next();
   };
 }
@@ -189,7 +232,10 @@ async function readPermissions(req, specs) {
         out.push(false);
         continue;
       }
-      const rows = await grantsCache.getGrants(pool, { role_ids: req.user.role_ids, module: key });
+      const rows = await grantsCache.getGrants(pool, {
+        role_ids: req.user.role_ids,
+        module: key,
+      });
       out.push(Boolean(scopeFromGrants(rows, action)));
     }
     return out;
@@ -198,8 +244,40 @@ async function readPermissions(req, specs) {
   }
 }
 
+/**
+ * The same decision as requirePermission, for code that is not a route: the AI's
+ * reads (shared/ai/authorise.js) and search (shared/search/search.service.js). One
+ * answer to "may this person do this, and over which records", wherever it is asked.
+ *
+ * @param {{user_id: string, employee_id?: string, role_ids?: string[], is_ceo?: boolean}|null} user
+ * @param {string} key     module key
+ * @param {string} action  view | create | edit | delete | approve | export
+ * @returns {Promise<{scope: string, scope_ids: string[]|null, employee_id: string|null}|null>}
+ *   null when the user holds no such grant
+ */
+async function scopeFor(user, key, action) {
+  checkSpec("scopeFor", key, action);
+  if (!user || !user.user_id) return null;
+  let scope = "all";
+  if (user.is_ceo !== true) {
+    const rows = await grantsCache.getGrants(pool, {
+      role_ids: user.role_ids || [],
+      module: key,
+    });
+    scope = scopeFromGrants(rows, action);
+    if (!scope) return null;
+  }
+  const effective = catalog.OWN_ONLY.has(key) ? "own" : scope;
+  return {
+    scope: effective,
+    scope_ids: await idsFor(effective, user),
+    employee_id: user.employee_id || null,
+  };
+}
+
 module.exports = {
   requirePermission,
+  scopeFor,
   requireAnyPermission,
   requireCapability,
   requireCeo,

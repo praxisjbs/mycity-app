@@ -39,7 +39,12 @@ const metrics = require("../shared/observability/metrics");
 const ACCESS_TYP = "access";
 
 function denied(reason, code, message) {
-  metrics.inc("mycity_auth_failures_total", { reason }, 1, "Authentication failures by reason.");
+  metrics.inc(
+    "mycity_auth_failures_total",
+    { reason },
+    1,
+    "Authentication failures by reason.",
+  );
   return new AppError(code, message, 401);
 }
 
@@ -50,7 +55,9 @@ function denied(reason, code, message) {
  * @returns {{sub: string, sid?: string, typ: string, iat: number, exp: number}}  throws on any failure
  */
 function verifyAccessToken(token) {
-  const payload = jwt.verify(token, config.JWT_ACCESS_SECRET, { algorithms: ["HS256"] });
+  const payload = jwt.verify(token, config.JWT_ACCESS_SECRET, {
+    algorithms: ["HS256"],
+  });
   if (payload.typ !== ACCESS_TYP) throw new Error("not an access token");
   return payload;
 }
@@ -76,14 +83,26 @@ async function sessionLive(db, sid) {
   const indexed = await sessions.isSessionActive(sid);
   if (indexed === true) return true;
   try {
-    const { rows } = await db.query("SELECT killed_at, expires_at FROM user_session WHERE session_id = $1", [sid]);
+    const { rows } = await db.query(
+      "SELECT killed_at, expires_at FROM user_session WHERE session_id = $1",
+      [sid],
+    );
     // A sid is only ever minted with its user_session row, so no row means gone.
     if (!rows[0]) return false;
-    return rows[0].killed_at === null && new Date(rows[0].expires_at) > new Date();
+    return (
+      rows[0].killed_at === null && new Date(rows[0].expires_at) > new Date()
+    );
   } catch (err) {
-    metrics.inc("mycity_auth_failures_total", { reason: "session_check_unavailable" }, 1,
-      "Authentication failures by reason.");
-    logger.error({ err, sid }, "session revocation check unavailable; allowing the request");
+    metrics.inc(
+      "mycity_auth_failures_total",
+      { reason: "session_check_unavailable" },
+      1,
+      "Authentication failures by reason.",
+    );
+    logger.error(
+      { err, sid },
+      "session revocation check unavailable; allowing the request",
+    );
     return true;
   }
 }
@@ -96,19 +115,30 @@ async function auth(req, _res, next) {
   try {
     payload = verifyAccessToken(token);
   } catch (err) {
-    if (err && err.name === "TokenExpiredError") throw denied("expired", "TOKEN_EXPIRED", "Your session has expired");
+    if (err && err.name === "TokenExpiredError")
+      throw denied("expired", "TOKEN_EXPIRED", "Your session has expired");
     throw denied("invalid", "INVALID_TOKEN", "Sign in to continue");
   }
 
   const user = await grantsCache.getAuthUser(pool, payload.sub);
   if (!user || user.status !== "active") {
-    logger.warn({ sub: payload.sub, reason: user ? user.status : "not_found" }, "authentication refused");
+    logger.warn(
+      { sub: payload.sub, reason: user ? user.status : "not_found" },
+      "authentication refused",
+    );
     throw denied("inactive", "USER_INACTIVE", "This account is not active");
   }
 
   if (!payload.sid || !(await sessionLive(pool, payload.sid))) {
-    logger.warn({ sub: payload.sub, sid: payload.sid || null }, "authentication refused: session ended");
-    throw denied("session_ended", "SESSION_ENDED", "This session has ended. Sign in again.");
+    logger.warn(
+      { sub: payload.sub, sid: payload.sid || null },
+      "authentication refused: session ended",
+    );
+    throw denied(
+      "session_ended",
+      "SESSION_ENDED",
+      "This session has ended. Sign in again.",
+    );
   }
 
   req.user = {
@@ -124,4 +154,11 @@ async function auth(req, _res, next) {
   return next();
 }
 
-module.exports = { auth, verifyAccessToken, bearerOf, userIdFromRequest, ACCESS_TYP };
+module.exports = {
+  auth,
+  verifyAccessToken,
+  bearerOf,
+  userIdFromRequest,
+  sessionLive,
+  ACCESS_TYP,
+};
