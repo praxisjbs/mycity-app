@@ -4,22 +4,17 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/partnerships";
 import type { Contract, Lead, PartnerRow, Proposal, ProposalDoc, Renewal } from "@/api/types/partnerships";
 import type { PersonRef } from "@/api/types/common";
-import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
-import { Chain, KV, Mini, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
+import { Chain, StatStrip } from "@/components/ui/data";
 import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
 import { BackButton, ProfileHeader } from "@/components/ui/Profile";
-import { Chips, ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, todayIso } from "@/lib/format";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { DateField, Field, FormFooter, MoneyField, PersonPicker, rules, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@/components/form";
+import { PersonPicker } from "@/components/form";
+import { Button, KeyValue, Meter, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, todayIso, StatusPill, DateField, Field, FormFooter, MoneyField, rules, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@mycity/ui";
 
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   if (id && (tab === "partners" || tab === "pipeline")) return <Partner360View id={id} back={tab} />;
@@ -49,7 +44,7 @@ function Pipeline() {
   const d = s.data;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Pipeline"
         sub={d ? `${d.in_pipeline} in the pipeline · ${d.going_quiet} going quiet` : " "}
         actions={
@@ -95,7 +90,7 @@ function Partners() {
   const list = usePaged("GET /api/v1/partnerships/partners", { filters: view === "quiet" ? { quiet: true } : {} });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Partners"
         sub="The 360 opens from any row"
         actions={
@@ -192,7 +187,7 @@ function Partner360View({ id, back }: { id: string; back: string }) {
   const modal = useModal();
   const p = useApi("GET /api/v1/partnerships/partners/:id", { params: { id } });
   const goBack = () => navigate(`/partnerships?tab=${back}`);
-  if (p.error) return (<><BackButton label={`Back to ${back === "pipeline" ? "Pipeline" : "Partners"}`} onClick={goBack} /><ErrorBlock error={p.error} onRetry={p.reload} /></>);
+  if (p.error) return (<><BackButton label={`Back to ${back === "pipeline" ? "Pipeline" : "Partners"}`} onClick={goBack} /><ErrorState error={p.error} onRetry={p.reload} /></>);
   if (!p.data) return <LoadingRows count={8} />;
   const x = p.data;
   return (
@@ -226,7 +221,7 @@ function Partner360View({ id, back }: { id: string; back: string }) {
             {x.days_at_stage.map((d) => (
               <div key={d.label} className="flex items-center gap-2.5 py-1">
                 <span className="min-w-0 flex-1 text-[12px]">{d.label}</span>
-                <span className="w-[160px] flex-none"><Mini pct={Math.min(100, d.days * 4)} label={d.current ? `${d.days} so far` : `${d.days} days`} /></span>
+                <span className="w-[160px] flex-none"><Meter pct={Math.min(100, d.days * 4)} label={d.current ? `${d.days} so far` : `${d.days} days`} /></span>
               </div>
             ))}
           </div>
@@ -328,7 +323,7 @@ function Leads() {
       title: l.title,
       body: (close) => (
         <>
-          <KV items={[["Source", l.source], ["Owner", l.owner.display_name], ["Added", formatDate(l.added_on)], ["Next action", l.next_action ?? "None"], ["Status", <StatusPill key="s" s={l.status} />]]} />
+          <KeyValue items={[["Source", l.source], ["Owner", l.owner.display_name], ["Added", formatDate(l.added_on)], ["Next action", l.next_action ?? "None"], ["Status", <StatusPill key="s" s={l.status} />]]} />
           {!["Converted", "Lost"].includes(l.status.text) && (
             <FormFooter>
               <Button className="mr-auto" onClick={() => modal.open({ title: "Close as Lost", body: (c2) => <LoseLead id={l.lead_id} close={c2} /> })}>Close as Lost</Button>
@@ -340,7 +335,7 @@ function Leads() {
     });
   return (
     <>
-      <PageHead title="Leads" sub="Entered manually after a business development conversation" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Lead", body: (close) => <LeadForm close={close} /> })}>New Lead</Button>} />
+      <PageHeader title="Leads" sub="Entered manually after a business development conversation" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Lead", body: (close) => <LeadForm close={close} /> })}>New Lead</Button>} />
       {s.data && <KpiTiles items={[{ label: "New", value: String(s.data.new) }, { label: "Contacted", value: String(s.data.contacted) }, { label: "Qualified", value: String(s.data.qualified) }, { label: "Converted This Month", value: String(s.data.converted_this_month), tone: "ok" }]} />}
       <PagedTable<Lead>
         title="Leads"
@@ -452,7 +447,7 @@ function Proposals() {
   }, [preset, navigate, modal]);
   return (
     <>
-      <PageHead title="Proposals" sub="Generated from a short questionnaire" actions={<Button variant="primary" icon="plus" onClick={() => openNew()}>New Proposal</Button>} />
+      <PageHeader title="Proposals" sub="Generated from a short questionnaire" actions={<Button variant="primary" icon="plus" onClick={() => openNew()}>New Proposal</Button>} />
       {s.data && <KpiTiles items={[{ label: "Sent This Year", value: String(s.data.sent_this_year) }, { label: "Accepted", value: String(s.data.accepted), tone: "ok" }, { label: "Viewed, No Reply", value: String(s.data.viewed_no_reply), tone: "warn" }, { label: "Acceptance Rate", value: s.data.acceptance_rate }]} />}
       <Grid cols="1/1.5">
         <PagedTable<Proposal>
@@ -540,7 +535,7 @@ function Contracts() {
   const ren = usePaged("GET /api/v1/partnerships/contracts/renewals");
   return (
     <>
-      <PageHead title="Contracts & MOUs" sub="Draft to renewal" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Contract", body: (close) => <ContractForm close={close} /> })}>New Contract</Button>} />
+      <PageHeader title="Contracts & MOUs" sub="Draft to renewal" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Contract", body: (close) => <ContractForm close={close} /> })}>New Contract</Button>} />
       {s.data && (
         <>
           <KpiTiles items={[{ label: "Active", value: String(s.data.active) }, { label: "In Review", value: String(s.data.in_review), tone: s.data.in_review ? "warn" : undefined }, { label: "Draft", value: String(s.data.draft) }, { label: "Renewals, 180 Days", value: String(s.data.renewals_180), tone: s.data.renewals_180 ? "warn" : undefined }]} />
@@ -618,10 +613,10 @@ function ContractForm({ close }: { close: () => void }) {
 function Analytics() {
   const a = useApi("GET /api/v1/partnerships/analytics");
   const d = a.data;
-  if (!d) return (<><PageHead title="Analytics" sub="Monthly partnership performance by lead owner" /><Card><LoadingRows count={6} /></Card></>);
+  if (!d) return (<><PageHeader title="Analytics" sub="Monthly partnership performance by lead owner" /><Card><LoadingRows count={6} /></Card></>);
   return (
     <>
-      <PageHead title="Analytics" sub="Monthly partnership performance by lead owner" />
+      <PageHeader title="Analytics" sub="Monthly partnership performance by lead owner" />
       <KpiTiles items={[{ label: "Prospects This Month", value: String(d.prospects) }, { label: "Meetings Held", value: String(d.meetings) }, { label: "Proposals Sent", value: String(d.proposals) }, { label: "Signed", value: String(d.signed), tone: "ok" }]} />
       <Table
         title={formatMonth(d.period)}
@@ -651,7 +646,7 @@ function Analytics() {
             { key: "p", label: "Prospects", align: "n", render: (r) => r.prospects },
             { key: "pr", label: "Proposals", align: "n", render: (r) => r.proposals },
             { key: "s", label: "Signed", align: "n", render: (r) => r.signed },
-            { key: "c", label: "Conversion", render: (r) => <span className="block w-[130px]"><Mini pct={r.conversion_pct} label={`${r.conversion_pct}%`} /></span> },
+            { key: "c", label: "Conversion", render: (r) => <span className="block w-[130px]"><Meter pct={r.conversion_pct} label={`${r.conversion_pct}%`} /></span> },
           ]}
         />
       </Grid>

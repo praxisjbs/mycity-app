@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { MyDocument } from "@/api/types/ess";
-import { Button } from "@/components/ui/Button";
-import { KV, Pill, StatStrip, TapList } from "@/components/ui/data";
-import { Card, CardHeader, DesktopOnly, Grid, MobileOnly, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
+import { StatStrip, TapList } from "@/components/ui/data";
 import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
 import { Pager, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 import { useMe } from "@/auth/AuthProvider";
-import { formatDate } from "@/lib/format";
-import { Field, TextField, UploadField } from "@/components/form";
+import { UploadField } from "@/components/form";
+import { Button, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PhoneOnly, PageHeader, useModal, toast, formatDate, Field, TextField } from "@mycity/ui";
 
 export function MyDocumentsPage() {
   const list = usePaged("GET /api/v1/ess/documents");
@@ -39,18 +35,18 @@ export function MyDocumentsPage() {
           title: d.name,
           body: (
             <>
-              <Card><CardHeader title={d.name} /><KV items={[["Uploaded", d.uploaded ? formatDate(d.uploaded) : "Not uploaded"], ["Status", <Pill tone={d.status.tone}>{d.status.text}</Pill>], ["Expires", d.expires ? formatDate(d.expires) : "None"]]} /></Card>
+              <Card><CardHeader title={d.name} /><KeyValue items={[["Uploaded", d.uploaded ? formatDate(d.uploaded) : "Not uploaded"], ["Status", <Pill tone={d.status.tone}>{d.status.text}</Pill>], ["Expires", d.expires ? formatDate(d.expires) : "None"]]} /></Card>
               {(d.status.text === "Missing" || d.status.text === "Expiring") && <Button variant="primary" icon="plus" className="mt-3" onClick={() => upload(d.name)}>Upload Now</Button>}
             </>
           ),
         });
   return (
     <>
-      <PageHead title="My Documents" sub="Your vault" actions={<Button variant="primary" icon="plus" onClick={() => upload()}>Upload</Button>} />
+      <PageHeader title="My Documents" sub="Your vault" actions={<Button variant="primary" icon="plus" onClick={() => upload()}>Upload</Button>} />
       <StatStrip items={[{ label: "Documents", value: String(list.page?.total ?? 0) }, { label: "Signed", value: String(count("Signed")), tone: "ok" }, { label: "Verified", value: String(count("Verified")), tone: "ok" }, { label: "Expiring", value: String(count("Expiring")), tone: "warn" }, { label: "Missing", value: String(count("Missing")), tone: "err" }]} />
-      <MobileOnly>
+      <PhoneOnly>
         <TapList items={list.rows.map((d) => ({ key: d.document_ref_id, title: d.name, sub: d.uploaded ? `Uploaded ${formatDate(d.uploaded)}` : "Not uploaded", right: <Pill tone={d.status.tone}>{d.status.text}</Pill>, onClick: () => open(d) }))} />
-      </MobileOnly>
+      </PhoneOnly>
       <DesktopOnly>
         <Grid cols="1/1.5">
           <Table

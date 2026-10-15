@@ -6,19 +6,14 @@ import "@/api/types/community";
 import type { Announcement } from "@/api/types/community";
 import type { ArticleKind, Block, Overdue, Resource } from "@/api/types/knowledge";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
-import { Accordion, Mini, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
+import { Accordion, StatStrip } from "@/components/ui/data";
 import { ArticleBody, Reader } from "@/components/ui/Reader";
-import { Chips, ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { formatDate, todayIso } from "@/lib/format";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { ChoiceField, DateField, Field, FormFooter, SelectField, TextAreaField, TextField, useContractForm } from "@/components/form";
+import { Button, Meter, Pill, Who, Card, Grid, PageHeader, useModal, Chips, ErrorState, toast, formatDate, todayIso, StatusPill, ChoiceField, DateField, Field, FormFooter, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
 
 export default function Knowledge({ tab, id }: ModuleScreenProps) {
   if (tab === "sops") return <Articles kind="sop" id={id} />;
@@ -59,7 +54,7 @@ function Articles({ kind, id }: { kind: ArticleKind; id: string | null }) {
   const title = policy ? "Policies" : "SOPs";
   return (
     <>
-      <PageHead
+      <PageHeader
         title={title}
         sub={policy ? "HR and company policy" : "How to do things in the platform"}
         actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: policy ? "New Policy" : "New SOP", wide: true, body: (close) => <ArticleForm kind={kind} close={close} /> })}>{policy ? "New Policy" : "New SOP"}</Button>}
@@ -75,7 +70,7 @@ function Articles({ kind, id }: { kind: ArticleKind; id: string | null }) {
       )}
       {list.loading && !list.rows.length ? <Card><LoadingRows count={6} /></Card> : (
         <Reader groups={groups} selected={current} onSelect={setSel}>
-          {a.error ? <ErrorBlock error={a.error} /> : !a.data ? <LoadingRows count={8} /> : (
+          {a.error ? <ErrorState error={a.error} /> : !a.data ? <LoadingRows count={8} /> : (
             <ArticleBody
               title={a.data.title}
               meta={<><StatusPill s={a.data.status} />{policy ? <Pill>Version {a.data.version}</Pill> : <Pill>{a.data.group}</Pill>}<Pill>Updated {formatDate(a.data.updated_on)}</Pill>{policy ? <Pill>Owner: {a.data.owner}</Pill> : <Pill>{a.data.read_minutes} minute read</Pill>}</>}
@@ -144,7 +139,7 @@ function Faqs() {
   const list = usePaged("GET /api/v1/knowledge/faqs", { filters: topic ? { topic } : {} });
   return (
     <>
-      <PageHead title="FAQs" sub="Answered in a sentence or two" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New FAQ", body: (close) => <FaqForm close={close} topics={s.data?.topics.map((t) => t.topic) ?? []} /> })}>New FAQ</Button>} />
+      <PageHeader title="FAQs" sub="Answered in a sentence or two" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New FAQ", body: (close) => <FaqForm close={close} topics={s.data?.topics.map((t) => t.topic) ?? []} /> })}>New FAQ</Button>} />
       {s.data && <StatStrip items={[{ label: "Questions", value: s.data.questions }, { label: "Asked This Month", value: s.data.asked_this_month }, { label: "Most Asked", value: s.data.most_asked }, { label: "Unanswered", value: s.data.unanswered, tone: s.data.unanswered ? "warn" : "ok" }, { label: "From Praxis AI", value: s.data.from_ai, desktop: true }]} />}
       <Grid cols="1.4/1">
         <div>
@@ -194,7 +189,7 @@ function Training() {
   const remind = useMutation("POST /api/v1/knowledge/training/overdue/remind");
   return (
     <>
-      <PageHead title="Training" sub="Resources and onboarding material" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Resource", body: (close) => <ResourceForm close={close} /> })}>New Resource</Button>} />
+      <PageHeader title="Training" sub="Resources and onboarding material" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Resource", body: (close) => <ResourceForm close={close} /> })}>New Resource</Button>} />
       {s.data && <KpiTiles items={[{ label: "Resources", value: String(s.data.resources) }, { label: "Completion", value: `${s.data.completion_pct}%` }, { label: "Overdue", value: String(s.data.overdue), tone: s.data.overdue ? "warn" : "ok" }, { label: "Certificates Issued", value: String(s.data.certificates) }]} />}
       <Grid cols={2}>
         {list.rows.map((r: Resource) => (
@@ -216,7 +211,7 @@ function Training() {
             { key: "t", label: "Resource", render: (r) => r.title },
             { key: "a", label: "Assigned", align: "n", render: (r) => r.assigned },
             { key: "c", label: "Completed", align: "n", render: (r) => r.completed },
-            { key: "p", label: "Progress", render: (r) => <span className="block w-[130px]"><Mini pct={Math.round((r.completed * 100) / Math.max(1, r.assigned))} label={`${Math.round((r.completed * 100) / Math.max(1, r.assigned))}%`} /></span> },
+            { key: "p", label: "Progress", render: (r) => <span className="block w-[130px]"><Meter pct={Math.round((r.completed * 100) / Math.max(1, r.assigned))} label={`${Math.round((r.completed * 100) / Math.max(1, r.assigned))}%`} /></span> },
           ]}
         />
         <PagedTable<Overdue>
@@ -284,7 +279,7 @@ function Announcements() {
   const avg = pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience), 0) * 100) / pub.length) : 0;
   return (
     <>
-      <PageHead title="Announcements" sub="Also posted to the staff community" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => navigate("/community?tab=announcements")}>New Announcement</Button>} />
+      <PageHeader title="Announcements" sub="Also posted to the staff community" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => navigate("/community?tab=announcements")}>New Announcement</Button>} />
       <KpiTiles items={[{ label: "Published", value: String(pub.length) }, { label: "Scheduled", value: String(list.rows.length - pub.length) }, { label: "Average Read", value: `${avg}%`, tone: "ok" }, { label: "This Quarter", value: String(list.page?.total ?? 0) }]} />
       <PagedTable<Announcement>
         title="Announcements"

@@ -5,11 +5,10 @@ import "@/api/types/public";
 import type { OfferToSign } from "@/api/types/public";
 import { Brand, Message, Page } from "@/components/Layout";
 import { SignaturePad, type SignaturePadHandle } from "@/components/SignaturePad";
-import { Button, Loading, Notice, Sub } from "@/components/ui";
-import { formatDate, formatTime } from "@/lib/format";
+import { Button, formatDate, formatTime, Skeleton, Banner, Field, TextAreaField } from "@mycity/ui";
+import { Sub } from "@/components/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
-import { Field, Textarea } from "@/components/form";
 
 /**
  * Sign Offer (#84): the candidate reads the same text that is in the PDF and
@@ -24,7 +23,7 @@ export function SignOffer({ token }: { token: string }) {
   if (!d)
     return (
       <Page title="Offer of Employment" brandInCard>
-        <Loading lines={8} />
+        <Skeleton lines={8} />
       </Page>
     );
   if (d.state === "awaiting") return <Sign d={d} token={token} onDone={o.set} />;
@@ -97,7 +96,7 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
           </div>
           {problem && (
             <div className="mt-2">
-              <Notice tone="err">{problem}</Notice>
+              <Banner tone="err">{problem}</Banner>
             </div>
           )}
           <Button variant="primary" block className="mt-2" disabled={busy || !inked} onClick={sign}>
@@ -112,10 +111,10 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
         </>
       ) : (
         <div className="mt-4 flex flex-col gap-3">
-          <Field label="Why Are You Declining? (Optional)" htmlFor="reason" hint="It is recorded with your answer and read by the hiring team only.">
-            <Textarea id="reason" rows={3} value={reason} onChange={setReason} maxLength={1000} />
+          <Field label="Reason for Declining" htmlFor="reason" optional>
+            <TextAreaField id="reason" rows={3} value={reason} onChange={setReason} maxLength={1000} />
           </Field>
-          {problem && <Notice tone="err">{problem}</Notice>}
+          {problem && <Banner tone="err">{problem}</Banner>}
           <div className="flex justify-end gap-2">
             <Button disabled={busy} onClick={() => (setDeclining(false), setProblem(null))}>
               Back to the Offer
@@ -162,7 +161,7 @@ function Closed({ d, token }: { d: OfferToSign; token: string }) {
           <p className="mt-2">Anyone you give the reference {d.verify_number} to can check it at go.mycityapp.io/verify. We will email you the list of documents to upload before your first day.</p>
           {note && (
             <div className="mt-3 text-left">
-              <Notice tone="info">{note}</Notice>
+              <Banner tone="info">{note}</Banner>
             </div>
           )}
         </Message>

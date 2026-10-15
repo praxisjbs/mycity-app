@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@mycity/ui";
 
 /** Article list on the left, the article on the right (Knowledge Hub). A scrolling strip above it on smaller screens. */
 export function Reader({ groups, selected, onSelect, children }: { groups: Array<{ label: string; items: Array<{ key: string; title: string }> }>; selected: string | null; onSelect: (key: string) => void; children: ReactNode }) {

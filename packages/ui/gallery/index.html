@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en-NG">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Component Gallery · MyCity App</title>
+    <script>
+      /* The page is light (each state shows in a light and a dark frame); density before first paint, on its own key. */
+      document.documentElement.setAttribute("data-theme", "light");
+      try {
+        var d = localStorage.getItem("mc-gallery-density"); if (d) document.documentElement.setAttribute("data-density", d);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

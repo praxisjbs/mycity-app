@@ -226,6 +226,7 @@ const SKIP_DIRS = new Set([
   ".git",
   "coverage",
   "dist",
+  "dist-gallery",
   "build",
   "__snapshots__",
 ]);

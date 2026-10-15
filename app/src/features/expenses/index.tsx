@@ -5,21 +5,14 @@ import "@/api/types/expenses";
 import type { Category, Disbursement, ExpenseRow, Requisition } from "@/api/types/expenses";
 import type { DocumentRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
 import { AreaChart } from "@/components/ui/charts";
-import { Chain, KV, Who } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
-import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatBytes, formatDate, formatDateTime, formatMoneyShort, todayIso } from "@/lib/format";
+import { Chain } from "@/components/ui/data";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
+import { BarsCard, ExportButton, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { DateField, Field, FormFooter, MoneyField, rules, SelectField, TextAreaField, TextField, UploadField, useContractForm, Wizard } from "@/components/form";
+import { UploadField } from "@/components/form";
+import { Button, KeyValue, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, cn, formatBytes, formatDate, formatDateTime, formatMoneyShort, todayIso, StatusPill, DateField, Field, FormFooter, MoneyField, rules, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@mycity/ui";
 
 export default function Expenses({ tab, id }: ModuleScreenProps) {
   if (tab === "approvals") return <Approvals id={id} />;
@@ -44,7 +37,7 @@ function MyRequests({ id }: { id: string | null }) {
   const focus = sel ?? s.data?.focus_id ?? null;
   return (
     <>
-      <PageHead title="My Requests" sub="Your own expense requests" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", wide: true, body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
+      <PageHeader title="My Requests" sub="Your own expense requests" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", wide: true, body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
       {s.data && <KpiTiles items={[{ label: "In Flight", value: String(s.data.in_flight), tone: s.data.in_flight ? "warn" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Turnaround", value: s.data.average_turnaround }, { label: "Rejected", value: String(s.data.rejected), tone: s.data.rejected ? "err" : "ok" }]} />}
       {focus && <FocusChain id={focus} />}
       <PagedTable<ExpenseRow>
@@ -83,7 +76,7 @@ function FocusChain({ id }: { id: string }) {
 
 function History({ id }: { id: string }) {
   const d = useApi("GET /api/v1/expenses/requests/:id", { params: { id } });
-  if (!d.data) return <Card>{d.error ? <ErrorBlock error={d.error} /> : <LoadingRows />}</Card>;
+  if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
   return <TrailCard title={`${d.data.number} History`} items={d.data.history.map((h) => ({ ...h, when: formatDateTime(h.when) }))} />;
 }
 
@@ -169,7 +162,7 @@ function Approvals({ id }: { id: string | null }) {
   const focus = sel ?? s.data?.focus_id ?? null;
   return (
     <>
-      <PageHead title="Approvals" sub="Requests waiting on you" />
+      <PageHeader title="Approvals" sub="Requests waiting on you" />
       {s.data && <KpiTiles items={[{ label: "With You", value: String(s.data.with_you), tone: s.data.with_you ? "warn" : "ok" }, { label: "Total Value", value: formatMoneyShort(s.data.total_value) }, { label: "Oldest", value: `${s.data.oldest_days} days` }, { label: "Approved This Month", value: String(s.data.approved_this_month), tone: "ok" }]} />}
       {focus && <ApprovalCard id={focus} onDone={() => setSel(null)} />}
       <PagedTable<ExpenseRow>
@@ -195,7 +188,7 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
   const modal = useModal();
   const d = useApi("GET /api/v1/expenses/requests/:id", { params: { id } });
   const approve = useMutation("POST /api/v1/expenses/requests/:id/approve");
-  if (!d.data) return <Card className="mb-3">{d.error ? <ErrorBlock error={d.error} /> : <LoadingRows />}</Card>;
+  if (!d.data) return <Card className="mb-3">{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
   const x = d.data;
   return (
     <Card className="mb-3">
@@ -203,7 +196,7 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
       <Chain steps={x.chain.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
       <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{x.chain_note} Vendor invoice attached, account details supplied.</p>
       <div className="mt-[13px]">
-        <KV
+        <KeyValue
           items={[
             ["Requested by", `${x.requester.display_name}, ${x.requester.job_title ?? x.requester.department ?? ""}`],
             ["Category", x.category],
@@ -251,7 +244,7 @@ function Requisitions() {
   const focus = sel ?? s.data?.focus_id ?? null;
   return (
     <>
-      <PageHead title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Requisition", wide: true, body: (close) => <NewRequisition close={close} /> })}>New Requisition</Button>} />
+      <PageHeader title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Requisition", wide: true, body: (close) => <NewRequisition close={close} /> })}>New Requisition</Button>} />
       {s.data && <KpiTiles items={[{ label: "With the CEO", value: String(s.data.with_ceo), tone: s.data.with_ceo ? "err" : "ok" }, { label: "Days Waiting", value: String(s.data.days_waiting), tone: s.data.days_waiting > 3 ? "err" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Size", value: s.data.average_size }]} />}
       <PagedTable<Requisition>
         title="Requisitions"
@@ -280,7 +273,7 @@ function RequisitionCard({ id }: { id: string }) {
   const approve = useMutation("POST /api/v1/expenses/requisitions/:id/approve");
   const [removed, setRemoved] = useState<string[]>([]);
   const [tried, setTried] = useState(false);
-  if (!d.data) return <Card>{d.error ? <ErrorBlock error={d.error} /> : <LoadingRows />}</Card>;
+  if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
   const x = d.data;
   const kept = x.items.filter((i) => !removed.includes(i.request_id));
   const total = kept.reduce((a, i) => a + Math.round(Number(i.amount) * 100), 0);
@@ -351,7 +344,7 @@ function Disbursements() {
   const list = usePaged("GET /api/v1/expenses/disbursements");
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Disbursements"
         sub="Logged after the bank confirms"
         actions={
@@ -421,7 +414,7 @@ function BudgetsTab() {
   const d = b.data;
   return (
     <>
-      <PageHead title="Budgets" sub={d ? `${d.year} · ${d.illustrative ? "no budget lines set" : `${d.lines.length} lines`}` : " "} actions={<Button variant="primary" icon="plus" onClick={() => toast("Budget lines open in 2027")}>Add Budget Line</Button>} />
+      <PageHeader title="Budgets" sub={d ? `${d.year} · ${d.illustrative ? "no budget lines set" : `${d.lines.length} lines`}` : " "} actions={<Button variant="primary" icon="plus" onClick={() => toast("Budget lines open in 2027")}>Add Budget Line</Button>} />
       {d?.illustrative && (
         <div className="mb-3 flex items-start gap-2.5 rounded-card bg-info-soft p-[14px] text-info">
           <Icon name="alert" className="mt-0.5 flex-none" />
@@ -460,7 +453,7 @@ function Categories() {
   const list = usePaged("GET /api/v1/expenses/categories");
   return (
     <>
-      <PageHead title="Categories" sub="Expense categories" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Category", body: (close) => <CategoryForm close={close} /> })}>New Category</Button>} />
+      <PageHeader title="Categories" sub="Expense categories" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Category", body: (close) => <CategoryForm close={close} /> })}>New Category</Button>} />
       {s.data && <KpiTiles items={[{ label: "Categories", value: String(s.data.categories) }, { label: "Spend This Month", value: formatMoneyShort(s.data.spend_this_month) }, { label: "Requests", value: String(s.data.requests) }, { label: "Capital", value: String(s.data.capital) }]} />}
       <PagedTable<Category>
         title="Categories"

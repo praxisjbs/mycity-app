@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card, CardHeader } from "./layout";
+import { Card, CardHeader } from "@mycity/ui";
 
 /**
  * The prototype's two chart forms, drawn as SVG: no chart library. Colours are

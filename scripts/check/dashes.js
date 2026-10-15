@@ -31,7 +31,7 @@ function walk(dir, test, out = []) {
   const abs = path.join(ROOT, dir);
   if (!fs.existsSync(abs)) return out;
   for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
-    if (e.name === "node_modules") continue;
+    if (["node_modules", "dist", "dist-gallery", "build", "coverage"].includes(e.name)) continue;
     const rel = `${dir}/${e.name}`;
     if (e.isDirectory()) walk(rel, test, out);
     else if (test(e.name)) out.push(rel);

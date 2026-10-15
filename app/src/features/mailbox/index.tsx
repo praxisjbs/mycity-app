@@ -3,22 +3,13 @@ import { api } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/mailbox";
 import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/types/mailbox";
-import { Button, IconButton } from "@/components/ui/Button";
-import { Avatar, Banner, Pill, StatStrip } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { PageHead } from "@/components/ui/layout";
-import { Menu, type MenuItem } from "@/components/ui/Menu";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatBytes, formatDateTime, formatWhen } from "@/lib/format";
-import { useIsMobile } from "@/lib/media";
+import { StatStrip } from "@/components/ui/data";
+import { LoadingRows } from "@/components/ui/Table";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Splitter, useSplit } from "@/features/community/Chat";
 import { Composer, type ComposeInit } from "./Composer";
-import { FormFooter, SearchBox } from "@/components/form";
+import { Button, IconButton, Avatar, Banner, Pill, Icon, PageHeader, Menu, type MenuItem, useModal, ErrorState, toast, cn, formatBytes, formatDateTime, formatWhen, useIsMobile, FormFooter, SearchInput } from "@mycity/ui";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
@@ -51,7 +42,7 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title={NAMES[folder]}
         sub={`${total} message${total === 1 ? "" : "s"}${nUnread ? ` · ${nUnread} unread` : ""}`}
         actions={
@@ -70,9 +61,9 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
         split={split}
         list={
           <>
-            <div className="flex-none border-b border-border p-2.5"><SearchBox value={list.q} onChange={list.setQ} placeholder={`Search ${NAMES[folder]}`} /></div>
+            <div className="flex-none border-b border-border p-2.5"><SearchInput value={list.q} onChange={list.setQ} placeholder={`Search ${NAMES[folder]}`} /></div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain max-md:overflow-visible">
-              {list.error ? <ErrorBlock error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={6} /> : rows.map((r) => (
+              {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={6} /> : rows.map((r) => (
                 <MailRow key={r.thread_id} r={r} on={r.thread_id === current?.thread_id && (!mobile || open)} onClick={() => (setSel(r.thread_id), setOpen(true))} />
               ))}
               {!list.loading && !list.error && !rows.length && <p className="p-4 text-[12.5px] text-subtle-foreground">{list.q ? "Nothing matches." : `Nothing in ${NAMES[folder]}.`}</p>}
@@ -189,7 +180,7 @@ function Reader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBack: () 
       Back
     </Button>
   );
-  if (t.error) return <div className="p-[18px]">{back}<ErrorBlock error={t.error} onRetry={t.reload} /></div>;
+  if (t.error) return <div className="p-[18px]">{back}<ErrorState error={t.error} onRetry={t.reload} /></div>;
   if (!t.data) return <div className="p-[18px]">{back}<LoadingRows count={5} /></div>;
   const thread = t.data;
   const lastMsg = thread.messages[thread.messages.length - 1];

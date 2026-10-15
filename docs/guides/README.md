@@ -5,6 +5,12 @@ how those screens relate, and what each must do**, so that what was planned is w
 nothing drifts, and no screen is left half done. It is read before building and updated before
 changing behaviour: **a change to a feature passes through its guide first.**
 
+**Guides are full-stack.** One guide covers the feature's backend modules, data, schemas, API,
+events, permissions, AI reads and screens (§4 to §10). A frontend builder reads the whole guide, not
+only §10, and a backend builder reads §10 too. The header's **Frontend paths** row names the
+feature's own folders (`app/src/features/<module>/`, `public-app/src/pages/...`); shared components
+live in `packages/ui` (`docs/COMPONENTS.md`) and are never a feature path.
+
 Start a new guide by copying `_TEMPLATE.md` to `<module>.md` (the backend module name, e.g.
 `attendance.md`). Keep it current: a guide that describes last month's behaviour is worse than none.
 

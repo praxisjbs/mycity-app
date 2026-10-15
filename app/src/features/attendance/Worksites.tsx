@@ -1,14 +1,9 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Worksite } from "@/api/types/attendance";
-import { Button } from "@/components/ui/Button";
-import { Pill } from "@/components/ui/data";
-import { Card, CardHeader, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Chips, Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { Field, FormFooter, rules, SearchBox, TextField, useContractForm } from "@/components/form";
+import { Button, Pill, Card, CardHeader, PageHeader, useModal, Chips, toast, Field, FormFooter, rules, SearchInput, TextField, useContractForm } from "@mycity/ui";
 
 const COLOR: Record<Worksite["type"], string> = { Office: "var(--chart-1)", "Approved home": "var(--primary)", "Temporary location": "var(--primary)", "Field assignment": "var(--chart-2)" };
 
@@ -52,7 +47,7 @@ export function Worksites() {
   const count = (t: string) => map.rows.filter((s) => s.type === t).length;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Worksites"
         sub="Geofenced offices, homes and field sites"
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Worksite", body: (close) => <WorksiteForm close={close} /> })}>Add Worksite</Button>}
@@ -60,7 +55,7 @@ export function Worksites() {
       <KpiTiles items={[{ label: "Office Worksites", value: String(count("Office")) }, { label: "Approved Homes", value: String(count("Approved home")) }, { label: "Field Sites Today", value: String(count("Field assignment")) }, { label: "Outside Any Fence Today", value: "1", tone: "warn" }]} />
       <FenceMap sites={map.rows} />
       <Toolbar className="mt-3">
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={type} onChange={setType} options={[["all", "All"], ["Office", "Offices"], ["Approved home", "Homes"], ["Temporary location", "Temporary"], ["Field assignment", "Field"]]} />
       <Table

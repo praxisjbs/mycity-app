@@ -1,6 +1,6 @@
 import type { ApiError } from "@/api/client";
 import { Message, Page } from "@/components/Layout";
-import { Button } from "@/components/ui";
+import { Button } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 
 /**

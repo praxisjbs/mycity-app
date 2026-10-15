@@ -20,7 +20,7 @@
  *   iso-date-on-paper    an ISO day ("yyyy-mm-dd", toISOString().slice(0, 10)) in code that
  *                        renders mail, PDFs, templates or spreadsheets a person opens
  *   month-first-literal  MM/DD/YYYY written into code
- * Frontend (app/src, public-app/src):
+ * Frontend (app/src, public-app/src, packages/ui/src):
  *   native-date-input    <input type="date"> or "datetime-local": renders in the OS locale
  *   floating-locale      an order-sensitive date format with no locale pinned
  *   month-first-locale   one pinned to en-US, en-PH, en or und
@@ -42,7 +42,7 @@ const { mask, argsAt, waived, walk, relTo } = require("./lib/source");
 const ROOT = path.resolve(__dirname, "..", "..");
 
 const BACKEND = ["src", "scripts", "packages"];
-const FRONTEND = ["app/src", "public-app/src"];
+const FRONTEND = ["app/src", "public-app/src", "packages/ui/src"];
 const TESTS = ["tests"];
 const EXTS = /\.(c|m)?(j|t)sx?$/;
 

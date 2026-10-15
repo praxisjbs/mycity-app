@@ -5,7 +5,7 @@
 | Owner | <initials> |
 | Milestone | M<N> |
 | Backend modules | `<module>`, `<module>` |
-| Frontend paths | `app/src/<path>/` (filled once the frontend structure exists) |
+| Frontend paths | `app/src/features/<module>/` (the feature's own folders; never `packages/ui`) |
 | Permission key(s) | `<key>` |
 | Screens (PROGRESS.md rows) | #<n>, #<n> |
 | Status | Draft · Agreed · Built · Accepted |
@@ -15,10 +15,17 @@ Copy this file to `docs/guides/<module>.md`. Delete the hints in angle brackets 
 section. A section that does not apply says so in one line ("No public routes."); it is not
 deleted, so a reader knows it was considered.
 
+A guide is **full-stack**: backend, data, API, events, permissions and screens. Fill every section,
+not only the ones your half of the work touches.
+
 The header table is read by `scripts/check/guides.js`: **Backend modules** and **Frontend paths**
-decide which code this guide covers. A change to that code must change this guide (and add a
-Change log line), or say `Guide-unchanged: <reason>` in the PR description. Keep all fourteen
-section headings and both §10 tables, each with at least one real row; the check requires them.
+decide which code this guide covers. Frontend paths name the feature's own folders
+(`app/src/features/<module>/`, a page in `public-app/src/pages/`). Shared components live in
+`packages/ui` and are never a feature path: a component this feature needs that does not exist is
+added there with `npm run new:component` (FRONTEND_GUIDE §1). A change to the covered code must
+change this guide (and add a Change log line), or say `Guide-unchanged: <reason>` in the PR
+description. Keep all fourteen section headings and both §10 tables, each with at least one real
+row; the check requires them.
 
 ---
 

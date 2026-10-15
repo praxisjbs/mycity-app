@@ -41,6 +41,10 @@
 /app/                                              @Ghosted34 @tomblakeasaah196 @swizfcodes
 /public-app/                                       @Ghosted34 @tomblakeasaah196 @swizfcodes
 /assets/                                           @Ghosted34 @tomblakeasaah196 @swizfcodes
+# The design system (F11): every shared component, its gallery and catalogue
+/packages/ui/                                      @Ghosted34 @tomblakeasaah196 @swizfcodes
+/docs/COMPONENTS.md                                @Ghosted34 @tomblakeasaah196 @swizfcodes
+/docs/FRONTEND_FOUNDATION.md                       @Ghosted34 @tomblakeasaah196 @swizfcodes
 
 # ── Engineering documents ───────────────────────────────────────────────────
 /docs/SYSTEM_ARCHITECTURE.md                       @swizfcodes @tomblakeasaah196

@@ -1,59 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { cn } from "@/lib/cn";
-import { initials } from "@/lib/format";
-import { useIsMobile } from "@/lib/media";
-import { Icon, type IconName } from "./Icon";
-import { Card } from "./layout";
 import type { Tone } from "@/api/types/common";
+import { cn, useIsMobile, Icon, type IconName, Card } from "@mycity/ui";
 
-const TONE = {
-  ok: "bg-success-soft text-success",
-  warn: "bg-warning-soft text-warning",
-  err: "bg-destructive-soft text-destructive",
-  info: "bg-info-soft text-info",
-  neutral: "border border-border bg-muted text-muted-foreground",
-} as const;
-
-/** Status pill: tone AND text, never colour alone. */
-export function Pill({ tone = "neutral", children, className, dot = true }: { tone?: Tone; children: ReactNode; className?: string; dot?: boolean }) {
-  return (
-    <span data-copy="content" className={cn("inline-flex items-center gap-[5px] rounded-full px-[9px] py-[3px] text-[11px] font-[650] whitespace-nowrap", TONE[tone], className)}>
-      {dot && <i className="size-[5px] flex-none rounded-full bg-current" />}
-      {children}
-    </span>
-  );
-}
-
-/** Round initials avatar. `tone="brand"` is the yellow one; the default is the soft accent. */
-export function Avatar({ name, size = 27, tone = "soft", className, online }: { name: string; size?: number; tone?: "soft" | "brand"; className?: string; online?: boolean }) {
-  return (
-    <span
-      className={cn(
-        "relative flex flex-none items-center justify-center rounded-full font-bold",
-        tone === "brand" ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground",
-        className,
-      )}
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.38 * 10) / 10 }}
-      aria-hidden="true"
-    >
-      {initials(name)}
-      {online && <i className="absolute -right-px -bottom-px size-[9px] rounded-full border-2 border-card bg-success" />}
-    </span>
-  );
-}
-
-/** Avatar, name and a second line. */
-export function Who({ name, sub, size = 27 }: { name: string; sub?: ReactNode; size?: number }) {
-  return (
-    <span data-copy="content" className="flex min-w-0 items-center gap-[9px]">
-      <Avatar name={name} size={size} />
-      <span className="min-w-0">
-        <b className="block truncate text-[13px] font-semibold">{name}</b>
-        {sub && <span className="text-[11px] text-subtle-foreground">{sub}</span>}
-      </span>
-    </span>
-  );
-}
 
 const TREND = { up: "text-success", dn: "text-destructive", fl: "text-subtle-foreground" } as const;
 const INK = { ok: "text-success", warn: "text-warning", err: "text-destructive", info: "text-info", neutral: "" } as const;
@@ -100,33 +48,6 @@ export function Kpi({
   );
 }
 
-/**
- * The empty-value marker (FRONTEND_GUIDE §5.4, §6): what the shared table and
- * detail components draw for a value that is not set. Never "N/A", never
- * "null", never a dash typed into copy.
- */
-export function EmptyValue() {
-  return (
-    <span className="text-subtle-foreground" aria-label="Not set">
-      –
-    </span>
-  );
-}
-const isEmpty = (v: ReactNode) => v == null || v === "" || v === false;
-
-/** Label and value pairs (record cards). One column on a phone. A value that is not set shows the empty marker. */
-export function KV({ items }: { items: Array<[ReactNode, ReactNode]> }) {
-  return (
-    <dl className="grid grid-cols-1 items-baseline gap-x-4 gap-y-0.5 text-[13px] md:grid-cols-[minmax(0,160px)_minmax(0,1fr)] md:gap-y-[9px]">
-      {items.map(([k, v], i) => (
-        <div key={i} className="contents">
-          <dt className="min-w-0 text-[12px] [overflow-wrap:anywhere] text-subtle-foreground">{k}</dt>
-          <dd className="m-0 min-w-0 font-[550] [overflow-wrap:anywhere] max-md:mb-2">{isEmpty(v) ? <EmptyValue /> : v}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
 /** A strip of labelled figures across the top of a record. Items marked `desktop` drop off on a phone. */
 /** A row of figures. On a phone at most four show, two to a row (gate 11). */
@@ -192,18 +113,6 @@ export function Bars({ rows, note }: { rows: Array<{ label: ReactNode; pct: numb
   );
 }
 
-/** A thin inline progress bar with its figure: table cells. */
-export function Mini({ pct, label, color }: { pct: number; label: ReactNode; color?: string }) {
-  return (
-    <span className="flex items-center gap-2">
-      <span className="h-1.5 min-w-11 flex-1 overflow-hidden rounded-full bg-muted">
-        <i className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color ?? "var(--chart-1)" }} />
-      </span>
-      <span className="w-[46px] flex-none text-right text-[11.5px] text-subtle-foreground">{label}</span>
-    </span>
-  );
-}
-
 /** An approval or stage chain: done, the current step, and what is still to come. */
 export function Chain({ steps }: { steps: Array<{ label: ReactNode; state?: "done" | "now" }> }) {
   return (
@@ -257,46 +166,6 @@ export function Accordion({ items }: { items: Array<{ title: ReactNode; body: Re
   );
 }
 
-/** A quoted line with the yellow rule. */
-export function Quote({ children, className }: { children: ReactNode; className?: string }) {
-  return <div data-copy="content" className={cn("rounded-r-[9px] border-l-[3px] border-primary bg-muted px-[14px] py-[9px] text-[12.5px] text-muted-foreground", className)}>{children}</div>;
-}
-
-/** Nothing to show, said plainly, with what to do about it. */
-export function EmptyState({ icon = "ok", title, text, action, bare }: { icon?: IconName; title: ReactNode; text?: ReactNode; action?: ReactNode; bare?: boolean }) {
-  const body = (
-    <div className="px-4 py-[30px] text-center">
-      <span className="mx-auto mb-[11px] flex size-[46px] items-center justify-center rounded-[14px] bg-accent text-accent-foreground">
-        <Icon name={icon} size="m" />
-      </span>
-      <h3 data-ui="title" className="text-[13.5px]">{title}</h3>
-      {text && <p data-ui="empty-text" className="mx-auto mt-[5px] max-w-[44ch] text-[11.5px] text-subtle-foreground">{text}</p>}
-      {action && <div className="mt-3 flex justify-center gap-2">{action}</div>}
-    </div>
-  );
-  return bare ? body : <Card pad={false}>{body}</Card>;
-}
-
-/** Inline status banner (attendance, policy, warnings). */
-export function Banner({ tone = "warn", icon = "alert", children, actions }: { tone?: "warn" | "err" | "info" | "ok"; icon?: IconName; children: ReactNode; actions?: ReactNode }) {
-  return (
-    <div
-      className={cn(
-        "mb-3 flex flex-wrap items-center gap-2.5 rounded-xl px-3 py-2.5 text-[12.5px]",
-        tone === "warn" && "bg-warning-soft text-warning",
-        tone === "err" && "bg-destructive-soft text-destructive",
-        tone === "info" && "bg-info-soft text-info",
-        tone === "ok" && "bg-success-soft text-success",
-      )}
-      role="status"
-    >
-      <Icon name={icon} />
-      <span className="min-w-[200px] flex-1 text-foreground">{children}</span>
-      {actions && <span className="flex flex-wrap gap-1.5">{actions}</span>}
-    </div>
-  );
-}
-
 /** A big result card: the outcome of clocking in, a signature, a check. */
 export function Result({ tone, label, title, text, icon }: { tone: "ok" | "warn" | "err" | "info"; label?: string; title: ReactNode; text?: ReactNode; icon?: IconName }) {
   return (
@@ -317,30 +186,6 @@ export function Result({ tone, label, title, text, icon }: { tone: "ok" | "warn"
       </span>
     </div>
   );
-}
-
-/** A mobile icon card: icon, title and a line, opening a sheet (gate 11). */
-export function IconCard({ icon, title, text, onClick }: { icon: IconName; title: ReactNode; text?: ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative flex min-h-[100px] min-w-0 flex-col items-start gap-1.5 rounded-card border border-border bg-card p-[13px] text-left shadow-1 hover:border-subtle-foreground"
-    >
-      <span className="flex size-[34px] flex-none items-center justify-center rounded-box bg-accent text-accent-foreground">
-        <Icon name={icon} size="m" />
-      </span>
-      <b data-ui="title" className="text-[13px] font-[650]">{title}</b>
-      {text && <span className="text-[11.5px] text-subtle-foreground">{text}</span>}
-      <i className="absolute top-[14px] right-3 text-subtle-foreground">
-        <Icon name="right" className="size-[15px]" />
-      </i>
-    </button>
-  );
-}
-
-export function IconCards({ children, cols = 2 }: { children: ReactNode; cols?: 2 | 3 }) {
-  return <div className={cn("mb-3 grid grid-cols-2 gap-2.5", cols === 3 && "lg:grid-cols-3")}>{children}</div>;
 }
 
 /** A stacked list of tappable rows (mobile lists that open a sheet). */

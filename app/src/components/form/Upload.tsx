@@ -1,9 +1,7 @@
 import { useRef, useState, type DragEvent, type ReactNode } from "react";
-import { cn } from "@/lib/cn";
-import { formatBytes } from "@/lib/format";
+import { cn, formatBytes, Icon } from "@mycity/ui";
 import { session } from "@/api/client";
 import type { DocumentRef } from "@/api/types/common";
-import { Icon } from "@/components/ui/Icon";
 
 /**
  * The upload engine's front end (gate 18): the ONLY file input in the app.

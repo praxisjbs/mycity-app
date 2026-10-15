@@ -6,24 +6,16 @@ import "@/api/types/organisation";
 import type { AuditEntry, FailedLogin, Hierarchy, Numbering, Organisation, Session, UserRow } from "@/api/types/settings";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button } from "@/components/ui/Button";
-import { Chain, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { HelpTerm } from "@/components/ui/Help";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
+import { Chain, StatStrip } from "@/components/ui/data";
 import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
-import { Chips, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDate, formatDateTime, formatWhen } from "@/lib/format";
-import { useTheme } from "@/lib/theme";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, KvCard, PagedTable, StatusPill } from "@/features/shared/sections";
+import { BarsCard, ExportButton, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AttendancePolicyTab } from "./Policy";
 import { Roles, useRoleOptions } from "./Roles";
-import { ChoiceField, Field, FormFooter, InlineInput, PersonPicker, SelectField, SwitchField, TextAreaField } from "@/components/form";
+import { PersonPicker } from "@/components/form";
+import { Button, Pill, Who, Icon, HelpTerm, Card, CardHeader, Grid, PageHeader, useModal, Chips, toast, cn, formatDate, formatDateTime, formatWhen, useTheme, StatusPill, ChoiceField, Field, FormFooter, InlineInput, SelectField, Switch, TextAreaField } from "@mycity/ui";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -51,13 +43,13 @@ function OrganisationTab() {
   const [week, setWeek] = useState<Organisation["week"] | null>(null);
   const save = useMutation("PATCH /api/v1/settings/organisation");
   const d = o.data;
-  if (!d) return (<><PageHead title="Organisation" /><Card><LoadingRows count={8} /></Card></>);
+  if (!d) return (<><PageHeader title="Organisation" /><Card><LoadingRows count={8} /></Card></>);
   const w = week ?? d.week;
   const dirty = !!week && JSON.stringify(week) !== JSON.stringify(d.week);
   const edit = (i: number, patch: Partial<Organisation["week"][number]>) => setWeek(w.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Organisation"
         sub={d.legal_name}
         actions={dirty && <Button variant="primary" busy={save.pending} onClick={async () => { try { await save.run({ body: { week: w } }); invalidate("/api/v1/settings"); setWeek(null); toast("Working week saved. Attendance and payroll use it"); } catch (e) { fail(e); } }}>Save</Button>}
@@ -77,7 +69,7 @@ function OrganisationTab() {
         rowKey={(r) => r.day}
         columns={[
           { key: "d", label: "Day", render: (r) => <b>{r.day}</b> },
-          { key: "w", label: "Working", render: (r) => <SwitchField checked={r.working} label={`${r.day} is a working day`} onChange={(v) => edit(w.indexOf(r), { working: v, start: v ? r.start ?? "09:00" : null, end: v ? r.end ?? "17:00" : null, grace_min: v ? r.grace_min ?? 10 : null })} /> },
+          { key: "w", label: "Working", render: (r) => <Switch checked={r.working} label={`${r.day} is a working day`} onChange={(v) => edit(w.indexOf(r), { working: v, start: v ? r.start ?? "09:00" : null, end: v ? r.end ?? "17:00" : null, grace_min: v ? r.grace_min ?? 10 : null })} /> },
           { key: "s", label: "Start", render: (r) => (r.working ? <TimeBox value={r.start ?? ""} label={`${r.day} start`} onChange={(v) => edit(w.indexOf(r), { start: v })} /> : "None") },
           { key: "e", label: "End", render: (r) => (r.working ? <TimeBox value={r.end ?? ""} label={`${r.day} end`} onChange={(v) => edit(w.indexOf(r), { end: v })} /> : "None") },
           { key: "g", label: "Grace", render: (r) => (r.grace_min != null ? `${r.grace_min} min` : "None"), desktop: true },
@@ -106,7 +98,7 @@ function Users() {
   const list = usePaged("GET /api/v1/settings/users");
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Users"
         sub={s.data ? `${s.data.users} users · ${s.data.pending} pending invitation` : " "}
         actions={
@@ -202,7 +194,7 @@ function Approvals() {
   const h = list.rows.find((x) => x.hierarchy_id === sel) ?? list.rows[0];
   return (
     <>
-      <PageHead title="Approvals" sub="Hierarchies as data. Changing one needs no deploy." />
+      <PageHeader title="Approvals" sub="Hierarchies as data. Changing one needs no deploy." />
       {s.data && <KpiTiles items={[{ label: "Hierarchies", value: String(s.data.hierarchies) }, { label: "Active", value: String(s.data.active), tone: "ok" }, { label: "Awaiting a Decision", value: String(s.data.awaiting), tone: s.data.awaiting ? "warn" : undefined }, { label: "Steps, Longest", value: String(s.data.longest) }]} />}
       <Grid cols={3}>
         {list.rows.map((x) => (
@@ -279,7 +271,7 @@ function Notifications() {
   const rows = n.data ?? [];
   return (
     <>
-      <PageHead title="Notifications" sub="Per category and transport, saved as you change" />
+      <PageHeader title="Notifications" sub="Per category and transport, saved as you change" />
       <Grid cols={2}>
         {(["email", "in_app"] as const).map((t) => (
           <Card key={t}>
@@ -287,8 +279,8 @@ function Notifications() {
             {!n.data && <LoadingRows />}
             {rows.map((r) => (
               <div key={r.key} className="flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0">
-                <div className="text-[13px] font-[550]">{r.help ? <HelpTerm text={r.help}>{r.label}</HelpTerm> : r.label}</div>
-                <SwitchField checked={r[t]} disabled={r.locked || save.pending} label={`${r.label}, ${t === "email" ? "email" : "in app"}`} onChange={(v) => void set(r.key, { in_app: r.in_app, email: r.email, [t]: v })} />
+                <div className="text-[13px] font-[550]">{r.help ? <HelpTerm help={r.help}>{r.label}</HelpTerm> : r.label}</div>
+                <Switch checked={r[t]} disabled={r.locked || save.pending} label={`${r.label}, ${t === "email" ? "email" : "in app"}`} onChange={(v) => void set(r.key, { in_app: r.in_app, email: r.email, [t]: v })} />
               </div>
             ))}
           </Card>
@@ -331,10 +323,10 @@ function AppearanceTab() {
   const { can } = useAuth();
   const d = a.data;
   const vals = useTokenValues([...(d?.palette ?? []), ...(d?.dark ?? [])].map((x) => x.token), String(theme));
-  if (!d) return (<><PageHead title="Appearance" /><Card><LoadingRows count={6} /></Card></>);
+  if (!d) return (<><PageHeader title="Appearance" /><Card><LoadingRows count={6} /></Card></>);
   return (
     <>
-      <PageHead title="Appearance" sub="MyCityApp brand" />
+      <PageHeader title="Appearance" sub="MyCityApp brand" />
       <Grid cols={2}>
         <Card>
           <CardHeader title="Palette" />
@@ -354,7 +346,7 @@ function AppearanceTab() {
           </dl>
           <div className="mt-3 border-t border-border pt-3">
             <div className="mb-1.5 text-[12px] text-subtle-foreground">Default theme for everyone</div>
-            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved. A person's own choice still wins"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
+            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
           </div>
         </Card>
       </Grid>
@@ -381,7 +373,7 @@ function NumberingTab() {
   const list = usePaged("GET /api/v1/settings/numbering");
   return (
     <>
-      <PageHead title="Documents & Numbering" sub="Reference formats and templates" />
+      <PageHeader title="Documents & Numbering" sub="Reference formats and templates" />
       {s.data && <StatStrip items={[{ label: "Document Types", value: s.data.types }, { label: "Templates", value: s.data.templates }, { label: "Issued This Year", value: s.data.issued_this_year }, { label: "Signed", value: s.data.signed }, { label: "Format", value: "PREFIX-0000", desktop: true }]} />}
       <Grid cols="1/1.5">
         <PagedTable<Numbering>
@@ -421,7 +413,7 @@ function Integrations() {
   const count = (t: string) => d?.items.filter((x) => x.status.text === t).length ?? 0;
   return (
     <>
-      <PageHead title="Integrations" sub="Connected services" />
+      <PageHeader title="Integrations" sub="Connected services" />
       {d && <KpiTiles items={[{ label: "Connected", value: String(count("Connected")) }, { label: "Manual", value: String(count("Manual")) }, { label: "Not in Scope", value: String(count("Not connected")) }, { label: "Failures, 7 Days", value: String(d.health.reduce((a, h) => a + h.failures, 0)), tone: "ok" }]} />}
       <Grid cols={3}>
         {(d?.items ?? []).map((x) => (
@@ -462,7 +454,7 @@ function Security() {
   const d = s.data;
   return (
     <>
-      <PageHead title="Security" sub="Sessions, devices and access" />
+      <PageHeader title="Security" sub="Sessions, devices and access" />
       {d && <KpiTiles items={[{ label: "Active Sessions", value: String(d.active_sessions) }, { label: "MFA Enrolled", value: `${d.mfa_enrolled} of ${d.users}`, tone: "warn" }, { label: "Failed Logins, 7 Days", value: String(d.failed_7d) }, { label: "Devices", value: String(d.devices) }]} />}
       <Grid cols={2}>
         <Card>
@@ -471,7 +463,7 @@ function Security() {
           {d?.rules.map((r) => (
             <div key={r.key} className="flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0">
               <div className="text-[13px] font-[550]">{r.label}</div>
-              <SwitchField checked={r.on} label={r.label} disabled={save.pending} onChange={async (v) => { try { await save.run({ body: { [r.key]: v } }); invalidate("/api/v1/settings/security"); toast(`${r.label}: ${v ? "on" : "off"}`); } catch (e) { fail(e); } }} />
+              <Switch checked={r.on} label={r.label} disabled={save.pending} onChange={async (v) => { try { await save.run({ body: { [r.key]: v } }); invalidate("/api/v1/settings/security"); toast(`${r.label}: ${v ? "on" : "off"}`); } catch (e) { fail(e); } }} />
             </div>
           ))}
         </Card>
@@ -516,7 +508,7 @@ function Audit() {
   const none = <span className="text-subtle-foreground">None</span>;
   return (
     <>
-      <PageHead title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportButton source="audit" filters={mod ? { module: mod } : {}} />} />
+      <PageHeader title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportButton source="audit" filters={mod ? { module: mod } : {}} />} />
       {s.data && <KpiTiles items={[{ label: "Entries Today", value: String(s.data.today) }, { label: "This Month", value: s.data.this_month.toLocaleString("en-NG") }, { label: "Modules", value: String(s.data.modules.length) }, { label: "Retention", value: s.data.retention }]} />}
       {s.data && <Chips value={mod} onChange={setMod} options={[["", "Everything"], ...s.data.modules.map((m) => [m, m] as [string, string])]} />}
       <PagedTable<AuditEntry>

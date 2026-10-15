@@ -9,11 +9,14 @@
  * explainer cards, help closed on load, no subtitle or chart caption on a
  * phone, and buttons only in a modal footer.
  *
- * RENDERED: every screen of demo.html (and the app once it has a build) is
- *   opened at phone and desktop size by lib/screens.js; the copy in each slot
- *   is checked as a person would see it.
- * STATIC: toast messages, which no crawl sees, in demo.html and in app/ and
- *   public-app/ source; and the copy props of the shared components in app/.
+ * RENDERED: every component page of the gallery (packages/ui), demo.html when
+ *   the change touches it (F23), and the app once it has a build, opened at
+ *   phone and desktop size by lib/screens.js; the copy in each slot is checked
+ *   as a person would see it. Help and Details open on load fail a screen,
+ *   not a gallery state (a state may show a help term open on purpose).
+ * STATIC: toast messages, which no crawl sees, in demo.html and in
+ *   packages/ui, app/ and public-app/ source; and the copy props of the
+ *   @mycity/ui components wherever they are written (COPY_PROPS below).
  *
  * Usage:
  *   node scripts/check/five-second.js                 exit 0 ok, 1 problems
@@ -21,7 +24,7 @@
  */
 const { LIMITS, wordCount, longestSentence, titleCaseViolation, explainerTitle, bannedButton } = require("./lib/copy");
 const { crawl, finish, run } = require("./lib/screens");
-const { readDemo, scan, frontendFiles, read, lineOf } = require("./lib/sources");
+const { readDemo, scan, frontendFiles, jsxProps, read, lineOf } = require("./lib/sources");
 
 const over = (text, limit, what) => {
   const n = wordCount(text);
@@ -100,6 +103,28 @@ function checkSlot(s, width, kind) {
   return out;
 }
 
+/**
+ * The copy props of the @mycity/ui components (packages/ui/src; SPEC §4 names the
+ * slot each one fills) and the merged #18 names screens still use until they move
+ * (PageHead, Section, KpiCard, Sheet). A prop written as a plain string is checked
+ * here; one built at run time is read by the crawl.
+ */
+const COPY_PROPS = [
+  { components: ["PageHeader", "PageHead"], props: ["title"], limit: LIMITS.pageTitle, what: "Page title" },
+  { components: ["PageHeader", "PageHead"], props: ["subtitle", "sub"], limit: LIMITS.pageSubtitle, what: "Page subtitle" },
+  {
+    components: ["Card", "CardHeader", "Modal", "SidePanel", "ConfirmDialog", "EmptyState", "Section", "KpiCard", "Sheet"],
+    props: ["title"],
+    limit: LIMITS.title,
+    what: "Title",
+    explainer: true,
+  },
+  { components: ["HelpTerm", "InfoButton", "CardHeader"], props: ["text", "help"], limit: LIMITS.help, what: "Help text" },
+  { components: ["EmptyState"], props: ["text", "sub"], limit: LIMITS.emptyText, what: "Empty state line" },
+  { components: ["Card", "Details"], props: ["details"], limit: LIMITS.details, what: "Details row" },
+];
+const COPY_COMPONENTS = [...new Set(COPY_PROPS.flatMap((r) => r.components))];
+
 /** Toasts and the shared components' copy props, read from source. */
 function staticFindings() {
   const findings = [];
@@ -117,26 +142,23 @@ function staticFindings() {
     }
   }
 
-  const props = [
-    [/<PageHeader\b[^>]*\btitle="([^"]*)"/g, LIMITS.pageTitle, "Page title"],
-    [/<PageHeader\b[^>]*\bsubtitle="([^"]*)"/g, LIMITS.pageSubtitle, "Page subtitle"],
-    [/<(?:Card|Section|KpiCard|Modal|Sheet)\b[^>]*\btitle="([^"]*)"/g, LIMITS.title, "Title"],
-    [/<HelpTerm\b[^>]*\btext="([^"]*)"/g, LIMITS.help, "Help text"],
-    [/<EmptyState\b[^>]*\btext="([^"]*)"/g, LIMITS.emptyText, "Empty state line"],
-    [/\btoast(?:\.\w+)?\(\s*["'`]([^"'`]*)["'`]/g, LIMITS.toast, "Toast"],
-  ];
   for (const file of frontendFiles()) {
     const src = scan(read(file)).code;
-    for (const [re, limit, what] of props) {
-      re.lastIndex = 0;
-      for (let m = re.exec(src); m; m = re.exec(src)) {
-        const msg = over(m[1], limit, what);
-        if (msg) push(file, lineOf(src, m.index), msg);
-        if (what === "Title") {
-          const why = explainerTitle(m[1]);
-          if (why) push(file, lineOf(src, m.index), `Title "${m[1]}" ${why}: tier 3, not a screen (§5.1)`);
-        }
+    for (const p of jsxProps(src, COPY_COMPONENTS)) {
+      const rule = COPY_PROPS.find((r) => r.components.includes(p.component) && r.props.includes(p.prop));
+      if (!rule || !p.value.trim()) continue;
+      const where = lineOf(src, p.index);
+      const msg = over(p.value, rule.limit, rule.what);
+      if (msg) push(file, where, `${p.component} ${p.prop}: ${msg}`);
+      if (rule.explainer) {
+        const why = explainerTitle(p.value);
+        if (why) push(file, where, `${p.component} title "${p.value}" ${why}: tier 3, not a screen (§5.1)`);
       }
+    }
+    const toast = /\btoast(?:\.\w+)?\(\s*(["'`])((?:\\.|(?!\1)[^\\$])*)\1\s*[,)]/g;
+    for (let m = toast.exec(src); m; m = toast.exec(src)) {
+      const msg = over(m[2], LIMITS.toast, "Toast");
+      if (msg) push(file, lineOf(src, m.index), msg);
     }
   }
   return findings;
@@ -148,7 +170,8 @@ run("five-second", async () => {
   for (const sc of result.screens) {
     for (const s of sc.slots) {
       if (sc.kind === "modal" && !s.modal && s.slot !== "help") continue; // the page behind a modal is checked as its own screen
-      for (const message of checkSlot(s, sc.width, sc.kind)) findings.push({ width: sc.width, screen: sc.screen, message });
+      const screen = s.state ? `${sc.screen} › ${s.state}` : sc.screen;
+      for (const message of checkSlot(s, sc.width, sc.kind)) findings.push({ width: sc.width, screen, message });
     }
   }
   findings.push(...staticFindings());

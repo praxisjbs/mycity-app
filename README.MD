@@ -20,7 +20,9 @@ map, read §11 first.
 | `docs/BACKEND_STRUCTURE.md` | The M0 foundation in detail: shared layer, contract, numbering, documents, imports, AI, pagination, first administrator |
 | `docs/BACKEND_GUIDE.md` | **How to write backend code here**: layers, a worked endpoint, what to reuse, done checklist. Read before any backend change |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
-| `docs/guides/<module>.md` | One engineering guide per feature: every screen it touches and how they relate. A change passes through its guide first |
+| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F24 (binding) and the three PRs that build `packages/ui` |
+| `docs/COMPONENTS.md` | Every shared component in `packages/ui`, generated from the code. Check it before building anything; a missing one is added with `npm run new:component` |
+| `docs/guides/<module>.md` | One full-stack engineering guide per feature: backend, API, events and every screen it touches, and how they relate. A change passes through its guide first |
 | `docs/PROGRESS.md` | The 86 screens and the M0 items, ticked as they are built, with a note per change |
 | `CLAUDE.md` | What an AI assistant reads first: which documents to read for a backend, frontend or full-stack task, and how to finish one |
 | `docs/MyCity-ERP-Documents/demo.html` | What the product looks like. UI and layout reference only, never a source for data or rules |
@@ -44,6 +46,9 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 mycity-app/
 ├── app/                      staff React + Vite app (frontend team), served at hub.mycityapp.io
 ├── public-app/               public React + Vite app (frontend team), served at go.mycityapp.io
+├── packages/ui/              @mycity/ui: the one design system both apps import (tokens, components,
+│                             form system, data client), with gallery/ (npm run gallery) and its tests;
+│                             catalogue in docs/COMPONENTS.md (FRONTEND_GUIDE §9)
 ├── src/                      backend source (§4, §5)
 ├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2)
 ├── migrations/               NNNN_name.sql, block per milestone (§6.3)
@@ -56,16 +61,20 @@ mycity-app/
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, full report
-│   ├── gen/                  contract and .env.example generators
-│   ├── check/                the CI gates (§8)
+│   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md
+│   ├── new-component.js      npm run new:component: a shared component with header, test and gallery page
+│   ├── check/                the CI gates (§8); frontend: components (palette, contrast and more in PR 1)
 │   │   ├── lib/changes.js    what a change touched (git diff vs main) and its trailers,
 │   │   │                     shared by check/progress.js, check/guides.js, check/readme-map.js
 │   │   ├── lib/copy.js       the screen copy rules: word LIMITS, word count, Title Case, explainer
 │   │   │                     titles, refused button labels (gates 8, 11, 12, 17; FRONTEND_GUIDE §5)
-│   │   ├── lib/screens.js    opens every screen of demo.html (and the app, once built) in Chromium at
-│   │   │                     phone and desktop size and records copy and layout (gates 8, 11)
+│   │   ├── lib/gallery.js    builds packages/ui's gallery when stale and serves it (gates 8, 11, a11y)
+│   │   ├── lib/screens.js    opens every gallery page and every app screen (demo.html only when touched)
+│   │   │                     in Chromium at phone and desktop size, records copy and layout (gates 8, 11)
 │   │   ├── lib/source.js     reads JavaScript for the backend code gates (date-format, money,
 │   │   │                     module-catalogue): comments, strings, template and regex literals apart
+│   │   ├── lib/styling-exemptions.json  #18 files still exempt from F4 styling; only shrinks
+│   │   │                     (read by check/palette.js and both apps' eslint configs)
 │   │   └── lib/sources.js    string literals, call arguments and frontend files for the static halves
 │   │                         of check/five-second.js, check/forms.js, check/dashes.js
 │   ├── db/                   migrate, seed, backup, restore-drill, create-admin
@@ -85,6 +94,8 @@ mycity-app/
 │   ├── MyCity-ERP-Documents/ the client document pack
 │   ├── BACKEND_GUIDE.md      how to write backend code (read first)
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
+│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F24, the three PRs
+│   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
 │   ├── PROGRESS.md           86 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
@@ -494,7 +505,7 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 14. **No login without an employee.** The first administrator comes from `scripts/db/create-admin.js`
     (full employee, login and role in one transaction); everyone else is created in the app
     (BACKEND_STRUCTURE §17).
-15. **One form system.** Every field in both apps comes from `src/components/form/` and validates
+15. **One form system.** Every field in both apps comes from `packages/ui/src/form/` and validates
     as it is filled from the contract schema (`useContractForm`); nobody writes a raw `<input>`,
     `<label>` or `react-hook-form` call in a feature (FRONTEND_GUIDE §8, gate 12).
 
@@ -518,9 +529,12 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 | 10 Search coverage | M1 | `check/search-coverage.js` |
 | 11 Two shells | M1 | `check/two-shells.js` (every screen, phone and desktop, in Chromium) |
 | 12 Inline validation, one form system | M1 | `check/forms.js` |
-| 13, 14, 16, 18 | M1 | frontend gates |
-| 15 Day-first dates | M1 | `check/date-format.js` |
+| 13 Palette | M1 | `check/palette.js` (hex only in `tokens.css`; F4 styling exemptions in `check/lib/styling-exemptions.json`, shared with both apps' lint) and the `no-hex` lint rule |
+| 14 Contrast | M1 | `check/contrast.js` (runs `packages/ui/src/styles/tokens.test.ts`: every text pair, both themes) |
+| 15 Day-first dates | M1 | lint rules in `packages/ui/eslint.shared.js`; `check/date-format.js` still empty (NOT BUILT) |
+| 16 No native dialogs | M1 | `check/native-dialogs.js` (and its aliases) and the lint rule in `packages/ui/eslint.shared.js` |
 | 17 No dashes | M1 | `check/dashes.js` (demo, both apps, `src/` strings, templates, the manual) |
+| 18 Upload engine | M1 | `check/upload.js` (no raw file input outside `packages/ui/src/form`) and the lint rule |
 | 19 AI read manifest only | M4 | `check/ai-no-writes.js` |
 | 20 Money | M6 | `check/money.js` |
 
@@ -528,6 +542,12 @@ Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check
 `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
 `check/ai-vendor-imports.js`, `check/shell.js`, `check/pagination.js`, `check/provenance.js`
 (code and comments never name the project code came from; that lives in REUSE_MAP.md only).
+
+Frontend guards, from M0 (FRONTEND_GUIDE §10): `gen:components --check` and `check/components.js`
+(the catalogue is current; every shared component has its header, test and gallery page; nothing new
+in an app's `components/`), and `fe:typecheck`, `fe:lint`, `fe:test`, `fe:build` over `packages/ui`,
+`app` and `public-app`; `check/mock-free.js` (no release build carries the mock, F12) and
+`check/a11y.js` (axe on every gallery page at 390 and 1440 px, both densities).
 
 Process gates, from M0. They check that the work is recorded where the team reads it:
 
@@ -584,6 +604,9 @@ npm run db:seed -- --build   # synthetic data; refuses on staging and production
 npm run dev                  # API
 npm run dev:worker           # worker
 npm run gen:contract         # after any schema or route change
+npm run gallery              # every shared component in every state (packages/ui)
+npm run new:component -- --name X --group Display   # a new shared component, never in a feature
+npm run fe:test              # also fe:typecheck, fe:lint, fe:build: packages/ui and both apps
 npm run ci                   # before every push
 ```
 

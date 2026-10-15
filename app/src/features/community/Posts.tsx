@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/api/client";
 import type { Message } from "@/api/types/community";
-import { Avatar } from "@/components/ui/data";
-import { Icon } from "@/components/ui/Icon";
-import { cn } from "@/lib/cn";
-import { formatBytes, formatTime, initials } from "@/lib/format";
+import { cn, formatBytes, formatTime, Icon, initials, Avatar } from "@mycity/ui";
 
 /** Highlight search hits inside a message. */
 export function Hl({ text, q }: { text: string; q: string }) {

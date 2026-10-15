@@ -1,5 +1,5 @@
 import type { RawRequest, RawResponse } from "../client";
-import { todayIso } from "@/lib/format";
+import { todayIso } from "@mycity/ui";
 
 /**
  * The in-browser mock API. It answers with the backend's exact envelopes so the
@@ -35,6 +35,13 @@ export function route(key: string, handler: Handler, opts: { anonymous?: boolean
   const re = new RegExp(`^${pattern.replace(/:([a-z_]+)/g, (_, n: string) => (names.push(n), "([^/]+)"))}$`);
   routes.push({ method, re, names, handler, anonymous: !!opts.anonymous });
 }
+
+/**
+ * Marks the mock in a build. scripts/check/mock-free.js (F12) builds this app for
+ * release and fails if the string is anywhere in the output: a release build
+ * never carries the in-browser mock. Used below, so a mock build keeps it.
+ */
+export const MOCK_SENTINEL = "mycity-in-browser-mock:app";
 
 let reqSeq = 0;
 const rid = () => `mock-${Date.now().toString(36)}-${(++reqSeq).toString(36)}`;
@@ -146,7 +153,7 @@ export async function dispatch(req: RawRequest): Promise<RawResponse> {
     try {
       return await r.handler({ method: req.method, path: req.path, params, query, body: (req.body ?? {}) as Record<string, unknown>, user, idempotency_key: req.headers["Idempotency-Key"] });
     } catch (err) {
-      console.error("[mock api]", req.method, req.path, err);
+      console.error(`[${MOCK_SENTINEL}]`, req.method, req.path, err);
       return fail(500, "INTERNAL_ERROR", "Something went wrong on our side. Try again, and quote this reference if it keeps happening.");
     }
   }

@@ -1,0 +1,144 @@
+/**
+ * How values read on screen (FRONTEND_GUIDE §6). The wire carries ISO dates and
+ * money as decimal strings; people read day-first dates and Naira.
+ *
+ * Nothing here does arithmetic on money (gate 20): amounts are formatted from
+ * their string digits, never through a float.
+ */
+const TZ = "Africa/Lagos";
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** "2026-10-13" or a full ISO timestamp → "13/10/2026". Empty for nothing. */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
+  }
+  const parts = lagosParts(iso);
+  return parts ? `${parts.day}/${parts.month}/${parts.year}` : "";
+}
+
+/** ISO timestamp → "09:14" in Lagos time. */
+export function formatTime(iso: string | null | undefined): string {
+  const parts = iso ? lagosParts(iso) : null;
+  return parts ? `${parts.hour}:${parts.minute}` : "";
+}
+
+/** ISO timestamp → "13/10/2026 09:14". */
+export function formatDateTime(iso: string | null | undefined): string {
+  return iso ? `${formatDate(iso)} ${formatTime(iso)}` : "";
+}
+
+/** ISO timestamp → "09:14" today, "Yesterday", or a day-first date. For lists of messages. */
+export function formatWhen(iso: string | null | undefined, now = new Date()): string {
+  const p = iso ? lagosParts(iso) : null;
+  if (!p) return "";
+  const today = lagosParts(now.toISOString());
+  const yesterday = lagosParts(new Date(now.getTime() - 86400000).toISOString());
+  const key = (x: NonNullable<typeof p>) => `${x.year}-${x.month}-${x.day}`;
+  if (today && key(p) === key(today)) return `${p.hour}:${p.minute}`;
+  if (yesterday && key(p) === key(yesterday)) return "Yesterday";
+  return `${p.day}/${p.month}/${p.year}`;
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** "2026-10" or "2026-10-01" → "October 2026". */
+export function formatMonth(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const [y, m] = iso.split("-");
+  return `${MONTHS[Number(m) - 1] ?? ""} ${y}`;
+}
+
+/** Month name from a zero-based index: 0 → "January". */
+export const monthName = (index0: number) => MONTHS[index0] ?? "";
+
+function lagosParts(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const f = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  });
+  const out: Record<string, string> = {};
+  for (const part of f.formatToParts(d)) out[part.type] = part.value;
+  return { year: out.year, month: out.month, day: out.day, hour: out.hour, minute: out.minute };
+}
+
+/** Today in Lagos as ISO "YYYY-MM-DD". */
+export function todayIso(now = new Date()): string {
+  const p = lagosParts(now.toISOString());
+  return p ? `${p.year}-${p.month}-${p.day}` : now.toISOString().slice(0, 10);
+}
+
+/** Day-first text a person typed ("13/10/2026", "13-10-2026", "13.10.26") → ISO, or null. */
+export function parseDayFirst(text: string): string | null {
+  const m = /^\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})\s*$/.exec(text);
+  if (!m) return null;
+  const d = Number(m[1]);
+  const mo = Number(m[2]);
+  let y = Number(m[3]);
+  if ((m[3] ?? "").length === 2) y += 2000;
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
+  return `${y}-${pad(mo)}-${pad(d)}`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Money: "1250000.00" → "₦1,250,000.00"
+ * ------------------------------------------------------------------ */
+
+const group = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+/** Full amount with kobo, for tables and documents. */
+export function formatMoney(amount: string | null | undefined, opts: { kobo?: boolean } = {}): string {
+  if (amount == null || amount === "") return "";
+  const neg = amount.startsWith("-");
+  const [whole = "", frac = "00"] = amount.replace(/^-/, "").split(".");
+  const body = `₦${group(whole.replace(/^0+(?=\d)/, ""))}${opts.kobo === false ? "" : `.${frac.padEnd(2, "0").slice(0, 2)}`}`;
+  return neg ? `−${body}` : body;
+}
+
+/** Short form for KPI tiles only: "₦1.3M", "₦850K". */
+export function formatMoneyShort(amount: string | null | undefined): string {
+  if (amount == null || amount === "") return "";
+  const neg = amount.startsWith("-");
+  const whole = (amount.replace(/^-/, "").split(".")[0] ?? "").replace(/^0+(?=\d)/, "");
+  const scale = (len: number, unit: string) => {
+    const head = whole.slice(0, whole.length - len) || "0";
+    const next = whole.charAt(whole.length - len) || "0";
+    const out = head.length >= 3 || next === "0" ? head : `${head}.${next}`;
+    return `${out}${unit}`;
+  };
+  let body: string;
+  if (whole.length > 9) body = scale(9, "B");
+  else if (whole.length > 6) body = scale(6, "M");
+  else if (whole.length > 3) body = `${whole.slice(0, whole.length - 3)}K`;
+  else body = whole;
+  return `${neg ? "−" : ""}₦${body}`;
+}
+
+/** Is this amount below zero? (string check; no float) */
+export const isNegative = (amount: string | null | undefined) => !!amount && amount.startsWith("-") && /[1-9]/.test(amount);
+
+/** Whole-number count with thousands separators. */
+export const formatCount = (n: number | null | undefined) => (n == null ? "" : group(String(n)));
+
+/** Initials for an avatar: "Cynthia Osakunih" → "CO". */
+export function initials(name: string | null | undefined): string {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "")).toUpperCase();
+}
+
+/** "84 KB", "1.1 MB" from a byte count. */
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Plural with count: plural(3, "employee") → "3 employees". */
+export const plural = (n: number, one: string, many = `${one}s`) => `${formatCount(n)} ${n === 1 ? one : many}`;

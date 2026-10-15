@@ -1,5 +1,5 @@
 import { useEnvironment } from "@/lib/environment";
-import { Icon } from "./Icon";
+import { Icon } from "@mycity/ui";
 
 /**
  * The persistent staging bar (MILESTONES §6). On staging, above everything,

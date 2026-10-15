@@ -1,9 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { DEMO_LINKS } from "@/api/mock/demo-links";
-import { cn } from "@/lib/cn";
+import { cn, Icon, useTheme } from "@mycity/ui";
 import { Link } from "@/lib/router";
-import { useTheme } from "@/lib/theme";
-import { Icon } from "./Icon";
 
 /** The MyCityApp mark: the pin and the name, in the brand green (the demo's public pages). */
 export function Brand({ size = "md" }: { size?: "md" | "lg" }) {

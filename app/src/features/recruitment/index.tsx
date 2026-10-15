@@ -4,22 +4,16 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/recruitment";
 import type { Assessment, Candidate, InterviewRow, OfferRow, OnboardingRow, PoolRow, Stage, Vacancy } from "@/api/types/recruitment";
 import type { PersonRef } from "@/api/types/common";
-import { Button } from "@/components/ui/Button";
 import { Board } from "@/components/ui/Board";
-import { KV, Mini, Pill, Quote, Timeline, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
-import { ErrorBlock, LoadingRows, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { cn } from "@/lib/cn";
-import { formatDate, formatDateTime, todayIso } from "@/lib/format";
+import { Timeline } from "@/components/ui/data";
+import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import { Letter } from "@/features/shared/Letter";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { ChoiceField, DateField, Field, FilterSelect, FormFooter, MoneyField, PersonPicker, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@/components/form";
+import { PersonPicker } from "@/components/form";
+import { Button, KeyValue, Meter, Pill, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, cn, formatDate, formatDateTime, todayIso, StatusPill, ChoiceField, DateField, Field, FilterSelect, FormFooter, MoneyField, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@mycity/ui";
 
 export default function Recruitment({ tab, id }: ModuleScreenProps) {
   if (tab === "candidates") return <Candidates id={id} />;
@@ -42,7 +36,7 @@ function Vacancies() {
   const open = (v: Vacancy) => modal.open({ title: v.title, body: (close) => <VacancyDetail v={v} close={close} /> });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Vacancies"
         sub={s.data ? `${s.data.open} open · ${s.data.applicants} applicants` : " "}
         actions={
@@ -109,7 +103,7 @@ function VacancyDetail({ v, close }: { v: Vacancy; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Department", v.department], ["Openings", v.openings], ["Location", v.location], ["Applicants", v.applicants], ["Published", formatDate(v.published_on)], ["Status", <StatusPill key="s" s={v.status} />], ["Public link", v.public_url], ["Next step", v.next_step]]} />
+      <KeyValue items={[["Department", v.department], ["Openings", v.openings], ["Location", v.location], ["Applicants", v.applicants], ["Published", formatDate(v.published_on)], ["Status", <StatusPill key="s" s={v.status} />], ["Public link", v.public_url], ["Next step", v.next_step]]} />
       <FormFooter>
         <Button onClick={flip} busy={pause.pending || resume.pending}>{v.paused ? "Resume" : "Pause"}</Button>
         <Button variant="primary" onClick={() => (close(), navigate(`/recruitment?tab=candidates&vacancy=${v.vacancy_id}`))}>See Candidates</Button>
@@ -208,7 +202,7 @@ function Candidates({ id }: { id: string | null }) {
   };
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Candidates"
         sub="Drag through the pipeline"
         actions={
@@ -241,12 +235,12 @@ function Candidates({ id }: { id: string | null }) {
 
 function CandidateCard({ id }: { id: string }) {
   const c = useApi("GET /api/v1/recruitment/candidates/:id", { params: { id } });
-  if (!c.data) return <Card>{c.error ? <ErrorBlock error={c.error} /> : <LoadingRows />}</Card>;
+  if (!c.data) return <Card>{c.error ? <ErrorState error={c.error} /> : <LoadingRows />}</Card>;
   const d = c.data;
   return (
     <Card>
       <CardHeader title={d.name} right={<StatusPill s={d.chip} />} />
-      <KV
+      <KeyValue
         items={[
           ["Role", d.vacancy.title],
           ["Applied", `${formatDate(d.applied_on)}, ${d.source.toLowerCase()}`],
@@ -267,7 +261,7 @@ function CandidateDetail({ id, close }: { id: string; close: () => void }) {
   const pool = useMutation("POST /api/v1/recruitment/candidates/:id/pool");
   const [reject, setReject] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
-  if (!c.data) return c.error ? <ErrorBlock error={c.error} /> : <LoadingRows />;
+  if (!c.data) return c.error ? <ErrorState error={c.error} /> : <LoadingRows />;
   const d = c.data;
   const go = async (stage: Stage) => {
     try {
@@ -281,7 +275,7 @@ function CandidateDetail({ id, close }: { id: string; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Role", d.vacancy.title], ["Stage", STAGE_LABEL[d.stage]], ["Email", d.email], ["Score", d.score ?? "Not scored"], ["Assessments", d.assessments ?? "Not taken"], ["Interview", d.interview ?? "Not scheduled"]]} />
+      <KeyValue items={[["Role", d.vacancy.title], ["Stage", STAGE_LABEL[d.stage]], ["Email", d.email], ["Score", d.score ?? "Not scored"], ["Assessments", d.assessments ?? "Not taken"], ["Interview", d.interview ?? "Not scheduled"]]} />
       {reject != null && (
         <div className="mt-3">
           <Field label="Why Not Progressed" info="It goes on the record and in the candidate's email." state={tried && !reject.trim() ? "bad" : undefined} message="Give a reason">
@@ -347,7 +341,7 @@ function Assessments() {
   const list = usePaged("GET /api/v1/recruitment/assessments");
   return (
     <>
-      <PageHead title="Assessments" sub="Psychometric, technical and case study" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Assessment", body: (close) => <AssessmentForm close={close} /> })}>New Assessment</Button>} />
+      <PageHeader title="Assessments" sub="Psychometric, technical and case study" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Assessment", body: (close) => <AssessmentForm close={close} /> })}>New Assessment</Button>} />
       {s.data && <KpiTiles items={[{ label: "Assessments", value: String(s.data.assessments) }, { label: "Taken", value: String(s.data.taken) }, { label: "Average Score", value: String(s.data.average_score) }, { label: "Abandoned", value: String(s.data.abandoned), tone: s.data.abandoned ? "warn" : undefined }]} />}
       <PagedTable<Assessment>
         title="Assessments"
@@ -413,7 +407,7 @@ function Interviews({ id }: { id: string | null }) {
   const x = d.data;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Interviews"
         sub={x ? `Blind panel · ${x.candidate}, ${x.role}` : "Blind panels"}
         actions={
@@ -520,7 +514,7 @@ function Offers() {
   const send = useMutation("POST /api/v1/recruitment/offers/:id/send");
   return (
     <>
-      <PageHead title="Offers" sub="Generated, sent, signed" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Offer", body: (close) => <OfferForm close={close} /> })}>New Offer</Button>} />
+      <PageHeader title="Offers" sub="Generated, sent, signed" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Offer", body: (close) => <OfferForm close={close} /> })}>New Offer</Button>} />
       {s.data && <KpiTiles items={[{ label: "Awaiting Signature", value: String(s.data.awaiting_signature), tone: s.data.awaiting_signature ? "warn" : undefined }, { label: "Signed, This Year", value: String(s.data.signed_this_year), tone: "ok" }, { label: "Declined", value: String(s.data.declined) }, { label: "Average Time to Sign", value: s.data.average_days_to_sign }]} />}
       <Grid cols="1/1.5">
         <PagedTable<OfferRow>
@@ -589,7 +583,7 @@ function Onboarding() {
   const x = d.data;
   return (
     <>
-      <PageHead title="Onboarding" sub="Documentation first, then onboarding" />
+      <PageHeader title="Onboarding" sub="Documentation first, then onboarding" />
       {s.data && (
         <>
           <KpiTiles items={[{ label: "In Progress", value: String(s.data.in_progress) }, { label: "Blocked on Documents", value: String(s.data.blocked), tone: s.data.blocked ? "warn" : "ok" }, { label: "Starting This Month", value: String(s.data.starting_this_month) }, { label: "Confirmed, 90d", value: String(s.data.confirmed_90d), tone: "ok" }]} />
@@ -614,7 +608,7 @@ function Onboarding() {
         <Grid cols={2} className="mt-3">
           <Table
             title="Document Checklist"
-            right={<span className="w-[150px]"><Mini pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
+            right={<span className="w-[150px]"><Meter pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
             rows={x.checklist}
             rowKey={(r) => r.name}
             columns={[{ key: "d", label: "Required Document", render: (r) => r.name }, { key: "s", label: x.name, render: (r) => <StatusPill s={r.status} /> }]}
@@ -644,7 +638,7 @@ function Pool() {
   const list = usePaged("GET /api/v1/recruitment/pool");
   return (
     <>
-      <PageHead title="Talent Pool" sub="Good candidates, wrong moment" actions={<ExportButton source="recruitment.pool" />} />
+      <PageHeader title="Talent Pool" sub="Good candidates, wrong moment" actions={<ExportButton source="recruitment.pool" />} />
       {s.data && <KpiTiles items={[{ label: "In the Pool", value: String(s.data.in_pool) }, { label: "Invited Back", value: String(s.data.invited_back) }, { label: "Hired From the Pool", value: String(s.data.hired_from_pool), tone: "ok" }, { label: "Average Score", value: String(s.data.average_score) }]} />}
       <Grid cols="1.4/1">
         <PagedTable<PoolRow>
