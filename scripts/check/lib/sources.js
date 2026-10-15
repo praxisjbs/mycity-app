@@ -185,7 +185,10 @@ function functionRanges(code, names) {
   return ranges;
 }
 
-/** Frontend source files of both apps (not node_modules, not builds). */
+/**
+ * Frontend source files: the design system (packages/ui/src) and both apps
+ * (app/src, public-app/src). Not node_modules, not builds, not tests.
+ */
 function frontendFiles() {
   const out = [];
   const walk = (dir) => {
@@ -197,9 +200,80 @@ function frontendFiles() {
       else if (/\.(tsx|jsx|ts|js)$/.test(e.name) && !/\.(test|spec|d)\.[jt]sx?$/.test(e.name)) out.push(full);
     }
   };
+  walk(path.join(ROOT, "packages", "ui", "src"));
   walk(path.join(ROOT, "app", "src"));
   walk(path.join(ROOT, "public-app", "src"));
   return out.map((f) => path.relative(ROOT, f).split(path.sep).join("/"));
+}
+
+/**
+ * The string props written on JSX elements of the named components:
+ * `<Card title="Leave Requests">`, `title={"..."}`, `title={`...`}` (a template
+ * without expressions). Props given as expressions are skipped: what they say is
+ * only known at run time, where the screen crawl reads it.
+ * Attribute values may hold `>` (an arrow function), so the tag is walked with
+ * its braces and strings, not cut at the first `>`.
+ * Returns [{ component, prop, value, index }].
+ */
+function jsxProps(code, components) {
+  const out = [];
+  const re = new RegExp(`<(${components.join("|")})(?![\\w.])`, "g");
+  for (let m = re.exec(code); m; m = re.exec(code)) {
+    const start = m.index + m[0].length;
+    let depth = 0;
+    let i = start;
+    for (; i < code.length; i += 1) {
+      const c = code[i];
+      if (c === "'" || c === '"' || c === "`") {
+        const q = c;
+        i += 1;
+        while (i < code.length && code[i] !== q) i += code[i] === "\\" ? 2 : 1;
+        continue;
+      }
+      if (c === "{") depth += 1;
+      else if (c === "}") depth -= 1;
+      else if (depth === 0 && (c === ">" || (c === "/" && code[i + 1] === ">"))) break;
+    }
+    // The tag with every nested expression blanked: only its own attributes remain.
+    let tag = "";
+    depth = 0;
+    for (let j = start; j < i; j += 1) {
+      const c = code[j];
+      if (depth === 0 && (c === "'" || c === '"' || c === "`")) {
+        let k = j + 1;
+        while (k < i && code[k] !== c) k += code[k] === "\\" ? 2 : 1;
+        tag += code.slice(j, k + 1);
+        j = k;
+        continue;
+      }
+      if (c === "{") {
+        depth += 1;
+        tag += depth === 1 ? c : " ";
+        if (depth === 1) {
+          // keep a literal-only expression ({"..."} or {`...`}) whole
+          const lit = /^\{\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`$]*`)\s*\}/.exec(code.slice(j, i));
+          if (lit) {
+            tag += lit[0].slice(1);
+            j += lit[0].length - 1;
+            depth = 0;
+          }
+        }
+        continue;
+      }
+      if (c === "}") {
+        depth -= 1;
+        tag += depth === 0 ? c : " ";
+        continue;
+      }
+      tag += depth ? " " : c;
+    }
+    const attr = /(?:^|\s)([A-Za-z][\w-]*)=(?:"([^"]*)"|'([^']*)'|\{\s*"((?:\\.|[^"\\])*)"\s*\}|\{\s*'((?:\\.|[^'\\])*)'\s*\}|\{\s*`([^`$]*)`\s*\})/g;
+    for (let a = attr.exec(tag); a; a = attr.exec(tag)) {
+      const value = [a[2], a[3], a[4], a[5], a[6]].find((v) => v !== undefined);
+      out.push({ component: m[1], prop: a[1], value, index: m.index });
+    }
+  }
+  return out;
 }
 
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -216,5 +290,6 @@ module.exports = {
   readDemo,
   functionRanges,
   frontendFiles,
+  jsxProps,
   read,
 };

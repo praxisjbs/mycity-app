@@ -13,6 +13,7 @@
  *   migrations/NNNN_name.sql
  *   seeds/, tests/, docs/, templates/, assets/, src/services/ai/prompts/
  *   app/, public-app/                        mapped in docs/FRONTEND_GUIDE.md §9.1
+ *   packages/ui/                             mapped in docs/FRONTEND_GUIDE.md §9.1 and docs/COMPONENTS.md
  *   .github/ files other than workflows, package-lock.json
  *
  * Anything else that is ADDED (or renamed into place) must be findable in
@@ -42,6 +43,7 @@ const ALLOWED = [
   (p) => /^migrations\/\d{4,5}_[a-z0-9_]+\.sql$/.test(p),
   (p) => /^(seeds|tests|docs|templates|assets|app|public-app)\//.test(p),
   (p) => /^src\/services\/ai\/prompts\/[a-z0-9-]+\.md$/.test(p),
+  (p) => /^packages\/ui\//.test(p),
   (p) => /^\.github\//.test(p) && !/^\.github\/workflows\//.test(p),
   (p) => p === "package-lock.json" || p.endsWith("/.gitkeep") || p === ".gitkeep",
 ];

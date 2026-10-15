@@ -11,11 +11,13 @@
  * instead of at review. CI runs the same checks for every PR, whoever or
  * whatever wrote it; this hook only makes Claude meet them first.
  *
- * Screen gates. When the change touches either app or the demo (app/,
- * public-app/, docs/MyCity-ERP-Documents/demo.html), the hook also runs the
- * screen gates: five-second (8), two-shells (11), forms (12) and dashes (17)
- * (FRONTEND_GUIDE §5, §7, §8). They are the conventions agreed on 8 October;
- * a session that broke one does not get to stop.
+ * Screen gates. When the change touches the design system, either app or the
+ * demo (packages/ui/, app/, public-app/, docs/MyCity-ERP-Documents/demo.html),
+ * the hook also runs the fast frontend gates: components (F8), palette (13),
+ * forms (12), dashes (17), five-second (8) and two-shells (11) (FRONTEND_GUIDE
+ * §5, §7, §8; FRONTEND_FOUNDATION F4, F8). They are the conventions agreed on
+ * 8 and 15 October; a session that broke one does not get to stop. The slow
+ * ones (a11y, mock-free, the builds) are left to npm run ci.
  *
  * Loop guard. If the checks still fail after Claude has been sent back twice
  * in a row in the same session, the hook lets it stop and prints the problems
@@ -32,8 +34,8 @@ const path = require("node:path");
 const ROOT = path.resolve(__dirname, "..", "..");
 const MAX_BLOCKS = 2;
 const CHECKS = ["progress", "guides", "readme-map"];
-const SCREEN_CHECKS = ["forms", "dashes", "five-second", "two-shells"];
-const TOUCHES_SCREENS = /^(app|public-app)\/|^docs\/MyCity-ERP-Documents\/demo\.html$/;
+const SCREEN_CHECKS = ["components", "palette", "forms", "dashes", "five-second", "two-shells"];
+const TOUCHES_SCREENS = /^(packages\/ui|app|public-app)\/|^docs\/MyCity-ERP-Documents\/demo\.html$/;
 
 function screensChanged() {
   try {

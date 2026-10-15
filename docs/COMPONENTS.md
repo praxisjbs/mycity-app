@@ -22,6 +22,41 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 |---|---|---|---|---|
 | Foundations | [Icon](#icon) | `Icon` | One Lucide glyph by its short name, drawn in the current text colour. | stable |
 | Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side. | stable |
+| Layout | [Card](#card) | `Card`, `CardHeader` | The raised panel every section sits in, with an optional title row (CardHeader) and one Details row at its foot. | stable |
+| Layout | [Grid](#grid) | `Grid` | The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone. | stable |
+| Layout | [PageHeader](#pageheader) | `PageHeader` | A page's title, its one-line subtitle (desktop only) and the page's actions. | stable |
+| Layout | [PhoneOnly](#phoneonly) | `PhoneOnly`, `DesktopOnly` | Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen. | stable |
+| Layout | [Stack](#stack) | `Stack`, `Inline` | A vertical run of blocks with an even gap; Inline is the horizontal run that wraps. | stable |
+| Display | [Avatar](#avatar) | `Avatar`, `Who` | A person's photo, or their initials in a round chip when there is none, with an optional presence dot; Who is the avatar with the name and a second line. | stable |
+| Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
+| Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
+| Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
+| Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
+| Display | [IconCards](#iconcards) | `IconCards`, `IconCard` | A grid of phone icon cards, two to a row; each IconCard is an icon, a title and a line, and opens a sheet with that section. | stable |
+| Display | [Illustration](#illustration) | `Illustration`, `EmptyIllustration`, `SearchIllustration`, `SuccessIllustration`, `ErrorIllustration`, `LockedIllustration`, `OfflineIllustration`, `FirstRunIllustration`, `ClockInIllustration`, `ClockOutIllustration` | A small line drawing in the theme's colours, for empty states, first run, results and the clock prompts. | beta |
+| Display | [Kbd](#kbd) | `Kbd` | A keyboard key or shortcut, drawn as keycaps (⌘ K, Esc). | stable |
+| Display | [KeyValue](#keyvalue) | `KeyValue` | Label and value pairs for a record: two columns on desktop, label over value on a phone; a value that is not set shows EmptyValue. | stable |
+| Display | [Money](#money) | `Money` | An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word. | stable |
+| Display | [Pill](#pill) | `Pill`, `StatusPill` | A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }). | stable |
+| Display | [ProgressBar](#progressbar) | `ProgressBar`, `Meter` | How far along something is: a bar with its percent, or a moving bar when the end is unknown; Meter is the thin inline bar with its figure (the merged Mini). | stable |
+| Display | [Quote](#quote) | `Quote` | A quoted passage a person wrote or received, with the yellow rule at its left. | stable |
+| Display | [Skeleton](#skeleton) | `Skeleton`, `Spinner` | A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape. | stable |
+| Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
+| Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
+| Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
+| Overlays | [ConfirmDialog](#confirmdialog) | `ConfirmDialog` | A yes or no before an action that cannot be taken back, named for the thing it acts on ("Delete Rule"). | stable |
+| Overlays | [Menu](#menu) | `Menu` | A short list of actions behind one button (the ⋮ on a record, the + in a composer, the account menu). | stable |
+| Overlays | [Modal](#modal) | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` | THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened with useModal or controlled with open. | stable |
+| Overlays | [Popover](#popover) | `Popover` | A small panel anchored to the button that opens it: filters, a quick pick, a short preview. | stable |
+| Overlays | [Sheet](#sheet) | `Sheet` | The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc. | stable |
+| Overlays | [SidePanel](#sidepanel) | `SidePanel` | A panel that slides over the right of the screen to edit or inspect the record behind it. | stable |
+| Overlays | [Tooltip](#tooltip) | `Tooltip` | A small label that appears beside a control on hover or keyboard focus, desktop only. | stable |
+| Help | [Details](#details) | `Details` | One row at the foot of a card, a chevron and the word Details, that opens a short section of support facts. | stable |
+| Help | [HelpTerm](#helpterm) | `HelpTerm` | The word a piece of help explains, with a light dotted underline; hovering, tabbing to or tapping it shows one or two sentences. | stable |
+| Help | [InfoButton](#infobutton) | `InfoButton` | The ⓘ, for help that has no word to attach to: a chart, an icon-only control, a figure with no title. | stable |
+| Feedback | [ErrorBoundary](#errorboundary) | `ErrorBoundary` | Catches a crash in one screen so the rest of the app keeps working, and shows ErrorState with Try Again in its place. | stable |
+| Feedback | [ErrorState](#errorstate) | `ErrorState` | Something did not load: one line saying so, and Try Again. | stable |
+| Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere. | stable |
 
 ## Foundations
 
@@ -107,6 +142,1303 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 ```tsx
 <Button variant="primary" icon="plus">New Rule</Button>
 <Button variant="ghost" iconRight="right">View All</Button>
+```
+
+## Layout
+
+### Card
+
+The raised panel every section sits in, with an optional title row (CardHeader) and one Details row at its foot.
+
+| | |
+|---|---|
+| Use | A section of a page: a KPI group, a record's fields, a list, a chart. One idea per card. |
+| Avoid | Cards inside cards; an explainer card (a title starting How, Why or What is tier 3 and never reaches a screen); a list on a phone (a card list comes from DataView). |
+| Phone | Full width with the same padding; the actions in CardHeader keep their 44 px targets and wrap under the title when there is no room. |
+| Accessibility | A plain container. CardHeader's title is a heading (h3 unless set) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. |
+| Status | stable |
+| Exports | `Card`, `CardHeader` |
+| Import | `import { Card, CardHeader } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/Card.tsx` |
+| Test | `packages/ui/src/layout/Card.test.tsx` |
+| Gallery | `packages/ui/src/layout/Card.gallery.tsx` (`npm run gallery`, `#/Card`) |
+
+**Card** props (`CardProps`, extends `HTMLAttributes<HTMLElement>`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `pad` | `boolean` |  | Inner padding (the default). `false` lets a table, a list or an image run to the card's edges. |
+| `as` | `"div" \| "section" \| "article"` |  | The element: `section` when the card has its own heading in a long page, `article` for one record. |
+| `details` | `ReactNode` |  | The one Details row at the foot of the card (a Details from |
+| `children` | `ReactNode` |  | The card's content. |
+
+**CardHeader** props (`CardHeaderProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` |  | The card's title: a noun phrase of at most 4 words, Title Case (Leave Requests). |
+| `help` | `ReactNode` |  | A HelpTerm or InfoButton that explains the title, shown right after it. |
+| `actions` | `ReactNode` |  | What sits at the right: a small button, a menu, a pill or a count. |
+| `right` | `ReactNode` |  | The merged name for `actions`; kept so screens move by an import change. |
+| `level` | `2 \| 3 \| 4` |  | The heading level; h3 unless the page's outline needs h2. |
+| `children` | `ReactNode` |  | Anything else after the title (a pill, a count). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Card><CardHeader title="Leave Requests" actions={<Button size="sm">View All</Button>} />...</Card>
+<Card details={<Details>...</Details>}>...</Card>
+```
+
+### Grid
+
+The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone.
+
+| | |
+|---|---|
+| Use | Laying out cards on a page: KPI tiles (4), two cards side by side (2), a list beside its detail ("1.4/1"). |
+| Avoid | Laying out controls inside a card (use Stack or Inline); a table's columns. |
+| Phone | One column, except `phoneCols={2}` (or the merged "4m2"), which keeps KPI tiles two to a row. |
+| Accessibility | A plain container; reading order is the source order at every width. |
+| Status | stable |
+| Exports | `Grid` |
+| Import | `import { Grid } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/Grid.tsx` |
+| Test | `packages/ui/src/layout/Grid.test.tsx` |
+| Gallery | `packages/ui/src/layout/Grid.gallery.tsx` (`npm run gallery`, `#/Grid`) |
+
+**Grid** props (`GridProps`, extends `HTMLAttributes<HTMLDivElement>`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `cols` | `1 \| 2 \| 3 \| 4 \| "4m2" \| "1.4/1" \| "1/1.5"` | yes | How many columns on desktop; see GridCols. |
+| `phoneCols` | `1 \| 2` |  | Columns on a phone: 1 (the default) or 2 (KPI tiles). |
+| `gap` | `"sm" \| "md"` |  | Space between cells: `md` 12 px (the default) or `sm` 8 px. |
+| `flush` | `boolean` |  | Drop the 12 px space under the grid (the merged grids carry it so blocks stack apart). |
+
+```tsx
+<Grid cols={4} phoneCols={2}>{kpis}</Grid>
+<Grid cols="1.4/1"><Card /><Card /></Grid>
+```
+
+### PageHeader
+
+A page's title, its one-line subtitle (desktop only) and the page's actions.
+
+| | |
+|---|---|
+| Use | Once, at the top of every screen. |
+| Avoid | A second title further down (use CardHeader); a subtitle that explains how the page works (tier 3); more than one primary action. |
+| Phone | The subtitle is not shown (FRONTEND_GUIDE §7: less text); the actions wrap under the title with 44 px targets. |
+| Accessibility | The title is the page's only h1 (data-ui="page-title"); the subtitle is a paragraph (data-ui="page-subtitle"). Title at most 3 words, subtitle at most 8. |
+| Status | stable |
+| Exports | `PageHeader` |
+| Import | `import { PageHeader } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/PageHeader.tsx` |
+| Test | `packages/ui/src/layout/PageHeader.test.tsx` |
+| Gallery | `packages/ui/src/layout/PageHeader.gallery.tsx` (`npm run gallery`, `#/PageHeader`) |
+
+**PageHeader** props (`PageHeaderProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The page's name, at most 3 words, Title Case (My Attendance). Something beside it, such as a Pill, may follow as children of the title. |
+| `subtitle` | `ReactNode` |  | One line under the title, at most 8 words; desktop only. |
+| `sub` | `ReactNode` |  | The merged name for `subtitle`; kept so screens move by an import change. |
+| `actions` | `ReactNode` |  | The page's actions, at the right on desktop: at most one primary Button. |
+| `children` | `ReactNode` |  | Anything between the title and the actions (a filter, a period switch). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PageHeader title="My Leave" subtitle="2026 entitlement" actions={<Button variant="primary" icon="plus">Request Leave</Button>} />
+```
+
+### PhoneOnly
+
+Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen.
+
+| | |
+|---|---|
+| Use | The pieces a feature guide's §10 lists for one shell: icon cards on a phone, a chart or an extra column on desktop. |
+| Avoid | Hiding something by accident of width; the whole page twice (each shell is a layout, not a copy); a table on a phone (DataView draws the card list). |
+| Phone | PhoneOnly renders at 760 px and below, DesktopOnly at 761 px and above, the same width as useIsPhone() and the gates. |
+| Accessibility | Hidden content is display:none, so it is out of the accessibility tree too. With `unmount` the hidden side is not rendered at all. |
+| Status | stable |
+| Exports | `PhoneOnly`, `DesktopOnly` |
+| Import | `import { PhoneOnly, DesktopOnly } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/PhoneOnly.tsx` |
+| Test | `packages/ui/src/layout/PhoneOnly.test.tsx` |
+| Gallery | `packages/ui/src/layout/PhoneOnly.gallery.tsx` (`npm run gallery`, `#/PhoneOnly`) |
+
+**PhoneOnly** props (`PhoneOnlyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | What only a phone shows. |
+| `unmount` | `boolean` |  | Do not render it at all on desktop (for something heavy); by default it is rendered and hidden with CSS, so there is no flash on first paint. |
+| `as` | `"div" \| "span"` |  | `span` inside a line of text; `div` otherwise. |
+| `className` | `string` |  | Layout classes only. |
+
+**DesktopOnly** props (`DesktopOnlyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | What only a desktop shows. |
+| `unmount` | `boolean` |  | Do not render it at all on a phone (for something heavy, such as a chart); by default it is rendered and hidden with CSS. |
+| `as` | `"div" \| "span"` |  | `span` inside a line of text; `div` otherwise. |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<PhoneOnly><IconCards>...</IconCards></PhoneOnly>
+<DesktopOnly unmount><AreaChart /></DesktopOnly>
+```
+
+### Stack
+
+A vertical run of blocks with an even gap; Inline is the horizontal run that wraps.
+
+| | |
+|---|---|
+| Use | Spacing blocks inside a card or a sheet (Stack), and a row of pills, buttons or figures (Inline), on the token spacing scale. |
+| Avoid | Page columns (use Grid); hand-written margins between siblings. |
+| Phone | The same; Inline wraps rather than scrolling the page sideways. |
+| Accessibility | A plain container (a list when as="ul"); reading order is the source order. |
+| Status | stable |
+| Exports | `Stack`, `Inline` |
+| Import | `import { Stack, Inline } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/Stack.tsx` |
+| Test | `packages/ui/src/layout/Stack.test.tsx` |
+| Gallery | `packages/ui/src/layout/Stack.gallery.tsx` (`npm run gallery`, `#/Stack`) |
+
+**Stack** props (`StackProps`, extends `HTMLAttributes<HTMLElement>`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `gap` | `0 \| 1 \| 1.5 \| 2 \| 3 \| 4 \| 5 \| 6` |  | Space between the blocks; 3 (12 px) unless set. |
+| `align` | `"start" \| "center" \| "end" \| "stretch" \| "baseline"` |  | Cross-axis alignment: stretch (the default) fills the width. |
+| `as` | `"div" \| "section" \| "ul" \| "ol"` |  | The element: a div, or a list when the blocks are list items. |
+
+**Inline** props (`InlineProps`, extends `HTMLAttributes<HTMLElement>`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `gap` | `0 \| 1 \| 1.5 \| 2 \| 3 \| 4 \| 5 \| 6` |  | Space between the items; 2 (8 px) unless set. |
+| `align` | `"start" \| "center" \| "end" \| "stretch" \| "baseline"` |  | Cross-axis alignment: center unless set. |
+| `justify` | `"start" \| "center" \| "end" \| "between"` |  | Main-axis distribution: start unless set; `between` pushes the last item to the end. |
+| `nowrap` | `boolean` |  | Keep everything on one line (it then truncates rather than wrapping). |
+| `as` | `"div" \| "span" \| "ul" \| "ol"` |  | The element: a div, or a list when the items are list items. |
+
+```tsx
+<Stack gap={3}><KeyValue items={rows} /><Banner tone="info">Payroll closes Friday</Banner></Stack>
+<Inline gap={2}><Pill tone="ok">Approved</Pill><Pill>Annual Leave</Pill></Inline>
+```
+
+## Display
+
+### Avatar
+
+A person's photo, or their initials in a round chip when there is none, with an optional presence dot; Who is the avatar with the name and a second line.
+
+| | |
+|---|---|
+| Use | Beside a person's name in a list, a card, a chat, a record header (Who for the name and role together). |
+| Avoid | An organisation's logo; a stack of avatars with no names and no label; a decorative picture. |
+| Phone | The same sizes; `md` and up in lists so the row reaches 44 px. |
+| Accessibility | Decorative (hidden) beside a visible name. Standalone, pass label (the person's name): it becomes an image with that name, and its presence is said too. Who marks the name as content. |
+| Status | stable |
+| Exports | `Avatar`, `Who` |
+| Import | `import { Avatar, Who } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Avatar.tsx` |
+| Test | `packages/ui/src/display/Avatar.test.tsx` |
+| Gallery | `packages/ui/src/display/Avatar.gallery.tsx` (`npm run gallery`, `#/Avatar`) |
+
+**Avatar** props (`AvatarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The person's full name; the initials come from it. |
+| `src` | `string \| null` |  | A photo URL (the person's profile picture). The initials show while it loads or if it fails. |
+| `size` | `AvatarSize \| number` |  | A named size, or a merged pixel size (27, 32, 42), which takes the nearest named one. |
+| `tone` | `"soft" \| "brand"` |  | `soft` (the default) is the accent chip; `brand` is the yellow one, for the signed-in person. |
+| `presence` | `"online" \| "away" \| "busy" \| "offline"` |  | A presence dot at the lower right. |
+| `online` | `boolean` |  | The merged flag for presence="online"; kept so screens move by an import change. |
+| `label` | `string` |  | The person's name for assistive technology, when no visible name sits beside the avatar. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**Who** props (`WhoProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The person's full name, shown and used for the initials. |
+| `role` | `ReactNode` |  | The second line: role, department or place (Field Sales, Lekki). |
+| `sub` | `ReactNode` |  | The merged name for `role`; kept so screens move by an import change. |
+| `src` | `string \| null` |  | The person's photo URL. |
+| `size` | `AvatarSize \| number` |  | The avatar's size; sm (28 px) unless set. Merged pixel sizes are accepted. |
+| `presence` | `"online" \| "away" \| "busy" \| "offline"` |  | The avatar's presence dot; also said to assistive technology. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Avatar name="Cynthia Osakunih" presence="online" />
+<Who name="Tobi Adeyemi" role="Field Sales, Lekki" />
+```
+
+### Banner
+
+One line across a page or a card in a status tone, with an icon and at most one action.
+
+| | |
+|---|---|
+| Use | Something the person must know or do now: a policy to acknowledge, a run that is locked, a device limit reached. |
+| Avoid | Reassurance or explanation (tier 3); a result after an action (use a toast); more than one line or more than one action; several banners stacked. |
+| Phone | Full width; the action drops under the line, 44 px tall. |
+| Accessibility | A status region, or an alert for tone="err", so it is announced when it appears. The icon is decorative; the words carry the meaning, at most 20. |
+| Status | stable |
+| Exports | `Banner` |
+| Import | `import { Banner } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Banner.tsx` |
+| Test | `packages/ui/src/display/Banner.test.tsx` |
+| Gallery | `packages/ui/src/display/Banner.gallery.tsx` (`npm run gallery`, `#/Banner`) |
+
+**Banner** props (`BannerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tone` | `"ok" \| "warn" \| "err" \| "info"` |  | The tone; warn unless set (the merged default). |
+| `icon` | `IconName` |  | The glyph; the tone's own unless set. |
+| `children` | `ReactNode` | yes | The line: one sentence, at most 20 words. |
+| `action` | `ReactNode` |  | One action, usually a small Button. |
+| `actions` | `ReactNode` |  | The merged name for `action`; kept so screens move by an import change. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Banner tone="warn" action={<Button size="sm">Read Policy</Button>}>Attendance policy updated</Banner>
+```
+
+### CountBadge
+
+A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile.
+
+| | |
+|---|---|
+| Use | Beside a tab label, a More tile, a nav item, an icon button (unread messages, approvals waiting). |
+| Avoid | A status (use Pill); a figure that matters on its own (use a KPI); a zero, which draws nothing unless showZero. |
+| Phone | The same size; it rides on its tile or tab and is never a tap target. |
+| Accessibility | With label it says the whole thing ("3 approvals waiting") to assistive technology; without one the number is read as it is. Counts above max read as max+ on screen and in full to a screen reader. |
+| Status | stable |
+| Exports | `CountBadge` |
+| Import | `import { CountBadge } from "@mycity/ui";` |
+| File | `packages/ui/src/display/CountBadge.tsx` |
+| Test | `packages/ui/src/display/CountBadge.test.tsx` |
+| Gallery | `packages/ui/src/display/CountBadge.gallery.tsx` (`npm run gallery`, `#/CountBadge`) |
+
+**CountBadge** props (`CountBadgeProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `count` | `number` | yes | The number; 0 or less draws nothing unless showZero. |
+| `max` | `number` |  | Above this it shows as max+ (99+). |
+| `tone` | `"primary" \| "err" \| "neutral"` |  | `primary` (yellow, the default), `err` for something overdue, `neutral` for a quiet total. |
+| `label` | `string` |  | What is counted, lower case, for assistive technology ("unread messages"). |
+| `showZero` | `boolean` |  | Draw a zero rather than nothing. |
+| `className` | `string` |  | Layout classes only (spacing, position). |
+
+```tsx
+<CountBadge count={3} label="approvals waiting" />
+<CountBadge count={120} tone="err" />
+```
+
+### EmptyState
+
+Nothing to show, said plainly: a drawing, a title, one short line and at most one action.
+
+| | |
+|---|---|
+| Use | A list, a search or a page with nothing in it yet; a filter that matched nothing; a first visit. |
+| Avoid | An explanation of the feature (tier 3); more than one action; a screen that has data on it. |
+| Phone | Centred, the drawing at the smaller size; the action is full width within thumb reach. |
+| Accessibility | The title is a heading (data-ui="title"), at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
+| Status | stable |
+| Exports | `EmptyState` |
+| Import | `import { EmptyState } from "@mycity/ui";` |
+| File | `packages/ui/src/display/EmptyState.tsx` |
+| Test | `packages/ui/src/display/EmptyState.test.tsx` |
+| Gallery | `packages/ui/src/display/EmptyState.gallery.tsx` (`npm run gallery`, `#/EmptyState`) |
+
+**EmptyState** props (`EmptyStateProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `illustration` | `IllustrationName` |  | The drawing, by name; Empty unless set (or unless the merged `icon` is given). |
+| `icon` | `IconName` |  | The merged glyph in a soft square, used when no illustration is named. |
+| `title` | `ReactNode` | yes | What is empty, at most 4 words, Title Case (No Requests Yet). |
+| `text` | `ReactNode` |  | One line, at most 8 words: what the person can do about it. |
+| `action` | `ReactNode` |  | At most one action, usually a primary Button. |
+| `bare` | `boolean` |  | Draw it without its card (inside a card or a sheet that already has one). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<EmptyState illustration="Search" title="No Matches" text="Try another name or department" />
+<EmptyState title="No Requests Yet" action={<Button variant="primary">Request Leave</Button>} />
+```
+
+### EmptyValue
+
+The marker for a value that is not set: the only dash a screen shows, muted.
+
+| | |
+|---|---|
+| Use | A field, a cell or a figure with no value (no end date, no manager, no amount). KeyValue and Money draw it for you. |
+| Avoid | Typing a dash, "N/A", "None" or "null" into copy (gate 17); a value that is zero (show 0 or ₦0.00). |
+| Phone | The same. |
+| Accessibility | An image named "Not set" (or the label given), so a screen reader says the words, not "dash". |
+| Status | stable |
+| Exports | `EmptyValue` |
+| Import | `import { EmptyValue } from "@mycity/ui";` |
+| File | `packages/ui/src/display/EmptyValue.tsx` |
+| Test | `packages/ui/src/display/EmptyValue.test.tsx` |
+| Gallery | `packages/ui/src/display/EmptyValue.gallery.tsx` (`npm run gallery`, `#/EmptyValue`) |
+
+**EmptyValue** props (`EmptyValueProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` |  | What assistive technology says; "Not set" unless a field needs something plainer ("No end date"). |
+| `className` | `string` |  | Layout classes only (alignment). |
+
+```tsx
+<EmptyValue />
+```
+
+### IconCards
+
+A grid of phone icon cards, two to a row; each IconCard is an icon, a title and a line, and opens a sheet with that section.
+
+| | |
+|---|---|
+| Use | On a phone, in place of stacked sections (FRONTEND_GUIDE §5.5): Password, Devices, Payslips, each opening its own sheet. |
+| Avoid | Desktop pages, which show the sections themselves (wrap in PhoneOnly); navigation between modules (that is the More sheet); a card with no destination. |
+| Phone | Two to a row (three from the wide breakpoint with cols={3}), each at least 96 px tall, the whole card is the tap target. |
+| Accessibility | Each IconCard is a native button named by its title; its line is read as the description. The chevron and the icon are decorative. The caller opens the sheet (useModal) in onClick. |
+| Status | stable |
+| Exports | `IconCards`, `IconCard` |
+| Import | `import { IconCards, IconCard } from "@mycity/ui";` |
+| File | `packages/ui/src/display/IconCards.tsx` |
+| Test | `packages/ui/src/display/IconCards.test.tsx` |
+| Gallery | `packages/ui/src/display/IconCards.gallery.tsx` (`npm run gallery`, `#/IconCards`) |
+
+**IconCards** props (`IconCardsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The IconCard elements. |
+| `cols` | `2 \| 3` |  | Two to a row (the default), or three from the wide breakpoint. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**IconCard** props (`IconCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `icon` | `IconName` | yes | The glyph in the soft square. |
+| `title` | `ReactNode` | yes | The section it opens, at most 4 words, Title Case: its accessible name. |
+| `text` | `ReactNode` |  | One short line of the section's state (Changed 02/10/2026, 2 active). |
+| `count` | `number` |  | A count of things waiting inside, shown at the top right. |
+| `onClick` | `() => void` | yes | Opens the section, usually as a sheet (useModal). |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<IconCards><IconCard icon="shield" title="Password" text="Changed 02/10/2026" onClick={openPassword} /></IconCards>
+```
+
+### Illustration
+
+A small line drawing in the theme's colours, for empty states, first run, results and the clock prompts.
+
+| | |
+|---|---|
+| Use | Inside EmptyState (by name), on a first-run page, beside a success or recoverable error result, on the Clock In and Clock Out prompts. |
+| Avoid | A data screen that has data on it; decoration for its own sake; a drawing that repeats what the words already say. Never a picture with text in it. |
+| Phone | The same drawing; EmptyState draws it at the smaller size on a phone. |
+| Accessibility | Decorative (aria-hidden) by default, because the title beside it says the same. Pass label only when the drawing stands alone and carries meaning. |
+| Status | beta |
+| Exports | `Illustration`, `EmptyIllustration`, `SearchIllustration`, `SuccessIllustration`, `ErrorIllustration`, `LockedIllustration`, `OfflineIllustration`, `FirstRunIllustration`, `ClockInIllustration`, `ClockOutIllustration` |
+| Import | `import { Illustration, EmptyIllustration, SearchIllustration, SuccessIllustration, ErrorIllustration, LockedIllustration, OfflineIllustration, FirstRunIllustration, ClockInIllustration, ClockOutIllustration } from "@mycity/ui";` |
+| File | `packages/ui/src/illustrations/Illustration.tsx` |
+| Test | `packages/ui/src/illustrations/Illustration.test.tsx` |
+| Gallery | `packages/ui/src/illustrations/Illustration.gallery.tsx` (`npm run gallery`, `#/Illustration`) |
+
+**Illustration** props (`IllustrationProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `"Empty" \| "Search" \| "Success" \| "Error" \| "Locked" \| "Offline" \| "FirstRun" \| "ClockIn" \| "ClockOut"` | yes | Which drawing. |
+| `size` | `"s" \| "m" \| "l"` |  | `s` 72 px, `m` 96 px (the default), `l` 128 px wide. |
+| `label` | `string` |  | Gives the drawing a name for assistive technology; without it the drawing is decorative. |
+| `className` | `string` |  | Layout classes, or a token text colour for the lines (text-muted-foreground by default). |
+
+**EmptyIllustration** props (`EmptyIllustrationProps`)
+
+No props of its own.
+
+**SearchIllustration** props (`SearchIllustrationProps`)
+
+No props of its own.
+
+**SuccessIllustration** props (`SuccessIllustrationProps`)
+
+No props of its own.
+
+**ErrorIllustration** props (`ErrorIllustrationProps`)
+
+No props of its own.
+
+**LockedIllustration** props (`LockedIllustrationProps`)
+
+No props of its own.
+
+**OfflineIllustration** props (`OfflineIllustrationProps`)
+
+No props of its own.
+
+**FirstRunIllustration** props (`FirstRunIllustrationProps`)
+
+No props of its own.
+
+**ClockInIllustration** props (`ClockInIllustrationProps`)
+
+No props of its own.
+
+**ClockOutIllustration** props (`ClockOutIllustrationProps`)
+
+No props of its own.
+
+```tsx
+<Illustration name="Empty" />
+<ClockInIllustration size="l" />
+```
+
+### Kbd
+
+A keyboard key or shortcut, drawn as keycaps (⌘ K, Esc).
+
+| | |
+|---|---|
+| Use | Beside a desktop action or in a menu to show its shortcut (search, the command palette, close). |
+| Avoid | A phone screen (there is no keyboard: it is hidden there); a key a person does not need to learn. |
+| Phone | Not shown. |
+| Accessibility | Native kbd elements; a combination is read key by key. Pass label when a symbol needs words (⌘ is read as "Command"). |
+| Status | stable |
+| Exports | `Kbd` |
+| Import | `import { Kbd } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Kbd.tsx` |
+| Test | `packages/ui/src/display/Kbd.test.tsx` |
+| Gallery | `packages/ui/src/display/Kbd.gallery.tsx` (`npm run gallery`, `#/Kbd`) |
+
+**Kbd** props (`KbdProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | One key, as children (Esc, Enter). |
+| `keys` | `string[]` |  | A combination, one keycap each, in order (["⌘", "K"]). |
+| `label` | `string` |  | What a screen reader says for the combination ("Command K"), when the keys are symbols. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Kbd keys={["⌘", "K"]} label="Command K" />
+<Kbd>Esc</Kbd>
+```
+
+### KeyValue
+
+Label and value pairs for a record: two columns on desktop, label over value on a phone; a value that is not set shows EmptyValue.
+
+| | |
+|---|---|
+| Use | A record's fields in a card or a sheet (Personal, Employment, a request's detail). |
+| Avoid | A list of many records (use DataView); prose; a label that explains how the system works (tier 3). |
+| Phone | One column, the label above its value, so nothing is squeezed. |
+| Accessibility | A description list (dl, dt, dd). Labels are interface copy, at most 4 words, Title Case; values are the record's data (data-copy="content"). A label's help goes in a HelpTerm passed as the label. |
+| Status | stable |
+| Exports | `KeyValue` |
+| Import | `import { KeyValue } from "@mycity/ui";` |
+| File | `packages/ui/src/display/KeyValue.tsx` |
+| Test | `packages/ui/src/display/KeyValue.test.tsx` |
+| Gallery | `packages/ui/src/display/KeyValue.gallery.tsx` (`npm run gallery`, `#/KeyValue`) |
+
+**KeyValue** props (`KeyValueProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `ReadonlyArray<KeyValueItem>` | yes | The pairs, in reading order. A value of null, undefined, "" or false shows EmptyValue. |
+| `layout` | `"columns" \| "stacked"` |  | `columns` (the default) puts labels in a narrow column on desktop; `stacked` puts each label above its value everywhere. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<KeyValue items={[["Department", "Field Sales"], ["Line Manager", null]]} />
+<KeyValue items={[{ label: "Start Date", value: "13/10/2026" }]} />
+```
+
+### Money
+
+An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word.
+
+| | |
+|---|---|
+| Use | Every amount on a screen: a table cell, a payslip line, a KPI (short), a record's field. |
+| Avoid | Formatting money by hand or through a float; ₦1.3M anywhere but a KPI tile; colour alone for a negative. |
+| Phone | The same; it never wraps inside the amount. |
+| Accessibility | Text, not an image: the minus sign and the word (deduction) are read, so a negative never depends on colour. An amount that is not set shows EmptyValue. |
+| Status | stable |
+| Exports | `Money` |
+| Import | `import { Money } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Money.tsx` |
+| Test | `packages/ui/src/display/Money.test.tsx` |
+| Gallery | `packages/ui/src/display/Money.gallery.tsx` (`npm run gallery`, `#/Money`) |
+
+**Money** props (`MoneyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string \| null \| undefined` | yes | The amount as the API sends it, a decimal string ("1250000.00"); null or "" shows EmptyValue. |
+| `short` | `boolean` |  | The short form (₦1.3M), for KPI tiles only. |
+| `kobo` | `boolean` |  | Drop the kobo (₦1,250,000), for whole-Naira figures such as a salary band. |
+| `negLabel` | `string` |  | The word after a negative amount, lower case; "deduction" unless set. |
+| `className` | `string` |  | Layout classes only (alignment, size). |
+
+```tsx
+<Money value="1250000.00" />
+<Money value="-45000.00" negLabel="refund" />
+<Money value={kpi.total} short />
+```
+
+### Pill
+
+A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }).
+
+| | |
+|---|---|
+| Use | A record's status (Approved, Pending, Late), a category tag on a card or a row. |
+| Avoid | A colour with no word (never colour alone); a count (use CountBadge); an action (use Button or Chips). |
+| Phone | The same size; a pill is never a tap target on its own. |
+| Accessibility | The text carries the meaning; the dot and the tint are decorative. Its text is marked as content (data-copy), because it is the record's value. |
+| Status | stable |
+| Exports | `Pill`, `StatusPill` |
+| Import | `import { Pill, StatusPill } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Pill.tsx` |
+| Test | `packages/ui/src/display/Pill.test.tsx` |
+| Gallery | `packages/ui/src/display/Pill.gallery.tsx` (`npm run gallery`, `#/Pill`) |
+
+**Pill** props (`PillProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tone` | `"ok" \| "warn" \| "err" \| "info" \| "neutral"` |  | The status tone; neutral unless set. |
+| `dot` | `boolean` |  | The dot before the words (on unless false). |
+| `children` | `ReactNode` | yes | The words: one to three, Title Case. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**StatusPill** props (`StatusPillProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `status` | `StatusValue \| null` |  | The status record ({ tone, text }); nothing is drawn when it is null. |
+| `s` | `StatusValue \| null` |  | The merged name for `status`; kept so screens move by an import change. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Pill tone="ok">Approved</Pill>
+<StatusPill status={leave.status} />
+```
+
+### ProgressBar
+
+How far along something is: a bar with its percent, or a moving bar when the end is unknown; Meter is the thin inline bar with its figure (the merged Mini).
+
+| | |
+|---|---|
+| Use | ProgressBar for work under way (an import, an upload, onboarding steps); Meter for a measure against a whole in a row or a card (leave used, a target met). |
+| Avoid | A chart of several values (use the chart components); a status (use Pill); colour as the only sign of good or bad (say it in the figure). |
+| Phone | Full width; the figure stays on the same line. |
+| Accessibility | ProgressBar is a progressbar with its value (or busy, with no value, while indeterminate); Meter is a meter. Both need a name: the visible label, or the name prop. Under reduced motion the indeterminate bar does not move. |
+| Status | stable |
+| Exports | `ProgressBar`, `Meter` |
+| Import | `import { ProgressBar, Meter } from "@mycity/ui";` |
+| File | `packages/ui/src/display/ProgressBar.tsx` |
+| Test | `packages/ui/src/display/ProgressBar.test.tsx` |
+| Gallery | `packages/ui/src/display/ProgressBar.gallery.tsx` (`npm run gallery`, `#/ProgressBar`) |
+
+**ProgressBar** props (`ProgressBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `number` |  | How far along, from 0 to max; leave unset while the end is unknown (indeterminate). |
+| `max` | `number` |  | The whole; 100 unless set. |
+| `label` | `ReactNode` |  | The visible label above the bar, Title Case (Importing Employees); also its accessible name. |
+| `name` | `string` |  | The accessible name when there is no visible label. |
+| `showValue` | `boolean` |  | Show the percent at the right of the label (on unless false). |
+| `tone` | `"primary" \| "ok" \| "warn" \| "err" \| "info" \| "neutral" \| "chart-1" \| "chart-2" \| "chart-3" \| "chart-4"` |  | The fill colour; primary unless set. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+**Meter** props (`MeterProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `pct` | `number` | yes | The measure as a percent of the whole, 0 to 100 (clamped). |
+| `label` | `ReactNode` |  | The figure at the right (8 of 20, 40%); may be empty. |
+| `name` | `string` |  | What is measured, its accessible name (Annual Leave Used); the label or the percent is used when unset. |
+| `tone` | `"primary" \| "ok" \| "warn" \| "err" \| "info" \| "neutral" \| "chart-1" \| "chart-2" \| "chart-3" \| "chart-4"` |  | The fill colour; chart-1 unless set. |
+| `color` | `string` |  | The merged colour, a token variable ("var(--chart-2)"); mapped to its tone. Prefer tone. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+```tsx
+<ProgressBar label="Importing Employees" value={64} />
+<ProgressBar label="Preparing Payslips" />
+<Meter pct={40} label="8 of 20" name="Annual Leave Used" />
+```
+
+### Quote
+
+A quoted passage a person wrote or received, with the yellow rule at its left.
+
+| | |
+|---|---|
+| Use | A manager's comment on a request, a line of an announcement, a reason given for a decision. |
+| Avoid | Interface copy or help (use HelpTerm or Details); a whole message thread (use the messaging components). |
+| Phone | Full width, the same rule. |
+| Accessibility | A blockquote; its text is content (data-copy="content"), not interface copy. Pass cite to name who said it. |
+| Status | stable |
+| Exports | `Quote` |
+| Import | `import { Quote } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Quote.tsx` |
+| Test | `packages/ui/src/display/Quote.test.tsx` |
+| Gallery | `packages/ui/src/display/Quote.gallery.tsx` (`npm run gallery`, `#/Quote`) |
+
+**Quote** props (`QuoteProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The quoted words, as the person wrote them. |
+| `cite` | `ReactNode` |  | Who said it, shown under the quote. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Quote cite="Adaeze Okafor, Line Manager">Approved, enjoy the break.</Quote>
+```
+
+### Skeleton
+
+A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape.
+
+| | |
+|---|---|
+| Use | Skeleton while a card, a list or a page loads, so the layout does not jump when the data lands; Spinner inside a small area that is waiting (a sheet's body, beside a label). |
+| Avoid | A Spinner for a whole page or list (use Skeleton); a Spinner inside a Button (Button has loading); either one after the data has failed (use the error state). |
+| Phone | The same shapes, full width. |
+| Accessibility | Skeleton lines and Spinner are a status region named "Loading" (or the label given); a single Skeleton shape is decorative, so a group of them should sit in one labelled Skeleton or a container with aria-busy. Under reduced motion neither moves. |
+| Status | stable |
+| Exports | `Skeleton`, `Spinner` |
+| Import | `import { Skeleton, Spinner } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Skeleton.tsx` |
+| Test | `packages/ui/src/display/Skeleton.test.tsx` |
+| Gallery | `packages/ui/src/display/Skeleton.gallery.tsx` (`npm run gallery`, `#/Skeleton`) |
+
+**Skeleton** props (`SkeletonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `lines` | `number` |  | A number of text lines, as a status region; leave unset for one shape sized by className. |
+| `shape` | `"line" \| "block" \| "circle"` |  | One shape: `line` (a text line, the default), `block` (a card or an image), `circle` (an avatar). |
+| `label` | `string` |  | What assistive technology hears while lines load; "Loading" unless set. |
+| `className` | `string` |  | Size and spacing for a single shape (h-24, size-8, w-40). |
+
+**Spinner** props (`SpinnerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `size` | `"s" \| "m" \| "l"` |  | `s` 16 px (the default), `m` 20 px, `l` 24 px. |
+| `label` | `string` |  | What assistive technology hears; "Loading" unless set. |
+| `className` | `string` |  | Layout classes, or a token text colour. |
+
+```tsx
+<Skeleton lines={4} />
+<Skeleton shape="circle" className="size-8" />
+<Spinner label="Loading payslips" />
+```
+
+## Navigation
+
+### Chips
+
+A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle).
+
+| | |
+|---|---|
+| Use | Narrowing a list by a status or a group (Everyone, Late 4, Remote 2); a board's stage switcher on a phone (F19); picking several departments with `selected`. |
+| Avoid | Switching between views (use SegmentedControl or Tabs); a choice inside a form (use ChoiceField or CheckboxField); a status shown on a record (use Pill). |
+| Phone | One row that scrolls sideways inside itself, never the page; each chip is a 44 px target. |
+| Accessibility | A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4). |
+| Status | stable |
+| Exports | `Chips` |
+| Import | `import { Chips } from "@mycity/ui";` |
+| File | `packages/ui/src/navigation/Chips.tsx` |
+| Test | `packages/ui/src/navigation/Chips.test.tsx` |
+| Gallery | `packages/ui/src/navigation/Chips.gallery.tsx` (`npm run gallery`, `#/Chips`) |
+
+**Chips** props (`ChipsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `options` | `ReadonlyArray<Choice<V>>` | yes | The merged tuple ["late", "Late"], or { value, label, count, icon, disabled }. Labels Title Case, at most 3 words; counts as numbers. |
+| `value` | `V` |  | Single select: the chip that is on. |
+| `onChange` | `(value: V) => void` |  | Single select: called with the chip pressed. |
+| `selected` | `readonly V[]` |  | Toggle: the chips that are on (several may be). Using it switches the row to toggle mode. |
+| `onSelectedChange` | `(selected: V[]) => void` |  | Toggle: called with the new set after a chip is switched on or off. |
+| `label` | `string` |  | Names the row for assistive technology ("Status", "Departments"). |
+| `className` | `string` |  | Layout classes only (spacing); the row keeps the merged 12 px gap below it unless overridden. |
+
+```tsx
+<Chips label="Status" value={status} onChange={setStatus} options={[["all", "Everyone"], { value: "late", label: "Late", count: 4 }]} />
+<Chips label="Departments" selected={depts} onSelectedChange={setDepts} options={departments.map((d) => [d.name, d.name])} />
+```
+
+### SegmentedControl
+
+Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on.
+
+| | |
+|---|---|
+| Use | Switching what a list, board or chart shows, in a toolbar or a page header; at most 5 options, each at most 3 words. |
+| Avoid | A choice inside a form (use ChoiceField); filtering a list by status with counts (use Chips); the module's views (use Tabs); more than 5 options (use a select or Tabs). |
+| Phone | Fills the width with equal segments, each a 44 px target; a long set scrolls sideways inside itself, never the page. |
+| Accessibility | A radiogroup named by `label`, each segment a radio: one Tab stop, the arrow keys move and choose, Home and End go to the ends. |
+| Status | stable |
+| Exports | `SegmentedControl` |
+| Import | `import { SegmentedControl } from "@mycity/ui";` |
+| File | `packages/ui/src/navigation/SegmentedControl.tsx` |
+| Test | `packages/ui/src/navigation/SegmentedControl.test.tsx` |
+| Gallery | `packages/ui/src/navigation/SegmentedControl.gallery.tsx` (`npm run gallery`, `#/SegmentedControl`) |
+
+**SegmentedControl** props (`SegmentedControlProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `V` | yes | The view showing. |
+| `onChange` | `(value: V) => void` | yes | Called with the chosen view. |
+| `options` | `ReadonlyArray<Choice<V>>` | yes | Two to five options: the merged tuple ["team", "My Team"], or { value, label, icon, count, disabled }. |
+| `label` | `string` |  | Names the group for assistive technology ("Whose Tasks"); give one unless a visible label sits beside it. |
+| `disabled` | `readonly V[]` |  | Values shown but not choosable (the merged Seg's `disabled`). |
+| `small` | `boolean` |  | The 28 px desktop size for a dense toolbar (still 44 px on a phone). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />
+```
+
+### Tabs
+
+The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each.
+
+| | |
+|---|---|
+| Use | Sibling views of one module or record (Register, Field Assignments, Location Requests). Controlled by value, so the router drives it from ?tab=; give each tab an href so it opens in a new tab and survives a reload. |
+| Avoid | Two or three views of one list in a toolbar (use SegmentedControl); filtering a list (use Chips); steps of a form (use Wizard); more than one strip on a screen. |
+| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. |
+| Accessibility | A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing. |
+| Status | stable |
+| Exports | `Tabs`, `TabPanel` |
+| Import | `import { Tabs, TabPanel } from "@mycity/ui";` |
+| File | `packages/ui/src/navigation/Tabs.tsx` |
+| Test | `packages/ui/src/navigation/Tabs.test.tsx` |
+| Gallery | `packages/ui/src/navigation/Tabs.gallery.tsx` (`npm run gallery`, `#/Tabs`) |
+
+**Tabs** props (`TabsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `TabItem[]` | yes | The tabs, in order. |
+| `value` | `string` | yes | The active tab's value (controlled: the router or the screen owns it). |
+| `onValueChange` | `(value: string) => void` |  | Called with the chosen tab's value; navigate or set state here. |
+| `label` | `string` | yes | Names the strip for assistive technology: the module or record ("Attendance"). |
+| `children` | `ReactNode` |  | TabPanel elements, when the views live on this screen; leave out when the router renders the view. |
+| `activation` | `"manual" \| "automatic"` |  | `manual` (the default): arrows move focus and Enter activates. `automatic`: arrows activate. |
+| `className` | `string` |  | Layout classes for the whole block (spacing). |
+
+**TabPanel** props (`TabPanelProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The tab it belongs to. |
+| `children` | `ReactNode` |  | The view. |
+| `className` | `string` |  | Layout classes (spacing). |
+
+```tsx
+<Tabs label="Attendance" value={tab} onValueChange={(t) => navigate(`/attendance?tab=${t}`)} items={[{ value: "register", label: "Register", href: "/attendance?tab=register" }]} />
+<Tabs label="Employee" value={tab} onValueChange={setTab} items={items}><TabPanel value="profile">...</TabPanel></Tabs>
+```
+
+## Overlays
+
+### ConfirmDialog
+
+A yes or no before an action that cannot be taken back, named for the thing it acts on ("Delete Rule").
+
+| | |
+|---|---|
+| Use | Deleting, cancelling, revoking, emptying a folder: `if (!(await confirm({ title: "Delete Rule", destructive: true }))) return;`. The component form when a screen keeps its own state. |
+| Avoid | Asking before something that can be undone (do it, and offer Undo in the toast); window.confirm (gate 16); a form (use Modal). |
+| Phone | A short bottom sheet; the confirm button full width at the bottom, Cancel above it. |
+| Accessibility | An alertdialog: Cancel has focus when it opens, Esc and the close button answer no. A destructive confirmation cannot be dismissed by a stray tap on the scrim. |
+| Status | stable |
+| Exports | `ConfirmDialog` |
+| Import | `import { ConfirmDialog } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/ConfirmDialog.tsx` |
+| Test | `packages/ui/src/overlay/ConfirmDialog.test.tsx` |
+| Gallery | `packages/ui/src/overlay/ConfirmDialog.gallery.tsx` (`npm run gallery`, `#/ConfirmDialog`) |
+
+**ConfirmDialog** props (`ConfirmDialogProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether it is showing. |
+| `title` | `string` | yes | The action and the thing, Verb Noun, at most 4 words: "Delete Rule", "Empty Trash". |
+| `body` | `ReactNode` |  | At most one sentence of 20 words on what follows, only when the title does not say it. |
+| `confirmLabel` | `string` |  | The confirm button, Verb Noun; the title by default. |
+| `cancelLabel` | `string` |  | The way out. Default "Cancel". |
+| `destructive` | `boolean` |  | A red confirm button, and the scrim no longer dismisses. |
+| `dismissible` | `boolean` |  | Whether Esc and the scrim answer no. Default: true unless destructive. |
+| `onConfirm` | `() => void \| Promise<unknown>` | yes | Called on confirm. A promise keeps the button busy until it settles. |
+| `onCancel` | `() => void` | yes | Called on Cancel, Esc, the close button, or (when dismissible) the scrim. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default. |
+
+```tsx
+const confirm = useConfirm(); if (await confirm({ title: "Delete Rule", destructive: true })) remove(rule);
+<ConfirmDialog open={open} title="Revoke Device" destructive onConfirm={revoke} onCancel={() => setOpen(false)} />
+```
+
+### Menu
+
+A short list of actions behind one button (the ⋮ on a record, the + in a composer, the account menu).
+
+| | |
+|---|---|
+| Use | Secondary actions on a record or a row, choices behind a split button (Schedule). Items are Verb Noun; destructive ones are red and come last. |
+| Avoid | The main action (a Button of its own); choosing a value in a form (SelectField); navigation between pages (links); more than about 8 items. |
+| Phone | An action sheet from the bottom: large rows, destructive items in red, Cancel at the foot. |
+| Accessibility | Radix menu on desktop: arrow keys move, Enter chooses, typing jumps to an item, Esc closes and focus returns to the button. The button needs a name (an IconButton label). |
+| Status | stable |
+| Exports | `Menu` |
+| Import | `import { Menu } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/Menu.tsx` |
+| Test | `packages/ui/src/overlay/Menu.test.tsx` |
+| Gallery | `packages/ui/src/overlay/Menu.gallery.tsx` (`npm run gallery`, `#/Menu`) |
+
+**Menu** props (`MenuProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `trigger` | `((props: MenuTriggerProps) => ReactNode) \| ReactElement` | yes | The button that opens it: a function that spreads the props it is given onto a button, or the button itself. |
+| `items` | `MenuItem[]` | yes | The actions, top to bottom; "sep" draws a divider. |
+| `align` | `"start" \| "end"` |  | Which edge of the button the menu lines up with on desktop. Default `end`. |
+| `label` | `string` |  | Names the action sheet on a phone for screen readers. Default "Actions". |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default. |
+
+```tsx
+<Menu trigger={(p) => <IconButton {...p} icon="dots" label="More Actions" />} items={[{ label: "Archive", icon: "book", onSelect: archive }, "sep", { label: "Move to Trash", icon: "x", danger: true, onSelect: trash }]} />
+```
+
+### Modal
+
+THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened with useModal or controlled with open.
+
+| | |
+|---|---|
+| Use | Create or edit with up to 6 fields, a record's detail, a short reader. useModal().open({ title, body }) from anywhere under ModalProvider; <Modal open> when the screen owns the state. |
+| Avoid | A destructive yes or no (use useConfirm); editing the record behind it on desktop (use SidePanel); more than 6 fields (a wizard); a stack of dialogs (opening one replaces the last). |
+| Phone | A bottom sheet that drags down to close, with the main action full width at the bottom; `full` makes it a full-screen sheet (a composer, a long form). |
+| Accessibility | Radix Dialog underneath: aria-modal, focus moves in and is trapped, Esc closes, focus returns to the opener. The title (at most 4 words) names it. With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard. |
+| Status | stable |
+| Exports | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` |
+| Import | `import { Modal, ModalProvider, ModalFooter, Grow } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/Modal.tsx` |
+| Test | `packages/ui/src/overlay/Modal.test.tsx` |
+| Gallery | `packages/ui/src/overlay/Modal.gallery.tsx` (`npm run gallery`, `#/Modal`) |
+
+**Modal** props (`ModalProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether it is showing. |
+| `onClose` | `() => void` | yes | Called to close it: after a dismissal (Esc, scrim, close button, drag), once any unsaved changes are discarded. |
+| `title` | `ReactNode` | yes | The title: a noun phrase of at most 4 words, Title Case ("New Rule", "Edit Worksite"). |
+| `sub` | `ReactNode` |  | A line under the title, at most 8 words, desktop only; kept as the dialog's description. |
+| `children` | `ModalContent` |  | The body, or a function of `close`. |
+| `footer` | `ModalContent` |  | Footer buttons only (Cancel, then the primary), or a function of `close`. A body can also use ModalFooter. |
+| `wide` | `boolean` |  | The wider desktop dialog (tables, documents). Same as size="wide". |
+| `size` | `"sm" \| "md" \| "wide"` |  | Desktop width: `sm` a confirmation, `md` a form (the default), `wide` a table or document. |
+| `full` | `boolean` |  | A full-screen sheet on a phone (a composer, a long form, a reader). No change on desktop. |
+| `side` | `boolean` |  | A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. |
+| `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. |
+| `dismissible` | `boolean` |  | false: Esc, the scrim and a drag do nothing; the close button and the footer still close it. Default true. |
+| `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation that must be answered. Default `dialog`. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
+| `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
+
+**ModalProvider** props (`ModalProviderProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The app. |
+| `resetKey` | `unknown` |  | Whatever is open closes when this changes: the app passes its route, so a new screen never inherits a dialog. |
+| `container` | `HTMLElement \| null` |  | Where the modals mount; document.body by default. |
+
+**ModalFooter** props (`ModalFooterProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | Buttons only: Cancel first, the primary last (it lands full width at the bottom on a phone). |
+
+**Grow** props (`GrowProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `className` | `string` |  | Extra classes. |
+
+```tsx
+modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })
+<Modal open={open} onClose={() => setOpen(false)} title="Edit Worksite" footer={<Button variant="primary">Save Worksite</Button>}>{fields}</Modal>
+```
+
+### Popover
+
+A small panel anchored to the button that opens it: filters, a quick pick, a short preview.
+
+| | |
+|---|---|
+| Use | A few controls that belong to one button (Filters, Columns, a date preset list), a preview that needs no page. |
+| Avoid | A list of actions (use Menu); a form that saves (use Modal); help text (use HelpTerm, which has its own popover). |
+| Phone | A bottom sheet titled by `title`, opened by a tap on the same button. |
+| Accessibility | A non-modal dialog named by `title`: focus moves in, Esc or a click outside closes it, focus returns to the button. The button says it has a popup and whether it is open. |
+| Status | stable |
+| Exports | `Popover` |
+| Import | `import { Popover } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/Popover.tsx` |
+| Test | `packages/ui/src/overlay/Popover.test.tsx` |
+| Gallery | `packages/ui/src/overlay/Popover.gallery.tsx` (`npm run gallery`, `#/Popover`) |
+
+**Popover** props (`PopoverProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `trigger` | `ReactElement` | yes | The button that opens it: one element that takes a ref. |
+| `title` | `string` | yes | Names the popover, at most 4 words: the sheet's title on a phone and the accessible name on desktop. |
+| `children` | `ReactNode \| ((close: () => void) => ReactNode)` | yes | The panel's content, or a function of `close`. |
+| `open` | `boolean` |  | Controlled open state. Leave both unset to let the popover keep its own. |
+| `onOpenChange` | `(open: boolean) => void` |  | Called when it opens or closes. |
+| `side` | `"top" \| "right" \| "bottom" \| "left"` |  | Which side of the button on desktop. Default `bottom`. |
+| `align` | `"start" \| "center" \| "end"` |  | Alignment along that side. Default `start`. |
+| `className` | `string` |  | Extra classes for the desktop panel (a width from the scale, such as w-80). |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default. |
+
+```tsx
+<Popover title="Filter Leave" trigger={<Button icon="flag">Filters</Button>}>{filters}</Popover>
+```
+
+### Sheet
+
+The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc.
+
+| | |
+|---|---|
+| Use | Underneath Modal, SidePanel, Popover and Menu on a phone; directly for a phone-only sheet (the More launcher, a KPI detail). |
+| Avoid | A dialog on desktop (use Modal, which is this sheet on a phone and a centred dialog on desktop); a toast or banner for news. |
+| Phone | This is the phone form. `full` fills the screen for a long form or a reader; otherwise it is as tall as its content, up to most of the screen, with a grab handle. |
+| Accessibility | A modal dialog (Radix underneath): focus moves in and is trapped, Esc closes, focus returns to the opener. The title names it; `hideHeader` keeps the title for screen readers only. |
+| Status | stable |
+| Exports | `Sheet` |
+| Import | `import { Sheet } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/Sheet.tsx` |
+| Test | `packages/ui/src/overlay/Sheet.test.tsx` |
+| Gallery | `packages/ui/src/overlay/Sheet.gallery.tsx` (`npm run gallery`, `#/Sheet`) |
+
+**Sheet** props (`SheetProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the sheet is showing. |
+| `onClose` | `() => void` | yes | Called when the person dismisses it (drag down, scrim, Esc, the close button). Keep `open` true to refuse, and the sheet springs back. |
+| `title` | `ReactNode` | yes | The heading, at most 4 words, Title Case. |
+| `sub` | `ReactNode` |  | A short line under the heading; hidden on a phone, kept as the dialog's description. |
+| `hideHeader` | `boolean` |  | No header row: the title is read by screen readers only (an action sheet). |
+| `full` | `boolean` |  | Fill the screen (a long form, a composer, a reader) instead of fitting the content. |
+| `footer` | `ReactNode` |  | Buttons for the footer; the main action is last and full width at the bottom. |
+| `children` | `ReactNode` |  | The body. |
+| `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. |
+| `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation. Default `dialog`. |
+| `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
+| `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
+
+```tsx
+<Sheet open={open} onClose={() => setOpen(false)} title="Leave Balance">{balance}</Sheet>
+```
+
+### SidePanel
+
+A panel that slides over the right of the screen to edit or inspect the record behind it.
+
+| | |
+|---|---|
+| Use | Editing a record you are looking at on desktop (FRONTEND_GUIDE §8.1); a record's detail opened from a table row while the list stays in view. |
+| Avoid | A new record or a short form (use Modal); a page of its own (route to it); content that must stay open while working elsewhere (a pane in the page). |
+| Phone | A full-screen sheet with the main action full width at the bottom. |
+| Accessibility | A modal dialog like Modal: focus moves in and is trapped, Esc closes, focus returns to the opener, and unsaved changes ask once before a dismissal discards them. |
+| Status | stable |
+| Exports | `SidePanel` |
+| Import | `import { SidePanel } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/SidePanel.tsx` |
+| Test | `packages/ui/src/overlay/SidePanel.test.tsx` |
+| Gallery | `packages/ui/src/overlay/SidePanel.gallery.tsx` (`npm run gallery`, `#/SidePanel`) |
+
+**SidePanel** props (`SidePanelProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether it is showing. |
+| `onClose` | `() => void` | yes | Called to close it, once any unsaved changes are discarded. |
+| `title` | `ReactNode` | yes | The title, at most 4 words, Title Case ("Edit Employee"). |
+| `sub` | `ReactNode` |  | A line under the title, at most 8 words, desktop only. |
+| `children` | `ModalContent` |  | The body, or a function of `close`. |
+| `footer` | `ModalContent` |  | Footer buttons only (Cancel, then the primary), or a function of `close`. |
+| `size` | `"md" \| "wide"` |  | Desktop width: `md` (the default, 448 px) or `wide` (672 px) for a table or a document. |
+| `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default. |
+
+```tsx
+<SidePanel open={!!row} onClose={() => setRow(null)} title="Edit Employee">{form}</SidePanel>
+```
+
+### Tooltip
+
+A small label that appears beside a control on hover or keyboard focus, desktop only.
+
+| | |
+|---|---|
+| Use | The words behind an icon-only button (IconButton's label), a truncated name in full. |
+| Avoid | Help or explanation (use HelpTerm); anything a person must read to act; anything on a phone, where there is no hover. |
+| Phone | Nothing: the child renders alone, since a touch screen has no hover and the control already carries its name. |
+| Accessibility | Opens on hover after a short pause and at once on keyboard focus; Esc closes it; the text is announced as the control's description. The control keeps its own accessible name. |
+| Status | stable |
+| Exports | `Tooltip` |
+| Import | `import { Tooltip } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/Tooltip.tsx` |
+| Test | `packages/ui/src/overlay/Tooltip.test.tsx` |
+| Gallery | `packages/ui/src/overlay/Tooltip.gallery.tsx` (`npm run gallery`, `#/Tooltip`) |
+
+**Tooltip** props (`TooltipProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `ReactNode` | yes | The words: at most 3 for a control's name, Title Case. |
+| `children` | `ReactElement` | yes | The control it labels: one element that takes a ref (a button, an IconButton). |
+| `side` | `"top" \| "right" \| "bottom" \| "left"` |  | Which side of the control. Default `bottom`. |
+| `align` | `"start" \| "center" \| "end"` |  | Alignment along that side. Default `center`. |
+| `delay` | `number` |  | Hover pause before it shows, in ms. Default 300. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default. |
+
+```tsx
+<Tooltip label="Notifications"><IconButton icon="bell" label="Notifications" /></Tooltip>
+```
+
+## Help
+
+### Details
+
+One row at the foot of a card, a chevron and the word Details, that opens a short section of support facts.
+
+| | |
+|---|---|
+| Use | Tier 2 facts a person needs now and then to act on the card above it: the rules a figure counts, a schedule's grace period, a policy line. Short label and value pairs rather than prose, at most 60 words. |
+| Avoid | One or two sentences about one word (use HelpTerm); how the system works or why it was built (tier 3: the manual); more than one per card; anything a person needs every visit (show it open). |
+| Phone | A 44 px row that opens the body in a bottom sheet, closed by dragging down. |
+| Accessibility | A button with aria-expanded that controls the body (desktop) or says it opens a dialog (phone). Closed on every visit: the open state is never remembered. The body (data-ui="details") stays in the DOM, hidden, so the word limit can be checked. |
+| Status | stable |
+| Exports | `Details` |
+| Import | `import { Details } from "@mycity/ui";` |
+| File | `packages/ui/src/help/Details.tsx` |
+| Test | `packages/ui/src/help/Details.test.tsx` |
+| Gallery | `packages/ui/src/help/Details.gallery.tsx` (`npm run gallery`, `#/Details`) |
+
+**Details** props (`DetailsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `Array<[ReactNode, ReactNode]>` |  | Short label and value pairs, Title Case labels ("Grace Period", "10 minutes"). Preferred over prose. |
+| `children` | `ReactNode` |  | Free content, after the pairs, when pairs do not fit: one or two short lines. |
+| `title` | `string` |  | The phone sheet's title, at most 4 words. Default "Details". |
+| `container` | `HTMLElement \| null` |  | Where the phone sheet mounts; document.body by default (the gallery passes its themed frame). |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<Card details={<Details items={[["Grace Period", "10 minutes"], ["Counts From", "Shift start"]]} />}>...</Card>
+```
+
+### HelpTerm
+
+The word a piece of help explains, with a light dotted underline; hovering, tabbing to or tapping it shows one or two sentences.
+
+| | |
+|---|---|
+| Use | Tier 2 support text of one or two sentences attached to the word it explains: a field label, a KPI title, a column header, a card title ("Over By", "Grace Period"). |
+| Avoid | Anything a person must read before acting (put it on the control or in the confirmation); more than 35 words (tier 3: the manual); a section of facts (use Details); a chart or icon with no word (use InfoButton). |
+| Phone | No hover: a tap opens the text in a bottom sheet titled by the term, closed by dragging down, the scrim or Esc. |
+| Accessibility | The term is a button with a dotted underline. The text is always in the DOM in a visually hidden node outside any label or heading, linked with aria-describedby, so it never joins the accessible name of what it explains. Desktop: opens after about 300 ms on hover or on reaching it with Tab, stays while the pointer is over the term or the popover, Esc closes it (WCAG 1.4.13). Pass helpId to describe a field's control by the same text. |
+| Status | stable |
+| Exports | `HelpTerm` |
+| Import | `import { HelpTerm } from "@mycity/ui";` |
+| File | `packages/ui/src/help/HelpTerm.tsx` |
+| Test | `packages/ui/src/help/HelpTerm.test.tsx` |
+| Gallery | `packages/ui/src/help/HelpTerm.gallery.tsx` (`npm run gallery`, `#/HelpTerm`) |
+
+**HelpTerm** props (`HelpTermProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The word or short phrase it explains, as the screen shows it (a label, a KPI title, a column header). |
+| `help` | `ReactNode` | yes | The help: one or two sentences, at most 35 words, sentence case. |
+| `title` | `string` |  | The phone sheet's title; the term itself when it is plain text, else "Help". |
+| `helpId` | `string` |  | The hidden text's id, so a field can add it to its control's aria-describedby (useControlIds().helpId). |
+| `side` | `"top" \| "right" \| "bottom" \| "left"` |  | Which side of the term the desktop popover opens on. Default `top`. |
+| `align` | `"start" \| "center" \| "end"` |  | The popover's alignment along that side. Default `center`. |
+| `container` | `HTMLElement \| null` |  | Where the popover and the sheet mount; document.body by default (the gallery passes its themed frame). |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<HelpTerm help="Minutes past the shift start before a punch counts as late.">Grace Period</HelpTerm>
+<CardHeader title={<HelpTerm help="Hours worked beyond the rostered shift this week.">Over By</HelpTerm>} />
+```
+
+### InfoButton
+
+The ⓘ, for help that has no word to attach to: a chart, an icon-only control, a figure with no title.
+
+| | |
+|---|---|
+| Use | Rarely: only where HelpTerm has no word to sit on. Same text rules as HelpTerm (one or two sentences, at most 35 words). |
+| Avoid | Beside a word (make the word a HelpTerm, so the screen is not covered in ⓘ marks); a section of facts (use Details); tier 3 explanations of how the system works. |
+| Phone | A 44 px target; a tap opens the text in a bottom sheet titled by `label`. |
+| Accessibility | A button named "About <label>" whose aria-describedby points at the text, kept visually hidden in the DOM outside any label or heading. Desktop: opens after about 300 ms on hover or on reaching it with Tab, stays while the pointer is over it or the popover, Esc closes it (WCAG 1.4.13). |
+| Status | stable |
+| Exports | `InfoButton` |
+| Import | `import { InfoButton } from "@mycity/ui";` |
+| File | `packages/ui/src/help/InfoButton.tsx` |
+| Test | `packages/ui/src/help/InfoButton.test.tsx` |
+| Gallery | `packages/ui/src/help/InfoButton.gallery.tsx` (`npm run gallery`, `#/InfoButton`) |
+
+**InfoButton** props (`InfoButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What it explains, in Title Case ("Overtime Trend"): the sheet's title, and the button's name as "About Overtime Trend". |
+| `help` | `ReactNode` | yes | The help: one or two sentences, at most 35 words, sentence case. |
+| `helpId` | `string` |  | The hidden text's id, when another element should be described by it too. |
+| `side` | `"top" \| "right" \| "bottom" \| "left"` |  | Which side the desktop popover opens on. Default `top`. |
+| `align` | `"start" \| "center" \| "end"` |  | The popover's alignment along that side. Default `center`. |
+| `container` | `HTMLElement \| null` |  | Where the popover and the sheet mount; document.body by default (the gallery passes its themed frame). |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<InfoButton label="Overtime Trend" help="Hours past the rostered shift, by week, for the last 12 weeks." />
+```
+
+## Feedback
+
+### ErrorBoundary
+
+Catches a crash in one screen so the rest of the app keeps working, and shows ErrorState with Try Again in its place.
+
+| | |
+|---|---|
+| Use | Around each screen in the shell, keyed by module and tab so moving to another screen starts it fresh; around a lazily loaded heavy part (a chart, the editor). |
+| Avoid | Catching a failed request (useApi gives its error to ErrorState); wrapping every small component; hiding a bug that should be fixed. |
+| Phone | The same ErrorState, its Try Again full width. |
+| Accessibility | The fallback is role="alert"; the rail, the tabs and the back button stay usable. Try Again renders the children again. |
+| Status | stable |
+| Exports | `ErrorBoundary` |
+| Import | `import { ErrorBoundary } from "@mycity/ui";` |
+| File | `packages/ui/src/feedback/ErrorBoundary.tsx` |
+| Test | `packages/ui/src/feedback/ErrorBoundary.test.tsx` |
+| Gallery | `packages/ui/src/feedback/ErrorBoundary.gallery.tsx` (`npm run gallery`, `#/ErrorBoundary`) |
+
+**ErrorBoundary** props (`ErrorBoundaryProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | What it guards: a screen, or a heavy part of one. |
+| `fallback` | `ReactNode \| ((error: Error, reset: () => void) => ReactNode)` |  | What shows instead; a function gets the error and a reset. Default: ErrorState, "This screen hit a problem", Try Again. |
+| `onError` | `(error: Error, info: ErrorInfo) => void` |  | Told of each crash (to report it); the console always gets it too. |
+| `resetKeys` | `readonly unknown[]` |  | When any of these change while the fallback shows, the children render again (a route, a record id). |
+
+```tsx
+<ErrorBoundary key={`${module}:${tab}`}><Screen /></ErrorBoundary>
+<ErrorBoundary fallback={(error, reset) => <ErrorState message="The chart did not draw" onRetry={reset} />}>{chart}</ErrorBoundary>
+```
+
+### ErrorState
+
+Something did not load: one line saying so, and Try Again.
+
+| | |
+|---|---|
+| Use | In place of a list, a card's content or a screen whose request failed (pass the ApiError and the reload); the fallback of ErrorBoundary. |
+| Avoid | A failed save (use toast.error, or the field's own mark); an empty result (use EmptyState); a stack trace, an error code or an apology paragraph. |
+| Phone | Centred; Try Again is full width within thumb reach. |
+| Accessibility | role="alert", so the line is announced when it replaces the content. Try Again is a real button; it is left out where trying again cannot help (no access, not found). The server's reference, when there is one, is shown for support as data. |
+| Status | stable |
+| Exports | `ErrorState` |
+| Import | `import { ErrorState } from "@mycity/ui";` |
+| File | `packages/ui/src/feedback/ErrorState.tsx` |
+| Test | `packages/ui/src/feedback/ErrorState.test.tsx` |
+| Gallery | `packages/ui/src/feedback/ErrorState.gallery.tsx` (`npm run gallery`, `#/ErrorState`) |
+
+**ErrorState** props (`ErrorStateProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `error` | `ErrorLike \| null` |  | The failure: the ApiError of the request (useApi's or usePaged's `error`). |
+| `message` | `ReactNode` |  | The line, when the status does not say enough (sentence case, at most 8 words). |
+| `onRetry` | `() => void` |  | Reloads what failed; shows Try Again. |
+| `page` | `boolean` |  | A whole screen failed: the error drawing instead of the glyph, with more room. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ErrorState error={list.error} onRetry={list.reload} />
+<ErrorState page message="This screen hit a problem" onRetry={reset} />
+```
+
+### Toaster
+
+Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere.
+
+| | |
+|---|---|
+| Use | The confirmation after an action (Rule created, Leave approved), with Undo where the action can be undone; a failure that has no field to sit on. |
+| Avoid | A field error (it sits on the field); news a person must act on (use a Banner); a confirmation before acting (use useConfirm); more than 8 words; window.alert (gate 16). |
+| Phone | Full width at the bottom, above the bottom bar (the shell sets --bottom-bar); swipe to dismiss; the Undo button is a 44 px target. |
+| Accessibility | A polite live region named Notifications, so each toast is announced without moving focus; Undo is a real button reachable from the keyboard. Toasts fade only when motion is allowed. |
+| Status | stable |
+| Exports | `Toaster` |
+| Import | `import { Toaster } from "@mycity/ui";` |
+| File | `packages/ui/src/feedback/Toaster.tsx` |
+| Test | `packages/ui/src/feedback/Toaster.test.tsx` |
+| Gallery | `packages/ui/src/feedback/Toaster.gallery.tsx` (`npm run gallery`, `#/Toaster`) |
+
+**Toaster** props (`ToasterProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` |  | Names this Toaster when a page mounts more than one; toast(text, { toasterId }) then picks it. |
+
+```tsx
+<Toaster />
+toast("Rule created")
+toast.success("Alert cleared", { undo: () => restore(alert) })
 ```
 
 ## Helpers

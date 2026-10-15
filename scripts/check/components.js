@@ -172,17 +172,23 @@ function checkFoundationTable() {
   for (const f of listed) if (!legacy.has(f)) add("docs/FRONTEND_FOUNDATION.md §7", `${f} is in the table but not on LEGACY; remove its row`);
 }
 
-const shared = checkPackage();
-checkApps(shared);
-checkFoundationTable();
+function main() {
+  const shared = checkPackage();
+  checkApps(shared);
+  checkFoundationTable();
 
-if (problems.length) {
-  console.error(`components: ${problems.length} problem(s)\n`);
-  for (const p of problems) console.error(p);
-  console.error("\nShared components live in packages/ui: npm run new:component -- --name <Name> --group <Group>.");
-  console.error("Catalogue: docs/COMPONENTS.md (npm run gen:components). Rules: docs/FRONTEND_FOUNDATION.md F8.");
-  process.exit(1);
+  if (problems.length) {
+    console.error(`components: ${problems.length} problem(s)\n`);
+    for (const p of problems) console.error(p);
+    console.error("\nShared components live in packages/ui: npm run new:component -- --name <Name> --group <Group>.");
+    console.error("Catalogue: docs/COMPONENTS.md (npm run gen:components). Rules: docs/FRONTEND_FOUNDATION.md F8.");
+    process.exit(1);
+  }
+  console.log(`components: ok (${shared.size} component(s) in packages/ui, ${LEGACY.length} legacy file(s) in the apps)`);
+  console.log("\nStill in the apps, and the PR that moves each into packages/ui:");
+  for (const [file, holds, pr] of LEGACY) console.log(`  ${file.padEnd(46)} ${pr.padEnd(34)} ${holds}`);
 }
-console.log(`components: ok (${shared.size} component(s) in packages/ui, ${LEGACY.length} legacy file(s) in the apps)`);
-console.log("\nStill in the apps, and the PR that moves each into packages/ui:");
-for (const [file, holds, pr] of LEGACY) console.log(`  ${file.padEnd(46)} ${pr.padEnd(34)} ${holds}`);
+
+// LEGACY is read by other gates (forms.js, upload.js): the checks run only when called directly.
+module.exports = { LEGACY };
+if (require.main === module) main();

@@ -6,29 +6,17 @@
  * Radix, Vaul, Sonner, Lucide and react-hook-form only inside @mycity/ui (F7),
  * and in src/ no inline style, raw colour or arbitrary value (F4, gate 13).
  */
+import { createRequire } from "node:module";
 import { frontendConfig } from "@mycity/ui/eslint";
 
 /**
  * Files from #18 written before F4, which still carry arbitrary values or an
- * inline style. Each leaves this list when its screen is converged onto the
- * token scale and @mycity/ui components; nothing is ever added to it.
+ * inline style. ONE list for both apps and gate 13 (scripts/check/palette.js):
+ * scripts/check/lib/styling-exemptions.json. Each file leaves it when its screen
+ * is converged onto the token scale and @mycity/ui components; nothing is ever
+ * added, and the gate fails an entry that no longer needs it.
  */
-const STYLE_LEGACY = [
-  "src/components/Layout.tsx",
-  "src/components/Planned.tsx",
-  "src/components/SignaturePad.tsx",
-  "src/components/StagingBar.tsx",
-  "src/components/form/Upload.tsx",
-  "src/components/form/fields.tsx",
-  "src/components/ui.tsx",
-  "src/pages/Apply.tsx",
-  "src/pages/Assessment.tsx",
-  "src/pages/Careers.tsx",
-  "src/pages/SignOffer.tsx",
-  "src/pages/Vacancy.tsx",
-  "src/pages/Verify.tsx",
-];
-
+const STYLE_LEGACY = createRequire(import.meta.url)("../scripts/check/lib/styling-exemptions.json")["public-app"];
 
 export default frontendConfig({
   kind: "app",

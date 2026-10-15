@@ -7,15 +7,25 @@
  * tables, tap targets) and any script error. The screen gates read it:
  * five-second.js (gate 8) and two-shells.js (gate 11), FRONTEND_GUIDE §5, §7.
  *
- * TARGETS
- *   demo   docs/MyCity-ERP-Documents/demo.html: signs in, walks every module
- *          and tab in the navigation, the detail pages a row opens, and the
- *          modals a KPI card, an action or a row opens (desktop).
- *   app    the staff app, once it has a build and an exportable route list
- *          (FRONTEND_GUIDE §9.2). Until then it is reported as not built.
+ * TARGETS (FRONTEND_FOUNDATION F10, F23)
+ *   gallery  packages/ui's component gallery: built when missing or stale
+ *            (lib/gallery.js), served on a local port, every component page
+ *            (`#/<Component>`) opened at 390 and 1440 px. Copy is read by the
+ *            data-ui slots the components set (SPEC §4). It is not an app, so
+ *            the navigation and first-screen checks do not apply; sideways
+ *            scroll (also a state wider than its phone frame), tap targets and
+ *            tables do.
+ *   demo     docs/MyCity-ERP-Documents/demo.html, frozen as a visual reference:
+ *            crawled ONLY when the change touches it (lib/changes.js) or with
+ *            --demo (or MYCITY_DEMO=1). It signs in, walks every module and tab
+ *            in the navigation, the detail pages a row opens, and the modals a
+ *            KPI card, an action or a row opens (desktop).
+ *   app      the staff app, once it has a build and an exportable route list
+ *            (FRONTEND_FOUNDATION PR 2). Until then it is reported as not built.
  *
  * One crawl serves both gates: the result is cached in the OS temp folder,
- * keyed by a hash of the demo and this file, so the second gate reuses it.
+ * keyed by the inputs (the gallery's input hash, the demo when it is crawled,
+ * this file and copy.js), so the second gate reuses it.
  *
  * Needs Playwright and Chromium: `npm ci`, then once `npx playwright install
  * chromium` (CI does this). Set MYCITY_CHROMIUM to use a browser binary of
@@ -25,6 +35,8 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+
+const gallery = require("./gallery");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const DEMO = "docs/MyCity-ERP-Documents/demo.html";
@@ -92,6 +104,51 @@ const DEMO_TARGET = {
   /** What a click on these opens is swept for modal copy (desktop). */
   modalOpeners: "[data-hk], [data-mo], [data-rule], .phead .right .btn",
   maxOpenersPerScreen: 12,
+  modalRoot: "#modal",
+  /** A help term is a word inside a sentence or a label, tapped as text (FRONTEND_GUIDE §5.2). */
+  tapExempt: ".ht",
+  checks: { navigation: true, firstScreen: true },
+};
+
+/** The data-ui slot names (packages/ui/src/lib/slots.ts) under the keys the gates use. */
+const SLOT_NAMES = {
+  pageTitle: "page-title",
+  pageSubtitle: "page-subtitle",
+  title: "title",
+  kpiCaption: "kpi-caption",
+  button: "button",
+  header: "header",
+  chartCaption: "chart-caption",
+  emptyText: "empty-text",
+  help: "help",
+  details: "details",
+  modalFooter: "modal-footer",
+  nav: "nav",
+};
+
+/** The gallery: one page per component, each state in a light and a dark frame. */
+const GALLERY_TARGET = {
+  id: "gallery",
+  slots: {
+    ...Object.fromEntries(Object.entries(SLOT_NAMES).map(([k, v]) => [k, `[data-ui="${v}"]`])),
+    prose: "main p, main dd, main li",
+  },
+  content: ["[data-copy=content]"],
+  interactive:
+    "main a[href], main button, main [role=button], main [role=tab], main [role=switch], main [role=checkbox], main [role=radio], main [role=menuitem], main input:not([type=hidden]), main select, main textarea, main summary",
+  page: "main",
+  scroller: null,
+  desktopNav: null,
+  phoneNav: null,
+  modalRoot: "[role=dialog], [role=alertdialog]",
+  /** A help term is a word inside a sentence or a label, tapped as text (FRONTEND_GUIDE §5.2). */
+  tapExempt: "[data-help-term]",
+  /** Each state's frame; a state wider than its phone frame scrolls sideways on a phone. */
+  frames: "[data-gallery-frame]",
+  /** The element that names a state (its heading via aria-labelledby). */
+  state: "section[aria-labelledby]",
+  /** Not an app: no navigation and no first phone screen to judge. */
+  checks: { navigation: false, firstScreen: false },
 };
 
 function hashOf(files) {
@@ -136,6 +193,14 @@ function collect(cfg) {
     return String(c.textContent || "").replace(/\s+/g, " ").trim();
   };
 
+  /* The gallery state an element belongs to ("" outside one, and on every other target). */
+  const stateOf = (el) => {
+    const s = cfg.state && el.closest(cfg.state);
+    const id = s && s.getAttribute("aria-labelledby");
+    const h = id && document.getElementById(id);
+    return h ? text(h) : "";
+  };
+
   const slots = [];
   for (const [slot, sel] of Object.entries(cfg.slots)) {
     document.querySelectorAll(sel).forEach((el) => {
@@ -143,7 +208,7 @@ function collect(cfg) {
       const t = slot === "modalFooter" ? footerText(el) : text(el) || String(el.textContent || "").replace(/\s+/g, " ").trim();
       if (!t) return;
       const r = el.getBoundingClientRect();
-      slots.push({ slot, text: t, visible: visible(el), modal: !!el.closest("#modal"), top: Math.round(r.top), bottom: Math.round(r.bottom) });
+      slots.push({ slot, text: t, visible: visible(el), modal: !!el.closest(cfg.modalRoot), state: stateOf(el), top: Math.round(r.top), bottom: Math.round(r.bottom) });
     });
   }
 
@@ -171,23 +236,37 @@ function collect(cfg) {
 
   const taps = [];
   document.querySelectorAll(cfg.interactive).forEach((el) => {
-    if (!visible(el) || el.closest(contentSel) || el.closest(".ht")) return;
+    if (!visible(el) || el.closest(contentSel) || el.closest(cfg.tapExempt)) return;
     if (getComputedStyle(el).display === "inline") return;
-    const r = el.getBoundingClientRect();
+    let r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) return;
+    // A control inside its label (a checkbox row) is tapped through the label.
+    const label = el.closest("label");
+    if (label) {
+      const lr = label.getBoundingClientRect();
+      if (lr.width * lr.height > r.width * r.height) r = lr;
+    }
     if (Math.round(r.width) < 44 || Math.round(r.height) < 44) {
-      taps.push({
-        label: (text(el) || el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.tagName.toLowerCase()).slice(0, 40),
-        w: Math.round(r.width),
-        h: Math.round(r.height),
-      });
+      const name = (text(el) || el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.tagName.toLowerCase()).slice(0, 40);
+      const st = stateOf(el);
+      taps.push({ label: st ? `${st} › ${name}` : name, w: Math.round(r.width), h: Math.round(r.height) });
     }
   });
 
+  /* Gallery frames whose content is wider than the frame: on a phone that state scrolls sideways. */
+  const frameOverflow = [];
+  if (cfg.frames) {
+    document.querySelectorAll(cfg.frames).forEach((f) => {
+      if (f.scrollWidth > f.clientWidth + 1) {
+        frameOverflow.push({ state: stateOf(f), frame: f.getAttribute("data-gallery-frame") || "", scrollWidth: f.scrollWidth, clientWidth: f.clientWidth });
+      }
+    });
+  }
+
   const tables = page ? [...page.querySelectorAll("table")].filter((t) => visible(t) && !t.closest("[data-copy=content]")).length : 0;
-  const scroller = document.querySelector(cfg.scroller);
-  const desktopNav = document.querySelector(cfg.desktopNav);
-  const phoneNav = document.querySelector(cfg.phoneNav);
+  const scroller = cfg.scroller && document.querySelector(cfg.scroller);
+  const desktopNav = cfg.desktopNav && document.querySelector(cfg.desktopNav);
+  const phoneNav = cfg.phoneNav && document.querySelector(cfg.phoneNav);
   return {
     slots,
     firstScreenWords,
@@ -203,6 +282,7 @@ function collect(cfg) {
       phoneNav: !!(phoneNav && visible(phoneNav) && phoneNav.getBoundingClientRect().height > 0),
       tables,
       taps,
+      frameOverflow,
     },
   };
 }
@@ -273,7 +353,7 @@ async function crawlDemo(browser, width, target, errors) {
       }
     });
     const s = await page.evaluate(collect, target);
-    screens.push({ target: target.id, width, screen: name, kind, ...s });
+    screens.push({ target: target.id, width, screen: name, kind, checks: target.checks, ...s });
   };
 
   await demoSignIn(page, target.file);
@@ -345,13 +425,69 @@ async function crawlDemo(browser, width, target, errors) {
   return { screens, skippedOpeners };
 }
 
+/* ───── gallery driver ───── */
+
+async function crawlGallery(browser, url, names, width, errors) {
+  const ctx = await browser.newContext(WIDTHS[width]);
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(15000);
+  let where = "Gallery";
+  page.on("pageerror", (e) => errors.push({ width, screen: where, message: String(e.message).split("\n")[0] }));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push({ width, screen: where, message: msg.text().split("\n")[0] });
+  });
+  page.on("dialog", (d) => {
+    errors.push({ width, screen: where, message: `native ${d.type()} dialog opened (gate 16)` });
+    d.dismiss().catch(() => null);
+  });
+  const screens = [];
+  for (const name of names) {
+    where = `Gallery · ${name}`;
+    try {
+      await gallery.openComponent(page, url, name);
+    } catch (err) {
+      errors.push({ width, screen: where, message: `the page did not render (${String(err.message).split("\n")[0]})` });
+      continue;
+    }
+    const s = await page.evaluate(collect, GALLERY_TARGET);
+    screens.push({ target: "gallery", width, screen: where, kind: "component", checks: GALLERY_TARGET.checks, ...s });
+  }
+  await ctx.close();
+  return screens;
+}
+
+/**
+ * Is demo.html crawled this run? Only when the change touches it, or when asked
+ * (F23). Pure, for the tests: `changed` is lib/changes.js changedFiles() (or
+ * null when git could not say, which crawls it rather than skip it unseen).
+ */
+function demoWanted(changed, argv = process.argv.slice(2), env = process.env) {
+  if (argv.includes("--demo") || env.MYCITY_DEMO === "1") return true;
+  if (changed === null) return true;
+  return changed.some((c) => c.path === DEMO);
+}
+
+function changedOrNull() {
+  try {
+    return require("./changes").changedFiles();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Crawl every target at both widths. Returns
  *   { checked: [ids], notBuilt: [notes], screens: [...], errors: [...], notes: [...] }
  */
 async function crawl() {
-  const files = [path.join(ROOT, DEMO), __filename, path.join(__dirname, "copy.js")];
-  const cacheFile = path.join(os.tmpdir(), `mycity-screens-${hashOf(files)}.json`);
+  const withDemo = demoWanted(changedOrNull()) && fs.existsSync(path.join(ROOT, DEMO));
+  const galleryHash = gallery.inputsHash();
+  const key = crypto
+    .createHash("sha1")
+    .update([galleryHash, withDemo ? hashOf([path.join(ROOT, DEMO)]) : "no-demo", hashOf([__filename, path.join(__dirname, "copy.js"), path.join(__dirname, "gallery.js")])].join("|"))
+    .digest("hex")
+    .slice(0, 16);
+  const cacheFile = path.join(os.tmpdir(), `mycity-screens-${key}.json`);
   if (fs.existsSync(cacheFile)) {
     try {
       return JSON.parse(fs.readFileSync(cacheFile, "utf8"));
@@ -361,20 +497,34 @@ async function crawl() {
   }
 
   const result = { checked: [], notBuilt: [], screens: [], errors: [], notes: [] };
+  const built = gallery.ensureGallery();
+  const server = await gallery.serve(built.dir);
   const browser = await launch();
   try {
-    if (fs.existsSync(path.join(ROOT, DEMO))) {
+    const probe = await browser.newPage({ viewport: WIDTHS.desktop.viewport });
+    const names = await gallery.componentNames(probe, server.url);
+    await probe.close();
+    if (!names.length) throw new Error("the gallery lists no component pages (packages/ui/src/**/*.gallery.tsx)");
+    for (const width of Object.keys(WIDTHS)) {
+      result.screens.push(...(await crawlGallery(browser, server.url, names, width, result.errors)));
+    }
+    result.checked.push(`gallery (${names.length} components)`);
+
+    if (withDemo) {
       for (const width of Object.keys(WIDTHS)) {
         const r = await crawlDemo(browser, width, DEMO_TARGET, result.errors);
         result.screens.push(...r.screens);
         if (r.skippedOpeners) result.notes.push(`demo (${width}): ${r.skippedOpeners} modal openers beyond ${DEMO_TARGET.maxOpenersPerScreen} per screen were not opened`);
       }
       result.checked.push("demo.html");
+    } else {
+      result.notes.push("demo.html: not crawled, the change does not touch it (F23); --demo crawls it");
     }
   } finally {
     await browser.close();
+    await server.close();
   }
-  result.notBuilt.push("app/: no build and route list yet (FRONTEND_GUIDE §9.2); add its target here when it lands");
+  result.notBuilt.push("app/: no build and route list yet (FRONTEND_FOUNDATION PR 2); add its target here when it lands");
 
   fs.writeFileSync(cacheFile, JSON.stringify(result));
   return result;
@@ -426,4 +576,4 @@ function run(gate, body) {
   });
 }
 
-module.exports = { crawl, summarise, finish, run, collect, WIDTHS, DEMO_TARGET, ROOT };
+module.exports = { crawl, demoWanted, summarise, finish, run, collect, WIDTHS, DEMO_TARGET, GALLERY_TARGET, ROOT };

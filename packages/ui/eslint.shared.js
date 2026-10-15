@@ -25,9 +25,10 @@ import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
-const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/;
+/** Exported for scripts/check/palette.js (gate 13), so the gate and the linter read one pattern. */
+export const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z])/;
 /** `w-[317px]`, `-mt-[3px]`, `text-[12.5px]`, `bg-[#fff]`, `[stroke-width:1.6]`; not `data-[state=open]:` or `w-[var(--x)]`. */
-const ARBITRARY = /(?:^|[\s"'`:!])(-?[a-z][a-z0-9-]*-\[(?!var\()[^\]\s]+\](?![\w:-])|\[[a-z][a-z-]*:[^\]\s]+\](?![\w:-]))/;
+export const ARBITRARY = /(?:^|[\s"'`:!])(-?[a-z][a-z0-9-]*-\[(?!var\()[^\]\s]+\](?![\w:-])|\[[a-z][a-z-]*:[^\]\s]+\](?![\w:-]))/;
 
 const attr = (node, name) => node.name && node.name.type === "JSXIdentifier" && node.name.name === name;
 const attrValue = (node) => {

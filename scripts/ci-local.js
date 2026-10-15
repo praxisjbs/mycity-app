@@ -58,8 +58,12 @@ const GATES = [
   { id: "search-coverage", label: "10 Search coverage", script: "scripts/check/search-coverage.js" },
   { id: "two-shells", label: "11 Two shells (phone and desktop)", script: "scripts/check/two-shells.js" },
   { id: "forms", label: "12 Inline validation, one form system", script: "scripts/check/forms.js" },
+  { id: "palette", label: "13 Palette (colours only in tokens.css)", script: "scripts/check/palette.js" },
+  { id: "contrast", label: "14 Contrast, every token pair, both themes", script: "scripts/check/contrast.js" },
   { id: "date-format", label: "15 Day-first dates", script: "scripts/check/date-format.js" },
+  { id: "native-dialogs", label: "16 No native dialogs", script: "scripts/check/native-dialogs.js" },
   { id: "dashes", label: "17 No dashes (and gate 8 backend copy)", script: "scripts/check/dashes.js" },
+  { id: "upload", label: "18 Files only through the upload field", script: "scripts/check/upload.js" },
   { id: "ai-no-writes", label: "19 AI read manifest only", script: "scripts/check/ai-no-writes.js" },
   { id: "money", label: "20 Money", script: "scripts/check/money.js" },
   // Pipeline guards
@@ -80,6 +84,8 @@ const GATES = [
   { id: "fe-lint", label: "Frontend lint", npm: "fe:lint" },
   { id: "fe-test", label: "Frontend tests", npm: "fe:test" },
   { id: "fe-build", label: "Frontend build (gallery, app, public site)", npm: "fe:build" },
+  { id: "mock-free", label: "Release builds carry no mock", script: "scripts/check/mock-free.js" },
+  { id: "a11y", label: "Accessibility (axe on the gallery)", script: "scripts/check/a11y.js" },
   // Process: the work is recorded where the team reads it
   { id: "progress", label: "PROGRESS.md updated and well formed", script: "scripts/check/progress.js" },
   { id: "guides", label: "Feature guides followed and complete", script: "scripts/check/guides.js" },
