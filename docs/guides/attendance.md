@@ -5,11 +5,11 @@
 | Owner | LA |
 | Milestone | M1 |
 | Backend modules | `attendance` |
-| Frontend paths | `app/src/attendance/` |
+| Frontend paths | `app/src/features/attendance/` |
 | Permission key(s) | `attendance` |
 | Screens (PROGRESS.md rows) | #9 My Attendance, #25 Attendance, #27 Devices, #28 Worksites, #73 Attendance Policy |
 | Status | Draft |
-| Last changed | 14/10/2026 |
+| Last changed | 15/10/2026 |
 
 This guide records the attendance behaviour demonstrated in `docs/MyCity-ERP-Documents/demo.html`.
 The demo date is 9 October 2026 and its displayed times use Africa/Lagos.
@@ -203,3 +203,4 @@ No external donor attendance implementation has been approved for M1.
 
 - 14/10/2026 · LA · Added the template metadata, engineering sections, mobile register behaviour and ownership-ready scope required by the guide check.
 - 14/10/2026 · TB · §10 rewritten to the On screen and mobile shape (content tiers and phone layout) for the screen conventions in FRONTEND_GUIDE §5 and §7; the phone register cards from this guide are kept.
+- 15/10/2026 · AJ · Frontend built in `app/src/features/attendance/` and Settings · Attendance Policy (draft, review, publish, acknowledgement report) against the mock API; not wired yet.

@@ -356,38 +356,224 @@ frontend foundation owner (AJ), and list it in §9.4. Never build it inside a fe
 Fill each section as it lands, so the next person builds on it instead of beside it.
 
 ### 9.1 Folder structure
-_To be written._ Once features have folders, each feature guide's **Frontend paths** row names
-them, so `scripts/check/guides.js` holds frontend changes to their guide too. New files under
-`app/` and `public-app/` are mapped here rather than in the README. Two folders are fixed already
-because gates read them: `app/src/components/form/` (the only home of raw form elements, §8.6) and
-`app/src/components/ui/` (the shared components below).
+
+The staff app lives in `app/` (React 18, Vite 7, TypeScript, Tailwind 4, `vite-plugin-pwa`). It is
+not a workspace of the root package; run its scripts from `app/` (`npm ci`, `npm run dev`,
+`npm run build`, `npm run build:demo`, `npm run typecheck`, `npm run lint`).
+
+Two folders are fixed because gates read them: `app/src/components/form/` is the only home of raw
+form elements (`<form>`, `<input>`, `<select>`, `<textarea>`, `<label>`; §8.6, gate 12), and
+`app/src/components/ui/` holds the shared components (§9.4). The same holds in `public-app/`. Once
+features have folders, each feature guide's **Frontend paths** row names them, so
+`scripts/check/guides.js` holds frontend changes to their guide too.
+
+```
+app/
+  index.html                  theme set before first paint (localStorage mc-theme)
+  vite.config.ts              page size from the contract, API mode, PWA manifest, /api proxy
+  eslint.config.js            the app's own lint (bans zod, alert/confirm/prompt, type="date", raw file inputs)
+  public/                     favicon, PWA icons
+  scripts/contract-status.mjs which modules still run on INTERIM types, and which are ready for the contract
+  src/
+    main.tsx  App.tsx         entry; providers (auth, router, modal, toasts)
+    styles/index.css          the only place colours exist: tokens, light and dark, keyframes, utilities
+    lib/                      cn, format (dates, money, counts), media (useIsMobile), theme, router
+    api/
+      client.ts               fetch, bearer token in memory, one refresh retry, ApiError
+      endpoints.ts  hooks.ts  typed endpoint map; useApi, usePaged, useInfinite, useMutation, invalidate
+      types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts lands
+      mock/                   the in-browser mock API (mode mock only): core, data/, modules/<module>.ts
+    auth/                     AuthProvider (useAuth, useMe), Login
+    shell/                    catalogue (modules and tab slugs), access, screens (lazy per module),
+                              Shell (desktop rail and mobile bar), Nav, CommandPalette, Bell, UpdatePrompt
+    components/form/          the form system: every field and the one <form> (§8.6, §9.4)
+    components/ui/            shared components (§9.4)
+    features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
+                              performance, queries, recruitment, payroll, partnerships, expenses,
+                              knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
+                              shared by People, ESS and Settings, and shared/ (sections, KPI tiles, letters)
+```
+
+A module's screens are `features/<module>/index.tsx`, whose default export renders the tab it is
+given (`<Module tab="employees" id="…" />`). Its guide's **Frontend paths** row names the folder.
+
+The public site lives in `public-app/` (`go.mycityapp.io`, A9): the same stack without the PWA, and
+the same scripts, run from `public-app/`. It imports nothing from `app/`; what both need (tokens,
+`cn`, `format`, `theme`, the icon set, the button and field look) is copied, so a change to a
+token or a shared control is made in both.
+
+```
+public-app/
+  index.html                  theme before first paint (localStorage mc-public-theme)
+  vite.config.ts              page size from the contract, API mode, /api/public proxy; no PWA, no service worker
+  eslint.config.js            the same gates as app/ (bans zod, native dialogs, type="date", raw file inputs)
+  src/
+    main.tsx  App.tsx         entry; the six routes and a not-found page
+    styles/index.css          the staff app's tokens, light and dark
+    lib/                      cn, format, theme (a toggle; the device setting until a visitor picks), router
+    api/
+      client.ts               fetch to /api/public/v1 only; no session, no cookie, no auth header
+      hooks.ts  endpoints.ts  useApi, usePaged; the typed endpoint map
+      types/public.ts         INTERIM shapes for every public route (TB for M4 pages, LA for M5)
+      mock/                   the in-browser mock (mode mock only); demo-links.ts lists sample addresses
+    components/               Layout (Page, Brand, Message, demo strip), ui (Button, Pill, Notice,
+                              Loading), form/ (Form, Field, Input, Textarea, Upload: the only file
+                              input), SignaturePad (canvas, paper-coloured in both themes), Icon
+    pages/                    Careers, Vacancy, Apply, Assessment, SignOffer, Verify, LinkProblem
+```
+
+Addresses are `/jobs`, `/jobs/<slug>`, `/apply/<token>`, `/assess/<token>`, `/sign/<token>` and
+`/verify/<number>` (MILESTONES §6). Only the careers list and an open vacancy may be indexed; every
+other page sets `noindex`. In mock mode a "Demo links" strip at the foot of each page opens every
+state (a used or expired link, a paused or filled role, each verify outcome); the mock keeps its
+state in memory, so a reload starts it again.
+
+**Moving a module from INTERIM to the contract.** `npm run contract:status` (from `app/`) lists every
+INTERIM file in both apps against `packages/contract/contract.gen.ts`: how many of the endpoints the
+screens call are in the contract, and whether the module is Interim, Partly or Ready to switch. With
+`-- --all` it lists each endpoint, including ones the contract has that no screen calls (often a
+rename). When a module is Ready to switch: point its imports at `contract.gen.ts`, delete its INTERIM
+file, run `npm run typecheck` and fix every screen it flags, move its forms to the contract's runtime
+schemas, then run it on the live API and tick its rows in `docs/PROGRESS.md`.
 
 ### 9.2 Routing, shell and permission filtering
-_To be written._ Tab slugs are the URL values in `docs/PROGRESS.md` and do not change when a label
-does. The one URL shape the backend produces for a screen or a record (notification bell, task
-panel, Home alerts, search, AI links) is `/<module>?tab=<tab>&id=<id>`, module key with `_` as `-`
-(`src/shared/route-map.js`); the router must honour it, and `id` opens that record. The route list
-is what `scripts/check/two-shells.js` walks, so it must be exportable.
+
+No router library (React Router 7+ needs React 19). `lib/router.tsx` owns one URL shape,
+`/<module>?tab=<tab>&id=<id>`, module key with `_` as `-`, exactly as `src/shared/route-map.js`
+builds it. `hrefFor`, `useRouter`, `useSearchParams` and `Link` are all there is. `id` opens a
+record (a 360, a query, an expense) in place.
+
+Tab slugs are the URL values in `docs/PROGRESS.md` and do not change when a label does. The route
+list is what `scripts/check/two-shells.js` walks, so it must be exportable: `shell/catalogue.ts`
+exports `MODULES` (each module's key and tab slugs).
+
+`shell/catalogue.ts` lists the fifteen modules and their tab slugs in the order of MILESTONES §18
+and `src/shared/route-map.js`; `shell/access.ts` filters modules by the `view` grant and tabs by
+role. Hiding is a courtesy: the API refuses what a grant does not allow. An unknown module or tab
+lands on the first allowed screen.
+
+Two shells (gate 11), chosen by `useIsMobile()` (760 px and below): the desktop rail (collapsible
+to 66 px, remembered in `mc-rail`) with a top bar and tab strip, and the mobile shell with a bottom
+bar (Home, Work, Chat, People, Praxis AI) and a drawer for the rest. A screen may also render a
+different layout per shell; it never shrinks the desktop one. Chat and Mailbox are "fit" pages
+(`useFitPage`): only their panes scroll, and scrolling past a pane's end slides the page header away.
+
+**Staging is marked, in both apps** (MILESTONES §6, A4). The same build runs on staging and
+production, so `lib/environment.ts` decides at runtime: a `staging.` host name (also set before first
+paint in `index.html`) or `X-Mycity-Environment: staging` on any API response sets `data-env="staging"`
+on `<html>`. `StagingBar` then shows a fixed, non-dismissible amber bar, and `--env-bar` (its height)
+moves everything else down: `#root`, and every full-screen layer (sign-in, modal, command palette,
+the phone menu, the chat and mail readers) starts at `top-(--env-bar)`. A new full-screen layer must
+do the same. On the public site the bar is sticky. Staging also swaps the tab icon for
+`public/favicon-staging.svg` and sets `theme-color` to the `--warning` amber. `?env=staging` shows
+all of it in development.
+
+**What opens, by the delivery plan, in both apps** (`lib/plan.ts`). At build time `vite.config.ts`
+reads each screen's milestone and its API, UI and Mobile ticks from `docs/PROGRESS.md`, and each
+milestone's name and demo date from the table in MILESTONES §4, into `__DELIVERY_PLAN__`.
+
+- **Production:** a screen opens only when its PROGRESS row has all three ticks; until then it
+  shows Coming Soon (`shell/Planned.tsx`, `components/Planned.tsx` on the public site). Staff see
+  the milestone and date; a stranger on the public site sees neither.
+- **Everywhere else** (development, the demo build, staging): the demo's "Prototype View" switch
+  above every screen: "Full Design" (the default) opens everything; "As Delivered at Mn" shows
+  Coming Soon for every screen planned after Mn. Mn is the current milestone, the earliest one not
+  yet done, where done means its demo day has passed or all its screens are ticked; it is worked
+  out from today's date, so it moves on by itself. The choice is kept per browser.
+- What each screen will do, on its card, is in `shell/coming-soon.ts` (and in `components/Planned.tsx`
+  for the public pages): add a line there when a tab is added. Re-planning a screen is a change to
+  the M column in PROGRESS, nothing in code. A build fails if the plan cannot be read.
 
 ### 9.3 Design tokens and theming (light, dark)
-_To be written._
+
+`styles/index.css` holds every colour as a token under shadcn role names, with the demo's values:
+`background`, `card`, `muted`, `foreground`, `muted-foreground`, `subtle-foreground`, `border`,
+`input`, `primary` (brand yellow), `secondary` (city green), `accent`, `ring`, `sidebar*`,
+`success`, `warning`, `destructive`, `info` (each with a `-soft` tint), `chart-1` to `chart-4`, and
+`paper-*` for documents. Dark mode is `[data-theme=dark]`, or the device setting when no choice is
+stored. No raw hex anywhere else (gate 13). Typeface Geist (`@fontsource-variable/geist`).
 
 ### 9.4 Shared components
-_To be written._ At least: app shell (desktop sidebar, mobile bottom bar), page header (title and
-desktop-only subtitle), card, KPI card, data view (table on desktop, card list on a phone, with the
-pager), modal, sheet, `HelpTerm` and `Details` (§5.2), the form components (§8.6), date field
-(day-first), money display, upload, empty state with illustration, empty-value marker, toast. Each
-component that shows content a person wrote (messages, mail, articles, document previews) marks it
-`data-copy="content"` (§5.3).
+
+Tailwind only, no component library. Fields live in `components/form/` (§8.6), imported from
+`@/components/form`; everything else in `components/ui/`:
+
+| `components/form/` | Gives |
+|---|---|
+| `Form.tsx` | `Form`: the one `<form>`; Enter submits, browser bubbles off |
+| `fields.tsx` | `useForm` (inline validation, server 422 fields), `Field`, `Input`, `Textarea`, `Select`, `Seg`, `SegBar`, `Switch`, `ToggleRow`, `FormRow`, `rules` |
+| `DateField.tsx` | day-first date entry with a picker; never `type="date"` |
+| `MoneyField.tsx` | `AmountInput` (₦, kept as typed), `toMoneyString` (the wire string) |
+| `Upload.tsx` | the only file input: progress per file; `trigger` for a composer button |
+| `PersonPicker.tsx` | search and pick one or more people |
+| `Search.tsx` | `SearchBox` (sent as `q`), `FilterSelect` |
+| `LoginField.tsx` | the sign-in screen's larger field |
+| `Inline.tsx` | `InlineInput`, `InlineSelect`, `InlineLabel`: unstyled controls for a field built into a larger widget (chat message box, command palette, mail composer rows, a number cell in a settings list). No validation; each needs a label or an `aria-label`. A field in a form uses `fields.tsx` |
+
+Today's names against §8.6: `Input` is `TextField`, `Select` is `SelectField`, `Seg` is
+`ChoiceField`, `Switch` is `SwitchField`, `Textarea` is `TextAreaField`, `AmountInput` is
+`MoneyField`, `Upload` is `UploadField`, `useForm` stands in for `useContractForm` until the
+contract schemas exist. Renaming them is part of the screen-conventions work below.
+
+| `components/ui/` | Gives |
+
+| File | Gives |
+|---|---|
+| `Button.tsx` | `Button`, `IconButton`, `BigButton` |
+| `layout.tsx` | `Card`, `CardHeader`, `PageHead`, `Grid`, `MobileOnly`, `DesktopOnly` |
+| `data.tsx` | `Pill`, `Avatar`, `Who`, `Kpi`, `KV`, `StatStrip`, `Timeline`, `Bars`, `Mini`, `Chain`, `Accordion`, `Banner`, `EmptyState`, `TapList` and others |
+| `Table.tsx` | `Table`, `Pager`, `Toolbar`, `Chips`, `LoadingRows`, `ErrorBlock` |
+| `Modal.tsx` | the one modal (`useModal`); a bottom sheet on a phone, full screen with `full` |
+| `Money.tsx` | `Money` (₦ with kobo, from the string) |
+| `Info.tsx` | the ⓘ toggle and its text |
+| `Menu.tsx`, `Toast.tsx`, `Board.tsx` (drag between columns), `Calendar.tsx`, `charts.tsx` (`AreaChart`, `Donut`, `Bands`), `Paper.tsx` (documents), `Profile.tsx` (360 header), `Reader.tsx` (articles) | |
+
+`features/shared/sections.tsx` adds the screen-level blocks: `PagedTable` (server page, search,
+pager), `KvCard`, `ChainCard`, `BarsCard`, `TrailCard`, `StatusPill`, `ExportButton`, `ModalFoot`.
+
+**Still to build for the screen conventions** (§5, §8): `HelpTerm` and `Details` (§5.2) to replace
+the ⓘ toggle, a data view that is a table on desktop and a card list on a phone, an empty state
+with illustration, an empty-value marker, the `data-ui` slot markers the screen gates read, and
+`data-copy="content"` on every component that shows content a person wrote (messages, mail,
+articles, document previews; §5.3). In `components/form/`: the §8.6 names, `PhoneField`,
+`CheckboxField`, `FormFooter`, `Wizard` and `useContractForm` on `react-hook-form` with the contract
+schemas, and Submit never disabled (§8.3: a disabled Submit still appears in a few forms).
 
 ### 9.5 Data fetching, caching and the API client
-_To be written._
+
+`api/client.ts` sends `Authorization: Bearer <access token>` (held in memory only) and
+`credentials: "include"` for the refresh cookie; on a 401 it calls `/api/v1/auth/refresh` once and
+retries. Errors arrive as `ApiError` with `code`, `message` and `fields`. Writes that must not
+repeat pass `idempotencyKey` (sent as `Idempotency-Key`).
+
+Every call is typed by its key, `api.call("GET /api/v1/employees/:id", { params, query, body })`,
+from the `Endpoints` map that each `api/types/<module>.ts` extends. These files are INTERIM: when a
+module's schemas land, its file is replaced by the generated `packages/contract/contract.gen.ts`
+types and TypeScript shows every screen that disagrees.
+
+`api/hooks.ts`: `useApi` (one read), `usePaged` (server pages: `page`, `q` debounced 250 ms,
+filters; changing either goes to page 1), `useInfinite` (phones), `useMutation` (with `fields`
+after a 422) and `invalidate(prefix)`, which reloads every mounted read under that path. There is
+no client cache beyond the mounted reads; the page size is the contract's (`__CONTRACT_PAGE_SIZE__`,
+read from `packages/contract/schemas/common.js` at build), never a constant in the app.
+
+API mode is set in `vite.config.ts`: `mock` for `npm run dev` and `npm run build:demo`, `live` for a
+production build (override with `VITE_API_MODE=live npm run dev`, which proxies `/api` to
+`localhost:3000`). The mock (`api/mock/`) answers with the backend's exact envelopes, applies
+search and filters itself, rejects unknown query keys with a 422, and is never in a live bundle.
 
 ### 9.6 Realtime (Socket.io) and notifications
-_To be written._
+
+Not built yet. The bell (`shell/Bell.tsx`) reads `GET /api/v1/notifications` and badge counts from
+`GET /api/v1/notifications/badges` (INTERIM), refreshed on open. Socket.io push replaces the
+polling when the notification engine lands in M6.
 
 ### 9.7 PWA (staff app only)
-_To be written._
+
+`vite-plugin-pwa` in `generateSW` mode with `registerType: "prompt"`: a new version shows the
+update prompt (`shell/UpdatePrompt.tsx`) rather than reloading under someone. The shell and assets
+are precached; `/api/` is `NetworkOnly`, so every number on screen is live and nothing personal is
+cached. The manifest is in `vite.config.ts` (standalone, brand colours, 192, 512 and maskable icons).
 
 ---
 

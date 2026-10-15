@@ -1,0 +1,260 @@
+/*
+ * MyCity design tokens for the public site (go.mycityapp.io). The same values as
+ * the staff app's app/src/styles/index.css; the two builds share no file (A9),
+ * so a token change is made in both.
+ *
+ * Every colour value is the prototype's (docs/MyCity-ERP-Documents/demo.html),
+ * exposed under the shadcn/ui role names (MILESTONES §1.1, §5) so Tailwind
+ * reads them as bg-card, text-muted-foreground, border-input and so on.
+ * This file is the ONLY place a hex value may appear (gate 13).
+ *
+ *   prototype        role token                  Tailwind
+ *   --bg             --background                bg-background
+ *   --surface        --muted                     bg-muted
+ *   --raised         --card, --popover           bg-card
+ *   --ink            --foreground                text-foreground
+ *   --ink-2          --muted-foreground          text-muted-foreground
+ *   --ink-3          --subtle-foreground         text-subtle-foreground
+ *   --line           --border                    border-border
+ *   --line-2         --input                     border-input
+ *   --yellow         --primary                   bg-primary
+ *   --on-yellow      --primary-foreground        text-primary-foreground
+ *   --yellow-tint    --primary-tint              bg-primary-tint
+ *   --green          --secondary                 bg-secondary
+ *   --accent-soft    --accent                    bg-accent
+ *   --accent         --accent-foreground, --ring text-accent-foreground
+ *   --rail ...       --sidebar ...               bg-sidebar
+ *   --ok/-bg ...     --success/-soft ...         text-success bg-success-soft
+ *   --c1 to --c4     --chart-1 to --chart-4      stroke-chart-1
+ */
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --primary: #FFDF55;
+  --primary-foreground: #01221D;
+  --primary-tint: #FFEFAA;
+  --secondary: #014339;
+  --secondary-foreground: #FFFFFF;
+  --deep: #01221D;
+
+  --background: #FFFFFF;
+  --muted: #F4F7F6;
+  --card: #FFFFFF;
+  --popover: #FFFFFF;
+  --foreground: #0A1412;
+  --muted-foreground: #566662;
+  --subtle-foreground: #7E8D88;
+  --border: #E2E9E7;
+  --input: #65756F;
+  --accent: #E8F0EE;
+  --accent-foreground: #014339;
+  --ring: #014339;
+
+  --success: #0D844C; --success-soft: #EAF7F0;
+  --warning: #A66105; --warning-soft: #FDF4E7;
+  --destructive: #DA1E10; --destructive-soft: #FDEDEC;
+  --info: #1D4ED8; --info-soft: #EEF3FE;
+
+  --sidebar: #01221D;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-muted: #9FB3AE;
+  --sidebar-border: rgba(255, 255, 255, .10);
+  --sidebar-hover: rgba(255, 255, 255, .07);
+  --sidebar-badge: rgba(255, 255, 255, .14);
+  --on-primary-badge: rgba(1, 34, 29, .18);
+  --sidebar-primary: #FFDF55;
+  --sidebar-primary-foreground: #01221D;
+
+  --glass: rgba(255, 255, 255, .80);
+  --glass-border: rgba(10, 20, 18, .10);
+  --scrim: rgba(1, 17, 14, .46);
+  --sb: rgba(10, 20, 18, .22);
+  --sb-hover: rgba(10, 20, 18, .36);
+
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, .05);
+  --shadow-2: 0 8px 14px rgba(16, 24, 40, .06);
+  --shadow-3: 0 20px 44px rgba(16, 24, 40, .14);
+
+  --chart-1: #014339; --chart-2: #0E7C6B; --chart-3: #98690C; --chart-4: #B54708;
+
+  /* Generated documents are printed paper: the same in both themes. */
+  --paper: #FFFFFF; --paper-ink: #14201D; --paper-heading: #0A1412; --paper-muted: #566662;
+  --paper-faint: #7E8D88; --paper-head: #F4F7F6; --paper-line: #E2E9E7; --paper-rule: #EDF2F0;
+  --paper-dash: #D5DEDB; --paper-brand: #014339; --paper-gold: #FFDF55;
+
+  /* Light text that sits on the Deep Green panels (login art, celebration cards) in both themes. */
+  --on-deep: #FFFFFF; --on-deep-muted: #CCCFCE; --on-deep-faint: #9FB3AE; --on-deep-soft: #D7E2DF; --on-deep-dim: #B9C8C4;
+
+  color-scheme: light;
+}
+
+
+:root[data-theme="dark"] {
+  --background: #01110E; --muted: #010C0A; --card: #01221D; --popover: #01221D;
+  --foreground: #E6EDEB; --muted-foreground: #A9B8B4; --subtle-foreground: #7F918C;
+  --border: #16564A; --input: #1F7465;
+  --accent: #012B24; --accent-foreground: #45C8B0; --ring: #45C8B0;
+  --success: #32D583; --success-soft: #042117; --warning: #FDB022; --warning-soft: #241703;
+  --destructive: #F97066; --destructive-soft: #260D0B; --info: #84ADFF; --info-soft: #081529;
+  --glass: rgba(1, 34, 29, .82); --glass-border: rgba(255, 255, 255, .12);
+  --sb: rgba(255, 255, 255, .14); --sb-hover: rgba(255, 255, 255, .26);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 8px 14px rgba(0, 0, 0, .45); --shadow-3: 0 20px 44px rgba(0, 0, 0, .6);
+  --chart-1: #45C8B0; --chart-2: #7CC4FA; --chart-3: #FFDF55; --chart-4: #FF9B85;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #01110E; --muted: #010C0A; --card: #01221D; --popover: #01221D;
+    --foreground: #E6EDEB; --muted-foreground: #A9B8B4; --subtle-foreground: #7F918C;
+    --border: #16564A; --input: #1F7465;
+    --accent: #012B24; --accent-foreground: #45C8B0; --ring: #45C8B0;
+    --success: #32D583; --success-soft: #042117; --warning: #FDB022; --warning-soft: #241703;
+    --destructive: #F97066; --destructive-soft: #260D0B; --info: #84ADFF; --info-soft: #081529;
+    --glass: rgba(1, 34, 29, .82); --glass-border: rgba(255, 255, 255, .12);
+    --sb: rgba(255, 255, 255, .14); --sb-hover: rgba(255, 255, 255, .26);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 8px 14px rgba(0, 0, 0, .45); --shadow-3: 0 20px 44px rgba(0, 0, 0, .6);
+    --chart-1: #45C8B0; --chart-2: #7CC4FA; --chart-3: #FFDF55; --chart-4: #FF9B85;
+    color-scheme: dark;
+  }
+}
+
+/* The staging bar's height (lib/environment.ts). Nothing on production. */
+:root { --env-bar: 0px; }
+:root[data-env="staging"] { --env-bar: 28px; }
+
+@theme inline {
+  --breakpoint-*: initial;
+  /* The prototype's three widths. Mobile is 760 and below; `md:` is the desktop shell. */
+  --breakpoint-md: 761px;
+  --breakpoint-lg: 1041px;
+  --breakpoint-xl: 1181px;
+
+  --font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-script: "Brush Script MT", "Segoe Script", cursive;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-tint: var(--primary-tint);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-deep: var(--deep);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-badge: var(--sidebar-badge);
+  --color-on-primary-badge: var(--on-primary-badge);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-glass: var(--glass);
+  --color-glass-border: var(--glass-border);
+  --color-scrim: var(--scrim);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-heading: var(--paper-heading);
+  --color-paper-muted: var(--paper-muted);
+  --color-paper-faint: var(--paper-faint);
+  --color-paper-head: var(--paper-head);
+  --color-paper-line: var(--paper-line);
+  --color-paper-rule: var(--paper-rule);
+  --color-paper-dash: var(--paper-dash);
+  --color-paper-brand: var(--paper-brand);
+  --color-paper-gold: var(--paper-gold);
+  --color-on-deep: var(--on-deep);
+  --color-on-deep-muted: var(--on-deep-muted);
+  --color-on-deep-faint: var(--on-deep-faint);
+  --color-on-deep-soft: var(--on-deep-soft);
+  --color-on-deep-dim: var(--on-deep-dim);
+
+  --radius-ctl: 9px;
+  --radius-box: 10px;
+  --radius-card: 14px;
+  --radius-sheet: 16px;
+
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-3: var(--shadow-3);
+
+  --animate-rise: rise .22s ease-out;
+  --animate-buzz: buzz .26s;
+  --animate-pulse-dot: pulse-dot 1s infinite;
+  --animate-slide-in: slide-in .2s ease-out;
+  --animate-celeb-in: celeb-in .55s cubic-bezier(.2, .9, .3, 1.25) both;
+  --animate-spin-slow: spin 8s linear infinite;
+  --animate-spin-slow-reverse: spin 8s linear infinite reverse;
+  --animate-bob: bob 2.4s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.1s linear infinite;
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes buzz { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
+@keyframes pulse-dot { 50% { opacity: .25; } }
+@keyframes slide-in { from { transform: translateX(-100%); } }
+@keyframes celeb-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+@keyframes bob { 50% { transform: translateY(-4px) rotate(-8deg); } }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+@layer base {
+  html, body, #root { min-height: 100%; }
+  body {
+    margin: 0;
+    background: var(--muted);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+  .on-primary:focus-visible { outline-color: var(--primary); }
+  h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -.016em; }
+  p { margin: 0; }
+  input::placeholder, textarea::placeholder { color: var(--subtle-foreground); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--sb); border-radius: 3px; }
+  ::-webkit-scrollbar-button { display: none; }
+  @supports (-moz-appearance: none) { * { scrollbar-width: thin; scrollbar-color: var(--sb) transparent; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+}
+
+@layer utilities {
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* The signature pad draws in the ink colour of the theme. */
+  .sig-pad { touch-action: none; }
+}

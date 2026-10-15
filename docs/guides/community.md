@@ -5,11 +5,11 @@
 | Owner | GE |
 | Milestone | M1 |
 | Backend modules | `community`, `announcements` |
-| Frontend paths | To be set when the frontend foundation lands (AJ). |
+| Frontend paths | `app/src/features/community/` |
 | Permission key(s) | `community` |
 | Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements; reads shared with #66 Knowledge Hub · Announcements (M10) |
 | Status | Agreed |
-| Last changed | 14/10/2026 |
+| Last changed | 15/10/2026 |
 
 Sources: MILESTONES §6.4 and A19, A20; REUSE_MAP §2.4; the internal workflow meeting of 12 October
 2026 (GE presenting, TB reviewing). The demo (`demo.html`, Staff Community) was updated the same day
@@ -280,3 +280,4 @@ fields, never in a toast.
 - 13/10/2026 · GE · Added message ticks, voice note playback and transcription, read and not read lists on announcements, resizable list; removed work details from the profile (TB review).
 - 13/10/2026 · GE · Announcement cards back to the original design; read and not read lists moved into the card's modal. Page header slides away while reading a conversation (TB review).
 - 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the Announcements subtitle and ⓘ text, the New Channel ⓘ text, the vault line, the Visibility row and "Posting as" left the screen; the channel name rule and the blank note became help terms; Average Read gained a help term; every community form uses the form helpers with errors on the field. §3 step 12 names the reads modal and defines Average Read; §6 gained the channel name rule, the fixed post policy and who posts.
+- 15/10/2026 · AJ · Channels, Direct Messages and Announcements built in `app/` against the mock API (load older paging, voice notes, ticks, profile panel, read report); not wired yet.

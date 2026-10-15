@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 86 screens (80 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 92 screens (86 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | items below | | | | | |
-| M1 Core Operations & Employee Management | 25 | 25 | 0 | 0 | 0 | 0 |
+| M1 Core Operations & Employee Management | 31 | 31 | 0 | 0 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **86** | **86** | **0** | **0** | **0** | **0** |
+| **Total** | **92** | **92** | **0** | **0** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -92,6 +92,10 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 15/10/2026 · AJ · `npm run contract:status` (in `app/`, FRONTEND_GUIDE §9.1): reports, for both apps, which modules still run on INTERIM types and which are ready to move to `contract.gen.ts`. Today 19 INTERIM files, 317 endpoints, none in the contract yet.
+- 15/10/2026 · AJ · Delivery plan in both apps (FRONTEND_GUIDE §9.2): production shows Coming Soon for any screen whose row here is not fully ticked, with its milestone and date from this file and MILESTONES §4 (the public site hides both from visitors); development, the demo build and staging get the demo's "Prototype View" switch: Full Design, or As Delivered at the current milestone (the earliest not past its demo day and not fully ticked; M1 today). This file is now read by the frontend build, so the table format (backticked slug, M column, three tick columns) must hold.
+- 15/10/2026 · AJ · Both apps pass gate 12 (`scripts/check/forms.js`): every field, the `<form>` and the field components moved to `components/form/` (FRONTEND_GUIDE §8.6, §9.4), imported from `@/components/form`; screens no longer write a raw form element; placeholders are short examples, with any instruction moved to the field's ⓘ. Left for the screen-conventions PR: the §8.6 names, `useContractForm` on `react-hook-form`, and Submit never disabled.
+- 15/10/2026 · AJ · Staging bar in both apps (MILESTONES §6): shown on a `staging.` host or when the API answers `X-Mycity-Environment: staging`; fixed above everything in `app/`, sticky in `public-app/`. Production renders nothing. The tab icon becomes the pin on amber (`favicon-staging.svg`) and the browser bar takes the staging amber (`theme-color`). Left from §6: the installed staff app's home-screen icon and splash colour come from the PWA manifest, which is fixed at build; varying them needs `src/http/static.js` to serve a staging manifest on `hub.staging` (GE).
 - 14/10/2026 · TB · Screen gates built: gate 8 (three tiers of screen text, word limits, Title Case),
   gate 11 (phone and desktop shells), gate 12 (one form system), gate 17 (no dashes in copy). They
   render demo.html at 390 and 1440 px in Chromium and will read `app/` once it has a build.
@@ -164,6 +168,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 15/10/2026 · AJ · Frontend built in `app/src/features/home/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/home.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · TB · Team tab ratified into the inventory (MILESTONES §18): Home is now four tabs, with Team added as #86 (`team`, M1). Summary counts and the SCREENS constant moved to 86. Full engineering guide written at `docs/guides/home.md`; Home reads live from the owning modules and owns the alert and report engines.
 - 13/10/2026 · TB · Home demo upgraded in `docs/MyCity-ERP-Documents/demo.html` from the two 12
   October meetings: role sensitive Overview (Operations, CEO, Partnerships, Staff), every KPI card
@@ -184,7 +189,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/workspace/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/workspace.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Employee Self-Service
 
@@ -197,9 +202,17 @@ _None yet._
 | 12 | My Leave | `my-leave` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 13 | My Queries | `my-queries` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 14 | My Documents | `my-documents` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
+| 88 | My Devices | `my-devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
+| 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
+| 90 | My Security | `my-security` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 91 | Org Chart | `org-chart` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 15/10/2026 · AJ · Frontend built in `app/src/features/ess/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/ess.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
+- 15/10/2026 · AJ · My Leave: the four KPI tiles open their modal on a phone only (`Kpi` `opensOn="phone"`); on desktop they are plain tiles because the requests table and entitlement card already sit beside them. Home keeps desktop drill-down, as `docs/guides/home.md` asks.
+- 15/10/2026 · TB · Five ESS tabs ratified into the inventory (MILESTONES §18): Work Location Requests (#87), My Devices (#88) and Policy Updates (#89), owned by LA from the attendance work; My Security (#90, AJ); Org Chart (#91, TB). Inventory now 92 screens; SCREENS constant and `src/shared/route-map.js` updated.
 - 13/10/2026 · AJ · ESS demo updated from the 12 October meeting. Desktop: photo upload on My Profile,
   work schedule inside Employment (read from LA's attendance data), year switcher and a deductions
   breakdown on My Payslips, pension text removed, three cards on My Queries (Open, Archived, Sanctions)
@@ -220,6 +233,7 @@ _None yet._
 
 **Notes**
 
+- 15/10/2026 · AJ · Frontend built in `app/src/features/community/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/community.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · GE · Demo updated per the 12 October meeting (guides removed, ＋ menu, members behind ⋮, fixed
   composer, read-only pinned #announcements, birthday and recognition cards, Praxis-style DMs with
   voice notes, mobile full screen). Engineering guide `docs/guides/community.md` written. No product code yet.
@@ -237,6 +251,7 @@ _None yet._
 
 **Notes**
 
+- 15/10/2026 · AJ · Frontend built in `app/src/features/mailbox/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/mailbox.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · GE · Demo composer added (rich text, recipient chips, attachments with progress, schedule,
   inline discard), reader full screen on mobile. Engineering guide `docs/guides/mailbox.md` written.
 
@@ -249,9 +264,12 @@ _None yet._
 | 26 | Leave | `leave` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 27 | Devices | `devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 28 | Worksites | `worksites` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
+| 92 | Organogram | `organogram` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 15/10/2026 · AJ · Frontend built in `app/src/features/people/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/organisation.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
+- 15/10/2026 · TB · Organogram ratified as #92 (`organogram`, M1, TB) alongside ESS · Org Chart (#91). Owner and milestone assigned; build follows `docs/guides/organogram.md`.
 - 13/10/2026 · TB · Organogram agreed with the client rep and written up as
   `docs/guides/organogram.md`: two screens, People · Organogram (HR builder) and ESS · Org Chart
   (read-only viewer for all staff), over the live reporting tree. Proposed scope addition to the
@@ -271,7 +289,7 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/performance/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/performance.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Queries & Sanctions
 
@@ -284,7 +302,7 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/queries/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/queries.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Recruitment
 
@@ -300,7 +318,7 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/recruitment/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/recruitment.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Payroll
 
@@ -314,7 +332,7 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/payroll/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/payroll.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Partnerships
 
@@ -329,7 +347,7 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/partnerships/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/partnerships.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Expenses
 
@@ -344,7 +362,7 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/expenses/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/expenses.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Knowledge Hub
 
@@ -358,7 +376,7 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/knowledge/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/knowledge.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Praxis AI
 
@@ -369,7 +387,8 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/assistant/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/knowledge.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
+- 15/10/2026 · AJ · Fixed a blank screen on Ask: the scroll effect returned a value, which crashed React in browsers where `scrollIntoView` returns a Promise. The shell now wraps every screen in an error boundary, so a crash in one screen shows an error card there and the menu and back button keep working.
 
 ### Settings
 
@@ -389,7 +408,8 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Frontend built in `app/src/features/settings/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/settings.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
+- 15/10/2026 · AJ · Roles & Permissions: New Role and Edit Role (name, purpose, per module the actions and the record scope, and the three sensitive fields), delete for an unused custom role, the CEO role locked, built-in roles keep their names. The matrix, the roles list and the role pickers in Users read the saved roles; every change is audited. Copy now says four layers with no entity layer (MILESTONES §14, A2). INTERIM endpoints in `app/src/api/types/settings.ts`: `GET /settings/roles/catalogue`, `GET|PUT|DELETE /settings/roles/:id`, `POST /settings/roles`, for GE to confirm. Left: the mock's demo sign-ins do not yet take their access from these roles.
 
 ### Public site · `go.mycityapp.io` (separate app)
 
@@ -404,4 +424,4 @@ _None yet._
 
 **Notes**
 
-_None yet._
+- 15/10/2026 · AJ · Built `public-app/` (A9) from the demo's Public Site pages: Careers, Vacancy, Apply, Assessment, Sign Offer and Verify Document, desktop and phone, light and dark with a visitor toggle, against an in-browser mock of `/api/public/v1`. Added the states the demo does not draw: application received, assessment start, finished and time up, offer signed, declined and expired, the three failed verify verdicts and a reference lookup, and every bad link (unknown, expired, used). No ticks: UI is ticked once the pages run on the real API. Left: the public routes in the contract. Only `GET /verify/:number` and `GET /<surface>/:token/document` are named in BACKEND_STRUCTURE §8; the rest are INTERIM in `public-app/src/api/types/public.ts` for TB (M4) and LA (M5) to agree, including `POST /jobs/:slug/apply` minting the apply token and `POST /apply/:token/cv` for the CV.

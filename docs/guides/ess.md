@@ -5,11 +5,11 @@
 | Owner | AJ |
 | Milestone | M1 |
 | Backend modules | `ess` |
-| Frontend paths | To be set when the frontend foundation lands (AJ). |
+| Frontend paths | `app/src/features/ess/`, `app/src/features/attendance/EssAttendance.tsx` |
 | Permission key(s) | `ess` (always `own` scope) |
-| Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents; My Security (not yet in the approved inventory, see §13) |
+| Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security |
 | Status | Draft |
-| Last changed | 14/10/2026 |
+| Last changed | 15/10/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -294,3 +294,4 @@ Deductions figure and every form open the shared modal.
 - 13/10/2026 · AJ · §10: phone layout for the four attendance tabs (icon cards that open the modal), built from LA's page.
 - 13/10/2026 · AJ · §6: page footnotes removed from ESS (My Documents, My Queries, My Attendance).
 - 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the What You Can Change card, the descriptive page subtitles, the chart caption, the footnotes and the Coming Soon feature list left the screen; support text became help terms on the word it explains; the leave, password and PIN forms and a new Edit Profile form use the form helpers. §2 and §6 now match, §6 gained the facts the removed text carried, §8 says who sees a query, and the ⓘ line in §6 became help terms and the Details row.
+- 15/10/2026 · AJ · Five tabs ratified (#87 to #91). All twelve ESS tabs built in `app/` against the mock API, desktop and phone; not wired to the API yet.

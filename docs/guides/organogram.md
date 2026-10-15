@@ -5,11 +5,11 @@
 | Owner | TB |
 | Milestone | M1 |
 | Backend modules | `organisation` |
-| Frontend paths | `app/src/features/organogram/` (not built yet; filled once the frontend structure exists) |
+| Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram tab), `app/src/features/ess/` (Org Chart tab) |
 | Permission key(s) | `people` (builder, manage), `org_chart` (viewer, read for all staff) |
-| Screens (PROGRESS.md rows) | #86 People · Organogram, #87 ESS · Org Chart (both proposed, pending §18 ratification; see §13) |
+| Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
 | Status | Agreed |
-| Last changed | 14/10/2026 |
+| Last changed | 15/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -240,3 +240,4 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
   (solid plus dotted lines) in v1, vacant seats shown and sent to Recruitment as suggested
   vacancies, whole-company visibility for all staff, desktop tree with a distinct mobile focus view,
   seed from the staff spreadsheet, PDF and PNG export, internal only.
+- 15/10/2026 · AJ · Ratified as #92 and #91. Frontend built on mocks in `app/` (builder with drag to reassign, viewer, levels below two collapsed at start); not wired to the API yet.

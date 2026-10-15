@@ -36,10 +36,13 @@ const catalog = require("./access/access.catalog");
 const SCREENS = Object.freeze({
   home: ["overview", "alerts", "reports", "team"],
   workspace: ["today", "tasks", "calendar", "analytics"],
-  ess: ["my-profile", "my-attendance", "my-performance", "my-payslips", "my-leave", "my-queries", "my-documents"],
+  ess: [
+    "my-profile", "my-attendance", "my-performance", "my-payslips", "my-leave", "my-queries", "my-documents",
+    "work-location-requests", "my-devices", "policy-updates", "my-security", "org-chart",
+  ],
   community: ["channels", "direct-messages", "announcements"],
   mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash"],
-  people: ["employees", "attendance", "leave", "devices", "worksites"],
+  people: ["employees", "attendance", "leave", "devices", "worksites", "organogram"],
   performance: ["goals", "targets", "kpis", "reviews", "analytics"],
   queries: ["queries", "rules", "sanctions", "letter-templates"],
   recruitment: ["vacancies", "candidates", "assessments", "interviews", "offers", "onboarding", "talent-pool"],

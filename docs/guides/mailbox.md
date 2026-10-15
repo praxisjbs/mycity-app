@@ -5,11 +5,11 @@
 | Owner | GE |
 | Milestone | M1 |
 | Backend modules | `mailbox` |
-| Frontend paths | To be set when the frontend foundation lands (AJ). |
+| Frontend paths | `app/src/features/mailbox/` |
 | Permission key(s) | `mailbox` |
 | Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash; connection under Settings · Integrations |
 | Status | Agreed |
-| Last changed | 14/10/2026 |
+| Last changed | 15/10/2026 |
 
 Sources: MILESTONES §6.5 and D6; REUSE_MAP §2.5; the internal workflow meeting of 12 October 2026.
 The demo (`demo.html`, Mailbox) was updated the same day with the composer described here.
@@ -202,3 +202,4 @@ interface copy; the copy rules apply to the chrome around them.
 - 13/10/2026 · GE · Schedule send at any date and time; independent panes with a resizable list (TB review).
 - 13/10/2026 · GE · Page header slides away while reading so the panes get the full height (TB review).
 - 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the page's ⓘ text (custom domain, no Google or Microsoft, not linked to other modules) left the screen for §1; the composer's labels became aria-labels on its compact rows, the schedule fields use the form helpers with a help term on Send Time, recipient and time errors sit on the field, the Draft Saved pill moved out of the footer and Discard asks with buttons only. §3 and §6 updated to match (Refresh, Draft Saved, discard, Lagos time).
+- 15/10/2026 · AJ · Six folders and the composer built in `app/` against the mock API (autosaved drafts, schedule, inline discard, sanitised reader); not wired yet.
