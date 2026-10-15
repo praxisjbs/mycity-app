@@ -230,13 +230,32 @@ module.exports = defineManifest({
     run: (client, params, actor) => repo.list(client, params, actor.scope),
     cite: (row) => ({ type: "thing", id: row.thing_id }),
   }],
-  routes: [{ intent: "create a thing", screen: "things.new", prefill: c.things.ThingCreate }],
+  routes: [{ intent: "create a thing", screen: "workspace.tasks", params: { action: "new" }, prefill: c.things.ThingCreate }],
 });
 ```
 
 A read returns one page. When someone asks the assistant for "all my contacts", it answers with
 the first 25 and the total, and fetches page 2 when asked. It never writes; it links to the screen
-where the person makes the change (A23).
+where the person makes the change (A23). A route's `screen` is `"<module>.<tab>"` as listed in
+`shared/route-map.js` SCREENS; `params` are extra query values for that screen (`action: "new"`).
+
+A module with records also ships `<module>.search.js` for ⌘K:
+
+```js
+// src/modules/things/things.search.js
+module.exports = recordProvider({                // shared/search/provider.js
+  type: "thing", module: "workspace", label: "Things", words: ["thing"],
+  from: "thing t", key: "t.thing_id", columns: ["t.number", "t.title"],
+  select: "t.thing_id AS id, t.number AS ref, t.title AS title",
+  scope: { column: "t.owner_employee_id" },     // team and own scope apply, as on the screen
+});
+```
+
+A module with no AI surface or nothing to search says so at the top of its controller, with a
+reason: `// ai:none <reason>`, `// search:none <reason>` (gates 9 and 10). Feature AI inside a
+service is one call, `services/ai/llm.service.complete({ purpose, module, actor, input, output })`,
+with its prompt in `services/ai/prompts/<purpose>.md`; it runs in an outbox handler or on a person's
+request, never inside a transaction, and what it returns is provisional until a person accepts it.
 
 ### 3.7 Tests, progress, guide
 
@@ -302,9 +321,15 @@ where the person makes the change (A23).
   `-- UP` and `-- DOWN` in every file. Idempotent (`IF NOT EXISTS`).
 - Every table: `<entity>_id uuid PRIMARY KEY DEFAULT gen_random_uuid()`, `created_at`, `updated_at
   timestamptz`. Money `numeric(18,2)`. Dates that are business dates are `date`.
-- A merged migration is never edited. Change it with a new file.
-- Destructive steps (drop, rename, type change) are declared in the header and ship one release
+- A merged migration is never edited. Change it with a new file. Gate 5 fails a merged file that
+  was edited, renamed or deleted.
+- Destructive steps (drop, rename, type change, SET NOT NULL, DELETE) are declared with
+  `-- DESTRUCTIVE: <what is lost, and why>` in the header or on the line above, and ship one release
   after the code that stops using them.
+- DOWN names everything UP creates. A change that cannot be undone says so instead of a DOWN:
+  `-- IRREVERSIBLE: <what cannot be rebuilt>`; `migrate.js --down` refuses that file.
+- Gates 3, 4 and 5 check all of this (`scripts/check/migration-*.js`). With `RUN_DB_TESTS=1` and
+  `DATABASE_URL`, gate 4 also runs UP, every DOWN and UP again on a throwaway database.
 - Add the numbering schemes and workflow definitions your milestone introduces in its migration.
 - **Two databases, not two schemas**: `mycity_stg` and `mycity_prod`, separate roles, no
   cross-grants. Staging gets realistic demonstration data from `scripts/db/seed.js --staging`.
@@ -320,7 +345,7 @@ where the person makes the change (A23).
 | `scripts/db/create-admin.js` | Once per environment, to make the first administrator: a full employee, login and role in one transaction (BACKEND_STRUCTURE §17). Interactive only. `--sample` on staging and local fills the employee with a sample profile and asks only for email, role and password |
 | `scripts/db/seed.js --build` / `--staging` | Synthetic or demonstration data. Refuses on production (three checks) |
 | `scripts/db/migrate.js` | Locally. On servers, migrations run only inside `deploy-gate` |
-| `scripts/import/run.js` | First staff load on staging, through the import engine |
+| `scripts/import/run.js` | First staff load on staging, through the import engine, as a named person: `upload employees staff.xlsx --as=<email>`, then `preview`, `errors`, `commit` (type the environment name, or `--yes`), `revert`. The file header has every command |
 | `scripts/check/*.js` | The gates. `npm run ci` runs them all |
 
 A script that writes data goes through services like any other caller.

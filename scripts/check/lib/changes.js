@@ -28,7 +28,11 @@ const IN_CI = process.env.GITHUB_ACTIONS === "true";
 const ZERO_SHA = /^0+$/;
 
 function git(args, { allowFail = false } = {}) {
-  const r = spawnSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync("git", args, {
+    cwd: ROOT,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
   if (r.status !== 0) {
     if (allowFail) return null;
     throw new Error(`git ${args.join(" ")} failed: ${(r.stderr || "").trim()}`);
@@ -36,7 +40,10 @@ function git(args, { allowFail = false } = {}) {
   return r.stdout;
 }
 
-const refExists = (ref) => git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { allowFail: true }) !== null;
+const refExists = (ref) =>
+  git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], {
+    allowFail: true,
+  }) !== null;
 
 function githubEvent() {
   const p = process.env.GITHUB_EVENT_PATH;
@@ -53,17 +60,25 @@ let cachedBase;
 function base() {
   if (cachedBase !== undefined) return cachedBase;
   const pick = () => {
-    if (process.env.MYCITY_BASE) return git(["rev-parse", process.env.MYCITY_BASE]).trim();
+    if (process.env.MYCITY_BASE)
+      return git(["rev-parse", process.env.MYCITY_BASE]).trim();
     const event = githubEvent();
     const name = process.env.GITHUB_EVENT_NAME;
     if (name === "pull_request" && process.env.GITHUB_BASE_REF) {
       const ref = `origin/${process.env.GITHUB_BASE_REF}`;
       return git(["merge-base", "HEAD", ref]).trim();
     }
-    if (name === "push" && event && event.before && !ZERO_SHA.test(event.before) && refExists(event.before)) {
+    if (
+      name === "push" &&
+      event &&
+      event.before &&
+      !ZERO_SHA.test(event.before) &&
+      refExists(event.before)
+    ) {
       return event.before;
     }
-    if (IN_CI) return refExists("HEAD~1") ? git(["rev-parse", "HEAD~1"]).trim() : null;
+    if (IN_CI)
+      return refExists("HEAD~1") ? git(["rev-parse", "HEAD~1"]).trim() : null;
     for (const ref of ["origin/main", "main"]) {
       if (refExists(ref)) return git(["merge-base", "HEAD", ref]).trim();
     }
@@ -99,7 +114,10 @@ function changedFiles() {
   if (b) parse(git(["diff", "--name-status", "-M", `${b}`, "HEAD"]));
   if (!IN_CI) {
     parse(git(["diff", "--name-status", "-M", "HEAD"], { allowFail: true }));
-    for (const f of (git(["ls-files", "--others", "--exclude-standard"]) || "").split("\n")) add("A", f.trim());
+    for (const f of (
+      git(["ls-files", "--others", "--exclude-standard"]) || ""
+    ).split("\n"))
+      add("A", f.trim());
   }
   return [...out.entries()].map(([file, status]) => ({ path: file, status }));
 }
@@ -110,13 +128,17 @@ function changedFiles() {
  */
 function addedLines(file) {
   const b = base();
-  const tracked = git(["ls-files", "--error-unmatch", file], { allowFail: true }) !== null;
+  const tracked =
+    git(["ls-files", "--error-unmatch", file], { allowFail: true }) !== null;
   if (!tracked || !b) {
     const full = path.join(ROOT, file);
-    if (!tracked && fs.existsSync(full)) return fs.readFileSync(full, "utf8").split(/\r?\n/);
+    if (!tracked && fs.existsSync(full))
+      return fs.readFileSync(full, "utf8").split(/\r?\n/);
     if (!b) return [];
   }
-  const diff = IN_CI ? git(["diff", "-U0", b, "HEAD", "--", file]) : git(["diff", "-U0", b, "--", file]);
+  const diff = IN_CI
+    ? git(["diff", "-U0", b, "HEAD", "--", file])
+    : git(["diff", "-U0", b, "--", file]);
   return (diff || "")
     .split("\n")
     .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
@@ -127,10 +149,14 @@ function addedLines(file) {
 function changeText() {
   const parts = [];
   const event = githubEvent();
-  if (event && event.pull_request && event.pull_request.body) parts.push(event.pull_request.body);
+  if (event && event.pull_request && event.pull_request.body)
+    parts.push(event.pull_request.body);
   if (process.env.MYCITY_PR_BODY) parts.push(process.env.MYCITY_PR_BODY);
   const b = base();
-  if (b) parts.push(git(["log", "--format=%B", `${b}..HEAD`], { allowFail: true }) || "");
+  if (b)
+    parts.push(
+      git(["log", "--format=%B", `${b}..HEAD`], { allowFail: true }) || "",
+    );
   return parts.join("\n");
 }
 
@@ -150,10 +176,24 @@ function isDayFirstDate(s) {
   if (!m) return false;
   const [, dd, mm, yyyy] = m.map(Number);
   const d = new Date(Date.UTC(yyyy, mm - 1, dd));
-  return d.getUTCFullYear() === yyyy && d.getUTCMonth() === mm - 1 && d.getUTCDate() === dd;
+  return (
+    d.getUTCFullYear() === yyyy &&
+    d.getUTCMonth() === mm - 1 &&
+    d.getUTCDate() === dd
+  );
 }
 
 /** Repo-relative, forward slashes. */
 const rel = (abs) => path.relative(ROOT, abs).split(path.sep).join("/");
 
-module.exports = { ROOT, IN_CI, git, base, changedFiles, addedLines, trailer, isDayFirstDate, rel };
+module.exports = {
+  ROOT,
+  IN_CI,
+  git,
+  base,
+  changedFiles,
+  addedLines,
+  trailer,
+  isDayFirstDate,
+  rel,
+};

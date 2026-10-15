@@ -42,7 +42,7 @@ const { emit } = require("../events/emit");
 const { defineEvents } = require("../events/catalogue");
 const { pageQuery, TOTAL_COL } = require("../http/paged");
 const { readDate } = require("../spreadsheet/day-first-cells");
-const { parseUpload } = require("../spreadsheet/parse");
+const { readSheets } = require("../spreadsheet/parse");
 const vault = require("../documents/vault");
 const storage = require("../../services/storage/storage.service");
 const registry = require("./registry");
@@ -52,6 +52,9 @@ const EVENTS = defineEvents("settings", {
   "import.batch_created": { summary: "A spreadsheet was uploaded for import" },
   "import.committed": { summary: "An import was committed" },
   "import.reverted": { summary: "An import was reverted" },
+  "import.expired": {
+    summary: "An unfinished import was closed after it was left",
+  },
 });
 
 const BATCH_COLUMNS = `import_batch_id, number, importer_key, document_id, file_name, sheet, header_row, mapping, options,
@@ -65,8 +68,14 @@ const ROLLBACK = Symbol("preview rollback");
  * ------------------------------------------------------------------ */
 
 const BOOLEAN = new Map([
-  ["yes", true], ["y", true], ["true", true], ["1", true],
-  ["no", false], ["n", false], ["false", false], ["0", false],
+  ["yes", true],
+  ["y", true],
+  ["true", true],
+  ["1", true],
+  ["no", false],
+  ["n", false],
+  ["false", false],
+  ["0", false],
 ]);
 
 /**
@@ -74,25 +83,39 @@ const BOOLEAN = new Map([
  * @returns {{value: *, error: string|null}}  value null for an empty cell
  */
 function coerce(field, raw) {
-  const empty = raw === null || raw === undefined || (typeof raw === "string" && raw.trim() === "");
-  if (empty) return { value: null, error: field.required ? "is required" : null };
+  const empty =
+    raw === null ||
+    raw === undefined ||
+    (typeof raw === "string" && raw.trim() === "");
+  if (empty)
+    return { value: null, error: field.required ? "is required" : null };
   const type = field.type || "text";
   const text = raw instanceof Date ? null : String(raw).trim();
   switch (type) {
     case "text":
     case "reference":
-      if (raw instanceof Date) return { value: null, error: "should be text, not a date" };
-      return text.length > 500 ? { value: null, error: "is longer than 500 characters" } : { value: text, error: null };
+      if (raw instanceof Date)
+        return { value: null, error: "should be text, not a date" };
+      return text.length > 500
+        ? { value: null, error: "is longer than 500 characters" }
+        : { value: text, error: null };
     case "int": {
       const n = Number(text.replace(/,/g, ""));
-      return Number.isInteger(n) ? { value: n, error: null } : { value: null, error: "should be a whole number" };
+      return Number.isInteger(n)
+        ? { value: n, error: null }
+        : { value: null, error: "should be a whole number" };
     }
     case "number": {
       const n = Number(text.replace(/,/g, ""));
-      return Number.isFinite(n) ? { value: n, error: null } : { value: null, error: "should be a number" };
+      return Number.isFinite(n)
+        ? { value: n, error: null }
+        : { value: null, error: "should be a number" };
     }
     case "money": {
-      const cleaned = typeof raw === "number" ? raw.toFixed(2) : text.replace(/[₦,\s]/g, "").replace(/^NGN/i, "");
+      const cleaned =
+        typeof raw === "number"
+          ? raw.toFixed(2)
+          : text.replace(/[₦,\s]/g, "").replace(/^NGN/i, "");
       try {
         return { value: money.toWire(money.money(cleaned)), error: null };
       } catch {
@@ -101,26 +124,44 @@ function coerce(field, raw) {
     }
     case "phone": {
       const c = require("@mycity/contract");
-      const r = c.common.phone.safeParse(typeof raw === "number" ? `0${raw}` : text);
-      return r.success ? { value: r.data, error: null } : { value: null, error: "should be a Nigerian phone number" };
+      const r = c.common.phone.safeParse(
+        typeof raw === "number" ? `0${raw}` : text,
+      );
+      return r.success
+        ? { value: r.data, error: null }
+        : { value: null, error: "should be a Nigerian phone number" };
     }
     case "email": {
       const v = text.toLowerCase();
-      return EMAIL_RE.test(v) ? { value: v, error: null } : { value: null, error: "should be an email address" };
+      return EMAIL_RE.test(v)
+        ? { value: v, error: null }
+        : { value: null, error: "should be an email address" };
     }
     case "enum": {
       const opts = registry.optionsOf(field);
       const n = mapping.normalise(text);
-      const hit = opts.find((o) => mapping.normalise(o.value) === n || mapping.normalise(o.label) === n);
-      return hit ? { value: hit.value, error: null } : { value: null, error: `should be one of: ${opts.map((o) => o.label).join(", ")}` };
+      const hit = opts.find(
+        (o) =>
+          mapping.normalise(o.value) === n || mapping.normalise(o.label) === n,
+      );
+      return hit
+        ? { value: hit.value, error: null }
+        : {
+            value: null,
+            error: `should be one of: ${opts.map((o) => o.label).join(", ")}`,
+          };
     }
     case "date": {
       const r = readDate(raw);
-      return r.error ? { value: null, error: r.error } : { value: r.date, error: null };
+      return r.error
+        ? { value: null, error: r.error }
+        : { value: r.date, error: null };
     }
     case "boolean": {
       const b = BOOLEAN.get(mapping.normalise(text));
-      return b === undefined ? { value: null, error: "should be Yes or No" } : { value: b, error: null };
+      return b === undefined
+        ? { value: null, error: "should be Yes or No" }
+        : { value: b, error: null };
     }
     default:
       return { value: null, error: `unknown type ${type}` };
@@ -140,37 +181,63 @@ const fieldMap = (imp) => new Map(imp.fields.map((f) => [f.key, f]));
 function buildRows(imp, grid, headerRow, columnsMap) {
   const fields = fieldMap(imp);
   const header = grid[headerRow] || [];
-  const mapped = columnsMap.columns.filter((c) => c.field && fields.has(c.field));
+  const mapped = columnsMap.columns.filter(
+    (c) => c.field && fields.has(c.field),
+  );
   const out = [];
   for (let i = headerRow + 1; i < grid.length; i += 1) {
     const cells = grid[i] || [];
     if (cells.every((v) => v === null || v === undefined || v === "")) continue;
     const raw = {};
     header.forEach((h, idx) => {
-      raw[h === null || h === undefined || h === "" ? `Column ${idx + 1}` : String(h)] = cells[idx] instanceof Date ? cells[idx].toISOString().slice(0, 10) : cells[idx] ?? null;
+      raw[
+        h === null || h === undefined || h === ""
+          ? `Column ${idx + 1}`
+          : String(h)
+      ] =
+        cells[idx] instanceof Date
+          ? cells[idx].toISOString().slice(0, 10)
+          : (cells[idx] ?? null);
     });
     const values = {};
     const problems = [];
     for (const c of mapped) {
       const f = fields.get(c.field);
       const { value, error } = coerce(f, cells[c.index]);
-      if (error) problems.push({ field: f.key, message: `${f.label} ${error}` });
+      if (error)
+        problems.push({ field: f.key, message: `${f.label} ${error}` });
       else if (value !== null) values[f.key] = value;
     }
     for (const f of fields.values()) {
-      if (f.required && !mapped.some((c) => c.field === f.key)) problems.push({ field: f.key, message: `${f.label} is required` });
+      if (f.required && !mapped.some((c) => c.field === f.key))
+        problems.push({ field: f.key, message: `${f.label} is required` });
     }
     if (problems.length === 0) {
       const parsed = imp.schema.safeParse(values);
       if (!parsed.success) {
         for (const issue of parsed.error.issues) {
           const key = issue.path[0];
-          const label = fields.has(key) ? fields.get(key).label : String(key || "Row");
-          problems.push({ field: key || null, message: `${label}: ${issue.message}` });
+          const label = fields.has(key)
+            ? fields.get(key).label
+            : String(key || "Row");
+          problems.push({
+            field: key || null,
+            message: `${label}: ${issue.message}`,
+          });
         }
       }
     }
-    out.push({ row_number: i + 1, raw, values, problems, status: problems.length ? "error" : "ok", action: "none", target_id: null, before: null, diff: null });
+    out.push({
+      row_number: i + 1,
+      raw,
+      values,
+      problems,
+      status: problems.length ? "error" : "ok",
+      action: "none",
+      target_id: null,
+      before: null,
+      diff: null,
+    });
   }
   return out;
 }
@@ -186,7 +253,10 @@ function markDuplicates(imp, rows) {
       const id = `${key}:${mapping.normalise(v)}`;
       if (seen.has(id)) {
         row.status = "duplicate";
-        row.problems.push({ field: key, message: `Same ${fieldMap(imp).get(key).label} as row ${seen.get(id)}` });
+        row.problems.push({
+          field: key,
+          message: `Same ${fieldMap(imp).get(key).label} as row ${seen.get(id)}`,
+        });
         break;
       }
       seen.set(id, row.row_number);
@@ -199,7 +269,10 @@ function markDuplicates(imp, rows) {
  * ------------------------------------------------------------------ */
 
 async function loadBatch(client, id, { forUpdate = false } = {}) {
-  const { rows } = await client.query(`SELECT ${BATCH_COLUMNS} FROM import_batch WHERE import_batch_id = $1${forUpdate ? " FOR UPDATE" : ""}`, [id]);
+  const { rows } = await client.query(
+    `SELECT ${BATCH_COLUMNS} FROM import_batch WHERE import_batch_id = $1${forUpdate ? " FOR UPDATE" : ""}`,
+    [id],
+  );
   if (!rows[0]) throw new AppError("NOT_FOUND", "Import not found", 404);
   return rows[0];
 }
@@ -213,19 +286,31 @@ function importerOf(key) {
 /** Refuse a user who does not hold the importer's permission (the CEO always may). */
 async function assertMay(client, user, imp) {
   const may = await registry.availableTo(client, user);
-  if (!may.includes(imp)) throw new AppError("PERMISSION_DENIED", "You cannot run this import", 403);
+  if (!may.includes(imp))
+    throw new AppError("PERMISSION_DENIED", "You cannot run this import", 403);
 }
 
 async function sourceGrid(client, batch) {
   const doc = await vault.get(client, batch.document_id);
-  if (!doc) throw new Error(`import ${batch.import_batch_id}: its source file record is gone`);
-  const book = await parseUpload({ buffer: await storage.get(doc.storage_key), filename: doc.original_name });
+  if (!doc)
+    throw new Error(
+      `import ${batch.import_batch_id}: its source file record is gone`,
+    );
+  const book = await readSheets({
+    buffer: await storage.get(doc.storage_key),
+    filename: doc.original_name,
+  });
   return book.sheets;
 }
 
 function sheetOf(sheets, name) {
   const s = sheets.find((x) => x.name === name);
-  if (!s) throw new AppError("IMPORT_SHEET_MISSING", `The file has no sheet called "${name}"`, 422);
+  if (!s)
+    throw new AppError(
+      "IMPORT_SHEET_MISSING",
+      `The file has no sheet called "${name}"`,
+      422,
+    );
   return s;
 }
 
@@ -237,11 +322,15 @@ const moduleOf = (imp) => imp.permission[0];
  * @param {{importer_key: string, file: {buffer: Buffer, originalname: string}, actor: object}} opts
  */
 async function createBatch(client, { importer_key: key, file, actor }) {
-  if (!inTransaction(client)) throw new Error("import.createBatch must run inside atomically()");
+  if (!inTransaction(client))
+    throw new Error("import.createBatch must run inside atomically()");
   const imp = importerOf(key);
   await assertMay(client, actor, imp);
   const id = crypto.randomUUID();
-  const book = await parseUpload({ buffer: file && file.buffer, filename: file && file.originalname });
+  const book = await readSheets({
+    buffer: file && file.buffer,
+    filename: file && file.originalname,
+  });
   const doc = await vault.store(client, {
     file,
     purpose: "import_sheet",
@@ -262,13 +351,27 @@ async function createBatch(client, { importer_key: key, file, actor }) {
       break;
     }
   }
-  if (!sheet) throw new AppError("IMPORT_EMPTY", "The file has no sheets with data", 422);
+  if (!sheet)
+    throw new AppError("IMPORT_EMPTY", "The file has no sheets with data", 422);
   const headerCells = headerRow === null ? [] : sheet.rows[headerRow];
   const signature = mapping.headerSignature(headerCells);
-  const profile = headerRow === null ? null : await mapping.findProfile(client, key, signature);
-  const columns = headerRow === null ? { columns: [] } : profile ? mapping.applyProfile(profile, headerCells) : mapping.autoMap(headerCells, imp.fields);
+  const profile =
+    headerRow === null
+      ? null
+      : await mapping.findProfile(client, key, signature);
+  const columns =
+    headerRow === null
+      ? { columns: [] }
+      : profile
+        ? mapping.applyProfile(profile, headerCells)
+        : mapping.autoMap(headerCells, imp.fields);
   const number = (await numbering.allocate(client, "import_batch")).number;
-  const dataRows = headerRow === null ? 0 : sheet.rows.slice(headerRow + 1).filter((r) => r.some((v) => v !== null && v !== "")).length;
+  const dataRows =
+    headerRow === null
+      ? 0
+      : sheet.rows
+          .slice(headerRow + 1)
+          .filter((r) => r.some((v) => v !== null && v !== "")).length;
 
   const { rows } = await client.query(
     `INSERT INTO import_batch
@@ -276,9 +379,21 @@ async function createBatch(client, { importer_key: key, file, actor }) {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, '{}'::jsonb, $9, $10::jsonb, $11)
      RETURNING ${BATCH_COLUMNS}`,
     [
-      id, number, key, doc.document_id, doc.original_name, sheet.name, headerRow, JSON.stringify(columns),
+      id,
+      number,
+      key,
+      doc.document_id,
+      doc.original_name,
+      sheet.name,
+      headerRow,
+      JSON.stringify(columns),
       headerRow === null ? "uploaded" : "mapped",
-      JSON.stringify({ rows: dataRows, sheets: book.sheets.map((s) => s.name), header_signature: signature, profile_applied: Boolean(profile) }),
+      JSON.stringify({
+        rows: dataRows,
+        sheets: book.sheets.map((s) => s.name),
+        header_signature: signature,
+        profile_applied: Boolean(profile),
+      }),
       actor ? actor.user_id : null,
     ],
   );
@@ -300,25 +415,48 @@ async function createBatch(client, { importer_key: key, file, actor }) {
  *   fields  column index → field key (null to ignore the column)
  */
 async function setMapping(client, batchId, input, actor) {
-  if (!inTransaction(client)) throw new Error("import.setMapping must run inside atomically()");
+  if (!inTransaction(client))
+    throw new Error("import.setMapping must run inside atomically()");
   const batch = await loadBatch(client, batchId, { forUpdate: true });
-  if (!["uploaded", "mapped", "previewed"].includes(batch.status)) throw new AppError("IMPORT_CLOSED", `This import is already ${batch.status}`, 409);
+  if (!["uploaded", "mapped", "previewed"].includes(batch.status))
+    throw new AppError(
+      "IMPORT_CLOSED",
+      `This import is already ${batch.status}`,
+      409,
+    );
   const imp = importerOf(batch.importer_key);
   await assertMay(client, actor, imp);
   const sheets = await sourceGrid(client, batch);
   const sheet = sheetOf(sheets, input.sheet || batch.sheet);
-  const headerRow = input.header_row === undefined || input.header_row === null ? batch.header_row : Number(input.header_row);
-  if (!Number.isInteger(headerRow) || headerRow < 0 || headerRow >= sheet.rows.length) throw new AppError("IMPORT_HEADER_ROW", "Choose the row that holds the column names", 422);
+  const headerRow =
+    input.header_row === undefined || input.header_row === null
+      ? batch.header_row
+      : Number(input.header_row);
+  if (
+    !Number.isInteger(headerRow) ||
+    headerRow < 0 ||
+    headerRow >= sheet.rows.length
+  )
+    throw new AppError(
+      "IMPORT_HEADER_ROW",
+      "Choose the row that holds the column names",
+      422,
+    );
   const headerCells = sheet.rows[headerRow];
   const columns = {
     columns: headerCells.map((cell, index) => ({
       index,
       header: cell === null || cell === undefined ? "" : String(cell),
-      field: Object.prototype.hasOwnProperty.call(input.fields || {}, index) ? input.fields[index] || null : null,
+      field: Object.prototype.hasOwnProperty.call(input.fields || {}, index)
+        ? input.fields[index] || null
+        : null,
     })),
   };
   const problems = mapping.problemsOf(columns, imp.fields);
-  if (problems.length) throw new AppError("IMPORT_MAPPING_INVALID", problems[0], 422, { mapping: problems });
+  if (problems.length)
+    throw new AppError("IMPORT_MAPPING_INVALID", problems[0], 422, {
+      mapping: problems,
+    });
   if (input.save_profile) {
     await mapping.saveProfile(client, {
       importer_key: imp.key,
@@ -343,7 +481,11 @@ async function setMapping(client, batchId, input, actor) {
 function problemOf(err) {
   if (err instanceof AppError) {
     const fields = err.fields ? Object.entries(err.fields) : [];
-    if (fields.length) return fields.map(([f, msgs]) => ({ field: f, message: `${f}: ${[].concat(msgs).join(", ")}` }));
+    if (fields.length)
+      return fields.map(([f, msgs]) => ({
+        field: f,
+        message: `${f}: ${[].concat(msgs).join(", ")}`,
+      }));
     return [{ field: null, message: err.message }];
   }
   return [{ field: null, message: "This row could not be saved" }];
@@ -357,7 +499,8 @@ async function inSavepoint(client, fn) {
     return { ok: true, out };
   } catch (err) {
     await client.query("ROLLBACK TO SAVEPOINT import_row");
-    if (!(err instanceof AppError)) require("../../config/logger").logger.warn({ err }, "import row failed");
+    if (!(err instanceof AppError))
+      require("../../config/logger").logger.warn({ err }, "import row failed");
     return { ok: false, err };
   }
 }
@@ -383,7 +526,8 @@ function cycleRows(edges) {
       path.push(at);
       at = edges.get(at).to;
     }
-    if (index.has(at)) for (const id of path.slice(index.get(at))) bad.add(edges.get(id).row);
+    if (index.has(at))
+      for (const id of path.slice(index.get(at))) bad.add(edges.get(id).row);
     for (const id of path) done.add(id);
   }
   return bad;
@@ -391,8 +535,12 @@ function cycleRows(edges) {
 
 async function processRows(client, imp, rows, ctx) {
   const fields = fieldMap(imp);
-  const refs1 = imp.fields.filter((f) => f.type === "reference" && f.pass !== 2);
-  const refs2 = imp.fields.filter((f) => f.type === "reference" && f.pass === 2);
+  const refs1 = imp.fields.filter(
+    (f) => f.type === "reference" && f.pass !== 2,
+  );
+  const refs2 = imp.fields.filter(
+    (f) => f.type === "reference" && f.pass === 2,
+  );
   const missing = {};
 
   // Pass 1: match, resolve, write.
@@ -407,7 +555,10 @@ async function processRows(client, imp, rows, ctx) {
     }
     if (found.size > 1) {
       row.status = "error";
-      row.problems.push({ field: null, message: `${imp.matchKeys.map((k) => fields.get(k).label).join(" and ")} point at different existing records` });
+      row.problems.push({
+        field: null,
+        message: `${imp.matchKeys.map((k) => fields.get(k).label).join(" and ")} point at different existing records`,
+      });
       continue;
     }
     const existing = found.size ? [...found.values()][0] : null;
@@ -421,21 +572,35 @@ async function processRows(client, imp, rows, ctx) {
       let id = await imp.resolve(client, f, v, ctx);
       if (!id && f.createMissing) {
         (missing[f.key] = missing[f.key] || new Set()).add(v);
-        const ticked = ctx.create_missing[f.key] && [...ctx.create_missing[f.key]].some((x) => same(x, v));
+        const ticked =
+          ctx.create_missing[f.key] &&
+          [...ctx.create_missing[f.key]].some((x) => same(x, v));
         if (ticked || ctx.preview) {
-          const created = await inSavepoint(client, () => imp.create(client, f, v, ctx));
+          const created = await inSavepoint(client, () =>
+            imp.create(client, f, v, ctx),
+          );
           if (created.ok) {
             id = created.out;
-            if (ctx.preview) row.problems.push({ field: f.key, message: `${f.label} "${v}" will be created${ticked ? "" : " if you tick it"}` });
+            if (ctx.preview)
+              row.problems.push({
+                field: f.key,
+                message: `${f.label} "${v}" will be created${ticked ? "" : " if you tick it"}`,
+              });
           }
         } else {
-          row.problems.push({ field: f.key, message: `${f.label} "${v}" does not exist. Tick it to create it, or correct the cell.` });
+          row.problems.push({
+            field: f.key,
+            message: `${f.label} "${v}" does not exist. Tick it to create it, or correct the cell.`,
+          });
           refProblem = true;
           continue;
         }
       }
       if (!id) {
-        row.problems.push({ field: f.key, message: `${f.label} "${v}" was not found` });
+        row.problems.push({
+          field: f.key,
+          message: `${f.label} "${v}" was not found`,
+        });
         refProblem = true;
         continue;
       }
@@ -457,7 +622,8 @@ async function processRows(client, imp, rows, ctx) {
       row.diff = diff;
       if (Object.keys(diff).length === 0) {
         row.action = "none";
-        row.status = row.status === "ok" && row.problems.length ? "warning" : "unchanged";
+        row.status =
+          row.status === "ok" && row.problems.length ? "warning" : "unchanged";
         continue;
       }
       row.action = "update";
@@ -465,7 +631,13 @@ async function processRows(client, imp, rows, ctx) {
       row.action = "create";
     }
 
-    const res = await inSavepoint(client, () => imp.write(client, write, { ...ctx, existing, row_number: row.row_number }));
+    const res = await inSavepoint(client, () =>
+      imp.write(client, write, {
+        ...ctx,
+        existing,
+        row_number: row.row_number,
+      }),
+    );
     if (!res.ok) {
       row.status = "error";
       row.action = "none";
@@ -482,36 +654,65 @@ async function processRows(client, imp, rows, ctx) {
     const resolved = new Map();
     for (const row of rows) {
       const v = row.values[f.key];
-      if (!row.target_id || v === undefined || v === null || !["ok", "warning", "unchanged"].includes(row.status)) continue;
+      if (
+        !row.target_id ||
+        v === undefined ||
+        v === null ||
+        !["ok", "warning", "unchanged"].includes(row.status)
+      )
+        continue;
       const id = await imp.resolve(client, f, v, ctx);
       if (!id) {
         row.status = row.action === "none" ? "error" : "warning";
-        row.problems.push({ field: f.key, message: `${f.label} "${v}" is not in the file or the system${row.action === "none" ? "" : `; saved without ${f.label}`}` });
+        row.problems.push({
+          field: f.key,
+          message: `${f.label} "${v}" is not in the file or the system${row.action === "none" ? "" : `; saved without ${f.label}`}`,
+        });
         continue;
       }
       resolved.set(row, String(id));
-      if (f.ref === imp.entity) edges.set(row.target_id, { to: String(id), row: row.row_number });
+      if (f.ref === imp.entity)
+        edges.set(row.target_id, { to: String(id), row: row.row_number });
     }
     const cyclic = cycleRows(edges);
     for (const [row, id] of resolved) {
       if (cyclic.has(row.row_number) || id === row.target_id) {
         row.status = "error";
-        row.problems.push({ field: f.key, message: `${f.label} would make a loop (someone managing themselves, directly or through others)` });
+        row.problems.push({
+          field: f.key,
+          message: `${f.label} would make a loop (someone managing themselves, directly or through others)`,
+        });
         continue;
       }
-      const res = await inSavepoint(client, () => imp.link(client, row.target_id, { [f.key]: id }, { ...ctx, row_number: row.row_number }));
+      const res = await inSavepoint(client, () =>
+        imp.link(
+          client,
+          row.target_id,
+          { [f.key]: id },
+          { ...ctx, row_number: row.row_number },
+        ),
+      );
       if (!res.ok) {
         row.status = "error";
         row.problems.push(...problemOf(res.err));
-      } else if (row.action === "none" && row.status === "unchanged" && (!row.before || !same(row.before[f.key], id))) {
+      } else if (
+        row.action === "none" &&
+        row.status === "unchanged" &&
+        (!row.before || !same(row.before[f.key], id))
+      ) {
         row.action = "update";
         row.status = "ok";
-        row.diff = { ...(row.diff || {}), [f.key]: [row.before ? row.before[f.key] || null : null, id] };
+        row.diff = {
+          ...(row.diff || {}),
+          [f.key]: [row.before ? row.before[f.key] || null : null, id],
+        };
       }
     }
   }
 
-  return Object.fromEntries(Object.entries(missing).map(([k, set]) => [k, [...set].sort()]));
+  return Object.fromEntries(
+    Object.entries(missing).map(([k, set]) => [k, [...set].sort()]),
+  );
 }
 
 function statsOf(rows, missing, base = {}) {
@@ -530,7 +731,9 @@ function statsOf(rows, missing, base = {}) {
 }
 
 async function saveRows(client, batchId, rows) {
-  await client.query("DELETE FROM import_row WHERE import_batch_id = $1", [batchId]);
+  await client.query("DELETE FROM import_row WHERE import_batch_id = $1", [
+    batchId,
+  ]);
   for (let i = 0; i < rows.length; i += 500) {
     const part = rows.slice(i, i + 500);
     await client.query(
@@ -542,8 +745,15 @@ async function saveRows(client, batchId, rows) {
         batchId,
         JSON.stringify(
           part.map((r) => ({
-            row_number: r.row_number, raw: r.raw, vals: r.values, status: r.status, problems: r.problems,
-            action: r.action, target_id: r.target_id, before: r.before, diff: r.diff,
+            row_number: r.row_number,
+            raw: r.raw,
+            vals: r.values,
+            status: r.status,
+            problems: r.problems,
+            action: r.action,
+            target_id: r.target_id,
+            before: r.before,
+            diff: r.diff,
           })),
         ),
       ],
@@ -557,17 +767,39 @@ async function saveRows(client, batchId, rows) {
  * @param {{commit: boolean, actor: object, valid_only?: boolean, create_missing?: Record<string, string[]>, db?: import("pg").Pool}} opts
  * @returns {Promise<{batch: object, stats: object}>}
  */
-async function run(batchId, { commit, actor, valid_only: validOnly = false, create_missing: createMissing = {}, db = require("../../config/db").pool }) {
+async function run(
+  batchId,
+  {
+    commit,
+    actor,
+    valid_only: validOnly = false,
+    create_missing: createMissing = {},
+    db = require("../../config/db").pool,
+  },
+) {
   const client = await db.connect();
   let outcome = null;
   try {
     const batch = await loadBatch(client, batchId);
     const imp = importerOf(batch.importer_key);
     await assertMay(client, actor, imp);
-    if (commit && batch.status !== "previewed") throw new AppError("IMPORT_PREVIEW_FIRST", "Preview the import before committing it", 409);
-    if (!commit && !["mapped", "previewed"].includes(batch.status)) throw new AppError("IMPORT_NOT_READY", `This import is ${batch.status}`, 409);
+    if (commit && batch.status !== "previewed")
+      throw new AppError(
+        "IMPORT_PREVIEW_FIRST",
+        "Preview the import before committing it",
+        409,
+      );
+    if (!commit && !["mapped", "previewed"].includes(batch.status))
+      throw new AppError(
+        "IMPORT_NOT_READY",
+        `This import is ${batch.status}`,
+        409,
+      );
     const problems = mapping.problemsOf(batch.mapping, imp.fields);
-    if (problems.length) throw new AppError("IMPORT_MAPPING_INVALID", problems[0], 422, { mapping: problems });
+    if (problems.length)
+      throw new AppError("IMPORT_MAPPING_INVALID", problems[0], 422, {
+        mapping: problems,
+      });
 
     const sheet = sheetOf(await sourceGrid(client, batch), batch.sheet);
     const rows = buildRows(imp, sheet.rows, batch.header_row, batch.mapping);
@@ -578,13 +810,24 @@ async function run(batchId, { commit, actor, valid_only: validOnly = false, crea
       importer: imp,
       preview: !commit,
       options: batch.options || {},
-      create_missing: Object.fromEntries(Object.entries(createMissing || {}).map(([k, v]) => [k, new Set([].concat(v))])),
+      create_missing: Object.fromEntries(
+        Object.entries(createMissing || {}).map(([k, v]) => [
+          k,
+          new Set([].concat(v)),
+        ]),
+      ),
     };
 
     const work = async () => {
-      await client.query("SELECT 1 FROM import_batch WHERE import_batch_id = $1 FOR UPDATE", [batchId]);
+      await client.query(
+        "SELECT 1 FROM import_batch WHERE import_batch_id = $1 FOR UPDATE",
+        [batchId],
+      );
       const missing = await processRows(client, imp, rows, ctx);
-      const stats = statsOf(rows, missing, { valid_only: validOnly, header_signature: batch.stats && batch.stats.header_signature });
+      const stats = statsOf(rows, missing, {
+        valid_only: validOnly,
+        header_signature: batch.stats && batch.stats.header_signature,
+      });
       const blocked = stats.error + stats.duplicate > 0 && !validOnly;
       if (!commit || blocked) {
         outcome = { stats, blocked };
@@ -594,20 +837,37 @@ async function run(batchId, { commit, actor, valid_only: validOnly = false, crea
       const { rows: up } = await client.query(
         `UPDATE import_batch SET status = 'committed', stats = $2::jsonb, options = options || $3::jsonb, committed_at = now(), committed_by = $4
           WHERE import_batch_id = $1 RETURNING ${BATCH_COLUMNS}`,
-        [batchId, JSON.stringify(stats), JSON.stringify({ valid_only: validOnly, create_missing: createMissing || {} }), actor ? actor.user_id : null],
+        [
+          batchId,
+          JSON.stringify(stats),
+          JSON.stringify({
+            valid_only: validOnly,
+            create_missing: createMissing || {},
+          }),
+          actor ? actor.user_id : null,
+        ],
       );
       await emit(client, {
         key: EVENTS.IMPORT_COMMITTED,
         entity: { type: "import_batch", id: batchId },
         module: moduleOf(imp),
         actor,
-        payload: { import_batch_id: batchId, importer_key: imp.key, create: stats.create, update: stats.update, error: stats.error },
+        payload: {
+          import_batch_id: batchId,
+          importer_key: imp.key,
+          create: stats.create,
+          update: stats.update,
+          error: stats.error,
+        },
       });
       outcome = { batch: up[0], stats, blocked: false };
     };
 
     try {
-      await requestContext.run({ ...(requestContext.get() || {}), importBatchId: batchId }, () => atomically(client, work));
+      await requestContext.run(
+        { ...(requestContext.get() || {}), importBatchId: batchId },
+        () => atomically(client, work),
+      );
     } catch (err) {
       if (err !== ROLLBACK) throw err;
     }
@@ -669,6 +929,71 @@ function history(client, query = {}) {
   );
 }
 
+/** Days an unfinished import (uploaded, mapped, previewed) is kept before import-cleanup closes it. */
+const ABANDONED_AFTER_DAYS = 14;
+
+/**
+ * Close imports that were started and left (the import-cleanup scheduler). Their per-row
+ * results are copies of the person's spreadsheet cells, personal data included, and
+ * nobody is going to act on them, so the rows are removed and the batch is marked
+ * `failed` with `stats.expired`. The batch stays in the history and the source file
+ * stays in the vault. Committed and reverted batches are never touched: revert needs
+ * their rows. Each batch is its own transaction.
+ * @param {{db?: import("pg").Pool, days?: number, limit?: number}} [opts]
+ * @returns {Promise<{expired: number}>}
+ */
+async function expireAbandoned({
+  db = require("../../config/db").pool,
+  days = ABANDONED_AFTER_DAYS,
+  limit = 100,
+} = {}) {
+  const { rows } = await db.query(
+    `SELECT import_batch_id FROM import_batch
+      WHERE status IN ('uploaded', 'mapped', 'previewed')
+        AND GREATEST(created_at, COALESCE(previewed_at, created_at)) < now() - make_interval(days => $1)
+      ORDER BY created_at, import_batch_id
+      LIMIT $2 -- pagination:batch abandoned imports one cleanup run closes`,
+    [days, limit],
+  );
+  let expired = 0;
+  for (const { import_batch_id: id } of rows) {
+    const client = await db.connect();
+    try {
+      await atomically(client, async () => {
+        const { rows: up } = await client.query(
+          `UPDATE import_batch
+              SET status = 'failed', stats = COALESCE(stats, '{}'::jsonb) || jsonb_build_object('expired', true)
+            WHERE import_batch_id = $1 AND status IN ('uploaded', 'mapped', 'previewed')
+            RETURNING import_batch_id, importer_key, status`,
+          [id],
+        );
+        if (!up[0]) return;
+        const { rowCount } = await client.query(
+          "DELETE FROM import_row WHERE import_batch_id = $1",
+          [id],
+        );
+        const imp = registry.get(up[0].importer_key);
+        await emit(client, {
+          key: EVENTS.IMPORT_EXPIRED,
+          entity: { type: "import_batch", id },
+          module: imp ? moduleOf(imp) : "settings",
+          actor: null,
+          payload: {
+            import_batch_id: id,
+            importer_key: up[0].importer_key,
+            rows_removed: rowCount,
+            after_days: days,
+          },
+        });
+        expired += 1;
+      });
+    } finally {
+      client.release();
+    }
+  }
+  return { expired };
+}
+
 module.exports = {
   EVENTS,
   BATCH_COLUMNS,
@@ -682,6 +1007,8 @@ module.exports = {
   commit,
   rowsOf,
   history,
+  expireAbandoned,
+  ABANDONED_AFTER_DAYS,
   loadBatch,
   importerOf,
   assertMay,

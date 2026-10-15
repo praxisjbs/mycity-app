@@ -41,7 +41,16 @@ const UPLOAD_CAPS = Object.freeze({
 
 /** "15 MB", for messages people read. */
 function describeBytes(bytes) {
-  return bytes >= MB ? `${Math.round(bytes / MB)} MB` : `${Math.ceil(bytes / 1024)} KB`;
+  return bytes >= MB
+    ? `${Math.round(bytes / MB)} MB`
+    : `${Math.ceil(bytes / 1024)} KB`;
 }
 
-module.exports = { PROXY_BODY_CAP, JSON_LIMIT, UPLOAD_HARD_CAP, UPLOAD_CAPS, describeBytes, MB };
+module.exports = {
+  PROXY_BODY_CAP,
+  JSON_LIMIT,
+  UPLOAD_HARD_CAP,
+  UPLOAD_CAPS,
+  describeBytes,
+  MB,
+};

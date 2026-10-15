@@ -16,7 +16,15 @@
  */
 const { SENSITIVE_KEYS } = require("../../config/logger");
 
-const KEY_ALTERNATION = [...SENSITIVE_KEYS, "authorization", "auth", "cookie", "session", "passwd", "pwd"]
+const KEY_ALTERNATION = [
+  ...SENSITIVE_KEYS,
+  "authorization",
+  "auth",
+  "cookie",
+  "session",
+  "passwd",
+  "pwd",
+]
   .sort((a, b) => b.length - a.length)
   .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
   .join("|");
@@ -25,7 +33,10 @@ const KEY_ALTERNATION = [...SENSITIVE_KEYS, "authorization", "auth", "cookie", "
 const RULES = [
   // scheme://user:pass@host
   [/\b([a-z][a-z0-9+.-]*:\/\/)[^\s:/@]+:[^\s@]+@/gi, "$1<credentials>@"],
-  [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "<private-key>"],
+  [
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+    "<private-key>",
+  ],
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "<jwt>"],
   [/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,}/gi, "$1 <token>"],
   [/\bAIza[0-9A-Za-z_-]{35}/g, "<api-key>"],
@@ -34,9 +45,14 @@ const RULES = [
   [/\bxox[baprs]-[A-Za-z0-9-]{10,}/g, "<api-key>"],
   // password=..., "token": "...", api_key: ...
   [
-    new RegExp(`\\b(${KEY_ALTERNATION})(["']?\\s*[:=]\\s*)(["']?)((?:Bearer|Basic)\\s+)?([^"'\\s,;&})\\]]{3,})`, "gi"),
+    new RegExp(
+      `\\b(${KEY_ALTERNATION})(["']?\\s*[:=]\\s*)(["']?)((?:Bearer|Basic)\\s+)?([^"'\\s,;&})\\]]{3,})`,
+      "gi",
+    ),
     (m, key, sep, quote, scheme, value) =>
-      /^<[a-z-]+>$/i.test(value) ? m : `${key}${sep}${quote}${scheme || ""}<redacted>`,
+      /^<[a-z-]+>$/i.test(value)
+        ? m
+        : `${key}${sep}${quote}${scheme || ""}<redacted>`,
   ],
   [/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "<email>"],
   [/\+\d[\d\s().-]{7,16}\d/g, "<phone>"],
@@ -75,7 +91,8 @@ function scrub(value, opts = {}) {
   if (typeof value !== "string" || value === "") return value;
   try {
     let out = value;
-    for (const [pattern, replacement] of RULES) out = out.replace(pattern, replacement);
+    for (const [pattern, replacement] of RULES)
+      out = out.replace(pattern, replacement);
     out = scrubCards(out);
     return opts.max ? out.slice(0, opts.max) : out;
   } catch {
@@ -86,7 +103,10 @@ function scrub(value, opts = {}) {
 /** Scrub every string in a small object (bounded depth), and drop sensitive keys outright. */
 function scrubObject(obj, depth = 0) {
   if (!obj || typeof obj !== "object" || depth > 3) return obj;
-  if (Array.isArray(obj)) return obj.map((v) => (typeof v === "string" ? scrub(v) : scrubObject(v, depth + 1)));
+  if (Array.isArray(obj))
+    return obj.map((v) =>
+      typeof v === "string" ? scrub(v) : scrubObject(v, depth + 1),
+    );
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
     if (SENSITIVE_KEYS.includes(k)) out[k] = "<redacted>";

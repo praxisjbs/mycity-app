@@ -19,7 +19,11 @@
  * .docx from an .xlsx from any other ZIP (an arbitrary ZIP is refused).
  */
 
-const UNKNOWN = Object.freeze({ mime: "application/octet-stream", ext: "bin", kind: "unknown" });
+const UNKNOWN = Object.freeze({
+  mime: "application/octet-stream",
+  ext: "bin",
+  kind: "unknown",
+});
 
 const t = (mime, ext, kind) => Object.freeze({ mime, ext, kind });
 
@@ -39,9 +43,21 @@ const TYPES = Object.freeze({
   ogg: t("audio/ogg", "ogg", "audio"),
   mp3: t("audio/mpeg", "mp3", "audio"),
   wav: t("audio/wav", "wav", "audio"),
-  docx: t("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx", "document"),
-  xlsx: t("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx", "sheet"),
-  pptx: t("application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx", "slides"),
+  docx: t(
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "docx",
+    "document",
+  ),
+  xlsx: t(
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "xlsx",
+    "sheet",
+  ),
+  pptx: t(
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "pptx",
+    "slides",
+  ),
   ole: t("application/x-ole-storage", "ole", "legacy_office"),
   zip: t("application/zip", "zip", "archive"),
   csv: t("text/csv", "csv", "sheet"),
@@ -51,8 +67,10 @@ const TYPES = Object.freeze({
   xml: t("application/xml", "xml", "markup"),
 });
 
-const startsWith = (buf, bytes, offset = 0) => bytes.every((b, i) => buf[offset + i] === b);
-const ascii = (buf, start, end) => buf.subarray(start, Math.min(end, buf.length)).toString("latin1");
+const startsWith = (buf, bytes, offset = 0) =>
+  bytes.every((b, i) => buf[offset + i] === b);
+const ascii = (buf, start, end) =>
+  buf.subarray(start, Math.min(end, buf.length)).toString("latin1");
 
 /** ISO base media (MP4, MOV, HEIC, AVIF): "ftyp" at 4, brand at 8. */
 function isoBrand(buf) {
@@ -60,14 +78,20 @@ function isoBrand(buf) {
   const major = ascii(buf, 8, 12);
   const size = buf.readUInt32BE(0);
   const compatible = [];
-  for (let i = 16; i + 4 <= Math.min(size, buf.length, 64); i += 4) compatible.push(ascii(buf, i, i + 4));
+  for (let i = 16; i + 4 <= Math.min(size, buf.length, 64); i += 4)
+    compatible.push(ascii(buf, i, i + 4));
   return { major, compatible };
 }
 
 function fromIso(brand) {
   const all = [brand.major, ...brand.compatible];
   if (all.some((b) => ["avif", "avis"].includes(b))) return TYPES.avif;
-  if (all.some((b) => ["heic", "heix", "hevc", "heim", "heis", "mif1", "msf1"].includes(b))) return TYPES.heic;
+  if (
+    all.some((b) =>
+      ["heic", "heix", "hevc", "heim", "heis", "mif1", "msf1"].includes(b),
+    )
+  )
+    return TYPES.heic;
   if (brand.major === "qt  ") return TYPES.mov;
   if (["M4A ", "M4B "].includes(brand.major)) return TYPES.m4a;
   return TYPES.mp4;
@@ -77,7 +101,11 @@ function fromIso(brand) {
 function zipEntryNames(buf, limit = 40) {
   const names = [];
   let at = 0;
-  while (names.length < limit && at + 30 <= buf.length && startsWith(buf, [0x50, 0x4b, 0x03, 0x04], at)) {
+  while (
+    names.length < limit &&
+    at + 30 <= buf.length &&
+    startsWith(buf, [0x50, 0x4b, 0x03, 0x04], at)
+  ) {
     const compressed = buf.readUInt32LE(at + 18);
     const nameLen = buf.readUInt16LE(at + 26);
     const extraLen = buf.readUInt16LE(at + 28);
@@ -117,10 +145,21 @@ function looksLikeText(buf) {
 }
 
 function textKind(buf, name) {
-  const head = buf.subarray(0, 2048).toString("utf8").replace(/^\uFEFF/, "").trimStart().toLowerCase();
-  if (head.startsWith("<?xml")) return head.includes("<svg") ? TYPES.svg : TYPES.xml;
+  const head = buf
+    .subarray(0, 2048)
+    .toString("utf8")
+    .replace(/^\uFEFF/, "")
+    .trimStart()
+    .toLowerCase();
+  if (head.startsWith("<?xml"))
+    return head.includes("<svg") ? TYPES.svg : TYPES.xml;
   if (head.startsWith("<svg")) return TYPES.svg;
-  if (head.startsWith("<!doctype html") || head.startsWith("<html") || /<(script|iframe|body|head)\b/.test(head)) return TYPES.html;
+  if (
+    head.startsWith("<!doctype html") ||
+    head.startsWith("<html") ||
+    /<(script|iframe|body|head)\b/.test(head)
+  )
+    return TYPES.html;
   if (/\.csv$/i.test(String(name || ""))) return TYPES.csv;
   return TYPES.txt;
 }
@@ -133,31 +172,49 @@ function textKind(buf, name) {
 function sniff(buf, name = "") {
   if (!Buffer.isBuffer(buf) || buf.length < 4) return UNKNOWN;
   if (startsWith(buf, [0x25, 0x50, 0x44, 0x46, 0x2d])) return TYPES.pdf; // %PDF-
-  if (startsWith(buf, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return TYPES.png;
+  if (startsWith(buf, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    return TYPES.png;
   if (startsWith(buf, [0xff, 0xd8, 0xff])) return TYPES.jpeg;
-  if (ascii(buf, 0, 6) === "GIF87a" || ascii(buf, 0, 6) === "GIF89a") return TYPES.gif;
-  if (ascii(buf, 0, 4) === "RIFF" && ascii(buf, 8, 12) === "WEBP") return TYPES.webp;
-  if (ascii(buf, 0, 4) === "RIFF" && ascii(buf, 8, 12) === "WAVE") return TYPES.wav;
+  if (ascii(buf, 0, 6) === "GIF87a" || ascii(buf, 0, 6) === "GIF89a")
+    return TYPES.gif;
+  if (ascii(buf, 0, 4) === "RIFF" && ascii(buf, 8, 12) === "WEBP")
+    return TYPES.webp;
+  if (ascii(buf, 0, 4) === "RIFF" && ascii(buf, 8, 12) === "WAVE")
+    return TYPES.wav;
   if (ascii(buf, 0, 4) === "OggS") return TYPES.ogg;
-  if (ascii(buf, 0, 3) === "ID3" || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0 && (buf[1] & 0x06) !== 0)) return TYPES.mp3;
+  if (
+    ascii(buf, 0, 3) === "ID3" ||
+    (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0 && (buf[1] & 0x06) !== 0)
+  )
+    return TYPES.mp3;
   if (startsWith(buf, [0x1a, 0x45, 0xdf, 0xa3])) {
     // EBML: webm or matroska. A recording with no video track is audio.
     const head = ascii(buf, 0, 4096);
     if (!head.includes("webm")) return UNKNOWN;
-    return head.includes("V_VP") || head.includes("V_AV1") || head.includes("V_MPEG") ? TYPES.webm : TYPES.webm_audio;
+    return head.includes("V_VP") ||
+      head.includes("V_AV1") ||
+      head.includes("V_MPEG")
+      ? TYPES.webm
+      : TYPES.webm_audio;
   }
   const brand = isoBrand(buf);
   if (brand) return fromIso(brand);
   if (startsWith(buf, [0x50, 0x4b, 0x03, 0x04])) return fromZip(buf);
-  if (startsWith(buf, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) return TYPES.ole;
+  if (startsWith(buf, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]))
+    return TYPES.ole;
   if (looksLikeText(buf)) return textKind(buf, name);
   return UNKNOWN;
 }
 
 /** The type for a known extension (serving a stored file whose type was sniffed when it arrived). */
 function typeForExt(ext) {
-  const e = String(ext || "").toLowerCase().replace(/^\./, "");
-  return Object.values(TYPES).find((x) => x.ext === e && x.kind !== "markup") || UNKNOWN;
+  const e = String(ext || "")
+    .toLowerCase()
+    .replace(/^\./, "");
+  return (
+    Object.values(TYPES).find((x) => x.ext === e && x.kind !== "markup") ||
+    UNKNOWN
+  );
 }
 
 module.exports = { sniff, typeForExt, TYPES, UNKNOWN, zipEntryNames };

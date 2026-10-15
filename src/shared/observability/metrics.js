@@ -18,11 +18,15 @@ const histograms = new Map();
 const gauges = new Map();
 
 const STARTED_AT = Date.now();
-const DEFAULT_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
+const DEFAULT_BUCKETS = [
+  0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
+];
 
 function labelKey(labels = {}) {
   const keys = Object.keys(labels).sort();
-  return keys.map((k) => `${k}=${String(labels[k]).replace(/[\\"\n,=]/g, "_")}`).join(",");
+  return keys
+    .map((k) => `${k}=${String(labels[k]).replace(/[\\"\n,=]/g, "_")}`)
+    .join(",");
 }
 
 function parseKey(key) {
@@ -60,23 +64,30 @@ function observe(name, seconds, labels = {}, help = "") {
   }
   v.count += 1;
   v.sum += seconds;
-  for (let i = 0; i < h.buckets.length; i += 1) if (seconds <= h.buckets[i]) v.counts[i] += 1;
+  for (let i = 0; i < h.buckets.length; i += 1)
+    if (seconds <= h.buckets[i]) v.counts[i] += 1;
 }
 
 /** /api/v1/employees/3f2a...-uuid/documents → /api/v1/employees/:id/documents */
 function templatePath(p) {
   return String(p || "/")
     .split("?")[0]
-    .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "/:id")
+    .replace(
+      /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      "/:id",
+    )
     .replace(/\/\d+(?=\/|$)/g, "/:n")
     .slice(0, 120);
 }
 
-const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/"/g, '\\"');
+const esc = (s) =>
+  String(s).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/"/g, '\\"');
 
 function renderLabels(labels) {
   const entries = Object.entries(labels);
-  return entries.length ? `{${entries.map(([k, v]) => `${k}="${esc(v)}"`).join(",")}}` : "";
+  return entries.length
+    ? `{${entries.map(([k, v]) => `${k}="${esc(v)}"`).join(",")}}`
+    : "";
 }
 
 function render() {
@@ -91,20 +102,28 @@ function render() {
   for (const [name, c] of counters) {
     if (c.help) out.push(`# HELP ${name} ${esc(c.help)}`);
     out.push(`# TYPE ${name} counter`);
-    for (const [k, v] of c.values) out.push(`${name}${renderLabels(parseKey(k))} ${v}`);
+    for (const [k, v] of c.values)
+      out.push(`${name}${renderLabels(parseKey(k))} ${v}`);
   }
   for (const [name, g] of gauges) {
     if (g.help) out.push(`# HELP ${name} ${esc(g.help)}`);
     out.push(`# TYPE ${name} gauge`);
-    for (const [k, v] of g.values) out.push(`${name}${renderLabels(parseKey(k))} ${v}`);
+    for (const [k, v] of g.values)
+      out.push(`${name}${renderLabels(parseKey(k))} ${v}`);
   }
   for (const [name, h] of histograms) {
     if (h.help) out.push(`# HELP ${name} ${esc(h.help)}`);
     out.push(`# TYPE ${name} histogram`);
     for (const [k, v] of h.values) {
       const labels = parseKey(k);
-      h.buckets.forEach((b, i) => out.push(`${name}_bucket${renderLabels({ ...labels, le: b })} ${v.counts[i]}`));
-      out.push(`${name}_bucket${renderLabels({ ...labels, le: "+Inf" })} ${v.count}`);
+      h.buckets.forEach((b, i) =>
+        out.push(
+          `${name}_bucket${renderLabels({ ...labels, le: b })} ${v.counts[i]}`,
+        ),
+      );
+      out.push(
+        `${name}_bucket${renderLabels({ ...labels, le: "+Inf" })} ${v.count}`,
+      );
       out.push(`${name}_sum${renderLabels(labels)} ${v.sum.toFixed(6)}`);
       out.push(`${name}_count${renderLabels(labels)} ${v.count}`);
     }
@@ -115,10 +134,14 @@ function render() {
 /** Plain-object view, for tests and the readiness probe. */
 function snapshot() {
   const out = { counters: {}, gauges: {}, histograms: {} };
-  for (const [name, c] of counters) out.counters[name] = Object.fromEntries(c.values);
-  for (const [name, g] of gauges) out.gauges[name] = Object.fromEntries(g.values);
+  for (const [name, c] of counters)
+    out.counters[name] = Object.fromEntries(c.values);
+  for (const [name, g] of gauges)
+    out.gauges[name] = Object.fromEntries(g.values);
   for (const [name, h] of histograms) {
-    out.histograms[name] = Object.fromEntries([...h.values].map(([k, v]) => [k, { count: v.count, sum: v.sum }]));
+    out.histograms[name] = Object.fromEntries(
+      [...h.values].map(([k, v]) => [k, { count: v.count, sum: v.sum }]),
+    );
   }
   return out;
 }
@@ -129,4 +152,12 @@ function __reset() {
   histograms.clear();
 }
 
-module.exports = { inc, setGauge, observe, templatePath, render, snapshot, __reset };
+module.exports = {
+  inc,
+  setGauge,
+  observe,
+  templatePath,
+  render,
+  snapshot,
+  __reset,
+};

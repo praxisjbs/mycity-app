@@ -64,6 +64,8 @@ mycity-app/
 │   │   │                     titles, refused button labels (gates 8, 11, 12, 17; FRONTEND_GUIDE §5)
 │   │   ├── lib/screens.js    opens every screen of demo.html (and the app, once built) in Chromium at
 │   │   │                     phone and desktop size and records copy and layout (gates 8, 11)
+│   │   ├── lib/source.js     reads JavaScript for the backend code gates (date-format, money,
+│   │   │                     module-catalogue): comments, strings, template and regex literals apart
 │   │   └── lib/sources.js    string literals, call arguments and frontend files for the static halves
 │   │                         of check/five-second.js, check/forms.js, check/dashes.js
 │   ├── db/                   migrate, seed, backup, restore-drill, create-admin
@@ -135,10 +137,10 @@ src/
 │   ├── money/         money
 │   ├── time/          lagos · working-week · day-first · recurrence
 │   ├── numbering/     numbering · schemes
-│   ├── files/         sniff · mime-policy · hash · safe-name
+│   ├── files/         sniff · mime-policy · hash · safe-name · variant-key
 │   ├── documents/     vault · generate · render · markdown · canonical
 │   ├── templates/     template-store · variables
-│   ├── spreadsheet/   parse · build · csv · cells · day-first-cells
+│   ├── spreadsheet/   parse · build · csv · cells · day-first-cells · context
 │   ├── import/        engine · mapping · registry · report · revert
 │   ├── tokens/        public-token
 │   ├── rules/         window-counter
@@ -154,7 +156,8 @@ src/
 │   ├── storage/       storage.service
 │   ├── media/         image-pipeline · av-pipeline · scan · reconcile
 │   ├── pdf/           chromium · pdf.service
-│   ├── mail/          system-mail.service · deliverability/{route-check, dns-check}
+│   ├── mail/          system-mail.service · deliverability/{check, route-check, dns-check,
+│   │                  dmarc, ptr, rbl, evaluate}
 │   ├── secrets/       encryption.service
 │   ├── ai/            llm.service · governance · ledger · redact · structured · transcription ·
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
@@ -554,7 +557,8 @@ installs it; locally run `npx playwright install chromium` once after `npm ci`. 
 1. Branch from `main`: `m<N>/<short-name>` (for example `m3/query-rules`).
 2. PR title in Conventional Commits form: `feat(queries): raise a query on the third late arrival`.
 3. One approving review, not the author, and from a code owner of every path the PR touches
-   (`.github/CODEOWNERS`). The `ci` check green. `main` is protected with no bypass, the
+   (`.github/CODEOWNERS`). GE and TB are owners of every path, so either one's approval is enough;
+   a path's own owner (LA for data, AJ for the apps) is listed first. The `ci` check green. `main` is protected with no bypass, the
    repository owner included (`docs/runbooks/github-settings.md`). Collaborators push branches and
    open PRs; nobody pushes to `main`.
 4. Merge to `main` deploys to **staging** automatically, runs the staging verification, and seals the

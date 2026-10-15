@@ -23,7 +23,11 @@
  */
 const multer = require("multer");
 const { AppError } = require("../shared/errors");
-const { UPLOAD_HARD_CAP, UPLOAD_CAPS, describeBytes } = require("../shared/http/body-limits");
+const {
+  UPLOAD_HARD_CAP,
+  UPLOAD_CAPS,
+  describeBytes,
+} = require("../shared/http/body-limits");
 
 const memory = multer({
   storage: multer.memoryStorage(),
@@ -31,14 +35,22 @@ const memory = multer({
 });
 
 function tooLarge(limit) {
-  return new AppError("FILE_TOO_LARGE", `That file is larger than ${describeBytes(limit)}. Choose a smaller file.`, 413);
+  return new AppError(
+    "FILE_TOO_LARGE",
+    `That file is larger than ${describeBytes(limit)}. Choose a smaller file.`,
+    413,
+  );
 }
 
 function translate(err) {
   if (!err) return null;
   if (err.code === "LIMIT_FILE_SIZE") return tooLarge(UPLOAD_HARD_CAP);
   if (err.code === "LIMIT_UNEXPECTED_FILE" || err.code === "LIMIT_FILE_COUNT") {
-    return new AppError("UNEXPECTED_FILE", "This upload has a file where none was expected", 400);
+    return new AppError(
+      "UNEXPECTED_FILE",
+      "This upload has a file where none was expected",
+      400,
+    );
   }
   if (err.code && String(err.code).startsWith("LIMIT_")) {
     return new AppError("UPLOAD_REJECTED", "This upload is malformed", 400);
@@ -48,7 +60,10 @@ function translate(err) {
 
 function capFor(purpose) {
   const cap = UPLOAD_CAPS[purpose];
-  if (!cap) throw new Error(`upload: unknown purpose "${purpose}" (shared/http/body-limits.js UPLOAD_CAPS)`);
+  if (!cap)
+    throw new Error(
+      `upload: unknown purpose "${purpose}" (shared/http/body-limits.js UPLOAD_CAPS)`,
+    );
   return cap;
 }
 
@@ -69,7 +84,10 @@ function single(field, { purpose, required = true }) {
       const e = translate(err);
       if (e) return next(e);
       try {
-        if (!req.file && required) throw new AppError("FILE_REQUIRED", "Choose a file to upload", 422, { [field]: ["is required"] });
+        if (!req.file && required)
+          throw new AppError("FILE_REQUIRED", "Choose a file to upload", 422, {
+            [field]: ["is required"],
+          });
         if (req.file) checkSizes([req.file], cap);
         req.upload_purpose = purpose;
         return next();
@@ -116,12 +134,16 @@ const toUpload = (f, purpose) => ({
  * @returns {{buffer: Buffer, size: number, originalname: string, declared_type: string|null, purpose: string}|null}
  */
 function readUpload(req) {
-  return req.file && Buffer.isBuffer(req.file.buffer) ? toUpload(req.file, req.upload_purpose) : null;
+  return req.file && Buffer.isBuffer(req.file.buffer)
+    ? toUpload(req.file, req.upload_purpose)
+    : null;
 }
 
 /** The files an array() upload received. */
 function readUploads(req) {
-  return (req.files || []).filter((f) => Buffer.isBuffer(f.buffer)).map((f) => toUpload(f, req.upload_purpose));
+  return (req.files || [])
+    .filter((f) => Buffer.isBuffer(f.buffer))
+    .map((f) => toUpload(f, req.upload_purpose));
 }
 
 module.exports = { single, array, readUpload, readUploads };

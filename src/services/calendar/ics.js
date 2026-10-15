@@ -55,16 +55,22 @@ function fold(line) {
 /** "20261020T090000Z" */
 function utc(instant) {
   const d = instant instanceof Date ? instant : new Date(instant);
-  if (Number.isNaN(d.getTime())) throw new Error(`ics: "${instant}" is not a date and time`);
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  if (Number.isNaN(d.getTime()))
+    throw new Error(`ics: "${instant}" is not a date and time`);
+  return d
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 }
 
 const mailto = (email) => {
   const e = String(email || "").trim();
-  if (!/^[^@\s]+@[^@\s]+$/.test(e)) throw new Error(`ics: "${email}" is not an email address`);
+  if (!/^[^@\s]+@[^@\s]+$/.test(e))
+    throw new Error(`ics: "${email}" is not an email address`);
   return `mailto:${e}`;
 };
-const cn = (name) => (name ? `;CN="${String(name).replace(/["\r\n]/g, "")}"` : "");
+const cn = (name) =>
+  name ? `;CN="${String(name).replace(/["\r\n]/g, "")}"` : "";
 
 /**
  * @param {object} e  see the file header
@@ -72,9 +78,12 @@ const cn = (name) => (name ? `;CN="${String(name).replace(/["\r\n]/g, "")}"` : "
  */
 function event(e) {
   const method = e.method || "REQUEST";
-  if (!METHODS.has(method)) throw new Error(`ics: method is REQUEST, CANCEL or PUBLISH`);
-  if (!e.uid || !/^[\w.@-]+$/.test(e.uid)) throw new Error("ics: a stable uid is required (letters, digits, . @ - _)");
-  if (new Date(e.end) <= new Date(e.start)) throw new Error("ics: end must be after start");
+  if (!METHODS.has(method))
+    throw new Error(`ics: method is REQUEST, CANCEL or PUBLISH`);
+  if (!e.uid || !/^[\w.@-]+$/.test(e.uid))
+    throw new Error("ics: a stable uid is required (letters, digits, . @ - _)");
+  if (new Date(e.end) <= new Date(e.start))
+    throw new Error("ics: end must be after start");
   const lines = [
     "BEGIN:VCALENDAR",
     "PRODID:-//MyCity App//ERP//EN",
@@ -92,13 +101,22 @@ function event(e) {
   if (e.description) lines.push(`DESCRIPTION:${escapeText(e.description)}`);
   if (e.location) lines.push(`LOCATION:${escapeText(e.location)}`);
   if (e.url) lines.push(`URL:${String(e.url).replace(/[\r\n]/g, "")}`);
-  if (e.organizer) lines.push(`ORGANIZER${cn(e.organizer.name)}:${mailto(e.organizer.email)}`);
+  if (e.organizer)
+    lines.push(`ORGANIZER${cn(e.organizer.name)}:${mailto(e.organizer.email)}`);
   for (const a of e.attendees || []) {
-    lines.push(`ATTENDEE${cn(a.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:${mailto(a.email)}`);
+    lines.push(
+      `ATTENDEE${cn(a.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:${mailto(a.email)}`,
+    );
   }
   lines.push(`STATUS:${method === "CANCEL" ? "CANCELLED" : "CONFIRMED"}`);
   if (e.reminderMinutes) {
-    lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(e.summary)}`, `TRIGGER:-PT${Math.round(e.reminderMinutes)}M`, "END:VALARM");
+    lines.push(
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${escapeText(e.summary)}`,
+      `TRIGGER:-PT${Math.round(e.reminderMinutes)}M`,
+      "END:VALARM",
+    );
   }
   lines.push("END:VEVENT", "END:VCALENDAR");
   return `${lines.map(fold).join("\r\n")}\r\n`;
@@ -106,7 +124,11 @@ function event(e) {
 
 /** As a mail attachment (system-mail.service send({ attachments })). */
 function attachment(e, filename = "invite.ics") {
-  return { filename, content: event(e), contentType: `text/calendar; charset=utf-8; method=${e.method || "REQUEST"}` };
+  return {
+    filename,
+    content: event(e),
+    contentType: `text/calendar; charset=utf-8; method=${e.method || "REQUEST"}`,
+  };
 }
 
 module.exports = { event, attachment, escapeText, fold, utc };

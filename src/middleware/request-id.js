@@ -17,10 +17,16 @@ const SAFE_ID = /^[A-Za-z0-9._:-]{8,64}$/;
 /** The surface is filled in later by http/routes.js, once the path says which one it is. */
 function requestId(req, res, next) {
   const incoming = req.headers["x-request-id"];
-  const id = typeof incoming === "string" && SAFE_ID.test(incoming) ? incoming : randomUUID();
+  const id =
+    typeof incoming === "string" && SAFE_ID.test(incoming)
+      ? incoming
+      : randomUUID();
   req.request_id = id;
   res.setHeader("X-Request-Id", id);
-  requestContext.run({ requestId: id, userId: null, surface: null, importBatchId: null }, () => next());
+  requestContext.run(
+    { requestId: id, userId: null, surface: null, importBatchId: null },
+    () => next(),
+  );
 }
 
 module.exports = { requestId, SAFE_ID };

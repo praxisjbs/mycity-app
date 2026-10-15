@@ -15,7 +15,8 @@ const { shortSha } = require("../config/build-info");
 function environmentMarker(_req, res, next) {
   res.setHeader("X-Mycity-Environment", config.APP_ENV);
   res.setHeader("X-Mycity-Build", shortSha());
-  if (config.APP_ENV !== "production") res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  if (config.APP_ENV !== "production")
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
   next();
 }
 

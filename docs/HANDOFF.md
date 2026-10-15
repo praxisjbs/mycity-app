@@ -1,212 +1,268 @@
-# MyCity Hub — Handoff for the next session
+# MyCity App: Handoff for the next session
 
-**Written 12 October 2026, 14:40 Lagos time.** Read this first, then `README.MD`, then the
-documents it points to. Everything below is the state at the end of the session that produced the
-architecture and the empty repository.
-
----
-
-## 1 · Who and what
-
-- **User:** Godwin-Okoh Elisha ("Wizzy"), GE on the JBS Praxis team. Owns architecture, schema and
-  M0 (foundation). Backend/full-stack, Node/Express, PostgreSQL, Linux VPS.
-- **Team:** Tom-Blake Asaah (TB), Love Adeola (LA), Adole Jerome (AJ). Tom-Blake is a colleague, not
-  the user.
-- **Client:** MyCity App Ltd (Lagos). Operations contact: Cynthia Osakunih. CEO: Ifeoma Chukwu (as
-  used in the demo; confirm before relying on it).
-- **Product:** MyCity App ERP. Staff app `hub.mycityapp.io`, separate public site `go.mycityapp.io`,
-  staging twins `hub.staging.` / `go.staging.`. Eleven contracted milestones (M1 to M11) plus M0,
-  9 October to 18 December 2026, ₦3,200,000 over the eleven weights. No production release
-  21 December to 5 January.
+**Written 15 October 2026, 08:30 Lagos time** (updated after phase 6, and after the first group of CI gates). It replaces the 12 October handoff. Read this
+first, then `CLAUDE.md`, then the documents it points to.
 
 ---
 
-## 2 · How this user works (follow it)
+## 1 · Start here
 
-- Short prompts, raw context. Expects finished output, not upfront questions. Ask only when a
-  decision genuinely blocks the work.
-- **Do not run tests, scripts or a browser unless he asks or approves.** (He explicitly asked for the
-  HTML files to be rendered once; that was approval for that task only.) Reading files with
-  `ls`/`cat`/`grep` is fine.
-- Prefers files delivered directly, not branch pushes. Do not commit to git unless asked; he commits
-  himself (`main` has one commit, "Project started: Building project foundation.").
-- **"Edit, don't rewrite"** when he says so: use targeted edits on existing documents.
-- **When he says "leave empty", files are created with zero bytes, no `.gitkeep`, and no migration
-  files.**
-- He corrected scope once and then reversed the correction: a version that moved later-milestone
-  features out of M0 (BACKEND_STRUCTURE v1.2) was rejected; **v1.1 is the accepted version.** Do not
-  re-trim M0.
-- He wants nothing missed or skipped. He reads closely and will catch omissions.
+You are continuing **M0, the shared foundation**, for Godwin-Okoh Elisha ("Wizzy", GE, GitHub
+`@swizfcodes`). The team is Tom-Blake Asaah (TB, `@tomblakeasaah196`, owns the GitHub repo
+`tomblakeasaah196/mycity-app`), Love Adeola (LA, `@LovedataX`, migrations and data) and Adole Jerome
+(AJ, `@Ghosted34`, frontend foundation). Tom-Blake is a colleague, not the user.
+
+The plan approved on 13 October was six phases of shared code that M1 to M11 build on. **All six
+phases are done, tested and passing (phase 6, AI and search, on 15 October).** What remains of M0
+is module code, migrations and the release pipeline (§4); confirm with him before starting any of it.
+
+### How he works (follow it exactly)
+
+- Short prompts with raw context (logs, screenshots). He expects finished, working output, not
+  upfront questions. Ask only when a decision genuinely blocks the work, and recommend an answer.
+- **Write code directly on his computer** (`C:\mycity-app`, through the device shell), never in the
+  cloud workspace. A cloud session can be wiped; patches written there were lost once.
+- **The cloud is a test bench only.** Copy a snapshot there, run tests, fix on his machine, copy
+  the fixed file across, rerun. Never edit code in the bench. Procedure in §6.
+- **Do not run tests, scripts or a browser unless he asks or approves.** He approved cloud testing
+  on 14 October; ask again in a new session. Reading files and `node --check` are fine.
+- **Do not commit, push or open a PR** unless asked. He commits himself.
+- **Do not touch `src/modules/*` or `migrations/`** in this work unless it is really needed, and
+  ask first. Migrations are LA's.
+- **Ported code never names its source**: no `praxis`, `pixie`, donor paths or "ported from" in
+  code, comments, tests or config. `scripts/check/provenance.js` fails the build. He was firm on this.
+- **Port from the donors, do not write from the map's description.** For each file REUSE_MAP names,
+  open the donor file, port it, and record every deliberate change in REUSE_MAP §1.4. He checks.
+- Node 20 stays (`.nvmrc`, engines `>=20.19 <21`). Express 4. CommonJS.
+- Leave `ops/nginx` alone. The backend serves the built frontends itself (`app/dist` on `hub.`,
+  `public-app/dist` on `go.`, host-guarded); the proxy only terminates TLS.
+- No deletions on his machine: delete permission was declined. Put anything to remove in a
+  `_to_delete/` folder and tell him.
+- After writing files on his machine, verify them by hash.
+- He asked for an honest answer when something is not done. Say what was not verified.
 
 ---
 
-## 3 · Where everything is
+## 2 · Where everything is
 
-### On his computer (linked through the Claude desktop app)
-
-| Path | What |
+| Place | What |
 |---|---|
-| `C:\mycity-app\` | The new repository. Git initialised, one commit. **All code files are empty** |
-| `C:\mycity-app\README.MD` | Engineer guide (filled, 28 KB). Note the uppercase `.MD`, his choice |
-| `C:\mycity-app\docs\SYSTEM_ARCHITECTURE.md` | System architecture v1.0 + edits (filled) |
-| `C:\mycity-app\docs\BACKEND_STRUCTURE.md` | Backend structure v1.1 + AI and offline sections (filled) |
-| `C:\mycity-app\docs\MyCity-ERP-Documents\` | Client pack: `MILESTONES.md` (v1.4), `REUSE_MAP.md`, `MILESTONE_QUESTIONS.md`, `INDEX.md`, `EMAIL-naming-approval.md`, `milestones.html`, `demo.html` |
-| `C:\praxis-ls\` | Donor repo 1 (multi-tenant logistics ERP, Cameroon). Has a `CLAUDE.md` worth reading |
-| `C:\pixie-girl-hub\` | Donor repo 2 (multi-brand Nigerian ERP). Has a `CLAUDE.md` worth reading |
+| `C:\mycity-app` (device shell: `$HOME/mnt/mycity-app`) | The repo. Branch **`m0-foundation-build`** |
+| `C:\praxis-ls` (`$HOME/mnt/praxis-ls`) | Donor 1. Read its `CLAUDE.md` |
+| `C:\pixie-girl-hub` (`$HOME/mnt/pixie-girl-hub`) | Donor 2. Read its `CLAUDE.md` |
 
-Folder access already granted this session: `C:\` (whole drive), `C:\praxis-ls`, `C:\pixie-girl-hub`.
-In the device shell they mount as `$HOME/mnt/c`, `$HOME/mnt/praxis-ls`, `$HOME/mnt/pixie-girl-hub`.
+**Git state at handoff:** `main` has PR #17 (phases 1 to 4) merged. Branch `m0-foundation-build`
+has commit `9c42322` (restored deliverability, encryption and spreadsheet ports) plus **staged,
+uncommitted** changes from the reuse pass (20 files, listed in §3.2). He will commit them.
+`main` is branch-protected; work on branches named `m<N>/<short-name>`.
 
-### Document authority
-
-1. `MILESTONES.md` v1.4 is binding for scope and decisions A1 to A25.
-2. `REUSE_MAP.md` **wins over** `MILESTONES.md` where they disagree (user ruling).
-3. `demo.html` is a **look-and-feel reference only**. Its data contradicts the documents in many
-   places; that is accepted and must not be "fixed" or used as a source of rules or data.
-4. `SYSTEM_ARCHITECTURE.md` and `BACKEND_STRUCTURE.md` are the engineering design produced this session.
-5. `README.MD` is the map for engineers and the place new files are recorded.
+**Document authority:** `MILESTONES.md` is binding for scope and decisions A1 to A25, and
+`REUSE_MAP.md` wins where the two disagree. Then `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`
+and the guides. `README.MD` is the file map; `demo.html` is look only. If two disagree in a way that
+matters, stop and ask.
 
 ---
 
-## 4 · Decisions made this session (user rulings)
+## 3 · What is done
 
-| # | Decision |
-|---|---|
-| 1 | `REUSE_MAP.md` wins over `MILESTONES.md`. Workflow engine is **Pixie's, ported** (A11 updated) |
-| 2 | **A23 holds**: AI reads only; writes are routed to the owning screen. No write contract anywhere |
-| 3 | §18.2 unregistered-route gate is **gate 10** (was wrongly 15) |
-| 4 | **No entity permission layer.** Four layers: module, action, record scope, field |
-| 5 | **Expenses reconciled**: one chain for every request: requester → line manager → Operations → requisition → CEO → disbursed. Category threshold does not add a step; a line at or above its category threshold needs its own CEO tick inside the requisition; removed lines return to Operations. No flat ₦500,000 hierarchy |
-| 6 | Demo is for visuals only |
-| 7 | PAYE bands and statutory rates come from current Nigerian law at M6; never the donor's or the demo's |
-| 8 | **Public site stays a separate app** on `go.mycityapp.io` (A9). User said "leave public site for now"; `REUSE_MAP.md` §1.3 still says otherwise and was deliberately not changed |
-| 9 | **Wire casing: `snake_case`** everywhere, matching DB columns |
-| 10 | Mobile layout is built alongside desktop in React + Vite by the frontend team; the backend design does not cover frontend |
-| 11 | Staging must be tested and **approved by a person before anything reaches production** (design in SYSTEM_ARCHITECTURE §9) |
-| 12 | Offline/sync is **out of scope** (BACKEND_STRUCTURE §15 records why and what exists if it is ever added) |
+### 3.1 Phases 1 to 4 (merged in PR #17)
 
-Edits already applied to the client pack for rulings 1 to 5 and 7: `MILESTONES.md` is v1.4
-(A11 rewritten, gate wording, write contract removed, four layers, §13 reconciliation, PAYE note),
-`REUSE_MAP.md` §9 and §11 amended, `milestones.html` deck corrected (M5/M10 reuse, gate 19 label,
-eight gates at M0, no em dashes, v1.4).
+1. **Config and HTTP core:** `config/*` (env schema, one pg pool, Redis, logger, request context),
+   `app.js`, `server.js`, `http/*` (`route()` with a contract and a permission on every route,
+   module loader, health), `middleware/*` (auth, rbac, idempotency, error handler, rate limit,
+   uploads, async-safe), `shared/http/paged.js` (25 per page, the pagination gate).
+2. **RBAC and contracts:** grants cache, sessions, scopes all/team/own, field masking, the contract
+   package `common.js`, route-contract and public-surface gates.
+3. **Events and work:** `events/{catalogue,emit,outbox}` (one `emit()` writes event_log, audit_ledger
+   and event_outbox; at-least-once handlers; `markReady()`), `workflow/*` (engine, conditions,
+   definitions, approvers), alerts, notifications (categories, fanout), route map, crud kit.
+4. **Files and documents:** sniff by bytes, mime policy, storage, vault, image/AV pipelines, clamd
+   scan, reconcile, PDF via Chromium, template language and versions, Markdown, canonical payloads,
+   spreadsheets, the import engine (map, real preview, commit, revert, error file), system mail,
+   deliverability, encryption, QR, ICS.
 
----
+### 3.2 Reuse pass (14 October; staged, not committed)
 
-## 5 · The design in brief
+Brought phases 3 and 4 in line with REUSE_MAP and recorded every deliberate change in
+**REUSE_MAP §1.4**: doc-type register (`shared/documents/types.js`, enforced by `vault.store`),
+served types limited to the allow-list, `shared/files/variant-key.js`, photo/avatar enhancement,
+versioned canonical signature payloads with a golden test, the escape-first Markdown renderer
+(`marked` removed), spreadsheet totals fix, MILESTONES workflow amendment, BACKEND_STRUCTURE port
+table, PROGRESS note, `.env.example` regenerated (`MAIL_RBL_HOSTS`).
 
-Full detail is in the two architecture documents; this is the spine.
+### 3.3 Phase 5: the worker (14 October; not committed)
 
-- **Processes:** per environment, one API (`src/server.js`) and one worker (`src/worker.js`). Four
-  systemd units on one server (4 vCPU, 8 GB, 80 GB). nginx, Let's Encrypt.
-- **Data:** PostgreSQL 16, `mycity_prod` / `mycity_stg`, separate roles, no cross-grants. Redis db 0/1
-  with BullMQ prefixes `mycity:prod` / `mycity:stg`. `system_marker` row in each DB; seed tooling
-  refuses production. Production is never seeded.
-- **Surfaces:** staff API `/api/v1/*` on `hub.`; public API `/api/public/v1/*` on `go.`; nginx
-  allow-lists paths per host. Modules declare `surface` per routes file (`*.public.routes.js`).
-- **Events:** one `emit()` in the service transaction writes `event_log` + `audit_ledger` +
-  `event_outbox`; the worker runs named, idempotent handlers after commit. Fixes Praxis's
-  in-transaction fan-out and Pixie's pre-commit EventEmitter.
-- **Workflow:** Pixie engine ported; `business` column dropped; events go through the outbox; money
-  conditions use `decimal.js`; approvers `role | user | manager_of_subject`; CEO = `app_user.is_ceo`.
-- **Contract:** Zod schemas in `packages/contract/schemas/`; routes declare `{ body, query, params,
-  response }` via `route()`; `npm run gen:contract` generates `contract.gen.ts` (types + `Endpoints`
-  map + runtime schemas). CI fails if stale, hand-edited, non-snake_case, a key is not a column, or a
-  route lacks a contract. Frontend may not declare its own Zod.
-- **Numbering:** one allocator, inside the caller's transaction, counter row locked, gap-free, never
-  reused, scheme is data, missing scheme fails readiness. Proposed prefixes in BACKEND_STRUCTURE §7.
-- **Documents/media:** one `document` table for every file (versions, lock, sensitivity, polymorphic
-  attachment); upload sniffs bytes; image pipeline (photo/document/avatar), ffmpeg for voice/video,
-  ClamAV for stranger uploads; Node checks access then nginx streams via `X-Accel-Redirect`;
-  `documents.generate()` numbers, renders, PDFs, stores, hashes, locks.
-- **Imports (v1.1 puts engine + staff importer in M0):** upload, detect header, map with remembered
-  profiles, day-first coercion, validate with the create-API schema, match, preview = real run rolled
-  back, commit through services, error file, history, revert. Staff importer resolves line managers in
-  a second pass. **A14 in MILESTONES still says M7; amendment offered, not yet approved.**
-- **AI:** everything through `services/ai/llm.service.js` (governance cap, redact, versioned prompt
-  files, Gemini or stub, structured Zod output, ledger). Output provisional until accepted. Module
-  `.ai.js` manifests declare reads (with permission and citation) and screen routes; a `write` key is
-  rejected. Catalogue synced on deploy. M10 assistant in `services/ai/assistant/`.
-- **Release (SYSTEM_ARCHITECTURE §9):** PR → CI → merge → `release.yml`: build → deploy staging →
-  automated verify → seal (tree hash) → **wait for approval** (GitHub `production` environment, GE or
-  TB, self-review blocked, prod SSH key only released after approval) → promote by hard-linking the
-  sealed staging tree into production (no rebuild) → readiness → tag. Server-side forced-command
-  `deploy-gate` with key-scoped verbs. Migrations run only inside stage/promote, after a dump. Freeze
-  21 Dec to 5 Jan enforced in promote.
+`worker.js`, `jobs/{queues,registry,cron-lock}`, the eight M0 handlers and five schedulers,
+outbox triggers (`document.stored` → `media-scan` / `av-transcode`; `document.render_requested` →
+`pdf-render`), notification delivery (bell over Socket.io, email with
+`templates/email/notification.html`, push counted until M6), `realtime/socket.js` and
+`services/realtime/emitter.js`, `scripts/db/{migrate,seed}.js`, `scripts/gen/contract.js`
+(`contract.gen.ts` generated, the contract gate built). Also: `shared/import/engine.expireAbandoned`
+(`import.expired`), `WORKER_DB_POOL_MAX`, a worker heartbeat read by `/api/health/ready`
+(`worker`), Chromium's background networking off, `sessionLive` and `originsFor` exported,
+template front matter values may be quoted (`subject: "{{ title }}"`), which survives his formatter.
+New packages in `package.json` and the lockfile: `bullmq`, `socket.io`, `@socket.io/redis-adapter`,
+`@socket.io/redis-emitter`; dev `socket.io-client`. **He must run `npm install`** on his machine.
+Every deliberate change against the donors is in REUSE_MAP §1.4; BACKEND_STRUCTURE §3, §11.1
+(`schema_migration` with `sha256`, `system_marker`) and SYSTEM_ARCHITECTURE §7 updated.
 
----
+Decisions taken in phase 5 (say so if he disagrees):
+- Queue names are the handler file names (`email-send`, `pdf-render`), not `email` / `pdf`.
+- Schedulers are BullMQ job schedulers on one `schedule` queue, each tick under the Postgres
+  cron lock; the outbox dispatch is a 1-second in-process timer in every worker (SKIP LOCKED).
+- `media-derive` re-derives audio/video by id; image variants are made at upload (phase 4), so it
+  only reports for images.
+- Unfinished imports are closed after 14 days (rows removed, batch `failed`, stats.expired).
+- import-validate / import-commit run as the person who asked (grant re-checked in the job).
 
-## 6 · Repository state
+### 3.4 Phase 6: AI and search (15 October; not committed)
 
-`C:\mycity-app` has 957 files outside `.git`, **all empty except** `README.MD`, the two
-architecture docs, and the client pack. 63 modules in `src/modules/` (9 for M0, 54 for M1 to M11),
-schema files per module in `packages/contract/schemas/` (modules carry only the files they need; README §5.1 lists the ai:none, search:none and no-events modules), jobs, prompts, templates, CI check scripts,
-ops files, runbooks and manual stubs. Empty directories with no files: `migrations/`, `seeds/build`,
-`seeds/staging`, `assets/brand`, `assets/fonts`, `tests/{unit,integration,staging}`. Git does not track
-empty directories; the user knows.
+- `services/ai`: `llm.service.complete()` (prompt file with `version:` front matter, governance,
+  ledger opened before anything leaves, redaction, Gemini or the stub, structured parsing against a
+  contract schema with one corrective retry, cost in naira), `governance.js` (`ai_setting`: switch,
+  `disabled_modules`, `monthly_cap_ngn`, prices; environment defaults with no row), `ledger.js`
+  (`ai_run`, `ai_run_step`; fails closed), `redact.js` (Nigerian identifiers, restricted fields),
+  `structured.js` (Zod to JSON Schema, parse), `vendors/gemini.js` (fetch to the OpenAI-compatible
+  gateway; no SDK), `vendors/stub.js` (a placeholder of the schema's shape), `transcription.js`
+  (seam; Gemini audio is M2). Prompt files are still empty: each milestone writes its own.
+- `shared/ai`: `manifest.js` (`defineManifest`: reads need `view`, params from the contract, routes
+  name `"<module>.<tab>"` screens; any write-shaped key refused), `registry.js`, `authorise.js`
+  (`runRead`, `allowedReads`), `cite.js`, `catalogue-sync.js` (worker boot and
+  `node src/shared/ai/catalogue-sync.js` for deploy-gate). The M10 assistant folder stays empty.
+- `shared/search`: `recordProvider` (folded prefix, substring, trigram; scope column; pages of 25;
+  link from the route map), `registry.js`, `search.service.js`.
+- `middleware/rbac.scopeFor(user, key, action)`: requirePermission's decision for non-route callers.
+- The API and the worker load manifests and providers at boot (a bad one stops the boot); `/api/health/ready`
+  reports `ai` (vendor and model, no call out).
+- Gates built: 9 `ai-manifest-coverage`, 10 `search-coverage` (backend half), 19 `ai-no-writes`,
+  `ai-vendor-imports`. New env: `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_REQUEST_TIMEOUT_MS`,
+  `AI_MAX_OUTPUT_TOKENS`, `AI_INPUT_NGN_PER_MILLION` (450.00), `AI_OUTPUT_NGN_PER_MILLION` (3750.00):
+  the price defaults are Gemini 2.5 Flash list prices at about ₦1,500 to the dollar, to check
+  before go-live. REUSE_MAP §1.4 has every change against the donors; BACKEND_STRUCTURE §3, §11.1
+  (ai tables), §14.3 and BACKEND_GUIDE §3.6 updated.
 
-The full module list, file conventions, permission-key mapping, jobs per milestone and migration
-number blocks (M0 0001 to 0999, M1 1000s … M11 11000s) are in `README.MD` §5 and §6.3.
+### 3.5 CI gates, first group (15 October; not committed)
 
----
+Nine gates and the import command line, each with tests (`tests/unit/foundation/gates.test.js`,
+plus round-trip and command-line tests in `tests/integration/worker.test.js` and
+`documents-import.test.js`):
 
-## 7 · Open items waiting on the user
+- Gate 3 `migration-numbers.js`: names, unique numbers, milestone blocks; a new file on an `m<N>`
+  branch must be in M<N>'s block (branch from `GITHUB_HEAD_REF` or git).
+- Gate 4 `migration-reversibility.js`: a DOWN or `-- IRREVERSIBLE: <reason>`; DOWN names what UP
+  creates; `-- DESTRUCTIVE: <reason>` on destructive steps. With `RUN_DB_TESTS=1` and
+  `DATABASE_URL` (or `--apply`): UP one file at a time, each DOWN compared with the catalogue as it
+  was before that UP, then UP again, on a throwaway `mycity_revcheck_*` database (needs CREATEDB).
+- Gate 5 `migration-idempotency.js`: the guard rules, and a merged migration edited, renamed or
+  deleted fails (git, through `check/lib/changes.js`).
+- Gate 15 `date-format.js`, 20 `money.js`; gate 17 `dashes.js` is the screen gates' version from
+  main (merged 15 October), widened to `packages/` and the AI prompts; guards `module-catalogue.js`
+  (unenforced keys are a note until `--exact` at M9), `production-environment-refs.js`, `shell.js`.
+- `check/lib/source.js`: the JavaScript reader the backend gates share. The screen gates from
+  main have their own (`check/lib/sources.js`); folding the two together is a later tidy-up.
+- `migrate.js`: five-digit numbers (M10 10000, M11 11000) ordered by number, `migrate({until})`,
+  and `--down` refuses an irreversible file.
+- `scripts/import/run.js`: list, template, upload, map, preview, errors, commit, revert, status,
+  history, as the person named by `--as`; commit and revert on staging or production ask for the
+  environment name (or `--yes`).
 
-1. **A14 amendment**: MILESTONES says the generic importer lands in M7; BACKEND_STRUCTURE v1.1 builds
-   the engine and staff importer in M0. Offer stands to make the one-line amendment.
-2. **Permission keys**: the 15 keys in README §5.2 (`home`, `workspace`, `ess`, `community`,
-   `mailbox`, `people`, `performance`, `queries`, `recruitment`, `payroll`, `partnerships`,
-   `expenses`, `knowledge`, `praxis_ai`, `settings`) were proposed by the AI. Confirm before code.
-3. **systemd vs PM2**: the docs say four systemd units; the user normally uses PM2. Not answered.
-4. **Numbering prefixes** (BACKEND_STRUCTURE §7, e.g. `MCA-0001` staff number) are proposals for
-   MyCity to confirm.
-5. **Public site wording in REUSE_MAP §1.3** still contradicts A9; user said leave it.
-6. **Things raised from the client pack, not yet acted on** (from the first review):
-   - SOW maintenance price contradiction: cover ₦500,000/yr vs clause 8.2 ₦300,000/yr.
-   - M11 "training on live data on staging" vs A5 "staging holds demonstration data" (NDPA question).
-   - Confirm current Nigerian PAYE bands (Nigeria Tax Act effective 2026) before M6. Not web-verified.
-   - Who approves payroll (CEO or COO) is open in MILESTONES §11.
-   - Lateness threshold for auto-query is unconfirmed (§8).
+### 3.6 Test state (15 October, Node 20, cloud bench)
 
----
-
-## 8 · Donor code findings worth remembering
-
-- **Praxis `shared/events/emit.js`** fans out notifications and starts a workflow executor inside
-  the business transaction. Do not port that part.
-- **Pixie `src/workflows/engine.js`** emits `workflow.*` on an in-process EventEmitter before commit,
-  and `conditions.js` compares money with `Number()`. Both changed in the port.
-- **Praxis `deploy.yaml`** has `environment: production` but its PR-review gate is `if: false` since
-  5 August 2026, and it deploys by `git pull` on the server. Not reused.
-- **Praxis `config/env.js`** is 1,075 lines of tenant/platform variables: rewrite, do not port.
-- Strong donors to port as-is or nearly: Praxis `tx.js`, `query-helpers.js`, `resource.js`,
-  `validate.js`, `error-handler.js`, `idempotency.js`, `auth.js`, `rbac.js`, `module-loader.js`,
-  `health.js`, `numbering.service.js`, `image-pipeline.service.js`, `upload.middleware.js`,
-  `services/spreadsheet/*`, `services/search/*`, `document_vault`; Pixie `outbox.js`, `money.js`,
-  `lagos-time.js`, `access.catalog.js`, `workflows/*`.
-- Both repos' `CLAUDE.md` files hold their house rules (no native dialogs, day-first dates, upload
-  engine, search registry, prose behind ⓘ, Title Case, no em dashes, AI manifests). MyCity keeps the
-  intent of all of them.
+387 tests pass (305 unit, 82 integration against Postgres 16 and Redis, real Chromium and
+ffmpeg). `npm run ci`: 26 passed, 0 failed, **2 not built** (schema-drift, contract-columns, both
+gate 6). The guides gate passed only with a `Guide-unchanged:` trailer: his editor reformatted
+`packages/contract/schemas/organisation.js` (layout only), which `docs/guides/organogram.md` covers.
+The same reformat changed the contract source hash; `contract.gen.ts` and its meta were
+regenerated. Not tested live: a real Gemini call
+(the bench cannot reach Google; the vendor is tested against a fake `fetch`), ClamAV (reply parsing
+only), real SMTP delivery, web push (M6).
 
 ---
 
-## 9 · What comes next
+## 4 · What is left
 
-The user's stated direction: **"we need to get to work now … build the foundation."** The structure
-and README are done; the natural next step is **writing M0 code into the empty files**, in roughly
-this order, each against `BACKEND_STRUCTURE.md` v1.1:
+### 4.1 Rest of M0 (module code: confirm first; other owners)
 
-1. Root config: `package.json` (scripts named in README §10), `.nvmrc` (20), `.gitignore`,
-   `.gitattributes` (LF), `eslint.config.js`, `jest.config.js`, `.env.example` (generated).
-2. `src/config/*`, `src/app.js`, `src/server.js`, `src/worker.js`, `src/http/*`, `src/middleware/*`
-   (port per BACKEND_STRUCTURE §3).
-3. `src/shared/db`, `crud`, `http`, `errors`, `events` (emit + outbox), `workflow` (port),
-   `numbering`, `money`, `time`, `access`, `rbac`.
-4. `packages/contract` + `scripts/gen/contract.js` + `http/route.js`.
-5. M0 migrations (the user has not yet asked for migration files; ask before creating them).
-6. The nine M0 modules.
-7. Scripts: `ci-local.js`, `check/*`, `db/*`, `deploy/*`; `.github/workflows/*`; `ops/*`.
+- **Nine M0 modules** (`identity`, `access`, `audit`, `organisation`, `settings`, `notifications`,
+  `workflow`, `documents`, `imports`): every file still empty. Module code, so confirm before
+  starting. The documents and imports routes, the staff importer, and the security modules REUSE_MAP
+  §1.1 lists (`app_user`, `audit_ledger`, `permission`, `scope`, `capability`, `field_visibility`)
+  land here.
+- **M0 migrations 0001 to 0099 (LA).** `migrations/` is empty. They must match BACKEND_STRUCTURE
+  §11.1, which now includes `setting`, `document`, `document_variant`, `template_version` and the
+  three import tables, plus `schema_migration` (`name`, `sha256`, `applied_at`; migrate.js creates
+  it with that DDL if missing) and `system_marker` (`environment`, one row; seed.js reads it).
+  Integration tests use fixture DDL in `tests/integration/fixtures/shared-layer.sql`; it is not a
+  migration.
+- The per-module contract schemas (only `common.js`, `organisation.js` and `notifications.js` have
+  content). The generator is built; run `npm run gen:contract` after any schema or route change.
+- Gate 6 (`schema-drift.js`, `contract-columns.js`), still empty; both need the M0 migrations.
+  `ci.yml` has no Postgres service yet, so in CI the integration tests and gate 4's round trip do
+  not run; add one (with `RUN_DB_TESTS=1` and `DATABASE_URL`) once the migrations exist.
+  `release.yml` and `rollback.yml` are empty. Release pipeline,
+  `deploy-gate`, staging seal, production approval (SYSTEM_ARCHITECTURE §9).
+- Server: four subdomains, TLS (`docs/runbooks/proxy.md`). GitHub settings by TB.
+- `assets/brand` and `assets/fonts` are empty, so PDFs show the text wordmark.
+- M3 and later letter templates are empty (each milestone writes its own). Web push waits for M6.
+- systemd or PM2 for the four processes is still open (§5.3); the worker is one entry point either way.
 
-Before writing code, confirm with the user which slice to start with, and remember: do not run
-anything without his approval.
+---
+
+## 5 · Waiting on the user (carried from 12 October; check whether settled)
+
+1. A14: MILESTONES says the generic importer lands in M7; the engine was built in M0. One-line
+   amendment offered.
+2. The 15 permission keys in README §5.2 were proposed, not confirmed.
+3. systemd (in the docs) or PM2 (his usual) for the four processes.
+4. Numbering prefixes in BACKEND_STRUCTURE §7 are proposals for MyCity to confirm.
+5. REUSE_MAP §1.3 public-site wording contradicts A9; he said leave it.
+6. Client pack: maintenance price contradiction (₦500,000 vs ₦300,000 a year); M11 "training on
+   live data on staging" vs A5; current PAYE bands before M6; who approves payroll; the lateness
+   threshold for the auto-query.
+7. Restricted documents (payslips, bank letters, ID) need the module's `edit` grant to open, not just
+   `view`. He has not objected; confirm if it comes up.
+
+---
+
+## 6 · Testing in the cloud bench (only when he approves)
+
+1. On his machine: `cd $HOME/mnt/mycity-app && mkdir -p coverage/claude-sync && git ls-files -co
+   --exclude-standard | grep -v '^coverage/' | tar czf coverage/claude-sync/repo.tgz -T -`.
+   `coverage/` is git-ignored; `.git` cannot be written through the remote tools.
+2. Stage `C:\mycity-app\coverage\claude-sync\repo.tgz`, unpack into `/home/claude/bench`.
+3. `export PATH=/opt/node20/bin:$PATH; npm ci`. Postgres: `pg_ctlcluster 16 main start`, set the
+   `postgres` password to `postgres`, create `mycity_test`. `redis-server --daemonize yes`.
+4. `RUN_DB_TESTS=1 DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/mycity_test
+   CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome npm run ci`. The progress gate
+   needs git: `git init -b main`, commit, branch.
+5. Fix on his machine; stage the changed file; copy it into the bench; rerun. At the end, compare
+   hashes of every changed file on both sides.
+
+Do not `npm install` inside `C:\mycity-app` from the device shell: it is Linux, and native packages
+(`sharp`) built there would break his Windows install. He runs `npm install` himself.
+
+---
+
+## 7 · Things learned the hard way
+
+- `marked` 16 is ESM-only and breaks Jest; it is now removed altogether.
+- ExcelJS `cell.value` is a prototype getter; a loaded workbook keeps no column keys or headers.
+- Writing dropdowns down to row 1000 moves `addRow()`; place rows by number.
+- jsonb keeps no key order: take column order from the stored mapping.
+- `.gitignore` `media/` also matched `src/services/media`; it is `/media/` now.
+- The error reporter flushes on a timer; tests flush it before closing the pool.
+- His editor reformats files written to his machine (Prettier style). JavaScript survives; an HTML
+  template's front matter did not (`{{ title }}` became `{ { title } }`). Re-read a file before
+  editing it, edit by content not by line, and check templates after writing.
+- A test file written to a temp folder cannot `require("@mycity/contract")` (no node_modules
+  above it); require `packages/contract` by absolute path.
+- Postgres cannot type a parameter the SQL never uses ("could not determine data type of
+  parameter $3"); add parameters only when the clause that uses them is present.
+- Redis pub/sub ignores the database number: the Socket.io adapter and emitter key must carry the
+  environment prefix (`mycity:<env>:socket.io`).
+- In the bench, `pkill -f "node src/..."` matches the shell running it and kills the command; stop
+  a background process by its saved pid.
+- Old leftovers on his machine he can delete: `coverage/claude-sync/`, `coverage/claude-restore/`,
+  `.git/claude-sync.tgz`.
 
 Engineered by JBS Praxis.

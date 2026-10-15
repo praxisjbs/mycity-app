@@ -72,17 +72,26 @@ let dispatching = false;
  * @param {(event: object, ctx: {outbox_id: string, attempt: number}) => Promise<void>} fn
  */
 function register(key, name, fn) {
-  if (key !== ALL && !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(String(key))) {
+  if (
+    key !== ALL &&
+    !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(String(key))
+  ) {
     throw new Error(`outbox.register: "${key}" is not an event key`);
   }
-  if (!HANDLER_NAME_RE.test(String(name))) throw new Error(`outbox.register(${key}): name is "<module>.<what>", got "${name}"`);
-  if (typeof fn !== "function") throw new Error(`outbox.register(${key}, ${name}): give a function`);
+  if (!HANDLER_NAME_RE.test(String(name)))
+    throw new Error(
+      `outbox.register(${key}): name is "<module>.<what>", got "${name}"`,
+    );
+  if (typeof fn !== "function")
+    throw new Error(`outbox.register(${key}, ${name}): give a function`);
   const list = registry.get(key) || [];
   const existing = list.find((h) => h.name === name);
   if (existing) {
     // The same file required twice registers the same function twice: harmless.
     if (existing.fn === fn) return;
-    throw new Error(`outbox.register(${key}): a handler named "${name}" is already registered`);
+    throw new Error(
+      `outbox.register(${key}): a handler named "${name}" is already registered`,
+    );
   }
   list.push({ name, fn });
   registry.set(key, list);
@@ -95,7 +104,9 @@ function handlersFor(key) {
 
 /** Every registration, for the health page and the docs. */
 function registrations() {
-  return [...registry.entries()].flatMap(([key, list]) => list.map((h) => ({ key, name: h.name })));
+  return [...registry.entries()].flatMap(([key, list]) =>
+    list.map((h) => ({ key, name: h.name })),
+  );
 }
 
 /** The worker calls this once every events file is loaded. */
@@ -109,7 +120,10 @@ function isReady() {
 
 /** Seconds to wait before attempt `attempts + 1`. */
 function backoffSeconds(attempts) {
-  return Math.min(MAX_BACKOFF_S, BASE_BACKOFF_S * 2 ** Math.max(0, Math.min(attempts - 1, 16)));
+  return Math.min(
+    MAX_BACKOFF_S,
+    BASE_BACKOFF_S * 2 ** Math.max(0, Math.min(attempts - 1, 16)),
+  );
 }
 
 function withTimeout(promise, ms, label) {
@@ -117,7 +131,11 @@ function withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
     new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${label} did not finish within ${ms / 1000} s`)), ms);
+      timer = setTimeout(
+        () =>
+          reject(new Error(`${label} did not finish within ${ms / 1000} s`)),
+        ms,
+      );
       if (timer.unref) timer.unref();
     }),
   ]).finally(() => clearTimeout(timer));
@@ -144,7 +162,11 @@ async function reclaimStale(db) {
         AND updated_at < now() - make_interval(mins => $1)`,
     [STALE_PROCESSING_MINUTES],
   );
-  if (rowCount) logger.warn({ reclaimed: rowCount }, "outbox: reclaimed rows left processing by a stopped worker");
+  if (rowCount)
+    logger.warn(
+      { reclaimed: rowCount },
+      "outbox: reclaimed rows left processing by a stopped worker",
+    );
   return rowCount;
 }
 
@@ -200,12 +222,21 @@ async function finish(db, row, completed, err) {
     ],
   );
   if (exhausted) {
-    metrics.inc("mycity_outbox_failed_total", { key: row.event_key }, 1, "Outbox rows that ran out of attempts.");
+    metrics.inc(
+      "mycity_outbox_failed_total",
+      { key: row.event_key },
+      1,
+      "Outbox rows that ran out of attempts.",
+    );
     require("../observability/error-reporter").report(err, {
       origin: "worker",
       severity: "error",
       route: `outbox ${row.event_key}`,
-      extra: { outbox_id: row.outbox_id, event_id: row.event_id, attempts: row.attempts },
+      extra: {
+        outbox_id: row.outbox_id,
+        event_id: row.event_id,
+        attempts: row.attempts,
+      },
     });
   }
   return exhausted ? "failed" : "retry";
@@ -216,25 +247,53 @@ async function processRow(db, row) {
   const done = new Set(row.completed_handlers || []);
   let firstErr = null;
 
-  await requestContext.run({ requestId: event.request_id, userId: event.actor_user_id, surface: "worker" }, async () => {
-    for (const h of handlersFor(event.key)) {
-      if (done.has(h.name)) continue;
-      const started = Date.now();
-      try {
-        await withTimeout(
-          Promise.resolve().then(() => h.fn(event, { outbox_id: row.outbox_id, attempt: row.attempts })),
-          HANDLER_TIMEOUT_MS,
-          `handler ${h.name}`,
-        );
-        done.add(h.name);
-        metrics.observe("mycity_outbox_handler_seconds", (Date.now() - started) / 1000, { handler: h.name }, "Outbox handler run time.");
-      } catch (err) {
-        if (!firstErr) firstErr = err;
-        metrics.inc("mycity_outbox_handler_errors_total", { handler: h.name }, 1, "Outbox handler failures.");
-        logger.error({ err, handler: h.name, event_key: event.key, outbox_id: row.outbox_id, attempt: row.attempts }, "outbox handler failed");
+  await requestContext.run(
+    {
+      requestId: event.request_id,
+      userId: event.actor_user_id,
+      surface: "worker",
+    },
+    async () => {
+      for (const h of handlersFor(event.key)) {
+        if (done.has(h.name)) continue;
+        const started = Date.now();
+        try {
+          await withTimeout(
+            Promise.resolve().then(() =>
+              h.fn(event, { outbox_id: row.outbox_id, attempt: row.attempts }),
+            ),
+            HANDLER_TIMEOUT_MS,
+            `handler ${h.name}`,
+          );
+          done.add(h.name);
+          metrics.observe(
+            "mycity_outbox_handler_seconds",
+            (Date.now() - started) / 1000,
+            { handler: h.name },
+            "Outbox handler run time.",
+          );
+        } catch (err) {
+          if (!firstErr) firstErr = err;
+          metrics.inc(
+            "mycity_outbox_handler_errors_total",
+            { handler: h.name },
+            1,
+            "Outbox handler failures.",
+          );
+          logger.error(
+            {
+              err,
+              handler: h.name,
+              event_key: event.key,
+              outbox_id: row.outbox_id,
+              attempt: row.attempts,
+            },
+            "outbox handler failed",
+          );
+        }
       }
-    }
-  });
+    },
+  );
 
   return finish(db, row, [...done], firstErr);
 }
@@ -245,8 +304,14 @@ async function processRow(db, row) {
  * @param {{db?: {query: Function}, limit?: number}} [opts]
  * @returns {Promise<{claimed: number, done: number, retry: number, failed: number}>}
  */
-async function dispatchDue({ db = require("../../config/db").pool, limit = 50 } = {}) {
-  if (!ready) throw new Error("outbox.dispatchDue: call markReady() after loading every module's events file");
+async function dispatchDue({
+  db = require("../../config/db").pool,
+  limit = 50,
+} = {}) {
+  if (!ready)
+    throw new Error(
+      "outbox.dispatchDue: call markReady() after loading every module's events file",
+    );
   const out = { claimed: 0, done: 0, retry: 0, failed: 0 };
   if (dispatching) return out;
   dispatching = true;
@@ -276,9 +341,16 @@ async function health(db) {
          FROM event_outbox`,
     );
     const { backlog, failed } = rows[0];
-    return { status: failed > 0 || backlog > 500 ? "degraded" : "up", backlog, failed };
+    return {
+      status: failed > 0 || backlog > 500 ? "degraded" : "up",
+      backlog,
+      failed,
+    };
   } catch (err) {
-    return { status: "degraded", error: err.code === "42P01" ? "no event_outbox table" : "unreadable" };
+    return {
+      status: "degraded",
+      error: err.code === "42P01" ? "no event_outbox table" : "unreadable",
+    };
   }
 }
 

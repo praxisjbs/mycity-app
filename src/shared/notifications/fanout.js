@@ -70,7 +70,14 @@ const SPECS = new Map();
 const deliveryHooks = [];
 const TITLE_MAX = 200;
 const BODY_MAX = 1000;
-const AUDIENCE_KEYS = ["permission", "subject", "approvers", "requester", "ceo", "users"];
+const AUDIENCE_KEYS = [
+  "permission",
+  "subject",
+  "approvers",
+  "requester",
+  "ceo",
+  "users",
+];
 
 /* ------------------------------------------------------------------ *
  * Declaring
@@ -79,12 +86,19 @@ const AUDIENCE_KEYS = ["permission", "subject", "approvers", "requester", "ceo",
 function checkAudience(key, a) {
   const where = `defineNotification(${key})`;
   const kinds = Object.keys(a || {}).filter((k) => AUDIENCE_KEYS.includes(k));
-  if (kinds.length !== 1 || Object.keys(a).length !== 1) throw new Error(`${where}: each audience is one of ${AUDIENCE_KEYS.join(", ")}`);
+  if (kinds.length !== 1 || Object.keys(a).length !== 1)
+    throw new Error(
+      `${where}: each audience is one of ${AUDIENCE_KEYS.join(", ")}`,
+    );
   if (a.permission && typeof a.permission !== "function") {
     const [module, action] = a.permission;
-    if (!catalog.isModule(module) || !catalog.isAction(action)) throw new Error(`${where}: permission is [module, action], got ${JSON.stringify(a.permission)}`);
+    if (!catalog.isModule(module) || !catalog.isAction(action))
+      throw new Error(
+        `${where}: permission is [module, action], got ${JSON.stringify(a.permission)}`,
+      );
   }
-  if (a.users && typeof a.users !== "function") throw new Error(`${where}: users is a function (event) => user ids`);
+  if (a.users && typeof a.users !== "function")
+    throw new Error(`${where}: users is a function (event) => user ids`);
 }
 
 /**
@@ -95,23 +109,34 @@ function checkAudience(key, a) {
  */
 function defineNotification(key, spec) {
   const where = `defineNotification(${key})`;
-  if (!catalogue.has(key)) throw new Error(`${where}: declare the event with defineEvents() first`);
-  if (!spec || !Array.isArray(spec.to) || spec.to.length === 0) throw new Error(`${where}: give to: [audiences]`);
+  if (!catalogue.has(key))
+    throw new Error(`${where}: declare the event with defineEvents() first`);
+  if (!spec || !Array.isArray(spec.to) || spec.to.length === 0)
+    throw new Error(`${where}: give to: [audiences]`);
   spec.to.forEach((a) => checkAudience(key, a));
-  if (!spec.title || !["string", "function"].includes(typeof spec.title)) throw new Error(`${where}: title is a string or (event) => string`);
-  if (spec.body !== undefined && !["string", "function"].includes(typeof spec.body)) throw new Error(`${where}: body is a string or (event) => string`);
-  if (spec.priority && !["normal", "high"].includes(spec.priority)) throw new Error(`${where}: priority is normal or high`);
+  if (!spec.title || !["string", "function"].includes(typeof spec.title))
+    throw new Error(`${where}: title is a string or (event) => string`);
+  if (
+    spec.body !== undefined &&
+    !["string", "function"].includes(typeof spec.body)
+  )
+    throw new Error(`${where}: body is a string or (event) => string`);
+  if (spec.priority && !["normal", "high"].includes(spec.priority))
+    throw new Error(`${where}: priority is normal or high`);
   for (const text of [spec.title, spec.body]) {
-    if (typeof text === "string" && text.includes("\u2014")) throw new Error(`${where}: no em dashes in copy a person reads`);
+    if (typeof text === "string" && text.includes("\u2014"))
+      throw new Error(`${where}: no em dashes in copy a person reads`);
   }
   const existing = SPECS.get(key);
-  if (existing && existing !== spec) throw new Error(`${where}: already declared`);
+  if (existing && existing !== spec)
+    throw new Error(`${where}: already declared`);
   SPECS.set(key, spec);
 }
 
 /** Register who sends a notification out (email, push, realtime). The worker does this. */
 function onDelivery(fn) {
-  if (typeof fn !== "function") throw new Error("onDelivery: give a function (rows, event) => Promise");
+  if (typeof fn !== "function")
+    throw new Error("onDelivery: give a function (rows, event) => Promise");
   if (!deliveryHooks.includes(fn)) deliveryHooks.push(fn);
 }
 
@@ -126,7 +151,8 @@ function subjectOf(event) {
 
 async function permissionHolders(client, [module, action], subjectId) {
   const column = `can_${action}`;
-  if (!catalog.isAction(action)) throw new Error(`fanout: unknown action "${action}"`);
+  if (!catalog.isAction(action))
+    throw new Error(`fanout: unknown action "${action}"`);
   const { rows } = await client.query(
     `WITH RECURSIVE chain AS (
        SELECT employee_id, line_manager_id, 0 AS depth FROM employee WHERE employee_id = $2::uuid
@@ -162,13 +188,18 @@ async function usersOfEmployees(client, employeeIds) {
 }
 
 async function ceoUsers(client) {
-  const { rows } = await client.query("SELECT user_id FROM app_user WHERE is_ceo = true AND status = 'active' ORDER BY user_id");
+  const { rows } = await client.query(
+    "SELECT user_id FROM app_user WHERE is_ceo = true AND status = 'active' ORDER BY user_id",
+  );
   return rows.map((r) => r.user_id);
 }
 
 async function audienceUsers(client, audience, event) {
   if (audience.permission) {
-    const perm = typeof audience.permission === "function" ? audience.permission(event) : audience.permission;
+    const perm =
+      typeof audience.permission === "function"
+        ? audience.permission(event)
+        : audience.permission;
     if (!perm) return [];
     return permissionHolders(client, perm, subjectOf(event));
   }
@@ -176,7 +207,11 @@ async function audienceUsers(client, audience, event) {
     const id = subjectOf(event);
     return id ? usersOfEmployees(client, [id]) : [];
   }
-  if (audience.approvers) return approvers.recipients(client, (event.payload && event.payload.stage_approvers) || []);
+  if (audience.approvers)
+    return approvers.recipients(
+      client,
+      (event.payload && event.payload.stage_approvers) || [],
+    );
   if (audience.requester) {
     const id = event.payload && event.payload.opened_by;
     return id ? [id] : [];
@@ -188,7 +223,10 @@ async function audienceUsers(client, audience, event) {
 
 /** The people who watch access changes: the CEO and `settings` editors with scope all. */
 async function watchers(client) {
-  const [ceo, editors] = await Promise.all([ceoUsers(client), permissionHolders(client, ["settings", "edit"], null)]);
+  const [ceo, editors] = await Promise.all([
+    ceoUsers(client),
+    permissionHolders(client, ["settings", "edit"], null),
+  ]);
   return [...new Set([...ceo, ...editors])];
 }
 
@@ -197,11 +235,14 @@ async function watchers(client) {
  * ------------------------------------------------------------------ */
 
 const clamp = (s, max) => {
-  const t = String(s || "").replace(/\u2014/g, ",").trim();
+  const t = String(s || "")
+    .replace(/\u2014/g, ",")
+    .trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 };
 
-const textOf = (value, event) => (typeof value === "function" ? value(event) : value);
+const textOf = (value, event) =>
+  typeof value === "function" ? value(event) : value;
 
 async function preferencesOf(client, userIds, category) {
   const { rows } = await client.query(
@@ -217,7 +258,9 @@ async function preferencesOf(client, userIds, category) {
 }
 
 function channelsFor(category, stored = {}) {
-  return categories.CHANNELS.filter((ch) => categories.isOn(category, ch, stored[ch]));
+  return categories.CHANNELS.filter((ch) =>
+    categories.isOn(category, ch, stored[ch]),
+  );
 }
 
 async function securityMessage(client, event, entry) {
@@ -231,7 +274,10 @@ async function securityMessage(client, event, entry) {
     );
     who = rows[0] ? ` by ${rows[0].name}` : "";
   }
-  return { title: `Access change: ${entry.summary}`, body: `${entry.summary}${who}.` };
+  return {
+    title: `Access change: ${entry.summary}`,
+    body: `${entry.summary}${who}.`,
+  };
 }
 
 /**
@@ -247,7 +293,9 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
   const security = Boolean(entry && entry.security);
   if (!spec && !security) return { recipients: 0, inserted: 0, handed_over: 0 };
 
-  const category = security ? "security" : categories.categoryFor(event.key, event.module);
+  const category = security
+    ? "security"
+    : categories.categoryFor(event.key, event.module);
   const priority = security ? "high" : (spec && spec.priority) || "normal";
 
   // Who, and what each group is told. A security event's watchers get the security
@@ -255,17 +303,23 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
   const messages = new Map();
   if (spec) {
     const title = clamp(textOf(spec.title, event), TITLE_MAX);
-    const body = spec.body === undefined ? "" : clamp(textOf(spec.body, event), BODY_MAX);
+    const body =
+      spec.body === undefined ? "" : clamp(textOf(spec.body, event), BODY_MAX);
     for (const audience of spec.to) {
-      for (const id of await audienceUsers(db, audience, event)) messages.set(id, { title, body });
+      for (const id of await audienceUsers(db, audience, event))
+        messages.set(id, { title, body });
     }
-    if (!spec.include_actor && event.actor_user_id) messages.delete(event.actor_user_id);
+    if (!spec.include_actor && event.actor_user_id)
+      messages.delete(event.actor_user_id);
   }
   if (security) {
     const msg = await securityMessage(db, event, entry);
-    for (const id of await watchers(db)) if (!messages.has(id) && id !== event.actor_user_id) messages.set(id, msg);
+    for (const id of await watchers(db))
+      if (!messages.has(id) && id !== event.actor_user_id)
+        messages.set(id, msg);
   }
-  if (messages.size === 0) return { recipients: 0, inserted: 0, handed_over: 0 };
+  if (messages.size === 0)
+    return { recipients: 0, inserted: 0, handed_over: 0 };
 
   const ids = [...messages.keys()];
   const prefs = await preferencesOf(db, ids, category);
@@ -290,7 +344,18 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
        SELECT t.user_id, $5, $6, $7, $8, t.title, NULLIF(t.body, ''), $9, $10, string_to_array(t.channels, ',')
          FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[]) AS t(user_id, channels, title, body)
        ON CONFLICT (event_id, user_id) DO NOTHING`,
-      [users, chans, titles, bodies, event.event_id, event.key, category, priority, event.entity.type, event.entity.id],
+      [
+        users,
+        chans,
+        titles,
+        bodies,
+        event.event_id,
+        event.key,
+        category,
+        priority,
+        event.entity.type,
+        event.entity.id,
+      ],
     );
     inserted = res.rowCount;
   }
@@ -308,18 +373,24 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
     );
     if (rows.length) {
       for (const hook of deliveryHooks) await hook(rows, event);
-      await db.query("UPDATE notification SET delivery_queued_at = now() WHERE notification_id = ANY($1::uuid[])", [
-        rows.map((r) => r.notification_id),
-      ]);
+      await db.query(
+        "UPDATE notification SET delivery_queued_at = now() WHERE notification_id = ANY($1::uuid[])",
+        [rows.map((r) => r.notification_id)],
+      );
       handedOver = rows.length;
     }
   }
 
-  logger.debug({ event_key: event.key, recipients: users.length, inserted }, "notifications fanned out");
+  logger.debug(
+    { event_key: event.key, recipients: users.length, inserted },
+    "notifications fanned out",
+  );
   return { recipients: users.length, inserted, handed_over: handedOver };
 }
 
-outbox.register(outbox.ALL, "notifications.fanout", (event, ctx) => handle(event, ctx));
+outbox.register(outbox.ALL, "notifications.fanout", (event, ctx) =>
+  handle(event, ctx),
+);
 
 /* ------------------------------------------------------------------ *
  * The shared layer's own events
@@ -327,7 +398,13 @@ outbox.register(outbox.ALL, "notifications.fanout", (event, ctx) => handle(event
 
 const { WORKFLOW, ALERTS } = catalogue;
 const nameOf = (e) => e.payload.definition_name || "A request";
-const OUTCOME = { approved: "Approved", rejected: "Rejected", cancelled: "Withdrawn", timeout_approved: "Approved", timeout_rejected: "Rejected" };
+const OUTCOME = {
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Withdrawn",
+  timeout_approved: "Approved",
+  timeout_rejected: "Rejected",
+};
 
 defineNotification(WORKFLOW.WORKFLOW_OPENED, {
   to: [{ approvers: true }],
@@ -344,25 +421,48 @@ defineNotification(WORKFLOW.WORKFLOW_ADVANCED, {
 defineNotification(WORKFLOW.WORKFLOW_CHANGES_REQUESTED, {
   to: [{ requester: true }, { approvers: true }],
   title: (e) => `Changes requested: ${nameOf(e)}`,
-  body: (e) => (e.payload.reason ? `Reason: ${e.payload.reason}` : "An approver sent this back."),
+  body: (e) =>
+    e.payload.reason
+      ? `Reason: ${e.payload.reason}`
+      : "An approver sent this back.",
 });
 
 defineNotification(WORKFLOW.WORKFLOW_COMPLETED, {
   // Approved on submission (nothing applied) needs no message; every other ending does.
-  to: [{ users: (e) => (e.payload.auto && e.payload.state === "approved" && !e.payload.decided_stage ? [] : [e.payload.opened_by].filter(Boolean)) }],
+  to: [
+    {
+      users: (e) =>
+        e.payload.auto &&
+        e.payload.state === "approved" &&
+        !e.payload.decided_stage
+          ? []
+          : [e.payload.opened_by].filter(Boolean),
+    },
+  ],
   title: (e) => `${nameOf(e)}: ${OUTCOME[e.payload.state] || "Decided"}`,
-  body: (e) => (e.payload.reason ? `Reason: ${e.payload.reason}` : e.payload.auto ? "Decided automatically at the time limit." : ""),
+  body: (e) =>
+    e.payload.reason
+      ? `Reason: ${e.payload.reason}`
+      : e.payload.auto
+        ? "Decided automatically at the time limit."
+        : "",
 });
 
 defineNotification(WORKFLOW.WORKFLOW_ESCALATED, {
   to: [{ ceo: true }, { approvers: true }],
   title: (e) => `Overdue approval: ${nameOf(e)}`,
-  body: (e) => `${e.payload.stage_name || "A stage"} passed its time limit without a decision.`,
+  body: (e) =>
+    `${e.payload.stage_name || "A stage"} passed its time limit without a decision.`,
   priority: "high",
 });
 
 defineNotification(WORKFLOW.WORKFLOW_CANCELLED, {
-  to: [{ users: (e, client) => approvers.recipients(client, e.payload.withdrawn_from || []) }],
+  to: [
+    {
+      users: (e, client) =>
+        approvers.recipients(client, e.payload.withdrawn_from || []),
+    },
+  ],
   title: (e) => `Withdrawn: ${nameOf(e)}`,
   body: "The requester withdrew this before it was decided.",
 });
@@ -386,4 +486,12 @@ function __hooks() {
   return deliveryHooks;
 }
 
-module.exports = { defineNotification, onDelivery, handle, watchers, permissionHolders, SPECS, __hooks };
+module.exports = {
+  defineNotification,
+  onDelivery,
+  handle,
+  watchers,
+  permissionHolders,
+  SPECS,
+  __hooks,
+};

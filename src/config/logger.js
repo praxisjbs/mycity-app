@@ -101,4 +101,10 @@ function createLogger(app = "mycity-api") {
 
 const logger = createLogger(PROCESS_NAME);
 
-module.exports = { logger, createLogger, SENSITIVE_KEYS, REDACT_PATHS, contextMixin };
+module.exports = {
+  logger,
+  createLogger,
+  SENSITIVE_KEYS,
+  REDACT_PATHS,
+  contextMixin,
+};

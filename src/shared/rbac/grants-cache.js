@@ -34,7 +34,8 @@ const TEAM_TTL_S = 60;
 
 const keys = {
   auth: (userId) => rkey("idc", "auth", userId),
-  grants: (roleIds, moduleKey) => rkey("idc", "grants", moduleKey, [...new Set(roleIds)].sort().join(",")),
+  grants: (roleIds, moduleKey) =>
+    rkey("idc", "grants", moduleKey, [...new Set(roleIds)].sort().join(",")),
   masked: (userId) => rkey("idc", "grants", "masked", userId),
   caps: (userId) => rkey("idc", "caps", userId),
   teamVersion: () => rkey("idc", "team", "version"),
@@ -54,7 +55,8 @@ async function cached(key, ttl, load) {
     }
   }
   const value = await load();
-  if (redis && value !== undefined) await redis.set(key, JSON.stringify(value), "EX", ttl).catch(() => {});
+  if (redis && value !== undefined)
+    await redis.set(key, JSON.stringify(value), "EX", ttl).catch(() => {});
   return value;
 }
 
@@ -167,7 +169,9 @@ function getCapabilities(client, userId) {
 async function scanDelete(redis, pattern) {
   let cursor = "0";
   do {
-    const res = await redis.scan(cursor, "MATCH", pattern, "COUNT", 500).catch(() => null);
+    const res = await redis
+      .scan(cursor, "MATCH", pattern, "COUNT", 500)
+      .catch(() => null);
     if (!res) return;
     const [next, found] = res;
     cursor = next;
@@ -180,7 +184,10 @@ async function scanDelete(redis, pattern) {
 /** After a user's status, roles, capabilities or employee link change. */
 async function invalidateUser(userId) {
   const redis = tryClient();
-  if (redis) await redis.del(keys.auth(userId), keys.caps(userId), keys.masked(userId)).catch(() => {});
+  if (redis)
+    await redis
+      .del(keys.auth(userId), keys.caps(userId), keys.masked(userId))
+      .catch(() => {});
 }
 
 /** After any role, grant or field-visibility change. */

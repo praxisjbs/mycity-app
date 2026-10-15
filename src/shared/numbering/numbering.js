@@ -43,7 +43,8 @@ function periodOf(scheme, date) {
 /** Pure: the number for a scheme, period and sequence value. */
 function format(scheme, period, seq) {
   const parts = [scheme.prefix];
-  if (scheme.include_period && period !== "all") parts.push(period.replace("-", scheme.separator || "-"));
+  if (scheme.include_period && period !== "all")
+    parts.push(period.replace("-", scheme.separator || "-"));
   if (scheme.padding > 0) parts.push(String(seq).padStart(scheme.padding, "0"));
   return parts.join(scheme.separator);
 }
@@ -54,7 +55,11 @@ async function schemeOf(client, docType) {
     [docType],
   );
   if (!rows[0]) {
-    throw new AppError("NUMBERING_SCHEME_MISSING", `No numbering scheme for "${docType}". Add it in Settings, Documents & Numbering.`, 500);
+    throw new AppError(
+      "NUMBERING_SCHEME_MISSING",
+      `No numbering scheme for "${docType}". Add it in Settings, Documents & Numbering.`,
+      500,
+    );
   }
   return { ...rows[0], padding: Number(rows[0].padding) };
 }
@@ -67,9 +72,17 @@ async function schemeOf(client, docType) {
  * @returns {Promise<{number: string, seq: number, period: string}>}
  */
 async function allocate(client, docType, { date } = {}) {
-  if (!SCHEMES[docType]) throw new Error(`numbering: "${docType}" is not in shared/numbering/schemes.js`);
-  if (!inTransaction(client)) throw new Error("numbering.allocate must run inside atomically(): a number commits with its record");
-  const day = date ? lagos.assertDate(String(date).slice(0, 10), "date") : lagos.today();
+  if (!SCHEMES[docType])
+    throw new Error(
+      `numbering: "${docType}" is not in shared/numbering/schemes.js`,
+    );
+  if (!inTransaction(client))
+    throw new Error(
+      "numbering.allocate must run inside atomically(): a number commits with its record",
+    );
+  const day = date
+    ? lagos.assertDate(String(date).slice(0, 10), "date")
+    : lagos.today();
   const scheme = await schemeOf(client, docType);
   const period = periodOf(scheme, day);
   const { rows } = await client.query(
@@ -87,7 +100,9 @@ async function allocate(client, docType, { date } = {}) {
  * preview). Never use it as a number: another save can take it first.
  */
 async function preview(client, docType, { date } = {}) {
-  const day = date ? lagos.assertDate(String(date).slice(0, 10), "date") : lagos.today();
+  const day = date
+    ? lagos.assertDate(String(date).slice(0, 10), "date")
+    : lagos.today();
   const scheme = await schemeOf(client, docType);
   const period = periodOf(scheme, day);
   const { rows } = await client.query(
@@ -104,12 +119,23 @@ async function checkSchemes(client) {
       "SELECT doc_type, prefix, padding, separator, reset, include_period FROM numbering_scheme WHERE doc_type = ANY($1)",
       [DOC_TYPES],
     );
-    const have = new Map(rows.map((r) => [r.doc_type, { ...r, padding: Number(r.padding) }]));
+    const have = new Map(
+      rows.map((r) => [r.doc_type, { ...r, padding: Number(r.padding) }]),
+    );
     const missing = DOC_TYPES.filter((t) => !have.has(t));
-    const invalid = [...have.entries()].filter(([, s]) => validateScheme(s).length).map(([t]) => t);
-    return { status: missing.length || invalid.length ? "down" : "up", missing, invalid };
+    const invalid = [...have.entries()]
+      .filter(([, s]) => validateScheme(s).length)
+      .map(([t]) => t);
+    return {
+      status: missing.length || invalid.length ? "down" : "up",
+      missing,
+      invalid,
+    };
   } catch (err) {
-    return { status: "down", error: err.code === "42P01" ? "no numbering_scheme table" : "unreadable" };
+    return {
+      status: "down",
+      error: err.code === "42P01" ? "no numbering_scheme table" : "unreadable",
+    };
   }
 }
 

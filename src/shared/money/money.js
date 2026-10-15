@@ -35,9 +35,12 @@ const ZERO = new D(0);
  * @returns {Decimal}
  */
 function money(value) {
-  if (value === null || value === undefined || value === "") throw new TypeError("money(): no value");
+  if (value === null || value === undefined || value === "")
+    throw new TypeError("money(): no value");
   if (typeof value === "number" && !Number.isInteger(value)) {
-    throw new TypeError(`money(): ${value} is a fractional JS number; pass the string from the database or the wire`);
+    throw new TypeError(
+      `money(): ${value} is a fractional JS number; pass the string from the database or the wire`,
+    );
   }
   if (typeof value === "string" && !/^-?\d+(\.\d+)?$/.test(value.trim())) {
     throw new TypeError(`money(): "${value}" is not an amount`);
@@ -91,7 +94,8 @@ function allocate(total, weights) {
   const t = round(total);
   const w = weights.map((x) => money(x));
   if (!w.length) throw new TypeError("allocate(): no weights");
-  if (w.some((x) => x.isNegative())) throw new TypeError("allocate(): a weight is negative");
+  if (w.some((x) => x.isNegative()))
+    throw new TypeError("allocate(): a weight is negative");
   const wsum = w.reduce((a, b) => a.plus(b), ZERO);
   if (wsum.isZero()) throw new TypeError("allocate(): weights add up to zero");
 
