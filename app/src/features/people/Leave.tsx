@@ -4,11 +4,11 @@ import type { PersonRef } from "@/api/types/common";
 import type { LeaveRequest, LeaveType } from "@/api/types/leave";
 import "@/api/types/leave";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, formatDate, monthName, todayIso, Pill, Who, Card, CardHeader, Grid, PageHeader, Grow, useModal, Chips, toast, DateField, Field, FormRow, rules, SearchInput, SelectField, TextAreaField, useForm, HelpTerm } from "@mycity/ui";
 import { MonthCalendar } from "@/components/ui/Calendar";
 import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PersonPicker } from "@/components/form";
+import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, Grow, useModal, Chips, toast, formatDate, monthName, todayIso, DateField, Field, FormFooter, rules, SearchInput, SelectField, TextAreaField, useContractForm } from "@mycity/ui";
 
 export const LEAVE_TONE: Record<LeaveRequest["status"], "ok" | "warn" | "err" | "neutral"> = { Approved: "ok", Pending: "warn", Rejected: "err", Cancelled: "neutral" };
 export const LEAVE_TYPES: LeaveType[] = ["Annual", "Sick", "Compassionate", "Maternity", "Paternity", "Study", "Unpaid"];
@@ -86,7 +86,7 @@ function CoverCard({ leave, onDone }: { leave: LeaveRequest; onDone: () => void 
   if (!cover.data) return <Card><LoadingRows /></Card>;
   return (
     <Card>
-      <CardHeader title={<HelpTerm help="Advisory only. The approver decides, and the reason is recorded either way.">{cover.data.title}</HelpTerm>} />
+      <CardHeader title={cover.data.title} />
       <p className="mb-[11px] text-[11.5px] text-subtle-foreground">{cover.data.text}</p>
       {cover.data.rows.map((r) => (
         <div key={r.title} className="flex items-center gap-2.5 border-b border-border py-2">
@@ -100,8 +100,8 @@ function CoverCard({ leave, onDone }: { leave: LeaveRequest; onDone: () => void 
       {leave.status === "Pending" && (
         <div className="mt-3 flex gap-2">
           <Grow />
-          <Button disabled={decide.pending} onClick={() => act(false)}>Reject</Button>
-          <Button variant="primary" icon="ok" disabled={decide.pending} onClick={() => act(true)}>Approve</Button>
+          <Button busy={decide.pending} onClick={() => act(false)}>Reject</Button>
+          <Button variant="primary" icon="ok" busy={decide.pending} onClick={() => act(true)}>Approve</Button>
         </div>
       )}
     </Card>
@@ -124,7 +124,7 @@ function LeaveCalendar() {
 /** Request leave (ESS), or record it for someone (People). */
 export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: boolean }) {
   const [who, setWho] = useState<PersonRef[]>([]);
-  const f = useForm({ type: "Annual", from: "", to: "", reason: "" }, { from: rules.required("Pick the first day"), to: (v, all) => (!v ? "Pick the last day" : all.from && v < (all.from as string) ? "Ends before it starts" : null), reason: rules.required("Give a short reason") });
+  const f = useContractForm({ type: "Annual", from: "", to: "", reason: "" }, { from: rules.required("Pick the first day"), to: (v, all) => (!v ? "Pick the last day" : all.from && v < (all.from as string) ? "Ends before it starts" : null), reason: rules.required("Give a short reason") });
   const save = useMutation("POST /api/v1/leave/requests");
   const submit = async () => {
     if (!f.check() || (onBehalf && !who.length)) return;
@@ -147,17 +147,17 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
       <Field label="Leave Type">
         <SelectField options={LEAVE_TYPES.map((t) => [t, t])} {...f.field("type")} />
       </Field>
-      <FormRow>
+      <>
         <Field label="First Day" {...f.field("from")}><DateField {...f.field("from")} /></Field>
         <Field label="Last Day" {...f.field("to")}><DateField {...f.field("to")} min={f.values.from || undefined} /></Field>
-      </FormRow>
+      </>
       <Field label="Reason" {...f.field("reason")}>
         <TextAreaField {...f.field("reason")} placeholder="Family event" />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>{onBehalf ? "Record Leave" : "Send Request"}</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={submit}>{onBehalf ? "Record Leave" : "Send Request"}</Button>
+      </FormFooter>
     </>
   );
 }

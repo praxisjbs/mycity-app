@@ -41,31 +41,69 @@ const FIELDS = Object.freeze({
   "employee.salary": {
     label: "Salary and pay",
     props: [
-      "salary", "base_salary", "basic_salary", "gross_pay", "net_pay", "monthly_gross", "annual_gross",
-      "gross_monthly", "net_monthly", "total_allowances", "total_deductions", "salary_grade_amount",
+      "salary",
+      "base_salary",
+      "basic_salary",
+      "gross_pay",
+      "net_pay",
+      "monthly_gross",
+      "annual_gross",
+      "gross_monthly",
+      "net_monthly",
+      "total_allowances",
+      "total_deductions",
+      "salary_grade_amount",
     ],
   },
   "employee.bank": {
     label: "Bank details",
-    props: ["bank_name", "bank_code", "account_number", "bank_account_number", "account_name", "bvn"],
+    props: [
+      "bank_name",
+      "bank_code",
+      "account_number",
+      "bank_account_number",
+      "account_name",
+      "bvn",
+    ],
   },
   "employee.personal": {
     label: "Personal details",
     props: [
-      "date_of_birth", "home_address", "residential_address", "personal_email", "personal_phone",
-      "marital_status", "state_of_origin", "lga_of_origin", "nin",
-      "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship", "next_of_kin_address",
-      "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
+      "date_of_birth",
+      "home_address",
+      "residential_address",
+      "personal_email",
+      "personal_phone",
+      "marital_status",
+      "state_of_origin",
+      "lga_of_origin",
+      "nin",
+      "next_of_kin_name",
+      "next_of_kin_phone",
+      "next_of_kin_relationship",
+      "next_of_kin_address",
+      "emergency_contact_name",
+      "emergency_contact_phone",
+      "emergency_contact_relationship",
     ],
   },
   "employee.statutory": {
     label: "Tax and pension numbers",
-    props: ["tax_id", "tin", "pension_pin", "pension_administrator", "nhf_number", "nsitf_number"],
+    props: [
+      "tax_id",
+      "tin",
+      "pension_pin",
+      "pension_administrator",
+      "nhf_number",
+      "nsitf_number",
+    ],
   },
 });
 
 /** For the Roles & Permissions screen and for validating a field_visibility write. */
-const FIELD_KEYS = Object.freeze(Object.entries(FIELDS).map(([key, f]) => ({ key, label: f.label })));
+const FIELD_KEYS = Object.freeze(
+  Object.entries(FIELDS).map(([key, f]) => ({ key, label: f.label })),
+);
 
 const isFieldKey = (key) => Object.prototype.hasOwnProperty.call(FIELDS, key);
 
@@ -74,18 +112,29 @@ const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 /** The property names masked for a set of field keys. Unknown keys mask nothing. */
 function maskedPropsFor(maskedKeys = []) {
   const props = new Set();
-  for (const k of maskedKeys) if (isFieldKey(k)) for (const p of FIELDS[k].props) props.add(p);
+  for (const k of maskedKeys)
+    if (isFieldKey(k)) for (const p of FIELDS[k].props) props.add(p);
   return props;
 }
 
 /** Copy of `value` with every property in `props` set to null, at any depth. */
 function applyMask(value, props, depth = 0) {
-  if (depth > 12 || value === null || typeof value !== "object" || value instanceof Date) return value;
-  if (Array.isArray(value)) return value.map((v) => applyMask(v, props, depth + 1));
+  if (
+    depth > 12 ||
+    value === null ||
+    typeof value !== "object" ||
+    value instanceof Date
+  )
+    return value;
+  if (Array.isArray(value))
+    return value.map((v) => applyMask(v, props, depth + 1));
   return Object.fromEntries(
     Object.entries(value)
       .filter(([k]) => !UNSAFE_KEYS.has(k))
-      .map(([k, v]) => [k, props.has(k) ? null : applyMask(v, props, depth + 1)]),
+      .map(([k, v]) => [
+        k,
+        props.has(k) ? null : applyMask(v, props, depth + 1),
+      ]),
   );
 }
 
@@ -122,4 +171,14 @@ async function canSee(client, user, fieldKey) {
   return !(await maskedKeysFor(client, user)).includes(fieldKey);
 }
 
-module.exports = { FIELDS, FIELD_KEYS, isFieldKey, maskedPropsFor, applyMask, maskData, maskedKeysFor, maskForUser, canSee };
+module.exports = {
+  FIELDS,
+  FIELD_KEYS,
+  isFieldKey,
+  maskedPropsFor,
+  applyMask,
+  maskData,
+  maskedKeysFor,
+  maskForUser,
+  canSee,
+};

@@ -55,7 +55,10 @@ function dbQuery(sql, params) {
 function fingerprint(err, meta = {}) {
   const name = (err && err.name) || "Error";
   const msg = String((err && err.message) || err || "unknown")
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<uuid>")
+    .replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      "<uuid>",
+    )
     .replace(/\b\d+\b/g, "<n>")
     .slice(0, 200);
   const frame =
@@ -63,7 +66,9 @@ function fingerprint(err, meta = {}) {
       .split("\n")[1]
       ?.trim()
       .replace(/:\d+:\d+\)?$/, ")")
-      .slice(0, 120) || meta.route || "";
+      .slice(0, 120) ||
+    meta.route ||
+    "";
   return `${name}|${msg}|${frame}`;
 }
 
@@ -80,7 +85,9 @@ function underAlertCap() {
 
 function forget() {
   if (seen.size <= MAX_TRACKED) return;
-  const oldest = [...seen.entries()].sort((a, b) => a[1].lastSent - b[1].lastSent);
+  const oldest = [...seen.entries()].sort(
+    (a, b) => a[1].lastSent - b[1].lastSent,
+  );
   for (const [k] of oldest.slice(0, Math.ceil(MAX_TRACKED / 4))) seen.delete(k);
 }
 
@@ -92,7 +99,9 @@ function alertText(p) {
     p.user_id ? `user: ${p.user_id}` : null,
     p.request_id ? `request: ${p.request_id}` : null,
     `build: ${p.release}`,
-    p.suppressed ? `(${p.suppressed} identical suppressed in the last 5 minutes)` : null,
+    p.suppressed
+      ? `(${p.suppressed} identical suppressed in the last 5 minutes)`
+      : null,
     p.stack ? `\n${p.stack.split("\n").slice(0, 5).join("\n")}` : null,
   ]
     .filter(Boolean)
@@ -116,8 +125,20 @@ async function postAlert(payload) {
 
 /* ---------------- storage ---------------- */
 
-const COLUMNS = ["occurred_at", "severity", "origin", "fingerprint", "name", "message", "stack",
-  "route", "request_id", "user_id", "release", "extra"];
+const COLUMNS = [
+  "occurred_at",
+  "severity",
+  "origin",
+  "fingerprint",
+  "name",
+  "message",
+  "stack",
+  "route",
+  "request_id",
+  "user_id",
+  "release",
+  "extra",
+];
 
 function schedule() {
   if (timer || storeBroken) return;
@@ -138,21 +159,41 @@ async function flush() {
   buffer = [];
   const params = [];
   const rows = batch.map((p) => {
-    const vals = [p.ts, p.severity, p.origin, p.fingerprint, p.name, p.message, p.stack, p.route,
-      p.request_id, p.user_id, p.release, p.extra ? JSON.stringify(p.extra) : null];
+    const vals = [
+      p.ts,
+      p.severity,
+      p.origin,
+      p.fingerprint,
+      p.name,
+      p.message,
+      p.stack,
+      p.route,
+      p.request_id,
+      p.user_id,
+      p.release,
+      p.extra ? JSON.stringify(p.extra) : null,
+    ];
     const start = params.length;
     params.push(...vals);
     return `(${vals.map((_, i) => `$${start + i + 1}`).join(", ")})`;
   });
   try {
-    await dbQuery(`INSERT INTO error_event (${COLUMNS.join(", ")}) VALUES ${rows.join(", ")}`, params);
+    await dbQuery(
+      `INSERT INTO error_event (${COLUMNS.join(", ")}) VALUES ${rows.join(", ")}`,
+      params,
+    );
     return batch.length;
   } catch (err) {
     if (err && err.code === "42P01") {
       storeBroken = true;
-      logger.warn("error_event table missing; errors are logged but not stored until migration 0030 runs");
+      logger.warn(
+        "error_event table missing; errors are logged but not stored until migration 0030 runs",
+      );
     } else {
-      logger.warn({ err }, "could not store error reports; they are in the log");
+      logger.warn(
+        { err },
+        "could not store error reports; they are in the log",
+      );
     }
     return 0;
   }
@@ -175,10 +216,15 @@ function persist(payload) {
  */
 function report(err, meta = {}) {
   try {
-    const message = scrub(String((err && err.message) || err || "unknown"), { max: 2000 });
+    const message = scrub(String((err && err.message) || err || "unknown"), {
+      max: 2000,
+    });
     const stack = scrub((err && err.stack) || null, { max: 8000 }) || null;
     const severity = meta.severity || "error";
-    const fp = fingerprint({ name: (err && err.name) || "Error", message, stack }, meta);
+    const fp = fingerprint(
+      { name: (err && err.name) || "Error", message, stack },
+      meta,
+    );
     const ctx = requestContext.get() || {};
     const prior = seen.get(fp);
 
@@ -199,20 +245,40 @@ function report(err, meta = {}) {
     };
 
     persist(payload);
-    metrics.inc("mycity_errors_total", { origin: payload.origin, severity }, 1, "Errors reported, by origin and severity.");
+    metrics.inc(
+      "mycity_errors_total",
+      { origin: payload.origin, severity },
+      1,
+      "Errors reported, by origin and severity.",
+    );
 
     if (!ALERT_SEVERITIES.has(severity)) {
-      return Promise.resolve({ alerted: false, reason: "not_alerting", fingerprint: fp });
+      return Promise.resolve({
+        alerted: false,
+        reason: "not_alerting",
+        fingerprint: fp,
+      });
     }
     if (prior && Date.now() - prior.lastSent < DEDUPE_WINDOW_MS) {
       prior.suppressed += 1;
-      return Promise.resolve({ alerted: false, reason: "deduped", fingerprint: fp });
+      return Promise.resolve({
+        alerted: false,
+        reason: "deduped",
+        fingerprint: fp,
+      });
     }
     seen.set(fp, { lastSent: Date.now(), suppressed: 0 });
     forget();
     if (!underAlertCap()) {
-      logger.warn({ fingerprint: fp }, "error alert capped (more than 20 a minute)");
-      return Promise.resolve({ alerted: false, reason: "capped", fingerprint: fp });
+      logger.warn(
+        { fingerprint: fp },
+        "error alert capped (more than 20 a minute)",
+      );
+      return Promise.resolve({
+        alerted: false,
+        reason: "capped",
+        fingerprint: fp,
+      });
     }
     return postAlert(payload).then((alerted) => ({ alerted, fingerprint: fp }));
   } catch (selfErr) {
@@ -237,4 +303,11 @@ function __reset({ query } = {}) {
   timer = null;
 }
 
-module.exports = { report, flush, fingerprint, __reset, ALERT_SEVERITIES, DEDUPE_WINDOW_MS };
+module.exports = {
+  report,
+  flush,
+  fingerprint,
+  __reset,
+  ALERT_SEVERITIES,
+  DEDUPE_WINDOW_MS,
+};

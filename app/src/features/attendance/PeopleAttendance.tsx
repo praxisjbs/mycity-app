@@ -3,7 +3,6 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { FieldAssignment, LocationRequest, ReconCase, RegisterRow } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, Icon, Banner, EmptyState, KeyValue, Pill, Who, Card, CardHeader, Grid, PhoneOnly, DesktopOnly, Grow, useModal, Chips, ErrorState, toast, DateField, Field, FormRow, TextField, rules, SearchInput, ChoiceField, SelectField, TextAreaField, useForm , HelpTerm} from "@mycity/ui";
 import { AreaChart, Donut } from "@/components/ui/charts";
 import { StatStrip } from "@/components/ui/data";
 import { BackButton } from "@/components/ui/Profile";
@@ -11,6 +10,7 @@ import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
 import { PersonPicker } from "@/components/form";
+import { Button, Banner, EmptyState, KeyValue, Pill, Who, Card, CardHeader, Grid, PhoneOnly, DesktopOnly, Grow, useModal, Chips, ErrorState, toast, cn, formatDate, ChoiceField, DateField, Field, FormFooter, rules, SearchInput, SelectField, TextAreaField, TextField, useContractForm, Wizard, Icon } from "@mycity/ui";
 
 type View = "register" | "assignments" | "requests" | "manager";
 const VIEWS: Array<[View, string]> = [["register", "Register"], ["assignments", "Field Assignments"], ["requests", "Location Requests"], ["manager", "Manager Preview"]];
@@ -33,7 +33,7 @@ export function PeopleAttendance() {
     <>
       <div className="mb-4 flex flex-wrap items-end gap-3 max-md:items-start">
         <div className="min-w-0">
-          <h1 className="text-[20px]">Attendance</h1>
+          <h1 data-ui="page-title" className="text-[20px]">Attendance</h1>
           <p className="mt-[3px] text-[13px] text-muted-foreground">{summary.data ? `${formatDate(summary.data.date)} · Africa/Lagos · ${hr ? "the whole organisation" : "your team"}` : " "}</p>
         </div>
         {hr && (
@@ -74,7 +74,7 @@ function Register() {
     <>
       {s && (
         <Grid cols="1.4/1">
-          <AreaChart title="Clocked In by Hour, Today" values={s.hours} labels={["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]} note="From 07:00, cumulative. The grace period closes at 09:10." />
+          <AreaChart title="Clocked In by Hour" values={s.hours} labels={["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]} note="From 07:00, cumulative. The grace period closes at 09:10." />
           <Donut pct={s.on_time_pct} label="clocked in" text={s.donut_text} />
         </Grid>
       )}
@@ -85,14 +85,13 @@ function Register() {
       <DesktopOnly>
         <Table
           title="Today’s Register"
-          right={<span className="text-[11.5px] text-subtle-foreground">Click a row for every recorded field</span>}
           wide
           rows={list.rows}
           rowKey={(r) => r.employee.employee_id}
           loading={list.loading}
           error={list.error}
           onRowClick={open}
-          empty={{ icon: "srch", title: "Nobody matches this filter", text: "Choose All to see the whole register." }}
+          empty={{ icon: "srch", title: "Nobody Matches This Filter", text: "Choose All to see the whole register." }}
           columns={[
             { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} /> },
             { key: "a", label: "Arrangement", render: (r) => <Pill>{r.arrangement}</Pill> },
@@ -130,11 +129,10 @@ function Register() {
               </span>
             </button>
           ))}
-          {list.rows.length === 0 && !list.loading && <EmptyState icon="srch" title="Nobody matches this filter" text="Choose All to see the whole register." />}
+          {list.rows.length === 0 && !list.loading && <EmptyState icon="srch" title="Nobody Matches This Filter" text="Choose All to see the whole register." />}
           <Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" className="px-0" />
         </div>
       </PhoneOnly>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">Reconcile decides what a day’s record should say. The original punch is never overwritten.</p>
     </>
   );
 }
@@ -143,7 +141,7 @@ function DayDetailView({ id }: { id: string }) {
   const { data, error } = useApi("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: id } });
   if (error) return <ErrorState error={error} />;
   if (!data) return <LoadingRows />;
-  if (!data.events.length) return <EmptyState bare icon="clock" title="No clock events today" text={data.status.text === "On leave" ? "On approved leave." : "Nothing has been recorded yet."} />;
+  if (!data.events.length) return <EmptyState bare icon="clock" title="No Clock Events Today" text={data.status.text === "On Leave" ? "On approved leave." : "Nothing has been recorded yet."} />;
   type Ev = (typeof data.events)[number];
   const fields: Array<[string, (e: Ev) => string]> = [
     ["Event", (e) => (e.kind === "out" ? "Clock-out" : "Clock-in")], ["System time", (e) => e.system_time], ["Employee device time", (e) => e.device_time ?? "Not applicable"],
@@ -193,7 +191,7 @@ function Assignments() {
     <>
       <div className="mb-2.5 flex flex-wrap items-end gap-3">
         <div>
-          <h2 className="text-[15px]">Field Assignments</h2>
+          <h2 data-ui="title" className="text-[15px]">Field Assignments</h2>
           <p className="mt-[3px] text-[13px] text-muted-foreground">An approved assignment overrides the office or home for its day and time window.</p>
         </div>
         <Button variant="primary" icon="plus" className="md:ml-auto" onClick={() => modal.open({ title: "Add Field Assignment", wide: true, body: (close) => <AssignmentForm close={close} /> })}>Add Field Assignment</Button>
@@ -216,7 +214,7 @@ function Assignments() {
           { key: "v", label: "Valid", render: (a) => `${a.start} to ${a.end}` },
           { key: "p", label: "Approving Manager", render: (a) => a.approver },
           { key: "t", label: "Status", render: (a) => <Pill tone={FA_TONE[a.status]}>{a.status}</Pill> },
-          { key: "x", label: "", render: (a) => a.status === "Awaiting manager" && <Button disabled={approve.pending} onClick={() => ok(a)}>Approve</Button> },
+          { key: "x", label: "", render: (a) => a.status === "Awaiting manager" && <Button busy={approve.pending} onClick={() => ok(a)}>Approve</Button> },
         ]}
         footer={<Pager page={list.page} onPage={list.setPage} noun="assignment" />}
       />
@@ -226,17 +224,18 @@ function Assignments() {
 
 function AssignmentForm({ close }: { close: () => void }) {
   const [who, setWho] = useState<PersonRef[]>([]);
-  const f = useForm(
+  const [triedWho, setTriedWho] = useState(false);
+  const f = useContractForm(
     { name: "", client: "", site_name: "", radius_m: "150", date: "", start: "09:00", end: "17:00", note: "" },
     {
-      name: rules.required("Name the assignment"), client: rules.required("Name the client or event"), site_name: rules.required("Name the site"), date: rules.required("Pick a date"),
+      name: rules.required("Name the assignment"), client: rules.required("Name the client"), site_name: rules.required("Name the site"), date: rules.required("Pick a date"),
       radius_m: (v) => (/^\d+$/.test(v) && Number(v) >= 100 && Number(v) <= 500 ? null : "Between 100 and 500"),
       start: (v) => (/^\d{2}:\d{2}$/.test(v) ? null : "HH:MM"), end: (v, a) => (!/^\d{2}:\d{2}$/.test(v) ? "HH:MM" : v <= (a.start as string) ? "After the start" : null),
     },
   );
   const save = useMutation("POST /api/v1/attendance/assignments");
   const submit = async () => {
-    if (!f.check() || !who.length) return;
+    if (!f.check()) return;
     try {
       const a = await save.run({ body: { ...f.values, radius_m: Number(f.values.radius_m), employee_ids: who.map((w) => w.employee_id) } });
       invalidate("/api/v1/attendance");
@@ -247,29 +246,42 @@ function AssignmentForm({ close }: { close: () => void }) {
     }
   };
   return (
-    <>
-      <Grid cols={2} className="mb-0">
-        <div>
-          <Field label="Assignment Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Venue check" /></Field>
-          <Field label="Client, Event or Campaign" {...f.field("client")}><TextField {...f.field("client")} /></Field>
-          <Field label="Employees"><PersonPicker multiple value={who} onChange={setWho} /></Field>
-        </div>
-        <div>
-          <Field label="Approved Site" {...f.field("site_name")}><TextField {...f.field("site_name")} placeholder="Venue, area" /></Field>
-          <Field label="Radius, Metres" {...f.field("radius_m")} info="100 m for a single building, up to 500 m for a park or an open venue."><TextField inputMode="numeric" {...f.field("radius_m")} /></Field>
-          <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} /></Field>
-          <FormRow>
-            <Field label="From" {...f.field("start")}><TextField {...f.field("start")} placeholder="09:00" /></Field>
-            <Field label="To" {...f.field("end")}><TextField {...f.field("end")} placeholder="17:00" /></Field>
-          </FormRow>
-          <Field label="Note"><TextField {...f.field("note")} /></Field>
-        </div>
-      </Grid>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Assignment</Button>
-      </div>
-    </>
+    <Wizard
+      finish="Add Assignment"
+      busy={save.pending}
+      onFinish={() => void submit()}
+      onCancel={close}
+      steps={[
+        {
+          title: "Assignment",
+          check: () => {
+            setTriedWho(true);
+            return f.check(["name", "client"]) && who.length > 0;
+          },
+          body: (
+            <>
+              <Field label="Assignment Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Venue check" /></Field>
+              <Field label="Client or Event" {...f.field("client")}><TextField {...f.field("client")} /></Field>
+              <Field label="Employees" state={triedWho && !who.length ? "bad" : undefined} message="Add at least one"><PersonPicker multiple value={who} onChange={setWho} /></Field>
+            </>
+          ),
+        },
+        {
+          title: "Place and Time",
+          check: () => f.check(["site_name", "radius_m", "date", "start", "end"]),
+          body: (
+            <>
+              <Field label="Approved Site" {...f.field("site_name")}><TextField {...f.field("site_name")} placeholder="Venue, area" /></Field>
+              <Field label="Radius, Metres" {...f.field("radius_m")} info="100 m for a single building, up to 500 m for a park or an open venue."><TextField inputMode="numeric" {...f.field("radius_m")} /></Field>
+              <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} /></Field>
+              <Field label="From" {...f.field("start")}><TextField inputMode="numeric" {...f.field("start")} placeholder="09:00" /></Field>
+              <Field label="To" {...f.field("end")}><TextField inputMode="numeric" {...f.field("end")} placeholder="17:00" /></Field>
+              <Field label="Note" optional><TextField {...f.field("note")} /></Field>
+            </>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -308,7 +320,6 @@ function Requests() {
   );
 }
 
-
 function RequestDecision({ r, close }: { r: LocationRequest; close: () => void }) {
   const me = useMe();
   const decide = useMutation("POST /api/v1/attendance/location-requests/:id/decision");
@@ -344,15 +355,15 @@ function RequestDecision({ r, close }: { r: LocationRequest; close: () => void }
           <TextField value={note} onChange={setNote} placeholder="Optional" />
         </Field>
       )}
-      <div className="-mx-[18px] mt-3 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>{open ? "Cancel" : "Close"}</Button>
         {open && !own && (
           <>
-            <Button disabled={decide.pending} onClick={() => act(false)}>Reject</Button>
-            <Button variant="primary" icon="ok" disabled={decide.pending} onClick={() => act(true)}>Approve</Button>
+            <Button busy={decide.pending} onClick={() => act(false)}>Reject</Button>
+            <Button variant="primary" icon="ok" busy={decide.pending} onClick={() => act(true)}>Approve</Button>
           </>
         )}
-      </div>
+      </FormFooter>
     </>
   );
 }
@@ -383,11 +394,12 @@ function ManagerView() {
           { key: "x", label: "Expected Location", desktop: true, render: (r) => r.expected_location },
           { key: "m", label: "Matched Location", desktop: true, render: (r) => r.matched_location ?? "Not yet" },
         ]}
-        empty={{ title: "Nobody reports to you", text: "Your direct reports appear here." }}
+        empty={{ title: "Nobody Reports to You", text: "Your direct reports appear here." }}
         footer={<Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" />}
       />
-      <Card className="mt-3">
-          <CardHeader title={<HelpTerm help="You recommend and People decide. You cannot change policy, edit a clock event or see staff outside your team.">Needs Your Recommendation</HelpTerm>} right={<Pill tone={waiting ? "warn" : "ok"}>{String(waiting)}</Pill>} />
+      <Grid cols={2} className="mt-3">
+        <Card>
+          <CardHeader title="Needs Your Recommendation" right={<Pill tone={waiting ? "warn" : "ok"}>{String(waiting)}</Pill>} />
           {reqs.rows.map((q) => (
             <Row key={q.request_id} icon="target" title={`${q.type} · ${q.employee.display_name}`} sub={`${q.area} · ${formatDate(q.from)} to ${formatDate(q.to)} · ${q.reason}`}>
               <Button onClick={() => modal.open({ title: `Recommend ${q.number}`, body: (close) => <Recommend r={q} close={close} /> })}>Recommend</Button>
@@ -399,7 +411,8 @@ function ManagerView() {
             </Row>
           ))}
           {!waiting && <p className="text-[11.5px] text-subtle-foreground">Nothing is waiting on you.</p>}
-      </Card>
+        </Card>
+      </Grid>
     </>
   );
 }
@@ -435,11 +448,11 @@ function Recommend({ r, close }: { r: LocationRequest; close: () => void }) {
       <Field label="Your Comment for People" className="mt-3" state={note ? (note.trim().length < 3 ? "bad" : "good") : undefined} message="Add a comment">
         <TextField value={note} onChange={setNote} placeholder="I support this" />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button disabled={rec.pending} onClick={() => send(false)}>Do Not Recommend</Button>
-        <Button variant="primary" disabled={rec.pending} onClick={() => send(true)}>Recommend</Button>
-      </div>
+        <Button busy={rec.pending} onClick={() => send(false)}>Do Not Recommend</Button>
+        <Button variant="primary" busy={rec.pending} onClick={() => send(true)}>Recommend</Button>
+      </FormFooter>
     </>
   );
 }
@@ -452,9 +465,9 @@ export const OUTCOMES: Array<[string, string]> = [
 
 function CaseRecommend({ c, close }: { c: ReconCase; close: () => void }) {
   const [out, setOut] = useState(c.suggested_outcome);
-  const [note, setNote] = useState("");
+  const f = useContractForm({ note: "" }, { note: rules.min(10, "At least 10 characters") });
   const send = () => {
-    if (note.trim().length < 10) return;
+    if (!f.check()) return;
     close();
     toast(`Recommendation on ${c.number} sent to People.`);
     void out;
@@ -462,15 +475,14 @@ function CaseRecommend({ c, close }: { c: ReconCase; close: () => void }) {
   return (
     <>
       <KeyValue items={[["Employee", c.employee.display_name], ["Case", `${c.type} · ${formatDate(c.date)}`], ["Employee explanation", c.explanation ?? "None given"]]} />
-      <p className="my-3 text-[11.5px] text-subtle-foreground">You recommend. People decides and records the outcome. You cannot change the clock event.</p>
       <Field label="Recommended Outcome"><SelectField value={out} onChange={setOut} options={OUTCOMES.filter(([k]) => k !== "escalate")} /></Field>
-      <Field label="Your Comment" state={note ? (note.trim().length < 10 ? "bad" : "good") : undefined} message="Write at least 10 characters">
-        <TextAreaField value={note} onChange={setNote} placeholder="Approved site visit" state={note ? (note.trim().length < 10 ? "bad" : "good") : undefined} />
+      <Field label="Your Comment" {...f.field("note")}>
+        <TextAreaField {...f.field("note")} placeholder="Approved site visit" />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={note.trim().length < 10} onClick={send}>Recommend Correction</Button>
-      </div>
+        <Button variant="primary" onClick={send}>Recommend</Button>
+      </FormFooter>
     </>
   );
 }
@@ -489,10 +501,10 @@ function Reconcile({ onBack }: { onBack: () => void }) {
     <>
       <BackButton label="Back to Attendance" onClick={onBack} />
       <div className="mb-4">
-        <h1 className="text-[20px]">Reconciliation Queue</h1>
+        <h1 data-ui="page-title" className="text-[20px]">Reconciliation Queue</h1>
         <p className="mt-[3px] text-[13px] text-muted-foreground">{count("Awaiting HR")} awaiting People · {count("Awaiting manager")} awaiting a manager</p>
       </div>
-      <StatStrip items={[{ label: "Awaiting People", value: String(count("Awaiting HR")), tone: count("Awaiting HR") ? "warn" : "ok" }, { label: "Awaiting a manager", value: String(count("Awaiting manager")) }, { label: "More information", value: String(count("Awaiting employee")) }, { label: "Escalated", value: String(count("Escalated")), desktop: true }, { label: "Total cases", value: String(all.page?.total ?? 0) }]} />
+      <StatStrip items={[{ label: "Awaiting People", value: String(count("Awaiting HR")), tone: count("Awaiting HR") ? "warn" : "ok" }, { label: "Awaiting a Manager", value: String(count("Awaiting manager")) }, { label: "More Information", value: String(count("Awaiting employee")) }, { label: "Escalated", value: String(count("Escalated")), desktop: true }, { label: "Total Cases", value: String(all.page?.total ?? 0) }]} />
       <Toolbar>
         <SearchInput value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-[260px]" />
       </Toolbar>
@@ -511,10 +523,10 @@ function Reconcile({ onBack }: { onBack: () => void }) {
               <span className="text-[11.5px] text-subtle-foreground">{c.number} · {c.employee.display_name} · {formatDate(c.date)} · payroll: {c.payroll_impact}</span>
             </button>
           ))}
-          {!list.rows.length && !list.loading && <EmptyState bare title="No cases match" text="Clear the filter to see the whole queue." />}
+          {!list.rows.length && !list.loading && <EmptyState bare title="No Cases Match" text="Clear the filter to see the whole queue." />}
           <Pager page={list.page} onPage={list.setPage} noun="case" />
         </div>
-        <div className="min-w-0">{current ? <CaseDetail key={current.case_id} c={current} /> : <EmptyState icon="check" title="Nothing selected" text="Choose a case on the left." />}</div>
+        <div className="min-w-0">{current ? <CaseDetail key={current.case_id} c={current} /> : <EmptyState icon="check" title="Nothing Selected" text="Choose a case on the left." />}</div>
       </div>
     </>
   );
@@ -523,23 +535,26 @@ function Reconcile({ onBack }: { onBack: () => void }) {
 function CaseDetail({ c }: { c: ReconCase }) {
   const done = c.status === "Resolved" || c.status === "Escalated";
   const [out, setOut] = useState(c.suggested_outcome);
-  const [time, setTime] = useState(c.suggested_outcome === "add_out" ? "17:00" : "08:00");
-  const [why, setWhy] = useState("");
+  const timed = ["add_in", "add_out", "correct"].includes(out);
+  const f = useContractForm(
+    { time: c.suggested_outcome === "add_out" ? "17:00" : "08:00", why: "" },
+    { time: (v) => (timed && !/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? "HH:MM, 24 hour" : null), why: rules.min(10, "At least 10 characters") },
+  );
   const decide = useMutation("POST /api/v1/attendance/cases/:id/decision");
   const save = async () => {
+    if (!f.check()) return;
     try {
-      await decide.run({ params: { id: c.case_id }, body: { outcome: out, note: why, ...(["add_in", "add_out", "correct"].includes(out) && { time }) } });
+      await decide.run({ params: { id: c.case_id }, body: { outcome: out, note: f.values.why, ...(timed && { time: f.values.time }) } });
       invalidate("/api/v1/attendance");
       toast(out === "escalate" ? `${c.number} sent to Queries & Sanctions` : `${c.number} resolved. The original punch is kept.`);
     } catch {
       /* the field shows the server's message */
     }
   };
-  const bad = why.length > 0 && why.trim().length < 10;
   return (
     <>
       <Card>
-        <CardHeader title={`${c.number} · ${c.type}`} right={<Pill tone={CASE_TONE[c.status]}>{c.status}</Pill>} />
+        <CardHeader record title={`${c.number} · ${c.type}`} right={<Pill tone={CASE_TONE[c.status]}>{c.status}</Pill>} />
         <KeyValue items={[["Employee", `${c.employee.display_name} · ${c.department}`], ["Work arrangement", c.arrangement], ["Date", formatDate(c.date)], ...c.evidence, ["Employee explanation", c.explanation ?? "None given"], ["Manager comment", c.manager_note ?? "None yet"], ["Payroll impact", c.payroll_impact]]} />
       </Card>
       {!done && (
@@ -548,16 +563,16 @@ function CaseDetail({ c }: { c: ReconCase }) {
           {c.status === "Awaiting manager" && <Banner tone="info" icon="info">The line manager has not recommended yet. People can still decide.</Banner>}
           <Field label="Outcome"><SelectField value={out} onChange={setOut} options={OUTCOMES} /></Field>
           {["add_in", "add_out", "correct"].includes(out) && (
-            <Field label="Time" state={/^\d{2}:\d{2}$/.test(time) ? undefined : "bad"} message="HH:MM">
-              <TextField value={time} onChange={setTime} placeholder="17:00" />
+            <Field label="Time" {...f.field("time")}>
+              <TextField {...f.field("time")} inputMode="numeric" placeholder="17:00" />
             </Field>
           )}
-          <Field label="Resolution Reason" state={bad || decide.fields.note ? "bad" : why ? "good" : undefined} message={decide.fields.note?.[0] ?? "At least 10 characters"}>
-            <TextAreaField value={why} onChange={setWhy} placeholder="Matches gate log" state={bad ? "bad" : why ? "good" : undefined} />
+          <Field label="Resolution Reason" {...f.field("why")} state={decide.fields.note ? "bad" : f.field("why").state} message={decide.fields.note?.[0] ?? f.field("why").message}>
+            <TextAreaField {...f.field("why")} placeholder="Matches gate log" />
           </Field>
           <div className="flex justify-end gap-2">
             <Grow />
-            <Button variant="primary" disabled={decide.pending || why.trim().length < 10} onClick={save}>Record Decision</Button>
+            <Button variant="primary" busy={decide.pending} onClick={save}>Record Decision</Button>
           </div>
         </Card>
       )}

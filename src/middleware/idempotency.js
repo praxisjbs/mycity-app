@@ -82,7 +82,9 @@ async function existing(db, key) {
 function release(key) {
   return pool
     .query("DELETE FROM idempotency_key WHERE key = $1", [key])
-    .catch((err) => logger.warn({ err }, "could not release an idempotency key"));
+    .catch((err) =>
+      logger.warn({ err }, "could not release an idempotency key"),
+    );
 }
 
 /**
@@ -117,7 +119,9 @@ function capture(req, res, key) {
           )
         : release(key);
     Promise.resolve(write)
-      .catch((err) => logger.warn({ err }, "could not record an idempotency outcome"))
+      .catch((err) =>
+        logger.warn({ err }, "could not record an idempotency outcome"),
+      )
       .finally(() => send(body));
     return res;
   };
@@ -133,7 +137,11 @@ async function idempotency(req, res, next) {
   if (!userId) return next();
 
   if (!KEY_PATTERN.test(key)) {
-    throw new AppError("IDEMPOTENCY_KEY_INVALID", "Idempotency-Key must be 8 to 200 characters: letters, digits and . _ : -", 400);
+    throw new AppError(
+      "IDEMPOTENCY_KEY_INVALID",
+      "Idempotency-Key must be 8 to 200 characters: letters, digits and . _ : -",
+      400,
+    );
   }
 
   const path = req.originalUrl || req.url;
@@ -147,7 +155,10 @@ async function idempotency(req, res, next) {
     }
     row = await existing(pool, key);
   } catch (err) {
-    logger.warn({ err }, "idempotency unavailable; the request runs without replay protection");
+    logger.warn(
+      { err },
+      "idempotency unavailable; the request runs without replay protection",
+    );
     return next();
   }
 
@@ -156,11 +167,19 @@ async function idempotency(req, res, next) {
     return next();
   }
   if (row.request_hash !== hash) {
-    throw new AppError("IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was used for a different request. Use a new key.", 422);
+    throw new AppError(
+      "IDEMPOTENCY_KEY_REUSED",
+      "This Idempotency-Key was used for a different request. Use a new key.",
+      422,
+    );
   }
   if (row.state === "in_flight") {
     res.setHeader("Retry-After", "2");
-    throw new AppError("IDEMPOTENCY_IN_PROGRESS", "The same request is still being processed. Try again in a moment.", 409);
+    throw new AppError(
+      "IDEMPOTENCY_IN_PROGRESS",
+      "The same request is still being processed. Try again in a moment.",
+      409,
+    );
   }
   res.setHeader("Idempotency-Replayed", "true");
   return res.status(row.status_code || 200).json(row.response_body);

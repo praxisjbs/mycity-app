@@ -1,103 +1,354 @@
-"use strict";
 /**
- * Will mail from our domain be delivered, or land in spam? The DNS half of the answer
- * (MILESTONES §5: SPF, DKIM and DMARC for the mail domain are an M0 server task).
+ * DNS deliverability checks for a sending domain (Settings, Integrations; the
+ * mail-setup guide).
  *
- *   const report = await dnsCheck.checkDomain("mycityapp.io", { selector: "default" });
- *   // { domain, ok, mx, spf, dkim, dmarc }, each { ok, record, problems: [...] }
+ * Verify what can be verified automatically, MX, SPF, DKIM and DMARC lookups
+ * against the sending domain, and hand the UI a clear per-record verdict. Where a
+ * lookup is IMPOSSIBLE (resolver failure, provider-only verification), the
+ * verdict is `ok: null` and the screen falls back to a self-check tick: maximum
+ * auto-verify, self-check only where practically impossible.
  *
- * Checks, each a reason real mail goes to spam:
- *  - MX: the domain receives mail (bounces and replies have somewhere to go).
- *  - SPF: exactly one "v=spf1" record (two is a permanent error), ending in -all or ~all
- *    (not +all, which authorises the whole internet), within the 10-lookup limit.
- *  - DKIM: a key published at <selector>._domainkey.<domain>, with a public key (p=).
- *  - DMARC: a "v=DMARC1" record at _dmarc.<domain>, with a policy; p=none is reported as
- *    a warning (monitoring only, protects nothing).
+ * Shape returned by `checkDomain`:
+ *   { domain, mx, spf, dkim, dmarc, done, checked_at }
+ *   each record: { ok: true | false | null, ...details }
+ *     ok:true   record present (and for SPF/DKIM/DMARC, the record value)
+ *     ok:false  definitively missing, with a suggested value / hint
+ *     ok:null   could not be checked (resolver error); self-check territory
  *
- * Settings, Integrations shows this report; ops runs it after DNS changes.
+ * `smtpHost` (the relay system mail goes through, SMTP_HOST) only sharpens the
+ * suggestions: relay presets for known ESPs (SendGrid/SES/Mailgun/...), an
+ * `include:` for the SMTP host's own domain, or a plain `mx` record.
  */
-const dns = require("node:dns").promises;
+"use strict";
+const dns = require("dns/promises");
+const { parseDmarc } = require("./dmarc");
 
-const LOOKUP_MECHS = /\b(include:|a\b|a:|mx\b|mx:|ptr\b|ptr:|exists:|redirect=)/gi;
+/** DNS codes that mean "no such record" rather than "could not look up". */
+const NO_RECORD = new Set(["ENOTFOUND", "ENODATA", "NXDOMAIN"]);
 
-async function txt(name) {
+const DKIM_SELECTORS = [
+  "default",
+  "dkim",
+  "google",
+  "selector1",
+  "selector2",
+  "s1",
+  "s2",
+  "k1",
+  "mail",
+  "smtp",
+  "email",
+  "cpanel",
+  "x",
+];
+
+/** Known relays → SPF include + where DKIM gets enabled (their dashboard). */
+const RELAYS = [
+  {
+    match: /sendgrid/i,
+    include: "sendgrid.net",
+    dkimHint:
+      "Enable DKIM in SendGrid → Settings → Sender Authentication, then verify again.",
+  },
+  {
+    match: /amazonses|amazonaws/i,
+    include: "amazonses.com",
+    dkimHint:
+      "Verify the domain in SES and enable Easy DKIM, then verify again.",
+  },
+  {
+    match: /mailgun/i,
+    include: "mailgun.org",
+    dkimHint: "Publish the DKIM record Mailgun shows under Sending → Domains.",
+  },
+  {
+    match: /mailjet/i,
+    include: "spf.mailjet.com",
+    dkimHint:
+      "Validate the domain in Mailjet. SPF and DKIM values are under Domain authentication.",
+  },
+  {
+    match: /mandrill|mailchimp/i,
+    include: "spf.mandrillapp.com",
+    dkimHint: "Verify the sending domain in Mandrill and enable DKIM.",
+  },
+  {
+    match: /postmark/i,
+    include: "spf.mtasv.net",
+    dkimHint:
+      "Add a Sender Signature in Postmark and copy its DKIM record to DNS.",
+  },
+  {
+    match: /zoho|zillum/i,
+    include: "zoho.com",
+    dkimHint:
+      "Zoho Mail publishes DKIM automatically for its domains. Check the admin console, then verify again.",
+  },
+  {
+    match: /outlook|office365|protection\.outlook/i,
+    include: "spf.protection.outlook.com",
+    dkimHint:
+      "Enable DKIM for the domain in Microsoft 365 (Defender → Email authentication), then verify again.",
+  },
+  {
+    match: /google|gmail/i,
+    include: "_spf.google.com",
+    dkimHint:
+      "Generate DKIM in Google Workspace (Apps → Gmail → Authenticate email); its selector is 'google'.",
+  },
+];
+
+const relayFor = (host) =>
+  RELAYS.find((r) => r.match.test(String(host || ""))) || null;
+
+/**
+ * Second-level suffixes under which a registrable domain has THREE labels
+ * ("mycity.com.ng", not "com.ng"). Nigerian registrations live under these.
+ */
+const SECOND_LEVEL = new Set([
+  "com.ng",
+  "org.ng",
+  "net.ng",
+  "gov.ng",
+  "edu.ng",
+  "name.ng",
+  "sch.ng",
+  "mil.ng",
+  "co.uk",
+  "org.uk",
+  "co.za",
+]);
+
+/** The registrable domain of a hostname: last two labels, or three under a second-level suffix. */
+const domainOf = (host) => {
+  const parts = String(host || "")
+    .toLowerCase()
+    .split(".")
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+  const lastTwo = parts.slice(-2).join(".");
+  return SECOND_LEVEL.has(lastTwo) && parts.length >= 3
+    ? parts.slice(-3).join(".")
+    : lastTwo;
+};
+
+/** Strip the left-most label ("mail.x.ng" → "x.ng"); null when already bare. */
+const parentOf = (domain) => {
+  const parts = String(domain).split(".");
+  return parts.length > 2 ? parts.slice(1).join(".") : null;
+};
+
+const readTxt = async (name) => {
   try {
-    return (await dns.resolveTxt(name)).map((parts) => parts.join(""));
+    return { found: true, txts: await dns.resolveTxt(name) };
   } catch (err) {
-    if (["ENOTFOUND", "ENODATA", "ENOTIMP"].includes(err.code)) return [];
+    if (NO_RECORD.has(err.code)) return { found: false, txts: [] };
     throw err;
   }
+};
+
+async function checkMx(domain) {
+  try {
+    const recs = await dns.resolveMx(domain);
+    if (!recs.length) {
+      return {
+        ok: false,
+        records: [],
+        hint: `The domain has no MX records. Add MX records at your DNS host (${domain}) so mail servers accept it as a sender domain.`,
+      };
+    }
+    return {
+      ok: true,
+      records: recs.map((r) => ({ host: r.exchange, priority: r.priority })),
+    };
+  } catch (err) {
+    if (NO_RECORD.has(err.code)) {
+      return {
+        ok: false,
+        records: [],
+        hint: `No MX records on ${domain}. Sending via a relay can work without MX, but the domain won't receive mail. Add MX records to make it a full mailbox domain.`,
+      };
+    }
+    return {
+      ok: null,
+      records: [],
+      error: err.code || err.message,
+      hint: "MX check couldn't complete right now. Tick the box below once you've added MX records.",
+    };
+  }
 }
 
-function result(record, problems, warnings = []) {
-  return { ok: problems.length === 0, record, problems, warnings };
+function spfSuggestions(domain, smtpHost) {
+  const relay = relayFor(smtpHost);
+  if (relay && relay.include) return [`v=spf1 include:${relay.include} ~all`];
+  const smtpDomain = domainOf(smtpHost);
+  if (smtpDomain && smtpDomain !== domain)
+    return [`v=spf1 mx include:${smtpDomain} ~all`];
+  return ["v=spf1 mx ~all"];
 }
 
-/** SPF from the TXT records of a domain. Pure, for tests. */
-function judgeSpf(records) {
-  const spf = records.filter((r) => /^v=spf1(\s|$)/i.test(r.trim()));
-  if (spf.length === 0) return result(null, ["No SPF record: receivers cannot tell our mail from forgeries"]);
-  if (spf.length > 1) return result(spf.join(" | "), ["More than one SPF record: receivers treat that as a permanent error"]);
-  const r = spf[0].trim();
-  const problems = [];
-  const warnings = [];
-  if (/\s\+all\b/i.test(r) || /\sall\b/i.test(r.replace(/[-~?]all/i, ""))) problems.push("SPF ends in +all, which lets anyone send as us");
-  else if (/\s\?all\b/i.test(r)) warnings.push("SPF ends in ?all (neutral); prefer ~all or -all");
-  else if (!/\s[-~]all\b/i.test(r) && !/redirect=/i.test(r)) problems.push("SPF does not end in -all or ~all");
-  const lookups = (r.match(LOOKUP_MECHS) || []).length;
-  if (lookups > 10) problems.push(`SPF needs ${lookups} DNS lookups; the limit is 10`);
-  return result(r, problems, warnings);
+async function checkSpf(domain, smtpHost) {
+  let result;
+  try {
+    result = await readTxt(domain);
+  } catch (err) {
+    return {
+      ok: null,
+      error: err.code || err.message,
+      hint: "SPF check couldn't complete right now. Tick the box below once you've published the record.",
+    };
+  }
+
+  let where = domain;
+  let txts = result.txts;
+  // SPF commonly lives on the parent domain and covers subdomains: check it
+  // before declaring the record missing.
+  if (!result.found) {
+    const parent = parentOf(domain);
+    if (parent) {
+      try {
+        const pr = await readTxt(parent);
+        if (pr.found) {
+          txts = pr.txts;
+          where = parent;
+        }
+      } catch {
+        /* parent check is best-effort */
+      }
+    }
+  }
+
+  const spf = txts.find((t) => t.join("").toLowerCase().startsWith("v=spf1"));
+  if (spf) {
+    return {
+      ok: true,
+      record: spf.join(""),
+      domain: where,
+      note:
+        where !== domain
+          ? `Found on ${where} (applies to ${domain} too)`
+          : undefined,
+    };
+  }
+  return {
+    ok: false,
+    record: null,
+    suggest: spfSuggestions(domain, smtpHost),
+    hint: `Add a TXT record on ${domain} with one of the suggested values, then verify again.`,
+  };
 }
 
-/** DKIM from the TXT records at the selector. Pure. */
-function judgeDkim(records) {
-  const r = records.find((x) => /\bp=/.test(x));
-  if (!r) return result(null, ["No DKIM key at the selector: mail cannot be signed verifiably"]);
-  const p = /\bp=([^;\s]*)/.exec(r);
-  if (!p || !p[1]) return result(r, ["The DKIM key is empty (revoked)"]);
-  return result(r, []);
+async function checkDkim(domain, smtpHost) {
+  const relay = relayFor(smtpHost);
+  const results = await Promise.allSettled(
+    DKIM_SELECTORS.map(async (sel) => {
+      const r = await readTxt(`${sel}._domainkey.${domain}`);
+      return r.found ? { sel, txts: r.txts } : null;
+    }),
+  );
+  const found = results.find((r) => r.status === "fulfilled" && r.value);
+  if (found) {
+    const { sel, txts } = found.value;
+    return {
+      ok: true,
+      selector: sel,
+      record: txts.map((t) => t.join("")).join(""),
+    };
+  }
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length === DKIM_SELECTORS.length) {
+    const first = failures[0].reason;
+    return {
+      ok: null,
+      error: (first && (first.code || first.message)) || "lookup failed",
+      hint: "DKIM check couldn't complete right now. Tick the box below once your provider has published the key.",
+    };
+  }
+  const hint =
+    relay && relay.dkimHint
+      ? relay.dkimHint
+      : `No DKIM key found under the common selectors. Enable DKIM at your mail provider, or publish a TXT record at <selector>._domainkey.${domain} with the key your provider gives you (template: v=DKIM1; k=rsa; p=<public key>).`;
+  return { ok: false, selector: null, record: null, hint };
 }
 
-/** DMARC from the TXT records at _dmarc. Pure. */
-function judgeDmarc(records) {
-  const d = records.filter((r) => /^v=DMARC1/i.test(r.trim()));
-  if (d.length === 0) return result(null, ["No DMARC record: big mail providers increasingly reject or junk such mail"]);
-  if (d.length > 1) return result(d.join(" | "), ["More than one DMARC record: receivers ignore them all"]);
-  const p = /\bp=(none|quarantine|reject)\b/i.exec(d[0]);
-  if (!p) return result(d[0], ["DMARC has no valid policy (p=)"]);
-  return result(d[0], [], p[1].toLowerCase() === "none" ? ["DMARC p=none only monitors; move to quarantine once reports are clean"] : []);
+async function checkDmarc(domain) {
+  try {
+    const txts = await dns.resolveTxt(`_dmarc.${domain}`);
+    const joined = (txts || []).map((t) => t.join(""));
+    const rec = joined.find((t) => /v=dmarc1/i.test(t));
+    if (!rec) {
+      return {
+        ok: false,
+        hint: `No DMARC record at _dmarc.${domain}. Add a TXT record starting with v=DMARC1; p=none; rua=mailto:postmaster@${domain} to start monitoring spoofing.`,
+      };
+    }
+    const parsed = parseDmarc(rec);
+    return {
+      ok: parsed.ok,
+      record: parsed.raw,
+      reading: parsed.reading,
+      parsed,
+    };
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "ENOTFOUND" || code === "ENODATA" || code === "NXDOMAIN") {
+      return {
+        ok: false,
+        hint: `No DMARC record at _dmarc.${domain}. Add a TXT record starting with v=DMARC1; p=none to start monitoring.`,
+      };
+    }
+    return {
+      ok: null,
+      error: code || err.message,
+      hint: "DMARC check could not complete right now.",
+    };
+  }
 }
 
 /**
- * @param {string} domain
- * @param {{selector?: string}} [opts]
+ * Verify a sending domain's deliverability records. `done` is true only when MX,
+ * SPF and DKIM all passed an automated check (DMARC is reported, and judged by
+ * services/mail/deliverability/check.js).
  */
-async function checkDomain(domain, { selector = "default" } = {}) {
-  const d = String(domain || "").trim().toLowerCase();
-  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) throw new Error(`"${domain}" is not a domain`);
-  if (!/^[a-z0-9_-]+$/i.test(selector)) throw new Error(`"${selector}" is not a DKIM selector`);
-  let mx = [];
-  try {
-    mx = (await dns.resolveMx(d)).sort((a, b) => a.priority - b.priority);
-  } catch (err) {
-    if (!["ENOTFOUND", "ENODATA"].includes(err.code)) throw err;
+async function checkDomain(domain, { smtpHost = null } = {}) {
+  const clean = String(domain || "")
+    .trim()
+    .toLowerCase();
+  if (
+    !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(
+      clean,
+    )
+  ) {
+    throw new Error("Not a domain name");
   }
-  const [rootTxt, dkimTxt, dmarcTxt] = await Promise.all([txt(d), txt(`${selector}._domainkey.${d}`), txt(`_dmarc.${d}`)]);
-  const out = {
-    domain: d,
-    mx: result(mx.map((m) => `${m.priority} ${m.exchange}`).join(", ") || null, mx.length ? [] : ["No MX record: replies and bounces have nowhere to go"]),
-    spf: judgeSpf(rootTxt),
-    dkim: judgeDkim(dkimTxt),
-    dmarc: judgeDmarc(dmarcTxt),
+  const [mx, spf, dkim, dmarc] = await Promise.all([
+    checkMx(clean),
+    checkSpf(clean, smtpHost),
+    checkDkim(clean, smtpHost),
+    checkDmarc(clean),
+  ]);
+  return {
+    domain: clean,
+    mx,
+    spf,
+    dkim,
+    dmarc,
+    done: mx.ok === true && spf.ok === true && dkim.ok === true,
+    checked_at: new Date().toISOString(),
   };
-  out.ok = out.mx.ok && out.spf.ok && out.dkim.ok && out.dmarc.ok;
-  return out;
 }
 
-/** The domain of an address or "Name <address>". */
-function domainOf(from) {
+/** The domain of an address or "Name <address>" (MAIL_FROM). */
+function senderDomain(from) {
   const m = /@([^>\s]+)>?\s*$/.exec(String(from || ""));
   return m ? m[1].toLowerCase() : null;
 }
 
-module.exports = { checkDomain, judgeSpf, judgeDkim, judgeDmarc, domainOf };
+module.exports = {
+  checkDomain,
+  checkDmarc,
+  DKIM_SELECTORS,
+  domainOf,
+  senderDomain,
+  spfSuggestions,
+};

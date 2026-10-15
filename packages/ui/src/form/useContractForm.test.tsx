@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import organisation from "@mycity/contract/schemas/organisation.js";
-import { useContractForm, shortMessage } from "./useContractForm";
+import { rules, useContractForm, shortMessage } from "./useContractForm";
 import { Field } from "./Field";
 import { TextField } from "./TextField";
 import { Form } from "./Form";
@@ -20,7 +20,7 @@ const blank = {
 };
 
 function EmployeeForm({ onSave }: { onSave: (data: unknown) => void }) {
-  const form = useContractForm(organisation.EmployeeCreate!, blank, { pauseMs: 50 });
+  const form = useContractForm(blank, organisation.EmployeeCreate!, { pauseMs: 50 });
   return (
     <Form onSubmit={form.submit(onSave)}>
       <Field label="First Name" {...form.status("first_name")}>
@@ -77,9 +77,9 @@ describe("useContractForm", () => {
   });
 
   it("puts a server 422's fields on the same marks", async () => {
-    let api: ReturnType<typeof useContractForm> | undefined;
+    let api: { setServerErrors: (f: Record<string, string[]>) => void } | undefined;
     function Probe() {
-      const form = useContractForm(organisation.EmployeeCreate!, blank);
+      const form = useContractForm(blank, organisation.EmployeeCreate!);
       api = form as never;
       return (
         <Field label="Work Email" {...form.status("work_email")}>
@@ -97,5 +97,31 @@ describe("useContractForm", () => {
     expect(shortMessage({ type: "custom", message: "must look like MCA-0001" })).toBe("Must look like MCA-0001");
     expect(shortMessage({ type: "too_small", message: "String must contain at least 1 character(s)" })).toBe("Required");
     expect(shortMessage({ type: "invalid_enum_value", message: "Invalid enum value" })).toBe("Choose one");
+  });
+});
+
+describe("useContractForm with INTERIM rules", () => {
+  it("check() marks everything and reports cleanliness", () => {
+    const { result } = renderHook(() => useContractForm({ name: "" }, { name: rules.required() }));
+    let ok = true;
+    act(() => {
+      ok = result.current.check();
+    });
+    expect(ok).toBe(false);
+    expect(result.current.status("name")).toEqual({ state: "bad", message: "Required" });
+  });
+
+  it("shows a server error until the field changes", () => {
+    const { result } = renderHook(() => useContractForm({ email: "ada@mycity.app" }));
+    act(() => result.current.setServerErrors({ email: ["Already in use"] }));
+    expect(result.current.field("email").message).toBe("Already in use");
+    act(() => result.current.field("email").onChange("ola@mycity.app"));
+    expect(result.current.field("email").message).toBeUndefined();
+  });
+
+  it("keeps every rule message to four words", () => {
+    for (const msg of [rules.required()(""), rules.email(""), rules.email("x"), rules.email("x@y"), rules.amount(""), rules.amount("1.234")]) {
+      expect(String(msg).split(" ").length).toBeLessThanOrEqual(4);
+    }
   });
 });

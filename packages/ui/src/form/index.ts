@@ -4,8 +4,7 @@
  * Each component file in this folder is exported here (npm run new:component adds the line).
  */
 export type { FieldBinding, FieldState, ServerFields } from "./binding";
-export { useForm, rules, type Validator } from "./useForm";
-export { useContractForm, shortMessage, PAUSE_MS, type ContractFormOptions } from "./useContractForm";
+export { useContractForm, rules, shortMessage, PAUSE_MS, type ContractFormOptions, type ContractSchema, type FormRules, type Validator } from "./useContractForm";
 export { Field, FormRow, FormError, type FieldProps, type FormRowProps, type FormErrorProps } from "./Field";
 export {
   TextField,

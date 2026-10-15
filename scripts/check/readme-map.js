@@ -28,7 +28,10 @@ const { ROOT, changedFiles } = require("./lib/changes");
 
 const README = "README.MD";
 const text = fs.readFileSync(path.join(ROOT, README), "utf8");
-const word = (w) => new RegExp(`(^|[^A-Za-z0-9_-])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9_-]|$)`).test(text);
+const word = (w) =>
+  new RegExp(
+    `(^|[^A-Za-z0-9_-])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9_-]|$)`,
+  ).test(text);
 const moduleExists = (m) => fs.existsSync(path.join(ROOT, "src", "modules", m));
 
 const ALLOWED = [
@@ -45,7 +48,8 @@ const ALLOWED = [
   (p) => /^src\/services\/ai\/prompts\/[a-z0-9-]+\.md$/.test(p),
   (p) => /^packages\/ui\//.test(p),
   (p) => /^\.github\//.test(p) && !/^\.github\/workflows\//.test(p),
-  (p) => p === "package-lock.json" || p.endsWith("/.gitkeep") || p === ".gitkeep",
+  (p) =>
+    p === "package-lock.json" || p.endsWith("/.gitkeep") || p === ".gitkeep",
 ];
 
 function onMap(p) {
@@ -61,15 +65,21 @@ let changed;
 try {
   changed = changedFiles();
 } catch (err) {
-  console.error(`readme-map: could not read the change from git: ${err.message}`);
+  console.error(
+    `readme-map: could not read the change from git: ${err.message}`,
+  );
   process.exit(1);
 }
 
-const added = changed.filter((c) => c.status === "A" || c.status === "R").map((c) => c.path);
+const added = changed
+  .filter((c) => c.status === "A" || c.status === "R")
+  .map((c) => c.path);
 const missing = added.filter((p) => !ALLOWED.some((ok) => ok(p)) && !onMap(p));
 
 if (missing.length) {
-  console.error(`readme-map: ${missing.length} new file(s) not on the map in ${README}\n`);
+  console.error(
+    `readme-map: ${missing.length} new file(s) not on the map in ${README}\n`,
+  );
   for (const p of missing) console.error(`  ${p}`);
   console.error(
     `\nAdd each to the right section of ${README} (§3 repository map, §4 src outside modules,\n` +

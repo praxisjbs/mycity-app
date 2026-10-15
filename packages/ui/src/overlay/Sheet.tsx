@@ -133,6 +133,7 @@ export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, chi
         <Drawer.Content
           ref={content}
           role={role ?? "dialog"}
+          data-ui="modal"
           aria-modal="true"
           {...(sub ? {} : { "aria-describedby": undefined })}
           onOpenAutoFocus={(e) => {

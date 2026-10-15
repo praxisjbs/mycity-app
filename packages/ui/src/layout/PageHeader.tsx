@@ -11,10 +11,13 @@
  */
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { HelpTerm } from "../help/HelpTerm";
 
 export interface PageHeaderProps {
   /** The page's name, at most 3 words, Title Case (My Attendance). Something beside it, such as a Pill, may follow as children of the title. */
   title: ReactNode;
+  /** Support text behind the title (a HelpTerm on it), at most 35 words. */
+  help?: ReactNode;
   /** One line under the title, at most 8 words; desktop only. */
   subtitle?: ReactNode;
   /** The merged name for `subtitle`; kept so screens move by an import change. */
@@ -27,13 +30,13 @@ export interface PageHeaderProps {
   className?: string;
 }
 
-export function PageHeader({ title, subtitle, sub, actions, children, className }: PageHeaderProps) {
+export function PageHeader({ title, help, subtitle, sub, actions, children, className }: PageHeaderProps) {
   const line = subtitle ?? sub;
   return (
     <div className={cn("mb-4 flex flex-wrap items-end gap-3", className)}>
       <div className="min-w-0">
         <h1 data-ui="page-title" className="flex items-center gap-1.5 text-2xl phone:text-xl">
-          {title}
+          {help ? <HelpTerm help={help}>{title}</HelpTerm> : title}
         </h1>
         {line != null && line !== "" && (
           <p data-ui="page-subtitle" className="mt-0.5 text-sm text-muted-foreground phone:hidden">

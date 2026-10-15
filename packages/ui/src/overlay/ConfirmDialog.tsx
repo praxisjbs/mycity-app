@@ -75,7 +75,7 @@ export function ConfirmDialog({
           <Button data-autofocus disabled={busy} onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button variant={destructive ? "danger" : "primary"} loading={busy} onClick={() => void confirm()}>
+          <Button variant={destructive ? "danger" : "primary"} busy={busy} onClick={() => void confirm()}>
             {confirmLabel ?? title}
           </Button>
         </>

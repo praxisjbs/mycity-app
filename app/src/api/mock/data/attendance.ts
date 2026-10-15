@@ -8,7 +8,7 @@ import { PEOPLE, type MockPerson } from "./people";
 export type TodayStatus = "on_time" | "late" | "remote" | "leave" | "no_clockout" | "new_device" | "absent" | "suspended" | "not_yet";
 export interface TodayRow {
   person: MockPerson;
-  mode: "On site" | "Remote" | "Field" | "None";
+  mode: "On Site" | "Remote" | "Field" | "None";
   clock_in: string | null;
   status: TodayStatus;
   late_min: number;
@@ -32,7 +32,7 @@ export const TODAY: TodayRow[] = PEOPLE.map((p, i) => {
   const remote = p.work_pattern === "remote" || (p.work_pattern === "hybrid" && i % 3 === 1);
   const base: TodayRow = {
     person: p,
-    mode: remote ? "Remote" : "On site",
+    mode: remote ? "Remote" : "On Site",
     clock_in: `0${7 + (i % 2)}:${String(40 + ((i * 7) % 20)).padStart(2, "0")}`,
     status: remote ? "remote" : "on_time",
     late_min: 0,
@@ -43,10 +43,10 @@ export const TODAY: TodayRow[] = PEOPLE.map((p, i) => {
 });
 
 export const STATUS_PILL: Record<TodayStatus, { tone: "ok" | "warn" | "err" | "info" | "neutral"; text: string }> = {
-  on_time: { tone: "ok", text: "On time" },
+  on_time: { tone: "ok", text: "On Time" },
   remote: { tone: "ok", text: "Remote" },
   late: { tone: "err", text: "Late" },
-  leave: { tone: "info", text: "On leave" },
+  leave: { tone: "info", text: "On Leave" },
   no_clockout: { tone: "warn", text: "No clock-out yesterday" },
   new_device: { tone: "warn", text: "New device" },
   absent: { tone: "err", text: "Not clocked in" },
@@ -96,7 +96,7 @@ export const HISTORY: PunchRow[] = (() => {
         clock_in_at: leave || absent ? null : at(d, inH),
         clock_out_at: leave || absent ? null : at(d, outH),
         worked_minutes: leave || absent ? null : oh * 60 + om - (ih * 60 + im) - (dow === 6 ? 0 : 60),
-        location: leave ? "On leave" : absent ? "No punch" : remote ? "Approved home location" : p.worksite,
+        location: leave ? "On Leave" : absent ? "No punch" : remote ? "Approved home location" : p.worksite,
         status: leave ? "leave" : absent ? "absent" : review ? "review" : late ? "late" : remote ? "remote" : dow === 6 ? "weekend" : "on_time",
         late_minutes: lateMin,
         note: review ? "Outside the geofence, explanation sent" : late && p.user_key === "bashir" ? "Counts toward the lateness rule" : null,
@@ -108,7 +108,7 @@ export const HISTORY: PunchRow[] = (() => {
 
 export const summaryOf = (rows: TodayRow[]) => ({
   present: rows.filter((r) => r.clock_in).length,
-  onsite: rows.filter((r) => r.mode === "On site" && r.clock_in).length,
+  onsite: rows.filter((r) => r.mode === "On Site" && r.clock_in).length,
   remote: rows.filter((r) => r.mode === "Remote" && r.clock_in).length,
   late: rows.filter((r) => r.status === "late").length,
   noout: rows.filter((r) => r.status === "no_clockout").length,

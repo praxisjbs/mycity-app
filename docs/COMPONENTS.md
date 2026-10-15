@@ -114,7 +114,7 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | Use | Every action a person takes: Create Rule, Clock In, Export. A link that looks like a button passes asChild with an <a>. |
 | Avoid | A second primary on one surface (one yellow button per surface); a bare icon (use IconButton); the sign in or clock in call to action (use BigButton). |
 | Phone | At least 44 px tall; a footer stretches the primary to full width at the bottom. |
-| Accessibility | A native button (type="button" unless set). While loading it stays focusable, says aria-busy and ignores presses. Verb Noun labels, Title Case. |
+| Accessibility | A native button (type="button" unless set). While busy it stays focusable, says aria-busy and ignores presses. Verb Noun labels, Title Case. |
 | Status | stable |
 | Exports | `Button`, `IconButton`, `BigButton` |
 | Import | `import { Button, IconButton, BigButton } from "@mycity/ui";` |
@@ -131,7 +131,7 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | `iconRight` | `IconName` |  | A glyph after the label (a chevron for "View All"). |
 | `size` | `"md" \| "sm"` |  | `md` follows the density (36 or 40 px); `sm` is 28 px on desktop. Both are 44 px on a phone. |
 | `block` | `boolean` |  | Fills the width: the call to action at the foot of a form or page. |
-| `loading` | `boolean` |  | Shows a spinner in place of the icon and ignores presses until the work finishes. |
+| `busy` | `boolean` |  | Shows a spinner in place of the icon and ignores presses until the work finishes. |
 | `asChild` | `boolean` |  | Renders the single child element (an <a>, a router Link) with the button's look instead of a <button>. |
 | `children` | `ReactNode` |  | The label: Verb Noun, Title Case, at most 3 words. |
 
@@ -149,7 +149,7 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `icon` | `IconName` |  | A glyph after the label. |
-| `loading` | `boolean` |  | Shows a spinner and ignores presses until the work finishes. |
+| `busy` | `boolean` |  | Shows a spinner and ignores presses until the work finishes. |
 
 ```tsx
 <Button variant="primary" icon="plus">New Rule</Button>
@@ -189,7 +189,8 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `title` | `ReactNode` |  | The card's title: a noun phrase of at most 4 words, Title Case (Leave Requests). |
-| `help` | `ReactNode` |  | A HelpTerm or InfoButton that explains the title, shown right after it. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words: the title becomes a HelpTerm. |
+| `record` | `boolean` |  | The title is record content (a person's name, a document number), not interface copy: the copy gates skip it. |
 | `actions` | `ReactNode` |  | What sits at the right: a small button, a menu, a pill or a count. |
 | `right` | `ReactNode` |  | The merged name for `actions`; kept so screens move by an import change. |
 | `level` | `2 \| 3 \| 4` |  | The heading level; h3 unless the page's outline needs h2. |
@@ -254,6 +255,7 @@ A page's title, its one-line subtitle (desktop only) and the page's actions.
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `title` | `ReactNode` | yes | The page's name, at most 3 words, Title Case (My Attendance). Something beside it, such as a Pill, may follow as children of the title. |
+| `help` | `ReactNode` |  | Support text behind the title (a HelpTerm on it), at most 35 words. |
 | `subtitle` | `ReactNode` |  | One line under the title, at most 8 words; desktop only. |
 | `sub` | `ReactNode` |  | The merged name for `subtitle`; kept so screens move by an import change. |
 | `actions` | `ReactNode` |  | The page's actions, at the right on desktop: at most one primary Button. |
@@ -842,7 +844,7 @@ A shimmering placeholder in the shape of what is loading: lines of text, a block
 | | |
 |---|---|
 | Use | Skeleton while a card, a list or a page loads, so the layout does not jump when the data lands; Spinner inside a small area that is waiting (a sheet's body, beside a label). |
-| Avoid | A Spinner for a whole page or list (use Skeleton); a Spinner inside a Button (Button has loading); either one after the data has failed (use the error state). |
+| Avoid | A Spinner for a whole page or list (use Skeleton); a Spinner inside a Button (Button has busy); either one after the data has failed (use the error state). |
 | Phone | The same shapes, full width. |
 | Accessibility | Skeleton lines and Spinner are a status region named "Loading" (or the label given); a single Skeleton shape is decorative, so a group of them should sit in one labelled Skeleton or a container with aria-busy. Under reduced motion neither moves. |
 | Status | stable |
@@ -1953,14 +1955,15 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `steps` | `WizardStep[]` | yes | The steps, in order. |
-| `finishLabel` | `string` | yes | The last step's button: Verb Noun naming the result (Publish Vacancy). |
-| `onFinish` | `() => void` | yes | Called after the last step validates. |
+| `finish` | `string` | yes | The last step's button: Verb Noun naming the result (Publish Vacancy). |
+| `busy` | `boolean` |  | Saving: the last button ignores presses but stays reachable. |
+| `onFinish` | `() => void` | yes | Called after the last step checks clean. |
+| `onCancel` | `() => void` |  | Cancel, shown on the first step instead of Back. |
 | `initialStep` | `number` |  | The step to start on (a draft resumed); 0. |
 | `onStepChange` | `(index: number) => void` |  | Called with the step index each time it changes, so a draft can remember it. |
-| `onCancel` | `() => void` |  | Cancel, shown on the first step instead of Back. |
 
 ```tsx
-<Wizard steps={steps} finishLabel="Publish Vacancy" onFinish={publish} />
+<Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
 ```
 
 ## Helpers

@@ -17,7 +17,14 @@ const { UPLOAD_CAPS } = require("../http/body-limits");
 const { TYPES } = require("./sniff");
 
 const IMAGES = [TYPES.jpeg, TYPES.png, TYPES.webp, TYPES.heic];
-const AUDIO = [TYPES.webm_audio, TYPES.ogg, TYPES.m4a, TYPES.mp3, TYPES.wav, TYPES.mp4];
+const AUDIO = [
+  TYPES.webm_audio,
+  TYPES.ogg,
+  TYPES.m4a,
+  TYPES.mp3,
+  TYPES.wav,
+  TYPES.mp4,
+];
 const VIDEO = [TYPES.mp4, TYPES.mov, TYPES.webm];
 
 const ALLOW = Object.freeze({
@@ -26,22 +33,40 @@ const ALLOW = Object.freeze({
   document: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx],
   voice_note: AUDIO,
   video: VIDEO,
-  attachment: [TYPES.pdf, ...IMAGES, TYPES.gif, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv, TYPES.txt, ...AUDIO, ...VIDEO],
+  attachment: [
+    TYPES.pdf,
+    ...IMAGES,
+    TYPES.gif,
+    TYPES.docx,
+    TYPES.xlsx,
+    TYPES.pptx,
+    TYPES.csv,
+    TYPES.txt,
+    ...AUDIO,
+    ...VIDEO,
+  ],
   import_sheet: [TYPES.xlsx, TYPES.csv],
   signature: [TYPES.png],
 });
 
 const NEVER = new Set(["markup", "archive", "unknown"]);
 
-for (const purpose of new Set([...Object.keys(ALLOW), ...Object.keys(UPLOAD_CAPS)])) {
+for (const purpose of new Set([
+  ...Object.keys(ALLOW),
+  ...Object.keys(UPLOAD_CAPS),
+])) {
   if (!ALLOW[purpose] || !UPLOAD_CAPS[purpose]) {
-    throw new Error(`mime-policy: purpose "${purpose}" needs both a type list here and a size cap in body-limits.js`);
+    throw new Error(
+      `mime-policy: purpose "${purpose}" needs both a type list here and a size cap in body-limits.js`,
+    );
   }
 }
 
 /** "PDF, JPG, PNG" for a message a person reads. */
 function describe(purpose) {
-  return [...new Set(ALLOW[purpose].map((x) => x.ext.toUpperCase()))].join(", ");
+  return [...new Set(ALLOW[purpose].map((x) => x.ext.toUpperCase()))].join(
+    ", ",
+  );
 }
 
 /**
@@ -54,15 +79,51 @@ function assertAllowed(purpose, type) {
   const list = ALLOW[purpose];
   if (!list) throw new Error(`mime-policy: unknown purpose "${purpose}"`);
   if (type.kind === "legacy_office") {
-    throw new AppError("FILE_TYPE_REFUSED", "This is an old Office file. Save it as .docx or .xlsx and upload it again.", 415);
+    throw new AppError(
+      "FILE_TYPE_REFUSED",
+      "This is an old Office file. Save it as .docx or .xlsx and upload it again.",
+      415,
+    );
   }
-  const accepted = !NEVER.has(type.kind) && list.some((x) => x.mime === type.mime);
+  const accepted =
+    !NEVER.has(type.kind) && list.some((x) => x.mime === type.mime);
   if (!accepted) {
-    throw new AppError("FILE_TYPE_REFUSED", `This file type is not accepted here. Accepted: ${describe(purpose)}.`, 415);
+    throw new AppError(
+      "FILE_TYPE_REFUSED",
+      `This file type is not accepted here. Accepted: ${describe(purpose)}.`,
+      415,
+    );
   }
   return type;
 }
 
-const isAllowed = (purpose, type) => Boolean(ALLOW[purpose]) && !NEVER.has(type.kind) && ALLOW[purpose].some((x) => x.mime === type.mime);
+/**
+ * The Content-Type a stored file is SERVED with. Only a type some purpose accepts
+ * goes out as itself; anything else (a row written before a policy change, a
+ * mistake in a migration) goes out as application/octet-stream, which no browser
+ * renders or runs in place. Preview code decides what to DISPLAY from this, so
+ * widening an ALLOW list above widens what a preview frames: add a type with that
+ * in mind.
+ */
+const SERVABLE = new Set(
+  Object.values(ALLOW)
+    .flat()
+    .map((x) => x.mime),
+);
+const FALLBACK_TYPE = "application/octet-stream";
+const servedType = (mime) =>
+  SERVABLE.has(String(mime || "")) ? mime : FALLBACK_TYPE;
 
-module.exports = { ALLOW, assertAllowed, isAllowed, describe };
+const isAllowed = (purpose, type) =>
+  Boolean(ALLOW[purpose]) &&
+  !NEVER.has(type.kind) &&
+  ALLOW[purpose].some((x) => x.mime === type.mime);
+
+module.exports = {
+  ALLOW,
+  assertAllowed,
+  isAllowed,
+  describe,
+  servedType,
+  FALLBACK_TYPE,
+};

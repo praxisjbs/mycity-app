@@ -198,7 +198,7 @@ route("DELETE /api/v1/settings/roles/:id", (req) => {
 });
 
 const HIER: Hierarchy[] = [
-  ["Expense request", "Every request, whatever the amount.", ["Requester", "Line manager", "Operations", "Requisition", "CEO", "Disbursed"], "Any expense request", S("ok", "Active")],
+  ["Expense Request", "Every request, whatever the amount.", ["Requester", "Line manager", "Operations", "Requisition", "CEO", "Disbursed"], "Any expense request", S("ok", "Active")],
   ["Leave request", "Requester, line manager. One step.", ["Requester", "Line manager"], "Any leave request", S("ok", "Active")],
   ["Monthly targets", "Managers, COO, Operations, CEO. Binding on CEO approval.", ["Managers set", "COO review", "Operations review", "CEO approval"], "A departmental target is submitted", S("ok", "Active")],
   ["Payroll run", "Operations, then the CEO. One step.", ["Operations", "CEO"], "A run is submitted", S("warn", "Approver to confirm")],
@@ -253,7 +253,7 @@ route("PATCH /api/v1/settings/appearance", (req) => {
   return ok(APPEAR());
 });
 
-const NUM = [["Expense request", "EXP", "0123"], ["Requisition", "REQ", "0043"], ["Offer letter", "OFF", "0020"], ["Employment contract", "CON", "0017"], ["Proposal", "PRO", "0031"], ["MOU", "MOU", "0012"], ["Query", "QRY", "0016"]].map(([document, prefix, next]) => ({ key: prefix, document, prefix, format: `${prefix}-0000`, next }));
+const NUM = [["Expense Request", "EXP", "0123"], ["Requisition", "REQ", "0043"], ["Offer letter", "OFF", "0020"], ["Employment contract", "CON", "0017"], ["Proposal", "PRO", "0031"], ["MOU", "MOU", "0012"], ["Query", "QRY", "0016"]].map(([document, prefix, next]) => ({ key: prefix, document, prefix, format: `${prefix}-0000`, next }));
 route("GET /api/v1/settings/numbering/summary", () => ok({ types: NUM.length, templates: 9, issued_this_year: 118, signed: 32 }));
 route("GET /api/v1/settings/numbering", (req) => paged(NUM, req, { search: (n) => [n.document, n.prefix] }));
 

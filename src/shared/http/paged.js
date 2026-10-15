@@ -106,7 +106,9 @@ async function pageQuery(client, sql, params = [], query = {}) {
     throw new Error("pageQuery: a paged query must end with a unique ORDER BY");
   }
   if (HAS_LIMIT.test(sql)) {
-    throw new Error("pageQuery: do not write LIMIT/OFFSET yourself; pageQuery appends them");
+    throw new Error(
+      "pageQuery: do not write LIMIT/OFFSET yourself; pageQuery appends them",
+    );
   }
 
   const { number, offset } = pageOf(query);
@@ -122,7 +124,10 @@ async function pageQuery(client, sql, params = [], query = {}) {
   } else if (number > 1) {
     // Past the last page: the window function has no row to report on, but the
     // client still needs the real total to jump back.
-    const { rows: c } = await client.query(`SELECT COUNT(*)::int AS n FROM (${sql}) AS _counted`, params);
+    const { rows: c } = await client.query(
+      `SELECT COUNT(*)::int AS n FROM (${sql}) AS _counted`,
+      params,
+    );
     total = c[0] ? c[0].n : 0;
   } else {
     total = 0;
@@ -153,10 +158,14 @@ function sendPaged(res, result) {
  */
 function assertPage(result, label) {
   if (!result || !Array.isArray(result.data) || !result.page) {
-    throw new Error(`${label}: expected a page envelope { data, page } from pageQuery()`);
+    throw new Error(
+      `${label}: expected a page envelope { data, page } from pageQuery()`,
+    );
   }
   if (result.data.length > PAGE_SIZE) {
-    throw new Error(`${label}: ${result.data.length} rows in one page; the limit is ${PAGE_SIZE}`);
+    throw new Error(
+      `${label}: ${result.data.length} rows in one page; the limit is ${PAGE_SIZE}`,
+    );
   }
   return result;
 }

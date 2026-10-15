@@ -50,7 +50,10 @@ function sites() {
   return {
     split: staffHost !== publicHost,
     staff: { host: staffHost, dir: path.resolve(ROOT, config.APP_DIST_DIR) },
-    public: { host: publicHost, dir: path.resolve(ROOT, config.PUBLIC_APP_DIST_DIR) },
+    public: {
+      host: publicHost,
+      dir: path.resolve(ROOT, config.PUBLIC_APP_DIST_DIR),
+    },
   };
 }
 
@@ -64,7 +67,13 @@ function surfaceOfHost(req, s = sites()) {
 }
 
 const notFound = (req, res) =>
-  res.status(404).json({ error: { code: "NOT_FOUND", message: `Nothing at ${req.method} ${req.path}` }, request_id: req.request_id });
+  res.status(404).json({
+    error: {
+      code: "NOT_FOUND",
+      message: `Nothing at ${req.method} ${req.path}`,
+    },
+    request_id: req.request_id,
+  });
 
 /** Refuse paths that belong to the other surface's host. */
 function hostGuard() {
@@ -74,21 +83,29 @@ function hostGuard() {
     if (/^\/api\/health(\/|$)/.test(req.path)) return next();
     const surface = surfaceOfHost(req, s);
     if (surface === null) return isServer ? notFound(req, res) : next();
-    if (surface === "staff" && /^\/api\/public(\/|$)/.test(req.path)) return notFound(req, res);
-    if (surface === "public" && /^\/(api\/v1|socket\.io)(\/|$)/.test(req.path)) return notFound(req, res);
+    if (surface === "staff" && /^\/api\/public(\/|$)/.test(req.path))
+      return notFound(req, res);
+    if (surface === "public" && /^\/(api\/v1|socket\.io)(\/|$)/.test(req.path))
+      return notFound(req, res);
     return next();
   };
 }
 
 function setCacheHeaders(res, filePath) {
   const rel = filePath.split(path.sep).join("/");
-  if (/\/assets\//.test(rel)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  if (/\/assets\//.test(rel))
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   else res.setHeader("Cache-Control", "no-cache");
 }
 
 function siteHandler(site) {
   const exists = () => fs.existsSync(path.join(site.dir, "index.html"));
-  const files = express.static(site.dir, { index: false, redirect: false, fallthrough: true, setHeaders: setCacheHeaders });
+  const files = express.static(site.dir, {
+    index: false,
+    redirect: false,
+    fallthrough: true,
+    setHeaders: setCacheHeaders,
+  });
   return function serveSite(req, res, next) {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (!exists()) return next();
@@ -103,7 +120,10 @@ function siteHandler(site) {
 /** Serve the build that belongs to the request's host. */
 function staticSites() {
   const s = sites();
-  const handlers = { staff: siteHandler(s.staff), public: siteHandler(s.public) };
+  const handlers = {
+    staff: siteHandler(s.staff),
+    public: siteHandler(s.public),
+  };
   return function serveForHost(req, res, next) {
     const surface = surfaceOfHost(req, s);
     if (!surface) return next();
@@ -114,7 +134,10 @@ function staticSites() {
 registerCheck("static", async () => {
   const s = sites();
   const built = (dir) => fs.existsSync(path.join(dir, "index.html"));
-  const out = { staff: built(s.staff.dir), public: s.split ? built(s.public.dir) : "not served on one host" };
+  const out = {
+    staff: built(s.staff.dir),
+    public: s.split ? built(s.public.dir) : "not served on one host",
+  };
   const missing = out.staff === false || out.public === false;
   return { status: missing && isServer ? "degraded" : "up", ...out };
 });

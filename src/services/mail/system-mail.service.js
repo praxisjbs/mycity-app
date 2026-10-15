@@ -20,6 +20,10 @@
  *    byte with SMTP_SECURE on 465). Staging sends real mail too (A4), marked: the subject
  *    starts "[STAGING]" and the message carries a red banner, so nobody mistakes a test
  *    offer letter for a real one.
+ *    Before handing a message to the relay, each recipient domain is checked
+ *    (deliverability/route-check.js): a relay that hosts the domain's website but not its
+ *    mail would keep the message in a local mailbox and report success, so that send
+ *    fails with MAIL_ROUTE_TRAPPED instead.
  *  - SMTP_HOST empty (development, test): nothing leaves the machine. Messages are kept in
  *    memory (captured()) for tests and logged at debug.
  *
@@ -36,6 +40,7 @@ const { markdownToHtml } = require("../../shared/documents/markdown");
 const templates = require("../../shared/templates/template-store");
 const variables = require("../../shared/templates/variables");
 const storage = require("../storage/storage.service");
+const routeCheck = require("./deliverability/route-check");
 
 const EMAIL_RE = /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/;
 const MAX_RECIPIENTS = 50;
@@ -52,7 +57,9 @@ function getTransport() {
       port: config.SMTP_PORT,
       secure: config.SMTP_SECURE,
       requireTLS: !config.SMTP_SECURE,
-      auth: config.SMTP_USER ? { user: config.SMTP_USER, pass: config.SMTP_PASSWORD } : undefined,
+      auth: config.SMTP_USER
+        ? { user: config.SMTP_USER, pass: config.SMTP_PASSWORD }
+        : undefined,
       pool: true,
       maxConnections: 3,
       connectionTimeout: 15_000,
@@ -66,12 +73,25 @@ function getTransport() {
 }
 
 function addressList(value) {
-  const list = (Array.isArray(value) ? value : [value]).filter(Boolean).map((a) => (typeof a === "string" ? { email: a } : a));
+  const list = (Array.isArray(value) ? value : [value])
+    .filter(Boolean)
+    .map((a) => (typeof a === "string" ? { email: a } : a));
   for (const a of list) {
-    if (!EMAIL_RE.test(String(a.email || "").trim())) throw new Error(`system mail: "${a.email}" is not an email address`);
+    if (!EMAIL_RE.test(String(a.email || "").trim()))
+      throw new Error(`system mail: "${a.email}" is not an email address`);
   }
-  if (list.length > MAX_RECIPIENTS) throw new Error(`system mail: at most ${MAX_RECIPIENTS} recipients per message`);
-  return list.map((a) => (a.name ? { name: String(a.name).replace(/[\r\n"]/g, ""), address: a.email.trim() } : a.email.trim()));
+  if (list.length > MAX_RECIPIENTS)
+    throw new Error(
+      `system mail: at most ${MAX_RECIPIENTS} recipients per message`,
+    );
+  return list.map((a) =>
+    a.name
+      ? {
+          name: String(a.name).replace(/[\r\n"]/g, ""),
+          address: a.email.trim(),
+        }
+      : a.email.trim(),
+  );
 }
 
 /** Plain text from the rendered HTML: links kept as "text (url)", tags dropped. */
@@ -100,34 +120,79 @@ function textOf(html) {
  * @param {object} data
  * @param {{recipient?: object, org?: object}} [ctx]
  */
-async function renderEmail(db, key, data, { recipient = null, org = null } = {}) {
+async function renderEmail(
+  db,
+  key,
+  data,
+  { recipient = null, org = null } = {},
+) {
   const checked = variables.parseData("email", key, data);
   const t = await templates.current(db, "email", key);
   const staging = config.APP_ENV === "staging";
-  const profile = org || (await require("../../shared/documents/generate").orgProfile(db));
-  const values = { ...checked, org: profile, recipient, staging, today: require("../../shared/time/lagos").today() };
-  const subject = render(t.subject || t.title || "MyCity App", values).replace(/\s+/g, " ").trim();
+  const profile =
+    org || (await require("../../shared/documents/generate").orgProfile(db));
+  const values = {
+    ...checked,
+    org: profile,
+    recipient,
+    staging,
+    today: require("../../shared/time/lagos").today(),
+  };
+  const subject = render(t.subject || t.title || "MyCity App", values)
+    .replace(/\s+/g, " ")
+    .trim();
   const inner = render(t.body, values);
   const body = t.format === "markdown" ? markdownToHtml(inner) : inner;
-  const html = render(templates.layout("email").body, { ...values, subject }, { body });
-  return { subject: staging ? `[STAGING] ${subject}` : subject, html, text: textOf(html), template_version: t.version };
+  const html = render(
+    templates.layout("email").body,
+    { ...values, subject },
+    { body },
+  );
+  return {
+    subject: staging ? `[STAGING] ${subject}` : subject,
+    html,
+    text: textOf(html),
+    template_version: t.version,
+  };
 }
 
 async function attachmentsOf(db, list) {
   const out = [];
   for (const a of list || []) {
     if (a.document_id) {
-      const { rows } = await db.query("SELECT storage_key, mime, original_name, render_status, scan_status FROM document WHERE document_id = $1", [a.document_id]);
+      const { rows } = await db.query(
+        "SELECT storage_key, mime, original_name, render_status, scan_status FROM document WHERE document_id = $1",
+        [a.document_id],
+      );
       const d = rows[0];
-      if (!d) throw new Error(`system mail: document ${a.document_id} does not exist`);
-      if (d.render_status === "pending" || d.scan_status === "pending" || d.scan_status === "infected") {
-        throw new Error(`system mail: document ${a.document_id} is not ready to attach`);
+      if (!d)
+        throw new Error(
+          `system mail: document ${a.document_id} does not exist`,
+        );
+      if (
+        d.render_status === "pending" ||
+        d.scan_status === "pending" ||
+        d.scan_status === "infected"
+      ) {
+        throw new Error(
+          `system mail: document ${a.document_id} is not ready to attach`,
+        );
       }
-      out.push({ filename: a.filename || d.original_name, content: await storage.get(d.storage_key), contentType: d.mime });
+      out.push({
+        filename: a.filename || d.original_name,
+        content: await storage.get(d.storage_key),
+        contentType: d.mime,
+      });
     } else if (a.filename && a.content !== undefined) {
-      out.push({ filename: a.filename, content: a.content, contentType: a.contentType });
+      out.push({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      });
     } else {
-      throw new Error("system mail: an attachment is { document_id } or { filename, content }");
+      throw new Error(
+        "system mail: an attachment is { document_id } or { filename, content }",
+      );
     }
   }
   return out;
@@ -146,8 +211,20 @@ async function send(msg) {
   if (to.length === 0) throw new Error("system mail: no recipient");
   const cc = msg.cc ? addressList(msg.cc) : undefined;
   const first = Array.isArray(msg.to) ? msg.to[0] : msg.to;
-  const recipient = msg.recipient || (typeof first === "object" ? first : { email: first });
-  const rendered = await renderEmail(db, msg.template, msg.data || {}, { recipient });
+  const recipient =
+    msg.recipient || (typeof first === "object" ? first : { email: first });
+  // A relay that hosts a recipient's domain but not its mail would accept the message and
+  // keep it in a local mailbox: fail loudly instead (code MAIL_ROUTE_TRAPPED).
+  if (config.SMTP_HOST)
+    await routeCheck.assertRoutable({
+      smtpHost: config.SMTP_HOST,
+      to: [...to, ...(cc || [])].map((a) =>
+        typeof a === "string" ? a : a.address,
+      ),
+    });
+  const rendered = await renderEmail(db, msg.template, msg.data || {}, {
+    recipient,
+  });
   const info = await getTransport().sendMail({
     from: config.MAIL_FROM,
     replyTo: msg.reply_to || config.MAIL_REPLY_TO || undefined,
@@ -157,14 +234,30 @@ async function send(msg) {
     html: rendered.html,
     text: rendered.text,
     attachments: await attachmentsOf(db, msg.attachments),
-    headers: { "X-MyCity-Template": `${msg.template}@${rendered.template_version}`, "Auto-Submitted": "auto-generated" },
+    headers: {
+      "X-MyCity-Template": `${msg.template}@${rendered.template_version}`,
+      "Auto-Submitted": "auto-generated",
+    },
   });
   if (!config.SMTP_HOST) {
-    captured.push({ template: msg.template, to, subject: rendered.subject, html: rendered.html, text: rendered.text });
+    captured.push({
+      template: msg.template,
+      to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    });
     if (captured.length > CAPTURE_LIMIT) captured.shift();
-    logger.debug({ template: msg.template, to }, "system mail captured (no SMTP_HOST)");
+    logger.debug(
+      { template: msg.template, to },
+      "system mail captured (no SMTP_HOST)",
+    );
   }
-  return { message_id: info.messageId, accepted: (info.accepted || []).map(String), rejected: (info.rejected || []).map(String) };
+  return {
+    message_id: info.messageId,
+    accepted: (info.accepted || []).map(String),
+    rejected: (info.rejected || []).map(String),
+  };
 }
 
 /** Messages kept instead of sent (no SMTP_HOST). Tests only. */
@@ -184,7 +277,10 @@ async function health() {
     await getTransport().verify();
     return { status: "up", mode: "smtp" };
   } catch (err) {
-    return { status: "degraded", error: String(err.code || err.message).slice(0, 120) };
+    return {
+      status: "degraded",
+      error: String(err.code || err.message).slice(0, 120),
+    };
   }
 }
 

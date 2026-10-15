@@ -3,13 +3,13 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { EmployeeCreate, EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, toast, MoneyField, DateField, Field, FilterSelect, FormRow, TextField, rules, SearchInput, SelectField, toMoneyString, useForm } from "@mycity/ui";
 import { Bars, StatStrip } from "@/components/ui/data";
 import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { hrefFor, useRouter } from "@/lib/router";
 import { EmployeeDetails } from "./EmployeeDetails";
-import { PersonPicker, Upload } from "@/components/form";
+import { PersonPicker, UploadField } from "@/components/form";
+import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, toast, DateField, Field, FilterSelect, MoneyField, PhoneField, rules, SearchInput, SelectField, TextField, toMoneyString, useContractForm, Wizard, type WizardStep } from "@mycity/ui";
 
 export function Employees() {
   const me = useMe();
@@ -27,7 +27,7 @@ export function Employees() {
     <>
       <PageHeader
         title="Employees"
-        sub={summary.data ? `${summary.data.kpis[0].value} staff · ${summary.data.departments.length} departments · select a row for details and actions` : " "}
+        sub={summary.data ? `${summary.data.kpis[0].value} staff · ${summary.data.departments.length} departments` : " "}
         actions={
           canCreate && (
             <>
@@ -44,7 +44,7 @@ export function Employees() {
       <Toolbar>
         <SearchInput value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-[300px]" />
         <FilterSelect label="Department" value={department} onChange={setDepartment} options={[["all", "All departments"], ...depts.rows.map((d) => [d.name, d.name] as [string, string])]} />
-        <FilterSelect label="Status" value={status} onChange={setStatus} options={[["all", "Any status"], ["confirmed", "Active"], ["probation", "Probation"], ["on_leave", "On leave"], ["suspended", "Suspended"]]} />
+        <FilterSelect label="Status" value={status} onChange={setStatus} options={[["all", "Any status"], ["confirmed", "Active"], ["probation", "Probation"], ["on_leave", "On Leave"], ["suspended", "Suspended"]]} />
       </Toolbar>
       <Table
         title="All Employees"
@@ -54,7 +54,7 @@ export function Employees() {
         loading={list.loading}
         error={list.error}
         onRowClick={open}
-        empty={{ icon: "srch", title: "Nobody matches", text: "Clear the search or filters to see everyone." }}
+        empty={{ icon: "srch", title: "Nobody Matches", text: "Clear the search or filters to see everyone." }}
         columns={[
           { key: "e", label: "Employee", render: (r) => <Who name={r.display_name} sub={r.department} /> },
           { key: "d", label: "Department", desktop: true, render: (r) => r.department },
@@ -70,7 +70,7 @@ export function Employees() {
         {summary.data && (
           <Card>
             <CardHeader title="Headcount by Department" />
-            <Bars rows={summary.data.departments} note="A department is a setting, not a code change." />
+            <Bars rows={summary.data.departments} />
           </Card>
         )}
         {summary.data && (
@@ -91,19 +91,19 @@ export function Employees() {
 }
 
 const EMPLOYMENT: Array<[EmployeeCreate["employment_type"], string]> = [["full_time", "Full time"], ["part_time", "Part time"], ["contractor", "Contractor"], ["consultant", "Consultant"], ["intern", "Intern"]];
-const PATTERN: Array<[EmployeeCreate["work_pattern"], string]> = [["on_site", "On site"], ["hybrid", "Hybrid"], ["remote", "Remote"]];
+const PATTERN: Array<[EmployeeCreate["work_pattern"], string]> = [["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]];
 
 /** Add an employee: the contract's EmployeeCreate. No login without an employee record (CLAUDE.md). */
 function AddEmployee({ close }: { close: () => void }) {
   const depts = usePaged("GET /api/v1/departments");
   const [manager, setManager] = useState<PersonRef[]>([]);
-  const f = useForm(
+  const f = useContractForm(
     { first_name: "", last_name: "", work_email: "", phone: "", job_title: "", start_date: "", employment_type: "full_time", work_pattern: "hybrid", department_id: "", date_of_birth: "", next_of_kin: "", bank_name: "", account_number: "", gross_monthly: "" },
     {
       first_name: rules.required("Enter a first name"),
       last_name: rules.required("Enter a last name"),
       work_email: rules.email,
-      phone: (v) => (/^(\+?234|0)\d{10}$/.test(v.replace(/[\s\-().]/g, "")) ? null : "A Nigerian number"),
+      phone: (v) => (/^0?\d{10}$/.test(v.replace(/\s/g, "")) ? null : "A Nigerian number"),
       job_title: rules.required("Enter a job title"),
       start_date: rules.required("Pick a start date"),
       department_id: rules.required("Pick a department"),
@@ -117,7 +117,7 @@ function AddEmployee({ close }: { close: () => void }) {
     if (!f.check()) return;
     const v = f.values;
     const body: EmployeeCreate = {
-      first_name: v.first_name.trim(), last_name: v.last_name.trim(), work_email: v.work_email.trim(), phone: v.phone.trim(), job_title: v.job_title.trim(), start_date: v.start_date,
+      first_name: v.first_name.trim(), last_name: v.last_name.trim(), work_email: v.work_email.trim(), phone: `+234${v.phone.replace(/\s/g, "").replace(/^0/, "")}`, job_title: v.job_title.trim(), start_date: v.start_date,
       employment_type: v.employment_type as EmployeeCreate["employment_type"], work_pattern: v.work_pattern as EmployeeCreate["work_pattern"], department_id: v.department_id,
       ...(manager[0] && { line_manager_id: manager[0].employee_id }), ...(v.date_of_birth && { date_of_birth: v.date_of_birth }), ...(v.next_of_kin && { next_of_kin: v.next_of_kin }),
       ...(v.bank_name && { bank_name: v.bank_name }), ...(v.account_number && { account_number: v.account_number }), ...(v.gross_monthly && { gross_monthly: toMoneyString(v.gross_monthly) }),
@@ -132,53 +132,45 @@ function AddEmployee({ close }: { close: () => void }) {
       f.setServerErrors(save.fields);
     }
   };
+  const step = (title: string, keys: Array<keyof typeof f.values>, body: React.ReactNode): WizardStep => ({ title, body, check: () => f.check(keys) });
   return (
-    <>
-      <FormRow>
-        <Field label="First Name" {...f.field("first_name")}><TextField {...f.field("first_name")} autoComplete="off" /></Field>
-        <Field label="Last Name" {...f.field("last_name")}><TextField {...f.field("last_name")} autoComplete="off" /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Work Email" {...f.field("work_email")}><TextField type="email" {...f.field("work_email")} placeholder="name@mycityapp.io" /></Field>
-        <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" {...f.field("phone")} placeholder="0803 123 4567" /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Job Title" {...f.field("job_title")}><TextField {...f.field("job_title")} /></Field>
-        <Field label="Department" {...f.field("department_id")}>
-          <SelectField placeholder="Pick a department" options={depts.rows.map((d) => [d.department_id, d.name])} {...f.field("department_id")} />
-        </Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Start Date" {...f.field("start_date")}><DateField {...f.field("start_date")} /></Field>
-        <Field label="Date of Birth" info="Used for the automatic birthday post in Staff Community. Never shown on a card.">
-          <DateField {...f.field("date_of_birth")} />
-        </Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Employment Type"><SelectField options={EMPLOYMENT} {...f.field("employment_type")} /></Field>
-        <Field label="Work Pattern"><SelectField options={PATTERN} {...f.field("work_pattern")} /></Field>
-      </FormRow>
-      <Field label="Line Manager">
-        <PersonPicker value={manager} onChange={setManager} placeholder="Manager's name" />
-      </Field>
-      <details className="plus-marker mb-3 rounded-box border border-border">
-        <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-[12.5px] font-[650] text-muted-foreground">Pay and Bank (restricted)</summary>
-        <div className="px-3 pt-1">
-          <FormRow>
-            <Field label="Gross Monthly" {...f.field("gross_monthly")}><MoneyField {...f.field("gross_monthly")} /></Field>
-            <Field label="Bank"><TextField {...f.field("bank_name")} /></Field>
-          </FormRow>
-          <FormRow>
-            <Field label="Account Number" {...f.field("account_number")}><TextField inputMode="numeric" maxLength={10} {...f.field("account_number")} /></Field>
-            <Field label="Next of Kin"><TextField {...f.field("next_of_kin")} /></Field>
-          </FormRow>
-        </div>
-      </details>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Employee</Button>
-      </div>
-    </>
+    <Wizard
+      finish="Add Employee"
+      busy={save.pending}
+      onFinish={() => void submit()}
+      onCancel={close}
+      steps={[
+        step("Person", ["first_name", "last_name", "work_email", "phone"], (
+          <>
+            <Field label="First Name" {...f.field("first_name")}><TextField {...f.field("first_name")} autoComplete="off" /></Field>
+            <Field label="Last Name" {...f.field("last_name")}><TextField {...f.field("last_name")} autoComplete="off" /></Field>
+            <Field label="Work Email" {...f.field("work_email")}><TextField type="email" {...f.field("work_email")} placeholder="name@mycityapp.io" /></Field>
+            <Field label="Phone" {...f.field("phone")}><PhoneField {...f.field("phone")} /></Field>
+            <Field label="Date of Birth" optional info="For the birthday post in Staff Community. Never shown on a card."><DateField {...f.field("date_of_birth")} /></Field>
+          </>
+        )),
+        step("Role", ["job_title", "department_id", "start_date"], (
+          <>
+            <Field label="Job Title" {...f.field("job_title")}><TextField {...f.field("job_title")} /></Field>
+            <Field label="Department" {...f.field("department_id")}>
+              <SelectField placeholder="Pick a department" options={depts.rows.map((d) => [d.department_id, d.name])} {...f.field("department_id")} />
+            </Field>
+            <Field label="Start Date" {...f.field("start_date")}><DateField {...f.field("start_date")} /></Field>
+            <Field label="Employment Type"><SelectField options={EMPLOYMENT} {...f.field("employment_type")} /></Field>
+            <Field label="Work Pattern"><SelectField options={PATTERN} {...f.field("work_pattern")} /></Field>
+            <Field label="Line Manager" optional><PersonPicker value={manager} onChange={setManager} placeholder="Manager's name" /></Field>
+          </>
+        )),
+        step("Pay and Bank", ["gross_monthly", "account_number"], (
+          <>
+            <Field label="Gross Monthly" optional info="Restricted: People, Payroll and the CEO see it." {...f.field("gross_monthly")}><MoneyField {...f.field("gross_monthly")} /></Field>
+            <Field label="Bank" optional><TextField {...f.field("bank_name")} /></Field>
+            <Field label="Account Number" optional {...f.field("account_number")}><TextField inputMode="numeric" maxLength={10} {...f.field("account_number")} /></Field>
+            <Field label="Next of Kin" optional><TextField {...f.field("next_of_kin")} /></Field>
+          </>
+        )),
+      ]}
+    />
   );
 }
 
@@ -187,7 +179,7 @@ function ImportStaff() {
   return (
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">Upload the staff sheet. Columns are mapped next, then a preview runs the import for real and rolls it back, so you see every error before anything is saved.</p>
-      <Upload purpose="import" accept=".xlsx,.csv" multiple={false} label="Drop the staff sheet here, or browse" onUploaded={() => toast("Sheet received. Map its columns to continue.")} />
+      <UploadField purpose="import" accept=".xlsx,.csv" multiple={false} label="Drop the staff sheet here, or browse" onUploaded={() => toast("Sheet received. Map its columns to continue.")} />
     </>
   );
 }

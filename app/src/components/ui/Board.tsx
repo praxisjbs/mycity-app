@@ -44,6 +44,7 @@ export function Board({ columns, onMove }: { columns: Array<{ key: string; label
             <button
               key={t.key}
               type="button"
+              data-copy="content"
               onClick={t.onClick}
               draggable={!!onMove}
               onDragStart={onMove ? (e) => e.dataTransfer.setData("text/plain", `${t.key}|${c.key}`) : undefined}

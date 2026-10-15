@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { OrgNode } from "@/api/types/organisation";
-import { Button, cn, Icon, initials, Card, PageHeader, ErrorState, toast, SearchInput, InfoButton } from "@mycity/ui";
 import { LoadingRows } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
+import { Button, Icon, Card, PageHeader, ErrorState, toast, cn, initials, SearchInput } from "@mycity/ui";
 
 /**
  * The live reporting tree (docs/guides/organogram.md). One render, two modes:
@@ -138,7 +138,7 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
     <>
       <PageHeader
         title={builder ? "Organogram" : "Org Chart"}
-        sub={data ? (builder ? `The live reporting structure · ${data.seats} seats · ${data.filled} filled · ${data.seats - data.filled} open` : `Who reports to whom across MyCity · read only · ${data.seats} seats · ${data.filled} filled`) : " "}
+        sub={data ? (builder ? `Reporting lines · ${data.seats} seats · ${data.filled} filled · ${data.seats - data.filled} open` : `Reporting lines · ${data.seats} seats · ${data.filled} filled`) : " "}
         actions={
           <>
             <SearchInput value={q} onChange={setQ} placeholder="Search the chart" className="w-[200px]" />
@@ -154,13 +154,8 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
         <span className="inline-flex items-center gap-[7px]"><i className="inline-block size-[13px] rounded border border-dashed border-input" />Vacant seat</span>
       </div>
       <Card className="p-1.5">
-        {!data ? <LoadingRows count={5} /> : <div ref={scroller} className="ogt"><ul>{roots.map(node)}</ul></div>}
+        {!data ? <LoadingRows count={5} /> : <div ref={scroller} className="ogt" data-copy="content"><ul>{roots.map(node)}</ul></div>}
       </Card>
-      {builder && (
-        <div className="mt-3">
-          <InfoButton label="Changing the Structure" help="Drag a card onto a new manager to change its reporting line. A vacant seat can be sent to Recruitment as a suggested vacancy." />
-        </div>
-      )}
     </>
   );
 }

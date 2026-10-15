@@ -13,6 +13,7 @@
  */
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { HelpTerm } from "../help/HelpTerm";
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {
   /** Inner padding (the default). `false` lets a table, a list or an image run to the card's edges. */
@@ -42,8 +43,10 @@ export const Card = forwardRef<HTMLElement, CardProps>(function Card({ pad = tru
 export interface CardHeaderProps {
   /** The card's title: a noun phrase of at most 4 words, Title Case (Leave Requests). */
   title?: ReactNode;
-  /** A HelpTerm or InfoButton that explains the title, shown right after it. */
+  /** Support text behind the title, at most 35 words: the title becomes a HelpTerm. */
   help?: ReactNode;
+  /** The title is record content (a person's name, a document number), not interface copy: the copy gates skip it. */
+  record?: boolean;
   /** What sits at the right: a small button, a menu, a pill or a count. */
   actions?: ReactNode;
   /** The merged name for `actions`; kept so screens move by an import change. */
@@ -57,17 +60,16 @@ export interface CardHeaderProps {
 }
 
 /** A card's title row: the title (data-ui="title"), its help, and the card's actions on the right. */
-export function CardHeader({ title, help, actions, right, level = 3, children, className }: CardHeaderProps) {
+export function CardHeader({ title, help, record, actions, right, level = 3, children, className }: CardHeaderProps) {
   const H = `h${level}` as "h2" | "h3" | "h4";
   const end = actions ?? right;
   return (
     <div className={cn("mb-3 flex min-w-0 flex-wrap items-center gap-2", className)}>
       {title != null && (
-        <H data-ui="title" className="min-w-0 text-base font-strong">
-          {title}
+        <H {...(record ? { "data-copy": "content" } : { "data-ui": "title" })} className="min-w-0 text-base font-strong">
+          {help ? <HelpTerm help={help}>{title}</HelpTerm> : title}
         </H>
       )}
-      {help}
       {children}
       {end != null && <div className="ml-auto flex flex-wrap items-center gap-1.5">{end}</div>}
     </div>

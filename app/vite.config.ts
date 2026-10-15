@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { defineConfig, mergeConfig } from "vite";
+import { defineConfig, mergeConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { sharedVite } from "@mycity/ui/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { MODULES } from "./src/shell/catalogue";
+import { hrefFor } from "./src/lib/routes";
 
 /**
  * The page size is the contract's, never the app's (FRONTEND_GUIDE §4). It is
@@ -74,6 +76,29 @@ function deliveryPlan(): Plan {
   return { milestones, screens };
 }
 
+/**
+ * The route list the screen gates read (FRONTEND_GUIDE §9.2): every module and
+ * tab in the catalogue, written into the build as screens.json, so
+ * scripts/check/lib/screens.js opens each screen at phone and desktop size
+ * (gates 8 and 11) without importing the app's TypeScript.
+ */
+function screenList(): Plugin {
+  let mode = "live";
+  return {
+    name: "mycity-screen-list",
+    apply: "build",
+    configResolved(c) {
+      mode = apiMode(c.mode);
+    },
+    generateBundle() {
+      const screens = MODULES.flatMap((m) =>
+        m.tabs.map((t) => ({ module: m.key, module_label: m.label, tab: t.slug, tab_label: t.label, path: hrefFor(m.key, t.slug) })),
+      );
+      this.emitFile({ type: "asset", fileName: "screens.json", source: `${JSON.stringify({ api_mode: mode, screens }, null, 2)}\n` });
+    },
+  };
+}
+
 /*
  * The shared settings come first (packages/ui/vite.shared.js): @mycity/ui resolved
  * from the workspace with one React, @mycity/contract consumed as CommonJS with
@@ -101,6 +126,7 @@ export default defineConfig(({ mode }) =>
     plugins: [
       react(),
       tailwindcss(),
+      screenList(),
       VitePWA({
         registerType: "prompt",
         injectRegister: false,

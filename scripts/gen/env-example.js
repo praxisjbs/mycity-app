@@ -39,10 +39,16 @@ function render() {
   for (const [key, schema, meta] of ENTRIES) {
     if (meta.group !== group) {
       group = meta.group;
-      out.push("", `# ---- ${group} ${"-".repeat(Math.max(0, 60 - group.length))}`);
+      out.push(
+        "",
+        `# ---- ${group} ${"-".repeat(Math.max(0, 60 - group.length))}`,
+      );
     }
     const value = meta.secret ? "" : defaultOf(schema);
-    const server = !meta.secret && meta.example !== undefined && meta.example !== value ? ` On servers: ${meta.example}` : "";
+    const server =
+      !meta.secret && meta.example !== undefined && meta.example !== value
+        ? ` On servers: ${meta.example}`
+        : "";
     out.push(`# ${meta.doc}${server}${meta.secret ? " SECRET." : ""}`);
     out.push(`${key}=${value}`);
   }
@@ -53,7 +59,9 @@ const next = render();
 if (process.argv.includes("--check")) {
   const current = fs.existsSync(FILE) ? fs.readFileSync(FILE, "utf8") : "";
   if (current !== next) {
-    console.error(".env.example is out of date with src/config/env.js. Run: npm run gen:env");
+    console.error(
+      ".env.example is out of date with src/config/env.js. Run: npm run gen:env",
+    );
     process.exit(1);
   }
   console.log(".env.example: up to date");

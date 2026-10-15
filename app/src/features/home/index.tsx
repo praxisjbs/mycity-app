@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, formatDateTime, KeyValue, Pill, Card, Grid, PageHeader, Grow, useModal, Chips, ErrorState, toast, Who, Field, FormRow, TextField, rules, SelectField, ToggleRow, useForm } from "@mycity/ui";
 import { Bars, Tile } from "@/components/ui/data";
 import { LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Block, InfoCard, KpiRow, toBars } from "./blocks";
+import { Button, KeyValue, Pill, Card, Grid, PageHeader, Grow, useModal, Chips, ErrorState, toast, Who, formatDateTime, Field, FormFooter, rules, SelectField, TextField, ToggleRow, useContractForm } from "@mycity/ui";
 
 export default function Home({ tab, id }: ModuleScreenProps) {
   if (tab === "team") return <Team />;
@@ -54,12 +54,12 @@ function Team() {
   if (summary.error) return <ErrorState error={summary.error} onRetry={summary.reload} />;
   return (
     <>
-      <PageHeader title="Team" sub={`Who is in, where they are, and how they are tracking${summary.data ? ` · ${summary.data.scope_label}` : ""}`} />
+      <PageHeader title="Team" sub={`Who is in and where${summary.data ? ` · ${summary.data.scope_label}` : ""}`} />
       {summary.data && <KpiRow items={summary.data.kpis} />}
       <Chips
         value={status}
         onChange={setStatus}
-        options={[["all", "Everyone"], ["late", "Late"], ["remote", "Remote"], ["leave", "On leave"], ["no_clockout", "No clock-out"]]}
+        options={[["all", "Everyone"], ["late", "Late"], ["remote", "Remote"], ["leave", "On Leave"], ["no_clockout", "No Clock-Out"]]}
       />
       <Table
         title="Team Roster"
@@ -81,13 +81,10 @@ function Team() {
       />
       <Grid cols={2} className="mt-3">
         {summary.data && (
-          <InfoCard title="Attendance This Month by Person" info="Click a KPI card above to see exactly who is on site, remote, late or missing a clock-out.">
+          <InfoCard title="Attendance by Person">
             <Bars rows={toBars(summary.data.attendance_bars)} />
           </InfoCard>
         )}
-        <InfoCard title="How the Team View Reads" info="The same attendance and task data the other screens use, filtered to the people you manage. Today's status is read from today's punches.">
-          <KeyValue items={[["Source", "Attendance and tasks, live"], ["Scope", "The people you manage"], ["A name", "Opens that person's record"]]} />
-        </InfoCard>
       </Grid>
     </>
   );
@@ -140,7 +137,7 @@ function Alerts({ openId }: { openId: string | null }) {
         loading={list.loading}
         error={list.error}
         onRowClick={(a) => (setParams({ id: a.home_alert_id }, { replace: true }), openAlert(a))}
-        empty={{ title: "No open alerts", text: "Everything that needed action has been dealt with." }}
+        empty={{ title: "No Open Alerts", text: "Everything that needed action has been dealt with." }}
         columns={[
           { key: "a", label: "Alert", render: (r) => r.title },
           { key: "t", label: "Trigger", desktop: true, render: (r) => r.trigger },
@@ -153,16 +150,10 @@ function Alerts({ openId }: { openId: string | null }) {
       />
       <Grid cols={2} className="mt-3">
         {summary.data && (
-          <InfoCard title="Where Alerts Come From, Last 30 Days" info="Every one of these is a configured threshold, not code. Changing a number needs no deploy.">
+          <InfoCard title="Alerts by Source">
             <Bars rows={toBars(summary.data.sources)} />
           </InfoCard>
         )}
-        <InfoCard
-          title="Alerts Are Not Notifications"
-          info="A notification is something that happened to you. It is read once and gone. An alert is something nobody has done; it sits here until a person with the right permission clears it, and it ages while it waits."
-        >
-          <KeyValue items={[["Escalation", "High severity goes to the CEO after 14 days"], ["Clearing", "Needs the permission the rule names"], ["Audit", "Who cleared it and when is logged"]]} />
-        </InfoCard>
       </Grid>
     </>
   );
@@ -179,7 +170,7 @@ function AlertDetail({ alert, close }: { alert: HomeAlert; close: () => void }) 
   };
   return (
     <>
-      <h3 className="mb-2 text-[15px]">{alert.title}</h3>
+      <h3 data-copy="content" className="mb-2 text-[15px]">{alert.title}</h3>
       <div className="mb-3 flex flex-wrap gap-1.5">
         <Pill tone={SEV[alert.severity][0]}>{SEV[alert.severity][1]}</Pill>
         <Pill>{alert.trigger}</Pill>
@@ -188,14 +179,14 @@ function AlertDetail({ alert, close }: { alert: HomeAlert; close: () => void }) 
       <Card>
         <KeyValue items={[["Trigger", alert.trigger], ["Who can clear", alert.who_clears], ["Raised", formatDateTime(alert.raised_at)], ["Over threshold", alert.over_by]]} />
       </Card>
-      <div className="-mx-[18px] mt-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         {alert.link && <Button onClick={() => (close(), navigate(alert.link!))}>Open Record</Button>}
         <Grow />
-        <Button disabled={clear.pending} onClick={() => act("dismissed")}>Dismiss</Button>
-        <Button variant="primary" disabled={clear.pending} onClick={() => act("cleared")}>
+        <Button busy={clear.pending} onClick={() => act("dismissed")}>Dismiss</Button>
+        <Button variant="primary" busy={clear.pending} onClick={() => act("cleared")}>
           Clear This Alert
         </Button>
-      </div>
+      </FormFooter>
     </>
   );
 }
@@ -222,7 +213,7 @@ function RuleList() {
 const METRICS: Array<[string, string]> = [["late_arrivals", "Late arrivals"], ["inactivity", "Partnership inactivity"], ["approval_ageing", "Approval ageing"], ["document_expiry", "Document expiry"], ["budget", "Budget threshold"]];
 
 function RuleForm({ close }: { close: () => void }) {
-  const f = useForm(
+  const f = useContractForm(
     { name: "", metric: "late_arrivals", threshold: "", window_days: "30", severity: "medium" },
     { name: rules.required("Name the rule"), threshold: (v) => (/^\d+$/.test(v) ? null : "A whole number"), window_days: (v) => (/^\d+$/.test(v) && Number(v) > 0 ? null : "Days, above 0") },
   );
@@ -240,31 +231,29 @@ function RuleForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <FormRow>
-        <Field label="Rule Name" {...f.field("name")} htmlFor="rn">
-          <TextField id="rn" placeholder="3 lates monthly" {...f.field("name")} />
-        </Field>
-        <Field label="Metric">
-          <SelectField options={METRICS} {...f.field("metric")} />
-        </Field>
-      </FormRow>
-      <FormRow>
+      <Field label="Rule Name" {...f.field("name")} htmlFor="rn">
+        <TextField id="rn" placeholder="3 lates monthly" {...f.field("name")} />
+      </Field>
+      <Field label="Metric">
+        <SelectField options={METRICS} {...f.field("metric")} />
+      </Field>
+      <>
         <Field label="Threshold" {...f.field("threshold")}>
           <TextField inputMode="numeric" placeholder="3" {...f.field("threshold")} />
         </Field>
         <Field label="Window, Days" {...f.field("window_days")}>
           <TextField inputMode="numeric" {...f.field("window_days")} />
         </Field>
-      </FormRow>
+      </>
       <Field label="Severity" info="High severity escalates to the CEO after 14 days.">
         <SelectField options={[["low", "Low"], ["medium", "Medium"], ["high", "High"]]} {...f.field("severity")} />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>
+        <Button variant="primary" busy={save.pending} onClick={submit}>
           Create Rule
         </Button>
-      </div>
+      </FormFooter>
     </>
   );
 }
@@ -292,7 +281,7 @@ function Reports() {
           <Tile key={r.home_report_id} title={r.name} text={r.cadence}>
             <Pill tone={RSTATUS[r.status][0]}>{RSTATUS[r.status][1]}</Pill>
             <Pill>{r.audience}</Pill>
-            <Button size="sm" className="ml-auto" disabled={run.pending} onClick={() => runNow(r)}>
+            <Button size="sm" className="ml-auto" busy={run.pending} onClick={() => runNow(r)}>
               Run Now
             </Button>
           </Tile>
@@ -314,19 +303,13 @@ function Reports() {
           ]}
           footer={<Pager page={runs.page} onPage={runs.setPage} noun="run" />}
         />
-        <InfoCard
-          title="How a Report Is Built"
-          info="Reports are permission gated. A card only renders for a role that may see it, and a report is generated as its recipient, so nobody receives a row they could not open."
-        >
-          <KeyValue items={[["Source", "The same queries the screens use"], ["Formats", "PDF to read, XLSX to work, day-first dates"], ["Delivery", "Email on a schedule, or on demand"], ["Retention", "Every file is kept and re-downloadable"]]} />
-        </InfoCard>
       </Grid>
     </>
   );
 }
 
 function ReportForm({ close }: { close: () => void }) {
-  const f = useForm({ name: "", source: "attendance", schedule: "Every weekday at 18:00", recipients: "" }, { name: rules.required("Name the report"), recipients: rules.required("Who receives it") });
+  const f = useContractForm({ name: "", source: "attendance", schedule: "Every weekday at 18:00", recipients: "" }, { name: rules.required("Name the report"), recipients: rules.required("Who receives it") });
   const save = useMutation("POST /api/v1/home/reports");
   const submit = async () => {
     if (!f.check()) return;
@@ -349,12 +332,12 @@ function ReportForm({ close }: { close: () => void }) {
       <Field label="Recipients" {...f.field("recipients")}>
         <TextField {...f.field("recipients")} placeholder="Operations, CEO" />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>
+        <Button variant="primary" busy={save.pending} onClick={submit}>
           Schedule Report
         </Button>
-      </div>
+      </FormFooter>
     </>
   );
 }

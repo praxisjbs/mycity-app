@@ -1,38 +1,54 @@
 /**
- * The form hook (FRONTEND_GUIDE §8.3): react-hook-form validating with the
- * contract's own Zod schema, the rule the API applies, so a field rule cannot
- * differ on the two sides. The frontend writes no rules of its own.
+ * The one form hook (FRONTEND_GUIDE §8.3, §8.6), on react-hook-form.
  *
- *   import { schemas } from "@mycity/contract/contract.gen";
- *   const form = useContractForm(schemas.organisation.EmployeeCreate, { first_name: "", ... });
- *   <Form onSubmit={form.submit((employee) => save.run(employee))}>
- *     <Field label="First Name" {...form.status("first_name")}><TextField {...form.field("first_name")} /></Field>
+ *   const f = useContractForm({ title: "", due: "" }, schemas.workspace.TaskCreate);
+ *   <Field label="Title" {...f.field("title")}><TextField {...f.field("title")} /></Field>
+ *   <FormFooter><Button variant="primary" onClick={() => f.check() && save()}>Create Task</Button></FormFooter>
  *
- * Reward early, punish late: a field is first checked when the person leaves
- * it, or after they pause typing for 600 ms; once marked it is re-checked on
- * every change, so the mark clears the moment it is fixed. Submit is never
- * disabled: it checks everything, marks every problem and moves focus to the
- * first. A server 422's `fields` land on the same marks. Messages are at most
- * 4 words (gate 12): the contract's own message when it is that short, else a
+ * The rules come from the contract: pass the Zod schema the API validates with
+ * (packages/contract/schemas/<module>.js). Until a module's schemas land, pass
+ * its INTERIM rules instead (a function per field, `rules` below); swapping one
+ * for the other changes nothing else in the form.
+ *
+ * Reward early, punish late: a field is checked when the person leaves it, or
+ * after they pause typing for about 600 ms. Once a field is marked it is
+ * re-checked on every keystroke, so the mark clears the moment it is fixed.
+ * check() marks every problem, moves focus to the first one and returns
+ * whether the form is clean; Submit is never disabled. The server's 422
+ * `fields` land on the same marks (setServerErrors). Messages are at most 4
+ * words (gate 12): the contract's own message when it is that short, else a
  * short one chosen by the kind of problem.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useForm as useHookForm, type FieldError, type FieldValues, type Path, type PathValue } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import type { z } from "zod";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useForm as useHookForm, type DefaultValues, type FieldErrors, type FieldValues, type Path, type PathValue, type Resolver } from "react-hook-form";
 import type { FieldBinding, FieldState, ServerFields } from "./binding";
 
 /** Milliseconds of no typing after which an untouched field is first checked. */
 export const PAUSE_MS = 600;
 
+/** An INTERIM rule: the field's problem in at most 4 words, or nothing when it is right. */
+export type Validator<V> = (value: V, all: Record<string, unknown>) => string | null | undefined;
+
+/** INTERIM rules, one per field, until the module's contract schema exists. */
+export type FormRules<T> = Partial<{ [K in keyof T]: Validator<T[K]> }>;
+
+/** A contract schema: anything with Zod's safeParse. The frontend declares no Zod of its own. */
+export interface ContractSchema {
+  safeParse(value: unknown): { success: boolean; data?: unknown; error?: { issues: Array<{ path: PropertyKey[]; message: string; code?: string }> } };
+}
+
+export interface ContractFormOptions {
+  /** The pause before an untouched field is first checked; 600 ms. */
+  pauseMs?: number;
+}
+
 const words = (s: string) => s.trim().split(/\s+/).filter((w) => /\p{L}/u.test(w));
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** A field error as at most 4 words: the contract's message when it fits, else one by kind. */
-export function shortMessage(error: Pick<FieldError, "type" | "message"> | undefined): string | undefined {
+/** A contract problem as at most 4 words: its own message when it fits, else one by kind. */
+export function shortMessage(error: { type?: string; message?: string } | undefined): string | undefined {
   if (!error) return undefined;
   const message = String(error.message ?? "");
-  if (error.type === "server" && message) return message;
   switch (error.type) {
     case "invalid_type":
       return "Required";
@@ -51,124 +67,164 @@ export function shortMessage(error: Pick<FieldError, "type" | "message"> | undef
   }
 }
 
-export interface ContractFormOptions {
-  /** The pause before an untouched field is first checked; 600 ms. */
-  pauseMs?: number;
+const isSchema = (r: unknown): r is ContractSchema => !!r && typeof (r as ContractSchema).safeParse === "function";
+
+/** Every field's first problem, from the schema or the INTERIM rules. */
+function problemsOf<T extends Record<string, unknown>>(values: T, rules: FormRules<T> | ContractSchema): Partial<Record<keyof T, string>> {
+  const out: Partial<Record<keyof T, string>> = {};
+  if (isSchema(rules)) {
+    const r = rules.safeParse(values);
+    for (const issue of r.success ? [] : (r.error?.issues ?? [])) {
+      const k = String(issue.path[0] ?? "") as keyof T;
+      if (k && !out[k]) out[k] = shortMessage({ type: issue.code, message: issue.message });
+    }
+    return out;
+  }
+  for (const k of Object.keys(rules) as Array<keyof T>) {
+    const msg = rules[k]?.(values[k], values);
+    if (msg) out[k] = msg;
+  }
+  return out;
 }
 
-/* The schema's input type (what the fields hold) and output type (what submit receives). */
-type AnySchema = z.ZodType<unknown, z.ZodTypeDef, unknown>;
-
-export function useContractForm<S extends AnySchema, In extends FieldValues = z.input<S> & FieldValues, Out = z.output<S>>(
-  schema: S,
-  initial: In,
-  { pauseMs = PAUSE_MS }: ContractFormOptions = {},
-) {
-  const form = useHookForm<In, unknown, Out>({
-    // The resolver's overloads cover Zod 3 and 4; the contract is Zod 3.
-    resolver: zodResolver(schema as never) as never,
-    defaultValues: initial as never,
-    mode: "onTouched",
-    reValidateMode: "onChange",
-    shouldFocusError: false,
-  });
-  const values = form.watch();
-  const { errors, isDirty, isSubmitting } = form.formState;
-  const [shown, setShown] = useState<Record<string, boolean>>({});
-  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  useEffect(() => {
-    const pending = timers.current;
-    return () => Object.values(pending).forEach(clearTimeout);
+export function useContractForm<T extends Record<string, unknown>>(initial: T, rules: FormRules<T> | ContractSchema = {}, options: ContractFormOptions = {}) {
+  const pauseMs = options.pauseMs ?? PAUSE_MS;
+  const rulesRef = useRef(rules);
+  rulesRef.current = rules;
+  const resolver = useCallback<Resolver<FieldValues>>(async (values) => {
+    const problems = problemsOf(values as T, rulesRef.current);
+    const errors: FieldErrors<FieldValues> = {};
+    for (const [k, message] of Object.entries(problems)) errors[k] = { type: "contract", message: message as string };
+    return Object.keys(errors).length ? { values: {}, errors } : { values, errors: {} };
   }, []);
+  const form = useHookForm<FieldValues>({ defaultValues: initial as DefaultValues<FieldValues>, mode: "onTouched", reValidateMode: "onChange", resolver });
+  const values = form.watch() as T;
+  const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
+  const [server, setServer] = useState<Record<string, string[]>>({});
+  const timers = useRef<Record<string, number>>({});
+  useEffect(() => () => Object.values(timers.current).forEach((t) => window.clearTimeout(t)), []);
 
-  const show = useCallback((k: string) => setShown((s) => (s[k] ? s : { ...s, [k]: true })), []);
-  const errorOf = (k: string) => (errors as Record<string, FieldError | undefined>)[k];
-  const marked = (k: string) => !!shown[k] || !!errorOf(k);
+  const local = useMemo(() => problemsOf(values, rules), [values, rules]);
+  const errors = useMemo(() => {
+    const out: Partial<Record<keyof T, string>> = { ...local };
+    for (const [k, msgs] of Object.entries(server)) if (msgs[0] && !out[k as keyof T]) out[k as keyof T] = msgs[0];
+    return out;
+  }, [local, server]);
 
-  const stateOf = (k: string): FieldState => {
-    if (!marked(k)) return undefined;
-    if (errorOf(k)) return "bad";
-    const v = (values as Record<string, unknown>)[k];
-    return v !== "" && v != null ? "good" : undefined;
+  const touch = useCallback((k: keyof T) => setTouched((s) => (s[k] ? s : { ...s, [k]: true })), []);
+
+  const set = useCallback(
+    <K extends keyof T>(k: K, v: T[K]) => {
+      const name = k as Path<FieldValues>;
+      form.setValue(name, v as PathValue<FieldValues, Path<FieldValues>>, { shouldDirty: true });
+      setServer((s) => {
+        if (!(k in s)) return s;
+        const next = { ...s };
+        delete next[k as string];
+        return next;
+      });
+      // An untouched field is checked once the person pauses; a marked one on every keystroke (it re-renders from `errors`).
+      window.clearTimeout(timers.current[k as string]);
+      timers.current[k as string] = window.setTimeout(() => {
+        touch(k);
+        void form.trigger(name);
+      }, pauseMs);
+    },
+    [form, touch, pauseMs],
+  );
+
+  const setValues = useCallback(
+    (next: T | ((prev: T) => T)) => {
+      const v = typeof next === "function" ? (next as (p: T) => T)(form.getValues() as T) : next;
+      for (const [k, x] of Object.entries(v)) form.setValue(k as Path<FieldValues>, x as PathValue<FieldValues, Path<FieldValues>>, { shouldDirty: true });
+    },
+    [form],
+  );
+
+  const shown = (k: keyof T) => !!touched[k] || !!server[k as string];
+  const stateOf = (k: keyof T): FieldState => {
+    if (!shown(k)) return undefined;
+    if (errors[k]) return "bad";
+    const value = values[k];
+    return value !== "" && value != null ? "good" : undefined;
   };
 
-  /** Props for a field control: its value, change handler and mark. */
-  const field = <K extends Path<In>>(k: K): FieldBinding<PathValue<In, K>> & { name: K } => ({
-    name: k,
-    value: form.getValues(k),
-    onChange: (v) => {
-      form.setValue(k, v, { shouldDirty: true });
-      clearTimeout(timers.current[k]);
-      if (marked(k)) void form.trigger(k);
-      else
-        timers.current[k] = setTimeout(() => {
-          show(k);
-          void form.trigger(k);
-        }, pauseMs);
-    },
+  /** Props for a field and its control: value, change and blur handlers, its mark and its message. */
+  const field = <K extends keyof T>(k: K): FieldBinding<T[K]> & { name: string } => ({
+    name: String(k),
+    value: values[k],
+    onChange: (v: T[K]) => set(k, v),
     onBlur: () => {
-      clearTimeout(timers.current[k]);
-      show(k);
-      void form.trigger(k);
+      touch(k);
+      void form.trigger(k as Path<FieldValues>);
     },
     state: stateOf(k),
-    message: marked(k) ? shortMessage(errorOf(k)) : undefined,
+    message: shown(k) ? errors[k] : undefined,
   });
 
-  /** Props for the Field around a control: its mark and message. */
-  const status = (k: Path<In>) => ({ state: stateOf(k), message: marked(k) ? shortMessage(errorOf(k)) : undefined });
+  /** Only the mark and the message, for the Field around a control. */
+  const status = (k: keyof T) => ({ state: stateOf(k), message: shown(k) ? errors[k] : undefined });
 
-  const markAll = () => setShown(Object.fromEntries(Object.keys(form.getValues()).map((k) => [k, true])));
-
-  /** Focus the first field with a problem, in the order the form declares them. */
-  const focusFirst = () => {
-    const first = Object.keys(form.getValues()).find((k) => errorOf(k) ?? form.getFieldState(k as Path<In>).error);
-    if (!first || typeof document === "undefined") return;
-    const el = document.getElementsByName(first)[0] as HTMLElement | undefined;
-    el?.focus();
-  };
-
-  /** Check every field and mark every problem; true when the form is clean. */
-  const check = async () => {
-    markAll();
-    const ok = await form.trigger();
-    if (!ok) focusFirst();
-    return ok;
-  };
-
-  /** A submit handler for <Form onSubmit>: checks everything, then calls onValid with the parsed values. */
-  const submit = (onValid: (data: Out) => unknown) => () =>
-    form.handleSubmit(
-      (data) => onValid(data),
-      () => {
-        markAll();
-        setTimeout(focusFirst, 0);
-      },
-    )();
-
-  /** Put a server 422's fields on the same marks. */
-  const setServerErrors = (fields: ServerFields) => {
-    for (const [k, list] of Object.entries(fields)) {
-      if (!list?.length) continue;
-      form.setError(k as Path<In>, { type: "server", message: list[0] });
-      show(k);
+  /**
+   * Mark every field (or only `keys`, for a wizard step), move focus to the
+   * first problem and say whether they are clean. Never disables anything.
+   */
+  const check = (keys?: Array<keyof T>) => {
+    const all = (keys ?? (Object.keys(form.getValues()) as Array<keyof T>)) as Array<keyof T>;
+    setTouched((s) => ({ ...s, ...Object.fromEntries(all.map((k) => [k, true])) }));
+    void form.trigger(all as Array<Path<FieldValues>>);
+    const now = { ...problemsOf(form.getValues() as T, rulesRef.current), ...Object.fromEntries(Object.entries(server).map(([k, m]) => [k, m[0]])) } as Partial<Record<keyof T, string>>;
+    const bad = all.filter((k) => now[k]);
+    if (bad.length) {
+      window.requestAnimationFrame(() => {
+        const scope = document.querySelector("[data-ui=modal]") ?? document;
+        const first = scope.querySelector<HTMLElement>(`[name="${String(bad[0])}"]`) ?? scope.querySelector<HTMLElement>("[aria-invalid=true]");
+        first?.focus();
+      });
     }
+    return bad.length === 0;
   };
 
-  return {
-    values: values as In,
-    field,
-    status,
-    check,
-    submit,
-    setServerErrors,
-    reset: form.reset,
-    /** True once anything changed: a modal asks before discarding. */
-    isDirty,
-    isSubmitting,
-    valid: Object.keys(errors).length === 0,
-    /** The react-hook-form instance, for the rare case the binding does not cover. */
-    hookForm: form,
+  /** A submit handler for <Form>: checks everything, then calls onValid with the values (the schema's parsed output when there is one). */
+  const submit = (onValid: (data: T) => unknown) => () => {
+    if (!check()) return;
+    const v = form.getValues() as T;
+    const r = rulesRef.current;
+    if (isSchema(r)) {
+      const parsed = r.safeParse(v);
+      return onValid((parsed.success ? parsed.data : v) as T);
+    }
+    return onValid(v);
   };
+
+  /** Back to the initial values (or `next`), with no marks. */
+  const reset = (next?: T) => {
+    form.reset((next ?? initial) as DefaultValues<FieldValues>);
+    setTouched({});
+    setServer({});
+  };
+
+  const setServerErrors = (fields: ServerFields) => setServer(Object.fromEntries(Object.entries(fields).filter((e): e is [string, string[]] => !!e[1]?.length)));
+
+  return { values, setValues, set, field, status, errors, check, submit, reset, setServerErrors, isDirty: form.formState.isDirty, valid: Object.keys(errors).length === 0 };
 }
+
+/** Common INTERIM rules. Messages are at most 4 words (gate 12). */
+export const rules = {
+  required:
+    (msg = "Required") =>
+    (v: unknown) =>
+      v == null || String(v).trim() === "" ? msg : null,
+  email: (v: unknown) => {
+    const s = String(v ?? "");
+    if (!s.trim()) return "Enter an email";
+    if (!s.includes("@")) return "Needs an @";
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s) ? null : "Check the spelling";
+  },
+  min: (n: number, msg?: string) => (v: unknown) => (String(v ?? "").length < n ? (msg ?? `At least ${n} characters`) : null),
+  amount: (v: unknown) => {
+    const s = String(v ?? "").replace(/,/g, "");
+    if (!s.trim()) return "Enter an amount";
+    return /^\d{1,16}(\.\d{1,2})?$/.test(s) ? null : "Two decimals at most";
+  },
+};

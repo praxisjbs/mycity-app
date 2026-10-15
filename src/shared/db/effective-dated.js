@@ -41,15 +41,22 @@ const { assertDate } = require("../time/lagos");
  * @param {number} paramIndex
  */
 function asOf(alias, paramIndex) {
-  if (!/^[a-z_][a-z0-9_]*$/.test(alias) || !Number.isInteger(paramIndex) || paramIndex < 1) {
-    throw new Error("asOf(alias, paramIndex): a table alias and a parameter number");
+  if (
+    !/^[a-z_][a-z0-9_]*$/.test(alias) ||
+    !Number.isInteger(paramIndex) ||
+    paramIndex < 1
+  ) {
+    throw new Error(
+      "asOf(alias, paramIndex): a table alias and a parameter number",
+    );
   }
   return `(${alias}.effective_from <= $${paramIndex}::date AND (${alias}.effective_to IS NULL OR ${alias}.effective_to > $${paramIndex}::date))`;
 }
 
 function keyWhere(key, startAt = 1) {
   const cols = Object.keys(key);
-  if (!cols.length) throw new Error("effective-dated: the key names at least one column");
+  if (!cols.length)
+    throw new Error("effective-dated: the key names at least one column");
   return {
     sql: cols.map((c, i) => `${ident(c)} = $${startAt + i}`).join(" AND "),
     params: cols.map((c) => key[c]),
@@ -76,7 +83,10 @@ async function versionOn(client, { table: tableName, key, on, columns = "*" }) {
  * Start a new version of `key` from `from`, closing the version open at that date.
  * @returns {Promise<object>} the new row
  */
-async function addVersion(client, { table: tableName, key, from, data, writable = null }) {
+async function addVersion(
+  client,
+  { table: tableName, key, from, data, writable = null },
+) {
   assertDate(from, "from");
   const w = keyWhere(key);
   const t = table(tableName);
@@ -103,8 +113,15 @@ async function addVersion(client, { table: tableName, key, from, data, writable 
     [...w.params, from],
   );
 
-  const allowed = writable ? [...writable, ...Object.keys(key), "effective_from", "effective_to"] : null;
-  return insertOne(client, tableName, { ...data, ...key, effective_from: from, effective_to: null }, { writable: allowed });
+  const allowed = writable
+    ? [...writable, ...Object.keys(key), "effective_from", "effective_to"]
+    : null;
+  return insertOne(
+    client,
+    tableName,
+    { ...data, ...key, effective_from: from, effective_to: null },
+    { writable: allowed },
+  );
 }
 
 module.exports = { asOf, versionOn, addVersion };

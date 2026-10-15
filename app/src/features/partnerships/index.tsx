@@ -4,7 +4,6 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/partnerships";
 import type { Contract, Lead, PartnerRow, Proposal, ProposalDoc, Renewal } from "@/api/types/partnerships";
 import type { PersonRef } from "@/api/types/common";
-import { Button, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, todayIso, KeyValue, Meter, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
 import { Chain, StatStrip } from "@/components/ui/data";
 import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
@@ -12,9 +11,10 @@ import { BackButton, ProfileHeader } from "@/components/ui/Profile";
 import { LoadingRows, Table } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, TrailCard } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { PersonPicker } from "@/components/form";
+import { Button, KeyValue, Meter, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, todayIso, StatusPill, DateField, Field, FormFooter, MoneyField, rules, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@mycity/ui";
 
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   if (id && (tab === "partners" || tab === "pipeline")) return <Partner360View id={id} back={tab} />;
@@ -57,7 +57,7 @@ function Pipeline() {
       {!d ? <Card><LoadingRows count={6} /></Card> : (
         <>
           <KpiTiles items={[{ label: "In the Pipeline", value: String(d.in_pipeline) }, { label: "Signed This Year", value: String(d.signed_this_year), tone: "ok" }, { label: "Signed Value", value: formatMoneyShort(d.signed_value) }, { label: "Going Quiet", value: String(d.going_quiet), tone: d.going_quiet ? "err" : "ok" }]} />
-          <BarsCard title="Stages" rows={d.stages} note={d.stages_note} />
+          <BarsCard title="Stages" rows={d.stages} />
           <Grid cols={2} className="mt-3">
             <Table
               title="Longest at a Stage"
@@ -71,17 +71,6 @@ function Pipeline() {
                 { key: "d", label: "Days at Stage", align: "n", render: (r) => r.days_at_stage },
                 { key: "o", label: "Owner", render: (r) => short(r.owner), desktop: true },
                 { key: "a", label: "Action", render: (r) => <StatusPill s={r.action} /> },
-              ]}
-            />
-            <KvCard
-              title="How the Pipeline Is Kept Honest"
-              items={[
-                ["Ageing", "Days at stage, not days since created"],
-                ["Inactivity rule", "Thirty days with no logged interaction raises an alert"],
-                ["Follow-up task", "Raised on the owner automatically, not on a manager"],
-                ["Escalation", "High severity goes to the CEO after fourteen more days"],
-                ["What counts as contact", "A logged interaction. An out-of-office auto-reply does not"],
-                ["Closing", "A lost opportunity is closed with a reason, never deleted"],
               ]}
             />
           </Grid>
@@ -130,9 +119,9 @@ function Partners() {
           { key: "l", label: "Last Contact", render: (p) => (p.last_contact_days === 0 ? "Today" : `${p.last_contact_days} days ago`) },
         ]}
       />
-      <div className="mt-3">
-        {s.data ? <BarsCard title="Value by Partnership Type" rows={s.data.by_type} note="Partnership types are configurable in Settings." /> : <Card><LoadingRows /></Card>}
-      </div>
+      <Grid cols={2} className="mt-3">
+        {s.data ? <BarsCard title="Value by Partnership Type" rows={s.data.by_type} /> : <Card><LoadingRows /></Card>}
+      </Grid>
     </>
   );
 }
@@ -141,7 +130,7 @@ function PartnerForm({ close }: { close: () => void }) {
   const { navigate } = useRouter();
   const [owner, setOwner] = useState<PersonRef[]>([]);
   const [tried, setTried] = useState(false);
-  const f = useForm({ name: "", legal_name: "", industry: "", type: "", value: "", hq: "Lagos", website: "" }, { name: (v) => (!v.trim() ? "Name the partner" : null), industry: (v) => (!v ? "Pick the industry" : null), type: (v) => (!v ? "Pick the type" : null) });
+  const f = useContractForm({ name: "", legal_name: "", industry: "", type: "", value: "", hq: "Lagos", website: "" }, { name: (v) => (!v.trim() ? "Name the partner" : null), industry: (v) => (!v ? "Pick the industry" : null), type: (v) => (!v ? "Pick the type" : null) });
   const save = useMutation("POST /api/v1/partnerships/partners");
   const submit = async () => {
     setTried(true);
@@ -157,26 +146,37 @@ function PartnerForm({ close }: { close: () => void }) {
     }
   };
   return (
-    <>
-      <FormRow>
-        <Field label="Partner" {...f.field("name")}><TextField {...f.field("name")} placeholder="Zenith Bank" /></Field>
-        <Field label="Legal Name"><TextField {...f.field("legal_name")} placeholder="Optional" /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Industry" {...f.field("industry")}><SelectField placeholder="Pick one" options={opts(INDUSTRIES)} {...f.field("industry")} /></Field>
-        <Field label="Partnership Type" {...f.field("type")}><SelectField placeholder="Pick one" options={opts(TYPES)} {...f.field("type")} /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Expected Value"><MoneyField {...f.field("value")} /></Field>
-        <Field label="Headquarters"><TextField {...f.field("hq")} /></Field>
-      </FormRow>
-      <Field label="Website"><TextField {...f.field("website")} placeholder="example.com" /></Field>
-      <Field label="Lead Owner" state={tried && !owner.length ? "bad" : undefined} message={tried && !owner.length ? "Pick the owner" : undefined}><PersonPicker value={owner} onChange={setOwner} /></Field>
-      <ModalFoot>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Partner</Button>
-      </ModalFoot>
-    </>
+    <Wizard
+      finish="Add Partner"
+      busy={save.pending}
+      onFinish={() => void submit()}
+      onCancel={close}
+      steps={[
+        {
+          title: "Partner",
+          check: () => f.check(["name", "industry", "type"]),
+          body: (
+            <>
+              <Field label="Partner" {...f.field("name")}><TextField {...f.field("name")} placeholder="Zenith Bank" /></Field>
+              <Field label="Legal Name" optional><TextField {...f.field("legal_name")} /></Field>
+              <Field label="Industry" {...f.field("industry")}><SelectField placeholder="Pick one" options={opts(INDUSTRIES)} {...f.field("industry")} /></Field>
+              <Field label="Partnership Type" {...f.field("type")}><SelectField placeholder="Pick one" options={opts(TYPES)} {...f.field("type")} /></Field>
+            </>
+          ),
+        },
+        {
+          title: "Details",
+          body: (
+            <>
+              <Field label="Expected Value" optional><MoneyField {...f.field("value")} /></Field>
+              <Field label="Headquarters"><TextField {...f.field("hq")} /></Field>
+              <Field label="Website" optional><TextField {...f.field("website")} placeholder="example.com" /></Field>
+              <Field label="Lead Owner" state={tried && !owner.length ? "bad" : undefined} message={tried && !owner.length ? "Pick the owner" : undefined}><PersonPicker value={owner} onChange={setOwner} /></Field>
+            </>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -233,11 +233,11 @@ function Partner360View({ id, back }: { id: string; back: string }) {
           title="Contracts and MOUs"
           rows={x.documents}
           rowKey={(d) => d.title}
-          empty={{ title: "No document yet", text: "Proposals and MOUs appear here with their signature state." }}
+          empty={{ title: "No Document Yet", text: "Proposals and MOUs appear here with their signature state." }}
           columns={[{ key: "t", label: "Document", render: (d) => d.title }, { key: "k", label: "Type", render: (d) => d.kind }, { key: "s", label: "Signed", render: (d) => (d.signed_on ? formatDate(d.signed_on) : "Not yet") }, { key: "st", label: "Status", render: (d) => <StatusPill s={d.status} /> }]}
         />
         <Table
-          title="What We Owe Them"
+          title="Our Deliverables"
           rows={x.deliverables}
           rowKey={(d) => d.title}
           columns={[{ key: "t", label: "Deliverable", render: (d) => d.title }, { key: "o", label: "Owner", render: (d) => short(d.owner) }, { key: "d", label: "Due", render: (d) => formatDate(d.due) }, { key: "s", label: "Status", render: (d) => <StatusPill s={d.status} /> }]}
@@ -252,7 +252,7 @@ function Partner360View({ id, back }: { id: string; back: string }) {
 }
 
 function LogInteraction({ id, close }: { id: string; close: () => void }) {
-  const f = useForm({ kind: "call", happened_on: todayIso(), summary: "" }, { happened_on: (v) => (!v ? "When did it happen" : null), summary: (v) => (v.trim().length < 10 ? "What was said or agreed" : null) });
+  const f = useContractForm({ kind: "call", happened_on: todayIso(), summary: "" }, { happened_on: (v) => (!v ? "When did it happen" : null), summary: (v) => (v.trim().length < 10 ? "Say what was agreed" : null) });
   const save = useMutation("POST /api/v1/partnerships/partners/:id/interactions");
   const submit = async () => {
     if (!f.check()) return;
@@ -267,25 +267,27 @@ function LogInteraction({ id, close }: { id: string; close: () => void }) {
   };
   return (
     <>
-      <FormRow>
-        <Field label="What"><SelectField options={[["call", "Call"], ["meeting", "Meeting"], ["email", "Email"], ["visit", "Visit"]]} {...f.field("kind")} /></Field>
-        <Field label="When" {...f.field("happened_on")}><DateField {...f.field("happened_on")} max={todayIso()} /></Field>
-      </FormRow>
+      <Field label="What"><SelectField options={[["call", "Call"], ["meeting", "Meeting"], ["email", "Email"], ["visit", "Visit"]]} {...f.field("kind")} /></Field>
+      <Field label="When" {...f.field("happened_on")}><DateField {...f.field("happened_on")} max={todayIso()} /></Field>
       <Field label="Summary" {...f.field("summary")}><TextAreaField {...f.field("summary")} placeholder="Agreed a pilot" /></Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Log</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Log</Button>
+      </FormFooter>
     </>
   );
 }
 
 function MoveStage({ id, current, close }: { id: string; current: string; close: () => void }) {
   const stages = useApi("GET /api/v1/partnerships/stages");
-  const [stage, setStage] = useState(current);
-  const [reason, setReason] = useState("");
+  const f = useContractForm(
+    { stage: current, reason: "" },
+    { stage: (v) => (v === current ? "Pick another stage" : null), reason: (v, all) => (all.stage === "On hold" && !v.trim() ? "Give a reason" : null) },
+  );
+  const { stage, reason } = f.values;
   const move = useMutation("POST /api/v1/partnerships/partners/:id/stage");
   const go = async () => {
+    if (!f.check()) return;
     try {
       await move.run({ params: { id }, body: { stage, ...(reason.trim() && { reason: reason.trim() }) } });
       invalidate("/api/v1/partnerships");
@@ -298,12 +300,12 @@ function MoveStage({ id, current, close }: { id: string; current: string; close:
   };
   return (
     <>
-      <Field label="Stage"><SelectField value={stage} onChange={setStage} options={opts(stages.data ?? [current])} /></Field>
-      <Field label={stage === "On hold" ? "Why It Is on Hold" : "Note (Optional)"}><TextAreaField value={reason} onChange={setReason} placeholder="Duplicate entry" /></Field>
-      <ModalFoot>
+      <Field label="Stage" {...f.field("stage")}><SelectField {...f.field("stage")} options={opts(stages.data ?? [current])} /></Field>
+      <Field label={stage === "On hold" ? "Why It Is on Hold" : "Note (Optional)"} {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Duplicate entry" /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={stage === current || move.pending} onClick={go}>Move</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={move.pending} onClick={go}>Move</Button>
+      </FormFooter>
     </>
   );
 }
@@ -323,10 +325,10 @@ function Leads() {
         <>
           <KeyValue items={[["Source", l.source], ["Owner", l.owner.display_name], ["Added", formatDate(l.added_on)], ["Next action", l.next_action ?? "None"], ["Status", <StatusPill key="s" s={l.status} />]]} />
           {!["Converted", "Lost"].includes(l.status.text) && (
-            <ModalFoot>
+            <FormFooter>
               <Button className="mr-auto" onClick={() => modal.open({ title: "Close as Lost", body: (c2) => <LoseLead id={l.lead_id} close={c2} /> })}>Close as Lost</Button>
-              <Button variant="primary" disabled={convert.pending} onClick={async () => { try { const r = await convert.run({ params: { id: l.lead_id }, body: {} }); invalidate("/api/v1/partnerships"); close(); toast("Converted. The partner starts at Prospect identified"); navigate(`/partnerships?tab=partners&id=${r.partner_id}`); } catch (e) { fail(e); } }}>Convert to Partner</Button>
-            </ModalFoot>
+              <Button variant="primary" busy={convert.pending} onClick={async () => { try { const r = await convert.run({ params: { id: l.lead_id }, body: {} }); invalidate("/api/v1/partnerships"); close(); toast("Converted. The partner starts at Prospect identified"); navigate(`/partnerships?tab=partners&id=${r.partner_id}`); } catch (e) { fail(e); } }}>Convert to Partner</Button>
+            </FormFooter>
           )}
         </>
       ),
@@ -353,7 +355,7 @@ function Leads() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Where Leads Come From" rows={s.data.sources} note="The website form is the only automatic source. Everything else is somebody typing what happened in a room." /> : <Card><LoadingRows /></Card>}
+        {s.data ? <BarsCard title="Leads by Source" rows={s.data.sources} /> : <Card><LoadingRows /></Card>}
         <KvCard
           title="Lead to Partner"
           items={[
@@ -370,7 +372,7 @@ function Leads() {
 }
 
 function LeadForm({ close }: { close: () => void }) {
-  const f = useForm({ title: "", source: "BD conversation", next_action: "" }, { title: (v) => (v.trim().length < 4 ? "Who, and what about" : null) });
+  const f = useContractForm({ title: "", source: "BD conversation", next_action: "" }, { title: (v) => (v.trim().length < 4 ? "Who, and what about" : null) });
   const save = useMutation("POST /api/v1/partnerships/leads");
   const submit = async () => {
     if (!f.check()) return;
@@ -388,24 +390,25 @@ function LeadForm({ close }: { close: () => void }) {
       <Field label="Lead" {...f.field("title")}><TextField {...f.field("title")} placeholder="Zenith events sponsorship" /></Field>
       <Field label="Source"><SelectField options={opts(["BD conversation", "Referral", "Inbound email", "Event", "Website form"])} {...f.field("source")} /></Field>
       <Field label="Next Action"><TextField {...f.field("next_action")} placeholder="Send one pager" /></Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Lead</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Lead</Button>
+      </FormFooter>
     </>
   );
 }
 
 function LoseLead({ id, close }: { id: string; close: () => void }) {
-  const [reason, setReason] = useState("");
+  const f = useContractForm({ reason: "" }, { reason: rules.required("Give a reason") });
+  const reason = f.values.reason;
   const lose = useMutation("POST /api/v1/partnerships/leads/:id/lose");
   return (
     <>
-      <Field label="Why"><TextAreaField value={reason} onChange={setReason} placeholder="Partner withdrew" /></Field>
-      <ModalFoot>
+      <Field label="Why" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Partner withdrew" /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={!reason.trim() || lose.pending} onClick={async () => { await lose.run({ params: { id }, body: { reason } }); invalidate("/api/v1/partnerships/leads"); close(); toast("Lead closed as lost"); }}>Close as Lost</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={lose.pending} onClick={async () => { if (!f.check()) return; await lose.run({ params: { id }, body: { reason } }); invalidate("/api/v1/partnerships/leads"); close(); toast("Lead closed as lost"); }}>Close as Lost</Button>
+      </FormFooter>
     </>
   );
 }
@@ -462,16 +465,15 @@ function Proposals() {
         />
         <div>{doc.data ? <ProposalPaper d={doc.data} /> : <Card><LoadingRows count={6} /></Card>}</div>
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">Answer six questions and the assistant drafts the proposal. You edit it before it goes anywhere.</p>
     </>
   );
 }
 
 function ProposalForm({ close, partner }: { close: () => void; partner: string }) {
   const partners = usePaged("GET /api/v1/partnerships/partners");
-  const f = useForm({ partner_id: partner, what: "", why_now: "", cities: "Lagos", weeks: "12", value: "", terms: "Half on signature, half on the first activation" }, {
+  const f = useContractForm({ partner_id: partner, what: "", why_now: "", cities: "Lagos", weeks: "12", value: "", terms: "Half on signature, half on the first activation" }, {
     partner_id: (v) => (!v ? "Pick the partner" : null),
-    what: (v) => (v.trim().length < 20 ? "What we propose, in a sentence or two" : null),
+    what: (v) => (v.trim().length < 20 ? "Describe the proposal" : null),
     why_now: (v) => (v.trim().length < 10 ? "Why now" : null),
     cities: (v) => (!v.trim() ? "Which cities" : null),
     weeks: (v) => (!(Number(v) >= 1) ? "How many weeks" : null),
@@ -490,24 +492,37 @@ function ProposalForm({ close, partner }: { close: () => void; partner: string }
     }
   };
   return (
-    <>
-      <p className="mb-3 text-[12.5px] text-muted-foreground">Six answers. The assistant drafts; you edit before anything is sent.</p>
-      <Field label="1 · Who Is It For" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
-      <Field label="2 · What We Propose" {...f.field("what")}><TextAreaField {...f.field("what")} placeholder="Four-city health activation" /></Field>
-      <Field label="3 · Why Now" {...f.field("why_now")}><TextField {...f.field("why_now")} placeholder="Fits campaign window" /></Field>
-      <FormRow>
-        <Field label="4 · Cities" {...f.field("cities")}><TextField {...f.field("cities")} /></Field>
-        <Field label="5 · Weeks" {...f.field("weeks")}><TextField {...f.field("weeks")} inputMode="numeric" onChange={(v) => f.set("weeks", v.replace(/\D/g, "").slice(0, 2))} /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="6 · Value We Ask" {...f.field("value")}><MoneyField {...f.field("value")} /></Field>
-        <Field label="Payment Terms"><TextField {...f.field("terms")} /></Field>
-      </FormRow>
-      <ModalFoot>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="spark" disabled={save.pending} onClick={submit}>Draft Proposal</Button>
-      </ModalFoot>
-    </>
+    <Wizard
+      finish="Draft Proposal"
+      busy={save.pending}
+      onFinish={() => void submit()}
+      onCancel={close}
+      steps={[
+        {
+          title: "The Idea",
+          check: () => f.check(["partner_id", "what", "why_now"]),
+          body: (
+            <>
+              <Field label="Who It Is For" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
+              <Field label="What We Propose" {...f.field("what")}><TextAreaField {...f.field("what")} placeholder="Four-city health activation" /></Field>
+              <Field label="Why Now" {...f.field("why_now")}><TextField {...f.field("why_now")} placeholder="Fits campaign window" /></Field>
+            </>
+          ),
+        },
+        {
+          title: "Scope and Value",
+          check: () => f.check(["cities", "weeks", "value"]),
+          body: (
+            <>
+              <Field label="Cities" {...f.field("cities")}><TextField {...f.field("cities")} /></Field>
+              <Field label="Weeks" {...f.field("weeks")}><TextField {...f.field("weeks")} inputMode="numeric" onChange={(v) => f.set("weeks", v.replace(/\D/g, "").slice(0, 2))} /></Field>
+              <Field label="Value We Ask" {...f.field("value")}><MoneyField {...f.field("value")} /></Field>
+              <Field label="Payment Terms"><TextField {...f.field("terms")} /></Field>
+            </>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -559,16 +574,6 @@ function Contracts() {
             { key: "o", label: "Owner", render: (r) => short(r.owner), desktop: true },
           ]}
         />
-        <KvCard
-          title="What Happens at 90 Days"
-          items={[
-            ["Alert", "Raised on the document owner, not on a manager"],
-            ["Task", "Renewal paper, with the original MOU attached"],
-            ["Escalation", "To the CEO at 30 days if nothing has moved"],
-            ["If it lapses", "The partnership moves to Expiring, and stops counting in signed value"],
-            ["Renewing", "Creates a new document that references the old one. The history stays"],
-          ]}
-        />
       </Grid>
     </>
   );
@@ -576,7 +581,7 @@ function Contracts() {
 
 function ContractForm({ close }: { close: () => void }) {
   const partners = usePaged("GET /api/v1/partnerships/partners");
-  const f = useForm({ partner_id: "", title: "", kind: "Contract", value: "" }, { partner_id: (v) => (!v ? "Pick the partner" : null), title: (v) => (!v.trim() ? "Name the document" : null), value: (v) => (!(Number(v) > 0) ? "Enter the value" : null) });
+  const f = useContractForm({ partner_id: "", title: "", kind: "Contract", value: "" }, { partner_id: (v) => (!v ? "Pick the partner" : null), title: (v) => (!v.trim() ? "Name the document" : null), value: (v) => (!(Number(v) > 0) ? "Enter the value" : null) });
   const save = useMutation("POST /api/v1/partnerships/contracts");
   const submit = async () => {
     if (!f.check()) return;
@@ -593,14 +598,12 @@ function ContractForm({ close }: { close: () => void }) {
     <>
       <Field label="Partner" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
       <Field label="Document" {...f.field("title")}><TextField {...f.field("title")} placeholder="e.g. Activation agreement" /></Field>
-      <FormRow>
-        <Field label="Type"><SelectField options={[["Contract", "Contract"], ["MOU", "MOU"]]} {...f.field("kind")} /></Field>
-        <Field label="Value" {...f.field("value")}><MoneyField {...f.field("value")} /></Field>
-      </FormRow>
-      <ModalFoot>
+      <Field label="Type"><SelectField options={[["Contract", "Contract"], ["MOU", "MOU"]]} {...f.field("kind")} /></Field>
+      <Field label="Value" {...f.field("value")}><MoneyField {...f.field("value")} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Create Draft</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Create Draft</Button>
+      </FormFooter>
     </>
   );
 }
@@ -644,15 +647,6 @@ function Analytics() {
             { key: "pr", label: "Proposals", align: "n", render: (r) => r.proposals },
             { key: "s", label: "Signed", align: "n", render: (r) => r.signed },
             { key: "c", label: "Conversion", render: (r) => <span className="block w-[130px]"><Meter pct={r.conversion_pct} label={`${r.conversion_pct}%`} /></span> },
-          ]}
-        />
-        <KvCard
-          title="What This View Answers"
-          items={[
-            ["For the CEO", "Is the revenue goal reachable at this rate"],
-            ["For Operations", "Which owner is holding partnerships that are going quiet"],
-            ["For the owner", "What is due from them this week"],
-            ["Downloads", "Attributed from the partner’s own listing and campaign links"],
           ]}
         />
       </Grid>

@@ -3,7 +3,7 @@
  * @group Display
  * @summary A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape.
  * @use Skeleton while a card, a list or a page loads, so the layout does not jump when the data lands; Spinner inside a small area that is waiting (a sheet's body, beside a label).
- * @avoid A Spinner for a whole page or list (use Skeleton); a Spinner inside a Button (Button has loading); either one after the data has failed (use the error state).
+ * @avoid A Spinner for a whole page or list (use Skeleton); a Spinner inside a Button (Button has busy); either one after the data has failed (use the error state).
  * @phone The same shapes, full width.
  * @a11y Skeleton lines and Spinner are a status region named "Loading" (or the label given); a single Skeleton shape is decorative, so a group of them should sit in one labelled Skeleton or a container with aria-busy. Under reduced motion neither moves.
  * @status stable

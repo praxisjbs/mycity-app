@@ -4,10 +4,10 @@ import { useApi, type PagedResult } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { BarRow } from "@/api/types/home";
 import "@/api/types/shared";
-import { Button, KeyValue, Card, CardHeader, toast, SearchInput, HelpTerm } from "@mycity/ui";
 import { Bars, Chain, Timeline } from "@/components/ui/data";
 import { Pager, Table, type Column } from "@/components/ui/Table";
 import { toBars } from "@/features/home/blocks";
+import { Button, KeyValue, Card, CardHeader, toast, SearchInput } from "@mycity/ui";
 
 /**
  * The building blocks the module screens share: the explanation card, the
@@ -17,7 +17,7 @@ import { toBars } from "@/features/home/blocks";
 export function KvCard({ title, items, info, right }: { title: string; items: Array<[ReactNode, ReactNode]>; info?: string; right?: ReactNode }) {
   return (
     <Card>
-      <CardHeader title={info ? <HelpTerm help={info}>{title}</HelpTerm> : title} right={right} />
+      <CardHeader title={title} help={info} right={right} />
       <KeyValue items={items} />
     </Card>
   );
@@ -36,7 +36,7 @@ export function ChainCard({ steps, note, title }: { steps: Array<{ label: string
 export function BarsCard({ title, rows, note, info, right }: { title: string; rows: BarRow[]; note?: string; info?: string; right?: ReactNode }) {
   return (
     <Card>
-      <CardHeader title={info ? <HelpTerm help={info}>{title}</HelpTerm> : title} right={right} />
+      <CardHeader title={title} help={info} right={right} />
       <Bars rows={toBars(rows)} note={note} />
     </Card>
   );
@@ -102,16 +102,11 @@ export function PagedTable<R>({
       loading={list.loading}
       error={list.error}
       onRowClick={onRowClick}
-      empty={empty ?? (list.q ? { title: "Nothing matches", text: "Try another search." } : undefined)}
+      empty={empty ?? (list.q ? { title: "Nothing Matches", text: "Try another search." } : undefined)}
       wide={wide}
       footer={<Pager page={list.page} onPage={list.setPage} noun={noun} nounPlural={nounPlural} />}
     />
   );
-}
-
-/** The buttons row at the bottom of a form in the modal. */
-export function ModalFoot({ children }: { children: ReactNode }) {
-  return <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap items-center justify-end gap-2 border-t border-border px-[18px] py-3">{children}</div>;
 }
 
 /** Department options from the organisation's own list (never typed into a screen). */

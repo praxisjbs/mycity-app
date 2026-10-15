@@ -1,181 +1,524 @@
-"use strict";
 /**
- * Write .xlsx files: list exports, reports, import templates and import error files.
+ * The branded workbook builder. PURE: rows in → .xlsx buffer out. Everything
+ * besides the rows arrives in the WorkbookContext (context.js), so unit tests
+ * and production build the same way; a missing context is the default
+ * MyCity context with no actor, title or filters.
+ *
+ * What "branded" means here, concretely:
+ *   - header fill City Green, header font white, accent MyCity yellow
+ *   - `wb.creator`/`lastModifiedBy`/`company` = the company name
+ *   - optional Cover sheet: title, company letterhead lines, generated-at in
+ *     Lagos time, actor, filters, and a STAGING stamp for exports made on
+ *     staging (the filename says so too: cells.exportFilename)
+ *   - money cells are raw typed numbers shown "₦#,##0.00", so a column SUMs
+ *   - dates are real date cells shown day-first (dd/mm/yyyy)
  *
  *   const buffer = await buildWorkbook({
  *     sheets: [{
  *       name: "Employees",
  *       columns: [
- *         { key: "number", label: "Staff ID" },
- *         { key: "full_name", label: "Name", width: 28 },
- *         { key: "start_date", label: "Start Date", type: "date" },
- *         { key: "gross_monthly", label: "Gross Monthly", type: "money" },
- *         { key: "work_pattern", label: "Work Pattern", type: "enum", options: ["On-site", "Hybrid", "Remote"] },
+ *         { key: "number", header: "Staff ID" },
+ *         { key: "full_name", header: "Name", width: 28 },
+ *         { key: "start_date", header: "Start Date", format: "date" },
+ *         { key: "gross_monthly", header: "Gross Monthly", format: "money", total: true },
+ *         { key: "work_pattern", header: "Work Pattern", list: ["On-site", "Hybrid", "Remote"] },
  *       ],
  *       rows,
  *     }],
- *     reference: [{ column: "Start Date", required: true, rule: "Day-first, like 03/07/2026", example: "03/11/2026" }],
+ *     context: workbookContext({ actor: req.user, title: "Employees" }),
  *   });
  *
- * House rules, so every export looks and reads the same:
- *  - Row 1 is the header: City Green, white bold text, frozen, with filters. Nothing sits
- *    above it, so an export can be edited and imported straight back.
- *  - Money is a number cell shown "₦#,##0.00" (it sums in Excel); the value comes from a
- *    decimal string, never rounded on the way.
- *  - Dates are real date cells shown dd/mm/yyyy; date-times are Lagos wall-clock time.
- *  - Text that would start a formula is escaped (cells.escapeFormula).
- *  - An enum column gets a dropdown of its options.
- *  - A Reference sheet, when given, lists each column's rules and is protected, so a
- *    template explains itself and cannot be edited by accident.
- *  - On staging, every sheet tab is red and the workbook is titled STAGING, so an export
- *    from the test system is never mistaken for live data.
- *
- * Rows are whatever the caller passes; this file never pages or queries. An export is
- * built from pages of 25 by the caller, or by a job for a large set (README §7).
+ * Rows are whatever the caller passes; this file never pages or queries. An export
+ * is built from pages of 25 by the caller, or by a job for a large set (README §7).
  */
+"use strict";
+
 const ExcelJS = require("exceljs");
-const { config } = require("../../config/env");
-const { escapeFormula, sheetName, argb } = require("./cells");
-const { writeDate, writeDateTime, DATE_FORMAT, DATETIME_FORMAT } = require("./day-first-cells");
+const { workbookContext } = require("./context");
+const {
+  sheetName,
+  escapeFormula,
+  hexToArgb,
+  serialDate,
+  formatInstant,
+  MONEY_FORMAT,
+} = require("./cells");
 
-const BRAND = { header: "#014339", headerText: "#FFFFFF", rule: "#FFDF55", staging: "#DA1E10" };
-const MONEY_FORMAT = '"₦"#,##0.00;-"₦"#,##0.00';
-const TYPES = new Set(["text", "number", "integer", "money", "date", "datetime", "boolean", "enum", "raw"]);
-const MAX_ROWS = 100_000;
+const REFERENCE_SHEET = "Reference";
+// Staging stamp colour. Red is the universal "not real" signal on a document.
+const STAGING_STAMP = "FFDA1E10";
 
-function cellFor(type, value) {
-  if (value === null || value === undefined || value === "") return null;
-  switch (type) {
-    case "money": {
-      const s = String(value);
-      if (!/^-?\d+(\.\d+)?$/.test(s)) throw new Error(`buildWorkbook: "${s}" is not an amount`);
-      return Number(s);
-    }
-    case "number":
-    case "integer":
-      return Number(value);
+/**
+ * @typedef {Object} ColumnSpec
+ * @property {string} header     Human header shown in row 1.
+ * @property {string} key        Object key used for rows + parsed rows.
+ * @property {number} [width]
+ * @property {string} [note]     Cell comment on the header (guidance).
+ * @property {string} [format]   money|qty|int|num|pct|date|datetime|bool|text|ref
+ * @property {string[]} [list]   Inline dropdown values (small, fixed lists).
+ * @property {string} [refColumn] Reference-sheet block title whose values
+ *                                become this column's dropdown.
+ * @property {boolean} [total]   Add a =SUM() cell for this column in a totals row.
+ * @property {boolean} [wrap]    Wrap text in data cells (long reason strings).
+ * @property {boolean} [emphasis] Data-cell font in the brand primary (the
+ *                                "why not imported" column of an import error file).
+ */
+
+/** numFmt + coercion for one column format. */
+function cellSpec(column, context) {
+  switch (column.format) {
+    case "money":
+      return { fmt: MONEY_FORMAT, coerce: (v) => num(v), align: "right" };
+    case "int":
+      return { fmt: "#,##0", coerce: num, align: "right" };
+    case "qty":
+      // Counts or measures: show what is there, up to 3 places.
+      return { fmt: "#,##0.###", coerce: num, align: "right" };
+    case "num":
+      return { fmt: "#,##0.00", coerce: num, align: "right" };
+    case "pct":
+      // Fraction in, % out (0.1925 → 19.3%).
+      return { fmt: "0.0%", coerce: num, align: "right" };
+    // Day-first, like every other date this product prints. These are Excel
+    // NUMBER FORMATS, not the stored value: the cell still holds a real date
+    // serial, so sorting, filtering and formulas are untouched. `dd/mm/yyyy`
+    // is literal in Excel's format language (unlike the locale-dependent
+    // `m/d/yy` shorthands), so the file renders the same for whoever opens it.
     case "date":
-      return writeDate(value);
-    case "datetime":
-      return writeDateTime(value);
-    case "boolean":
-      return value === true ? "Yes" : value === false ? "No" : escapeFormula(String(value));
-    case "raw":
-      // A value as the person gave it (the import error file): numbers stay numbers.
-      return typeof value === "number" && Number.isFinite(value) ? value : escapeFormula(String(value));
-    default:
-      return escapeFormula(typeof value === "string" ? value : String(value));
-  }
-}
-
-function numFmt(type) {
-  if (type === "money") return MONEY_FORMAT;
-  if (type === "date") return DATE_FORMAT;
-  if (type === "datetime") return DATETIME_FORMAT;
-  if (type === "integer") return "0";
-  return undefined;
-}
-
-function checkColumns(name, columns) {
-  if (!Array.isArray(columns) || columns.length === 0) throw new Error(`buildWorkbook: sheet "${name}" needs columns`);
-  for (const c of columns) {
-    if (!c.key || !c.label) throw new Error(`buildWorkbook: every column needs key and label (sheet "${name}")`);
-    if (c.type && !TYPES.has(c.type)) throw new Error(`buildWorkbook: column "${c.key}" has type "${c.type}"`);
-    if (c.type === "enum" && (!Array.isArray(c.options) || c.options.length === 0)) throw new Error(`buildWorkbook: enum column "${c.key}" needs options`);
-  }
-}
-
-function addDataSheet(wb, sheet, taken, staging) {
-  const name = sheetName(sheet.name, taken);
-  checkColumns(name, sheet.columns);
-  const rows = sheet.rows || [];
-  if (rows.length > MAX_ROWS) throw new Error(`buildWorkbook: ${rows.length} rows; build exports this large in a job, in parts`);
-  const ws = wb.addWorksheet(name, {
-    views: [{ state: "frozen", ySplit: 1 }],
-    properties: staging ? { tabColor: { argb: argb(BRAND.staging) } } : {},
-  });
-  ws.columns = sheet.columns.map((c) => ({
-    key: c.key,
-    header: c.label,
-    width: c.width || Math.min(60, Math.max(12, String(c.label).length + 4)),
-    style: numFmt(c.type) ? { numFmt: numFmt(c.type) } : {},
-  }));
-  const header = ws.getRow(1);
-  header.font = { bold: true, color: { argb: argb(BRAND.headerText) } };
-  header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(BRAND.header) } };
-  header.alignment = { vertical: "middle" };
-  header.height = 20;
-  for (const r of rows) {
-    const values = {};
-    for (const c of sheet.columns) values[c.key] = cellFor(c.type || "text", c.value ? c.value(r) : r[c.key]);
-    ws.addRow(values);
-  }
-  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: sheet.columns.length } };
-
-  const last = Math.max(rows.length + 1, sheet.validateRows || 1000);
-  sheet.columns.forEach((c, i) => {
-    if (c.type !== "enum") return;
-    const list = c.options.map((o) => String(o).replace(/"/g, "")).join(",");
-    if (list.length > 250) return; // Excel's inline list limit; the Reference sheet lists them instead
-    for (let r = 2; r <= last; r += 1) {
-      ws.getCell(r, i + 1).dataValidation = {
-        type: "list",
-        allowBlank: true,
-        formulae: [`"${list}"`],
-        showErrorMessage: true,
-        errorTitle: c.label,
-        error: `Choose one of: ${c.options.join(", ")}`,
+      return {
+        fmt: "dd/mm/yyyy",
+        coerce: (v) =>
+          serialDate(v, { timezone: context.timezone, hasTime: false }) ??
+          textOut(v),
       };
-    }
+    case "datetime":
+      return {
+        fmt: "dd/mm/yyyy hh:mm",
+        coerce: (v) =>
+          serialDate(v, { timezone: context.timezone, hasTime: true }) ??
+          textOut(v),
+      };
+    case "bool":
+      return {
+        coerce: (v) =>
+          v === true || v === "true" || v === 1
+            ? "Yes"
+            : v === false || v === "false" || v === 0
+              ? "No"
+              : null,
+        align: "left",
+      };
+    default:
+      // text / ref / anything undeclared: string + injection lock.
+      return { coerce: textOut, align: "left" };
+  }
+}
+
+/** Postgres NUMERIC arrives as a string: coerce for a typed number cell. */
+function num(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Typed cells (number/bool/Date) pass through untouched: they cannot be
+ *  formulas, and re-typing one as text is how a summable amount column quietly
+ *  dies. Strings get the injection lock; objects JSON-encode so a nested cell
+ *  is visible rather than silently dropped ("[object Object]"). */
+function textOut(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number" || typeof v === "boolean" || v instanceof Date)
+    return v;
+  const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+  return s === "" ? null : escapeFormula(s);
+}
+
+/** Effective header text. */
+function headerText(column) {
+  return String(column.header ?? column.key ?? "");
+}
+
+/** Header/footer text: `&` is the control character in Excel headers, so a
+ *  name containing one must be doubled to render literally. */
+const hfEscape = (s) => String(s ?? "").replace(/&/g, "&&");
+
+/** Palette from the context; hexToArgb returns null for unparseable values. */
+function palette(context) {
+  const primary = hexToArgb(context.brand.primary) || "FF014339";
+  const foreground = hexToArgb(context.brand.primaryForeground) || "FFFFFFFF";
+  const accent = hexToArgb(context.brand.accent) || primary;
+  return { primary, foreground, accent, muted: "FFF3F4F6", ink: "FF111827" };
+}
+
+/** Brand header row: City Green fill + white bold font, frozen below it.
+ *  `freeze` overrides the split ({ x, y }): the import error file pins its
+ *  leading columns as well as the header. */
+function styleHeaderRow(ws, colors, freeze) {
+  const row = ws.getRow(1);
+  row.font = { bold: true, color: { argb: colors.foreground } };
+  row.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: colors.primary },
+  };
+  row.alignment = { vertical: "middle" };
+  row.height = 20;
+  ws.views = [
+    {
+      state: "frozen",
+      xSplit: (freeze && freeze.x) || 0,
+      ySplit: freeze ? freeze.y : 1,
+    },
+  ];
+}
+
+/** Apply a list data-validation to a column across a generous row range:
+ *  people paste hundreds of rows under the sample, and a dropdown that stops
+ *  at the last written row is a dropdown that does nothing. */
+function applyDropdown(ws, colIndex, formulae, message, validateRows) {
+  const letter = ws.getColumn(colIndex).letter;
+  const last = Math.min(validateRows || 1000, 1048576);
+  for (let r = 2; r <= last; r++) {
+    ws.getCell(`${letter}${r}`).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae,
+      showErrorMessage: true,
+      errorStyle: "warning",
+      error: message,
+    };
+  }
+}
+
+/** Freeze/autofilter/print packaging shared by every data sheet. A4, header
+ *  row repeated on every printed page, company + generated-at + page numbers
+ *  in the header/footer, fit-to-width so a wide sheet prints instead of
+ *  spilling columns across pages. Portrait under ~7 columns, landscape above. */
+function packageSheet(ws, displayTitle, context, cols) {
+  ws.pageSetup = {
+    paperSize: 9, // A4
+    orientation: cols > 6 ? "landscape" : "portrait",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+  };
+  ws.pageSetup.printTitlesRow = "1:1";
+  const who =
+    context.env === "staging"
+      ? `STAGING ${context.brand.name}`
+      : context.brand.name;
+  const when = formatInstant(context.generatedAt, context.timezone);
+  ws.headerFooter = {
+    oddHeader: `&L${hfEscape(who)}&R${hfEscape(displayTitle)}`,
+    oddFooter: `&LGenerated ${when} (Lagos)&RPage &P / &N`,
+  };
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols } };
+}
+
+/* ── Cover sheet ─────────────────────────────────────────────────────────── */
+
+/**
+ * The cover: identity first (who exported, when, under which environment),
+ * because a downloaded sheet circulates for years without the app that made
+ * it. Row 1 is the title; the company's letterhead lines follow;
+ * generated-at/actor/filters close it.
+ */
+function addCoverSheet(wb, taken, context, colors) {
+  const ws = wb.addWorksheet(sheetName("Cover", { fallback: "Cover", taken }), {
+    properties: { tabColor: { argb: colors.accent } },
   });
+  ws.getColumn(1).width = 24;
+  ws.getColumn(2).width = 46;
+  ws.getColumn(3).width = 20;
+
+  const titleCell = ws.getCell("A1");
+  titleCell.value = textOut(context.title) || "Export";
+  titleCell.font = { size: 20, bold: true, color: { argb: colors.ink } };
+  ws.getRow(1).height = 30;
+
+  let r = 3;
+  const line = (label, value) => {
+    if (value === null || value === undefined || value === "") return;
+    ws.getCell(r, 1).value = label;
+    ws.getCell(r, 1).font = { bold: true, color: { argb: colors.ink } };
+    ws.getCell(r, 2).value = textOut(value);
+    r += 1;
+  };
+
+  ws.getCell(r, 1).value = textOut(context.brand.name);
+  ws.getCell(r, 1).font = {
+    size: 14,
+    bold: true,
+    color: { argb: colors.primary },
+  };
+  r += 2;
+  const o = context.org || {};
+  line("Address", o.address);
+  line("Phone", o.phone);
+  line("Email", o.email);
+  line("Website", o.website);
+  r = Math.max(r + 1, 9);
+
+  line(
+    "Generated",
+    `${formatInstant(context.generatedAt, context.timezone)} (Lagos)`,
+  );
+  if (context.actor && context.actor.name)
+    line("Generated by", context.actor.name);
+  if (context.filters && typeof context.filters === "object") {
+    const parts = Object.entries(context.filters)
+      .filter(([, v]) => v !== undefined && v !== null && v !== "")
+      .map(([k, v]) => `${k} = ${Array.isArray(v) ? v.join("|") : v}`);
+    if (parts.length) line("Filters", parts.join(", "));
+  }
+
+  // A staging export must be identifiable with the file open AND from the
+  // filename (cells.exportFilename).
+  if (context.env === "staging") {
+    r += 1;
+    const stamp = ws.getCell(r, 1);
+    stamp.value = "STAGING: NOT LIVE DATA";
+    stamp.font = { bold: true, size: 16, color: { argb: STAGING_STAMP } };
+    ws.getRow(r).height = 24;
+  }
   return ws;
 }
 
-async function addReferenceSheet(wb, reference, taken) {
-  const ws = wb.addWorksheet(sheetName("Reference", taken));
-  ws.columns = [
-    { header: "Column", key: "column", width: 26 },
-    { header: "Required", key: "required", width: 10 },
-    { header: "What to enter", key: "rule", width: 60 },
-    { header: "Example", key: "example", width: 26 },
-  ];
-  const header = ws.getRow(1);
-  header.font = { bold: true, color: { argb: argb(BRAND.headerText) } };
-  header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(BRAND.header) } };
-  for (const r of reference) {
-    ws.addRow({ column: escapeFormula(r.column), required: r.required ? "Yes" : "No", rule: escapeFormula(r.rule || ""), example: escapeFormula(r.example || "") });
-  }
-  ws.getColumn("rule").alignment = { wrapText: true, vertical: "top" };
-  await ws.protect("", { selectLockedCells: true, selectUnlockedCells: true });
-}
+/* ── Reference sheet ─────────────────────────────────────────────────────── */
 
 /**
- * @param {{sheets: Array<{name: string, columns: object[], rows: object[], validateRows?: number}>,
- *          reference?: Array<{column: string, required?: boolean, rule?: string, example?: string}>,
- *          title?: string}} spec
+ * The read-only guidance sheet: the REAL valid values, laid out as parallel
+ * labelled blocks a person scans ("which department code goes here?"), not one
+ * 900-row table. Protected (locked, no password: unprotecting is one click,
+ * which is the right trade for a guidance sheet) but VISIBLE, because the
+ * whole point is that people copy from it.
+ *
+ * Block shapes: `{ title, values }` with values either strings (one column)
+ * or `[code, label]` pairs (two columns, header on the first).
+ */
+function addReferenceSheet(wb, colors, blocks) {
+  const ws = wb.addWorksheet(REFERENCE_SHEET, {
+    views: [{ state: "frozen", ySplit: 2 }],
+    properties: { tabColor: { argb: colors.accent } },
+  });
+  ws.state = "visible";
+  ws.getCell("A1").value =
+    "Reference: the values this file accepts. Copy them into the data sheet.";
+  ws.getCell("A1").font = {
+    bold: true,
+    size: 12,
+    color: { argb: colors.primary },
+  };
+
+  const refLetters = {};
+  let col = 1;
+  for (const block of blocks) {
+    const paired = block.values.length && Array.isArray(block.values[0]);
+    const span = paired ? 2 : 1;
+    ws.getColumn(col).width = 26;
+    if (paired) ws.getColumn(col + 1).width = 60;
+    for (let c = 0; c < span; c++) {
+      const head = ws.getCell(2, col + c);
+      head.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: colors.primary },
+      };
+      head.font = { bold: true, color: { argb: colors.foreground } };
+    }
+    ws.getCell(2, col).value = block.title;
+    block.values.forEach((entry, i) => {
+      const [code, label] = paired ? entry : [entry, null];
+      ws.getCell(3 + i, col).value = textOut(code);
+      if (paired && label !== null && label !== undefined) {
+        const cell = ws.getCell(3 + i, col + 1);
+        cell.value = textOut(label);
+        cell.alignment = { wrapText: true, vertical: "top" };
+      }
+    });
+    // Dropdown formulae point at the VALUES column, which starts at row 3.
+    const letter = ws.getColumn(col).letter;
+    refLetters[block.title] = { letter, count: block.values.length };
+    col += span;
+  }
+  ws.protect(undefined, { selectLockedCells: true, selectUnlockedCells: true });
+  return refLetters;
+}
+
+/* ── Builder ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Build an .xlsx buffer.
+ *
+ * @param {Object} opts
+ * @param {{name:string, title?:string, columns:ColumnSpec[], rows?:Object[],
+ *          sample?:Object, validateRows?:number,
+ *          freeze?:{x?:number, y?:number}}[]} opts.sheets
+ * @param {{title:string, values:(string[]|[string,string][])[]}[]} [opts.reference]
+ * @param {Object} [opts.context]  from workbookContext()
+ * @param {boolean} [opts.cover]   Emit a Cover sheet first. Reports use it;
+ *        import TEMPLATES must not: their row 1 is the header the parser keys on.
  * @returns {Promise<Buffer>}
  */
-async function buildWorkbook({ sheets, reference = [], title = "MyCity App" }) {
-  if (!Array.isArray(sheets) || sheets.length === 0) throw new Error("buildWorkbook: give at least one sheet");
-  const staging = config.APP_ENV === "staging";
+async function buildWorkbook({
+  sheets,
+  reference = [],
+  context,
+  cover = false,
+} = {}) {
+  if (!Array.isArray(sheets) || sheets.length === 0)
+    throw new Error("buildWorkbook: give at least one sheet");
+  const ctx = context || workbookContext();
+  const colors = palette(ctx);
   const wb = new ExcelJS.Workbook();
-  wb.creator = "MyCity App";
-  wb.company = "MyCity App Ltd";
-  wb.title = staging ? `STAGING ${title}` : title;
-  wb.created = new Date();
-  const taken = new Set(["reference"]);
-  for (const s of sheets) addDataSheet(wb, s, taken, staging);
-  if (reference.length) {
-    taken.delete("reference");
-    await addReferenceSheet(wb, reference, taken);
+  wb.creator = ctx.brand.name;
+  wb.lastModifiedBy = ctx.brand.name;
+  wb.company = ctx.brand.name;
+  if (ctx.title)
+    wb.title = ctx.env === "staging" ? `STAGING ${ctx.title}` : ctx.title;
+  const createdAt =
+    ctx.generatedAt instanceof Date
+      ? ctx.generatedAt
+      : new Date(ctx.generatedAt);
+  wb.created = Number.isNaN(createdAt.getTime()) ? new Date() : createdAt;
+
+  // Uniqueness across the whole workbook, cover + reference included. The
+  // Reference name is reserved whenever the sheet will exist: a data sheet
+  // stealing it would be skipped by the parser (which treats "Reference" as
+  // guidance) and would collide at addWorksheet anyway.
+  const taken = new Set();
+  if (reference.length) taken.add(REFERENCE_SHEET.toLowerCase());
+  if (cover) addCoverSheet(wb, taken, ctx, colors);
+
+  // Data sheets FIRST, reference last: an import reads the first data sheet.
+  const created = [];
+  for (const sheet of sheets) {
+    const ws = wb.addWorksheet(sheetName(sheet.name, { taken }), {
+      properties:
+        ctx.env === "staging" ? { tabColor: { argb: STAGING_STAMP } } : {},
+    });
+    created.push(ws);
+    const specs = sheet.columns.map((c) => cellSpec(c, ctx));
+
+    ws.columns = sheet.columns.map((c, i) => ({
+      header: headerText(c),
+      key: c.key,
+      width: c.width ?? 20,
+      style: specs[i].fmt ? { numFmt: specs[i].fmt } : undefined,
+    }));
+    styleHeaderRow(ws, colors, sheet.freeze);
+
+    const writeRow = (values, { muted = false } = {}) => {
+      const out = {};
+      sheet.columns.forEach((c, i) => {
+        out[c.key] = specs[i].coerce(values[c.key]);
+      });
+      const row = ws.addRow(out);
+      sheet.columns.forEach((c, i) => {
+        const cell = row.getCell(i + 1);
+        if (specs[i].align) cell.alignment = { horizontal: specs[i].align };
+        if (c.wrap)
+          cell.alignment = {
+            ...(cell.alignment || {}),
+            wrapText: true,
+            vertical: "top",
+          };
+        if (c.emphasis) cell.font = { color: { argb: colors.primary } };
+        if (muted) {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: colors.muted },
+          };
+        }
+      });
+      return row;
+    };
+
+    for (const row of sheet.rows ?? []) writeRow(row);
+    // One worked example in the muted fill: reads as a sample, deletes as a
+    // one-row delete. Guessing the shape of 27 columns is not a workflow.
+    if (sheet.sample) writeRow(sheet.sample, { muted: true });
+
+    // Header comments + dropdowns.
+    sheet.columns.forEach((c, idx) => {
+      const colIndex = idx + 1;
+      if (c.note) ws.getCell(`${ws.getColumn(colIndex).letter}1`).note = c.note;
+      if (c.list && c.list.length) {
+        const inline = c.list.map((v) => String(v).replace(/"/g, "")).join(",");
+        // Excel's inline list limit is 255 characters; longer lists belong on
+        // the Reference sheet (refColumn).
+        if (inline.length <= 250)
+          applyDropdown(
+            ws,
+            colIndex,
+            [`"${inline}"`],
+            "Pick a value from the list.",
+            sheet.validateRows,
+          );
+      }
+    });
+
+    // Totals row: live SUM formulas, never pre-baked numbers: a total that
+    // is a constant keeps looking right after someone edits a row above it.
+    const totalIdx = sheet.columns
+      .map((c, i) => (c.total ? i : -1))
+      .filter((i) => i >= 0);
+    const dataRows = (sheet.rows ?? []).length + (sheet.sample ? 1 : 0);
+    if (totalIdx.length && dataRows > 0) {
+      // The row straight after the data, by number: the dropdown pass above has
+      // already touched rows down to validateRows, so addRow() would land the
+      // totals a thousand rows below the data.
+      const row = ws.getRow(dataRows + 2);
+      row.getCell(1).value = "Total";
+      row.font = { bold: true };
+      for (const i of totalIdx) {
+        const letter = ws.getColumn(i + 1).letter;
+        const cell = row.getCell(i + 1);
+        cell.value = { formula: `SUM(${letter}2:${letter}${dataRows + 1})` };
+        if (specs[i].fmt) cell.numFmt = specs[i].fmt;
+        cell.border = {
+          top: { style: "thin", color: { argb: colors.primary } },
+        };
+      }
+    }
+
+    packageSheet(ws, sheet.title || sheet.name, ctx, sheet.columns.length);
   }
-  return Buffer.from(await wb.xlsx.writeBuffer());
+
+  // refColumn dropdowns last: they need the Reference sheet's letters. Kept
+  // separate from the inline-list pass so a column can never get both.
+  if (reference.length) {
+    const refLetters = addReferenceSheet(wb, colors, reference);
+    sheets.forEach((sheet, s) => {
+      const ws = created[s];
+      sheet.columns.forEach((c, idx) => {
+        if (!c.refColumn || !refLetters[c.refColumn]) return;
+        const { letter, count } = refLetters[c.refColumn];
+        const last = Math.max(count + 2, 3); // values start at row 3
+        applyDropdown(
+          ws,
+          idx + 1,
+          [`${REFERENCE_SHEET}!$${letter}$3:$${letter}$${last}`],
+          "Pick a value from the Reference sheet.",
+          sheet.validateRows,
+        );
+      });
+    });
+  }
+
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf);
 }
 
-/** "employees-2026-10-14.xlsx" (and "-staging" on staging). */
-function exportFilename(base, ext = "xlsx", date = require("../time/lagos").today()) {
-  const safe = String(base || "export").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "export";
-  return `${safe}-${date}${config.APP_ENV === "staging" ? "-staging" : ""}.${ext}`;
-}
-
-module.exports = { buildWorkbook, exportFilename, MONEY_FORMAT, BRAND };
+/* Exported for csv.js, which must emit the SAME header text and cell
+   semantics (Yes/No bools, Lagos dates, injection lock): a csv/xlsx pair
+   that disagrees on headers is two different exports. */
+module.exports = {
+  buildWorkbook,
+  cellSpec,
+  headerText,
+  num,
+  textOut,
+  REFERENCE_SHEET,
+};

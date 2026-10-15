@@ -27,7 +27,10 @@ const { logger } = require("../config/logger");
 const { userIdFromRequest } = require("./auth");
 
 const TOO_MANY = {
-  error: { code: "RATE_LIMITED", message: "Too many requests. Wait a moment and try again." },
+  error: {
+    code: "RATE_LIMITED",
+    message: "Too many requests. Wait a moment and try again.",
+  },
 };
 
 /** Builds a Redis store for one limiter; null until initRateLimitStore(). */
@@ -40,7 +43,10 @@ function initRateLimitStore() {
     const { getClient, rkey } = require("../config/redis");
     const client = getClient();
     makeRedisStore = (name) =>
-      new RedisStore({ sendCommand: (...args) => client.call(...args), prefix: `${rkey("rl", name)}:` });
+      new RedisStore({
+        sendCommand: (...args) => client.call(...args),
+        prefix: `${rkey("rl", name)}:`,
+      });
     return "redis";
   } catch (err) {
     logger.warn({ err }, "rate limits are counting in memory, per process");
@@ -56,7 +62,14 @@ function storeKind() {
  * @param {{name: string, max: number, windowMs?: number, key?: (req) => string,
  *          failuresOnly?: boolean, skip?: (req) => boolean}} opts
  */
-function makeLimiter({ name, max, windowMs = 60_000, key, failuresOnly = false, skip }) {
+function makeLimiter({
+  name,
+  max,
+  windowMs = 60_000,
+  key,
+  failuresOnly = false,
+  skip,
+}) {
   const limiter = rateLimit({
     windowMs,
     limit: max,
@@ -110,7 +123,10 @@ const staffLimiter = makeLimiter({
   },
 });
 
-const publicLimiter = makeLimiter({ name: "public", max: config.RATE_LIMIT_PUBLIC_PER_MIN });
+const publicLimiter = makeLimiter({
+  name: "public",
+  max: config.RATE_LIMIT_PUBLIC_PER_MIN,
+});
 
 const publicWriteLimiter = makeLimiter({
   name: "public-write",
@@ -118,8 +134,18 @@ const publicWriteLimiter = makeLimiter({
   skip: (req) => !WRITE.has(req.method),
 });
 
-const signInLimiter = makeLimiter({ name: "sign-in", max: 10, windowMs: 15 * 60_000, failuresOnly: true });
-const refreshLimiter = makeLimiter({ name: "refresh", max: 60, windowMs: 15 * 60_000, failuresOnly: true });
+const signInLimiter = makeLimiter({
+  name: "sign-in",
+  max: 10,
+  windowMs: 15 * 60_000,
+  failuresOnly: true,
+});
+const refreshLimiter = makeLimiter({
+  name: "refresh",
+  max: 60,
+  windowMs: 15 * 60_000,
+  failuresOnly: true,
+});
 
 module.exports = {
   initRateLimitStore,

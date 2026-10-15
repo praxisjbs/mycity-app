@@ -5,13 +5,13 @@ import "@/api/types/performance";
 import type { Goal, GoalLevel, KpiAssignment, ReviewRow, Target } from "@/api/types/performance";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, formatDateTime, formatMonth, Icon, Meter, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, toast, StatusPill, DateField, Field, FilterSelect, FormRow, TextField, SelectField, useForm } from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
 import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { PersonPicker } from "@/components/form";
+import { Button, Meter, Quote, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, toast, cn, formatDate, formatDateTime, formatMonth, StatusPill, DateField, Field, FilterSelect, FormFooter, SelectField, TextField, useContractForm } from "@mycity/ui";
 
 export default function Performance({ tab }: ModuleScreenProps) {
   if (tab === "targets") return <Targets />;
@@ -34,7 +34,7 @@ function Goals() {
     <>
       <PageHeader
         title="Goals"
-        sub="Organisational and annual goals"
+        sub="Organisational and annual, set by management"
         actions={
           <>
             <ExportButton source="performance.goals" />
@@ -42,7 +42,6 @@ function Goals() {
           </>
         }
       />
-      {s.data && <ChainCard title="How Goals Cascade" steps={s.data.cascade} note="CEO sets organisational. Management sets annual and monthly. Unit heads set departmental. Department managers set individual KPIs. Line managers set the week." />}
       <PagedTable<Goal>
         title="Organisational Goals 2026"
         list={org}
@@ -75,17 +74,7 @@ function Goals() {
         />
       </div>
       <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Progress Against Each Organisational Goal" rows={s.data.progress} /> : <Card><LoadingRows /></Card>}
-        <KvCard
-          title="Why the Cascade Matters"
-          items={[
-            ["The problem", "A weekly task that nobody can trace to a company goal"],
-            ["The rule", "Every level names the one above it. Nothing is orphaned"],
-            ["What staff see", "Their own KPI, and the whole chain above it"],
-            ["What binds", "Nothing until the CEO approves. Then it dispatches"],
-            ["Who sets the week", "The line manager. The employee can still add their own"],
-          ]}
-        />
+        {s.data ? <BarsCard title="Goal Progress" rows={s.data.progress} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );
@@ -95,9 +84,9 @@ function GoalForm({ close }: { close: () => void }) {
   const { me } = useAuth();
   const ceo = !!me?.is_ceo;
   const parents = usePaged("GET /api/v1/performance/goals", { filters: { level: "organisational" } });
-  const f = useForm({ level: ceo ? "organisational" : "annual", title: "", theme: "", measure: "", baseline: "", rolls_up_to: "" }, {
-    title: (v) => (v.trim().length < 4 ? "Say what the goal is" : null),
-    rolls_up_to: (v, all) => (all.level === "annual" && !v ? "An annual goal names the goal above it" : null),
+  const f = useContractForm({ level: ceo ? "organisational" : "annual", title: "", theme: "", measure: "", baseline: "", rolls_up_to: "" }, {
+    title: (v) => (v.trim().length < 4 ? "Name the goal" : null),
+    rolls_up_to: (v, all) => (all.level === "annual" && !v ? "Pick the parent goal" : null),
   });
   const save = useMutation("POST /api/v1/performance/goals");
   const submit = async () => {
@@ -122,10 +111,8 @@ function GoalForm({ close }: { close: () => void }) {
       {f.values.level === "organisational" ? (
         <>
           <Field label="Strategic Theme"><TextField {...f.field("theme")} placeholder="Growth, Revenue, People" /></Field>
-          <FormRow>
-            <Field label="Success Measure"><TextField {...f.field("measure")} placeholder="Cities live" /></Field>
-            <Field label="Baseline"><TextField {...f.field("baseline")} placeholder="8" /></Field>
-          </FormRow>
+          <Field label="Success Measure"><TextField {...f.field("measure")} placeholder="Cities live" /></Field>
+          <Field label="Baseline"><TextField {...f.field("baseline")} placeholder="8" /></Field>
         </>
       ) : (
         <Field label="Rolls Up To" {...f.field("rolls_up_to")}>
@@ -133,10 +120,10 @@ function GoalForm({ close }: { close: () => void }) {
         </Field>
       )}
       <p className="text-[11.5px] text-subtle-foreground">Saved as a draft. Nothing binds until the CEO approves.</p>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Goal</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Goal</Button>
+      </FormFooter>
     </>
   );
 }
@@ -182,7 +169,7 @@ function Targets() {
         rowKey={(t) => t.target_id}
         noun="target"
         wide
-        empty={{ title: "No targets for this month", text: "Department managers set them, then the CEO approves." }}
+        empty={{ title: "No Targets Yet", text: "Department managers set them, then the CEO approves." }}
         columns={[
           { key: "dept", label: "Department", render: (t) => <span className="font-semibold">{t.department}</span> },
           { key: "target", label: "Target", render: (t) => t.title },
@@ -193,14 +180,14 @@ function Targets() {
           {
             key: "act", label: "", render: (t) =>
               t.can_approve && (
-                <Button size="sm" variant="primary" disabled={approve.pending} onClick={async () => { await approve.run({ params: { id: t.target_id }, body: {} }); invalidate("/api/v1/performance/targets"); toast(`${t.department} target approved and dispatched`); }}>Approve</Button>
+                <Button size="sm" variant="primary" busy={approve.pending} onClick={async () => { await approve.run({ params: { id: t.target_id }, body: {} }); invalidate("/api/v1/performance/targets"); toast(`${t.department} target approved and dispatched`); }}>Approve</Button>
               ),
           },
         ]}
       />
       {s.data && (
         <Grid cols={2} className="mt-3">
-          <BarsCard title={`${formatMonth(shiftMonth(s.data.month, -1)).split(" ")[0]}, How They Landed`} rows={s.data.last_month} note="A target that lands under 50% raises a query on the owner. That rule is currently a draft." />
+          <BarsCard title={`${formatMonth(shiftMonth(s.data.month, -1)).split(" ")[0]} Results`} rows={s.data.last_month} />
           <TrailCard title={`${formatMonth(s.data.month).split(" ")[0]} Approval Trail`} items={s.data.trail.map((x) => ({ ...x, when: formatDateTime(x.when) }))} />
         </Grid>
       )}
@@ -211,11 +198,11 @@ function Targets() {
 function TargetForm({ close, month }: { close: () => void; month: string }) {
   const depts = useDepartmentOptions("Pick the department");
   const goals = usePaged("GET /api/v1/performance/goals", { filters: { level: "annual" } });
-  const f = useForm({ department: "", title: "", measure: "", rolls_up_to: "" }, {
+  const f = useContractForm({ department: "", title: "", measure: "", rolls_up_to: "" }, {
     department: (v) => (!v ? "Pick the department" : null),
-    title: (v) => (v.trim().length < 4 ? "Say what the target is" : null),
+    title: (v) => (v.trim().length < 4 ? "Name the target" : null),
     measure: (v) => (!v.trim() ? "How is it measured" : null),
-    rolls_up_to: (v) => (!v ? "Every target names the goal above it" : null),
+    rolls_up_to: (v) => (!v ? "Pick the parent goal" : null),
   });
   const save = useMutation("POST /api/v1/performance/targets");
   const submit = async () => {
@@ -234,14 +221,12 @@ function TargetForm({ close, month }: { close: () => void; month: string }) {
       <p className="mb-3 text-[12.5px] text-muted-foreground">For {formatMonth(month)}. It binds once the CEO approves.</p>
       <Field label="Department" {...f.field("department")}><SelectField options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
       <Field label="Target" {...f.field("title")}><TextField {...f.field("title")} placeholder="8 new prospects" /></Field>
-      <FormRow>
-        <Field label="Measure" {...f.field("measure")}><TextField {...f.field("measure")} placeholder="Count, days, date" /></Field>
-        <Field label="Rolls Up To" {...f.field("rolls_up_to")}><SelectField placeholder="Annual goal" options={goals.rows.map((g) => [g.goal_id, g.title])} {...f.field("rolls_up_to")} /></Field>
-      </FormRow>
-      <ModalFoot>
+      <Field label="Measure" {...f.field("measure")}><TextField {...f.field("measure")} placeholder="Count, days, date" /></Field>
+      <Field label="Rolls Up To" {...f.field("rolls_up_to")}><SelectField placeholder="Annual goal" options={goals.rows.map((g) => [g.goal_id, g.title])} {...f.field("rolls_up_to")} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Submit for Approval</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Submit for Approval</Button>
+      </FormFooter>
     </>
   );
 }
@@ -257,7 +242,6 @@ function Kpis() {
   const [who, setWho] = useState<PersonRef | null>(null);
   const shown = who ?? list.rows.find((r) => r.employee.display_name.startsWith("Chidera"))?.employee ?? list.rows[0]?.employee ?? null;
   const assign = (p?: PersonRef) => modal.open({ title: "Assign KPIs", body: (close) => <AssignKpis close={close} initial={p} /> });
-  const total = s.data?.sources.reduce((a, x) => a + x.count, 0) ?? 0;
   return (
     <>
       <PageHeader title="KPIs" sub="Individual monthly KPIs · set by department managers" actions={<Button variant="primary" icon="plus" onClick={() => assign()}>Assign KPIs</Button>} />
@@ -284,14 +268,13 @@ function Kpis() {
       <Grid cols={2} className="mt-3">
         {shown ? <WeightsCard p={shown} onEdit={() => assign(shown)} /> : <Card><LoadingRows /></Card>}
         <Table
-          title={`How ${total} KPIs Are Measured`}
+          title="KPI Sources"
           rows={s.data?.sources ?? []}
           rowKey={(r) => r.label}
           loading={s.loading}
           columns={[{ key: "l", label: "Where Progress Comes From", render: (r) => r.label }, { key: "c", label: "Counts", align: "n", render: (r) => r.count }]}
         />
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">Weights per employee total 100%. Progress counts automatically from tasks linked to the KPI. Pick a row to see that person's weights.</p>
     </>
   );
 }
@@ -313,7 +296,6 @@ function WeightsCard({ p, onEdit }: { p: PersonRef; onEdit: () => void }) {
         <b className="flex-1 text-[12.5px]">Total</b>
         <b className={cn("text-[12.5px]", ok ? "text-success" : "text-destructive")}>{k.data?.total_pct ?? 0}%</b>
       </div>
-      <p className="mt-[11px] text-[11.5px] text-subtle-foreground">The form will not save at 95% or 105%. It is a constraint, not a warning.</p>
       <Button size="sm" className="mt-2" onClick={onEdit}>Edit Weights</Button>
     </Card>
   );
@@ -346,7 +328,7 @@ function AssignKpis({ close, initial }: { close: () => void; initial?: PersonRef
         <PersonPicker value={who} onChange={(v) => (setWho(v), setRows(null))} />
       </Field>
       {who.length > 0 && (
-        <Field label="KPIs and Weights" state={tried && total !== 100 ? "bad" : undefined} message={tried && total !== 100 ? `Weights total ${total}%. They must total 100%` : undefined}>
+        <Field label="KPIs and Weights" state={tried && total !== 100 ? "bad" : undefined} message={tried && total !== 100 ? "Must total 100%" : undefined}>
           <div className="flex flex-col gap-1.5">
             {items.map((r, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -365,10 +347,10 @@ function AssignKpis({ close, initial }: { close: () => void; initial?: PersonRef
           </div>
         </Field>
       )}
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending || total !== 100} onClick={submit}>Save KPIs</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Save KPIs</Button>
+      </FormFooter>
     </>
   );
 }
@@ -415,13 +397,11 @@ function Reviews() {
       <Grid cols={2} className="mt-3">
         <Card>
           <CardHeader title="Dictate Your Answer" right={<StatusPill s={{ tone: "info", text: "AI assisted" }} />} />
-          <p className="mb-2.5 text-[11.5px] text-subtle-foreground">Speak instead of typing. The assistant tidies the wording against your goals. It does not change what you said.</p>
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3">
-            <Button variant="primary" className="size-10 justify-center rounded-full p-0" aria-label="Record an answer" onClick={() => toast("Dictation opens when the review cycle starts")}><Icon name="spark" /></Button>
+            <Button variant="primary" className="size-10 max-md:size-11 justify-center rounded-full p-0" aria-label="Record an answer" onClick={() => toast("Dictation opens when the review cycle starts")}><Icon name="spark" /></Button>
             <span className="text-[11.5px] text-subtle-foreground">Tap to record your answer to “What went well this quarter?”</span>
           </div>
           <Quote className="mt-3">“We closed the Providus sponsorship and got the Lagos venues confirmed, but I was slow on the Eko follow-up.”</Quote>
-          <p className="mt-[9px] text-[11.5px] text-subtle-foreground">Transcribed, then tidied. The original recording and the raw transcript are both kept.</p>
         </Card>
         <FormOutlineCard />
       </Grid>
@@ -438,11 +418,11 @@ const OUTLINE: Array<[string, string]> = [
   ["Manager sees", "All of it, only after you submit"],
   ["Second level", "The manager’s own line manager approves"],
 ];
-const FormOutlineCard = () => <KvCard title="What the Form Asks" items={OUTLINE} />;
+const FormOutlineCard = () => <KvCard title="Review Form" items={OUTLINE} />;
 const FormOutline = () => <KvCard title="Quarterly Review" items={OUTLINE} />;
 
 function CycleForm({ close }: { close: () => void }) {
-  const f = useForm({ name: "", opens_on: "" }, { name: (v) => (!v.trim() ? "Name the cycle, e.g. Q1 2027" : null), opens_on: (v) => (!v ? "Pick the day it opens" : null) });
+  const f = useContractForm({ name: "", opens_on: "" }, { name: (v) => (!v.trim() ? "Name the cycle" : null), opens_on: (v) => (!v ? "Pick the opening day" : null) });
   const save = useMutation("POST /api/v1/performance/reviews/cycles");
   const submit = async () => {
     if (!f.check()) return;
@@ -457,15 +437,12 @@ function CycleForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <FormRow>
-        <Field label="Cycle" {...f.field("name")}><TextField {...f.field("name")} placeholder="Q1 2027" /></Field>
-        <Field label="Opens On" {...f.field("opens_on")}><DateField {...f.field("opens_on")} /></Field>
-      </FormRow>
-      <p className="text-[11.5px] text-subtle-foreground">Staff are told when it opens. Self ratings come first; managers see the form only after.</p>
-      <ModalFoot>
+      <Field label="Cycle" {...f.field("name")}><TextField {...f.field("name")} placeholder="Q1 2027" /></Field>
+      <Field label="Opens On" {...f.field("opens_on")}><DateField {...f.field("opens_on")} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Open Cycle</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Open Cycle</Button>
+      </FormFooter>
     </>
   );
 }
@@ -486,7 +463,7 @@ function Analytics() {
       </Grid>
       <Grid cols={2}>
         <Table
-          title="Self Rating Against Manager Rating"
+          title="Self vs Manager Rating"
           right={<span className="text-[11.5px] text-subtle-foreground">{d.gap_cycle}</span>}
           rows={d.gap}
           rowKey={(r) => r.department}
@@ -495,16 +472,6 @@ function Analytics() {
             { key: "s", label: "Self", align: "n", render: (r) => r.self },
             { key: "m", label: "Manager", align: "n", render: (r) => r.manager },
             { key: "g", label: "Gap", align: "n", render: (r) => <span className={cn(Number(r.gap) <= -0.4 && "font-semibold text-warning")}>{r.gap.replace("-", "−")}</span> },
-          ]}
-        />
-        <KvCard
-          title="What the Gap Means"
-          items={[
-            ["A small gap", "Expected. People rate themselves a little higher"],
-            ["A wide gap", "The KPI was not clear, or the conversation did not happen"],
-            ["A negative gap", "Rare, and worth a conversation either way"],
-            ["The widest gap", "Read it with the department's targets: the two usually move together"],
-            ["Not a score", "This is a prompt for a conversation, not a ranking"],
           ]}
         />
       </Grid>

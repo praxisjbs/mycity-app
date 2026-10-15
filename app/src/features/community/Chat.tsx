@@ -80,7 +80,7 @@ export function ChatFrame({ list, thread, info, open, listWidth, split }: { list
 /** A list row: a channel or a person. */
 export function Row({ on, unread, lead, title, sub, when, count, onClick }: { on: boolean; unread: boolean; lead: ReactNode; title: ReactNode; sub: string; when: string; count: number; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-center gap-2.5 rounded-box px-2 py-[9px] text-left", on ? "bg-accent" : "hover:bg-muted")}>
+    <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-center gap-2.5 rounded-box px-2 py-[9px] text-left max-md:min-h-11", on ? "bg-accent" : "hover:bg-muted")}>
       {lead}
       <span className="min-w-0 flex-1">
         <b className={cn("flex items-center gap-[5px] truncate text-[13px]", unread ? "font-bold" : "font-semibold")}>{title}</b>
@@ -170,7 +170,7 @@ export function ThreadBody({ t, dm }: { t: ReturnType<typeof useThread>; dm?: bo
   const react = async (m: Message) => t.replace(await api.call("POST /api/v1/community/messages/:id/reactions", { params: { id: m.message_id }, body: {} }));
   const vote = async (m: Message, i: number) => t.replace(await api.call("POST /api/v1/community/messages/:id/vote", { params: { id: m.message_id }, body: { option: i } }));
   return (
-    <div ref={box} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 [&>*]:flex-shrink-0">
+    <div ref={box} data-copy="content" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 [&>*]:flex-shrink-0">
       {t.page?.has_next && (
         <Button className="self-center" size="sm" onClick={() => void t.older()}>
           Load Older

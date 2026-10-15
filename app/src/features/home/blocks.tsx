@@ -3,18 +3,18 @@ import type { BarRow, HomeBlock, KpiCell } from "@/api/types/home";
 import { Bars, Kpi, StatStrip, Timeline } from "@/components/ui/data";
 import { AreaChart, Donut } from "@/components/ui/charts";
 import { Table } from "@/components/ui/Table";
-import { formatDate, Meter, Pill, Who, Card, CardHeader, Grid, Money, HelpTerm } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 import { useKpiDetail } from "./KpiDetail";
+import { Meter, Pill, Who, Card, CardHeader, Grid, Money, formatDate } from "@mycity/ui";
 
 const barColor = (b: BarRow) => (b.emphasis === "warn" ? "var(--chart-4)" : b.emphasis === "brand" ? "var(--primary)" : undefined);
 export const toBars = (rows: BarRow[]) => rows.map((r) => ({ label: r.label, pct: r.pct, value: r.value, color: barColor(r) }));
 
-/** A card with a title and an optional ⓘ, the common frame of Home's blocks. */
+/** A card with a title, the common frame of Home's blocks. `info` makes the title a help term (§5.2). */
 export function InfoCard({ title, info, right, children }: { title: string; info?: string; right?: ReactNode; children: ReactNode }) {
   return (
     <Card>
-      <CardHeader title={info ? <HelpTerm help={info}>{title}</HelpTerm> : title} right={right} />
+      <CardHeader title={title} help={info} right={right} />
       {children}
     </Card>
   );
@@ -69,7 +69,7 @@ export function Block({ block }: { block: HomeBlock }) {
           rows={block.rows}
           rowKey={(r) => r.id}
           onRowClick={(r) => navigate(r.link)}
-          empty={{ title: "Nothing needs you", text: "Requests waiting on you appear here." }}
+          empty={{ title: "Nothing Needs You", text: "Requests waiting on you appear here." }}
           columns={
             block.variant === "requests"
               ? [

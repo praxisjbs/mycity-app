@@ -20,7 +20,15 @@
 const { AppError } = require("../errors");
 const { parse, variablesOf } = require("../documents/render");
 
-const BUILT_INS = new Set(["org", "number", "today", "staging", "recipient", "doc", "subject"]);
+const BUILT_INS = new Set([
+  "org",
+  "number",
+  "today",
+  "staging",
+  "recipient",
+  "doc",
+  "subject",
+]);
 const KINDS = new Set(["document", "email"]);
 
 /** "kind:key" → Zod object schema */
@@ -32,10 +40,17 @@ const REGISTRY = new Map();
  * @param {import("zod").ZodObject} schema
  */
 function defineVariables(kind, key, schema) {
-  if (!KINDS.has(kind)) throw new Error(`defineVariables: kind is document or email (got "${kind}")`);
-  if (!schema || typeof schema.safeParse !== "function" || !schema.shape) throw new Error(`defineVariables(${kind}:${key}): give a Zod object schema`);
+  if (!KINDS.has(kind))
+    throw new Error(
+      `defineVariables: kind is document or email (got "${kind}")`,
+    );
+  if (!schema || typeof schema.safeParse !== "function" || !schema.shape)
+    throw new Error(
+      `defineVariables(${kind}:${key}): give a Zod object schema`,
+    );
   const id = `${kind}:${key}`;
-  if (REGISTRY.has(id) && REGISTRY.get(id) !== schema) throw new Error(`defineVariables: ${id} is already declared`);
+  if (REGISTRY.has(id) && REGISTRY.get(id) !== schema)
+    throw new Error(`defineVariables: ${id} is already declared`);
   REGISTRY.set(id, schema);
 }
 
@@ -46,7 +61,8 @@ function schemaOf(kind, key) {
 /** Top-level names a Zod object declares, recursing through optional/nullable wrappers. */
 function shapeOf(schema) {
   let s = schema;
-  while (s && s._def && !s.shape && (s._def.innerType || s._def.schema)) s = s._def.innerType || s._def.schema;
+  while (s && s._def && !s.shape && (s._def.innerType || s._def.schema))
+    s = s._def.innerType || s._def.schema;
   return (s && s.shape) || {};
 }
 
@@ -59,19 +75,31 @@ function shapeOf(schema) {
  */
 function undeclared(source, schema) {
   const declared = new Set([...Object.keys(shapeOf(schema)), ...BUILT_INS]);
-  const used = [...variablesOf(parse(source))].filter((p) => !p.startsWith("~"));
-  return [...new Set(used.map((p) => p.split(".")[0]))].filter((root) => !declared.has(root)).sort();
+  const used = [...variablesOf(parse(source))].filter(
+    (p) => !p.startsWith("~"),
+  );
+  return [...new Set(used.map((p) => p.split(".")[0]))]
+    .filter((root) => !declared.has(root))
+    .sort();
 }
 
 /** Refuse a template that names an undeclared variable (422 for a Settings edit). */
 function assertTemplate(kind, key, source) {
   const schema = schemaOf(kind, key);
-  if (!schema) throw new Error(`template ${kind}:${key} has no declared variables; call defineVariables()`);
+  if (!schema)
+    throw new Error(
+      `template ${kind}:${key} has no declared variables; call defineVariables()`,
+    );
   const bad = undeclared(source, schema);
   if (bad.length) {
-    throw new AppError("TEMPLATE_UNKNOWN_VARIABLE", `This template uses ${bad.map((b) => `"${b}"`).join(", ")}, which it cannot fill.`, 422, {
-      body: bad.map((b) => `${b} is not a variable of this template`),
-    });
+    throw new AppError(
+      "TEMPLATE_UNKNOWN_VARIABLE",
+      `This template uses ${bad.map((b) => `"${b}"`).join(", ")}, which it cannot fill.`,
+      422,
+      {
+        body: bad.map((b) => `${b} is not a variable of this template`),
+      },
+    );
   }
 }
 
@@ -81,7 +109,10 @@ function assertTemplate(kind, key, source) {
  */
 function parseData(kind, key, data) {
   const schema = schemaOf(kind, key);
-  if (!schema) throw new Error(`template ${kind}:${key} has no declared variables; call defineVariables()`);
+  if (!schema)
+    throw new Error(
+      `template ${kind}:${key} has no declared variables; call defineVariables()`,
+    );
   const parsed = schema.safeParse(data || {});
   if (parsed.success) return parsed.data;
   const fields = {};
@@ -89,7 +120,19 @@ function parseData(kind, key, data) {
     const k = issue.path.join(".") || "(data)";
     (fields[k] = fields[k] || []).push(issue.message);
   }
-  throw new AppError("TEMPLATE_DATA_INVALID", `This ${kind === "email" ? "message" : "document"} cannot be produced: ${Object.keys(fields).join(", ")} missing or wrong.`, 422, fields);
+  throw new AppError(
+    "TEMPLATE_DATA_INVALID",
+    `This ${kind === "email" ? "message" : "document"} cannot be produced: ${Object.keys(fields).join(", ")} missing or wrong.`,
+    422,
+    fields,
+  );
 }
 
-module.exports = { BUILT_INS, defineVariables, schemaOf, undeclared, assertTemplate, parseData };
+module.exports = {
+  BUILT_INS,
+  defineVariables,
+  schemaOf,
+  undeclared,
+  assertTemplate,
+  parseData,
+};

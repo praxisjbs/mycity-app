@@ -342,6 +342,70 @@ CREATE TABLE import_mapping_profile (
   UNIQUE (importer_key, header_signature)
 );
 
+-- 0095
+CREATE TABLE ai_setting (
+  ai_setting_id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  enabled                boolean NOT NULL DEFAULT true,
+  vendor                 text NOT NULL DEFAULT 'gemini' CHECK (vendor IN ('gemini', 'stub')),
+  model                  text,
+  disabled_modules       text[] NOT NULL DEFAULT '{}',
+  monthly_cap_ngn        numeric(18,2),
+  input_ngn_per_million  numeric(18,2),
+  output_ngn_per_million numeric(18,2),
+  updated_by             uuid,
+  updated_at             timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE ai_run (
+  run_id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  purpose        text NOT NULL,
+  module_key     text NOT NULL,
+  actor_user_id  uuid,
+  vendor         text,
+  model          text,
+  prompt_key     text,
+  prompt_version int,
+  prompt_sha     text,
+  status         text NOT NULL CHECK (status IN ('running', 'ok', 'failed', 'refused')),
+  provisional    boolean NOT NULL DEFAULT true,
+  error_code     text,
+  error          text,
+  request_id     text,
+  started_at     timestamptz NOT NULL DEFAULT now(),
+  finished_at    timestamptz
+);
+CREATE TABLE ai_run_step (
+  ai_run_step_id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_id                 uuid NOT NULL REFERENCES ai_run (run_id),
+  step_no                int NOT NULL,
+  kind                   text NOT NULL CHECK (kind IN ('completion', 'retry', 'transcription')),
+  vendor                 text NOT NULL,
+  model                  text NOT NULL,
+  input_tokens           int NOT NULL DEFAULT 0,
+  output_tokens          int NOT NULL DEFAULT 0,
+  input_ngn_per_million  numeric(18,2) NOT NULL,
+  output_ngn_per_million numeric(18,2) NOT NULL,
+  cost_ngn               numeric(18,2) NOT NULL,
+  latency_ms             int NOT NULL,
+  finish_reason          text,
+  outcome                text NOT NULL CHECK (outcome IN ('ok', 'invalid', 'failed')),
+  error                  text,
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (run_id, step_no)
+);
+CREATE INDEX ai_run_step_created ON ai_run_step (created_at);
+CREATE TABLE ai_catalogue (
+  key           text PRIMARY KEY,
+  kind          text NOT NULL CHECK (kind IN ('read', 'route')),
+  module_key    text NOT NULL,
+  description   text NOT NULL,
+  permission    text,
+  params_schema jsonb,
+  screen        text,
+  path          text,
+  build_sha     text,
+  synced_at     timestamptz NOT NULL DEFAULT now()
+);
+
 -- Records the import test writes through a small "service".
 CREATE TABLE test_department (
   test_department_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

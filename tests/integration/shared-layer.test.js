@@ -126,6 +126,9 @@ describeDb("shared layer against Postgres", () => {
   });
 
   afterAll(async () => {
+    // A failing outbox handler is reported; write those reports now, while the pool is
+    // open, rather than on the reporter's timer after the test environment is gone.
+    await require("../../src/shared/observability/error-reporter").flush();
     await pool.end();
   });
 

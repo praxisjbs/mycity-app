@@ -33,12 +33,17 @@ const HELPERS = Object.freeze({
   longdate: (v) => (v ? dayFirst.formatLongDate(v) : ""),
   datetime: (v) => (v ? dayFirst.formatDateTime(v) : ""),
   month: (v) => (v ? dayFirst.formatMonth(v) : ""),
-  money: (v) => (v === null || v === undefined || v === "" ? "" : money.formatNaira(v)),
-  number: (v) => (v === null || v === undefined || v === "" ? "" : new Intl.NumberFormat("en-NG").format(Number(v))),
+  money: (v) =>
+    v === null || v === undefined || v === "" ? "" : money.formatNaira(v),
+  number: (v) =>
+    v === null || v === undefined || v === ""
+      ? ""
+      : new Intl.NumberFormat("en-NG").format(Number(v)),
   markdown: null, // handled specially: its output is HTML, not escaped
 });
 
-const PATH_RE = /^(@index|@number|this|[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*)$/;
+const PATH_RE =
+  /^(@index|@number|this|[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*)$/;
 const FORBIDDEN = new Set(["__proto__", "constructor", "prototype"]);
 const TAG_RE = /\{\{\s*([#/>]?)\s*([^}]*?)\s*\}\}/g;
 
@@ -51,8 +56,10 @@ class TemplateError extends Error {
 }
 
 function checkPath(p, line) {
-  if (!PATH_RE.test(p)) throw new TemplateError(`"${p}" is not a variable name`, line);
-  if (p.split(".").some((s) => FORBIDDEN.has(s))) throw new TemplateError(`"${p}" is not allowed`, line);
+  if (!PATH_RE.test(p))
+    throw new TemplateError(`"${p}" is not a variable name`, line);
+  if (p.split(".").some((s) => FORBIDDEN.has(s)))
+    throw new TemplateError(`"${p}" is not allowed`, line);
   return p;
 }
 
@@ -73,41 +80,67 @@ function parse(src) {
     const [whole, sigil, body] = m;
     const line = lineAt(text, m.index);
     const top = stack[stack.length - 1];
-    if (m.index > last) into(top).push({ kind: "text", text: text.slice(last, m.index) });
+    if (m.index > last)
+      into(top).push({ kind: "text", text: text.slice(last, m.index) });
     last = m.index + whole.length;
 
     if (sigil === "#") {
       const [word, arg, extra] = body.split(/\s+/);
-      if (!["if", "each"].includes(word) || !arg || extra) throw new TemplateError(`"{{#${body}}}" should be {{#if name}} or {{#each name}}`, line);
-      const node = { kind: word, path: checkPath(arg, line), children: [], otherwise: null, inElse: false, line };
+      if (!["if", "each"].includes(word) || !arg || extra)
+        throw new TemplateError(
+          `"{{#${body}}}" should be {{#if name}} or {{#each name}}`,
+          line,
+        );
+      const node = {
+        kind: word,
+        path: checkPath(arg, line),
+        children: [],
+        otherwise: null,
+        inElse: false,
+        line,
+      };
       into(top).push(node);
       stack.push(node);
     } else if (sigil === "/") {
       if (top.kind !== body || top.kind === "root") {
-        throw new TemplateError(`"{{/${body}}}" does not close ${top.kind === "root" ? "anything" : `{{#${top.kind}}}`}`, line);
+        throw new TemplateError(
+          `"{{/${body}}}" does not close ${top.kind === "root" ? "anything" : `{{#${top.kind}}}`}`,
+          line,
+        );
       }
       delete top.inElse;
       stack.pop();
     } else if (sigil === ">") {
-      if (body !== "body") throw new TemplateError("only {{> body}} can be included", line);
+      if (body !== "body")
+        throw new TemplateError("only {{> body}} can be included", line);
       into(top).push({ kind: "body", line });
     } else if (body === "else") {
-      if (top.kind !== "if" || top.inElse) throw new TemplateError("{{else}} outside {{#if}}", line);
+      if (top.kind !== "if" || top.inElse)
+        throw new TemplateError("{{else}} outside {{#if}}", line);
       top.otherwise = [];
       top.inElse = true;
     } else {
       const parts = body.split(/\s+/);
-      if (parts.length > 2) throw new TemplateError(`"{{ ${body} }}" has too many words`, line);
+      if (parts.length > 2)
+        throw new TemplateError(`"{{ ${body} }}" has too many words`, line);
       const [helper, arg] = parts.length === 2 ? parts : [null, parts[0]];
       if (helper && !Object.prototype.hasOwnProperty.call(HELPERS, helper)) {
-        throw new TemplateError(`"${helper}" is not a formatter; use ${Object.keys(HELPERS).join(", ")}`, line);
+        throw new TemplateError(
+          `"${helper}" is not a formatter; use ${Object.keys(HELPERS).join(", ")}`,
+          line,
+        );
       }
       into(top).push({ kind: "var", helper, path: checkPath(arg, line), line });
     }
   }
-  if (last < text.length) into(stack[stack.length - 1]).push({ kind: "text", text: text.slice(last) });
+  if (last < text.length)
+    into(stack[stack.length - 1]).push({
+      kind: "text",
+      text: text.slice(last),
+    });
   const open = stack[stack.length - 1];
-  if (open !== root) throw new TemplateError(`{{#${open.kind}}} is never closed`, open.line);
+  if (open !== root)
+    throw new TemplateError(`{{#${open.kind}}} is never closed`, open.line);
   return root.children;
 }
 
@@ -115,7 +148,8 @@ function parse(src) {
 function variablesOf(nodes, out = new Set(), inEach = false) {
   for (const n of nodes) {
     if (n.kind === "var" || n.kind === "if" || n.kind === "each") {
-      if (!n.path.startsWith("@") && n.path !== "this") out.add(`${inEach ? "~" : ""}${n.path}`);
+      if (!n.path.startsWith("@") && n.path !== "this")
+        out.add(`${inEach ? "~" : ""}${n.path}`);
     }
     if (n.kind === "if") {
       variablesOf(n.children, out, inEach);
@@ -127,14 +161,19 @@ function variablesOf(nodes, out = new Set(), inEach = false) {
 }
 
 function own(obj, key) {
-  return obj !== null && typeof obj === "object" && Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : undefined;
+  return obj !== null &&
+    typeof obj === "object" &&
+    Object.prototype.hasOwnProperty.call(obj, key)
+    ? obj[key]
+    : undefined;
 }
 
 function lookup(scopes, path) {
   const top = scopes[scopes.length - 1];
   if (path === "this") return top.item;
   if (path === "@index") return top.index;
-  if (path === "@number") return top.index === undefined ? undefined : top.index + 1;
+  if (path === "@number")
+    return top.index === undefined ? undefined : top.index + 1;
   const [head, ...rest] = path.split(".");
   for (let i = scopes.length - 1; i >= 0; i -= 1) {
     const value = own(scopes[i].data, head);
@@ -143,7 +182,15 @@ function lookup(scopes, path) {
   return undefined;
 }
 
-const truthy = (v) => !(v === null || v === undefined || v === false || v === "" || v === 0 || (Array.isArray(v) && v.length === 0));
+const truthy = (v) =>
+  !(
+    v === null ||
+    v === undefined ||
+    v === false ||
+    v === "" ||
+    v === 0 ||
+    (Array.isArray(v) && v.length === 0)
+  );
 
 function renderNodes(nodes, scopes, body) {
   let out = "";
@@ -159,18 +206,28 @@ function renderNodes(nodes, scopes, body) {
         const v = lookup(scopes, n.path);
         if (n.helper === "markdown") out += markdownToHtml(v || "");
         else if (n.helper) out += escapeHtml(HELPERS[n.helper](v));
-        else out += v === null || v === undefined ? "" : escapeHtml(typeof v === "object" ? "" : v);
+        else
+          out +=
+            v === null || v === undefined
+              ? ""
+              : escapeHtml(typeof v === "object" ? "" : v);
         break;
       }
       case "if":
-        out += truthy(lookup(scopes, n.path)) ? renderNodes(n.children, scopes, body) : renderNodes(n.otherwise || [], scopes, body);
+        out += truthy(lookup(scopes, n.path))
+          ? renderNodes(n.children, scopes, body)
+          : renderNodes(n.otherwise || [], scopes, body);
         break;
       case "each": {
         const list = lookup(scopes, n.path);
         if (Array.isArray(list)) {
           list.forEach((item, index) => {
             const data = item !== null && typeof item === "object" ? item : {};
-            out += renderNodes(n.children, [...scopes, { data, item, index }], body);
+            out += renderNodes(
+              n.children,
+              [...scopes, { data, item, index }],
+              body,
+            );
           });
         }
         break;

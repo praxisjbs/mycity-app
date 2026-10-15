@@ -42,7 +42,11 @@ const exists = (p) => {
 function findUnder(dir) {
   try {
     for (const entry of fs.readdirSync(dir)) {
-      for (const sub of ["chrome-linux/chrome", "chrome-linux64/chrome", "chrome"]) {
+      for (const sub of [
+        "chrome-linux/chrome",
+        "chrome-linux64/chrome",
+        "chrome",
+      ]) {
         const p = `${dir}/${entry}/${sub}`;
         if (exists(p)) return p;
       }
@@ -59,7 +63,10 @@ function findUnder(dir) {
  */
 function resolvePath() {
   if (config.CHROMIUM_PATH) {
-    if (!exists(config.CHROMIUM_PATH)) throw new Error(`CHROMIUM_PATH is ${config.CHROMIUM_PATH}, which does not exist`);
+    if (!exists(config.CHROMIUM_PATH))
+      throw new Error(
+        `CHROMIUM_PATH is ${config.CHROMIUM_PATH}, which does not exist`,
+      );
     return config.CHROMIUM_PATH;
   }
   return KNOWN_PATHS.find(exists) || findUnder("/opt/pw-browsers") || null;
@@ -70,15 +77,34 @@ let closing = false;
 
 async function launch() {
   const executablePath = resolvePath();
-  if (!executablePath) throw new Error("Chromium is not installed; set CHROMIUM_PATH (ops/provision installs it)");
+  if (!executablePath)
+    throw new Error(
+      "Chromium is not installed; set CHROMIUM_PATH (ops/provision installs it)",
+    );
   const puppeteer = require("puppeteer-core");
   const instance = await puppeteer.launch({
     executablePath,
     headless: true,
-    args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--font-render-hinting=none", "--no-first-run", "--mute-audio"],
+    // The background-networking flags stop Chromium itself calling out (Google sign-in,
+    // component updates, sync): a PDF renderer on our server talks to nobody.
+    args: [
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--font-render-hinting=none",
+      "--no-first-run",
+      "--mute-audio",
+      "--disable-background-networking",
+      "--disable-component-update",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--no-default-browser-check",
+      "--metrics-recording-only",
+    ],
   });
   instance.on("disconnected", () => {
-    if (!closing) logger.warn("chromium disconnected; the next render relaunches it");
+    if (!closing)
+      logger.warn("chromium disconnected; the next render relaunches it");
     browserPromise = null;
   });
   return instance;
@@ -100,7 +126,8 @@ const waiting = [];
 
 /** Run `fn(page)` on a fresh page, at most MAX_CONCURRENT at a time. */
 async function withPage(fn) {
-  if (active >= MAX_CONCURRENT) await new Promise((resolve) => waiting.push(resolve));
+  if (active >= MAX_CONCURRENT)
+    await new Promise((resolve) => waiting.push(resolve));
   active += 1;
   let page;
   try {
@@ -132,7 +159,11 @@ async function close() {
 function health() {
   try {
     const p = resolvePath();
-    return { status: p ? "up" : "degraded", path: p, error: p ? undefined : "Chromium not found" };
+    return {
+      status: p ? "up" : "degraded",
+      path: p,
+      error: p ? undefined : "Chromium not found",
+    };
   } catch (err) {
     return { status: "degraded", error: err.message };
   }

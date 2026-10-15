@@ -26,21 +26,96 @@ const AREAS = [
 ];
 
 const MODULE_CATALOG = [
-  { key: "home", area: "top", label: "Home", description: "Overview, team, alerts and reports" },
-  { key: "workspace", area: "top", label: "My Workspace", description: "Today, tasks, calendar and analytics" },
-  { key: "ess", area: "top", label: "Employee Self-Service", description: "Your own record, attendance, pay, leave and documents" },
-  { key: "community", area: "work", label: "Staff Community", description: "Channels, direct messages and announcements" },
-  { key: "mailbox", area: "work", label: "Mailbox", description: "Your work email" },
-  { key: "people", area: "people", label: "People", description: "Employees, attendance, leave, devices and worksites" },
-  { key: "performance", area: "people", label: "Performance", description: "Goals, targets, KPIs and reviews" },
-  { key: "queries", area: "people", label: "Queries & Sanctions", description: "Queries, rules, sanctions and letter templates" },
-  { key: "recruitment", area: "people", label: "Recruitment", description: "Vacancies through to onboarding" },
-  { key: "payroll", area: "people", label: "Payroll", description: "Payroll runs, payslips, salary structure and statutory" },
-  { key: "partnerships", area: "business", label: "Partnerships", description: "Pipeline, partners, leads, proposals and contracts" },
-  { key: "expenses", area: "business", label: "Expenses", description: "Requests, approvals, requisitions, disbursements and budgets" },
-  { key: "knowledge", area: "system", label: "Knowledge Hub", description: "Policies, SOPs, FAQs, training and announcements" },
-  { key: "praxis_ai", area: "system", label: "Praxis AI", description: "The assistant, and AI controls" },
-  { key: "settings", area: "system", label: "Settings", description: "Organisation, users, roles, approvals and system settings" },
+  {
+    key: "home",
+    area: "top",
+    label: "Home",
+    description: "Overview, team, alerts and reports",
+  },
+  {
+    key: "workspace",
+    area: "top",
+    label: "My Workspace",
+    description: "Today, tasks, calendar and analytics",
+  },
+  {
+    key: "ess",
+    area: "top",
+    label: "Employee Self-Service",
+    description: "Your own record, attendance, pay, leave and documents",
+  },
+  {
+    key: "community",
+    area: "work",
+    label: "Staff Community",
+    description: "Channels, direct messages and announcements",
+  },
+  {
+    key: "mailbox",
+    area: "work",
+    label: "Mailbox",
+    description: "Your work email",
+  },
+  {
+    key: "people",
+    area: "people",
+    label: "People",
+    description: "Employees, attendance, leave, devices and worksites",
+  },
+  {
+    key: "performance",
+    area: "people",
+    label: "Performance",
+    description: "Goals, targets, KPIs and reviews",
+  },
+  {
+    key: "queries",
+    area: "people",
+    label: "Queries & Sanctions",
+    description: "Queries, rules, sanctions and letter templates",
+  },
+  {
+    key: "recruitment",
+    area: "people",
+    label: "Recruitment",
+    description: "Vacancies through to onboarding",
+  },
+  {
+    key: "payroll",
+    area: "people",
+    label: "Payroll",
+    description: "Payroll runs, payslips, salary structure and statutory",
+  },
+  {
+    key: "partnerships",
+    area: "business",
+    label: "Partnerships",
+    description: "Pipeline, partners, leads, proposals and contracts",
+  },
+  {
+    key: "expenses",
+    area: "business",
+    label: "Expenses",
+    description: "Requests, approvals, requisitions, disbursements and budgets",
+  },
+  {
+    key: "knowledge",
+    area: "system",
+    label: "Knowledge Hub",
+    description: "Policies, SOPs, FAQs, training and announcements",
+  },
+  {
+    key: "praxis_ai",
+    area: "system",
+    label: "Praxis AI",
+    description: "The assistant, and AI controls",
+  },
+  {
+    key: "settings",
+    area: "system",
+    label: "Settings",
+    description: "Organisation, users, roles, approvals and system settings",
+  },
 ];
 
 /** Every permission check names one of these. It is `edit`, never `update`. */
@@ -62,7 +137,12 @@ const MODULE_SET = new Set(MODULES);
 const ACTION_SET = new Set(ACTIONS);
 
 const MODULE_META = Object.freeze(
-  Object.fromEntries(MODULE_CATALOG.map((m) => [m.key, { label: m.label, area: m.area, description: m.description }])),
+  Object.fromEntries(
+    MODULE_CATALOG.map((m) => [
+      m.key,
+      { label: m.label, area: m.area, description: m.description },
+    ]),
+  ),
 );
 
 const isModule = (key) => MODULE_SET.has(key);

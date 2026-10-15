@@ -358,8 +358,10 @@ element outside the form components (§8.6).
 
 ### 8.3 Validation (gate 12)
 
-- **The rules come from the contract.** `useContractForm(schema)` validates with the same Zod
-  schema the API uses (§3); the frontend writes no rules of its own.
+- **The rules come from the contract.** `useContractForm(initial, schema)` validates with the same
+  Zod schema the API uses (§3); the frontend writes no rules of its own. Until a module's schema
+  exists it takes INTERIM rules (one function per field, from `rules`), and swapping them for the
+  schema changes nothing else in the form.
 - **Reward early, punish late.** A field is checked when the person leaves it, or after they pause
   typing for about 600 ms. Once a field is marked, it is re-checked on every keystroke, so the mark
   clears the moment it is fixed. A field with a format shows a tick when it is right.
@@ -392,17 +394,19 @@ The form system lives in **`packages/ui/src/form/`**, for both apps. It is the *
 `<form>`, `<input>`, `<select>`, `<textarea>` or `<label>` may appear, and the only place that
 imports `react-hook-form`. Features import its parts from `@mycity/ui`: `Form`, `Field`,
 `TextField`, `PasswordField`, `NumberField`, `DateField`, `DateRangeField`, `TimeField`,
-`MoneyField`, `PhoneField`, `SelectField`, `ChoiceField`, `CheckboxField`, `SwitchField`, `Switch`,
-`TextAreaField`, `SearchInput`, `OtpField`, `FormFooter`, `FormError`, `Wizard`, `InlineInput`,
-`InlineSelect`, and the hook `useContractForm(schema)`. `UploadField`, `PersonPicker` and
+`MoneyField`, `PhoneField`, `SelectField`, `ChoiceField`, `CheckboxField`, `Switch`, `ToggleRow`,
+`TextAreaField`, `SearchInput`, `FilterSelect`, `LoginField`, `OtpField`, `FormFooter`, `FormError`,
+`Wizard`, `InlineInput`, `InlineSelect`, `InlineLabel`, and the hook `useContractForm(initial, rules)`. `UploadField`, `PersonPicker` and
 `SignatureField` join them in PR 3. `docs/COMPONENTS.md` (Forms) has the props of each.
 
-**Two hooks, one field binding.** `useContractForm(schema)` is react-hook-form with the contract's
-Zod schema (§8.3). Most modules have no contract schema yet, so their forms use the interim
-`useForm` with its `rules`, kept from #18 and marked beta. Both hooks give every field the same
-binding (`{...form.field("name")}`: value, onChange, onBlur, name, error, invalid, ok), so the
-fields do not care which hook is behind them. When `npm run contract:status` says a module is Ready
-to switch, its forms move to `useContractForm`; `useForm` retires with the last one.
+**One hook, one field binding.** `useContractForm(initial, rules)` is react-hook-form checked by the
+module's contract schema (anything with `safeParse`) or, until it exists, by INTERIM rules (§8.3).
+Every field takes the same binding (`{...f.field("name")}`: value, onChange, onBlur, name, state,
+message), and `Field` takes the mark (`{...f.status("name")}`, or the same `f.field`). `f.check(keys?)`
+marks every problem (or one wizard step's), focuses the first and returns whether it is clean;
+`f.submit(save)` does the same for a `<Form>`; `f.setServerErrors(error.fields)` puts a 422 on the
+fields. When `npm run contract:status` says a module is Ready to switch, its forms pass the schema
+in place of the rules.
 
 `scripts/check/forms.js` fails the build when a feature writes a raw element, imports
 `react-hook-form` directly, uses an instruction as a placeholder, or labels a button Submit or OK.
@@ -496,15 +500,16 @@ app/
   src/
     main.tsx  App.tsx         entry; providers (auth, router, modal, toasts)
     styles/index.css          Tailwind and the @mycity/ui styles; the staging offset; no colour of its own
-    lib/                      environment (staging marks), plan (what opens), router
+    lib/                      environment (staging marks), plan (what opens), router, routes (screen URLs)
     api/
       client.ts               the staff app's client, made with createApiClient (session, refresh)
       endpoints.ts  hooks.ts  the typed endpoint map; the shared hooks bound to this client
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
     auth/                     AuthProvider (useAuth, useMe), Login
-    shell/                    catalogue (modules and tab slugs), access, screens (lazy per module), Shell,
-                              Nav, CommandPalette, Bell, UpdatePrompt; rebuilt on @mycity/ui in PR 2
+    shell/                    catalogue (modules and tab slugs), access, screens (lazy per module),
+                              Shell (desktop rail and mobile bar), Nav, CommandPalette, Bell,
+                              UpdatePrompt; rebuilt on @mycity/ui in PR 2
     components/               LEGACY only: #18 components not yet moved (§9.4); nothing new goes here
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
@@ -552,9 +557,18 @@ No router library (React Router 7+ needs React 19). `lib/router.tsx` owns one UR
 builds it. `hrefFor`, `useRouter`, `useSearchParams` and `Link` are all there is. `id` opens a
 record (a 360, a query, an expense) in place.
 
-Tab slugs are the URL values in `docs/PROGRESS.md` and do not change when a label does. The route
-list is what `scripts/check/two-shells.js` walks, so it must be exportable: `shell/catalogue.ts`
-exports `MODULES` (each module's key and tab slugs).
+Tab slugs are the URL values in `docs/PROGRESS.md` and do not change when a label does.
+
+**The route list the screen gates read.** `shell/catalogue.ts` exports `MODULES` (each module's key,
+label and tab slugs) and `lib/routes.ts` builds each screen's URL. At build time `vite.config.ts`
+writes them into the build as `dist/screens.json` (every module and tab, its labels and its path).
+`scripts/check/lib/screens.js` builds the demo version of the app when its build is missing or
+older than `app/src` (it needs `npm ci` in `app/` once; CI does that), serves it, signs in with the
+mock Operations account and opens every screen at phone and desktop size for gates 8 and 11. It
+reads the copy from the shared components' `data-ui` slots (§9.4) and skips anything marked
+`data-copy="content"` or `data-ui-ignore` (the prototype view switch, which never ships to
+production). `MYCITY_SCREEN_TARGETS=app node scripts/check/two-shells.js` crawls the app alone, for
+a quicker loop while fixing a screen.
 
 `shell/catalogue.ts` lists the fifteen modules and their tab slugs in the order of MILESTONES §18
 and `src/shared/route-map.js`; `shell/access.ts` filters modules by the `view` grant and tabs by
@@ -666,6 +680,24 @@ one moves, its screens import the shared component from `@mycity/ui` and its fil
 `features/shared/sections.tsx` (`PagedTable`, `ExportButton`) is not in a components folder, but its
 table pieces move with `Table.tsx` to `DataView` in PR 3.
 
+**Submit is never disabled** (§8.3). `Button`'s `busy` ignores presses while a request is in flight
+but keeps the button enabled and reachable; a form shows what is wrong on its fields when Submit is
+pressed, never by disabling it. A choice that is not a field (pick at least one row) says so in one
+line above the footer.
+
+**What the screen gates read** (gates 8 and 11, §9.2). The shared components carry the copy slots
+as `data-ui` attributes: `page-title`, `page-subtitle`, `title` (card, section, modal and KPI
+titles), `kpi-caption`, `button` (buttons, tabs, filter chips), `chart-caption`, `empty-text`,
+`help`, `details`, `modal-footer`, `nav-label`; the shell marks `page`, `scroller`, `desktop-nav`,
+`phone-nav`, and a modal or sheet is `modal`; a help term carries `data-help-term`. Anything a
+person wrote or received is marked `data-copy="content"` and is not counted: messages and chat
+lists, mail rows, announcements, articles and documents, timelines, chains, bars, pills, people and
+record names (`CardHeader record`), the org chart and the phone card list. A heading written by hand
+in a feature carries `data-ui="title"` or `data-copy="content"`, so the gate sees it. On a phone,
+every button, chip, tab, input and switch is at least 44 × 44 px. The gates crawl the gallery and
+every app screen (the mock build, as the Operations account); a screen only Staff or the CEO see is
+held to the same rules by review until the crawl signs in as them too.
+
 ### 9.5 Data: the client, the mock, the seed and what opens where
 
 **The client** is `packages/ui/src/data`, shared by both apps. `createApiClient` makes each app's
@@ -690,9 +722,9 @@ every INTERIM file in both apps against `contract.gen.ts`: how many of the endpo
 are in the contract, and whether the module is Interim, Partly or Ready to switch. With `-- --all`
 it lists each endpoint, including ones the contract has that no screen calls (often a rename). When
 a module is Ready to switch: point its imports at the generated `Endpoints`, delete its INTERIM
-file, run `npm run fe:typecheck` and fix every screen it flags, move its forms from `useForm` to
-`useContractForm` with the module's `schemas` (§8.6), then run it on the live API and tick its rows
-in `docs/PROGRESS.md`.
+file, run `npm run fe:typecheck` and fix every screen it flags, give each form's `useContractForm`
+the module's schema in place of its INTERIM rules (§8.6), then run it on the live API and tick its
+rows in `docs/PROGRESS.md`.
 
 **The mock (F12).** Staging and production run the same live build on the real API. Staging shows
 its seeded data (`seeds/staging`, A5); production shows only live data. The in-browser mock
@@ -779,7 +811,7 @@ The Stop hook runs them when a change touches `app/`, `public-app/` or `demo.htm
 - [ ] Icons through `Icon`; empty states carry the shared illustration
 - [ ] Desktop and mobile shells both built; the PR body states the native app feel measures (gate 11)
 - [ ] Forms only from the form system in `@mycity/ui` (`packages/ui/src/form/`), validated as filled
-  from the contract schema, or the interim `useForm` until it exists (gate 12)
+  by `useContractForm` from the contract schema, or INTERIM rules until it exists (gate 12)
 - [ ] Day-first dates, formatted money, through the `@mycity/ui` helpers
 - [ ] No native dialogs; upload engine
 - [ ] `npm run ci` green, the whole suite, before pushing

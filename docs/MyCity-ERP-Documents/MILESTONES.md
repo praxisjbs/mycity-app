@@ -289,7 +289,12 @@ sla_hours }`. A condition is a comparison against `context` — one operator set
 **skipped, not run**. Adding a step is inserting an object into `stages`; it needs no deploy. That
 is the whole engine, and it stays the whole engine. M3's consequence chain, M5's offer approval,
 M6's payroll approval and M8's expense hierarchy are all definitions over it. Port it as it is;
-do not extend it in M0.
+do not extend it in M0. **Amended 14 October 2026:** four rules were added in M0 because no later
+milestone can safely add them under live requests: nobody approves their own request (the CEO
+excepted); the requester can withdraw; rejecting or sending back needs a reason; approvers are
+resolved when a stage starts and stored on the request. Each definition also declares the type of
+every value its conditions compare. Pixie's `position` approvers and deputy fallback were dropped
+(BACKEND_STRUCTURE §4). See REUSE_MAP §1.4.
 
 **Design system.** Port the primitive **engineering** from `praxis-ls/client/src/components/ui/`
 (89 files) and rebuild the shell and visual language on MyCity's tokens. Primitives first:

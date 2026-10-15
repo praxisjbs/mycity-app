@@ -6,14 +6,14 @@ import "@/api/types/organisation";
 import type { Announcement, Channel, Conversation, MessageCreate } from "@/api/types/community";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, formatDateTime, formatWhen, Icon, IconButton, todayIso, useIsMobile, Avatar, KeyValue, Meter, Pill, Card, Grid, PageHeader, Menu, useModal, ErrorState, toast, DateField, Field, TextField, rules, SearchInput, ChoiceField, Switch, TextAreaField, useForm } from "@mycity/ui";
 import { StatStrip } from "@/components/ui/data";
 import { LoadingRows } from "@/components/ui/Table";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { ChatFrame, Composer, Row, ThreadBody, ThreadSearch, useSplit, useThread } from "./Chat";
-import { PersonPicker, Upload } from "@/components/form";
+import { PersonPicker, UploadField } from "@/components/form";
+import { Button, IconButton, Avatar, KeyValue, Meter, Pill, Icon, Card, Grid, PageHeader, Menu, useModal, ErrorState, toast, cn, formatDate, formatDateTime, formatWhen, todayIso, useIsMobile, ChoiceField, DateField, Field, FormFooter, rules, SearchInput, Switch, TextAreaField, TextField, useContractForm } from "@mycity/ui";
 
 export default function Community({ tab }: ModuleScreenProps) {
   if (tab === "direct-messages") return <Direct />;
@@ -22,9 +22,6 @@ export default function Community({ tab }: ModuleScreenProps) {
 }
 
 /** Modal footer row, inside the body so it can use the form's state. */
-function Foot({ children }: { children: ReactNode }) {
-  return <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap items-center justify-end gap-2 border-t border-border px-[18px] py-3">{children}</div>;
-}
 
 const Group = ({ children }: { children: ReactNode }) => <div className="px-2 pt-2 pb-1 text-[10px] font-[650] tracking-[.12em] text-subtle-foreground uppercase">{children}</div>;
 
@@ -110,7 +107,7 @@ function Channels() {
           trigger={(p) => <IconButton {...p} icon="dots" label="Channel menu" />}
           items={[
             { label: "View Members", icon: "users", onSelect: () => modal.open({ title: `Members · #${current.name}`, body: (close) => <Members c={current} close={close} /> }) },
-            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: `#${current.name}`, body: (close) => <><KeyValue items={[["Members", current.members], ["Who can post", current.read_only ? "People and the CEO" : "Every member"], ["Visibility", "Internal to MyCity"]]} /><Foot><Button variant="primary" onClick={close}>Close</Button></Foot></> }) },
+            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: `#${current.name}`, body: (close) => <><KeyValue items={[["Members", current.members], ["Who can post", current.read_only ? "People and the CEO" : "Every member"], ["Visibility", "Internal to MyCity"]]} /><FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter></> }) },
             { label: "Search in Channel", icon: "srch", onSelect: () => setSearching(true) },
             "sep",
             { label: "Mute Notifications", icon: "bell", onSelect: () => void api.call("POST /api/v1/community/channels/:id/mute", { params: { id: current.channel_id }, body: {} }).then(() => toast(`#${current.name} muted`)) },
@@ -162,7 +159,7 @@ function Members({ c, close }: { c: Channel; close: () => void }) {
       <p className="mb-2 text-[11.5px] text-subtle-foreground">{c.members} members{list.page && list.page.total > list.rows.length ? `, showing ${list.rows.length}` : ""}</p>
       <PeopleList people={list.rows} />
       {list.page?.has_next && <Button size="sm" className="mt-2" onClick={() => list.setPage(list.pageNumber + 1)}>Next Page</Button>}
-      <Foot><Button variant="primary" onClick={close}>Close</Button></Foot>
+      <FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter>
     </>
   );
 }
@@ -183,7 +180,7 @@ function PeopleList({ people, right }: { people: PersonRef[]; right?: (p: Person
 }
 
 function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel) => void }) {
-  const f = useForm({ name: "", purpose: "" }, { name: (v) => (/^[a-z0-9][a-z0-9-]{1,29}$/.test(v) ? null : "Lower case letters, numbers and hyphens, 2 to 30 characters") });
+  const f = useContractForm({ name: "", purpose: "" }, { name: (v) => (/^[a-z0-9][a-z0-9-]{1,29}$/.test(v) ? null : "Lower case letters, numbers and hyphens, 2 to 30 characters") });
   const [people, setPeople] = useState<PersonRef[]>([]);
   const [depts, setDepts] = useState<string[]>([]);
   const [who, setWho] = useState<"everyone" | "admins">("everyone");
@@ -214,13 +211,13 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
         </div>
       </Field>
       <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><PersonPicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
-      <Field label="Who Can Post" help="Set when the channel is created. Everyone can read.">
+      <Field label="Who Can Post" info="Set when the channel is created. Everyone can read.">
         <ChoiceField value={who} onChange={setWho} options={[["everyone", "Every Member"], ["admins", "Only Admins"]]} />
       </Field>
-      <Foot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Create Channel</Button>
-      </Foot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Create Channel</Button>
+      </FormFooter>
     </>
   );
 }
@@ -242,10 +239,10 @@ function Recognise({ channel, close, done }: { channel: Channel; close: () => vo
     <>
       <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are recognising" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
       <Field label="What Did They Do (Optional)" info="Leave it blank and a note is written for you."><TextAreaField value={text} onChange={setText} placeholder="Led the launch" /></Field>
-      <Foot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="thumb" disabled={save.pending} onClick={go}>Post</Button>
-      </Foot>
+        <Button variant="primary" icon="thumb" busy={save.pending} onClick={go}>Post</Button>
+      </FormFooter>
     </>
   );
 }
@@ -264,16 +261,16 @@ function Celebrate({ close, send }: { close: () => void; send: (b: MessageCreate
     <>
       <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are celebrating" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
       <Field label="What"><ChoiceField value={what} onChange={setWhat} options={[["birthday", "Birthday"], ["anniversary", "Work Anniversary"]]} /></Field>
-      <Foot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="flag" onClick={go}>Post</Button>
-      </Foot>
+      </FormFooter>
     </>
   );
 }
 
 function PollForm({ close, send }: { close: () => void; send: (b: MessageCreate) => Promise<void> }) {
-  const f = useForm({ q: "", o1: "", o2: "", o3: "", o4: "" }, { q: (v) => (v.trim().length > 3 ? null : "Ask a question"), o1: rules.required("Give at least two options"), o2: rules.required("Give at least two options") });
+  const f = useContractForm({ q: "", o1: "", o2: "", o3: "", o4: "" }, { q: (v) => (v.trim().length > 3 ? null : "Ask a question"), o1: rules.required("At least two options"), o2: rules.required("At least two options") });
   const go = async () => {
     if (!f.check()) return;
     close();
@@ -287,10 +284,10 @@ function PollForm({ close, send }: { close: () => void; send: (b: MessageCreate)
           {(["o1", "o2", "o3", "o4"] as const).map((k, i) => <TextField key={k} {...f.field(k)} placeholder={`Option ${i + 1}${i > 1 ? " (optional)" : ""}`} aria-label={`Option ${i + 1}`} />)}
         </div>
       </Field>
-      <Foot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="chart" onClick={go}>Post Poll</Button>
-      </Foot>
+      </FormFooter>
     </>
   );
 }
@@ -300,7 +297,7 @@ function Attach({ close, send }: { close: () => void; send: (b: MessageCreate) =
   return (
     <>
       <p className="mb-2.5 text-[11.5px] text-subtle-foreground">Files are stored in the vault and shared here.</p>
-      <Upload
+      <UploadField
         purpose="community"
         multiple={false}
         onUploaded={(docs) => {
@@ -308,7 +305,7 @@ function Attach({ close, send }: { close: () => void; send: (b: MessageCreate) =
           void Promise.all(docs.map((d) => send({ kind: "file", document_id: d.document_id })));
         }}
       />
-      <Foot><Button onClick={close}>Cancel</Button></Foot>
+      <FormFooter><Button onClick={close}>Cancel</Button></FormFooter>
     </>
   );
 }
@@ -372,7 +369,7 @@ function Direct() {
       <div className="flex-none px-3 pt-3 pb-2"><SearchInput value={list.q} onChange={list.setQ} placeholder="Search people" label="Search conversations" /></div>
       <div className="flex flex-none gap-1 px-3 pb-2" role="group" aria-label="Show">
         {(["all", "unread"] as const).map((v) => (
-          <button key={v} type="button" aria-pressed={filter === v} onClick={() => setFilter(v)} className={cn("h-[26px] rounded-full px-[11px] text-[11.5px] font-[650]", filter === v ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>{v === "all" ? "All" : "Unread"}</button>
+          <button key={v} type="button" aria-pressed={filter === v} onClick={() => setFilter(v)} className={cn("h-[26px] max-md:h-11 max-md:min-w-11 rounded-full px-[11px] text-[11.5px] font-[650]", filter === v ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>{v === "all" ? "All" : "Unread"}</button>
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 max-md:overflow-visible">
@@ -430,7 +427,7 @@ function Direct() {
   const side = info && !mobile && current ? (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-card border border-border bg-card shadow-1">
       <div className="flex flex-none items-center gap-2 border-b border-border py-[11px] pr-3 pl-4">
-        <h3 className="flex-1 text-[13.5px] font-semibold">Profile</h3>
+        <h3 data-ui="title" className="flex-1 text-[13.5px] font-semibold">Profile</h3>
         <IconButton icon="x" label="Close profile" onClick={() => setInfo(false)} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -461,7 +458,7 @@ function NewMessage({ close, start }: { close: () => void; start: (p: PersonRef)
   return (
     <>
       <PersonPicker value={who} onChange={setWho} placeholder="Name or department" />
-      <Foot><Button onClick={close}>Cancel</Button></Foot>
+      <FormFooter><Button onClick={close}>Cancel</Button></FormFooter>
     </>
   );
 }
@@ -490,7 +487,7 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
           {p.person.display_name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
           {p.online && <i className="absolute right-[3px] bottom-[3px] size-3.5 rounded-full border-[3px] border-card bg-success" />}
         </span>
-        <h2 className="text-[16px] font-semibold">{p.person.display_name}</h2>
+        <h2 data-copy="content" className="text-[16px] font-semibold">{p.person.display_name}</h2>
         <p className="mt-0.5 text-[11.5px] text-subtle-foreground">{p.person.job_title}</p>
         <p className="mt-1">{p.online ? <Pill tone="ok">Online</Pill> : <Pill>Last seen yesterday</Pill>}</p>
         <div className="mt-3 flex justify-center gap-2">
@@ -499,18 +496,18 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
         </div>
       </div>
       <div className={sec}>
-        <h4 className={h4}>Contact</h4>
+        <h4 data-ui="title" className={h4}>Contact</h4>
         {line("mail", p.email)}
         {p.phone && line("user", p.phone)}
         {line("globe", p.location)}
         {line("clock", `${p.local_time} in Lagos`)}
       </div>
       <div className={sec}>
-        <h4 className={h4}>Shared in this conversation</h4>
+        <h4 data-ui="title" className={h4}>Shared in this conversation</h4>
         {p.shared_files.length ? p.shared_files.map((f) => <div key={f.document_id}>{line("doc", f.file_name, f.size_bytes != null ? `${Math.round(f.size_bytes / 1024)} KB` : undefined)}</div>) : <p className="text-[11.5px] text-subtle-foreground">Nothing shared yet.</p>}
       </div>
       <div className={sec}>
-        <h4 className={h4}>Channels in common</h4>
+        <h4 data-ui="title" className={h4}>Channels in common</h4>
         {p.shared_channels.map((n) => <div key={n} className="flex items-center gap-2.5 py-[5px] text-[13px]"><b className="text-subtle-foreground">#</b>{n}</div>)}
       </div>
       <div className={sec}>
@@ -545,9 +542,9 @@ function Announcements() {
       {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
         <Grid cols={2} className="mt-3">
           {list.rows.map((a) => (
-            <Card key={a.announcement_id} role="button" tabIndex={0} className="cursor-pointer text-left transition-[box-shadow,transform] hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.title, body: (close) => <AnnouncementReads a={a} close={close} poster={poster} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
+            <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition-[box-shadow,transform] hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.title, body: (close) => <AnnouncementReads a={a} close={close} poster={poster} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
               <div className="mb-1.5 flex items-start gap-2">
-                <h3 className="flex-1 text-[13.5px] font-semibold">{a.title}</h3>
+                <h3 data-copy="content" className="flex-1 text-[13.5px] font-semibold">{a.title}</h3>
                 {a.scheduled ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience ? "ok" : "neutral"}>{a.reads} of {a.audience} read</Pill>}
               </div>
               <p className="text-[13px] text-muted-foreground">{a.body}</p>
@@ -572,18 +569,18 @@ function AnnouncementReads({ a, close, poster }: { a: Announcement; close: () =>
       <p className="mt-2.5 mb-3.5 text-[13.5px] text-muted-foreground">{a.body}</p>
       {a.scheduled ? <Pill tone="info">Scheduled. Not yet visible to staff</Pill> : poster && (
         <>
-          <h3 className="mb-1.5 text-[13.5px] font-semibold">Read by {a.reads} of {a.audience}</h3>
+          <h3 data-ui="title" className="mb-1.5 text-[13.5px] font-semibold">Read by {a.reads} of {a.audience}</h3>
           <Meter pct={pct} label={`${pct}%`} />
           <div className="mt-4 mb-1.5 flex items-center gap-2">
-            <h3 className="flex-1 text-[13.5px] font-semibold">Not Read · {nNot}</h3>
-            {nNot > 0 && <Button size="sm" icon="bell" disabled={remind.pending} onClick={async () => { const r = await remind.run({ params: { id: a.announcement_id }, body: {} }); toast(`Reminder sent to ${r.reminded} ${r.reminded === 1 ? "person" : "people"}`); }}>Remind Them</Button>}
+            <h3 data-ui="title" className="flex-1 text-[13.5px] font-semibold">Not Read · {nNot}</h3>
+            {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { const r = await remind.run({ params: { id: a.announcement_id }, body: {} }); toast(`Reminder sent to ${r.reminded} ${r.reminded === 1 ? "person" : "people"}`); }}>Remind Them</Button>}
           </div>
           {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">Not Read</Pill>} /> : <p className="text-[11.5px] text-subtle-foreground">Everyone has read it.</p>}
-          <h3 className="mt-4 mb-1.5 text-[13.5px] font-semibold">Read · {read.page?.total ?? 0}</h3>
+          <h3 data-ui="title" className="mt-4 mb-1.5 text-[13.5px] font-semibold">Read · {read.page?.total ?? 0}</h3>
           <PeopleList people={read.rows.map((r) => r.person)} right={() => <Pill tone="ok">Read</Pill>} />
         </>
       )}
-      <Foot><Button variant="primary" onClick={close}>Close</Button></Foot>
+      <FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter>
     </>
   );
 }
@@ -591,7 +588,7 @@ function AnnouncementReads({ a, close, poster }: { a: Announcement; close: () =>
 function NewAnnouncement({ close }: { close: () => void }) {
   const { me } = useAuth();
   const [when, setWhen] = useState<"now" | "later">("now");
-  const f = useForm({ title: "", body: "", date: "" }, { title: (v) => (v.trim().length > 3 ? null : "Give it a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
+  const f = useContractForm({ title: "", body: "", date: "" }, { title: (v) => (v.trim().length > 3 ? null : "Give it a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
   const save = useMutation("POST /api/v1/community/announcements");
   const submit = async () => {
     const noDate = when === "later" && !f.values.date;
@@ -614,10 +611,10 @@ function NewAnnouncement({ close }: { close: () => void }) {
       <Field label="When"><ChoiceField value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>
       {when === "later" && <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>}
       <p className="flex items-center gap-1.5 text-[11.5px] text-subtle-foreground"><Icon name="user" className="size-3.5" />Posting as {me?.display_name}</p>
-      <Foot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>{when === "later" ? "Schedule" : "Publish"}</Button>
-      </Foot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>{when === "later" ? "Schedule" : "Publish"}</Button>
+      </FormFooter>
     </>
   );
 }

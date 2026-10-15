@@ -50,7 +50,8 @@ function discover(dir = MODULES_DIR) {
       ["public", `${e.name}.public.routes.js`],
     ]) {
       const full = path.join(dir, e.name, file);
-      if (fs.existsSync(full) && fs.statSync(full).size > 0) out.push({ module: e.name, surface, file: full });
+      if (fs.existsSync(full) && fs.statSync(full).size > 0)
+        out.push({ module: e.name, surface, file: full });
     }
   }
   return out;
@@ -71,25 +72,42 @@ function stackRoutes(router) {
 
 function checkDefinition(found, def) {
   const where = path.relative(path.resolve(__dirname, "../.."), found.file);
-  if (!def || typeof def !== "object" || !def.router) throw new Error(`${where}: export { basePath, surface, router }`);
+  if (!def || typeof def !== "object" || !def.router)
+    throw new Error(`${where}: export { basePath, surface, router }`);
   if (def.surface !== found.surface) {
-    throw new Error(`${where}: surface is "${def.surface}" but a ${found.surface === "public" ? ".public.routes.js" : ".routes.js"} file is the ${found.surface} surface`);
+    throw new Error(
+      `${where}: surface is "${def.surface}" but a ${found.surface === "public" ? ".public.routes.js" : ".routes.js"} file is the ${found.surface} surface`,
+    );
   }
-  if (typeof def.basePath !== "string" || !/^\/[a-z0-9/_-]*$/.test(def.basePath)) {
-    throw new Error(`${where}: basePath must be a lower-case path starting with /`);
+  if (
+    typeof def.basePath !== "string" ||
+    !/^\/[a-z0-9/_-]*$/.test(def.basePath)
+  ) {
+    throw new Error(
+      `${where}: basePath must be a lower-case path starting with /`,
+    );
   }
   for (const layer of def.router.stack || []) {
     if (!layer.route && layer.handle && Array.isArray(layer.handle.stack)) {
-      throw new Error(`${where}: a router nested with router.use() hides its routes from the contract; define every route on the module's router`);
+      throw new Error(
+        `${where}: a router nested with router.use() hides its routes from the contract; define every route on the module's router`,
+      );
     }
   }
-  const defined = new Set(routesOf(def.router).map((r) => `${r.method} ${r.path}`));
+  const defined = new Set(
+    routesOf(def.router).map((r) => `${r.method} ${r.path}`),
+  );
   for (const key of stackRoutes(def.router)) {
-    if (!defined.has(key)) throw new Error(`${where}: ${key} was not defined with route() / publicRoute(), so it has no contract`);
+    if (!defined.has(key))
+      throw new Error(
+        `${where}: ${key} was not defined with route() / publicRoute(), so it has no contract`,
+      );
   }
   const wrongKind = routesOf(def.router).find((r) => r.kind !== found.surface);
   if (wrongKind) {
-    throw new Error(`${where}: ${wrongKind.method} ${wrongKind.path} uses ${wrongKind.kind === "public" ? "publicRoute" : "route"} on the ${found.surface} surface`);
+    throw new Error(
+      `${where}: ${wrongKind.method} ${wrongKind.path} uses ${wrongKind.kind === "public" ? "publicRoute" : "route"} on the ${found.surface} surface`,
+    );
   }
 }
 
@@ -113,7 +131,10 @@ function mountModules(targets, { strict = false, dir = MODULES_DIR } = {}) {
       checkDefinition(found, def);
     } catch (err) {
       if (strict) throw err;
-      logger.error({ module: label, err }, "module skipped: it failed to load, and its routes are not served");
+      logger.error(
+        { module: label, err },
+        "module skipped: it failed to load, and its routes are not served",
+      );
       skipped.push({ module: label, error: err.message });
       continue;
     }
@@ -123,7 +144,9 @@ function mountModules(targets, { strict = false, dir = MODULES_DIR } = {}) {
     for (const r of routesOf(def.router)) {
       const full = `${r.method} ${prefix}${base}${r.path === "/" ? "" : r.path}`;
       if (seen.has(full)) {
-        throw new Error(`Duplicate route ${full}: defined by ${seen.get(full)} and ${label}. Give one of them a different path.`);
+        throw new Error(
+          `Duplicate route ${full}: defined by ${seen.get(full)} and ${label}. Give one of them a different path.`,
+        );
       }
       seen.set(full, label);
       routes.push({
@@ -143,7 +166,10 @@ function mountModules(targets, { strict = false, dir = MODULES_DIR } = {}) {
   }
 
   if (skipped.length) {
-    logger.error({ skipped: skipped.map((s) => s.module) }, "this process is serving an incomplete API");
+    logger.error(
+      { skipped: skipped.map((s) => s.module) },
+      "this process is serving an incomplete API",
+    );
   }
   lastReport = { mounted, skipped, routes };
   return lastReport;

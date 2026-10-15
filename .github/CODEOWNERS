@@ -6,9 +6,11 @@
 #
 # Rules this file keeps, checked by scripts/check/codeowners.js:
 #  - the LAST matching line wins, so general paths come first, specific last
-#  - every line has two owners: the owner, then a backup. GitHub does not
-#    count an author's own approval, so a single-owner path could never merge
-#    a PR opened by that owner
+#  - every line has two owners or more: the owner, then a backup. GitHub does
+#    not count an author's own approval, so a single-owner path could never
+#    merge a PR opened by that owner
+#  - GE and TB are on every line, so an approval from either one is enough
+#    for any path (decided 15 October 2026); the path's own owner comes first
 #  - every module folder and every feature guide has its own line
 #  - usernames are real: GitHub silently ignores one it cannot resolve
 #
@@ -31,30 +33,30 @@
 /README.MD                                         @swizfcodes @tomblakeasaah196
 
 # ── Data ────────────────────────────────────────────────────────────────────
-/migrations/                                       @swizfcodes @LovedataX
-/seeds/                                            @LovedataX @swizfcodes
-/templates/                                        @swizfcodes @LovedataX
+/migrations/                                       @swizfcodes @LovedataX @tomblakeasaah196
+/seeds/                                            @LovedataX @swizfcodes @tomblakeasaah196
+/templates/                                        @swizfcodes @LovedataX @tomblakeasaah196
 
 # ── Frontend ────────────────────────────────────────────────────────────────
-/app/                                              @Ghosted34 @tomblakeasaah196
-/public-app/                                       @Ghosted34 @tomblakeasaah196
-/assets/                                           @Ghosted34 @tomblakeasaah196
+/app/                                              @Ghosted34 @tomblakeasaah196 @swizfcodes
+/public-app/                                       @Ghosted34 @tomblakeasaah196 @swizfcodes
+/assets/                                           @Ghosted34 @tomblakeasaah196 @swizfcodes
 # The design system (F11): every shared component, its gallery and catalogue
-/packages/ui/                                      @Ghosted34 @tomblakeasaah196
-/docs/COMPONENTS.md                                @Ghosted34 @tomblakeasaah196
-/docs/FRONTEND_FOUNDATION.md                       @Ghosted34 @tomblakeasaah196
+/packages/ui/                                      @Ghosted34 @tomblakeasaah196 @swizfcodes
+/docs/COMPONENTS.md                                @Ghosted34 @tomblakeasaah196 @swizfcodes
+/docs/FRONTEND_FOUNDATION.md                       @Ghosted34 @tomblakeasaah196 @swizfcodes
 
 # ── Engineering documents ───────────────────────────────────────────────────
 /docs/SYSTEM_ARCHITECTURE.md                       @swizfcodes @tomblakeasaah196
 /docs/BACKEND_STRUCTURE.md                         @swizfcodes @tomblakeasaah196
 /docs/BACKEND_GUIDE.md                             @swizfcodes @tomblakeasaah196
-/docs/FRONTEND_GUIDE.md                            @Ghosted34 @tomblakeasaah196
+/docs/FRONTEND_GUIDE.md                            @Ghosted34 @tomblakeasaah196 @swizfcodes
 /docs/MyCity-ERP-Documents/                        @swizfcodes @tomblakeasaah196
 /docs/runbooks/                                    @swizfcodes @tomblakeasaah196
 /docs/guides/README.md                             @swizfcodes @tomblakeasaah196
 /docs/guides/_TEMPLATE.md                          @swizfcodes @tomblakeasaah196
 # A new guide gets its line here when it is created: owner, then backup.
-/docs/guides/attendance.md                         @LovedataX @swizfcodes
+/docs/guides/attendance.md                         @LovedataX @swizfcodes @tomblakeasaah196
 
 
 # ── Modules: code and contract (README §5) ─────────────────────────────────
@@ -136,62 +138,62 @@
 /packages/contract/schemas/vacancies.js            @tomblakeasaah196 @swizfcodes
 
 # LA, backup GE
-/src/modules/attendance/                           @LovedataX @swizfcodes
-/packages/contract/schemas/attendance.js           @LovedataX @swizfcodes
-/src/modules/deductions/                           @LovedataX @swizfcodes
-/packages/contract/schemas/deductions.js           @LovedataX @swizfcodes
-/src/modules/devices/                              @LovedataX @swizfcodes
-/packages/contract/schemas/devices.js              @LovedataX @swizfcodes
-/src/modules/employment_contracts/                 @LovedataX @swizfcodes
-/packages/contract/schemas/employment_contracts.js @LovedataX @swizfcodes
-/src/modules/offers/                               @LovedataX @swizfcodes
-/packages/contract/schemas/offers.js               @LovedataX @swizfcodes
-/src/modules/onboarding/                           @LovedataX @swizfcodes
-/packages/contract/schemas/onboarding.js           @LovedataX @swizfcodes
-/src/modules/payroll/                              @LovedataX @swizfcodes
-/packages/contract/schemas/payroll.js              @LovedataX @swizfcodes
-/src/modules/payslips/                             @LovedataX @swizfcodes
-/packages/contract/schemas/payslips.js             @LovedataX @swizfcodes
-/src/modules/salary_structure/                     @LovedataX @swizfcodes
-/packages/contract/schemas/salary_structure.js     @LovedataX @swizfcodes
-/src/modules/signatures/                           @LovedataX @swizfcodes
-/packages/contract/schemas/signatures.js           @LovedataX @swizfcodes
-/src/modules/statutory/                            @LovedataX @swizfcodes
-/packages/contract/schemas/statutory.js            @LovedataX @swizfcodes
-/src/modules/talent_pool/                          @LovedataX @swizfcodes
-/packages/contract/schemas/talent_pool.js          @LovedataX @swizfcodes
-/src/modules/worksites/                            @LovedataX @swizfcodes
-/packages/contract/schemas/worksites.js            @LovedataX @swizfcodes
+/src/modules/attendance/                           @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/attendance.js           @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/deductions/                           @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/deductions.js           @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/devices/                              @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/devices.js              @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/employment_contracts/                 @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/employment_contracts.js @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/offers/                               @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/offers.js               @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/onboarding/                           @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/onboarding.js           @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/payroll/                              @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/payroll.js              @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/payslips/                             @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/payslips.js             @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/salary_structure/                     @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/salary_structure.js     @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/signatures/                           @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/signatures.js           @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/statutory/                            @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/statutory.js            @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/talent_pool/                          @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/talent_pool.js          @LovedataX @swizfcodes @tomblakeasaah196
+/src/modules/worksites/                            @LovedataX @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/worksites.js            @LovedataX @swizfcodes @tomblakeasaah196
 
 # AJ, backup TB
-/src/modules/budgets/                              @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/budgets.js              @Ghosted34 @tomblakeasaah196
-/src/modules/calendar/                             @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/calendar.js             @Ghosted34 @tomblakeasaah196
-/src/modules/disbursements/                        @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/disbursements.js        @Ghosted34 @tomblakeasaah196
-/src/modules/ess/                                  @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/ess.js                  @Ghosted34 @tomblakeasaah196
-/src/modules/expense_categories/                   @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/expense_categories.js   @Ghosted34 @tomblakeasaah196
-/src/modules/expenses/                             @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/expenses.js             @Ghosted34 @tomblakeasaah196
-/src/modules/goals/                                @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/goals.js                @Ghosted34 @tomblakeasaah196
-/src/modules/kpis/                                 @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/kpis.js                 @Ghosted34 @tomblakeasaah196
-/src/modules/leave/                                @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/leave.js                @Ghosted34 @tomblakeasaah196
-/src/modules/requisitions/                         @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/requisitions.js         @Ghosted34 @tomblakeasaah196
-/src/modules/reviews/                              @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/reviews.js              @Ghosted34 @tomblakeasaah196
-/src/modules/targets/                              @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/targets.js              @Ghosted34 @tomblakeasaah196
-/src/modules/tasks/                                @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/tasks.js                @Ghosted34 @tomblakeasaah196
-/src/modules/workspace/                            @Ghosted34 @tomblakeasaah196
-/packages/contract/schemas/workspace.js            @Ghosted34 @tomblakeasaah196
+/src/modules/budgets/                              @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/budgets.js              @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/calendar/                             @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/calendar.js             @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/disbursements/                        @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/disbursements.js        @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/ess/                                  @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/ess.js                  @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/expense_categories/                   @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/expense_categories.js   @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/expenses/                             @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/expenses.js             @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/goals/                                @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/goals.js                @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/kpis/                                 @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/kpis.js                 @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/leave/                                @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/leave.js                @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/requisitions/                         @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/requisitions.js         @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/reviews/                              @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/reviews.js              @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/targets/                              @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/targets.js              @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/tasks/                                @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/tasks.js                @Ghosted34 @tomblakeasaah196 @swizfcodes
+/src/modules/workspace/                            @Ghosted34 @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/workspace.js            @Ghosted34 @tomblakeasaah196 @swizfcodes
 
 # The gates themselves: weakening a check needs GE or TB, whoever is not the author.
 /scripts/check/                                    @swizfcodes @tomblakeasaah196
@@ -202,6 +204,6 @@
 /.claude/hooks/                                    @swizfcodes @tomblakeasaah196
 /docs/guides/community.md                          @swizfcodes @tomblakeasaah196
 /docs/guides/mailbox.md                            @swizfcodes @tomblakeasaah196
-/docs/guides/ess.md                                @Ghosted34 @tomblakeasaah196
+/docs/guides/ess.md                                @Ghosted34 @tomblakeasaah196 @swizfcodes
 /docs/guides/organogram.md                         @swizfcodes @tomblakeasaah196
 /docs/guides/home.md                               @swizfcodes @tomblakeasaah196

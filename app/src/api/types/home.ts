@@ -56,7 +56,7 @@ export interface KpiDetailMeta {
   title: string;
   sub: string | null;
   columns: Array<{ key: string; label: string; align?: "n" }>;
-  /** Server-side groups shown as chips ("On site", "Remote"…), each with its count. */
+  /** Server-side groups shown as chips ("On Site", "Remote"…), each with its count. */
   groups: Array<{ value: string; label: string; count: number }>;
 }
 export type KpiCell =

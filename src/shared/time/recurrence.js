@@ -21,7 +21,13 @@
  * person can read in the database is worth more than coverage of shapes nobody
  * uses. ICS invites (services/calendar) translate these to RRULE when sending.
  */
-const { assertDate, addDays, addMonths, weekday, daysBetween } = require("./lagos");
+const {
+  assertDate,
+  addDays,
+  addMonths,
+  weekday,
+  daysBetween,
+} = require("./lagos");
 const { isWorkingDay, nextWorkingDay } = require("./working-week");
 
 const FREQS = ["daily", "weekly", "monthly", "yearly"];
@@ -34,21 +40,29 @@ const MAX_ITERATIONS = 20_000;
 function validateRule(rule) {
   const p = [];
   if (!rule || typeof rule !== "object") return ["rule must be an object"];
-  if (!FREQS.includes(rule.freq)) p.push(`freq must be one of ${FREQS.join(", ")}`);
+  if (!FREQS.includes(rule.freq))
+    p.push(`freq must be one of ${FREQS.join(", ")}`);
   const interval = rule.interval === undefined ? 1 : rule.interval;
-  if (!Number.isInteger(interval) || interval < 1 || interval > 366) p.push("interval must be a whole number from 1 to 366");
+  if (!Number.isInteger(interval) || interval < 1 || interval > 366)
+    p.push("interval must be a whole number from 1 to 366");
   if (rule.by_weekday !== undefined) {
     if (rule.freq !== "weekly") p.push("by_weekday is for weekly rules");
-    if (!Array.isArray(rule.by_weekday) || !rule.by_weekday.length || rule.by_weekday.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) {
+    if (
+      !Array.isArray(rule.by_weekday) ||
+      !rule.by_weekday.length ||
+      rule.by_weekday.some((d) => !Number.isInteger(d) || d < 1 || d > 7)
+    ) {
       p.push("by_weekday must list weekdays 1 (Monday) to 7 (Sunday)");
     }
   }
   if (rule.by_month_day !== undefined) {
     if (rule.freq !== "monthly") p.push("by_month_day is for monthly rules");
     const d = rule.by_month_day;
-    if (!Number.isInteger(d) || d === 0 || d < -1 || d > 31) p.push("by_month_day must be 1 to 31, or -1 for the last day");
+    if (!Number.isInteger(d) || d === 0 || d < -1 || d > 31)
+      p.push("by_month_day must be 1 to 31, or -1 for the last day");
   }
-  if (rule.until !== undefined && rule.count !== undefined) p.push("give until or count, not both");
+  if (rule.until !== undefined && rule.count !== undefined)
+    p.push("give until or count, not both");
   if (rule.until !== undefined) {
     try {
       assertDate(rule.until, "until");
@@ -56,7 +70,12 @@ function validateRule(rule) {
       p.push(e.message);
     }
   }
-  if (rule.count !== undefined && (!Number.isInteger(rule.count) || rule.count < 1 || rule.count > MAX_OCCURRENCES)) {
+  if (
+    rule.count !== undefined &&
+    (!Number.isInteger(rule.count) ||
+      rule.count < 1 ||
+      rule.count > MAX_OCCURRENCES)
+  ) {
     p.push(`count must be 1 to ${MAX_OCCURRENCES}`);
   }
   return p;
@@ -80,7 +99,8 @@ function* candidates(rule, start) {
     for (let d = start; ; d = addDays(d, interval)) yield d;
   }
   if (rule.freq === "weekly") {
-    const days = (rule.by_weekday && [...rule.by_weekday].sort((a, b) => a - b)) || [weekday(start)];
+    const days = (rule.by_weekday &&
+      [...rule.by_weekday].sort((a, b) => a - b)) || [weekday(start)];
     const monday = addDays(start, 1 - weekday(start));
     for (let w = monday; ; w = addDays(w, 7 * interval)) {
       for (const d of days) {
@@ -90,7 +110,8 @@ function* candidates(rule, start) {
     }
   }
   if (rule.freq === "monthly") {
-    const dom = rule.by_month_day === undefined ? +start.slice(8, 10) : rule.by_month_day;
+    const dom =
+      rule.by_month_day === undefined ? +start.slice(8, 10) : rule.by_month_day;
     const first = `${start.slice(0, 8)}01`;
     for (let k = 0; ; k += interval) {
       const date = monthDay(addMonths(first, k), dom);
@@ -114,7 +135,8 @@ function occurrences(rule, start, { from, to, calendar } = {}) {
   assertDate(start, "start");
   assertDate(to, "to");
   const lower = from ? assertDate(from, "from") : start;
-  if (rule.working_days_only && !calendar) throw new TypeError("recurrence: working_days_only needs a calendar");
+  if (rule.working_days_only && !calendar)
+    throw new TypeError("recurrence: working_days_only needs a calendar");
 
   const out = [];
   let produced = 0;
@@ -125,7 +147,8 @@ function occurrences(rule, start, { from, to, calendar } = {}) {
     if (iterations > MAX_ITERATIONS) break;
     if (rule.until && raw > rule.until) break;
     if (rule.count && produced >= rule.count) break;
-    if (raw > to && (!rule.working_days_only || daysBetween(to, raw) > 14)) break;
+    if (raw > to && (!rule.working_days_only || daysBetween(to, raw) > 14))
+      break;
 
     let date = raw;
     if (rule.working_days_only) {
@@ -152,8 +175,19 @@ function occurrences(rule, start, { from, to, calendar } = {}) {
 function nextAfter(rule, start, after, { calendar } = {}) {
   assertDate(after, "after");
   const from = addDays(after, 1);
-  const list = occurrences(rule, start, { from: from < start ? start : from, to: addDays(after, 1830), calendar });
+  const list = occurrences(rule, start, {
+    from: from < start ? start : from,
+    to: addDays(after, 1830),
+    calendar,
+  });
   return list[0] || null;
 }
 
-module.exports = { FREQS, validateRule, assertRule, occurrences, nextAfter, MAX_OCCURRENCES };
+module.exports = {
+  FREQS,
+  validateRule,
+  assertRule,
+  occurrences,
+  nextAfter,
+  MAX_OCCURRENCES,
+};

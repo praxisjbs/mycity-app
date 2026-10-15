@@ -26,10 +26,10 @@ describe("Button", () => {
     expect(onClick).toHaveBeenCalledTimes(3);
   });
 
-  it("ignores presses while loading but stays focusable", async () => {
+  it("ignores presses while busy but stays focusable", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
-    render(<Button loading onClick={onClick}>Save Changes</Button>);
+    render(<Button busy onClick={onClick}>Save Changes</Button>);
     const button = screen.getByRole("button", { name: "Save Changes" });
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).not.toBeDisabled();
@@ -75,7 +75,7 @@ describe("IconButton", () => {
 });
 
 describe("BigButton", () => {
-  it("submits a form unless loading", async () => {
+  it("submits a form unless busy", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn((e: { preventDefault: () => void }) => e.preventDefault());
     const { rerender } = render(
@@ -87,7 +87,7 @@ describe("BigButton", () => {
     expect(onSubmit).toHaveBeenCalledOnce();
     rerender(
       <form onSubmit={onSubmit}>
-        <BigButton type="submit" loading>
+        <BigButton type="submit" busy>
           Sign In
         </BigButton>
       </form>,

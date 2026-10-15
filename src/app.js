@@ -72,19 +72,30 @@ const CSP = {
 function buildApp(opts = {}) {
   const app = express();
   app.disable("x-powered-by");
-  app.set("trust proxy", config.TRUST_PROXY_HOPS > 0 ? config.TRUST_PROXY_HOPS : false);
+  app.set(
+    "trust proxy",
+    config.TRUST_PROXY_HOPS > 0 ? config.TRUST_PROXY_HOPS : false,
+  );
   app.set("etag", false);
 
   app.use(requestId);
   if (opts.accessLog !== false) app.use(accessLog());
-  app.use(helmet({ contentSecurityPolicy: CSP, crossOriginResourcePolicy: { policy: "same-site" } }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: CSP,
+      crossOriginResourcePolicy: { policy: "same-site" },
+    }),
+  );
   app.use(compression());
   app.use(environmentMarker);
   app.use(hostGuard());
   app.use(express.json({ limit: JSON_LIMIT }));
   app.use(cookieParser());
 
-  const { router, report } = buildRoutes({ strict: Boolean(opts.strict), dir: opts.modulesDir });
+  const { router, report } = buildRoutes({
+    strict: Boolean(opts.strict),
+    dir: opts.modulesDir,
+  });
   app.use(router);
   app.use(staticSites());
 

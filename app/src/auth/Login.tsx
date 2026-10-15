@@ -109,7 +109,7 @@ function SplashStats() {
   const stats: Array<[number, string]> = [
     [data.staff, "Staff on the platform"],
     [data.cities, "Cities live"],
-    [data.partnerships, "Active partnerships"],
+    [data.partnerships, "Active Partnerships"],
   ];
   return (
     <div className="relative mt-7 mb-auto flex flex-wrap gap-7">

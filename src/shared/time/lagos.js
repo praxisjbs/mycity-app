@@ -35,7 +35,10 @@ function isDate(s) {
 }
 
 function assertDate(s, label = "date") {
-  if (!isDate(s)) throw new TypeError(`${label} must be a real date as YYYY-MM-DD, got ${JSON.stringify(s)}`);
+  if (!isDate(s))
+    throw new TypeError(
+      `${label} must be a real date as YYYY-MM-DD, got ${JSON.stringify(s)}`,
+    );
   return s;
 }
 
@@ -62,8 +65,16 @@ function timeOf(at) {
 function instant(date, time = "00:00") {
   assertDate(date);
   const m = TIME_RE.exec(time);
-  if (!m) throw new TypeError(`time must be HH:MM, got ${JSON.stringify(time)}`);
-  const utc = Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10), +m[1], +m[2], +(m[3] || 0));
+  if (!m)
+    throw new TypeError(`time must be HH:MM, got ${JSON.stringify(time)}`);
+  const utc = Date.UTC(
+    +date.slice(0, 4),
+    +date.slice(5, 7) - 1,
+    +date.slice(8, 10),
+    +m[1],
+    +m[2],
+    +(m[3] || 0),
+  );
   return new Date(utc - OFFSET_MS);
 }
 
@@ -89,7 +100,9 @@ function addMonths(date, n) {
   const m = +date.slice(5, 7) - 1 + n;
   const day = +date.slice(8, 10);
   const first = new Date(Date.UTC(y, m, 1));
-  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  const last = new Date(
+    Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0),
+  ).getUTCDate();
   first.setUTCDate(Math.min(day, last));
   return first.toISOString().slice(0, 10);
 }
@@ -98,7 +111,9 @@ function addMonths(date, n) {
 function daysBetween(a, b) {
   assertDate(a, "from");
   assertDate(b, "to");
-  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+  return Math.round(
+    (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000,
+  );
 }
 
 /** ISO weekday: 1 Monday … 7 Sunday. */

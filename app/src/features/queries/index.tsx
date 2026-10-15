@@ -5,15 +5,15 @@ import "@/api/types/queries";
 import type { Firing, LetterTemplate, Outcome, QueryRow, Rule, RuleCreate, SanctionCreate, SanctionRow } from "@/api/types/queries";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, formatDate, formatDateTime, formatWhen, Banner, KeyValue, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, StatusPill, MoneyField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
 import { Chain, StatStrip } from "@/components/ui/data";
 import { Letter } from "@/features/shared/Letter";
 import { LoadingRows } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, KvCard, ModalFoot, PagedTable, TrailCard } from "@/features/shared/sections";
+import { BarsCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { PersonPicker } from "@/components/form";
+import { Button, Banner, KeyValue, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, formatDate, formatDateTime, formatWhen, StatusPill, Field, FormFooter, MoneyField, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
 
 export default function Queries({ tab, id }: ModuleScreenProps) {
   if (tab === "rules") return <Rules />;
@@ -39,7 +39,7 @@ function QueriesTab({ id }: { id: string | null }) {
     <>
       <PageHeader
         title="Queries"
-        sub="Queries in your scope"
+        sub="Every query and its outcome"
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Raise a Query", body: (close) => <RaiseQuery close={close} /> })}>Raise a Query</Button>}
       />
       {s.data && <KpiTiles items={[{ label: "Open", value: String(s.data.open), tone: s.data.open ? "warn" : "ok" }, { label: "Awaiting Response", value: String(s.data.awaiting_response) }, { label: "Closed This Month", value: String(s.data.closed_this_month), tone: "ok" }, { label: "Escalated", value: String(s.data.escalated), tone: s.data.escalated ? "err" : undefined }]} />}
@@ -53,7 +53,7 @@ function QueriesTab({ id }: { id: string | null }) {
         nounPlural="queries"
         onRowClick={(q) => navigate(`/queries?tab=queries&id=${q.query_id}`)}
         wide
-        empty={{ title: "No queries", text: "Queries you raise, and those rules raise on your team, appear here." }}
+        empty={{ title: "No Queries", text: "Queries you raise, and those rules raise on your team, appear here." }}
         columns={[
           { key: "e", label: "Employee", render: (q) => person(q.employee) },
           { key: "n", label: "Number", render: (q) => q.number, desktop: true },
@@ -66,7 +66,7 @@ function QueriesTab({ id }: { id: string | null }) {
       />
       <Grid cols={2} className="mt-3">
         {focus ? <QueryCard id={focus} /> : <Card><p className="text-[12.5px] text-subtle-foreground">Pick a query to see it here.</p></Card>}
-        {s.data ? <BarsCard title="Queries by Reason, Last 90 Days" rows={s.data.by_reason} note={s.data.by_reason_note} /> : <Card><LoadingRows /></Card>}
+        {s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );
@@ -81,7 +81,7 @@ function QueryCard({ id }: { id: string }) {
   const d = q.data;
   return (
     <Card>
-      <CardHeader title={`${d.number} · ${d.employee.display_name}`} right={<StatusPill s={d.status} />} />
+      <CardHeader record title={`${d.number} · ${d.employee.display_name}`} right={<StatusPill s={d.status} />} />
       <KeyValue
         items={[
           ["Subject", d.subject],
@@ -96,7 +96,7 @@ function QueryCard({ id }: { id: string }) {
       <div className="mt-3.5 flex flex-wrap gap-2">
         <Button icon="doc" onClick={() => modal.open({ title: `${d.number} · Query Letter`, wide: true, body: <LetterById id={d.query_id} /> })}>View Letter</Button>
         {d.can_remind && (
-          <Button disabled={remind.pending} onClick={async () => { await remind.run({ params: { id: d.query_id }, body: {} }); toast(`Reminder sent to ${d.employee.display_name}`); }}>Send Reminder</Button>
+          <Button busy={remind.pending} onClick={async () => { await remind.run({ params: { id: d.query_id }, body: {} }); toast(`Reminder sent to ${d.employee.display_name}`); }}>Send Reminder</Button>
         )}
         {d.can_decide && <Button variant="primary" onClick={() => modal.open({ title: `Decision on ${d.number}`, body: (close) => <Decide id={d.query_id} hasResponse={!!d.response_text} close={close} /> })}>Record a Decision</Button>}
       </div>
@@ -111,7 +111,7 @@ function LetterById({ id }: { id: string }) {
 
 function RaiseQuery({ close }: { close: () => void }) {
   const [who, setWho] = useState<PersonRef[]>([]);
-  const f = useForm({ subject: "", details: "" }, { subject: (v) => (v.trim().length < 4 ? "Say what the query is about" : null), details: (v) => (v.trim().length < 20 ? "Give the facts: dates, times, what happened" : null) });
+  const f = useContractForm({ subject: "", details: "" }, { subject: (v) => (v.trim().length < 4 ? "Name the subject" : null), details: (v) => (v.trim().length < 20 ? "Give the facts" : null) });
   const [tried, setTried] = useState(false);
   const save = useMutation("POST /api/v1/queries");
   const submit = async () => {
@@ -133,10 +133,10 @@ function RaiseQuery({ close }: { close: () => void }) {
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
       <Field label="Subject" {...f.field("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out Thursday" /></Field>
       <Field label="What Happened" {...f.field("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" disabled={save.pending} onClick={submit}>Raise and Send Letter</Button>
-      </ModalFoot>
+        <Button variant="primary" icon="send" busy={save.pending} onClick={submit}>Raise Query</Button>
+      </FormFooter>
     </>
   );
 }
@@ -144,7 +144,7 @@ function RaiseQuery({ close }: { close: () => void }) {
 const OUTCOMES: Array<[Outcome, string]> = [["no_action", "Close, No Action"], ["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"]];
 
 function Decide({ id, hasResponse, close }: { id: string; hasResponse: boolean; close: () => void }) {
-  const f = useForm({ outcome: "no_action", note: "", fine: "" }, { note: (v) => (v.trim().length < 10 ? "Record the reason" : null) });
+  const f = useContractForm({ outcome: "no_action", note: "", fine: "" }, { note: (v) => (v.trim().length < 10 ? "Record the reason" : null) });
   const save = useMutation("POST /api/v1/queries/:id/decision");
   const submit = async () => {
     if (!f.check()) return;
@@ -168,10 +168,10 @@ function Decide({ id, hasResponse, close }: { id: string; hasResponse: boolean; 
         </Field>
       )}
       <Field label="Reason" {...f.field("note")}><TextAreaField {...f.field("note")} placeholder="Explanation accepted" /></Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Record Decision</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Record Decision</Button>
+      </FormFooter>
     </>
   );
 }
@@ -192,13 +192,13 @@ function Rules() {
         <Grid cols={3}>
           {rules.rows.map((r: Rule) => (
             <div key={r.rule_id} className="rounded-box border border-border bg-card p-[14px]">
-              <h4 className="text-[13.5px] font-semibold">{r.name}</h4>
+              <h4 data-copy="content" className="text-[13.5px] font-semibold">{r.name}</h4>
               <p className="mt-1 text-[12.5px] text-muted-foreground">{r.description}</p>
               <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 <StatusPill s={r.status} />
                 {r.threshold && <StatusPill s={{ tone: "neutral", text: r.threshold }} />}
                 {r.status.text === "Draft" && (
-                  <Button size="sm" className="ml-auto" disabled={activate.pending} onClick={async () => { await activate.run({ params: { id: r.rule_id }, body: {} }); invalidate("/api/v1/queries/rules"); toast(`${r.name} is now active`); }}>Activate</Button>
+                  <Button size="sm" className="ml-auto" busy={activate.pending} onClick={async () => { await activate.run({ params: { id: r.rule_id }, body: {} }); invalidate("/api/v1/queries/rules"); toast(`${r.name} is now active`); }}>Activate</Button>
                 )}
               </div>
             </div>
@@ -219,32 +219,20 @@ function Rules() {
             { key: "o", label: "Outcome", render: (x) => <StatusPill s={x.outcome} /> },
           ]}
         />
-        <KvCard
-          title="What a Rule Is Made Of"
-          items={[
-            ["Trigger", "An event: a punch, a day ending, a task date passing"],
-            ["Threshold", "A number and a window. “3 in 30 days”"],
-            ["Who it notifies", "A role, not a person. The role can change"],
-            ["Letter", "Which template to send, filled from the record"],
-            ["Chain", "Which consequence step it opens, if any"],
-            ["Changing it", "Editing a value. No deploy, no release"],
-          ]}
-        />
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">The threshold on each rule is a setting. Changing “3 in 30 days” needs no deploy.</p>
     </>
   );
 }
 
-const TRIGGERS: Array<[RuleCreate["trigger"], string]> = [["lateness", "Late arrival"], ["missing_clock_out", "Missing clock-out"], ["unenrolled_device", "Punch from an unenrolled device"], ["absence", "Absence without notice"], ["overdue_task", "Overdue task"], ["missed_kpi", "KPI closed below 50%"]];
+const TRIGGERS: Array<[RuleCreate["trigger"], string]> = [["lateness", "Late arrival"], ["missing_clock_out", "Missing Clock-Out"], ["unenrolled_device", "Punch from an unenrolled device"], ["absence", "Absence without notice"], ["overdue_task", "Overdue task"], ["missed_kpi", "KPI closed below 50%"]];
 
 function RuleForm({ close }: { close: () => void }) {
   const tpl = usePaged("GET /api/v1/queries/templates");
-  const f = useForm({ name: "", trigger: "lateness", count: "3", window_days: "30", template_id: "" }, {
+  const f = useContractForm({ name: "", trigger: "lateness", count: "3", window_days: "30", template_id: "" }, {
     name: (v) => (v.trim().length < 3 ? "Name the rule" : null),
     count: (v) => (!(Number(v) >= 1) ? "At least 1" : null),
     window_days: (v) => (!(Number(v) >= 1) ? "At least 1 day" : null),
-    template_id: (v) => (!v ? "Pick the letter it sends" : null),
+    template_id: (v) => (!v ? "Pick a letter" : null),
   });
   const save = useMutation("POST /api/v1/queries/rules");
   const num = (k: "count" | "window_days") => ({ ...f.field(k), onChange: (v: string) => f.set(k, v.replace(/\D/g, "").slice(0, 3)), inputMode: "numeric" as const });
@@ -264,18 +252,16 @@ function RuleForm({ close }: { close: () => void }) {
     <>
       <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Repeated lateness" /></Field>
       <Field label="What Sets It Off"><SelectField options={TRIGGERS} {...f.field("trigger")} /></Field>
-      <FormRow>
-        <Field label="How Many Times" {...f.field("count")}><TextField {...num("count")} /></Field>
-        <Field label="Within (Days)" {...f.field("window_days")}><TextField {...num("window_days")} /></Field>
-      </FormRow>
+      <Field label="How Many Times" {...f.field("count")}><TextField {...num("count")} /></Field>
+      <Field label="Within (Days)" {...f.field("window_days")}><TextField {...num("window_days")} /></Field>
       <Field label="Letter It Sends" {...f.field("template_id")}>
         <SelectField placeholder="Pick a template" options={tpl.rows.filter((t) => t.status.tone === "ok").map((t) => [t.template_id, t.name])} {...f.field("template_id")} />
       </Field>
       <p className="text-[11.5px] text-subtle-foreground">Saved as a draft. Nothing fires until it is activated.</p>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Save Rule</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Save Rule</Button>
+      </FormFooter>
     </>
   );
 }
@@ -300,9 +286,8 @@ function Sanctions() {
       />
       {s.data?.focus && (
         <Card className="mb-3">
-          <CardHeader title={s.data.focus.title} right={<StatusPill s={s.data.focus.status} />} />
+          <CardHeader record title={s.data.focus.title} right={<StatusPill s={s.data.focus.status} />} />
           <ChainSteps steps={s.data.focus.chain} />
-          <p className="mt-[11px] text-[11.5px] text-subtle-foreground">Adding or removing a step is configuration. A fine attaches to any step and reaches payroll as a pending deduction, used for property damage.</p>
         </Card>
       )}
       {s.data && <KpiTiles items={[{ label: "Active Sanctions", value: String(s.data.active) }, { label: "Served", value: String(s.data.served) }, { label: "Financial, This Year", value: <Money value={s.data.financial_this_year} /> }, { label: "Recovered", value: <Money value={s.data.recovered} />, tone: "ok" }]} />}
@@ -324,17 +309,6 @@ function Sanctions() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        <KvCard
-          title="How a Fine Reaches Payroll"
-          items={[
-            ["Issued", "On any step of the chain, with an amount and a reason"],
-            ["Lands in", "Payroll, Deductions, as pending acceptance"],
-            ["Who accepts", "Finance or Operations. Never automatic"],
-            ["Spread", "Can be split across runs"],
-            ["If the employee appeals", "The deduction holds until the appeal is decided"],
-            ["On the payslip", "A single line: the reason, not the sanction wording"],
-          ]}
-        />
         {s.data ? <TrailCard title="Chain Activity" items={s.data.activity.map((x) => ({ ...x, when: formatDate(x.when) }))} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
@@ -348,7 +322,6 @@ function ChainSettings() {
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">The MyCity ladder, in order. Each step names the letter it sends; a step without an active letter cannot send one.</p>
       <KeyValue items={[["1 · Caution", "Caution letter"], ["2 · Warning", "Warning letter"], ["3 · Suspension", "Suspension letter (awaiting sample)"], ["4 · Suspension without pay", "Awaiting sample"], ["5 · Dismissal", "Termination letter (awaiting sample)"], ["Fines", "Attach to any step"]]} />
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">Changing the ladder is a setting under Settings, Approvals. It needs no deploy.</p>
     </>
   );
 }
@@ -356,7 +329,7 @@ function ChainSettings() {
 function IssueSanction({ close }: { close: () => void }) {
   const [who, setWho] = useState<PersonRef[]>([]);
   const [tried, setTried] = useState(false);
-  const f = useForm({ kind: "caution", reason: "", amount: "" }, { reason: (v) => (v.trim().length < 6 ? "Give the reason" : null), amount: (v, all) => (all.kind === "fine" && !(Number(v) > 0) ? "A fine needs an amount" : null) });
+  const f = useContractForm({ kind: "caution", reason: "", amount: "" }, { reason: (v) => (v.trim().length < 6 ? "Give the reason" : null), amount: (v, all) => (all.kind === "fine" && !(Number(v) > 0) ? "Enter the fine" : null) });
   const save = useMutation("POST /api/v1/queries/sanctions");
   const submit = async () => {
     setTried(true);
@@ -377,10 +350,10 @@ function IssueSanction({ close }: { close: () => void }) {
       <Field label="Sanction"><SelectField options={[["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"], ["fine", "Fine"]]} {...f.field("kind")} /></Field>
       {f.values.kind === "fine" && <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>}
       <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Follows QRY-0042" /></Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Issue</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Issue</Button>
+      </FormFooter>
     </>
   );
 }
@@ -398,7 +371,7 @@ function Templates() {
     <>
       <PageHeader
         title="Letter Templates"
-        sub="Wording used in issued letters"
+        sub="The system fills name, date and reason"
         actions={
           <>
             <Button icon="doc" disabled={!preview.data} onClick={() => preview.data && modal.open({ title: shown!.name, wide: true, body: <Letter l={preview.data} /> })}>Preview</Button>
@@ -424,13 +397,12 @@ function Templates() {
           {preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><Banner tone="warn">{preview.error.message}</Banner></Card> : <Card><LoadingRows count={6} /></Card>}
         </div>
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">Three templates are waiting on sample letters from MyCity so the wording is theirs, not ours. Until a sample arrives, that step of the chain cannot send a letter.</p>
     </>
   );
 }
 
 function TemplateForm({ close }: { close: () => void }) {
-  const f = useForm({ name: "", used_for: "", body: "" }, { name: (v) => (v.trim().length < 3 ? "Name the template" : null), used_for: (v) => (!v.trim() ? "Say when it is sent" : null), body: (v) => (v.trim().length < 40 ? "Write the letter" : null) });
+  const f = useContractForm({ name: "", used_for: "", body: "" }, { name: (v) => (v.trim().length < 3 ? "Name the template" : null), used_for: (v) => (!v.trim() ? "Pick when it sends" : null), body: (v) => (v.trim().length < 40 ? "Write the letter" : null) });
   const save = useMutation("POST /api/v1/queries/templates");
   const submit = async () => {
     if (!f.check()) return;
@@ -445,17 +417,15 @@ function TemplateForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <FormRow>
-        <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Final warning letter" /></Field>
-        <Field label="Used For" {...f.field("used_for")}><TextField {...f.field("used_for")} placeholder="Step name" /></Field>
-      </FormRow>
+      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Final warning letter" /></Field>
+      <Field label="Used For" {...f.field("used_for")}><TextField {...f.field("used_for")} placeholder="Step name" /></Field>
       <Field label="Letter" info="Use {name}, {date}, {reason} and {hours} where the record fills in. Everything else is sent as written." {...f.field("body")}>
         <TextAreaField {...f.field("body")} rows={8} placeholder="Dear {name}, ..." />
       </Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Save Template</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Save Template</Button>
+      </FormFooter>
     </>
   );
 }

@@ -28,8 +28,15 @@
 const { assertDate, addDays } = require("../time/lagos");
 
 function assertRule(rule) {
-  if (!rule || !Number.isInteger(rule.threshold) || rule.threshold < 1) throw new TypeError("window rule: threshold must be a whole number of at least 1");
-  if (!Number.isInteger(rule.window_days) || rule.window_days < 1 || rule.window_days > 3660) {
+  if (!rule || !Number.isInteger(rule.threshold) || rule.threshold < 1)
+    throw new TypeError(
+      "window rule: threshold must be a whole number of at least 1",
+    );
+  if (
+    !Number.isInteger(rule.window_days) ||
+    rule.window_days < 1 ||
+    rule.window_days > 3660
+  ) {
     throw new TypeError("window rule: window_days must be 1 to 3660");
   }
 }
@@ -48,8 +55,16 @@ function windowBounds(rule, asOf) {
  */
 function evaluate(rule, dates, asOf) {
   const { from, to } = windowBounds(rule, asOf);
-  const inside = (dates || []).filter((d) => assertDate(d, "event date") >= from && d <= to).sort();
-  return { count: inside.length, triggered: inside.length >= rule.threshold, window_from: from, window_to: to, dates: inside };
+  const inside = (dates || [])
+    .filter((d) => assertDate(d, "event date") >= from && d <= to)
+    .sort();
+  return {
+    count: inside.length,
+    triggered: inside.length >= rule.threshold,
+    window_from: from,
+    window_to: to,
+    dates: inside,
+  };
 }
 
 /**
@@ -58,7 +73,9 @@ function evaluate(rule, dates, asOf) {
  */
 function firstBreach(rule, dates) {
   assertRule(rule);
-  const sorted = [...(dates || [])].map((d) => assertDate(d, "event date")).sort();
+  const sorted = [...(dates || [])]
+    .map((d) => assertDate(d, "event date"))
+    .sort();
   for (let i = rule.threshold - 1; i < sorted.length; i += 1) {
     const end = sorted[i];
     const { from } = windowBounds(rule, end);

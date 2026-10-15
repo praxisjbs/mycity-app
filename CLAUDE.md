@@ -97,8 +97,8 @@ silently.
   no arbitrary value, no inline `style`. Colours exist only in `packages/ui/src/styles/tokens.css`.
 - **The mock never ships** (F12 to F14): the in-browser mock is for laptops and CI only, never in a
   release build. Staging shows its seed, production only live data.
-- **One form system** (gate 12): fields only from `packages/ui/src/form/` (`useContractForm`, or the
-  interim `useForm` until the module's schema exists), labels above, Optional tags, errors of at
+- **One form system** (gate 12): fields only from `packages/ui/src/form/` (`useContractForm` with the
+  module's schema, or INTERIM rules until it exists), labels above, Optional tags, errors of at
   most 4 words on the field as it is filled, buttons only in a footer. Nobody builds their own field.
 - **Migrations**: in your milestone's number block, `-- UP` and `-- DOWN`, idempotent, never edit
   a merged one.

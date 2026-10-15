@@ -100,7 +100,7 @@ function DesktopShell({ modules, mod, tabs, tab, page, fit, openPalette }: Frame
     });
   return (
     <div className="grid h-full grid-cols-[auto_1fr] grid-rows-[minmax(0,100%)]">
-      <aside className={cn("on-dark flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200", slim ? "w-[66px]" : "w-[248px]")}>
+      <aside data-ui="desktop-nav" className={cn("on-dark flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200", slim ? "w-[66px]" : "w-[248px]")}>
         <RailTop slim={slim} />
         <NavList modules={modules} current={mod?.key ?? null} slim={slim} />
         <RailFoot slim={slim} />
@@ -134,8 +134,10 @@ function MobileShell({ modules, mod, tabs, tab, page, openPalette }: FrameProps)
         <ThemeButton />
       </header>
       <TabStrip mod={mod} tabs={tabs} tab={tab} />
-      <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-[14px] pt-[14px] pb-[90px]">{page}</main>
-      <nav className="on-dark pb-safe fixed inset-x-0 bottom-0 z-50 flex border-t border-sidebar-border bg-sidebar px-1 pt-1.5" aria-label="Main">
+      <main data-ui="scroller" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-[14px] pt-[14px] pb-[90px]">
+        <div data-ui="page">{page}</div>
+      </main>
+      <nav data-ui="phone-nav" className="on-dark pb-safe fixed inset-x-0 bottom-0 z-50 flex border-t border-sidebar-border bg-sidebar px-1 pt-1.5" aria-label="Main">
         {bar.map((b) => {
           const on = mod?.key === b.key;
           return (
@@ -146,7 +148,7 @@ function MobileShell({ modules, mod, tabs, tab, page, openPalette }: FrameProps)
               className={cn("mb-1.5 flex min-h-[52px] flex-1 flex-col items-center justify-center gap-[3px] rounded-box px-0.5 py-[7px] text-[10px] font-semibold no-underline", on ? "text-primary [&_svg]:[stroke-width:2.1]" : "text-sidebar-muted")}
             >
               <Icon name={b.icon} size="m" />
-              {b.label}
+              <span data-ui="nav-label">{b.label}</span>
             </Link>
           );
         })}
@@ -214,7 +216,7 @@ function SearchPill({ onClick, compact }: { onClick: () => void; compact?: boole
     <button
       type="button"
       onClick={onClick}
-      className={cn("flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full border border-border bg-muted px-3 text-[13px] text-subtle-foreground hover:border-input", !compact && "max-w-[380px]")}
+      className={cn("flex h-9 max-md:h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-border bg-muted px-3 text-[13px] text-subtle-foreground hover:border-input", !compact && "max-w-[380px]")}
     >
       <Icon name="srch" />
       <span className="truncate">Search anything</span>
@@ -247,9 +249,10 @@ function TabStrip({ mod, tabs, tab }: { mod: ModuleDef | null; tabs: TabDef[]; t
             key={t.slug}
             to={hrefFor(mod.key, t.slug)}
             role="tab"
+            data-ui="button"
             aria-selected={sel}
             className={cn(
-              "-mb-px border-b-2 px-3 py-[11px] text-[13px] whitespace-nowrap no-underline transition-colors",
+              "-mb-px border-b-2 px-3 py-[11px] text-[13px] whitespace-nowrap no-underline transition-colors max-md:py-[13px]",
               on ? "border-primary font-[650] text-foreground" : "border-transparent font-[550] text-muted-foreground hover:text-foreground",
             )}
           >
@@ -282,8 +285,8 @@ function FitMain({ fit, children }: { fit: boolean; children: ReactNode }) {
     else if (e.deltaY < 0 && top && hide) setHide(false);
   };
   return (
-    <main onWheel={onWheel} className={cn("min-h-0 flex-1 overflow-x-hidden px-4", fit ? "flex flex-col overflow-y-hidden pb-4" : "overflow-y-auto pt-[18px] pb-11", fit && (hide ? "pt-2.5" : "pt-[18px]"))}>
-      <div className={cn("mx-auto w-full max-w-[1340px]", fit && "fit-page flex min-h-0 flex-1 flex-col", hide && "hidehead")}>{children}</div>
+    <main data-ui="scroller" onWheel={onWheel} className={cn("min-h-0 flex-1 overflow-x-hidden px-4", fit ? "flex flex-col overflow-y-hidden pb-4" : "overflow-y-auto pt-[18px] pb-11", fit && (hide ? "pt-2.5" : "pt-[18px]"))}>
+      <div data-ui="page" className={cn("mx-auto w-full max-w-[1340px]", fit && "fit-page flex min-h-0 flex-1 flex-col", hide && "hidehead")}>{children}</div>
     </main>
   );
 }

@@ -65,8 +65,34 @@ const norm = {
   },
 };
 
-const TITLES = new Set(["mr", "mrs", "ms", "miss", "dr", "prof", "engr", "chief", "alhaji", "alhaja", "pastor", "barr", "hon"]);
-const COMPANY_SUFFIXES = new Set(["ltd", "limited", "plc", "llc", "inc", "nig", "nigeria", "co", "company", "enterprises", "ventures"]);
+const TITLES = new Set([
+  "mr",
+  "mrs",
+  "ms",
+  "miss",
+  "dr",
+  "prof",
+  "engr",
+  "chief",
+  "alhaji",
+  "alhaja",
+  "pastor",
+  "barr",
+  "hon",
+]);
+const COMPANY_SUFFIXES = new Set([
+  "ltd",
+  "limited",
+  "plc",
+  "llc",
+  "inc",
+  "nig",
+  "nigeria",
+  "co",
+  "company",
+  "enterprises",
+  "ventures",
+]);
 
 /** Share of words in common: |a ∩ b| / |a ∪ b|. */
 function overlap(a, b) {
@@ -90,7 +116,15 @@ function score(input, candidate, signals) {
     const n = s.normalize || ((v) => v);
     const a = n(input[s.key]);
     const b = n(candidate[s.key]);
-    if (a === null || a === undefined || a === "" || b === null || b === undefined || b === "") continue;
+    if (
+      a === null ||
+      a === undefined ||
+      a === "" ||
+      b === null ||
+      b === undefined ||
+      b === ""
+    )
+      continue;
     if (a === b) {
       total += s.weight;
       reasons.push(s.label);
@@ -112,11 +146,18 @@ function score(input, candidate, signals) {
  * @param {Array<{key: string, weight: number, label: string, normalize?: Function, similar?: boolean}>} signals
  * @param {{min?: number, cap?: number, idKey?: string}} [opts]
  */
-function rank(input, candidates, signals, { min = 55, cap = 10, idKey = "id" } = {}) {
+function rank(
+  input,
+  candidates,
+  signals,
+  { min = 55, cap = 10, idKey = "id" } = {},
+) {
   return (candidates || [])
     .map((c) => ({ id: c[idKey], ...score(input, c, signals) }))
     .filter((r) => r.score >= min)
-    .sort((a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)))
+    .sort(
+      (a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)),
+    )
     .slice(0, cap);
 }
 

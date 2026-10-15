@@ -178,7 +178,7 @@ export interface Device {
   name: string;
   first_seen: IsoDateTime;
   last_punch: IsoDateTime | null;
-  status: "Enrolled" | "Pending review" | "Blocked" | "Revoked" | "Verification unavailable";
+  status: "Enrolled" | "Pending Review" | "Blocked" | "Revoked" | "Verification unavailable";
   effect: Pill;
   note: string | null;
 }

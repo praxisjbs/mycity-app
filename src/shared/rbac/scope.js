@@ -31,7 +31,11 @@ const { AppError } = require("../errors");
 
 /** The scope object a controller hands to its service. */
 function scopeOf(req) {
-  return { scope: req.scope || "own", scope_ids: req.scope_ids || null, employee_id: req.user ? req.user.employee_id : null };
+  return {
+    scope: req.scope || "own",
+    scope_ids: req.scope_ids || null,
+    employee_id: req.user ? req.user.employee_id : null,
+  };
 }
 
 /**
@@ -44,7 +48,8 @@ function scopeClause(s, on, params) {
   if (!on || !on.column) throw new Error("scopeClause: name the owner column");
   if (!s || !s.scope) throw new Error("scopeClause: pass scopeOf(req)");
   if (s.scope === "all") return { and: "", where: "" };
-  if (s.scope !== "team" && s.scope !== "own") throw new Error(`scopeClause: unknown scope "${s.scope}"`);
+  if (s.scope !== "team" && s.scope !== "own")
+    throw new Error(`scopeClause: unknown scope "${s.scope}"`);
   const ids = Array.isArray(s.scope_ids) ? s.scope_ids : [];
   params.push(ids);
   const cond = `${on.column} = ANY($${params.length}::uuid[])`;

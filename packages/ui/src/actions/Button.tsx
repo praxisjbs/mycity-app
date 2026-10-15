@@ -5,7 +5,7 @@
  * @use Every action a person takes: Create Rule, Clock In, Export. A link that looks like a button passes asChild with an <a>.
  * @avoid A second primary on one surface (one yellow button per surface); a bare icon (use IconButton); the sign in or clock in call to action (use BigButton).
  * @phone At least 44 px tall; a footer stretches the primary to full width at the bottom.
- * @a11y A native button (type="button" unless set). While loading it stays focusable, says aria-busy and ignores presses. Verb Noun labels, Title Case.
+ * @a11y A native button (type="button" unless set). While busy it stays focusable, says aria-busy and ignores presses. Verb Noun labels, Title Case.
  * @status stable
  * @exports IconButton, BigButton
  * @example <Button variant="primary" icon="plus">New Rule</Button>
@@ -41,7 +41,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Fills the width: the call to action at the foot of a form or page. */
   block?: boolean;
   /** Shows a spinner in place of the icon and ignores presses until the work finishes. */
-  loading?: boolean;
+  busy?: boolean;
   /** Renders the single child element (an <a>, a router Link) with the button's look instead of a <button>. */
   asChild?: boolean;
   /** The label: Verb Noun, Title Case, at most 3 words. */
@@ -49,12 +49,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "default", icon, iconRight, size = "md", block, loading, asChild, className, children, type, onClick, ...rest },
+  { variant = "default", icon, iconRight, size = "md", block, busy, asChild, className, children, type, onClick, ...rest },
   ref,
 ) {
   const Comp = asChild ? Slot : "button";
   const press = (e: MouseEvent<HTMLButtonElement>) => {
-    if (loading) {
+    if (busy) {
       e.preventDefault();
       return;
     }
@@ -66,8 +66,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       type={asChild ? undefined : (type ?? "button")}
       data-ui="button"
       data-variant={variant}
-      aria-busy={loading || undefined}
-      aria-disabled={loading || undefined}
+      aria-busy={busy || undefined}
+      aria-disabled={busy || undefined}
       onClick={press}
       className={cn(
         BASE,
@@ -78,9 +78,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       )}
       {...rest}
     >
-      {loading ? <LoaderCircle className="size-4 flex-none animate-spin" aria-hidden="true" /> : icon && <Icon name={icon} />}
+      {busy ? <LoaderCircle className="size-4 flex-none animate-spin" aria-hidden="true" /> : icon && <Icon name={icon} />}
       <Slottable>{children}</Slottable>
-      {iconRight && !loading && <Icon name={iconRight} />}
+      {iconRight && !busy && <Icon name={iconRight} />}
     </Comp>
   );
 });
@@ -125,12 +125,12 @@ export interface BigButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> 
   /** A glyph after the label. */
   icon?: IconName;
   /** Shows a spinner and ignores presses until the work finishes. */
-  loading?: boolean;
+  busy?: boolean;
 }
 
 /** The big yellow call to action, full width (Sign In, Clock In). */
 export const BigButton = forwardRef<HTMLButtonElement, BigButtonProps>(function BigButton(
-  { className, children, icon, loading, type = "button", onClick, ...rest },
+  { className, children, icon, busy, type = "button", onClick, ...rest },
   ref,
 ) {
   return (
@@ -138,9 +138,9 @@ export const BigButton = forwardRef<HTMLButtonElement, BigButtonProps>(function 
       ref={ref}
       type={type}
       data-ui="button"
-      aria-busy={loading || undefined}
-      aria-disabled={loading || undefined}
-      onClick={(e) => (loading ? e.preventDefault() : onClick?.(e))}
+      aria-busy={busy || undefined}
+      aria-disabled={busy || undefined}
+      onClick={(e) => (busy ? e.preventDefault() : onClick?.(e))}
       className={cn(
         "on-primary mt-5.5 flex h-11.5 w-full items-center justify-center gap-2 rounded-full bg-primary text-md font-strong text-primary-foreground transition duration-(--dur-fast) hover:brightness-95 active:scale-98 disabled:opacity-60",
         className,
@@ -148,7 +148,7 @@ export const BigButton = forwardRef<HTMLButtonElement, BigButtonProps>(function 
       {...rest}
     >
       {children}
-      {loading ? <LoaderCircle className="size-4 flex-none animate-spin" aria-hidden="true" /> : icon && <Icon name={icon} />}
+      {busy ? <LoaderCircle className="size-4 flex-none animate-spin" aria-hidden="true" /> : icon && <Icon name={icon} />}
     </button>
   );
 });

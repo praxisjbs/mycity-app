@@ -2,10 +2,10 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { Arrangement } from "@/api/types/attendance";
 import "@/api/types/attendance";
-import { Button, formatDate, Banner, KeyValue, Pill, Card, CardHeader, Grid, useModal, ErrorState, toast, Field, TextField, ChoiceField, SelectField } from "@mycity/ui";
 import { Timeline } from "@/components/ui/data";
 import { LoadingRows } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
+import { Button, Banner, KeyValue, Pill, Card, CardHeader, Grid, useModal, ErrorState, toast, formatDate, ChoiceField, Field, FormFooter, SelectField, TextField } from "@mycity/ui";
 
 /** The details modal from the Employees list: employment, and attendance and location (HR only). */
 export function EmployeeDetails({ id, close }: { id: string; close: () => void }) {
@@ -30,11 +30,11 @@ export function EmployeeDetails({ id, close }: { id: string; close: () => void }
           <KeyValue items={[["Registered home", a.home_address ?? "Not on file"], ["Home geofence", a.home_radius_m ? `${a.home_radius_m} m · mandatory` : "Not available"], ["Temporary location", <Pill tone={a.temporary_location.tone}>{a.temporary_location.text}</Pill>], ["Field assignment today", a.field_assignment_today ?? "None"], ["Attendance profile", a.profile]]} />
         </Card>
       </Grid>
-      <div className="-mx-[18px] mt-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Close</Button>
         <Button onClick={() => modal.open({ title: "Change Work Arrangement", body: (c) => <ArrangementForm id={id} name={x.display_name} current={a.arrangement} schedule={a.schedule} office={a.office} close={c} /> })}>Change Arrangement</Button>
         <Button variant="primary" onClick={() => (close(), navigate(hrefFor("people", "employees", { id })))}>Open Full Record</Button>
-      </div>
+      </FormFooter>
     </>
   );
 }
@@ -49,8 +49,10 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
   const [why, setWhy] = useState("");
   const save = useMutation("PATCH /api/v1/attendance/setup/:employee_id");
   const sites = useApi("GET /api/v1/attendance/worksites", { query: { type: "Office" } });
+  const [tried, setTried] = useState(false);
   const bad = why.trim().length < 5;
   const submit = async () => {
+    setTried(true);
     if (bad) return;
     await save.run({ params: { employee_id: id }, body: { arrangement: arr, ...(arr === "Hybrid" && { schedule: sched }), office: site, reason: why.trim() } });
     invalidate("/api/v1/attendance", "/api/v1/employees");
@@ -80,13 +82,13 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
       <Field label="Assigned Office">
         <SelectField value={site} onChange={setSite} options={(sites.data?.data ?? []).map((s) => [s.name, s.name])} />
       </Field>
-      <Field label="Reason" state={why ? (bad ? "bad" : "good") : undefined} message="Give a reason">
-        <TextField value={why} onChange={setWhy} placeholder="Moved to field" state={why ? (bad ? "bad" : "good") : undefined} />
+      <Field label="Reason" state={why || tried ? (bad ? "bad" : "good") : undefined} message="At least 5 characters">
+        <TextField value={why} onChange={setWhy} placeholder="Moved to field" state={why || tried ? (bad ? "bad" : "good") : undefined} />
       </Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={bad || save.pending} onClick={submit}>Save Change</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Save Change</Button>
+      </FormFooter>
     </>
   );
 }

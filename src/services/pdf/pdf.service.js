@@ -33,7 +33,8 @@ function footerTemplate(ref) {
  * @returns {Promise<Buffer>}
  */
 async function render(html, { footer = null, landscape = false } = {}) {
-  if (typeof html !== "string" || !html.trim()) throw new Error("pdf.render: give the HTML");
+  if (typeof html !== "string" || !html.trim())
+    throw new Error("pdf.render: give the HTML");
   return chromium.withPage(async (page) => {
     await page.setJavaScriptEnabled(false);
     await page.setRequestInterception(true);
@@ -43,7 +44,10 @@ async function render(html, { footer = null, landscape = false } = {}) {
       else req.abort("blockedbyclient");
     });
     page.setDefaultTimeout(RENDER_TIMEOUT_MS);
-    await page.setContent(html, { waitUntil: "load", timeout: RENDER_TIMEOUT_MS });
+    await page.setContent(html, {
+      waitUntil: "load",
+      timeout: RENDER_TIMEOUT_MS,
+    });
     await page.emulateMediaType("print");
     const bytes = await page.pdf({
       format: "A4",

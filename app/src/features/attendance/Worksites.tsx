@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Worksite } from "@/api/types/attendance";
-import { Button, Pill, Card, CardHeader, PageHeader, useModal, Chips, toast, Field, TextField, rules, SearchInput, useForm, HelpTerm } from "@mycity/ui";
 import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
+import { Button, Pill, Card, CardHeader, PageHeader, useModal, Chips, toast, Field, FormFooter, rules, SearchInput, TextField, useContractForm } from "@mycity/ui";
 
 const COLOR: Record<Worksite["type"], string> = { Office: "var(--chart-1)", "Approved home": "var(--primary)", "Temporary location": "var(--primary)", "Field assignment": "var(--chart-2)" };
 
@@ -11,9 +11,9 @@ const COLOR: Record<Worksite["type"], string> = { Office: "var(--chart-1)", "App
 function FenceMap({ sites }: { sites: Worksite[] }) {
   return (
     <Card>
-      <CardHeader title="Lagos Geofences Today" right={<span className="text-[11.5px] text-subtle-foreground">Schematic, not to scale · homes masked</span>} />
+      <CardHeader title="Lagos Geofences Today" />
       <div className="relative h-[300px] overflow-hidden rounded-card border border-border bg-muted max-md:h-[200px]">
-        <svg viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" className="block size-full" role="img" aria-label="Schematic map of Lagos geofences">
+        <svg data-copy="content" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" className="block size-full" role="img" aria-label="Schematic map of Lagos geofences">
           <rect width="1000" height="300" fill="var(--muted)" />
           <path d="M0 230 Q 250 205 500 240 T 1000 228 L1000 300 L0 300Z" fill="var(--chart-2)" opacity=".10" />
           {sites.filter((s) => s.map).map((s, i) => {
@@ -48,11 +48,11 @@ export function Worksites() {
   return (
     <>
       <PageHeader
-        title={<HelpTerm help="Location is read only at clock-in and clock-out. Lists show a home's area only, and opening a full address is logged.">Worksites</HelpTerm>}
-        sub="Geofenced clock-in locations"
+        title="Worksites"
+        sub="Geofenced offices, homes and field sites"
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Worksite", body: (close) => <WorksiteForm close={close} /> })}>Add Worksite</Button>}
       />
-      <KpiTiles items={[{ label: "Office worksites", value: String(count("Office")) }, { label: "Approved homes", value: String(count("Approved home")) }, { label: "Field sites today", value: String(count("Field assignment")) }, { label: "Outside any fence today", value: "1", tone: "warn" }]} />
+      <KpiTiles items={[{ label: "Office Worksites", value: String(count("Office")) }, { label: "Approved Homes", value: String(count("Approved home")) }, { label: "Field Sites Today", value: String(count("Field assignment")) }, { label: "Outside Any Fence Today", value: "1", tone: "warn" }]} />
       <FenceMap sites={map.rows} />
       <Toolbar className="mt-3">
         <SearchInput value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-[260px]" />
@@ -83,7 +83,7 @@ export function Worksites() {
 }
 
 function WorksiteForm({ close }: { close: () => void }) {
-  const f = useForm({ name: "", address: "", radius_m: "120" }, { name: rules.required("Name the worksite"), address: rules.required("Enter the address"), radius_m: (v) => (/^\d+$/.test(v) && Number(v) >= 50 && Number(v) <= 300 ? null : "Between 50 and 300") });
+  const f = useContractForm({ name: "", address: "", radius_m: "120" }, { name: rules.required("Name the worksite"), address: rules.required("Enter the address"), radius_m: (v) => (/^\d+$/.test(v) && Number(v) >= 50 && Number(v) <= 300 ? null : "Between 50 and 300") });
   const save = useMutation("POST /api/v1/attendance/worksites");
   const submit = async () => {
     if (!f.check()) return;
@@ -101,10 +101,10 @@ function WorksiteForm({ close }: { close: () => void }) {
       <Field label="Worksite Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Enugu Office" /></Field>
       <Field label="Address" {...f.field("address")} info="The address is turned into coordinates when saved; check the pin on the map before staff clock in there."><TextField {...f.field("address")} placeholder="Street, area, city" /></Field>
       <Field label="Radius, Metres" {...f.field("radius_m")}><TextField inputMode="numeric" {...f.field("radius_m")} /></Field>
-      <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Worksite</Button>
-      </div>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Worksite</Button>
+      </FormFooter>
     </>
   );
 }

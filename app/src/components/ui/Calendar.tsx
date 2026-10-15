@@ -20,7 +20,7 @@ export function MonthCalendar({ year, month, events, right }: { year: number; mo
   return (
     <Card>
       <CardHeader title={`${monthName(month)} ${year}`} right={right ?? <span className="text-[11.5px] text-subtle-foreground">Africa/Lagos</span>} />
-      <div className="grid grid-cols-7 gap-1">
+      <div data-copy="content" className="grid grid-cols-7 gap-1">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
           <div key={d} className="min-w-0 overflow-hidden py-1 text-center text-[10px] font-[650] tracking-[.08em] text-subtle-foreground uppercase">
             {d}

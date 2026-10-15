@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { Device } from "@/api/types/attendance";
-import { Button, formatDate, formatDateTime, KeyValue, Pill, Who, Card, CardHeader, Grid, PageHeader, Chips, toast, SearchInput } from "@mycity/ui";
 import { StatStrip } from "@/components/ui/data";
 import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
+import { Button, KeyValue, Pill, Who, Card, CardHeader, Grid, PageHeader, Chips, toast, formatDate, formatDateTime, SearchInput } from "@mycity/ui";
 
-export const DEVICE_TONE: Record<Device["status"], "ok" | "warn" | "err" | "neutral"> = { Enrolled: "ok", "Pending review": "warn", Blocked: "err", Revoked: "neutral", "Verification unavailable": "warn" };
+export const DEVICE_TONE: Record<Device["status"], "ok" | "warn" | "err" | "neutral"> = { Enrolled: "ok", "Pending Review": "warn", Blocked: "err", Revoked: "neutral", "Verification unavailable": "warn" };
 
 /** People · Devices: devices used to clock in, and what the current policy does with each. */
 export function Devices() {
@@ -15,7 +15,7 @@ export function Devices() {
   const [status, setStatus] = useState("all");
   const list = usePaged("GET /api/v1/attendance/devices", { filters: status === "all" ? {} : { status } });
   const [selId, setSelId] = useState<string | null>(null);
-  const sel = list.rows.find((d) => d.device_id === selId) ?? list.rows.find((d) => d.status === "Pending review") ?? list.rows[0];
+  const sel = list.rows.find((d) => d.device_id === selId) ?? list.rows.find((d) => d.status === "Pending Review") ?? list.rows[0];
   const act = useMutation("POST /api/v1/attendance/devices/:id/status");
   const set = async (d: Device, s: Device["status"]) => {
     await act.run({ params: { id: d.device_id }, body: { status: s } });
@@ -30,11 +30,10 @@ export function Devices() {
       <Toolbar>
         <SearchInput value={list.q} onChange={list.setQ} placeholder="Device or person" className="w-full md:w-[260px]" />
       </Toolbar>
-      <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending review", "Pending review"], ["Enrolled", "Enrolled"], ["Blocked", "Blocked"], ["Revoked", "Revoked"]]} />
+      <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending Review", "Pending Review"], ["Enrolled", "Enrolled"], ["Blocked", "Blocked"], ["Revoked", "Revoked"]]} />
       <Grid cols="1.4/1">
         <Table
           title="Devices"
-          right={<span className="text-[11.5px] text-subtle-foreground">Click a row to review</span>}
           rows={list.rows}
           rowKey={(d) => d.device_id}
           selectedKey={sel?.device_id}
@@ -53,15 +52,15 @@ export function Devices() {
         />
         {sel && (
           <Card>
-            <CardHeader title={`${sel.employee.display_name} · ${sel.name}`} right={<Pill tone={DEVICE_TONE[sel.status]}>{sel.status}</Pill>} />
+            <CardHeader record title={`${sel.employee.display_name} · ${sel.name}`} right={<Pill tone={DEVICE_TONE[sel.status]}>{sel.status}</Pill>} />
             <KeyValue items={[["First seen", formatDateTime(sel.first_seen)], ["Last punch", sel.last_punch ? formatDateTime(sel.last_punch) : "None"], ["Note", sel.note ?? "None"], ["Other devices", others(sel).map((d) => `${d.name} (${d.status.toLowerCase()})`).join(", ") || "None"], ["Next punch", <Pill tone={sel.effect.tone}>{sel.effect.text}</Pill>]]} />
             <div className="mt-[14px] flex flex-wrap gap-2">
-              {sel.status !== "Enrolled" && <Button variant="primary" icon="ok" disabled={act.pending} onClick={() => set(sel, "Enrolled")}>Enrol This Device</Button>}
-              {sel.status === "Pending review" && <Button disabled={act.pending} onClick={() => set(sel, "Blocked")}>Reject</Button>}
+              {sel.status !== "Enrolled" && <Button variant="primary" icon="ok" busy={act.pending} onClick={() => set(sel, "Enrolled")}>Enrol This Device</Button>}
+              {sel.status === "Pending Review" && <Button busy={act.pending} onClick={() => set(sel, "Blocked")}>Reject</Button>}
               {sel.status === "Enrolled" && (
                 <>
-                  <Button disabled={act.pending} onClick={() => set(sel, "Revoked")}>Revoke</Button>
-                  <Button disabled={act.pending} onClick={() => set(sel, "Blocked")}>Block</Button>
+                  <Button busy={act.pending} onClick={() => set(sel, "Revoked")}>Revoke</Button>
+                  <Button busy={act.pending} onClick={() => set(sel, "Blocked")}>Block</Button>
                 </>
               )}
             </div>
@@ -70,12 +69,12 @@ export function Devices() {
       </Grid>
       {summary.data && (
         <Table
-          title={`How the Current Device Policy Affects a Punch, v${summary.data.policy_version}`}
+          title={`Device Policy v${summary.data.policy_version}`}
           rows={summary.data.effects}
           rowKey={(r) => r.state}
           columns={[
             { key: "s", label: "Device State", render: (r) => r.state },
-            { key: "e", label: "What Happens on a Punch", render: (r) => <Pill tone={r.effect.tone}>{r.effect.text}</Pill> },
+            { key: "e", label: "Punch Outcome", render: (r) => <Pill tone={r.effect.tone}>{r.effect.text}</Pill> },
           ]}
         />
       )}

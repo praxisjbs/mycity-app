@@ -4,16 +4,16 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
 import type { Grade, PayrollDeduction, PayslipRow, RunRow } from "@/api/types/payroll";
 import type { PersonRef } from "@/api/types/common";
-import { Button, formatMoneyShort, formatMonth, Icon, todayIso, Banner, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart, Bands } from "@/components/ui/charts";
 import { Chain, StatStrip } from "@/components/ui/data";
 import { LoadingRows, Table } from "@/components/ui/Table";
 
 import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { ChainCard, ExportButton, KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
+import { ChainCard, ExportButton, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { PersonPicker } from "@/components/form";
+import { Button, Banner, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, formatMoneyShort, formatMonth, todayIso, StatusPill, DateField, Field, FormFooter, MoneyField, rules, TextAreaField, TextField, useContractForm } from "@mycity/ui";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
   if (tab === "payslips") return <Payslips />;
@@ -79,13 +79,12 @@ function Runs() {
           { key: "st", label: "Status", render: (r) => <StatusPill s={r.status} /> },
         ]}
       />
-      <div className="mt-3">
-        {s.data ? <AreaChart title="Net Payroll by Month" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} note={s.data.trend_note} /> : <Card><LoadingRows /></Card>}
-      </div>
+      <Grid cols={2} className="mt-3">
+        {s.data ? <AreaChart title="Net Payroll by Month" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} /> : <Card><LoadingRows /></Card>}
+      </Grid>
     </>
   );
 }
-
 
 /* ───────────── Payslips ───────────── */
 
@@ -153,7 +152,6 @@ function Structure() {
           title="Bands by Grade"
           scaleLabel={`₦0 to ${formatMoneyShort(String(Math.round(scale)))}`}
           rows={list.rows.map((g) => ({ label: `${g.code} · ${g.band}`, sub: `${g.staff} staff`, minPct: pct(g.minimum), midPct: pct(g.midpoint), maxPct: pct(g.maximum), value: `${formatMoneyShort(g.minimum)} to ${formatMoneyShort(g.maximum)}` }))}
-          note="The tick is the midpoint. A new hire is normally placed between the minimum and the midpoint."
         />
       )}
       <Grid cols={2} className="mt-3">
@@ -171,31 +169,19 @@ function Structure() {
             { key: "s", label: "Staff", align: "n", render: (g) => g.staff },
           ]}
         />
-        <KvCard
-          title="What a Band Controls"
-          items={[
-            ["Offers", "A salary outside the band warns the recruiter"],
-            ["Reviews", "A rating does not move a grade. A promotion does"],
-            ["Promotion", "Changes the grade, which changes the band, which changes pay"],
-            ["Field security", "Bands are masked from Manager and Staff roles"],
-            ["Effective dating", "A band change applies from a date, never retrospectively"],
-            ["Above maximum", "Flagged, not blocked"],
-          ]}
-        />
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">Placeholder bands. MyCity has been asked for their real structure so these are replaced before M6 is demonstrated.</p>
     </>
   );
 }
 
 function GradeForm({ close }: { close: () => void }) {
-  const f = useForm({ code: "", band: "", minimum: "", midpoint: "", maximum: "", effective_from: "" }, {
+  const f = useContractForm({ code: "", band: "", minimum: "", midpoint: "", maximum: "", effective_from: "" }, {
     code: (v) => (!/^G\d{1,2}$/.test(v) ? "Like G7" : null),
     band: (v) => (!v.trim() ? "Name the band" : null),
     minimum: (v) => (!(Number(v) > 0) ? "Enter the minimum" : null),
     midpoint: (v, a) => (!(Number(v) > Number(a.minimum)) ? "Above the minimum" : null),
     maximum: (v, a) => (!(Number(v) > Number(a.midpoint)) ? "Above the midpoint" : null),
-    effective_from: (v) => (!v ? "Pick the date it applies from" : null),
+    effective_from: (v) => (!v ? "Pick the start date" : null),
   });
   const save = useMutation("POST /api/v1/payroll/grades");
   const submit = async () => {
@@ -211,22 +197,16 @@ function GradeForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <FormRow>
-        <Field label="Grade" {...f.field("code")}><TextField {...f.field("code")} placeholder="G7" onChange={(v) => f.set("code", v.toUpperCase())} /></Field>
-        <Field label="Band" {...f.field("band")}><TextField {...f.field("band")} placeholder="Principal" /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Minimum" {...f.field("minimum")}><MoneyField {...f.field("minimum")} /></Field>
-        <Field label="Midpoint" {...f.field("midpoint")}><MoneyField {...f.field("midpoint")} /></Field>
-      </FormRow>
-      <FormRow>
-        <Field label="Maximum" {...f.field("maximum")}><MoneyField {...f.field("maximum")} /></Field>
-        <Field label="Applies From" {...f.field("effective_from")}><DateField {...f.field("effective_from")} min={todayIso()} /></Field>
-      </FormRow>
-      <ModalFoot>
+      <Field label="Grade" {...f.field("code")}><TextField {...f.field("code")} placeholder="G7" onChange={(v) => f.set("code", v.toUpperCase())} /></Field>
+      <Field label="Band" {...f.field("band")}><TextField {...f.field("band")} placeholder="Principal" /></Field>
+      <Field label="Minimum" {...f.field("minimum")}><MoneyField {...f.field("minimum")} /></Field>
+      <Field label="Midpoint" {...f.field("midpoint")}><MoneyField {...f.field("midpoint")} /></Field>
+      <Field label="Maximum" {...f.field("maximum")}><MoneyField {...f.field("maximum")} /></Field>
+      <Field label="Applies From" {...f.field("effective_from")}><DateField {...f.field("effective_from")} min={todayIso()} /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Grade</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Grade</Button>
+      </FormFooter>
     </>
   );
 }
@@ -280,8 +260,8 @@ function Deductions() {
             <Chain steps={f.chain.map((x) => ({ label: x.label, state: x.state ?? undefined }))} />
             <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{f.note}</p>
             <div className="mt-[13px] flex flex-wrap gap-2">
-              <Button variant="primary" icon="ok" disabled={accept.pending} onClick={() => doAccept(1)}>Accept Into This Month</Button>
-              <Button disabled={accept.pending} onClick={() => doAccept(2)}>Spread Over Two Runs</Button>
+              <Button variant="primary" icon="ok" busy={accept.pending} onClick={() => doAccept(1)}>Accept This Month</Button>
+              <Button busy={accept.pending} onClick={() => doAccept(2)}>Split Across Runs</Button>
               <Button onClick={() => modal.open({ title: "Waive Deduction", body: (close) => <Waive id={f.deduction_id} close={close} /> })}>Waive</Button>
             </div>
           </Card>
@@ -301,21 +281,21 @@ function Deductions() {
           ]}
         />
       </Grid>
-      <p className="mt-3 text-[11.5px] text-subtle-foreground">A deduction from a sanction never enters a run automatically. Someone has to accept it.</p>
     </>
   );
 }
 
 function Waive({ id, close }: { id: string; close: () => void }) {
-  const [reason, setReason] = useState("");
+  const f = useContractForm({ reason: "" }, { reason: rules.min(6, "At least 6 characters") });
+  const reason = f.values.reason;
   const waive = useMutation("POST /api/v1/payroll/deductions/:id/waive");
   return (
     <>
-      <Field label="Why It Is Waived" state={reason && reason.trim().length < 6 ? "bad" : undefined}><TextAreaField value={reason} onChange={setReason} placeholder="Damaged laptop" /></Field>
-      <ModalFoot>
+      <Field label="Why It Is Waived" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Damaged laptop" /></Field>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={reason.trim().length < 6 || waive.pending} onClick={async () => { try { await waive.run({ params: { id }, body: { reason } }); invalidate("/api/v1/payroll"); close(); toast("Deduction waived"); } catch (e) { fail(e); } }}>Waive</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={waive.pending} onClick={async () => { if (!f.check()) return; try { await waive.run({ params: { id }, body: { reason } }); invalidate("/api/v1/payroll"); close(); toast("Deduction waived"); } catch (e) { fail(e); } }}>Waive</Button>
+      </FormFooter>
     </>
   );
 }
@@ -323,7 +303,7 @@ function Waive({ id, close }: { id: string; close: () => void }) {
 function DeductionForm({ close }: { close: () => void }) {
   const [who, setWho] = useState<PersonRef[]>([]);
   const [tried, setTried] = useState(false);
-  const f = useForm({ reason: "", amount: "" }, { reason: (v) => (!v.trim() ? "Give the reason; it is the payslip line" : null), amount: (v) => (!(Number(v) > 0) ? "Enter the amount" : null) });
+  const f = useContractForm({ reason: "", amount: "" }, { reason: (v) => (!v.trim() ? "Give a reason" : null), amount: (v) => (!(Number(v) > 0) ? "Enter the amount" : null) });
   const save = useMutation("POST /api/v1/payroll/deductions");
   const submit = async () => {
     setTried(true);
@@ -343,10 +323,10 @@ function DeductionForm({ close }: { close: () => void }) {
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
       <Field label="Reason" {...f.field("reason")}><TextField {...f.field("reason")} placeholder="Salary advance repayment" /></Field>
       <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" disabled={save.pending} onClick={submit}>Add Deduction</Button>
-      </ModalFoot>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Deduction</Button>
+      </FormFooter>
     </>
   );
 }
@@ -368,7 +348,7 @@ function StatutoryTab() {
         <div className="mb-3 flex items-start gap-2.5 rounded-card bg-warning-soft p-[14px] text-warning">
           <Icon name="alert" className="mt-0.5 flex-none" />
           <div>
-            <h3 className="text-[13.5px] font-semibold">Advanced payroll is off</h3>
+            <h3 data-ui="title" className="text-[13.5px] font-semibold">Advanced Payroll Off</h3>
             <p className="mt-1 text-[11.5px]">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p>
           </div>
         </div>
@@ -389,7 +369,7 @@ function StatutoryTab() {
       />
       <Grid cols={2} className="mt-3">
         <Table
-          title="Progressive Bands, Configured and Dormant"
+          title="Progressive Bands"
           right={<span className="text-[11.5px] text-subtle-foreground">Effective dated</span>}
           rows={d?.paye_bands ?? []}
           rowKey={(r) => `${r.label}-${r.annual}-${r.rate}`}
@@ -398,17 +378,6 @@ function StatutoryTab() {
             { key: "l", label: "PAYE Band", render: (r) => r.label },
             { key: "a", label: "Annual", align: "n", render: (r) => <Money value={r.annual} /> },
             { key: "r", label: "Rate", align: "n", render: (r) => r.rate },
-          ]}
-        />
-        <KvCard
-          title="Why It Is Built but Off"
-          items={[
-            ["The ask", "MyCity asked for simple payroll. Gross, deductions, net"],
-            ["The risk", "Statutory payroll added later is a rewrite, not a setting"],
-            ["The answer", "Build it now, configure it, leave it off"],
-            ["Switching on", "Recomputes future runs only. A locked run never changes"],
-            ["Rates", "Effective dated, so a rate change next year does not rewrite this one"],
-            ["Handover", "Documented in the handover pack either way"],
           ]}
         />
       </Grid>
@@ -435,10 +404,10 @@ function Enable({ close }: { close: () => void }) {
     <>
       <Banner tone="warn">PAYE, pension, NHF, ITF and NSITF will apply to every run from this date. Locked runs never change.</Banner>
       <Field label="From" state={tried && !from ? "bad" : undefined} message={tried && !from ? "Pick the first day it applies" : undefined}><DateField value={from} onChange={setFrom} min={todayIso()} /></Field>
-      <ModalFoot>
+      <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={go}>Switch On</Button>
-      </ModalFoot>
+      </FormFooter>
     </>
   );
 }

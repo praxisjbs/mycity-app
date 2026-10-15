@@ -1,11 +1,11 @@
 /**
- * The one field binding every form hook returns and every field takes, so a
- * screen moves from the interim useForm to useContractForm by changing the
- * hook, not the fields (FRONTEND_GUIDE §8.3).
+ * The one field binding the form hook returns and every field takes, so a
+ * form moves from INTERIM rules to the contract schema by changing the hook's
+ * second argument, not the fields (FRONTEND_GUIDE §8.3).
  *
- *   const form = useContractForm(schemas.organisation.EmployeeCreate, { first_name: "" });
- *   <Field label="First Name" {...form.status("first_name")}>
- *     <TextField {...form.field("first_name")} />
+ *   const f = useContractForm({ first_name: "" }, schemas.organisation.EmployeeCreate);
+ *   <Field label="First Name" {...f.status("first_name")}>
+ *     <TextField {...f.field("first_name")} />
  *   </Field>
  */
 

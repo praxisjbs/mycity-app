@@ -26,7 +26,7 @@ export function AreaChart({ title, values, labels, note, right }: { title: React
           ))}
         </svg>
       </div>
-      {note && <p className="mt-2 text-[11.5px] text-subtle-foreground">{note}</p>}
+      {note && <p data-ui="chart-caption" className="mt-2 text-[11.5px] text-subtle-foreground max-md:hidden">{note}</p>}
     </Card>
   );
 }
@@ -67,7 +67,7 @@ export function Bands({ title, scaleLabel, rows, note }: {
     <Card>
       <CardHeader title={title} right={<span className="text-[11.5px] text-subtle-foreground">{scaleLabel}</span>} />
       {rows.map((r, i) => (
-        <div key={i} className="flex items-center gap-2.5 py-[7px]">
+        <div key={i} data-copy="content" className="flex items-center gap-2.5 py-[7px]">
           <span className="w-[124px] flex-none text-[12.5px] leading-[1.3] font-semibold max-md:w-[86px]">
             {r.label}
             {r.sub && <em className="block text-[10.5px] font-medium text-subtle-foreground not-italic">{r.sub}</em>}
@@ -79,7 +79,7 @@ export function Bands({ title, scaleLabel, rows, note }: {
           <span className="w-[124px] flex-none text-right text-[11.5px] font-semibold text-muted-foreground max-md:w-24">{r.value}</span>
         </div>
       ))}
-      {note && <p className="mt-[11px] border-t border-dashed border-border pt-2.5 text-[11.5px] text-subtle-foreground">{note}</p>}
+      {note && <p data-ui="chart-caption" className="mt-[11px] border-t border-dashed border-border pt-2.5 text-[11.5px] text-subtle-foreground max-md:hidden">{note}</p>}
     </Card>
   );
 }

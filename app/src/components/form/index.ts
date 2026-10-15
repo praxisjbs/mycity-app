@@ -3,5 +3,5 @@
  * packages/ui: the server-searching person picker and the upload field. Every
  * other field comes from @mycity/ui (FRONTEND_GUIDE §8.6).
  */
-export { Upload } from "./Upload";
+export { UploadField } from "./Upload";
 export { PersonPicker } from "./PersonPicker";

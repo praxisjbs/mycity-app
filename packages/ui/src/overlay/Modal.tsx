@@ -149,6 +149,7 @@ export function Modal({
               <Dialog.Content
                 ref={box}
                 role={role ?? "dialog"}
+                data-ui="modal"
                 aria-modal="true"
                 {...(sub ? {} : { "aria-describedby": undefined })}
                 onOpenAutoFocus={(e) => {

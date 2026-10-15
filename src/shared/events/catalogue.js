@@ -49,12 +49,19 @@ function constantOf(key) {
 
 function checkEntry(moduleKey, key, meta) {
   const where = `defineEvents(${moduleKey}) "${key}"`;
-  if (!KEY_RE.test(key)) throw new Error(`${where}: an event key is dotted lower snake_case, e.g. "employee.created"`);
-  if (!meta || typeof meta !== "object") throw new Error(`${where}: give { summary }`);
-  if (typeof meta.summary !== "string" || meta.summary.trim() === "") throw new Error(`${where}: summary is required`);
-  if (meta.summary.includes("\u2014")) throw new Error(`${where}: no em dashes in copy a person reads`);
+  if (!KEY_RE.test(key))
+    throw new Error(
+      `${where}: an event key is dotted lower snake_case, e.g. "employee.created"`,
+    );
+  if (!meta || typeof meta !== "object")
+    throw new Error(`${where}: give { summary }`);
+  if (typeof meta.summary !== "string" || meta.summary.trim() === "")
+    throw new Error(`${where}: summary is required`);
+  if (meta.summary.includes("\u2014"))
+    throw new Error(`${where}: no em dashes in copy a person reads`);
   for (const k of Object.keys(meta)) {
-    if (!["summary", "security", "sensitive"].includes(k)) throw new Error(`${where}: unknown option "${k}"`);
+    if (!["summary", "security", "sensitive"].includes(k))
+      throw new Error(`${where}: unknown option "${k}"`);
   }
 }
 
@@ -66,16 +73,21 @@ function checkEntry(moduleKey, key, meta) {
  */
 function defineEvents(moduleKey, events) {
   if (!catalog.isModule(moduleKey)) {
-    throw new Error(`defineEvents: "${moduleKey}" is not a module key (shared/access/access.catalog.js)`);
+    throw new Error(
+      `defineEvents: "${moduleKey}" is not a module key (shared/access/access.catalog.js)`,
+    );
   }
-  if (!events || typeof events !== "object") throw new Error("defineEvents: give an object of key → { summary }");
+  if (!events || typeof events !== "object")
+    throw new Error("defineEvents: give an object of key → { summary }");
 
   const constants = {};
   for (const [key, meta] of Object.entries(events)) {
     checkEntry(moduleKey, key, meta);
     const existing = ENTRIES.get(key);
     if (existing && existing.module !== moduleKey) {
-      throw new Error(`defineEvents: "${key}" is already declared by module "${existing.module}"`);
+      throw new Error(
+        `defineEvents: "${key}" is already declared by module "${existing.module}"`,
+      );
     }
     if (!existing) {
       ENTRIES.set(
@@ -107,7 +119,9 @@ function has(key) {
 function require_(key) {
   const entry = ENTRIES.get(key);
   if (!entry) {
-    throw new Error(`event "${key}" is not declared; add it to the module's <module>.events.js with defineEvents()`);
+    throw new Error(
+      `event "${key}" is not declared; add it to the module's <module>.events.js with defineEvents()`,
+    );
   }
   return entry;
 }
@@ -128,7 +142,9 @@ const WORKFLOW = defineEvents("settings", {
   "workflow.advanced": { summary: "An approval moved to its next stage" },
   "workflow.completed": { summary: "An approval finished" },
   "workflow.changes_requested": { summary: "An approver asked for changes" },
-  "workflow.escalated": { summary: "An approval passed its time limit and was escalated" },
+  "workflow.escalated": {
+    summary: "An approval passed its time limit and was escalated",
+  },
   "workflow.cancelled": { summary: "An approval was withdrawn" },
 });
 
@@ -136,7 +152,9 @@ const WORKFLOW = defineEvents("settings", {
 const ALERTS = defineEvents("home", {
   "home.alert_raised": { summary: "An alert was raised" },
   "home.alert_cleared": { summary: "An alert was cleared or dismissed" },
-  "home.alert_escalated": { summary: "A high alert was left open too long and escalated" },
+  "home.alert_escalated": {
+    summary: "A high alert was left open too long and escalated",
+  },
 });
 
 module.exports = {

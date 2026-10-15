@@ -312,3 +312,4 @@ the catalogue's eligibility pattern so an alert inherits the clearing permission
   screen, Over By became a help term, and the facts they carried that were missing here were added
   to §6. §6 and §11 now point at help terms and §10 instead of an ⓘ button.
 - 15/10/2026 · AJ · Four tabs built in `app/` against the mock API; not wired yet.
+- 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: the three explainer cards are gone (as in the demo), card help is a help term on the title, KPI and card titles are Title Case, Team and Alerts subtitles shortened.

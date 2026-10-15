@@ -22,7 +22,7 @@ export default {
       </Button>
     ),
     Loading: () => (
-      <Button variant="primary" loading>
+      <Button variant="primary" busy>
         Save Changes
       </Button>
     ),

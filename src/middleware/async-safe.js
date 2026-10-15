@@ -18,7 +18,8 @@ if (!Layer.prototype.__mycityAsyncSafe) {
   Layer.prototype.handle_request = function handleRequest(req, res, next) {
     const fn = this.handle;
     // Error middleware (arity 4) is dispatched by handle_error; leave it alone.
-    if (typeof fn !== "function" || fn.length > 3) return original.call(this, req, res, next);
+    if (typeof fn !== "function" || fn.length > 3)
+      return original.call(this, req, res, next);
     let ret;
     try {
       ret = fn.call(this, req, res, next);

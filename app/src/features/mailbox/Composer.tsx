@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailAttachment, MailDraftSave } from "@/api/types/mailbox";
-import { Button, cn, formatBytes, formatDate, Icon, todayIso, Pill, Menu, toast, DateField, Field, InlineInput, InlineLabel, InlineSelect, TextField } from "@mycity/ui";
-import { Upload } from "@/components/form";
+import { UploadField } from "@/components/form";
+import { Button, Pill, Icon, Menu, toast, cn, formatBytes, formatDate, todayIso, DateField, Field, InlineInput, InlineLabel, InlineSelect, TextField } from "@mycity/ui";
 
 export interface ComposeInit {
   draft_id?: string;
@@ -218,12 +218,12 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
             </button>
           ),
         )}
-        <Upload
+        <UploadField
           purpose="mail"
           endpoint="/api/v1/mailbox/attachments"
           onUploaded={(docs) => (setFiles((f) => [...f, ...docs.map((d) => ({ ...d, attachment_id: (d as MailAttachment).attachment_id ?? d.document_id }))]), touch())}
           trigger={(open) => (
-            <button type="button" title="Attach a file" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-[30px] min-w-[30px] items-center justify-center rounded-[7px] text-muted-foreground hover:bg-accent hover:text-foreground"><Icon name="clip" /></button>
+            <button type="button" title="Attach a File" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-[30px] min-w-[30px] items-center justify-center rounded-[7px] text-muted-foreground hover:bg-accent hover:text-foreground"><Icon name="clip" /></button>
           )}
         />
         {linkOpen && (
@@ -260,7 +260,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
       )}
       {sched.open && (
         <div className="mt-3 rounded-xl border border-border bg-muted p-3">
-          <h3 className="mb-2 flex items-center gap-[7px] text-[13.5px] font-semibold"><Icon name="clock" />Schedule Send</h3>
+          <h3 data-ui="title" className="mb-2 flex items-center gap-[7px] text-[13.5px] font-semibold"><Icon name="clock" />Schedule Send</h3>
           <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2.5 max-md:grid-cols-2">
             <Field label="Date" state={sched.tried && !sched.date ? "bad" : undefined} message={sched.tried && !sched.date ? "A real date, today or later" : undefined} className="mb-0">
               <DateField value={sched.date} onChange={(v) => setSched((s) => ({ ...s, date: v, past: false }))} min={todayIso()} />
@@ -270,7 +270,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
             </Field>
             <div className="flex justify-end gap-2 max-md:col-span-2">
               <Button onClick={() => setSched((s) => ({ ...s, open: false }))}>Cancel</Button>
-              <Button variant="primary" icon="clock" disabled={busy} onClick={schedule}>Schedule</Button>
+              <Button variant="primary" icon="clock" busy={busy} onClick={schedule}>Schedule</Button>
             </div>
           </div>
           {sched.past && <p className="mt-2 text-[11.5px] text-destructive">That time has already passed.</p>}
@@ -296,7 +296,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
                 { label: "Pick Date and Time", icon: "check", onSelect: () => setSched((s) => ({ ...s, open: true })) },
               ]}
             />
-            <Button variant="primary" icon="send" disabled={busy} onClick={() => void send()}>Send</Button>
+            <Button variant="primary" icon="send" busy={busy} onClick={() => void send()}>Send</Button>
           </>
         )}
       </div>

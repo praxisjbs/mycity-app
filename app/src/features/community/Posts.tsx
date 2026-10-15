@@ -49,7 +49,7 @@ function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }
         <span className={cn("inline-flex items-center gap-1.5 rounded-full px-[9px] py-[3px] text-[10.5px] font-[750] tracking-[.12em] uppercase", bday ? "bg-primary text-primary-foreground" : "bg-chart-2 text-deep")}>
           {bday ? "Birthday" : "Work Anniversary"}
         </span>
-        <h4 className="mt-2 text-[18px] leading-tight tracking-[-.02em] max-md:text-[16px]">
+        <h4 data-copy="content" className="mt-2 text-[18px] leading-tight tracking-[-.02em] max-md:text-[16px]">
           {bday ? <>Happy birthday, <em className="text-primary not-italic">{first}</em></> : <><em className="text-primary not-italic">{c.years} years</em> at MyCity, {first}</>}
         </h4>
         <p className="mt-[5px] text-[13px] text-on-deep-soft">{c.wish}</p>
@@ -138,7 +138,7 @@ export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string;
     return (
       <div className="max-w-[560px] rounded-card border border-border bg-background px-[14px] py-3">
         <div className="mb-[5px] text-[11.5px] text-subtle-foreground">Poll by {m.author.display_name} · {votes} vote{votes === 1 ? "" : "s"}</div>
-        <h4 className="mb-[9px] text-[13.5px]">{p.question}</h4>
+        <h4 data-copy="content" className="mb-[9px] text-[13.5px]">{p.question}</h4>
         {p.options.map((o, i) => {
           const pc = Math.round((o.votes * 100) / tot);
           return (
@@ -155,7 +155,7 @@ export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string;
     return (
       <div className="max-w-[620px] rounded-card border border-border bg-background px-[15px] py-[13px]">
         <div className="mb-1.5 flex items-center gap-2 text-[11.5px] text-subtle-foreground"><Icon name="flag" />{m.author.display_name} · {formatTime(m.created_at)}</div>
-        <h4 className="text-[14.5px]">{m.announcement!.title}</h4>
+        <h4 data-copy="content" className="text-[14.5px]">{m.announcement!.title}</h4>
         <p className="mt-[5px] text-[13px] leading-normal text-muted-foreground">{m.announcement!.body}</p>
       </div>
     );
