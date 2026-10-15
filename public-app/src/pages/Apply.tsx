@@ -4,8 +4,8 @@ import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { ApplicationReceipt } from "@/api/types/public";
 import type { DocumentRef } from "@/api/types/common";
-import { Message, Page } from "@/components/Layout";
-import { Button, formatDate, formatTime, Skeleton, Banner, Field, Form, TextField, TextAreaField } from "@mycity/ui";
+import { Page } from "@/shell/Page";
+import { Banner, Button, Field, Form, formatDate, formatTime, PageMessage, Skeleton, TextAreaField, TextField } from "@mycity/ui";
 import { Sub } from "@/components/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
@@ -51,12 +51,12 @@ export function Apply({ token }: { token: string }) {
   if (receipt)
     return (
       <Page title="Application Sent">
-        <Message icon="ok" tone="ok" title="Application sent" action={<Button onClick={() => navigate("/jobs")}>See Other Roles</Button>}>
+        <PageMessage icon="ok" tone="ok" title="Application sent" action={<Button onClick={() => navigate("/jobs")}>See Other Roles</Button>}>
           <p>Thank you for applying for {link.data.vacancy_title}. A person reads every application, and we will email you within five working days.</p>
           <p className="mt-2">
             Your reference is <b className="text-foreground">{receipt.reference}</b>. You can close this page.
           </p>
-        </Message>
+        </PageMessage>
       </Page>
     );
 

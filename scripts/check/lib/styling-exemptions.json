@@ -52,8 +52,6 @@
     "src/features/workspace/index.tsx"
   ],
   "public-app": [
-    "src/components/Layout.tsx",
-    "src/components/Planned.tsx",
     "src/components/SignaturePad.tsx",
     "src/components/form/Upload.tsx",
     "src/components/ui.tsx",

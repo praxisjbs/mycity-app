@@ -3,9 +3,9 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { OfferToSign } from "@/api/types/public";
-import { Brand, Message, Page } from "@/components/Layout";
+import { Page } from "@/shell/Page";
 import { SignaturePad, type SignaturePadHandle } from "@/components/SignaturePad";
-import { Button, formatDate, formatTime, Skeleton, Banner, Field, TextAreaField } from "@mycity/ui";
+import { Banner, Brand, Button, Field, formatDate, formatTime, PageMessage, Skeleton, TextAreaField } from "@mycity/ui";
 import { Sub } from "@/components/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
@@ -34,7 +34,7 @@ function Head({ d }: { d: OfferToSign }) {
   return (
     <>
       <div className="mb-[18px] text-center">
-        <Brand />
+        <Brand name="MyCityApp" />
       </div>
       <h1 className="text-[19px]">Offer of Employment</h1>
       <Sub className="mt-1">
@@ -140,7 +140,7 @@ function Closed({ d, token }: { d: OfferToSign; token: string }) {
     <Page title="Offer of Employment" brandInCard>
       <Head d={d} />
       {d.state === "signed" ? (
-        <Message
+        <PageMessage
           icon="ok"
           tone="ok"
           title="Offer signed"
@@ -164,19 +164,19 @@ function Closed({ d, token }: { d: OfferToSign; token: string }) {
               <Banner tone="info">{note}</Banner>
             </div>
           )}
-        </Message>
+        </PageMessage>
       ) : d.state === "declined" ? (
-        <Message icon="ok" title="Offer declined">
+        <PageMessage icon="ok" title="Offer declined">
           Thank you for letting us know. Your answer has been recorded and the hiring team has been told. We wish you well.
-        </Message>
+        </PageMessage>
       ) : d.state === "expired" ? (
-        <Message icon="clock" tone="warn" title="This offer has expired">
+        <PageMessage icon="clock" tone="warn" title="This offer has expired">
           It expired on {formatDate(d.expires_at)} without a signature. If you still want the role, reply to the email the offer came with.
-        </Message>
+        </PageMessage>
       ) : (
-        <Message icon="alert" title="This offer has been withdrawn">
+        <PageMessage icon="alert" title="This offer has been withdrawn">
           It can no longer be signed. If you think this is a mistake, reply to the email the offer came with.
-        </Message>
+        </PageMessage>
       )}
     </Page>
   );

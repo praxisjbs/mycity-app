@@ -198,14 +198,11 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 Each #18 file below stays where it is until the PR named beside it moves its components into
 `packages/ui`; nothing new may be added beside them (`check/components.js` refuses a new file in
 `app/src/components/` or `public-app/src/components/`). PR 1 moved the form system, overlays,
-feedback, help, layout and the basic display parts; what is left moves in PR 2 and PR 3.
+feedback, help, layout and the basic display parts; PR 2 moved the staging bars, the public page
+frame and Coming Soon into the Shell group; what is left moves in PR 3.
 
 | File | Holds | Moves in |
 |---|---|---|
-| `app/src/components/ui/StagingBar.tsx` | staging bar | PR 2 (shell) |
-| `public-app/src/components/Layout.tsx` | Page, Brand, Message, demo strip | PR 2 (public shell) |
-| `public-app/src/components/Planned.tsx` | Coming Soon page | PR 2 (public shell) |
-| `public-app/src/components/StagingBar.tsx` | staging bar | PR 2 (shell) |
 | `app/src/components/form/index.ts` | the barrel for PersonPicker and Upload | PR 3 (pickers, upload engine) |
 | `app/src/components/form/PersonPicker.tsx` | PersonPicker | PR 3 (pickers) |
 | `app/src/components/form/Upload.tsx` | Upload | PR 3 (upload engine) |

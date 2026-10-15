@@ -250,6 +250,9 @@ function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }:
   );
 }
 
+/** A mock build (laptops and CI); a live build drops the Prototype View switch entirely. */
+const MOCK = import.meta.env.VITE_API_MODE === "mock";
+
 /**
  * One screen, as the delivery plan allows (F14): Coming Soon before its
  * milestone opens it; in mock mode (laptops and CI) the Prototype View switch
@@ -262,7 +265,7 @@ function ModulePage({ mod, tab, id }: { mod: ModuleDef; tab: TabDef; id: string 
   if (!online) return <OfflinePage />;
   return (
     <>
-      {state.rule === "mock" && <ViewBar />}
+      {MOCK && state.rule === "mock" && <ViewBar />}
       {state.open ? (
         <ErrorBoundary key={`${mod.key}:${tab.slug}`}>
           <Suspense fallback={<Skeleton lines={6} />}>
@@ -270,7 +273,7 @@ function ModulePage({ mod, tab, id }: { mod: ModuleDef; tab: TabDef; id: string 
           </Suspense>
         </ErrorBoundary>
       ) : (
-        <PlannedScreen moduleKey={mod.key} tab={tab.slug} label={tab.label} m={state.screen?.m ?? "M11"} mock={state.rule === "mock"} />
+        <PlannedScreen moduleKey={mod.key} tab={tab.slug} label={tab.label} m={state.screen?.m ?? "M11"} mock={MOCK && state.rule === "mock"} />
       )}
     </>
   );
