@@ -1,14 +1,8 @@
 import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { MyQuery } from "@/api/types/ess";
-import { Button, cn, formatDate, formatDateTime, Icon, type IconName } from "@mycity/ui";
-import { Banner, EmptyState, KV, Pill } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
+import { Button, cn, formatDate, formatDateTime, Icon, type IconName, Banner, EmptyState, KeyValue, Pill, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, Field, TextAreaField } from "@mycity/ui";
 import { Pager, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { Field, Textarea } from "@/components/form";
 
 type View = "open" | "archived" | "sanctions";
 
@@ -32,7 +26,7 @@ export function MyQueriesPage() {
   );
   return (
     <>
-      <PageHead title="My Queries" sub="Queries raised against you, and their outcome" />
+      <PageHeader title="My Queries" sub="Queries raised against you, and their outcome" />
       {s.data && (
         <Grid cols={3}>
           {card("open", "alert", "Open Queries", s.data.open, s.data.open ? "Waiting on your response" : "Nothing waiting on you", s.data.open ? "warn" : "ok")}
@@ -56,7 +50,7 @@ function OpenQueries() {
       {list.rows.map((q) => (
         <Card key={q.query_id} className="mb-3">
           <CardHeader title={`${q.number} · ${q.subject}`} right={<Pill tone={q.outcome.tone}>{q.outcome.text}</Pill>} />
-          <KV items={[["Raised by", q.raised_by], ["Raised on", formatDate(q.date)], ["Respond by", q.respond_by ? formatDateTime(q.respond_by) : "None"], ["Your response", q.response ?? "Not yet"]]} />
+          <KeyValue items={[["Raised by", q.raised_by], ["Raised on", formatDate(q.date)], ["Respond by", q.respond_by ? formatDateTime(q.respond_by) : "None"], ["Your response", q.response ?? "Not yet"]]} />
           {!q.response && (
             <div className="mt-3 flex justify-end">
               <Button variant="primary" icon="send" onClick={() => modal.open({ title: `Respond to ${q.number}`, body: (close) => <Respond q={q} close={close} /> })}>Respond</Button>
@@ -76,7 +70,7 @@ function Respond({ q, close }: { q: MyQuery; close: () => void }) {
     <>
       <Banner tone="info" icon="info">Your response stays on the record next to the decision. Most queries close with no action.</Banner>
       <Field label="Your Response" state={text ? (ok ? "good" : "bad") : undefined} message={send.fields.response?.[0] ?? "Write at least 20 characters"}>
-        <Textarea value={text} onChange={setText} rows={6} state={text ? (ok ? "good" : "bad") : undefined} placeholder="Traffic on Ikorodu" />
+        <TextAreaField value={text} onChange={setText} rows={6} state={text ? (ok ? "good" : "bad") : undefined} placeholder="Traffic on Ikorodu" />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

@@ -3,19 +3,13 @@ import { api } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/mailbox";
 import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/types/mailbox";
-import { Button, cn, formatBytes, formatDateTime, formatWhen, Icon, IconButton, useIsMobile } from "@mycity/ui";
-import { Avatar, Banner, Pill, StatStrip } from "@/components/ui/data";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
-import { PageHead } from "@/components/ui/layout";
-import { Menu, type MenuItem } from "@/components/ui/Menu";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Button, cn, formatBytes, formatDateTime, formatWhen, Icon, IconButton, useIsMobile, Avatar, Banner, Pill, PageHeader, Menu, type MenuItem, useModal, ErrorState, toast, SearchInput } from "@mycity/ui";
+import { StatStrip } from "@/components/ui/data";
+import { LoadingRows } from "@/components/ui/Table";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Splitter, useSplit } from "@/features/community/Chat";
 import { Composer, type ComposeInit } from "./Composer";
-import { SearchBox } from "@/components/form";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
@@ -25,7 +19,6 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
   const mobile = useIsMobile();
   useFitPage(!mobile);
   const modal = useModal();
-  const info = useInfo();
   const conn = useApi("GET /api/v1/mailbox/connection");
   const list = usePaged("GET /api/v1/mailbox/threads", { filters: { folder } });
   const unread = useApi("GET /api/v1/mailbox/threads", { query: { folder, unread: true } });
@@ -49,8 +42,8 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
 
   return (
     <>
-      <PageHead
-        title={<span className="inline-flex items-center gap-1.5">{NAMES[folder]} <InfoButton {...info} label="About the mailbox" /></span>}
+      <PageHeader
+        title={NAMES[folder]}
         sub={`${total} message${total === 1 ? "" : "s"}${nUnread ? ` · ${nUnread} unread` : ""}`}
         actions={
           <>
@@ -60,7 +53,6 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
           </>
         }
       />
-      <InfoText {...info}>Custom domain only. No Google, no Microsoft. Signed in with an address and a password, the same as any other mailbox. Mail here sends and receives only; it is not linked to any other module.</InfoText>
       {conn.data?.status === "needs_reconnect" && <Banner tone="warn">The mail server refused the saved password. Reconnect under Settings, Integrations to keep receiving mail.</Banner>}
       <StatStrip items={[{ label: "Folder", value: NAMES[folder] }, { label: "Messages", value: total }, { label: "Unread", value: nUnread, tone: nUnread ? "warn" : "ok" }, { label: "Attachments", value: withFiles }, { label: "Mailbox", value: from, desktop: true }]} />
       <MailFrame
@@ -69,9 +61,9 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
         split={split}
         list={
           <>
-            <div className="flex-none border-b border-border p-2.5"><SearchBox value={list.q} onChange={list.setQ} placeholder={`Search ${NAMES[folder]}`} /></div>
+            <div className="flex-none border-b border-border p-2.5"><SearchInput value={list.q} onChange={list.setQ} placeholder={`Search ${NAMES[folder]}`} /></div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain max-md:overflow-visible">
-              {list.error ? <ErrorBlock error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={6} /> : rows.map((r) => (
+              {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={6} /> : rows.map((r) => (
                 <MailRow key={r.thread_id} r={r} on={r.thread_id === current?.thread_id && (!mobile || open)} onClick={() => (setSel(r.thread_id), setOpen(true))} />
               ))}
               {!list.loading && !list.error && !rows.length && <p className="p-4 text-[12.5px] text-subtle-foreground">{list.q ? "Nothing matches." : `Nothing in ${NAMES[folder]}.`}</p>}
@@ -188,7 +180,7 @@ function Reader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBack: () 
       Back
     </Button>
   );
-  if (t.error) return <div className="p-[18px]">{back}<ErrorBlock error={t.error} onRetry={t.reload} /></div>;
+  if (t.error) return <div className="p-[18px]">{back}<ErrorState error={t.error} onRetry={t.reload} /></div>;
   if (!t.data) return <div className="p-[18px]">{back}<LoadingRows count={5} /></div>;
   const thread = t.data;
   const lastMsg = thread.messages[thread.messages.length - 1];

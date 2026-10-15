@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { OrgNode } from "@/api/types/organisation";
-import { Button, cn, Icon, initials } from "@mycity/ui";
-import { Card, PageHead } from "@/components/ui/layout";
-import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { WithInfo } from "@/components/ui/Info";
+import { Button, cn, Icon, initials, Card, PageHeader, ErrorState, toast, SearchInput, InfoButton } from "@mycity/ui";
+import { LoadingRows } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { SearchBox } from "@/components/form";
 
 /**
  * The live reporting tree (docs/guides/organogram.md). One render, two modes:
@@ -137,15 +133,15 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
     );
   };
 
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   return (
     <>
-      <PageHead
+      <PageHeader
         title={builder ? "Organogram" : "Org Chart"}
         sub={data ? (builder ? `The live reporting structure · ${data.seats} seats · ${data.filled} filled · ${data.seats - data.filled} open` : `Who reports to whom across MyCity · read only · ${data.seats} seats · ${data.filled} filled`) : " "}
         actions={
           <>
-            <SearchBox value={q} onChange={setQ} placeholder="Search the chart" className="w-[200px]" />
+            <SearchInput value={q} onChange={setQ} placeholder="Search the chart" className="w-[200px]" />
             {builder && <Button onClick={() => setCollapsed(new Set())}>Expand All</Button>}
             <Button icon="doc" onClick={() => toast("PDF queued. It arrives in your Mailbox.")}>Download PDF</Button>
           </>
@@ -160,13 +156,11 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
       <Card className="p-1.5">
         {!data ? <LoadingRows count={5} /> : <div ref={scroller} className="ogt"><ul>{roots.map(node)}</ul></div>}
       </Card>
-      <div className="mt-3">
-        <WithInfo heading={builder ? "Changing the Structure" : "About This Chart"} label="About the organogram">
-          {builder
-            ? "Drag a card onto a new manager to change its reporting line. Every change is written through People and recorded in the audit log, the same write the employee form uses. A vacant seat can be sent to Recruitment as a suggested vacancy."
-            : "Read only. Every employee sees the whole company here. Salary, bank details and phone numbers are never shown."}
-        </WithInfo>
-      </div>
+      {builder && (
+        <div className="mt-3">
+          <InfoButton label="Changing the Structure" help="Drag a card onto a new manager to change its reporting line. A vacant seat can be sent to Recruitment as a suggested vacancy." />
+        </div>
+      )}
     </>
   );
 }

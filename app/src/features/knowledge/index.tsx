@@ -6,18 +6,14 @@ import "@/api/types/community";
 import type { Announcement } from "@/api/types/community";
 import type { ArticleKind, Block, Overdue, Resource } from "@/api/types/knowledge";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, formatDate, todayIso } from "@mycity/ui";
-import { Accordion, Mini, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
+import { Button, formatDate, todayIso, Meter, Pill, Who, Card, Grid, PageHeader, useModal, Chips, ErrorState, toast, StatusPill, DateField, Field, FormRow, TextField, ChoiceField, SelectField, TextAreaField, useForm } from "@mycity/ui";
+import { Accordion, StatStrip } from "@/components/ui/data";
 import { ArticleBody, Reader } from "@/components/ui/Reader";
-import { Chips, ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { KvCard, ModalFoot, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { KvCard, ModalFoot, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { DateField, Field, FormRow, Input, Seg, Select, Textarea, useForm } from "@/components/form";
 
 export default function Knowledge({ tab, id }: ModuleScreenProps) {
   if (tab === "sops") return <Articles kind="sop" id={id} />;
@@ -58,7 +54,7 @@ function Articles({ kind, id }: { kind: ArticleKind; id: string | null }) {
   const title = policy ? "Policies" : "SOPs";
   return (
     <>
-      <PageHead
+      <PageHeader
         title={title}
         sub={policy ? "HR and company policy" : "How to do things in the platform"}
         actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: policy ? "New Policy" : "New SOP", wide: true, body: (close) => <ArticleForm kind={kind} close={close} /> })}>{policy ? "New Policy" : "New SOP"}</Button>}
@@ -74,7 +70,7 @@ function Articles({ kind, id }: { kind: ArticleKind; id: string | null }) {
       )}
       {list.loading && !list.rows.length ? <Card><LoadingRows count={6} /></Card> : (
         <Reader groups={groups} selected={current} onSelect={setSel}>
-          {a.error ? <ErrorBlock error={a.error} /> : !a.data ? <LoadingRows count={8} /> : (
+          {a.error ? <ErrorState error={a.error} /> : !a.data ? <LoadingRows count={8} /> : (
             <ArticleBody
               title={a.data.title}
               meta={<><StatusPill s={a.data.status} />{policy ? <Pill>Version {a.data.version}</Pill> : <Pill>{a.data.group}</Pill>}<Pill>Updated {formatDate(a.data.updated_on)}</Pill>{policy ? <Pill>Owner: {a.data.owner}</Pill> : <Pill>{a.data.read_minutes} minute read</Pill>}</>}
@@ -121,11 +117,11 @@ function ArticleForm({ kind, close }: { kind: ArticleKind; close: () => void }) 
   return (
     <>
       <FormRow>
-        <Field label="Title" {...f.field("title")}><Input {...f.field("title")} placeholder={kind === "sop" ? "How do I ...?" : "e.g. Travel policy"} /></Field>
-        <Field label="Section" {...f.field("group")}><Input {...f.field("group")} placeholder={kind === "sop" ? "Money, People, Attendance" : "Current"} /></Field>
+        <Field label="Title" {...f.field("title")}><TextField {...f.field("title")} placeholder={kind === "sop" ? "How do I ...?" : "e.g. Travel policy"} /></Field>
+        <Field label="Section" {...f.field("group")}><TextField {...f.field("group")} placeholder={kind === "sop" ? "Money, People, Attendance" : "Current"} /></Field>
       </FormRow>
       <Field label="Text" info="A blank line starts a paragraph. Start a line with ## for a heading, - for a list item, > for a highlighted note, and wrap words in ** for bold." {...f.field("body")}>
-        <Textarea {...f.field("body")} rows={12} />
+        <TextAreaField {...f.field("body")} rows={12} />
       </Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
@@ -145,7 +141,7 @@ function Faqs() {
   const list = usePaged("GET /api/v1/knowledge/faqs", { filters: topic ? { topic } : {} });
   return (
     <>
-      <PageHead title="FAQs" sub="Answered in a sentence or two" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New FAQ", body: (close) => <FaqForm close={close} topics={s.data?.topics.map((t) => t.topic) ?? []} /> })}>New FAQ</Button>} />
+      <PageHeader title="FAQs" sub="Answered in a sentence or two" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New FAQ", body: (close) => <FaqForm close={close} topics={s.data?.topics.map((t) => t.topic) ?? []} /> })}>New FAQ</Button>} />
       {s.data && <StatStrip items={[{ label: "Questions", value: s.data.questions }, { label: "Asked This Month", value: s.data.asked_this_month }, { label: "Most Asked", value: s.data.most_asked }, { label: "Unanswered", value: s.data.unanswered, tone: s.data.unanswered ? "warn" : "ok" }, { label: "From Praxis AI", value: s.data.from_ai, desktop: true }]} />}
       <Grid cols="1.4/1">
         <div>
@@ -184,9 +180,9 @@ function FaqForm({ close, topics }: { close: () => void; topics: string[] }) {
   };
   return (
     <>
-      <Field label="Question" {...f.field("question")}><Input {...f.field("question")} /></Field>
-      <Field label="Answer" {...f.field("answer")}><Textarea {...f.field("answer")} /></Field>
-      <Field label="Topic"><Select options={topics.map((t) => [t, t])} {...f.field("topic")} /></Field>
+      <Field label="Question" {...f.field("question")}><TextField {...f.field("question")} /></Field>
+      <Field label="Answer" {...f.field("answer")}><TextAreaField {...f.field("answer")} /></Field>
+      <Field label="Topic"><SelectField options={topics.map((t) => [t, t])} {...f.field("topic")} /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Add FAQ</Button>
@@ -206,7 +202,7 @@ function Training() {
   const remind = useMutation("POST /api/v1/knowledge/training/overdue/remind");
   return (
     <>
-      <PageHead title="Training" sub="Resources and onboarding material" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Resource", body: (close) => <ResourceForm close={close} /> })}>New Resource</Button>} />
+      <PageHeader title="Training" sub="Resources and onboarding material" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Resource", body: (close) => <ResourceForm close={close} /> })}>New Resource</Button>} />
       {s.data && <KpiTiles items={[{ label: "Resources", value: String(s.data.resources) }, { label: "Completion", value: `${s.data.completion_pct}%` }, { label: "Overdue", value: String(s.data.overdue), tone: s.data.overdue ? "warn" : "ok" }, { label: "Certificates Issued", value: String(s.data.certificates) }]} />}
       <Grid cols={2}>
         {list.rows.map((r: Resource) => (
@@ -228,7 +224,7 @@ function Training() {
             { key: "t", label: "Resource", render: (r) => r.title },
             { key: "a", label: "Assigned", align: "n", render: (r) => r.assigned },
             { key: "c", label: "Completed", align: "n", render: (r) => r.completed },
-            { key: "p", label: "Progress", render: (r) => <span className="block w-[130px]"><Mini pct={Math.round((r.completed * 100) / Math.max(1, r.assigned))} label={`${Math.round((r.completed * 100) / Math.max(1, r.assigned))}%`} /></span> },
+            { key: "p", label: "Progress", render: (r) => <span className="block w-[130px]"><Meter pct={Math.round((r.completed * 100) / Math.max(1, r.assigned))} label={`${Math.round((r.completed * 100) / Math.max(1, r.assigned))}%`} /></span> },
           ]}
         />
         <PagedTable<Overdue>
@@ -273,14 +269,14 @@ function ResourceForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Title" {...f.field("title")}><Input {...f.field("title")} /></Field>
-      <Field label="What It Covers" {...f.field("description")}><Textarea {...f.field("description")} /></Field>
+      <Field label="Title" {...f.field("title")}><TextField {...f.field("title")} /></Field>
+      <Field label="What It Covers" {...f.field("description")}><TextAreaField {...f.field("description")} /></Field>
       <FormRow>
-        <Field label="Kind"><Select options={[["Document", "Document"], ["Video", "Video"], ["Course", "Course"]]} {...f.field("kind")} /></Field>
+        <Field label="Kind"><SelectField options={[["Document", "Document"], ["Video", "Video"], ["Course", "Course"]]} {...f.field("kind")} /></Field>
         <Field label="Due (Optional)"><DateField {...f.field("due")} min={todayIso()} /></Field>
       </FormRow>
-      <Field label="Assign To"><Seg value={aud} onChange={setAud} options={[["everyone", "Everyone"], ["department", "A Department"]]} /></Field>
-      {aud === "department" && <Field label="Department" {...f.field("department")}><Select placeholder="Pick the department" options={depts.slice(1)} {...f.field("department")} /></Field>}
+      <Field label="Assign To"><ChoiceField value={aud} onChange={setAud} options={[["everyone", "Everyone"], ["department", "A Department"]]} /></Field>
+      {aud === "department" && <Field label="Department" {...f.field("department")}><SelectField placeholder="Pick the department" options={depts.slice(1)} {...f.field("department")} /></Field>}
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Assign</Button>
@@ -299,7 +295,7 @@ function Announcements() {
   const avg = pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience), 0) * 100) / pub.length) : 0;
   return (
     <>
-      <PageHead title="Announcements" sub="Also posted to the staff community" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => navigate("/community?tab=announcements")}>New Announcement</Button>} />
+      <PageHeader title="Announcements" sub="Also posted to the staff community" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => navigate("/community?tab=announcements")}>New Announcement</Button>} />
       <KpiTiles items={[{ label: "Published", value: String(pub.length) }, { label: "Scheduled", value: String(list.rows.length - pub.length) }, { label: "Average Read", value: `${avg}%`, tone: "ok" }, { label: "This Quarter", value: String(list.page?.total ?? 0) }]} />
       <PagedTable<Announcement>
         title="Announcements"

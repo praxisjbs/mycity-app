@@ -1,9 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMe, useAuth } from "@/auth/AuthProvider";
-import { cn, Icon, IconButton, useIsMobile, useTheme } from "@mycity/ui";
-import { Avatar } from "@/components/ui/data";
-import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { Menu } from "@/components/ui/Menu";
+import { cn, Icon, IconButton, useIsMobile, useTheme, Avatar, ErrorBoundary, Menu } from "@mycity/ui";
 import { LoadingRows } from "@/components/ui/Table";
 import { ClockButton } from "@/features/attendance/ClockButton";
 import { hrefFor, Link, moduleKeyOf, useRouter } from "@/lib/router";

@@ -4,16 +4,11 @@ import type { PersonRef } from "@/api/types/common";
 import type { LeaveRequest, LeaveType } from "@/api/types/leave";
 import "@/api/types/leave";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, formatDate, monthName, todayIso } from "@mycity/ui";
+import { Button, formatDate, monthName, todayIso, Pill, Who, Card, CardHeader, Grid, PageHeader, Grow, useModal, Chips, toast, DateField, Field, FormRow, rules, SearchInput, SelectField, TextAreaField, useForm, HelpTerm } from "@mycity/ui";
 import { MonthCalendar } from "@/components/ui/Calendar";
-import { Pill, Who } from "@/components/ui/data";
-import { WithInfo } from "@/components/ui/Info";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { Grow, useModal } from "@/components/ui/Modal";
-import { Chips, LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { DateField, Field, FormRow, PersonPicker, rules, SearchBox, Select, Textarea, useForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
 
 export const LEAVE_TONE: Record<LeaveRequest["status"], "ok" | "warn" | "err" | "neutral"> = { Approved: "ok", Pending: "warn", Rejected: "err", Cancelled: "neutral" };
 export const LEAVE_TYPES: LeaveType[] = ["Annual", "Sick", "Compassionate", "Maternity", "Paternity", "Study", "Unpaid"];
@@ -29,7 +24,7 @@ export function PeopleLeave() {
   const now = todayIso();
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Leave"
         sub={`${monthName(Number(now.slice(5, 7)) - 1)} ${now.slice(0, 4)}`}
         actions={
@@ -47,7 +42,7 @@ export function PeopleLeave() {
       <Grid cols="1.4/1">
         <div className="min-w-0">
           <Toolbar>
-            <SearchBox value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-[260px]" />
+            <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-[260px]" />
           </Toolbar>
           <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending", "Pending"], ["Approved", "Approved"], ["Rejected", "Rejected"]]} />
           <Table
@@ -91,7 +86,7 @@ function CoverCard({ leave, onDone }: { leave: LeaveRequest; onDone: () => void 
   if (!cover.data) return <Card><LoadingRows /></Card>;
   return (
     <Card>
-      <CardHeader title={cover.data.title} />
+      <CardHeader title={<HelpTerm help="Advisory only. The approver decides, and the reason is recorded either way.">{cover.data.title}</HelpTerm>} />
       <p className="mb-[11px] text-[11.5px] text-subtle-foreground">{cover.data.text}</p>
       {cover.data.rows.map((r) => (
         <div key={r.title} className="flex items-center gap-2.5 border-b border-border py-2">
@@ -102,11 +97,6 @@ function CoverCard({ leave, onDone }: { leave: LeaveRequest; onDone: () => void 
           <Pill tone={r.tone}>{r.result}</Pill>
         </div>
       ))}
-      <div className="mt-[11px]">
-        <WithInfo heading="Advisory Only" label="About the cover check">
-          The clash check is advisory. The approver decides, and the reason is recorded either way.
-        </WithInfo>
-      </div>
       {leave.status === "Pending" && (
         <div className="mt-3 flex gap-2">
           <Grow />
@@ -155,14 +145,14 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
         </Field>
       )}
       <Field label="Leave Type">
-        <Select options={LEAVE_TYPES.map((t) => [t, t])} {...f.field("type")} />
+        <SelectField options={LEAVE_TYPES.map((t) => [t, t])} {...f.field("type")} />
       </Field>
       <FormRow>
         <Field label="First Day" {...f.field("from")}><DateField {...f.field("from")} /></Field>
         <Field label="Last Day" {...f.field("to")}><DateField {...f.field("to")} min={f.values.from || undefined} /></Field>
       </FormRow>
       <Field label="Reason" {...f.field("reason")}>
-        <Textarea {...f.field("reason")} placeholder="Family event" />
+        <TextAreaField {...f.field("reason")} placeholder="Family event" />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

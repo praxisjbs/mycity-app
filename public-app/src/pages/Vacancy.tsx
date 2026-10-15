@@ -3,8 +3,8 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import { Message, Page } from "@/components/Layout";
-import { Button, formatMoney } from "@mycity/ui";
-import { Loading, Notice, Pill, Sub } from "@/components/ui";
+import { Button, formatMoney, Skeleton, Banner, Pill } from "@mycity/ui";
+import { Sub } from "@/components/ui";
 import { Link, useRouter } from "@/lib/router";
 import { PATTERN } from "./Careers";
 
@@ -31,7 +31,7 @@ export function Vacancy({ slug }: { slug: string }) {
   if (!d)
     return (
       <Page title="Careers" index>
-        <Loading lines={8} />
+        <Skeleton lines={8} />
       </Page>
     );
 
@@ -63,9 +63,9 @@ export function Vacancy({ slug }: { slug: string }) {
       </div>
       {d.state !== "open" && (
         <div className="mb-4">
-          <Notice tone={d.state === "filled" ? "info" : "warn"}>
+          <Banner tone={d.state === "filled" ? "info" : "warn"}>
             {d.state === "filled" ? "This role has been filled. Thank you to everyone who applied." : "This role is not taking applications right now. The link will keep working if it reopens."}
-          </Notice>
+          </Banner>
         </div>
       )}
       <p className="text-[13.5px] leading-[1.6] text-muted-foreground">{d.summary}</p>
@@ -81,7 +81,7 @@ export function Vacancy({ slug }: { slug: string }) {
       <p className="mt-[5px] text-[13px] leading-[1.6] text-muted-foreground">{d.how_we_hire}</p>
       {problem && (
         <div className="mt-4">
-          <Notice tone="err">{problem}</Notice>
+          <Banner tone="err">{problem}</Banner>
         </div>
       )}
       {d.state === "open" ? (

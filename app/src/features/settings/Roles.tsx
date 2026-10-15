@@ -4,14 +4,9 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
 import type { AccessCatalogue, RecordScope, Role, RoleAction, RoleBody, RoleDetail, RoleGrant } from "@/api/types/settings";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, cn } from "@mycity/ui";
-import { Banner, Pill } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Button, cn, Banner, Pill, Card, CardHeader, Grid, PageHeader, useModal, ErrorState, toast, Field, TextField, ChoiceField, Switch } from "@mycity/ui";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
-import { Field, Input, Seg, Switch } from "@/components/form";
 
 const ACTIONS: Array<[RoleAction, string]> = [["view", "View"], ["create", "Create"], ["edit", "Edit"], ["delete", "Delete"], ["approve", "Approve"], ["export", "Export"]];
 const SCOPES: Array<[RecordScope, string]> = [["all", "All"], ["team", "Team"], ["own", "Own"]];
@@ -38,7 +33,7 @@ export function Roles() {
     modal.open({ title: r ? r.name : "New Role", wide: true, full: true, body: (close) => <RoleEditor roleId={r?.role_id ?? null} canManage={canManage} close={close} /> });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Roles & Permissions"
         sub="Four layers: module, action, record scope, field"
         actions={canManage ? <Button variant="primary" icon="plus" onClick={() => open(null)}>New Role</Button> : undefined}
@@ -99,8 +94,8 @@ export function Roles() {
 function RoleEditor({ roleId, canManage, close }: { roleId: string | null; canManage: boolean; close: () => void }) {
   const cat = useApi("GET /api/v1/settings/roles/catalogue");
   const role = useApi("GET /api/v1/settings/roles/:id", { params: { id: roleId ?? "" }, enabled: !!roleId });
-  if (cat.error) return <ErrorBlock error={cat.error} />;
-  if (roleId && role.error) return <ErrorBlock error={role.error} />;
+  if (cat.error) return <ErrorState error={cat.error} />;
+  if (roleId && role.error) return <ErrorState error={role.error} />;
   if (!cat.data || (roleId && !role.data)) return <LoadingRows count={8} />;
   return <RoleForm cat={cat.data} role={roleId ? role.data! : null} canManage={canManage} close={close} />;
 }
@@ -164,10 +159,10 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
       {!canManage && !role?.locked && <Banner tone="info" icon="lock">Operations and the CEO change roles. You can see this one.</Banner>}
       <Grid cols={2}>
         <Field label="Role Name" state={errors.name || nameBad ? "bad" : undefined} message={errors.name?.[0] ?? (nameBad ? "Between 2 and 40 characters" : role?.system && !readOnly ? "A built-in role keeps its name" : undefined)}>
-          <Input value={name} onChange={(v) => (setName(v), setErrors((x) => ({ ...x, name: [] })))} disabled={readOnly || role?.system} placeholder="e.g. Studio Lead" maxLength={40} />
+          <TextField value={name} onChange={(v) => (setName(v), setErrors((x) => ({ ...x, name: [] })))} disabled={readOnly || role?.system} placeholder="e.g. Studio Lead" maxLength={40} />
         </Field>
         <Field label="What It Is For">
-          <Input value={description} onChange={setDescription} disabled={readOnly} placeholder="Runs payroll" maxLength={140} />
+          <TextField value={description} onChange={setDescription} disabled={readOnly} placeholder="Runs payroll" maxLength={140} />
         </Field>
       </Grid>
       {role && <p className="-mt-1.5 mb-3 text-[11.5px] text-subtle-foreground">{role.users} {role.users === 1 ? "user holds" : "users hold"} this role.</p>}
@@ -206,7 +201,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
                 {!on ? (
                   <span className="text-[11.5px] text-subtle-foreground">No access</span>
                 ) : m.scoped ? (
-                  readOnly ? <Pill>{SCOPES.find(([v]) => v === g.scope)![1]} records</Pill> : <Seg value={g.scope} onChange={(v) => setScope(m.key, v)} options={SCOPES} />
+                  readOnly ? <Pill>{SCOPES.find(([v]) => v === g.scope)![1]} records</Pill> : <ChoiceField value={g.scope} onChange={(v) => setScope(m.key, v)} options={SCOPES} />
                 ) : (
                   <span className="text-[11.5px] text-subtle-foreground">Not record scoped</span>
                 )}

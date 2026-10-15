@@ -1,13 +1,9 @@
 import { useApi, usePaged, useMutation, invalidate } from "@/api/hooks";
 import type { LeaveRequest } from "@/api/types/leave";
 import "@/api/types/leave";
-import { Button, formatDate } from "@mycity/ui";
-import { Kpi, KV, Pill, TapList } from "@/components/ui/data";
-import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Mini } from "@/components/ui/data";
+import { Button, formatDate, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, Meter, toast } from "@mycity/ui";
+import { Kpi, TapList } from "@/components/ui/data";
 import { Pager, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { LEAVE_TONE, LeaveForm } from "@/features/people/Leave";
 
@@ -28,7 +24,7 @@ export function MyLeavePage() {
         <>
           <Card>
             <CardHeader title="Request" />
-            <KV items={[["Number", r.number], ["Type", r.type], ["From", formatDate(r.from)], ["To", formatDate(r.to)], ["Days", String(r.days)], ["Approver", r.approver ?? "Your line manager"], ["Status", <Pill tone={LEAVE_TONE[r.status]}>{r.status}</Pill>]]} />
+            <KeyValue items={[["Number", r.number], ["Type", r.type], ["From", formatDate(r.from)], ["To", formatDate(r.to)], ["Days", String(r.days)], ["Approver", r.approver ?? "Your line manager"], ["Status", <Pill tone={LEAVE_TONE[r.status]}>{r.status}</Pill>]]} />
           </Card>
           {r.status === "Pending" && (
             <div className="mt-3 flex justify-end">
@@ -49,7 +45,7 @@ export function MyLeavePage() {
             <b className="text-[12.5px]">{b.type}</b>
             <span className="ml-auto text-[11.5px] text-subtle-foreground">{b.entitled} days</span>
           </div>
-          <div className="mt-1.5"><Mini pct={((b.taken + b.booked) / b.entitled) * 100} label="" color={COLORS[i % 4]} /></div>
+          <div className="mt-1.5"><Meter pct={((b.taken + b.booked) / b.entitled) * 100} label="" color={COLORS[i % 4]} /></div>
           <div className="mt-1 text-[11.5px] text-subtle-foreground">{b.taken} taken, {b.booked} booked, {b.left} left</div>
         </div>
       ))}
@@ -76,7 +72,7 @@ export function MyLeavePage() {
   );
   return (
     <>
-      <PageHead title="My Leave" sub={`${bal.data?.year ?? ""} entitlement`} actions={<Button variant="primary" icon="plus" onClick={request}>Request Leave</Button>} />
+      <PageHeader title="My Leave" sub={`${bal.data?.year ?? ""} entitlement`} actions={<Button variant="primary" icon="plus" onClick={request}>Request Leave</Button>} />
       {annual && ent && (
         <Grid cols="4m2">
           <Kpi opensOn="phone" label="Entitlement" value={`${annual.entitled} days`} trend={`Annual, ${bal.data!.year}`} onClick={() => modal.open({ title: "Entitlement", body: ent })} />

@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
-import { BigButton, formatCount, Icon } from "@mycity/ui";
-import { Form, LoginField } from "@/components/form";
+import { BigButton, formatCount, Icon, Form, LoginField } from "@mycity/ui";
 import { useAuth } from "./AuthProvider";
 
 const vEmail = (v: string) => (!v.trim() ? "Enter your work email" : !v.includes("@") ? "Needs an @" : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? "Check the spelling" : "");

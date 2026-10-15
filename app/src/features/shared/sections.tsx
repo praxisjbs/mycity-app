@@ -3,16 +3,11 @@ import { api } from "@/api/client";
 import { useApi, type PagedResult } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { BarRow } from "@/api/types/home";
-import type { Tone } from "@/api/types/common";
 import "@/api/types/shared";
-import { Button } from "@mycity/ui";
-import { Bars, Chain, KV, Pill, Timeline } from "@/components/ui/data";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
-import { Card, CardHeader } from "@/components/ui/layout";
+import { Button, KeyValue, Card, CardHeader, toast, SearchInput, HelpTerm } from "@mycity/ui";
+import { Bars, Chain, Timeline } from "@/components/ui/data";
 import { Pager, Table, type Column } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 import { toBars } from "@/features/home/blocks";
-import { SearchBox } from "@/components/form";
 
 /**
  * The building blocks the module screens share: the explanation card, the
@@ -20,12 +15,10 @@ import { SearchBox } from "@/components/form";
  */
 
 export function KvCard({ title, items, info, right }: { title: string; items: Array<[ReactNode, ReactNode]>; info?: string; right?: ReactNode }) {
-  const i = useInfo();
   return (
     <Card>
-      <CardHeader title={title} right={right}>{info && <InfoButton {...i} label={`About ${title.toLowerCase()}`} />}</CardHeader>
-      {info && <InfoText {...i}>{info}</InfoText>}
-      <KV items={items} />
+      <CardHeader title={info ? <HelpTerm help={info}>{title}</HelpTerm> : title} right={right} />
+      <KeyValue items={items} />
     </Card>
   );
 }
@@ -41,11 +34,9 @@ export function ChainCard({ steps, note, title }: { steps: Array<{ label: string
 }
 
 export function BarsCard({ title, rows, note, info, right }: { title: string; rows: BarRow[]; note?: string; info?: string; right?: ReactNode }) {
-  const i = useInfo();
   return (
     <Card>
-      <CardHeader title={title} right={right}>{info && <InfoButton {...i} label={`About ${title.toLowerCase()}`} />}</CardHeader>
-      {info && <InfoText {...i}>{info}</InfoText>}
+      <CardHeader title={info ? <HelpTerm help={info}>{title}</HelpTerm> : title} right={right} />
       <Bars rows={toBars(rows)} note={note} />
     </Card>
   );
@@ -59,9 +50,6 @@ export function TrailCard({ title, items }: { title: string; items: Array<{ titl
     </Card>
   );
 }
-
-/** A status the API words and tones; the screen only draws it. */
-export const StatusPill = ({ s }: { s: { tone: Tone; text: string } | null | undefined }) => (s ? <Pill tone={s.tone}>{s.text}</Pill> : null);
 
 /** Export goes to the worker; the file arrives in the Mailbox (FRONTEND_GUIDE §4: never a client-side dump of rows). */
 export function ExportButton({ source, filters, label = "Export" }: { source: string; filters?: Record<string, unknown>; label?: string }) {
@@ -103,7 +91,7 @@ export function PagedTable<R>({
       right={
         (search || right) && (
           <span className="flex flex-wrap items-center justify-end gap-2">
-            {search && <SearchBox value={list.q} onChange={list.setQ} placeholder={search} className="w-[220px] max-md:w-full" />}
+            {search && <SearchInput value={list.q} onChange={list.setQ} placeholder={search} className="w-[220px] max-md:w-full" />}
             {right}
           </span>
         )

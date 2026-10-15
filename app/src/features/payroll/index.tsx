@@ -4,20 +4,16 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
 import type { Grade, PayrollDeduction, PayslipRow, RunRow } from "@/api/types/payroll";
 import type { PersonRef } from "@/api/types/common";
-import { Button, formatMoneyShort, formatMonth, Icon, todayIso } from "@mycity/ui";
+import { Button, formatMoneyShort, formatMonth, Icon, todayIso, Banner, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart, Bands } from "@/components/ui/charts";
-import { Banner, Chain, Quote, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
+import { Chain, StatStrip } from "@/components/ui/data";
 import { LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 
 import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill } from "@/features/shared/sections";
+import { ChainCard, ExportButton, KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AmountInput, DateField, Field, FormRow, Input, PersonPicker, Textarea, useForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
   if (tab === "payslips") return <Payslips />;
@@ -49,7 +45,7 @@ function Runs() {
   };
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Payroll Runs"
         sub={c ? formatMonth(c.period) : " "}
         actions={
@@ -125,7 +121,7 @@ function Payslips() {
   const locked = c && c.stage !== "awaiting_approval" && c.stage !== "review";
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Payslips"
         sub={c ? `${formatMonth(c.period)} ${locked ? "run" : "preview"}` : " "}
         actions={
@@ -171,7 +167,7 @@ function Structure() {
   const pct = (m: string) => (Number(m) / scale) * 100;
   return (
     <>
-      <PageHead title="Salary Structure" sub="Grades and bands" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Grade", body: (close) => <GradeForm close={close} /> })}>Add Grade</Button>} />
+      <PageHeader title="Salary Structure" sub="Grades and bands" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Grade", body: (close) => <GradeForm close={close} /> })}>Add Grade</Button>} />
       {s.data && <KpiTiles items={[{ label: "Grades", value: String(s.data.grades) }, { label: "Staff Placed", value: String(s.data.placed) }, { label: "Below Band Minimum", value: String(s.data.below_minimum), tone: s.data.below_minimum ? "warn" : "ok" }, { label: "Above Maximum", value: String(s.data.above_maximum), tone: s.data.above_maximum ? "warn" : "ok" }]} />}
       {list.rows.length > 0 && (
         <Bands
@@ -237,15 +233,15 @@ function GradeForm({ close }: { close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="Grade" {...f.field("code")}><Input {...f.field("code")} placeholder="G7" onChange={(v) => f.set("code", v.toUpperCase())} /></Field>
-        <Field label="Band" {...f.field("band")}><Input {...f.field("band")} placeholder="Principal" /></Field>
+        <Field label="Grade" {...f.field("code")}><TextField {...f.field("code")} placeholder="G7" onChange={(v) => f.set("code", v.toUpperCase())} /></Field>
+        <Field label="Band" {...f.field("band")}><TextField {...f.field("band")} placeholder="Principal" /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Minimum" {...f.field("minimum")}><AmountInput {...f.field("minimum")} /></Field>
-        <Field label="Midpoint" {...f.field("midpoint")}><AmountInput {...f.field("midpoint")} /></Field>
+        <Field label="Minimum" {...f.field("minimum")}><MoneyField {...f.field("minimum")} /></Field>
+        <Field label="Midpoint" {...f.field("midpoint")}><MoneyField {...f.field("midpoint")} /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Maximum" {...f.field("maximum")}><AmountInput {...f.field("maximum")} /></Field>
+        <Field label="Maximum" {...f.field("maximum")}><MoneyField {...f.field("maximum")} /></Field>
         <Field label="Applies From" {...f.field("effective_from")}><DateField {...f.field("effective_from")} min={todayIso()} /></Field>
       </FormRow>
       <ModalFoot>
@@ -276,7 +272,7 @@ function Deductions() {
   };
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Deductions"
         sub={`Pending and applied · attendance tiers ${s.data?.tiers_on ? "on" : "off"}`}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Deduction", body: (close) => <DeductionForm close={close} /> })}>Add Deduction</Button>}
@@ -336,7 +332,7 @@ function Waive({ id, close }: { id: string; close: () => void }) {
   const waive = useMutation("POST /api/v1/payroll/deductions/:id/waive");
   return (
     <>
-      <Field label="Why It Is Waived" state={reason && reason.trim().length < 6 ? "bad" : undefined}><Textarea value={reason} onChange={setReason} placeholder="Damaged laptop" /></Field>
+      <Field label="Why It Is Waived" state={reason && reason.trim().length < 6 ? "bad" : undefined}><TextAreaField value={reason} onChange={setReason} placeholder="Damaged laptop" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={reason.trim().length < 6 || waive.pending} onClick={async () => { try { await waive.run({ params: { id }, body: { reason } }); invalidate("/api/v1/payroll"); close(); toast("Deduction waived"); } catch (e) { fail(e); } }}>Waive</Button>
@@ -366,8 +362,8 @@ function DeductionForm({ close }: { close: () => void }) {
   return (
     <>
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="Reason" {...f.field("reason")}><Input {...f.field("reason")} placeholder="Salary advance repayment" /></Field>
-      <Field label="Amount" {...f.field("amount")}><AmountInput {...f.field("amount")} /></Field>
+      <Field label="Reason" {...f.field("reason")}><TextField {...f.field("reason")} placeholder="Salary advance repayment" /></Field>
+      <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Add Deduction</Button>
@@ -384,7 +380,7 @@ function StatutoryTab() {
   const d = s.data;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Statutory"
         sub={`Advanced payroll · ${d?.enabled ? "on" : "off by default"}`}
         actions={!d?.enabled && <Button variant="primary" onClick={() => modal.open({ title: "Switch On Advanced Payroll", body: (close) => <Enable close={close} /> })}>Switch On</Button>}

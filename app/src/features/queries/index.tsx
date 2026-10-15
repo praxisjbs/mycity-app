@@ -5,19 +5,15 @@ import "@/api/types/queries";
 import type { Firing, LetterTemplate, Outcome, QueryRow, Rule, RuleCreate, SanctionCreate, SanctionRow } from "@/api/types/queries";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, formatDate, formatDateTime, formatWhen } from "@mycity/ui";
-import { Banner, Chain, KV, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
+import { Button, formatDate, formatDateTime, formatWhen, Banner, KeyValue, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, StatusPill, MoneyField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
+import { Chain, StatStrip } from "@/components/ui/data";
 import { Letter } from "@/features/shared/Letter";
-import { Chips, ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
+import { BarsCard, KvCard, ModalFoot, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AmountInput, Field, FormRow, Input, PersonPicker, Select, Textarea, useForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
 
 export default function Queries({ tab, id }: ModuleScreenProps) {
   if (tab === "rules") return <Rules />;
@@ -41,7 +37,7 @@ function QueriesTab({ id }: { id: string | null }) {
   const focus = id ?? s.data?.focus_id ?? null;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Queries"
         sub="Managers see the queries they raised. People and the CEO see all."
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Raise a Query", body: (close) => <RaiseQuery close={close} /> })}>Raise a Query</Button>}
@@ -80,13 +76,13 @@ function QueryCard({ id }: { id: string }) {
   const modal = useModal();
   const q = useApi("GET /api/v1/queries/:id", { params: { id } });
   const remind = useMutation("POST /api/v1/queries/:id/remind");
-  if (q.error) return <Card><ErrorBlock error={q.error} onRetry={q.reload} /></Card>;
+  if (q.error) return <Card><ErrorState error={q.error} onRetry={q.reload} /></Card>;
   if (!q.data) return <Card><LoadingRows /></Card>;
   const d = q.data;
   return (
     <Card>
       <CardHeader title={`${d.number} · ${d.employee.display_name}`} right={<StatusPill s={d.status} />} />
-      <KV
+      <KeyValue
         items={[
           ["Subject", d.subject],
           ["Raised by", d.raised_by === "System rule" ? "A system rule, not a manager" : d.raised_by],
@@ -110,7 +106,7 @@ function QueryCard({ id }: { id: string }) {
 
 function LetterById({ id }: { id: string }) {
   const l = useApi("GET /api/v1/queries/:id/letter", { params: { id } });
-  return l.data ? <Letter l={l.data} note="Query letter as it is sent. Everything underlined came from the record, not from typing." /> : l.error ? <ErrorBlock error={l.error} /> : <LoadingRows count={6} />;
+  return l.data ? <Letter l={l.data} note="Query letter as it is sent. Everything underlined came from the record, not from typing." /> : l.error ? <ErrorState error={l.error} /> : <LoadingRows count={6} />;
 }
 
 function RaiseQuery({ close }: { close: () => void }) {
@@ -135,8 +131,8 @@ function RaiseQuery({ close }: { close: () => void }) {
     <>
       <Banner tone="info" icon="info">The employee has 48 hours to respond in writing. Their response is read before any decision.</Banner>
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="Subject" {...f.field("subject")}><Input {...f.field("subject")} placeholder="Missing clock-out Thursday" /></Field>
-      <Field label="What Happened" {...f.field("details")}><Textarea {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
+      <Field label="Subject" {...f.field("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out Thursday" /></Field>
+      <Field label="What Happened" {...f.field("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="send" disabled={save.pending} onClick={submit}>Raise and Send Letter</Button>
@@ -165,13 +161,13 @@ function Decide({ id, hasResponse, close }: { id: string; hasResponse: boolean; 
   return (
     <>
       {!hasResponse && <Banner tone="warn">No response yet. A sanction waits until the employee has answered or the 48 hours have passed.</Banner>}
-      <Field label="Outcome"><Select options={OUTCOMES} {...f.field("outcome")} /></Field>
+      <Field label="Outcome"><SelectField options={OUTCOMES} {...f.field("outcome")} /></Field>
       {f.values.outcome !== "no_action" && (
         <Field label="Fine (Optional)" info="A fine reaches payroll as a pending deduction. Finance or Operations accepts it; it is never automatic.">
-          <AmountInput {...f.field("fine")} />
+          <MoneyField {...f.field("fine")} />
         </Field>
       )}
-      <Field label="Reason" {...f.field("note")}><Textarea {...f.field("note")} placeholder="Explanation accepted" /></Field>
+      <Field label="Reason" {...f.field("note")}><TextAreaField {...f.field("note")} placeholder="Explanation accepted" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Record Decision</Button>
@@ -190,7 +186,7 @@ function Rules() {
   const activate = useMutation("POST /api/v1/queries/rules/:id/activate");
   return (
     <>
-      <PageHead title="Rules" sub="Automatic queries, configured not coded" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })}>New Rule</Button>} />
+      <PageHeader title="Rules" sub="Automatic queries, configured not coded" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })}>New Rule</Button>} />
       {s.data && <KpiTiles items={[{ label: "Active Rules", value: String(s.data.active) }, { label: "Draft", value: String(s.data.draft) }, { label: "Fired This Month", value: String(s.data.fired_this_month) }, { label: "Queries Raised", value: String(s.data.queries_raised) }]} />}
       {rules.loading && !rules.rows.length ? <Card><LoadingRows /></Card> : (
         <Grid cols={3}>
@@ -266,14 +262,14 @@ function RuleForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><Input {...f.field("name")} placeholder="e.g. Repeated lateness" /></Field>
-      <Field label="What Sets It Off"><Select options={TRIGGERS} {...f.field("trigger")} /></Field>
+      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Repeated lateness" /></Field>
+      <Field label="What Sets It Off"><SelectField options={TRIGGERS} {...f.field("trigger")} /></Field>
       <FormRow>
-        <Field label="How Many Times" {...f.field("count")}><Input {...num("count")} /></Field>
-        <Field label="Within (Days)" {...f.field("window_days")}><Input {...num("window_days")} /></Field>
+        <Field label="How Many Times" {...f.field("count")}><TextField {...num("count")} /></Field>
+        <Field label="Within (Days)" {...f.field("window_days")}><TextField {...num("window_days")} /></Field>
       </FormRow>
       <Field label="Letter It Sends" {...f.field("template_id")}>
-        <Select placeholder="Pick a template" options={tpl.rows.filter((t) => t.status.tone === "ok").map((t) => [t.template_id, t.name])} {...f.field("template_id")} />
+        <SelectField placeholder="Pick a template" options={tpl.rows.filter((t) => t.status.tone === "ok").map((t) => [t.template_id, t.name])} {...f.field("template_id")} />
       </Field>
       <p className="text-[11.5px] text-subtle-foreground">Saved as a draft. Nothing fires until it is activated.</p>
       <ModalFoot>
@@ -292,7 +288,7 @@ function Sanctions() {
   const list = usePaged("GET /api/v1/queries/sanctions");
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Sanctions"
         sub="The consequence chain · MyCity ladder"
         actions={
@@ -351,7 +347,7 @@ function ChainSettings() {
   return (
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">The MyCity ladder, in order. Each step names the letter it sends; a step without an active letter cannot send one.</p>
-      <KV items={[["1 · Caution", "Caution letter"], ["2 · Warning", "Warning letter"], ["3 · Suspension", "Suspension letter (awaiting sample)"], ["4 · Suspension without pay", "Awaiting sample"], ["5 · Dismissal", "Termination letter (awaiting sample)"], ["Fines", "Attach to any step"]]} />
+      <KeyValue items={[["1 · Caution", "Caution letter"], ["2 · Warning", "Warning letter"], ["3 · Suspension", "Suspension letter (awaiting sample)"], ["4 · Suspension without pay", "Awaiting sample"], ["5 · Dismissal", "Termination letter (awaiting sample)"], ["Fines", "Attach to any step"]]} />
       <p className="mt-3 text-[11.5px] text-subtle-foreground">Changing the ladder is a setting under Settings, Approvals. It needs no deploy.</p>
     </>
   );
@@ -378,9 +374,9 @@ function IssueSanction({ close }: { close: () => void }) {
   return (
     <>
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="Sanction"><Select options={[["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"], ["fine", "Fine"]]} {...f.field("kind")} /></Field>
-      {f.values.kind === "fine" && <Field label="Amount" {...f.field("amount")}><AmountInput {...f.field("amount")} /></Field>}
-      <Field label="Reason" {...f.field("reason")}><Textarea {...f.field("reason")} placeholder="Follows QRY-0042" /></Field>
+      <Field label="Sanction"><SelectField options={[["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"], ["fine", "Fine"]]} {...f.field("kind")} /></Field>
+      {f.values.kind === "fine" && <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>}
+      <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Follows QRY-0042" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Issue</Button>
@@ -400,7 +396,7 @@ function Templates() {
   const preview = useApi("GET /api/v1/queries/templates/:id/preview", { params: { id: shown?.template_id ?? "" }, enabled: !!shown });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Letter Templates"
         sub="Seeded with MyCity wording. The system fills name, date and reason."
         actions={
@@ -450,11 +446,11 @@ function TemplateForm({ close }: { close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="Name" {...f.field("name")}><Input {...f.field("name")} placeholder="Final warning letter" /></Field>
-        <Field label="Used For" {...f.field("used_for")}><Input {...f.field("used_for")} placeholder="Step name" /></Field>
+        <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Final warning letter" /></Field>
+        <Field label="Used For" {...f.field("used_for")}><TextField {...f.field("used_for")} placeholder="Step name" /></Field>
       </FormRow>
       <Field label="Letter" info="Use {name}, {date}, {reason} and {hours} where the record fills in. Everything else is sent as written." {...f.field("body")}>
-        <Textarea {...f.field("body")} rows={8} placeholder="Dear {name}, ..." />
+        <TextAreaField {...f.field("body")} rows={8} placeholder="Dear {name}, ..." />
       </Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>

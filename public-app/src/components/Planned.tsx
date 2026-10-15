@@ -1,7 +1,7 @@
-import { Button, cn, formatDate, Icon } from "@mycity/ui";
+import { Button, cn, formatDate, Icon, Pill } from "@mycity/ui";
 import { currentMilestone, milestone, useView } from "@/lib/plan";
 import { Page } from "./Layout";
-import { Pill, Sub } from "./ui";
+import { Sub } from "./ui";
 
 /** What each page will do, on its Coming Soon card. From the page as built and MILESTONES §9, §10. */
 const COMING: Record<string, string[]> = {

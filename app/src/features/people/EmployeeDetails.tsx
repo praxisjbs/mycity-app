@@ -2,14 +2,10 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { Arrangement } from "@/api/types/attendance";
 import "@/api/types/attendance";
-import { Button, formatDate } from "@mycity/ui";
-import { Banner, KV, Pill, Timeline } from "@/components/ui/data";
-import { Card, CardHeader, Grid } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Button, formatDate, Banner, KeyValue, Pill, Card, CardHeader, Grid, useModal, ErrorState, toast, Field, TextField, ChoiceField, SelectField } from "@mycity/ui";
+import { Timeline } from "@/components/ui/data";
+import { LoadingRows } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, Input, Seg, Select } from "@/components/form";
 
 /** The details modal from the Employees list: employment, and attendance and location (HR only). */
 export function EmployeeDetails({ id, close }: { id: string; close: () => void }) {
@@ -17,7 +13,7 @@ export function EmployeeDetails({ id, close }: { id: string; close: () => void }
   const s = useApi("GET /api/v1/attendance/setup/:employee_id", { params: { employee_id: id } });
   const { navigate } = useRouter();
   const modal = useModal();
-  if (e.error) return <ErrorBlock error={e.error} />;
+  if (e.error) return <ErrorState error={e.error} />;
   if (!e.data || !s.data) return <LoadingRows />;
   const x = e.data;
   const a = s.data;
@@ -27,11 +23,11 @@ export function EmployeeDetails({ id, close }: { id: string; close: () => void }
       <Grid cols={2} className="mb-0">
         <Card>
           <CardHeader title="Employment" right={<Pill tone={x.status.tone}>{x.status.text}</Pill>} />
-          <KV items={[["Employee", `${x.display_name} · ${x.job_title}`], ["Department", x.department], ["Line manager", x.line_manager?.display_name ?? "None"], ["Work arrangement", a.arrangement], ["Primary location", a.primary_location], ["Assigned office", a.office]]} />
+          <KeyValue items={[["Employee", `${x.display_name} · ${x.job_title}`], ["Department", x.department], ["Line manager", x.line_manager?.display_name ?? "None"], ["Work arrangement", a.arrangement], ["Primary location", a.primary_location], ["Assigned office", a.office]]} />
         </Card>
         <Card>
           <CardHeader title="Attendance and Location" />
-          <KV items={[["Registered home", a.home_address ?? "Not on file"], ["Home geofence", a.home_radius_m ? `${a.home_radius_m} m · mandatory` : "Not available"], ["Temporary location", <Pill tone={a.temporary_location.tone}>{a.temporary_location.text}</Pill>], ["Field assignment today", a.field_assignment_today ?? "None"], ["Attendance profile", a.profile]]} />
+          <KeyValue items={[["Registered home", a.home_address ?? "Not on file"], ["Home geofence", a.home_radius_m ? `${a.home_radius_m} m · mandatory` : "Not available"], ["Temporary location", <Pill tone={a.temporary_location.tone}>{a.temporary_location.text}</Pill>], ["Field assignment today", a.field_assignment_today ?? "None"], ["Attendance profile", a.profile]]} />
         </Card>
       </Grid>
       <div className="-mx-[18px] mt-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
@@ -67,7 +63,7 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
         {name} is <b>{current}</b> today. The change applies from the next punch and is written to the audit log.
       </p>
       <Field label="Arrangement">
-        <Seg value={arr} onChange={setArr} options={ARRS.map((a) => [a, a])} />
+        <ChoiceField value={arr} onChange={setArr} options={ARRS.map((a) => [a, a])} />
       </Field>
       {arr === "Hybrid" && (
         <Field label="Hybrid Schedule">
@@ -75,17 +71,17 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
             {DAYS.map((d) => (
               <div key={d} className="flex items-center gap-3 border-b border-border px-3 py-1.5 last:border-b-0">
                 <span className="w-[60px] text-[12.5px] font-semibold">{d}</span>
-                <Seg value={sched[d]} onChange={(v) => setSched((s) => ({ ...s, [d]: v }))} options={[["Office", "Office"], ["Remote", "Remote"]]} />
+                <ChoiceField value={sched[d]} onChange={(v) => setSched((s) => ({ ...s, [d]: v }))} options={[["Office", "Office"], ["Remote", "Remote"]]} />
               </div>
             ))}
           </div>
         </Field>
       )}
       <Field label="Assigned Office">
-        <Select value={site} onChange={setSite} options={(sites.data?.data ?? []).map((s) => [s.name, s.name])} />
+        <SelectField value={site} onChange={setSite} options={(sites.data?.data ?? []).map((s) => [s.name, s.name])} />
       </Field>
       <Field label="Reason" state={why ? (bad ? "bad" : "good") : undefined} message="Give a reason">
-        <Input value={why} onChange={setWhy} placeholder="Moved to field" state={why ? (bad ? "bad" : "good") : undefined} />
+        <TextField value={why} onChange={setWhy} placeholder="Moved to field" state={why ? (bad ? "bad" : "good") : undefined} />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
@@ -106,7 +102,7 @@ export function AttendanceSetupCard({ id, name }: { id: string; name: string }) 
     <Grid cols={2}>
       <Card>
         <CardHeader title="Attendance Setup" right={<Pill>{a.arrangement}</Pill>} />
-        <KV
+        <KeyValue
           items={[
             ["Work arrangement", a.arrangement],
             ["Primary work location", a.primary_location],

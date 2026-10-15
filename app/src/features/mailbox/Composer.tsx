@@ -2,11 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailAttachment, MailDraftSave } from "@/api/types/mailbox";
-import { Button, cn, formatBytes, formatDate, Icon, todayIso } from "@mycity/ui";
-import { Pill } from "@/components/ui/data";
-import { Menu } from "@/components/ui/Menu";
-import { toast } from "@/components/ui/Toast";
-import { DateField, Field, InlineInput, InlineLabel, InlineSelect, Input, Upload } from "@/components/form";
+import { Button, cn, formatBytes, formatDate, Icon, todayIso, Pill, Menu, toast, DateField, Field, InlineInput, InlineLabel, InlineSelect, TextField } from "@mycity/ui";
+import { Upload } from "@/components/form";
 
 export interface ComposeInit {
   draft_id?: string;
@@ -269,7 +266,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
               <DateField value={sched.date} onChange={(v) => setSched((s) => ({ ...s, date: v, past: false }))} min={todayIso()} />
             </Field>
             <Field label="Time (24 Hour)" htmlFor="stime" state={timeBad ? "bad" : undefined} message={timeBad ? "HH:MM, in Lagos time" : undefined} className="mb-0">
-              <Input id="stime" inputMode="numeric" autoComplete="off" placeholder="08:30" state={timeBad ? "bad" : undefined} value={sched.time} onChange={(v) => setSched((s) => ({ ...s, time: v.trim(), past: false }))} />
+              <TextField id="stime" inputMode="numeric" autoComplete="off" placeholder="08:30" state={timeBad ? "bad" : undefined} value={sched.time} onChange={(v) => setSched((s) => ({ ...s, time: v.trim(), past: false }))} />
             </Field>
             <div className="flex justify-end gap-2 max-md:col-span-2">
               <Button onClick={() => setSched((s) => ({ ...s, open: false }))}>Cancel</Button>

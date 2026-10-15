@@ -1,12 +1,9 @@
 import type { ReactNode } from "react";
 import type { BarRow, HomeBlock, KpiCell } from "@/api/types/home";
-import { Bars, Kpi, Mini, Pill, StatStrip, Timeline, Who } from "@/components/ui/data";
+import { Bars, Kpi, StatStrip, Timeline } from "@/components/ui/data";
 import { AreaChart, Donut } from "@/components/ui/charts";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
-import { Card, CardHeader, Grid } from "@/components/ui/layout";
-import { Money } from "@/components/ui/Money";
 import { Table } from "@/components/ui/Table";
-import { formatDate } from "@mycity/ui";
+import { formatDate, Meter, Pill, Who, Card, CardHeader, Grid, Money, HelpTerm } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 import { useKpiDetail } from "./KpiDetail";
 
@@ -15,13 +12,9 @@ export const toBars = (rows: BarRow[]) => rows.map((r) => ({ label: r.label, pct
 
 /** A card with a title and an optional ⓘ, the common frame of Home's blocks. */
 export function InfoCard({ title, info, right, children }: { title: string; info?: string; right?: ReactNode; children: ReactNode }) {
-  const i = useInfo();
   return (
     <Card>
-      <CardHeader title={title} right={right}>
-        {info && <InfoButton {...i} label={`About ${title.toLowerCase()}`} />}
-      </CardHeader>
-      {info && <InfoText {...i}>{info}</InfoText>}
+      <CardHeader title={info ? <HelpTerm help={info}>{title}</HelpTerm> : title} right={right} />
       {children}
     </Card>
   );
@@ -147,6 +140,6 @@ export function Cell({ cell }: { cell: KpiCell }) {
     case "over":
       return <span className="inline-block rounded-full bg-warning-soft px-[9px] py-0.5 text-[11px] font-semibold whitespace-nowrap text-warning">{cell.text}</span>;
     case "bar":
-      return <Mini pct={cell.pct} label={cell.text} />;
+      return <Meter pct={cell.pct} label={cell.text} />;
   }
 }

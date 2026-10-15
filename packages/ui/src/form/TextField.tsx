@@ -46,8 +46,8 @@ function Mark({ state }: { state: FieldState }) {
 }
 
 export interface TextFieldProps extends BoundProps, NativeInput {
-  /** text, email, url or search. */
-  type?: "text" | "email" | "url" | "search";
+  /** text, email, url, search or tel (a phone number typed in any format). */
+  type?: "text" | "email" | "url" | "search" | "tel";
 }
 
 export function TextField({ value, onChange, onBlur, state, message: _message, type = "text", className, id, ...rest }: TextFieldProps) {

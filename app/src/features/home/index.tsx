@@ -2,17 +2,12 @@ import { useEffect, useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, formatDateTime } from "@mycity/ui";
-import { Bars, KV, Pill, Tile } from "@/components/ui/data";
-import { Card, Grid, PageHead } from "@/components/ui/layout";
-import { Grow, useModal } from "@/components/ui/Modal";
-import { Chips, ErrorBlock, LoadingRows, Pager, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { Who } from "@/components/ui/data";
+import { Button, formatDateTime, KeyValue, Pill, Card, Grid, PageHeader, Grow, useModal, Chips, ErrorState, toast, Who, Field, FormRow, TextField, rules, SelectField, ToggleRow, useForm } from "@mycity/ui";
+import { Bars, Tile } from "@/components/ui/data";
+import { LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Block, InfoCard, KpiRow, toBars } from "./blocks";
-import { Field, FormRow, Input, rules, Select, ToggleRow, useForm } from "@/components/form";
 
 export default function Home({ tab, id }: ModuleScreenProps) {
   if (tab === "team") return <Team />;
@@ -25,12 +20,12 @@ function Overview() {
   const { data, error, reload } = useApi("GET /api/v1/home/overview");
   const { navigate } = useRouter();
   const me = useMe();
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <LoadingRows count={8} />;
   const canNew = me.grants.workspace?.includes("create");
   return (
     <>
-      <PageHead
+      <PageHeader
         title={data.greeting}
         sub={data.subtitle}
         actions={
@@ -56,10 +51,10 @@ function Team() {
   const [status, setStatus] = useState("all");
   const list = usePaged("GET /api/v1/home/team", { filters: status === "all" ? {} : { status } });
   const { navigate } = useRouter();
-  if (summary.error) return <ErrorBlock error={summary.error} onRetry={summary.reload} />;
+  if (summary.error) return <ErrorState error={summary.error} onRetry={summary.reload} />;
   return (
     <>
-      <PageHead title="Team" sub={`Who is in, where they are, and how they are tracking${summary.data ? ` · ${summary.data.scope_label}` : ""}`} />
+      <PageHeader title="Team" sub={`Who is in, where they are, and how they are tracking${summary.data ? ` · ${summary.data.scope_label}` : ""}`} />
       {summary.data && <KpiRow items={summary.data.kpis} />}
       <Chips
         value={status}
@@ -91,7 +86,7 @@ function Team() {
           </InfoCard>
         )}
         <InfoCard title="How the Team View Reads" info="The same attendance and task data the other screens use, filtered to the people you manage. Today's status is read from today's punches.">
-          <KV items={[["Source", "Attendance and tasks, live"], ["Scope", "The people you manage"], ["A name", "Opens that person's record"]]} />
+          <KeyValue items={[["Source", "Attendance and tasks, live"], ["Scope", "The people you manage"], ["A name", "Opens that person's record"]]} />
         </InfoCard>
       </Grid>
     </>
@@ -119,7 +114,7 @@ function Alerts({ openId }: { openId: string | null }) {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Alerts"
         sub="Rules that have crossed a threshold and nobody has cleared yet"
         actions={
@@ -166,7 +161,7 @@ function Alerts({ openId }: { openId: string | null }) {
           title="Alerts Are Not Notifications"
           info="A notification is something that happened to you. It is read once and gone. An alert is something nobody has done; it sits here until a person with the right permission clears it, and it ages while it waits."
         >
-          <KV items={[["Escalation", "High severity goes to the CEO after 14 days"], ["Clearing", "Needs the permission the rule names"], ["Audit", "Who cleared it and when is logged"]]} />
+          <KeyValue items={[["Escalation", "High severity goes to the CEO after 14 days"], ["Clearing", "Needs the permission the rule names"], ["Audit", "Who cleared it and when is logged"]]} />
         </InfoCard>
       </Grid>
     </>
@@ -191,7 +186,7 @@ function AlertDetail({ alert, close }: { alert: HomeAlert; close: () => void }) 
         <Pill tone="warn">{`Over ${alert.over_by}`}</Pill>
       </div>
       <Card>
-        <KV items={[["Trigger", alert.trigger], ["Who can clear", alert.who_clears], ["Raised", formatDateTime(alert.raised_at)], ["Over threshold", alert.over_by]]} />
+        <KeyValue items={[["Trigger", alert.trigger], ["Who can clear", alert.who_clears], ["Raised", formatDateTime(alert.raised_at)], ["Over threshold", alert.over_by]]} />
       </Card>
       <div className="-mx-[18px] mt-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
         {alert.link && <Button onClick={() => (close(), navigate(alert.link!))}>Open Record</Button>}
@@ -213,7 +208,7 @@ function RuleList() {
     list.reload();
     toast(enabled ? "Rule enabled" : "Rule disabled, its alerts stop");
   };
-  if (list.error) return <ErrorBlock error={list.error} />;
+  if (list.error) return <ErrorState error={list.error} />;
   return (
     <>
       {list.rows.map((r) => (
@@ -247,22 +242,22 @@ function RuleForm({ close }: { close: () => void }) {
     <>
       <FormRow>
         <Field label="Rule Name" {...f.field("name")} htmlFor="rn">
-          <Input id="rn" placeholder="3 lates monthly" {...f.field("name")} />
+          <TextField id="rn" placeholder="3 lates monthly" {...f.field("name")} />
         </Field>
         <Field label="Metric">
-          <Select options={METRICS} {...f.field("metric")} />
+          <SelectField options={METRICS} {...f.field("metric")} />
         </Field>
       </FormRow>
       <FormRow>
         <Field label="Threshold" {...f.field("threshold")}>
-          <Input inputMode="numeric" placeholder="3" {...f.field("threshold")} />
+          <TextField inputMode="numeric" placeholder="3" {...f.field("threshold")} />
         </Field>
         <Field label="Window, Days" {...f.field("window_days")}>
-          <Input inputMode="numeric" {...f.field("window_days")} />
+          <TextField inputMode="numeric" {...f.field("window_days")} />
         </Field>
       </FormRow>
       <Field label="Severity" info="High severity escalates to the CEO after 14 days.">
-        <Select options={[["low", "Low"], ["medium", "Medium"], ["high", "High"]]} {...f.field("severity")} />
+        <SelectField options={[["low", "Low"], ["medium", "Medium"], ["high", "High"]]} {...f.field("severity")} />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
@@ -289,9 +284,9 @@ function Reports() {
   };
   return (
     <>
-      <PageHead title="Reports" sub="Scheduled and on demand · Managers and the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Report", body: (close) => <ReportForm close={close} /> })}>New Report</Button>} />
+      <PageHeader title="Reports" sub="Scheduled and on demand · Managers and the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Report", body: (close) => <ReportForm close={close} /> })}>New Report</Button>} />
       {summary.data && <KpiRow items={summary.data.kpis} />}
-      {reports.error && <ErrorBlock error={reports.error} onRetry={reports.reload} />}
+      {reports.error && <ErrorState error={reports.error} onRetry={reports.reload} />}
       <Grid cols={3}>
         {reports.rows.map((r) => (
           <Tile key={r.home_report_id} title={r.name} text={r.cadence}>
@@ -323,7 +318,7 @@ function Reports() {
           title="How a Report Is Built"
           info="Reports are permission gated. A card only renders for a role that may see it, and a report is generated as its recipient, so nobody receives a row they could not open."
         >
-          <KV items={[["Source", "The same queries the screens use"], ["Formats", "PDF to read, XLSX to work, day-first dates"], ["Delivery", "Email on a schedule, or on demand"], ["Retention", "Every file is kept and re-downloadable"]]} />
+          <KeyValue items={[["Source", "The same queries the screens use"], ["Formats", "PDF to read, XLSX to work, day-first dates"], ["Delivery", "Email on a schedule, or on demand"], ["Retention", "Every file is kept and re-downloadable"]]} />
         </InfoCard>
       </Grid>
     </>
@@ -343,16 +338,16 @@ function ReportForm({ close }: { close: () => void }) {
   return (
     <>
       <Field label="Report Name" {...f.field("name")}>
-        <Input {...f.field("name")} placeholder="Weekly leave summary" />
+        <TextField {...f.field("name")} placeholder="Weekly leave summary" />
       </Field>
       <Field label="Source" info="The query the report runs: the same one its screen uses, so a report never disagrees with a page.">
-        <Select options={[["attendance", "Attendance"], ["tasks", "Tasks"], ["expenses", "Expenses"], ["recruitment", "Recruitment"], ["partnerships", "Partnerships"]]} {...f.field("source")} />
+        <SelectField options={[["attendance", "Attendance"], ["tasks", "Tasks"], ["expenses", "Expenses"], ["recruitment", "Recruitment"], ["partnerships", "Partnerships"]]} {...f.field("source")} />
       </Field>
       <Field label="Schedule">
-        <Select options={[["Every weekday at 18:00", "Every weekday at 18:00"], ["Mondays at 08:00", "Mondays at 08:00"], ["First working day of the month", "First working day of the month"], ["On demand", "On demand only"]]} {...f.field("schedule")} />
+        <SelectField options={[["Every weekday at 18:00", "Every weekday at 18:00"], ["Mondays at 08:00", "Mondays at 08:00"], ["First working day of the month", "First working day of the month"], ["On demand", "On demand only"]]} {...f.field("schedule")} />
       </Field>
       <Field label="Recipients" {...f.field("recipients")}>
-        <Input {...f.field("recipients")} placeholder="Operations, CEO" />
+        <TextField {...f.field("recipients")} placeholder="Operations, CEO" />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

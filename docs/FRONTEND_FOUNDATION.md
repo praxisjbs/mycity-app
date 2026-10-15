@@ -172,46 +172,31 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 
 Each #18 file below stays where it is until the PR named beside it moves its components into
 `packages/ui`; nothing new may be added beside them (`check/components.js` refuses a new file in
-`app/src/components/` or `public-app/src/components/`). The PR 1 rows leave as the PR 1 slices
-land; the PR 2 and PR 3 rows stay until those PRs.
+`app/src/components/` or `public-app/src/components/`). PR 1 moved the form system, overlays,
+feedback, help, layout and the basic display parts; what is left moves in PR 2 and PR 3.
 
 | File | Holds | Moves in |
 |---|---|---|
-| `app/src/components/form/DateField.tsx` | DateField | PR 1 (form system) |
-| `app/src/components/form/fields.tsx` | useForm, Field, Input, Select, Seg, Switch and the rest | PR 1 (form system) |
-| `app/src/components/form/Form.tsx` | Form | PR 1 (form system) |
-| `app/src/components/form/index.ts` | the form barrel | PR 1 (form system) |
-| `app/src/components/form/Inline.tsx` | InlineInput, InlineSelect, InlineLabel | PR 1 (form system) |
-| `app/src/components/form/LoginField.tsx` | sign-in field | PR 1 (form system) |
-| `app/src/components/form/MoneyField.tsx` | AmountInput, toMoneyString | PR 1 (form system) |
-| `app/src/components/form/Search.tsx` | SearchBox, FilterSelect | PR 1 (form system) |
-| `app/src/components/ui/data.tsx` | Pill, Avatar, Who, KV, Banner, EmptyState (PR 1); Kpi, StatStrip, Timeline, Bars, Chain, Accordion, TapList (PR 3) | PR 1 (display), then PR 3 |
-| `app/src/components/ui/ErrorBoundary.tsx` | ErrorBoundary | PR 1 (feedback) |
-| `app/src/components/ui/Info.tsx` | the info toggle | PR 1 (help: HelpTerm, InfoButton, Details) |
-| `app/src/components/ui/layout.tsx` | Card, CardHeader, PageHead, Grid, MobileOnly, DesktopOnly | PR 1 (layout) |
-| `app/src/components/ui/Menu.tsx` | Menu | PR 1 (overlays) |
-| `app/src/components/ui/Modal.tsx` | Modal, useModal | PR 1 (overlays) |
-| `app/src/components/ui/Money.tsx` | Money | PR 1 (display) |
-| `app/src/components/ui/Toast.tsx` | toast | PR 1 (feedback) |
-| `public-app/src/components/form/fields.tsx` | Field, Input, Textarea | PR 1 (form system) |
-| `public-app/src/components/form/Form.tsx` | Form | PR 1 (form system) |
-| `public-app/src/components/form/index.ts` | the form barrel | PR 1 (form system) |
-| `public-app/src/components/ui.tsx` | Pill, Notice, Loading, Sub | PR 1 (display, feedback) |
 | `app/src/components/ui/StagingBar.tsx` | staging bar | PR 2 (shell) |
 | `public-app/src/components/Layout.tsx` | Page, Brand, Message, demo strip | PR 2 (public shell) |
 | `public-app/src/components/Planned.tsx` | Coming Soon page | PR 2 (public shell) |
 | `public-app/src/components/StagingBar.tsx` | staging bar | PR 2 (shell) |
+| `app/src/components/form/index.ts` | the barrel for PersonPicker and Upload | PR 3 (pickers, upload engine) |
 | `app/src/components/form/PersonPicker.tsx` | PersonPicker | PR 3 (pickers) |
 | `app/src/components/form/Upload.tsx` | Upload | PR 3 (upload engine) |
 | `app/src/components/ui/Board.tsx` | Board | PR 3 (kanban) |
 | `app/src/components/ui/Calendar.tsx` | Calendar | PR 3 (calendar) |
 | `app/src/components/ui/charts.tsx` | AreaChart, Donut, Bands | PR 3 (charts) |
+| `app/src/components/ui/data.tsx` | Kpi, StatStrip, Timeline, Bars, Chain, Accordion, TapList | PR 3 (display) |
+| `app/src/components/ui/layout.tsx` | Sub | PR 3 (display) |
 | `app/src/components/ui/Paper.tsx` | documents | PR 3 (PDF and document preview) |
 | `app/src/components/ui/Profile.tsx` | 360 header | PR 3 (profile header) |
 | `app/src/components/ui/Reader.tsx` | articles | PR 3 (reader) |
-| `app/src/components/ui/Table.tsx` | Table, Pager, Toolbar, Chips, LoadingRows, ErrorBlock | PR 3 (DataView) |
+| `app/src/components/ui/Table.tsx` | Table, Pager, Toolbar, LoadingRows | PR 3 (DataView) |
+| `public-app/src/components/form/index.ts` | the barrel for Upload | PR 3 (upload engine) |
 | `public-app/src/components/form/Upload.tsx` | Upload | PR 3 (upload engine) |
 | `public-app/src/components/SignaturePad.tsx` | SignaturePad | PR 3 (signature field) |
+| `public-app/src/components/ui.tsx` | Sub | PR 3 (display) |
 
 `app/src/features/shared/sections.tsx` (`PagedTable`, `ExportButton`) is not in a components folder,
 but its table pieces move with `Table.tsx` in PR 3 (DataView).

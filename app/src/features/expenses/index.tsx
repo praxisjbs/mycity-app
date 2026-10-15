@@ -5,18 +5,14 @@ import "@/api/types/expenses";
 import type { Category, Disbursement, ExpenseRow, Requisition } from "@/api/types/expenses";
 import type { DocumentRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, cn, formatBytes, formatDate, formatDateTime, formatMoneyShort, Icon, todayIso } from "@mycity/ui";
+import { Button, cn, formatBytes, formatDate, formatDateTime, formatMoneyShort, Icon, todayIso, KeyValue, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
-import { Chain, KV, Quote, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
-import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Chain } from "@/components/ui/data";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
+import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AmountInput, DateField, Field, FormRow, Input, Select, Textarea, Upload, useForm } from "@/components/form";
+import { Upload } from "@/components/form";
 
 export default function Expenses({ tab, id }: ModuleScreenProps) {
   if (tab === "approvals") return <Approvals id={id} />;
@@ -41,7 +37,7 @@ function MyRequests({ id }: { id: string | null }) {
   const focus = sel ?? s.data?.focus_id ?? null;
   return (
     <>
-      <PageHead title="My Requests" sub="Your own expense requests" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", wide: true, body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
+      <PageHeader title="My Requests" sub="Your own expense requests" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", wide: true, body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
       {s.data && <KpiTiles items={[{ label: "In Flight", value: String(s.data.in_flight), tone: s.data.in_flight ? "warn" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Turnaround", value: s.data.average_turnaround }, { label: "Rejected", value: String(s.data.rejected), tone: s.data.rejected ? "err" : "ok" }]} />}
       {focus && <FocusChain id={focus} />}
       <PagedTable<ExpenseRow>
@@ -91,7 +87,7 @@ function FocusChain({ id }: { id: string }) {
 
 function History({ id }: { id: string }) {
   const d = useApi("GET /api/v1/expenses/requests/:id", { params: { id } });
-  if (!d.data) return <Card>{d.error ? <ErrorBlock error={d.error} /> : <LoadingRows />}</Card>;
+  if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
   return <TrailCard title={`${d.data.number} History`} items={d.data.history.map((h) => ({ ...h, when: formatDateTime(h.when) }))} />;
 }
 
@@ -123,17 +119,17 @@ function RequestForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Description" {...f.field("title")}><Input {...f.field("title")} placeholder="Courier to Enugu" /></Field>
+      <Field label="Description" {...f.field("title")}><TextField {...f.field("title")} placeholder="Courier to Enugu" /></Field>
       <FormRow>
-        <Field label="Category" {...f.field("category_id")}><Select placeholder="Pick one" options={cats.rows.map((c) => [c.category_id, c.name])} {...f.field("category_id")} /></Field>
-        <Field label="Amount" {...f.field("amount")}><AmountInput {...f.field("amount")} /></Field>
+        <Field label="Category" {...f.field("category_id")}><SelectField placeholder="Pick one" options={cats.rows.map((c) => [c.category_id, c.name])} {...f.field("category_id")} /></Field>
+        <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>
       </FormRow>
-      <Field label="Project (Optional)"><Input {...f.field("project")} placeholder="Campaign or city" /></Field>
+      <Field label="Project (Optional)"><TextField {...f.field("project")} placeholder="Campaign or city" /></Field>
       <FormRow>
-        <Field label="Beneficiary" {...f.field("beneficiary_name")}><Input {...f.field("beneficiary_name")} /></Field>
-        <Field label="Bank" {...f.field("bank")}><Select placeholder="Pick the bank" options={BANKS} {...f.field("bank")} /></Field>
+        <Field label="Beneficiary" {...f.field("beneficiary_name")}><TextField {...f.field("beneficiary_name")} /></Field>
+        <Field label="Bank" {...f.field("bank")}><SelectField placeholder="Pick the bank" options={BANKS} {...f.field("bank")} /></Field>
       </FormRow>
-      <Field label="Account Number" {...f.field("account_number")}><Input {...f.field("account_number")} inputMode="numeric" onChange={(v) => f.set("account_number", v.replace(/\D/g, "").slice(0, 10))} placeholder="10 digits" /></Field>
+      <Field label="Account Number" {...f.field("account_number")}><TextField {...f.field("account_number")} inputMode="numeric" onChange={(v) => f.set("account_number", v.replace(/\D/g, "").slice(0, 10))} placeholder="10 digits" /></Field>
       <Field label="Vendor Invoice" state={tried && !invoice ? "bad" : undefined} message={tried && !invoice ? "Attach the invoice" : undefined}>
         {invoice ? (
           <span className="flex items-center gap-2 rounded-ctl border border-border bg-muted px-3 py-2 text-[12.5px]"><Icon name="doc" />{invoice.file_name}<span className="text-subtle-foreground">{formatBytes(invoice.size_bytes)}</span><button type="button" className="ml-auto text-accent-foreground underline" onClick={() => setInvoice(null)}>Replace</button></span>
@@ -158,7 +154,7 @@ function Approvals({ id }: { id: string | null }) {
   const focus = sel ?? s.data?.focus_id ?? null;
   return (
     <>
-      <PageHead title="Approvals" sub="Requests waiting on you" />
+      <PageHeader title="Approvals" sub="Requests waiting on you" />
       {s.data && <KpiTiles items={[{ label: "With You", value: String(s.data.with_you), tone: s.data.with_you ? "warn" : "ok" }, { label: "Total Value", value: formatMoneyShort(s.data.total_value) }, { label: "Oldest", value: `${s.data.oldest_days} days` }, { label: "Approved This Month", value: String(s.data.approved_this_month), tone: "ok" }]} />}
       {focus && <ApprovalCard id={focus} onDone={() => setSel(null)} />}
       <PagedTable<ExpenseRow>
@@ -184,7 +180,7 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
   const modal = useModal();
   const d = useApi("GET /api/v1/expenses/requests/:id", { params: { id } });
   const approve = useMutation("POST /api/v1/expenses/requests/:id/approve");
-  if (!d.data) return <Card className="mb-3">{d.error ? <ErrorBlock error={d.error} /> : <LoadingRows />}</Card>;
+  if (!d.data) return <Card className="mb-3">{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
   const x = d.data;
   return (
     <Card className="mb-3">
@@ -192,7 +188,7 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
       <Chain steps={x.chain.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
       <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{x.chain_note} Vendor invoice attached, account details supplied.</p>
       <div className="mt-[13px]">
-        <KV
+        <KeyValue
           items={[
             ["Requested by", `${x.requester.display_name}, ${x.requester.job_title ?? x.requester.department ?? ""}`],
             ["Category", x.category],
@@ -219,7 +215,7 @@ function Reject({ id, close, onDone }: { id: string; close: () => void; onDone: 
   return (
     <>
       <Field label="Reason" info="The requester sees this.">
-        <Textarea value={reason} onChange={setReason} placeholder="Use approved vendors" />
+        <TextAreaField value={reason} onChange={setReason} placeholder="Use approved vendors" />
       </Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
@@ -239,7 +235,7 @@ function Requisitions() {
   const focus = sel ?? s.data?.focus_id ?? null;
   return (
     <>
-      <PageHead title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Requisition", wide: true, body: (close) => <NewRequisition close={close} /> })}>New Requisition</Button>} />
+      <PageHeader title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Requisition", wide: true, body: (close) => <NewRequisition close={close} /> })}>New Requisition</Button>} />
       {s.data && <KpiTiles items={[{ label: "With the CEO", value: String(s.data.with_ceo), tone: s.data.with_ceo ? "err" : "ok" }, { label: "Days Waiting", value: String(s.data.days_waiting), tone: s.data.days_waiting > 3 ? "err" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Size", value: s.data.average_size }]} />}
       <p className="mb-3 text-[11.5px] text-subtle-foreground">Operations selects approved requests and submits them as one requisition. The CEO approves the requisition, not each request.</p>
       <PagedTable<Requisition>
@@ -265,7 +261,7 @@ function Requisitions() {
           <p className="mt-[9px] text-[11.5px] text-subtle-foreground">A requisition is one decision on one number, with the requests visible underneath it.</p>
           <Quote className="mt-3">An open requisition ages like any approval. The ageing rule raises an alert after three days.</Quote>
           <div className="mt-3.5">
-            <KV items={[["Who groups", "Operations"], ["Who approves", "The CEO. One decision"], ["Partial approval", "Possible. A removed request returns to the queue"], ["After approval", "Each request becomes disbursable on its own"]]} />
+            <KeyValue items={[["Who groups", "Operations"], ["Who approves", "The CEO. One decision"], ["Partial approval", "Possible. A removed request returns to the queue"], ["After approval", "Each request becomes disbursable on its own"]]} />
           </div>
         </Card>
       </Grid>
@@ -277,7 +273,7 @@ function RequisitionCard({ id }: { id: string }) {
   const d = useApi("GET /api/v1/expenses/requisitions/:id", { params: { id } });
   const approve = useMutation("POST /api/v1/expenses/requisitions/:id/approve");
   const [removed, setRemoved] = useState<string[]>([]);
-  if (!d.data) return <Card>{d.error ? <ErrorBlock error={d.error} /> : <LoadingRows />}</Card>;
+  if (!d.data) return <Card>{d.error ? <ErrorState error={d.error} /> : <LoadingRows />}</Card>;
   const x = d.data;
   const kept = x.items.filter((i) => !removed.includes(i.request_id));
   const total = kept.reduce((a, i) => a + Math.round(Number(i.amount) * 100), 0);
@@ -345,7 +341,7 @@ function Disbursements() {
   const list = usePaged("GET /api/v1/expenses/disbursements");
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Disbursements"
         sub="Logged after the bank confirms"
         actions={
@@ -408,9 +404,9 @@ function LogDisbursement({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Request" {...f.field("request_id")}><Select placeholder={ready.rows.length ? "Pick an approved request" : "Nothing awaiting disbursement"} options={ready.rows.map((r) => [r.request_id, `${r.number} · ${r.title} · ₦${Number(r.amount).toLocaleString("en-NG")}`])} {...f.field("request_id")} /></Field>
+      <Field label="Request" {...f.field("request_id")}><SelectField placeholder={ready.rows.length ? "Pick an approved request" : "Nothing awaiting disbursement"} options={ready.rows.map((r) => [r.request_id, `${r.number} · ${r.title} · ₦${Number(r.amount).toLocaleString("en-NG")}`])} {...f.field("request_id")} /></Field>
       <FormRow>
-        <Field label="Bank Reference" {...f.field("bank_reference")}><Input {...f.field("bank_reference")} onChange={(v) => f.set("bank_reference", v.toUpperCase().replace(/\s/g, ""))} placeholder="FT26092812445" /></Field>
+        <Field label="Bank Reference" {...f.field("bank_reference")}><TextField {...f.field("bank_reference")} onChange={(v) => f.set("bank_reference", v.toUpperCase().replace(/\s/g, ""))} placeholder="FT26092812445" /></Field>
         <Field label="Paid On" {...f.field("paid_on")}><DateField {...f.field("paid_on")} max={todayIso()} /></Field>
       </FormRow>
       <ModalFoot>
@@ -428,7 +424,7 @@ function BudgetsTab() {
   const d = b.data;
   return (
     <>
-      <PageHead title="Budgets" sub={d ? `${d.year} · ${d.illustrative ? "no budget lines set" : `${d.lines.length} lines`}` : " "} actions={<Button variant="primary" icon="plus" onClick={() => toast("Budget lines open in 2027")}>Add Budget Line</Button>} />
+      <PageHeader title="Budgets" sub={d ? `${d.year} · ${d.illustrative ? "no budget lines set" : `${d.lines.length} lines`}` : " "} actions={<Button variant="primary" icon="plus" onClick={() => toast("Budget lines open in 2027")}>Add Budget Line</Button>} />
       {d?.illustrative && (
         <div className="mb-3 flex items-start gap-2.5 rounded-card bg-info-soft p-[14px] text-info">
           <Icon name="alert" className="mt-0.5 flex-none" />
@@ -478,7 +474,7 @@ function Categories() {
   const list = usePaged("GET /api/v1/expenses/categories");
   return (
     <>
-      <PageHead title="Categories" sub="Expense categories" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Category", body: (close) => <CategoryForm close={close} /> })}>New Category</Button>} />
+      <PageHeader title="Categories" sub="Expense categories" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Category", body: (close) => <CategoryForm close={close} /> })}>New Category</Button>} />
       {s.data && <KpiTiles items={[{ label: "Categories", value: String(s.data.categories) }, { label: "Spend This Month", value: formatMoneyShort(s.data.spend_this_month) }, { label: "Requests", value: String(s.data.requests) }, { label: "Capital", value: String(s.data.capital) }]} />}
       <PagedTable<Category>
         title="Categories"
@@ -527,10 +523,10 @@ function CategoryForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><Input {...f.field("name")} placeholder="e.g. Training" /></Field>
+      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Training" /></Field>
       <FormRow>
-        <Field label="Type"><Select options={[["Operating", "Operating"], ["Capital", "Capital"]]} {...f.field("kind")} /></Field>
-        <Field label="Flag Above" {...f.field("flag_above")}><AmountInput {...f.field("flag_above")} /></Field>
+        <Field label="Type"><SelectField options={[["Operating", "Operating"], ["Capital", "Capital"]]} {...f.field("kind")} /></Field>
+        <Field label="Flag Above" {...f.field("flag_above")}><MoneyField {...f.field("flag_above")} /></Field>
       </FormRow>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>

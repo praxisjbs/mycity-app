@@ -4,21 +4,17 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/partnerships";
 import type { Contract, Lead, PartnerRow, Proposal, ProposalDoc, Renewal } from "@/api/types/partnerships";
 import type { PersonRef } from "@/api/types/common";
-import { Button, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, Icon, todayIso } from "@mycity/ui";
+import { Button, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, Icon, todayIso, KeyValue, Meter, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
-import { Chain, KV, Mini, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
+import { Chain, StatStrip } from "@/components/ui/data";
 import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
 import { BackButton, ProfileHeader } from "@/components/ui/Profile";
-import { Chips, ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AmountInput, DateField, Field, FormRow, Input, PersonPicker, Select, Textarea, useForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
 
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   if (id && (tab === "partners" || tab === "pipeline")) return <Partner360View id={id} back={tab} />;
@@ -48,7 +44,7 @@ function Pipeline() {
   const d = s.data;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Pipeline"
         sub={d ? `${d.in_pipeline} in the pipeline · ${d.going_quiet} going quiet` : " "}
         actions={
@@ -105,7 +101,7 @@ function Partners() {
   const list = usePaged("GET /api/v1/partnerships/partners", { filters: view === "quiet" ? { quiet: true } : {} });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Partners"
         sub="The 360 opens from any row"
         actions={
@@ -181,18 +177,18 @@ function PartnerForm({ close }: { close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="Partner" {...f.field("name")}><Input {...f.field("name")} placeholder="Zenith Bank" /></Field>
-        <Field label="Legal Name"><Input {...f.field("legal_name")} placeholder="Optional" /></Field>
+        <Field label="Partner" {...f.field("name")}><TextField {...f.field("name")} placeholder="Zenith Bank" /></Field>
+        <Field label="Legal Name"><TextField {...f.field("legal_name")} placeholder="Optional" /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Industry" {...f.field("industry")}><Select placeholder="Pick one" options={opts(INDUSTRIES)} {...f.field("industry")} /></Field>
-        <Field label="Partnership Type" {...f.field("type")}><Select placeholder="Pick one" options={opts(TYPES)} {...f.field("type")} /></Field>
+        <Field label="Industry" {...f.field("industry")}><SelectField placeholder="Pick one" options={opts(INDUSTRIES)} {...f.field("industry")} /></Field>
+        <Field label="Partnership Type" {...f.field("type")}><SelectField placeholder="Pick one" options={opts(TYPES)} {...f.field("type")} /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Expected Value"><AmountInput {...f.field("value")} /></Field>
-        <Field label="Headquarters"><Input {...f.field("hq")} /></Field>
+        <Field label="Expected Value"><MoneyField {...f.field("value")} /></Field>
+        <Field label="Headquarters"><TextField {...f.field("hq")} /></Field>
       </FormRow>
-      <Field label="Website"><Input {...f.field("website")} placeholder="example.com" /></Field>
+      <Field label="Website"><TextField {...f.field("website")} placeholder="example.com" /></Field>
       <Field label="Lead Owner" state={tried && !owner.length ? "bad" : undefined} message={tried && !owner.length ? "Pick the owner" : undefined}><PersonPicker value={owner} onChange={setOwner} /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
@@ -209,7 +205,7 @@ function Partner360View({ id, back }: { id: string; back: string }) {
   const modal = useModal();
   const p = useApi("GET /api/v1/partnerships/partners/:id", { params: { id } });
   const goBack = () => navigate(`/partnerships?tab=${back}`);
-  if (p.error) return (<><BackButton label={`Back to ${back === "pipeline" ? "Pipeline" : "Partners"}`} onClick={goBack} /><ErrorBlock error={p.error} onRetry={p.reload} /></>);
+  if (p.error) return (<><BackButton label={`Back to ${back === "pipeline" ? "Pipeline" : "Partners"}`} onClick={goBack} /><ErrorState error={p.error} onRetry={p.reload} /></>);
   if (!p.data) return <LoadingRows count={8} />;
   const x = p.data;
   return (
@@ -243,7 +239,7 @@ function Partner360View({ id, back }: { id: string; back: string }) {
             {x.days_at_stage.map((d) => (
               <div key={d.label} className="flex items-center gap-2.5 py-1">
                 <span className="min-w-0 flex-1 text-[12px]">{d.label}</span>
-                <span className="w-[160px] flex-none"><Mini pct={Math.min(100, d.days * 4)} label={d.current ? `${d.days} so far` : `${d.days} days`} /></span>
+                <span className="w-[160px] flex-none"><Meter pct={Math.min(100, d.days * 4)} label={d.current ? `${d.days} so far` : `${d.days} days`} /></span>
               </div>
             ))}
           </div>
@@ -290,10 +286,10 @@ function LogInteraction({ id, close }: { id: string; close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="What"><Select options={[["call", "Call"], ["meeting", "Meeting"], ["email", "Email"], ["visit", "Visit"]]} {...f.field("kind")} /></Field>
+        <Field label="What"><SelectField options={[["call", "Call"], ["meeting", "Meeting"], ["email", "Email"], ["visit", "Visit"]]} {...f.field("kind")} /></Field>
         <Field label="When" {...f.field("happened_on")}><DateField {...f.field("happened_on")} max={todayIso()} /></Field>
       </FormRow>
-      <Field label="Summary" {...f.field("summary")}><Textarea {...f.field("summary")} placeholder="Agreed a pilot" /></Field>
+      <Field label="Summary" {...f.field("summary")}><TextAreaField {...f.field("summary")} placeholder="Agreed a pilot" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Log</Button>
@@ -320,8 +316,8 @@ function MoveStage({ id, current, close }: { id: string; current: string; close:
   };
   return (
     <>
-      <Field label="Stage"><Select value={stage} onChange={setStage} options={opts(stages.data ?? [current])} /></Field>
-      <Field label={stage === "On hold" ? "Why It Is on Hold" : "Note (Optional)"}><Textarea value={reason} onChange={setReason} placeholder="Duplicate entry" /></Field>
+      <Field label="Stage"><SelectField value={stage} onChange={setStage} options={opts(stages.data ?? [current])} /></Field>
+      <Field label={stage === "On hold" ? "Why It Is on Hold" : "Note (Optional)"}><TextAreaField value={reason} onChange={setReason} placeholder="Duplicate entry" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={stage === current || move.pending} onClick={go}>Move</Button>
@@ -343,7 +339,7 @@ function Leads() {
       title: l.title,
       body: (close) => (
         <>
-          <KV items={[["Source", l.source], ["Owner", l.owner.display_name], ["Added", formatDate(l.added_on)], ["Next action", l.next_action ?? "None"], ["Status", <StatusPill key="s" s={l.status} />]]} />
+          <KeyValue items={[["Source", l.source], ["Owner", l.owner.display_name], ["Added", formatDate(l.added_on)], ["Next action", l.next_action ?? "None"], ["Status", <StatusPill key="s" s={l.status} />]]} />
           {!["Converted", "Lost"].includes(l.status.text) && (
             <ModalFoot>
               <Button className="mr-auto" onClick={() => modal.open({ title: "Close as Lost", body: (c2) => <LoseLead id={l.lead_id} close={c2} /> })}>Close as Lost</Button>
@@ -355,7 +351,7 @@ function Leads() {
     });
   return (
     <>
-      <PageHead title="Leads" sub="Entered manually after a business development conversation" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Lead", body: (close) => <LeadForm close={close} /> })}>New Lead</Button>} />
+      <PageHeader title="Leads" sub="Entered manually after a business development conversation" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Lead", body: (close) => <LeadForm close={close} /> })}>New Lead</Button>} />
       {s.data && <KpiTiles items={[{ label: "New", value: String(s.data.new) }, { label: "Contacted", value: String(s.data.contacted) }, { label: "Qualified", value: String(s.data.qualified) }, { label: "Converted This Month", value: String(s.data.converted_this_month), tone: "ok" }]} />}
       <PagedTable<Lead>
         title="Leads"
@@ -407,9 +403,9 @@ function LeadForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Lead" {...f.field("title")}><Input {...f.field("title")} placeholder="Zenith events sponsorship" /></Field>
-      <Field label="Source"><Select options={opts(["BD conversation", "Referral", "Inbound email", "Event", "Website form"])} {...f.field("source")} /></Field>
-      <Field label="Next Action"><Input {...f.field("next_action")} placeholder="Send one pager" /></Field>
+      <Field label="Lead" {...f.field("title")}><TextField {...f.field("title")} placeholder="Zenith events sponsorship" /></Field>
+      <Field label="Source"><SelectField options={opts(["BD conversation", "Referral", "Inbound email", "Event", "Website form"])} {...f.field("source")} /></Field>
+      <Field label="Next Action"><TextField {...f.field("next_action")} placeholder="Send one pager" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Add Lead</Button>
@@ -423,7 +419,7 @@ function LoseLead({ id, close }: { id: string; close: () => void }) {
   const lose = useMutation("POST /api/v1/partnerships/leads/:id/lose");
   return (
     <>
-      <Field label="Why"><Textarea value={reason} onChange={setReason} placeholder="Partner withdrew" /></Field>
+      <Field label="Why"><TextAreaField value={reason} onChange={setReason} placeholder="Partner withdrew" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={!reason.trim() || lose.pending} onClick={async () => { await lose.run({ params: { id }, body: { reason } }); invalidate("/api/v1/partnerships/leads"); close(); toast("Lead closed as lost"); }}>Close as Lost</Button>
@@ -466,7 +462,7 @@ function Proposals() {
   }, [preset, navigate, modal]);
   return (
     <>
-      <PageHead title="Proposals" sub="Generated from a short questionnaire" actions={<Button variant="primary" icon="plus" onClick={() => openNew()}>New Proposal</Button>} />
+      <PageHeader title="Proposals" sub="Generated from a short questionnaire" actions={<Button variant="primary" icon="plus" onClick={() => openNew()}>New Proposal</Button>} />
       {s.data && <KpiTiles items={[{ label: "Sent This Year", value: String(s.data.sent_this_year) }, { label: "Accepted", value: String(s.data.accepted), tone: "ok" }, { label: "Viewed, No Reply", value: String(s.data.viewed_no_reply), tone: "warn" }, { label: "Acceptance Rate", value: s.data.acceptance_rate }]} />}
       <Grid cols="1/1.5">
         <PagedTable<Proposal>
@@ -514,16 +510,16 @@ function ProposalForm({ close, partner }: { close: () => void; partner: string }
   return (
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">Six answers. The assistant drafts; you edit before anything is sent.</p>
-      <Field label="1 · Who Is It For" {...f.field("partner_id")}><Select placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
-      <Field label="2 · What We Propose" {...f.field("what")}><Textarea {...f.field("what")} placeholder="Four-city health activation" /></Field>
-      <Field label="3 · Why Now" {...f.field("why_now")}><Input {...f.field("why_now")} placeholder="Fits campaign window" /></Field>
+      <Field label="1 · Who Is It For" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
+      <Field label="2 · What We Propose" {...f.field("what")}><TextAreaField {...f.field("what")} placeholder="Four-city health activation" /></Field>
+      <Field label="3 · Why Now" {...f.field("why_now")}><TextField {...f.field("why_now")} placeholder="Fits campaign window" /></Field>
       <FormRow>
-        <Field label="4 · Cities" {...f.field("cities")}><Input {...f.field("cities")} /></Field>
-        <Field label="5 · Weeks" {...f.field("weeks")}><Input {...f.field("weeks")} inputMode="numeric" onChange={(v) => f.set("weeks", v.replace(/\D/g, "").slice(0, 2))} /></Field>
+        <Field label="4 · Cities" {...f.field("cities")}><TextField {...f.field("cities")} /></Field>
+        <Field label="5 · Weeks" {...f.field("weeks")}><TextField {...f.field("weeks")} inputMode="numeric" onChange={(v) => f.set("weeks", v.replace(/\D/g, "").slice(0, 2))} /></Field>
       </FormRow>
       <FormRow>
-        <Field label="6 · Value We Ask" {...f.field("value")}><AmountInput {...f.field("value")} /></Field>
-        <Field label="Payment Terms"><Input {...f.field("terms")} /></Field>
+        <Field label="6 · Value We Ask" {...f.field("value")}><MoneyField {...f.field("value")} /></Field>
+        <Field label="Payment Terms"><TextField {...f.field("terms")} /></Field>
       </FormRow>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
@@ -542,7 +538,7 @@ function Contracts() {
   const ren = usePaged("GET /api/v1/partnerships/contracts/renewals");
   return (
     <>
-      <PageHead title="Contracts & MOUs" sub="Draft to renewal" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Contract", body: (close) => <ContractForm close={close} /> })}>New Contract</Button>} />
+      <PageHeader title="Contracts & MOUs" sub="Draft to renewal" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Contract", body: (close) => <ContractForm close={close} /> })}>New Contract</Button>} />
       {s.data && (
         <>
           <KpiTiles items={[{ label: "Active", value: String(s.data.active) }, { label: "In Review", value: String(s.data.in_review), tone: s.data.in_review ? "warn" : undefined }, { label: "Draft", value: String(s.data.draft) }, { label: "Renewals, 180 Days", value: String(s.data.renewals_180), tone: s.data.renewals_180 ? "warn" : undefined }]} />
@@ -613,11 +609,11 @@ function ContractForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Partner" {...f.field("partner_id")}><Select placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
-      <Field label="Document" {...f.field("title")}><Input {...f.field("title")} placeholder="e.g. Activation agreement" /></Field>
+      <Field label="Partner" {...f.field("partner_id")}><SelectField placeholder="Pick the partner" options={partners.rows.map((p) => [p.partner_id, p.name])} {...f.field("partner_id")} /></Field>
+      <Field label="Document" {...f.field("title")}><TextField {...f.field("title")} placeholder="e.g. Activation agreement" /></Field>
       <FormRow>
-        <Field label="Type"><Select options={[["Contract", "Contract"], ["MOU", "MOU"]]} {...f.field("kind")} /></Field>
-        <Field label="Value" {...f.field("value")}><AmountInput {...f.field("value")} /></Field>
+        <Field label="Type"><SelectField options={[["Contract", "Contract"], ["MOU", "MOU"]]} {...f.field("kind")} /></Field>
+        <Field label="Value" {...f.field("value")}><MoneyField {...f.field("value")} /></Field>
       </FormRow>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
@@ -632,10 +628,10 @@ function ContractForm({ close }: { close: () => void }) {
 function Analytics() {
   const a = useApi("GET /api/v1/partnerships/analytics");
   const d = a.data;
-  if (!d) return (<><PageHead title="Analytics" sub="Monthly partnership performance by lead owner" /><Card><LoadingRows count={6} /></Card></>);
+  if (!d) return (<><PageHeader title="Analytics" sub="Monthly partnership performance by lead owner" /><Card><LoadingRows count={6} /></Card></>);
   return (
     <>
-      <PageHead title="Analytics" sub="Monthly partnership performance by lead owner" />
+      <PageHeader title="Analytics" sub="Monthly partnership performance by lead owner" />
       <KpiTiles items={[{ label: "Prospects This Month", value: String(d.prospects) }, { label: "Meetings Held", value: String(d.meetings) }, { label: "Proposals Sent", value: String(d.proposals) }, { label: "Signed", value: String(d.signed), tone: "ok" }]} />
       <Table
         title={formatMonth(d.period)}
@@ -665,7 +661,7 @@ function Analytics() {
             { key: "p", label: "Prospects", align: "n", render: (r) => r.prospects },
             { key: "pr", label: "Proposals", align: "n", render: (r) => r.proposals },
             { key: "s", label: "Signed", align: "n", render: (r) => r.signed },
-            { key: "c", label: "Conversion", render: (r) => <span className="block w-[130px]"><Mini pct={r.conversion_pct} label={`${r.conversion_pct}%`} /></span> },
+            { key: "c", label: "Conversion", render: (r) => <span className="block w-[130px]"><Meter pct={r.conversion_pct} label={`${r.conversion_pct}%`} /></span> },
           ]}
         />
         <KvCard

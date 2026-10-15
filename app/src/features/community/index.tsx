@@ -6,19 +6,14 @@ import "@/api/types/organisation";
 import type { Announcement, Channel, Conversation, MessageCreate } from "@/api/types/community";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, formatDateTime, formatWhen, Icon, IconButton, todayIso, useIsMobile } from "@mycity/ui";
-import { Avatar, KV, Mini, Pill, StatStrip } from "@/components/ui/data";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
-import { Card, Grid, PageHead } from "@/components/ui/layout";
-import { Menu } from "@/components/ui/Menu";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Button, cn, formatDate, formatDateTime, formatWhen, Icon, IconButton, todayIso, useIsMobile, Avatar, KeyValue, Meter, Pill, Card, Grid, PageHeader, Menu, useModal, ErrorState, toast, DateField, Field, TextField, rules, SearchInput, ChoiceField, Switch, TextAreaField, useForm } from "@mycity/ui";
+import { StatStrip } from "@/components/ui/data";
+import { LoadingRows } from "@/components/ui/Table";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { ChatFrame, Composer, Row, ThreadBody, ThreadSearch, useSplit, useThread } from "./Chat";
-import { DateField, Field, Input, PersonPicker, rules, SearchBox, Seg, Switch, Textarea, Upload, useForm } from "@/components/form";
+import { PersonPicker, Upload } from "@/components/form";
 
 export default function Community({ tab }: ModuleScreenProps) {
   if (tab === "direct-messages") return <Direct />;
@@ -91,9 +86,9 @@ function Channels() {
 
   const listPane = (
     <>
-      <div className="flex-none px-3 pt-3 pb-2"><SearchBox value={list.q} onChange={list.setQ} placeholder="Search channels" /></div>
+      <div className="flex-none px-3 pt-3 pb-2"><SearchInput value={list.q} onChange={list.setQ} placeholder="Search channels" /></div>
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 max-md:overflow-visible">
-        {list.error ? <ErrorBlock error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={5} /> : (
+        {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={5} /> : (
           <>
             {pinned.length > 0 && <><Group>Pinned</Group>{pinned.map(row)}</>}
             <Group>Channels</Group>
@@ -115,7 +110,7 @@ function Channels() {
           trigger={(p) => <IconButton {...p} icon="dots" label="Channel menu" />}
           items={[
             { label: "View Members", icon: "users", onSelect: () => modal.open({ title: `Members · #${current.name}`, body: (close) => <Members c={current} close={close} /> }) },
-            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: `#${current.name}`, body: (close) => <><KV items={[["Members", current.members], ["Who can post", current.read_only ? "People and the CEO" : "Every member"], ["Visibility", "Internal to MyCity"]]} /><Foot><Button variant="primary" onClick={close}>Close</Button></Foot></> }) },
+            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: `#${current.name}`, body: (close) => <><KeyValue items={[["Members", current.members], ["Who can post", current.read_only ? "People and the CEO" : "Every member"], ["Visibility", "Internal to MyCity"]]} /><Foot><Button variant="primary" onClick={close}>Close</Button></Foot></> }) },
             { label: "Search in Channel", icon: "srch", onSelect: () => setSearching(true) },
             "sep",
             { label: "Mute Notifications", icon: "bell", onSelect: () => void api.call("POST /api/v1/community/channels/:id/mute", { params: { id: current.channel_id }, body: {} }).then(() => toast(`#${current.name} muted`)) },
@@ -149,7 +144,7 @@ function Channels() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Channels"
         sub={list.page ? `${list.page.total} channels` : " "}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Channel", body: (close) => <NewChannel close={close} onMade={(c) => (list.reload(), pick(c))} /> })}>New Channel</Button>}
@@ -163,7 +158,7 @@ function Members({ c, close }: { c: Channel; close: () => void }) {
   const list = usePaged("GET /api/v1/community/channels/:id/members", { params: { id: c.channel_id } });
   return (
     <>
-      <SearchBox value={list.q} onChange={list.setQ} placeholder="Search members" className="mb-2" />
+      <SearchInput value={list.q} onChange={list.setQ} placeholder="Search members" className="mb-2" />
       <p className="mb-2 text-[11.5px] text-subtle-foreground">{c.members} members{list.page && list.page.total > list.rows.length ? `, showing ${list.rows.length}` : ""}</p>
       <PeopleList people={list.rows} />
       {list.page?.has_next && <Button size="sm" className="mt-2" onClick={() => list.setPage(list.pageNumber + 1)}>Next Page</Button>}
@@ -192,7 +187,6 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
   const [people, setPeople] = useState<PersonRef[]>([]);
   const [depts, setDepts] = useState<string[]>([]);
   const [who, setWho] = useState<"everyone" | "admins">("everyone");
-  const info = useInfo();
   const departments = useApi("GET /api/v1/departments", { query: {} });
   const save = useMutation("POST /api/v1/community/channels");
   const submit = async () => {
@@ -209,8 +203,8 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
   };
   return (
     <>
-      <Field label="Channel Name" {...f.field("name")}><Input {...f.field("name")} placeholder="e.g. abuja-hub" autoComplete="off" onChange={(v) => f.set("name", v.toLowerCase())} /></Field>
-      <Field label="What Is It For"><Input {...f.field("purpose")} placeholder="Optional" /></Field>
+      <Field label="Channel Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. abuja-hub" autoComplete="off" onChange={(v) => f.set("name", v.toLowerCase())} /></Field>
+      <Field label="What Is It For"><TextField {...f.field("purpose")} placeholder="Optional" /></Field>
       <Field label="Add Whole Departments">
         <div className="flex flex-wrap gap-1.5">
           {(departments.data?.data ?? []).map((d) => {
@@ -220,9 +214,8 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
         </div>
       </Field>
       <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><PersonPicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
-      <Field label={<span className="inline-flex items-center gap-1">Who Can Post <InfoButton {...info} label="About who can post" /></span>}>
-        <InfoText {...info}>Set when the channel is created. Everyone can read. Channels are internal to MyCity: there is no public link to join one.</InfoText>
-        <Seg value={who} onChange={setWho} options={[["everyone", "Every Member"], ["admins", "Only Admins"]]} />
+      <Field label="Who Can Post" help="Set when the channel is created. Everyone can read.">
+        <ChoiceField value={who} onChange={setWho} options={[["everyone", "Every Member"], ["admins", "Only Admins"]]} />
       </Field>
       <Foot>
         <Button onClick={close}>Cancel</Button>
@@ -248,7 +241,7 @@ function Recognise({ channel, close, done }: { channel: Channel; close: () => vo
   return (
     <>
       <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are recognising" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="What Did They Do (Optional)" info="Leave it blank and a note is written for you."><Textarea value={text} onChange={setText} placeholder="Led the launch" /></Field>
+      <Field label="What Did They Do (Optional)" info="Leave it blank and a note is written for you."><TextAreaField value={text} onChange={setText} placeholder="Led the launch" /></Field>
       <Foot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="thumb" disabled={save.pending} onClick={go}>Post</Button>
@@ -270,7 +263,7 @@ function Celebrate({ close, send }: { close: () => void; send: (b: MessageCreate
   return (
     <>
       <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are celebrating" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="What"><Seg value={what} onChange={setWhat} options={[["birthday", "Birthday"], ["anniversary", "Work Anniversary"]]} /></Field>
+      <Field label="What"><ChoiceField value={what} onChange={setWhat} options={[["birthday", "Birthday"], ["anniversary", "Work Anniversary"]]} /></Field>
       <Foot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="flag" onClick={go}>Post</Button>
@@ -288,10 +281,10 @@ function PollForm({ close, send }: { close: () => void; send: (b: MessageCreate)
   };
   return (
     <>
-      <Field label="Question" {...f.field("q")}><Input {...f.field("q")} placeholder="Ask one question" /></Field>
+      <Field label="Question" {...f.field("q")}><TextField {...f.field("q")} placeholder="Ask one question" /></Field>
       <Field label="Options" state={f.field("o1").state ?? f.field("o2").state} message={f.field("o1").message ?? f.field("o2").message}>
         <div className="flex flex-col gap-1.5">
-          {(["o1", "o2", "o3", "o4"] as const).map((k, i) => <Input key={k} {...f.field(k)} placeholder={`Option ${i + 1}${i > 1 ? " (optional)" : ""}`} aria-label={`Option ${i + 1}`} />)}
+          {(["o1", "o2", "o3", "o4"] as const).map((k, i) => <TextField key={k} {...f.field(k)} placeholder={`Option ${i + 1}${i > 1 ? " (optional)" : ""}`} aria-label={`Option ${i + 1}`} />)}
         </div>
       </Field>
       <Foot>
@@ -376,14 +369,14 @@ function Direct() {
 
   const listPane = (
     <>
-      <div className="flex-none px-3 pt-3 pb-2"><SearchBox value={list.q} onChange={list.setQ} placeholder="Search people" label="Search conversations" /></div>
+      <div className="flex-none px-3 pt-3 pb-2"><SearchInput value={list.q} onChange={list.setQ} placeholder="Search people" label="Search conversations" /></div>
       <div className="flex flex-none gap-1 px-3 pb-2" role="group" aria-label="Show">
         {(["all", "unread"] as const).map((v) => (
           <button key={v} type="button" aria-pressed={filter === v} onClick={() => setFilter(v)} className={cn("h-[26px] rounded-full px-[11px] text-[11.5px] font-[650]", filter === v ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>{v === "all" ? "All" : "Unread"}</button>
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 max-md:overflow-visible">
-        {list.error ? <ErrorBlock error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <LoadingRows count={5} /> : list.rows.map((c) => (
+        {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <LoadingRows count={5} /> : list.rows.map((c) => (
           <Row
             key={c.conversation_id}
             on={c.conversation_id === current?.conversation_id && (!mobile || open)}
@@ -448,7 +441,7 @@ function Direct() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Direct Messages"
         sub={unread ? `${unread} unread` : "All caught up"}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Message", body: (close) => <NewMessage close={close} start={start} /> })}>New Message</Button>}
@@ -479,7 +472,7 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
   const card = useApi("GET /api/v1/community/people/:user_id/card", { params: { user_id: c.person.employee_id } });
   const [mute, setMute] = useState(false);
   const p = card.data;
-  if (card.error) return <ErrorBlock error={card.error} onRetry={card.reload} />;
+  if (card.error) return <ErrorState error={card.error} onRetry={card.reload} />;
   if (!p) return <LoadingRows count={4} />;
   const sec = "border-b border-border py-3.5 last:border-b-0";
   const h4 = "mb-2 text-[10.5px] font-[650] tracking-[.12em] text-subtle-foreground uppercase";
@@ -533,7 +526,6 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
 function Announcements() {
   const modal = useModal();
   const { can } = useAuth();
-  const info = useInfo();
   const list = usePaged("GET /api/v1/community/announcements");
   const poster = can("people", "create");
   const stats = useMemo(() => {
@@ -544,14 +536,13 @@ function Announcements() {
   }, [list.rows]);
   return (
     <>
-      <PageHead
-        title={<span className="inline-flex items-center gap-1.5">Announcements <InfoButton {...info} label="About announcements" /></span>}
+      <PageHeader
+        title="Announcements"
         sub="Posted by People and the CEO · staff read them in #announcements"
         actions={poster && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Announcement", body: (close) => <NewAnnouncement close={close} /> })}>New Announcement</Button>}
       />
-      <InfoText {...info}>Only People and the CEO can post. An announcement appears in #announcements, which is pinned and read only for everyone else, and as a notification. It can be scheduled. Read counts are visible to the poster only.</InfoText>
       <StatStrip items={[{ label: "Published", value: stats.pub }, { label: "Scheduled", value: stats.sch }, { label: "Average Read", value: `${stats.avg}%`, tone: "ok" }, { label: "Audience", value: `${stats.audience} staff` }, { label: "This Month", value: stats.month, desktop: true }]} />
-      {list.error ? <ErrorBlock error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
+      {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
         <Grid cols={2} className="mt-3">
           {list.rows.map((a) => (
             <Card key={a.announcement_id} role="button" tabIndex={0} className="cursor-pointer text-left transition-[box-shadow,transform] hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.title, body: (close) => <AnnouncementReads a={a} close={close} poster={poster} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
@@ -582,7 +573,7 @@ function AnnouncementReads({ a, close, poster }: { a: Announcement; close: () =>
       {a.scheduled ? <Pill tone="info">Scheduled. Not yet visible to staff</Pill> : poster && (
         <>
           <h3 className="mb-1.5 text-[13.5px] font-semibold">Read by {a.reads} of {a.audience}</h3>
-          <Mini pct={pct} label={`${pct}%`} />
+          <Meter pct={pct} label={`${pct}%`} />
           <div className="mt-4 mb-1.5 flex items-center gap-2">
             <h3 className="flex-1 text-[13.5px] font-semibold">Not Read · {nNot}</h3>
             {nNot > 0 && <Button size="sm" icon="bell" disabled={remind.pending} onClick={async () => { const r = await remind.run({ params: { id: a.announcement_id }, body: {} }); toast(`Reminder sent to ${r.reminded} ${r.reminded === 1 ? "person" : "people"}`); }}>Remind Them</Button>}
@@ -618,9 +609,9 @@ function NewAnnouncement({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Headline" {...f.field("title")}><Input {...f.field("title")} placeholder="Office closed Friday" /></Field>
-      <Field label="Message" {...f.field("body")}><Textarea {...f.field("body")} placeholder="Details for staff" /></Field>
-      <Field label="When"><Seg value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>
+      <Field label="Headline" {...f.field("title")}><TextField {...f.field("title")} placeholder="Office closed Friday" /></Field>
+      <Field label="Message" {...f.field("body")}><TextAreaField {...f.field("body")} placeholder="Details for staff" /></Field>
+      <Field label="When"><ChoiceField value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>
       {when === "later" && <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>}
       <p className="flex items-center gap-1.5 text-[11.5px] text-subtle-foreground"><Icon name="user" className="size-3.5" />Posting as {me?.display_name}</p>
       <Foot>

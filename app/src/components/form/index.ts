@@ -1,14 +1,7 @@
 /**
- * The form system (FRONTEND_GUIDE §8.6). The only folder where a raw <form>,
- * <input>, <select>, <textarea> or <label> may be written (gate 12); screens
- * import their fields from here.
+ * What remains of the staff app's own form folder until PR 3 moves it into
+ * packages/ui: the server-searching person picker and the upload field. Every
+ * other field comes from @mycity/ui (FRONTEND_GUIDE §8.6).
  */
-export { Form } from "./Form";
-export { Field, FormRow, Input, Seg, SegBar, Select, Switch, Textarea, ToggleRow, rules, useForm } from "./fields";
-export { DateField } from "./DateField";
-export { AmountInput, toMoneyString } from "./MoneyField";
 export { Upload } from "./Upload";
 export { PersonPicker } from "./PersonPicker";
-export { FilterSelect, SearchBox } from "./Search";
-export { LoginField } from "./LoginField";
-export { InlineInput, InlineLabel, InlineSelect } from "./Inline";

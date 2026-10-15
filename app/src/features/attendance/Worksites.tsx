@@ -1,14 +1,9 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Worksite } from "@/api/types/attendance";
-import { Button } from "@mycity/ui";
-import { KV, Pill } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Chips, Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Button, KeyValue, Pill, Card, CardHeader, Grid, PageHeader, useModal, Chips, toast, Field, TextField, rules, SearchInput, useForm } from "@mycity/ui";
+import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { Field, Input, rules, SearchBox, useForm } from "@/components/form";
 
 const COLOR: Record<Worksite["type"], string> = { Office: "var(--chart-1)", "Approved home": "var(--primary)", "Temporary location": "var(--primary)", "Field assignment": "var(--chart-2)" };
 
@@ -52,7 +47,7 @@ export function Worksites() {
   const count = (t: string) => map.rows.filter((s) => s.type === t).length;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Worksites"
         sub="Geofenced locations · MTN Head Office is the principal worksite"
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Worksite", body: (close) => <WorksiteForm close={close} /> })}>Add Worksite</Button>}
@@ -60,7 +55,7 @@ export function Worksites() {
       <KpiTiles items={[{ label: "Office worksites", value: String(count("Office")) }, { label: "Approved homes", value: String(count("Approved home")) }, { label: "Field sites today", value: String(count("Field assignment")) }, { label: "Outside any fence today", value: "1", tone: "warn" }]} />
       <FenceMap sites={map.rows} />
       <Toolbar className="mt-3">
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={type} onChange={setType} options={[["all", "All"], ["Office", "Offices"], ["Approved home", "Homes"], ["Temporary location", "Temporary"], ["Field assignment", "Field"]]} />
       <Table
@@ -86,11 +81,11 @@ export function Worksites() {
       <Grid cols={2} className="mt-3">
         <Card>
           <CardHeader title="How the Geofence Behaves" />
-          <KV items={[["Remote", "Warned outside the approved home, fixed 100 m"], ["Hybrid", "The office on office days, home on remote days"], ["Field", "An approved assignment overrides office and home"], ["Office-only", "Blocked outside the assigned office"], ["Tracking", "None. Location is read only at clock-in and clock-out"]]} />
+          <KeyValue items={[["Remote", "Warned outside the approved home, fixed 100 m"], ["Hybrid", "The office on office days, home on remote days"], ["Field", "An approved assignment overrides office and home"], ["Office-only", "Blocked outside the assigned office"], ["Tracking", "None. Location is read only at clock-in and clock-out"]]} />
         </Card>
         <Card>
           <CardHeader title="Why Homes Are Masked" />
-          <KV items={[["In this list", "Area only: Approved home · Lekki"], ["Full address", "In the HR detail view, and each view is logged"], ["Who can open it", "People and the CEO. Managers see the area only"], ["History", "A changed home is superseded, never overwritten"]]} />
+          <KeyValue items={[["In this list", "Area only: Approved home · Lekki"], ["Full address", "In the HR detail view, and each view is logged"], ["Who can open it", "People and the CEO. Managers see the area only"], ["History", "A changed home is superseded, never overwritten"]]} />
         </Card>
       </Grid>
     </>
@@ -113,9 +108,9 @@ function WorksiteForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Worksite Name" {...f.field("name")}><Input {...f.field("name")} placeholder="Enugu Office" /></Field>
-      <Field label="Address" {...f.field("address")} info="The address is turned into coordinates when saved; check the pin on the map before staff clock in there."><Input {...f.field("address")} placeholder="Street, area, city" /></Field>
-      <Field label="Radius, Metres" {...f.field("radius_m")}><Input inputMode="numeric" {...f.field("radius_m")} /></Field>
+      <Field label="Worksite Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Enugu Office" /></Field>
+      <Field label="Address" {...f.field("address")} info="The address is turned into coordinates when saved; check the pin on the map before staff clock in there."><TextField {...f.field("address")} placeholder="Street, area, city" /></Field>
+      <Field label="Radius, Metres" {...f.field("radius_m")}><TextField inputMode="numeric" {...f.field("radius_m")} /></Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Add Worksite</Button>

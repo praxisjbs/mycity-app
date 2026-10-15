@@ -1,8 +1,6 @@
-import { Icon } from "@mycity/ui";
+import { Icon, ModalProvider, Toaster } from "@mycity/ui";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { Login } from "@/auth/Login";
-import { ModalProvider } from "@/components/ui/Modal";
-import { Toasts } from "@/components/ui/Toast";
 import { RouterProvider } from "@/lib/router";
 import { StagingBar } from "@/components/ui/StagingBar";
 import { Shell } from "@/shell/Shell";
@@ -15,7 +13,7 @@ export function App() {
         <ModalProvider>
           <StagingBar />
           <Gate />
-          <Toasts />
+          <Toaster />
           <UpdatePrompt />
         </ModalProvider>
       </AuthProvider>

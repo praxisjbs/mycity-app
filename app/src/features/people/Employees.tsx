@@ -3,16 +3,13 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { EmployeeCreate, EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
-import { Button } from "@mycity/ui";
-import { Bars, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
+import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, toast, MoneyField, DateField, Field, FilterSelect, FormRow, TextField, rules, SearchInput, SelectField, toMoneyString, useForm } from "@mycity/ui";
+import { Bars, StatStrip } from "@/components/ui/data";
 import { Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { hrefFor, useRouter } from "@/lib/router";
 import { EmployeeDetails } from "./EmployeeDetails";
-import { AmountInput, DateField, Field, FilterSelect, FormRow, Input, PersonPicker, rules, SearchBox, Select, toMoneyString, Upload, useForm } from "@/components/form";
+import { PersonPicker, Upload } from "@/components/form";
 
 export function Employees() {
   const me = useMe();
@@ -28,7 +25,7 @@ export function Employees() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Employees"
         sub={summary.data ? `${summary.data.kpis[0].value} staff · ${summary.data.departments.length} departments · select a row for details and actions` : " "}
         actions={
@@ -45,7 +42,7 @@ export function Employees() {
       {summary.data && <KpiTiles items={summary.data.kpis} />}
       {summary.data && <StatStrip items={summary.data.arrangements.map((a) => ({ label: a.label, value: a.value }))} />}
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-[300px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-[300px]" />
         <FilterSelect label="Department" value={department} onChange={setDepartment} options={[["all", "All departments"], ...depts.rows.map((d) => [d.name, d.name] as [string, string])]} />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={[["all", "Any status"], ["confirmed", "Active"], ["probation", "Probation"], ["on_leave", "On leave"], ["suspended", "Suspended"]]} />
       </Toolbar>
@@ -138,17 +135,17 @@ function AddEmployee({ close }: { close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="First Name" {...f.field("first_name")}><Input {...f.field("first_name")} autoComplete="off" /></Field>
-        <Field label="Last Name" {...f.field("last_name")}><Input {...f.field("last_name")} autoComplete="off" /></Field>
+        <Field label="First Name" {...f.field("first_name")}><TextField {...f.field("first_name")} autoComplete="off" /></Field>
+        <Field label="Last Name" {...f.field("last_name")}><TextField {...f.field("last_name")} autoComplete="off" /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Work Email" {...f.field("work_email")}><Input type="email" {...f.field("work_email")} placeholder="name@mycityapp.io" /></Field>
-        <Field label="Phone" {...f.field("phone")}><Input inputMode="tel" {...f.field("phone")} placeholder="0803 123 4567" /></Field>
+        <Field label="Work Email" {...f.field("work_email")}><TextField type="email" {...f.field("work_email")} placeholder="name@mycityapp.io" /></Field>
+        <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" {...f.field("phone")} placeholder="0803 123 4567" /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Job Title" {...f.field("job_title")}><Input {...f.field("job_title")} /></Field>
+        <Field label="Job Title" {...f.field("job_title")}><TextField {...f.field("job_title")} /></Field>
         <Field label="Department" {...f.field("department_id")}>
-          <Select placeholder="Pick a department" options={depts.rows.map((d) => [d.department_id, d.name])} {...f.field("department_id")} />
+          <SelectField placeholder="Pick a department" options={depts.rows.map((d) => [d.department_id, d.name])} {...f.field("department_id")} />
         </Field>
       </FormRow>
       <FormRow>
@@ -158,8 +155,8 @@ function AddEmployee({ close }: { close: () => void }) {
         </Field>
       </FormRow>
       <FormRow>
-        <Field label="Employment Type"><Select options={EMPLOYMENT} {...f.field("employment_type")} /></Field>
-        <Field label="Work Pattern"><Select options={PATTERN} {...f.field("work_pattern")} /></Field>
+        <Field label="Employment Type"><SelectField options={EMPLOYMENT} {...f.field("employment_type")} /></Field>
+        <Field label="Work Pattern"><SelectField options={PATTERN} {...f.field("work_pattern")} /></Field>
       </FormRow>
       <Field label="Line Manager">
         <PersonPicker value={manager} onChange={setManager} placeholder="Manager's name" />
@@ -168,12 +165,12 @@ function AddEmployee({ close }: { close: () => void }) {
         <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-[12.5px] font-[650] text-muted-foreground">Pay and Bank (restricted)</summary>
         <div className="px-3 pt-1">
           <FormRow>
-            <Field label="Gross Monthly" {...f.field("gross_monthly")}><AmountInput {...f.field("gross_monthly")} /></Field>
-            <Field label="Bank"><Input {...f.field("bank_name")} /></Field>
+            <Field label="Gross Monthly" {...f.field("gross_monthly")}><MoneyField {...f.field("gross_monthly")} /></Field>
+            <Field label="Bank"><TextField {...f.field("bank_name")} /></Field>
           </FormRow>
           <FormRow>
-            <Field label="Account Number" {...f.field("account_number")}><Input inputMode="numeric" maxLength={10} {...f.field("account_number")} /></Field>
-            <Field label="Next of Kin"><Input {...f.field("next_of_kin")} /></Field>
+            <Field label="Account Number" {...f.field("account_number")}><TextField inputMode="numeric" maxLength={10} {...f.field("account_number")} /></Field>
+            <Field label="Next of Kin"><TextField {...f.field("next_of_kin")} /></Field>
           </FormRow>
         </div>
       </details>

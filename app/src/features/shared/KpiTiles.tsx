@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Tone } from "@/api/types/common";
 import { Kpi } from "@/components/ui/data";
-import { Grid } from "@/components/ui/layout";
+import { Grid } from "@mycity/ui";
 
 /** A row of plain KPI tiles (no drill-down), four across. */
 export function KpiTiles({ items, mobileCols = 1 }: { items: Array<{ key?: string; label: string; value: ReactNode; tone?: Tone; sub?: string; trend?: string; dir?: "up" | "dn" | "fl" }>; mobileCols?: 1 | 2 }) {

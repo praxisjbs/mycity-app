@@ -1,14 +1,10 @@
 import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { Device } from "@/api/types/attendance";
-import { Button, formatDate, formatDateTime } from "@mycity/ui";
-import { KV, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { Chips, Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
-import { WithInfo } from "@/components/ui/Info";
+import { Button, formatDate, formatDateTime, KeyValue, Pill, Who, Card, CardHeader, Grid, PageHeader, Chips, toast, SearchInput } from "@mycity/ui";
+import { StatStrip } from "@/components/ui/data";
+import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { SearchBox } from "@/components/form";
 
 export const DEVICE_TONE: Record<Device["status"], "ok" | "warn" | "err" | "neutral"> = { Enrolled: "ok", "Pending review": "warn", Blocked: "err", Revoked: "neutral", "Verification unavailable": "warn" };
 
@@ -29,10 +25,10 @@ export function Devices() {
   const others = (d: Device) => list.rows.filter((x) => x.employee.employee_id === d.employee.employee_id && x.device_id !== d.device_id);
   return (
     <>
-      <PageHead title="Devices" sub="Devices used to clock in" actions={<Button onClick={() => navigate(hrefFor("settings", "attendance-policy"))}>Device Policy</Button>} />
+      <PageHeader title="Devices" sub="Devices used to clock in" actions={<Button onClick={() => navigate(hrefFor("settings", "attendance-policy"))}>Device Policy</Button>} />
       {summary.data && <StatStrip items={summary.data.counts} />}
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Device or person" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Device or person" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending review", "Pending review"], ["Enrolled", "Enrolled"], ["Blocked", "Blocked"], ["Revoked", "Revoked"]]} />
       <Grid cols="1.4/1">
@@ -58,7 +54,7 @@ export function Devices() {
         {sel && (
           <Card>
             <CardHeader title={`${sel.employee.display_name} · ${sel.name}`} right={<Pill tone={DEVICE_TONE[sel.status]}>{sel.status}</Pill>} />
-            <KV items={[["First seen", formatDateTime(sel.first_seen)], ["Last punch", sel.last_punch ? formatDateTime(sel.last_punch) : "None"], ["Note", sel.note ?? "None"], ["Other devices", others(sel).map((d) => `${d.name} (${d.status.toLowerCase()})`).join(", ") || "None"], ["Next punch", <Pill tone={sel.effect.tone}>{sel.effect.text}</Pill>]]} />
+            <KeyValue items={[["First seen", formatDateTime(sel.first_seen)], ["Last punch", sel.last_punch ? formatDateTime(sel.last_punch) : "None"], ["Note", sel.note ?? "None"], ["Other devices", others(sel).map((d) => `${d.name} (${d.status.toLowerCase()})`).join(", ") || "None"], ["Next punch", <Pill tone={sel.effect.tone}>{sel.effect.text}</Pill>]]} />
             <div className="mt-[14px] flex flex-wrap gap-2">
               {sel.status !== "Enrolled" && <Button variant="primary" icon="ok" disabled={act.pending} onClick={() => set(sel, "Enrolled")}>Enrol This Device</Button>}
               {sel.status === "Pending review" && <Button disabled={act.pending} onClick={() => set(sel, "Blocked")}>Reject</Button>}
@@ -68,11 +64,6 @@ export function Devices() {
                   <Button disabled={act.pending} onClick={() => set(sel, "Blocked")}>Block</Button>
                 </>
               )}
-            </div>
-            <div className="mt-[11px]">
-              <WithInfo heading="Why Devices Are Recorded" label="About device recording">
-                Devices register on every punch whether the policy is on or off, so it can be tightened later without losing history.
-              </WithInfo>
             </div>
           </Card>
         )}

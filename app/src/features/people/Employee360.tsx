@@ -1,11 +1,9 @@
 import { useApi } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, formatDate } from "@mycity/ui";
-import { Bars, KV, Pill, StatStrip, Timeline } from "@/components/ui/data";
-import { Card, CardHeader, Grid } from "@/components/ui/layout";
-import { Money } from "@/components/ui/Money";
+import { Button, formatDate, KeyValue, Pill, Card, CardHeader, Grid, Money, ErrorState } from "@mycity/ui";
+import { Bars, StatStrip, Timeline } from "@/components/ui/data";
 import { BackButton, ProfileHeader } from "@/components/ui/Profile";
-import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
 import { AttendanceSetupCard } from "./EmployeeDetails";
 
@@ -15,7 +13,7 @@ export function Employee360({ id }: { id: string }) {
   const { navigate } = useRouter();
   const { data: e, error, reload } = useApi("GET /api/v1/employees/:id", { params: { id } });
   const back = () => navigate(hrefFor("people", "employees"));
-  if (error) return (<><BackButton label="Back to Employees" onClick={back} /><ErrorBlock error={error} onRetry={reload} /></>);
+  if (error) return (<><BackButton label="Back to Employees" onClick={back} /><ErrorState error={error} onRetry={reload} /></>);
   if (!e) return <LoadingRows count={8} />;
   const hr = me.grants.people?.includes("edit");
   return (
@@ -44,11 +42,11 @@ export function Employee360({ id }: { id: string }) {
       <Grid cols={2}>
         <Card>
           <CardHeader title="Employment" />
-          <KV items={[["Staff number", e.staff_number], ["Job title", e.job_title], ["Department", e.department], ["Grade", e.grade], ["Line manager", e.line_manager?.display_name ?? "None"], ["Start date", formatDate(e.start_date)], ["Employment type", e.employment_type], ["Work arrangement", e.arrangement], ["Status", <Pill tone={e.status.tone}>{e.status.text}</Pill>]]} />
+          <KeyValue items={[["Staff number", e.staff_number], ["Job title", e.job_title], ["Department", e.department], ["Grade", e.grade], ["Line manager", e.line_manager?.display_name ?? "None"], ["Start date", formatDate(e.start_date)], ["Employment type", e.employment_type], ["Work arrangement", e.arrangement], ["Status", <Pill tone={e.status.tone}>{e.status.text}</Pill>]]} />
         </Card>
         <Card>
           <CardHeader title="Contact and Pay" />
-          <KV
+          <KeyValue
             items={[
               ["Work email", e.work_email],
               ["Phone", e.phone],

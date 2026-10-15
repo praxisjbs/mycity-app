@@ -2,26 +2,23 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { MyProfile, ProfilePatch } from "@/api/types/ess";
 import "@/api/types/ess";
-import { Button, formatDate, Icon, initials } from "@mycity/ui";
-import { KV, Pill, Timeline } from "@/components/ui/data";
-import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Button, formatDate, Icon, initials, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, Field, FormRow, TextField, rules, useForm } from "@mycity/ui";
+import { Timeline } from "@/components/ui/data";
+import { LoadingRows } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, FormRow, Input, rules, Upload, useForm } from "@/components/form";
+import { Upload } from "@/components/form";
 
 export function MyProfilePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/profile");
   const modal = useModal();
   const { navigate } = useRouter();
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!p) return <LoadingRows count={8} />;
   const edit = () => modal.open({ title: "Edit My Details", body: (close) => <EditProfile p={p} close={close} /> });
   const photo = () => modal.open({ title: "Profile Photo", body: (close) => <PhotoForm close={close} /> });
 
-  const personal = <Card><CardHeader title="Personal" /><KV items={[["Full name", p.personal.full_name], ["Date of birth", formatDate(p.personal.date_of_birth)], ["Phone", p.personal.phone], ["Work email", p.personal.work_email], ["Address", p.personal.address]]} /></Card>;
+  const personal = <Card><CardHeader title="Personal" /><KeyValue items={[["Full name", p.personal.full_name], ["Date of birth", formatDate(p.personal.date_of_birth)], ["Phone", p.personal.phone], ["Work email", p.personal.work_email], ["Address", p.personal.address]]} /></Card>;
   const schedule = (
     <div className="mt-[14px] border-t border-border pt-3">
       <CardHeader title="Work Schedule" right={<Pill>Set by People</Pill>} className="mb-1" />
@@ -37,12 +34,12 @@ export function MyProfilePage() {
   const employment = (
     <Card>
       <CardHeader title="Employment" />
-      <KV items={[["Job title", p.employment.job_title], ["Department", p.employment.department], ["Line manager", p.employment.line_manager], ["Start date", formatDate(p.employment.start_date)], ["Employment type", p.employment.employment_type], ["Work arrangement", p.employment.arrangement], ["Status", <Pill tone={p.employment.status.tone}>{p.employment.status.text}</Pill>]]} />
+      <KeyValue items={[["Job title", p.employment.job_title], ["Department", p.employment.department], ["Line manager", p.employment.line_manager], ["Start date", formatDate(p.employment.start_date)], ["Employment type", p.employment.employment_type], ["Work arrangement", p.employment.arrangement], ["Status", <Pill tone={p.employment.status.tone}>{p.employment.status.text}</Pill>]]} />
       {schedule}
     </Card>
   );
-  const bank = <Card><CardHeader title="Bank, Used for Expense Disbursement" /><KV items={[["Bank", p.bank.bank_name], ["Account name", p.bank.account_name], ["Account number", `•••• ${p.bank.account_last4}`]]} /></Card>;
-  const nok = <Card><CardHeader title="Next of Kin" /><KV items={[["Name", p.next_of_kin.name], ["Relationship", p.next_of_kin.relationship], ["Phone", p.next_of_kin.phone]]} /></Card>;
+  const bank = <Card><CardHeader title="Bank, Used for Expense Disbursement" /><KeyValue items={[["Bank", p.bank.bank_name], ["Account name", p.bank.account_name], ["Account number", `•••• ${p.bank.account_last4}`]]} /></Card>;
+  const nok = <Card><CardHeader title="Next of Kin" /><KeyValue items={[["Name", p.next_of_kin.name], ["Relationship", p.next_of_kin.relationship], ["Phone", p.next_of_kin.phone]]} /></Card>;
   const can = (
     <Card>
       <CardHeader title="What You Can Change" />
@@ -59,7 +56,7 @@ export function MyProfilePage() {
 
   return (
     <>
-      <PageHead title="My Profile" sub="What People see, and what you can change yourself" actions={<Button variant="primary" icon="plus" onClick={edit}>Edit</Button>} />
+      <PageHeader title="My Profile" sub="What People see, and what you can change yourself" actions={<Button variant="primary" icon="plus" onClick={edit}>Edit</Button>} />
       <div className="mb-3 flex flex-wrap items-start gap-4 rounded-card border border-border bg-card p-4 shadow-1 max-md:p-[14px]">
         <button type="button" onClick={photo} title={p.photo_url ? "Change photo" : "Upload a photo"} className="relative flex size-[62px] flex-none items-center justify-center rounded-sheet bg-secondary text-[21px] font-bold tracking-[-.02em] text-secondary-foreground max-md:size-[52px] max-md:text-[18px]">
           {initials(p.display_name)}
@@ -126,19 +123,19 @@ function EditProfile({ p, close }: { p: MyProfile; close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="Phone" {...f.field("phone")}><Input inputMode="tel" {...f.field("phone")} /></Field>
-        <Field label="Address" {...f.field("address")}><Input {...f.field("address")} /></Field>
+        <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" {...f.field("phone")} /></Field>
+        <Field label="Address" {...f.field("address")}><TextField {...f.field("address")} /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Next of Kin"><Input {...f.field("next_of_kin_name")} /></Field>
-        <Field label="Relationship"><Input {...f.field("next_of_kin_relationship")} /></Field>
+        <Field label="Next of Kin"><TextField {...f.field("next_of_kin_name")} /></Field>
+        <Field label="Relationship"><TextField {...f.field("next_of_kin_relationship")} /></Field>
       </FormRow>
-      <Field label="Next of Kin Phone"><Input inputMode="tel" {...f.field("next_of_kin_phone")} /></Field>
+      <Field label="Next of Kin Phone"><TextField inputMode="tel" {...f.field("next_of_kin_phone")} /></Field>
       <FormRow>
         <Field label="Bank" info="A bank change is logged and People are notified the same day, because expenses are paid into it.">
-          <Input {...f.field("bank_name")} />
+          <TextField {...f.field("bank_name")} />
         </Field>
-        <Field label="New Account Number" info="Leave it empty to keep the account you have." {...f.field("account_number")}><Input inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="Unchanged" /></Field>
+        <Field label="New Account Number" info="Leave it empty to keep the account you have." {...f.field("account_number")}><TextField inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="Unchanged" /></Field>
       </FormRow>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

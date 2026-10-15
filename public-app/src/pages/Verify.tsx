@@ -2,11 +2,10 @@ import { useState, type ReactNode } from "react";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { VerifyResult } from "@/api/types/public";
-import { Button, cn, formatDate, formatTime, Icon } from "@mycity/ui";
+import { Button, cn, formatDate, formatTime, Icon, Skeleton, Pill, Field, Form, TextField } from "@mycity/ui";
 import { Brand, Page } from "@/components/Layout";
-import { Loading, Pill, Sub } from "@/components/ui";
+import { Sub } from "@/components/ui";
 import { useRouter } from "@/lib/router";
-import { Field, Form, Input } from "@/components/form";
 
 /**
  * Verify Document (#85): two hashes, two verdicts (A12). The content hash is
@@ -46,7 +45,7 @@ function Lookup({ initial = "", heading }: { initial?: string; heading?: ReactNo
         </>
       )}
       <Field label="Reference" htmlFor="ref">
-        <Input id="ref" value={ref} onChange={setRef} placeholder="OFF-0018" autoCapitalize="characters" spellCheck={false} />
+        <TextField id="ref" value={ref} onChange={setRef} placeholder="OFF-0018" autoCapitalize="characters" spellCheck={false} />
       </Field>
       <Button type="submit" variant="primary" block className="mt-3" disabled={!clean}>
         Verify
@@ -81,7 +80,7 @@ function Result({ number }: { number: string }) {
   if (!d)
     return (
       <div className="mt-6">
-        <Loading lines={6} />
+        <Skeleton lines={6} />
       </div>
     );
   const o = OUTCOME(d);

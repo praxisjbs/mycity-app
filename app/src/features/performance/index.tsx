@@ -5,17 +5,13 @@ import "@/api/types/performance";
 import type { Goal, GoalLevel, KpiAssignment, ReviewRow, Target } from "@/api/types/performance";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, formatDateTime, formatMonth, Icon } from "@mycity/ui";
+import { Button, cn, formatDate, formatDateTime, formatMonth, Icon, Meter, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, toast, StatusPill, DateField, Field, FilterSelect, FormRow, TextField, SelectField, useForm } from "@mycity/ui";
 import { AreaChart } from "@/components/ui/charts";
-import { Mini, Quote, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
 import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { DateField, Field, FilterSelect, FormRow, Input, PersonPicker, Select, useForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
 
 export default function Performance({ tab }: ModuleScreenProps) {
   if (tab === "targets") return <Targets />;
@@ -36,7 +32,7 @@ function Goals() {
   const annual = usePaged("GET /api/v1/performance/goals", { filters: { level: "annual" } });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Goals"
         sub="Organisational and annual · set by the CEO and management"
         actions={
@@ -120,20 +116,20 @@ function GoalForm({ close }: { close: () => void }) {
   return (
     <>
       <Field label="Level">
-        <Select options={ceo ? [["organisational", "Organisational"], ["annual", "Annual"]] : [["annual", "Annual"]]} {...f.field("level")} />
+        <SelectField options={ceo ? [["organisational", "Organisational"], ["annual", "Annual"]] : [["annual", "Annual"]]} {...f.field("level")} />
       </Field>
-      <Field label="Goal" {...f.field("title")}><Input {...f.field("title")} placeholder="Operate in 12 cities" /></Field>
+      <Field label="Goal" {...f.field("title")}><TextField {...f.field("title")} placeholder="Operate in 12 cities" /></Field>
       {f.values.level === "organisational" ? (
         <>
-          <Field label="Strategic Theme"><Input {...f.field("theme")} placeholder="Growth, Revenue, People" /></Field>
+          <Field label="Strategic Theme"><TextField {...f.field("theme")} placeholder="Growth, Revenue, People" /></Field>
           <FormRow>
-            <Field label="Success Measure"><Input {...f.field("measure")} placeholder="Cities live" /></Field>
-            <Field label="Baseline"><Input {...f.field("baseline")} placeholder="8" /></Field>
+            <Field label="Success Measure"><TextField {...f.field("measure")} placeholder="Cities live" /></Field>
+            <Field label="Baseline"><TextField {...f.field("baseline")} placeholder="8" /></Field>
           </FormRow>
         </>
       ) : (
         <Field label="Rolls Up To" {...f.field("rolls_up_to")}>
-          <Select placeholder="Organisational goal" options={parents.rows.map((g) => [g.goal_id, `${g.code} · ${g.title}`])} {...f.field("rolls_up_to")} />
+          <SelectField placeholder="Organisational goal" options={parents.rows.map((g) => [g.goal_id, `${g.code} · ${g.title}`])} {...f.field("rolls_up_to")} />
         </Field>
       )}
       <p className="text-[11.5px] text-subtle-foreground">Saved as a draft. Nothing binds until the CEO approves.</p>
@@ -163,7 +159,7 @@ function Targets() {
   const current = s.data?.month;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Targets"
         sub={`Monthly and departmental · ${formatMonth(m)}`}
         actions={
@@ -236,11 +232,11 @@ function TargetForm({ close, month }: { close: () => void; month: string }) {
   return (
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">For {formatMonth(month)}. It binds once the CEO approves.</p>
-      <Field label="Department" {...f.field("department")}><Select options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
-      <Field label="Target" {...f.field("title")}><Input {...f.field("title")} placeholder="8 new prospects" /></Field>
+      <Field label="Department" {...f.field("department")}><SelectField options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
+      <Field label="Target" {...f.field("title")}><TextField {...f.field("title")} placeholder="8 new prospects" /></Field>
       <FormRow>
-        <Field label="Measure" {...f.field("measure")}><Input {...f.field("measure")} placeholder="Count, days, date" /></Field>
-        <Field label="Rolls Up To" {...f.field("rolls_up_to")}><Select placeholder="Annual goal" options={goals.rows.map((g) => [g.goal_id, g.title])} {...f.field("rolls_up_to")} /></Field>
+        <Field label="Measure" {...f.field("measure")}><TextField {...f.field("measure")} placeholder="Count, days, date" /></Field>
+        <Field label="Rolls Up To" {...f.field("rolls_up_to")}><SelectField placeholder="Annual goal" options={goals.rows.map((g) => [g.goal_id, g.title])} {...f.field("rolls_up_to")} /></Field>
       </FormRow>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
@@ -264,7 +260,7 @@ function Kpis() {
   const total = s.data?.sources.reduce((a, x) => a + x.count, 0) ?? 0;
   return (
     <>
-      <PageHead title="KPIs" sub="Individual monthly KPIs · set by department managers" actions={<Button variant="primary" icon="plus" onClick={() => assign()}>Assign KPIs</Button>} />
+      <PageHeader title="KPIs" sub="Individual monthly KPIs · set by department managers" actions={<Button variant="primary" icon="plus" onClick={() => assign()}>Assign KPIs</Button>} />
       {s.data && <KpiTiles items={[{ label: "Staff With KPIs", value: `${s.data.with_kpis} / ${s.data.staff}` }, { label: "Weights", value: s.data.weights_valid ? "100%" : "Check", tone: s.data.weights_valid ? "ok" : "err" }, { label: "On Track", value: String(s.data.on_track), tone: "ok" }, { label: "Behind or At Risk", value: String(s.data.behind), tone: "warn" }]} />}
       <Toolbar>
         <FilterSelect label="Department" value={dept} onChange={setDept} options={depts} />
@@ -310,7 +306,7 @@ function WeightsCard({ p, onEdit }: { p: PersonRef; onEdit: () => void }) {
       {k.data?.items.map((r) => (
         <div key={r.kpi_id} className="flex items-center gap-2.5 py-[7px]">
           <span className="flex-1 text-[12.5px]">{r.title}</span>
-          <span className="w-[150px] flex-none"><Mini pct={Math.min(100, r.weight_pct * 2.5)} label={`${r.weight_pct}%`} /></span>
+          <span className="w-[150px] flex-none"><Meter pct={Math.min(100, r.weight_pct * 2.5)} label={`${r.weight_pct}%`} /></span>
         </div>
       ))}
       <div className="mt-1 flex gap-2.5 border-t-2 border-border pt-[9px]">
@@ -354,9 +350,9 @@ function AssignKpis({ close, initial }: { close: () => void; initial?: PersonRef
           <div className="flex flex-col gap-1.5">
             {items.map((r, i) => (
               <div key={i} className="flex items-center gap-2">
-                <Input value={r.title} onChange={(v) => set(i, "title", v)} placeholder={`KPI ${i + 1}`} aria-label={`KPI ${i + 1}`} />
+                <TextField value={r.title} onChange={(v) => set(i, "title", v)} placeholder={`KPI ${i + 1}`} aria-label={`KPI ${i + 1}`} />
                 <span className="relative w-[84px] flex-none">
-                  <Input value={r.weight} onChange={(v) => set(i, "weight", v)} inputMode="numeric" aria-label={`Weight of KPI ${i + 1}`} className="pr-7 text-right" />
+                  <TextField value={r.weight} onChange={(v) => set(i, "weight", v)} inputMode="numeric" aria-label={`Weight of KPI ${i + 1}`} className="pr-7 text-right" />
                   <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[12px] text-subtle-foreground">%</span>
                 </span>
                 <button type="button" aria-label={`Remove KPI ${i + 1}`} className="flex size-8 flex-none items-center justify-center rounded-full text-subtle-foreground hover:bg-muted" onClick={() => setRows(items.filter((_, j) => j !== i))}><Icon name="x" /></button>
@@ -385,7 +381,7 @@ function Reviews() {
   const list = usePaged("GET /api/v1/performance/reviews");
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Reviews"
         sub={s.data ? `${s.data.cycle} cycle opens ${formatDate(s.data.opens_on)}` : " "}
         actions={
@@ -462,7 +458,7 @@ function CycleForm({ close }: { close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="Cycle" {...f.field("name")}><Input {...f.field("name")} placeholder="Q1 2027" /></Field>
+        <Field label="Cycle" {...f.field("name")}><TextField {...f.field("name")} placeholder="Q1 2027" /></Field>
         <Field label="Opens On" {...f.field("opens_on")}><DateField {...f.field("opens_on")} /></Field>
       </FormRow>
       <p className="text-[11.5px] text-subtle-foreground">Staff are told when it opens. Self ratings come first; managers see the form only after.</p>
@@ -478,11 +474,11 @@ function CycleForm({ close }: { close: () => void }) {
 
 function Analytics() {
   const a = useApi("GET /api/v1/performance/analytics");
-  if (!a.data) return (<><PageHead title="Analytics" sub="Performance across the organisation" /><Card><LoadingRows count={6} /></Card></>);
+  if (!a.data) return (<><PageHeader title="Analytics" sub="Performance across the organisation" /><Card><LoadingRows count={6} /></Card></>);
   const d = a.data;
   return (
     <>
-      <PageHead title="Analytics" sub="Performance across the organisation" />
+      <PageHeader title="Analytics" sub="Performance across the organisation" />
       <KpiTiles items={[{ label: "Goals On Track", value: d.goals_on_track, tone: "ok" }, { label: "Reviews Completed", value: d.reviews_completed }, { label: "Avg Self Rating", value: d.average_self }, { label: "Avg Manager Rating", value: d.average_manager }]} />
       <Grid cols={2}>
         <AreaChart title="Goal Completion by Month" values={d.completion.values} labels={d.completion.labels} />

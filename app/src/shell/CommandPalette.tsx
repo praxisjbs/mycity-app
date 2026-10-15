@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePaged } from "@/api/hooks";
-import { cn, Icon } from "@mycity/ui";
+import { cn, Icon, InlineInput } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
-import { InlineInput } from "@/components/form";
 
 /**
  * ⌘K. Screens and records from the server's search registry, first page only

@@ -4,20 +4,16 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/recruitment";
 import type { Assessment, Candidate, InterviewRow, OfferRow, OnboardingRow, PoolRow, Stage, Vacancy } from "@/api/types/recruitment";
 import type { PersonRef } from "@/api/types/common";
-import { Button, cn, formatDate, formatDateTime, todayIso } from "@mycity/ui";
+import { Button, cn, formatDate, formatDateTime, todayIso, Banner, KeyValue, Meter, Pill, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, StatusPill, MoneyField, DateField, Field, FilterSelect, FormRow, TextField, SelectField, TextAreaField, useForm } from "@mycity/ui";
 import { Board } from "@/components/ui/Board";
-import { Banner, KV, Mini, Pill, Quote, Timeline, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { Money } from "@/components/ui/Money";
-import { ErrorBlock, LoadingRows, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Timeline } from "@/components/ui/data";
+import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportButton, KvCard, ModalFoot, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import { Letter } from "@/features/shared/Letter";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AmountInput, DateField, Field, FilterSelect, FormRow, Input, PersonPicker, Select, Textarea, useForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
 
 export default function Recruitment({ tab, id }: ModuleScreenProps) {
   if (tab === "candidates") return <Candidates id={id} />;
@@ -40,7 +36,7 @@ function Vacancies() {
   const open = (v: Vacancy) => modal.open({ title: v.title, body: (close) => <VacancyDetail v={v} close={close} /> });
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Vacancies"
         sub={s.data ? `${s.data.open} open · ${s.data.applicants} applicants` : " "}
         actions={
@@ -108,7 +104,7 @@ function VacancyDetail({ v, close }: { v: Vacancy; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Department", v.department], ["Openings", v.openings], ["Location", v.location], ["Applicants", v.applicants], ["Published", formatDate(v.published_on)], ["Status", <StatusPill key="s" s={v.status} />], ["Public link", v.public_url], ["Next step", v.next_step]]} />
+      <KeyValue items={[["Department", v.department], ["Openings", v.openings], ["Location", v.location], ["Applicants", v.applicants], ["Published", formatDate(v.published_on)], ["Status", <StatusPill key="s" s={v.status} />], ["Public link", v.public_url], ["Next step", v.next_step]]} />
       <ModalFoot>
         <Button onClick={flip} disabled={pause.pending || resume.pending}>{v.paused ? "Resume" : "Pause"}</Button>
         <Button variant="primary" onClick={() => (close(), navigate(`/recruitment?tab=candidates&vacancy=${v.vacancy_id}`))}>See Candidates</Button>
@@ -142,18 +138,18 @@ function VacancyForm({ close }: { close: () => void }) {
   return (
     <>
       <FormRow>
-        <Field label="Role" {...f.field("title")}><Input {...f.field("title")} placeholder="e.g. Content Producer" /></Field>
-        <Field label="Department" {...f.field("department")}><Select options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
+        <Field label="Role" {...f.field("title")}><TextField {...f.field("title")} placeholder="e.g. Content Producer" /></Field>
+        <Field label="Department" {...f.field("department")}><SelectField options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Location" {...f.field("location")}><Input {...f.field("location")} /></Field>
-        <Field label="Arrangement"><Select options={[["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]} {...f.field("arrangement")} /></Field>
+        <Field label="Location" {...f.field("location")}><TextField {...f.field("location")} /></Field>
+        <Field label="Arrangement"><SelectField options={[["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]} {...f.field("arrangement")} /></Field>
       </FormRow>
       <FormRow>
-        <Field label="Openings" {...f.field("openings")}><Input {...f.field("openings")} inputMode="numeric" onChange={(v) => f.set("openings", v.replace(/\D/g, "").slice(0, 2))} /></Field>
+        <Field label="Openings" {...f.field("openings")}><TextField {...f.field("openings")} inputMode="numeric" onChange={(v) => f.set("openings", v.replace(/\D/g, "").slice(0, 2))} /></Field>
         <Field label="Closes On" {...f.field("closes_on")}><DateField {...f.field("closes_on")} min={todayIso()} /></Field>
       </FormRow>
-      <Field label="About the Role" {...f.field("description")}><Textarea {...f.field("description")} rows={5} placeholder="Duties and requirements" /></Field>
+      <Field label="About the Role" {...f.field("description")}><TextAreaField {...f.field("description")} rows={5} placeholder="Duties and requirements" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Publish Vacancy</Button>
@@ -195,7 +191,7 @@ function Candidates({ id }: { id: string | null }) {
   };
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Candidates"
         sub="Drag through the pipeline"
         actions={
@@ -229,12 +225,12 @@ function Candidates({ id }: { id: string | null }) {
 
 function CandidateCard({ id }: { id: string }) {
   const c = useApi("GET /api/v1/recruitment/candidates/:id", { params: { id } });
-  if (!c.data) return <Card>{c.error ? <ErrorBlock error={c.error} /> : <LoadingRows />}</Card>;
+  if (!c.data) return <Card>{c.error ? <ErrorState error={c.error} /> : <LoadingRows />}</Card>;
   const d = c.data;
   return (
     <Card>
       <CardHeader title={d.name} right={<StatusPill s={d.chip} />} />
-      <KV
+      <KeyValue
         items={[
           ["Role", d.vacancy.title],
           ["Applied", `${formatDate(d.applied_on)}, ${d.source.toLowerCase()}`],
@@ -254,7 +250,7 @@ function CandidateDetail({ id, close }: { id: string; close: () => void }) {
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
   const pool = useMutation("POST /api/v1/recruitment/candidates/:id/pool");
   const [reject, setReject] = useState<string | null>(null);
-  if (!c.data) return c.error ? <ErrorBlock error={c.error} /> : <LoadingRows />;
+  if (!c.data) return c.error ? <ErrorState error={c.error} /> : <LoadingRows />;
   const d = c.data;
   const go = async (stage: Stage) => {
     try {
@@ -268,11 +264,11 @@ function CandidateDetail({ id, close }: { id: string; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Role", d.vacancy.title], ["Stage", STAGE_LABEL[d.stage]], ["Email", d.email], ["Score", d.score ?? "Not scored"], ["Assessments", d.assessments ?? "Not taken"], ["Interview", d.interview ?? "Not scheduled"]]} />
+      <KeyValue items={[["Role", d.vacancy.title], ["Stage", STAGE_LABEL[d.stage]], ["Email", d.email], ["Score", d.score ?? "Not scored"], ["Assessments", d.assessments ?? "Not taken"], ["Interview", d.interview ?? "Not scheduled"]]} />
       {reject != null && (
         <div className="mt-3">
           <Field label="Why Not Progressed" state={!reject.trim() ? "bad" : undefined} message={!reject.trim() ? "For the record and the candidate's email" : undefined}>
-            <Textarea value={reject} onChange={setReject} placeholder="Strong, needs partnerships" />
+            <TextAreaField value={reject} onChange={setReject} placeholder="Strong, needs partnerships" />
           </Field>
         </div>
       )}
@@ -315,9 +311,9 @@ function AddCandidate({ close, vacancies }: { close: () => void; vacancies: Vaca
   };
   return (
     <>
-      <Field label="Full Name" {...f.field("name")}><Input {...f.field("name")} /></Field>
-      <Field label="Email" {...f.field("email")}><Input {...f.field("email")} type="email" /></Field>
-      <Field label="Vacancy" {...f.field("vacancy_id")}><Select placeholder="Pick the vacancy" options={vacancies.filter((v) => !v.paused).map((v) => [v.vacancy_id, v.title])} {...f.field("vacancy_id")} /></Field>
+      <Field label="Full Name" {...f.field("name")}><TextField {...f.field("name")} /></Field>
+      <Field label="Email" {...f.field("email")}><TextField {...f.field("email")} type="email" /></Field>
+      <Field label="Vacancy" {...f.field("vacancy_id")}><SelectField placeholder="Pick the vacancy" options={vacancies.filter((v) => !v.paused).map((v) => [v.vacancy_id, v.title])} {...f.field("vacancy_id")} /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Add Candidate</Button>
@@ -334,7 +330,7 @@ function Assessments() {
   const list = usePaged("GET /api/v1/recruitment/assessments");
   return (
     <>
-      <PageHead title="Assessments" sub="Psychometric, technical and case study" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Assessment", body: (close) => <AssessmentForm close={close} /> })}>New Assessment</Button>} />
+      <PageHeader title="Assessments" sub="Psychometric, technical and case study" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Assessment", body: (close) => <AssessmentForm close={close} /> })}>New Assessment</Button>} />
       {s.data && <KpiTiles items={[{ label: "Assessments", value: String(s.data.assessments) }, { label: "Taken", value: String(s.data.taken) }, { label: "Average Score", value: String(s.data.average_score) }, { label: "Abandoned", value: String(s.data.abandoned), tone: s.data.abandoned ? "warn" : undefined }]} />}
       <PagedTable<Assessment>
         title="Assessments"
@@ -387,12 +383,12 @@ function AssessmentForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><Input {...f.field("name")} placeholder="e.g. Verbal reasoning" /></Field>
+      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Verbal reasoning" /></Field>
       <FormRow>
-        <Field label="Type"><Select options={[["Psychometric", "Psychometric"], ["Technical", "Technical"], ["Case study", "Case Study"]]} {...f.field("kind")} /></Field>
-        <Field label="Duration (Minutes)" {...f.field("duration_min")}><Input {...f.field("duration_min")} inputMode="numeric" onChange={(v) => f.set("duration_min", v.replace(/\D/g, "").slice(0, 3))} /></Field>
+        <Field label="Type"><SelectField options={[["Psychometric", "Psychometric"], ["Technical", "Technical"], ["Case study", "Case Study"]]} {...f.field("kind")} /></Field>
+        <Field label="Duration (Minutes)" {...f.field("duration_min")}><TextField {...f.field("duration_min")} inputMode="numeric" onChange={(v) => f.set("duration_min", v.replace(/\D/g, "").slice(0, 3))} /></Field>
       </FormRow>
-      <Field label="Taken By"><Input {...f.field("role")} placeholder="Any role" /></Field>
+      <Field label="Taken By"><TextField {...f.field("role")} placeholder="Any role" /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" disabled={save.pending} onClick={submit}>Save Assessment</Button>
@@ -413,7 +409,7 @@ function Interviews({ id }: { id: string | null }) {
   const x = d.data;
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Interviews"
         sub={x ? `Blind panel · ${x.candidate}, ${x.role}` : "Blind panels"}
         actions={
@@ -501,10 +497,10 @@ function ScheduleInterview({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Candidate" {...f.field("candidate_id")}><Select placeholder="Shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
+      <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
       <FormRow>
         <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>
-        <Field label="Time (24 Hour)" {...f.field("time")}><Input {...f.field("time")} inputMode="numeric" placeholder="10:00" /></Field>
+        <Field label="Time (24 Hour)" {...f.field("time")}><TextField {...f.field("time")} inputMode="numeric" placeholder="10:00" /></Field>
       </FormRow>
       <Field label="Panel" state={tried && !panel.length ? "bad" : undefined} message={tried && !panel.length ? "Add at least one panellist" : undefined}><PersonPicker multiple value={panel} onChange={setPanel} /></Field>
       <ModalFoot>
@@ -527,7 +523,7 @@ function Offers() {
   const send = useMutation("POST /api/v1/recruitment/offers/:id/send");
   return (
     <>
-      <PageHead title="Offers" sub="Generated, sent, signed" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Offer", body: (close) => <OfferForm close={close} /> })}>New Offer</Button>} />
+      <PageHeader title="Offers" sub="Generated, sent, signed" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Offer", body: (close) => <OfferForm close={close} /> })}>New Offer</Button>} />
       {s.data && <KpiTiles items={[{ label: "Awaiting Signature", value: String(s.data.awaiting_signature), tone: s.data.awaiting_signature ? "warn" : undefined }, { label: "Signed, This Year", value: String(s.data.signed_this_year), tone: "ok" }, { label: "Declined", value: String(s.data.declined) }, { label: "Average Time to Sign", value: s.data.average_days_to_sign }]} />}
       <Grid cols="1/1.5">
         <PagedTable<OfferRow>
@@ -573,8 +569,8 @@ function OfferForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Candidate" {...f.field("candidate_id")}><Select placeholder="Interviewed candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
-      <Field label="Gross Monthly Salary" {...f.field("salary")}><AmountInput {...f.field("salary")} /></Field>
+      <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Interviewed candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
+      <Field label="Gross Monthly Salary" {...f.field("salary")}><MoneyField {...f.field("salary")} /></Field>
       <FormRow>
         <Field label="Start Date" {...f.field("start_date")}><DateField {...f.field("start_date")} min={todayIso()} /></Field>
         <Field label="Offer Expires" {...f.field("expires_on")}><DateField {...f.field("expires_on")} min={todayIso()} /></Field>
@@ -599,7 +595,7 @@ function Onboarding() {
   const x = d.data;
   return (
     <>
-      <PageHead title="Onboarding" sub="Documentation first, then onboarding" />
+      <PageHeader title="Onboarding" sub="Documentation first, then onboarding" />
       {s.data && (
         <>
           <KpiTiles items={[{ label: "In Progress", value: String(s.data.in_progress) }, { label: "Blocked on Documents", value: String(s.data.blocked), tone: s.data.blocked ? "warn" : "ok" }, { label: "Starting This Month", value: String(s.data.starting_this_month) }, { label: "Confirmed, 90d", value: String(s.data.confirmed_90d), tone: "ok" }]} />
@@ -624,7 +620,7 @@ function Onboarding() {
         <Grid cols={2} className="mt-3">
           <Table
             title="Document Checklist"
-            right={<span className="w-[150px]"><Mini pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
+            right={<span className="w-[150px]"><Meter pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
             rows={x.checklist}
             rowKey={(r) => r.name}
             columns={[{ key: "d", label: "Required Document", render: (r) => r.name }, { key: "s", label: x.name, render: (r) => <StatusPill s={r.status} /> }]}
@@ -655,7 +651,7 @@ function Pool() {
   const list = usePaged("GET /api/v1/recruitment/pool");
   return (
     <>
-      <PageHead title="Talent Pool" sub="Good candidates, wrong moment" actions={<ExportButton source="recruitment.pool" />} />
+      <PageHeader title="Talent Pool" sub="Good candidates, wrong moment" actions={<ExportButton source="recruitment.pool" />} />
       {s.data && <KpiTiles items={[{ label: "In the Pool", value: String(s.data.in_pool) }, { label: "Invited Back", value: String(s.data.invited_back) }, { label: "Hired From the Pool", value: String(s.data.hired_from_pool), tone: "ok" }, { label: "Average Score", value: String(s.data.average_score) }]} />}
       <Grid cols="1.4/1">
         <PagedTable<PoolRow>
@@ -697,7 +693,7 @@ function Invite({ p, close }: { p: PoolRow; close: () => void }) {
   return (
     <>
       <Banner tone="info" icon="send">{p.name} gets a personal link to the vacancy, with their earlier application pre-filled.</Banner>
-      <Field label="Vacancy"><Select value={vac} onChange={setVac} placeholder="Open vacancy" options={vacs.rows.map((v) => [v.vacancy_id, v.title])} /></Field>
+      <Field label="Vacancy"><SelectField value={vac} onChange={setVac} placeholder="Open vacancy" options={vacs.rows.map((v) => [v.vacancy_id, v.title])} /></Field>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="send" disabled={!vac || invite.pending} onClick={async () => { try { await invite.run({ params: { id: p.pool_id }, body: { vacancy_id: vac } }); invalidate("/api/v1/recruitment/pool"); close(); toast(`Invitation sent to ${p.name}`); } catch (e) { fail(e); } }}>Send Invitation</Button>

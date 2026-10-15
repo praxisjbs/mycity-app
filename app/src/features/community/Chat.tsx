@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointer
 import { api } from "@/api/client";
 import type { Message, MessageCreate } from "@/api/types/community";
 import type { PageMeta } from "@/api/types/common";
-import { Button, cn, formatDate, Icon, IconButton, todayIso, useIsMobile } from "@mycity/ui";
+import { Button, cn, formatDate, Icon, IconButton, todayIso, useIsMobile, InlineInput } from "@mycity/ui";
 import { Post } from "./Posts";
-import { InlineInput } from "@/components/form";
 
 /** List width, dragged by the divider and remembered on this device. */
 export function useSplit(key: string, initial: number) {

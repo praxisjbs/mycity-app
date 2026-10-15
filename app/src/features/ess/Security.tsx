@@ -1,21 +1,16 @@
 import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
-import { Button, formatDate, formatDateTime, Icon } from "@mycity/ui";
-import { Pill } from "@/components/ui/data";
-import { Card, CardHeader, DesktopOnly, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { ErrorBlock, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { Button, formatDate, formatDateTime, Icon, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, Field, ToggleRow, PasswordField } from "@mycity/ui";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, Input, ToggleRow } from "@/components/form";
 
 export function MySecurityPage() {
   const { data: s, error, reload } = useApi("GET /api/v1/ess/security");
   const patch = useMutation("PATCH /api/v1/ess/security");
   const modal = useModal();
   const { navigate } = useRouter();
-  if (error) return <ErrorBlock error={error} onRetry={reload} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!s) return <LoadingRows count={6} />;
   const set = async (body: { mfa_app?: boolean; mfa_email_fallback?: boolean }) => {
     await patch.run({ body });
@@ -78,7 +73,7 @@ export function MySecurityPage() {
   );
   return (
     <>
-      <PageHead title="My Security" sub="How you sign in, and the devices you clock in from" />
+      <PageHeader title="My Security" sub="How you sign in, and the devices you clock in from" />
       <PhoneCards
         items={[
           { icon: "shield", title: "Password", sub: `Changed ${formatDate(s.password_changed_at)}`, body: pw },
@@ -108,9 +103,9 @@ function PasswordForm({ close }: { close: () => void }) {
   const ok = cur.length >= 8 && next.length >= 12 && again === next;
   return (
     <>
-      <Field label="Current Password" state={save.fields.current_password ? "bad" : undefined} message={save.fields.current_password?.[0]}><Input type="password" value={cur} onChange={setCur} autoComplete="current-password" /></Field>
-      <Field label="New Password" state={nBad ? "bad" : next ? "good" : undefined} message="At least 12 characters"><Input type="password" value={next} onChange={setNext} autoComplete="new-password" state={nBad ? "bad" : next ? "good" : undefined} /></Field>
-      <Field label="Confirm New Password" state={aBad ? "bad" : again ? "good" : undefined} message="Does not match"><Input type="password" value={again} onChange={setAgain} autoComplete="new-password" state={aBad ? "bad" : again ? "good" : undefined} /></Field>
+      <Field label="Current Password" state={save.fields.current_password ? "bad" : undefined} message={save.fields.current_password?.[0]}><PasswordField value={cur} onChange={setCur} autoComplete="current-password" /></Field>
+      <Field label="New Password" state={nBad ? "bad" : next ? "good" : undefined} message="At least 12 characters"><PasswordField value={next} onChange={setNext} autoComplete="new-password" state={nBad ? "bad" : next ? "good" : undefined} /></Field>
+      <Field label="Confirm New Password" state={aBad ? "bad" : again ? "good" : undefined} message="Does not match"><PasswordField value={again} onChange={setAgain} autoComplete="new-password" state={aBad ? "bad" : again ? "good" : undefined} /></Field>
       <p className="text-[11.5px] text-subtle-foreground">Changing your password signs you out everywhere else.</p>
       <div className="-mx-[18px] mt-3 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
@@ -128,7 +123,7 @@ function PinForm({ close }: { close: () => void }) {
     <>
       <p className="mb-3 text-[11.5px] text-subtle-foreground">A 4 to 6 digit PIN unlocks the app and confirms a clock-in on a registered device.</p>
       <Field label="PIN" state={pin ? (ok ? "good" : "bad") : undefined} message="4 to 6 digits">
-        <Input type="password" inputMode="numeric" maxLength={6} value={pin} onChange={(v) => setPin(v.replace(/\D/g, ""))} className="h-[50px] text-center text-[20px] font-bold tracking-[.4em]" state={pin ? (ok ? "good" : "bad") : undefined} />
+        <PasswordField inputMode="numeric" maxLength={6} value={pin} onChange={(v) => setPin(v.replace(/\D/g, ""))} className="h-[50px] text-center text-[20px] font-bold tracking-[.4em]" state={pin ? (ok ? "good" : "bad") : undefined} />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>

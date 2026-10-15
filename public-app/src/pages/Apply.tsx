@@ -5,11 +5,11 @@ import "@/api/types/public";
 import type { ApplicationReceipt } from "@/api/types/public";
 import type { DocumentRef } from "@/api/types/common";
 import { Message, Page } from "@/components/Layout";
-import { Button, formatDate, formatTime } from "@mycity/ui";
-import { Loading, Notice, Sub } from "@/components/ui";
+import { Button, formatDate, formatTime, Skeleton, Banner, Field, Form, TextField, TextAreaField } from "@mycity/ui";
+import { Sub } from "@/components/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
-import { Field, Form, Input, Textarea, Upload } from "@/components/form";
+import { Upload } from "@/components/form";
 
 type Values = { full_name: string; email: string; phone: string; years: string; why: string };
 type Key = keyof Values | "cv";
@@ -45,7 +45,7 @@ export function Apply({ token }: { token: string }) {
   if (!link.data)
     return (
       <Page title="Apply">
-        <Loading lines={7} />
+        <Skeleton lines={7} />
       </Page>
     );
   if (receipt)
@@ -98,16 +98,16 @@ export function Apply({ token }: { token: string }) {
       </Sub>
       <Form className="mt-[18px] flex flex-col gap-[13px]" onSubmit={() => void submit()}>
         <Field label="Full Name" htmlFor="full_name" state={state("full_name")} message={err("full_name")}>
-          <Input id="full_name" autoComplete="name" value={v.full_name} onChange={set("full_name")} onBlur={blur("full_name")} state={state("full_name")} />
+          <TextField id="full_name" autoComplete="name" value={v.full_name} onChange={set("full_name")} onBlur={blur("full_name")} state={state("full_name")} />
         </Field>
         <Field label="Email" htmlFor="email" state={state("email")} message={err("email")}>
-          <Input id="email" type="email" autoComplete="email" inputMode="email" value={v.email} onChange={set("email")} onBlur={blur("email")} state={state("email")} />
+          <TextField id="email" type="email" autoComplete="email" inputMode="email" value={v.email} onChange={set("email")} onBlur={blur("email")} state={state("email")} />
         </Field>
         <Field label="Phone" htmlFor="phone" state={state("phone")} message={err("phone")}>
-          <Input id="phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="+234 802 000 0000" value={v.phone} onChange={set("phone")} onBlur={blur("phone")} state={state("phone")} />
+          <TextField id="phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="+234 802 000 0000" value={v.phone} onChange={set("phone")} onBlur={blur("phone")} state={state("phone")} />
         </Field>
         <Field label="Years of Experience" htmlFor="years" state={state("years")} message={err("years")}>
-          <Input id="years" inputMode="numeric" value={v.years} onChange={set("years")} onBlur={blur("years")} state={state("years")} className="max-w-[140px]" />
+          <TextField id="years" inputMode="numeric" value={v.years} onChange={set("years")} onBlur={blur("years")} state={state("years")} className="max-w-[140px]" />
         </Field>
         <Field label="CV" state={err("cv") ? "bad" : undefined} message={err("cv")}>
           <Upload
@@ -124,9 +124,9 @@ export function Apply({ token }: { token: string }) {
           />
         </Field>
         <Field label="Why This Role?" htmlFor="why" state={state("why")} message={err("why")}>
-          <Textarea id="why" rows={3} value={v.why} onChange={set("why")} onBlur={blur("why")} state={state("why")} />
+          <TextAreaField id="why" rows={3} value={v.why} onChange={set("why")} onBlur={blur("why")} state={state("why")} />
         </Field>
-        {problem && <Notice tone="err">{problem}</Notice>}
+        {problem && <Banner tone="err">{problem}</Banner>}
         <Button type="submit" variant="primary" block disabled={busy}>
           {busy ? "Sending" : "Submit Application"}
         </Button>

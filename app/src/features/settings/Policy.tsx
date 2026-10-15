@@ -5,15 +5,9 @@ import "@/api/types/attendance";
 import "@/api/types/settings";
 import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
 import type { PolicyAck } from "@/api/types/settings";
-import { Button, cn, formatDate, formatDateTime } from "@mycity/ui";
-import { Banner, Pill, Who } from "@/components/ui/data";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
+import { Button, cn, formatDate, formatDateTime, Banner, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, toast, Field, InlineInput, Switch, TextAreaField, HelpTerm } from "@mycity/ui";
 import { LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
 import { ModalFoot, PagedTable } from "@/features/shared/sections";
-import { Field, InlineInput, Switch, Textarea } from "@/components/form";
 
 const fmt = (s: PolicySetting) => (s.kind === "bool" ? (s.value ? "On" : "Off") : s.kind === "mode" ? String(s.value)[0].toUpperCase() + String(s.value).slice(1) : String(s.value));
 
@@ -24,13 +18,12 @@ const fmt = (s: PolicySetting) => (s.kind === "bool" ? (s.value ? "On" : "Off") 
  */
 export function AttendancePolicyTab() {
   const modal = useModal();
-  const info = useInfo();
   const cur = useApi("GET /api/v1/attendance/policies/current");
   const versions = usePaged("GET /api/v1/attendance/policies");
   const save = useMutation("PATCH /api/v1/attendance/policies/draft");
   const discard = useMutation("POST /api/v1/attendance/policies/draft/discard");
   const p = cur.data;
-  if (!p) return (<><PageHead title="Attendance Policy" /><Card><LoadingRows count={8} /></Card></>);
+  if (!p) return (<><PageHeader title="Attendance Policy" /><Card><LoadingRows count={8} /></Card></>);
   const settings = p.draft?.settings ?? p.settings;
   const changed = new Set(p.draft?.changed_keys ?? []);
   const sections = [...new Set(settings.map((s) => s.section))];
@@ -46,11 +39,10 @@ export function AttendancePolicyTab() {
     modal.open({ title: publish ? "Publish Policy" : "Review Draft Changes", wide: true, body: (close) => <Review p={p} publish={publish} close={close} /> });
   return (
     <>
-      <PageHead
-        title={<span className="inline-flex items-center gap-1.5">Attendance Policy <InfoButton {...info} label="About the attendance policy" /></span>}
+      <PageHeader
+        title={<HelpTerm help="Changes edit a draft. Nothing applies until it is published, and older records are never recalculated.">Attendance Policy</HelpTerm>}
         sub={`Version ${p.version} in force since ${formatDate(p.published_at)} · published by ${p.published_by}`}
       />
-      <InfoText {...info}>A change on this screen edits a draft. Nobody is notified and no punch is judged by it until the draft is published. Older records are never recalculated.</InfoText>
       {p.draft ? (
         <Banner
           tone="warn"
@@ -164,7 +156,7 @@ function Review({ p, publish, close }: { p: AttendancePolicy; publish: boolean; 
       {publish && (
         <div className="mt-3">
           <Field label="What Changed, for Staff" state={summary && summary.trim().length < 10 ? "bad" : undefined} message={summary && summary.trim().length < 10 ? "At least 10 characters" : undefined}>
-            <Textarea value={summary} onChange={setSummary} placeholder="Lateness rule changed" />
+            <TextAreaField value={summary} onChange={setSummary} placeholder="Lateness rule changed" />
           </Field>
           <Banner tone="info" icon="bell">Everyone affected is notified and asked to acknowledge v{p.version + 1}. Records before today are not recalculated.</Banner>
         </div>

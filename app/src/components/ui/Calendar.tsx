@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { cn, monthName } from "@mycity/ui";
-import { Card, CardHeader } from "./layout";
+import { cn, monthName, Card, CardHeader } from "@mycity/ui";
 
 export interface CalEvent {
   date: string; // ISO day

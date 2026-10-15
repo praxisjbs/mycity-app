@@ -3,18 +3,14 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { FieldAssignment, LocationRequest, ReconCase, RegisterRow } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, Icon } from "@mycity/ui";
+import { Button, cn, formatDate, Icon, Banner, EmptyState, KeyValue, Pill, Who, Card, CardHeader, Grid, PhoneOnly, DesktopOnly, Grow, useModal, Chips, ErrorState, toast, DateField, Field, FormRow, TextField, rules, SearchInput, ChoiceField, SelectField, TextAreaField, useForm } from "@mycity/ui";
 import { AreaChart, Donut } from "@/components/ui/charts";
-import { Banner, EmptyState, KV, Pill, StatStrip, Who } from "@/components/ui/data";
-import { InfoButton, InfoText, useInfo } from "@/components/ui/Info";
-import { Card, CardHeader, Grid, MobileOnly, DesktopOnly } from "@/components/ui/layout";
-import { Grow, useModal } from "@/components/ui/Modal";
+import { StatStrip } from "@/components/ui/data";
 import { BackButton } from "@/components/ui/Profile";
-import { Chips, ErrorBlock, LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
-import { DateField, Field, FormRow, Input, PersonPicker, rules, SearchBox, Seg, Select, Textarea, useForm } from "@/components/form";
+import { PersonPicker } from "@/components/form";
 
 type View = "register" | "assignments" | "requests" | "manager";
 const VIEWS: Array<[View, string]> = [["register", "Register"], ["assignments", "Field Assignments"], ["requests", "Location Requests"], ["manager", "Manager Preview"]];
@@ -29,7 +25,6 @@ export function PeopleAttendance() {
   const [params, setParams] = useSearchParams();
   const view = (hr ? (params.get("view") as View | "reconcile" | null) : "manager") ?? "register";
   const summary = useApi("GET /api/v1/attendance/summary", { query: { scope: hr ? "all" : "team" } });
-  const info = useInfo();
   const modal = useModal();
 
   if (view === "reconcile") return <Reconcile onBack={() => setParams({ view: null })} />;
@@ -38,10 +33,7 @@ export function PeopleAttendance() {
     <>
       <div className="mb-4 flex flex-wrap items-end gap-3 max-md:items-start">
         <div className="min-w-0">
-          <span className="flex items-center gap-1.5">
-            <h1 className="text-[20px]">Attendance</h1>
-            <InfoButton {...info} label="About attendance" />
-          </span>
+          <h1 className="text-[20px]">Attendance</h1>
           <p className="mt-[3px] text-[13px] text-muted-foreground">{summary.data ? `${formatDate(summary.data.date)} · Africa/Lagos · ${hr ? "the whole organisation" : "your team"}` : " "}</p>
         </div>
         {hr && (
@@ -53,16 +45,13 @@ export function PeopleAttendance() {
           </div>
         )}
       </div>
-      <InfoText {...info}>
-        Every figure here is computed from clock events. Reconcile fixes what the record should say and never edits a punch. Possible policy breaches go to Queries & Sanctions, which is separate.
-      </InfoText>
-      {summary.error && <ErrorBlock error={summary.error} onRetry={summary.reload} />}
+      {summary.error && <ErrorState error={summary.error} onRetry={summary.reload} />}
       {summary.data && hr && (
         <>
           <KpiTiles items={summary.data.kpis.slice(0, 4)} mobileCols={2} />
           <KpiTiles items={summary.data.kpis.slice(4)} mobileCols={2} />
           <div className="no-scrollbar mb-3 max-w-[640px] overflow-x-auto max-md:max-w-none">
-            <Seg value={view} onChange={(v) => setParams({ view: v === "register" ? null : v })} options={VIEWS} />
+            <ChoiceField value={view} onChange={(v) => setParams({ view: v === "register" ? null : v })} options={VIEWS} />
           </div>
         </>
       )}
@@ -90,7 +79,7 @@ function Register() {
         </Grid>
       )}
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Name or location" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or location" className="w-full md:w-[260px]" />
       </Toolbar>
       {s && <Chips value={filter} onChange={setFilter} options={[["all", `All ${s.kpis[0].value.split(" / ")[1]}`], ...s.filters.map((f) => [f.value, `${f.label} ${f.count}`] as [string, string])]} />}
       <DesktopOnly>
@@ -118,7 +107,7 @@ function Register() {
           footer={<Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" />}
         />
       </DesktopOnly>
-      <MobileOnly>
+      <PhoneOnly>
         <div className="grid gap-2.5">
           {list.rows.map((r) => (
             <button key={r.employee.employee_id} type="button" onClick={() => open(r)} className="block w-full rounded-card border border-border bg-card p-[13px] text-left shadow-1">
@@ -144,7 +133,7 @@ function Register() {
           {list.rows.length === 0 && !list.loading && <EmptyState icon="srch" title="Nobody matches this filter" text="Choose All to see the whole register." />}
           <Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" className="px-0" />
         </div>
-      </MobileOnly>
+      </PhoneOnly>
       <p className="mt-3 text-[11.5px] text-subtle-foreground">Reconcile decides what a day’s record should say. The original punch is never overwritten.</p>
     </>
   );
@@ -152,7 +141,7 @@ function Register() {
 
 function DayDetailView({ id }: { id: string }) {
   const { data, error } = useApi("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: id } });
-  if (error) return <ErrorBlock error={error} />;
+  if (error) return <ErrorState error={error} />;
   if (!data) return <LoadingRows />;
   if (!data.events.length) return <EmptyState bare icon="clock" title="No clock events today" text={data.status.text === "On leave" ? "On approved leave." : "Nothing has been recorded yet."} />;
   type Ev = (typeof data.events)[number];
@@ -165,7 +154,7 @@ function DayDetailView({ id }: { id: string }) {
   return (
     <>
       <div className="mb-3">
-        <KV items={[["Work arrangement", data.arrangement], ["Shift", data.shift], ["Attendance status", <Pill tone={data.status.tone}>{data.status.text}</Pill>], ["Hours", data.hours]]} />
+        <KeyValue items={[["Work arrangement", data.arrangement], ["Shift", data.shift], ["Attendance status", <Pill tone={data.status.tone}>{data.status.text}</Pill>], ["Hours", data.hours]]} />
       </div>
       <div className="overflow-x-auto rounded-card border border-border">
         <table className="w-full border-collapse text-[13px]">
@@ -261,19 +250,19 @@ function AssignmentForm({ close }: { close: () => void }) {
     <>
       <Grid cols={2} className="mb-0">
         <div>
-          <Field label="Assignment Name" {...f.field("name")}><Input {...f.field("name")} placeholder="Venue check" /></Field>
-          <Field label="Client, Event or Campaign" {...f.field("client")}><Input {...f.field("client")} /></Field>
+          <Field label="Assignment Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Venue check" /></Field>
+          <Field label="Client, Event or Campaign" {...f.field("client")}><TextField {...f.field("client")} /></Field>
           <Field label="Employees"><PersonPicker multiple value={who} onChange={setWho} /></Field>
         </div>
         <div>
-          <Field label="Approved Site" {...f.field("site_name")}><Input {...f.field("site_name")} placeholder="Venue, area" /></Field>
-          <Field label="Radius, Metres" {...f.field("radius_m")} info="100 m for a single building, up to 500 m for a park or an open venue."><Input inputMode="numeric" {...f.field("radius_m")} /></Field>
+          <Field label="Approved Site" {...f.field("site_name")}><TextField {...f.field("site_name")} placeholder="Venue, area" /></Field>
+          <Field label="Radius, Metres" {...f.field("radius_m")} info="100 m for a single building, up to 500 m for a park or an open venue."><TextField inputMode="numeric" {...f.field("radius_m")} /></Field>
           <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} /></Field>
           <FormRow>
-            <Field label="From" {...f.field("start")}><Input {...f.field("start")} placeholder="09:00" /></Field>
-            <Field label="To" {...f.field("end")}><Input {...f.field("end")} placeholder="17:00" /></Field>
+            <Field label="From" {...f.field("start")}><TextField {...f.field("start")} placeholder="09:00" /></Field>
+            <Field label="To" {...f.field("end")}><TextField {...f.field("end")} placeholder="17:00" /></Field>
           </FormRow>
-          <Field label="Note"><Input {...f.field("note")} /></Field>
+          <Field label="Note"><TextField {...f.field("note")} /></Field>
         </div>
       </Grid>
       <div className="-mx-[18px] mt-2 -mb-4 flex justify-end gap-2 border-t border-border px-[18px] py-3">
@@ -293,7 +282,6 @@ function Requests() {
   const waiting = list.rows.filter((r) => r.status === "Awaiting manager" || r.status === "Awaiting HR").length;
   return (
     <>
-      <WithParagraph text="People approves or rejects. A request normally reaches People after the line manager, but People can decide at either stage. Approved locations are used by Clock In for their dates only." />
       <Table
         title="Work Location Requests"
         right={<span className="text-[11.5px] text-subtle-foreground">{waiting} awaiting a decision</span>}
@@ -320,15 +308,6 @@ function Requests() {
   );
 }
 
-function WithParagraph({ text }: { text: string }) {
-  const i = useInfo();
-  return (
-    <div className="mb-2.5">
-      <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-muted-foreground">How Requests Are Decided<InfoButton {...i} label="About location requests" /></span>
-      <InfoText {...i} className={i.open ? "mt-2" : undefined}>{text}</InfoText>
-    </div>
-  );
-}
 
 function RequestDecision({ r, close }: { r: LocationRequest; close: () => void }) {
   const me = useMe();
@@ -353,16 +332,16 @@ function RequestDecision({ r, close }: { r: LocationRequest; close: () => void }
       <Grid cols={2} className="mb-0">
         <Card>
           <CardHeader title="Request" />
-          <KV items={[["Employee", r.employee.display_name], ["Type", r.type], ["Dates", r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Reason", r.reason], ["Evidence", r.evidence ?? "None"], ["Manager", r.manager_note ?? "No recommendation yet"]]} />
+          <KeyValue items={[["Employee", r.employee.display_name], ["Type", r.type], ["Dates", r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Reason", r.reason], ["Evidence", r.evidence ?? "None"], ["Manager", r.manager_note ?? "No recommendation yet"]]} />
         </Card>
         <Card>
           <CardHeader title="Location, Old and New" />
-          <KV items={[["Requested", `${r.area} · ${r.radius_m} m`], ["Full address", r.address ?? "Not needed for this type"], ["After it ends", "The permanent location applies again. Both stay in history."], ["Status", <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill>]]} />
+          <KeyValue items={[["Requested", `${r.area} · ${r.radius_m} m`], ["Full address", r.address ?? "Not needed for this type"], ["After it ends", "The permanent location applies again. Both stay in history."], ["Status", <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill>]]} />
         </Card>
       </Grid>
       {open && (
         <Field label="Note to the Employee" className="mt-3">
-          <Input value={note} onChange={setNote} placeholder="Optional" />
+          <TextField value={note} onChange={setNote} placeholder="Optional" />
         </Field>
       )}
       <div className="-mx-[18px] mt-3 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
@@ -424,7 +403,7 @@ function ManagerView() {
         </Card>
         <Card>
           <CardHeader title="What a Manager Can and Cannot Do" />
-          <KV items={[["Can", "Confirm field assignments, recommend temporary locations, review explanations, recommend corrections"], ["Cannot change policy", "Attendance policy belongs to People"], ["Cannot edit a clock event", "A recommendation goes to People, who decide"], ["Cannot see", "Employees outside the team"]]} />
+          <KeyValue items={[["Can", "Confirm field assignments, recommend temporary locations, review explanations, recommend corrections"], ["Cannot change policy", "Attendance policy belongs to People"], ["Cannot edit a clock event", "A recommendation goes to People, who decide"], ["Cannot see", "Employees outside the team"]]} />
         </Card>
       </Grid>
     </>
@@ -458,9 +437,9 @@ function Recommend({ r, close }: { r: LocationRequest; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Employee", r.employee.display_name], ["Request", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason]]} />
+      <KeyValue items={[["Employee", r.employee.display_name], ["Request", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason]]} />
       <Field label="Your Comment for People" className="mt-3" state={note ? (note.trim().length < 3 ? "bad" : "good") : undefined} message="Add a comment">
-        <Input value={note} onChange={setNote} placeholder="I support this" />
+        <TextField value={note} onChange={setNote} placeholder="I support this" />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
@@ -488,11 +467,11 @@ function CaseRecommend({ c, close }: { c: ReconCase; close: () => void }) {
   };
   return (
     <>
-      <KV items={[["Employee", c.employee.display_name], ["Case", `${c.type} · ${formatDate(c.date)}`], ["Employee explanation", c.explanation ?? "None given"]]} />
+      <KeyValue items={[["Employee", c.employee.display_name], ["Case", `${c.type} · ${formatDate(c.date)}`], ["Employee explanation", c.explanation ?? "None given"]]} />
       <p className="my-3 text-[11.5px] text-subtle-foreground">You recommend. People decides and records the outcome. You cannot change the clock event.</p>
-      <Field label="Recommended Outcome"><Select value={out} onChange={setOut} options={OUTCOMES.filter(([k]) => k !== "escalate")} /></Field>
+      <Field label="Recommended Outcome"><SelectField value={out} onChange={setOut} options={OUTCOMES.filter(([k]) => k !== "escalate")} /></Field>
       <Field label="Your Comment" state={note ? (note.trim().length < 10 ? "bad" : "good") : undefined} message="Write at least 10 characters">
-        <Textarea value={note} onChange={setNote} placeholder="Approved site visit" state={note ? (note.trim().length < 10 ? "bad" : "good") : undefined} />
+        <TextAreaField value={note} onChange={setNote} placeholder="Approved site visit" state={note ? (note.trim().length < 10 ? "bad" : "good") : undefined} />
       </Field>
       <div className="-mx-[18px] mt-2 -mb-4 flex flex-wrap justify-end gap-2 border-t border-border px-[18px] py-3">
         <Button onClick={close}>Cancel</Button>
@@ -511,22 +490,17 @@ function Reconcile({ onBack }: { onBack: () => void }) {
   const all = usePaged("GET /api/v1/attendance/cases");
   const [sel, setSel] = useState<string | null>(null);
   const current = list.rows.find((c) => c.case_id === sel) ?? list.rows[0] ?? null;
-  const info = useInfo();
   const count = (s: string) => all.rows.filter((c) => c.status === s).length;
   return (
     <>
       <BackButton label="Back to Attendance" onClick={onBack} />
       <div className="mb-4">
-        <span className="flex items-center gap-1.5">
-          <h1 className="text-[20px]">Reconciliation Queue</h1>
-          <InfoButton {...info} label="About reconciliation" />
-        </span>
+        <h1 className="text-[20px]">Reconciliation Queue</h1>
         <p className="mt-[3px] text-[13px] text-muted-foreground">{count("Awaiting HR")} awaiting People · {count("Awaiting manager")} awaiting a manager</p>
       </div>
-      <InfoText {...info}>Reconciliation decides what the attendance record should say. It never edits a clock event: a correction is a new event, and the original stays visible. A possible policy breach goes to Queries & Sanctions, which is a separate process.</InfoText>
       <StatStrip items={[{ label: "Awaiting People", value: String(count("Awaiting HR")), tone: count("Awaiting HR") ? "warn" : "ok" }, { label: "Awaiting a manager", value: String(count("Awaiting manager")) }, { label: "More information", value: String(count("Awaiting employee")) }, { label: "Escalated", value: String(count("Escalated")), desktop: true }, { label: "Total cases", value: String(all.page?.total ?? 0) }]} />
       <Toolbar>
-        <SearchBox value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={status} onChange={setStatus} options={[["open", "Open"], ["Awaiting HR", "Awaiting People"], ["Awaiting manager", "Awaiting a manager"], ["Resolved", "Resolved"], ["all", "All"]]} />
       <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
@@ -572,20 +546,20 @@ function CaseDetail({ c }: { c: ReconCase }) {
     <>
       <Card>
         <CardHeader title={`${c.number} · ${c.type}`} right={<Pill tone={CASE_TONE[c.status]}>{c.status}</Pill>} />
-        <KV items={[["Employee", `${c.employee.display_name} · ${c.department}`], ["Work arrangement", c.arrangement], ["Date", formatDate(c.date)], ...c.evidence, ["Employee explanation", c.explanation ?? "None given"], ["Manager comment", c.manager_note ?? "None yet"], ["Payroll impact", c.payroll_impact]]} />
+        <KeyValue items={[["Employee", `${c.employee.display_name} · ${c.department}`], ["Work arrangement", c.arrangement], ["Date", formatDate(c.date)], ...c.evidence, ["Employee explanation", c.explanation ?? "None given"], ["Manager comment", c.manager_note ?? "None yet"], ["Payroll impact", c.payroll_impact]]} />
       </Card>
       {!done && (
         <Card className="mt-3">
           <CardHeader title="Decide the Record" />
           {c.status === "Awaiting manager" && <Banner tone="info" icon="info">The line manager has not recommended yet. People can still decide.</Banner>}
-          <Field label="Outcome"><Select value={out} onChange={setOut} options={OUTCOMES} /></Field>
+          <Field label="Outcome"><SelectField value={out} onChange={setOut} options={OUTCOMES} /></Field>
           {["add_in", "add_out", "correct"].includes(out) && (
             <Field label="Time" state={/^\d{2}:\d{2}$/.test(time) ? undefined : "bad"} message="HH:MM">
-              <Input value={time} onChange={setTime} placeholder="17:00" />
+              <TextField value={time} onChange={setTime} placeholder="17:00" />
             </Field>
           )}
           <Field label="Resolution Reason" state={bad || decide.fields.note ? "bad" : why ? "good" : undefined} message={decide.fields.note?.[0] ?? "At least 10 characters"}>
-            <Textarea value={why} onChange={setWhy} placeholder="Matches gate log" state={bad ? "bad" : why ? "good" : undefined} />
+            <TextAreaField value={why} onChange={setWhy} placeholder="Matches gate log" state={bad ? "bad" : why ? "good" : undefined} />
           </Field>
           <div className="flex justify-end gap-2">
             <Grow />

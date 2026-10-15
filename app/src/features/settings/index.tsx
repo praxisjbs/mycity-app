@@ -6,19 +6,16 @@ import "@/api/types/organisation";
 import type { AuditEntry, FailedLogin, Hierarchy, Numbering, Organisation, Session, UserRow } from "@/api/types/settings";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, formatDateTime, formatWhen, Icon, useTheme } from "@mycity/ui";
-import { Chain, Pill, StatStrip, Who } from "@/components/ui/data";
-import { Card, CardHeader, Grid, PageHead } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
+import { Button, cn, formatDate, formatDateTime, formatWhen, Icon, useTheme, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, Chips, toast, StatusPill, Field, InlineInput, ChoiceField, SelectField, Switch, TextAreaField } from "@mycity/ui";
+import { Chain, StatStrip } from "@/components/ui/data";
 import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
-import { Chips, LoadingRows, Table } from "@/components/ui/Table";
-import { toast } from "@/components/ui/Toast";
+import { LoadingRows, Table } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable, StatusPill } from "@/features/shared/sections";
+import { BarsCard, ExportButton, KvCard, ModalFoot, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AttendancePolicyTab } from "./Policy";
 import { Roles, useRoleOptions } from "./Roles";
-import { Field, InlineInput, PersonPicker, Seg, Select, Switch, Textarea } from "@/components/form";
+import { PersonPicker } from "@/components/form";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -46,13 +43,13 @@ function OrganisationTab() {
   const [week, setWeek] = useState<Organisation["week"] | null>(null);
   const save = useMutation("PATCH /api/v1/settings/organisation");
   const d = o.data;
-  if (!d) return (<><PageHead title="Organisation" /><Card><LoadingRows count={8} /></Card></>);
+  if (!d) return (<><PageHeader title="Organisation" /><Card><LoadingRows count={8} /></Card></>);
   const w = week ?? d.week;
   const dirty = !!week && JSON.stringify(week) !== JSON.stringify(d.week);
   const edit = (i: number, patch: Partial<Organisation["week"][number]>) => setWeek(w.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Organisation"
         sub={d.legal_name}
         actions={<Button variant="primary" disabled={!dirty || save.pending} onClick={async () => { try { await save.run({ body: { week: w } }); invalidate("/api/v1/settings"); setWeek(null); toast("Working week saved. Attendance and payroll use it"); } catch (e) { fail(e); } }}>Save</Button>}
@@ -112,7 +109,7 @@ function Users() {
   const list = usePaged("GET /api/v1/settings/users");
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Users"
         sub={s.data ? `${s.data.users} users · ${s.data.pending} pending invitation` : " "}
         actions={
@@ -174,8 +171,8 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   };
   return (
     <>
-      <Field label="Role"><Select value={role} onChange={setRole} options={roles} /></Field>
-      {reason != null && <Field label="Why the Login Is Disabled"><Textarea value={reason} onChange={setReason} placeholder="Role changed" /></Field>}
+      <Field label="Role"><SelectField value={role} onChange={setRole} options={roles} /></Field>
+      {reason != null && <Field label="Why the Login Is Disabled"><TextAreaField value={reason} onChange={setReason} placeholder="Role changed" /></Field>}
       <ModalFoot>
         {u.status.text !== "Disabled" && (reason == null ? <Button className="mr-auto" onClick={() => setReason("")}>Disable Login</Button> : <Button className="mr-auto" variant="primary" disabled={reason.trim().length < 6} onClick={() => run(() => disable.run({ params: { id: u.user_id }, body: { reason } }), "Login disabled. The record and its history stay")}>Confirm Disable</Button>)}
         <Button onClick={close}>Cancel</Button>
@@ -193,7 +190,7 @@ function Invite({ close }: { close: () => void }) {
   return (
     <>
       <Field label="Employee"><PersonPicker value={who} onChange={setWho} /></Field>
-      <Field label="Role"><Select value={role} onChange={setRole} options={roles} /></Field>
+      <Field label="Role"><SelectField value={role} onChange={setRole} options={roles} /></Field>
       <p className="text-[11.5px] text-subtle-foreground">They get an email to set a password. The invitation expires after seven days.</p>
       <ModalFoot>
         <Button onClick={close}>Cancel</Button>
@@ -213,7 +210,7 @@ function Approvals() {
   const h = list.rows.find((x) => x.hierarchy_id === sel) ?? list.rows[0];
   return (
     <>
-      <PageHead title="Approvals" sub="Hierarchies as data. Changing one needs no deploy." />
+      <PageHeader title="Approvals" sub="Hierarchies as data. Changing one needs no deploy." />
       {s.data && <KpiTiles items={[{ label: "Hierarchies", value: String(s.data.hierarchies) }, { label: "Active", value: String(s.data.active), tone: "ok" }, { label: "Awaiting a Decision", value: String(s.data.awaiting), tone: s.data.awaiting ? "warn" : undefined }, { label: "Steps, Longest", value: String(s.data.longest) }]} />}
       <Grid cols={3}>
         {list.rows.map((x) => (
@@ -302,7 +299,7 @@ function Notifications() {
   const rows = n.data ?? [];
   return (
     <>
-      <PageHead title="Notifications" sub="Per category and transport. Saved as you change them." />
+      <PageHeader title="Notifications" sub="Per category and transport. Saved as you change them." />
       <Grid cols={2}>
         {(["email", "in_app"] as const).map((t) => (
           <Card key={t}>
@@ -364,10 +361,10 @@ function AppearanceTab() {
   const { can } = useAuth();
   const d = a.data;
   const vals = useTokenValues([...(d?.palette ?? []), ...(d?.dark ?? [])].map((x) => x.token), String(theme));
-  if (!d) return (<><PageHead title="Appearance" /><Card><LoadingRows count={6} /></Card></>);
+  if (!d) return (<><PageHeader title="Appearance" /><Card><LoadingRows count={6} /></Card></>);
   return (
     <>
-      <PageHead title="Appearance" sub="MyCityApp brand" />
+      <PageHeader title="Appearance" sub="MyCityApp brand" />
       <Grid cols={2}>
         <Card>
           <CardHeader title="Palette" />
@@ -388,7 +385,7 @@ function AppearanceTab() {
           </dl>
           <div className="mt-3 border-t border-border pt-3">
             <div className="mb-1.5 text-[12px] text-subtle-foreground">Default theme for everyone</div>
-            <Seg value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved. A person's own choice still wins"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
+            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved. A person's own choice still wins"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
           </div>
         </Card>
       </Grid>
@@ -427,7 +424,7 @@ function NumberingTab() {
   const list = usePaged("GET /api/v1/settings/numbering");
   return (
     <>
-      <PageHead title="Documents & Numbering" sub="Reference formats and templates" />
+      <PageHeader title="Documents & Numbering" sub="Reference formats and templates" />
       {s.data && <StatStrip items={[{ label: "Document Types", value: s.data.types }, { label: "Templates", value: s.data.templates }, { label: "Issued This Year", value: s.data.issued_this_year }, { label: "Signed", value: s.data.signed }, { label: "Format", value: "PREFIX-0000", desktop: true }]} />}
       <Grid cols="1/1.5">
         <PagedTable<Numbering>
@@ -468,7 +465,7 @@ function Integrations() {
   const count = (t: string) => d?.items.filter((x) => x.status.text === t).length ?? 0;
   return (
     <>
-      <PageHead title="Integrations" sub="Connected services" />
+      <PageHeader title="Integrations" sub="Connected services" />
       {d && <KpiTiles items={[{ label: "Connected", value: String(count("Connected")) }, { label: "Manual", value: String(count("Manual")) }, { label: "Not in Scope", value: String(count("Not connected")) }, { label: "Failures, 7 Days", value: String(d.health.reduce((a, h) => a + h.failures, 0)), tone: "ok" }]} />}
       <Grid cols={3}>
         {(d?.items ?? []).map((x) => (
@@ -520,7 +517,7 @@ function Security() {
   const d = s.data;
   return (
     <>
-      <PageHead title="Security" sub="Sessions, devices and access" />
+      <PageHeader title="Security" sub="Sessions, devices and access" />
       {d && <KpiTiles items={[{ label: "Active Sessions", value: String(d.active_sessions) }, { label: "MFA Enrolled", value: `${d.mfa_enrolled} of ${d.users}`, tone: "warn" }, { label: "Failed Logins, 7 Days", value: String(d.failed_7d) }, { label: "Devices", value: String(d.devices) }]} />}
       <Grid cols={2}>
         <Card>
@@ -585,7 +582,7 @@ function Audit() {
   const none = <span className="text-subtle-foreground">None</span>;
   return (
     <>
-      <PageHead title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportButton source="audit" filters={mod ? { module: mod } : {}} />} />
+      <PageHeader title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportButton source="audit" filters={mod ? { module: mod } : {}} />} />
       {s.data && <KpiTiles items={[{ label: "Entries Today", value: String(s.data.today) }, { label: "This Month", value: s.data.this_month.toLocaleString("en-NG") }, { label: "Modules", value: String(s.data.modules.length) }, { label: "Retention", value: s.data.retention }]} />}
       {s.data && <Chips value={mod} onChange={setMod} options={[["", "Everything"], ...s.data.modules.map((m) => [m, m] as [string, string])]} />}
       <PagedTable<AuditEntry>

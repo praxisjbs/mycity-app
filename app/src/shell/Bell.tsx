@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { useMutation, usePaged, invalidate } from "@/api/hooks";
 import type { Notification } from "@/api/types/identity";
-import { Button, cn, formatDateTime, Icon, type IconName } from "@mycity/ui";
-import { EmptyState } from "@/components/ui/data";
-import { useModal } from "@/components/ui/Modal";
+import { Button, cn, formatDateTime, Icon, type IconName, EmptyState, useModal, ChoiceField } from "@mycity/ui";
 import { Pager } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
-import { Seg } from "@/components/form";
 
 /**
  * The bell: things that happened to you. Read once and gone. Unresolved
@@ -32,7 +29,7 @@ function BellBody({ close }: { close: () => void }) {
   return (
     <>
       <div className="mb-2.5">
-        <Seg value={view} onChange={setView} options={[["all", "All"], ["unread", "Unread"]]} />
+        <ChoiceField value={view} onChange={setView} options={[["all", "All"], ["unread", "Unread"]]} />
       </div>
       {list.rows.length === 0 && !list.loading ? (
         <EmptyState bare icon="bell" title="Nothing yet" text="New notifications appear here." />

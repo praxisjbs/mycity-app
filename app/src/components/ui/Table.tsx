@@ -1,9 +1,7 @@
 import type { KeyboardEvent, ReactNode } from "react";
-import { Button, cn, formatCount, Icon } from "@mycity/ui";
+import { Button, cn, formatCount, CardHeader, EmptyState, ErrorState } from "@mycity/ui";
 import type { ApiError } from "@/api/client";
 import type { PageMeta } from "@/api/types/common";
-import { CardHeader } from "./layout";
-import { EmptyState } from "./data";
 
 export interface Column<R> {
   key: string;
@@ -92,7 +90,7 @@ export function Table<R>({ columns, rows, rowKey, title, right, onRowClick, sele
         </table>
       </div>
       {rows.length === 0 && loading && <LoadingRows />}
-      {rows.length === 0 && !loading && error && <ErrorBlock error={error} />}
+      {rows.length === 0 && !loading && error && <ErrorState error={error} />}
       {rows.length === 0 && !loading && !error && (
         <EmptyState bare icon={empty?.icon ?? "ok"} title={empty?.title ?? "Nothing here yet"} text={empty?.text} />
       )}
@@ -109,26 +107,6 @@ export function LoadingRows({ count = 4 }: { count?: number }) {
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="h-[18px] animate-pulse rounded-md bg-muted" style={{ width: `${90 - i * 12}%` }} />
       ))}
-    </div>
-  );
-}
-
-export function ErrorBlock({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
-  return (
-    <div className="px-4 py-[26px] text-center" role="alert">
-      <span className="mx-auto mb-[11px] flex size-[46px] items-center justify-center rounded-[14px] bg-destructive-soft text-destructive">
-        <Icon name="alert" size="m" />
-      </span>
-      <h3 className="text-[13.5px]">{error.status === 403 ? "You do not have access to this" : "This did not load"}</h3>
-      <p className="mx-auto mt-[5px] max-w-[48ch] text-[11.5px] text-subtle-foreground">
-        {error.message}
-        {error.reference ? ` Reference ${error.reference}.` : ""}
-      </p>
-      {onRetry && (
-        <Button className="mt-3" icon="right" onClick={onRetry}>
-          Try Again
-        </Button>
-      )}
     </div>
   );
 }
@@ -167,26 +145,4 @@ export function Pager({ page, onPage, noun = "record", nounPlural, className }: 
 /** The row of controls above a list. */
 export function Toolbar({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("mb-3 flex flex-wrap items-end gap-2", className)}>{children}</div>;
-}
-
-/** Filter chips: one choice from a few. */
-export function Chips<V extends string>({ value, onChange, options, className }: { value: V; onChange: (v: V) => void; options: Array<[V, ReactNode]>; className?: string }) {
-  return (
-    <div className={cn("mb-3 flex flex-wrap gap-1.5 max-md:no-scrollbar max-md:flex-nowrap max-md:overflow-x-auto", className)} role="group">
-      {options.map(([v, label]) => (
-        <button
-          key={v}
-          type="button"
-          aria-pressed={v === value}
-          onClick={() => onChange(v)}
-          className={cn(
-            "inline-flex h-[30px] flex-none items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold",
-            v === value ? "border-secondary bg-secondary text-secondary-foreground" : "border-border bg-card text-muted-foreground hover:border-subtle-foreground hover:text-foreground",
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
 }

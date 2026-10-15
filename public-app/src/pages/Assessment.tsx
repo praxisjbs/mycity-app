@@ -3,11 +3,10 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { AssessmentQuestion, AssessmentSession } from "@/api/types/public";
-import { Button, cn, formatDate, Icon } from "@mycity/ui";
+import { Button, cn, formatDate, Icon, Skeleton, Banner, TextAreaField } from "@mycity/ui";
 import { Message, Page } from "@/components/Layout";
-import { Loading, Notice, Sub } from "@/components/ui";
+import { Sub } from "@/components/ui";
 import { LinkProblem } from "./LinkProblem";
-import { Textarea } from "@/components/form";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const clock = (ms: number) => {
@@ -29,7 +28,7 @@ export function Assessment({ token }: { token: string }) {
   if (!d)
     return (
       <Page title="Assessment">
-        <Loading lines={6} />
+        <Skeleton lines={6} />
       </Page>
     );
   if (d.state === "not_started") return <Intro d={d} token={token} onStarted={s.set} />;
@@ -81,13 +80,13 @@ function Intro({ d, token, onStarted }: { d: AssessmentSession; token: string; o
         Hello {d.candidate_first_name}. {d.assessment.instructions}
       </p>
       <div className="mt-4">
-        <Notice tone="info" icon="clock">
+        <Banner tone="info" icon="clock">
           The timer starts when you press Start and runs on our side. Closing this tab does not stop it. If the connection or the power goes, open the same link again: every answer is saved as you go, and you continue exactly where you were.
-        </Notice>
+        </Banner>
       </div>
       {problem && (
         <div className="mt-3">
-          <Notice tone="err">{problem}</Notice>
+          <Banner tone="err">{problem}</Banner>
         </div>
       )}
       <Button variant="primary" block className="mt-5" disabled={busy} onClick={start}>
@@ -199,7 +198,7 @@ function Running({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
         {q.prompt}
       </p>
       {q.kind === "text" ? (
-        <Textarea aria-labelledby={`p-${q.question_id}`} className="mt-3.5 min-h-[150px]" rows={6} value={answers[q.question_id] ?? ""} onChange={(val) => answer(q, val)} />
+        <TextAreaField aria-labelledby={`p-${q.question_id}`} className="mt-3.5 min-h-[150px]" rows={6} value={answers[q.question_id] ?? ""} onChange={(val) => answer(q, val)} />
       ) : (
         <div role="radiogroup" aria-labelledby={`p-${q.question_id}`} className="mt-3.5 flex flex-col gap-2">
           {q.options!.map((o) => {
@@ -259,7 +258,7 @@ function Running({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
           </Sub>
           {problem && (
             <div className="mt-2.5">
-              <Notice tone="err">{problem}</Notice>
+              <Banner tone="err">{problem}</Banner>
             </div>
           )}
           <div className="mt-3 flex justify-end gap-2">

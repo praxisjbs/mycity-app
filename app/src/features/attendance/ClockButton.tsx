@@ -3,13 +3,9 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi } from "@/api/hooks";
 import type { AttendanceToday, ClockResponse } from "@/api/types/attendance";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, cn, formatDate, formatTime, Icon } from "@mycity/ui";
-import { Avatar, Banner, KV, Result } from "@/components/ui/data";
-import { Card } from "@/components/ui/layout";
-import { useModal } from "@/components/ui/Modal";
-import { toast } from "@/components/ui/Toast";
+import { Button, cn, formatDate, formatTime, Icon, Avatar, Banner, KeyValue, Card, useModal, toast, Field, TextAreaField } from "@mycity/ui";
+import { Result } from "@/components/ui/data";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Field, Textarea } from "@/components/form";
 
 /**
  * The top bar's Clock In / Clock Out button. The button only asks; the API
@@ -149,7 +145,7 @@ function ClockPanel({ close }: { close: () => void }) {
           <h3 className="mb-1 text-[13.5px]">Add Exception Details</h3>
           <p className="mb-2.5 text-[11.5px] text-subtle-foreground">People and your manager will review it.</p>
           <Field label="Explanation" state={why.trim().length >= 10 ? "good" : why ? "bad" : undefined} message="Write at least 10 characters">
-            <Textarea value={why} onChange={setWhy} placeholder="Phone battery died" state={why.trim().length >= 10 ? "good" : why ? "bad" : undefined} />
+            <TextAreaField value={why} onChange={setWhy} placeholder="Phone battery died" state={why.trim().length >= 10 ? "good" : why ? "bad" : undefined} />
           </Field>
         </Card>
         <Foot>
@@ -183,7 +179,7 @@ function ClockPanel({ close }: { close: () => void }) {
         <Result tone="ok" label="Location check" title="Location found" text={`Accurate to about ${fix.acc} m. The server checks it against ${t.location_label}.`} />
       )}
       <Card className="mt-3">
-        <KV
+        <KeyValue
           items={[
             ["Work arrangement", t.work_pattern],
             ["Shift", `${t.shift_start} to ${t.shift_end}${t.grace_minutes ? ` · ${t.grace_minutes} min grace` : ""}`],

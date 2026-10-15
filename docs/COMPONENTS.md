@@ -1901,7 +1901,7 @@ The text input of the form system, with its typed relatives: password, whole num
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `type` | `"text" \| "email" \| "url" \| "search"` |  | text, email, url or search. |
+| `type` | `"text" \| "email" \| "url" \| "search" \| "tel"` |  | text, email, url, search or tel (a phone number typed in any format). |
 
 **PasswordField** props (`PasswordFieldProps`, extends `BoundProps`, `NativeInput`)
 
