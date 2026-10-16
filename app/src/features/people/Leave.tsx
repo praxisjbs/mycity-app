@@ -40,7 +40,7 @@ export function PeopleLeave() {
       <Grid cols="1.4/1">
         <div className="min-w-0">
           <Toolbar>
-            <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-[260px]" />
+            <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-64" />
           </Toolbar>
           <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending", "Pending"], ["Approved", "Approved"], ["Rejected", "Rejected"]]} />
           <DataView
@@ -62,7 +62,7 @@ export function PeopleLeave() {
             footer={<Pager page={list.page} onPage={list.setPage} noun="request" />}
           />
         </div>
-        {sel ? <CoverCard leave={sel} onDone={() => setSelected(null)} /> : <Card><p className="text-[12.5px] text-subtle-foreground">Select a request to check cover.</p></Card>}
+        {sel ? <CoverCard leave={sel} onDone={() => setSelected(null)} /> : <Card><p className="text-xs text-subtle-foreground">Select a request to check cover.</p></Card>}
       </Grid>
     </>
   );
@@ -85,12 +85,12 @@ function CoverCard({ leave, onDone }: { leave: LeaveRequest; onDone: () => void 
   return (
     <Card>
       <CardHeader title={cover.data.title} />
-      <p className="mb-[11px] text-[11.5px] text-subtle-foreground">{cover.data.text}</p>
+      <p className="mb-2.5 text-2xs text-subtle-foreground">{cover.data.text}</p>
       {cover.data.rows.map((r) => (
         <div key={r.title} className="flex items-center gap-2.5 border-b border-border py-2">
           <span className="min-w-0 flex-1">
-            <div className="text-[12.5px] font-semibold">{r.title}</div>
-            <div className="text-[11.5px] text-subtle-foreground">{r.text}</div>
+            <div className="text-xs font-semibold">{r.title}</div>
+            <div className="text-2xs text-subtle-foreground">{r.text}</div>
           </span>
           <Pill tone={r.tone}>{r.result}</Pill>
         </div>

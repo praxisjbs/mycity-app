@@ -142,7 +142,7 @@ function Alerts({ openId }: { openId: string | null }) {
           { key: "t", label: "Trigger", desktop: true, render: (r) => r.trigger },
           { key: "w", label: "Who Can Clear", desktop: true, render: (r) => r.who_clears },
           { key: "g", label: "Age", render: (r) => r.age },
-          { key: "o", label: "Over By", render: (r) => <span className="inline-block rounded-full bg-warning-soft px-[9px] py-0.5 text-[11px] font-semibold whitespace-nowrap text-warning">{r.over_by}</span> },
+          { key: "o", label: "Over By", render: (r) => <span className="inline-block rounded-full bg-warning-soft px-2 py-0.5 text-2xs font-semibold whitespace-nowrap text-warning">{r.over_by}</span> },
           { key: "s", label: "Severity", render: (r) => <Pill tone={SEV[r.severity][0]}>{SEV[r.severity][1]}</Pill> },
         ]}
         footer={<Pager page={list.page} onPage={list.setPage} noun="alert" />}
@@ -169,7 +169,7 @@ function AlertDetail({ alert, close }: { alert: HomeAlert; close: () => void }) 
   };
   return (
     <>
-      <h3 data-copy="content" className="mb-2 text-[15px]">{alert.title}</h3>
+      <h3 data-copy="content" className="mb-2 text-md">{alert.title}</h3>
       <div className="mb-3 flex flex-wrap gap-1.5">
         <Pill tone={SEV[alert.severity][0]}>{SEV[alert.severity][1]}</Pill>
         <Pill>{alert.trigger}</Pill>

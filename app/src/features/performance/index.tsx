@@ -117,7 +117,7 @@ function GoalForm({ close }: { close: () => void }) {
           <SelectField placeholder="Organisational goal" options={parents.rows.map((g) => [g.goal_id, `${g.code} · ${g.title}`])} {...f.field("rolls_up_to")} />
         </Field>
       )}
-      <p className="text-[11.5px] text-subtle-foreground">Saved as a draft. Nothing binds until the CEO approves.</p>
+      <p className="text-2xs text-subtle-foreground">Saved as a draft. Nothing binds until the CEO approves.</p>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Add Goal</Button>
@@ -216,7 +216,7 @@ function TargetForm({ close, month }: { close: () => void; month: string }) {
   };
   return (
     <>
-      <p className="mb-3 text-[12.5px] text-muted-foreground">For {formatMonth(month)}. It binds once the CEO approves.</p>
+      <p className="mb-3 text-xs text-muted-foreground">For {formatMonth(month)}. It binds once the CEO approves.</p>
       <Field label="Department" {...f.field("department")}><SelectField options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
       <Field label="Target" {...f.field("title")}><TextField {...f.field("title")} placeholder="8 new prospects" /></Field>
       <Field label="Measure" {...f.field("measure")}><TextField {...f.field("measure")} placeholder="Count, days, date" /></Field>
@@ -283,16 +283,16 @@ function WeightsCard({ p, onEdit }: { p: PersonRef; onEdit: () => void }) {
   return (
     <Card>
       <CardHeader title="Weights Must Total 100%" right={k.data && <StatusPill s={ok ? { tone: "ok", text: "All valid" } : { tone: "err", text: `${k.data.total_pct}%` }} />} />
-      <p className="mb-[11px] text-[11.5px] text-subtle-foreground">{p.display_name}, {k.data ? `${k.data.items.length} KPI${k.data.items.length === 1 ? "" : "s"} this month` : "loading"}.</p>
+      <p className="mb-2.5 text-2xs text-subtle-foreground">{p.display_name}, {k.data ? `${k.data.items.length} KPI${k.data.items.length === 1 ? "" : "s"} this month` : "loading"}.</p>
       {k.data?.items.map((r) => (
-        <div key={r.kpi_id} className="flex items-center gap-2.5 py-[7px]">
-          <span className="flex-1 text-[12.5px]">{r.title}</span>
-          <span className="w-[150px] flex-none"><Meter pct={Math.min(100, r.weight_pct * 2.5)} label={`${r.weight_pct}%`} /></span>
+        <div key={r.kpi_id} className="flex items-center gap-2.5 py-1.5">
+          <span className="flex-1 text-xs">{r.title}</span>
+          <span className="w-36 flex-none"><Meter pct={Math.min(100, r.weight_pct * 2.5)} label={`${r.weight_pct}%`} /></span>
         </div>
       ))}
-      <div className="mt-1 flex gap-2.5 border-t-2 border-border pt-[9px]">
-        <b className="flex-1 text-[12.5px]">Total</b>
-        <b className={cn("text-[12.5px]", ok ? "text-success" : "text-destructive")}>{k.data?.total_pct ?? 0}%</b>
+      <div className="mt-1 flex gap-2.5 border-t-2 border-border pt-2">
+        <b className="flex-1 text-xs">Total</b>
+        <b className={cn("text-xs", ok ? "text-success" : "text-destructive")}>{k.data?.total_pct ?? 0}%</b>
       </div>
       <Button size="sm" className="mt-2" onClick={onEdit}>Edit Weights</Button>
     </Card>
@@ -331,16 +331,16 @@ function AssignKpis({ close, initial }: { close: () => void; initial?: PersonRef
             {items.map((r, i) => (
               <div key={i} className="flex items-center gap-2">
                 <TextField value={r.title} onChange={(v) => set(i, "title", v)} placeholder={`KPI ${i + 1}`} aria-label={`KPI ${i + 1}`} />
-                <span className="relative w-[84px] flex-none">
+                <span className="relative w-20 flex-none">
                   <TextField value={r.weight} onChange={(v) => set(i, "weight", v)} inputMode="numeric" aria-label={`Weight of KPI ${i + 1}`} className="pr-7 text-right" />
-                  <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[12px] text-subtle-foreground">%</span>
+                  <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs text-subtle-foreground">%</span>
                 </span>
                 <button type="button" aria-label={`Remove KPI ${i + 1}`} className="flex size-8 flex-none items-center justify-center rounded-full text-subtle-foreground hover:bg-muted" onClick={() => setRows(items.filter((_, j) => j !== i))}><Icon name="x" /></button>
               </div>
             ))}
             <div className="flex items-center justify-between pt-1">
               <Button size="sm" icon="plus" onClick={() => setRows([...items, { title: "", weight: "" }])}>Add KPI</Button>
-              <b className={cn("text-[12.5px]", total === 100 ? "text-success" : "text-destructive")}>Total {total}%</b>
+              <b className={cn("text-xs", total === 100 ? "text-success" : "text-destructive")}>Total {total}%</b>
             </div>
           </div>
         </Field>
@@ -397,7 +397,7 @@ function Reviews() {
           <CardHeader title="Dictate Your Answer" right={<StatusPill s={{ tone: "info", text: "AI assisted" }} />} />
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3">
             <IconButton icon="spark" label="Record an answer" className="rounded-full bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" onClick={() => toast("Dictation opens when the review cycle starts")} />
-            <span className="text-[11.5px] text-subtle-foreground">Tap to record your answer to “What went well this quarter?”</span>
+            <span className="text-2xs text-subtle-foreground">Tap to record your answer to “What went well this quarter?”</span>
           </div>
           <Quote className="mt-3">“We closed the Providus sponsorship and got the Lagos venues confirmed, but I was slow on the Eko follow-up.”</Quote>
         </Card>
@@ -462,7 +462,7 @@ function Analytics() {
       <Grid cols={2}>
         <DataView
           title="Self vs Manager Rating"
-          right={<span className="text-[11.5px] text-subtle-foreground">{d.gap_cycle}</span>}
+          right={<span className="text-2xs text-subtle-foreground">{d.gap_cycle}</span>}
           rows={d.gap}
           rowKey={(r) => r.department}
           columns={[

@@ -123,6 +123,144 @@
   }
 }
 
+/* A message bubble's corners: square but for the 4 px notch where its tail sits,
+   bottom left for a message received and bottom right for one sent. */
+@utility bubble-them {
+  border-radius: var(--radius-card) var(--radius-card) var(--radius-card) 4px;
+}
+@utility bubble-me {
+  border-radius: var(--radius-card) var(--radius-card) 4px var(--radius-card);
+}
+
+/* The bar inside the left edge of the row in view, in a list beside a reader
+   (the mailbox, chat, a day's punches). Inset, so it takes no width and the
+   rows below it do not shift. */
+@utility bar-selected {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+/* The bottom padding of a bar a phone's home indicator sits under: the gap that
+   is wanted, plus whatever the device needs. */
+@utility pb-safe-2 {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+@utility pb-safe-3 {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+@utility pb-safe-5 {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+/* The celebration card's drifting pieces (Confetti) and its slow sheen. Each
+   piece's place, pace and head start come from its own CSS variables, so the
+   component sets four values and the shape and size are decided here. The
+   reduced-motion rule in base's @layer base stops all of it. */
+@keyframes mc-fall {
+  0% {
+    transform: translateY(-10px) rotate(0);
+  }
+  100% {
+    transform: translateY(190px) rotate(540deg);
+  }
+}
+@keyframes mc-sheen {
+  0% {
+    background-position: 120% 0;
+  }
+  60%,
+  100% {
+    background-position: -120% 0;
+  }
+}
+@layer components {
+  .confetti > i {
+    position: absolute;
+    top: -14px;
+    width: 7px;
+    height: 11px;
+    border-radius: 2px;
+    opacity: 0.9;
+    left: var(--piece-left);
+    background: var(--piece-ink);
+    animation: mc-fall linear infinite var(--piece-time);
+    animation-delay: var(--piece-delay);
+  }
+  .confetti > i:nth-child(3n) {
+    border-radius: 50%;
+    width: 7px;
+    height: 7px;
+  }
+  .confetti > i:nth-child(4n) {
+    width: 4px;
+    height: 13px;
+  }
+  .confetti.stars > i {
+    border-radius: 1px;
+    width: 11px;
+    height: 11px;
+    clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  }
+}
+@utility sheen {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, color-mix(in oklab, var(--on-deep) 10%, transparent) 50%, transparent 65%);
+    background-size: 250% 100%;
+    animation: mc-sheen 5s ease-in-out infinite;
+  }
+}
+
+/* A celebration card's own background: warm for a birthday, cool for a work
+   anniversary. Both are the brand's own tokens over Deep Green. */
+@utility celebrate-warm {
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in oklab, var(--primary) 20%, transparent), transparent 55%),
+    linear-gradient(135deg, var(--secondary), var(--deep));
+}
+@utility celebrate-cool {
+  background:
+    radial-gradient(120% 140% at 0% 100%, color-mix(in oklab, var(--chart-3) 22%, transparent), transparent 55%),
+    linear-gradient(135deg, var(--deep), var(--secondary));
+}
+/* The spinning ring around a celebration's initials. */
+@utility ring-warm {
+  background: conic-gradient(var(--primary), color-mix(in oklab, var(--primary) 15%, transparent), var(--primary), color-mix(in oklab, var(--primary) 15%, transparent), var(--primary));
+}
+@utility ring-cool {
+  background: conic-gradient(var(--chart-2), color-mix(in oklab, var(--chart-3) 15%, transparent), var(--primary), color-mix(in oklab, var(--chart-3) 15%, transparent), var(--chart-2));
+}
+
+/* The split panes: the list at the width the person dragged (--pane), the
+   divider, the record, and optionally a third pane at the right. */
+@utility cols-panes {
+  grid-template-columns: var(--pane) 8px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+@utility cols-panes-aside {
+  grid-template-columns: var(--pane) 8px minmax(0, 1fr) 300px;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* The page layouts a screen cannot express on the spacing scale: a list beside
+   the record it opens, a definition list's label column, and a row of two
+   fields with their action. */
+@utility cols-list-detail {
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+}
+@utility cols-term-value {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+@utility cols-term-value-tight {
+  grid-template-columns: 118px minmax(0, 1fr);
+}
+@utility cols-two-and-action {
+  grid-template-columns: 1fr 1fr auto;
+}
+
 /* The reader's two columns on a wide screen: a fixed list beside the article
    that takes the rest (Reader). */
 @utility reader-columns {

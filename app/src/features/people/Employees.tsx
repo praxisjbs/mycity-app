@@ -42,13 +42,13 @@ export function Employees() {
       {summary.data && <KpiTiles items={summary.data.kpis} />}
       {summary.data && <StatStrip items={summary.data.arrangements.map((a) => ({ label: a.label, value: a.value }))} />}
       <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-[300px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-72" />
         <FilterSelect label="Department" value={department} onChange={setDepartment} options={[["all", "All departments"], ...depts.rows.map((d) => [d.name, d.name] as [string, string])]} />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={[["all", "Any status"], ["confirmed", "Active"], ["probation", "Probation"], ["on_leave", "On Leave"], ["suspended", "Suspended"]]} />
       </Toolbar>
       <DataView
         title="All Employees"
-        right={<span className="text-[11.5px] text-subtle-foreground max-md:hidden">Home addresses appear only in the authorised details view</span>}
+        right={<span className="text-2xs text-subtle-foreground max-md:hidden">Home addresses appear only in the authorised details view</span>}
         rows={list.rows}
         rowKey={(r) => r.employee_id}
         loading={list.loading}
@@ -77,9 +77,9 @@ export function Employees() {
           <Card>
             <CardHeader title="Needs a Decision" right={<Pill tone="warn">{String(summary.data.decisions.length)}</Pill>} />
             {summary.data.decisions.map((d) => (
-              <button key={d.title} type="button" onClick={() => navigate(d.link)} className="mb-2 block w-full rounded-box border border-border bg-card p-2.5 text-left transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-2">
-                <b className="block text-[12.5px] font-semibold">{d.title}</b>
-                <span className="mb-1.5 block text-[11.5px] text-subtle-foreground">{d.text}</span>
+              <button key={d.title} type="button" onClick={() => navigate(d.link)} className="mb-2 block w-full rounded-box border border-border bg-card p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-2">
+                <b className="block text-xs font-semibold">{d.title}</b>
+                <span className="mb-1.5 block text-2xs text-subtle-foreground">{d.text}</span>
                 <Pill tone={d.action.tone}>{d.action.text}</Pill>
               </button>
             ))}
@@ -178,7 +178,7 @@ function AddEmployee({ close }: { close: () => void }) {
 function ImportStaff() {
   return (
     <>
-      <p className="mb-3 text-[12.5px] text-muted-foreground">Upload the staff sheet. Columns are mapped next, then a preview runs the import for real and rolls it back, so you see every error before anything is saved.</p>
+      <p className="mb-3 text-xs text-muted-foreground">Upload the staff sheet. Columns are mapped next, then a preview runs the import for real and rolls it back, so you see every error before anything is saved.</p>
       <UploadField upload={upload} purpose="import" accept=".xlsx,.csv" multiple={false} label="Drop the staff sheet here, or browse" onUploaded={() => toast("Sheet received. Map its columns to continue.")} />
     </>
   );

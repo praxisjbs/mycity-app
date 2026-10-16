@@ -26,12 +26,14 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Layout | [Grid](#grid) | `Grid` | The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone. | stable |
 | Layout | [PageHeader](#pageheader) | `PageHeader` | A page's title, its one-line subtitle (desktop only) and the page's actions. | stable |
 | Layout | [PhoneOnly](#phoneonly) | `PhoneOnly`, `DesktopOnly` | Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen. | stable |
+| Layout | [SplitPanes](#splitpanes) | `SplitPanes` | A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it. | stable |
 | Layout | [Stack](#stack) | `Stack`, `Inline` | A vertical run of blocks with an even gap; Inline is the horizontal run that wraps. | stable |
 | Display | [Accordion](#accordion) | `Accordion` | Questions and their answers, each closed until it is opened. | stable |
 | Display | [Avatar](#avatar) | `Avatar`, `Who` | A person's photo, or their initials in a round chip when there is none, with an optional presence dot; Who is the avatar with the name and a second line. | stable |
 | Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
 | Display | [Bars](#bars) | `Bars` | Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target. | stable |
 | Display | [Chain](#chain) | `Chain` | An approval route: the steps already done, the one in hand, and what is still to come. | stable |
+| Display | [Confetti](#confetti) | `Confetti` | Pieces of paper or stars drifting down behind a celebration card. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
 | Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
@@ -48,12 +50,15 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [ProgressBar](#progressbar) | `ProgressBar`, `Meter` | How far along something is: a bar with its percent, or a moving bar when the end is unknown; Meter is the thin inline bar with its figure (the merged Mini). | stable |
 | Display | [Quote](#quote) | `Quote` | A quoted passage a person wrote or received, with the yellow rule at its left. | stable |
 | Display | [Result](#result) | `Result` | The outcome of something a person just did: clocking in, signing, a check that passed or failed. | stable |
+| Display | [ShareBar](#sharebar) | `ShareBar` | The share of a total, drawn behind a row of text rather than beside it. | stable |
 | Display | [Skeleton](#skeleton) | `Skeleton`, `Spinner` | A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape. | stable |
 | Display | [StatStrip](#statstrip) | `StatStrip` | A strip of labelled figures across the top of a record: smaller than KPI cards, for a record's own counts. | stable |
 | Display | [Sub](#sub) | `Sub` | The faint line under a heading or beside a value: the smallest secondary text there is. | stable |
+| Display | [Swatch](#swatch) | `Swatch` | A square of one palette token's colour, beside its name and its value. | stable |
 | Display | [TapList](#taplist) | `TapList` | A stack of rows that each open something: the phone's way into a record when a table would be wrong. | stable |
 | Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
 | Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
+| Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, which fill as it plays. | stable |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
@@ -360,6 +365,41 @@ Shows its content on a phone only; DesktopOnly shows it on a desktop only. What 
 <DesktopOnly unmount><AreaChart /></DesktopOnly>
 ```
 
+### SplitPanes
+
+A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it.
+
+| | |
+|---|---|
+| Use | A screen read one record at a time out of a list: the mailbox, chat, a day's punches. |
+| Avoid | A page of sections (use Grid); a list and a detail that fit side by side at a fixed width (use Grid "1.4/1"); three panes a person drags independently. |
+| Phone | There are no panes: the list fills the screen and an open record covers it, above the shell, with the safe area kept clear. |
+| Accessibility | The divider is a real separator with its width as its value, and the arrow keys move it, so the panes can be resized without a pointer. |
+| Status | stable |
+| Exports | `SplitPanes` |
+| Import | `import { SplitPanes } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/SplitPanes.tsx` |
+| Test | `packages/ui/src/layout/SplitPanes.test.tsx` |
+| Gallery | `packages/ui/src/layout/SplitPanes.gallery.tsx` (`npm run gallery`, `#/SplitPanes`) |
+
+**SplitPanes** props (`SplitPanesProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `split` | `SplitState` | yes | The width and the drag, from `useSplitPanes`. |
+| `list` | `ReactNode` | yes | The list, which fills the screen on a phone. |
+| `detail` | `ReactNode` | yes | The record in view, which covers the list on a phone. |
+| `aside` | `ReactNode` |  | A third pane at the right on desktop, 300 px wide (a channel's own information). |
+| `open` | `boolean` |  | A record is open: on a phone it covers the list. |
+| `minHeight` | `"sm" \| "md"` |  | The panes' least height; `md` unless a screen wants more. |
+| `scrolls` | `boolean` |  | The open record scrolls as one, rather than its own parts scrolling (the mailbox reads this way). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+const split = useSplitPanes("mailbox", 320);
+<SplitPanes split={split} open={open} list={list} detail={reader} />
+```
+
 ### Stack
 
 A vertical run of blocks with an even gap; Inline is the horizontal run that wraps.
@@ -565,6 +605,35 @@ An approval route: the steps already done, the one in hand, and what is still to
 
 ```tsx
 <Chain steps={[{ label: "Submitted", state: "done" }, { label: "Line Manager", state: "now" }, { label: "Finance" }]} />
+```
+
+### Confetti
+
+Pieces of paper or stars drifting down behind a celebration card.
+
+| | |
+|---|---|
+| Use | Behind a birthday or a work anniversary in the Staff Community, and nowhere a person is working. |
+| Avoid | A saved form, a completed task or anything a person does many times a day; a screen that needs reading while it moves. |
+| Phone | The same pieces at the same pace; they stop under reduced motion, like every other animation. |
+| Accessibility | Decorative and hidden from screen readers, and it stops entirely under prefers-reduced-motion (base.css). |
+| Status | stable |
+| Exports | `Confetti` |
+| Import | `import { Confetti } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Confetti.tsx` |
+| Test | `packages/ui/src/display/Confetti.test.tsx` |
+| Gallery | `packages/ui/src/display/Confetti.gallery.tsx` (`npm run gallery`, `#/Confetti`) |
+
+**Confetti** props (`ConfettiProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `shape` | `"paper" \| "stars"` |  | `paper` (the default) drops rectangles and circles; `stars` drops five-pointed stars. |
+| `className` | `string` |  | Layout classes only (the box it falls inside). |
+
+```tsx
+<Confetti />
+<Confetti shape="stars" />
 ```
 
 ### CountBadge
@@ -1157,6 +1226,34 @@ The outcome of something a person just did: clocking in, signing, a check that p
 <Result tone="ok" label="Clocked In" title="07:52, On Site" text="Lekki Office" />
 ```
 
+### ShareBar
+
+The share of a total, drawn behind a row of text rather than beside it.
+
+| | |
+|---|---|
+| Use | A poll option's votes behind its words, a tally where the bar must not take a column of its own. |
+| Avoid | A measure a person reads a figure off (use Meter); progress through work under way (use ProgressBar); a bar that hides the text over it. |
+| Phone | The same bar; the row over it keeps its 44 px, so the share never changes what can be tapped. |
+| Accessibility | Decorative: the figure it shows is in the words over it, and the row itself says whether it is chosen. |
+| Status | stable |
+| Exports | `ShareBar` |
+| Import | `import { ShareBar } from "@mycity/ui";` |
+| File | `packages/ui/src/display/ShareBar.tsx` |
+| Test | `packages/ui/src/display/ShareBar.test.tsx` |
+| Gallery | `packages/ui/src/display/ShareBar.gallery.tsx` (`npm run gallery`, `#/ShareBar`) |
+
+**ShareBar** props (`ShareBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `percent` | `number` | yes | The share, 0 to 100 (held inside that range). |
+| `className` | `string` |  | Layout classes only (the tint, where a screen wants another). |
+
+```tsx
+<ShareBar percent={62} />
+```
+
 ### Skeleton
 
 A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape.
@@ -1257,6 +1354,35 @@ The faint line under a heading or beside a value: the smallest secondary text th
 <Sub as="p" record>{employee.job_title}</Sub>
 ```
 
+### Swatch
+
+A square of one palette token's colour, beside its name and its value.
+
+| | |
+|---|---|
+| Use | Settings · Appearance, where a person checks the brand's own palette in the theme they are in. |
+| Avoid | Showing a colour a screen chose rather than a token; a swatch of a colour nobody can name. |
+| Phone | The same square at the same size; the name and value wrap beside it. |
+| Accessibility | Decorative: the token's name and its value are words beside the square, so the colour is never the only thing said. |
+| Status | stable |
+| Exports | `Swatch` |
+| Import | `import { Swatch } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Swatch.tsx` |
+| Test | `packages/ui/src/display/Swatch.test.tsx` |
+| Gallery | `packages/ui/src/display/Swatch.gallery.tsx` (`npm run gallery`, `#/Swatch`) |
+
+**Swatch** props (`SwatchProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `token` | `string` | yes | The token, as it is written in tokens.css (`--primary`, `--chart-1`). |
+| `size` | `"sm" \| "md"` |  | `md` (30 px, the default) or `sm` (24 px), for a denser list. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Swatch token="--primary" />
+```
+
 ### TapList
 
 A stack of rows that each open something: the phone's way into a record when a table would be wrong.
@@ -1345,6 +1471,35 @@ What happened to a record, newest or oldest first: a rail of dated events, each 
 
 ```tsx
 <Timeline items={[{ title: "Approved by Ada Obi", when: "13/10/2026 09:41", tone: "done" }]} />
+```
+
+### Waveform
+
+A voice note's bars, which fill as it plays.
+
+| | |
+|---|---|
+| Use | Beside the play button on a voice note: a community message, a review's dictated comment. |
+| Avoid | A real reading of the audio (these bars are a shape, not the sound); a progress figure a person reads (use ProgressBar). |
+| Phone | The same bars at the width the bubble gives them; the play button beside it keeps its 44 px. |
+| Accessibility | Decorative: the length is said in words beside it and the button says whether it is playing, so nothing here needs reading. |
+| Status | stable |
+| Exports | `Waveform` |
+| Import | `import { Waveform } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Waveform.tsx` |
+| Test | `packages/ui/src/display/Waveform.test.tsx` |
+| Gallery | `packages/ui/src/display/Waveform.gallery.tsx` (`npm run gallery`, `#/Waveform`) |
+
+**Waveform** props (`WaveformProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `seconds` | `number` | yes | How long the note is, in seconds: it sets how fast the bars fill. |
+| `playing` | `boolean` |  | It is playing: the bars light in turn over the note's length. |
+| `className` | `string` |  | Layout classes only (width, height). |
+
+```tsx
+<Waveform seconds={42} playing={playing} />
 ```
 
 ## Navigation

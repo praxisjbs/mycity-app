@@ -111,7 +111,7 @@ export function WorkLocationRequestsPage() {
         <>
           <KeyValue items={[["Type", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason], ["Status", <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill>], ["People's note", r.hr_note ?? "None"]]} />
           <div className="mt-3 border-t border-border pt-3">
-            {r.history.map((h, i) => <p key={i} className="text-[11.5px] text-subtle-foreground">{formatDateTime(h.at)} · {h.by} · {h.text}</p>)}
+            {r.history.map((h, i) => <p key={i} className="text-2xs text-subtle-foreground">{formatDateTime(h.at)} · {h.by} · {h.text}</p>)}
           </div>
         </>
       ),
@@ -254,11 +254,11 @@ export function PolicyUpdatesPage() {
   return (
     <>
       <PageHeader title="Policy Updates" sub={`Attendance policy · ${me.display_name}`} />
-      <div className="mb-3 rounded-card border border-border bg-background px-[15px] py-[13px]">
-        <h2 data-ui="title" className="text-[14.5px]">Policy v{p.version}</h2>
+      <div className="mb-3 rounded-card border border-border bg-background px-3.5 py-3">
+        <h2 data-ui="title" className="text-base">Policy v{p.version}</h2>
         <div data-copy="content">
-          <p className="mt-[5px] text-[13px] leading-normal text-muted-foreground">{p.summary}</p>
-          <ul className="mt-2 list-disc pl-5 text-[12.5px] text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>
+          <p className="mt-1 text-sm leading-normal text-muted-foreground">{p.summary}</p>
+          <ul className="mt-2 list-disc pl-5 text-xs text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button onClick={read}>Read Full Policy</Button>

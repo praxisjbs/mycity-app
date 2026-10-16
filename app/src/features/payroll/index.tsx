@@ -125,7 +125,7 @@ function Payslips() {
       {shown && (
         <div className="mt-3">
           <SlipPaper id={shown.payslip_id} />
-          {shown.has_query_deduction && <p className="mt-3 text-[11.5px] text-subtle-foreground">{shown.employee.display_name} carries a deduction accepted into this run from Queries and Sanctions. The line names its reason, not the sanction.</p>}
+          {shown.has_query_deduction && <p className="mt-3 text-2xs text-subtle-foreground">{shown.employee.display_name} carries a deduction accepted into this run from Queries and Sanctions. The line names its reason, not the sanction.</p>}
         </div>
       )}
     </>
@@ -255,15 +255,15 @@ function Deductions() {
           <Card>
             <CardHeader title={f.title} right={<StatusPill s={{ tone: "warn", text: "Needs acceptance" }} />} />
             <Chain steps={f.chain.map((x) => ({ label: x.label, state: x.state ?? undefined }))} />
-            <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{f.note}</p>
-            <div className="mt-[13px] flex flex-wrap gap-2">
+            <p className="mt-2.5 text-2xs text-subtle-foreground">{f.note}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button variant="primary" icon="ok" busy={accept.pending} onClick={() => doAccept(1)}>Accept This Month</Button>
               <Button busy={accept.pending} onClick={() => doAccept(2)}>Split Across Runs</Button>
               <Button onClick={() => modal.open({ title: "Waive Deduction", body: (close) => <Waive id={f.deduction_id} close={close} /> })}>Waive</Button>
             </div>
           </Card>
         ) : (
-          <Card><CardHeader title="Nothing Pending" /><p className="text-[12.5px] text-subtle-foreground">Every deduction raised has been accepted or waived.</p></Card>
+          <Card><CardHeader title="Nothing Pending" /><p className="text-xs text-subtle-foreground">Every deduction raised has been accepted or waived.</p></Card>
         )}
         <KvCard
           title="Deduction Tiers, From Attendance"
@@ -342,11 +342,11 @@ function StatutoryTab() {
         actions={!d?.enabled && <Button variant="primary" onClick={() => modal.open({ title: "Switch On Advanced Payroll", body: (close) => <Enable close={close} /> })}>Switch On</Button>}
       />
       {d && !d.enabled && (
-        <div className="mb-3 flex items-start gap-2.5 rounded-card bg-warning-soft p-[14px] text-warning">
+        <div className="mb-3 flex items-start gap-2.5 rounded-card bg-warning-soft p-3.5 text-warning">
           <Icon name="alert" className="mt-0.5 flex-none" />
           <div>
-            <h2 data-ui="title" className="text-[13.5px] font-semibold">Advanced Payroll Off</h2>
-            <p className="mt-1 text-[11.5px]">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p>
+            <h2 data-ui="title" className="text-sm font-semibold">Advanced Payroll Off</h2>
+            <p className="mt-1 text-2xs">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p>
           </div>
         </div>
       )}
@@ -367,7 +367,7 @@ function StatutoryTab() {
       <Grid cols={2} className="mt-3">
         <DataView
           title="Progressive BandChart"
-          right={<span className="text-[11.5px] text-subtle-foreground">Effective dated</span>}
+          right={<span className="text-2xs text-subtle-foreground">Effective dated</span>}
           rows={d?.paye_bands ?? []}
           rowKey={(r) => `${r.label}-${r.annual}-${r.rate}`}
           loading={s.loading}

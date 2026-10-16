@@ -36,10 +36,10 @@ function Lookup({ initial = "", heading }: { initial?: string; heading?: ReactNo
   const [ref, setRef] = useState(initial);
   const clean = ref.trim().toUpperCase();
   return (
-    <Form className="mx-auto mt-5 max-w-[380px]" onSubmit={() => clean && navigate(`/verify/${encodeURIComponent(clean)}`)}>
+    <Form className="mx-auto mt-5 max-w-96" onSubmit={() => clean && navigate(`/verify/${encodeURIComponent(clean)}`)}>
       {heading ?? (
         <>
-          <h1 className="text-center text-[19px]">Verify a Document</h1>
+          <h1 className="text-center text-xl">Verify a Document</h1>
           <Sub className="mt-1 mb-4 text-center">Enter the reference printed on the document, for example OFF-0018.</Sub>
         </>
       )}
@@ -62,7 +62,7 @@ function VerifyResult({ number }: { number: string }) {
         heading={
           <div className="mb-4 text-center">
             <Badge ok={false} />
-            <h1 className="mt-3 text-[19px]">No document has this reference</h1>
+            <h1 className="mt-3 text-xl">No document has this reference</h1>
             <Sub className="mt-1">Check the reference on the document and try again. It looks like OFF-0018.</Sub>
           </div>
         }
@@ -94,26 +94,26 @@ function VerifyResult({ number }: { number: string }) {
   ];
   return (
     <>
-      <div className="mt-[18px] text-center">
+      <div className="mt-4.5 text-center">
         <Badge ok={o.ok} />
-        <h1 className="mt-3 text-[19px]">{o.title}</h1>
+        <h1 className="mt-3 text-xl">{o.title}</h1>
       </div>
-      <dl className="mt-5 grid grid-cols-[150px_1fr] gap-x-3 gap-y-2.5 text-[13px] max-md:grid-cols-[120px_1fr]">
+      <dl className="mt-5 grid cols-term-value gap-x-3 gap-y-2.5 text-sm max-md:cols-term-value-tight">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="text-subtle-foreground">{k}</dt>
-            <dd className="m-0 font-[550]">{v}</dd>
+            <dd className="m-0 font-semibold">{v}</dd>
           </div>
         ))}
       </dl>
-      <Sub className={cn("mt-[18px] border-t border-border pt-3.5", !o.ok && "text-destructive")}>{o.text}</Sub>
+      <Sub className={cn("mt-4.5 border-t border-border pt-3.5", !o.ok && "text-destructive")}>{o.text}</Sub>
     </>
   );
 }
 
 function Badge({ ok }: { ok: boolean }) {
   return (
-    <span className={cn("mx-auto flex size-[58px] items-center justify-center rounded-full", ok ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive")}>
+    <span className={cn("mx-auto flex size-14 items-center justify-center rounded-full", ok ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive")}>
       <Icon name={ok ? "ok" : "x"} className="size-7" />
     </span>
   );

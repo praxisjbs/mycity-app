@@ -105,17 +105,17 @@ function SettingRow({ s, changed, busy, onChange }: { s: PolicySetting; changed:
     }
   };
   return (
-    <div className={cn("flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0", changed && "-mx-[14px] bg-warning-soft px-[14px]")}>
+    <div className={cn("flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0", changed && "-mx-3.5 bg-warning-soft px-3.5")}>
       <div className="min-w-0">
-        <div className="text-[13px] font-[550]">{s.help ? <HelpTerm help={s.help}>{s.label}</HelpTerm> : s.label}{changed && <Pill tone="warn" className="ml-1.5">Draft</Pill>}</div>
-        {bad && <div className="text-[11.5px] text-destructive">{bad}</div>}
+        <div className="text-sm font-semibold">{s.help ? <HelpTerm help={s.help}>{s.label}</HelpTerm> : s.label}{changed && <Pill tone="warn" className="ml-1.5">Draft</Pill>}</div>
+        {bad && <div className="text-2xs text-destructive">{bad}</div>}
       </div>
       {s.kind === "bool" && <Switch checked={!!s.value} onChange={onChange} label={s.label} disabled={busy} />}
       {s.kind === "locked" && <Pill>{String(s.value)}</Pill>}
       {s.kind === "mode" && (
         <div className="flex flex-none overflow-hidden rounded-full border border-input" role="group" aria-label={s.label}>
           {(s.options ?? []).map((o) => (
-            <button key={o} type="button" aria-pressed={s.value === o} disabled={busy} onClick={() => s.value !== o && onChange(o)} className={cn("h-7 px-2.5 text-[11.5px] font-semibold max-md:h-11", s.value === o ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>
+            <button key={o} type="button" aria-pressed={s.value === o} disabled={busy} onClick={() => s.value !== o && onChange(o)} className={cn("h-7 px-2.5 text-2xs font-semibold max-md:h-11", s.value === o ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>
               {o[0].toUpperCase() + o.slice(1)}
             </button>
           ))}
@@ -123,7 +123,7 @@ function SettingRow({ s, changed, busy, onChange }: { s: PolicySetting; changed:
       )}
       {(s.kind === "number" || s.kind === "time") && (
         <InlineInput
-          className={cn("h-8 w-[76px] max-md:h-11 flex-none rounded-ctl border bg-background px-2 text-right text-[13px] outline-none", bad ? "border-destructive" : "border-input focus:border-ring")}
+          className={cn("h-8 w-18 max-md:h-11 flex-none rounded-ctl border bg-background px-2 text-right text-sm outline-none", bad ? "border-destructive" : "border-input focus:border-ring")}
           inputMode="numeric"
           aria-label={s.label}
           value={text}
@@ -143,7 +143,7 @@ function Review({ p, publish, close }: { p: AttendancePolicy; publish: boolean; 
   const rows = (p.draft?.changed_keys ?? []).map((k) => ({ key: k, old: p.settings.find((s) => s.key === k)!, next: p.draft!.settings.find((s) => s.key === k)! }));
   return (
     <>
-      <p className="mb-2.5 text-[11.5px] text-subtle-foreground">Draft against v{p.version}. Nothing has been sent.</p>
+      <p className="mb-2.5 text-2xs text-subtle-foreground">Draft against v{p.version}. Nothing has been sent.</p>
       <DataView
         rows={rows}
         rowKey={(r) => r.key}

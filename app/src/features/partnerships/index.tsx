@@ -210,13 +210,13 @@ function Partner360View({ id, back }: { id: string; back: string }) {
         <Card>
           <CardHeader title="Stage History" />
           <Chain steps={x.chain.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
-          <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{x.chain_note}</p>
-          <div className="mt-[13px] border-t border-dashed border-border pt-3">
-            <div className="mb-2 text-[11.5px] font-[650] text-subtle-foreground">Days at each stage</div>
+          <p className="mt-2.5 text-2xs text-subtle-foreground">{x.chain_note}</p>
+          <div className="mt-3 border-t border-dashed border-border pt-3">
+            <div className="mb-2 text-2xs font-strong text-subtle-foreground">Days at each stage</div>
             {x.days_at_stage.map((d) => (
               <div key={d.label} className="flex items-center gap-2.5 py-1">
-                <span className="min-w-0 flex-1 text-[12px]">{d.label}</span>
-                <span className="w-[160px] flex-none"><Meter pct={Math.min(100, d.days * 4)} label={d.current ? `${d.days} so far` : `${d.days} days`} /></span>
+                <span className="min-w-0 flex-1 text-xs">{d.label}</span>
+                <span className="w-40 flex-none"><Meter pct={Math.min(100, d.days * 4)} label={d.current ? `${d.days} so far` : `${d.days} days`} /></span>
               </div>
             ))}
           </div>
@@ -557,7 +557,7 @@ function Contracts() {
       <Grid cols={2} className="mt-3">
         <PagedTable<Renewal>
           title="Renewal Calendar"
-          right={<span className="text-[11.5px] text-subtle-foreground">Alert at 90 days</span>}
+          right={<span className="text-2xs text-subtle-foreground">Alert at 90 days</span>}
           list={ren}
           rowKey={(r) => r.contract_id}
           noun="renewal"
@@ -641,7 +641,7 @@ function Analytics() {
             { key: "p", label: "Prospects", align: "n", render: (r) => r.prospects },
             { key: "pr", label: "Proposals", align: "n", render: (r) => r.proposals },
             { key: "s", label: "Signed", align: "n", render: (r) => r.signed },
-            { key: "c", label: "Conversion", render: (r) => <span className="block w-[130px]"><Meter pct={r.conversion_pct} label={`${r.conversion_pct}%`} /></span> },
+            { key: "c", label: "Conversion", render: (r) => <span className="block w-32"><Meter pct={r.conversion_pct} label={`${r.conversion_pct}%`} /></span> },
           ]}
         />
       </Grid>

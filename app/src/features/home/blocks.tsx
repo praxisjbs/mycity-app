@@ -93,11 +93,11 @@ export function Block({ block }: { block: HomeBlock }) {
     case "week":
       return (
         <Card>
-          <CardHeader title={block.title} right={<span className="text-[11.5px] text-subtle-foreground">{block.range}</span>} />
+          <CardHeader title={block.title} right={<span className="text-2xs text-subtle-foreground">{block.range}</span>} />
           {block.days.map((d, i) => (
-            <div key={i} className="flex items-center gap-[11px] border-b border-border py-2 last:border-b-0">
-              <b className="w-[58px] flex-none text-[12px] text-subtle-foreground">{d.day}</b>
-              <span className="min-w-0 flex-1 text-[12.5px]">{d.text}</span>
+            <div key={i} className="flex items-center gap-2.5 border-b border-border py-2 last:border-b-0">
+              <b className="w-14 flex-none text-xs text-subtle-foreground">{d.day}</b>
+              <span className="min-w-0 flex-1 text-xs">{d.text}</span>
               <Pill tone={KIND[d.kind][0]}>{KIND[d.kind][1]}</Pill>
             </div>
           ))}
@@ -107,16 +107,16 @@ export function Block({ block }: { block: HomeBlock }) {
       return (
         <InfoCard title={block.title} info={block.info}>
           {block.rows.map((r, i) => (
-            <div key={i} className="flex items-center gap-[11px] border-b border-border py-2.5 last:border-b-0">
-              <b className="w-[92px] flex-none text-[12px] text-subtle-foreground">{r.label}</b>
-              <span className="flex-1 text-[12.5px]">{r.text}</span>
+            <div key={i} className="flex items-center gap-2.5 border-b border-border py-2.5 last:border-b-0">
+              <b className="w-22 flex-none text-xs text-subtle-foreground">{r.label}</b>
+              <span className="flex-1 text-xs">{r.text}</span>
               <Pill tone={r.pill.tone}>{r.pill.text}</Pill>
             </div>
           ))}
         </InfoCard>
       );
     case "note":
-      return <p className="mt-1 text-[11.5px] text-subtle-foreground">{block.text}</p>;
+      return <p className="mt-1 text-2xs text-subtle-foreground">{block.text}</p>;
   }
 }
 
@@ -134,7 +134,7 @@ export function Cell({ cell }: { cell: KpiCell }) {
     case "date":
       return <>{formatDate(cell.date)}</>;
     case "over":
-      return <span className="inline-block rounded-full bg-warning-soft px-[9px] py-0.5 text-[11px] font-semibold whitespace-nowrap text-warning">{cell.text}</span>;
+      return <span className="inline-block rounded-full bg-warning-soft px-2 py-0.5 text-2xs font-semibold whitespace-nowrap text-warning">{cell.text}</span>;
     case "bar":
       return <Meter pct={cell.pct} label={cell.text} />;
   }

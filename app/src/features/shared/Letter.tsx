@@ -11,7 +11,7 @@ export function Letter({ l, note = "As it is sent. Everything underlined came fr
         <p key={i}>{p.map((x, j) => (x.filled ? <em key={j} className="underline decoration-dotted underline-offset-2">{x.text}</em> : <span key={j}>{x.text}</span>))}</p>
       ))}
       <div className="mt-3"><Signature>{l.signer}</Signature></div>
-      <p className="mt-0.5 border-t border-paper-dash pt-1 text-[10.5px] text-paper-faint">{l.signer_role}</p>
+      <p className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">{l.signer_role}</p>
       <PaperFoot><span>{l.fields_note}</span></PaperFoot>
     </Paper>
   );

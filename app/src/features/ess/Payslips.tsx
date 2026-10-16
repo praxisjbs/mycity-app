@@ -21,10 +21,10 @@ export function MyPayslipsPage() {
   const years = s?.years ?? [];
   const idx = years.indexOf(Number(y));
   const yearPicker = s && (
-    <span className="inline-flex h-[34px] max-md:h-[46px] items-center overflow-hidden rounded-full border border-input bg-background">
-      <button type="button" aria-label="Previous year" disabled={idx >= years.length - 1} onClick={() => setYear(String(years[idx + 1]))} className="h-full px-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-35 max-md:min-w-11">‹</button>
-      <InlineSelect aria-label="Year" value={y ?? ""} onChange={setYear} options={years.map(String)} className="h-full border-x border-border bg-background px-2.5 text-[12.5px] font-[650]" />
-      <button type="button" aria-label="Next year" disabled={idx <= 0} onClick={() => setYear(String(years[idx - 1]))} className="h-full px-3 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-35 max-md:min-w-11">›</button>
+    <span className="inline-flex h-8.5 max-md:h-11.5 items-center overflow-hidden rounded-full border border-input bg-background">
+      <button type="button" aria-label="Previous year" disabled={idx >= years.length - 1} onClick={() => setYear(String(years[idx + 1]))} className="h-full px-3 text-xs font-semibold text-muted-foreground disabled:opacity-35 max-md:min-w-11">‹</button>
+      <InlineSelect aria-label="Year" value={y ?? ""} onChange={setYear} options={years.map(String)} className="h-full border-x border-border bg-background px-2.5 text-xs font-strong" />
+      <button type="button" aria-label="Next year" disabled={idx <= 0} onClick={() => setYear(String(years[idx - 1]))} className="h-full px-3 text-xs font-semibold text-muted-foreground disabled:opacity-35 max-md:min-w-11">›</button>
     </span>
   );
   const openSlip = (r: PayslipRow) =>
@@ -47,20 +47,20 @@ export function MyPayslipsPage() {
       {s && (
         <div className="mb-3 flex flex-wrap overflow-hidden rounded-card border border-border bg-card">
           {[["Gross", <Money value={s.gross} />], ["Net received", <Money value={s.net} />], ["Payslips", String(s.count)]].map(([l, v]) => (
-            <div key={l as string} className="min-w-[128px] flex-1 border-r border-border px-[14px] py-3 max-md:min-w-[50%] max-md:border-b">
-              <span className="text-[11px] font-semibold tracking-[.07em] text-subtle-foreground uppercase">{l}</span>
-              <b className="mt-[3px] block text-[17px] font-bold tracking-[-.02em]">{v}</b>
+            <div key={l as string} className="min-w-32 flex-1 border-r border-border px-3.5 py-3 max-md:min-w-1/2 max-md:border-b">
+              <span className="text-2xs font-semibold tracking-caps text-subtle-foreground uppercase">{l}</span>
+              <b className="mt-0.5 block text-lg font-bold tracking-tight">{v}</b>
             </div>
           ))}
-          <button type="button" onClick={() => modal.open({ title: "Salary Deductions", sub: "Every month that carried a deduction, and the query behind it", wide: true, body: <Deductions /> })} className="min-w-[128px] flex-1 border-r border-border px-[14px] py-3 text-left last:border-r-0 hover:bg-accent max-md:min-w-[50%] max-md:border-b">
-            <span className="text-[11px] font-semibold tracking-[.07em] text-subtle-foreground uppercase">Deductions</span>
-            <b className={`mt-[3px] block text-[17px] font-bold tracking-[-.02em] ${s.deductions === "0.00" ? "text-success" : "text-warning"}`}>{formatMoney(s.deductions)}</b>
-            <span className="mt-0.5 block text-[11.5px] font-semibold text-accent-foreground">View Details</span>
+          <button type="button" onClick={() => modal.open({ title: "Salary Deductions", sub: "Every month that carried a deduction, and the query behind it", wide: true, body: <Deductions /> })} className="min-w-32 flex-1 border-r border-border px-3.5 py-3 text-left last:border-r-0 hover:bg-accent max-md:min-w-1/2 max-md:border-b">
+            <span className="text-2xs font-semibold tracking-caps text-subtle-foreground uppercase">Deductions</span>
+            <b className={`mt-0.5 block text-lg font-bold tracking-tight ${s.deductions === "0.00" ? "text-success" : "text-warning"}`}>{formatMoney(s.deductions)}</b>
+            <span className="mt-0.5 block text-2xs font-semibold text-accent-foreground">View Details</span>
           </button>
           {s.next_payday && (
-            <div className="min-w-[128px] flex-1 px-[14px] py-3 max-md:min-w-[50%]">
-              <span className="text-[11px] font-semibold tracking-[.07em] text-subtle-foreground uppercase">Next payday</span>
-              <b className="mt-[3px] block text-[17px] font-bold tracking-[-.02em]">{formatDate(s.next_payday)}</b>
+            <div className="min-w-32 flex-1 px-3.5 py-3 max-md:min-w-1/2">
+              <span className="text-2xs font-semibold tracking-caps text-subtle-foreground uppercase">Next payday</span>
+              <b className="mt-0.5 block text-lg font-bold tracking-tight">{formatDate(s.next_payday)}</b>
             </div>
           )}
         </div>
@@ -82,7 +82,7 @@ export function MyPayslipsPage() {
               { key: "m", label: "Month", render: (r) => formatMonth(r.period) },
               { key: "n", label: "Net", align: "n", render: (r) => <Money value={r.net} /> },
               { key: "s", label: "Status", render: statusPill },
-              { key: "x", label: "", render: (r) => (r.status === "in_run" ? <span className="text-[11.5px] text-subtle-foreground">On approval</span> : <Button size="sm" icon="doc" onClick={(e) => (e.stopPropagation(), toast(`${r.number}.pdf downloading`))}>PDF</Button>) },
+              { key: "x", label: "", render: (r) => (r.status === "in_run" ? <span className="text-2xs text-subtle-foreground">On approval</span> : <Button size="sm" icon="doc" onClick={(e) => (e.stopPropagation(), toast(`${r.number}.pdf downloading`))}>PDF</Button>) },
             ]}
             footer={<Pager page={list.page} onPage={list.setPage} noun="payslip" />}
           />
@@ -101,10 +101,10 @@ export function SlipPaper({ id }: { id: string }) {
       <PaperLogo reference={`PAYSLIP · ${formatMonth(s.period).slice(0, 3).toUpperCase()}-${s.period.slice(0, 4)}`} />
       <PaperTitle sub={`${s.employee.display_name} · ${s.job_title} · ${s.grade}${s.paid_on ? ` · Paid ${formatDate(s.paid_on)}` : ""}`}>Payslip, {formatMonth(s.period)}</PaperTitle>
       <PaperTable head={["Earnings", "Amount"]} rows={s.earnings.map((e) => [e.label, formatMoney(e.amount)])} totals={[["Gross pay", formatMoney(s.gross)]]} />
-      <div className="mt-[14px]">
+      <div className="mt-3.5">
         <PaperTable head={["Deductions", "Amount"]} rows={s.deduction_lines.map((d) => [`${d.label}${d.reference ? ` (${d.reference})` : ""}`, formatMoney(d.amount)])} totals={[["Net pay", formatMoney(s.net)]]} />
       </div>
-      <p className="!mt-[14px] text-[11px] text-paper-faint">Paid to {s.bank_name}, account ending {s.account_last4}.</p>
+      <p className="!mt-3.5 text-2xs text-paper-faint">Paid to {s.bank_name}, account ending {s.account_last4}.</p>
       <PaperFoot>
         <span>{s.approved_by ? `Approved by ${s.approved_by}` : "Awaiting Approval"}</span>
         <span className="ml-auto">{s.number}</span>

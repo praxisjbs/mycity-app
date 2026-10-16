@@ -64,19 +64,19 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
   const card = (n: OrgNode) => {
     if (n.vacant)
       return (
-        <div className="og-card relative w-[178px] rounded-[13px] border border-dashed border-input bg-transparent px-3 py-[11px] text-center">
-          <span className="mx-auto mb-2 flex size-[42px] items-center justify-center rounded-full border border-dashed border-input bg-muted text-subtle-foreground">
+        <div className="og-card relative w-44 rounded-card border border-dashed border-input bg-transparent px-3 py-2.5 text-center">
+          <span className="mx-auto mb-2 flex size-10.5 items-center justify-center rounded-full border border-dashed border-input bg-muted text-subtle-foreground">
             <Icon name="plus" />
           </span>
-          <b className="block text-[13px] leading-tight font-[650]">{n.display_name}</b>
-          <span className="mt-0.5 block text-[11px] text-muted-foreground">Vacant · {n.department}</span>
+          <b className="block text-sm leading-tight font-strong">{n.display_name}</b>
+          <span className="mt-0.5 block text-2xs text-muted-foreground">Vacant · {n.department}</span>
           {builder ? (
-            <button type="button" onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: n.display_name }))} className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-[3px] text-[10.5px] font-[650] text-primary-foreground">
+            <button type="button" onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: n.display_name }))} className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-2xs font-strong text-primary-foreground">
               <Icon name="plus" className="size-3" />
               Create Vacancy
             </button>
           ) : (
-            <span className="mt-2 inline-block rounded-full border border-dashed border-input px-[9px] py-0.5 text-[10px] font-[650] text-subtle-foreground">Open role</span>
+            <span className="mt-2 inline-block rounded-full border border-dashed border-input px-2 py-0.5 text-2xs font-strong text-subtle-foreground">Open role</span>
           )}
         </div>
       );
@@ -88,26 +88,26 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
         onDragEnd={() => (setDragging(null), setOver(null))}
         onClick={() => n.employee_id && navigate(builder ? hrefFor("people", "employees", { id: n.employee_id }) : hrefFor("ess", "org-chart", { id: n.employee_id }))}
         className={cn(
-          "og-card relative w-[178px] cursor-pointer rounded-[13px] border bg-card px-3 py-[11px] text-center shadow-1 transition-[box-shadow,border-color] hover:border-input hover:shadow-2",
-          n.is_ceo ? "border-primary shadow-[0_0_0_2px_var(--primary-tint),var(--shadow-1)]" : "border-border",
-          hit(n) && "border-ring shadow-[0_0_0_3px_var(--accent)]",
+          "og-card relative w-44 cursor-pointer rounded-card border bg-card px-3 py-2.5 text-center shadow-1 transition hover:border-input hover:shadow-2",
+          n.is_ceo ? "border-primary shadow-1 ring-2 ring-primary-tint" : "border-border",
+          hit(n) && "border-ring ring-2 ring-accent",
           dragging?.seat_id === n.seat_id && "opacity-50",
         )}
       >
-        <span className={cn("mx-auto mb-2 flex size-[42px] items-center justify-center rounded-full text-[13.5px] font-bold", n.is_ceo ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}>
+        <span className={cn("mx-auto mb-2 flex size-10.5 items-center justify-center rounded-full text-sm font-bold", n.is_ceo ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}>
           {initials(n.display_name)}
         </span>
-        <b className="block text-[13px] leading-tight font-[650]">{n.display_name}</b>
-        <span className="mt-0.5 block text-[11px] text-muted-foreground">{n.job_title}</span>
-        <span className="mt-2 inline-block rounded-full border border-border bg-muted px-[9px] py-0.5 text-[10px] font-[650] text-subtle-foreground">{n.department}</span>
-        {n.meta && <span className="mt-1.5 block text-[10px] text-subtle-foreground">{n.meta}</span>}
-        {n.dotted_line_to && <span className="mt-[7px] inline-block rounded-full border border-dashed border-input px-2 py-px text-[9.5px] text-subtle-foreground">Dotted line · {n.dotted_line_to}</span>}
+        <b className="block text-sm leading-tight font-strong">{n.display_name}</b>
+        <span className="mt-0.5 block text-2xs text-muted-foreground">{n.job_title}</span>
+        <span className="mt-2 inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{n.department}</span>
+        {n.meta && <span className="mt-1.5 block text-2xs text-subtle-foreground">{n.meta}</span>}
+        {n.dotted_line_to && <span className="mt-1.5 inline-block rounded-full border border-dashed border-input px-2 py-px text-2xs text-subtle-foreground">Dotted line · {n.dotted_line_to}</span>}
         {(children.get(n.seat_id)?.length ?? 0) > 0 && (
           <button
             type="button"
             aria-label={folded.has(n.seat_id) ? "Expand" : "Collapse"}
             onClick={(e) => (e.stopPropagation(), setCollapsed(() => { const x = new Set(folded); if (x.has(n.seat_id)) x.delete(n.seat_id); else x.add(n.seat_id); return x; }))}
-            className="absolute -bottom-[11px] left-1/2 z-[1] flex h-[22px] min-w-[22px] -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card px-1.5 text-[10px] font-bold text-muted-foreground"
+            className="absolute -bottom-2.5 left-1/2 z-1 flex h-5.5 min-w-5.5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card px-1.5 text-2xs font-bold text-muted-foreground"
           >
             {folded.has(n.seat_id) ? `+${children.get(n.seat_id)!.length}` : "−"}
           </button>
@@ -140,17 +140,17 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
         sub={data ? (builder ? `Reporting lines · ${data.seats} seats · ${data.filled} filled · ${data.seats - data.filled} open` : `Reporting lines · ${data.seats} seats · ${data.filled} filled`) : " "}
         actions={
           <>
-            <SearchInput value={q} onChange={setQ} placeholder="Search the chart" className="w-[200px]" />
+            <SearchInput value={q} onChange={setQ} placeholder="Search the chart" className="w-48" />
             {builder && <Button onClick={() => setCollapsed(new Set())}>Expand All</Button>}
             <Button icon="doc" onClick={() => toast("PDF queued. It arrives in your Mailbox.")}>Download PDF</Button>
           </>
         }
       />
-      <div className="mt-0.5 mb-1 flex flex-wrap gap-4 text-[11.5px] text-muted-foreground">
-        <span className="inline-flex items-center gap-[7px]"><i className="inline-block w-[22px] border-t-2 border-input" />Reporting line</span>
-        <span className="inline-flex items-center gap-[7px]"><i className="inline-block w-[22px] border-t-2 border-dashed border-input" />Dotted line (matrix)</span>
-        <span className="inline-flex items-center gap-[7px]"><i className="inline-block size-[13px] rounded bg-primary" />CEO</span>
-        <span className="inline-flex items-center gap-[7px]"><i className="inline-block size-[13px] rounded border border-dashed border-input" />Vacant seat</span>
+      <div className="mt-0.5 mb-1 flex flex-wrap gap-4 text-2xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block w-5.5 border-t-2 border-input" />Reporting line</span>
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block w-5.5 border-t-2 border-dashed border-input" />Dotted line (matrix)</span>
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block size-3 rounded bg-primary" />CEO</span>
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block size-3 rounded border border-dashed border-input" />Vacant seat</span>
       </div>
       <Card className="p-1.5">
         {!data ? <LoadingRows count={5} /> : <div ref={scroller} className="ogt" data-copy="content"><ul>{roots.map(node)}</ul></div>}

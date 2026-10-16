@@ -25,7 +25,7 @@ export function ChainCard({ steps, note, title }: { steps: Array<{ label: string
     <Card className="mb-3">
       {title && <CardHeader title={title} />}
       <Chain steps={steps.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
-      {note && <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{note}</p>}
+      {note && <p className="mt-2.5 text-2xs text-subtle-foreground">{note}</p>}
     </Card>
   );
 }
@@ -89,7 +89,7 @@ export function PagedTable<R>({
       right={
         (search || right) && (
           <span className="flex flex-wrap items-center justify-end gap-2">
-            {search && <SearchInput value={list.q} onChange={list.setQ} placeholder={search} className="w-[220px] max-md:w-full" />}
+            {search && <SearchInput value={list.q} onChange={list.setQ} placeholder={search} className="w-56 max-md:w-full" />}
             {right}
           </span>
         )

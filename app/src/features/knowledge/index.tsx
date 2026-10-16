@@ -190,9 +190,9 @@ function Training() {
       {s.data && <KpiTiles items={[{ label: "Resources", value: String(s.data.resources) }, { label: "Completion", value: `${s.data.completion_pct}%` }, { label: "Overdue", value: String(s.data.overdue), tone: s.data.overdue ? "warn" : "ok" }, { label: "Certificates Issued", value: String(s.data.certificates) }]} />}
       <Grid cols={2}>
         {list.rows.map((r: Resource) => (
-          <div key={r.resource_id} className="rounded-box border border-border bg-card p-[14px]">
-            <h2 data-copy="content" className="text-[13.5px] font-semibold">{r.title}</h2>
-            <p className="mt-1 text-[12.5px] text-muted-foreground">{r.description}</p>
+          <div key={r.resource_id} className="rounded-box border border-border bg-card p-3.5">
+            <h2 data-copy="content" className="text-sm font-semibold">{r.title}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{r.description}</p>
             <div className="mt-2.5 flex flex-wrap gap-1.5"><Pill>{r.kind}</Pill>{r.due && <Pill tone="warn">Due {formatDate(r.due)}</Pill>}</div>
           </div>
         ))}
@@ -200,7 +200,7 @@ function Training() {
       <Grid cols={2} className="mt-3">
         <DataView
           title="Completion"
-          right={<span className="text-[11.5px] text-subtle-foreground">Across all staff</span>}
+          right={<span className="text-2xs text-subtle-foreground">Across all staff</span>}
           rows={list.rows}
           rowKey={(r) => r.resource_id}
           loading={list.loading}
@@ -208,7 +208,7 @@ function Training() {
             { key: "t", label: "Resource", render: (r) => r.title },
             { key: "a", label: "Assigned", align: "n", render: (r) => r.assigned },
             { key: "c", label: "Completed", align: "n", render: (r) => r.completed },
-            { key: "p", label: "Progress", render: (r) => <span className="block w-[130px]"><Meter pct={Math.round((r.completed * 100) / Math.max(1, r.assigned))} label={`${Math.round((r.completed * 100) / Math.max(1, r.assigned))}%`} /></span> },
+            { key: "p", label: "Progress", render: (r) => <span className="block w-32"><Meter pct={Math.round((r.completed * 100) / Math.max(1, r.assigned))} label={`${Math.round((r.completed * 100) / Math.max(1, r.assigned))}%`} /></span> },
           ]}
         />
         <PagedTable<Overdue>

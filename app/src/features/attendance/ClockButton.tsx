@@ -48,8 +48,8 @@ export function ClockButton({ compact }: { compact?: boolean }) {
       title={title}
       aria-label={title}
       className={cn(
-        "flex h-9 max-md:h-11 max-md:min-w-11 max-md:justify-center items-center gap-[7px] rounded-full text-[13px] font-semibold transition-[filter] hover:brightness-110 disabled:opacity-50",
-        compact ? "px-[11px]" : "px-[14px]",
+        "flex h-9 max-md:h-11 max-md:min-w-11 max-md:justify-center items-center gap-1.5 rounded-full text-sm font-semibold transition hover:brightness-110 disabled:opacity-50",
+        compact ? "px-2.5" : "px-3.5",
         out ? "on-primary bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
       )}
     >
@@ -90,7 +90,7 @@ function ClockPanel({ close }: { close: () => void }) {
     );
   }, []);
 
-  if (loading || !t || !me) return <p className="text-[12.5px] text-subtle-foreground">Checking today’s attendance…</p>;
+  if (loading || !t || !me) return <p className="text-xs text-subtle-foreground">Checking today’s attendance…</p>;
 
   if (t.state === "unavailable") {
     return (
@@ -150,7 +150,7 @@ function ClockPanel({ close }: { close: () => void }) {
       <>
         <Result tone="warn" label="Location check" title={stage.res.title} text={stage.res.message} />
         <Card className="mt-3">
-          <h3 data-ui="title" className="mb-1 text-[13.5px]">Add Exception Details</h3>
+          <h3 data-ui="title" className="mb-1 text-sm">Add Exception Details</h3>
           <Field label="Explanation" {...f.field("why")}>
             <TextAreaField {...f.field("why")} placeholder="Phone battery died" />
           </Field>
@@ -167,12 +167,12 @@ function ClockPanel({ close }: { close: () => void }) {
 
   return (
     <>
-      <div className="pt-0.5 pb-[15px] text-center">
+      <div className="pt-0.5 pb-3.5 text-center">
         <span className="mx-auto mb-2.5 flex w-fit">
           <Avatar name={me.display_name} size={42} tone="brand" />
         </span>
-        <h2 data-ui="title" className="mb-1 text-[20px]">{kind === "out" ? "Finish Your Day" : "Start Your Day"}</h2>
-        <p className="text-[11.5px] text-subtle-foreground">
+        <h2 data-ui="title" className="mb-1 text-2xl">{kind === "out" ? "Finish Your Day" : "Start Your Day"}</h2>
+        <p className="text-2xs text-subtle-foreground">
           {me.display_name} · {formatDate(t.date)}
         </p>
       </div>
@@ -195,14 +195,14 @@ function ClockPanel({ close }: { close: () => void }) {
             [
               "Current time",
               <>
-                <b>{formatTime(now.toISOString())}</b> <span className="text-[11.5px] text-subtle-foreground">Africa/Lagos</span>
+                <b>{formatTime(now.toISOString())}</b> <span className="text-2xs text-subtle-foreground">Africa/Lagos</span>
               </>,
             ],
           ]}
         />
       </Card>
       {t.policy_ack_pending && !blocked && (
-        <p className="mx-0.5 mt-2 text-[11.5px] text-subtle-foreground">Policy v{t.policy_ack_pending.version} still needs acknowledgment. Read it from Policy Updates afterwards.</p>
+        <p className="mx-0.5 mt-2 text-2xs text-subtle-foreground">Policy v{t.policy_ack_pending.version} still needs acknowledgment. Read it from Policy Updates afterwards.</p>
       )}
       <FormFooter>
         <Button onClick={close}>Not Now</Button>

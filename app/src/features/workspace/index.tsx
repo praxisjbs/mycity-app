@@ -29,8 +29,8 @@ export default function Workspace({ tab }: ModuleScreenProps) {
 
 function TaskCard({ t, onClick }: { t: Task; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="mb-2 block w-full rounded-box border border-border bg-card p-2.5 text-left transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-2">
-      <b className="mb-[7px] block text-[12.5px] leading-[1.35] font-semibold">{t.title}</b>
+    <button type="button" onClick={onClick} className="mb-2 block w-full rounded-box border border-border bg-card p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-2">
+      <b className="mb-1.5 block text-xs leading-snug font-semibold">{t.title}</b>
       <span className="flex flex-wrap items-center gap-1.5">
         <Pill tone={t.due_pill.tone}>{t.due_pill.text}</Pill>
         <Avatar name={(t.set_by ?? t.owner).display_name} size={21} />
@@ -58,7 +58,7 @@ function TaskDetail({ t, close }: { t: Task; close: () => void }) {
   return (
     <>
       <KeyValue items={[["Number", t.number], ["Owner", t.owner.display_name], ["Set by", t.set_by?.display_name ?? "Themselves"], ["Due", t.due ? formatDate(t.due) : "No date"], ["Priority", t.priority[0].toUpperCase() + t.priority.slice(1)], ["Status", LABEL[t.status]], ...(t.linked ? ([["Linked to", t.linked.label]] as Array<[string, string]>) : [])]} />
-      {t.description && <p className="mt-3 text-[12.5px] text-muted-foreground">{t.description}</p>}
+      {t.description && <p className="mt-3 text-xs text-muted-foreground">{t.description}</p>}
       <FormFooter>
         <Button onClick={close}>Close</Button>
         {NEXT[t.status] && <Button variant="primary" iconRight="right" busy={patch.pending} onClick={() => move(NEXT[t.status]!)}>Move to {LABEL[NEXT[t.status]!]}</Button>}
@@ -82,7 +82,7 @@ function Today() {
         <Card>
           <CardHeader title="Your Day" right={over ? <Pill tone="err">{`${over} overdue`}</Pill> : undefined} />
           {data.my_day.map((t) => <TaskCard key={t.task_id} t={t} onClick={() => openTask(t)} />)}
-          {!data.my_day.length && <p className="text-[11.5px] text-subtle-foreground">Nothing due today.</p>}
+          {!data.my_day.length && <p className="text-2xs text-subtle-foreground">Nothing due today.</p>}
         </Card>
         <Card>
           <CardHeader title="Set by Your Manager" />
@@ -92,11 +92,11 @@ function Today() {
       </Grid>
       <Grid cols={2}>
         <Card>
-          <CardHeader title="Diary" right={<span className="text-[11.5px] text-subtle-foreground">Africa/Lagos</span>} />
+          <CardHeader title="Diary" right={<span className="text-2xs text-subtle-foreground">Africa/Lagos</span>} />
           {data.diary.map((d) => (
-            <div key={d.time + d.title} className="flex items-start gap-[11px] border-b border-border py-[9px] last:border-b-0">
-              <b className="w-[46px] flex-none text-[12.5px] font-bold">{d.time}</b>
-              <span className="min-w-0 flex-1"><div className="text-[12.5px] font-semibold">{d.title}</div><div className="text-[11.5px] text-subtle-foreground">{d.sub}</div></span>
+            <div key={d.time + d.title} className="flex items-start gap-2.5 border-b border-border py-2 last:border-b-0">
+              <b className="w-11.5 flex-none text-xs font-bold">{d.time}</b>
+              <span className="min-w-0 flex-1"><div className="text-xs font-semibold">{d.title}</div><div className="text-2xs text-subtle-foreground">{d.sub}</div></span>
               <Pill tone={d.confirmed ? "info" : "neutral"}>{d.confirmed ? "Confirmed" : "Tentative"}</Pill>
             </div>
           ))}
@@ -138,7 +138,7 @@ function Tasks() {
         }
       />
       {summary.data && <KpiTiles items={summary.data.kpis} mobileCols={2} />}
-      <Toolbar><SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-[260px]" /></Toolbar>
+      <Toolbar><SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-64" /></Toolbar>
       <Kanban
         columns={COLS.map(([status, label, color], i) => ({
           key: status,
@@ -222,14 +222,14 @@ function CalendarTab() {
         <Card>
           <CardHeader title="Coming Up" />
           {upcoming.map((e) => (
-            <div key={e.event_id} className="flex items-center gap-2.5 border-b border-border py-[7px] last:border-b-0">
-              <b className="w-[52px] flex-none text-[11.5px] text-subtle-foreground">{new Date(e.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })}</b>
-              <span className="min-w-0 flex-1 text-[12.5px]">{e.title}</span>
-              <span className="flex-none text-[11.5px] text-subtle-foreground">{e.kind}</span>
+            <div key={e.event_id} className="flex items-center gap-2.5 border-b border-border py-1.5 last:border-b-0">
+              <b className="w-13 flex-none text-2xs text-subtle-foreground">{new Date(e.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })}</b>
+              <span className="min-w-0 flex-1 text-xs">{e.title}</span>
+              <span className="flex-none text-2xs text-subtle-foreground">{e.kind}</span>
             </div>
           ))}
-          {!upcoming.length && <p className="text-[11.5px] text-subtle-foreground">Nothing else this month.</p>}
-          <p className="mt-[11px] text-[11.5px] text-subtle-foreground">Leave, interviews, payday and campaign dates all land here.</p>
+          {!upcoming.length && <p className="text-2xs text-subtle-foreground">Nothing else this month.</p>}
+          <p className="mt-2.5 text-2xs text-subtle-foreground">Leave, interviews, payday and campaign dates all land here.</p>
         </Card>
       </Grid>
     </>

@@ -27,3 +27,7 @@ export * from "./Result";
 export * from "./Tile";
 export * from "./Sub";
 export * from "./ProfileHeader";
+export * from "./Confetti";
+export * from "./Waveform";
+export * from "./Swatch";
+export * from "./ShareBar";

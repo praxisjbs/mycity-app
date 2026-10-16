@@ -38,13 +38,13 @@ export function MyLeavePage() {
     <Card>
       <CardHeader title="Entitlement" />
       {bal.data.balances.map((b, i) => (
-        <div key={b.type} className="border-b border-border py-[9px] last:border-b-0">
+        <div key={b.type} className="border-b border-border py-2 last:border-b-0">
           <div className="flex items-baseline gap-2">
-            <b className="text-[12.5px]">{b.type}</b>
-            <span className="ml-auto text-[11.5px] text-subtle-foreground">{b.entitled} days</span>
+            <b className="text-xs">{b.type}</b>
+            <span className="ml-auto text-2xs text-subtle-foreground">{b.entitled} days</span>
           </div>
           <div className="mt-1.5"><Meter pct={((b.taken + b.booked) / b.entitled) * 100} label="" color={COLORS[i % 4]} /></div>
-          <div className="mt-1 text-[11.5px] text-subtle-foreground">{b.taken} taken, {b.booked} booked, {b.left} left</div>
+          <div className="mt-1 text-2xs text-subtle-foreground">{b.taken} taken, {b.booked} booked, {b.left} left</div>
         </div>
       ))}
     </Card>

@@ -66,7 +66,7 @@ function FocusChain({ id }: { id: string }) {
   return (
     <Card className="mb-3">
       <Chain steps={d.data.chain.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
-      <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{d.data.number}, {d.data.title.toLowerCase()}. {d.data.chain_note}</p>
+      <p className="mt-2.5 text-2xs text-subtle-foreground">{d.data.number}, {d.data.title.toLowerCase()}. {d.data.chain_note}</p>
     </Card>
   );
 }
@@ -138,7 +138,7 @@ function RequestForm({ close }: { close: () => void }) {
           body: (
           <Field label="Vendor Invoice" state={tried && !invoice ? "bad" : undefined} message={tried && !invoice ? "Attach the invoice" : undefined}>
             {invoice ? (
-              <span className="flex items-center gap-2 rounded-ctl border border-border bg-muted px-3 py-2 text-[12.5px]"><Icon name="doc" />{invoice.file_name}<span className="text-subtle-foreground">{formatBytes(invoice.size_bytes)}</span><button type="button" className="ml-auto text-accent-foreground underline" onClick={() => setInvoice(null)}>Replace</button></span>
+              <span className="flex items-center gap-2 rounded-ctl border border-border bg-muted px-3 py-2 text-xs"><Icon name="doc" />{invoice.file_name}<span className="text-subtle-foreground">{formatBytes(invoice.size_bytes)}</span><button type="button" className="ml-auto text-accent-foreground underline" onClick={() => setInvoice(null)}>Replace</button></span>
             ) : (
               <UploadField upload={upload} purpose="expense_invoice" accept=".pdf,image/*" multiple={false} compact onUploaded={(d) => setInvoice(d[0])} />
             )}
@@ -191,8 +191,8 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
     <Card className="mb-3">
       <CardHeader record title={`${x.number} · ${x.title}`} right={<StatusPill s={{ tone: "warn", text: formatMoneyShort(x.amount) }} />} />
       <Chain steps={x.chain.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />
-      <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{x.chain_note} Vendor invoice attached, account details supplied.</p>
-      <div className="mt-[13px]">
+      <p className="mt-2.5 text-2xs text-subtle-foreground">{x.chain_note} Vendor invoice attached, account details supplied.</p>
+      <div className="mt-3">
         <KeyValue
           items={[
             ["Requested by", `${x.requester.display_name}, ${x.requester.job_title ?? x.requester.department ?? ""}`],
@@ -204,7 +204,7 @@ function ApprovalCard({ id, onDone }: { id: string; onDone: () => void }) {
         />
       </div>
       {x.can_approve && (
-        <div className="mt-[13px] flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="primary" icon="ok" busy={approve.pending} onClick={async () => { try { await approve.run({ params: { id }, body: {} }); invalidate("/api/v1/expenses"); onDone(); toast(`${x.number} approved`); } catch (e) { fail(e); } }}>Approve as {x.approve_as}</Button>
           <Button onClick={() => modal.open({ title: `Reject ${x.number}`, body: (close) => <Reject id={id} close={close} onDone={onDone} /> })}>Reject</Button>
           {x.invoice && <Button icon="doc" onClick={() => toast(`${x.invoice!.file_name} opens from the vault once connected`)}>View Invoice</Button>}
@@ -278,7 +278,7 @@ function RequisitionCard({ id }: { id: string }) {
   return (
     <DataView
       title={`Included in ${x.number}`}
-      right={<b className="text-[13px]"><Money value={totalStr} /></b>}
+      right={<b className="text-sm"><Money value={totalStr} /></b>}
       rows={x.items}
       rowKey={(r) => r.request_id}
       columns={[
@@ -289,8 +289,8 @@ function RequisitionCard({ id }: { id: string }) {
       ]}
       footer={
         x.can_approve && (
-          <div className="flex items-center justify-end gap-3 border-t border-border px-[14px] py-2.5">
-            {tried && !kept.length && <span role="alert" className="mr-auto text-[12px] text-destructive">Keep at least one</span>}
+          <div className="flex items-center justify-end gap-3 border-t border-border px-3.5 py-2.5">
+            {tried && !kept.length && <span role="alert" className="mr-auto text-xs text-destructive">Keep at least one</span>}
             <Button variant="primary" icon="ok" busy={approve.pending} onClick={async () => { if (!kept.length) return setTried(true); try { await approve.run({ params: { id }, body: { remove_ids: removed } }); invalidate("/api/v1/expenses"); toast(`${x.number} approved${removed.length ? `, ${removed.length} returned to the queue` : ""}`); } catch (e) { fail(e); } }}>
               Approve {kept.length} of {x.items.length}
             </Button>
@@ -322,7 +322,7 @@ function NewRequisition({ close }: { close: () => void }) {
           { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
         ]}
       />
-      <p className={cn("mt-3 text-[12.5px]", tried && !ids.length ? "text-destructive" : "text-muted-foreground")} role={tried && !ids.length ? "alert" : undefined}>
+      <p className={cn("mt-3 text-xs", tried && !ids.length ? "text-destructive" : "text-muted-foreground")} role={tried && !ids.length ? "alert" : undefined}>
         {tried && !ids.length ? "Pick at least one request" : <>{ids.length} selected · <b><Money value={`${Math.trunc(total / 100)}.${String(total % 100).padStart(2, "0")}`} /></b></>}
       </p>
       <FormFooter>
@@ -364,7 +364,7 @@ function Disbursements() {
           { key: "b", label: "Beneficiary", render: (d) => d.beneficiary },
           { key: "k", label: "Bank", render: (d) => d.bank, desktop: true },
           { key: "a", label: "Amount", align: "n", render: (d) => <Money value={d.amount} /> },
-          { key: "r", label: "Bank Reference", render: (d) => <span className="font-mono text-[12px]">{d.bank_reference}</span>, desktop: true },
+          { key: "r", label: "Bank Reference", render: (d) => <span className="font-mono text-xs">{d.bank_reference}</span>, desktop: true },
           { key: "d", label: "Date", render: (d) => formatDate(d.paid_on) },
           { key: "s", label: "Status", render: (d) => <StatusPill s={d.status} /> },
         ]}
@@ -413,11 +413,11 @@ function BudgetsTab() {
     <>
       <PageHeader title="Budgets" sub={d ? `${d.year} · ${d.illustrative ? "no budget lines set" : `${d.lines.length} lines`}` : " "} actions={<Button variant="primary" icon="plus" onClick={() => toast("Budget lines open in 2027")}>Add Budget Line</Button>} />
       {d?.illustrative && (
-        <div className="mb-3 flex items-start gap-2.5 rounded-card bg-info-soft p-[14px] text-info">
+        <div className="mb-3 flex items-start gap-2.5 rounded-card bg-info-soft p-3.5 text-info">
           <Icon name="alert" className="mt-0.5 flex-none" />
           <div>
-            <h2 data-ui="title" className="text-[13.5px] font-semibold">Example Figures</h2>
-            <p className="mt-1 text-[11.5px]">Budgets start in 2027.</p>
+            <h2 data-ui="title" className="text-sm font-semibold">Example Figures</h2>
+            <p className="mt-1 text-2xs">Budgets start in 2027.</p>
           </div>
         </div>
       )}

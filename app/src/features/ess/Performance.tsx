@@ -21,7 +21,7 @@ export function MyPerformancePage() {
           {r.manager_comment && (
             <Card className="mt-3">
               <CardHeader title="Manager Comment" />
-              <p className="text-[11.5px] text-subtle-foreground">{r.manager_comment}</p>
+              <p className="text-2xs text-subtle-foreground">{r.manager_comment}</p>
             </Card>
           )}
         </>
@@ -33,9 +33,9 @@ export function MyPerformancePage() {
       <CardHeader title="Rolls Up To" />
       <div className="tl">
         {p.chain.map((c) => (
-          <div key={c.title} className={cn("tl-dot relative pb-[14px] last:pb-0", c.top && "hi", c.mine && "ok")}>
-            <b className="block text-[12.5px] font-semibold">{c.title}</b>
-            <span className="text-[11.5px] text-subtle-foreground">{c.level}</span>
+          <div key={c.title} className={cn("tl-dot relative pb-3.5 last:pb-0", c.top && "hi", c.mine && "ok")}>
+            <b className="block text-xs font-semibold">{c.title}</b>
+            <span className="text-2xs text-subtle-foreground">{c.level}</span>
           </div>
         ))}
       </div>

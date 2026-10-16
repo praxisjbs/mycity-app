@@ -91,11 +91,11 @@ export function Apply({ token }: { token: string }) {
 
   return (
     <Page title={`Apply: ${link.data.vacancy_title}`}>
-      <h1 className="text-[20px]">Apply: {link.data.vacancy_title}</h1>
+      <h1 className="text-2xl">Apply: {link.data.vacancy_title}</h1>
       <Sub className="mt-1">
         This link is yours and works until {formatDate(link.data.expires_at)} at {formatTime(link.data.expires_at)}.
       </Sub>
-      <Form className="mt-[18px] flex flex-col gap-[13px]" onSubmit={() => void submit()}>
+      <Form className="mt-4.5 flex flex-col gap-3" onSubmit={() => void submit()}>
         <Field label="Full Name" htmlFor="full_name" state={state("full_name")} message={err("full_name")}>
           <TextField id="full_name" autoComplete="name" value={v.full_name} onChange={set("full_name")} onBlur={blur("full_name")} state={state("full_name")} />
         </Field>
@@ -106,7 +106,7 @@ export function Apply({ token }: { token: string }) {
           <TextField id="phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="+234 802 000 0000" value={v.phone} onChange={set("phone")} onBlur={blur("phone")} state={state("phone")} />
         </Field>
         <Field label="Years of Experience" htmlFor="years" state={state("years")} message={err("years")}>
-          <TextField id="years" inputMode="numeric" value={v.years} onChange={set("years")} onBlur={blur("years")} state={state("years")} className="max-w-[140px]" />
+          <TextField id="years" inputMode="numeric" value={v.years} onChange={set("years")} onBlur={blur("years")} state={state("years")} className="max-w-36" />
         </Field>
         <Field label="CV" state={err("cv") ? "bad" : undefined} message={err("cv")}>
           <UploadField

@@ -18,7 +18,7 @@ export function MySecurityPage() {
   const pw = (
     <Card>
       <CardHeader title="Password" />
-      <p className="text-[11.5px] text-subtle-foreground">Last changed {formatDate(s.password_changed_at)}.</p>
+      <p className="text-2xs text-subtle-foreground">Last changed {formatDate(s.password_changed_at)}.</p>
       <Button className="mt-3" onClick={() => modal.open({ title: "Change Password", body: (close) => <PasswordForm close={close} /> })}>Change Password</Button>
     </Card>
   );
@@ -33,19 +33,19 @@ export function MySecurityPage() {
     <Card>
       <CardHeader title="Passkeys" right={<Pill tone="ok">{`${s.passkeys.length} set up`}</Pill>} />
       {s.passkeys.map((k) => (
-        <div key={k.passkey_id} className="flex items-center gap-[11px] border-b border-border py-2.5">
-          <span className="flex size-[34px] items-center justify-center rounded-box bg-accent text-accent-foreground"><Icon name="shield" size="m" /></span>
-          <span className="flex-1"><b className="text-[13px] font-semibold">{k.name}</b><span className="block text-[11.5px] text-subtle-foreground">Added {formatDate(k.added)} · used {k.last_used}</span></span>
+        <div key={k.passkey_id} className="flex items-center gap-2.5 border-b border-border py-2.5">
+          <span className="flex size-8.5 items-center justify-center rounded-box bg-accent text-accent-foreground"><Icon name="shield" size="m" /></span>
+          <span className="flex-1"><b className="text-sm font-semibold">{k.name}</b><span className="block text-2xs text-subtle-foreground">Added {formatDate(k.added)} · used {k.last_used}</span></span>
         </div>
       ))}
       <Button className="mt-3" icon="plus" onClick={() => toast("Follow the prompt on your device")}>Add a Passkey</Button>
-      <p className="mt-[11px] text-[11.5px] text-subtle-foreground">Sign in with your fingerprint or face instead of a password.</p>
+      <p className="mt-2.5 text-2xs text-subtle-foreground">Sign in with your fingerprint or face instead of a password.</p>
     </Card>
   );
   const pin = (
     <Card>
       <CardHeader title="PIN" right={<Pill tone={s.pin_set ? "ok" : "neutral"}>{s.pin_set ? "Set" : "Not set"}</Pill>} />
-      <p className="text-[11.5px] text-subtle-foreground">A short PIN to unlock the app and confirm a clock-in on a registered device.</p>
+      <p className="text-2xs text-subtle-foreground">A short PIN to unlock the app and confirm a clock-in on a registered device.</p>
       <Button className="mt-3" onClick={() => modal.open({ title: "Set a PIN", body: (close) => <PinForm close={close} /> })}>{s.pin_set ? "Change PIN" : "Set a PIN"}</Button>
     </Card>
   );
@@ -134,7 +134,7 @@ function PinForm({ close }: { close: () => void }) {
   return (
     <>
       <Field label="PIN" {...pin}>
-        <PasswordField inputMode="numeric" maxLength={6} {...pin} onChange={(v) => pin.onChange(v.replace(/\D/g, ""))} className="h-[50px] text-center text-[20px] font-bold tracking-[.4em]" />
+        <PasswordField inputMode="numeric" maxLength={6} {...pin} onChange={(v) => pin.onChange(v.replace(/\D/g, ""))} className="h-12 text-center text-2xl font-bold tracking-otp" />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

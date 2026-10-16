@@ -13,14 +13,14 @@ export function MyQueriesPage() {
       type="button"
       onClick={() => setView(k)}
       aria-pressed={view === k}
-      className={cn("flex w-full min-w-0 flex-col gap-1.5 rounded-card border bg-card p-[14px] text-left shadow-1 hover:border-subtle-foreground", view === k ? "border-secondary shadow-[0_0_0_1px_var(--secondary)]" : "border-border")}
+      className={cn("flex w-full min-w-0 flex-col gap-1.5 rounded-card border bg-card p-3.5 text-left shadow-1 hover:border-subtle-foreground", view === k ? "border-secondary ring-1 ring-secondary" : "border-border")}
     >
-      <span className={cn("flex size-[34px] items-center justify-center rounded-box", tone === "ok" ? "bg-success-soft text-success" : tone === "warn" ? "bg-warning-soft text-warning" : "bg-accent text-accent-foreground")}>
+      <span className={cn("flex size-8.5 items-center justify-center rounded-box", tone === "ok" ? "bg-success-soft text-success" : tone === "warn" ? "bg-warning-soft text-warning" : "bg-accent text-accent-foreground")}>
         <Icon name={icon} size="m" />
       </span>
-      <span className="mt-1 text-[11.5px] font-semibold text-muted-foreground">{label}</span>
-      <b className="text-[25px] leading-[1.05] font-bold tracking-[-.028em]">{n}</b>
-      <span className="text-[11.5px] text-subtle-foreground">{sub}</span>
+      <span className="mt-1 text-2xs font-semibold text-muted-foreground">{label}</span>
+      <b className="text-3xl leading-none font-bold tracking-tight">{n}</b>
+      <span className="text-2xs text-subtle-foreground">{sub}</span>
     </button>
   );
   return (

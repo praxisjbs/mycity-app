@@ -60,7 +60,7 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
   };
   return (
     <>
-      <p className="mb-3 text-[11.5px] text-subtle-foreground">
+      <p className="mb-3 text-2xs text-subtle-foreground">
         {name} is <b>{current}</b> today. The change applies from the next punch and is written to the audit log.
       </p>
       <Field label="Arrangement">
@@ -71,7 +71,7 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
           <div className="overflow-hidden rounded-box border border-border">
             {DAYS.map((d) => (
               <div key={d} className="flex items-center gap-3 border-b border-border px-3 py-1.5 last:border-b-0">
-                <span className="w-[60px] text-[12.5px] font-semibold">{d}</span>
+                <span className="w-15 text-xs font-semibold">{d}</span>
                 <ChoiceField value={sched[d]} onChange={(v) => setSched((s) => ({ ...s, [d]: v }))} options={[["Office", "Office"], ["Remote", "Remote"]]} />
               </div>
             ))}
@@ -130,7 +130,7 @@ export function AttendanceSetupCard({ id, name }: { id: string; name: string }) 
             ["Attendance profile", a.profile],
           ]}
         />
-        <div className="mt-[14px] flex flex-wrap gap-2">
+        <div className="mt-3.5 flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => modal.open({ title: "Change Work Arrangement", body: (c) => <ArrangementForm id={id} name={name} current={a.arrangement} schedule={a.schedule} office={a.office} close={c} /> })}>
             Change Arrangement
           </Button>

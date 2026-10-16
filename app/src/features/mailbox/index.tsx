@@ -5,9 +5,8 @@ import "@/api/types/mailbox";
 import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/types/mailbox";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Splitter, useSplit } from "@/features/community/Chat";
 import { Composer, type ComposeInit } from "./Composer";
-import { Avatar, Banner, Button, cn, ErrorState, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, Pill, SearchInput, StatStrip, toast, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
+import { Avatar, Banner, Button, cn, ErrorState, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, Pill, SearchInput, SplitPanes, StatStrip, toast, useIsMobile, useModal, useSplitPanes, type MenuItem, type SplitState } from "@mycity/ui";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
@@ -22,7 +21,7 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
   const unread = useApi("GET /api/v1/mailbox/threads", { query: { folder, unread: true } });
   const [sel, setSel] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const split = useSplit("mail", 330);
+  const split = useSplitPanes("mail", 330);
   const rows = list.rows;
   const current = rows.find((r) => r.thread_id === sel) ?? (mobile ? undefined : rows[0]);
   const from = conn.data?.email_address ?? "";
@@ -54,7 +53,6 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
       {conn.data?.status === "needs_reconnect" && <Banner tone="warn">The mail server refused the saved password. Reconnect under Settings, Integrations to keep receiving mail.</Banner>}
       <StatStrip items={[{ label: "Folder", value: NAMES[folder] }, { label: "Messages", value: total }, { label: "Unread", value: nUnread, tone: nUnread ? "warn" : "ok" }, { label: "Attachments", value: withFiles }, { label: "Mailbox", value: from, desktop: true }]} />
       <MailFrame
-        mobile={mobile}
         open={open}
         split={split}
         list={
@@ -64,9 +62,9 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
               {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={6} /> : rows.map((r) => (
                 <MailRow key={r.thread_id} r={r} on={r.thread_id === current?.thread_id && (!mobile || open)} onClick={() => (setSel(r.thread_id), setOpen(true))} />
               ))}
-              {!list.loading && !list.error && !rows.length && <p className="p-4 text-[12.5px] text-subtle-foreground">{list.q ? "Nothing matches." : `Nothing in ${NAMES[folder]}.`}</p>}
+              {!list.loading && !list.error && !rows.length && <p className="p-4 text-xs text-subtle-foreground">{list.q ? "Nothing matches." : `Nothing in ${NAMES[folder]}.`}</p>}
               {list.page && list.page.pages > 1 && (
-                <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-[11.5px] text-subtle-foreground">
+                <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-2xs text-subtle-foreground">
                   <span>Page {list.page.number} of {list.page.pages}</span>
                   <span className="flex gap-1.5">
                     <Button size="sm" disabled={list.page.number <= 1} onClick={() => list.setPage(list.pageNumber - 1)}>Newer</Button>
@@ -77,43 +75,31 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
             </div>
           </>
         }
-        reader={current ? <ThreadReader key={current.thread_id} row={current} onBack={() => setOpen(false)} compose={compose} onMoved={() => (setSel(null), setOpen(false))} /> : <p className="m-auto p-6 text-[12.5px] text-subtle-foreground">{list.loading ? "" : "Pick a message to read it."}</p>}
+        reader={current ? <ThreadReader key={current.thread_id} row={current} onBack={() => setOpen(false)} compose={compose} onMoved={() => (setSel(null), setOpen(false))} /> : <p className="m-auto p-6 text-xs text-subtle-foreground">{list.loading ? "" : "Pick a message to read it."}</p>}
       />
     </>
   );
 }
 
-function MailFrame({ mobile, open, split, list, reader }: { mobile: boolean; open: boolean; split: ReturnType<typeof useSplit>; list: ReactNode; reader: ReactNode }) {
-  const pane = "flex min-h-0 flex-col overflow-hidden rounded-card border border-border bg-card shadow-1";
-  if (mobile)
-    return (
-      <>
-        <div className={pane}>{list}</div>
-        {open && <div className="pt-safe fixed inset-x-0 top-(--env-bar) bottom-0 z-[62] flex flex-col overflow-y-auto bg-card">{reader}</div>}
-      </>
-    );
+function MailFrame({ open, split, list, reader }: { open: boolean; split: SplitState; list: ReactNode; reader: ReactNode }) {
   return (
-    <div className="grid min-h-[360px] flex-1 gap-1" style={{ gridTemplateColumns: `${split.w}px 8px minmax(0,1fr)`, gridTemplateRows: "minmax(0,1fr)" }}>
-      <div className={pane}>{list}</div>
-      <Splitter onPointerDown={split.start} nudge={split.nudge} value={split.w} />
-      <div className={cn(pane, "overflow-y-auto overscroll-contain")}>{reader}</div>
-    </div>
+    <SplitPanes split={split} list={list} detail={reader} open={open} minHeight="sm" scrolls />
   );
 }
 
 function MailRow({ r, on, onClick }: { r: ThreadRow; on: boolean; onClick: () => void }) {
   return (
-    <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-start gap-[9px] border-b border-border px-[13px] py-[11px] text-left last:border-b-0", on ? "bg-muted shadow-[inset_3px_0_0_var(--primary)]" : "hover:bg-muted")}>
-      <i className={cn("mt-[5px] size-[7px] flex-none rounded-full", r.unread ? "bg-primary" : "bg-transparent")} aria-label={r.unread ? "Unread" : undefined} />
+    <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-start gap-2 border-b border-border px-3 py-2.5 text-left last:border-b-0", on ? "bg-muted bar-selected" : "hover:bg-muted")}>
+      <i className={cn("mt-1 size-1.5 flex-none rounded-full", r.unread ? "bg-primary" : "bg-transparent")} aria-label={r.unread ? "Unread" : undefined} />
       <span className="min-w-0 flex-1">
-        <b className={cn("block truncate text-[12.5px]", r.unread ? "font-bold" : "font-[650]")}>{who(r.party)}</b>
-        <span className="flex items-center gap-1.5 truncate text-[12px] text-muted-foreground">
+        <b className={cn("block truncate text-xs", r.unread ? "font-bold" : "font-strong")}>{who(r.party)}</b>
+        <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
           {r.scheduled && <Pill tone="info">Scheduled</Pill>}
           <span className="truncate">{r.subject}</span>
         </span>
-        <span className="block truncate text-[11.5px] text-subtle-foreground">{r.snippet}</span>
+        <span className="block truncate text-2xs text-subtle-foreground">{r.snippet}</span>
       </span>
-      <span className="flex flex-none flex-col items-end gap-1 text-[11px] text-subtle-foreground">
+      <span className="flex flex-none flex-col items-end gap-1 text-2xs text-subtle-foreground">
         {formatWhen(r.last_message_at)}
         {r.has_attachment && <Icon name="clip" className="size-3.5" />}
       </span>
@@ -178,8 +164,8 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
       Back
     </Button>
   );
-  if (t.error) return <div className="p-[18px]">{back}<ErrorState error={t.error} onRetry={t.reload} /></div>;
-  if (!t.data) return <div className="p-[18px]">{back}<LoadingRows count={5} /></div>;
+  if (t.error) return <div className="p-4.5">{back}<ErrorState error={t.error} onRetry={t.reload} /></div>;
+  if (!t.data) return <div className="p-4.5">{back}<LoadingRows count={5} /></div>;
   const thread = t.data;
   const lastMsg = thread.messages[thread.messages.length - 1];
   const draft = row.folder === "drafts";
@@ -197,13 +183,13 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
   ];
 
   return (
-    <div className="p-[18px] max-md:px-[14px] max-md:pt-3 max-md:pb-[calc(20px+env(safe-area-inset-bottom,0px))]">
+    <div className="p-4.5 max-md:px-3.5 max-md:pt-3 max-md:pb-safe-5">
       {back}
       <div className="flex items-start gap-3 border-b border-border pb-3.5 max-md:flex-wrap">
         <Avatar name={who(draft ? lastMsg.from : row.party)} size={38} />
         <span className="min-w-0 flex-1">
-          <h2 data-copy="content" className="text-[15px] leading-[1.35] font-semibold">{thread.subject}</h2>
-          <p className="mt-1 text-[11.5px] text-subtle-foreground">
+          <h2 data-copy="content" className="text-md leading-snug font-semibold">{thread.subject}</h2>
+          <p className="mt-1 text-2xs text-subtle-foreground">
             {draft ? `To ${lastMsg.to.map((a) => a.address).join(", ") || "(no recipient)"}` : `${who(lastMsg.from)} <${lastMsg.from.address}>`} · {formatWhen(lastMsg.sent_at)}
           </p>
         </span>
@@ -236,25 +222,25 @@ function Message({ m, head, images, onImages }: { m: MailMessage; head: boolean;
   const download = (name: string) => (import.meta.env.VITE_API_MODE === "mock" ? toast(`${name} downloads once the mailbox is connected`) : undefined);
   return (
     <div className={cn(head && "border-b border-dashed border-border")}>
-      {head && <p className="pt-3 text-[11.5px] font-semibold text-subtle-foreground">{who(m.from)} · {formatWhen(m.sent_at)}</p>}
+      {head && <p className="pt-3 text-2xs font-semibold text-subtle-foreground">{who(m.from)} · {formatWhen(m.sent_at)}</p>}
       {body == null ? (
-        <p className="py-3.5 text-[13px] text-subtle-foreground">Marked as spam by the filter. The body is not rendered.</p>
+        <p className="py-3.5 text-sm text-subtle-foreground">Marked as spam by the filter. The body is not rendered.</p>
       ) : (
         <>
           {body.blocked > 0 && (
-            <p className="mt-3 flex items-center gap-2 rounded-ctl bg-muted px-3 py-2 text-[12px] text-muted-foreground">
+            <p className="mt-3 flex items-center gap-2 rounded-ctl bg-muted px-3 py-2 text-xs text-muted-foreground">
               <Icon name="image" />Remote images are hidden.
               <button type="button" className="font-semibold text-accent-foreground underline" onClick={onImages}>Load Images</button>
             </p>
           )}
-          <div className="rte mail-body py-3.5 text-[13px] leading-[1.65] text-muted-foreground [&_p+p]:mt-2.5" dangerouslySetInnerHTML={{ __html: body.html || "<p></p>" }} />
+          <div className="rte mail-body py-3.5 text-sm leading-relaxed text-muted-foreground [&_p+p]:mt-2.5" dangerouslySetInnerHTML={{ __html: body.html || "<p></p>" }} />
         </>
       )}
       {m.attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t border-dashed border-border pt-3 pb-1">
           {m.attachments.map((a) => (
-            <a key={a.attachment_id} href={import.meta.env.VITE_API_MODE === "mock" ? undefined : `/api/v1/mailbox/attachments/${a.attachment_id}/content`} onClick={() => download(a.file_name)} role="button" tabIndex={0} className="flex cursor-pointer items-center gap-[7px] rounded-[9px] border border-border bg-muted px-[11px] py-[7px] text-[12px] font-[550] hover:bg-accent">
-              <Icon name="doc" />{a.file_name}<span className="text-[11.5px] text-subtle-foreground">{formatBytes(a.size_bytes)}</span>
+            <a key={a.attachment_id} href={import.meta.env.VITE_API_MODE === "mock" ? undefined : `/api/v1/mailbox/attachments/${a.attachment_id}/content`} onClick={() => download(a.file_name)} role="button" tabIndex={0} className="flex cursor-pointer items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover:bg-accent">
+              <Icon name="doc" />{a.file_name}<span className="text-2xs text-subtle-foreground">{formatBytes(a.size_bytes)}</span>
             </a>
           ))}
         </div>
@@ -267,7 +253,7 @@ function EmptyFolder({ kind, count, close }: { kind: "spam" | "trash"; count: nu
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <p className="text-[13px] text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         {count} message{count === 1 ? "" : "s"} in {NAMES[kind]} will be deleted for good. This cannot be undone.
       </p>
       <FormFooter>

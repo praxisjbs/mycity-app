@@ -64,6 +64,8 @@
 
   /* The letter spacing of a small-caps label: a table header, a strip's caption. */
   --tracking-caps: 0.09em;
+  /* A one-character-per-box field: a PIN, an OTP. */
+  --tracking-otp: 0.4em;
 
   --radius-ctl: 9px;
   --radius-box: 10px;

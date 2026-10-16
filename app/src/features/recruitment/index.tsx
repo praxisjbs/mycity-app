@@ -606,13 +606,13 @@ function Onboarding() {
         <Grid cols={2} className="mt-3">
           <DataView
             title="Document Checklist"
-            right={<span className="w-[150px]"><Meter pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
+            right={<span className="w-36"><Meter pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
             rows={x.checklist}
             rowKey={(r) => r.name}
             columns={[{ key: "d", label: "Required Document", render: (r) => r.name }, { key: "s", label: x.name, render: (r) => <StatusPill s={r.status} /> }]}
             footer={
               x.documents_done < x.documents_total && (
-                <div className="flex justify-end border-t border-border px-[14px] py-2.5">
+                <div className="flex justify-end border-t border-border px-3.5 py-2.5">
                   <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { await remind.run({ params: { id: x.onboarding_id }, body: {} }); toast(`Reminder sent to ${x.name} for ${x.documents_total - x.documents_done} documents`); }}>Remind {x.name.split(" ")[0]}</Button>
                 </div>
               )
