@@ -35,6 +35,9 @@ systemctl --no-pager status mycity-api-prod mycity-worker-prod postgresql redis-
 | Public uploads stay "pending" | clamd down or signatures missing | `sudo systemctl status clamav-daemon clamav-freshclam` |
 | Certificate warning in browsers | renewal failed | `sudo certbot renew`; `sudo systemctl reload nginx` |
 | Disk full | media growth, logs, dumps | `sudo du -sh /srv/mycity/* /var/log`; `sudo journalctl --vacuum-size=1G`; old dumps in `/srv/mycity/backups/*` |
+| Backup alert, or `mycity-backup` failed | the database unreachable, the disk full, the offsite host refusing | `journalctl -u mycity-backup -n 50`; fix the cause, then `sudo systemctl start mycity-backup` (`docs/runbooks/backup-restore.md`) |
+| Restore drill alert | the backup stopped (newest nightly over 36 hours old), or a dump that does not restore | `journalctl -u mycity-restore-drill -n 50`; take a backup now, then `sudo /srv/mycity/bin/mycity-restore-drill` |
+| Uptime alert, server looks fine | DNS, the certificate, or the firewall, seen only from outside | `node ops/monitoring/uptime-probe.js` from your own machine; its reason names which |
 | Deploy failed | see the failing job in GitHub Actions, then `~mycity-deploy/deploy-gate.log` | a failed deploy leaves the previous release running; fix forward with a PR |
 
 Restarting a unit is safe: requests in flight finish, the worker lets running jobs finish (30 s),

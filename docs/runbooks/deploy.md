@@ -18,7 +18,8 @@ ssh-keygen -t ed25519 -N "" -C "mycity staging deploy" -f mycity-staging-deploy
 ssh-keygen -t ed25519 -N "" -C "mycity production deploy" -f mycity-prod-deploy
 ```
 
-**2. Their public halves on the server.** Copy the two `.pub` files and the latest `ops/` up, then
+**2. Their public halves on the server.** Copy the two `.pub` files and the latest `ops/` and
+`scripts/` up (the script installs `scripts/deploy/deploy-gate` and the two backup tools from there), then
 run the provisioning script again with them. It writes `~mycity-deploy/.ssh/authorized_keys` from
 `ops/ssh/authorized_keys.template`, forcing each key into deploy-gate with its own `--key=`:
 
@@ -28,7 +29,8 @@ sudo STAGING_DEPLOY_KEY="$(cat mycity-staging-deploy.pub)" \
      LE_EMAIL=mycityapp09@gmail.com bash ~/ops/provision/provision.sh
 ```
 
-That run also installs `deploy-gate` into `/srv/mycity/bin`.
+That run also installs `deploy-gate`, `mycity-backup` and `mycity-restore-drill` into
+`/srv/mycity/bin` and starts the backup timers.
 
 **3. GitHub** (repository Settings; TB or GE):
 
@@ -41,6 +43,7 @@ That run also installs `deploy-gate` into `/srv/mycity/bin`.
 | Environment `production` | deployment branches | `main` only |
 | Repository variables | `DEPLOY_HOST` | `108.181.196.53` |
 | Repository variables | `DEPLOY_KNOWN_HOSTS` | the output of `ssh-keyscan -t ed25519 108.181.196.53` |
+| Repository secret | `ALERT_WEBHOOK_URL` | the alert webhook, for the uptime probe (`uptime.yml`); not needed to deploy |
 
 **4. Delete the two private files** from wherever they were made. GitHub has the only copies; a
 lost key is replaced by making a new pair and repeating steps 2 and 3.

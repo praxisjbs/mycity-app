@@ -40,6 +40,14 @@ Settings → Environments:
   on, deployment branches `main` only. Holds `PROD_SSH_KEY`. Never store the production key as a
   repository secret: it must be released only after approval (SYSTEM_ARCHITECTURE §9.3).
 
+## Repository secret
+
+Settings → Secrets and variables → Actions → Repository secrets:
+
+- [ ] `ALERT_WEBHOOK_URL`: the same incoming webhook as in production's `.env`. The uptime probe
+  (`.github/workflows/uptime.yml`) posts to it; nothing else in GitHub reads it. It is not a
+  production key, so it may be a repository secret.
+
 ## Collaborators
 
 Settings → Collaborators: GE, LA, AJ invited with write access. A collaborator can push branches,

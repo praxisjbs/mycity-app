@@ -397,9 +397,18 @@ seed guard.
   live (Praxis `routes/health.js`).
 - **Errors.** `error_event` table + alert channel for 5xx only; 4xx are logged, not alerted (Praxis
   `shared/observability/error-reporter.js`).
-- **Backups.** Nightly `pg_dump` of both databases, 14 kept, media rsync; pre-deploy dump on every
-  stage and promote. Restore rehearsed into a scratch database before M11 (MILESTONES §16).
-- **Uptime.** External probe on both production hosts and `/api/health/ready`.
+- **Backups.** Nightly at 02:30 Lagos (`mycity-backup.timer`, `scripts/db/backup.sh`): `pg_dump` of
+  both databases with the migration head and every table's row count read from the same exported
+  snapshot, 14 kept; media as hard-linked rsync snapshots, 14 kept; then a mirror of all of it to
+  an offsite host over SSH when one is set. Pre-deploy dump on every stage and promote. The
+  secrets in `/root/mycity-secrets` never travel with the data.
+- **Restore drill.** Every Sunday (`mycity-restore-drill.timer`, `scripts/db/restore-drill.js`): the
+  newest nightly restored into a scratch database, which must hold exactly the row counts the
+  backup recorded; it fails when the newest nightly is over 36 hours old. Timed and logged, so the
+  M11 rehearsal (MILESTONES §16) is a record, not an event.
+- **Uptime.** `ops/monitoring/uptime-probe.js` from outside the server (`.github/workflows/uptime.yml`
+  every 10 minutes): both production hosts over HTTPS, `/api/health/ready`, the environment header
+  and the certificate's days left. Backup, drill and probe all alert through `ALERT_WEBHOOK_URL`.
 
 ---
 

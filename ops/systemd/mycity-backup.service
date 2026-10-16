@@ -1,0 +1,31 @@
+# MyCity nightly backup · SYSTEM_ARCHITECTURE §11, docs/runbooks/backup-restore.md.
+# Installed by ops/provision/provision.sh; started by mycity-backup.timer every night.
+# Run now:  sudo systemctl start mycity-backup     Logs: journalctl -u mycity-backup
+# Both databases (dump plus the row counts of the same snapshot), both media folders, then the
+# offsite copy when /etc/mycity/backup.env sets one. A failure alerts production's webhook and
+# leaves this unit failed (systemctl --failed).
+
+[Unit]
+Description=MyCity nightly backup (databases, media, offsite copy)
+After=network-online.target postgresql.service
+Wants=network-online.target
+ConditionPathExists=/srv/mycity/bin/mycity-backup
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/srv/mycity/bin/mycity-backup
+TimeoutStartSec=4h
+Nice=10
+IOSchedulingClass=idle
+SyslogIdentifier=mycity-backup
+
+# Reads the environments, writes only the backups. /root stays readable for the offsite key.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/srv/mycity/backups
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes

@@ -50,16 +50,18 @@ mycity-erp/
 │   ├── import/              CLI over the import engine (first staff load)
 │   └── deploy/              deploy-gate, release-manifest, verify-staging, rollback
 ├── ops/
-│   ├── systemd/             four units + env file templates
+│   ├── systemd/             four units + env file templates; the backup and restore-drill
+│   │                        services and timers
 │   ├── provision/           server packages: postgres 16 + pgvector, redis, chromium,
 │   │                        ffmpeg, clamav, fonts
-│   └── ssh/                 authorized_keys template for mycity-deploy
+│   ├── monitoring/          uptime-probe.js (run from outside by .github/workflows/uptime.yml)
+│   ├── ssh/                 authorized_keys template for mycity-deploy
 │   └── nginx/               mycity.conf (shared) + one file per host; docs/runbooks/proxy.md
 ├── tests/
 │   ├── unit/
 │   ├── integration/         real Postgres + Redis, RUN_DB_TESTS=1
 │   └── staging/             runs against hub.staging / go.staging in verify-staging
-├── .github/workflows/       ci.yml, release.yml, rollback.yml
+├── .github/workflows/       ci.yml, release.yml, rollback.yml, uptime.yml
 ├── .env.example             generated from config/env.js, CI checks they match
 └── CLAUDE.md
 ```

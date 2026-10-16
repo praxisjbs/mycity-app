@@ -18,6 +18,7 @@
 #   files      /srv/mycity/<prod|stg>/{releases,shared/.env,media}, /srv/mycity/bin,
 #              /srv/mycity/backups/<prod|stg>
 #   systemd    mycity-{api,worker}-{prod,stg}, enabled; deploy-gate starts them
+#              mycity-backup.timer (nightly) and mycity-restore-drill.timer (Sundays), started
 #
 # Run it from a checkout of the repository, as root:
 #
@@ -44,6 +45,7 @@ ENVS=(prod stg)
 declare -A APP_ENV=([prod]=production [stg]=staging)
 declare -A HOSTS=([prod]="hub.mycityapp.io go.mycityapp.io" [stg]="hub.staging.mycityapp.io go.staging.mycityapp.io")
 UNITS=(mycity-api-prod mycity-worker-prod mycity-api-stg mycity-worker-stg)
+TIMERS=(mycity-backup mycity-restore-drill)
 NODE_MAJOR=20
 NODE_MIN=20.19.0
 
@@ -58,7 +60,7 @@ later() { LEFT+=("$*"); note "LATER: $*"; }
 . /etc/os-release
 [[ "${ID:-}" == ubuntu && "${VERSION_ID:-}" == 24.04 ]] || die "written for Ubuntu 24.04; this is ${PRETTY_NAME:-unknown}"
 [[ "$(dpkg --print-architecture)" == amd64 ]] || die "Chrome is packaged for amd64 only"
-for f in nginx/mycity.conf systemd/prod.env.template systemd/mycity-api-prod.service ssh/authorized_keys.template; do
+for f in nginx/mycity.conf systemd/prod.env.template systemd/mycity-api-prod.service systemd/mycity-backup.timer ssh/authorized_keys.template; do
   [[ -s "$OPS/$f" ]] || die "ops/$f is missing or empty; run this from a full checkout"
 done
 export DEBIAN_FRONTEND=noninteractive
@@ -169,12 +171,17 @@ for e in "${ENVS[@]}"; do
   install -d -m 750 -o "mycity-$e" -g "mycity-$e" "/srv/mycity/$e/media"
   install -d -m 700 -o mycity-deploy -g mycity-deploy "/srv/mycity/backups/$e"
 done
-if [[ -s "$REPO/scripts/deploy/deploy-gate" ]]; then
-  install -m 755 -o root -g root "$REPO/scripts/deploy/deploy-gate" /srv/mycity/bin/deploy-gate
-  note "deploy-gate installed"
-else
-  later "scripts/deploy/deploy-gate is not written yet: re-run this once it is, to install it"
-fi
+# The server's own tools, root-owned in /srv/mycity/bin: deploy-gate (CI's forced command), the
+# nightly backup and the restore drill (their timers are set up in step 10).
+for tool in scripts/deploy/deploy-gate:deploy-gate scripts/db/backup.sh:mycity-backup \
+  scripts/db/restore-drill.js:mycity-restore-drill; do
+  if [[ -s "$REPO/${tool%%:*}" ]]; then
+    install -m 755 -o root -g root "$REPO/${tool%%:*}" "/srv/mycity/bin/${tool##*:}"
+    note "${tool##*:} installed"
+  else
+    later "${tool%%:*} is missing or empty: re-run this from a full checkout to install it"
+  fi
+done
 
 # ---------------------------------------------------------------------------------------
 step "6/12 PostgreSQL"
@@ -296,9 +303,32 @@ step "10/12 systemd units and deploy access"
 for u in "${UNITS[@]}"; do
   install -m 644 "$OPS/systemd/$u.service" "/etc/systemd/system/$u.service"
 done
+for t in "${TIMERS[@]}"; do
+  install -m 644 "$OPS/systemd/$t.service" "/etc/systemd/system/$t.service"
+  install -m 644 "$OPS/systemd/$t.timer" "/etc/systemd/system/$t.timer"
+done
 systemctl daemon-reload
 systemctl enable "${UNITS[@]/%/.service}" >/dev/null
 note "units enabled; they start with the first deploy (no release in /srv/mycity/*/current yet)"
+systemctl enable --now "${TIMERS[@]/%/.timer}" >/dev/null
+note "backup nightly at 02:30 and restore drill on Sundays at 04:00 (Lagos): systemctl list-timers 'mycity-*'"
+
+# Where the nightly backup sends its offsite copy. Written once, commented out, for the operator
+# to fill (docs/runbooks/backup-restore.md §2); never overwritten.
+install -d -m 700 /etc/mycity
+if [[ ! -e /etc/mycity/backup.env ]]; then
+  cat >/etc/mycity/backup.env <<'CONF'
+# MyCity nightly backup: the offsite copy (scripts/db/backup.sh, docs/runbooks/backup-restore.md).
+# Until OFFSITE_TARGET is set, every backup lives on this server only.
+#OFFSITE_TARGET=mycity-offsite@203.0.113.10:
+#OFFSITE_SSH_KEY=/root/.ssh/mycity-offsite
+#OFFSITE_PORT=22
+CONF
+  chmod 600 /etc/mycity/backup.env
+fi
+if ! grep -q '^OFFSITE_TARGET=.' /etc/mycity/backup.env; then
+  later "offsite backups: set OFFSITE_TARGET in /etc/mycity/backup.env (docs/runbooks/backup-restore.md §2)"
+fi
 
 cat >/etc/sudoers.d/mycity-deploy <<'CONF'
 # deploy-gate runs as mycity-deploy. It may restart the four MyCity units and run Node as an

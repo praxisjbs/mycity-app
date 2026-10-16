@@ -60,6 +60,7 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
 | `.env` | `/srv/mycity/<env>/shared/.env` from `ops/systemd/<env>.env.template`, secrets generated on the server. **Written once, never overwritten** |
 | systemd | The four units, enabled. Each is skipped until its environment has a release, so nothing crash-loops before the first deploy |
 | Deploy | `sudo` for `mycity-deploy` limited to restarting the four units and running Node as an environment's user; `authorized_keys` with forced commands when the keys are given; `deploy-gate` installed into `/srv/mycity/bin` |
+| Backups | `mycity-backup` and `mycity-restore-drill` installed into `/srv/mycity/bin`; their timers started (nightly 02:30, Sundays 04:00, Lagos); `/etc/mycity/backup.env` written once for the offsite copy (`docs/runbooks/backup-restore.md`) |
 | Firewall | SSH (whatever port `sshd` uses), 80 and 443 only |
 | nginx | `ops/nginx/` installed, the default site removed, a certificate per host whose DNS is ready, renewals reload nginx |
 
@@ -72,7 +73,9 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
    passwords and the two `ENCRYPTION_KEY`s; a lost encryption key loses every value encrypted
    with it (mailbox passwords, integration secrets).
 3. If it says a reboot is wanted: `sudo reboot`. Everything comes back on its own.
-4. Check: `systemctl status postgresql redis-server clamav-daemon nginx` all active;
+4. **Set up the offsite backup copy**: `docs/runbooks/backup-restore.md` §2.
+5. Check: `systemctl status postgresql redis-server clamav-daemon nginx` all active;
+   `systemctl list-timers 'mycity-*'` lists the backup and the drill;
    `sudo ufw status` shows only SSH, 80 and 443; `curl -sI http://hub.staging.mycityapp.io`
    gives a 301 to https.
 
