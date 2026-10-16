@@ -33,6 +33,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
 | Display | [Bars](#bars) | `Bars` | Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target. | stable |
 | Display | [Chain](#chain) | `Chain` | An approval route: the steps already done, the one in hand, and what is still to come. | stable |
+| Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's moving picture: Lagos, London, Accra and Nairobi drawn at their own local hour, taking turns, each with its clock. | beta |
 | Display | [Confetti](#confetti) | `Confetti` | Pieces of paper or stars drifting down behind a celebration card. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
@@ -63,6 +64,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
 | Overlays | [ConfirmDialog](#confirmdialog) | `ConfirmDialog` | A yes or no before an action that cannot be taken back, named for the thing it acts on ("Delete Rule"). | stable |
+| Overlays | [LockScreen](#lockscreen) | `LockScreen` | The full-screen lock over the staff app when a session ends: who is signed in, why it locked, and their password to carry on. | beta |
 | Overlays | [Menu](#menu) | `Menu` | A short list of actions behind one button (the ⋮ on a record, the + in a composer, the account menu). | stable |
 | Overlays | [Modal](#modal) | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` | THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened with useModal or controlled with open. | stable |
 | Overlays | [Popover](#popover) | `Popover` | A small panel anchored to the button that opens it: filters, a quick pick, a short preview. | stable |
@@ -605,6 +607,41 @@ An approval route: the steps already done, the one in hand, and what is still to
 
 ```tsx
 <Chain steps={[{ label: "Submitted", state: "done" }, { label: "Line Manager", state: "now" }, { label: "Finance" }]} />
+```
+
+### CityShowcase
+
+The sign-in screen's moving picture: Lagos, London, Accra and Nairobi drawn at their own local hour, taking turns, each with its clock.
+
+| | |
+|---|---|
+| Use | The staff sign-in screen only: `full` beside the form on desktop, `band` above it on a phone. |
+| Avoid | Any screen behind sign-in, and decoration anywhere else (use Illustration). |
+| Phone | variant="band": a short band with the city, its country and its time; the drawing holds still and the city changes each interval. |
+| Accessibility | The drawings are decorative (aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too). |
+| Status | beta |
+| Exports | `CityShowcase` |
+| Import | `import { CityShowcase } from "@mycity/ui";` |
+| File | `packages/ui/src/illustrations/CityShowcase.tsx` |
+| Test | `packages/ui/src/illustrations/CityShowcase.test.tsx` |
+| Gallery | `packages/ui/src/illustrations/CityShowcase.gallery.tsx` (`npm run gallery`, `#/CityShowcase`) |
+
+**CityShowcase** props (`CityShowcaseProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `variant` | `"full" \| "band"` |  | `full` fills its parent, with the clock and the city buttons at the foot; `band` is the phone's short strip. |
+| `cities` | `CityKey[]` |  | Which cities, in order. All four by default. |
+| `interval` | `number` |  | How long each city shows, in milliseconds. |
+| `start` | `CityKey` |  | The first city shown. |
+| `children` | `ReactNode` |  | What sits at the top over the picture: the brand, and on `full` a headline. |
+| `aside` | `ReactNode` |  | `full` only: what stands at the right over the picture, centred (the sign-in card). The clock and the cities keep clear of it. |
+| `className` | `string` |  | Layout classes only (height, the grid cell); the look is the component's own. |
+
+```tsx
+<CityShowcase>{brandAndHeadline}</CityShowcase>
+<CityShowcase variant="band"><Brand tone="on-dark" /></CityShowcase>
+<CityShowcase aside={<SignInCard />}>{brandAndHeadline}</CityShowcase>
 ```
 
 ### Confetti
@@ -1650,6 +1687,42 @@ A yes or no before an action that cannot be taken back, named for the thing it a
 ```tsx
 const confirm = useConfirm(); if (await confirm({ title: "Delete Rule", destructive: true })) remove(rule);
 <ConfirmDialog open={open} title="Revoke Device" destructive onConfirm={revoke} onCancel={() => setOpen(false)} />
+```
+
+### LockScreen
+
+The full-screen lock over the staff app when a session ends: who is signed in, why it locked, and their password to carry on.
+
+| | |
+|---|---|
+| Use | The staff app's session lock only (the time limit, the idle limit, a session ended elsewhere). The work underneath stays exactly as it was. |
+| Avoid | Any other prompt (use Modal or useConfirm); the first sign-in (the sign-in screen). |
+| Phone | Fills the screen the same way: the card sits in 16 px gutters and its buttons stack full width. |
+| Accessibility | Radix Dialog underneath: aria-modal, focus moves to the first field and stays inside, Esc and the backdrop do nothing. It stacks over any dialog already open. The title names it; the reason is its description. |
+| Status | beta |
+| Exports | `LockScreen` |
+| Import | `import { LockScreen } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/LockScreen.tsx` |
+| Test | `packages/ui/src/overlay/LockScreen.test.tsx` |
+| Gallery | `packages/ui/src/overlay/LockScreen.gallery.tsx` (`npm run gallery`, `#/LockScreen`) |
+
+**LockScreen** props (`LockScreenProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the screen is locked. |
+| `name` | `string` | yes | The signed-in person's full name. |
+| `email` | `string` | yes | Their sign-in email, under the name. |
+| `photo` | `string \| null` |  | Their photo, if they have one; the initials otherwise. |
+| `title` | `string` | yes | At most 4 words, Title Case ("Session Locked"). |
+| `reason` | `string` | yes | Why it locked, one short line ("Locked after 30 minutes idle"). |
+| `children` | `ReactNode` | yes | The password field (in a Form whose id the footer's submit button names). |
+| `footer` | `ReactNode` | yes | Buttons only: the way out (Sign Out), then the primary (Unlock). |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its frame). |
+| `className` | `string` |  | Layout classes for the card only. |
+
+```tsx
+<LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{passwordField}</LockScreen>
 ```
 
 ### Menu
@@ -4055,6 +4128,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `formatWhen` | `lib/format.ts` | ISO timestamp → "09:14" today, "Yesterday", or a day-first date. |
 | `formatMonth` | `lib/format.ts` | "2026-10" or "2026-10-01" → "October 2026". |
 | `monthName` | `lib/format.ts` | Month name from a zero-based index: 0 → "January". |
+| `zoneClock` | `lib/format.ts` | The wall clock in another city, for the sign-in screen's cities: the time ("19:42"), the day as a person says it ("Wednesday 16 October", day first), and the hour as a number (with minutes as a fraction) for the scene's light. |
 | `todayIso` | `lib/format.ts` | Today in Lagos as ISO "YYYY-MM-DD". |
 | `parseDayFirst` | `lib/format.ts` | Day-first text a person typed ("13/10/2026", "13-10-2026", "13.10.26") → ISO, or null. |
 | `formatMoney` | `lib/format.ts` | Full amount with kobo, for tables and documents. |

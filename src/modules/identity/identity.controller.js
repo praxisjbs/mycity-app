@@ -52,6 +52,7 @@ async function logout(req, res) {
     accessClaims,
     refreshToken: cookies.readRefresh(req),
     ip: req.ip,
+    idle: req.body?.reason === "idle",
   });
   cookies.clearRefresh(res);
   return noContent(res);

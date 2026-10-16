@@ -116,6 +116,25 @@
   --on-deep-soft: #D7E2DF;            /* 12.69:1 */
   --on-deep-dim: #B9C8C4;             /* 9.71:1 */
 
+  /* ---- The sign-in screen's city scenes, both themes: decorative art, no text sits on them unshaded ---- */
+  --scene-night-top: #010F0D;
+  --scene-night-bottom: #0A4A40;
+  --scene-dawn-top: #0E3B4A;
+  --scene-dawn-bottom: #F4B97A;
+  --scene-day-top: #2C8C84;
+  --scene-day-bottom: #CDEDE4;
+  --scene-dusk-top: #03231E;
+  --scene-dusk-bottom: #F0A440;
+  --scene-far: #0D5247;
+  --scene-mid: #043A31;
+  --scene-near: #011A16;
+  --scene-water: #022B25;
+  --scene-glint: #9FD9CC;
+  --scene-sun: #FFE98A;
+  --scene-moon: #F1F4E4;
+  --scene-light: #FFFFFF;             /* stars, cloud, the clock face */
+  --scene-window: #FFDF55;            /* lit windows: the brand yellow */
+
   color-scheme: light;
 }
 

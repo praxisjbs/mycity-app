@@ -1,7 +1,7 @@
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
-import { PersonPicker } from "@mycity/ui";
+import { PersonPicker, RecordPicker } from "@mycity/ui";
 
 /**
  * The pickers bound to this app's endpoints. `PersonPicker` and `RecordPicker`
@@ -42,6 +42,45 @@ export function EmployeePicker({
       onChange={onChange}
       multiple={multiple}
       placeholder={placeholder}
+    />
+  );
+}
+
+/** Employees who have no login yet (Settings · Users, Invite User), searched by the server. */
+export function LoginCandidatePicker({ value, onChange }: { value: PersonRef[]; onChange: (value: PersonRef[]) => void }) {
+  const list = usePaged("GET /api/v1/users/candidates");
+  return (
+    <PersonPicker
+      list={{
+        rows: list.rows.map((row) => ({ employee_id: row.employee_id, display_name: row.display_name, job_title: row.job_title, department: row.department, photo_url: null })),
+        page: list.page,
+        loading: list.loading,
+        error: list.error,
+        q: list.q,
+        setQ: list.setQ,
+      }}
+      value={value}
+      onChange={onChange}
+      placeholder="Search staff"
+    />
+  );
+}
+
+export type RoleRef = { code: string; name: string };
+
+/** Roles, most senior first, from the server (seeds/reference/0101). Several may be picked. */
+export function RolePicker({ value, onChange }: { value: RoleRef[]; onChange: (value: RoleRef[]) => void }) {
+  const list = usePaged("GET /api/v1/access/roles");
+  return (
+    <RecordPicker
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={list.rows.filter((r) => value.some((v) => v.code === r.code))}
+      onChange={(rows) => onChange(rows.map((r) => ({ code: r.code, name: r.name })))}
+      id={(r) => r.code}
+      title={(r) => r.name}
+      sub={(r) => r.description ?? ""}
+      multiple
+      placeholder="Search roles"
     />
   );
 }

@@ -422,16 +422,18 @@ async function refresh(refreshToken) {
 /**
  * POST /auth/logout. The session comes from the access token when it is still
  * valid, or else from the refresh cookie, so signing out works after the access
- * token has expired. Ends nothing it cannot identify; always succeeds.
- * @param {{accessClaims?: {sub: string, sid: string}|null, refreshToken?: string|null, ip?: string}} input
+ * token has expired. Ends nothing it cannot identify; always succeeds. `idle`
+ * is the screen locking itself after the idle limit, recorded as such.
+ * @param {{accessClaims?: {sub: string, sid: string}|null, refreshToken?: string|null, ip?: string, idle?: boolean}} input
  */
-async function logout({ accessClaims, refreshToken, ip }) {
+async function logout({ accessClaims, refreshToken, ip, idle = false }) {
   const claims =
     accessClaims && accessClaims.sid ? accessClaims : readRefreshToken(refreshToken);
   if (!claims || !claims.sid || !claims.sub) return { ended: false };
+  const reason = idle ? "inactivity_timeout" : "signed_out";
   const ended = await tx(async (client) => {
     const done = await repo.endSession(client, claims.sid, {
-      reason: "signed_out",
+      reason,
       by: claims.sub,
       userId: claims.sub,
     });
@@ -440,7 +442,7 @@ async function logout({ accessClaims, refreshToken, ip }) {
         key: EVENTS.AUTH_SIGNED_OUT,
         entity: account(claims.sub),
         actor: { user_id: claims.sub, ip: ip || null },
-        payload: { session_id: claims.sid },
+        payload: { session_id: claims.sid, reason },
       });
     }
     return done;

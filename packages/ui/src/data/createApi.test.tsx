@@ -52,6 +52,53 @@ describe("createApi", () => {
     core.session.onEnded(ended);
     await expect(core.api.call("GET /api/v1/employees/:id", { params: { id: "e1" } })).rejects.toBeInstanceOf(ApiError);
     expect(ended).toHaveBeenCalledOnce();
+    expect(ended).toHaveBeenCalledWith("SESSION_ENDED");
+  });
+
+  it("says why the session ended, and hands a good refresh's clock to the app", async () => {
+    let refuse = false;
+    const { transport } = fake((req) => {
+      if (req.path.endsWith("/refresh"))
+        return refuse ? { status: 401, body: { error: { code: "SESSION_IDLE", message: "Idle" } } } : { status: 200, body: { access_token: "t2", session_expires_in: 600 } };
+      return { status: 401, body: null };
+    });
+    const core = createApi<Endpoints>({ auth: { refreshPath: "/api/v1/auth/refresh" }, credentials: "include", transport });
+    const ended = vi.fn();
+    const refreshed = vi.fn();
+    core.session.onEnded(ended);
+    core.session.onRefreshed(refreshed);
+    expect(await core.refreshSession()).toBe(true);
+    expect(refreshed).toHaveBeenCalledWith({ access_token: "t2", session_expires_in: 600 });
+    refuse = true;
+    await core.api.call("GET /api/v1/employees/:id", { params: { id: "e1" } }).catch(() => undefined);
+    expect(ended).toHaveBeenCalledWith("SESSION_IDLE");
+    expect(core.session.endCode).toBe("SESSION_IDLE");
+  });
+
+  it("does not end the session when the refresh could not reach the server", async () => {
+    const { transport } = fake((req) => (req.path.endsWith("/refresh") ? { status: 0, body: { error: { code: "NETWORK", message: "Offline" } } } : { status: 401, body: null }));
+    const core = createApi<Endpoints>({ auth: { refreshPath: "/api/v1/auth/refresh" }, credentials: "include", transport });
+    const ended = vi.fn();
+    core.session.onEnded(ended);
+    await core.api.call("GET /api/v1/employees/:id", { params: { id: "e1" } }).catch(() => undefined);
+    expect(ended).not.toHaveBeenCalled();
+  });
+
+  it("takes refreshes one at a time across tabs through a shared lock", async () => {
+    const held: string[] = [];
+    const request = vi.fn(async (name: string, fn: () => Promise<unknown>) => {
+      held.push(name);
+      return fn();
+    });
+    vi.stubGlobal("navigator", { ...navigator, locks: { request } });
+    try {
+      const { transport } = fake(() => ({ status: 200, body: { access_token: "t2" } }));
+      const core = createApi<Endpoints>({ auth: { refreshPath: "/api/v1/auth/refresh" }, credentials: "include", transport });
+      await Promise.all([core.refreshSession(), core.refreshSession()]);
+      expect(held).toEqual(["refresh /api/v1/auth/refresh"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("sends an idempotency key and puts a 422's fields on the error", async () => {

@@ -67,6 +67,7 @@ function clock(remaining) {
     expires_in: accessTtlFor(remaining),
     session_expires_in: Math.max(0, Math.floor(remaining)),
     session_max_age: maxAgeSeconds(),
+    session_idle_limit: idleSeconds(),
   };
 }
 

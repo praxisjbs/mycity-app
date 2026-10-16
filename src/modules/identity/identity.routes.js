@@ -24,7 +24,7 @@ route(router, "post", "/refresh",
   limits.refreshLimiter, controller.refresh);
 
 route(router, "post", "/logout",
-  { body: c.common.EmptyBody, no_content: true, anonymous: true, summary: "Sign out this session" },
+  { body: c.identity.LogoutBody, no_content: true, anonymous: true, summary: "Sign out this session" },
   controller.logout);
 
 route(router, "get", "/device",

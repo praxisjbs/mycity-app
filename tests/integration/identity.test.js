@@ -270,6 +270,15 @@ describeDb("identity against the real migrations", () => {
       expect((await agent.post("/api/v1/auth/refresh").send({})).status).toBe(401);
     });
 
+    test("a screen that locked itself when idle records the session as ended for inactivity", async () => {
+      const { agent, token } = await signIn("ops@mycity.test", OPS_PASSWORD);
+      const sid = JSON.parse(Buffer.from(token.split(".")[1], "base64url")).sid;
+      const out = await agent.post("/api/v1/auth/logout").send({ reason: "idle" });
+      expect(out.status).toBe(204);
+      expect((await one("SELECT end_reason FROM user_session WHERE session_id = $1", [sid])).end_reason).toBe("inactivity_timeout");
+      expect((await agent.post("/api/v1/auth/logout").send({ reason: "away" })).status).toBe(422);
+    });
+
     test("My Security lists the sign-ins, marks this one, and ends another", async () => {
       const other = await signIn("ops@mycity.test", OPS_PASSWORD);
       const mine = await signIn("ops@mycity.test", OPS_PASSWORD);

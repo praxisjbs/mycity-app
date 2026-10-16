@@ -41,7 +41,7 @@ describe("session policy", () => {
   });
 
   test("the clock the client locks by", () => {
-    expect(policy.clock(3600)).toEqual({ expires_in: 900, session_expires_in: 3600, session_max_age: 7200 });
+    expect(policy.clock(3600)).toEqual({ expires_in: 900, session_expires_in: 3600, session_max_age: 7200, session_idle_limit: 1800 });
   });
 });
 

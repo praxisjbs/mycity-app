@@ -109,7 +109,8 @@ mycity-app/
 │   ├── PROGRESS.md           86 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
-│   │                         proxy (nginx settings), server-setup (provisioning), github-settings
+│   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
+│   │                         first-accounts (the first two logins on a server)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
 ├── .github/
 │   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml, uptime.yml

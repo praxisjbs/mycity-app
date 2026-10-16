@@ -548,7 +548,7 @@ app/
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
-    auth/                     AuthProvider (useAuth, useMe; the expired state), Login, SignInSheet
+    auth/                     AuthProvider (useAuth, useMe; the session clock and the locked state), Login, LockSheet
     shell/                    Shell (DesktopShell or PhoneShell from @mycity/ui), catalogue (modules, tab
                               slugs, one-word names), access (grants), nav (rail, bottom bar, More),
                               screens (lazy per module), More, Fab, screen-action (useScreenAction),
@@ -637,13 +637,16 @@ A screen may also render a different layout per shell; it never shrinks the desk
 Mailbox are "fit" pages (`useFitPage`): only their panes scroll, and scrolling past a pane's end
 slides the page header away; the floating button stays off them.
 
-**Sign-in and the session.** `auth/Login.tsx` is the sign-in screen (the Deep Green panel with the
-pin on desktop; the pin and the form on a phone). The access token is held in memory only and the
-refresh cookie restores the session on load (§9.5). When the session ends mid-work (a 401 the
-refresh cookie cannot cure), the shell stays, with the person's screen and any half-filled form, and
-`auth/SignInSheet.tsx` opens over it (PR 2 question 2): signing in again as the same person carries
-on and reloads what failed; another account reloads at Home; Sign Out leaves. Sign Out is in the
-account menu and at the foot of More.
+**Sign-in and the session** (`docs/guides/identity.md`). `auth/Login.tsx` is the sign-in screen:
+on desktop the four cities fill the screen (`CityShowcase`) with the card over them; on a phone a
+short band of the city and the form under it. The same card holds Forgot Password, and the page a
+reset or invitation link opens (`/reset`, `/welcome`). The access token is held in memory only and
+the refresh cookie restores the session on load (§9.5). The session locks at its two-hour ceiling,
+after the idle limit with no activity in any tab, or when the refresh cookie is refused; every open
+tab locks at once (a BroadcastChannel), the shell stays with the person's screen and any half-filled
+form, and `auth/LockSheet.tsx` (`LockScreen`) covers it: their password carries on and reloads what
+failed; Sign Out leaves. While the person is active the access token is renewed a minute before it
+expires. Sign Out is in the account menu and at the foot of More.
 
 **Search** (`shell/Search.tsx` on `CommandPalette`): ⌘K or Ctrl K anywhere, the top bar's search
 button, the phone's search icon and More's search bar. Screens and records from
@@ -776,7 +779,8 @@ held to the same rules by review until the crawl signs in as them too.
 **The client** is `packages/ui/src/data`, shared by both apps. `createApiClient` makes each app's
 client: the staff app's sends `Authorization: Bearer <access token>` (held in memory only) and
 `credentials: "include"` for the refresh cookie, and on a 401 calls `/api/v1/auth/refresh` once and
-retries; the public site's calls `/api/public/v1` with no session. Errors arrive as one `ApiError`
+retries (one tab at a time, through the Web Locks API, because the refresh token rotates and a
+rotated one ends the session; `session.onEnded` receives the server's reason); the public site's calls `/api/public/v1` with no session. Errors arrive as one `ApiError`
 with `code`, `message` and `fields`. Writes that must not repeat pass `idempotencyKey` (sent as
 `Idempotency-Key`). The hooks: `useApi` (one read), `usePaged` (server pages: `page`, `q` debounced
 250 ms, filters; changing either goes to page 1), `useInfinite` (phones), `useMutation` (with
@@ -786,9 +790,11 @@ There is no client cache beyond the mounted reads. The page size is the contract
 constant in an app.
 
 **Types.** Every call is typed by its key, `api.call("GET /api/v1/employees/:id", { params, query,
-body })`, from the `Endpoints` map. Today each `api/types/<module>.ts` extends it with INTERIM
-shapes; the generated `Endpoints` and `schemas` in `packages/contract/contract.gen.ts` (F15) replace
-them module by module.
+body })`, from the `Endpoints` map. `app/src/api/endpoints.ts` starts from the generated `Endpoints`
+in `packages/contract/contract.gen.ts` (F15; `tsconfig.app.json` has `allowJs` so the schemas' types
+resolve), and each `api/types/<module>.ts` still on INTERIM shapes adds its routes by declaration
+merging until the module lands. A form may use a contract schema directly
+(`import identity from "@mycity/contract/schemas/identity.js"`) for its field rules.
 
 **Moving a module from INTERIM to the contract.** `npm run contract:status` (from `app/`) lists
 every INTERIM file in both apps against `contract.gen.ts`: how many of the endpoints the screens call
@@ -805,7 +811,8 @@ its seeded data (`seeds/staging`, A5); production shows only live data. The in-b
 (tests, the gallery, the crawl), and the `mock-free` gate proves no release build contains it. It
 answers with the backend's exact envelopes, applies search and filters itself and rejects unknown
 query keys with a 422. Each mock response is checked against the contract once that module's schema
-exists, and a module's mock is deleted when its real routes ship. API mode is set in
+exists, and a module's mock is deleted when its real routes ship. The identity mock is the exception:
+it stays, in the contract's shapes, because the gallery, the crawl and a laptop all need to sign in. API mode is set in
 `vite.config.ts`: `mock` for `npm run dev` and `npm run build:demo`, `live` for a production build;
 `VITE_API_MODE=live npm run dev` proxies `/api` to `localhost:3000`.
 

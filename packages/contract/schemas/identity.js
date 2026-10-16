@@ -88,6 +88,8 @@ const sessionClock = {
   session_expires_in: seconds,
   /** The session's full length in seconds. */
   session_max_age: seconds,
+  /** Seconds without use after which the screen locks. */
+  session_idle_limit: seconds,
 };
 
 /* ------------------------------------------------------------------ *
@@ -102,6 +104,14 @@ const LoginBody = z
 /** POST /auth/login. The refresh cookie is set beside it. */
 const Session = z
   .object({ access_token: z.string(), ...sessionClock, user: Me })
+  .strict();
+
+/**
+ * POST /auth/logout. `idle` when the screen locked itself after the idle limit,
+ * so the person's sign-in list says why the session ended.
+ */
+const LogoutBody = z
+  .object({ reason: z.enum(["idle"]).optional() })
   .strict();
 
 /** POST /auth/refresh: a new access token for the session the cookie names; the cookie rotates. */
@@ -231,27 +241,6 @@ const UserInviteEmailVars = z
   })
   .strict();
 
-/** templates/email/new-sign-in.html */
-const NewSignInEmailVars = z
-  .object({
-    when: z.string(),
-    device: z.string(),
-    ip_address: z.string(),
-    security_url: z.string().url(),
-    forgot_url: z.string().url(),
-  })
-  .strict();
-
-/** templates/email/sign-in-throttled.html */
-const SignInThrottledEmailVars = z
-  .object({ attempts: z.number().int().min(1), forgot_url: z.string().url() })
-  .strict();
-
-/** templates/email/password-changed.html */
-const PasswordChangedEmailVars = z
-  .object({ when: z.string(), forgot_url: z.string().url() })
-  .strict();
-
 module.exports = {
   PASSWORD_MIN,
   PASSWORD_MAX,
@@ -267,6 +256,7 @@ module.exports = {
   LoginBody,
   Session,
   SessionTokens,
+  LogoutBody,
   DeviceAccount,
   PasswordChange,
   PasswordChanged,
@@ -285,7 +275,4 @@ module.exports = {
   SecuritySummary,
   PasswordResetEmailVars,
   UserInviteEmailVars,
-  NewSignInEmailVars,
-  SignInThrottledEmailVars,
-  PasswordChangedEmailVars,
 };

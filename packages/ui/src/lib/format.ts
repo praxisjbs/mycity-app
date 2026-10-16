@@ -66,6 +66,21 @@ function lagosParts(iso: string) {
   return { year: out.year, month: out.month, day: out.day, hour: out.hour, minute: out.minute };
 }
 
+/**
+ * The wall clock in another city, for the sign-in screen's cities: the time
+ * ("19:42"), the day as a person says it ("Wednesday 16 October", day first),
+ * and the hour as a number (with minutes as a fraction) for the scene's light.
+ */
+export function zoneClock(now: Date, timeZone: string): { time: string; day: string; hour: number } {
+  // @date-format:parts the parts are read by name and joined day first below
+  const f = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const out: Record<string, string> = {};
+  for (const part of f.formatToParts(now)) out[part.type] = part.value;
+  const hour = Number(out.hour) % 24;
+  const minute = Number(out.minute);
+  return { time: `${pad(hour)}:${pad(minute)}`, day: `${out.weekday} ${out.day} ${out.month}`, hour: hour + minute / 60 };
+}
+
 /** Today in Lagos as ISO "YYYY-MM-DD". */
 export function todayIso(now = new Date()): string {
   const p = lagosParts(now.toISOString());

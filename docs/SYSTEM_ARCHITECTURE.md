@@ -228,7 +228,9 @@ seconds; `/api/health/ready` reports `worker` degraded when none is fresh.
 ## 8 · Security model, at system level
 
 - **Auth.** Argon2id passwords. Access JWT 15 min, in memory. Refresh token rotated on use, stored
-  hashed in `user_session`, sent as host-only cookie. Session kill is effective on the next request
+  hashed in `user_session`, sent as host-only cookie; a rotated token presented again ends the
+  session. A session lasts 2 hours from sign-in and ends after 30 idle minutes, every token capped
+  at the session's end (`docs/guides/identity.md` §6). Session kill is effective on the next request
   (Redis session set, Postgres fallback), as Praxis `middleware/auth.js` does today.
 - **RBAC, four layers.** Module → action (`view create edit delete approve export`) → record scope
   (`all team own`) → field. Enforced by the API; the shell only hides. No entity layer (A2).

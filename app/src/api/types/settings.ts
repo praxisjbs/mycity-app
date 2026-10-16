@@ -15,22 +15,6 @@ export interface Organisation {
   week: Array<{ day: string; working: boolean; start: string | null; end: string | null; grace_min: number | null }>;
   holidays: Array<{ date: IsoDate; name: string }>;
 }
-export interface UserRow {
-  user_id: Uuid;
-  person: PersonRef;
-  email: string;
-  role: string;
-  last_seen: IsoDateTime | null;
-  mfa: boolean;
-  status: Status;
-}
-export interface UsersSummary {
-  users: number;
-  active_now: number;
-  pending: number;
-  mfa: number;
-  by_role: BarRow[];
-}
 export interface Role {
   role_id: Uuid;
   name: string;
@@ -188,11 +172,6 @@ declare module "@/api/endpoints" {
   interface Endpoints {
     "GET /api/v1/settings/organisation": { query: never; body: never; params: never; response: Organisation };
     "PATCH /api/v1/settings/organisation": { query: never; body: { trading_name?: string; week?: Organisation["week"] }; params: never; response: Organisation };
-    "GET /api/v1/settings/users/summary": { query: never; body: never; params: never; response: UsersSummary };
-    "GET /api/v1/settings/users": { query: Q<{ role?: string }>; body: never; params: never; response: Paged<UserRow> };
-    "POST /api/v1/settings/users/invite": { query: never; body: { employee_id: Uuid; role: string }; params: never; response: UserRow };
-    "POST /api/v1/settings/users/:id/role": { query: never; body: { role: string }; params: { id: string }; response: UserRow };
-    "POST /api/v1/settings/users/:id/disable": { query: never; body: { reason: string }; params: { id: string }; response: UserRow };
     "GET /api/v1/settings/roles": { query: Q; body: never; params: never; response: Paged<Role> };
     "GET /api/v1/settings/roles/matrix": { query: never; body: never; params: never; response: Matrix };
     "GET /api/v1/settings/roles/catalogue": { query: never; body: never; params: never; response: AccessCatalogue };
