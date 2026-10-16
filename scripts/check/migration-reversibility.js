@@ -88,7 +88,7 @@ const lineIndex = (lines, re) => lines.findIndex((l) => re.test(l));
  * @returns {string[]} problems
  */
 function review(text, name) {
-  const where = `migrations/${name}`;
+  const where = name.includes("/") ? name : `migrations/${name}`;
   try {
     parseMigration(text, where);
   } catch (err) {
@@ -213,7 +213,7 @@ const diff = (a, b) => a.filter((x) => !b.includes(x));
  */
 async function roundTrip({
   databaseUrl,
-  dir = path.join(ROOT, "migrations"),
+  dir,
   log = () => {},
 }) {
   const { Client } = require("pg");
@@ -240,6 +240,7 @@ async function roundTrip({
         log(`up ${f.name}`);
       }
       for (const f of [...files].reverse()) {
+        const where = f.file.includes("/") ? f.file : `migrations/${f.file}`;
         let undone;
         try {
           undone = await migrator.down(c, { dir });
@@ -250,7 +251,7 @@ async function roundTrip({
             );
             break;
           }
-          problems.push(`migrations/${f.file}: DOWN failed: ${err.message}`);
+          problems.push(`${where}: DOWN failed: ${err.message}`);
           break;
         }
         log(`down ${undone}`);
@@ -258,11 +259,11 @@ async function roundTrip({
         const was = before.get(f.name);
         for (const o of diff(now, was))
           problems.push(
-            `migrations/${f.file}: after DOWN, ${o} is still there`,
+            `${where}: after DOWN, ${o} is still there`,
           );
         for (const o of diff(was, now))
           problems.push(
-            `migrations/${f.file}: DOWN removed ${o}, which existed before its UP`,
+            `${where}: DOWN removed ${o}, which existed before its UP`,
           );
       }
       if (!problems.length) {
@@ -288,16 +289,22 @@ async function roundTrip({
  * @returns {{problems: string[], notes: string[], count: number}}
  */
 function check({ root = ROOT } = {}) {
-  const dir = path.join(root, "migrations");
-  const files = fs.existsSync(dir)
-    ? fs
-        .readdirSync(dir)
-        .filter((f) => FILE_RE.test(f))
-        .sort(byNumber)
-    : [];
+  const files = [
+    [path.join(root, "migrations"), "migrations"],
+    [path.join(root, "seeds", "reference"), "seeds/reference"],
+  ].flatMap(([dir, label]) =>
+    fs.existsSync(dir)
+      ? fs
+          .readdirSync(dir)
+          .filter((f) => FILE_RE.test(f))
+          .map((f) => ({ dir, label, file: f }))
+      : [],
+  ).sort((a, b) => byNumber(a.file, b.file));
   const problems = [];
-  for (const f of files)
-    problems.push(...review(fs.readFileSync(path.join(dir, f), "utf8"), f));
+  for (const { dir, label, file } of files)
+    problems.push(
+      ...review(fs.readFileSync(path.join(dir, file), "utf8"), `${label}/${file}`),
+    );
   return { problems, notes: [], count: files.length };
 }
 

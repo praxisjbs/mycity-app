@@ -57,7 +57,8 @@ mycity-app/
 │                             catalogue in docs/COMPONENTS.md (FRONTEND_GUIDE §9)
 ├── src/                      backend source (§4, §5)
 ├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2)
-├── migrations/               NNNN_name.sql, block per milestone (§6.3)
+├── migrations/               NNNN_name.sql schema steps (§6.3)
+├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
 ├── templates/documents/      PDF templates (HTML)
@@ -444,9 +445,10 @@ another module; call that module's service.
 
 ### 6.3 Migrations
 
-- `migrations/NNNN_name.sql`, each with `-- UP` and `-- DOWN`, idempotent, `created_at` and
-  `updated_at timestamptz` on every table.
-- **Number blocks per milestone**, so parallel work never collides:
+- Schema changes are `migrations/NNNN_name.sql`. Deterministic product/reference data is
+  `seeds/reference/NNNN_seed_name.sql`. Both have `-- UP` and `-- DOWN` and are idempotent.
+- The two folders share the milestone number blocks below. A number is unique across both folders;
+  `db:migrate` interleaves them numerically and records every step in `schema_migration`.
 
 | Milestone | Block | Milestone | Block |
 |---|---|---|---|
@@ -456,6 +458,12 @@ another module; call that module's service.
 | M3 | 3000 to 3999 | M9 | 9000 to 9999 |
 | M4 | 4000 to 4999 | M10 | 10000 to 10999 |
 | M5 | 5000 to 5999 | M11 | 11000 to 11999 |
+
+- `seeds/build/` and `seeds/staging/` remain JavaScript service-level demo-data seeds; production
+  never runs those folders. Reference SQL is safe for every environment and contains no people or
+  transactions.
+- Every table has `created_at` and `updated_at timestamptz` unless its documented infrastructure
+  contract requires an exact shape.
 
 - A merged migration is never edited. A change is a new file.
 - Destructive steps (drop, rename, type change) are declared in the file header and ship one release
