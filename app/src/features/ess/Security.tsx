@@ -1,144 +1,176 @@
-import { invalidate, useApi, useMutation } from "@/api/hooks";
+import identity from "@mycity/contract/schemas/identity.js";
+import type { SignIn } from "@mycity/contract/contract.gen.ts";
+import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { PhoneCards } from "@/features/shared/PhoneCards";
+import { PagedTable } from "@/features/shared/sections";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, Card, CardHeader, DataView, DesktopOnly, ErrorState, Field, formatDate, formatDateTime, FormFooter, Grid, Icon, LoadingRows, PageHeader, PasswordField, Pill, rules, toast, ToggleRow, useContractForm, useModal } from "@mycity/ui";
+import { Button, Card, CardHeader, DesktopOnly, ErrorState, Field, formatDate, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, PasswordField, Pill, toast, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
 
+/** How an ended sign-in ended, in a person's words. */
+const ENDED: Record<NonNullable<SignIn["end_reason"]>, string> = {
+  signed_out: "Signed out",
+  session_max_age: "Timed out",
+  inactivity_timeout: "Idle",
+  refresh_token_reuse: "Stopped",
+  password_changed: "Password changed",
+  password_reset: "Password reset",
+  ended_by_user: "Signed out",
+  ended_by_admin: "Signed out",
+  account_suspended: "Suspended",
+};
+
+function statusOf(s: SignIn) {
+  if (s.current) return <Pill tone="ok">This Device</Pill>;
+  if (s.status === "active") return <Pill tone="info">Signed In</Pill>;
+  return <Pill tone="neutral">{s.end_reason ? ENDED[s.end_reason] : "Ended"}</Pill>;
+}
+
+/**
+ * ESS · My Security: the person's password, where they are signed in, and the
+ * sign-ins on their account (docs/guides/identity.md §10). Two-step sign-in,
+ * passkeys and the PIN join this page with the security module.
+ */
 export function MySecurityPage() {
-  const { data: s, error, reload } = useApi("GET /api/v1/ess/security");
-  const patch = useMutation("PATCH /api/v1/ess/security");
+  const summary = useApi("GET /api/v1/auth/security");
+  const live = usePaged("GET /api/v1/auth/sessions", { filters: { status: "active" } });
+  const all = usePaged("GET /api/v1/auth/sessions");
+  const endOne = useMutation("POST /api/v1/auth/sessions/:id/end");
+  const endOthers = useMutation("POST /api/v1/auth/sessions/end-others");
   const modal = useModal();
+  const confirm = useConfirm();
   const { navigate } = useRouter();
-  if (error) return <ErrorState error={error} onRetry={reload} />;
-  if (!s) return <LoadingRows count={6} />;
-  const set = async (body: { mfa_app?: boolean; mfa_email_fallback?: boolean }) => {
-    await patch.run({ body });
-    invalidate("/api/v1/ess/security");
-    toast("Saved");
+  if (summary.error) return <ErrorState error={summary.error} onRetry={summary.reload} />;
+  if (!summary.data) return <LoadingRows count={6} />;
+  const s = summary.data;
+  const refresh = () => invalidate("/api/v1/auth/s");
+
+  const end = async (row: SignIn) => {
+    if (!(await confirm({ title: "Sign Out Device", body: row.device_label, confirmLabel: "Sign Out" }))) return;
+    try {
+      await endOne.run({ params: { id: row.session_id }, body: {} });
+      refresh();
+      toast("Device signed out");
+    } catch (e) {
+      toast((e as Error).message);
+    }
   };
+  const others = async () => {
+    if (!(await confirm({ title: "Sign Out Others", confirmLabel: "Sign Out" }))) return;
+    const r = await endOthers.run({ body: {} });
+    refresh();
+    toast(r.ended === 1 ? "1 device signed out" : `${r.ended} devices signed out`);
+  };
+
   const pw = (
     <Card>
       <CardHeader title="Password" />
-      <p className="text-2xs text-subtle-foreground">Last changed {formatDate(s.password_changed_at)}.</p>
-      <Button className="mt-3" onClick={() => modal.open({ title: "Change Password", body: (close) => <PasswordForm close={close} /> })}>Change Password</Button>
+      <p className="text-sm text-muted-foreground">{s.password_changed_at ? `Changed ${formatDate(s.password_changed_at)}` : "Not changed yet"}</p>
+      <Button className="mt-3" icon="lock" onClick={() => modal.open({ title: "Change Password", body: (close) => <PasswordForm close={close} /> })}>
+        Change Password
+      </Button>
     </Card>
   );
-  const mfa = (
-    <Card>
-      <CardHeader title="Two-Step Sign-In" />
-      <ToggleRow title="Authenticator App" text="A 6 digit code at sign in, from any authenticator app" checked={s.mfa_app} onChange={(v) => set({ mfa_app: v })} />
-      <ToggleRow title="Email Code Fallback" text="Used only if the app is unavailable" checked={s.mfa_email_fallback} onChange={(v) => set({ mfa_email_fallback: v })} />
-    </Card>
-  );
-  const pk = (
-    <Card>
-      <CardHeader title="Passkeys" right={<Pill tone="ok">{`${s.passkeys.length} set up`}</Pill>} />
-      {s.passkeys.map((k) => (
-        <div key={k.passkey_id} className="flex items-center gap-2.5 border-b border-border py-2.5">
-          <span className="flex size-8.5 items-center justify-center rounded-box bg-accent text-accent-foreground"><Icon name="shield" size="m" /></span>
-          <span className="flex-1"><b className="text-sm font-semibold">{k.name}</b><span className="block text-2xs text-subtle-foreground">Added {formatDate(k.added)} · used {k.last_used}</span></span>
-        </div>
-      ))}
-      <Button className="mt-3" icon="plus" onClick={() => toast("Follow the prompt on your device")}>Add a Passkey</Button>
-      <p className="mt-2.5 text-2xs text-subtle-foreground">Sign in with your fingerprint or face instead of a password.</p>
-    </Card>
-  );
-  const pin = (
-    <Card>
-      <CardHeader title="PIN" right={<Pill tone={s.pin_set ? "ok" : "neutral"}>{s.pin_set ? "Set" : "Not set"}</Pill>} />
-      <p className="text-2xs text-subtle-foreground">A short PIN to unlock the app and confirm a clock-in on a registered device.</p>
-      <Button className="mt-3" onClick={() => modal.open({ title: "Set a PIN", body: (close) => <PinForm close={close} /> })}>{s.pin_set ? "Change PIN" : "Set a PIN"}</Button>
-    </Card>
-  );
-  const dev = (
-    <Card>
-      <CardHeader title="Devices" right={<Pill>Up to 3</Pill>} />
-      <Button className="mt-3" iconRight="right" onClick={() => navigate(hrefFor("ess", "my-devices"))}>Open My Devices</Button>
-    </Card>
-  );
-  const act = (
-    <DataView
-      title="Recent Sign-Ins"
-      rows={s.sign_ins}
-      rowKey={(r) => r.at}
+  const sessions = (
+    <PagedTable<SignIn>
+      title="Signed In"
+      list={live}
+      rowKey={(r) => r.session_id}
+      noun="device"
+      right={s.active_sessions > 1 ? <Button size="sm" busy={endOthers.pending} onClick={() => void others()}>Sign Out Others</Button> : undefined}
       columns={[
-        { key: "w", label: "When", render: (r) => formatDateTime(r.at) },
-        { key: "d", label: "Device", render: (r) => r.device },
-        { key: "p", label: "Where", desktop: true, render: (r) => r.where },
-        { key: "r", label: "Result", render: (r) => <Pill tone={r.result.tone}>{r.result.text}</Pill> },
+        { key: "d", label: "Device", render: (r) => <Who name={r.device_label} sub={r.ip_address ?? ""} /> },
+        { key: "w", label: "Signed In", render: (r) => formatWhen(r.issued_at) },
+        { key: "s", label: "Status", render: (r) => (r.current ? statusOf(r) : <Button size="sm" onClick={() => void end(r)}>Sign Out</Button>) },
       ]}
     />
   );
+  const history = (
+    <PagedTable<SignIn>
+      title="Recent Sign-Ins"
+      list={all}
+      rowKey={(r) => r.session_id}
+      noun="sign-in"
+      columns={[
+        { key: "w", label: "When", render: (r) => formatWhen(r.issued_at) },
+        { key: "d", label: "Device", render: (r) => r.device_label },
+        { key: "a", label: "Address", desktop: true, render: (r) => r.ip_address ?? "" },
+        { key: "s", label: "Status", render: statusOf },
+      ]}
+    />
+  );
+  const dev = (
+    <Card>
+      <CardHeader title="Clock-In Devices" />
+      <Button className="mt-3" iconRight="right" onClick={() => navigate(hrefFor("ess", "my-devices"))}>
+        Open My Devices
+      </Button>
+    </Card>
+  );
+
   return (
     <>
-      <PageHeader title="My Security" sub="Sign-in methods and clock-in devices" />
+      <PageHeader title="My Security" sub="Your password and where you are signed in" />
       <PhoneCards
         items={[
-          { icon: "shield", title: "Password", sub: `Changed ${formatDate(s.password_changed_at)}`, body: pw },
-          { icon: "check", title: "Two-Step Sign-In", sub: s.mfa_app ? "Authenticator on" : "Off", body: mfa },
-          { icon: "spark", title: "Passkeys", sub: `${s.passkeys.length} set up`, body: pk },
-          { icon: "grid", title: "PIN", sub: s.pin_set ? "Set" : "Not set", body: pin },
-          { icon: "msg", title: "Devices", sub: "Managed in My Devices", body: dev },
-          { icon: "clock", title: "Sign-In Activity", sub: `${s.sign_ins.filter((x) => x.result.tone === "err").length} flagged`, body: act, wide: true },
+          { icon: "lock", title: "Password", sub: s.password_changed_at ? `Changed ${formatDate(s.password_changed_at)}` : "Not changed yet", body: pw },
+          { icon: "shield", title: "Signed In", sub: s.active_sessions === 1 ? "1 device" : `${s.active_sessions} devices`, body: sessions, wide: true },
+          { icon: "clock", title: "Recent Sign-Ins", sub: "Every sign-in", body: history, wide: true },
+          { icon: "msg", title: "Clock-In Devices", sub: "In My Devices", body: dev },
         ]}
       />
       <DesktopOnly>
-        <Grid cols={2}>{pw}{mfa}</Grid>
-        <Grid cols={2}>{pk}{pin}</Grid>
-        <Grid cols={2}>{dev}{act}</Grid>
+        <Grid cols={2}>
+          {pw}
+          {dev}
+        </Grid>
+        {sessions}
+        {history}
       </DesktopOnly>
     </>
   );
 }
 
+/** The contract's rule for a new password, as a field mark. */
+const newPasswordRule = (v: string) => {
+  const r = identity.NewPassword.safeParse(v);
+  return r.success ? null : r.error.issues[0].message;
+};
+
 function PasswordForm({ close }: { close: () => void }) {
   const f = useContractForm(
     { cur: "", next: "", again: "" },
-    { cur: rules.min(8, "At least 8 characters"), next: rules.min(12, "At least 12 characters"), again: (v, all) => (v !== all.next ? "Does not match" : null) },
+    { cur: (v) => (v ? null : "Enter your password"), next: newPasswordRule, again: (v, all) => (v !== all.next ? "Does not match" : null) },
   );
   const save = useMutation("POST /api/v1/auth/password");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: { current_password: f.values.cur, new_password: f.values.next } });
+      const r = await save.run({ body: { current_password: f.values.cur, new_password: f.values.next } });
+      invalidate("/api/v1/auth/s");
       close();
-      toast("Password updated");
+      toast(r.sessions_signed_out ? "Password changed, other devices signed out" : "Password changed");
     } catch {
-      /* the field shows why */
+      /* the fields show why */
     }
   };
   const cur = f.field("cur");
+  const next = f.field("next");
   return (
     <>
-      <Field label="Current Password" {...cur} state={save.fields.current_password ? "bad" : cur.state} message={save.fields.current_password?.[0] ?? cur.message}><PasswordField autoComplete="current-password" {...cur} /></Field>
-      <Field label="New Password" info="Changing it signs you out everywhere else." {...f.field("next")}><PasswordField autoComplete="new-password" {...f.field("next")} /></Field>
-      <Field label="Confirm New Password" {...f.field("again")}><PasswordField autoComplete="new-password" {...f.field("again")} /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Update Password</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-function PinForm({ close }: { close: () => void }) {
-  const f = useContractForm({ pin: "" }, { pin: (v) => (/^\d{4,6}$/.test(v) ? null : "4 to 6 digits") });
-  const save = useMutation("POST /api/v1/auth/pin");
-  const pin = f.field("pin");
-  const submit = async () => {
-    if (!f.check()) return;
-    await save.run({ body: { pin: f.values.pin } });
-    invalidate("/api/v1/ess/security");
-    close();
-    toast("PIN saved");
-  };
-  return (
-    <>
-      <Field label="PIN" {...pin}>
-        <PasswordField inputMode="numeric" maxLength={6} {...pin} onChange={(v) => pin.onChange(v.replace(/\D/g, ""))} className="h-12 text-center text-2xl font-bold tracking-otp" />
+      <Field label="Current Password" {...cur} state={save.fields.current_password ? "bad" : cur.state} message={save.fields.current_password?.[0] ?? cur.message}>
+        <PasswordField autoComplete="current-password" {...cur} />
+      </Field>
+      <Field label="New Password" {...next} state={save.fields.new_password ? "bad" : next.state} message={save.fields.new_password?.[0] ?? next.message}>
+        <PasswordField autoComplete="new-password" {...next} />
+      </Field>
+      <Field label="Confirm New Password" {...f.field("again")}>
+        <PasswordField autoComplete="new-password" {...f.field("again")} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Save PIN</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>
+          Change Password
+        </Button>
       </FormFooter>
     </>
   );

@@ -1,4 +1,4 @@
-import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, ok, paged, route, sid, fail } from "../core";
+import { at, created, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
 import { byKey, managerOf } from "../data/people";
 
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
@@ -142,31 +142,3 @@ route("POST /api/v1/ess/documents", (req) => {
   return created(existing ?? list[0]);
 });
 
-const SEC = new Map<string, { mfa_app: boolean; mfa_email_fallback: boolean; pin: boolean }>();
-const sec = (u: string) => SEC.get(u) ?? { mfa_app: true, mfa_email_fallback: false, pin: false };
-const secOut = (u: string) => ({
-  password_changed_at: isoDaysAgo(61), mfa_app: sec(u).mfa_app, mfa_email_fallback: sec(u).mfa_email_fallback,
-  passkeys: [{ passkey_id: sid(`pk:${u}`), name: "MacBook Pro, Touch ID", added: isoDaysAgo(42), last_used: "today" }], pin_set: sec(u).pin,
-  sign_ins: [
-    { at: at(0, "08:04"), device: "MacBook Pro · Chrome", where: "Victoria Island", result: { tone: "ok" as const, text: "Registered" } },
-    { at: at(1, "17:22"), device: "Samsung Galaxy S23", where: "Victoria Island", result: { tone: "ok" as const, text: "Registered" } },
-    { at: at(1, "07:41"), device: "iPhone 13 · Safari", where: "Lekki", result: { tone: "err" as const, text: "Unregistered, flagged" } },
-  ],
-});
-route("GET /api/v1/ess/security", (req) => ok(secOut(req.user!)));
-route("PATCH /api/v1/ess/security", (req) => {
-  SEC.set(req.user!, { ...sec(req.user!), ...(req.body as object) });
-  return ok(secOut(req.user!));
-});
-route("POST /api/v1/auth/password", (req) => {
-  const f: Record<string, string[]> = {};
-  if (String(req.body.current_password ?? "").length < 8) f.current_password = ["That is not your current password"];
-  if (String(req.body.new_password ?? "").length < 12) f.new_password = ["At least 12 characters"];
-  if (Object.keys(f).length) return invalid(f);
-  return noContent();
-});
-route("POST /api/v1/auth/pin", (req) => {
-  if (!/^\d{4,6}$/.test(String(req.body.pin ?? ""))) return invalid({ pin: ["4 to 6 digits"] });
-  SEC.set(req.user!, { ...sec(req.user!), pin: true });
-  return noContent();
-});

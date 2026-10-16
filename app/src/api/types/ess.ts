@@ -74,15 +74,6 @@ export interface MyDocument {
   signed_number: string | null;
 }
 
-export interface MySecurity {
-  password_changed_at: IsoDate;
-  mfa_app: boolean;
-  mfa_email_fallback: boolean;
-  passkeys: Array<{ passkey_id: Uuid; name: string; added: IsoDate; last_used: string }>;
-  pin_set: boolean;
-  sign_ins: Array<{ at: IsoDateTime; device: string; where: string; result: Pill }>;
-}
-
 type Q<T = object> = T & { page?: number; q?: string };
 
 declare module "@/api/endpoints" {
@@ -96,11 +87,6 @@ declare module "@/api/endpoints" {
     "GET /api/v1/ess/sanctions": { query: Q; body: never; params: never; response: Paged<MySanction> };
     "GET /api/v1/ess/documents": { query: Q; body: never; params: never; response: Paged<MyDocument> };
     "POST /api/v1/ess/documents": { query: never; body: { name: string; document_id: Uuid }; params: never; response: MyDocument };
-    "GET /api/v1/ess/security": { query: never; body: never; params: never; response: MySecurity };
-    "PATCH /api/v1/ess/security": { query: never; body: { mfa_app?: boolean; mfa_email_fallback?: boolean }; params: never; response: MySecurity };
-    "POST /api/v1/auth/password": { query: never; body: { current_password: string; new_password: string }; params: never; response: null };
-    "POST /api/v1/auth/pin": { query: never; body: { pin: string }; params: never; response: null };
-    "GET /api/v1/auth/sign-ins": { query: Q; body: never; params: never; response: Paged<{ at: IsoDateTime; device: string; where: string; result: Pill }> };
   }
 }
 
