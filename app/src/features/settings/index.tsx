@@ -6,16 +6,13 @@ import "@/api/types/organisation";
 import type { AuditEntry, FailedLogin, Hierarchy, Numbering, Organisation, Session, UserRow } from "@/api/types/settings";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Chain, StatStrip } from "@/components/ui/data";
-import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, KvCard, PagedTable } from "@/features/shared/sections";
+import { BarsCard, ExportAction, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AttendancePolicyTab } from "./Policy";
 import { Roles, useRoleOptions } from "./Roles";
-import { PersonPicker } from "@/components/form";
-import { Button, Pill, Who, Icon, HelpTerm, Card, CardHeader, Grid, PageHeader, useModal, Chips, toast, cn, formatDate, formatDateTime, formatWhen, useTheme, StatusPill, ChoiceField, Field, FormFooter, InlineInput, SelectField, Switch, TextAreaField } from "@mycity/ui";
+import { Button, Card, CardHeader, Chain, Chips, ChoiceField, cn, DataView, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, InlineInput, LoadingRows, PageHeader, Paper, PaperFoot, PaperLogo, PaperTitle, Pill, SelectField, Signature, StatStrip, StatusPill, Swatch, Switch, TextAreaField, toast, useModal, useTheme, Who } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -59,12 +56,12 @@ function OrganisationTab() {
         <KvCard title="Departments" items={(depts.data?.data ?? []).map((x) => [x.name, `${x.headcount} staff`])} />
       </Grid>
       <Grid cols={2}>
-        <KvCard title="Addresses" items={d.hosts.map(([k, v]) => [k, k.startsWith("Why") ? v : <code key={k} className="text-[12px]">{v}</code>])} />
-        <KvCard title="System" items={d.about.map(([k, v]) => [k, v === "JBS Praxis" ? <a key={k} href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer" className="font-[650] text-accent-foreground">{v}</a> : v])} />
+        <KvCard title="Addresses" items={d.hosts.map(([k, v]) => [k, k.startsWith("Why") ? v : <code key={k} className="text-xs">{v}</code>])} />
+        <KvCard title="System" items={d.about.map(([k, v]) => [k, v === "JBS Praxis" ? <a key={k} href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer" className="font-strong text-accent-foreground">{v}</a> : v])} />
       </Grid>
-      <Table
+      <DataView
         title="Working Week"
-        right={<span className="text-[11.5px] text-subtle-foreground">Per day, not a fixed pattern</span>}
+        right={<span className="text-2xs text-subtle-foreground">Per day, not a fixed pattern</span>}
         rows={w}
         rowKey={(r) => r.day}
         columns={[
@@ -86,7 +83,7 @@ function TimeBox({ value, onChange, label }: { value: string; onChange: (v: stri
   const [t, setT] = useState(value);
   useEffect(() => setT(value), [value]);
   const ok = /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
-  return <InlineInput aria-label={label} inputMode="numeric" className={cn("h-8 w-[70px] max-md:h-11 rounded-ctl border bg-background px-2 text-[13px] outline-none", ok ? "border-input focus:border-ring" : "border-destructive")} value={t} onChange={setT} onBlur={() => ok && t !== value && onChange(t)} />;
+  return <InlineInput aria-label={label} inputMode="numeric" className={cn("h-8 w-18 max-md:h-11 rounded-ctl border bg-background px-2 text-sm outline-none", ok ? "border-input focus:border-ring" : "border-destructive")} value={t} onChange={setT} onBlur={() => ok && t !== value && onChange(t)} />;
 }
 
 /* ───────────── Users ───────────── */
@@ -103,7 +100,7 @@ function Users() {
         sub={s.data ? `${s.data.users} users · ${s.data.pending} pending invitation` : " "}
         actions={
           <>
-            <ExportButton source="settings.users" />
+            <ExportAction source="settings.users" />
             <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Invite User", body: (close) => <Invite close={close} /> })}>Invite User</Button>
           </>
         }
@@ -174,7 +171,7 @@ function Invite({ close }: { close: () => void }) {
   const inv = useMutation("POST /api/v1/settings/users/invite");
   return (
     <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message="Pick the employee"><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message="Pick the employee"><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Role"><SelectField value={role} onChange={setRole} options={roles} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -198,9 +195,9 @@ function Approvals() {
       {s.data && <KpiTiles items={[{ label: "Hierarchies", value: String(s.data.hierarchies) }, { label: "Active", value: String(s.data.active), tone: "ok" }, { label: "Awaiting a Decision", value: String(s.data.awaiting), tone: s.data.awaiting ? "warn" : undefined }, { label: "Steps, Longest", value: String(s.data.longest) }]} />}
       <Grid cols={3}>
         {list.rows.map((x) => (
-          <button key={x.hierarchy_id} type="button" onClick={() => setSel(x.hierarchy_id)} className={cn("rounded-box border bg-card p-[14px] text-left transition-shadow hover:shadow-2", x.hierarchy_id === h?.hierarchy_id ? "border-secondary shadow-[0_0_0_1px_var(--secondary)]" : "border-border")}>
-            <h4 data-copy="content" className="text-[13.5px] font-semibold">{x.name}</h4>
-            <p className="mt-1 text-[12.5px] text-muted-foreground">{x.description}</p>
+          <button key={x.hierarchy_id} type="button" onClick={() => setSel(x.hierarchy_id)} className={cn("rounded-box border bg-card p-3.5 text-left transition-shadow hover:shadow-2", x.hierarchy_id === h?.hierarchy_id ? "border-secondary ring-1 ring-secondary" : "border-border")}>
+            <h2 data-copy="content" className="text-sm font-semibold">{x.name}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{x.description}</p>
             <div className="mt-2.5"><StatusPill s={x.status} /></div>
           </button>
         ))}
@@ -210,12 +207,12 @@ function Approvals() {
           <Card>
             <CardHeader title={h.name} right={<StatusPill s={h.status} />} />
             <Chain steps={h.steps.map((label) => ({ label }))} />
-            <div className="mt-3.5 grid grid-cols-1 gap-x-4 gap-y-0.5 text-[13px] md:grid-cols-[118px_minmax(0,1fr)] md:gap-y-[9px]">
+            <dl className="mt-3.5 grid grid-cols-1 gap-x-4 gap-y-0.5 text-sm md:cols-term-value-tight md:gap-y-2">
               {[["Trigger", h.trigger], ["Steps", "Roles, not people. A role can be reassigned"], ["Deputies", h.deputies], ["Ageing", h.ageing], ["In-flight", "A request keeps the chain it started on, even if the hierarchy changes"]].map(([k, v]) => (
-                <div key={k} className="contents"><dt className="text-[12px] text-subtle-foreground">{k}</dt><dd className="font-[550] max-md:mb-2">{v}</dd></div>
+                <div key={k} className="contents"><dt className="text-xs text-subtle-foreground">{k}</dt><dd className="font-semibold max-md:mb-2">{v}</dd></div>
               ))}
-            </div>
-            <div className="mt-[13px] flex flex-wrap gap-2">
+            </dl>
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button icon="plus" onClick={() => modal.open({ title: `Steps · ${h.name}`, body: (close) => <EditSteps h={h} close={close} /> })}>Edit Steps</Button>
             </div>
           </Card>
@@ -238,8 +235,8 @@ function EditSteps({ h, close }: { h: Hierarchy; close: () => void }) {
       <div className="flex flex-col gap-1.5">
         {steps.map((s, i) => (
           <div key={i} className="flex items-center gap-1.5">
-            <b className="w-5 text-[12px] text-subtle-foreground">{i + 1}</b>
-            <InlineInput aria-label={`Step ${i + 1}`} className="h-9 min-w-0 flex-1 rounded-ctl border border-input bg-background px-3 text-[13px] outline-none focus:border-ring" value={s} onChange={(v) => setSteps(steps.map((x, j) => (j === i ? v : x)))} />
+            <b className="w-5 text-xs text-subtle-foreground">{i + 1}</b>
+            <InlineInput aria-label={`Step ${i + 1}`} className="h-9 min-w-0 flex-1 rounded-ctl border border-input bg-background px-3 text-sm outline-none focus:border-ring" value={s} onChange={(v) => setSteps(steps.map((x, j) => (j === i ? v : x)))} />
             <Button size="sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up"><Icon name="up" /></Button>
             <Button size="sm" disabled={i === steps.length - 1} onClick={() => move(i, 1)} aria-label="Move down"><Icon name="up" className="rotate-180" /></Button>
             <Button size="sm" aria-label={`Remove step ${i + 1}`} onClick={() => setSteps(steps.filter((_, j) => j !== i))}><Icon name="x" /></Button>
@@ -279,7 +276,7 @@ function Notifications() {
             {!n.data && <LoadingRows />}
             {rows.map((r) => (
               <div key={r.key} className="flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0">
-                <div className="text-[13px] font-[550]">{r.help ? <HelpTerm help={r.help}>{r.label}</HelpTerm> : r.label}</div>
+                <div className="text-sm font-semibold">{r.help ? <HelpTerm help={r.help}>{r.label}</HelpTerm> : r.label}</div>
                 <Switch checked={r[t]} disabled={r.locked || save.pending} label={`${r.label}, ${t === "email" ? "email" : "in app"}`} onChange={(v) => void set(r.key, { in_app: r.in_app, email: r.email, [t]: v })} />
               </div>
             ))}
@@ -287,7 +284,7 @@ function Notifications() {
         ))}
       </Grid>
       <Grid cols={2}>
-        <Table
+        <DataView
           title="Every Category"
           rows={rows}
           rowKey={(r) => r.key}
@@ -331,21 +328,21 @@ function AppearanceTab() {
         <Card>
           <CardHeader title="Palette" />
           {d.palette.map((c) => (
-            <div key={c.name} data-copy="content" className="flex items-center gap-[11px] py-[7px]">
-              <i className="size-[30px] flex-none rounded-lg border border-border" style={{ background: `var(${c.token})` }} />
-              <div className="flex-1"><div className="text-[13px] font-[550]">{c.name}</div><div className="text-[11.5px] text-subtle-foreground">{vals[c.token]}</div></div>
+            <div key={c.name} data-copy="content" className="flex items-center gap-2.5 py-1.5">
+              <Swatch token={c.token} />
+              <div className="flex-1"><div className="text-sm font-semibold">{c.name}</div><div className="text-2xs text-subtle-foreground">{vals[c.token]}</div></div>
             </div>
           ))}
         </Card>
         <Card>
           <CardHeader title="Typography and Theme" />
-          <dl className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-[13px] md:grid-cols-[minmax(0,160px)_minmax(0,1fr)] md:gap-y-[9px]">
+          <dl className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-sm md:cols-term-value md:gap-y-2">
             {[["Typeface", d.typeface], ["Money figures", "Tabular figures, 2dp"], ["Dates", "Day first, 09/10/2026"], ["Logo", "MyCityApp lockup"], ["Favicon", "Map pin mark"]].map(([k, v]) => (
-              <div key={k} className="contents"><dt className="text-[12px] text-subtle-foreground">{k}</dt><dd className="font-[550]">{v}</dd></div>
+              <div key={k} className="contents"><dt className="text-xs text-subtle-foreground">{k}</dt><dd className="font-semibold">{v}</dd></div>
             ))}
           </dl>
           <div className="mt-3 border-t border-border pt-3">
-            <div className="mb-1.5 text-[12px] text-subtle-foreground">Default theme for everyone</div>
+            <div className="mb-1.5 text-xs text-subtle-foreground">Default theme for everyone</div>
             <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
           </div>
         </Card>
@@ -354,10 +351,10 @@ function AppearanceTab() {
         <Card>
           <CardHeader title="Dark Theme" />
           {d.dark.map((r) => (
-            <div key={r.name} className="flex items-center gap-[11px] border-b border-border py-1.5 last:border-b-0">
-              <i className="size-6 flex-none rounded-[7px] border border-border" style={{ background: `var(${r.token})` }} />
-              <span className="min-w-0 flex-1 text-[12.5px] font-[550]">{r.name} <span className="font-normal text-subtle-foreground">{vals[r.token]}</span></span>
-              <span className="flex-none text-[11.5px] text-subtle-foreground">{r.note}</span>
+            <div key={r.name} className="flex items-center gap-2.5 border-b border-border py-1.5 last:border-b-0">
+              <Swatch token={r.token} size="sm" />
+              <span className="min-w-0 flex-1 text-xs font-semibold">{r.name} <span className="font-normal text-subtle-foreground">{vals[r.token]}</span></span>
+              <span className="flex-none text-2xs text-subtle-foreground">{r.note}</span>
             </div>
           ))}
         </Card>
@@ -394,9 +391,9 @@ function NumberingTab() {
           <p><b>1. Purpose.</b> The parties record their intention to co-operate on the distribution and promotion of the MyCityApp platform across Nigerian cities.</p>
           <p><b>2. Term.</b> This memorandum takes effect on 13 March 2025 and continues for twenty-four months, expiring on 13 March 2027 unless renewed in writing.</p>
           <p><b>3. Consideration.</b> The commercial schedule is set out in Annexe A and carries a total value of ₦18,400,000.</p>
-          <div className="mt-[18px] flex gap-[30px]">
-            <div><Signature>For MyCity</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-[10px] text-paper-faint">I. Chukwu · 13/03/2025</div></div>
-            <div><Signature>For MTN</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-[10px] text-paper-faint">O. Adesanya · 02/04/2025</div></div>
+          <div className="mt-4.5 flex gap-7.5">
+            <div><Signature>For MyCity</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">I. Chukwu · 13/03/2025</div></div>
+            <div><Signature>For MTN</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">O. Adesanya · 02/04/2025</div></div>
           </div>
           <PaperFoot><span>Content hash verified</span><span>Artifact hash verified</span><span className="ml-auto">go.mycityapp.io/verify/MOU-0004</span></PaperFoot>
         </Paper>
@@ -417,17 +414,17 @@ function Integrations() {
       {d && <KpiTiles items={[{ label: "Connected", value: String(count("Connected")) }, { label: "Manual", value: String(count("Manual")) }, { label: "Not in Scope", value: String(count("Not connected")) }, { label: "Failures, 7 Days", value: String(d.health.reduce((a, h) => a + h.failures, 0)), tone: "ok" }]} />}
       <Grid cols={3}>
         {(d?.items ?? []).map((x) => (
-          <div key={x.key} className="rounded-box border border-border bg-card p-[14px]">
-            <h4 data-copy="content" className="text-[13.5px] font-semibold">{x.name}</h4>
-            <p className="mt-1 text-[12.5px] text-muted-foreground">{x.text}</p>
+          <div key={x.key} className="rounded-box border border-border bg-card p-3.5">
+            <h2 data-copy="content" className="text-sm font-semibold">{x.name}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{x.text}</p>
             <div className="mt-2.5"><StatusPill s={x.status} /></div>
           </div>
         ))}
       </Grid>
       <Grid cols={2} className="mt-3">
-        <Table
+        <DataView
           title="Health"
-          right={<span className="text-[11.5px] text-subtle-foreground">Last 7 days</span>}
+          right={<span className="text-2xs text-subtle-foreground">Last 7 days</span>}
           rows={d?.health ?? []}
           rowKey={(h) => h.service}
           loading={i.loading}
@@ -462,7 +459,7 @@ function Security() {
           {!d && <LoadingRows />}
           {d?.rules.map((r) => (
             <div key={r.key} className="flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0">
-              <div className="text-[13px] font-[550]">{r.label}</div>
+              <div className="text-sm font-semibold">{r.label}</div>
               <Switch checked={r.on} label={r.label} disabled={save.pending} onChange={async (v) => { try { await save.run({ body: { [r.key]: v } }); invalidate("/api/v1/settings/security"); toast(`${r.label}: ${v ? "on" : "off"}`); } catch (e) { fail(e); } }} />
             </div>
           ))}
@@ -483,7 +480,7 @@ function Security() {
       <Grid cols={2}>
         <PagedTable<FailedLogin>
           title="Failed Sign-Ins"
-          right={<span className="text-[11.5px] text-subtle-foreground">Last 7 days</span>}
+          right={<span className="text-2xs text-subtle-foreground">Last 7 days</span>}
           list={failed}
           rowKey={(x) => x.attempt_id}
           noun="attempt"
@@ -508,7 +505,7 @@ function Audit() {
   const none = <span className="text-subtle-foreground">None</span>;
   return (
     <>
-      <PageHeader title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportButton source="audit" filters={mod ? { module: mod } : {}} />} />
+      <PageHeader title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportAction source="audit" filters={mod ? { module: mod } : {}} />} />
       {s.data && <KpiTiles items={[{ label: "Entries Today", value: String(s.data.today) }, { label: "This Month", value: s.data.this_month.toLocaleString("en-NG") }, { label: "Modules", value: String(s.data.modules.length) }, { label: "Retention", value: s.data.retention }]} />}
       {s.data && <Chips value={mod} onChange={setMod} options={[["", "Everything"], ...s.data.modules.map((m) => [m, m] as [string, string])]} />}
       <PagedTable<AuditEntry>

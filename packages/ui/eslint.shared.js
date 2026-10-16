@@ -3,7 +3,7 @@
  * MILESTONES §3). Zero warnings everywhere, like the backend.
  *
  *   frontendConfig({ kind: "package" })                       packages/ui
- *   frontendConfig({ kind: "app", fileInputAllowed, styleLegacy })   app/, public-app/
+ *   frontendConfig({ kind: "app" })                               app/, public-app/
  *
  * What a linter can check on its own:
  *   - no Zod: no `zod` import (nor a subpath such as `zod/v4`) and no `z.object(...)` outside @mycity/contract
@@ -113,16 +113,20 @@ const ZOD_MESSAGE = "No Zod outside @mycity/contract: forms validate with the co
 const ZOD = { name: "zod", message: ZOD_MESSAGE };
 /** Zod's subpaths ("zod/v4", "zod/v4/core", "zod/mini") are other builds of Zod: a second instance by another door. */
 const ZOD_SUBPATHS = { group: ["zod/*"], message: `${ZOD_MESSAGE} Zod's subpaths are other builds of it, so they are refused too.` };
-const UI_ONLY = ["@radix-ui/*", "vaul", "sonner", "lucide-react", "react-hook-form", "@hookform/*"];
+/**
+ * Libraries only @mycity/ui may import (F7, F22). A feature composes the
+ * component instead, so an upgrade is one package's work and the heavy parts
+ * stay inside their own chunks.
+ */
+const UI_ONLY = ["@radix-ui/*", "vaul", "sonner", "lucide-react", "react-hook-form", "@hookform/*", "@tiptap/*", "leaflet"];
 
 /**
  * @param {object} options
  * @param {"package" | "app"} options.kind
- * @param {string[]} [options.fileInputAllowed]  app files that may still hold a raw file input (legacy upload, moving in PR 3)
- * @param {string[]} [options.styleLegacy]       app files written before F4, each leaving the list as it is converged; nothing is added
+ * @param {string[]} [options.fileInputAllowed]  app files that may still hold a raw file input; empty since PR 3 moved the upload engine into packages/ui
  * @param {string[]} [options.ignores]
  */
-export function frontendConfig({ kind, fileInputAllowed = [], styleLegacy = [], ignores = [] }) {
+export function frontendConfig({ kind, fileInputAllowed = [], ignores = [] }) {
   const app = kind === "app";
   const restricted = app
     ? {
@@ -171,7 +175,6 @@ export function frontendConfig({ kind, fileInputAllowed = [], styleLegacy = [], 
     app
       ? {
           files: ["src/**/*.{ts,tsx}"],
-          ignores: styleLegacy,
           rules: { "mycity/no-inline-style": "error", "mycity/no-arbitrary-class": "error" },
         }
       : {

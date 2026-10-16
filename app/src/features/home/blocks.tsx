@@ -1,14 +1,10 @@
 import type { ReactNode } from "react";
-import type { BarRow, HomeBlock, KpiCell } from "@/api/types/home";
-import { Bars, Kpi, StatStrip, Timeline } from "@/components/ui/data";
-import { AreaChart, Donut } from "@/components/ui/charts";
-import { Table } from "@/components/ui/Table";
+import type { HomeBlock, KpiCell } from "@/api/types/home";
+import { toBars, toTrail, toTrend } from "@/features/shared/wire";
 import { useRouter } from "@/lib/router";
 import { useKpiDetail } from "./KpiDetail";
-import { Meter, Pill, Who, Card, CardHeader, Grid, Money, formatDate } from "@mycity/ui";
+import { AreaChart, Bars, Card, CardHeader, DataView, DonutChart, formatDate, Grid, KpiCard, Meter, Money, Pill, StatStrip, Timeline, Who } from "@mycity/ui";
 
-const barColor = (b: BarRow) => (b.emphasis === "warn" ? "var(--chart-4)" : b.emphasis === "brand" ? "var(--primary)" : undefined);
-export const toBars = (rows: BarRow[]) => rows.map((r) => ({ label: r.label, pct: r.pct, value: r.value, color: barColor(r) }));
 
 /** A card with a title, the common frame of Home's blocks. `info` makes the title a help term (§5.2). */
 export function InfoCard({ title, info, right, children }: { title: string; info?: string; right?: ReactNode; children: ReactNode }) {
@@ -26,7 +22,7 @@ export function KpiRow({ items, mobileCols = 1 }: { mobileCols?: 1 | 2; items: A
   return (
     <Grid cols={mobileCols === 2 ? "4m2" : 4}>
       {items.map((k) => (
-        <Kpi key={k.key} label={k.label} value={k.value} tone={k.tone} trend={k.trend?.text} trendDir={k.trend?.dir} onClick={() => open(k.key, k.label)} />
+        <KpiCard key={k.key} title={k.label} value={k.value} tone={k.tone} caption={k.trend?.text} trend={toTrend(k.trend?.dir)} onOpen={() => open(k.key, k.label)} />
       ))}
     </Grid>
   );
@@ -50,9 +46,9 @@ export function Block({ block }: { block: HomeBlock }) {
         </Grid>
       );
     case "area":
-      return <AreaChart title={block.title} values={block.values} labels={block.labels} note={block.note} />;
+      return <AreaChart title={block.title} values={block.values} labels={block.labels ?? []} caption={block.note} />;
     case "donut":
-      return <Donut pct={block.pct} label={block.label} text={block.text} />;
+      return <DonutChart percent={block.pct} middle={`${block.pct}%`} under={block.label} lines={[block.text]} />;
     case "bars":
       return (
         <div className="mb-3 last:mb-0 [.grid_&]:mb-0">
@@ -63,7 +59,7 @@ export function Block({ block }: { block: HomeBlock }) {
       );
     case "need_you":
       return (
-        <Table
+        <DataView
           title={block.title}
           right={<Pill tone={block.badge.tone}>{block.badge.text}</Pill>}
           rows={block.rows}
@@ -91,17 +87,17 @@ export function Block({ block }: { block: HomeBlock }) {
       return (
         <Card>
           <CardHeader title={block.title} />
-          <Timeline items={block.items.map((i) => ({ title: i.title, when: i.when, text: i.text, tone: i.tone }))} />
+          <Timeline items={toTrail(block.items)} />
         </Card>
       );
     case "week":
       return (
         <Card>
-          <CardHeader title={block.title} right={<span className="text-[11.5px] text-subtle-foreground">{block.range}</span>} />
+          <CardHeader title={block.title} right={<span className="text-2xs text-subtle-foreground">{block.range}</span>} />
           {block.days.map((d, i) => (
-            <div key={i} className="flex items-center gap-[11px] border-b border-border py-2 last:border-b-0">
-              <b className="w-[58px] flex-none text-[12px] text-subtle-foreground">{d.day}</b>
-              <span className="min-w-0 flex-1 text-[12.5px]">{d.text}</span>
+            <div key={i} className="flex items-center gap-2.5 border-b border-border py-2 last:border-b-0">
+              <b className="w-14 flex-none text-xs text-subtle-foreground">{d.day}</b>
+              <span className="min-w-0 flex-1 text-xs">{d.text}</span>
               <Pill tone={KIND[d.kind][0]}>{KIND[d.kind][1]}</Pill>
             </div>
           ))}
@@ -111,16 +107,16 @@ export function Block({ block }: { block: HomeBlock }) {
       return (
         <InfoCard title={block.title} info={block.info}>
           {block.rows.map((r, i) => (
-            <div key={i} className="flex items-center gap-[11px] border-b border-border py-2.5 last:border-b-0">
-              <b className="w-[92px] flex-none text-[12px] text-subtle-foreground">{r.label}</b>
-              <span className="flex-1 text-[12.5px]">{r.text}</span>
+            <div key={i} className="flex items-center gap-2.5 border-b border-border py-2.5 last:border-b-0">
+              <b className="w-22 flex-none text-xs text-subtle-foreground">{r.label}</b>
+              <span className="flex-1 text-xs">{r.text}</span>
               <Pill tone={r.pill.tone}>{r.pill.text}</Pill>
             </div>
           ))}
         </InfoCard>
       );
     case "note":
-      return <p className="mt-1 text-[11.5px] text-subtle-foreground">{block.text}</p>;
+      return <p className="mt-1 text-2xs text-subtle-foreground">{block.text}</p>;
   }
 }
 
@@ -138,7 +134,7 @@ export function Cell({ cell }: { cell: KpiCell }) {
     case "date":
       return <>{formatDate(cell.date)}</>;
     case "over":
-      return <span className="inline-block rounded-full bg-warning-soft px-[9px] py-0.5 text-[11px] font-semibold whitespace-nowrap text-warning">{cell.text}</span>;
+      return <span className="inline-block rounded-full bg-warning-soft px-2 py-0.5 text-2xs font-semibold whitespace-nowrap text-warning">{cell.text}</span>;
     case "bar":
       return <Meter pct={cell.pct} label={cell.text} />;
   }

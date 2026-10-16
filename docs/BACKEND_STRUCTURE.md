@@ -991,18 +991,23 @@ loads a whole table works in testing and takes the server down when the table is
 - **Every list is paged on the server at 25 rows.** Screens, pickers, search results, exports'
   previews, mobile infinite scroll and AI reads. The size is fixed, not a default: the client cannot
   ask for more or for fewer.
-- The client sends `page` (1-based) and the list's own filters. The contract has no `limit`,
-  `offset`, `per_page` or `page_size` key; `listQuery()` is `.strict()`, so a client that sends one
-  gets a 422 naming it.
+- The client sends `page` (1-based), the list's own filters and at most one `sort`. The contract has
+  no `limit`, `offset`, `per_page` or `page_size` key; `listQuery()` is `.strict()`, so a client that
+  sends one gets a 422 naming it.
 - Search, filtering and sorting happen in SQL, before the page is cut. A page is never filtered in
   the browser and presented as the whole result.
+- **The sortable fields are the list's own** (FRONTEND_FOUNDATION F20). `listQuery(filters, sortable)`
+  allow-lists them and parses one key, the field name with a leading `-` for descending
+  (`?sort=-due_on` → `{ field: "due_on", dir: "desc" }`); a field not on the list is a 422 naming
+  `sort`. `orderBy(query, columns, tiebreak)` builds the `ORDER BY` from the repo's own map, so a
+  caller chooses a key and never a character of SQL, and every order finishes on a unique column.
 
 ### 16.2 Where it lives
 
 | Piece | File |
 |---|---|
-| `PAGE_SIZE = 25`, `listQuery(filters)`, `PageQuery`, `PageMeta`, `Paged(item)` | `packages/contract/schemas/common.js` |
-| `pageQuery`, `TOTAL_COL`, `sendPaged`, `assertPage`, `completeQuery` | `src/shared/http/paged.js` |
+| `PAGE_SIZE = 25`, `listQuery(filters, sortable)`, `sortParam`, `PageQuery`, `PageMeta`, `Paged(item)` | `packages/contract/schemas/common.js` |
+| `pageQuery`, `orderBy`, `TOTAL_COL`, `sendPaged`, `assertPage`, `completeQuery` | `src/shared/http/paged.js` |
 | The gate | `scripts/check/pagination.js` |
 
 Every list response is the same envelope, in the body (no header to expose through CORS):

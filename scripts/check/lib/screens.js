@@ -763,4 +763,4 @@ function run(gate, body) {
   });
 }
 
-module.exports = { crawl, demoWanted, summarise, finish, run, collect, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, ROOT };
+module.exports = { crawl, demoWanted, summarise, finish, run, collect, ensureAppBuild, serve, appSettle, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, ROOT };

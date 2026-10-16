@@ -2,8 +2,8 @@
  * The public site's stylesheet. Tokens, the Tailwind theme and the element
  * defaults come from @mycity/ui (packages/ui/src/styles), the same files as the
  * staff app (F1); the @source line lets Tailwind see the classes the package's
- * components use. What stays here is the site's own: the staging bar offset,
- * the page background and the signature pad.
+ * components use. What stays here is the site's own: the page as a column
+ * under the staging bar, the page background and the signature pad.
  */
 @import "tailwindcss";
 @import "@mycity/ui/styles/tokens.css";
@@ -11,12 +11,9 @@
 @import "@mycity/ui/styles/base.css";
 @source "../../../packages/ui/src";
 
-/* The staging bar's height (lib/environment.ts). Nothing on production. */
-:root { --env-bar: 0px; }
-:root[data-env="staging"] { --env-bar: 28px; }
-
 @layer base {
-  html, body, #root { min-height: 100%; }
+  html, body { min-height: 100%; }
+  #root { display: flex; flex-direction: column; min-height: 100dvh; }
   body { background: var(--muted); }
 }
 

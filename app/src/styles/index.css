@@ -1,10 +1,16 @@
 /*
- * The staff app's stylesheet. Tokens, the Tailwind theme and the element
- * defaults come from @mycity/ui (packages/ui/src/styles: tokens.css is the only
- * file with colour values, gate 13); the @source line lets Tailwind see the
- * classes the package's components use. What stays here is the app's own: the
- * staging bar offset, the full-height shell, and the few effects a utility
- * class cannot express.
+ * The staff app's stylesheet. Tokens, the Tailwind theme, the element defaults
+ * and every shared component's own drawing come from @mycity/ui
+ * (packages/ui/src/styles: tokens.css is the only file with colour values,
+ * gate 13); the @source line lets Tailwind see the classes the package's
+ * components use.
+ *
+ * What stays here is this app's own and nothing else: the full-height shell
+ * below the staging bar (--env-bar, from @mycity/ui), the burst a tap leaves on
+ * a reaction, the shimmer under provisional AI text, the search hit marks, and
+ * the reporting tree's connector lines. PR 3 moved the celebration card, the
+ * rich text box, the timeline rail and the disclosure marker into the package
+ * with the components that draw them.
  */
 @import "tailwindcss";
 @import "@mycity/ui/styles/tokens.css";
@@ -12,12 +18,6 @@
 @import "@mycity/ui/styles/base.css";
 @source "../../../packages/ui/src";
 
-/* The staging bar's height (lib/environment.ts). Nothing on production. */
-:root { --env-bar: 0px; }
-:root[data-env="staging"] { --env-bar: calc(28px + env(safe-area-inset-top, 0px)); }
-
-@keyframes sheen { 0% { background-position: 120% 0; } 60%, 100% { background-position: -120% 0; } }
-@keyframes fall { 0% { transform: translateY(-10px) rotate(0); } 100% { transform: translateY(190px) rotate(540deg); } }
 @keyframes burst { 0% { opacity: 1; transform: translate(0, 0) scale(.7); } 100% { opacity: 0; transform: translate(var(--dx), -70px) scale(1.25); } }
 
 @layer base {
@@ -27,32 +27,7 @@
 }
 
 @layer utilities {
-  .scrollbar-on-dark::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); }
-  /* The celebration card's slow sheen and drifting confetti. */
-  .sheen::after {
-    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .10) 50%, transparent 65%);
-    background-size: 250% 100%; animation: sheen 5s ease-in-out infinite;
-  }
-  .confetti > i { position: absolute; top: -14px; width: 7px; height: 11px; border-radius: 2px; opacity: .9; animation: fall linear infinite; }
-  .confetti > i:nth-child(3n) { border-radius: 50%; width: 7px; height: 7px; }
-  .confetti > i:nth-child(4n) { width: 4px; height: 13px; }
-  .confetti.stars > i { border-radius: 1px; width: 11px; height: 11px; clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
   .burst { position: fixed; z-index: 90; pointer-events: none; font-size: 20px; animation: burst .9s ease-out forwards; }
-  /* A rich-text box shows its placeholder while empty. */
-  .rte:empty::before { content: attr(data-ph); color: var(--subtle-foreground); }
-  .rte blockquote { border-left: 3px solid var(--input); margin: 8px 0; padding: 2px 12px; color: var(--muted-foreground); }
-  .rte h2 { font-size: 17px; margin: 8px 0 4px; }
-  .rte a { color: var(--accent-foreground); }
-  /* Accordion and "more" disclosures: a + that turns into a minus. */
-  .plus-marker > summary::before { content: "+"; color: var(--accent-foreground); font-weight: 700; width: 12px; }
-  .plus-marker[open] > summary::before { content: "\2212"; }
-  /* Timeline rail and dots. */
-  .tl { position: relative; padding-left: 22px; }
-  .tl::before { content: ""; position: absolute; left: 5px; top: 5px; bottom: 5px; width: 2px; background: var(--border); }
-  .tl-dot::before { content: ""; position: absolute; left: -21px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 2.5px solid var(--input); }
-  .tl-dot.hi::before { border-color: var(--primary); background: var(--primary); }
-  .tl-dot.ok::before { border-color: var(--success); }
   /* A gentle loading shimmer for provisional AI text. */
   .shimmer { background: linear-gradient(90deg, rgba(0, 0, 0, .05) 30%, rgba(0, 0, 0, .12) 50%, rgba(0, 0, 0, .05) 70%); background-size: 200% 100%; animation: shimmer 1.1s linear infinite; }
   mark.hit { background: rgba(255, 223, 85, .45); color: inherit; border-radius: 3px; padding: 0 1px; }
@@ -76,22 +51,4 @@
   .ogt > ul > li { padding-top: 0; }
   .ogt > ul > li::before, .ogt > ul > li::after { display: none; }
   .ogt .drop-target > .og-card { border-color: var(--ring); box-shadow: 0 0 0 3px var(--accent); }
-}
-
-/* A fit page's header (title, ⓘ text, stat strip) slides away while reading; the panes are the last child. */
-@layer components {
-  .fit-page > :not(:last-child) {
-    max-height: 240px;
-    transition: max-height 0.28s ease, opacity 0.2s ease, margin 0.28s ease, padding 0.28s ease;
-  }
-  .fit-page.hidehead > :not(:last-child) {
-    max-height: 0;
-    opacity: 0;
-    margin: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    border-width: 0;
-    overflow: hidden;
-    pointer-events: none;
-  }
 }

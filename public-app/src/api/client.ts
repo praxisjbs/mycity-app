@@ -1,5 +1,4 @@
-import { createApi } from "@mycity/ui";
-import { noteEnvironmentHeader } from "@/lib/environment";
+import { createApi, noteEnvironmentHeader } from "@mycity/ui";
 import type { Endpoints } from "./endpoints";
 
 /**

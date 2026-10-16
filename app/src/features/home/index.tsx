@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
-import { Bars, Tile } from "@/components/ui/data";
-import { LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Block, InfoCard, KpiRow, toBars } from "./blocks";
-import { Button, KeyValue, Pill, Card, Grid, PageHeader, Grow, useModal, Chips, ErrorState, toast, Who, formatDateTime, Field, FormFooter, rules, SelectField, TextField, ToggleRow, useContractForm } from "@mycity/ui";
+import { Block, InfoCard, KpiRow } from "./blocks";
+import { toBars } from "@/features/shared/wire";
+import { Bars, Button, Card, Chips, DataView, ErrorState, Field, formatDateTime, FormFooter, Grid, Grow, KeyValue, LoadingRows, PageHeader, Pager, Pill, rules, SelectField, TextField, Tile, toast, ToggleRow, useContractForm, useModal, Who } from "@mycity/ui";
 
 export default function Home({ tab, id }: ModuleScreenProps) {
   if (tab === "team") return <Team />;
@@ -61,7 +60,7 @@ function Team() {
         onChange={setStatus}
         options={[["all", "Everyone"], ["late", "Late"], ["remote", "Remote"], ["leave", "On Leave"], ["no_clockout", "No Clock-Out"]]}
       />
-      <Table
+      <DataView
         title="Team Roster"
         right={list.page && <Pill>{`${list.page.total} people`}</Pill>}
         rows={list.rows}
@@ -129,7 +128,7 @@ function Alerts({ openId }: { openId: string | null }) {
       {summary.data && (
         <Chips value={cat} onChange={setCat} options={[["all", `All ${summary.data.categories.reduce((a, c) => a + c.count, 0)}`], ...summary.data.categories.map((c) => [c.value, c.label] as [string, string])]} />
       )}
-      <Table
+      <DataView
         title="Open Alerts"
         right={list.page && <Pill tone="warn">{`${list.page.total} open`}</Pill>}
         rows={list.rows}
@@ -143,7 +142,7 @@ function Alerts({ openId }: { openId: string | null }) {
           { key: "t", label: "Trigger", desktop: true, render: (r) => r.trigger },
           { key: "w", label: "Who Can Clear", desktop: true, render: (r) => r.who_clears },
           { key: "g", label: "Age", render: (r) => r.age },
-          { key: "o", label: "Over By", render: (r) => <span className="inline-block rounded-full bg-warning-soft px-[9px] py-0.5 text-[11px] font-semibold whitespace-nowrap text-warning">{r.over_by}</span> },
+          { key: "o", label: "Over By", render: (r) => <span className="inline-block rounded-full bg-warning-soft px-2 py-0.5 text-2xs font-semibold whitespace-nowrap text-warning">{r.over_by}</span> },
           { key: "s", label: "Severity", render: (r) => <Pill tone={SEV[r.severity][0]}>{SEV[r.severity][1]}</Pill> },
         ]}
         footer={<Pager page={list.page} onPage={list.setPage} noun="alert" />}
@@ -170,7 +169,7 @@ function AlertDetail({ alert, close }: { alert: HomeAlert; close: () => void }) 
   };
   return (
     <>
-      <h3 data-copy="content" className="mb-2 text-[15px]">{alert.title}</h3>
+      <h3 data-copy="content" className="mb-2 text-md">{alert.title}</h3>
       <div className="mb-3 flex flex-wrap gap-1.5">
         <Pill tone={SEV[alert.severity][0]}>{SEV[alert.severity][1]}</Pill>
         <Pill>{alert.trigger}</Pill>
@@ -289,7 +288,7 @@ function Reports() {
       </Grid>
       <Pager page={reports.page} onPage={reports.setPage} noun="report" className="px-0" />
       <Grid cols={2} className="mt-3">
-        <Table
+        <DataView
           title="Recent Runs"
           rows={runs.rows}
           rowKey={(r) => r.run_id}

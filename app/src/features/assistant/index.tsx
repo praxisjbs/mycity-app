@@ -3,13 +3,11 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/knowledge";
 import type { AiAnswer, AiTurn } from "@/api/types/knowledge";
-import { AreaChart } from "@/components/ui/charts";
-import { LoadingRows } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, PagedTable } from "@/features/shared/sections";
+import { BarsCard, ExportAction, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Button, Card, CardHeader, Grid, PageHeader, Icon, useModal, Money, toast, cn, formatDateTime, formatMoneyShort, Form, FormFooter, InlineInput } from "@mycity/ui";
+import { AreaChart, Button, Card, CardHeader, cn, Form, formatDateTime, formatMoneyShort, FormFooter, Grid, Icon, InlineInput, LoadingRows, Money, PageHeader, toast, useModal } from "@mycity/ui";
 
 export default function Assistant({ tab }: ModuleScreenProps) {
   return tab === "history" ? <History /> : <Ask />;
@@ -20,13 +18,13 @@ type Turn = { q: string; a: AiAnswer | null; error?: string };
 function Answer({ a }: { a: AiAnswer }) {
   const { navigate } = useRouter();
   return (
-    <div className="max-w-[92%] rounded-[12px_12px_12px_4px] border border-border bg-card p-[13px]">
-      <p className="text-[13.5px]">{a.text}</p>
+    <div className="max-w-11/12 bubble-them border border-border bg-card p-3">
+      <p className="text-sm">{a.text}</p>
       {a.table && (
-        <div className="mt-[11px] overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
+        <div className="mt-2.5 overflow-x-auto" tabIndex={0}>
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr>{a.table.columns.map((c, i) => <th key={c} className={cn("border-b border-border bg-muted px-3 py-2 text-left text-[10.5px] font-[650] tracking-[.09em] text-subtle-foreground uppercase", a.table!.numeric.includes(i) && "text-right")}>{c}</th>)}</tr>
+              <tr>{a.table.columns.map((c, i) => <th key={c} className={cn("border-b border-border bg-muted px-3 py-2 text-left text-2xs font-strong tracking-caps text-subtle-foreground uppercase", a.table!.numeric.includes(i) && "text-right")}>{c}</th>)}</tr>
             </thead>
             <tbody>
               {a.table.rows.map((r, i) => (
@@ -36,16 +34,16 @@ function Answer({ a }: { a: AiAnswer }) {
           </table>
         </div>
       )}
-      {a.note && <p className="mt-[11px] text-[13px] text-muted-foreground">{a.note}</p>}
+      {a.note && <p className="mt-2.5 text-sm text-muted-foreground">{a.note}</p>}
       {a.action && (
-        <div className="mt-[11px] flex flex-wrap gap-2">
+        <div className="mt-2.5 flex flex-wrap gap-2">
           <Button variant="primary" iconRight="right" onClick={() => navigate(a.action!.link)}>{a.action.label}</Button>
         </div>
       )}
       {a.sources.length > 0 && (
-        <div className="mt-[11px] flex flex-wrap gap-1.5 border-t border-dashed border-border pt-2.5">
-          <b className="self-center text-[10.5px] tracking-[.08em] text-subtle-foreground uppercase">From</b>
-          {a.sources.map((s) => <span key={s.label} className="rounded-full border border-border bg-muted px-[9px] py-[3px] text-[11px] text-muted-foreground">{s.label} ×{s.count}</span>)}
+        <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-dashed border-border pt-2.5">
+          <b className="self-center text-2xs tracking-caps text-subtle-foreground uppercase">From</b>
+          {a.sources.map((s) => <span key={s.label} className="rounded-full border border-border bg-muted px-2 py-0.5 text-2xs text-muted-foreground">{s.label} ×{s.count}</span>)}
         </div>
       )}
     </div>
@@ -79,22 +77,22 @@ function Ask() {
   return (
     <>
       <PageHeader title="Praxis AI" sub="Answers from your data, within your permissions" />
-      <Card className="max-w-[840px]">
+      <Card className="max-w-208">
         <div className="flex flex-col gap-3.5">
           
           {turns.map((t, i) => (
             <div key={i} className="flex flex-col gap-3.5">
-              <div className="ml-auto w-fit max-w-[78%] rounded-[12px_12px_4px_12px] border border-border bg-accent px-[13px] py-2.5 text-[13.5px]">{t.q}</div>
-              {t.a ? <Answer a={t.a} /> : t.error ? <p className="text-[12.5px] text-destructive">{t.error}</p> : (
-                <div className="flex w-fit items-center gap-2 rounded-[12px_12px_12px_4px] border border-border px-[13px] py-2.5 text-[12.5px] text-subtle-foreground"><Icon name="spark" className="animate-pulse" />Reading the records you can see</div>
+              <div className="ml-auto w-fit max-w-4/5 bubble-me border border-border bg-accent px-3 py-2.5 text-sm">{t.q}</div>
+              {t.a ? <Answer a={t.a} /> : t.error ? <p className="text-xs text-destructive">{t.error}</p> : (
+                <div className="flex w-fit items-center gap-2 bubble-them border border-border px-3 py-2.5 text-xs text-subtle-foreground"><Icon name="spark" className="animate-pulse" />Reading the records you can see</div>
               )}
             </div>
           ))}
           <div ref={end} />
         </div>
         <Form className="mt-4 flex gap-2" onSubmit={() => void ask(text)}>
-          <InlineInput className="h-[42px] max-md:h-11 min-w-0 flex-1 rounded-full border border-input bg-background px-4 text-[13.5px] outline-none focus:border-ring" placeholder="Ask a question" aria-label="Ask Praxis AI" value={text} onChange={setText} />
-          <button type="submit" disabled={busy || text.trim().length < 4} aria-label="Ask" className="on-primary flex size-[42px] max-md:size-11 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Icon name="send" /></button>
+          <InlineInput className="h-10.5 max-md:h-11 min-w-0 flex-1 rounded-full border border-input bg-background px-4 text-sm outline-none focus:border-ring" placeholder="Ask a question" aria-label="Ask Praxis AI" value={text} onChange={setText} />
+          <button type="submit" disabled={busy || text.trim().length < 4} aria-label="Ask" className="on-primary flex size-10.5 max-md:size-11 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Icon name="send" /></button>
         </Form>
       </Card>
       <Grid cols={2} className="mt-3">
@@ -102,7 +100,7 @@ function Ask() {
           <CardHeader title="Try Asking" />
           <div data-copy="content">
           {(sug.data ?? []).map((q) => (
-            <button key={q} type="button" disabled={busy} onClick={() => void ask(q)} className="mb-1.5 block w-full rounded-box border border-border bg-card px-3 py-2.5 text-left max-md:min-h-11 text-[12.5px] transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-2">
+            <button key={q} type="button" disabled={busy} onClick={() => void ask(q)} className="mb-1.5 block w-full rounded-box border border-border bg-card px-3 py-2.5 text-left max-md:min-h-11 text-xs transition hover:-translate-y-px hover:shadow-2">
               {q}
             </button>
           ))}
@@ -125,7 +123,7 @@ function History() {
         sub="Your questions, and what they read"
         actions={
           <>
-            <ExportButton source="ai.history" />
+            <ExportAction source="ai.history" />
             <Button onClick={() => modal.open({ title: "Clear History", body: (close) => <ClearHistory close={close} /> })}>Clear History</Button>
           </>
         }
@@ -148,7 +146,7 @@ function History() {
       />
       {s.data && (
         <Grid cols={2} className="mt-3">
-          <AreaChart title="Spend per Month, Naira" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} note={`Against a ${formatMoneyShort(s.data.cap)} monthly cap.`} />
+          <AreaChart title="Spend per Month, Naira" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} caption={`Against a ${formatMoneyShort(s.data.cap)} monthly cap.`} />
           <BarsCard title="Questions by Topic" rows={s.data.topics} />
         </Grid>
       )}
@@ -160,7 +158,7 @@ function ClearHistory({ close }: { close: () => void }) {
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <p className="text-[13px] text-muted-foreground">Your questions and their answers are removed from this list. The spend record stays, for the monthly cap.</p>
+      <p className="text-sm text-muted-foreground">Your questions and their answers are removed from this list. The spend record stays, for the monthly cap.</p>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={busy} onClick={async () => { setBusy(true); await api.call("DELETE /api/v1/ai/history"); invalidate("/api/v1/ai"); close(); toast("History cleared"); }}>Clear</Button>

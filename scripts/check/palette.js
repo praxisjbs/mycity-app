@@ -15,11 +15,10 @@
  *   - #FFCD05 or #004F70 anywhere in frontend source, comments and tokens.css
  *     included: they are in the client's CSS but are not brand (MILESTONES §5)
  *   - in app/src and public-app/src, an arbitrary-value class (`w-[317px]`,
- *     `bg-[#fff]`) or a `style=` prop, except the files on the ONE exemption
- *     list, scripts/check/lib/styling-exemptions.json, which both apps'
- *     eslint configs read too. The list may only shrink: a file added since
- *     the base fails, a listed file that no longer needs it fails (take it
- *     off), a listed file that is gone fails.
+ *     `bg-[#fff]`) or a `style=` prop, anywhere, with no exemptions. The
+ *     exemption list every screen was converged off in PR 3 (Build kit) is
+ *     gone: a runtime value belongs in a shared component, where a class can
+ *     read it from a CSS variable (F4).
  *
  * The hex and arbitrary-value patterns are the linter's own, exported by
  * packages/ui/eslint.shared.js, so the gate and `npm run fe:lint` agree.
@@ -32,7 +31,6 @@ const { pathToFileURL } = require("node:url");
 const { ROOT, scan, lineOf } = require("./lib/sources");
 
 const TOKENS = "packages/ui/src/styles/tokens.css";
-const EXEMPTIONS = "scripts/check/lib/styling-exemptions.json";
 const NOT_BRAND = /#(?:FFCD05|004F70)(?![0-9a-z])/gi;
 
 /**
@@ -122,22 +120,6 @@ function findStyling(src, ARBITRARY) {
   return out.sort((a, b) => a.index - b.index);
 }
 
-/** Pure: entries in `now` that `before` did not have (the list may only shrink). */
-const grown = (before, now) => now.filter((f) => !before.includes(f));
-
-/** The exemption list as it was at the change's base, or null when the base has none. */
-function baseExemptions() {
-  try {
-    const { base, git } = require("./lib/changes");
-    const b = base();
-    if (!b) return null;
-    const text = git(["show", `${b}:${EXEMPTIONS}`], { allowFail: true });
-    return text ? JSON.parse(text) : null;
-  } catch {
-    return null;
-  }
-}
-
 async function main() {
   const { HEX, ARBITRARY } = await import(pathToFileURL(path.join(ROOT, "packages", "ui", "eslint.shared.js")).href);
   const problems = [];
@@ -176,33 +158,15 @@ async function main() {
   }
   for (const a of HEX_ALLOWED) if (!fs.existsSync(path.join(ROOT, a.file))) add(a.file, "is on HEX_ALLOWED in scripts/check/palette.js but does not exist; take it off the list");
 
-  // Arbitrary values and inline styles in the apps, against the one exemption list.
-  const list = JSON.parse(read(EXEMPTIONS));
+  // Arbitrary values and inline styles in the apps. No exemptions: a runtime
+  // value belongs in a shared component, where a class reads it from a CSS
+  // variable (F4; PR 3 converged the last of #18's screens off the old list).
   for (const app of ["app", "public-app"]) {
-    const exempt = new Set(list[app] || []);
-    const appFiles = walk(`${app}/src`).filter((f) => /\.(ts|tsx)$/.test(f));
-    for (const file of appFiles) {
-      const local = file.slice(app.length + 1);
-      const found = findStyling(read(file), ARBITRARY);
-      if (exempt.has(local)) {
-        if (!found.length) add(file, `no longer needs its styling exemption; remove "${local}" from ${EXEMPTIONS} ("${app}")`);
-        continue;
-      }
+    for (const file of walk(`${app}/src`).filter((f) => /\.(ts|tsx)$/.test(f))) {
       const text = read(file);
-      for (const f of found) {
+      for (const f of findStyling(text, ARBITRARY)) {
         add(`${file}:${lineOf(text, f.index)}`, `${f.what} (F4): use the token scale (text-sm, h-control, gap-3) or a component from @mycity/ui (docs/COMPONENTS.md)`);
       }
-    }
-    for (const local of exempt) {
-      if (!fs.existsSync(path.join(ROOT, app, local))) add(EXEMPTIONS, `"${app}" lists ${local}, which does not exist; remove it`);
-    }
-    const before = baseExemptions();
-    if (before) {
-      for (const f of grown(before[app] || [], list[app] || [])) {
-        add(EXEMPTIONS, `"${app}" gained ${f}: the list only shrinks; convert the file to token classes instead (FRONTEND_FOUNDATION F4)`);
-      }
-    } else if (app === "app") {
-      notes.push(`${EXEMPTIONS} is not in the base of this change: growth is checked from the next change on`);
     }
   }
 
@@ -215,11 +179,11 @@ async function main() {
     );
     process.exit(1);
   }
-  console.log(`palette: ok (${files.length} frontend file(s); ${(list.app || []).length + (list["public-app"] || []).length} file(s) still exempt from F4 styling)`);
+  console.log(`palette: ok (${files.length} frontend file(s); colours only in ${TOKENS}, no F4 exemptions)`);
   for (const n of notes) console.log(`  note: ${n}`);
 }
 
-module.exports = { findHex, findStyling, tokenValues, grown, HEX_ALLOWED };
+module.exports = { findHex, findStyling, tokenValues, HEX_ALLOWED };
 
 if (require.main === module) {
   main().catch((err) => {

@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { Device } from "@/api/types/attendance";
-import { StatStrip } from "@/components/ui/data";
-import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, KeyValue, Pill, Who, Card, CardHeader, Grid, PageHeader, Chips, toast, formatDate, formatDateTime, SearchInput } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, DataView, formatDate, formatDateTime, Grid, KeyValue, PageHeader, Pager, Pill, SearchInput, StatStrip, toast, Toolbar, Who } from "@mycity/ui";
 
 export const DEVICE_TONE: Record<Device["status"], "ok" | "warn" | "err" | "neutral"> = { Enrolled: "ok", "Pending Review": "warn", Blocked: "err", Revoked: "neutral", "Verification unavailable": "warn" };
 
@@ -28,11 +26,11 @@ export function Devices() {
       <PageHeader title="Devices" sub="Devices used to clock in" actions={<Button onClick={() => navigate(hrefFor("settings", "attendance-policy"))}>Device Policy</Button>} />
       {summary.data && <StatStrip items={summary.data.counts} />}
       <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Device or person" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Device or person" className="w-full md:w-64" />
       </Toolbar>
       <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending Review", "Pending Review"], ["Enrolled", "Enrolled"], ["Blocked", "Blocked"], ["Revoked", "Revoked"]]} />
       <Grid cols="1.4/1">
-        <Table
+        <DataView
           title="Devices"
           rows={list.rows}
           rowKey={(d) => d.device_id}
@@ -54,7 +52,7 @@ export function Devices() {
           <Card>
             <CardHeader record title={`${sel.employee.display_name} · ${sel.name}`} right={<Pill tone={DEVICE_TONE[sel.status]}>{sel.status}</Pill>} />
             <KeyValue items={[["First seen", formatDateTime(sel.first_seen)], ["Last punch", sel.last_punch ? formatDateTime(sel.last_punch) : "None"], ["Note", sel.note ?? "None"], ["Other devices", others(sel).map((d) => `${d.name} (${d.status.toLowerCase()})`).join(", ") || "None"], ["Next punch", <Pill tone={sel.effect.tone}>{sel.effect.text}</Pill>]]} />
-            <div className="mt-[14px] flex flex-wrap gap-2">
+            <div className="mt-3.5 flex flex-wrap gap-2">
               {sel.status !== "Enrolled" && <Button variant="primary" icon="ok" busy={act.pending} onClick={() => set(sel, "Enrolled")}>Enrol This Device</Button>}
               {sel.status === "Pending Review" && <Button busy={act.pending} onClick={() => set(sel, "Blocked")}>Reject</Button>}
               {sel.status === "Enrolled" && (
@@ -68,7 +66,7 @@ export function Devices() {
         )}
       </Grid>
       {summary.data && (
-        <Table
+        <DataView
           title={`Device Policy v${summary.data.policy_version}`}
           rows={summary.data.effects}
           rowKey={(r) => r.state}

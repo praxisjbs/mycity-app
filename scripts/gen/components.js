@@ -9,8 +9,11 @@
  *   node scripts/gen/components.js --check   exit 1 when docs/COMPONENTS.md is stale (CI)
  *
  * A component file is any .tsx under packages/ui/src except tests, gallery
- * pages and src/testing. Its header is the first JSDoc block holding
- * @component (FRONTEND_FOUNDATION SPEC §2):
+ * pages, `*.draw.tsx` and src/testing. A `.draw.tsx` is the drawing half of a
+ * lazily loaded component (the charts and the maps, F22): its own chunk, not
+ * its own catalogue entry, so the component that loads it documents it. Its
+ * header is the first JSDoc block holding @component
+ * (FRONTEND_FOUNDATION SPEC §2):
  *
  *   @component @group @summary @use @avoid @phone @a11y @status   required
  *   @exports  other components exported from the file, comma separated
@@ -28,7 +31,7 @@ const PKG = path.join(ROOT, "packages", "ui");
 const SRC = path.join(PKG, "src");
 const OUT = path.join(ROOT, "docs", "COMPONENTS.md");
 
-const GROUPS = ["Foundations", "Actions", "Layout", "Display", "Navigation", "Overlays", "Help", "Feedback", "Forms", "Data"];
+const GROUPS = ["Foundations", "Actions", "Layout", "Display", "Navigation", "Overlays", "Help", "Feedback", "Forms", "Data", "Charts", "Documents", "Maps", "Shell"];
 const STATUSES = ["stable", "beta", "deprecated"];
 const REQUIRED = ["component", "group", "summary", "use", "avoid", "phone", "a11y", "status"];
 /** Where each group's components live by default (npm run new:component). */
@@ -43,6 +46,10 @@ const GROUP_DIRS = {
   Feedback: "feedback",
   Forms: "form",
   Data: "data",
+  Charts: "charts",
+  Documents: "documents",
+  Maps: "maps",
+  Shell: "shell",
 };
 
 const rel = (file) => path.relative(ROOT, file).split(path.sep).join("/");
@@ -55,7 +62,7 @@ function componentFiles() {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
         if (full !== path.join(SRC, "testing")) walk(full);
-      } else if (/\.tsx$/.test(e.name) && !/\.(test|gallery)\.tsx$/.test(e.name)) out.push(full);
+      } else if (/\.tsx$/.test(e.name) && !/\.(test|gallery|draw)\.tsx$/.test(e.name)) out.push(full);
     }
   };
   walk(SRC);

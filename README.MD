@@ -46,8 +46,14 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 mycity-app/
 ├── app/                      staff React + Vite app (frontend team), served at hub.mycityapp.io
 ├── public-app/               public React + Vite app (frontend team), served at go.mycityapp.io
-├── packages/ui/              @mycity/ui: the one design system both apps import (tokens, components,
-│                             form system, data client), with gallery/ (npm run gallery) and its tests;
+├── packages/ui/              @mycity/ui: the one design system both apps import. 157 components in
+│                             groups: Foundations, Actions, Layout, Display, Navigation, Overlays,
+│                             Help, Feedback, Forms, Data (DataView, Kanban, Calendar), Charts,
+│                             Documents, Maps and Shell; plus the tokens, the form system, the data
+│                             client and lib/ (formats, preferences, the upload transport). A heavy
+│                             part is a boundary around its own *.draw.tsx chunk (F22: the charts,
+│                             the editor, the maps). With gallery/ (npm run gallery, served on
+│                             staging at /gallery/) and a test per component;
 │                             catalogue in docs/COMPONENTS.md (FRONTEND_GUIDE §9)
 ├── src/                      backend source (§4, §5)
 ├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2)
@@ -63,6 +69,7 @@ mycity-app/
 │   ├── ci-local.js           runs every CI gate locally, full report
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md
 │   ├── new-component.js      npm run new:component: a shared component with header, test and gallery page
+│   ├── new-screen.js         npm run new:screen: a staff-app screen in its module, the route map, PROGRESS and the gates
 │   ├── check/                the CI gates (§8); frontend: components (palette, contrast and more in PR 1)
 │   │   ├── lib/changes.js    what a change touched (git diff vs main) and its trailers,
 │   │   │                     shared by check/progress.js, check/guides.js, check/readme-map.js
@@ -508,6 +515,15 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 15. **One form system.** Every field in both apps comes from `packages/ui/src/form/` and validates
     as it is filled from the contract schema (`useContractForm`); nobody writes a raw `<input>`,
     `<label>` or `react-hook-form` call in a feature (FRONTEND_GUIDE §8, gate 12).
+16. **Every shared component lives in `packages/ui`.** Neither app has a `components/` folder:
+    PR 3 moved the last of them and the gate refuses one being created again. What a feature keeps
+    beside its screens is wiring, not components (an endpoint bound to a shared component, the
+    API's shapes mapped to the components', the app's session on the upload engine)
+    (FRONTEND_FOUNDATION F8, F11, §7).
+17. **Styling is the token scale, with no exemptions.** Named type, spacing, radius and leading
+    steps; no arbitrary value, no raw hex, and no `style` prop in an app at all. A runtime value
+    belongs in a shared component, where a class reads it from a CSS variable
+    (FRONTEND_FOUNDATION F4, gate 13).
 
 ---
 
@@ -547,7 +563,8 @@ Frontend guards, from M0 (FRONTEND_GUIDE §10): `gen:components --check` and `ch
 (the catalogue is current; every shared component has its header, test and gallery page; nothing new
 in an app's `components/`), and `fe:typecheck`, `fe:lint`, `fe:test`, `fe:build` over `packages/ui`,
 `app` and `public-app`; `check/mock-free.js` (no release build carries the mock, F12) and
-`check/a11y.js` (axe on every gallery page at 390 and 1440 px, both densities).
+`check/a11y.js` (axe on every gallery page at 390 and 1440 px, both densities, and on every app
+screen, shell included, at both sizes).
 
 Process gates, from M0. They check that the work is recorded where the team reads it:
 
@@ -606,6 +623,7 @@ npm run dev:worker           # worker
 npm run gen:contract         # after any schema or route change
 npm run gallery              # every shared component in every state (packages/ui)
 npm run new:component -- --name X --group Display   # a new shared component, never in a feature
+npm run new:screen -- --module people --tab "Work Patterns" --m M1 --owner LA   # a new staff-app screen, every piece at once
 npm run fe:test              # also fe:typecheck, fe:lint, fe:build: packages/ui and both apps
 npm run ci                   # before every push
 ```

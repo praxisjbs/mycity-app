@@ -14,10 +14,10 @@ A tab's slug is a URL and does not change when its label does.
 
 1. **Tick the columns** the change completed, on the row of each screen it touched:
 
-   | Column | Ticked when |
-   |---|---|
-   | API | Every endpoint the screen calls exists with its contract, permission check and tests |
-   | UI | The desktop screen is built against the real API (no mock data in the component) |
+   | Column | Ticked when                                                                             |
+   | ------ | --------------------------------------------------------------------------------------- |
+   | API    | Every endpoint the screen calls exists with its contract, permission check and tests    |
+   | UI     | The desktop screen is built against the real API (no mock data in the component)        |
    | Mobile | The mobile shell is built (gate 11: a native mobile layout, not the desktop one shrunk) |
 
 2. **Set Status** to one of: `Not started` · `In progress` · `Built` (all three ticked) ·
@@ -31,6 +31,7 @@ A tab's slug is a URL and does not change when its label does.
 
    Say what was done and what is left. Name a blocker if there is one. Replace `_None yet._` with the
    first note.
+
 5. **Update the summary** counts below when a Status changes.
 
 A row is never deleted. A screen that is dropped by agreement gets Status `Dropped` and a note
@@ -40,20 +41,20 @@ saying who agreed and when.
 
 ## Summary
 
-| Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
-|---|---|---|---|---|---|---|
-| M0 Foundation | items below | | | | | |
-| M1 Core Operations & Employee Management | 31 | 31 | 0 | 0 | 0 | 0 |
-| M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
-| M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
-| M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
-| M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
-| M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
-| M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
-| M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 10 | 10 | 0 | 0 | 0 | 0 |
-| M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **92** | **92** | **0** | **0** | **0** | **0** |
+| Milestone                                | Screens     | Not started | In progress | Built | On staging | Accepted |
+| ---------------------------------------- | ----------- | ----------- | ----------- | ----- | ---------- | -------- |
+| M0 Foundation                            | items below |             |             |       |            |          |
+| M1 Core Operations & Employee Management | 31          | 31          | 0           | 0     | 0          | 0        |
+| M2 Productivity & Performance            | 9           | 9           | 0           | 0     | 0          | 0        |
+| M3 Queries & Consequence Management      | 4           | 4           | 0           | 0     | 0          | 0        |
+| M4 Recruitment End to End                | 8           | 8           | 0           | 0     | 0          | 0        |
+| M5 Offers, Documentation & Onboarding    | 5           | 5           | 0           | 0     | 0          | 0        |
+| M6 Payroll & Notifications               | 6           | 6           | 0           | 0     | 0          | 0        |
+| M7 Partnerships, CRM & Trackers          | 6           | 6           | 0           | 0     | 0          | 0        |
+| M8 Expenses & Budget Control             | 6           | 6           | 0           | 0     | 0          | 0        |
+| M9 Settings & Governance                 | 10          | 10          | 0           | 0     | 0          | 0        |
+| M10 Staff Knowledge Hub & AI Assistance  | 7           | 7           | 0           | 0     | 0          | 0        |
+| **Total**                                | **92**      | **92**      | **0**       | **0** | **0**      | **0**    |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -65,32 +66,32 @@ pages. Settings → Notifications is counted in M6, where it is built.
 Not a screen each, so tracked as items. `☑` done, `☐` not yet. Same note format as the screens.
 Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal meeting.
 
-| Item | Owner | Done | Updated |
-|---|---|---|---|
-| Server: 4 subdomains, TLS, proxy settings per `docs/runbooks/proxy.md` | GE | ☐ | |
-| Root config: `package.json`, `.nvmrc`, `.gitignore`, `.gitattributes`, ESLint, Jest | GE | ☑ | 14/10/2026 |
-| `src/config/*`, `app.js`, `server.js`, `worker.js`, `http/*`, `middleware/*` | GE | ☑ | 14/10/2026 |
-| Shared core: `db`, `crud`, `http`, `errors`, `events`, `workflow`, `numbering`, `money`, `time`, `access`, `rbac` | GE | ☑ | 14/10/2026 |
-| Pagination gate: `shared/http/paged.js`, `common.js` page schemas, `check/pagination.js` (§16) | GE | ☑ | 13/10/2026 |
-| Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☑ | 14/10/2026 |
-| M0 migrations 0001 to 0099 | LA | ☐ | |
-| Staging seed data | LA | ☐ | |
-| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE | ☐ | |
-| `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
-| Documents, media, uploads, PDF generation | GE | ☑ | 14/10/2026 |
-| Import engine + staff importer; real staff sheet imported on staging | GE · LA | ☐ | 15/10/2026 |
-| AI foundation: `services/ai`, manifests, registry, gate 9 | GE | ☑ | 15/10/2026 |
-| CI wiring: `package.json`, lockfile, ESLint, Jest, `ci-local.js`, `ci.yml` | GE | ☑ | 13/10/2026 |
-| Process gates: progress, guides, README map, CODEOWNERS; PR template; Claude Stop hook | GE | ☑ | 13/10/2026 |
-| GitHub settings applied by TB (`docs/runbooks/github-settings.md`) | TB | ☐ | |
-| CODEOWNERS usernames: GE `@swizfcodes`, TB `@tomblakeasaah196`, AJ `@Ghosted34`, LA `@LovedataX` | GE | ☑ | 13/10/2026 |
-| CI gates 1 to 8 and pipeline guards (gate 6, schema-drift and contract-columns, still empty, reported NOT BUILT) | GE | ☐ | 15/10/2026 |
-| Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | 15/10/2026 |
-| Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
-| Screen gates 8, 11, 12, 17: `five-second`, `two-shells`, `forms`, `dashes`; screen conventions in FRONTEND_GUIDE §5, §7, §8 | TB | ☑ | 14/10/2026 |
-| Frontend foundation PR 1 · Ground: `packages/ui` (tokens, primitives, overlays, help, toast, form system, data client), catalogue and gallery, new gates, docs (FRONTEND_FOUNDATION §4) | AJ | ☑ | 15/10/2026 |
-| Frontend foundation PR 2 · Shell: both apps' shells on `packages/ui`, bottom bar, More, floating button, session, PWA, what opens where | AJ | ☐ | |
-| Frontend foundation PR 3 · Build kit: DataView, KPI, charts, kanban, calendar, pickers, upload, editor, PDF preview, voice, maps; app component folders emptied | AJ | ☐ | |
+| Item                                                                                                                                                                                             | Owner   | Done | Updated    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | ---- | ---------- |
+| Server: 4 subdomains, TLS, proxy settings per `docs/runbooks/proxy.md`                                                                                                                           | GE      | ☐    |            |
+| Root config: `package.json`, `.nvmrc`, `.gitignore`, `.gitattributes`, ESLint, Jest                                                                                                              | GE      | ☑    | 14/10/2026 |
+| `src/config/*`, `app.js`, `server.js`, `worker.js`, `http/*`, `middleware/*`                                                                                                                     | GE      | ☑    | 14/10/2026 |
+| Shared core: `db`, `crud`, `http`, `errors`, `events`, `workflow`, `numbering`, `money`, `time`, `access`, `rbac`                                                                                | GE      | ☑    | 14/10/2026 |
+| Pagination gate: `shared/http/paged.js`, `common.js` page schemas, `check/pagination.js` (§16)                                                                                                   | GE      | ☑    | 13/10/2026 |
+| Contract package + generator (`gen:contract`) + `http/route.js`                                                                                                                                  | GE      | ☑    | 14/10/2026 |
+| M0 migrations 0001 to 0099                                                                                                                                                                       | LA      | ☐    |            |
+| Staging seed data                                                                                                                                                                                | LA      | ☐    |            |
+| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports                                                                                    | GE      | ☐    |            |
+| `create-admin` seeds a full employee, login and role (§17)                                                                                                                                       | GE      | ☑    | 13/10/2026 |
+| Documents, media, uploads, PDF generation                                                                                                                                                        | GE      | ☑    | 14/10/2026 |
+| Import engine + staff importer; real staff sheet imported on staging                                                                                                                             | GE · LA | ☐    | 15/10/2026 |
+| AI foundation: `services/ai`, manifests, registry, gate 9                                                                                                                                        | GE      | ☑    | 15/10/2026 |
+| CI wiring: `package.json`, lockfile, ESLint, Jest, `ci-local.js`, `ci.yml`                                                                                                                       | GE      | ☑    | 13/10/2026 |
+| Process gates: progress, guides, README map, CODEOWNERS; PR template; Claude Stop hook                                                                                                           | GE      | ☑    | 13/10/2026 |
+| GitHub settings applied by TB (`docs/runbooks/github-settings.md`)                                                                                                                               | TB      | ☐    |            |
+| CODEOWNERS usernames: GE `@swizfcodes`, TB `@tomblakeasaah196`, AJ `@Ghosted34`, LA `@LovedataX`                                                                                                 | GE      | ☑    | 13/10/2026 |
+| CI gates 1 to 8 and pipeline guards (gate 6, schema-drift and contract-columns, still empty, reported NOT BUILT)                                                                                 | GE      | ☐    | 15/10/2026 |
+| Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval                                                                                                                | GE      | ☐    | 15/10/2026 |
+| Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template                                                                                                                      | GE      | ☑    | 13/10/2026 |
+| Screen gates 8, 11, 12, 17: `five-second`, `two-shells`, `forms`, `dashes`; screen conventions in FRONTEND_GUIDE §5, §7, §8                                                                      | TB      | ☑    | 14/10/2026 |
+| Frontend foundation PR 1 · Ground: `packages/ui` (tokens, primitives, overlays, help, toast, form system, data client), catalogue and gallery, new gates, docs (FRONTEND_FOUNDATION §4)          | AJ      | ☑    | 15/10/2026 |
+| Frontend foundation PR 2 · Shell: both apps' shells on `packages/ui`, bottom bar, More, floating button, session, PWA, what opens where                                                          | AJ      | ☑    | 15/10/2026 |
+| Frontend foundation PR 3 · Build kit: DataView, KPI, charts, kanban, calendar, pickers, upload, editor, PDF preview, voice, maps; app component folders emptied; every screen on the token scale | AJ      | ☑    | 16/10/2026 |
 
 **Notes**
 
@@ -110,11 +111,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   from `ops/nginx/` (no hosting panel); processes run under systemd. Runbook:
   `docs/runbooks/server-setup.md`. Run once on the server the same day. Left: DNS for the four hosts
   (`docs/runbooks/dns-and-mail.md`), mail settings, then the release pipeline (`deploy-gate`, `release.yml`) for the first deploy.
+- 16/10/2026 · TB · Frontend foundation PR 3 (Build kit) done, and with it the whole frontend foundation (`docs/FRONTEND_FOUNDATION.md` §4 and §6; the four questions answered in §5: one `sort` key with a per-list allow-list, both styling-exemption lists emptied and deleted, TipTap in a lazy chunk for rich text, the browser's own PDF viewer plus an image viewer with Open in Tab). `packages/ui` now holds 157 components: a Data group (DataView with the pager, server sort, selection, bulk actions and Export; Kanban to F19; Calendar), a Charts group (area, bar, donut, bands, sparkline, each its own lazy chunk, both palettes from the chart tokens), a Documents group (DocumentPreview, ImageViewer, Paper, Reader), a Maps group (MapView, PlaceSearch, LocationLabel on Leaflet with the tiles, the address search and the reverse lookup all proxied), the KPI pieces and the record display parts, and the pickers, the upload engine, SignatureField, RichTextField, VoiceField and Tick in Forms. The contract gained one `sort` key per list (a field name, a leading `-` for descending, allow-listed, a 422 naming `sort` otherwise) and `shared/http/paged.js` gained `orderBy()`, which builds the ORDER BY from the repo's own map so a caller picks a key and never a character of SQL. Both apps' `components/` folders are deleted, LEGACY and §7 are empty, and `styling-exemptions.json` is gone with its readers: 804 arbitrary values converged onto the named type, spacing, radius and leading scales, and the last 10 inline styles became shared components, because an app may not write `style` at all. The mailbox composer runs on the shared editor rather than its own `contentEditable` on the deprecated `execCommand`. The map's drawing holds no focus (Leaflet's keyboard panning, focusable markers, zoom control and Leaflet link are off; the zoom buttons are ours, outside the hidden part), a list's pages are a landmark named after that list, a board's stages are a screen's second level, and the file input sits out of the reading order behind the words a person presses. 663 tests green in the package, the whole `npm run ci` green. Left: the Geoapify proxy routes are backend work (attendance, worksites), so the map components run against the paths `maps/geoapify.ts` names; voice input waits on the M2 transcription route; screens adopt server sort as each module's contract names its sortable fields.
+- 15/10/2026 · TB · Frontend foundation PR 2 (Shell) done, to `docs/FRONTEND_FOUNDATION.md` §4 and §5 (four questions answered: the frame in `packages/ui`, the session sheet in place, the phone top bar, the install offer). `packages/ui` gains a Shell group (15 components) and one copy of the environment and the delivery plan. Staff app: desktop rail and top bar; phone top bar with the pin, search, bell and avatar over a title rail; bottom bar Home, Workspace, Community, Self-Service, More (F16); More as a launcher of the modules the `/me` grants allow (F17); the floating button with the screen's New action, Clock In or Out, Praxis AI, Help and Hide Here (F18); ⌘K search; the bell on Socket.io; sign-in, sign-out and the in-place session sheet; update, install and offline in the PWA. Both apps open screens by F14: production at API, UI and Mobile, staging at API, the Prototype View switch only on the mock. Public site on PublicPage, ComingSoon and the staging bar. `/gallery/` on the staff host everywhere but production. The a11y gate now crawls all 86 app screens at both sizes and they pass; `npm run new:screen` adds a screen to the catalogue, route map, module, PROGRESS and the gates at once. Left: PR 3 (Build kit); screens adopt `useScreenAction` as they are touched; presence needs M1 chat; the release pipeline must carry `packages/ui/dist-gallery`.
 - 15/10/2026 · TB · Frontend foundation PR 1 (Ground) done, to `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F24). `packages/ui` (`@mycity/ui`) is the one design system for both apps: tokens, density and motion, 87 components (primitives, overlays, help, toast, the form system, the shared data client), the generated catalogue `docs/COMPONENTS.md`, `npm run new:component` and the gallery (`npm run gallery`). Both apps import every Ground part from `@mycity/ui`; the app copies are deleted and FRONTEND_FOUNDATION §7 lists what PR 2 and PR 3 still move. Merged with the screen conventions work: its screens and copy stay, and `@mycity/ui` takes its API (`useContractForm(initial, rules or schema)`, `Button busy`, `Wizard`, `CardHeader help`). New gates: components, palette, contrast, native dialogs, upload, mock-free, a11y, frontend typecheck, lint, test and build; gates 8 and 11 crawl the gallery and every app screen. Left: PR 2 (Shell) and PR 3 (Build kit).
 - 15/10/2026 · AJ · Screen conventions in the staff app (FRONTEND_GUIDE §5, §7, §8): gates 8 and 11 now crawl all 86 app screens at phone and desktop size (the build writes `dist/screens.json`; `scripts/check/lib/screens.js` builds and serves the demo app, CI installs `app/`), and both pass. `HelpTerm` and `Details` replace the ⓘ toggle; about 60 explainer cards, footnotes and long captions are gone; titles are Title Case and within the word limits; `Table` is a card list on a phone; controls are 44 px on a phone. Forms: `useContractForm` on react-hook-form, the §8.6 names, `FormFooter`, `Wizard` (seven long forms), `PhoneField`, `CheckboxField`, the Optional tag; Submit is never disabled. Left for this item: the contract client (waits on `contract.gen.ts`), Lucide icons and the illustration set (§5.5), and crawling as Staff and the CEO.
 - 15/10/2026 · GE · CI gates, first group. Gate 3 migration numbers (unique, in the milestone's
   block, a new file in its branch's block), gate 4 reversibility (a DOWN or `-- IRREVERSIBLE:
-  <reason>`, DOWN names what UP creates, `-- DESTRUCTIVE: <reason>` on destructive steps, and UP,
+<reason>`, DOWN names what UP creates, `-- DESTRUCTIVE: <reason>` on destructive steps, and UP,
   DOWN, UP on a throwaway database when RUN_DB_TESTS=1), gate 5 idempotency (and a merged migration
   never edited, by git), gate 17's backend half widened to packages/ and AI prompts, gate 15 day-first dates
   (backend formats only through `shared/time`), gate 20 money, and the guards: module catalogue,
@@ -229,12 +232,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Home
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | Overview | `overview` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
-| 2 | Alerts | `alerts` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
-| 3 | Reports | `reports` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
-| 86 | Team | `team` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen   | Tab        | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | -------- | ---------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 1   | Overview | `overview` | M1  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 2   | Alerts   | `alerts`   | M1  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 3   | Reports  | `reports`  | M1  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 86  | Team     | `team`     | M1  | TB    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -250,12 +253,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### My Workspace
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 4 | Today | `today` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 5 | Tasks | `tasks` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 6 | Calendar | `calendar` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 7 | Analytics | `analytics` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen    | Tab         | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | --------- | ----------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 4   | Today     | `today`     | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 5   | Tasks     | `tasks`     | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 6   | Calendar  | `calendar`  | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 7   | Analytics | `analytics` | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -263,20 +266,20 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Employee Self-Service
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 8 | My Profile | `my-profile` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 9 | My Attendance | `my-attendance` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 10 | My Performance | `my-performance` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 11 | My Payslips | `my-payslips` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 12 | My Leave | `my-leave` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 13 | My Queries | `my-queries` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 14 | My Documents | `my-documents` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 88 | My Devices | `my-devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 90 | My Security | `my-security` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 91 | Org Chart | `org-chart` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen                 | Tab                      | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ---------------------- | ------------------------ | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 8   | My Profile             | `my-profile`             | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 9   | My Attendance          | `my-attendance`          | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 10  | My Performance         | `my-performance`         | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 11  | My Payslips            | `my-payslips`            | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 12  | My Leave               | `my-leave`               | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 13  | My Queries             | `my-queries`             | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 14  | My Documents           | `my-documents`           | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 87  | Work Location Requests | `work-location-requests` | M1  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 88  | My Devices             | `my-devices`             | M1  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 89  | Policy Updates         | `policy-updates`         | M1  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 90  | My Security            | `my-security`            | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 91  | Org Chart              | `org-chart`              | M1  | TB    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -295,11 +298,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Staff Community
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 15 | Channels | `channels` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 16 | Direct Messages | `direct-messages` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 17 | Announcements | `announcements` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen          | Tab               | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | --------------- | ----------------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 15  | Channels        | `channels`        | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 16  | Direct Messages | `direct-messages` | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 17  | Announcements   | `announcements`   | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -310,14 +313,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Mailbox
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 18 | Inbox | `inbox` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 19 | Sent | `sent` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 20 | Drafts | `drafts` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 21 | Archive | `archive` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 22 | Spam | `spam` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 23 | Trash | `trash` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen  | Tab       | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ------- | --------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 18  | Inbox   | `inbox`   | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 19  | Sent    | `sent`    | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 20  | Drafts  | `drafts`  | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 21  | Archive | `archive` | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 22  | Spam    | `spam`    | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 23  | Trash   | `trash`   | M1  | GE    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -327,14 +330,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### People
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 24 | Employees | `employees` | M0 | GE | ☐ | ☐ | ☐ | Not started | |
-| 25 | Attendance | `attendance` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 26 | Leave | `leave` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 27 | Devices | `devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 28 | Worksites | `worksites` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 92 | Organogram | `organogram` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen     | Tab          | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ---------- | ------------ | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 24  | Employees  | `employees`  | M0  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 25  | Attendance | `attendance` | M1  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 26  | Leave      | `leave`      | M1  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 27  | Devices    | `devices`    | M1  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 28  | Worksites  | `worksites`  | M1  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 92  | Organogram | `organogram` | M1  | TB    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -349,13 +352,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Performance
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 29 | Goals | `goals` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 30 | Targets | `targets` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 31 | KPIs | `kpis` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 32 | Reviews | `reviews` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 33 | Analytics | `analytics` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen    | Tab         | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | --------- | ----------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 29  | Goals     | `goals`     | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 30  | Targets   | `targets`   | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 31  | KPIs      | `kpis`      | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 32  | Reviews   | `reviews`   | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 33  | Analytics | `analytics` | M2  | AJ    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -363,12 +366,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Queries & Sanctions
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 34 | Queries | `queries` | M3 | GE | ☐ | ☐ | ☐ | Not started | |
-| 35 | Rules | `rules` | M3 | GE | ☐ | ☐ | ☐ | Not started | |
-| 36 | Sanctions | `sanctions` | M3 | GE | ☐ | ☐ | ☐ | Not started | |
-| 37 | Letter Templates | `letter-templates` | M3 | GE | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen           | Tab                | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ---------------- | ------------------ | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 34  | Queries          | `queries`          | M3  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 35  | Rules            | `rules`            | M3  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 36  | Sanctions        | `sanctions`        | M3  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 37  | Letter Templates | `letter-templates` | M3  | GE    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -376,15 +379,15 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Recruitment
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 38 | Vacancies | `vacancies` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 39 | Candidates | `candidates` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 40 | Assessments | `assessments` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 41 | Interviews | `interviews` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 42 | Offers | `offers` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 43 | Onboarding | `onboarding` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 44 | Talent Pool | `talent-pool` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen      | Tab           | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ----------- | ------------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 38  | Vacancies   | `vacancies`   | M4  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 39  | Candidates  | `candidates`  | M4  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 40  | Assessments | `assessments` | M4  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 41  | Interviews  | `interviews`  | M4  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 42  | Offers      | `offers`      | M5  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 43  | Onboarding  | `onboarding`  | M5  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 44  | Talent Pool | `talent-pool` | M5  | LA    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -392,13 +395,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Payroll
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 45 | Payroll Runs | `payroll-runs` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 46 | Payslips | `payslips` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 47 | Salary Structure | `salary-structure` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 48 | Deductions | `deductions` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 49 | Statutory | `statutory` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen           | Tab                | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ---------------- | ------------------ | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 45  | Payroll Runs     | `payroll-runs`     | M6  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 46  | Payslips         | `payslips`         | M6  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 47  | Salary Structure | `salary-structure` | M6  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 48  | Deductions       | `deductions`       | M6  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 49  | Statutory        | `statutory`        | M6  | LA    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -406,14 +409,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Partnerships
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 50 | Pipeline | `pipeline` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 51 | Partners | `partners` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 52 | Leads | `leads` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 53 | Proposals | `proposals` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 54 | Contracts & MOUs | `contracts-and-mous` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
-| 55 | Analytics | `analytics` | M7 | GE | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen           | Tab                  | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ---------------- | -------------------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 50  | Pipeline         | `pipeline`           | M7  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 51  | Partners         | `partners`           | M7  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 52  | Leads            | `leads`              | M7  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 53  | Proposals        | `proposals`          | M7  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 54  | Contracts & MOUs | `contracts-and-mous` | M7  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 55  | Analytics        | `analytics`          | M7  | GE    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -421,14 +424,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Expenses
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 56 | My Requests | `my-requests` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 57 | Approvals | `approvals` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 58 | Requisitions | `requisitions` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 59 | Disbursements | `disbursements` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 60 | Budgets | `budgets` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 61 | Categories | `categories` | M8 | AJ | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen        | Tab             | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ------------- | --------------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 56  | My Requests   | `my-requests`   | M8  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 57  | Approvals     | `approvals`     | M8  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 58  | Requisitions  | `requisitions`  | M8  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 59  | Disbursements | `disbursements` | M8  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 60  | Budgets       | `budgets`       | M8  | AJ    | ☐   | ☐   | ☐      | Not started |         |
+| 61  | Categories    | `categories`    | M8  | AJ    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -436,13 +439,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Knowledge Hub
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 62 | Policies | `policies` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
-| 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
-| 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
-| 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
-| 66 | Announcements | `announcements` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen        | Tab             | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ------------- | --------------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 62  | Policies      | `policies`      | M10 | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 63  | SOPs          | `sops`          | M10 | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 64  | FAQs          | `faqs`          | M10 | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 65  | Training      | `training`      | M10 | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 66  | Announcements | `announcements` | M10 | TB    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -450,10 +453,10 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Praxis AI
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 67 | Ask | `ask` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
-| 68 | History | `history` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen  | Tab       | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | ------- | --------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 67  | Ask     | `ask`     | M10 | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 68  | History | `history` | M10 | TB    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -462,19 +465,19 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Settings
 
-| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 69 | Organisation | `organisation` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 70 | Users | `users` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 72 | Approvals | `approvals` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 74 | Notifications | `notifications` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
-| 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 78 | Security | `security` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 79 | Audit Log | `audit-log` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen                | Tab                       | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | --------------------- | ------------------------- | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 69  | Organisation          | `organisation`            | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 70  | Users                 | `users`                   | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 71  | Roles & Permissions   | `roles-and-permissions`   | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 72  | Approvals             | `approvals`               | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 73  | Attendance Policy     | `attendance-policy`       | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 74  | Notifications         | `notifications`           | M6  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 75  | Appearance            | `appearance`              | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 76  | Documents & Numbering | `documents-and-numbering` | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 77  | Integrations          | `integrations`            | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 78  | Security              | `security`                | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
+| 79  | Audit Log             | `audit-log`               | M9  | GE    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 
@@ -483,14 +486,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 ### Public site · `go.mycityapp.io` (separate app)
 
-| # | Screen | Path | M | Owner | API | UI | Mobile | Status | Updated |
-|---|---|---|---|---|---|---|---|---|---|
-| 80 | Careers | `/jobs` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 81 | Vacancy | `/jobs/<slug>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 82 | Apply | `/apply/<token>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 83 | Assessment | `/assess/<token>` | M4 | TB | ☐ | ☐ | ☐ | Not started | |
-| 84 | Sign Offer | `/sign/<token>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
-| 85 | Verify Document | `/verify/<number>` | M5 | LA | ☐ | ☐ | ☐ | Not started | |
+| #   | Screen          | Path               | M   | Owner | API | UI  | Mobile | Status      | Updated |
+| --- | --------------- | ------------------ | --- | ----- | --- | --- | ------ | ----------- | ------- |
+| 80  | Careers         | `/jobs`            | M4  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 81  | Vacancy         | `/jobs/<slug>`     | M4  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 82  | Apply           | `/apply/<token>`   | M4  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 83  | Assessment      | `/assess/<token>`  | M4  | TB    | ☐   | ☐   | ☐      | Not started |         |
+| 84  | Sign Offer      | `/sign/<token>`    | M5  | LA    | ☐   | ☐   | ☐      | Not started |         |
+| 85  | Verify Document | `/verify/<number>` | M5  | LA    | ☐   | ☐   | ☐      | Not started |         |
 
 **Notes**
 

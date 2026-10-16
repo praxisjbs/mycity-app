@@ -10,7 +10,8 @@ planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F24 are binding:
 and that file differ, that file wins and this one is fixed. Started 13 October 2026 from
 MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and §8 rewritten 14 October
 2026 into the screen content, two shells and form conventions; §1 to §3, §6, §9, §10 and §11
-rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8 brought into line.
+rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8 brought into line;
+§1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell).
 If something here is wrong or missing, fix the guide in the same PR as the code.
 
 **Feature guides are full-stack guides.** A guide in `docs/guides/` covers the backend modules,
@@ -53,6 +54,12 @@ confirm work that was built right instead of rejecting it at the end.
    A second table, modal, pager, field or date picker is a defect, and `check/components.js`
    refuses a new file in `app/src/components/` or `public-app/src/components/` and a feature that
    declares a component with a shared name.
+6. **A new screen (a tab) is added with `npm run new:screen`**, never by hand:
+   `npm run new:screen -- --module people --tab "Work Patterns" --m M1 --owner LA`. It writes the
+   tab into the shell's catalogue, the slug into `src/shared/route-map.js`, the screen file and its
+   case in the module, its Coming Soon entry, and its PROGRESS row, note and counts, so the shell,
+   the backend's links, the delivery plan and the screen gates agree from the next build. A new
+   screen changes the approved inventory (MILESTONES §18): agree it first.
 
 ---
 
@@ -114,9 +121,13 @@ The rule from the 12 October meeting, for every table, list, card grid, picker a
 - Every list response is `{ data, page: { number, size, total, pages, has_next } }`. The shared
   pager reads `page`; show the true total ("312 employees"), never "showing 25". The pager is the
   only place the total appears; never a sentence explaining the page size.
-- **Search and filters go to the server** (`q` and the list's filter params). Never filter or sort
-  the 25 rows you have and present the result as the whole list: that is the praxis-ls bug where a
-  search said "no results" for records on page 4.
+- **Search, filters and sort go to the server** (`q`, the list's filter params, and one `sort`).
+  Never filter or sort the 25 rows you have and present the result as the whole list: that is the
+  praxis-ls bug where a search said "no results" for records on page 4.
+- **Sort is one key** (F20): the field name, with a leading `-` for descending (`?sort=-due_on`).
+  The list's contract schema allow-lists the fields, so a field it does not name is a 422. `DataView`
+  sends it for you: a sortable column's header cycles ascending, descending, none, and changing it
+  goes back to page 1.
 - Infinite scroll on mobile is the same API: fetch `page + 1` when `has_next`.
 - Never fetch "all" of anything to build a dropdown. Pickers search the server and show the first
   page.
@@ -272,10 +283,17 @@ Mobile is a native-feeling app, not the desktop squeezed. Desktop is desktop sof
 that ships one layout scaled fails the gate. The test agreed on 8 October (00:23:26): **on a phone,
 does it look like a mobile application, with less text?** On desktop, is it full desktop software?
 
-**The phone shell (up to 760 px wide).** The bottom bar, More, the floating button and boards
-below are decided now (F16 to F19) and built in PR 2 (the bar, More and the floating button) and
-PR 3 (boards). Build every screen for them today: leave the bottom of the page clear, give the
-screen one New action, and never rely on dragging on a phone.
+**The phone shell (up to 760 px wide).** The top bar, the bottom bar, More and the floating button
+are built (PR 2, the Shell group in `docs/COMPONENTS.md`), and so is the build kit the screens are
+drawn with (PR 3: `DataView`, `Kanban`, the charts, the pickers, the editor, the previews, the maps).
+Build every screen for them: the page keeps clear space under its content by itself, give the screen one New
+action (`useScreenAction`, below), and never rely on dragging on a phone.
+
+- **Top bar and title rail** (PR 2 question 3): the pin alone at the left, which goes Home; search,
+  the bell and the person's avatar at the right (the avatar opens More). Under it the title rail:
+  the module's name as one large line, shortened when long, over the module's tabs. Scrolling down
+  slides the name away and keeps the tabs; scrolling up brings it back. A screen keeps its own
+  `PageHeader` for its h1.
 
 - **Bottom bar** (F16): **Home, Workspace, Community, Self-Service, More**, the same five for
   everyone, each an icon with one word, thumb reachable. Never the desktop sidebar.
@@ -285,15 +303,21 @@ screen one New action, and never rely on dragging on a phone.
   icon in a soft brand square, one word and a count badge, showing only the modules the person may
   open; Sign Out at the foot.
 - **Floating button** (F18), phone only, bottom right above the bottom bar, never draggable. A tap
-  fans out: the screen's own New action when it has one, Clock In or Out, Praxis AI, Help. It never
-  hides data: every page carries bottom clearance equal to its footprint; it tucks away while the
-  page scrolls down and returns on scrolling up; it hides while a sheet or the keyboard is open;
-  its fan has Hide Here, which keeps it hidden until the person leaves that page. Desktop has none.
-- **Boards** (F19): a stage switcher (chips with counts) over a card list for that stage. Moving a
-  card is Move To in its sheet. No dragging on a phone.
+  fans out over a dimmed page: the screen's own New action when it has one, Clock In or Out, Praxis
+  AI, Help (the Knowledge Hub's FAQs). It never hides data: every page carries bottom clearance
+  equal to its footprint; it tucks away while the page scrolls down and returns on scrolling up; it
+  hides while a sheet or the keyboard is open, and on a fit page (a chat, the mailbox); its fan has
+  Hide Here, which keeps it hidden until the person leaves that page. Desktop has none. A screen
+  offers its New action with `useScreenAction({ label: "New Task", onSelect })` from
+  `app/src/shell/screen-action.tsx`; on desktop the same action stays in its page header.
+- **Boards** (F19): `Kanban` from `@mycity/ui`. On a phone it is a stage switcher (chips with
+  counts) over that stage's cards, and a card moves by Move To, never by dragging; Move To is a real
+  menu on desktop too, so a keyboard and a screen reader can move a card.
 - **Cards, not tables.** A list is a card list (the primary value as the title, two or three
-  label and value pairs, a status pill). The shared data view (`DataView`, PR 3, F20) draws the
-  table on desktop and the card list on a phone from the same rows. No visible `<table>` on a phone.
+  label and value pairs, a status pill). `DataView` (F20) draws the table on desktop and the card
+  list on a phone from the same columns, with the pager, server sort, selection, bulk actions and
+  Export; where a phone has no table header, sort moves into an action sheet. No visible `<table>`
+  on a phone.
 - **Sheets, not centred modals.** The shared `Modal` becomes a bottom sheet that slides with a
   spring and closes by dragging down (F6); a long form becomes a full screen sheet. `Menu` becomes
   an action sheet.
@@ -313,8 +337,8 @@ panels and multi-pane layouts where they help, hover help (§5.2). The mobile bo
 floating button never show.
 
 **How it is checked.** `scripts/check/two-shells.js` opens every target at phone size (390 × 844)
-and desktop size (1440 × 900) in Chromium: the gallery, the app once PR 2 makes it a crawl target,
-and `demo.html` only when a change touches it (F23). It fails on: sideways page scrolling, the desktop
+and desktop size (1440 × 900) in Chromium: the gallery, every app screen (the mock build, signed
+in), and `demo.html` only when a change touches it (F23). It fails on: sideways page scrolling, the desktop
 sidebar on a phone, the bottom bar on desktop, a visible table on a phone, a tap target under
 44 px, more than 40 words of interface copy on the first phone screen, and any script error. The
 feature guide's §10 carries a per-screen phone table, and the pull request body states the steps
@@ -396,8 +420,10 @@ imports `react-hook-form`. Features import its parts from `@mycity/ui`: `Form`, 
 `TextField`, `PasswordField`, `NumberField`, `DateField`, `DateRangeField`, `TimeField`,
 `MoneyField`, `PhoneField`, `SelectField`, `ChoiceField`, `CheckboxField`, `Switch`, `ToggleRow`,
 `TextAreaField`, `SearchInput`, `FilterSelect`, `LoginField`, `OtpField`, `FormFooter`, `FormError`,
-`Wizard`, `InlineInput`, `InlineSelect`, `InlineLabel`, and the hook `useContractForm(initial, rules)`. `UploadField`, `PersonPicker` and
-`SignatureField` join them in PR 3. `docs/COMPONENTS.md` (Forms) has the props of each.
+`Wizard`, `InlineInput`, `InlineSelect`, `InlineLabel`, and the hook `useContractForm(initial, rules)`. PR 3 added `UploadField` (the
+only file input in the product), `PersonPicker` and `RecordPicker` (both searching the server, 25 at a
+time), `SignatureField`, `RichTextField` (TipTap in its own chunk), `VoiceField` (A18) and `Tick` (a
+list row's own checkbox). `docs/COMPONENTS.md` (Forms) has the props of each.
 
 **One hook, one field binding.** `useContractForm(initial, rules)` is react-hook-form checked by the
 module's contract schema (anything with `safeParse`) or, until it exists, by INTERIM rules (§8.3).
@@ -420,8 +446,11 @@ in `packages/ui`, approved by AJ (backup TB). Never build it inside a feature.
   `ConfirmDialog`; tell with a `toast`.
 - **One modal component** (`Modal`, a bottom sheet on a phone), used everywhere. A "new" or "edit"
   action opens it; editing a record you are looking at on desktop opens a `SidePanel`.
-- **Uploads** through the upload engine with a percentage; never a raw `<input type="file">`
-  (gate 18). The engine moves into `packages/ui` in PR 3; until then the merged `Upload` stands.
+- **Uploads** through `UploadField` with a percentage per file; never a raw `<input type="file">`
+  (gate 18). The engine is one copy in `packages/ui` (`lib/upload.ts` sends it, because `fetch`
+  cannot report how far a request body has travelled); each app passes its own `upload`, which adds
+  its session (`app/src/api/upload.ts`, `public-app/src/api/upload.ts`). A record stores the
+  answer's `document_id`, never a name or a path.
 - **Permissions**: the shell shows only the modules and actions the user's grants allow. Hiding is
   a courtesy; the API enforces. Never assume a hidden button means a forbidden action is safe.
 - **Home is role-sensitive.** Each role sees its own KPIs and main chart; "Needs you" is the same
@@ -436,12 +465,13 @@ in `packages/ui`, approved by AJ (backup TB). Never build it inside a feature.
 
 ## 9 · Foundation: `packages/ui` and the two apps
 
-Owner AJ, backup TB (CODEOWNERS). Built in three PRs (FRONTEND_FOUNDATION §1, §4): **PR 1 Ground**
-gives the package, the tokens, the primitives, overlays, help, toast, the form system, the data
-client, the catalogue, the gallery and the gates; **PR 2 Shell** puts both apps' shells on it;
-**PR 3 Build kit** adds the heavy components and empties the apps' own component folders. A section
-below says where PR 2 or PR 3 changes it. Fill a section as its work lands, so the next person
-builds on it instead of beside it.
+Owner AJ, backup TB (CODEOWNERS). Built in three PRs (FRONTEND_FOUNDATION §1, §4), **all three
+landed**: **PR 1 Ground** gave the package, the tokens, the primitives, overlays, help, toast, the
+form system, the data client, the catalogue, the gallery and the gates; **PR 2 Shell** put both
+apps' shells on it; **PR 3 Build kit** added the heavy components (DataView, the KPI pieces, the
+charts, the board, the calendar, the pickers, the upload engine, the editor, the previews, voice
+input and the maps), emptied both apps' component folders and converged every screen onto the token
+scales. The foundation is done: every component a screen uses lives in `packages/ui`.
 
 ### 9.1 Folder structure
 
@@ -462,14 +492,16 @@ packages/ui/
   package.json                @mycity/ui: source only, compiled by each app; exports ".", "./styles/*",
                               "./eslint", "./vite", "./testing"
   eslint.shared.js            the lint rules the package and both apps share (F4, F7, gates 13, 15, 16, 18)
-  vite.shared.js              the Vite settings both apps share: the contract as CommonJS, one Zod, one React
+  vite.shared.js              the Vite settings both apps share: the contract as CommonJS, one Zod, one React;
+                              and the build-time readers: contractPageSize, apiMode, deliveryPlan
   vitest.config.ts            jsdom, Testing Library, the axe matcher
   gallery/                    the gallery app (npm run gallery; served on staging only, F10)
   src/
     index.ts                  THE public barrel: everything a feature may import, and nothing else
     styles/                   tokens.css (the only file with a hex value), theme.css (the Tailwind 4
                               theme and variants), base.css (element defaults, focus ring, reduced motion)
-    lib/                      cn, format, media (useIsPhone), preferences (theme, density), slots, ids
+    lib/                      cn, format, media (useIsPhone), preferences (theme, density), slots, ids,
+                              environment (the staging marks), plan (what opens where, F14)
     icons/                    Icon (Lucide underneath)
     actions/                  Button, IconButton, BigButton
     layout/                   Card, PageHeader, Grid, Stack, Inline, PhoneOnly, DesktopOnly
@@ -480,8 +512,16 @@ packages/ui/
     help/                     HelpTerm, InfoButton, Details (§5.2)
     feedback/                 toast and Toaster, ErrorBoundary, ErrorState
     form/                     the form system: the only home of raw form elements (§8.6)
-    data/                     ApiError, createApiClient, useApi, usePaged, useInfinite, useMutation, invalidate
+    data/                     ApiError, createApiClient, useApi, usePaged, useInfinite, useMutation, invalidate,
+                              DataView (F20), Pager, Toolbar, ExportButton, Kanban (F19), Calendar
+    charts/                   AreaChart, BarChart, DonutChart, BandChart, Sparkline; each a boundary
+                              around its own *.draw.tsx chunk (F22)
+    documents/                DocumentPreview, ImageViewer, Paper, Reader
+    maps/                     MapView, PlaceSearch, LocationLabel on Leaflet, with Geoapify proxied (F21)
     illustrations/            Illustration, in token colours
+    shell/                    the frame both apps' shells are built from (PR 2): Brand, StagingBar, ComingSoon,
+                              PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
+                              MoreSheet, FloatingButton, CommandPalette, NotificationRow, ShellNotice
     testing/                  test setup, render helpers, gallery types (not exported from ".")
 ```
 
@@ -500,17 +540,23 @@ app/
   src/
     main.tsx  App.tsx         entry; providers (auth, router, modal, toasts)
     styles/index.css          Tailwind and the @mycity/ui styles; the staging offset; no colour of its own
-    lib/                      environment (staging marks), plan (what opens), router, routes (screen URLs)
+    lib/                      plan (the delivery plan bound to this app), router, routes (screen URLs)
     api/
       client.ts               the staff app's client, made with createApiClient (session, refresh)
       endpoints.ts  hooks.ts  the typed endpoint map; the shared hooks bound to this client
+      realtime.ts             Socket.io for the bell and presence (§9.6); nothing on the mock
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
+      upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
-    auth/                     AuthProvider (useAuth, useMe), Login
-    shell/                    catalogue (modules and tab slugs), access, screens (lazy per module),
-                              Shell (desktop rail and mobile bar), Nav, CommandPalette, Bell,
-                              UpdatePrompt; rebuilt on @mycity/ui in PR 2
-    components/               LEGACY only: #18 components not yet moved (§9.4); nothing new goes here
+    auth/                     AuthProvider (useAuth, useMe; the expired state), Login, SignInSheet
+    shell/                    Shell (DesktopShell or PhoneShell from @mycity/ui), catalogue (modules, tab
+                              slugs, one-word names), access (grants), nav (rail, bottom bar, More),
+                              screens (lazy per module), More, Fab, screen-action (useScreenAction),
+                              Search (⌘K), Bell, Notices, pwa (update, install), offline, Planned
+                              (Coming Soon, the Prototype View switch), coming-soon, layout-context
+    features/shared/          wiring, never components (§9.4): sections (PagedTable, ExportAction),
+                              pickers (EmployeePicker), wire (the API's shapes to the components'),
+                              KpiTiles, Letter
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
@@ -534,19 +580,20 @@ public-app/
   src/
     main.tsx  App.tsx         entry; the six routes and a not-found page
     styles/index.css          Tailwind and the @mycity/ui styles
-    lib/                      environment, plan, router
+    lib/                      plan (the delivery plan bound to this site), router
     api/
       client.ts               fetch to /api/public/v1 only, made with createApiClient; no session, no cookie
       hooks.ts  endpoints.ts  the shared hooks bound to this client; the typed endpoint map
       types/public.ts         INTERIM shapes for every public route (TB for M4 pages, LA for M5)
       mock/                   the in-browser mock, laptops and CI only; demo-links.ts lists sample addresses
-    components/               LEGACY only (§9.4): Layout, Planned and StagingBar (PR 2), SignaturePad and Upload (PR 3)
+    shell/                    Page (PublicPage with the site's links and noindex), Planned (Coming Soon, the
+                              Prototype View switch), DemoLinks (mock only)
     pages/                    Careers, Vacancy, Apply, Assessment, SignOffer, Verify, LinkProblem
 ```
 
 Addresses are `/jobs`, `/jobs/<slug>`, `/apply/<token>`, `/assess/<token>`, `/sign/<token>` and
 `/verify/<number>` (MILESTONES §6). Only the careers list and an open vacancy may be indexed; every
-other page sets `noindex`. In mock mode a "Demo links" strip at the foot of each page opens every
+other page sets `noindex`. In mock mode a Demo Links menu at the foot of each page opens every
 state (a used or expired link, a paused or filled role, each verify outcome); the mock keeps its
 state in memory, so a reload starts it again.
 
@@ -570,50 +617,69 @@ reads the copy from the shared components' `data-ui` slots (§9.4) and skips any
 production). `MYCITY_SCREEN_TARGETS=app node scripts/check/two-shells.js` crawls the app alone, for
 a quicker loop while fixing a screen.
 
-`shell/catalogue.ts` lists the fifteen modules and their tab slugs in the order of MILESTONES §18
-and `src/shared/route-map.js`; `shell/access.ts` filters modules by the `view` grant and tabs by
-role. Hiding is a courtesy: the API refuses what a grant does not allow. An unknown module or tab
-lands on the first allowed screen.
+`shell/catalogue.ts` lists the fifteen modules, their one-word names (the More tiles and the bottom
+bar) and their tab slugs in the order of MILESTONES §18 and `src/shared/route-map.js`;
+`shell/access.ts` filters modules by the `view` grant from `/me` and tabs by role, and `shell/nav.ts`
+builds the rail, the bottom bar and More from what is left. Hiding is a courtesy: the API refuses
+what a grant does not allow. An unknown module or tab lands on the first allowed screen.
+`npm run new:screen` adds a tab everywhere it is listed (§1).
 
 Two shells (gate 11), chosen by `useIsPhone()` from `@mycity/ui` (760 px and below; the merged
-screens still call it `useIsMobile`, the same hook): the desktop rail (collapsible to 66 px,
-remembered in `mc-rail`) with a top bar and tab strip, and the phone shell. A screen may also render
-a different layout per shell; it never shrinks the desktop one. Chat and Mailbox are "fit" pages
-(`useFitPage`): only their panes scroll, and scrolling past a pane's end slides the page header away.
+screens still call it `useIsMobile`, the same hook), both from the Shell group of `@mycity/ui`:
 
-**PR 2 changes the phone shell.** Today it has a bottom bar of Home, Work, Chat, People and Praxis
-AI and a drawer for the rest. PR 2 replaces them with the bottom bar (F16), the More sheet (F17)
-and the floating button (F18) in §7, and adds sign-in and session expiry, navigation from the
-`/me` grants, the command palette and search, and the bell on `packages/ui`.
+- **Desktop** (`DesktopShell`): the `Rail` (collapsible to 66 px, remembered in `mc-rail`; the
+  person's menu at its foot: My Profile, My Security, Theme, Density, Install App, Sign Out), the
+  `TopBar` (rail toggle, `SearchButton`, Clock In or Out, the bell), the module's `Tabs`, the page.
+- **Phone** (`PhoneShell`): `PhoneHeader` (§7: the pin; search, the bell, the avatar; the title rail
+  over the tabs), the page, the `FloatingButton` and the `BottomBar` with `MoreSheet` (F16 to F18).
+
+A screen may also render a different layout per shell; it never shrinks the desktop one. Chat and
+Mailbox are "fit" pages (`useFitPage`): only their panes scroll, and scrolling past a pane's end
+slides the page header away; the floating button stays off them.
+
+**Sign-in and the session.** `auth/Login.tsx` is the sign-in screen (the Deep Green panel with the
+pin on desktop; the pin and the form on a phone). The access token is held in memory only and the
+refresh cookie restores the session on load (§9.5). When the session ends mid-work (a 401 the
+refresh cookie cannot cure), the shell stays, with the person's screen and any half-filled form, and
+`auth/SignInSheet.tsx` opens over it (PR 2 question 2): signing in again as the same person carries
+on and reloads what failed; another account reloads at Home; Sign Out leaves. Sign Out is in the
+account menu and at the foot of More.
+
+**Search** (`shell/Search.tsx` on `CommandPalette`): ⌘K or Ctrl K anywhere, the top bar's search
+button, the phone's search icon and More's search bar. Screens and records from
+`GET /api/v1/search`, first page only (25), filtered by grant on the server; arrows move, Enter
+opens. **The bell** (`shell/Bell.tsx` on `NotificationRow`): `GET /api/v1/notifications`, the
+shared pager, a dot while anything is unread, refreshed over realtime (§9.6).
 
 **Staging is marked, in both apps** (MILESTONES §6, A4). The same build runs on staging and
-production, so `lib/environment.ts` decides at runtime: a `staging.` host name (also set before first
-paint in `index.html`) or `X-Mycity-Environment: staging` on any API response sets `data-env="staging"`
-on `<html>`. `StagingBar` then shows a fixed, non-dismissible amber bar, and `--env-bar` (its height)
-moves everything else down: `#root`, and every full-screen layer (sign-in, modal, command palette,
+production, so `lib/environment.ts` in `@mycity/ui` decides at runtime: a `staging.` host name (also
+set before first paint in `index.html`) or `X-Mycity-Environment: staging` on any API response sets
+`data-env="staging"` on `<html>`. `StagingBar` from `@mycity/ui` then shows a fixed, non-dismissible
+amber bar, and `--env-bar` (its height, in `base.css`) moves everything else down: `#root`, and every full-screen layer (sign-in, modal, command palette,
 the phone menu, the chat and mail readers) starts at `top-(--env-bar)`. A new full-screen layer must
 do the same. On the public site the bar is sticky. Staging also swaps the tab icon for
 `public/favicon-staging.svg` and sets `theme-color` to the `--warning` amber. `?env=staging` shows
 all of it in development.
 
-**What opens, by the delivery plan, in both apps** (`lib/plan.ts`). At build time `vite.config.ts`
-reads each screen's milestone and its API, UI and Mobile ticks from `docs/PROGRESS.md`, and each
-milestone's name and demo date from the table in MILESTONES §4, into `__DELIVERY_PLAN__`.
+**What opens where, in both apps** (F14; `lib/plan.ts` in `@mycity/ui`, bound in each app's
+`lib/plan.ts`). At build time `deliveryPlan()` in `vite.shared.js` reads each screen's milestone and
+its API, UI and Mobile ticks from `docs/PROGRESS.md`, and each milestone's name and demo date from
+the table in MILESTONES §4, into `__DELIVERY_PLAN__`. The rule comes from where the build runs:
 
-- **Production:** a screen opens only when its PROGRESS row has all three ticks; until then it
-  shows Coming Soon (`shell/Planned.tsx`, `components/Planned.tsx` on the public site). Staff see
-  the milestone and date; a stranger on the public site sees neither.
-- **Everywhere else** (development, the demo build, staging): the demo's "Prototype View" switch
-  above every screen: "Full Design" (the default) opens everything; "As Delivered at Mn" shows
-  Coming Soon for every screen planned after Mn. Mn is the current milestone, the earliest one not
-  yet done, where done means its demo day has passed or all its screens are ticked; it is worked
-  out from today's date, so it moves on by itself. The choice is kept per browser.
-- What each screen will do, on its card, is in `shell/coming-soon.ts` (and in `components/Planned.tsx`
-  for the public pages): add a line there when a tab is added. Re-planning a screen is a change to
-  the M column in PROGRESS, nothing in code. A build fails if the plan cannot be read.
-
-**PR 2 changes what opens on staging** (F14, §9.5): staging opens a screen as soon as its API is
-ticked, on its seeded data, and the Prototype View switch exists only in mock mode on a laptop.
+- **Production** (a live build on a production host): a screen opens when its PROGRESS row has API,
+  UI and Mobile ticked.
+- **Staging** (a live build on a staging host, or a laptop on the live API): a screen opens as soon
+  as its API is ticked, so its owner can check it on the seeded data.
+- **Mock** (the in-browser mock: laptops and CI, never released): the Prototype View switch above
+  every screen, "Full Design" (the default) or "As Delivered" at the current milestone, the earliest
+  one neither past its demo day nor fully ticked, worked out from today's date. The choice is kept
+  per browser. A live build does not contain the switch.
+- Before its rule opens it, a screen shows Coming Soon (`ComingSoon` from `@mycity/ui`, through
+  `shell/Planned.tsx`; `shell/Planned.tsx` on the public site). Staff and staging visitors see the
+  milestone and date; a stranger on the public site's production sees neither. What each screen
+  will do, on its card, is in `shell/coming-soon.ts` (and in the public site's `shell/Planned.tsx`).
+  Re-planning a screen is a change to the M column in PROGRESS, nothing in code. A build fails if the
+  plan cannot be read.
 
 ### 9.3 Tokens, type, styling and density
 
@@ -644,10 +710,13 @@ and set before first paint. `useTheme` and `setTheme` from `@mycity/ui` read and
 
 Typeface Geist (`@fontsource-variable/geist`), one family.
 
-**Styling (F4).** Inside `packages/ui`: Tailwind utilities on token classes; CSS variables are
-allowed; no hex outside `tokens.css`. In `app/` and `public-app/`: token classes and layout and
-spacing utilities from the named scales only. No arbitrary value (`w-[317px]`), no `style=` prop,
-no hex. ESLint refuses each (`eslint.shared.js`). Anything visual beyond that is a shared component.
+**Styling (F4).** Inside `packages/ui`: Tailwind utilities on token classes; a `style` prop may set
+a CSS **variable** that a class reads (`w-(--fill)`), which is how every measured bar, pane and
+swatch carries its one runtime value; no hex outside `tokens.css`. In `app/` and `public-app/`:
+token classes and layout and spacing utilities from the named scales only. No arbitrary value
+(`w-[317px]`), no `style=` prop at all, no hex. ESLint refuses each (`eslint.shared.js`), **with no
+exemptions**: PR 3 converged every screen #18 wrote onto the scales and deleted the list.
+Anything visual beyond that is a shared component.
 
 **Density (F5).** `--control-h`, `--row-h`, `--text-body`, `--text-field` and `--tap`: Compact by
 default (36, 40, 14, 14 and 36 px), `[data-density=comfortable]` (40, 48, 15, 15 and 40 px). At
@@ -672,13 +741,17 @@ app's `components/` folder, and a feature that declares a component with a share
 from a button without guessing from markup. Content a person wrote or received is marked
 `data-copy="content"` (`content()`) and is not counted as interface copy (§5.3).
 
-**LEGACY.** Components from #18 that have not moved yet stay where they are, in `app/src/components/`
-and `public-app/src/components/`, until the PR named for them moves them into `packages/ui`. The
-list is `LEGACY` in `scripts/check/components.js`; FRONTEND_FOUNDATION §7 mirrors it row for row,
-and the check fails when the two differ. Entries only leave. Nothing new is added beside them. When
-one moves, its screens import the shared component from `@mycity/ui` and its file leaves the list.
-`features/shared/sections.tsx` (`PagedTable`, `ExportButton`) is not in a components folder, but its
-table pieces move with `Table.tsx` to `DataView` in PR 3.
+**LEGACY is empty.** PR 3 moved the last of #18's own components into `packages/ui` and deleted
+`app/src/components/` and `public-app/src/components/`. `LEGACY` in `scripts/check/components.js` is
+an empty list and FRONTEND_FOUNDATION §7 an empty table, and the check around them stays: a file in
+either folder fails the build, and so does a feature that declares a component with a shared name. A
+missing component is added to `packages/ui` with `npm run new:component` (F11).
+
+What a feature may still keep beside its screens is **wiring**, not components:
+`features/shared/sections.tsx` binds `DataView` and `ExportButton` to this app's endpoints
+(`PagedTable`, `ExportAction`), `features/shared/pickers.tsx` binds `PersonPicker` to the employees
+endpoint (`EmployeePicker`), `features/shared/wire.ts` maps what the API sends to what the
+components take, and `api/upload.ts` gives the upload engine this app's session.
 
 **Submit is never disabled** (§8.3). `Button`'s `busy` ignores presses while a request is in flight
 but keeps the button enabled and reachable; a form shows what is wrong on its fields when Submit is
@@ -743,21 +816,41 @@ reviews), so a laptop and staging show the same people and numbers.
 **What opens where (F14).** Production opens a screen when its PROGRESS row has API, UI and Mobile
 ticked. Staging opens it as soon as API is ticked, so its owner can check it on seeded data. Before
 that both show Coming Soon. The Full Design and As Delivered switch exists only in mock mode, on a
-laptop. PR 2 builds this; §9.2 describes what runs until then.
+laptop or in CI (§9.2).
 
 ### 9.6 Realtime (Socket.io) and notifications
 
-Not built yet. The bell (`shell/Bell.tsx`) reads `GET /api/v1/notifications` and badge counts from
-`GET /api/v1/notifications/badges` (INTERIM), refreshed on open. PR 2 adds Socket.io for the bell
-and presence; the notification engine itself lands in M6.
+`api/realtime.ts`: one Socket.io connection to the API (`src/realtime/socket.js`) while a person is
+signed in, with the access token from memory in the handshake. The server joins the socket to the
+person's own rooms and closes it when the token expires; the client then refreshes the session once
+and reconnects. A refused refresh leaves it closed and the session sheet takes over (§9.2).
+`useRealtime(event, handler)` hands an event to the components listening while they are mounted;
+`usePresence(userId)` keeps who is online from `presence` events. The bell listens for
+`notification` and reloads its dot, its list and the badge counts (`GET /api/v1/notifications`,
+`GET /api/v1/notifications/badges`, INTERIM). Realtime is best effort: everything also arrives over
+HTTP, so a dropped socket only means the bell refreshes when it is opened. The in-browser mock has no
+server, so nothing connects in mock mode. The server sends `presence` from M1 chat; the notification
+engine itself lands in M6.
 
 ### 9.7 PWA (staff app only)
 
-`vite-plugin-pwa` in `generateSW` mode with `registerType: "prompt"`: a new version shows the
-update prompt (`shell/UpdatePrompt.tsx`) rather than reloading under someone. The shell and assets
-are precached; `/api/` is `NetworkOnly`, so every number on screen is live and nothing personal is
-cached. The manifest is in `vite.config.ts` (standalone, brand colours, 192, 512 and maskable icons).
-PR 2 adds the install prompt and an offline shell page.
+`vite-plugin-pwa` in `generateSW` mode with `registerType: "prompt"`; `shell/pwa.ts` holds what the
+shell shows (`startPwa()` at start, `usePwa()` in the shell):
+
+- **Update**: a new version shows a `ShellNotice` with Reload rather than reloading under someone.
+- **Install** (PR 2 question 4): an Install App action in More and in the desktop account menu, and
+  a one-time banner (`ShellNotice`: Install App, Not Now) from a person's second signed-in visit on
+  that device, on a phone and on desktop; Not Now holds it for 30 days. Neither shows once the app
+  is installed (opened standalone, or the browser reports `appinstalled`). Where the browser offers
+  its own prompt (`beforeinstallprompt`) Install App uses it; on an iPhone or iPad it shows the Add
+  to Home Screen steps.
+- **Offline**: the shell and assets are precached, so the installed app opens without a connection;
+  `/api/` is `NetworkOnly`, so every number on screen is live and nothing personal is cached. With
+  no connection the page area shows the offline page (`shell/offline.tsx`: No Connection, Try
+  Again) and the shell stays; when the connection returns every mounted read reloads.
+
+The manifest is in `vite.config.ts` (standalone, brand colours, 192, 512 and maskable icons). The
+service worker never answers `/api/` or `/gallery/` with the app shell.
 
 ---
 
@@ -767,10 +860,9 @@ The same as the backend: nobody pushes to `main`; branch, push, pull request, CI
 owner's approval, merge. How to open a branch, keep it up to date, and what makes CI fail are in
 `BACKEND_GUIDE.md` §8. A change under `packages/ui/` needs AJ or TB (CODEOWNERS, F11).
 
-The gates that hold the frontend to this guide run in `npm run ci`. A row marked **PR 1** is still
-being built (FRONTEND_FOUNDATION §6) and joins `npm run ci` when it lands; `npm run ci -- --list`
-shows what runs today. The screen gates crawl the gallery, the app once PR 2 makes it a target, and
-`demo.html` only when a change touches it (F23). Several gates are lint rules in
+The gates that hold the frontend to this guide run in `npm run ci`; `npm run ci -- --list` shows
+what runs today. The screen gates crawl the gallery, every app screen, and `demo.html` only
+when a change touches it (F23). Several gates are lint rules in
 `packages/ui/eslint.shared.js`, run by `fe:lint` in the package and both apps.
 
 | Gate | Where | Refuses |
@@ -778,20 +870,19 @@ shows what runs today. The screen gates crawl the gallery, the app once PR 2 mak
 | 8 Five-second rule | `scripts/check/five-second.js` | A word limit broken (§5.3), an explainer title, chrome not in Title Case, help visible on load, a subtitle or chart caption on a phone, text in a modal footer |
 | 11 Two shells | `scripts/check/two-shells.js` | Sideways scrolling, the wrong navigation for the width, a table on a phone, a tap target under 44 px, a wordy first phone screen, a script error (§7) |
 | 12 Inline validation and the form system | `scripts/check/forms.js` | A raw form element or `react-hook-form` outside `packages/ui/src/form/`, a hand-made label, an asterisk, an instruction as a placeholder, a long field error, a Submit or OK button (§8) |
-| 13 Palette | lint `no-hex`; `scripts/check/palette.js` (**PR 1**) | A raw hex outside `tokens.css`; `#FFCD05` or `#004F70` anywhere; a colour or arbitrary value in a class (F4) |
-| 14 Contrast | `scripts/check/contrast.js` (**PR 1**) | A text pair in `tokens.css` below AA (4.5:1) in either theme, chart series included (§9.3) |
+| 13 Palette | lint `no-hex`; `scripts/check/palette.js` | A raw hex outside `tokens.css`; `#FFCD05` or `#004F70` anywhere; a colour, an arbitrary value or a `style` prop in an app (F4), with no exemptions |
+| 14 Contrast | `scripts/check/contrast.js` | A text pair in `tokens.css` below AA (4.5:1) in either theme, chart series included (§9.3) |
 | 15 Day-first dates | lint `no-date-input`, `no-bare-date-locale`; `scripts/check/date-format.js` is still empty (NOT BUILT in `npm run ci`) | `<input type="date">`, `toLocaleDateString()` with no locale (§6) |
-| 16 No native dialogs | lint; `scripts/check/native-dialogs.js` (**PR 1**) | `alert`, `confirm`, `prompt` and `window.` forms of them (§8.7) |
+| 16 No native dialogs | lint; `scripts/check/native-dialogs.js` | `alert`, `confirm`, `prompt` and `window.` forms of them (§8.7) |
 | 17 No dashes | `scripts/check/dashes.js` | An em dash, an en dash or a double hyphen in copy a person reads (§5.4) |
-| 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` (**PR 1**) | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
-| Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; a new file in an app's `components/`; a feature shadowing a shared component (§9.4) |
-| Mock-free (F12) | `scripts/check/mock-free.js` (**PR 1**) | A release build that contains the in-browser mock (§9.5) |
-| Accessibility | `scripts/check/a11y.js` (**PR 1**) | An axe violation on any gallery state, in either theme |
+| 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
+| Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; ANY file in an app's `components/` (both folders are gone); a feature shadowing a shared component (§9.4) |
+| Mock-free (F12) | `scripts/check/mock-free.js` | A release build that contains the in-browser mock (§9.5) |
+| Accessibility | `scripts/check/a11y.js` | An axe violation on any gallery state, in either theme, or on any app screen (shell and page together) at phone and desktop size |
 | Frontend typecheck, lint, test, build | `npm run fe:typecheck`, `fe:lint`, `fe:test`, `fe:build` | A type error, a lint error (the rules above, F4, F7, no local Zod), a failing Vitest test (each component's render, behaviour and axe check), a build that does not complete, in `packages/ui`, `app` or `public-app` |
 
 The screen gates need Chromium. CI installs it; locally, `npx playwright install chromium` once.
-The Stop hook runs them when a change touches `app/`, `public-app/` or `demo.html`; a change only in
-`packages/ui/` does not trigger them until PR 1 adds it (FRONTEND_FOUNDATION §6), so run them yourself.
+The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`.
 
 ## 11 · Done means
 

@@ -3,13 +3,13 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { EmployeeCreate, EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
-import { Bars, StatStrip } from "@/components/ui/data";
-import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { hrefFor, useRouter } from "@/lib/router";
 import { EmployeeDetails } from "./EmployeeDetails";
-import { PersonPicker, UploadField } from "@/components/form";
-import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, toast, DateField, Field, FilterSelect, MoneyField, PhoneField, rules, SearchInput, SelectField, TextField, toMoneyString, useContractForm, Wizard, type WizardStep } from "@mycity/ui";
+import { Bars, Button, Card, CardHeader, DataView, DateField, Field, FilterSelect, Grid, MoneyField, PageHeader, Pager, PhoneField, Pill, rules, SearchInput, SelectField, StatStrip, TextField, toast, toMoneyString, Toolbar, UploadField, useContractForm, useModal, Who, Wizard, type WizardStep } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
+import { toBars } from "@/features/shared/wire";
+import { upload } from "@/api/upload";
 
 export function Employees() {
   const me = useMe();
@@ -42,13 +42,13 @@ export function Employees() {
       {summary.data && <KpiTiles items={summary.data.kpis} />}
       {summary.data && <StatStrip items={summary.data.arrangements.map((a) => ({ label: a.label, value: a.value }))} />}
       <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-[300px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name, title, number" className="w-full md:w-72" />
         <FilterSelect label="Department" value={department} onChange={setDepartment} options={[["all", "All departments"], ...depts.rows.map((d) => [d.name, d.name] as [string, string])]} />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={[["all", "Any status"], ["confirmed", "Active"], ["probation", "Probation"], ["on_leave", "On Leave"], ["suspended", "Suspended"]]} />
       </Toolbar>
-      <Table
+      <DataView
         title="All Employees"
-        right={<span className="text-[11.5px] text-subtle-foreground max-md:hidden">Home addresses appear only in the authorised details view</span>}
+        right={<span className="text-2xs text-subtle-foreground max-md:hidden">Home addresses appear only in the authorised details view</span>}
         rows={list.rows}
         rowKey={(r) => r.employee_id}
         loading={list.loading}
@@ -70,16 +70,16 @@ export function Employees() {
         {summary.data && (
           <Card>
             <CardHeader title="Headcount by Department" />
-            <Bars rows={summary.data.departments} />
+            <Bars rows={toBars(summary.data.departments)} />
           </Card>
         )}
         {summary.data && (
           <Card>
             <CardHeader title="Needs a Decision" right={<Pill tone="warn">{String(summary.data.decisions.length)}</Pill>} />
             {summary.data.decisions.map((d) => (
-              <button key={d.title} type="button" onClick={() => navigate(d.link)} className="mb-2 block w-full rounded-box border border-border bg-card p-2.5 text-left transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-2">
-                <b className="block text-[12.5px] font-semibold">{d.title}</b>
-                <span className="mb-1.5 block text-[11.5px] text-subtle-foreground">{d.text}</span>
+              <button key={d.title} type="button" onClick={() => navigate(d.link)} className="mb-2 block w-full rounded-box border border-border bg-card p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-2">
+                <b className="block text-xs font-semibold">{d.title}</b>
+                <span className="mb-1.5 block text-2xs text-subtle-foreground">{d.text}</span>
                 <Pill tone={d.action.tone}>{d.action.text}</Pill>
               </button>
             ))}
@@ -158,7 +158,7 @@ function AddEmployee({ close }: { close: () => void }) {
             <Field label="Start Date" {...f.field("start_date")}><DateField {...f.field("start_date")} /></Field>
             <Field label="Employment Type"><SelectField options={EMPLOYMENT} {...f.field("employment_type")} /></Field>
             <Field label="Work Pattern"><SelectField options={PATTERN} {...f.field("work_pattern")} /></Field>
-            <Field label="Line Manager" optional><PersonPicker value={manager} onChange={setManager} placeholder="Manager's name" /></Field>
+            <Field label="Line Manager" optional><EmployeePicker value={manager} onChange={setManager} placeholder="Manager's name" /></Field>
           </>
         )),
         step("Pay and Bank", ["gross_monthly", "account_number"], (
@@ -178,8 +178,8 @@ function AddEmployee({ close }: { close: () => void }) {
 function ImportStaff() {
   return (
     <>
-      <p className="mb-3 text-[12.5px] text-muted-foreground">Upload the staff sheet. Columns are mapped next, then a preview runs the import for real and rolls it back, so you see every error before anything is saved.</p>
-      <UploadField purpose="import" accept=".xlsx,.csv" multiple={false} label="Drop the staff sheet here, or browse" onUploaded={() => toast("Sheet received. Map its columns to continue.")} />
+      <p className="mb-3 text-xs text-muted-foreground">Upload the staff sheet. Columns are mapped next, then a preview runs the import for real and rolls it back, so you see every error before anything is saved.</p>
+      <UploadField upload={upload} purpose="import" accept=".xlsx,.csv" multiple={false} label="Drop the staff sheet here, or browse" onUploaded={() => toast("Sheet received. Map its columns to continue.")} />
     </>
   );
 }

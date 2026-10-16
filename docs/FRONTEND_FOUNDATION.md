@@ -21,12 +21,16 @@ parallel produce one product:
 |---|---|---|
 | 1 | **Ground** | `packages/ui` (one design system for both apps), tokens, primitives, overlays, help, toast, the whole form system, the component catalogue and its gate, the gallery, the new gates, the playbook |
 | 2 | **Shell** | Both apps' shells on `packages/ui`: navigation, bottom bar and More, the floating button, sign-in and session, permissions, search, bell, realtime, PWA, the staging rules, the gallery on staging, the app as a gated crawl target, `new:screen` |
-| 3 | **Build kit** | DataView, KPI card, charts, kanban, calendar, timeline, pickers, upload, rich text editor, PDF preview, voice input, maps; every remaining component of #18 moved into `packages/ui` |
+| 3 | **Build kit** | DataView, KPI card, charts, kanban, calendar, timeline, pickers, upload, rich text editor, PDF preview, voice input, maps; every remaining component of #18 moved into `packages/ui`; every screen on the token scale and the F4 exemption list deleted |
 
 **Done**, for the foundation: every component a screen uses lives in `packages/ui`, is listed in
 `docs/COMPONENTS.md`, has a test and a gallery page, and passes every gate; `app/src/components/`
 and `public-app/src/components/` are empty; both apps build, typecheck, lint and test in
 `npm run ci`.
+
+**All three PRs have landed** (§6). What a feature keeps beside its screens is wiring, not
+components: an endpoint bound to a shared component, the API's shapes mapped to the components', the
+app's session on the upload engine.
 
 ---
 
@@ -116,26 +120,27 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 
 ### PR 2 · Shell
 
-- [ ] Staff shell on `packages/ui`: desktop rail and top bar; phone top bar, bottom bar (F16), More sheet (F17), floating button (F18)
-- [ ] Sign-in, session (access token in memory, refresh cookie), sign-out, session expiry
-- [ ] Permission-aware navigation from `/me` grants; routes by the one URL shape (`/<module>?tab=<tab>&id=<id>`)
-- [ ] Command palette (⌘K) and search; notification bell; realtime (Socket.io) for the bell and presence
-- [ ] PWA: install, update prompt, offline shell page
-- [ ] Theme, density and staging bar; what opens where (F14)
-- [ ] Public site shell on `packages/ui`
-- [ ] Gallery served on staging only (F10): `src/http/static.js` refuses `/gallery` on production; release builds it
-- [ ] The app as a gated crawl target (gates 8, 11, a11y) on mock data in CI; `npm run new:screen`
+- [x] Staff shell on `packages/ui`: desktop rail and top bar; phone top bar, bottom bar (F16), More sheet (F17), floating button (F18)
+- [x] Sign-in, session (access token in memory, refresh cookie), sign-out, session expiry
+- [x] Permission-aware navigation from `/me` grants; routes by the one URL shape (`/<module>?tab=<tab>&id=<id>`)
+- [x] Command palette (⌘K) and search; notification bell; realtime (Socket.io) for the bell and presence
+- [x] PWA: install, update prompt, offline shell page
+- [x] Theme, density and staging bar; what opens where (F14)
+- [x] Public site shell on `packages/ui`
+- [x] Gallery served on staging only (F10): `src/http/static.js` refuses `/gallery` on production; release builds it
+- [x] The app as a gated crawl target (gates 8, 11, a11y) on mock data in CI; `npm run new:screen`
 
 ### PR 3 · Build kit
 
-- [ ] DataView (F20): table on desktop, card list on a phone, the pager, server sort, selection and bulk actions, Export; `sort` in `listQuery` (contract, with GE)
-- [ ] KPI card and KPI grid, StatStrip, the KPI detail sheet
-- [ ] Charts (lazy): area, bar, donut, bands, sparkline; two palettes (MILESTONES §5.2), legible in both themes
-- [ ] Kanban (F19), Calendar, Timeline, approval Chain, Accordion
-- [ ] Pickers: PersonPicker, RecordPicker (server search, 25 per page); upload engine with progress (gate 18); SignatureField
-- [ ] Rich text editor, PDF and document preview, Reader, voice input (A18), Profile header
-- [ ] Maps (F21): MapView, PlaceSearch, LocationLabel
-- [ ] `app/src/components/` and `public-app/src/components/` empty; §7 cleared
+- [x] DataView (F20): table on desktop, card list on a phone, the pager, server sort, selection and bulk actions, Export; `sort` in `listQuery` (one key, a leading `-` for descending, allow-listed per list) with `orderBy()` in `shared/http/paged.js`
+- [x] KPI card and KPI grid, StatStrip, the KPI detail sheet (the report model: summary, group chips, search past a screenful, records paged at 25)
+- [x] Charts (lazy): area, bar, donut, bands, sparkline, each its own `*.draw.tsx` chunk; both palettes from the chart tokens (MILESTONES §5.2), with every value also read out as words
+- [x] Kanban (F19: stage chips and Move To on a phone, Move To as a real menu on desktop too), Calendar, Timeline, approval Chain, Accordion
+- [x] Pickers: PersonPicker and RecordPicker (server search, 25 per page, nothing filtered on the client); the upload engine with a percentage per file (gate 18), one copy for both apps; SignatureField
+- [x] Rich text editor (TipTap, lazy), PDF and document preview with an image viewer and Open in Tab, Paper, Reader, voice input (A18), Profile header
+- [x] Maps (F21): MapView, PlaceSearch, LocationLabel on Leaflet, with the tiles, the address search and the reverse lookup all through our API
+- [x] `app/src/components/` and `public-app/src/components/` deleted; §7 cleared and `LEGACY` empty
+- [x] Every screen on the token scale: 804 arbitrary values converged, the 10 inline styles became shared components, and `styling-exemptions.json` is deleted with its readers
 
 ---
 
@@ -148,9 +153,44 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 3. How should a phone feel? Native, drag to dismiss (F6).
 4. Where does the gallery live? Staging only (F10).
 
-**PR 2 · Shell**: _asked at the start of its session._
+**PR 2 · Shell** (15/10/2026, TB)
 
-**PR 3 · Build kit**: _asked at the start of its session._
+1. Where do the shell's frame parts live? In `packages/ui`, a **Shell** group: the rail, top bars,
+   bottom bar, More, the floating button, the command palette, the notification row, the staging
+   bar, Coming Soon and the public page frame are data-free components with header, test and
+   gallery page; each app keeps only its wiring (catalogue, grants, session, routes).
+2. What happens when a session expires mid-work? A **sign-in sheet opens in place**, over the
+   screen, which stays underneath with any half-filled form; signing in again carries on where the
+   person was. Another account signing in reloads at Home.
+3. What does the phone top bar hold? **The pin alone** (no word) at the left; search, the bell and
+   the person's avatar at the right (the avatar opens their row: theme, density, settings, sign
+   out). Under it a **title rail**: the module's name as one large line (shortened when long) over
+   the tab chips. Scrolling down slides the title away and keeps the tabs; scrolling up brings it
+   back.
+4. How is installing the app offered? An **Install App** action in More and the desktop account
+   menu, and a **one-time banner** from a person's second signed-in visit, on a phone and on
+   desktop, with Install App and Not Now (Not Now holds for 30 days on that device). Neither shows
+   once the app is installed (opened as an installed app, or the browser reports it installed). On
+   an iPhone, Install App opens a sheet with the Add to Home Screen steps.
+
+**PR 3 · Build kit** (16/10/2026, TB)
+
+1. How does a list ask the server to sort? **One `sort` key in `listQuery`**, the field name with a
+   leading `-` for descending (`?sort=-created_at`). Each list passes its own allow-list
+   (`listQuery(filters, ["display_name", "created_at"])`); a field that is not on it is a 422 that
+   names the key, like any other bad filter. `DataView` sends one value and a column header cycles
+   ascending, descending, none.
+2. How far does this PR take F4? **Both styling-exemption lists are emptied and the file deleted.**
+   All 58 files (49 in the staff app, 9 on the public site) move onto the token scale and
+   `@mycity/ui` components in this PR, and `styling-exemptions.json` goes with its readers in both
+   apps' ESLint configs and `check/palette.js`. F4 is then whole, with no list to shrink later.
+3. What draws the rich text editor? **TipTap (ProseMirror), in its own lazy chunk** (F22). Selection,
+   paste sanitising, lists and undo are the parts that are not worth hand-rolling, and the composer
+   and announcements both take pasted mail. The toolbar and every style are ours, on tokens.
+4. How is a document previewed? **The browser's own viewer**: a PDF streams from the vault into an
+   `<object>`, and anything that refuses it inline gets a Download card instead. An **image viewer**
+   sits beside it for pictures, and **both carry Open in Tab**, so a preview opens full size.
+   Our own generated documents keep rendering through `Paper`.
 
 ---
 
@@ -159,11 +199,49 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 | PR | Status | Branch · PR | Updated |
 |---|---|---|---|
 | 1 Ground | Done | `claude/nifty-ptolemy-4fb7gz` | 15/10/2026 |
-| 2 Shell | Not started | | |
-| 3 Build kit | Not started | | |
+| 2 Shell | Done | `m0/frontend-shell` | 15/10/2026 |
+| 3 Build kit | Done | `m0/frontend-build-kit` | 16/10/2026 |
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 16/10/2026 · TB · PR 3 (Build kit) done, and with it the frontend foundation. `packages/ui` holds
+  157 components: a **Data** group (DataView, Pager, Toolbar, ExportButton, Kanban, Calendar), a
+  **Charts** group (five charts, each a boundary around its own lazy chunk), a **Documents** group
+  (DocumentPreview, ImageViewer, Paper, Reader), a **Maps** group (MapView, PlaceSearch,
+  LocationLabel on Leaflet with Geoapify proxied), the KPI pieces and the record display parts in
+  Display, and the pickers, the upload engine, SignatureField, RichTextField, VoiceField and Tick in
+  Forms. The contract gained one `sort` key per list, allow-listed, with `orderBy()` building the
+  ORDER BY from the repo's own map. Both apps' `components/` folders are deleted, `LEGACY` and §7 are
+  empty, and the F4 exemption list is gone: 804 arbitrary values converged onto the named scales and
+  the last 10 inline styles became shared components (SplitPanes, Confetti, Waveform, Swatch,
+  ShareBar), because an app may not write `style` at all. The mailbox composer is on the shared
+  editor instead of its own `contentEditable` on the deprecated `execCommand`. The celebration card,
+  the rich text body, the timeline rail and the disclosure marker moved from the staff app's
+  stylesheet into the package's base.css, which cut it from 90 lines to 54. The screen gates closed
+  the last of it: the map's drawing holds no focus at all now (Leaflet's keyboard panning, focusable
+  markers, zoom control and Leaflet link are off and the zoom buttons are ours, outside the hidden
+  part), a list's pages are a landmark named after that list, a board's stages are a screen's second
+  level, and the file input sits out of the reading order behind the words a person presses. 663
+  tests green in the package; the whole `npm run ci` green.
+  Left: the Geoapify proxy routes are backend work (attendance, worksites), so the maps run against
+  the paths `maps/geoapify.ts` names; voice input needs the M2 transcription route; and screens
+  adopt server sort as their modules' contracts name their sortable fields.
+- 15/10/2026 · TB · PR 2 (Shell) done. A Shell group in `packages/ui` (15 components: Brand,
+  StagingBar, ComingSoon, PublicPage and PageMessage, DesktopShell, PhoneShell, Rail, TopBar and
+  SearchButton, PhoneHeader, BottomBar, MoreSheet, FloatingButton, CommandPalette, NotificationRow,
+  ShellNotice) and the environment and delivery plan as one copy in `lib/`. The staff app's shell is
+  rebuilt on it and leaves the F4 exemptions: the rail and top bar; the phone top bar (the pin;
+  search, bell, avatar) over a title rail that slides away; the bottom bar (F16), More (F17) and the
+  floating button (F18, `useScreenAction`, Hide Here, a scrim behind the fan); ⌘K search; the bell
+  on realtime; sign-in, sign-out and the in-place session sheet; the PWA's update notice, Install
+  App and the second-visit banner, and the offline page. Both apps open screens by F14 (production
+  at all three ticks, staging at API, the switch only on the mock). The public site runs on
+  PublicPage, PageMessage, ComingSoon and the sticky StagingBar. `/gallery/` is served on the staff
+  host everywhere but production. The a11y gate crawls every app screen too; the screens' own axe
+  findings (heading order, contrast on selected rows, scroll regions, a nested button, table
+  headers, ARIA attributes) are fixed. `npm run new:screen` adds a screen everywhere it is listed.
+  Left: screens adopt `useScreenAction` for the fan's New action as their PRs touch them; presence
+  waits for M1 chat on the server; the release pipeline (GE) must carry `packages/ui/dist-gallery`.
 - 15/10/2026 · TB · PR 1 (Ground) done. `packages/ui` holds 87 components with headers, tests and
   gallery pages; `docs/COMPONENTS.md` is generated; both apps import every Ground part from
   `@mycity/ui` and their copies are gone. Merged with #20 (screen conventions): its screens and copy
@@ -177,36 +255,43 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 
 ## 7 · Components still in the apps, and where they go
 
-Each #18 file below stays where it is until the PR named beside it moves its components into
-`packages/ui`; nothing new may be added beside them (`check/components.js` refuses a new file in
-`app/src/components/` or `public-app/src/components/`). PR 1 moved the form system, overlays,
-feedback, help, layout and the basic display parts; what is left moves in PR 2 and PR 3.
+**None. Both folders are gone.**
+
+PR 3 moved the last of #18's own components into `packages/ui` and deleted
+`app/src/components/` and `public-app/src/components/`. Every shared component
+a screen uses now comes from `@mycity/ui`, is listed in `docs/COMPONENTS.md`,
+and has its header, test and gallery page.
+
+`LEGACY` in `scripts/check/components.js` is an empty list, and the check
+around it stays: a file that appears in either folder again fails the build,
+and so does a feature that declares a component with a shared name. A missing
+component is added to `packages/ui` with `npm run new:component` (F11).
 
 | File | Holds | Moves in |
 |---|---|---|
-| `app/src/components/ui/StagingBar.tsx` | staging bar | PR 2 (shell) |
-| `public-app/src/components/Layout.tsx` | Page, Brand, Message, demo strip | PR 2 (public shell) |
-| `public-app/src/components/Planned.tsx` | Coming Soon page | PR 2 (public shell) |
-| `public-app/src/components/StagingBar.tsx` | staging bar | PR 2 (shell) |
-| `app/src/components/form/index.ts` | the barrel for PersonPicker and Upload | PR 3 (pickers, upload engine) |
-| `app/src/components/form/PersonPicker.tsx` | PersonPicker | PR 3 (pickers) |
-| `app/src/components/form/Upload.tsx` | Upload | PR 3 (upload engine) |
-| `app/src/components/ui/Board.tsx` | Board | PR 3 (kanban) |
-| `app/src/components/ui/Calendar.tsx` | Calendar | PR 3 (calendar) |
-| `app/src/components/ui/charts.tsx` | AreaChart, Donut, Bands | PR 3 (charts) |
-| `app/src/components/ui/data.tsx` | Kpi, StatStrip, Timeline, Bars, Chain, Accordion, TapList | PR 3 (display) |
-| `app/src/components/ui/layout.tsx` | Sub | PR 3 (display) |
-| `app/src/components/ui/Paper.tsx` | documents | PR 3 (PDF and document preview) |
-| `app/src/components/ui/Profile.tsx` | 360 header | PR 3 (profile header) |
-| `app/src/components/ui/Reader.tsx` | articles | PR 3 (reader) |
-| `app/src/components/ui/Table.tsx` | Table, Pager, Toolbar, LoadingRows | PR 3 (DataView) |
-| `public-app/src/components/form/index.ts` | the barrel for Upload | PR 3 (upload engine) |
-| `public-app/src/components/form/Upload.tsx` | Upload | PR 3 (upload engine) |
-| `public-app/src/components/SignaturePad.tsx` | SignaturePad | PR 3 (signature field) |
-| `public-app/src/components/ui.tsx` | Sub | PR 3 (display) |
+| _(none)_ | | |
 
-`app/src/features/shared/sections.tsx` (`PagedTable`, `ExportButton`) is not in a components folder,
-but its table pieces move with `Table.tsx` in PR 3 (DataView).
+What moved, and what it became (the new name first, so the §7 check above sees
+an empty table and not this history):
 
-The authoritative list is `LEGACY` in `scripts/check/components.js`. This table mirrors it row for
-row, and `check/components.js` fails when the two differ.
+| Now in `@mycity/ui` | Came from |
+|---|---|
+| `DataView` (F20), `Pager`, `Toolbar`, `LoadingRows` | `ui/Table.tsx` |
+| `KpiCard`, `StatStrip`, `Timeline`, `Bars`, `Chain`, `Accordion`, `TapList`, `Tile`, `Result` | `ui/data.tsx` |
+| `AreaChart`, `DonutChart`, `BandChart` (with `BarChart` and `Sparkline`, new) | `ui/charts.tsx` |
+| `Kanban` (F19) | `ui/Board.tsx` |
+| `Calendar` | `ui/Calendar.tsx` |
+| `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | `ui/Paper.tsx` |
+| `ProfileHeader`, `BackButton` | `ui/Profile.tsx` |
+| `Reader`, `ArticleBody` | `ui/Reader.tsx` |
+| `Sub` | `ui/layout.tsx` and the public site's `ui.tsx` |
+| `PersonPicker` on `RecordPicker` | `form/PersonPicker.tsx`, with the app's own `EmployeePicker` wiring |
+| `UploadField` on `lib/upload.ts` | both apps' `form/Upload.tsx`, with each app's own `upload` |
+| `SignatureField` | the public site's `SignaturePad.tsx` |
+
+`Soon` and `TextLink` were not moved: PR 2's `ComingSoon` replaced `Soon`, and
+nothing used `TextLink`.
+
+`app/src/features/shared/sections.tsx` keeps `PagedTable` and `ExportButton` as
+thin wrappers that bind `DataView` and `@mycity/ui`'s `ExportButton` to this
+app's endpoints; the table itself is no longer its own.

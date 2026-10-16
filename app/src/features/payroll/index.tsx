@@ -4,16 +4,13 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/payroll";
 import type { Grade, PayrollDeduction, PayslipRow, RunRow } from "@/api/types/payroll";
 import type { PersonRef } from "@/api/types/common";
-import { AreaChart, Bands } from "@/components/ui/charts";
-import { Chain, StatStrip } from "@/components/ui/data";
-import { LoadingRows, Table } from "@/components/ui/Table";
 
 import { SlipPaper } from "@/features/ess/Payslips";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { ChainCard, ExportButton, KvCard, PagedTable } from "@/features/shared/sections";
+import { ChainCard, ExportAction, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { PersonPicker } from "@/components/form";
-import { Button, Banner, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, formatMoneyShort, formatMonth, todayIso, StatusPill, DateField, Field, FormFooter, MoneyField, rules, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { AreaChart, BandChart, Banner, Button, Card, CardHeader, Chain, DataView, DateField, Field, formatMoneyShort, formatMonth, FormFooter, Grid, Icon, LoadingRows, Money, MoneyField, PageHeader, rules, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Payroll({ tab }: ModuleScreenProps) {
   if (tab === "payslips") return <Payslips />;
@@ -105,7 +102,7 @@ function Payslips() {
         actions={
           <>
             <Button icon="mail" disabled={!c || email.pending} onClick={async () => { try { await email.run({ params: { id: c!.run_id }, body: {} }); toast(`Payslips are being emailed to ${c!.headcount} staff`); } catch (e) { fail(e); } }}>Email All</Button>
-            {c && <ExportButton source="payroll.payslips" filters={{ period: c.period }} label="Download All" />}
+            {c && <ExportAction source="payroll.payslips" filters={{ period: c.period }} label="Download All" />}
           </>
         }
       />
@@ -128,7 +125,7 @@ function Payslips() {
       {shown && (
         <div className="mt-3">
           <SlipPaper id={shown.payslip_id} />
-          {shown.has_query_deduction && <p className="mt-3 text-[11.5px] text-subtle-foreground">{shown.employee.display_name} carries a deduction accepted into this run from Queries and Sanctions. The line names its reason, not the sanction.</p>}
+          {shown.has_query_deduction && <p className="mt-3 text-2xs text-subtle-foreground">{shown.employee.display_name} carries a deduction accepted into this run from Queries and Sanctions. The line names its reason, not the sanction.</p>}
         </div>
       )}
     </>
@@ -148,10 +145,10 @@ function Structure() {
       <PageHeader title="Salary Structure" sub="Grades and bands" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Grade", body: (close) => <GradeForm close={close} /> })}>Add Grade</Button>} />
       {s.data && <KpiTiles items={[{ label: "Grades", value: String(s.data.grades) }, { label: "Staff Placed", value: String(s.data.placed) }, { label: "Below Band Minimum", value: String(s.data.below_minimum), tone: s.data.below_minimum ? "warn" : "ok" }, { label: "Above Maximum", value: String(s.data.above_maximum), tone: s.data.above_maximum ? "warn" : "ok" }]} />}
       {list.rows.length > 0 && (
-        <Bands
-          title="Bands by Grade"
-          scaleLabel={`₦0 to ${formatMoneyShort(String(Math.round(scale)))}`}
-          rows={list.rows.map((g) => ({ label: `${g.code} · ${g.band}`, sub: `${g.staff} staff`, minPct: pct(g.minimum), midPct: pct(g.midpoint), maxPct: pct(g.maximum), value: `${formatMoneyShort(g.minimum)} to ${formatMoneyShort(g.maximum)}` }))}
+        <BandChart
+          title="BandChart by Grade"
+          scale={`₦0 to ${formatMoneyShort(String(Math.round(scale)))}`}
+          rows={list.rows.map((g) => ({ label: `${g.code} · ${g.band}`, sub: `${g.staff} staff`, from: pct(g.minimum), middle: pct(g.midpoint), to: pct(g.maximum), value: `${formatMoneyShort(g.minimum)} to ${formatMoneyShort(g.maximum)}` }))}
         />
       )}
       <Grid cols={2} className="mt-3">
@@ -258,15 +255,15 @@ function Deductions() {
           <Card>
             <CardHeader title={f.title} right={<StatusPill s={{ tone: "warn", text: "Needs acceptance" }} />} />
             <Chain steps={f.chain.map((x) => ({ label: x.label, state: x.state ?? undefined }))} />
-            <p className="mt-[11px] text-[11.5px] text-subtle-foreground">{f.note}</p>
-            <div className="mt-[13px] flex flex-wrap gap-2">
+            <p className="mt-2.5 text-2xs text-subtle-foreground">{f.note}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button variant="primary" icon="ok" busy={accept.pending} onClick={() => doAccept(1)}>Accept This Month</Button>
               <Button busy={accept.pending} onClick={() => doAccept(2)}>Split Across Runs</Button>
               <Button onClick={() => modal.open({ title: "Waive Deduction", body: (close) => <Waive id={f.deduction_id} close={close} /> })}>Waive</Button>
             </div>
           </Card>
         ) : (
-          <Card><CardHeader title="Nothing Pending" /><p className="text-[12.5px] text-subtle-foreground">Every deduction raised has been accepted or waived.</p></Card>
+          <Card><CardHeader title="Nothing Pending" /><p className="text-xs text-subtle-foreground">Every deduction raised has been accepted or waived.</p></Card>
         )}
         <KvCard
           title="Deduction Tiers, From Attendance"
@@ -320,7 +317,7 @@ function DeductionForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Reason" {...f.field("reason")}><TextField {...f.field("reason")} placeholder="Salary advance repayment" /></Field>
       <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>
       <FormFooter>
@@ -345,16 +342,16 @@ function StatutoryTab() {
         actions={!d?.enabled && <Button variant="primary" onClick={() => modal.open({ title: "Switch On Advanced Payroll", body: (close) => <Enable close={close} /> })}>Switch On</Button>}
       />
       {d && !d.enabled && (
-        <div className="mb-3 flex items-start gap-2.5 rounded-card bg-warning-soft p-[14px] text-warning">
+        <div className="mb-3 flex items-start gap-2.5 rounded-card bg-warning-soft p-3.5 text-warning">
           <Icon name="alert" className="mt-0.5 flex-none" />
           <div>
-            <h3 data-ui="title" className="text-[13.5px] font-semibold">Advanced Payroll Off</h3>
-            <p className="mt-1 text-[11.5px]">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p>
+            <h2 data-ui="title" className="text-sm font-semibold">Advanced Payroll Off</h2>
+            <p className="mt-1 text-2xs">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p>
           </div>
         </div>
       )}
       {d?.enabled && <Banner tone="ok" icon="ok">Advanced payroll is on from {d.effective_from?.split("-").reverse().join("/")}. Runs before that date are unchanged.</Banner>}
-      <Table
+      <DataView
         title="Nigerian Statutory Items"
         rows={d?.items ?? []}
         rowKey={(r) => r.item}
@@ -368,9 +365,9 @@ function StatutoryTab() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        <Table
-          title="Progressive Bands"
-          right={<span className="text-[11.5px] text-subtle-foreground">Effective dated</span>}
+        <DataView
+          title="Progressive BandChart"
+          right={<span className="text-2xs text-subtle-foreground">Effective dated</span>}
           rows={d?.paye_bands ?? []}
           rowKey={(r) => `${r.label}-${r.annual}-${r.rate}`}
           loading={s.loading}

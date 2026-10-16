@@ -4,11 +4,9 @@ import type { PersonRef } from "@/api/types/common";
 import type { LeaveRequest, LeaveType } from "@/api/types/leave";
 import "@/api/types/leave";
 import { useMe } from "@/auth/AuthProvider";
-import { MonthCalendar } from "@/components/ui/Calendar";
-import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { PersonPicker } from "@/components/form";
-import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, Grow, useModal, Chips, toast, formatDate, monthName, todayIso, DateField, Field, FormFooter, rules, SearchInput, SelectField, TextAreaField, useContractForm } from "@mycity/ui";
+import { Button, Calendar, Card, CardHeader, Chips, DataView, DateField, Field, formatDate, FormFooter, Grid, Grow, LoadingRows, monthName, PageHeader, Pager, Pill, rules, SearchInput, SelectField, TextAreaField, toast, todayIso, Toolbar, useContractForm, useModal, Who } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export const LEAVE_TONE: Record<LeaveRequest["status"], "ok" | "warn" | "err" | "neutral"> = { Approved: "ok", Pending: "warn", Rejected: "err", Cancelled: "neutral" };
 export const LEAVE_TYPES: LeaveType[] = ["Annual", "Sick", "Compassionate", "Maternity", "Paternity", "Study", "Unpaid"];
@@ -42,10 +40,10 @@ export function PeopleLeave() {
       <Grid cols="1.4/1">
         <div className="min-w-0">
           <Toolbar>
-            <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-[260px]" />
+            <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-64" />
           </Toolbar>
           <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending", "Pending"], ["Approved", "Approved"], ["Rejected", "Rejected"]]} />
-          <Table
+          <DataView
             title="Requests"
             rows={list.rows}
             rowKey={(r) => r.leave_id}
@@ -64,7 +62,7 @@ export function PeopleLeave() {
             footer={<Pager page={list.page} onPage={list.setPage} noun="request" />}
           />
         </div>
-        {sel ? <CoverCard leave={sel} onDone={() => setSelected(null)} /> : <Card><p className="text-[12.5px] text-subtle-foreground">Select a request to check cover.</p></Card>}
+        {sel ? <CoverCard leave={sel} onDone={() => setSelected(null)} /> : <Card><p className="text-xs text-subtle-foreground">Select a request to check cover.</p></Card>}
       </Grid>
     </>
   );
@@ -87,12 +85,12 @@ function CoverCard({ leave, onDone }: { leave: LeaveRequest; onDone: () => void 
   return (
     <Card>
       <CardHeader title={cover.data.title} />
-      <p className="mb-[11px] text-[11.5px] text-subtle-foreground">{cover.data.text}</p>
+      <p className="mb-2.5 text-2xs text-subtle-foreground">{cover.data.text}</p>
       {cover.data.rows.map((r) => (
         <div key={r.title} className="flex items-center gap-2.5 border-b border-border py-2">
           <span className="min-w-0 flex-1">
-            <div className="text-[12.5px] font-semibold">{r.title}</div>
-            <div className="text-[11.5px] text-subtle-foreground">{r.text}</div>
+            <div className="text-xs font-semibold">{r.title}</div>
+            <div className="text-2xs text-subtle-foreground">{r.text}</div>
           </span>
           <Pill tone={r.tone}>{r.result}</Pill>
         </div>
@@ -118,7 +116,7 @@ function LeaveCalendar() {
     for (let d = new Date(`${r.from}T12:00:00Z`); d <= new Date(`${r.to}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) out.push({ date: d.toISOString().slice(0, 10), label: r.employee.display_name.split(" ")[0] });
     return out;
   });
-  return <MonthCalendar year={y} month={m} events={events} />;
+  return <Calendar year={y} month={m} events={events} />;
 }
 
 /** Request leave (ESS), or record it for someone (People). */
@@ -141,7 +139,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
     <>
       {onBehalf && (
         <Field label="Employee">
-          <PersonPicker value={who} onChange={setWho} />
+          <EmployeePicker value={who} onChange={setWho} />
         </Field>
       )}
       <Field label="Leave Type">

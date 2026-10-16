@@ -5,15 +5,13 @@ import "@/api/types/queries";
 import type { Firing, LetterTemplate, Outcome, QueryRow, Rule, RuleCreate, SanctionCreate, SanctionRow } from "@/api/types/queries";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Chain, StatStrip } from "@/components/ui/data";
 import { Letter } from "@/features/shared/Letter";
-import { LoadingRows } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { PersonPicker } from "@/components/form";
-import { Button, Banner, KeyValue, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, formatDate, formatDateTime, formatWhen, StatusPill, Field, FormFooter, MoneyField, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, Chain, Chips, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, KeyValue, LoadingRows, Money, MoneyField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useModal, Who } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Queries({ tab, id }: ModuleScreenProps) {
   if (tab === "rules") return <Rules />;
@@ -65,7 +63,7 @@ function QueriesTab({ id }: { id: string | null }) {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {focus ? <QueryCard id={focus} /> : <Card><p className="text-[12.5px] text-subtle-foreground">Pick a query to see it here.</p></Card>}
+        {focus ? <QueryCard id={focus} /> : <Card><p className="text-xs text-subtle-foreground">Pick a query to see it here.</p></Card>}
         {s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
@@ -130,7 +128,7 @@ function RaiseQuery({ close }: { close: () => void }) {
   return (
     <>
       <Banner tone="info" icon="info">The employee has 48 hours to respond in writing. Their response is read before any decision.</Banner>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Subject" {...f.field("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out Thursday" /></Field>
       <Field label="What Happened" {...f.field("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
       <FormFooter>
@@ -191,9 +189,9 @@ function Rules() {
       {rules.loading && !rules.rows.length ? <Card><LoadingRows /></Card> : (
         <Grid cols={3}>
           {rules.rows.map((r: Rule) => (
-            <div key={r.rule_id} className="rounded-box border border-border bg-card p-[14px]">
-              <h4 data-copy="content" className="text-[13.5px] font-semibold">{r.name}</h4>
-              <p className="mt-1 text-[12.5px] text-muted-foreground">{r.description}</p>
+            <div key={r.rule_id} className="rounded-box border border-border bg-card p-3.5">
+              <h2 data-copy="content" className="text-sm font-semibold">{r.name}</h2>
+              <p className="mt-1 text-xs text-muted-foreground">{r.description}</p>
               <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 <StatusPill s={r.status} />
                 {r.threshold && <StatusPill s={{ tone: "neutral", text: r.threshold }} />}
@@ -208,7 +206,7 @@ function Rules() {
       <Grid cols={2} className="mt-3">
         <PagedTable<Firing>
           title="Recent Firings"
-          right={<span className="text-[11.5px] text-subtle-foreground">Last 7 days</span>}
+          right={<span className="text-2xs text-subtle-foreground">Last 7 days</span>}
           list={firings}
           rowKey={(x) => x.firing_id}
           noun="firing"
@@ -257,7 +255,7 @@ function RuleForm({ close }: { close: () => void }) {
       <Field label="Letter It Sends" {...f.field("template_id")}>
         <SelectField placeholder="Pick a template" options={tpl.rows.filter((t) => t.status.tone === "ok").map((t) => [t.template_id, t.name])} {...f.field("template_id")} />
       </Field>
-      <p className="text-[11.5px] text-subtle-foreground">Saved as a draft. Nothing fires until it is activated.</p>
+      <p className="text-2xs text-subtle-foreground">Saved as a draft. Nothing fires until it is activated.</p>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Save Rule</Button>
@@ -320,7 +318,7 @@ const ChainSteps = ({ steps }: { steps: Array<{ label: string; state: "done" | "
 function ChainSettings() {
   return (
     <>
-      <p className="mb-3 text-[12.5px] text-muted-foreground">The MyCity ladder, in order. Each step names the letter it sends; a step without an active letter cannot send one.</p>
+      <p className="mb-3 text-xs text-muted-foreground">The MyCity ladder, in order. Each step names the letter it sends; a step without an active letter cannot send one.</p>
       <KeyValue items={[["1 · Caution", "Caution letter"], ["2 · Warning", "Warning letter"], ["3 · Suspension", "Suspension letter (awaiting sample)"], ["4 · Suspension without pay", "Awaiting sample"], ["5 · Dismissal", "Termination letter (awaiting sample)"], ["Fines", "Attach to any step"]]} />
     </>
   );
@@ -346,7 +344,7 @@ function IssueSanction({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Sanction"><SelectField options={[["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"], ["fine", "Fine"]]} {...f.field("kind")} /></Field>
       {f.values.kind === "fine" && <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>}
       <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Follows QRY-0042" /></Field>

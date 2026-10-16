@@ -10,7 +10,7 @@ describe("EmptyState", () => {
     const { container } = render(<EmptyState title="No Requests Yet" text="Your leave requests appear here" />);
     expect(container.querySelector("[data-card]")).not.toBeNull();
     expect(container.querySelector("[data-illustration=Empty]")).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "No Requests Yet" })).toHaveAttribute("data-ui", "title");
+    expect(screen.getByRole("heading", { level: 2, name: "No Requests Yet" })).toHaveAttribute("data-ui", "title");
     expect(screen.getByText("Your leave requests appear here")).toHaveAttribute("data-ui", "empty-text");
   });
 
