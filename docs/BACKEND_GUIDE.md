@@ -328,6 +328,9 @@ request, never inside a transaction, and what it returns is provisional until a 
 
 ## 6 · Migrations
 
+**The full rules are `docs/MIGRATIONS.md`; read it before writing a migration or a reference seed.**
+The summary:
+
 - `migrations/NNNN_name.sql` in your milestone's block (README §6.3: M1 is 1000 to 1999, and so on).
   `-- UP` and `-- DOWN` in every file. Idempotent (`IF NOT EXISTS`).
 - Every table: `<entity>_id uuid PRIMARY KEY DEFAULT gen_random_uuid()`, `created_at`, `updated_at

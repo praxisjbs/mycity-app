@@ -127,7 +127,7 @@ route("POST /api/v1/employees", (req) => {
     employee_id: sid(`employee:${key}`), user_key: key, staff_number: b.staff_number || `MCA-${String(PEOPLE.length + 1).padStart(4, "0")}`, first_name: b.first_name, last_name: b.last_name,
     display_name: `${b.first_name} ${b.last_name}`, job_title: b.job_title, department: dept, grade: "G1 · Associate", manager: byId(b.line_manager_id)?.user_key ?? "cynthia", work_email: b.work_email.toLowerCase(),
     phone: b.phone, start_date: b.start_date, date_of_birth: b.date_of_birth || "1998-01-01", employment_type: b.employment_type as "full_time", work_pattern: b.work_pattern as "hybrid", status: "probation",
-    worksite: "MTN Head Office, Ikoyi", gross_monthly: b.gross_monthly || "0.00", bank_name: b.bank_name || "", account_last4: (b.account_number || "0000").slice(-4), next_of_kin: b.next_of_kin || "",
+    worksite: "MTN Head Office, Ikoyi", gross_monthly: b.gross_monthly || "0.00", bank_name: b.bank_name || "", account_last4: (b.account_number || "0000").slice(-4), next_of_kin: b.next_of_kin_name || "",
   };
   PEOPLE.push(p);
   TODAY.push({ person: p, mode: "None", clock_in: null, status: "not_yet", late_min: 0, kpi_pct: 0, open_tasks: 0 });

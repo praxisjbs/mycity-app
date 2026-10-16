@@ -95,6 +95,24 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · M0 schema made to match the foundation code: `0100` lets the shared layer write
+  what it writes (emit's empty diff, bell rows without a body, untitled uploads, 0-based import
+  header rows, refused AI runs, the AI settings defaults); `0110` gives `employee` the contract's
+  columns (`staff_number`, gender, date of birth, next of kin, bank, gross monthly, dotted line,
+  vacant seats in `org_seat`) with checks equal to the contract's enums; `0120` indexes the 43
+  unindexed M0 foreign keys; `0199` fixes `on_site`, adds employment types, makes Saturday
+  09:00 to 15:00 (A22) and staff numbers `00001`. `migrate.js --down` now rolls back to empty; the
+  health check reports the real head. Phone numbers abroad are accepted in international form.
+  `0130` lets the error reporter record an error with no extra detail (it was silently lost).
+  Left: `home_alert` (M1 block) and the integration suite on the real migrations (next PR); role
+  permissions wait on a role matrix; the importer must advance the staff-number counter past
+  imported IDs.
+- 16/10/2026 · TB · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
+  schema, and A26 added (reference seeds hold only what the code cannot run without). Left: a
+  fix-forward M0 file for the six columns the shared layer cannot write (`audit_ledger.changed_fields`,
+  `notification.body`, `document.title`, `import_batch.header_row`, `ai_run` vendor and prompt,
+  `home_alert.trigger`), the `0002` DOWN, the employee columns the contract and staff importer need,
+  and the integration suite moved onto the real migrations.
 - 16/10/2026 · GE · Alerts go to WhatsApp: one sender (`shared/observability/alert.js`) for errors,
   the backup, the restore drill and the uptime probe; `ALERT_WHATSAPP_URLS` holds one gateway link
   per person (CallMeBot, or TextMeBot), `ALERT_WEBHOOK_URL` stays for a Slack or Google Chat

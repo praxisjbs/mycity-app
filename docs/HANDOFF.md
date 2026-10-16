@@ -56,7 +56,7 @@ has commit `9c42322` (restored deliverability, encryption and spreadsheet ports)
 uncommitted** changes from the reuse pass (20 files, listed in §3.2). He will commit them.
 `main` is branch-protected; work on branches named `m<N>/<short-name>`.
 
-**Document authority:** `MILESTONES.md` is binding for scope and decisions A1 to A25, and
+**Document authority:** `MILESTONES.md` is binding for scope and decisions A1 to A26, and
 `REUSE_MAP.md` wins where the two disagree. Then `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`
 and the guides. `README.MD` is the file map; `demo.html` is look only. If two disagree in a way that
 matters, stop and ask.
