@@ -524,7 +524,7 @@ Seeded schemes (reference data, same in every environment):
 
 | doc_type | Format | First used |
 |---|---|---|
-| `employee` | `MCA-0001` (staff number) | M0 import |
+| `employee` | `00001` (staff number: MyCity's own five digits, no prefix; `0199_seed_foundation_fixes.sql`) | M0 import |
 | `query` | `QRY-0001` | M3 |
 | `sanction`, `letter` | `SAN-0001`, `LTR-0001` | M3 |
 | `vacancy` | `VAC-0001` | M4 |
@@ -783,9 +783,9 @@ fails at the first query. Everything else in each table is the migration's call.
 | `ai_catalogue` (0095) | `key` PK, `kind` (`read` / `route`), `module_key`, `description`, `permission` (`people.view`), `params_schema` jsonb, `screen`, `path`, `build_sha`, `synced_at` | `shared/ai/catalogue-sync` |
 
 `entity_id` is text wherever a row points at "any record", because not every record's key is a
-uuid. `tests/integration/fixtures/shared-layer.sql` holds these columns as runnable DDL so the
-integration suite (`RUN_DB_TESTS=1`) proves the shared layer against Postgres; it is a test
-fixture, not a migration, and is deleted when the suite runs the real migrations.
+uuid. The integration suite (`RUN_DB_TESTS=1`, in CI on every PR) builds its schema from the real
+migrations (`tests/integration/helpers/schema.js`), so it proves the shared layer against the
+columns above as they are actually migrated.
 
 ---
 

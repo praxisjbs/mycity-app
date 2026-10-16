@@ -84,7 +84,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Process gates: progress, guides, README map, CODEOWNERS; PR template; Claude Stop hook | GE | ☑ | 13/10/2026 |
 | GitHub settings applied by TB (`docs/runbooks/github-settings.md`) | TB | ☐ | |
 | CODEOWNERS usernames: GE `@swizfcodes`, TB `@tomblakeasaah196`, AJ `@Ghosted34`, LA `@LovedataX` | GE | ☑ | 13/10/2026 |
-| CI gates 1 to 8 and pipeline guards (gate 6, schema-drift and contract-columns, still empty, reported NOT BUILT) | GE | ☐ | 15/10/2026 |
+| CI gates 1 to 8 and pipeline guards (gate 6: schema-drift and contract-columns) | GE · TB | ☑ | 16/10/2026 |
 | Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | 15/10/2026 |
 | Operations: nightly backup, weekly restore drill, offsite copy, uptime probe; runbooks backup-restore, incident, monitoring, add-a-module | GE | ☐ | 16/10/2026 |
 | Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
@@ -102,6 +102,42 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   carry the values. Left: the SMTP password and `MAIL_SEND_PER_HOUR` in both `.env` files on the
   server; whether the 50 is per mailbox or per account; the IMAP limit is a rule for the Mailbox
   module (`mailbox.md` §6).
+- 16/10/2026 · TB · `docs/DATABASE_SCHEMA.md` rewritten as the database design: the M0 core and how a
+  module attaches to it, each milestone's block, owner, tables as built and what it still owes (from
+  the coverage audit), what is not built and why (passkeys per REUSE_MAP; nothing for M11), and the
+  open decisions (payroll design, the role permission matrix, moving business choices out of seeds).
+  M6 payroll is in scope (MILESTONES §11); the earlier "not modelled" note is withdrawn.
+- 16/10/2026 · TB · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
+  rebuilds the schema with `migrate.js` and `fixtures/shared-layer.sql` is gone; CI now has PostgreSQL 16
+  with pgvector and Redis, so the suite and gate 4's round trip run on every PR. `1100` lets the alerts
+  code raise an alert with no trigger and returns `over_by` to two places. 82 of 82 integration tests
+  pass. Left: the role permission matrix (M9), the staff-number counter after an import.
+- 16/10/2026 · TB · M0 schema made to match the foundation code: `0100` lets the shared layer write
+  what it writes (emit's empty diff, bell rows without a body, untitled uploads, 0-based import
+  header rows, refused AI runs, the AI settings defaults); `0110` gives `employee` the contract's
+  columns (`staff_number`, gender, date of birth, next of kin, bank, gross monthly, dotted line,
+  vacant seats in `org_seat`) with checks equal to the contract's enums; `0120` indexes the 43
+  unindexed M0 foreign keys; `0199` fixes `on_site`, adds employment types, makes Saturday
+  09:00 to 15:00 (A22) and staff numbers `00001`. `migrate.js --down` now rolls back to empty; the
+  health check reports the real head. Phone numbers abroad are accepted in international form.
+  `0130` lets the error reporter record an error with no extra detail (it was silently lost).
+  Left: `home_alert` (M1 block) and the integration suite on the real migrations (next PR); role
+  permissions wait on a role matrix; the importer must advance the staff-number counter past
+  imported IDs.
+- 16/10/2026 · TB · Gate 6 built: `check/schema-drift.js` (every SQL string in `src/` and `scripts/` names only
+  tables and columns the migrations create: qualified columns, INSERT column lists, UPDATE SET lists,
+  dropped or unknown tables, a table created twice with different columns) and `check/contract-columns.js`
+  (each contract file's `TABLES` names the table every object schema's keys are columns of, with a
+  reason for any key that is not), over one catalogue read from the migrations (`check/lib/catalogue.js`,
+  checked column for column against a migrated database). Run against the schema PR 25 merged,
+  contract-columns reports the 12 employee mismatches. `CI_STRICT` is on: no gate can sit empty again.
+  Left: nothing for gate 6; every new contract file declares its `TABLES`.
+- 16/10/2026 · TB · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
+  schema, and A26 added (reference seeds hold only what the code cannot run without). Left: a
+  fix-forward M0 file for the six columns the shared layer cannot write (`audit_ledger.changed_fields`,
+  `notification.body`, `document.title`, `import_batch.header_row`, `ai_run` vendor and prompt,
+  `home_alert.trigger`), the `0002` DOWN, the employee columns the contract and staff importer need,
+  and the integration suite moved onto the real migrations.
 - 16/10/2026 · GE · Alerts go to WhatsApp: one sender (`shared/observability/alert.js`) for errors,
   the backup, the restore drill and the uptime probe; `ALERT_WHATSAPP_URLS` holds one gateway link
   per person (CallMeBot, or TextMeBot), `ALERT_WEBHOOK_URL` stays for a Slack or Google Chat

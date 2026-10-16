@@ -10,8 +10,8 @@
  *     words: ["employee", "staff"],             // "staff ada" searches employees for "ada"
  *     from: "employee e",
  *     key: "e.employee_id",                     // unique: ends the ORDER BY, so pages are stable
- *     columns: ["e.first_name", "e.last_name", "e.number", "e.work_email"],
- *     select: "e.employee_id AS id, e.number AS ref, e.first_name || ' ' || e.last_name AS title, e.job_title AS sub",
+ *     columns: ["e.first_name", "e.last_name", "e.staff_number", "e.work_email"],
+ *     select: "e.employee_id AS id, e.staff_number AS ref, e.first_name || ' ' || e.last_name AS title, e.job_title AS sub",
  *     where: "e.status <> 'archived'",
  *     scope: { column: "e.employee_id" },       // team and own scope narrow it, as on the screen
  *   });

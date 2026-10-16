@@ -8,7 +8,7 @@
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/worker
  *
  * Refuses to run unless the database name ends in "_test": it rebuilds the public
- * schema from fixtures/shared-layer.sql. Redis keys are this environment's
+ * schema from the real migrations (helpers/schema.js). Redis keys are this environment's
  * (mycity:test:*) and are cleared at the start and the end.
  */
 const fs = require("node:fs");
@@ -23,6 +23,7 @@ const { io: connectClient } = require("socket.io-client");
 const { Emitter } = require("@socket.io/redis-emitter");
 
 const { config, REDIS_PREFIX } = require("../../src/config/env");
+const schema = require("./helpers/schema");
 const { pool } = require("../../src/config/db");
 const redis = require("../../src/config/redis");
 const { atomically } = require("../../src/shared/db/tx");
@@ -87,14 +88,7 @@ const consumers = [];
 beforeAll(async () => {
   if (!config.DB_NAME.endsWith("_test"))
     throw new Error(`refusing: ${config.DB_NAME} is not a _test database`);
-  await q(
-    fs.readFileSync(
-      path.join(__dirname, "fixtures", "shared-layer.sql"),
-      "utf8",
-    ),
-  );
-  await q(`CREATE TABLE user_session (
-             session_id uuid PRIMARY KEY, user_id uuid NOT NULL, killed_at timestamptz, expires_at timestamptz NOT NULL)`);
+  await schema.rebuild(pool, config.DB_NAME);
   await redis.initRedis();
   await clearRedis();
   for (const [key, first] of [
@@ -102,11 +96,11 @@ beforeAll(async () => {
     ["bayo", "Bayo"],
   ]) {
     const e = await one(
-      "INSERT INTO employee (first_name, last_name) VALUES ($1, 'Test') RETURNING employee_id",
+      schema.sql.employeeNamed,
       [first],
     );
     const u = await one(
-      "INSERT INTO app_user (employee_id, email) VALUES ($1, $2) RETURNING user_id",
+      schema.sql.userPlain,
       [e.employee_id, `${key}@mycity.test`],
     );
     people[key] = { user_id: u.user_id, employee_id: e.employee_id };
@@ -301,7 +295,7 @@ describe("realtime", () => {
     expect((await connect({ token: "nonsense" })).error).toBe("INVALID_TOKEN");
     const killed = crypto.randomUUID();
     await q(
-      "INSERT INTO user_session (session_id, user_id, killed_at, expires_at) VALUES ($1, $2, now(), now() + interval '1 day')",
+      "INSERT INTO user_session (session_id, user_id, refresh_token_hash, killed_at, expires_at) VALUES ($1::uuid, $2, $1::uuid::text, now(), now() + interval '1 day')",
       [killed, people.ada.user_id],
     );
     expect(
@@ -584,6 +578,10 @@ describe("scripts", () => {
       password: config.DB_PASSWORD,
     });
     await c.connect();
+    // The runner's own tests use throwaway files and a ledger of their own, in a schema of
+    // their own: public holds the real migrations and their ledger.
+    await c.query("CREATE SCHEMA IF NOT EXISTS runner_test");
+    await c.query("SET search_path TO runner_test, public");
     return c;
   };
 
@@ -749,17 +747,17 @@ describe("scripts", () => {
       });
     await expect(run()).rejects.toMatchObject({
       code: "SEED_REFUSED",
-      problems: [expect.stringMatching(/no system_marker table/)],
+      problems: [expect.stringMatching(/system_marker has no row/)],
     });
-    await q("CREATE TABLE system_marker (environment text NOT NULL)");
-    await q("INSERT INTO system_marker VALUES ('production')");
+    await q("INSERT INTO system_marker (environment) VALUES ('production')");
     await expect(run()).rejects.toMatchObject({
       problems: [expect.stringMatching(/says production/)],
     });
     await q("UPDATE system_marker SET environment = 'development'");
     expect(await run()).toEqual({ ran: ["10_things.js"] });
     expect(await one("SELECT by FROM seeded")).toEqual({ by: "script:seed" });
-    await q("DROP TABLE seeded, system_marker");
+    await q("DROP TABLE seeded");
+    await q("DELETE FROM system_marker");
   });
 });
 

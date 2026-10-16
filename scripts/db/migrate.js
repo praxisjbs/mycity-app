@@ -292,11 +292,23 @@ async function down(client, { dir } = {}) {
       throw new Error(
         `${f.file} is declared irreversible (${reason || "no reason given"}); restore from the dump instead`,
       );
+    // 0002's DOWN drops the ledger table itself. The row goes first, so the DELETE cannot
+    // fail after it, and the ledger is rebuilt with the rows still applied (0001), so the
+    // next --down still knows them. All of it commits together.
+    const remaining = rows.filter((r) => r.name !== f.name);
     await inTransaction(client, async () => {
-      await client.query(f.down);
       await client.query("DELETE FROM schema_migration WHERE name = $1", [
         f.name,
       ]);
+      await client.query(f.down);
+      await ensureLedger(client);
+      for (const r of remaining) {
+        await client.query(
+          `INSERT INTO schema_migration (name, sha256, applied_at) VALUES ($1, $2, $3)
+           ON CONFLICT (name) DO NOTHING`,
+          [r.name, r.sha256, r.applied_at],
+        );
+      }
     });
     return f.name;
   });

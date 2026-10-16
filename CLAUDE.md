@@ -37,7 +37,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 
 | Type | Read |
 |---|---|
-| Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules |
+| Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
 | Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F24, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
@@ -50,7 +50,7 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 
 ## Step 3 · Which document wins
 
-1. `MILESTONES.md` is binding for scope and decisions A1 to A25.
+1. `MILESTONES.md` is binding for scope and decisions A1 to A26.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
 3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
    frontend gates), decisions F1 to F24 in `docs/FRONTEND_FOUNDATION.md` §3 win over
@@ -101,7 +101,8 @@ silently.
   module's schema, or INTERIM rules until it exists), labels above, Optional tags, errors of at
   most 4 words on the field as it is filled, buttons only in a footer. Nobody builds their own field.
 - **Migrations**: in your milestone's number block, `-- UP` and `-- DOWN`, idempotent, never edit
-  a merged one.
+  a merged one, and every rule in `docs/MIGRATIONS.md` (match the code that writes the table; seeds
+  hold only what A26 allows).
 
 ## Step 5 · Finish
 

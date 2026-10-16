@@ -36,15 +36,23 @@ const EMPLOYMENT_TYPES = [
 /** MILESTONES §6.2: remote, hybrid and on-site are work patterns on the employee. */
 const WORK_PATTERNS = ["on_site", "hybrid", "remote"];
 
+/** The values employee_gender_check allows (migration 0110). */
+const GENDERS = ["female", "male"];
+
 const EmploymentType = z.enum(EMPLOYMENT_TYPES);
 const WorkPattern = z.enum(WORK_PATTERNS);
+const Gender = z.enum(GENDERS);
 
-/** Staff number as issued by numbering ("MCA-0001"). Optional on create: allocated when absent. */
+/**
+ * Staff number as issued by numbering: MyCity's five digits ("00001") by default, or whatever
+ * prefix Settings gives the scheme ("HQ-0042"). Optional on create: allocated when absent.
+ */
 const staffNumber = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^[A-Z]{2,5}-\d{3,6}$/, "must look like MCA-0001");
+  .max(20)
+  .regex(/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/, "use letters and digits");
 
 /** The fields every employee has, whoever creates them and however. */
 const employeeCore = {
@@ -57,8 +65,11 @@ const employeeCore = {
   start_date: isoDate,
   employment_type: EmploymentType,
   work_pattern: WorkPattern,
+  gender: Gender.optional(),
   date_of_birth: isoDate.optional(),
-  next_of_kin: optionalText(300),
+  next_of_kin_name: optionalText(150),
+  next_of_kin_phone: phone.optional(),
+  next_of_kin_relationship: optionalText(50),
 };
 
 /** Restricted fields (field-masked, BACKEND_STRUCTURE §9.4). Optional on create. */
@@ -79,6 +90,7 @@ const EmployeeCreate = z
     ...employeeRestricted,
     department_id: uuid,
     line_manager_id: uuid.optional(),
+    dotted_manager_id: uuid.optional(),
     worksite_id: uuid.optional(),
   })
   .strict();
@@ -107,11 +119,35 @@ const AdminBootstrap = z
   })
   .strict();
 
+/**
+ * Which table each schema's keys are the columns of (gate 6, check/contract-columns.js).
+ * department_name is the one key that is not a column: create-admin finds or creates the
+ * department by that name and stores its department_id.
+ */
+const TABLES = {
+  EmployeeCreate: { table: "employee" },
+  AdminBootstrap: {
+    table: null,
+    reason: "script input to create-admin: one employee, a role code and the CEO flag",
+    nested: {
+      employee: {
+        table: "employee",
+        virtual: {
+          department_name: "named, not picked: create-admin finds or creates the department and stores its department_id",
+        },
+      },
+    },
+  },
+};
+
 module.exports = {
+  TABLES,
   EMPLOYMENT_TYPES,
   WORK_PATTERNS,
+  GENDERS,
   EmploymentType,
   WorkPattern,
+  Gender,
   EmployeeCreate,
   AdminBootstrap,
 };

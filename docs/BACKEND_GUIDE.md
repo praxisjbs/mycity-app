@@ -85,8 +85,21 @@ const ThingCreate = z.object({ title: text(150), due_on: isoDate }).strict();
 module.exports = { Thing, ThingListQuery, ThingPage, ThingCreate };
 ```
 
-Keys are `snake_case` and equal the table columns. A key that is not a column is declared `virtual`
-with a reason (gate 6). Run `npm run gen:contract` after any schema or route change; never edit
+Keys are `snake_case` and equal the table columns. Each schema file says which table each exported
+object schema belongs to, in a `TABLES` export, and gate 6 (`check/contract-columns.js`) checks every
+key against the migrated columns:
+
+```js
+const TABLES = {
+  ThingCreate: { table: "thing" },                        // every key is a column of thing
+  ThingImportRow: { table: "thing", virtual: { owner_email: "resolved to owner_employee_id" } },
+  ThingListQuery: { table: null, reason: "list controls, not a row" },
+};
+module.exports = { TABLES, Thing, ThingListQuery, ThingPage, ThingCreate, ThingImportRow };
+```
+
+A key that is not a column is declared `virtual` with a reason; a schema that is not a row says
+`table: null` and why. Run `npm run gen:contract` after any schema or route change; never edit
 `contract.gen.ts`.
 
 ### 3.2 Route
@@ -327,6 +340,9 @@ request, never inside a transaction, and what it returns is provisional until a 
 ---
 
 ## 6 · Migrations
+
+**The full rules are `docs/MIGRATIONS.md`; read it before writing a migration or a reference seed.**
+The summary:
 
 - `migrations/NNNN_name.sql` in your milestone's block (README §6.3: M1 is 1000 to 1999, and so on).
   `-- UP` and `-- DOWN` in every file. Idempotent (`IF NOT EXISTS`).

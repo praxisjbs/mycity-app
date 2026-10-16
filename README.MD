@@ -14,11 +14,13 @@ map, read §11 first.
 
 | Document | What it settles |
 |---|---|
-| `docs/MyCity-ERP-Documents/MILESTONES.md` | Scope, decisions A1 to A25, gates, schedule, each milestone's definition of done. **Binding** |
+| `docs/MyCity-ERP-Documents/MILESTONES.md` | Scope, decisions A1 to A26, gates, schedule, each milestone's definition of done. **Binding** |
 | `docs/MyCity-ERP-Documents/REUSE_MAP.md` | Which donor file each piece comes from. Wins over MILESTONES where they disagree |
 | `docs/SYSTEM_ARCHITECTURE.md` | Servers, processes, request lifecycle, events, release pipeline |
 | `docs/BACKEND_STRUCTURE.md` | The M0 foundation in detail: shared layer, contract, numbering, documents, imports, AI, pagination, first administrator |
 | `docs/BACKEND_GUIDE.md` | **How to write backend code here**: layers, a worked endpoint, what to reuse, done checklist. Read before any backend change |
+| `docs/DATABASE_SCHEMA.md` | **The database design**: the core every milestone attaches to, each milestone's tables as built and what it still owes, and what is not built and why. Read before any milestone's schema work |
+| `docs/MIGRATIONS.md` | **The migration and reference-seed conventions**: numbering, idempotency, DOWN, table shape, matching the code, what a seed may hold (A26), checks before the PR. Read before any migration |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
 | `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F24 (binding) and the three PRs that build `packages/ui` |
 | `docs/COMPONENTS.md` | Every shared component in `packages/ui`, generated from the code. Check it before building anything; a missing one is added with `npm run new:component` |
@@ -103,6 +105,7 @@ mycity-app/
 ├── docs/
 │   ├── MyCity-ERP-Documents/ the client document pack
 │   ├── BACKEND_GUIDE.md      how to write backend code (read first)
+│   ├── MIGRATIONS.md         migration and reference-seed conventions (read before any migration)
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
 │   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F24, the three PRs
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
@@ -467,8 +470,10 @@ another module; call that module's service.
 | M5 | 5000 to 5999 | M11 | 11000 to 11999 |
 
 - `seeds/build/` and `seeds/staging/` remain JavaScript service-level demo-data seeds; production
-  never runs those folders. Reference SQL is safe for every environment and contains no people or
-  transactions.
+  never runs those folders. Reference SQL runs in every environment, so it holds only what the code
+  cannot run without (A26): roles and permissions, numbering schemes, validated workflow
+  definitions, code lists. No people, no transactions, no business choices.
+- The full rules, and the checks to run before a migration PR: `docs/MIGRATIONS.md`.
 - Every table has `created_at` and `updated_at timestamptz` unless its documented infrastructure
   contract requires an exact shape.
 

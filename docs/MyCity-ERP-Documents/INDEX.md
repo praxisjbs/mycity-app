@@ -4,7 +4,7 @@ Prepared by [JBS Praxis](https://jbspraxis.com). Six files, 12 October 2026.
 
 | File | What it is | How to open |
 | --- | --- | --- |
-| `MILESTONES.md` | The technical milestone document. Architecture decisions A1 to A25, environment topology, twenty engineering gates, the schedule, and Milestone 0 through Milestone 11 in detail. About 16 pages. | Any markdown reader, or a text editor |
+| `MILESTONES.md` | The technical milestone document. Architecture decisions A1 to A26, environment topology, twenty engineering gates, the schedule, and Milestone 0 through Milestone 11 in detail. About 16 pages. | Any markdown reader, or a text editor |
 | `REUSE_MAP.md` | The reuse audit. A file-level account of what each milestone takes from the two donor codebases, with the revised percentages after the 10 October meeting. About 10 pages. | Any markdown reader, or a text editor |
 | `MILESTONE_QUESTIONS.md` | The fifteen questions put before the technical document was written, each with a recommendation and the answer given. | Any markdown reader, or a text editor |
 | `milestones.html` | The twelve-page presentation deck. Brand aware, with the Gantt, the reuse chart and the architecture diagram. | Double click. Opens in any browser |
