@@ -83,6 +83,60 @@
   min-width: 1080px;
 }
 
+/* The Timeline's rail and its dots: a pseudo-element each, so an event is one
+   element and the rail is drawn once rather than per row. */
+@utility timeline {
+  position: relative;
+  padding-left: 22px;
+  &::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 5px;
+    bottom: 5px;
+    width: 2px;
+    background: var(--border);
+  }
+}
+@utility timeline-dot {
+  &::before {
+    content: "";
+    position: absolute;
+    left: -21px;
+    top: 4px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 2.5px solid var(--input);
+  }
+}
+@utility timeline-dot-now {
+  &::before {
+    border-color: var(--primary);
+    background: var(--primary);
+  }
+}
+@utility timeline-dot-done {
+  &::before {
+    border-color: var(--success);
+  }
+}
+
+/* A disclosure's marker: a + that becomes a minus when it is open (Accordion,
+   Details). The native triangle is turned off in base.css. */
+@utility plus-marker {
+  & > summary::before {
+    content: "+";
+    color: var(--accent-foreground);
+    font-weight: 700;
+    width: 12px;
+  }
+  &[open] > summary::before {
+    content: "\2212";
+  }
+}
+
 /* A fit page (a chat, the mailbox; DesktopShell fit): its header slides away while reading so the
    panes, its last child, take the height. */
 @layer components {
