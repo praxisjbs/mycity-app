@@ -36,11 +36,15 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Illustration](#illustration) | `Illustration`, `EmptyIllustration`, `SearchIllustration`, `SuccessIllustration`, `ErrorIllustration`, `LockedIllustration`, `OfflineIllustration`, `FirstRunIllustration`, `ClockInIllustration`, `ClockOutIllustration` | A small line drawing in the theme's colours, for empty states, first run, results and the clock prompts. | beta |
 | Display | [Kbd](#kbd) | `Kbd` | A keyboard key or shortcut, drawn as keycaps (⌘ K, Esc). | stable |
 | Display | [KeyValue](#keyvalue) | `KeyValue` | Label and value pairs for a record: two columns on desktop, label over value on a phone; a value that is not set shows EmptyValue. | stable |
+| Display | [KpiCard](#kpicard) | `KpiCard` | One figure a person acts on: its title, the number, and a short trend line; with `onOpen` it becomes the way into the records behind it. | stable |
+| Display | [KpiDetail](#kpidetail) | `KpiDetail` | The report model behind a KPI card: the records that make up the number, grouped, searchable and paged at 25. | stable |
+| Display | [KpiGrid](#kpigrid) | `KpiGrid` | The row of KPI cards: four across on desktop, two to a row on a phone. | stable |
 | Display | [Money](#money) | `Money` | An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word. | stable |
 | Display | [Pill](#pill) | `Pill`, `StatusPill` | A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }). | stable |
 | Display | [ProgressBar](#progressbar) | `ProgressBar`, `Meter` | How far along something is: a bar with its percent, or a moving bar when the end is unknown; Meter is the thin inline bar with its figure (the merged Mini). | stable |
 | Display | [Quote](#quote) | `Quote` | A quoted passage a person wrote or received, with the yellow rule at its left. | stable |
 | Display | [Skeleton](#skeleton) | `Skeleton`, `Spinner` | A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape. | stable |
+| Display | [StatStrip](#statstrip) | `StatStrip` | A strip of labelled figures across the top of a record: smaller than KPI cards, for a record's own counts. | stable |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
@@ -709,6 +713,112 @@ Label and value pairs for a record: two columns on desktop, label over value on 
 <KeyValue items={[{ label: "Start Date", value: "13/10/2026" }]} />
 ```
 
+### KpiCard
+
+One figure a person acts on: its title, the number, and a short trend line; with `onOpen` it becomes the way into the records behind it.
+
+| | |
+|---|---|
+| Use | A role's figures at the top of Home, a record's own counts, a module's four tiles above its list. |
+| Avoid | A sentence about the number (put it behind the help); a tile for a figure nobody acts on; more than four on one row. |
+| Phone | Two to a row in a KpiGrid, with the number a size smaller; opening one shows its records as a bottom sheet. |
+| Accessibility | A tile that opens something is a button named by its title and value, with the chevron decorative; its help is an InfoButton beside the button, never a focusable term inside it; the trend's direction is a word, never colour alone. |
+| Status | stable |
+| Exports | `KpiCard` |
+| Import | `import { KpiCard } from "@mycity/ui";` |
+| File | `packages/ui/src/display/KpiCard.tsx` |
+| Test | `packages/ui/src/display/KpiCard.test.tsx` |
+| Gallery | `packages/ui/src/display/KpiCard.gallery.tsx` (`npm run gallery`, `#/KpiCard`) |
+
+**KpiCard** props (`KpiCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The figure's name, Title Case, at most 4 words (Clocked In Today). |
+| `value` | `ReactNode` | yes | The figure itself: a count, a Money, a fraction ("22 of 25"). |
+| `tone` | `StatusTone` |  | The number's tone, when the figure itself is good or bad news. |
+| `caption` | `ReactNode` |  | The line under the number, at most 5 words (4 overdue, 3 more than last month). |
+| `trend` | `"up" \| "down" \| "flat"` |  | Which way it has moved; the caption then carries an arrow and the direction as a word. |
+| `help` | `ReactNode` |  | Support text, at most 35 words: what the figure counts. On a plain tile it sits behind the title as a help term; on a tile that opens its records it is an ⓘ beside the number instead, because a focusable term cannot live inside the button that opens them. |
+| `helpLabel` | `string` |  | The figure's name as plain words, when `title` is not a string: the ⓘ's name and the help sheet's title. |
+| `onOpen` | `() => void` |  | Opens the records behind the number (the report model). Without it the tile is plain. |
+| `opensOn` | `"all" \| "phone"` |  | Where the tile is clickable. `all` (the default) on both; `phone` when the desktop page already shows the detail beside the tiles, so desktop gets no second way to the same thing. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<KpiCard title="Clocked In Today" value="22 of 25" onOpen={() => openDetail("attendance.punched")} />
+<KpiCard title="Owed This Month" value={<Money value={total} short />} tone="warn" caption="4 overdue" trend="up" />
+```
+
+### KpiDetail
+
+The report model behind a KPI card: the records that make up the number, grouped, searchable and paged at 25.
+
+| | |
+|---|---|
+| Use | As the body of the modal a KPI card opens (docs/guides/home.md §3 step 3), and anywhere a figure has to be opened up. |
+| Avoid | Explaining how the figure is worked out (that is the guide's); loading the whole set to count it; a second table inside it. |
+| Phone | The modal is a bottom sheet and the records are cards, so the groups stay chips and nothing scrolls sideways. |
+| Accessibility | The group chips are a group named for the list, each chip saying whether it is pressed; the summary is a live region, so a changed group is heard. |
+| Status | stable |
+| Exports | `KpiDetail` |
+| Import | `import { KpiDetail } from "@mycity/ui";` |
+| File | `packages/ui/src/display/KpiDetail.tsx` |
+| Test | `packages/ui/src/display/KpiDetail.test.tsx` |
+| Gallery | `packages/ui/src/display/KpiDetail.gallery.tsx` (`npm run gallery`, `#/KpiDetail`) |
+
+**KpiDetail** props (`KpiDetailProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `summary` | `ReactNode` |  | One operational line above the list, at most 20 words ("22 of 25 clocked in across the organisation"). |
+| `groups` | `KpiDetailGroup[]` |  | The groups the rules read the figure in; chips show only when there is more than one. |
+| `group` | `string` |  | The group in view; `all` for every record. |
+| `onGroup` | `(group: string) => void` |  | Called with the chosen group's value, or `all`. |
+| `list` | `DataViewList<R>` | yes | The server-paged records behind the number (a `usePaged()` result). |
+| `columns` | `DataViewColumn<R>[]` | yes | The columns, as the KPI's own meta describes them. |
+| `rowKey` | `(row: R) => string` | yes | Names one record. |
+| `onRowClick` | `(row: R) => void` |  | Opens a record; the modal closes first, so the person lands on the screen. |
+| `noun` | `string` |  | What one record is, for the pager's count ("person"). |
+| `nounPlural` | `string` |  | The plural, when it is not the noun with an s. |
+| `caption` | `string` | yes | Names the list for screen readers; the KPI's own title. |
+| `empty` | `{ title: ReactNode; text?: ReactNode }` |  | What to show when nothing is behind the number. |
+
+```tsx
+<KpiDetail summary="22 of 25 clocked in" groups={groups} group={group} onGroup={setGroup} list={list} columns={columns} rowKey={(r) => r.id} />
+```
+
+### KpiGrid
+
+The row of KPI cards: four across on desktop, two to a row on a phone.
+
+| | |
+|---|---|
+| Use | Above a list or at the top of a tab, holding the three or four figures that tab is about. |
+| Avoid | More than four figures in one row; mixing KPI cards with other cards inside it; a grid of one (use the card). |
+| Phone | Two to a row with tighter spacing, as the feature guides' §10 lays Home out. |
+| Accessibility | A list, so a screen reader hears how many figures there are before reading them. |
+| Status | stable |
+| Exports | `KpiGrid` |
+| Import | `import { KpiGrid } from "@mycity/ui";` |
+| File | `packages/ui/src/display/KpiGrid.tsx` |
+| Test | `packages/ui/src/display/KpiGrid.test.tsx` |
+| Gallery | `packages/ui/src/display/KpiGrid.gallery.tsx` (`npm run gallery`, `#/KpiGrid`) |
+
+**KpiGrid** props (`KpiGridProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `KpiGridItem[]` |  | The figures, left to right. Pass this or `children`. |
+| `children` | `ReactNode` |  | The cards themselves, when a screen builds each one. Pass this or `items`. |
+| `cols` | `2 \| 3 \| 4` |  | Cards across on desktop: 4 unless the tab has three figures. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<KpiGrid items={[{ key: "in", title: "Clocked In Today", value: "22 of 25", onOpen: open }]} />
+<KpiGrid>{figures.map((f) => <KpiCard key={f.key} {...f} />)}</KpiGrid>
+```
+
 ### Money
 
 An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word.
@@ -894,6 +1004,35 @@ A shimmering placeholder in the shape of what is loading: lines of text, a block
 <Skeleton lines={4} />
 <Skeleton shape="circle" className="size-8" />
 <Spinner label="Loading payslips" />
+```
+
+### StatStrip
+
+A strip of labelled figures across the top of a record: smaller than KPI cards, for a record's own counts.
+
+| | |
+|---|---|
+| Use | At the head of a record (an expense claim's totals, a payroll run's counts, a vacancy's pipeline). |
+| Avoid | A role's dashboard figures (use KpiGrid); more than six figures; a figure with a sentence under it. |
+| Phone | Two to a row, and only the first four show unless a figure is marked `desktop` (gate 11). |
+| Accessibility | A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. |
+| Status | stable |
+| Exports | `StatStrip` |
+| Import | `import { StatStrip } from "@mycity/ui";` |
+| File | `packages/ui/src/display/StatStrip.tsx` |
+| Test | `packages/ui/src/display/StatStrip.test.tsx` |
+| Gallery | `packages/ui/src/display/StatStrip.gallery.tsx` (`npm run gallery`, `#/StatStrip`) |
+
+**StatStrip** props (`StatStripProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `StatStripItem[]` | yes | The figures, left to right. |
+| `label` | `string` |  | Names the strip for screen readers; "Figures" unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<StatStrip items={[{ label: "Submitted", value: 18 }, { label: "Approved", value: 14, tone: "ok" }]} />
 ```
 
 ## Navigation

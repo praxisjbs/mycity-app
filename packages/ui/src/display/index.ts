@@ -14,3 +14,7 @@ export * from "./Kbd";
 export * from "./Money";
 export * from "./IconCards";
 export * from "./Quote";
+export * from "./KpiCard";
+export * from "./KpiGrid";
+export * from "./KpiDetail";
+export * from "./StatStrip";
