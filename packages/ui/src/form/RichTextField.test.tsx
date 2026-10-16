@@ -5,6 +5,9 @@ import { axe } from "../testing/axe";
 import { Field } from "./Field";
 import { RichTextField } from "./RichTextField";
 import { installEditorTestEnv } from "./test-env";
+import { syncDraft } from "./RichTextField.draw";
+import { Editor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
 
 beforeAll(installEditorTestEnv);
 
@@ -123,5 +126,22 @@ describe("RichTextField", () => {
     const { container } = render(<RichTextField label="Message" value="<p>Hello</p>" onChange={vi.fn()} />);
     await open();
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("syncDraft", () => {
+  const make = () => new Editor({ extensions: [StarterKit], content: "<p>Draft</p>" });
+
+  it("puts a value that changed outside into the document", () => {
+    const editor = make();
+    syncDraft(editor, "<p>Restored</p>");
+    expect(editor.getHTML()).toBe("<p>Restored</p>");
+    editor.destroy();
+  });
+
+  it("leaves an editor that was already destroyed alone", () => {
+    const editor = make();
+    editor.destroy();
+    expect(() => syncDraft(editor, "<p>Restored</p>")).not.toThrow();
   });
 });
