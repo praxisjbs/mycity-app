@@ -23,6 +23,7 @@ rules that would have caught them.
    §11.1, which lists the columns the shared layer reads and writes.
 2. **Contract first** (CLAUDE.md Step 2). Change the Zod schema, then the migration, then the code.
    A contract key is the column name: `staff_number` in the contract means a `staff_number` column.
+   Gate 6 (`check/contract-columns.js`) holds the two together through each contract file's `TABLES`.
 3. **Your milestone only.** You write tables for the milestone your branch is named after
    (`m<N>/<short-name>`). A table another milestone owns is changed by its owner, or with the
    owner's review on your PR (README §12 names the owners). Never write a later milestone's schema
@@ -120,7 +121,7 @@ step, an enum value can never be removed.
 | A file is a `document_id uuid REFERENCES document(document_id)`; never a path, URL or blob column | The vault owns files | Review |
 | Every foreign key says `ON DELETE` (`RESTRICT` by default, `CASCADE` only for rows that are part of their parent, `SET NULL` for optional links) | Deleting a person must never silently delete their history | Review |
 | **Every foreign key column has an index**, and so does every column a list allow-lists for sort or filter (BACKEND_GUIDE §3.5) | Scope and lists join on them; 205 of 254 had none in the first schema | Review |
-| A status or type column has a `CHECK (col IN (...))` with **exactly** the contract's enum values, same spelling | One spelling everywhere (`on_site`, not `onsite`) | Review; gate 6 when built |
+| A status or type column has a `CHECK (col IN (...))` with **exactly** the contract's enum values, same spelling | One spelling everywhere (`on_site`, not `onsite`) | Review |
 | Effective-dated rows (`effective_from`, `effective_to`, `expires_at`) are only added together with the code that filters on them | A column nobody reads grants access that should have expired | Review |
 | A field that is required, filtered, sorted, masked or reported on is a column, not a key inside a `jsonb` blob. `jsonb` is for genuinely open-ended extras | Field masking, CHECKs and indexes work on columns | Review |
 | Restricted personal data (bank details, salary, date of birth, next of kin) is a column, masked through `shared/rbac/field-mask.js` under its mask key (`employee.bank`, `employee.salary`, `employee.personal`) | The staff importer (BACKEND_STRUCTURE §9.4) and the API mask by field | Review |
@@ -221,6 +222,8 @@ Run all of these and paste the result in the PR's Notes:
 node scripts/check/migration-numbers.js        # gate 3
 node scripts/check/migration-reversibility.js  # gate 4, static
 node scripts/check/migration-idempotency.js    # gate 5
+node scripts/check/schema-drift.js             # gate 6: the code names only tables and columns that exist
+node scripts/check/contract-columns.js         # gate 6: contract keys are column names
 RUN_DB_TESTS=1 DATABASE_URL=postgres://...mycity_test node scripts/check/migration-reversibility.js
                                                # gate 4 for real: UP, every DOWN, UP again
 RUN_DB_TESTS=1 DATABASE_URL=... npx jest tests/integration

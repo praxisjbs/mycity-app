@@ -59,6 +59,6 @@ jobs:
       - name: All gates
         run: npm run ci
         env:
-          # Set to "1" once M0 is complete: a gate whose script is still empty
-          # then fails the run instead of being reported as NOT BUILT.
-          CI_STRICT: "0"
+          # Every gate script is built (gate 6 was the last), so a gate whose script is
+          # empty fails the run instead of being reported as NOT BUILT.
+          CI_STRICT: "1"
