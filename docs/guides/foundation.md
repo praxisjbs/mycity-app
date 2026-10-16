@@ -87,8 +87,8 @@ These finish M0 and no prompt can do them:
 
 ## 3 · How the screens relate
 
-1. **The roster.** Each deploy loads `seeds/staff/` through the staff importer (track A runs it,
-   track B owns the importer): new people become employees with a staff number, department, line
+1. **The roster.** Each deploy loads `seeds/staff/` through the staff importer (track A runs it
+   and owns the importer): new people become employees with a staff number, department, line
    manager (or a vacant seat), and a login in the invited state with their roles. Nobody is emailed.
    People · Employees then lists them, and Settings · Users shows them as Invited.
 2. **Inviting.** Operations & People press Send Invite on an employee or a login, one
