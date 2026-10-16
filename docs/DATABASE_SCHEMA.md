@@ -110,7 +110,8 @@ seed · `1100` `home_alert` columns the alerts code writes.
   (screen #87), policy versions and acknowledgements (#89), a unique key for the auto-query
   upsert, the lateness deduction amount.
 - Devices (ess.md §6): enrolment requests, status and the three-device rule on `known_device`.
-- ESS My Security: a PIN on the user (passkeys are not built, §4).
+- ESS My Security: two-step sign-in, passkeys and the PIN, built in the M0 block by the second
+  sign-in PR (decided 16/10/2026, §4).
 - Home (home.md §4): `home_report_run`, `role_kpi` (per-role tile defaults and locks), alert scope.
 - Community (community.md §4): post policy, pinned and system messages, read pointers, poll votes,
   `announcement_read`.
@@ -204,7 +205,9 @@ and lines, disbursements · `8099` seed.
 reporting views · `9095` `updated_at` triggers (a one-time sweep of the tables that existed then;
 later tables create their own, `docs/MIGRATIONS.md` §6) · `9099` seed.
 
-**Owes:** MFA required per role (the second sign-in PR). Editing roles and their grants on screen.
+**Owes:** MFA required per role, with Settings · Security (personal enrolment came forward to the
+second sign-in PR; enforcement by role stays in M9, TB 16/10/2026). Editing roles and their grants
+on screen.
 
 ### M10 Staff Knowledge Hub & AI Assistance · 10000 to 10999 · TB
 
@@ -225,12 +228,15 @@ No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `resto
 
 | What | Why it is not built | Decided by |
 |---|---|---|
-| Passkeys (WebAuthn) on ESS My Security | REUSE_MAP drops the passkey service "for now", and REUSE_MAP wins over the guides (CLAUDE.md Step 3). The ess.md screen keeps password, two-step, PIN and devices. Revisit as a decision if MyCity asks | REUSE_MAP (the `security/app_user` row), MILESTONES §5 reuse table |
 | Tables for M11 | Handover is scripts and documents, not records | MILESTONES §16 |
 | Demonstration and business data in production | Reference seeds hold only what the code cannot run without; categories, stages, policies and thresholds are entered by MyCity | A5, A26 |
 
 Anything else in MILESTONES that has no table yet is **owed**, not excluded, and is listed under
 its milestone in §3.
+
+Passkeys (WebAuthn) were listed here until 16/10/2026, when TB decided to build them with two-step
+sign-in and the PIN in the second sign-in PR (M0 block), reversing REUSE_MAP's "drop WebAuthn for
+now"; REUSE_MAP §1.1 and MILESTONES §5 record it.
 
 ## 5 · Open decisions
 

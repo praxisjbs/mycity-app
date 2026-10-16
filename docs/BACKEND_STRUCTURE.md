@@ -252,7 +252,8 @@ src/
 
 **Not ported:** `tenant-context.js`, `host-tenent-resolver.js`, `platform-auth.js` (521 loc, A2);
 `api-version.js`; `public-head.js`; `feature-gate.js` (A4); praxis `services/workflow/executor`;
-`webauthn.service.js`; praxis's base64 upload path.
+praxis's base64 upload path. (`webauthn.service.js` was on this list until 16/10/2026, when TB
+decided to build passkeys with two-step sign-in and the PIN; REUSE_MAP §1.1.)
 
 ---
 
