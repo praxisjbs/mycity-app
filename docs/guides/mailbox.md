@@ -110,6 +110,16 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 - Attachments: 25 MB each through the upload engine; types by the mime policy.
 - Spam bodies are not rendered.
 - Copy: Title Case chrome, no em dashes, day-first dates.
+- **The mail host's limits** (Namecheap plan, `docs/runbooks/dns-and-mail.md` §4): IMAP and SMTP
+  at `mycityapp.io` (993, 465), strict certificate check on that name. At most **30 IMAP connections
+  at once from one IP address**, and production and staging share the server's address: production
+  holds at most one IDLE connection per connected mailbox and runs sync with short-lived
+  connections under a shared cap (IDLE plus sync never above 24, leaving room for staging; mailboxes beyond that
+  are polled);
+  staging never IDLEs, it polls with one connection at a time. People's own phones and webmail
+  connect from other addresses and do not count. **30 mailboxes** on the plan. **50 recipients an
+  hour** to send; whether that is per mailbox or for the whole account is still open (§13), and
+  the send queue paces each user to it either way.
 
 ## 7 · Events, jobs and notifications
 
@@ -193,7 +203,9 @@ interface copy; the copy rules apply to the chrome around them.
 
 - Shared mailboxes (for example `people@mycityapp.io`): wanted, and in which milestone?
 - Email signatures: the donor's signature builder was left out; is a plain text signature enough?
-- Which server hosts MyCity's mail (cPanel or other), for autodiscover and the connection guide?
+- Answered 16/10/2026: Namecheap cPanel, `mycityapp.io` for IMAP (993) and SMTP (465).
+- Is the 50 an hour sending limit per mailbox or for the whole hosting account? (asked of the
+  domain manager)
 - Undo send window, and how long scheduled mail may wait.
 
 ## 14 · Change log
@@ -203,6 +215,7 @@ interface copy; the copy rules apply to the chrome around them.
 - 13/10/2026 · GE · Page header slides away while reading so the panes get the full height (TB review).
 - 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the page's ⓘ text (custom domain, no Google or Microsoft, not linked to other modules) left the screen for §1; the composer's labels became aria-labels on its compact rows, the schedule fields use the form helpers with a help term on Send Time, recipient and time errors sit on the field, the Draft Saved pill moved out of the footer and Discard asks with buttons only. §3 and §6 updated to match (Refresh, Draft Saved, discard, Lagos time).
 - 15/10/2026 · AJ · Six folders and the composer built in `app/` against the mock API (autosaved drafts, schedule, inline discard, sanitised reader); not wired yet.
+- 16/10/2026 · GE · §6 and §13: the mail host's limits from the domain manager (30 IMAP connections per IP, 30 mailboxes, 50 an hour), and how sync and IDLE stay inside them.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: the ⓘ text on the folder title is gone; message rows are marked as content for gate 8; the composer's fields come from the form system.
 - 15/10/2026 · AJ · Frontend foundation PR 2 (Shell): Mailbox opens from the rail on desktop and from More on a phone (F17); the list's pane splitter now says its width to assistive technology (the a11y gate crawls the app). No Mailbox behaviour changed.
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): the composer's body is now the shared `RichTextField` (TipTap, its own lazy chunk) instead of its own `contentEditable` on the deprecated `execCommand`. Paste from Word and Gmail is parsed into the document rather than carried in as foreign markup, which is why TipTap was chosen (FRONTEND_FOUNDATION §5, PR 3 question 3). The bar carries exactly what §6 and §10 list: Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link (`https://` or `mailto:` only, typed in a field under the bar, never a native dialog) and Clear Formatting, with Undo and Redo at its end and Attach a File beside it. The list beside the reader is `SplitPanes`, shared with Chat.

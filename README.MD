@@ -184,8 +184,8 @@ src/
 │   ├── storage/       storage.service
 │   ├── media/         image-pipeline · av-pipeline · scan · reconcile
 │   ├── pdf/           chromium · pdf.service
-│   ├── mail/          system-mail.service · deliverability/{check, route-check, dns-check,
-│   │                  dmarc, ptr, rbl, evaluate}
+│   ├── mail/          system-mail.service · pace (the hourly sending limit) · deliverability/{check,
+│   │                  route-check, dns-check, dmarc, ptr, rbl, evaluate}
 │   ├── secrets/       encryption.service
 │   ├── ai/            llm.service · governance · ledger · redact · structured · transcription ·
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)

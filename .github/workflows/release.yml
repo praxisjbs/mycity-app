@@ -59,11 +59,11 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Build the staff app
-        run: npm ci --prefix app && npm run build --prefix app
-
-      - name: Build the public site
-        run: npm ci --prefix public-app && npm run build --prefix public-app
+      # Both apps are npm workspaces, installed by the root `npm ci` above (one lockfile). A plain
+      # `vite build` is production mode with VITE_API_MODE unset: the live build, no mock (F12;
+      # check/mock-free.js builds them the same way).
+      - name: Build the staff app and the public site
+        run: npm run build -w @mycity/app -w @mycity/public-app
 
       - name: Assemble the release and its manifest
         env:

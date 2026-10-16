@@ -25,6 +25,9 @@ concurrency:
 
 permissions:
   contents: read
+  # On a push to main the process gates read the merged PR's description for its trailers
+  # ("Guide-unchanged: <reason>"); GitHub sends none with a push event.
+  pull-requests: read
 
 jobs:
   ci:
@@ -91,3 +94,4 @@ jobs:
           APP_ENV: test
           DATABASE_URL: postgres://mycity:mycity@127.0.0.1:5432/mycity_test
           REDIS_URL: redis://127.0.0.1:6379/15
+          GH_TOKEN: ${{ github.token }}

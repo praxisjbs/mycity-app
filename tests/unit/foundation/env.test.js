@@ -13,6 +13,7 @@ const SERVER = {
   JWT_REFRESH_SECRET: "b".repeat(40),
   ENCRYPTION_KEY: "ab".repeat(32),
   SMTP_HOST: "smtp.mycityapp.io",
+  MAIL_SEND_PER_HOUR: "40",
 };
 
 describe("config/env parseEnv", () => {
@@ -67,6 +68,13 @@ describe("config/env parseEnv", () => {
       "STAFF_ORIGIN must be https on production",
       "JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ",
     ]));
+  });
+
+  test("a server must pace its mail to the mailbox's hourly limit", () => {
+    expect(parseEnv({ ...SERVER, MAIL_SEND_PER_HOUR: "" }).problems).toContain(
+      "MAIL_SEND_PER_HOUR is required on production (the mailbox's hourly limit; docs/runbooks/dns-and-mail.md)",
+    );
+    expect(parseEnv({ MAIL_SEND_PER_HOUR: "" }).config.MAIL_SEND_PER_HOUR).toBe(0);
   });
 
   test("WhatsApp alert links must be https and say where the message goes", () => {

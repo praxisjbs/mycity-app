@@ -13,6 +13,9 @@
  *           (shared/route-map). Sent only to active users.
  *   push    web push arrives in M6 (keys and subscriptions); counted as waiting until then.
  *
+ * Paced like all system mail (services/mail/pace.js): when the hourly limit is reached, the
+ * emails already sent are recorded and the job is put back in the queue for the rest.
+ *
  * Retries do not repeat what already went out: each email sent is recorded on the job
  * (job.updateData), and a retry skips it. A bell push may repeat; the client keys on
  * notification_id.
@@ -25,6 +28,7 @@ const c = require("@mycity/contract");
 const routeMap = require("../../shared/route-map");
 const variables = require("../../shared/templates/variables");
 const systemMail = require("../../services/mail/system-mail.service");
+const pace = require("../../services/mail/pace");
 const realtime = require("../../services/realtime/emitter");
 
 const TEMPLATE = "notification";
@@ -64,7 +68,7 @@ async function recipients(userIds) {
   return new Map(rows.map((r) => [r.user_id, r]));
 }
 
-module.exports = async function notificationDeliver(job) {
+module.exports = async function notificationDeliver(job, token) {
   const { notifications: rows, event } = job.data || {};
   if (!Array.isArray(rows))
     throw new UnrecoverableError(
@@ -113,6 +117,8 @@ module.exports = async function notificationDeliver(job) {
       out.email += 1;
       await job.updateData({ ...job.data, sent_email: [...done] });
     } catch (err) {
+      if (err && err.code === "MAIL_PACED")
+        throw await pace.postpone(job, token, err.retryAfterMs);
       if (!firstErr) firstErr = err;
       logger.warn(
         {

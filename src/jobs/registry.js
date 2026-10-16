@@ -293,6 +293,12 @@ function instrument(queue, fn) {
         { queue },
         "Background job run time.",
       );
+      if (err && err.name === "DelayedError") {
+        // Not a failure: the job put itself back for later (mail pacing).
+        metrics.inc("mycity_jobs_total", { queue, outcome: "postponed" }, 1, "Background jobs by queue and outcome.");
+        logger.info({ queue, job: job.name, id: job.id, ms, reason: err.message }, "job postponed");
+        throw err;
+      }
       logger.warn({ queue, job: job.name, id: job.id, ms, err }, "job threw");
       throw err;
     }
