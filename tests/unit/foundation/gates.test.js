@@ -599,3 +599,135 @@ describe("shell scripts and JavaScript parse", () => {
     ).toMatch(/bash is not on the PATH/);
   });
 });
+
+describe("schema drift (gate 6)", () => {
+  const drift = require("../../../scripts/check/schema-drift");
+  const SCHEMA = MIG(
+    `CREATE TABLE IF NOT EXISTS person (person_id uuid PRIMARY KEY, number text, name text NOT NULL, CHECK (name <> ''));
+CREATE TABLE IF NOT EXISTS old_thing (old_thing_id uuid PRIMARY KEY);
+ALTER TABLE person RENAME COLUMN number TO staff_number;
+DROP TABLE IF EXISTS old_thing;`,
+    "SELECT 1;",
+  );
+  const run = (code, extra = {}) => {
+    const root = tmp("mycity-drift-");
+    put(root, "migrations/0001_people.sql", SCHEMA);
+    for (const [rel, text] of Object.entries(extra)) put(root, rel, text);
+    put(root, "src/thing.repo.js", code);
+    return drift.check({ root }).problems;
+  };
+
+  test("queries naming real columns pass, renames followed", () => {
+    expect(
+      run(
+        "const A = `SELECT p.staff_number, p.name FROM person p WHERE p.person_id = $1`;\n" +
+          "const B = `INSERT INTO person (person_id, staff_number, name) VALUES ($1, $2, $3)`;\n" +
+          "const C = `UPDATE person SET name = $2, staff_number = upper($3) WHERE person_id = $1`;\n" +
+          "const D = `SELECT 1 FROM person FOR UPDATE SKIP LOCKED`;",
+      ),
+    ).toEqual([]);
+  });
+
+  test("a qualified column the table lacks is named, with the nearest real one", () => {
+    const p = run("const A = `SELECT p.number FROM person p`;");
+    expect(p).toEqual([expect.stringMatching(/p\.number: person has no column "number"; did you mean staff_number/)]);
+  });
+
+  test("INSERT column lists and UPDATE SET lists are checked", () => {
+    const p = run(
+      "const A = `INSERT INTO person (person_id, nickname) VALUES ($1, $2)`;\n" +
+        "const B = `UPDATE person SET title = $2 WHERE person_id = $1`;",
+    );
+    expect(p).toEqual([
+      expect.stringMatching(/INSERT INTO person \(nickname\): person has no column "nickname"/),
+      expect.stringMatching(/UPDATE person SET title: person has no column "title"/),
+    ]);
+  });
+
+  test("a dropped table, and one no migration creates, are refused", () => {
+    const p = run("const A = `DELETE FROM old_thing WHERE 1 = 1`;\nconst B = `SELECT * FROM nowhere`;");
+    expect(p).toEqual([
+      expect.stringMatching(/old_thing: this table no longer exists \(dropped by migrations\/0001_people\.sql\)/),
+      expect.stringMatching(/nowhere: no migration creates this table/),
+    ]);
+  });
+
+  test("CTEs, subqueries, interpolation and system catalogues are left alone", () => {
+    expect(
+      run(
+        "const A = `WITH ev AS (INSERT INTO person (person_id, name) VALUES ($1, $2) RETURNING person_id) SELECT ev.whatever FROM ev`;\n" +
+          "const B = `SELECT x.anything FROM (SELECT 1) x`;\n" +
+          "const C = `SELECT t.col FROM ${table} t`;\n" +
+          "const D = `SELECT extname FROM pg_extension`;",
+      ),
+    ).toEqual([]);
+  });
+
+  test("a table created twice with different columns is drift", () => {
+    const p = run("", {
+      "migrations/0002_people_again.sql": MIG("CREATE TABLE IF NOT EXISTS person (person_id uuid PRIMARY KEY, nickname text);", "SELECT 1;"),
+    });
+    expect(p).toEqual([expect.stringMatching(/person is created in .*0001_people\.sql and again in .*0002_people_again\.sql.*never created: nickname/)]);
+  });
+
+  test("the repository is clean", () => {
+    expect(drift.check().problems).toEqual([]);
+  });
+});
+
+describe("contract keys are columns (gate 6)", () => {
+  const cols = require("../../../scripts/check/contract-columns");
+  const ZOD = JSON.stringify(require.resolve("zod"));
+  const run = (contract, up = "CREATE TABLE IF NOT EXISTS person (person_id uuid PRIMARY KEY, number text, name text);") => {
+    const root = tmp("mycity-cols-");
+    put(root, "migrations/0001_people.sql", MIG(up, "SELECT 1;"));
+    put(root, "packages/contract/schemas/people.js", `const { z } = require(${ZOD});\n${contract}`);
+    put(root, "packages/contract/schemas/empty.js", "");
+    return cols.check({ root }).problems;
+  };
+
+  test("a contract key the table spells differently is caught: staff_number against number", () => {
+    const p = run(
+      "const PersonCreate = z.object({ staff_number: z.string(), name: z.string() }).strict();\n" +
+        'module.exports = { PersonCreate, TABLES: { PersonCreate: { table: "person" } } };',
+    );
+    expect(p).toEqual([expect.stringMatching(/PersonCreate: "staff_number" is not a column of person/)]);
+  });
+
+  test("keys that are columns pass; a declared virtual key passes with its reason", () => {
+    expect(
+      run(
+        "const PersonCreate = z.object({ number: z.string(), name: z.string(), team_name: z.string() }).strict().refine(() => true);\n" +
+          'module.exports = { PersonCreate, TABLES: { PersonCreate: { table: "person", virtual: { team_name: "resolved to a team id" } } } };',
+      ),
+    ).toEqual([]);
+  });
+
+  test("every exported object schema is declared, and every declaration is real", () => {
+    const p = run(
+      "const A = z.object({ name: z.string() });\nconst B = z.object({ name: z.string() });\n" +
+        'module.exports = { A, B, TABLES: { B: { table: null, reason: "" }, C: { table: "person" } } };',
+    );
+    expect(p).toEqual([
+      expect.stringMatching(/A has no TABLES entry/),
+      expect.stringMatching(/B: table: null needs a reason/),
+      expect.stringMatching(/TABLES names C, which the file does not export/),
+    ]);
+  });
+
+  test("a nested row is checked as a row; an unknown table is refused", () => {
+    const p = run(
+      "const Input = z.object({ person: z.object({ nickname: z.string() }), flag: z.boolean() });\n" +
+        "const Other = z.object({ x: z.string() });\n" +
+        'module.exports = { Input, Other, TABLES: { Input: { table: null, reason: "script input", nested: { person: { table: "person" } } }, Other: { table: "nowhere" } } };',
+    );
+    expect(p).toEqual([
+      expect.stringMatching(/Input\.person: "nickname" is not a column of person/),
+      expect.stringMatching(/Other: no migration creates table "nowhere"/),
+    ]);
+  });
+
+  test("the repository is clean", () => {
+    expect(cols.check().problems).toEqual([]);
+  });
+});

@@ -26,7 +26,7 @@
  *
  *   function list(client, query, scope) {
  *     return pageQuery(client,
- *       `SELECT e.employee_id, e.number, e.first_name, e.last_name, ${TOTAL_COL}
+ *       `SELECT e.employee_id, e.staff_number, e.first_name, e.last_name, ${TOTAL_COL}
  *          FROM employee e
  *         WHERE ($1::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($1) || '%')
  *         ORDER BY ${orderBy(query, SORTS, "e.employee_id")}`,
