@@ -53,9 +53,11 @@ export type ResponseOf<E, K extends Key<E>> = Shape<E, K>["response"];
 export type PagedKeyOf<E> = { [K in Key<E>]: ResponseOf<E, K> extends { data: unknown[]; page: unknown } ? K : never }[Key<E>];
 export type RowOf<E, K extends Key<E>> = ResponseOf<E, K> extends { data: Array<infer R> } ? R : never;
 /**
- * A list's `sort` values: the literal union the contract allow-lists
- * (`"due_on" | "-due_on" | ...`, common.js `sortParam`), or a plain string
- * while the list still runs on INTERIM types with no sort declared.
+ * A list's `sort` value: a field name, with a leading `-` for descending
+ * (common.js `sortParam`). The allow-list is the contract's and is enforced
+ * where it matters, on the server: a field the list does not name is a 422.
+ * The type here is whatever the endpoint declares for the key, and `string`
+ * for a list still on INTERIM types with no sort of its own.
  */
 export type SortOf<E, K extends Key<E>> = "sort" extends keyof NonNullable<QueryOf<E, K>>
   ? NonNullable<NonNullable<QueryOf<E, K>>["sort"]>
