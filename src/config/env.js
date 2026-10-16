@@ -275,11 +275,35 @@ const ENTRIES = [
     { group: "Sign-in", doc: "Access token life in minutes." },
   ],
   [
-    "REFRESH_TOKEN_DAYS",
-    int(14, { min: 1, max: 90 }),
+    "SESSION_MAX_AGE_MIN",
+    int(120, { min: 5, max: 24 * 60 }),
     {
       group: "Sign-in",
-      doc: "Refresh token life in days. Rotated on every use.",
+      doc: "A session ends this many minutes after sign-in, whatever the person is doing; the screen locks and they sign in again. Every token ends with its session.",
+    },
+  ],
+  [
+    "SESSION_INACTIVITY_MIN",
+    int(30, { min: 5, max: 24 * 60 }),
+    {
+      group: "Sign-in",
+      doc: "A session with no refresh for this many minutes (a closed tab, a sleeping laptop) ends on its return.",
+    },
+  ],
+  [
+    "CREDENTIAL_ENROL_WINDOW_MIN",
+    int(15, { min: 1, max: 120 }),
+    {
+      group: "Sign-in",
+      doc: "Adding a new way to sign in (a passkey, a PIN) needs no password only this soon after signing in.",
+    },
+  ],
+  [
+    "PASSWORD_BREACH_CHECK",
+    bool(true),
+    {
+      group: "Sign-in",
+      doc: "Refuse a new password found in known breaches (Have I Been Pwned range API: only 5 characters of a hash leave the server). Allows the password if the service is unreachable.",
     },
   ],
 

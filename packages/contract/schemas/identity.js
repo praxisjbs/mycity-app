@@ -1,0 +1,291 @@
+"use strict";
+/**
+ * Identity: signing in and out, the session, the caller's own account, and the
+ * credential links (password reset and the first password of an invited person).
+ *
+ * Sessions follow one policy (docs/guides/identity.md §6): a session lives a fixed
+ * time from sign-in whatever the person does, and less if it sits idle; every
+ * token ends no later than its session. The access token travels in the body and
+ * is held in memory; the refresh token never does: it is an HttpOnly cookie.
+ */
+const { z } = require("zod");
+const { uuid, email, isoDateTime, listQuery, Paged } = require("./common");
+
+/** Seconds, whole. */
+const seconds = z.number().int().min(0);
+
+/* ------------------------------------------------------------------ *
+ * Passwords
+ * ------------------------------------------------------------------ */
+
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 200;
+
+/**
+ * A password someone is choosing. The messages are field marks (at most four
+ * words). The server also refuses one that contains the name part of the
+ * person's email or appears in a known breach; those arrive as a 422 on the field.
+ */
+const NewPassword = z
+  .string()
+  .min(PASSWORD_MIN, "At least 8 characters")
+  .max(PASSWORD_MAX, "At most 200 characters")
+  .refine((v) => /[a-z]/.test(v), "Add a lowercase letter")
+  .refine((v) => /[A-Z]/.test(v), "Add an uppercase letter")
+  .refine((v) => /[0-9]/.test(v), "Add a number")
+  .refine((v) => /[^A-Za-z0-9]/.test(v), "Add a symbol");
+
+/** A password someone is typing to prove who they are: never judged, only bounded. */
+const CurrentPassword = z.string().min(1, "Enter your password").max(PASSWORD_MAX);
+
+/** A credential link's token: 32 random bytes, base64url. */
+const LinkToken = z.string().regex(/^[A-Za-z0-9_-]{43}$/, "Link is not valid");
+
+/* ------------------------------------------------------------------ *
+ * The signed-in person
+ * ------------------------------------------------------------------ */
+
+/**
+ * A permission key and an action, as the wire carries them. The lists themselves are
+ * the access catalogue's (src/shared/access/access.catalog.js); a test holds the
+ * action list here equal to it.
+ */
+const ModuleKey = z.string().regex(/^[a-z][a-z_]*$/);
+const ACTIONS = ["view", "create", "edit", "delete", "approve", "export"];
+const Action = z.enum(ACTIONS);
+
+/** Which Home layout the person's role opens (docs/guides/home.md). */
+const HomeView = z.enum(["operations", "ceo", "partnerships", "staff"]);
+
+const RoleRef = z.object({ code: z.string(), name: z.string() }).strict();
+
+/** GET /auth/me, and the user inside every session response. */
+const Me = z
+  .object({
+    user_id: uuid,
+    employee_id: uuid,
+    email: z.string(),
+    display_name: z.string(),
+    first_name: z.string(),
+    job_title: z.string(),
+    department: z.string(),
+    photo_url: z.string().nullable(),
+    is_ceo: z.boolean(),
+    /** Module key → the actions the person may take there. Hiding is a courtesy; the API enforces. */
+    grants: z.record(ModuleKey, z.array(Action)),
+    roles: z.array(RoleRef),
+    home_view: HomeView,
+    /** Does anyone report to this person? Opens Home · Team and the manager views. */
+    manages_people: z.boolean(),
+  })
+  .strict();
+
+/** How long the session has left, so every open tab locks at the same moment. */
+const sessionClock = {
+  /** Access token life in seconds (never past the session's end). */
+  expires_in: seconds,
+  /** Seconds until the session ends and the screen locks. */
+  session_expires_in: seconds,
+  /** The session's full length in seconds. */
+  session_max_age: seconds,
+};
+
+/* ------------------------------------------------------------------ *
+ * Signing in, refreshing, signing out
+ * ------------------------------------------------------------------ */
+
+/** POST /auth/login */
+const LoginBody = z
+  .object({ email, password: CurrentPassword })
+  .strict();
+
+/** POST /auth/login. The refresh cookie is set beside it. */
+const Session = z
+  .object({ access_token: z.string(), ...sessionClock, user: Me })
+  .strict();
+
+/** POST /auth/refresh: a new access token for the session the cookie names; the cookie rotates. */
+const SessionTokens = z
+  .object({ access_token: z.string(), ...sessionClock })
+  .strict();
+
+/**
+ * GET /auth/device: who this browser last signed in as, so the sign-in screen
+ * can greet them. Read from an HttpOnly cookie the server set; it grants nothing.
+ */
+const DeviceAccount = z
+  .object({
+    account: z
+      .object({
+        email: z.string(),
+        display_name: z.string(),
+        first_name: z.string(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
+ * Passwords
+ * ------------------------------------------------------------------ */
+
+/** POST /auth/password: the signed-in person replaces their own password. */
+const PasswordChange = z
+  .object({ current_password: CurrentPassword, new_password: NewPassword })
+  .strict();
+
+const PasswordChanged = z
+  .object({ sessions_signed_out: z.number().int().min(0) })
+  .strict();
+
+/** POST /auth/forgot. Always the same answer, so nobody learns which addresses have an account. */
+const ForgotBody = z.object({ email }).strict();
+const Accepted = z.object({ ok: z.literal(true) }).strict();
+
+/** POST /auth/link: is this reset or invitation link still good? */
+const LinkCheckBody = z.object({ token: LinkToken }).strict();
+const LinkCheck = z
+  .object({
+    purpose: z.enum(["reset", "invite"]),
+    email: z.string(),
+    first_name: z.string(),
+    expires_at: isoDateTime,
+  })
+  .strict();
+
+/** POST /auth/reset: choose a password from a link. Every session of the account ends. */
+const ResetBody = z
+  .object({ token: LinkToken, new_password: NewPassword })
+  .strict();
+const ResetDone = z.object({ email: z.string() }).strict();
+
+/* ------------------------------------------------------------------ *
+ * The caller's own sessions (My Security)
+ * ------------------------------------------------------------------ */
+
+const SessionStatus = z.enum(["active", "ended"]);
+const EndReason = z.enum([
+  "signed_out",
+  "session_max_age",
+  "inactivity_timeout",
+  "refresh_token_reuse",
+  "password_changed",
+  "password_reset",
+  "ended_by_user",
+  "ended_by_admin",
+  "account_suspended",
+]);
+
+/** One sign-in: a session, live or ended. */
+const SignIn = z
+  .object({
+    session_id: uuid,
+    device_label: z.string(),
+    ip_address: z.string().nullable(),
+    method: z.enum(["password", "pin", "passkey", "password_totp"]),
+    issued_at: isoDateTime,
+    last_seen_at: isoDateTime,
+    status: SessionStatus,
+    end_reason: EndReason.nullable(),
+    /** The session this request came from. */
+    current: z.boolean(),
+  })
+  .strict();
+
+/** GET /auth/sessions: the caller's sign-ins, newest first. */
+const SignInListQuery = listQuery({ status: SessionStatus.optional() }, [
+  "issued_at",
+]);
+const SignInPage = Paged(SignIn);
+
+/** POST /auth/sessions/end-others */
+const SessionsEnded = z.object({ ended: z.number().int().min(0) }).strict();
+
+/** GET /auth/security: the My Security summary. */
+const SecuritySummary = z
+  .object({
+    password_changed_at: isoDateTime.nullable(),
+    active_sessions: z.number().int().min(0),
+    session_max_age: seconds,
+    session_idle_limit: seconds,
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
+ * What the system mails (template variables, BACKEND_STRUCTURE §5.5)
+ * ------------------------------------------------------------------ */
+
+/** templates/email/password-reset.html */
+const PasswordResetEmailVars = z
+  .object({ link_url: z.string().url(), minutes: z.number().int().min(1) })
+  .strict();
+
+/** templates/email/user-invite.html */
+const UserInviteEmailVars = z
+  .object({
+    link_url: z.string().url(),
+    hours: z.number().int().min(1),
+    job_title: z.string(),
+    invited_by: z.string(),
+  })
+  .strict();
+
+/** templates/email/new-sign-in.html */
+const NewSignInEmailVars = z
+  .object({
+    when: z.string(),
+    device: z.string(),
+    ip_address: z.string(),
+    security_url: z.string().url(),
+    forgot_url: z.string().url(),
+  })
+  .strict();
+
+/** templates/email/sign-in-throttled.html */
+const SignInThrottledEmailVars = z
+  .object({ attempts: z.number().int().min(1), forgot_url: z.string().url() })
+  .strict();
+
+/** templates/email/password-changed.html */
+const PasswordChangedEmailVars = z
+  .object({ when: z.string(), forgot_url: z.string().url() })
+  .strict();
+
+module.exports = {
+  PASSWORD_MIN,
+  PASSWORD_MAX,
+  NewPassword,
+  CurrentPassword,
+  LinkToken,
+  ModuleKey,
+  ACTIONS,
+  Action,
+  HomeView,
+  RoleRef,
+  Me,
+  LoginBody,
+  Session,
+  SessionTokens,
+  DeviceAccount,
+  PasswordChange,
+  PasswordChanged,
+  ForgotBody,
+  Accepted,
+  LinkCheckBody,
+  LinkCheck,
+  ResetBody,
+  ResetDone,
+  SessionStatus,
+  EndReason,
+  SignIn,
+  SignInListQuery,
+  SignInPage,
+  SessionsEnded,
+  SecuritySummary,
+  PasswordResetEmailVars,
+  UserInviteEmailVars,
+  NewSignInEmailVars,
+  SignInThrottledEmailVars,
+  PasswordChangedEmailVars,
+};

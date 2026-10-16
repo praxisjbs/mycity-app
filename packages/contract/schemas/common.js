@@ -74,6 +74,12 @@ const isoDate = z
   }, "is not a real calendar date");
 
 /**
+ * An instant on the wire: ISO 8601 with its offset, as a timestamptz column
+ * leaves the API ("2026-10-16T09:30:00.000Z").
+ */
+const isoDateTime = z.string().datetime({ offset: true });
+
+/**
  * Money is a decimal STRING with exactly two places (gate 20). Never a JS
  * number on the wire. numeric(18,2) holds 16 integer digits.
  */
@@ -226,6 +232,7 @@ module.exports = {
   email,
   phone,
   isoDate,
+  isoDateTime,
   money,
   PAGE_SIZE,
   LIST_CONTROLS,
