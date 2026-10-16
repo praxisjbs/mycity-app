@@ -62,6 +62,9 @@
   --font-weight-semibold: 600;
   --font-weight-strong: 650;
 
+  /* The letter spacing of a small-caps label: a table header, a strip's caption. */
+  --tracking-caps: 0.09em;
+
   --radius-ctl: 9px;
   --radius-box: 10px;
   --radius-card: 14px;

@@ -7,8 +7,8 @@ import { core } from "./client";
  * shows what it changed.
  *
  * Lists are ALWAYS the server's pages (FRONTEND_GUIDE §4): usePaged sends
- * `page`, `q` and the list's own filters, and shows `page.total`. Nothing here
- * filters, sorts or slices rows on the client.
+ * `page`, `q`, one `sort` and the list's own filters, and shows `page.total`.
+ * Nothing here filters, sorts or slices rows on the client.
  */
 export const { useApi, usePaged, useInfinite, useMutation, invalidate } = core;
 export type { PagedResult } from "@mycity/ui";

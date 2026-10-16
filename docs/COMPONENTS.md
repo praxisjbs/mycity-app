@@ -69,6 +69,10 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
 | Forms | [TextField](#textfield) | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` | The text input of the form system, with its typed relatives: password, whole number, phone and long text. | stable |
 | Forms | [Wizard](#wizard) | `Wizard` | A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result. | stable |
+| Data | [DataView](#dataview) | `DataView`, `LoadingRows` | THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export. | stable |
+| Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox. | stable |
+| Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
+| Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
 | Shell | [BottomBar](#bottombar) | `BottomBar` | The phone's bottom bar: Home, Workspace, Community, Self-Service and More, each an icon with one word, within thumb reach (F16). | stable |
 | Shell | [Brand](#brand) | `Brand` | The MyCity pin mark, alone or with the name beside it, in the brand colours of the surface it sits on. | stable |
 | Shell | [ComingSoon](#comingsoon) | `ComingSoon` | The card a screen shows before its milestone opens it: the milestone and date, one line, and what the screen will do. | stable |
@@ -1979,6 +1983,152 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 
 ```tsx
 <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
+```
+
+## Data
+
+### DataView
+
+THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export.
+
+| | |
+|---|---|
+| Use | Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners. |
+| Avoid | A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone. |
+| Phone | The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
+| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons, a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
+| Status | stable |
+| Exports | `DataView`, `LoadingRows` |
+| Import | `import { DataView, LoadingRows } from "@mycity/ui";` |
+| File | `packages/ui/src/data/DataView.tsx` |
+| Test | `packages/ui/src/data/DataView.test.tsx` |
+| Gallery | `packages/ui/src/data/DataView.gallery.tsx` (`npm run gallery`, `#/DataView`) |
+
+**DataView** props (`DataViewProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `columns` | `DataViewColumn<R>[]` | yes | The columns, left to right. The first is the card's title on a phone. |
+| `rowKey` | `(row: R) => string` | yes | Names one row for the key, the pager's count and screen readers. |
+| `list` | `DataViewList<R>` |  | A server-paged list (a `usePaged()` result). Pass this or `rows`. |
+| `rows` | `R[]` |  | A set already in hand (a record's own steps, a sheet's rows). Pass this or `list`. |
+| `caption` | `string` |  | Names the table for screen readers; the title unless set. Required when there is no title. |
+| `title` | `ReactNode` |  | The card's title above the list, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row: a button, a menu, a pill. |
+| `right` | `ReactNode` |  | The merged name for `actions`; kept so screens move by an import change. |
+| `search` | `string` |  | A search box above the list, with this as its placeholder (at most 3 words). Needs `list.setQ`. |
+| `onRowClick` | `(row: R) => void` |  | Opens a row. A phone card becomes one tap target; a desktop row is reachable by Tab. |
+| `selectedKey` | `string \| null` |  | The row drawn as the one being looked at (a desktop list beside a panel). |
+| `selection` | `DataViewSelection` |  | Row selection and its bulk actions. |
+| `onExport` | `() => Promise<unknown>` |  | Queues the export of the whole filtered list on the server. |
+| `noun` | `string` |  | What one row is, for the pager's count ("employee"). |
+| `nounPlural` | `string` |  | The plural, when it is not the noun with an s. |
+| `empty` | `{ title: ReactNode; text?: ReactNode; icon?: IconName }` |  | What to show when there are no rows. |
+| `wide` | `boolean` |  | A wide table scrolls inside its own card rather than squeezing its columns. |
+| `footer` | `ReactNode` |  | Anything under the pager. |
+| `bare` | `boolean` |  | Draw it without its card, inside one that is already there. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**LoadingRows** props (`LoadingRowsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `count` | `number` |  | How many lines to draw; 4 unless set. |
+
+```tsx
+<DataView list={list} columns={columns} rowKey={(r) => r.employee_id} caption="Employees" noun="employee" search="Search People" />
+<DataView rows={rows} columns={columns} rowKey={(r) => r.id} caption="Approval Steps" bare />
+```
+
+### ExportButton
+
+Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox.
+
+| | |
+|---|---|
+| Use | Beside a list that a person needs outside the product (a payroll run, an attendance month, an expense claim set). |
+| Avoid | Building a file in the browser from the 25 rows on screen; a download that blocks the page while a large list is gathered. |
+| Phone | The same button, full width in the toolbar; the toast confirms where the file will arrive. |
+| Accessibility | Busy while the request is in flight, and the button stays pressable rather than disabled (FRONTEND_GUIDE §9.4). |
+| Status | stable |
+| Exports | `ExportButton` |
+| Import | `import { ExportButton } from "@mycity/ui";` |
+| File | `packages/ui/src/data/ExportButton.tsx` |
+| Test | `packages/ui/src/data/ExportButton.test.tsx` |
+| Gallery | `packages/ui/src/data/ExportButton.gallery.tsx` (`npm run gallery`, `#/ExportButton`) |
+
+**ExportButton** props (`ExportButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `onExport` | `() => Promise<unknown>` | yes | Queues the export on the server for the list's CURRENT filters, which the caller holds. It must ask the server for the whole filtered list, never the page on screen. |
+| `children` | `string` |  | The label: Verb Noun, at most 3 words. "Export" unless set. |
+| `message` | `string` |  | What the toast says once it is queued. At most 8 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ExportButton onExport={() => api.call("POST /api/v1/exports", { body: { source: "employees", filters } })} />
+```
+
+### Pager
+
+Page controls under a list, showing the server's true total ("312 employees") and Previous and Next.
+
+| | |
+|---|---|
+| Use | Under any server-paged list: DataView draws one for you, and a card grid or a picker that pages itself takes one directly. |
+| Avoid | A page-size chooser, a jump-to-page box, or "showing 25 of many"; the size is the server's 25 and is never offered. |
+| Phone | The count sits above the buttons, which are full width and 44 px, so paging is a thumb reach. |
+| Accessibility | A navigation landmark named for what is being paged; the count is a live region, so a screen reader hears the new range after Next. |
+| Status | stable |
+| Exports | `Pager` |
+| Import | `import { Pager } from "@mycity/ui";` |
+| File | `packages/ui/src/data/Pager.tsx` |
+| Test | `packages/ui/src/data/Pager.test.tsx` |
+| Gallery | `packages/ui/src/data/Pager.gallery.tsx` (`npm run gallery`, `#/Pager`) |
+
+**Pager** props (`PagerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `page` | `PageMeta \| undefined \| null` | yes | The `page` object from the list response; nothing is drawn without it. |
+| `onPage` | `(number: number) => void` | yes | Asks for a page number. |
+| `noun` | `string` |  | What one row is, lower case ("employee"); "record" unless set. |
+| `nounPlural` | `string` |  | The plural, when it is not the noun with an s ("people", "queries"). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Pager page={list.page} onPage={list.setPage} noun="employee" />
+```
+
+### Toolbar
+
+The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen.
+
+| | |
+|---|---|
+| Use | Above a list or a board, holding the search box and the list's filters; DataView puts its own search and sort in one. |
+| Avoid | Page-level actions (they belong in PageHeader); a column chooser; more than four filters on one list. |
+| Phone | The controls stack full width in the order given, so the search box is first under the thumb; each is 44 px. |
+| Accessibility | A group named for the list it controls, so a screen reader can skip past the filters to the rows. |
+| Status | stable |
+| Exports | `Toolbar` |
+| Import | `import { Toolbar } from "@mycity/ui";` |
+| File | `packages/ui/src/data/Toolbar.tsx` |
+| Test | `packages/ui/src/data/Toolbar.test.tsx` |
+| Gallery | `packages/ui/src/data/Toolbar.gallery.tsx` (`npm run gallery`, `#/Toolbar`) |
+
+**Toolbar** props (`ToolbarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` |  | What the controls filter, for screen readers ("Employees"); "List controls" unless set. |
+| `children` | `ReactNode` | yes | The controls, left to right: the search box first, then filters, then actions. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Toolbar label="Employees"><SearchInput value={list.q} onChange={list.setQ} /></Toolbar>
 ```
 
 ## Shell

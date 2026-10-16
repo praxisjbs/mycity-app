@@ -62,6 +62,27 @@
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* A long value with no spaces (a document number, an email, a file name) breaks
+   rather than pushing a card or a table cell sideways (gate 11: a phone never
+   scrolls sideways). */
+@utility wrap-any {
+  overflow-wrap: anywhere;
+}
+/* Stretches a card's own link over the whole card, so a tap anywhere on it opens
+   the record while the values inside stay their own targets. */
+@utility stretch-link {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+}
+/* A table with more columns than a narrow desktop fits scrolls inside its card
+   (DataView `wide`) rather than squeezing every column to nothing. */
+@utility table-wide {
+  min-width: 1080px;
+}
+
 /* A fit page (a chat, the mailbox; DesktopShell fit): its header slides away while reading so the
    panes, its last child, take the height. */
 @layer components {

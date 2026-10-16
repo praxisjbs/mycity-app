@@ -29,7 +29,9 @@ describe("Icon", () => {
     const svgs = container.querySelectorAll("svg");
     expect(svgs).toHaveLength(ICON_NAMES.length);
     svgs.forEach((svg) => expect(svg).toHaveAttribute("stroke", "currentColor"));
-    expect(ICON_NAMES).toHaveLength(55);
+    // The whole set, so a glyph is never added without a screen that needs it.
+    expect(ICON_NAMES).toHaveLength(78);
+    expect(new Set(ICON_NAMES).size).toBe(ICON_NAMES.length);
   });
 
   it("lets a class override the size box", () => {
