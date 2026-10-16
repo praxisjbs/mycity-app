@@ -108,6 +108,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   unindexed M0 foreign keys; `0199` fixes `on_site`, adds employment types, makes Saturday
   09:00 to 15:00 (A22) and staff numbers `00001`. `migrate.js --down` now rolls back to empty; the
   health check reports the real head. Phone numbers abroad are accepted in international form.
+  `0130` lets the error reporter record an error with no extra detail (it was silently lost).
   Left: `home_alert` (M1 block) and the integration suite on the real migrations (next PR); role
   permissions wait on a role matrix; the importer must advance the staff-number counter past
   imported IDs.
