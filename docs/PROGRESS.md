@@ -95,6 +95,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
+  schema, and A26 added (reference seeds hold only what the code cannot run without). Left: a
+  fix-forward M0 file for the six columns the shared layer cannot write (`audit_ledger.changed_fields`,
+  `notification.body`, `document.title`, `import_batch.header_row`, `ai_run` vendor and prompt,
+  `home_alert.trigger`), the `0002` DOWN, the employee columns the contract and staff importer need,
+  and the integration suite moved onto the real migrations.
 - 16/10/2026 · GE · Alerts go to WhatsApp: one sender (`shared/observability/alert.js`) for errors,
   the backup, the restore drill and the uptime probe; `ALERT_WHATSAPP_URLS` holds one gateway link
   per person (CallMeBot, or TextMeBot), `ALERT_WEBHOOK_URL` stays for a Slack or Google Chat
