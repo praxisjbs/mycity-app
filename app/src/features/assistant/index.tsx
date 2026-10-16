@@ -23,7 +23,7 @@ function Answer({ a }: { a: AiAnswer }) {
     <div className="max-w-[92%] rounded-[12px_12px_12px_4px] border border-border bg-card p-[13px]">
       <p className="text-[13.5px]">{a.text}</p>
       {a.table && (
-        <div className="mt-[11px] overflow-x-auto">
+        <div className="mt-[11px] overflow-x-auto" tabIndex={0}>
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>{a.table.columns.map((c, i) => <th key={c} className={cn("border-b border-border bg-muted px-3 py-2 text-left text-[10.5px] font-[650] tracking-[.09em] text-subtle-foreground uppercase", a.table!.numeric.includes(i) && "text-right")}>{c}</th>)}</tr>

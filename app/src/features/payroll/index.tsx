@@ -348,7 +348,7 @@ function StatutoryTab() {
         <div className="mb-3 flex items-start gap-2.5 rounded-card bg-warning-soft p-[14px] text-warning">
           <Icon name="alert" className="mt-0.5 flex-none" />
           <div>
-            <h3 data-ui="title" className="text-[13.5px] font-semibold">Advanced Payroll Off</h3>
+            <h2 data-ui="title" className="text-[13.5px] font-semibold">Advanced Payroll Off</h2>
             <p className="mt-1 text-[11.5px]">MyCity runs simple payroll: gross, attendance and query deductions, net. Nothing statutory appears anywhere until this is switched on.</p>
           </div>
         </div>

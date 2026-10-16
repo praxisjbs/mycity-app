@@ -199,7 +199,7 @@ function Approvals() {
       <Grid cols={3}>
         {list.rows.map((x) => (
           <button key={x.hierarchy_id} type="button" onClick={() => setSel(x.hierarchy_id)} className={cn("rounded-box border bg-card p-[14px] text-left transition-shadow hover:shadow-2", x.hierarchy_id === h?.hierarchy_id ? "border-secondary shadow-[0_0_0_1px_var(--secondary)]" : "border-border")}>
-            <h4 data-copy="content" className="text-[13.5px] font-semibold">{x.name}</h4>
+            <h2 data-copy="content" className="text-[13.5px] font-semibold">{x.name}</h2>
             <p className="mt-1 text-[12.5px] text-muted-foreground">{x.description}</p>
             <div className="mt-2.5"><StatusPill s={x.status} /></div>
           </button>
@@ -210,11 +210,11 @@ function Approvals() {
           <Card>
             <CardHeader title={h.name} right={<StatusPill s={h.status} />} />
             <Chain steps={h.steps.map((label) => ({ label }))} />
-            <div className="mt-3.5 grid grid-cols-1 gap-x-4 gap-y-0.5 text-[13px] md:grid-cols-[118px_minmax(0,1fr)] md:gap-y-[9px]">
+            <dl className="mt-3.5 grid grid-cols-1 gap-x-4 gap-y-0.5 text-[13px] md:grid-cols-[118px_minmax(0,1fr)] md:gap-y-[9px]">
               {[["Trigger", h.trigger], ["Steps", "Roles, not people. A role can be reassigned"], ["Deputies", h.deputies], ["Ageing", h.ageing], ["In-flight", "A request keeps the chain it started on, even if the hierarchy changes"]].map(([k, v]) => (
                 <div key={k} className="contents"><dt className="text-[12px] text-subtle-foreground">{k}</dt><dd className="font-[550] max-md:mb-2">{v}</dd></div>
               ))}
-            </div>
+            </dl>
             <div className="mt-[13px] flex flex-wrap gap-2">
               <Button icon="plus" onClick={() => modal.open({ title: `Steps · ${h.name}`, body: (close) => <EditSteps h={h} close={close} /> })}>Edit Steps</Button>
             </div>
@@ -418,7 +418,7 @@ function Integrations() {
       <Grid cols={3}>
         {(d?.items ?? []).map((x) => (
           <div key={x.key} className="rounded-box border border-border bg-card p-[14px]">
-            <h4 data-copy="content" className="text-[13.5px] font-semibold">{x.name}</h4>
+            <h2 data-copy="content" className="text-[13.5px] font-semibold">{x.name}</h2>
             <p className="mt-1 text-[12.5px] text-muted-foreground">{x.text}</p>
             <div className="mt-2.5"><StatusPill s={x.status} /></div>
           </div>

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
-import { Message, Page } from "@/components/Layout";
-import { Button, formatMoney, Skeleton, Banner, Pill } from "@mycity/ui";
+import { Page } from "@/shell/Page";
+import { Banner, Button, formatMoney, PageMessage, Pill, Skeleton } from "@mycity/ui";
 import { Sub } from "@/components/ui";
 import { Link, useRouter } from "@/lib/router";
 import { PATTERN } from "./Careers";
@@ -22,9 +22,9 @@ export function Vacancy({ slug }: { slug: string }) {
   if (v.error)
     return (
       <Page title="Role Not Found">
-        <Message icon="brief" title={v.error.status === 404 ? "There is no open role at this address" : "This role could not load"} action={<Button variant="primary" onClick={() => navigate("/jobs")}>See Open Roles</Button>}>
+        <PageMessage icon="brief" title={v.error.status === 404 ? "There is no open role at this address" : "This role could not load"} action={<Button variant="primary" onClick={() => navigate("/jobs")}>See Open Roles</Button>}>
           {v.error.status === 404 ? "The link may be mistyped, or the role was never published." : v.error.message}
-        </Message>
+        </PageMessage>
       </Page>
     );
   const d = v.data;

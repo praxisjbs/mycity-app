@@ -169,7 +169,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
       </Grid>
       {role && <p className="-mt-1.5 mb-3 text-[11.5px] text-subtle-foreground">{role.users} {role.users === 1 ? "user holds" : "users hold"} this role.</p>}
 
-      <h4 data-ui="title" className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Modules, Actions and Record Scope</h4>
+      <h3 data-ui="title" className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Modules, Actions and Record Scope</h3>
       {errors.grants?.[0] && <p className="mb-2 text-[11.5px] text-destructive">{errors.grants[0]}</p>}
       <div className="mb-4 overflow-hidden rounded-card border border-border">
         {cat.modules.map((m) => {
@@ -212,7 +212,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
         })}
       </div>
 
-      <h4 data-ui="title" className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Sensitive Fields</h4>
+      <h3 data-ui="title" className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Sensitive Fields</h3>
       <div className="mb-1 overflow-hidden rounded-card border border-border">
         {cat.fields.map((f) => (
           <div key={f.key} className="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5 last:border-b-0">

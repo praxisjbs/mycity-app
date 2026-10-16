@@ -1,7 +1,6 @@
 {
   "$comment": "F4 styling exemptions, read by app/eslint.config.js, public-app/eslint.config.js and scripts/check/palette.js (gate 13). Files from #18 written before F4 that still carry an arbitrary-value class or an inline style, by app, relative to the app folder. The list only shrinks: a file leaves it when its screen is converged onto the token scale and @mycity/ui components; palette.js fails a new entry and an entry whose file no longer needs it.",
   "app": [
-    "src/auth/Login.tsx",
     "src/components/form/PersonPicker.tsx",
     "src/components/form/Upload.tsx",
     "src/components/ui/Board.tsx",
@@ -9,7 +8,6 @@
     "src/components/ui/Paper.tsx",
     "src/components/ui/Profile.tsx",
     "src/components/ui/Reader.tsx",
-    "src/components/ui/StagingBar.tsx",
     "src/components/ui/Table.tsx",
     "src/components/ui/charts.tsx",
     "src/components/ui/data.tsx",
@@ -51,19 +49,10 @@
     "src/features/settings/index.tsx",
     "src/features/shared/Letter.tsx",
     "src/features/shared/sections.tsx",
-    "src/features/workspace/index.tsx",
-    "src/shell/Bell.tsx",
-    "src/shell/CommandPalette.tsx",
-    "src/shell/Nav.tsx",
-    "src/shell/Planned.tsx",
-    "src/shell/Shell.tsx",
-    "src/shell/UpdatePrompt.tsx"
+    "src/features/workspace/index.tsx"
   ],
   "public-app": [
-    "src/components/Layout.tsx",
-    "src/components/Planned.tsx",
     "src/components/SignaturePad.tsx",
-    "src/components/StagingBar.tsx",
     "src/components/form/Upload.tsx",
     "src/components/ui.tsx",
     "src/pages/Apply.tsx",

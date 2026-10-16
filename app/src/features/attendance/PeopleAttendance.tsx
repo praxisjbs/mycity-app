@@ -154,7 +154,7 @@ function DayDetailView({ id }: { id: string }) {
       <div className="mb-3">
         <KeyValue items={[["Work arrangement", data.arrangement], ["Shift", data.shift], ["Attendance status", <Pill tone={data.status.tone}>{data.status.text}</Pill>], ["Hours", data.hours]]} />
       </div>
-      <div className="overflow-x-auto rounded-card border border-border">
+      <div className="overflow-x-auto rounded-card border border-border" tabIndex={0}>
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr>

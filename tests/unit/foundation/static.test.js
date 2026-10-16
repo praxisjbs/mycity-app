@@ -78,3 +78,49 @@ describe("the host guard", () => {
     expect((await request(app).get("/api/health").set("Host", "10.0.0.5")).status).toBe(200);
   });
 });
+
+describe("the component gallery (F10)", () => {
+  const express = require("express");
+  const { galleryHandler } = require("../../../src/http/static");
+  const galleryDir = path.join(tmp, "dist-gallery");
+  fs.mkdirSync(path.join(galleryDir, "assets"), { recursive: true });
+  fs.writeFileSync(path.join(galleryDir, "index.html"), "<!doctype html><title>gallery</title>");
+  fs.writeFileSync(path.join(galleryDir, "assets", "gallery.9a1b.js"), "console.log(2)");
+  const on = (appEnv, dir = galleryDir) => {
+    const a = express();
+    a.use(galleryHandler({ appEnv, dir }));
+    a.use((req, res) => res.status(418).end());
+    return a;
+  };
+
+  test("staging serves it under /gallery/, with its own page and cached assets", async () => {
+    const a = on("staging");
+    const redirect = await request(a).get("/gallery");
+    expect(redirect.status).toBe(301);
+    expect(redirect.headers.location).toBe("/gallery/");
+    const page = await request(a).get("/gallery/");
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("<title>gallery</title>");
+    expect(page.headers["cache-control"]).toBe("no-cache");
+    const asset = await request(a).get("/gallery/assets/gallery.9a1b.js");
+    expect(asset.headers["cache-control"]).toMatch(/immutable/);
+    expect((await request(a).get("/gallery/nothing.js")).status).toBe(404);
+  });
+
+  test("production refuses it, rather than falling back to the app", async () => {
+    const a = on("production");
+    for (const p of ["/gallery", "/gallery/", "/gallery/assets/gallery.9a1b.js"]) {
+      const res = await request(a).get(p);
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe("NOT_FOUND");
+    }
+  });
+
+  test("a staging release without the gallery build answers 404", async () => {
+    expect((await request(on("staging", path.join(tmp, "missing"))).get("/gallery/")).status).toBe(404);
+  });
+
+  test("only the staff host has a gallery; the public site's own page answers /gallery there", async () => {
+    expect((await go("/gallery/")).text).toContain("<title>go</title>");
+  });
+});

@@ -35,11 +35,11 @@ export function Board({ columns, onMove }: { columns: Array<{ key: string; label
               : undefined
           }
         >
-          <h4 className="mb-2.5 flex items-center gap-[7px] text-[11.5px] tracking-[.07em] text-muted-foreground uppercase">
+          <h2 className="mb-2.5 flex items-center gap-[7px] text-[11.5px] tracking-[.07em] text-muted-foreground uppercase">
             <i className="size-[7px] flex-none rounded-[2px]" style={{ background: c.color }} />
             {c.label}
             <em className="ml-auto text-[11px] text-subtle-foreground not-italic">{c.count ?? c.cards.length}</em>
-          </h4>
+          </h2>
           {c.cards.map((t) => (
             <button
               key={t.key}

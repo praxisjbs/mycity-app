@@ -116,15 +116,15 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 
 ### PR 2 · Shell
 
-- [ ] Staff shell on `packages/ui`: desktop rail and top bar; phone top bar, bottom bar (F16), More sheet (F17), floating button (F18)
-- [ ] Sign-in, session (access token in memory, refresh cookie), sign-out, session expiry
-- [ ] Permission-aware navigation from `/me` grants; routes by the one URL shape (`/<module>?tab=<tab>&id=<id>`)
-- [ ] Command palette (⌘K) and search; notification bell; realtime (Socket.io) for the bell and presence
-- [ ] PWA: install, update prompt, offline shell page
-- [ ] Theme, density and staging bar; what opens where (F14)
-- [ ] Public site shell on `packages/ui`
-- [ ] Gallery served on staging only (F10): `src/http/static.js` refuses `/gallery` on production; release builds it
-- [ ] The app as a gated crawl target (gates 8, 11, a11y) on mock data in CI; `npm run new:screen`
+- [x] Staff shell on `packages/ui`: desktop rail and top bar; phone top bar, bottom bar (F16), More sheet (F17), floating button (F18)
+- [x] Sign-in, session (access token in memory, refresh cookie), sign-out, session expiry
+- [x] Permission-aware navigation from `/me` grants; routes by the one URL shape (`/<module>?tab=<tab>&id=<id>`)
+- [x] Command palette (⌘K) and search; notification bell; realtime (Socket.io) for the bell and presence
+- [x] PWA: install, update prompt, offline shell page
+- [x] Theme, density and staging bar; what opens where (F14)
+- [x] Public site shell on `packages/ui`
+- [x] Gallery served on staging only (F10): `src/http/static.js` refuses `/gallery` on production; release builds it
+- [x] The app as a gated crawl target (gates 8, 11, a11y) on mock data in CI; `npm run new:screen`
 
 ### PR 3 · Build kit
 
@@ -148,7 +148,25 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 3. How should a phone feel? Native, drag to dismiss (F6).
 4. Where does the gallery live? Staging only (F10).
 
-**PR 2 · Shell**: _asked at the start of its session._
+**PR 2 · Shell** (15/10/2026, TB)
+
+1. Where do the shell's frame parts live? In `packages/ui`, a **Shell** group: the rail, top bars,
+   bottom bar, More, the floating button, the command palette, the notification row, the staging
+   bar, Coming Soon and the public page frame are data-free components with header, test and
+   gallery page; each app keeps only its wiring (catalogue, grants, session, routes).
+2. What happens when a session expires mid-work? A **sign-in sheet opens in place**, over the
+   screen, which stays underneath with any half-filled form; signing in again carries on where the
+   person was. Another account signing in reloads at Home.
+3. What does the phone top bar hold? **The pin alone** (no word) at the left; search, the bell and
+   the person's avatar at the right (the avatar opens their row: theme, density, settings, sign
+   out). Under it a **title rail**: the module's name as one large line (shortened when long) over
+   the tab chips. Scrolling down slides the title away and keeps the tabs; scrolling up brings it
+   back.
+4. How is installing the app offered? An **Install App** action in More and the desktop account
+   menu, and a **one-time banner** from a person's second signed-in visit, on a phone and on
+   desktop, with Install App and Not Now (Not Now holds for 30 days on that device). Neither shows
+   once the app is installed (opened as an installed app, or the browser reports it installed). On
+   an iPhone, Install App opens a sheet with the Add to Home Screen steps.
 
 **PR 3 · Build kit**: _asked at the start of its session._
 
@@ -159,11 +177,27 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 | PR | Status | Branch · PR | Updated |
 |---|---|---|---|
 | 1 Ground | Done | `claude/nifty-ptolemy-4fb7gz` | 15/10/2026 |
-| 2 Shell | Not started | | |
+| 2 Shell | Done | `m0/frontend-shell` | 15/10/2026 |
 | 3 Build kit | Not started | | |
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 15/10/2026 · TB · PR 2 (Shell) done. A Shell group in `packages/ui` (15 components: Brand,
+  StagingBar, ComingSoon, PublicPage and PageMessage, DesktopShell, PhoneShell, Rail, TopBar and
+  SearchButton, PhoneHeader, BottomBar, MoreSheet, FloatingButton, CommandPalette, NotificationRow,
+  ShellNotice) and the environment and delivery plan as one copy in `lib/`. The staff app's shell is
+  rebuilt on it and leaves the F4 exemptions: the rail and top bar; the phone top bar (the pin;
+  search, bell, avatar) over a title rail that slides away; the bottom bar (F16), More (F17) and the
+  floating button (F18, `useScreenAction`, Hide Here, a scrim behind the fan); ⌘K search; the bell
+  on realtime; sign-in, sign-out and the in-place session sheet; the PWA's update notice, Install
+  App and the second-visit banner, and the offline page. Both apps open screens by F14 (production
+  at all three ticks, staging at API, the switch only on the mock). The public site runs on
+  PublicPage, PageMessage, ComingSoon and the sticky StagingBar. `/gallery/` is served on the staff
+  host everywhere but production. The a11y gate crawls every app screen too; the screens' own axe
+  findings (heading order, contrast on selected rows, scroll regions, a nested button, table
+  headers, ARIA attributes) are fixed. `npm run new:screen` adds a screen everywhere it is listed.
+  Left: screens adopt `useScreenAction` for the fan's New action as their PRs touch them; presence
+  waits for M1 chat on the server; the release pipeline (GE) must carry `packages/ui/dist-gallery`.
 - 15/10/2026 · TB · PR 1 (Ground) done. `packages/ui` holds 87 components with headers, tests and
   gallery pages; `docs/COMPONENTS.md` is generated; both apps import every Ground part from
   `@mycity/ui` and their copies are gone. Merged with #20 (screen conventions): its screens and copy
@@ -180,14 +214,11 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 Each #18 file below stays where it is until the PR named beside it moves its components into
 `packages/ui`; nothing new may be added beside them (`check/components.js` refuses a new file in
 `app/src/components/` or `public-app/src/components/`). PR 1 moved the form system, overlays,
-feedback, help, layout and the basic display parts; what is left moves in PR 2 and PR 3.
+feedback, help, layout and the basic display parts; PR 2 moved the staging bars, the public page
+frame and Coming Soon into the Shell group; what is left moves in PR 3.
 
 | File | Holds | Moves in |
 |---|---|---|
-| `app/src/components/ui/StagingBar.tsx` | staging bar | PR 2 (shell) |
-| `public-app/src/components/Layout.tsx` | Page, Brand, Message, demo strip | PR 2 (public shell) |
-| `public-app/src/components/Planned.tsx` | Coming Soon page | PR 2 (public shell) |
-| `public-app/src/components/StagingBar.tsx` | staging bar | PR 2 (shell) |
 | `app/src/components/form/index.ts` | the barrel for PersonPicker and Upload | PR 3 (pickers, upload engine) |
 | `app/src/components/form/PersonPicker.tsx` | PersonPicker | PR 3 (pickers) |
 | `app/src/components/form/Upload.tsx` | Upload | PR 3 (upload engine) |

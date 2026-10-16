@@ -1,11 +1,18 @@
 "use strict";
 /**
  * The API process serves both frontend builds and keeps the two surfaces apart
- * by host (SYSTEM_ARCHITECTURE §3). The hosting panel's proxy only terminates TLS
- * and forwards every path; it allow-lists nothing.
+ * by host (SYSTEM_ARCHITECTURE §3). The proxy (nginx, docs/runbooks/proxy.md)
+ * only terminates TLS and forwards every path; it allow-lists nothing.
  *
  *   hub.<domain>   app/dist          staff app (PWA, service worker at /)
  *   go.<domain>    public-app/dist   public site (no service worker)
+ *
+ *   hub.staging.<domain>/gallery/    packages/ui/dist-gallery: the component gallery
+ *                                    (FRONTEND_FOUNDATION F10), on the staff host only
+ *                                    and never on production, where /gallery is a 404
+ *                                    rather than the app's index.html. The release's
+ *                                    frontend build (npm run fe:build) writes it; the
+ *                                    app's service worker leaves /gallery alone.
  *
  * hostGuard (before the API routes) refuses a path on the wrong host:
  *
@@ -41,6 +48,11 @@ const { registerCheck } = require("./health");
 
 const ROOT = path.resolve(__dirname, "../..");
 const NEVER_HTML = /^\/(api|socket\.io|media)(\/|$)/;
+const GALLERY_DIR = path.join(ROOT, "packages", "ui", "dist-gallery");
+const GALLERY = /^\/gallery(\/|$)/;
+
+/** The gallery is never served on production (F10). */
+const galleryAllowed = (appEnv = config.APP_ENV) => appEnv !== "production";
 
 const hostOf = (origin) => new URL(origin).hostname.toLowerCase();
 
@@ -117,6 +129,38 @@ function siteHandler(site) {
   };
 }
 
+/**
+ * /gallery on the staff host: the component gallery's build, its own
+ * index.html for /gallery/ (it routes by hash, #/Button). Production refuses it.
+ * Options for tests only.
+ */
+function galleryHandler({ appEnv = config.APP_ENV, dir = GALLERY_DIR } = {}) {
+  const files = express.static(dir, {
+    index: false,
+    redirect: false,
+    fallthrough: true,
+    setHeaders: setCacheHeaders,
+  });
+  return function serveGallery(req, res, next) {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (!galleryAllowed(appEnv)) return notFound(req, res);
+    if (!fs.existsSync(path.join(dir, "index.html"))) return notFound(req, res);
+    // Relative asset paths need the trailing slash.
+    if (req.path === "/gallery") return res.redirect(301, "/gallery/");
+    const sub = req.path.slice("/gallery".length) || "/";
+    if (sub === "/") {
+      res.setHeader("Cache-Control", "no-cache");
+      return res.sendFile(path.join(dir, "index.html"));
+    }
+    const original = req.url;
+    req.url = sub;
+    return files(req, res, () => {
+      req.url = original;
+      return notFound(req, res);
+    });
+  };
+}
+
 /** Serve the build that belongs to the request's host. */
 function staticSites() {
   const s = sites();
@@ -124,9 +168,11 @@ function staticSites() {
     staff: siteHandler(s.staff),
     public: siteHandler(s.public),
   };
+  const gallery = galleryHandler();
   return function serveForHost(req, res, next) {
     const surface = surfaceOfHost(req, s);
     if (!surface) return next();
+    if (surface === "staff" && GALLERY.test(req.path)) return gallery(req, res, next);
     return handlers[surface](req, res, next);
   };
 }
@@ -137,9 +183,10 @@ registerCheck("static", async () => {
   const out = {
     staff: built(s.staff.dir),
     public: s.split ? built(s.public.dir) : "not served on one host",
+    gallery: galleryAllowed() ? built(GALLERY_DIR) : "not served on production",
   };
   const missing = out.staff === false || out.public === false;
   return { status: missing && isServer ? "degraded" : "up", ...out };
 });
 
-module.exports = { hostGuard, staticSites, surfaceOfHost, sites };
+module.exports = { hostGuard, staticSites, galleryHandler, surfaceOfHost, sites, GALLERY_DIR };

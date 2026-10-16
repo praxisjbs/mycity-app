@@ -3,18 +3,14 @@
  * defaults come from @mycity/ui (packages/ui/src/styles: tokens.css is the only
  * file with colour values, gate 13); the @source line lets Tailwind see the
  * classes the package's components use. What stays here is the app's own: the
- * staging bar offset, the full-height shell, and the few effects a utility
- * class cannot express.
+ * full-height shell below the staging bar (--env-bar, from @mycity/ui), and the
+ * few effects a utility class cannot express.
  */
 @import "tailwindcss";
 @import "@mycity/ui/styles/tokens.css";
 @import "@mycity/ui/styles/theme.css";
 @import "@mycity/ui/styles/base.css";
 @source "../../../packages/ui/src";
-
-/* The staging bar's height (lib/environment.ts). Nothing on production. */
-:root { --env-bar: 0px; }
-:root[data-env="staging"] { --env-bar: calc(28px + env(safe-area-inset-top, 0px)); }
 
 @keyframes sheen { 0% { background-position: 120% 0; } 60%, 100% { background-position: -120% 0; } }
 @keyframes fall { 0% { transform: translateY(-10px) rotate(0); } 100% { transform: translateY(190px) rotate(540deg); } }
@@ -27,7 +23,6 @@
 }
 
 @layer utilities {
-  .scrollbar-on-dark::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); }
   /* The celebration card's slow sheen and drifting confetti. */
   .sheen::after {
     content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
@@ -76,22 +71,4 @@
   .ogt > ul > li { padding-top: 0; }
   .ogt > ul > li::before, .ogt > ul > li::after { display: none; }
   .ogt .drop-target > .og-card { border-color: var(--ring); box-shadow: 0 0 0 3px var(--accent); }
-}
-
-/* A fit page's header (title, ⓘ text, stat strip) slides away while reading; the panes are the last child. */
-@layer components {
-  .fit-page > :not(:last-child) {
-    max-height: 240px;
-    transition: max-height 0.28s ease, opacity 0.2s ease, margin 0.28s ease, padding 0.28s ease;
-  }
-  .fit-page.hidehead > :not(:last-child) {
-    max-height: 0;
-    opacity: 0;
-    margin: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    border-width: 0;
-    overflow: hidden;
-    pointer-events: none;
-  }
 }

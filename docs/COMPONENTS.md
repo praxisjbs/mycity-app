@@ -69,6 +69,21 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
 | Forms | [TextField](#textfield) | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` | The text input of the form system, with its typed relatives: password, whole number, phone and long text. | stable |
 | Forms | [Wizard](#wizard) | `Wizard` | A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result. | stable |
+| Shell | [BottomBar](#bottombar) | `BottomBar` | The phone's bottom bar: Home, Workspace, Community, Self-Service and More, each an icon with one word, within thumb reach (F16). | stable |
+| Shell | [Brand](#brand) | `Brand` | The MyCity pin mark, alone or with the name beside it, in the brand colours of the surface it sits on. | stable |
+| Shell | [ComingSoon](#comingsoon) | `ComingSoon` | The card a screen shows before its milestone opens it: the milestone and date, one line, and what the screen will do. | stable |
+| Shell | [CommandPalette](#commandpalette) | `CommandPalette` | ⌘K: one search line over screens and records from the server's search, grouped, moved through with the arrow keys and opened with Enter. | stable |
+| Shell | [DesktopShell](#desktopshell) | `DesktopShell` | The staff app's desktop frame: the rail at the left, the top bar, the module's tab strip and the page, which alone scrolls. | stable |
+| Shell | [FloatingButton](#floatingbutton) | `FloatingButton` | The phone's floating button, bottom right above the bottom bar: a tap fans out the screen's New action, Clock In or Out, Praxis AI and Help, with Hide Here last (F18). | stable |
+| Shell | [MoreSheet](#moresheet) | `MoreSheet` | The phone's More: a launcher in a bottom sheet with the person's row, a search bar, the modules they may open as tiles four to a row, and Sign Out (F17). | stable |
+| Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the bell's list: its glyph in a tone, its title and line, when it came, a dot while unread, and Open. | stable |
+| Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
+| Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls, the floating button, and the bottom bar. | stable |
+| Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer. | stable |
+| Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
+| Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
+| Shell | [StagingBar](#stagingbar) | `StagingBar` | The amber bar across the top of every staging page, sign-in included, so nobody mistakes staging for the live system. | stable |
+| Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 
 ## Foundations
 
@@ -167,7 +182,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | Use | A section of a page: a KPI group, a record's fields, a list, a chart. One idea per card. |
 | Avoid | Cards inside cards; an explainer card (a title starting How, Why or What is tier 3 and never reaches a screen); a list on a phone (a card list comes from DataView). |
 | Phone | Full width with the same padding; the actions in CardHeader keep their 44 px targets and wrap under the title when there is no room. |
-| Accessibility | A plain container. CardHeader's title is a heading (h3 unless set) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. |
+| Accessibility | A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. |
 | Status | stable |
 | Exports | `Card`, `CardHeader` |
 | Import | `import { Card, CardHeader } from "@mycity/ui";` |
@@ -193,7 +208,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | `record` | `boolean` |  | The title is record content (a person's name, a document number), not interface copy: the copy gates skip it. |
 | `actions` | `ReactNode` |  | What sits at the right: a small button, a menu, a pill or a count. |
 | `right` | `ReactNode` |  | The merged name for `actions`; kept so screens move by an import change. |
-| `level` | `2 \| 3 \| 4` |  | The heading level; h3 unless the page's outline needs h2. |
+| `level` | `2 \| 3 \| 4` |  | The heading level; h2 (a section of the page) unless the card sits inside another section, where it is h3. |
 | `children` | `ReactNode` |  | Anything else after the title (a pill, a count). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -469,7 +484,7 @@ Nothing to show, said plainly: a drawing, a title, one short line and at most on
 | Use | A list, a search or a page with nothing in it yet; a filter that matched nothing; a first visit. |
 | Avoid | An explanation of the feature (tier 3); more than one action; a screen that has data on it. |
 | Phone | Centred, the drawing at the smaller size; the action is full width within thumb reach. |
-| Accessibility | The title is a heading (data-ui="title"), at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
+| Accessibility | The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet; at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
 | Status | stable |
 | Exports | `EmptyState` |
 | Import | `import { EmptyState } from "@mycity/ui";` |
@@ -1966,6 +1981,514 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
 ```
 
+## Shell
+
+### BottomBar
+
+The phone's bottom bar: Home, Workspace, Community, Self-Service and More, each an icon with one word, within thumb reach (F16).
+
+| | |
+|---|---|
+| Use | Once, in PhoneShell's bottom bar slot. The same five for everyone; More is a button that opens MoreSheet, the others are links. |
+| Avoid | Desktop (the Rail; the screen gates fail a bottom bar on desktop); more than five items; a second row. |
+| Phone | The whole point: fixed at the foot, above the home indicator, each item at least 52 px tall; a count shows on the icon. |
+| Accessibility | The Main navigation landmark; the current item is aria-current="page"; More says it opens a dialog (aria-haspopup) and whether it is open. |
+| Status | stable |
+| Exports | `BottomBar` |
+| Import | `import { BottomBar } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/BottomBar.tsx` |
+| Test | `packages/ui/src/shell/BottomBar.test.tsx` |
+| Gallery | `packages/ui/src/shell/BottomBar.gallery.tsx` (`npm run gallery`, `#/BottomBar`) |
+
+**BottomBar** props (`BottomBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `BottomBarItem[]` | yes | The five places, left to right. |
+| `current` | `string \| null` | yes | The key of the place in view. |
+| `onNavigate` | `(href: string) => void` |  | Called with an item's href on a plain tap. |
+| `label` | `string` |  | Names the navigation landmark; Main unless set. |
+
+```tsx
+<BottomBar current="home" onNavigate={navigate} items={[{ key: "home", label: "Home", icon: "home", href: "/home" }, { key: "more", label: "More", icon: "grid", onSelect: openMore }]} />
+```
+
+### Brand
+
+The MyCity pin mark, alone or with the name beside it, in the brand colours of the surface it sits on.
+
+| | |
+|---|---|
+| Use | The top of the desktop rail, the phone top bar (the pin alone), the sign-in splash and the public site's header. |
+| Avoid | An icon inside a button or a list (use Icon name="pin"); a document or a letterhead (documents carry the full logo). |
+| Phone | The pin alone in the phone top bar, at 24 px; with the name on the public site and the sign-in screen. |
+| Accessibility | An image named "MyCity App" (or `label`) when it stands alone; with the name shown, the drawing is decorative and the name is read. |
+| Status | stable |
+| Exports | `Brand` |
+| Import | `import { Brand } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/Brand.tsx` |
+| Test | `packages/ui/src/shell/Brand.test.tsx` |
+| Gallery | `packages/ui/src/shell/Brand.gallery.tsx` (`npm run gallery`, `#/Brand`) |
+
+**Brand** props (`BrandProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `size` | `"s" \| "m" \| "l" \| "xl"` |  | `s` 20 px, `m` 24 px (the default: top bars), `l` 32 px, `xl` 56 px (the splash). |
+| `name` | `string` |  | The name beside the pin ("MyCityApp", "MyCity App"); the pin alone when left out. |
+| `tone` | `"auto" \| "on-dark"` |  | `auto`: City Green on a light surface, the yellow in the dark theme; `on-dark`: the yellow on the Deep Green rail or splash. |
+| `label` | `string` |  | The accessible name when the pin stands alone. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Brand />
+<Brand name="MyCityApp" size="m" />
+<Brand tone="on-dark" size="xl" />
+```
+
+### ComingSoon
+
+The card a screen shows before its milestone opens it: the milestone and date, one line, and what the screen will do.
+
+| | |
+|---|---|
+| Use | In place of a screen the delivery plan has not opened yet (F14: production after API, UI and Mobile are ticked, staging after API). The shell renders it; a feature never does. |
+| Avoid | An empty list (use EmptyState); a screen the person may not open (the shell hides it); a page of explanation (at most three short lines of what it will do). |
+| Phone | Full width, centred, the same parts; the action is a 44 px target. |
+| Accessibility | The heading is a real heading (h2 unless set); the list of what it will do is a list; the milestone pill is plain text. |
+| Status | stable |
+| Exports | `ComingSoon` |
+| Import | `import { ComingSoon } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/ComingSoon.tsx` |
+| Test | `packages/ui/src/shell/ComingSoon.test.tsx` |
+| Gallery | `packages/ui/src/shell/ComingSoon.gallery.tsx` (`npm run gallery`, `#/ComingSoon`) |
+
+**ComingSoon** props (`ComingSoonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` |  | The heading; Coming Soon unless set. |
+| `milestone` | `ReactNode` |  | The milestone and date, as one pill ("Milestone 2 · 06/11/2026"); left out for a stranger on the public site. |
+| `line` | `ReactNode` |  | One line under the heading, at most 12 words. |
+| `features` | `string[]` |  | What the screen will do: at most three short lines. |
+| `action` | `ReactNode` |  | At most one action (See Full Design, in a preview). |
+| `bare` | `boolean` |  | Draw it without its card, inside a page that already has one (the public site). |
+| `level` | `2 \| 3` |  | The heading level; h2 unless the page's outline needs h3. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ComingSoon milestone="Milestone 2 · 06/11/2026" line="Opens with Milestone 2." features={["Your KPIs for the month"]} />
+```
+
+### CommandPalette
+
+⌘K: one search line over screens and records from the server's search, grouped, moved through with the arrow keys and opened with Enter.
+
+| | |
+|---|---|
+| Use | Once, by the staff app's shell: ⌘K or Ctrl K, the top bar's SearchButton, the phone's search icon and More's search bar all open it. The app sends the query to GET /api/v1/search and passes the first page of results. |
+| Avoid | Searching one list (SearchInput, which filters that list on the server); a picker inside a form (PersonPicker, RecordPicker); filtering rows on the client. |
+| Phone | A full-screen sheet with the search line at the top and Close beside it; results are 44 px rows. |
+| Accessibility | A dialog named Search. The line is a combobox that owns the result list (aria-activedescendant follows the arrow keys); results are options in labelled groups; Esc closes and focus returns to what opened it. |
+| Status | stable |
+| Exports | `CommandPalette` |
+| Import | `import { CommandPalette } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/CommandPalette.tsx` |
+| Test | `packages/ui/src/shell/CommandPalette.test.tsx` |
+| Gallery | `packages/ui/src/shell/CommandPalette.gallery.tsx` (`npm run gallery`, `#/CommandPalette`) |
+
+**CommandPalette** props (`CommandPaletteProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the palette is showing. |
+| `onClose` | `() => void` | yes | Called on Esc, a click outside, Close, or after a result is chosen. |
+| `query` | `string` | yes | The search line. |
+| `onQueryChange` | `(query: string) => void` | yes | Called on each key with the new line; the app sends it to the server as q. |
+| `results` | `PaletteResult[]` | yes | The first page of results, in the order the server ranked them. |
+| `loading` | `boolean` |  | A search is in flight. |
+| `onSelect` | `(result: PaletteResult) => void` | yes | Called with the chosen result. |
+| `placeholder` | `string` |  | The format example in the line, at most 3 words; Screens, People, Records unless set. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<CommandPalette open={open} onClose={close} query={q} onQueryChange={setQ} results={hits} onSelect={(r) => navigate(r.href)} />
+```
+
+### DesktopShell
+
+The staff app's desktop frame: the rail at the left, the top bar, the module's tab strip and the page, which alone scrolls.
+
+| | |
+|---|---|
+| Use | Once, by the staff app's shell, above 760 px; it lays out the Rail, TopBar, Tabs and the screen it is given. A fit page (a chat, the mailbox) fills the height and only its panes scroll. |
+| Avoid | A phone (PhoneShell is the phone's own frame, gate 11); a screen laying out its own navigation; the public site (PublicPage). |
+| Phone | Never shown: at 760 px and below the shell renders PhoneShell instead. |
+| Accessibility | The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the rail and the tab strip are navigation landmarks, the top bar the banner, so nothing on screen sits outside a landmark. |
+| Status | stable |
+| Exports | `DesktopShell` |
+| Import | `import { DesktopShell } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/DesktopShell.tsx` |
+| Test | `packages/ui/src/shell/DesktopShell.test.tsx` |
+| Gallery | `packages/ui/src/shell/DesktopShell.gallery.tsx` (`npm run gallery`, `#/DesktopShell`) |
+
+**DesktopShell** props (`DesktopShellProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `rail` | `ReactNode` | yes | The Rail. |
+| `topBar` | `ReactNode` | yes | The TopBar. |
+| `tabs` | `ReactNode` |  | The module's tab strip (Tabs), under the top bar. |
+| `children` | `ReactNode` | yes | The screen. |
+| `fit` | `boolean` |  | A fit page: it fills the height and only its panes scroll; scrolling past a pane's end slides the page's header away. |
+| `notice` | `ReactNode` |  | A notice floating at the foot of the page (ShellNotice: the update prompt, the install offer). |
+| `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
+
+```tsx
+<DesktopShell rail={<Rail ... />} topBar={<TopBar ... />} tabs={<Tabs ... />}>{screen}</DesktopShell>
+```
+
+### FloatingButton
+
+The phone's floating button, bottom right above the bottom bar: a tap fans out the screen's New action, Clock In or Out, Praxis AI and Help, with Hide Here last (F18).
+
+| | |
+|---|---|
+| Use | Once, in PhoneShell's fab slot; the app passes the actions for the screen in view. Hide Here keeps it hidden until the person leaves the page (the app clears `hidden` on a new page). |
+| Avoid | Desktop (it has none: the top bar holds the clock, the page header the New action); a second floating button; dragging it anywhere. |
+| Phone | The whole point. It tucks away while the page scrolls down and returns on scrolling up; it hides while a sheet or dialog is open and while the keyboard is up; the page keeps clear space under its content so it never hides data. |
+| Accessibility | A button named Quick Actions that says whether its fan is open; the fan is a list of named buttons, the first focused on opening; Esc or a tap outside closes it and focus returns. Hidden, it leaves the tab order. |
+| Status | stable |
+| Exports | `FloatingButton` |
+| Import | `import { FloatingButton } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/FloatingButton.tsx` |
+| Test | `packages/ui/src/shell/FloatingButton.test.tsx` |
+| Gallery | `packages/ui/src/shell/FloatingButton.gallery.tsx` (`npm run gallery`, `#/FloatingButton`) |
+
+**FloatingButton** props (`FloatingButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `actions` | `FabAction[]` | yes | The fan, top to bottom as read: the screen's New action when it has one, Clock In or Out, Praxis AI, Help. |
+| `onHideHere` | `() => void` | yes | Hide Here: the app hides the button until the person leaves the page. |
+| `hidden` | `boolean` |  | Hidden by Hide Here. |
+| `label` | `string` |  | The button's name; Quick Actions unless set. |
+| `defaultOpen` | `boolean` |  | Open the fan from the start (the gallery). |
+
+```tsx
+<FloatingButton actions={[{ key: "clock", label: "Clock In", icon: "clock", onSelect: clockIn }]} onHideHere={hideHere} />
+```
+
+### MoreSheet
+
+The phone's More: a launcher in a bottom sheet with the person's row, a search bar, the modules they may open as tiles four to a row, and Sign Out (F17).
+
+| | |
+|---|---|
+| Use | Opened by the bottom bar's More. Tiles come from the module catalogue filtered by the person's grants, grouped Work, People, Business and System, each one word with its count. |
+| Avoid | Desktop (the Rail and the account menu); actions inside a module (Menu); settings that need a form (Settings). |
+| Phone | The whole point: up to 90% of the height, closed by dragging down, tapping the scrim or Esc; every tile and button a 44 px target. |
+| Accessibility | A dialog named More. The person's row and the groups are labelled; each tile is a link named by its word and its count; the current module is aria-current="page". |
+| Status | stable |
+| Exports | `MoreSheet` |
+| Import | `import { MoreSheet } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/MoreSheet.tsx` |
+| Test | `packages/ui/src/shell/MoreSheet.test.tsx` |
+| Gallery | `packages/ui/src/shell/MoreSheet.gallery.tsx` (`npm run gallery`, `#/MoreSheet`) |
+
+**MoreSheet** props (`MoreSheetProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the sheet is showing. |
+| `onClose` | `() => void` | yes | Called when the person dismisses it, or after a tile is chosen. |
+| `person` | `MorePerson` | yes | The signed-in person. |
+| `personActions` | `ReactNode` |  | Beside the person: IconButtons for Theme, Density and Settings. |
+| `onSearch` | `() => void` |  | Opens full search (the command palette); the search bar is hidden without it. |
+| `groups` | `LauncherGroup[]` | yes | The module tiles, by group; empty groups are not drawn. |
+| `current` | `string \| null` |  | The module in view, by key. |
+| `onNavigate` | `(href: string) => void` |  | Called with a tile's href on a plain tap; the sheet closes. |
+| `extra` | `ReactNode` |  | More rows above Sign Out (Install App). |
+| `onSignOut` | `() => void` | yes | Signs the person out. |
+| `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<MoreSheet open={open} onClose={close} person={{ name: "Cynthia Osakunih", subtitle: "Operations Manager" }} groups={groups} onSearch={openSearch} onSignOut={signOut} />
+```
+
+### NotificationRow
+
+One notification in the bell's list: its glyph in a tone, its title and line, when it came, a dot while unread, and Open.
+
+| | |
+|---|---|
+| Use | The bell's list (the app's Bell): each notification from GET /api/v1/notifications, newest first, under the shared pager. |
+| Avoid | Alerts, which are conditions to act on (Home · Alerts); a toast (something that just happened in front of the person); a list of records (DataView). |
+| Phone | The same row; Open drops under the text when there is no room, a 44 px target. |
+| Accessibility | An article; unread is said in words as well as by the dot; the title, line and time are content, read as written. |
+| Status | stable |
+| Exports | `NotificationRow` |
+| Import | `import { NotificationRow } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/NotificationRow.tsx` |
+| Test | `packages/ui/src/shell/NotificationRow.test.tsx` |
+| Gallery | `packages/ui/src/shell/NotificationRow.gallery.tsx` (`npm run gallery`, `#/NotificationRow`) |
+
+**NotificationRow** props (`NotificationRowProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | What happened, as the notification says it. |
+| `body` | `ReactNode` |  | Its line, as the notification says it. |
+| `when` | `string` | yes | When it came, formatted (formatWhen). |
+| `icon` | `IconName` |  | Its glyph, from its category; the bell unless set. |
+| `tone` | `"ok" \| "warn" \| "err" \| "info"` |  | Its tone; info unless set. |
+| `unread` | `boolean` |  | Not read yet: a dot before the title, and the word Unread for screen readers. |
+| `action` | `ReactNode` |  | Open, when it links to a record. |
+
+```tsx
+<NotificationRow title="Expense request waiting on you" body="Bashir Lawal · ₦185,000.00" when="08:41" tone="warn" icon="check" unread action={<Button size="sm">Open</Button>} />
+```
+
+### PhoneHeader
+
+The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs.
+
+| | |
+|---|---|
+| Use | Once, in PhoneShell's header slot. The title is the module's name; the tabs are the module's Tabs. Scrolling the page down slides the title away and keeps the tabs; scrolling up brings it back. |
+| Avoid | Desktop (TopBar); a screen's own title (PageHeader carries that inside the page); more than three actions in the bar. |
+| Phone | The whole point: one line of bar (the pin alone, no word), a large one-line title shortened with an ellipsis when long, the tabs a sideways-scrolling strip; every control 44 px. |
+| Accessibility | The pin is a link named "MyCity App, Home". The title is text, not a heading (the screen's PageHeader holds the page's h1); while it is slid away it is hidden from assistive technology too. |
+| Status | stable |
+| Exports | `PhoneHeader` |
+| Import | `import { PhoneHeader } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/PhoneHeader.tsx` |
+| Test | `packages/ui/src/shell/PhoneHeader.test.tsx` |
+| Gallery | `packages/ui/src/shell/PhoneHeader.gallery.tsx` (`npm run gallery`, `#/PhoneHeader`) |
+
+**PhoneHeader** props (`PhoneHeaderProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` |  | The module's name, one line. |
+| `tabs` | `ReactNode` |  | The module's tab strip (Tabs). |
+| `actions` | `ReactNode` |  | The bar's actions, right to left as read: search, the bell, the avatar button. |
+| `homeHref` | `string` | yes | Where the pin goes: Home. |
+| `onNavigate` | `(href: string) => void` |  | Called with homeHref on a plain tap on the pin. |
+
+```tsx
+<PhoneHeader title="Employee Self-Service" homeHref="/home" actions={<><IconButton icon="srch" label="Search" /><IconButton icon="bell" label="Notifications" /></>} tabs={<Tabs ... />} />
+```
+
+### PhoneShell
+
+The staff app's phone frame: the top bar and title rail, the page, which alone scrolls, the floating button, and the bottom bar.
+
+| | |
+|---|---|
+| Use | Once, by the staff app's shell, at 760 px and below; it lays out PhoneHeader, the screen, FloatingButton and BottomBar, and tells them which way the page scrolls. |
+| Avoid | Desktop (DesktopShell); a screen drawing its own bottom bar or floating button; the public site (PublicPage). |
+| Phone | The whole point: a native app frame. The page keeps clear space under its content for the floating button (F18), so the button never hides data, and only the page scrolls. While the button's fan is open the page dims behind it. |
+| Accessibility | The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the bottom bar is the Main navigation. |
+| Status | stable |
+| Exports | `PhoneShell` |
+| Import | `import { PhoneShell } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/PhoneShell.tsx` |
+| Test | `packages/ui/src/shell/PhoneShell.test.tsx` |
+| Gallery | `packages/ui/src/shell/PhoneShell.gallery.tsx` (`npm run gallery`, `#/PhoneShell`) |
+
+**PhoneShell** props (`PhoneShellProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `header` | `ReactNode` | yes | The PhoneHeader: the top bar and title rail. |
+| `children` | `ReactNode` | yes | The screen. |
+| `bottomBar` | `ReactNode` | yes | The BottomBar. |
+| `fab` | `ReactNode` |  | The FloatingButton; when given, the page keeps clear space under its content for it. |
+| `notice` | `ReactNode` |  | A notice floating above the bottom bar (ShellNotice). |
+| `fit` | `boolean` |  | A fit page: it fills the height and only its panes scroll. |
+| `pageKey` | `string` |  | Changes when the screen changes (its path): the page scrolls back to the top and the title returns. |
+| `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
+
+```tsx
+<PhoneShell header={<PhoneHeader ... />} bottomBar={<BottomBar ... />} fab={<FloatingButton ... />}>{screen}</PhoneShell>
+```
+
+### PublicPage
+
+The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer.
+
+| | |
+|---|---|
+| Use | Every page of go.mycityapp.io (careers, a vacancy, apply, assessment, sign, verify); PageMessage is a whole-page outcome inside it (sent, expired, not found). |
+| Avoid | The staff app (it has its own shells); a second card inside the card; a page of explanation (a PageMessage says one thing). |
+| Phone | The card runs edge to edge with no side border; the header and footer keep a 16 px margin; the theme switch is a 44 px target. |
+| Accessibility | A banner, a main and a contentinfo landmark; the theme switch is a named button. PageMessage's title is a heading (h2) and its icon is decorative. |
+| Status | stable |
+| Exports | `PublicPage`, `PageMessage` |
+| Import | `import { PublicPage, PageMessage } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/PublicPage.tsx` |
+| Test | `packages/ui/src/shell/PublicPage.test.tsx` |
+| Gallery | `packages/ui/src/shell/PublicPage.gallery.tsx` (`npm run gallery`, `#/PublicPage`) |
+
+**PublicPage** props (`PublicPageProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `brand` | `ReactNode` |  | The mark at the top left, usually a link home with Brand; left out when the page draws its own inside the card. |
+| `children` | `ReactNode` | yes | The page, drawn on the card. |
+| `below` | `ReactNode` |  | Anything under the card (a second action, a note from the system). |
+| `links` | `ReactNode` |  | The footer's links (Careers, Verify a Document). |
+| `company` | `string` |  | The company line at the foot; MyCity App Ltd · Lagos, Nigeria unless set. |
+| `foot` | `ReactNode` |  | More at the very foot (the mock's demo links, on a laptop only). |
+| `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
+
+**PageMessage** props (`PageMessageProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `icon` | `IconName` |  | The glyph in the circle; alert unless set. |
+| `tone` | `"neutral" \| "ok" \| "warn" \| "err"` |  | The circle's tone; neutral unless set. |
+| `title` | `ReactNode` | yes | What happened, at most 6 words (Application Sent, Offer Expired). |
+| `children` | `ReactNode` |  | One or two short sentences: what the person can do now. |
+| `action` | `ReactNode` |  | One or two actions, usually Buttons. |
+
+```tsx
+<PublicPage brand={<a href="/jobs"><Brand name="MyCityApp" /></a>} links={<a href="/verify">Verify a Document</a>}>...</PublicPage>
+<PageMessage icon="ok" tone="ok" title="Application Sent">We reply within five working days.</PageMessage>
+```
+
+### Rail
+
+The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot.
+
+| | |
+|---|---|
+| Use | Once, in DesktopShell's rail slot. Items come from the module catalogue filtered by the person's grants; it collapses to icons (66 px) when the person asks, remembered per device by the app. |
+| Avoid | A phone (BottomBar and MoreSheet are the phone's navigation, gate 11); tabs inside a module (Tabs); actions (the top bar). |
+| Phone | Never shown on a phone; its items are still 44 px targets so the gallery's phone view passes. |
+| Accessibility | The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu. |
+| Status | stable |
+| Exports | `Rail` |
+| Import | `import { Rail } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/Rail.tsx` |
+| Test | `packages/ui/src/shell/Rail.test.tsx` |
+| Gallery | `packages/ui/src/shell/Rail.gallery.tsx` (`npm run gallery`, `#/Rail`) |
+
+**Rail** props (`RailProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `RailItem[]` | yes | The modules, in rail order. |
+| `current` | `string \| null` | yes | The module in view, by key. |
+| `collapsed` | `boolean` |  | Icons only (66 px). |
+| `onNavigate` | `(href: string) => void` |  | Called with an item's href on a plain click; the link still opens in a new tab with a modifier. |
+| `account` | `RailAccount` |  | The person and their menu, at the foot. |
+| `brandName` | `string` |  | The name beside the pin; MyCity App unless set. |
+| `foot` | `ReactNode` |  | A last line under the account (Engineered by JBS Praxis). |
+| `label` | `string` |  | Names the navigation landmark; Modules unless set. |
+
+```tsx
+<Rail items={items} current="people" onNavigate={navigate} account={{ name: "Cynthia Osakunih", subtitle: "Operations Manager", menu }} />
+```
+
+### ShellNotice
+
+A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back.
+
+| | |
+|---|---|
+| Use | In the shell's notice slot (DesktopShell, PhoneShell): the update prompt (Reload), the install offer (Install App, Not Now). One at a time. |
+| Avoid | A result of something the person did (a toast); news about their work (the bell); anything that must interrupt (a ConfirmDialog). |
+| Phone | Above the floating button and the bottom bar, full width less the margins; its buttons are 44 px. |
+| Accessibility | A status region, announced when it appears and never taking focus; its actions are named buttons, drawn in the dark theme so they keep their contrast on the dark card. At most 12 words. |
+| Status | stable |
+| Exports | `ShellNotice` |
+| Import | `import { ShellNotice } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/ShellNotice.tsx` |
+| Test | `packages/ui/src/shell/ShellNotice.test.tsx` |
+| Gallery | `packages/ui/src/shell/ShellNotice.gallery.tsx` (`npm run gallery`, `#/ShellNotice`) |
+
+**ShellNotice** props (`ShellNoticeProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `icon` | `IconName` |  | Its glyph, in the brand yellow. |
+| `children` | `ReactNode` | yes | One short line, at most 12 words. |
+| `actions` | `ReactNode` |  | One or two small Buttons; the primary last. |
+
+```tsx
+<ShellNotice icon="refresh" actions={<Button variant="primary" size="sm">Reload</Button>}>A new version is ready</ShellNotice>
+```
+
+### StagingBar
+
+The amber bar across the top of every staging page, sign-in included, so nobody mistakes staging for the live system.
+
+| | |
+|---|---|
+| Use | Once per app, at the top, rendered only when useEnvironment() says staging (MILESTONES §6, A4). The staff app fixes it above everything; the public site lets it stick. |
+| Avoid | Any other notice (use Banner or ShellNotice); production, where it never renders; dismissing it (it has no close). |
+| Phone | The short line only; it takes the status bar inset on a notched phone, so its text is never under the notch. |
+| Accessibility | A status region, read once when the page opens. Its height is --env-bar, which every full-screen layer starts below. |
+| Status | stable |
+| Exports | `StagingBar` |
+| Import | `import { StagingBar } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/StagingBar.tsx` |
+| Test | `packages/ui/src/shell/StagingBar.test.tsx` |
+| Gallery | `packages/ui/src/shell/StagingBar.gallery.tsx` (`npm run gallery`, `#/StagingBar`) |
+
+**StagingBar** props (`StagingBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `message` | `string` | yes | The line on desktop, after the word Staging: one sentence, at most 20 words. |
+| `short` | `string` | yes | The line on a phone: at most 5 words. |
+| `placement` | `"fixed" \| "sticky" \| "inline"` |  | `fixed` above everything (the staff app, the default), `sticky` while the page scrolls (the public site), `inline` in the flow (the gallery). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<StagingBar message="For training and testing. Every feature works and mail reaches real people." short="Mail here is real" />
+```
+
+### TopBar
+
+The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell).
+
+| | |
+|---|---|
+| Use | Once, in DesktopShell's top bar slot. SearchButton is its search control; the actions are IconButtons and the clock button. |
+| Avoid | A phone (PhoneHeader is the phone's top bar); page actions (PageHeader); more than four actions. |
+| Phone | Never shown on a phone; its controls are 44 px targets so the gallery's phone view passes. |
+| Accessibility | A banner landmark when it is the page's top bar; SearchButton names the shortcut (aria-keyshortcuts) and shows it as keycaps. |
+| Status | stable |
+| Exports | `TopBar`, `SearchButton` |
+| Import | `import { TopBar, SearchButton } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/TopBar.tsx` |
+| Test | `packages/ui/src/shell/TopBar.test.tsx` |
+| Gallery | `packages/ui/src/shell/TopBar.gallery.tsx` (`npm run gallery`, `#/TopBar`) |
+
+**TopBar** props (`TopBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `start` | `ReactNode` |  | What sits first: the rail's collapse toggle. |
+| `search` | `ReactNode` |  | The SearchButton. |
+| `actions` | `ReactNode` |  | The quick actions at the right: clock in or out, the bell. |
+
+**SearchButton** props (`SearchButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `onClick` | `() => void` | yes | Opens the command palette. |
+| `label` | `string` |  | The words in the box; Search Anything unless set. |
+| `shortcut` | `boolean` |  | Show the ⌘K (or Ctrl K) keycaps; default true. |
+| `className` | `string` |  | Layout classes only (width). |
+
+```tsx
+<TopBar start={<IconButton icon="panel" label="Collapse Menu" />} search={<SearchButton onClick={openPalette} />} actions={<IconButton icon="bell" label="Notifications" />} />
+```
+
 ## Helpers
 
 Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/lib`).
@@ -1973,6 +2496,12 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | Export | File | What it does |
 |---|---|---|
 | `cn` | `lib/cn.ts` | Join class names, skipping the falsy ones; of two that conflict, the later wins (`cn("h-control", "h-9")` is `h-9`). |
+| `Environment` (type) | `lib/environment.ts` | Staging, or anything else (production, a laptop, CI). |
+| `isStagingHost` | `lib/environment.ts` | A staging host name: hub.staging.mycityapp.io, go.staging.mycityapp.io. |
+| `markStaging` | `lib/environment.ts` | Marks the page as staging: the attribute, the amber tab icon and the browser bar colour. |
+| `noteEnvironmentHeader` | `lib/environment.ts` | Called with each API response's X-Mycity-Environment value. |
+| `initEnvironment` | `lib/environment.ts` | Reads the address once at start. |
+| `useEnvironment` | `lib/environment.ts` | The environment in force, re-rendering when the API reveals staging. |
 | `formatDate` | `lib/format.ts` | "2026-10-13" or a full ISO timestamp → "13/10/2026". |
 | `formatTime` | `lib/format.ts` | ISO timestamp → "09:14" in Lagos time. |
 | `formatDateTime` | `lib/format.ts` | ISO timestamp → "13/10/2026 09:14". |
@@ -1995,6 +2524,17 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `useMediaQuery` | `lib/media.ts` | true while the media query matches; false before the first render on a server. |
 | `useIsPhone` | `lib/media.ts` | true on a phone: the phone shell renders (gate 11). |
 | `useIsMobile` | `lib/media.ts` | The merged screens' name for useIsPhone. |
+| `PlanMilestone` (type) | `lib/plan.ts` | One milestone from MILESTONES §4. |
+| `PlanScreen` (type) | `lib/plan.ts` | One screen's row in PROGRESS: its milestone, and which ticks it has. |
+| `DeliveryPlan` (type) | `lib/plan.ts` | The whole plan, as vite.shared.js deliveryPlan() writes it. |
+| `OpenRule` (type) | `lib/plan.ts` | Which rule decides what opens. |
+| `PlanView` (type) | `lib/plan.ts` | The Prototype View switch, in mock mode only. |
+| `openRule` | `lib/plan.ts` | The rule for where this build runs. |
+| `currentMilestone` | `lib/plan.ts` | The milestone being delivered now: the earliest one with screens that is neither past its demo day nor fully ticked. |
+| `screenOpens` | `lib/plan.ts` | Does this screen open under this rule? A screen missing from the plan opens only in mock mode. |
+| `ScreenState` (type) | `lib/plan.ts` | What useScreenState returns. |
+| `createDeliveryPlan` | `lib/plan.ts` | Binds the plan to one app: its storage key for the view switch, its API mode and whether it is a dev server. |
+| `BoundPlan` (type) | `lib/plan.ts` | One app's bound plan. |
 | `Theme` (type) | `lib/preferences.ts` | The theme in force: light or dark. |
 | `ThemeChoice` (type) | `lib/preferences.ts` | What a person may choose: light, dark, or the device's setting. |
 | `Density` (type) | `lib/preferences.ts` | Compact (the default) or Comfortable. |

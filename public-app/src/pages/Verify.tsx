@@ -2,8 +2,8 @@ import { useState, type ReactNode } from "react";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { VerifyResult } from "@/api/types/public";
-import { Button, cn, formatDate, formatTime, Icon, Skeleton, Pill, Field, Form, TextField } from "@mycity/ui";
-import { Brand, Page } from "@/components/Layout";
+import { Brand, Button, cn, Field, Form, formatDate, formatTime, Icon, Pill, Skeleton, TextField } from "@mycity/ui";
+import { Page } from "@/shell/Page";
 import { Sub } from "@/components/ui";
 import { useRouter } from "@/lib/router";
 
@@ -25,7 +25,7 @@ export function Verify({ number }: { number: string | null }) {
   return (
     <Page title={number ? `Verify ${number}` : "Verify a Document"} brandInCard>
       <div className="text-center">
-        <Brand />
+        <Brand name="MyCityApp" />
       </div>
       {number ? <Result number={number} /> : <Lookup />}
     </Page>

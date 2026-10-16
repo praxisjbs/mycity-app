@@ -46,14 +46,10 @@ const LEGACY = [
   ["app/src/components/ui/Paper.tsx", "documents", "PR 3 (PDF and document preview)"],
   ["app/src/components/ui/Profile.tsx", "360 header", "PR 3 (profile header)"],
   ["app/src/components/ui/Reader.tsx", "articles", "PR 3 (reader)"],
-  ["app/src/components/ui/StagingBar.tsx", "staging bar", "PR 2 (shell)"],
   ["public-app/src/components/ui.tsx", "Sub", "PR 3 (display)"],
   ["public-app/src/components/form/index.ts", "the barrel for Upload", "PR 3 (upload engine)"],
   ["public-app/src/components/form/Upload.tsx", "Upload", "PR 3 (upload engine)"],
   ["public-app/src/components/SignaturePad.tsx", "SignaturePad", "PR 3 (signature field)"],
-  ["public-app/src/components/StagingBar.tsx", "staging bar", "PR 2 (shell)"],
-  ["public-app/src/components/Layout.tsx", "Page, Brand, Message, demo strip", "PR 2 (public shell)"],
-  ["public-app/src/components/Planned.tsx", "Coming Soon page", "PR 2 (public shell)"],
 ];
 
 const problems = [];

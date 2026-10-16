@@ -5,7 +5,7 @@
  * @use A list, a search or a page with nothing in it yet; a filter that matched nothing; a first visit.
  * @avoid An explanation of the feature (tier 3); more than one action; a screen that has data on it.
  * @phone Centred, the drawing at the smaller size; the action is full width within thumb reach.
- * @a11y The title is a heading (data-ui="title"), at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative.
+ * @a11y The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet; at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative.
  * @status stable
  * @example <EmptyState illustration="Search" title="No Matches" text="Try another name or department" />
  * @example <EmptyState title="No Requests Yet" action={<Button variant="primary">Request Leave</Button>} />
@@ -34,6 +34,8 @@ export interface EmptyStateProps {
 }
 
 export function EmptyState({ illustration, icon, title, text, action, bare, className }: EmptyStateProps) {
+  // Its own card on a page is a section of it (h2); bare, inside a card or a sheet, it sits under that title (h3).
+  const Heading = bare ? "h3" : "h2";
   const art =
     illustration || !icon ? (
       <Illustration name={illustration ?? "Empty"} className="mx-auto mb-3 phone:w-18" />
@@ -45,9 +47,9 @@ export function EmptyState({ illustration, icon, title, text, action, bare, clas
   const body = (
     <div data-empty-state="" className={cn("flex flex-col items-center px-4 py-8 text-center", bare && className)}>
       {art}
-      <h3 data-ui="title" className="text-base font-strong">
+      <Heading data-ui="title" className="text-base font-strong">
         {title}
-      </h3>
+      </Heading>
       {text != null && text !== "" && (
         <p data-ui="empty-text" className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
           {text}

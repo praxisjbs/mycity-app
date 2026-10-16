@@ -3,8 +3,8 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { AssessmentQuestion, AssessmentSession } from "@/api/types/public";
-import { Button, cn, formatDate, Icon, Skeleton, Banner, TextAreaField } from "@mycity/ui";
-import { Message, Page } from "@/components/Layout";
+import { Banner, Button, cn, formatDate, Icon, PageMessage, Skeleton, TextAreaField } from "@mycity/ui";
+import { Page } from "@/shell/Page";
 import { Sub } from "@/components/ui";
 import { LinkProblem } from "./LinkProblem";
 
@@ -36,17 +36,17 @@ export function Assessment({ token }: { token: string }) {
   return (
     <Page title="Assessment">
       {d.state === "submitted" ? (
-        <Message icon="ok" tone="ok" title="Assessment submitted">
+        <PageMessage icon="ok" tone="ok" title="Assessment submitted">
           <p>
             Thank you, {d.candidate_first_name}. Your answers to {d.assessment.title} were received{d.submitted_at ? ` on ${formatDate(d.submitted_at)}` : ""}.
           </p>
           <p className="mt-2">We will email you about the next step for {d.vacancy_title}. You will not see a score here. You can close this page.</p>
-        </Message>
+        </PageMessage>
       ) : (
-        <Message icon="clock" tone="warn" title="The time is up">
+        <PageMessage icon="clock" tone="warn" title="The time is up">
           <p>Your saved answers to {d.assessment.title} were submitted as they stood when the time ran out.</p>
           <p className="mt-2">We will email you about the next step for {d.vacancy_title}. You can close this page.</p>
-        </Message>
+        </PageMessage>
       )}
     </Page>
   );

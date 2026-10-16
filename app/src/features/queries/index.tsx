@@ -192,7 +192,7 @@ function Rules() {
         <Grid cols={3}>
           {rules.rows.map((r: Rule) => (
             <div key={r.rule_id} className="rounded-box border border-border bg-card p-[14px]">
-              <h4 data-copy="content" className="text-[13.5px] font-semibold">{r.name}</h4>
+              <h2 data-copy="content" className="text-[13.5px] font-semibold">{r.name}</h2>
               <p className="mt-1 text-[12.5px] text-muted-foreground">{r.description}</p>
               <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 <StatusPill s={r.status} />

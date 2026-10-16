@@ -1,8 +1,8 @@
 import { usePaged } from "@/api/hooks";
 import "@/api/types/public";
 import type { VacancyCard } from "@/api/types/public";
-import { Brand, Message, Page } from "@/components/Layout";
-import { Button, Skeleton, TextField } from "@mycity/ui";
+import { Page } from "@/shell/Page";
+import { Brand, Button, PageMessage, Skeleton, TextField } from "@mycity/ui";
 import { Sub } from "@/components/ui";
 import { Link, useRouter } from "@/lib/router";
 
@@ -18,7 +18,7 @@ export function Careers() {
   return (
     <Page title="Careers" index brandInCard>
       <div className="mb-[22px] text-center">
-        <Brand size="lg" />
+        <Brand name="MyCityApp" size="l" />
         <h1 className="mt-3.5 text-[24px]">Work With Us</h1>
         <Sub className="mt-1.5">Building the app that knows every Nigerian city.</Sub>
       </div>
@@ -28,13 +28,13 @@ export function Careers() {
         </div>
       )}
       {list.error ? (
-        <Message title="The roles could not load" action={<Button onClick={list.reload}>Try Again</Button>}>{list.error.message}</Message>
+        <PageMessage title="The roles could not load" action={<Button onClick={list.reload}>Try Again</Button>}>{list.error.message}</PageMessage>
       ) : list.loading && !list.page ? (
         <Skeleton lines={5} />
       ) : list.rows.length === 0 ? (
-        <Message icon="brief" title={searching ? "No role matches that search" : "No open roles right now"}>
+        <PageMessage icon="brief" title={searching ? "No role matches that search" : "No open roles right now"}>
           {searching ? "Try a shorter word, or clear the search." : "New roles are posted here first. Check back soon."}
-        </Message>
+        </PageMessage>
       ) : (
         <ul className="m-0 list-none p-0">
           {list.rows.map((v) => (

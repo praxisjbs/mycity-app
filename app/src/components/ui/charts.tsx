@@ -15,7 +15,7 @@ export function AreaChart({ title, values, labels, note, right }: { title: React
   return (
     <Card>
       <CardHeader title={title} right={right} />
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" tabIndex={0}>
         <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full min-w-[380px]" role="img" aria-label={typeof title === "string" ? title : "Chart"}>
           <polygon points={`0,${h - 10} ${pts.join(" ")} ${w},${h - 10}`} fill="var(--chart-1)" opacity=".12" />
           <polyline points={pts.join(" ")} fill="none" stroke="var(--chart-1)" strokeWidth="2.5" strokeLinejoin="round" />
