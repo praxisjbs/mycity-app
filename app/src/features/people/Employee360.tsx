@@ -1,11 +1,9 @@
 import { useApi } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
-import { Button, formatDate, KeyValue, Pill, Card, CardHeader, Grid, Money, ErrorState } from "@mycity/ui";
-import { Bars, StatStrip, Timeline } from "@/components/ui/data";
-import { BackButton, ProfileHeader } from "@/components/ui/Profile";
-import { LoadingRows, Table } from "@/components/ui/Table";
+import { BackButton, Bars, Button, Card, CardHeader, DataView, ErrorState, formatDate, Grid, KeyValue, LoadingRows, Money, Pill, ProfileHeader, StatStrip, Timeline } from "@mycity/ui";
 import { hrefFor, useRouter } from "@/lib/router";
 import { AttendanceSetupCard } from "./EmployeeDetails";
+import { toBars, toTrail } from "@/features/shared/wire";
 
 /** The employee 360: everything about one person on one page, each part read from its owning module. */
 export function Employee360({ id }: { id: string }) {
@@ -13,12 +11,12 @@ export function Employee360({ id }: { id: string }) {
   const { navigate } = useRouter();
   const { data: e, error, reload } = useApi("GET /api/v1/employees/:id", { params: { id } });
   const back = () => navigate(hrefFor("people", "employees"));
-  if (error) return (<><BackButton label="Back to Employees" onClick={back} /><ErrorState error={error} onRetry={reload} /></>);
+  if (error) return (<><BackButton label="Back to Employees" onBack={back} /><ErrorState error={error} onRetry={reload} /></>);
   if (!e) return <LoadingRows count={8} />;
   const hr = me.grants.people?.includes("edit");
   return (
     <>
-      <BackButton label="Back to Employees" onClick={back} />
+      <BackButton label="Back to Employees" onBack={back} />
       <ProfileHeader
         name={e.display_name}
         role={`${e.job_title} · ${e.department}`}
@@ -62,15 +60,15 @@ export function Employee360({ id }: { id: string }) {
       <Grid cols={2}>
         <Card>
           <CardHeader title="KPIs This Month" />
-          <Bars rows={e.kpis.map((k) => ({ label: k.label, pct: k.pct, value: k.value, color: k.emphasis === "warn" ? "var(--chart-4)" : k.emphasis === "brand" ? "var(--primary)" : undefined }))} note="Weighted to 100%. Progress counts from tasks linked to each KPI." />
+          <Bars rows={toBars(e.kpis)} note="Weighted to 100%. Progress counts from tasks linked to each KPI." />
         </Card>
         <Card>
           <CardHeader title="Record Activity" />
-          <Timeline items={e.activity} />
+          <Timeline items={toTrail(e.activity)} />
         </Card>
       </Grid>
       <Grid cols={2}>
-        <Table
+        <DataView
           title="Last Punches"
           rows={e.punches}
           rowKey={(r) => r.date}
@@ -82,7 +80,7 @@ export function Employee360({ id }: { id: string }) {
             { key: "s", label: "Status", render: (r) => <Pill tone={r.status.tone}>{r.status.text}</Pill> },
           ]}
         />
-        <Table
+        <DataView
           title="Documents"
           rows={e.documents}
           rowKey={(r) => r.name}
@@ -93,7 +91,7 @@ export function Employee360({ id }: { id: string }) {
           ]}
         />
       </Grid>
-      <Table
+      <DataView
         title="Queries and Sanctions"
         right={e.open_queries ? <Pill tone="warn">{`${e.open_queries} open`}</Pill> : <Pill tone="ok">Nothing open</Pill>}
         rows={e.queries}

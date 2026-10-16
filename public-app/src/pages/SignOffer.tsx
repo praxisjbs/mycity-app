@@ -4,9 +4,7 @@ import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { OfferToSign } from "@/api/types/public";
 import { Page } from "@/shell/Page";
-import { SignaturePad, type SignaturePadHandle } from "@/components/SignaturePad";
-import { Banner, Brand, Button, Field, formatDate, formatTime, PageMessage, Skeleton, TextAreaField } from "@mycity/ui";
-import { Sub } from "@/components/ui";
+import { Banner, Brand, Button, Field, formatDate, formatTime, PageMessage, SignatureField, Skeleton, Sub, TextAreaField, type SignatureFieldHandle } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
 
@@ -33,10 +31,10 @@ export function SignOffer({ token }: { token: string }) {
 function Head({ d }: { d: OfferToSign }) {
   return (
     <>
-      <div className="mb-[18px] text-center">
+      <div className="mb-4.5 text-center">
         <Brand name="MyCityApp" />
       </div>
-      <h1 className="text-[19px]">Offer of Employment</h1>
+      <h1 className="text-xl">Offer of Employment</h1>
       <Sub className="mt-1">
         {d.candidate_name} · {d.role} · {d.reference}
       </Sub>
@@ -45,7 +43,7 @@ function Head({ d }: { d: OfferToSign }) {
 }
 
 function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d: OfferToSign) => void }) {
-  const pad = useRef<SignaturePadHandle>(null);
+  const pad = useRef<SignatureFieldHandle>(null);
   const [inked, setInked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -76,9 +74,9 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
       <Sub className="mt-0.5">
         Expires {formatDate(d.expires_at)}
       </Sub>
-      <div className="mt-3.5 max-h-[170px] overflow-y-auto rounded-[10px] border border-border p-3.5 text-[13px] leading-[1.6] text-muted-foreground max-md:max-h-[260px]" tabIndex={0} aria-label="The offer letter">
+      <div className="mt-3.5 max-h-44 overflow-y-auto rounded-box border border-border p-3.5 text-sm leading-relaxed text-muted-foreground max-md:max-h-64" tabIndex={0} aria-label="The offer letter">
         {d.letter.map((p, n) => (
-          <p key={n} className={n ? "mt-[9px]" : undefined}>
+          <p key={n} className={n ? "mt-2" : undefined}>
             {p}
           </p>
         ))}
@@ -86,8 +84,8 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
       {!declining ? (
         <>
           <div className="mt-4">
-            <span className="mb-1.5 block text-[12.5px] font-semibold text-muted-foreground">Sign Below</span>
-            <SignaturePad ref={pad} onChange={onInk} disabled={busy} label="Signature box. Draw your signature with a finger or a mouse." />
+            <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">Sign Below</span>
+            <SignatureField ref={pad} noClear onChange={onInk} disabled={busy} label="Signature box. Draw your signature with a finger or a mouse." />
             <div className="mt-2 flex justify-end">
               <Button disabled={!inked || busy} onClick={() => pad.current?.clear()}>
                 Clear
@@ -104,7 +102,7 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
           </Button>
           <Sub className="mt-2.5 text-center">Once signed, this document is locked and verifiable at go.mycityapp.io/verify</Sub>
           <div className="mt-3 text-center">
-            <button type="button" className="text-[12.5px] font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => setDeclining(true)}>
+            <button type="button" className="text-xs font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => setDeclining(true)}>
               Decline the Offer
             </button>
           </div>

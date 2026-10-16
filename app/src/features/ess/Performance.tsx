@@ -1,9 +1,8 @@
 import { useApi } from "@/api/hooks";
 import type { MyPerformance } from "@/api/types/ess";
-import { Bars, StatStrip, TapList } from "@/components/ui/data";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
-import { cn, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState } from "@mycity/ui";
+import { Bars, Card, CardHeader, cn, DataView, DesktopOnly, ErrorState, Grid, KeyValue, LoadingRows, PageHeader, Pill, StatStrip, TapList, useModal } from "@mycity/ui";
+import { toBars } from "@/features/shared/wire";
 
 export function MyPerformancePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/performance");
@@ -22,21 +21,21 @@ export function MyPerformancePage() {
           {r.manager_comment && (
             <Card className="mt-3">
               <CardHeader title="Manager Comment" />
-              <p className="text-[11.5px] text-subtle-foreground">{r.manager_comment}</p>
+              <p className="text-2xs text-subtle-foreground">{r.manager_comment}</p>
             </Card>
           )}
         </>
       ),
     });
-  const kpis = <Card><CardHeader title="My KPIs This Month" /><Bars rows={p.kpis.map((k) => ({ ...k, color: k.emphasis === "brand" ? "var(--primary)" : k.emphasis === "warn" ? "var(--chart-4)" : undefined }))} note="Weighted by KPI" /></Card>;
+  const kpis = <Card><CardHeader title="My KPIs This Month" /><Bars rows={toBars(p.kpis)} note="Weighted by KPI" /></Card>;
   const chain = (
     <Card>
       <CardHeader title="Rolls Up To" />
       <div className="tl">
         {p.chain.map((c) => (
-          <div key={c.title} className={cn("tl-dot relative pb-[14px] last:pb-0", c.top && "hi", c.mine && "ok")}>
-            <b className="block text-[12.5px] font-semibold">{c.title}</b>
-            <span className="text-[11.5px] text-subtle-foreground">{c.level}</span>
+          <div key={c.title} className={cn("tl-dot relative pb-3.5 last:pb-0", c.top && "hi", c.mine && "ok")}>
+            <b className="block text-xs font-semibold">{c.title}</b>
+            <span className="text-2xs text-subtle-foreground">{c.level}</span>
           </div>
         ))}
       </div>
@@ -60,7 +59,7 @@ export function MyPerformancePage() {
       />
       <DesktopOnly>
         <Grid cols={2}>{kpis}{chain}</Grid>
-        <Table
+        <DataView
           title="My Reviews"
           rows={p.reviews}
           rowKey={(r) => r.review_id}

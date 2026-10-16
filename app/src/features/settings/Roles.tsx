@@ -4,9 +4,8 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
 import type { AccessCatalogue, RecordScope, Role, RoleAction, RoleBody, RoleDetail, RoleGrant } from "@/api/types/settings";
 import { useMe } from "@/auth/AuthProvider";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { KvCard, PagedTable } from "@/features/shared/sections";
-import { Button, Banner, Pill, Card, CardHeader, Grid, PageHeader, useModal, ErrorState, toast, cn, ChoiceField, Field, FormFooter, Switch, TextField } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, ChoiceField, cn, DataView, ErrorState, Field, FormFooter, Grid, LoadingRows, PageHeader, Pill, Switch, TextField, toast, useModal } from "@mycity/ui";
 
 const ACTIONS: Array<[RoleAction, string]> = [["view", "View"], ["create", "Create"], ["edit", "Edit"], ["delete", "Delete"], ["approve", "Approve"], ["export", "Export"]];
 const SCOPES: Array<[RecordScope, string]> = [["all", "All"], ["team", "Team"], ["own", "Own"]];
@@ -53,7 +52,7 @@ export function Roles() {
         ]}
       />
       <div className="mt-3">
-        <Table
+        <DataView
           title="Permission Matrix"
           rows={m.data?.rows ?? []}
           rowKey={(r) => r.module}
@@ -67,9 +66,9 @@ export function Roles() {
         <Card>
           <CardHeader title="The Four Layers" />
           {[["Module", "Can they see Payroll at all"], ["Action", "View, create, edit, delete, approve, export"], ["Record scope", "All records, their team’s, or only their own"], ["Field", "Salary, bank details and query history masked unless granted"]].map(([t, x], i) => (
-            <div key={t} className="flex items-start gap-[11px] border-b border-border py-2 last:border-b-0">
-              <b className="w-[18px] flex-none text-[12px] text-accent-foreground">{i + 1}</b>
-              <span className="min-w-0 flex-1"><div className="text-[12.5px] font-semibold">{t}</div><div className="text-[11.5px] text-subtle-foreground">{x}</div></span>
+            <div key={t} className="flex items-start gap-2.5 border-b border-border py-2 last:border-b-0">
+              <b className="w-4.5 flex-none text-xs text-accent-foreground">{i + 1}</b>
+              <span className="min-w-0 flex-1"><div className="text-xs font-semibold">{t}</div><div className="text-2xs text-subtle-foreground">{x}</div></span>
               <Pill tone="ok">In use</Pill>
             </div>
           ))}
@@ -167,17 +166,17 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
           <TextField value={description} onChange={setDescription} disabled={readOnly} placeholder="Runs payroll" maxLength={140} />
         </Field>
       </Grid>
-      {role && <p className="-mt-1.5 mb-3 text-[11.5px] text-subtle-foreground">{role.users} {role.users === 1 ? "user holds" : "users hold"} this role.</p>}
+      {role && <p className="-mt-1.5 mb-3 text-2xs text-subtle-foreground">{role.users} {role.users === 1 ? "user holds" : "users hold"} this role.</p>}
 
-      <h3 data-ui="title" className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Modules, Actions and Record Scope</h3>
-      {errors.grants?.[0] && <p className="mb-2 text-[11.5px] text-destructive">{errors.grants[0]}</p>}
+      <h3 data-ui="title" className="mb-1 text-xs font-strong tracking-caps text-subtle-foreground uppercase">Modules, Actions and Record Scope</h3>
+      {errors.grants?.[0] && <p className="mb-2 text-2xs text-destructive">{errors.grants[0]}</p>}
       <div className="mb-4 overflow-hidden rounded-card border border-border">
         {cat.modules.map((m) => {
           const g = grants[m.key];
           const on = g.actions.includes("view");
           return (
             <div key={m.key} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-3 py-2.5 last:border-b-0", !on && "bg-muted/40")}>
-              <b className={cn("w-[170px] flex-none text-[12.5px] font-semibold max-md:w-full", !on && "text-muted-foreground")}>{m.label}</b>
+              <b className={cn("w-44 flex-none text-xs font-semibold max-md:w-full", !on && "text-muted-foreground")}>{m.label}</b>
               <div className="flex min-w-0 flex-1 flex-wrap gap-1.5" role="group" aria-label={`${m.label} actions`}>
                 {ACTIONS.filter(([a]) => m.actions.includes(a)).map(([a, l]) => {
                   const pressed = g.actions.includes(a);
@@ -189,7 +188,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
                       disabled={readOnly}
                       onClick={() => toggle(m.key, a)}
                       className={cn(
-                        "h-7 rounded-full border px-2.5 text-[11.5px] font-semibold transition-colors disabled:cursor-default",
+                        "h-7 rounded-full border px-2.5 text-2xs font-semibold transition-colors disabled:cursor-default",
                         pressed ? "border-secondary bg-secondary text-secondary-foreground" : "border-border bg-card text-muted-foreground enabled:hover:border-subtle-foreground enabled:hover:text-foreground",
                       )}
                     >
@@ -200,11 +199,11 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
               </div>
               <div className="flex-none">
                 {!on ? (
-                  <span className="text-[11.5px] text-subtle-foreground">No access</span>
+                  <span className="text-2xs text-subtle-foreground">No access</span>
                 ) : m.scoped ? (
                   readOnly ? <Pill>{SCOPES.find(([v]) => v === g.scope)![1]} records</Pill> : <ChoiceField value={g.scope} onChange={(v) => setScope(m.key, v)} options={SCOPES} />
                 ) : (
-                  <span className="text-[11.5px] text-subtle-foreground">Not record scoped</span>
+                  <span className="text-2xs text-subtle-foreground">Not record scoped</span>
                 )}
               </div>
             </div>
@@ -212,20 +211,20 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
         })}
       </div>
 
-      <h3 data-ui="title" className="mb-1 text-[12px] font-[650] tracking-[.06em] text-subtle-foreground uppercase">Sensitive Fields</h3>
+      <h3 data-ui="title" className="mb-1 text-xs font-strong tracking-caps text-subtle-foreground uppercase">Sensitive Fields</h3>
       <div className="mb-1 overflow-hidden rounded-card border border-border">
         {cat.fields.map((f) => (
           <div key={f.key} className="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5 last:border-b-0">
             <span className="min-w-0">
-              <div className="text-[12.5px] font-semibold">{f.label}</div>
-              <div className="text-[11.5px] text-subtle-foreground">{f.help}</div>
+              <div className="text-xs font-semibold">{f.label}</div>
+              <div className="text-2xs text-subtle-foreground">{f.help}</div>
             </span>
             <Switch checked={fields.includes(f.key)} disabled={readOnly} label={`${f.label} visible`} onChange={(v) => setFields((x) => (v ? [...x, f.key] : x.filter((k) => k !== f.key)))} />
           </div>
         ))}
       </div>
 
-      {tried && !granted && <p role="alert" className="mt-3 text-[12px] text-destructive">Grant at least one module</p>}
+      {tried && !granted && <p role="alert" className="mt-3 text-xs text-destructive">Grant at least one module</p>}
       <FormFooter>
         {role && !role.system && canManage && (confirmDelete ? (
           <Button className="mr-auto" variant="primary" busy={busy} onClick={del}>Confirm Delete</Button>

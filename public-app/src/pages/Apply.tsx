@@ -5,11 +5,10 @@ import "@/api/types/public";
 import type { ApplicationReceipt } from "@/api/types/public";
 import type { DocumentRef } from "@/api/types/common";
 import { Page } from "@/shell/Page";
-import { Banner, Button, Field, Form, formatDate, formatTime, PageMessage, Skeleton, TextAreaField, TextField } from "@mycity/ui";
-import { Sub } from "@/components/ui";
+import { Banner, Button, Field, Form, formatDate, formatTime, PageMessage, Skeleton, Sub, TextAreaField, TextField, UploadField } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
-import { Upload } from "@/components/form";
+import { upload } from "@/api/upload";
 
 type Values = { full_name: string; email: string; phone: string; years: string; why: string };
 type Key = keyof Values | "cv";
@@ -92,11 +91,11 @@ export function Apply({ token }: { token: string }) {
 
   return (
     <Page title={`Apply: ${link.data.vacancy_title}`}>
-      <h1 className="text-[20px]">Apply: {link.data.vacancy_title}</h1>
+      <h1 className="text-2xl">Apply: {link.data.vacancy_title}</h1>
       <Sub className="mt-1">
         This link is yours and works until {formatDate(link.data.expires_at)} at {formatTime(link.data.expires_at)}.
       </Sub>
-      <Form className="mt-[18px] flex flex-col gap-[13px]" onSubmit={() => void submit()}>
+      <Form className="mt-4.5 flex flex-col gap-3" onSubmit={() => void submit()}>
         <Field label="Full Name" htmlFor="full_name" state={state("full_name")} message={err("full_name")}>
           <TextField id="full_name" autoComplete="name" value={v.full_name} onChange={set("full_name")} onBlur={blur("full_name")} state={state("full_name")} />
         </Field>
@@ -107,16 +106,20 @@ export function Apply({ token }: { token: string }) {
           <TextField id="phone" type="tel" autoComplete="tel" inputMode="tel" placeholder="+234 802 000 0000" value={v.phone} onChange={set("phone")} onBlur={blur("phone")} state={state("phone")} />
         </Field>
         <Field label="Years of Experience" htmlFor="years" state={state("years")} message={err("years")}>
-          <TextField id="years" inputMode="numeric" value={v.years} onChange={set("years")} onBlur={blur("years")} state={state("years")} className="max-w-[140px]" />
+          <TextField id="years" inputMode="numeric" value={v.years} onChange={set("years")} onBlur={blur("years")} state={state("years")} className="max-w-36" />
         </Field>
         <Field label="CV" state={err("cv") ? "bad" : undefined} message={err("cv")}>
-          <Upload
+          <UploadField
             endpoint={`/api/public/v1/apply/${encodeURIComponent(token)}/cv`}
+            purpose="cv"
+            upload={upload}
+            multiple={false}
             accept=".pdf,.doc,.docx"
             kinds="PDF or Word"
             maxBytes={10 * 1024 * 1024}
-            state={err("cv") ? "bad" : undefined}
-            onUploaded={(doc) => {
+            label="Choose your CV"
+            onUploaded={(docs) => {
+              const doc = docs[0] ?? null;
               setCv(doc);
               setServer((s) => ({ ...s, cv: undefined }));
               if (doc) setTouched((t) => ({ ...t, cv: true }));

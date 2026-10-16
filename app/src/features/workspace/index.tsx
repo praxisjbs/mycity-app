@@ -4,16 +4,12 @@ import type { PersonRef } from "@/api/types/common";
 import type { Task, TaskStatus } from "@/api/types/workspace";
 import "@/api/types/workspace";
 import { useMe } from "@/auth/AuthProvider";
-import { Board } from "@/components/ui/Board";
-import { MonthCalendar } from "@/components/ui/Calendar";
-import { AreaChart } from "@/components/ui/charts";
-import { Bars, Timeline } from "@/components/ui/data";
-import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { PersonPicker } from "@/components/form";
-import { Button, Avatar, KeyValue, Meter, Pill, Card, CardHeader, Grid, PageHeader, useModal, ErrorState, toast, formatDate, monthName, todayIso, DateField, Field, FormFooter, rules, SearchInput, SegmentedControl, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { AreaChart, Avatar, Bars, Button, Calendar, Card, CardHeader, DataView, DateField, ErrorState, Field, formatDate, FormFooter, Grid, Kanban, KeyValue, LoadingRows, Meter, monthName, PageHeader, Pill, rules, SearchInput, SegmentedControl, SelectField, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useModal } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
+import { toBars, toTrail } from "@/features/shared/wire";
 
 export default function Workspace({ tab }: ModuleScreenProps) {
   const [params, setParams] = useSearchParams();
@@ -33,8 +29,8 @@ export default function Workspace({ tab }: ModuleScreenProps) {
 
 function TaskCard({ t, onClick }: { t: Task; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="mb-2 block w-full rounded-box border border-border bg-card p-2.5 text-left transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-2">
-      <b className="mb-[7px] block text-[12.5px] leading-[1.35] font-semibold">{t.title}</b>
+    <button type="button" onClick={onClick} className="mb-2 block w-full rounded-box border border-border bg-card p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-2">
+      <b className="mb-1.5 block text-xs leading-snug font-semibold">{t.title}</b>
       <span className="flex flex-wrap items-center gap-1.5">
         <Pill tone={t.due_pill.tone}>{t.due_pill.text}</Pill>
         <Avatar name={(t.set_by ?? t.owner).display_name} size={21} />
@@ -62,7 +58,7 @@ function TaskDetail({ t, close }: { t: Task; close: () => void }) {
   return (
     <>
       <KeyValue items={[["Number", t.number], ["Owner", t.owner.display_name], ["Set by", t.set_by?.display_name ?? "Themselves"], ["Due", t.due ? formatDate(t.due) : "No date"], ["Priority", t.priority[0].toUpperCase() + t.priority.slice(1)], ["Status", LABEL[t.status]], ...(t.linked ? ([["Linked to", t.linked.label]] as Array<[string, string]>) : [])]} />
-      {t.description && <p className="mt-3 text-[12.5px] text-muted-foreground">{t.description}</p>}
+      {t.description && <p className="mt-3 text-xs text-muted-foreground">{t.description}</p>}
       <FormFooter>
         <Button onClick={close}>Close</Button>
         {NEXT[t.status] && <Button variant="primary" iconRight="right" busy={patch.pending} onClick={() => move(NEXT[t.status]!)}>Move to {LABEL[NEXT[t.status]!]}</Button>}
@@ -86,7 +82,7 @@ function Today() {
         <Card>
           <CardHeader title="Your Day" right={over ? <Pill tone="err">{`${over} overdue`}</Pill> : undefined} />
           {data.my_day.map((t) => <TaskCard key={t.task_id} t={t} onClick={() => openTask(t)} />)}
-          {!data.my_day.length && <p className="text-[11.5px] text-subtle-foreground">Nothing due today.</p>}
+          {!data.my_day.length && <p className="text-2xs text-subtle-foreground">Nothing due today.</p>}
         </Card>
         <Card>
           <CardHeader title="Set by Your Manager" />
@@ -96,25 +92,26 @@ function Today() {
       </Grid>
       <Grid cols={2}>
         <Card>
-          <CardHeader title="Diary" right={<span className="text-[11.5px] text-subtle-foreground">Africa/Lagos</span>} />
+          <CardHeader title="Diary" right={<span className="text-2xs text-subtle-foreground">Africa/Lagos</span>} />
           {data.diary.map((d) => (
-            <div key={d.time + d.title} className="flex items-start gap-[11px] border-b border-border py-[9px] last:border-b-0">
-              <b className="w-[46px] flex-none text-[12.5px] font-bold">{d.time}</b>
-              <span className="min-w-0 flex-1"><div className="text-[12.5px] font-semibold">{d.title}</div><div className="text-[11.5px] text-subtle-foreground">{d.sub}</div></span>
+            <div key={d.time + d.title} className="flex items-start gap-2.5 border-b border-border py-2 last:border-b-0">
+              <b className="w-11.5 flex-none text-xs font-bold">{d.time}</b>
+              <span className="min-w-0 flex-1"><div className="text-xs font-semibold">{d.title}</div><div className="text-2xs text-subtle-foreground">{d.sub}</div></span>
               <Pill tone={d.confirmed ? "info" : "neutral"}>{d.confirmed ? "Confirmed" : "Tentative"}</Pill>
             </div>
           ))}
         </Card>
         <Card>
           <CardHeader title="Since You Were Away" />
-          <Timeline items={data.activity} />
+          <Timeline items={toTrail(data.activity)} />
         </Card>
       </Grid>
     </>
   );
 }
 
-const COLS: Array<[TaskStatus, string, string]> = [["todo", "To do", "var(--subtle-foreground)"], ["in_progress", "In progress", "var(--chart-2)"], ["in_review", "In review", "var(--chart-3)"], ["done", "Done", "var(--chart-1)"]];
+// The board's own titles, which are the stage tabs on a phone, so they are Title Case chrome.
+const COLS: Array<[TaskStatus, string, string]> = [["todo", "To Do", "var(--subtle-foreground)"], ["in_progress", "In Progress", "var(--chart-2)"], ["in_review", "In Review", "var(--chart-3)"], ["done", "Done", "var(--chart-1)"]];
 
 function Tasks() {
   const me = useMe();
@@ -142,8 +139,8 @@ function Tasks() {
         }
       />
       {summary.data && <KpiTiles items={summary.data.kpis} mobileCols={2} />}
-      <Toolbar><SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-[260px]" /></Toolbar>
-      <Board
+      <Toolbar><SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-64" /></Toolbar>
+      <Kanban
         columns={COLS.map(([status, label, color], i) => ({
           key: status,
           label,
@@ -187,7 +184,7 @@ export function TaskForm({ close, title = "" }: { close: () => void; title?: str
       <Field label="Priority"><SelectField options={[["urgent", "Urgent"], ["high", "High"], ["normal", "Normal"], ["low", "Low"]]} {...f.field("priority")} /></Field>
       {me.manages_people && (
         <Field label="Assign To" info="Leave empty to keep it yourself. You can set tasks for the people who report to you.">
-          <PersonPicker value={owner} onChange={setOwner} placeholder="Search your team" />
+          <EmployeePicker value={owner} onChange={setOwner} placeholder="Search your team" />
         </Field>
       )}
       <Field label="Notes"><TextAreaField {...f.field("description")} /></Field>
@@ -222,18 +219,18 @@ function CalendarTab() {
         }
       />
       <Grid cols="1.4/1">
-        <MonthCalendar year={ym[0]} month={ym[1]} events={list.rows.map((e) => ({ date: e.date, label: e.title, highlight: e.highlight }))} />
+        <Calendar year={ym[0]} month={ym[1]} events={list.rows.map((e) => ({ date: e.date, label: e.title, highlight: e.highlight }))} />
         <Card>
           <CardHeader title="Coming Up" />
           {upcoming.map((e) => (
-            <div key={e.event_id} className="flex items-center gap-2.5 border-b border-border py-[7px] last:border-b-0">
-              <b className="w-[52px] flex-none text-[11.5px] text-subtle-foreground">{new Date(e.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })}</b>
-              <span className="min-w-0 flex-1 text-[12.5px]">{e.title}</span>
-              <span className="flex-none text-[11.5px] text-subtle-foreground">{e.kind}</span>
+            <div key={e.event_id} className="flex items-center gap-2.5 border-b border-border py-1.5 last:border-b-0">
+              <b className="w-13 flex-none text-2xs text-subtle-foreground">{new Date(e.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })}</b>
+              <span className="min-w-0 flex-1 text-xs">{e.title}</span>
+              <span className="flex-none text-2xs text-subtle-foreground">{e.kind}</span>
             </div>
           ))}
-          {!upcoming.length && <p className="text-[11.5px] text-subtle-foreground">Nothing else this month.</p>}
-          <p className="mt-[11px] text-[11.5px] text-subtle-foreground">Leave, interviews, payday and campaign dates all land here.</p>
+          {!upcoming.length && <p className="text-2xs text-subtle-foreground">Nothing else this month.</p>}
+          <p className="mt-2.5 text-2xs text-subtle-foreground">Leave, interviews, payday and campaign dates all land here.</p>
         </Card>
       </Grid>
     </>
@@ -266,12 +263,12 @@ function Analytics() {
       <PageHeader title="Analytics" sub="Your team, last 30 days" />
       <KpiTiles items={data.kpis} mobileCols={2} />
       <Grid cols={2}>
-        <AreaChart title="Tasks Completed per Week" values={data.completed_per_week} />
-        <Card><CardHeader title="Workload by Person" /><Bars rows={data.workload} /></Card>
+        <AreaChart title="Tasks Completed per Week" values={data.completed_per_week} labels={data.completed_per_week.map((_, i) => `Week ${i + 1}`)} />
+        <Card><CardHeader title="Workload by Person" /><Bars rows={toBars(data.workload)} /></Card>
       </Grid>
       <Grid cols={2}>
-        <Card><CardHeader title="Tasks by Priority" /><Bars rows={data.priority.map((p) => ({ ...p, color: p.emphasis === "warn" ? "var(--chart-4)" : undefined }))} /></Card>
-        <Table
+        <Card><CardHeader title="Tasks by Priority" /><Bars rows={toBars(data.priority)} /></Card>
+        <DataView
           title="Overdue Reasons"
           rows={data.late_reasons}
           rowKey={(r) => r.reason}

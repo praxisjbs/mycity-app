@@ -26,9 +26,14 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Layout | [Grid](#grid) | `Grid` | The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone. | stable |
 | Layout | [PageHeader](#pageheader) | `PageHeader` | A page's title, its one-line subtitle (desktop only) and the page's actions. | stable |
 | Layout | [PhoneOnly](#phoneonly) | `PhoneOnly`, `DesktopOnly` | Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen. | stable |
+| Layout | [SplitPanes](#splitpanes) | `SplitPanes` | A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it. | stable |
 | Layout | [Stack](#stack) | `Stack`, `Inline` | A vertical run of blocks with an even gap; Inline is the horizontal run that wraps. | stable |
+| Display | [Accordion](#accordion) | `Accordion` | Questions and their answers, each closed until it is opened. | stable |
 | Display | [Avatar](#avatar) | `Avatar`, `Who` | A person's photo, or their initials in a round chip when there is none, with an optional presence dot; Who is the avatar with the name and a second line. | stable |
 | Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
+| Display | [Bars](#bars) | `Bars` | Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target. | stable |
+| Display | [Chain](#chain) | `Chain` | An approval route: the steps already done, the one in hand, and what is still to come. | stable |
+| Display | [Confetti](#confetti) | `Confetti` | Pieces of paper or stars drifting down behind a celebration card. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
 | Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
@@ -36,11 +41,24 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Illustration](#illustration) | `Illustration`, `EmptyIllustration`, `SearchIllustration`, `SuccessIllustration`, `ErrorIllustration`, `LockedIllustration`, `OfflineIllustration`, `FirstRunIllustration`, `ClockInIllustration`, `ClockOutIllustration` | A small line drawing in the theme's colours, for empty states, first run, results and the clock prompts. | beta |
 | Display | [Kbd](#kbd) | `Kbd` | A keyboard key or shortcut, drawn as keycaps (⌘ K, Esc). | stable |
 | Display | [KeyValue](#keyvalue) | `KeyValue` | Label and value pairs for a record: two columns on desktop, label over value on a phone; a value that is not set shows EmptyValue. | stable |
+| Display | [KpiCard](#kpicard) | `KpiCard` | One figure a person acts on: its title, the number, and a short trend line; with `onOpen` it becomes the way into the records behind it. | stable |
+| Display | [KpiDetail](#kpidetail) | `KpiDetail` | The report model behind a KPI card: the records that make up the number, grouped, searchable and paged at 25. | stable |
+| Display | [KpiGrid](#kpigrid) | `KpiGrid` | The row of KPI cards: four across on desktop, two to a row on a phone. | stable |
 | Display | [Money](#money) | `Money` | An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word. | stable |
 | Display | [Pill](#pill) | `Pill`, `StatusPill` | A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }). | stable |
+| Display | [ProfileHeader](#profileheader) | `ProfileHeader`, `BackButton` | The head of a record page: who or what it is, in big initials, with its chips and its actions. | stable |
 | Display | [ProgressBar](#progressbar) | `ProgressBar`, `Meter` | How far along something is: a bar with its percent, or a moving bar when the end is unknown; Meter is the thin inline bar with its figure (the merged Mini). | stable |
 | Display | [Quote](#quote) | `Quote` | A quoted passage a person wrote or received, with the yellow rule at its left. | stable |
+| Display | [Result](#result) | `Result` | The outcome of something a person just did: clocking in, signing, a check that passed or failed. | stable |
+| Display | [ShareBar](#sharebar) | `ShareBar` | The share of a total, drawn behind a row of text rather than beside it. | stable |
 | Display | [Skeleton](#skeleton) | `Skeleton`, `Spinner` | A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape. | stable |
+| Display | [StatStrip](#statstrip) | `StatStrip` | A strip of labelled figures across the top of a record: smaller than KPI cards, for a record's own counts. | stable |
+| Display | [Sub](#sub) | `Sub` | The faint line under a heading or beside a value: the smallest secondary text there is. | stable |
+| Display | [Swatch](#swatch) | `Swatch` | A square of one palette token's colour, beside its name and its value. | stable |
+| Display | [TapList](#taplist) | `TapList` | A stack of rows that each open something: the phone's way into a record when a table would be wrong. | stable |
+| Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
+| Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
+| Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, which fill as it plays. | stable |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
@@ -64,11 +82,37 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
+| Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
+| Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
+| Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row. | stable |
 | Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField` | Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField). | stable |
+| Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
 | Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
 | Forms | [TextField](#textfield) | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` | The text input of the form system, with its typed relatives: password, whole number, phone and long text. | stable |
+| Forms | [Tick](#tick) | `Tick` | A checkbox with no label beside it, named by what it picks: the tick on a list's row. | stable |
+| Forms | [UploadField](#uploadfield) | `UploadField` | The upload engine: the only file input in the product, with a percentage per file and the vault's document as its answer. | stable |
+| Forms | [VoiceField](#voicefield) | `VoiceField` | Speak instead of typing: records, sends the audio to be transcribed, and drops the words into the field (A18). | stable |
 | Forms | [Wizard](#wizard) | `Wizard` | A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result. | stable |
+| Data | [Calendar](#calendar) | `Calendar` | A month at a glance, Monday first, with what happens on each day. | stable |
+| Data | [DataView](#dataview) | `DataView`, `LoadingRows` | THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export. | stable |
+| Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox. | stable |
+| Data | [Kanban](#kanban) | `Kanban`, `KanbanCardBody` | A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19). | stable |
+| Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
+| Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
+| Charts | [AreaChart](#areachart) | `AreaChart` | A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter. | stable |
+| Charts | [BandChart](#bandchart) | `BandChart` | Salary bands: each grade's range on one scale, with its midpoint marked and its figures beside it. | stable |
+| Charts | [BarChart](#barchart) | `BarChart` | Figures side by side as bars: headcount by department, claims by month, interviews by stage. | stable |
+| Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
+| Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
+| Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
+| Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both. | stable |
+| Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
+| Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
+| Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
+| Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
+| Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
+| Maps | [PlaceSearch](#placesearch) | `PlaceSearch` | Finds an address through our own API and hands back the place with its coordinates. | stable |
 | Shell | [BottomBar](#bottombar) | `BottomBar` | The phone's bottom bar: Home, Workspace, Community, Self-Service and More, each an icon with one word, within thumb reach (F16). | stable |
 | Shell | [Brand](#brand) | `Brand` | The MyCity pin mark, alone or with the name beside it, in the brand colours of the surface it sits on. | stable |
 | Shell | [ComingSoon](#comingsoon) | `ComingSoon` | The card a screen shows before its milestone opens it: the milestone and date, one line, and what the screen will do. | stable |
@@ -321,6 +365,41 @@ Shows its content on a phone only; DesktopOnly shows it on a desktop only. What 
 <DesktopOnly unmount><AreaChart /></DesktopOnly>
 ```
 
+### SplitPanes
+
+A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it.
+
+| | |
+|---|---|
+| Use | A screen read one record at a time out of a list: the mailbox, chat, a day's punches. |
+| Avoid | A page of sections (use Grid); a list and a detail that fit side by side at a fixed width (use Grid "1.4/1"); three panes a person drags independently. |
+| Phone | There are no panes: the list fills the screen and an open record covers it, above the shell, with the safe area kept clear. |
+| Accessibility | The divider is a real separator with its width as its value, and the arrow keys move it, so the panes can be resized without a pointer. |
+| Status | stable |
+| Exports | `SplitPanes` |
+| Import | `import { SplitPanes } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/SplitPanes.tsx` |
+| Test | `packages/ui/src/layout/SplitPanes.test.tsx` |
+| Gallery | `packages/ui/src/layout/SplitPanes.gallery.tsx` (`npm run gallery`, `#/SplitPanes`) |
+
+**SplitPanes** props (`SplitPanesProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `split` | `SplitState` | yes | The width and the drag, from `useSplitPanes`. |
+| `list` | `ReactNode` | yes | The list, which fills the screen on a phone. |
+| `detail` | `ReactNode` | yes | The record in view, which covers the list on a phone. |
+| `aside` | `ReactNode` |  | A third pane at the right on desktop, 300 px wide (a channel's own information). |
+| `open` | `boolean` |  | A record is open: on a phone it covers the list. |
+| `minHeight` | `"sm" \| "md"` |  | The panes' least height; `md` unless a screen wants more. |
+| `scrolls` | `boolean` |  | The open record scrolls as one, rather than its own parts scrolling (the mailbox reads this way). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+const split = useSplitPanes("mailbox", 320);
+<SplitPanes split={split} open={open} list={list} detail={reader} />
+```
+
 ### Stack
 
 A vertical run of blocks with an even gap; Inline is the horizontal run that wraps.
@@ -362,6 +441,34 @@ A vertical run of blocks with an even gap; Inline is the horizontal run that wra
 ```
 
 ## Display
+
+### Accordion
+
+Questions and their answers, each closed until it is opened.
+
+| | |
+|---|---|
+| Use | A set of FAQs (the Knowledge Hub), a policy's clauses, a long list of named notes a person reads one of. |
+| Avoid | Support text on a screen (use HelpTerm or Details); hiding something a person needs to act (that is tier 1, and belongs open); one item on its own (use Details). |
+| Phone | The same rows, each at least 44 px tall, opening in place rather than in a sheet. |
+| Accessibility | Native disclosures, so the keyboard and screen readers work without any script; the + marker is decorative. |
+| Status | stable |
+| Exports | `Accordion` |
+| Import | `import { Accordion } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Accordion.tsx` |
+| Test | `packages/ui/src/display/Accordion.test.tsx` |
+| Gallery | `packages/ui/src/display/Accordion.gallery.tsx` (`npm run gallery`, `#/Accordion`) |
+
+**Accordion** props (`AccordionProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `AccordionItem[]` | yes | The items, in the order they should be read. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Accordion items={[{ title: "How do I claim overtime?", body: "Open My Attendance and ..." }]} />
+```
 
 ### Avatar
 
@@ -440,6 +547,93 @@ One line across a page or a card in a status tone, with an icon and at most one 
 
 ```tsx
 <Banner tone="warn" action={<Button size="sm">Read Policy</Button>}>Attendance policy updated</Banner>
+```
+
+### Bars
+
+Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target.
+
+| | |
+|---|---|
+| Use | A handful of named measures a person reads top to bottom, where the label matters as much as the figure. |
+| Avoid | A figure over time (use AreaChart); comparing one measure across categories (use BarChart); a single measure (use Meter). |
+| Phone | The same rows, with a narrower label column; the bar keeps its figure beside it. |
+| Accessibility | Each row is a meter with its own name and figure, so the proportion is read rather than guessed from a colour. |
+| Status | stable |
+| Exports | `Bars` |
+| Import | `import { Bars } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Bars.tsx` |
+| Test | `packages/ui/src/display/Bars.test.tsx` |
+| Gallery | `packages/ui/src/display/Bars.gallery.tsx` (`npm run gallery`, `#/Bars`) |
+
+**Bars** props (`BarsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `rows` | `BarsRow[]` | yes | The rows, top to bottom. |
+| `note` | `ReactNode` |  | The line under the rows, at most 8 words, desktop only. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Bars rows={[{ label: "Qualified", percent: 64, value: "18 leads" }]} />
+```
+
+### Chain
+
+An approval route: the steps already done, the one in hand, and what is still to come.
+
+| | |
+|---|---|
+| Use | Above a record that waits on people (an expense claim, a leave request, a requisition, an offer). |
+| Avoid | What has already happened with dates (use Timeline); a progress figure (use ProgressBar or Meter); more than six steps. |
+| Phone | The steps wrap onto as many lines as they need; the arrows stay between them, never a sideways scroll. |
+| Accessibility | An ordered list whose current step says so in words, so the state is never the colour of a pill alone. |
+| Status | stable |
+| Exports | `Chain` |
+| Import | `import { Chain } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Chain.tsx` |
+| Test | `packages/ui/src/display/Chain.test.tsx` |
+| Gallery | `packages/ui/src/display/Chain.gallery.tsx` (`npm run gallery`, `#/Chain`) |
+
+**Chain** props (`ChainProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `steps` | `ChainStep[]` | yes | The steps, first to last. |
+| `label` | `string` |  | Names the route for screen readers; "Approval route" unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Chain steps={[{ label: "Submitted", state: "done" }, { label: "Line Manager", state: "now" }, { label: "Finance" }]} />
+```
+
+### Confetti
+
+Pieces of paper or stars drifting down behind a celebration card.
+
+| | |
+|---|---|
+| Use | Behind a birthday or a work anniversary in the Staff Community, and nowhere a person is working. |
+| Avoid | A saved form, a completed task or anything a person does many times a day; a screen that needs reading while it moves. |
+| Phone | The same pieces at the same pace; they stop under reduced motion, like every other animation. |
+| Accessibility | Decorative and hidden from screen readers, and it stops entirely under prefers-reduced-motion (base.css). |
+| Status | stable |
+| Exports | `Confetti` |
+| Import | `import { Confetti } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Confetti.tsx` |
+| Test | `packages/ui/src/display/Confetti.test.tsx` |
+| Gallery | `packages/ui/src/display/Confetti.gallery.tsx` (`npm run gallery`, `#/Confetti`) |
+
+**Confetti** props (`ConfettiProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `shape` | `"paper" \| "stars"` |  | `paper` (the default) drops rectangles and circles; `stars` drops five-pointed stars. |
+| `className` | `string` |  | Layout classes only (the box it falls inside). |
+
+```tsx
+<Confetti />
+<Confetti shape="stars" />
 ```
 
 ### CountBadge
@@ -705,6 +899,112 @@ Label and value pairs for a record: two columns on desktop, label over value on 
 <KeyValue items={[{ label: "Start Date", value: "13/10/2026" }]} />
 ```
 
+### KpiCard
+
+One figure a person acts on: its title, the number, and a short trend line; with `onOpen` it becomes the way into the records behind it.
+
+| | |
+|---|---|
+| Use | A role's figures at the top of Home, a record's own counts, a module's four tiles above its list. |
+| Avoid | A sentence about the number (put it behind the help); a tile for a figure nobody acts on; more than four on one row. |
+| Phone | Two to a row in a KpiGrid, with the number a size smaller; opening one shows its records as a bottom sheet. |
+| Accessibility | A tile that opens something is a button named by its title and value, with the chevron decorative; its help is an InfoButton beside the button, never a focusable term inside it; the trend's direction is a word, never colour alone. |
+| Status | stable |
+| Exports | `KpiCard` |
+| Import | `import { KpiCard } from "@mycity/ui";` |
+| File | `packages/ui/src/display/KpiCard.tsx` |
+| Test | `packages/ui/src/display/KpiCard.test.tsx` |
+| Gallery | `packages/ui/src/display/KpiCard.gallery.tsx` (`npm run gallery`, `#/KpiCard`) |
+
+**KpiCard** props (`KpiCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The figure's name, Title Case, at most 4 words (Clocked In Today). |
+| `value` | `ReactNode` | yes | The figure itself: a count, a Money, a fraction ("22 of 25"). |
+| `tone` | `StatusTone` |  | The number's tone, when the figure itself is good or bad news. |
+| `caption` | `ReactNode` |  | The line under the number, at most 5 words (4 overdue, 3 more than last month). |
+| `trend` | `"up" \| "down" \| "flat"` |  | Which way it has moved; the caption then carries an arrow and the direction as a word. |
+| `help` | `ReactNode` |  | Support text, at most 35 words: what the figure counts. On a plain tile it sits behind the title as a help term; on a tile that opens its records it is an ⓘ beside the number instead, because a focusable term cannot live inside the button that opens them. |
+| `helpLabel` | `string` |  | The figure's name as plain words, when `title` is not a string: the ⓘ's name and the help sheet's title. |
+| `onOpen` | `() => void` |  | Opens the records behind the number (the report model). Without it the tile is plain. |
+| `opensOn` | `"all" \| "phone"` |  | Where the tile is clickable. `all` (the default) on both; `phone` when the desktop page already shows the detail beside the tiles, so desktop gets no second way to the same thing. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<KpiCard title="Clocked In Today" value="22 of 25" onOpen={() => openDetail("attendance.punched")} />
+<KpiCard title="Owed This Month" value={<Money value={total} short />} tone="warn" caption="4 overdue" trend="up" />
+```
+
+### KpiDetail
+
+The report model behind a KPI card: the records that make up the number, grouped, searchable and paged at 25.
+
+| | |
+|---|---|
+| Use | As the body of the modal a KPI card opens (docs/guides/home.md §3 step 3), and anywhere a figure has to be opened up. |
+| Avoid | Explaining how the figure is worked out (that is the guide's); loading the whole set to count it; a second table inside it. |
+| Phone | The modal is a bottom sheet and the records are cards, so the groups stay chips and nothing scrolls sideways. |
+| Accessibility | The group chips are a group named for the list, each chip saying whether it is pressed; the summary is a live region, so a changed group is heard. |
+| Status | stable |
+| Exports | `KpiDetail` |
+| Import | `import { KpiDetail } from "@mycity/ui";` |
+| File | `packages/ui/src/display/KpiDetail.tsx` |
+| Test | `packages/ui/src/display/KpiDetail.test.tsx` |
+| Gallery | `packages/ui/src/display/KpiDetail.gallery.tsx` (`npm run gallery`, `#/KpiDetail`) |
+
+**KpiDetail** props (`KpiDetailProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `summary` | `ReactNode` |  | One operational line above the list, at most 20 words ("22 of 25 clocked in across the organisation"). |
+| `groups` | `KpiDetailGroup[]` |  | The groups the rules read the figure in; chips show only when there is more than one. |
+| `group` | `string` |  | The group in view; `all` for every record. |
+| `onGroup` | `(group: string) => void` |  | Called with the chosen group's value, or `all`. |
+| `list` | `DataViewList<R>` | yes | The server-paged records behind the number (a `usePaged()` result). |
+| `columns` | `DataViewColumn<R>[]` | yes | The columns, as the KPI's own meta describes them. |
+| `rowKey` | `(row: R) => string` | yes | Names one record. |
+| `onRowClick` | `(row: R) => void` |  | Opens a record; the modal closes first, so the person lands on the screen. |
+| `noun` | `string` |  | What one record is, for the pager's count ("person"). |
+| `nounPlural` | `string` |  | The plural, when it is not the noun with an s. |
+| `caption` | `string` | yes | Names the list for screen readers; the KPI's own title. |
+| `empty` | `{ title: ReactNode; text?: ReactNode }` |  | What to show when nothing is behind the number. |
+
+```tsx
+<KpiDetail summary="22 of 25 clocked in" groups={groups} group={group} onGroup={setGroup} list={list} columns={columns} rowKey={(r) => r.id} />
+```
+
+### KpiGrid
+
+The row of KPI cards: four across on desktop, two to a row on a phone.
+
+| | |
+|---|---|
+| Use | Above a list or at the top of a tab, holding the three or four figures that tab is about. |
+| Avoid | More than four figures in one row; mixing KPI cards with other cards inside it; a grid of one (use the card). |
+| Phone | Two to a row with tighter spacing, as the feature guides' §10 lays Home out. |
+| Accessibility | A list, so a screen reader hears how many figures there are before reading them. |
+| Status | stable |
+| Exports | `KpiGrid` |
+| Import | `import { KpiGrid } from "@mycity/ui";` |
+| File | `packages/ui/src/display/KpiGrid.tsx` |
+| Test | `packages/ui/src/display/KpiGrid.test.tsx` |
+| Gallery | `packages/ui/src/display/KpiGrid.gallery.tsx` (`npm run gallery`, `#/KpiGrid`) |
+
+**KpiGrid** props (`KpiGridProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `KpiGridItem[]` |  | The figures, left to right. Pass this or `children`. |
+| `children` | `ReactNode` |  | The cards themselves, when a screen builds each one. Pass this or `items`. |
+| `cols` | `2 \| 3 \| 4` |  | Cards across on desktop: 4 unless the tab has three figures. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<KpiGrid items={[{ key: "in", title: "Clocked In Today", value: "22 of 25", onOpen: open }]} />
+<KpiGrid>{figures.map((f) => <KpiCard key={f.key} {...f} />)}</KpiGrid>
+```
+
 ### Money
 
 An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word.
@@ -775,6 +1075,48 @@ A small rounded label in a status tone, with a dot; StatusPill draws one from a 
 ```tsx
 <Pill tone="ok">Approved</Pill>
 <StatusPill status={leave.status} />
+```
+
+### ProfileHeader
+
+The head of a record page: who or what it is, in big initials, with its chips and its actions.
+
+| | |
+|---|---|
+| Use | A 360 page (an employee, a partner, a candidate, a vacancy), above the tabs or sections of that record. |
+| Avoid | A page title (use PageHeader); a list row (use DataView); more than four chips or three actions. |
+| Phone | The initials and the name sit together with the actions full width under them, so nothing is squeezed. |
+| Accessibility | The name is the page's own heading, and the initials are decorative, since the name is right beside them. |
+| Status | stable |
+| Exports | `ProfileHeader`, `BackButton` |
+| Import | `import { ProfileHeader, BackButton } from "@mycity/ui";` |
+| File | `packages/ui/src/display/ProfileHeader.tsx` |
+| Test | `packages/ui/src/display/ProfileHeader.test.tsx` |
+| Gallery | `packages/ui/src/display/ProfileHeader.gallery.tsx` (`npm run gallery`, `#/ProfileHeader`) |
+
+**ProfileHeader** props (`ProfileHeaderProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The record's own name, as the organisation holds it. |
+| `role` | `ReactNode` |  | What it is: a job title, a sector, a stage. |
+| `chips` | `ReactNode` |  | Up to four pills: status, department, grade. |
+| `actions` | `ReactNode` |  | Up to three actions, the primary last. |
+| `brand` | `boolean` |  | Draw the initials in the brand yellow instead of City Green (a partner, not a person). |
+| `avatar` | `ReactNode` |  | A picture instead of the initials. |
+| `level` | `1 \| 2` |  | The heading level; h1 on a record's own page, h2 inside one. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**BackButton** props (`BackButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | Where it goes back to, Title Case, at most 3 words ("Back to Employees"). |
+| `onBack` | `() => void` | yes | Goes back. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ProfileHeader name={employee.display_name} role={employee.job_title} chips={pills} actions={buttons} />
 ```
 
 ### ProgressBar
@@ -852,6 +1194,66 @@ A quoted passage a person wrote or received, with the yellow rule at its left.
 <Quote cite="Adaeze Okafor, Line Manager">Approved, enjoy the break.</Quote>
 ```
 
+### Result
+
+The outcome of something a person just did: clocking in, signing, a check that passed or failed.
+
+| | |
+|---|---|
+| Use | Straight after an action, at the top of the screen or sheet that shows what happened. |
+| Avoid | A notice about the system (use Banner); an error from a read (use ErrorState); a confirmation a toast already gave. |
+| Phone | Full width at the top of the sheet, with the glyph beside the words rather than above them. |
+| Accessibility | A live region, so the outcome is heard without the person going looking for it; the tone is always carried by words too. |
+| Status | stable |
+| Exports | `Result` |
+| Import | `import { Result } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Result.tsx` |
+| Test | `packages/ui/src/display/Result.test.tsx` |
+| Gallery | `packages/ui/src/display/Result.gallery.tsx` (`npm run gallery`, `#/Result`) |
+
+**Result** props (`ResultProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tone` | `"ok" \| "warn" \| "err" \| "info"` | yes | How it went: ok, warn, err or info. |
+| `title` | `ReactNode` | yes | The outcome itself, at most 4 words ("07:52, On Site"). |
+| `label` | `string` |  | The small line above it, Title Case, at most 3 words ("Clocked In"). |
+| `text` | `ReactNode` |  | One line under it, at most 20 words. |
+| `icon` | `IconName` |  | A glyph instead of the tone's own. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Result tone="ok" label="Clocked In" title="07:52, On Site" text="Lekki Office" />
+```
+
+### ShareBar
+
+The share of a total, drawn behind a row of text rather than beside it.
+
+| | |
+|---|---|
+| Use | A poll option's votes behind its words, a tally where the bar must not take a column of its own. |
+| Avoid | A measure a person reads a figure off (use Meter); progress through work under way (use ProgressBar); a bar that hides the text over it. |
+| Phone | The same bar; the row over it keeps its 44 px, so the share never changes what can be tapped. |
+| Accessibility | Decorative: the figure it shows is in the words over it, and the row itself says whether it is chosen. |
+| Status | stable |
+| Exports | `ShareBar` |
+| Import | `import { ShareBar } from "@mycity/ui";` |
+| File | `packages/ui/src/display/ShareBar.tsx` |
+| Test | `packages/ui/src/display/ShareBar.test.tsx` |
+| Gallery | `packages/ui/src/display/ShareBar.gallery.tsx` (`npm run gallery`, `#/ShareBar`) |
+
+**ShareBar** props (`ShareBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `percent` | `number` | yes | The share, 0 to 100 (held inside that range). |
+| `className` | `string` |  | Layout classes only (the tint, where a screen wants another). |
+
+```tsx
+<ShareBar percent={62} />
+```
+
 ### Skeleton
 
 A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape.
@@ -890,6 +1292,214 @@ A shimmering placeholder in the shape of what is loading: lines of text, a block
 <Skeleton lines={4} />
 <Skeleton shape="circle" className="size-8" />
 <Spinner label="Loading payslips" />
+```
+
+### StatStrip
+
+A strip of labelled figures across the top of a record: smaller than KPI cards, for a record's own counts.
+
+| | |
+|---|---|
+| Use | At the head of a record (an expense claim's totals, a payroll run's counts, a vacancy's pipeline). |
+| Avoid | A role's dashboard figures (use KpiGrid); more than six figures; a figure with a sentence under it. |
+| Phone | Two to a row, and only the first four show unless a figure is marked `desktop` (gate 11). |
+| Accessibility | A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. |
+| Status | stable |
+| Exports | `StatStrip` |
+| Import | `import { StatStrip } from "@mycity/ui";` |
+| File | `packages/ui/src/display/StatStrip.tsx` |
+| Test | `packages/ui/src/display/StatStrip.test.tsx` |
+| Gallery | `packages/ui/src/display/StatStrip.gallery.tsx` (`npm run gallery`, `#/StatStrip`) |
+
+**StatStrip** props (`StatStripProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `StatStripItem[]` | yes | The figures, left to right. |
+| `label` | `string` |  | Names the strip for screen readers; "Figures" unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<StatStrip items={[{ label: "Submitted", value: 18 }, { label: "Approved", value: 14, tone: "ok" }]} />
+```
+
+### Sub
+
+The faint line under a heading or beside a value: the smallest secondary text there is.
+
+| | |
+|---|---|
+| Use | A line under a card's title, a unit beside a figure, who last changed a record. |
+| Avoid | A page subtitle (PageHeader draws one); support text (use HelpTerm); a sentence longer than the thing it sits under. |
+| Phone | The same size; secondary lines are what a phone drops first, so check the guide's §10 before adding one. |
+| Accessibility | Plain text in the reading order; where it is a record's own value it is marked as content, so the copy gates skip it. |
+| Status | stable |
+| Exports | `Sub` |
+| Import | `import { Sub } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Sub.tsx` |
+| Test | `packages/ui/src/display/Sub.test.tsx` |
+| Gallery | `packages/ui/src/display/Sub.gallery.tsx` (`npm run gallery`, `#/Sub`) |
+
+**Sub** props (`SubProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The words. |
+| `as` | `"span" \| "p"` |  | `span` (the default) inside a line, `p` on its own. |
+| `record` | `boolean` |  | The words are a record's own value, not interface copy: the copy gates skip them. |
+| `className` | `string` |  | Layout classes only (spacing, alignment). |
+
+```tsx
+<Sub>Updated 13/10/2026</Sub>
+<Sub as="p" record>{employee.job_title}</Sub>
+```
+
+### Swatch
+
+A square of one palette token's colour, beside its name and its value.
+
+| | |
+|---|---|
+| Use | Settings · Appearance, where a person checks the brand's own palette in the theme they are in. |
+| Avoid | Showing a colour a screen chose rather than a token; a swatch of a colour nobody can name. |
+| Phone | The same square at the same size; the name and value wrap beside it. |
+| Accessibility | Decorative: the token's name and its value are words beside the square, so the colour is never the only thing said. |
+| Status | stable |
+| Exports | `Swatch` |
+| Import | `import { Swatch } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Swatch.tsx` |
+| Test | `packages/ui/src/display/Swatch.test.tsx` |
+| Gallery | `packages/ui/src/display/Swatch.gallery.tsx` (`npm run gallery`, `#/Swatch`) |
+
+**Swatch** props (`SwatchProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `token` | `string` | yes | The token, as it is written in tokens.css (`--primary`, `--chart-1`). |
+| `size` | `"sm" \| "md"` |  | `md` (30 px, the default) or `sm` (24 px), for a denser list. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Swatch token="--primary" />
+```
+
+### TapList
+
+A stack of rows that each open something: the phone's way into a record when a table would be wrong.
+
+| | |
+|---|---|
+| Use | On a phone, a short list a person taps into (a payslip per month, a device, a worksite, a leave request). |
+| Avoid | A server-paged list of records (use DataView, which draws the card list itself); a row that opens nothing; more than about ten rows without paging. |
+| Phone | This is the phone layout: each row is at least 44 px with a chevron, and `flat` lets it run to the screen's edges. |
+| Accessibility | A list whose rows are buttons named by their own words, with the chevron decorative. |
+| Status | stable |
+| Exports | `TapList` |
+| Import | `import { TapList } from "@mycity/ui";` |
+| File | `packages/ui/src/display/TapList.tsx` |
+| Test | `packages/ui/src/display/TapList.test.tsx` |
+| Gallery | `packages/ui/src/display/TapList.gallery.tsx` (`npm run gallery`, `#/TapList`) |
+
+**TapList** props (`TapListProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `TapListItem[]` | yes | The rows, top to bottom. |
+| `label` | `string` |  | Names the list for screen readers. |
+| `flat` | `boolean` |  | Run to the screen's edges, with a rule above, instead of sitting in a rounded card. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<TapList items={[{ key: "p1", title: "September 2026", sub: "Paid 25/09/2026", onSelect: open }]} />
+```
+
+### Tile
+
+A small bordered tile: a heading, a line, and whatever sits under them.
+
+| | |
+|---|---|
+| Use | A grid of named things that are not records (a report to run, a letter template, a setting group). |
+| Avoid | A figure (use KpiCard); a record (use DataView or TapList); a card with its own sections (use Card and CardHeader). |
+| Phone | Full width in a one-column grid, or two to a row inside a Grid; the pills wrap under the line. |
+| Accessibility | Its heading is a real heading at the level the page needs, so the tiles form part of the outline. |
+| Status | stable |
+| Exports | `Tile` |
+| Import | `import { Tile } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Tile.tsx` |
+| Test | `packages/ui/src/display/Tile.test.tsx` |
+| Gallery | `packages/ui/src/display/Tile.gallery.tsx` (`npm run gallery`, `#/Tile`) |
+
+**Tile** props (`TileProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The tile's name, Title Case, at most 4 words. |
+| `text` | `ReactNode` |  | One line about it, at most 20 words. |
+| `children` | `ReactNode` |  | What sits under the line: pills, a small button. |
+| `level` | `2 \| 3 \| 4` |  | The heading level; h2 unless the tile sits inside a section, where it is h3. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Tile title="Attendance Month" text="Every clocking for one month."><Pill>Excel</Pill></Tile>
+```
+
+### Timeline
+
+What happened to a record, newest or oldest first: a rail of dated events, each with its own dot.
+
+| | |
+|---|---|
+| Use | A record's trail (an expense claim's steps, a query's history, a candidate's stages), an audit list on a record page. |
+| Avoid | An approval route that has not happened yet (use Chain); a list of records (use DataView); more than about a dozen events without paging them. |
+| Phone | The same rail, full width; the text wraps rather than truncating, since it is content. |
+| Accessibility | An ordered list, so a screen reader hears how many events there are and reads them in order; the dots are decorative. |
+| Status | stable |
+| Exports | `Timeline` |
+| Import | `import { Timeline } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Timeline.tsx` |
+| Test | `packages/ui/src/display/Timeline.test.tsx` |
+| Gallery | `packages/ui/src/display/Timeline.gallery.tsx` (`npm run gallery`, `#/Timeline`) |
+
+**Timeline** props (`TimelineProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `TimelineItem[]` | yes | The events, in the order they should be read. |
+| `label` | `string` |  | Names the trail for screen readers; "History" unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Timeline items={[{ title: "Approved by Ada Obi", when: "13/10/2026 09:41", tone: "done" }]} />
+```
+
+### Waveform
+
+A voice note's bars, which fill as it plays.
+
+| | |
+|---|---|
+| Use | Beside the play button on a voice note: a community message, a review's dictated comment. |
+| Avoid | A real reading of the audio (these bars are a shape, not the sound); a progress figure a person reads (use ProgressBar). |
+| Phone | The same bars at the width the bubble gives them; the play button beside it keeps its 44 px. |
+| Accessibility | Decorative: the length is said in words beside it and the button says whether it is playing, so nothing here needs reading. |
+| Status | stable |
+| Exports | `Waveform` |
+| Import | `import { Waveform } from "@mycity/ui";` |
+| File | `packages/ui/src/display/Waveform.tsx` |
+| Test | `packages/ui/src/display/Waveform.test.tsx` |
+| Gallery | `packages/ui/src/display/Waveform.gallery.tsx` (`npm run gallery`, `#/Waveform`) |
+
+**Waveform** props (`WaveformProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `seconds` | `number` | yes | How long the note is, in seconds: it sets how fast the bars fill. |
+| `playing` | `boolean` |  | It is playing: the bars light in turn over the note's length. |
+| `className` | `string` |  | Layout classes only (width, height). |
+
+```tsx
+<Waveform seconds={42} playing={playing} />
 ```
 
 ## Navigation
@@ -1756,6 +2366,110 @@ A one-time code in separate boxes: each digit moves to the next, a pasted code f
 <OtpField label="Sign-In Code" value={code} onChange={setCode} />
 ```
 
+### PersonPicker
+
+Picks people the server searches: their name, job title and department, one page of 25 at a time.
+
+| | |
+|---|---|
+| Use | Any field that names a person: an approver, an interview panel, a task's owner, who a letter is for. |
+| Avoid | Loading every employee into a dropdown (FRONTEND_GUIDE §4); a free-text name box where a record exists; a picker for the person signed in. |
+| Phone | Full width, each person a 44 px row with their initials; the picked chips wrap above the search box. |
+| Accessibility | A search box over a listbox whose options say whether they are picked, and each person named by their own words. |
+| Status | stable |
+| Exports | `PersonPicker` |
+| Import | `import { PersonPicker } from "@mycity/ui";` |
+| File | `packages/ui/src/form/PersonPicker.tsx` |
+| Test | `packages/ui/src/form/PersonPicker.test.tsx` |
+| Gallery | `packages/ui/src/form/PersonPicker.gallery.tsx` (`npm run gallery`, `#/PersonPicker`) |
+
+**PersonPicker** props (`PersonPickerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `list` | `DataViewList<P>` | yes | The server-paged people to pick from (a `usePaged()` result). |
+| `value` | `P[]` | yes | Who is picked, held by the form. |
+| `onChange` | `(value: P[]) => void` | yes | Called with the new set. |
+| `multiple` | `boolean` |  | Pick several; one only unless set. |
+| `placeholder` | `string` |  | A format example of at most 3 words; "Search people" otherwise. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PersonPicker list={employees} value={panel} onChange={setPanel} multiple />
+```
+
+### RecordPicker
+
+Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything.
+
+| | |
+|---|---|
+| Use | A field that points at another record: a worksite, a department, a partner, a vacancy, an expense category. |
+| Avoid | Fetching every record to fill a `<select>` (FRONTEND_GUIDE §4); a picker over a list short enough to be a SelectField; filtering the 25 rows on screen. |
+| Phone | The search box and the results are full width, each result a 44 px row; the picked chips wrap above it. |
+| Accessibility | A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. |
+| Status | stable |
+| Exports | `RecordPicker` |
+| Import | `import { RecordPicker } from "@mycity/ui";` |
+| File | `packages/ui/src/form/RecordPicker.tsx` |
+| Test | `packages/ui/src/form/RecordPicker.test.tsx` |
+| Gallery | `packages/ui/src/form/RecordPicker.gallery.tsx` (`npm run gallery`, `#/RecordPicker`) |
+
+**RecordPicker** props (`RecordPickerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `list` | `DataViewList<R>` | yes | The server-paged records to pick from (a `usePaged()` result); the picker drives its search. |
+| `value` | `R[]` | yes | What is picked, held by the form. |
+| `onChange` | `(value: R[]) => void` | yes | Called with the new set. |
+| `id` | `(row: R) => string` | yes | Names one record, for the key and for what is already picked. |
+| `title` | `(row: R) => ReactNode` | yes | The record's own words (a name, a number). |
+| `sub` | `(row: R) => ReactNode` |  | The line under it (a department, a date, an amount). |
+| `lead` | `(row: R) => ReactNode` |  | What sits at the left of a row (an avatar, a glyph). |
+| `multiple` | `boolean` |  | Pick several; one only unless set. |
+| `placeholder` | `string` |  | A format example of at most 3 words; "Search" otherwise. |
+| `chip` | `(row: R) => string` |  | How a picked record reads on its chip; the title unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<RecordPicker list={worksites} value={picked} onChange={setPicked} id={(w) => w.worksite_id} title={(w) => w.name} />
+```
+
+### RichTextField
+
+Long text with the little formatting a message needs, loaded only when a composer opens.
+
+| | |
+|---|---|
+| Use | A mail body, an announcement, a letter's own paragraphs, a policy's text. |
+| Avoid | Any short answer (use TextField); a note nobody formats (use TextAreaField); pasting a whole page of foreign markup into a record. |
+| Phone | The toolbar wraps and every button is 44 px; the box grows with the text rather than scrolling inside itself. |
+| Accessibility | A named multi-line textbox with a formatting group whose buttons say whether they are on; the whole toolbar is reachable by Tab. |
+| Status | stable |
+| Exports | `RichTextField` |
+| Import | `import { RichTextField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/RichTextField.tsx` |
+| Test | `packages/ui/src/form/RichTextField.test.tsx` |
+| Gallery | `packages/ui/src/form/RichTextField.gallery.tsx` (`npm run gallery`, `#/RichTextField`) |
+
+**RichTextField** props (`RichTextFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The HTML, as the record stores it. |
+| `onChange` | `(html: string) => void` | yes | Called with the new HTML, or "" when the box is emptied. |
+| `onBlur` | `() => void` |  | Called when the person leaves the box: the moment it is first checked. |
+| `label` | `string` | yes | Names the box, Title Case, at most 4 words; the Field's label otherwise. |
+| `placeholder` | `string` |  | A format example of at most 3 words, never an instruction. |
+| `readOnly` | `boolean` |  | Read it without being able to change it (a sent message, a signed letter). |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id, when the caller sets it; the Field's otherwise. |
+
+```tsx
+<Field label="Message" {...f.status("body")}><RichTextField label="Message" {...f.field("body")} /></Field>
+```
+
 ### SearchInput
 
 The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row.
@@ -1841,6 +2555,37 @@ Pick one value: a select list, or for five options or fewer a segmented choice (
 
 ```tsx
 <ChoiceField options={[["remote", "Remote"], ["hybrid", "Hybrid"], ["on_site", "On Site"]]} {...form.field("work_pattern")} />
+```
+
+### SignatureField
+
+A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into.
+
+| | |
+|---|---|
+| Use | Signing an offer, an acknowledgement, a policy, an asset handover (MILESTONES §10: signed on a canvas from a phone). |
+| Avoid | A typed name as a signature; keeping the image anywhere but the document it belongs to; a pad nobody can clear. |
+| Phone | This is where it is used most: the pad is full width and drawn with a finger, and Clear is a 44 px target. |
+| Accessibility | The pad is named, and Clear says whether anything has been drawn, so the state is never only visual; a typed-name fallback stays the screen's choice. |
+| Status | stable |
+| Exports | `SignatureField` |
+| Import | `import { SignatureField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/SignatureField.tsx` |
+| Test | `packages/ui/src/form/SignatureField.test.tsx` |
+| Gallery | `packages/ui/src/form/SignatureField.gallery.tsx` (`npm run gallery`, `#/SignatureField`) |
+
+**SignatureField** props (`SignatureFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | Names the pad, Title Case, at most 4 words. |
+| `onChange` | `(hasInk: boolean) => void` | yes | Called true the moment the first stroke lands, and false when it is cleared. |
+| `disabled` | `boolean` |  | Nothing can be drawn (the document is already signed, or the link has been used). |
+| `noClear` | `boolean` |  | Hide the Clear button, where the screen offers its own. |
+| `className` | `string` |  | Layout classes only (spacing, height). |
+
+```tsx
+<SignatureField label="Your Signature" onChange={setInk} ref={pad} />
 ```
 
 ### Switch
@@ -1948,6 +2693,107 @@ The text input of the form system, with its typed relatives: password, whole num
 <TextField type="email" placeholder="ada@mycity.app" {...form.field("work_email")} />
 ```
 
+### Tick
+
+A checkbox with no label beside it, named by what it picks: the tick on a list's row.
+
+| | |
+|---|---|
+| Use | Row selection in DataView, and the one in a list's header that picks the whole page. |
+| Avoid | A yes or no answer in a form (use CheckboxField, which carries its label); a tick with no name; a tick that submits something on its own. |
+| Phone | A 44 px target around the box, so the tick is hittable without hitting the row it sits on. |
+| Accessibility | A real checkbox with its own name, so a screen reader says what is being picked, and it stops a press reaching the row underneath. |
+| Status | stable |
+| Exports | `Tick` |
+| Import | `import { Tick } from "@mycity/ui";` |
+| File | `packages/ui/src/form/Tick.tsx` |
+| Test | `packages/ui/src/form/Tick.test.tsx` |
+| Gallery | `packages/ui/src/form/Tick.gallery.tsx` (`npm run gallery`, `#/Tick`) |
+
+**Tick** props (`TickProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `checked` | `boolean` | yes | Ticked or not. |
+| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `label` | `string` | yes | What it picks, as words ("Select Page", "Select Ada Obi"): its accessible name. |
+| `disabled` | `boolean` |  | Nothing can be picked. |
+| `className` | `string` |  | Layout classes only (alignment). |
+
+```tsx
+<Tick checked={picked} onChange={toggle} label="Select Ada Obi" />
+```
+
+### UploadField
+
+The upload engine: the only file input in the product, with a percentage per file and the vault's document as its answer.
+
+| | |
+|---|---|
+| Use | Anywhere a person attaches a file: a CV, a receipt, a signed offer, a mail attachment, an import sheet. |
+| Avoid | A raw `<input type="file">` anywhere else (gate 18); storing a path or a name instead of the `document_id`; a silent wait on a large file. |
+| Phone | The drop zone is a full-width tap target, since a phone cannot drop; every file shows its own percentage as it travels. |
+| Accessibility | The words in the drop zone are a real button, which opens the picker; the progress is a named meter per file, and each file's state is in words as well as a glyph. |
+| Status | stable |
+| Exports | `UploadField` |
+| Import | `import { UploadField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/UploadField.tsx` |
+| Test | `packages/ui/src/form/UploadField.test.tsx` |
+| Gallery | `packages/ui/src/form/UploadField.gallery.tsx` (`npm run gallery`, `#/UploadField`) |
+
+**UploadField** props (`UploadFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `endpoint` | `string` |  | Where the multipart goes; `/api/v1/documents` unless the route is its own. |
+| `purpose` | `string` | yes | What the file is for: the server reads it to decide which types it takes. |
+| `upload` | `Uploader` |  | How the file is sent; the app's own client, which adds its session. The bare engine otherwise. |
+| `multiple` | `boolean` |  | Several files at once (the default), or exactly one. |
+| `accept` | `string` |  | What the picker offers, as extensions (".pdf,.jpg"). |
+| `maxBytes` | `number` |  | The biggest file taken; 25 MB unless set. |
+| `onUploaded` | `(docs: DocumentRef[]) => void` |  | Called with the documents once they have all arrived. |
+| `label` | `string` |  | The words in the drop zone, at most 6 words. |
+| `kinds` | `string` |  | What kinds of file are wanted, lower case, for the line under the words ("PDF or Word"). |
+| `compact` | `boolean` |  | A tighter drop zone, inside a sheet or beside a form's footer. |
+| `trigger` | `(open: () => void) => ReactNode` |  | A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<UploadField purpose="receipt" endpoint="/api/v1/documents" upload={api.upload} onUploaded={(docs) => form.set("receipts", docs)} />
+```
+
+### VoiceField
+
+Speak instead of typing: records, sends the audio to be transcribed, and drops the words into the field (A18).
+
+| | |
+|---|---|
+| Use | Beside a long text field the feature guide marks for it: a review's comments, an interview note, a query's account. |
+| Avoid | A short field; a field where the exact words matter legally (a signature block); keeping the recording after the words arrive. |
+| Phone | Where it is used most: Record is a 44 px target and the level meter shows it is listening. |
+| Accessibility | The button says whether it is recording, the elapsed time is a live region, and the transcript lands in the field where a screen reader can read and edit it. |
+| Status | stable |
+| Exports | `VoiceField` |
+| Import | `import { VoiceField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/VoiceField.tsx` |
+| Test | `packages/ui/src/form/VoiceField.test.tsx` |
+| Gallery | `packages/ui/src/form/VoiceField.gallery.tsx` (`npm run gallery`, `#/VoiceField`) |
+
+**VoiceField** props (`VoiceFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What is being dictated, Title Case, at most 4 words: names the button. |
+| `transcribe` | `Transcribe` | yes | Sends the audio and answers with the words. An AI tidies them server side without changing the meaning (A18). |
+| `onTranscript` | `(text: string) => void` | yes | Called with the words once they arrive. |
+| `maxSeconds` | `number` |  | The longest recording taken, in seconds; 120 unless set. |
+| `disabled` | `boolean` |  | Nothing can be recorded (the form is closed, or the browser refused the microphone). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<VoiceField label="Comments" transcribe={api.transcribe} onTranscript={(text) => f.set("comments", text)} />
+```
+
 ### Wizard
 
 A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result.
@@ -1979,6 +2825,707 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 
 ```tsx
 <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
+```
+
+## Data
+
+### Calendar
+
+A month at a glance, Monday first, with what happens on each day.
+
+| | |
+|---|---|
+| Use | Leave across a month, a shift pattern, interviews, a payroll calendar, anything a person reads by date. |
+| Avoid | A list of dated records (use DataView); a date to type into a form (use DateField); more than three events on one day without opening it. |
+| Phone | The same seven columns at a shorter height; a day's events are one tap each, and the page never scrolls sideways. |
+| Accessibility | A table of weeks with the weekdays as real headers, so a screen reader can say "Wednesday 14"; Sundays are marked in words, not only by their shade. |
+| Status | stable |
+| Exports | `Calendar` |
+| Import | `import { Calendar } from "@mycity/ui";` |
+| File | `packages/ui/src/data/Calendar.tsx` |
+| Test | `packages/ui/src/data/Calendar.test.tsx` |
+| Gallery | `packages/ui/src/data/Calendar.gallery.tsx` (`npm run gallery`, `#/Calendar`) |
+
+**Calendar** props (`CalendarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `year` | `number` | yes | The year. |
+| `month` | `number` | yes | The month, 0 for January, as `Date` counts them. |
+| `events` | `CalendarEvent[]` | yes | Everything happening that month; days outside it are ignored. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row (the month's own controls); the time zone otherwise. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Calendar year={2026} month={9} events={[{ date: "2026-10-14", label: "Ada on leave" }]} />
+```
+
+### DataView
+
+THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export.
+
+| | |
+|---|---|
+| Use | Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners. |
+| Avoid | A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone. |
+| Phone | The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
+| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons, a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
+| Status | stable |
+| Exports | `DataView`, `LoadingRows` |
+| Import | `import { DataView, LoadingRows } from "@mycity/ui";` |
+| File | `packages/ui/src/data/DataView.tsx` |
+| Test | `packages/ui/src/data/DataView.test.tsx` |
+| Gallery | `packages/ui/src/data/DataView.gallery.tsx` (`npm run gallery`, `#/DataView`) |
+
+**DataView** props (`DataViewProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `columns` | `DataViewColumn<R>[]` | yes | The columns, left to right. The first is the card's title on a phone. |
+| `rowKey` | `(row: R) => string` | yes | Names one row for the key, the pager's count and screen readers. |
+| `list` | `DataViewList<R>` |  | A server-paged list (a `usePaged()` result): the rows, the page, the search, the sort and the state in one. Pass this or `rows`. |
+| `rows` | `R[]` |  | A set already in hand (a record's own steps, a sheet's rows). Pass this or `list`. |
+| `loading` | `boolean` |  | A request is in flight, for a set passed as `rows`. |
+| `error` | `ApiError \| null` |  | The read's error, for a set passed as `rows`. |
+| `page` | `PageMeta` |  | The server's page, for a set passed as `rows`; the pager is drawn when `onPage` comes with it. |
+| `onPage` | `(n: number) => void` |  | Asks for a page number, for a set passed as `rows`. |
+| `onReload` | `() => void` |  | Asks for the rows again, behind Try Again, for a set passed as `rows`. |
+| `caption` | `string` |  | Names the table for screen readers; the title unless set. Required when there is no title. |
+| `title` | `ReactNode` |  | The card's title above the list, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row: a button, a menu, a pill. |
+| `right` | `ReactNode` |  | The merged name for `actions`; kept so screens move by an import change. |
+| `search` | `string` |  | A search box above the list, with this as its placeholder (at most 3 words). Needs `list.setQ`. |
+| `onRowClick` | `(row: R) => void` |  | Opens a row. A phone card becomes one tap target; a desktop row is reachable by Tab. |
+| `selectedKey` | `string \| null` |  | The row drawn as the one being looked at (a desktop list beside a panel). |
+| `selection` | `DataViewSelection` |  | Row selection and its bulk actions. |
+| `onExport` | `() => Promise<unknown>` |  | Queues the export of the whole filtered list on the server. |
+| `noun` | `string` |  | What one row is, for the pager's count ("employee"). |
+| `nounPlural` | `string` |  | The plural, when it is not the noun with an s. |
+| `empty` | `{ title: ReactNode; text?: ReactNode; icon?: IconName }` |  | What to show when there are no rows. |
+| `wide` | `boolean` |  | A wide table scrolls inside its own card rather than squeezing its columns. |
+| `footer` | `ReactNode` |  | Anything under the pager. |
+| `bare` | `boolean` |  | Draw it without its card, inside one that is already there. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**LoadingRows** props (`LoadingRowsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `count` | `number` |  | How many lines to draw; 4 unless set. |
+
+```tsx
+<DataView list={list} columns={columns} rowKey={(r) => r.employee_id} caption="Employees" noun="employee" search="Search People" />
+<DataView rows={rows} loading={read.loading} error={read.error} columns={columns} rowKey={(r) => r.id} caption="Approval Steps" bare />
+```
+
+### ExportButton
+
+Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox.
+
+| | |
+|---|---|
+| Use | Beside a list that a person needs outside the product (a payroll run, an attendance month, an expense claim set). |
+| Avoid | Building a file in the browser from the 25 rows on screen; a download that blocks the page while a large list is gathered. |
+| Phone | The same button, full width in the toolbar; the toast confirms where the file will arrive. |
+| Accessibility | Busy while the request is in flight, and the button stays pressable rather than disabled (FRONTEND_GUIDE §9.4). |
+| Status | stable |
+| Exports | `ExportButton` |
+| Import | `import { ExportButton } from "@mycity/ui";` |
+| File | `packages/ui/src/data/ExportButton.tsx` |
+| Test | `packages/ui/src/data/ExportButton.test.tsx` |
+| Gallery | `packages/ui/src/data/ExportButton.gallery.tsx` (`npm run gallery`, `#/ExportButton`) |
+
+**ExportButton** props (`ExportButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `onExport` | `() => Promise<unknown>` | yes | Queues the export on the server for the list's CURRENT filters, which the caller holds. It must ask the server for the whole filtered list, never the page on screen. |
+| `children` | `string` |  | The label: Verb Noun, at most 3 words. "Export" unless set. |
+| `message` | `string` |  | What the toast says once it is queued. At most 8 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ExportButton onExport={() => api.call("POST /api/v1/exports", { body: { source: "employees", filters } })} />
+```
+
+### Kanban
+
+A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19).
+
+| | |
+|---|---|
+| Use | A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions. |
+| Avoid | A list that is not staged (use DataView); dragging as the only way to move a card; more than six stages. |
+| Phone | No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. |
+| Accessibility | Each column is a named group; Move To is a real menu, so a card can be moved by keyboard and by screen reader, never only by dragging. |
+| Status | stable |
+| Exports | `Kanban`, `KanbanCardBody` |
+| Import | `import { Kanban, KanbanCardBody } from "@mycity/ui";` |
+| File | `packages/ui/src/data/Kanban.tsx` |
+| Test | `packages/ui/src/data/Kanban.test.tsx` |
+| Gallery | `packages/ui/src/data/Kanban.gallery.tsx` (`npm run gallery`, `#/Kanban`) |
+
+**Kanban** props (`KanbanProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `columns` | `KanbanColumn[]` | yes | The stages, left to right. |
+| `onOpen` | `(card: string, column: string) => void` |  | Opens a card's record. |
+| `onMove` | `(card: string, from: string, to: string) => void` |  | Moves a card to another stage. Without it the board is read only. On desktop a card can also be dragged; Move To exists either way, because a keyboard and a phone cannot drag (F19). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**KanbanCardBody** props (`KanbanCardBodyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `card` | `KanbanCard` | yes | The card. |
+
+```tsx
+<Kanban columns={stages} onMove={(card, from, to) => move(card, to)} onOpen={openRecord} />
+```
+
+### Pager
+
+Page controls under a list, showing the server's true total ("312 employees") and Previous and Next.
+
+| | |
+|---|---|
+| Use | Under any server-paged list: DataView draws one for you, and a card grid or a picker that pages itself takes one directly. |
+| Avoid | A page-size chooser, a jump-to-page box, or "showing 25 of many"; the size is the server's 25 and is never offered. |
+| Phone | The count sits above the buttons, which are full width and 44 px, so paging is a thumb reach. |
+| Accessibility | A navigation landmark named for the list it pages, so two lists on one screen stay apart; the count is a live region, so a screen reader hears the new range after Next. |
+| Status | stable |
+| Exports | `Pager` |
+| Import | `import { Pager } from "@mycity/ui";` |
+| File | `packages/ui/src/data/Pager.tsx` |
+| Test | `packages/ui/src/data/Pager.test.tsx` |
+| Gallery | `packages/ui/src/data/Pager.gallery.tsx` (`npm run gallery`, `#/Pager`) |
+
+**Pager** props (`PagerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `page` | `PageMeta \| undefined \| null` | yes | The `page` object from the list response; nothing is drawn without it. |
+| `onPage` | `(number: number) => void` | yes | Asks for a page number. |
+| `noun` | `string` |  | What one row is, lower case ("employee"); "record" unless set. |
+| `nounPlural` | `string` |  | The plural, when it is not the noun with an s ("people", "queries"). |
+| `label` | `string` |  | The list these pages belong to ("Annual Goals"), which names the landmark; the noun unless set. Two lists on one screen each need their own. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Pager page={list.page} onPage={list.setPage} noun="employee" />
+```
+
+### Toolbar
+
+The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen.
+
+| | |
+|---|---|
+| Use | Above a list or a board, holding the search box and the list's filters; DataView puts its own search and sort in one. |
+| Avoid | Page-level actions (they belong in PageHeader); a column chooser; more than four filters on one list. |
+| Phone | The controls stack full width in the order given, so the search box is first under the thumb; each is 44 px. |
+| Accessibility | A group named for the list it controls, so a screen reader can skip past the filters to the rows. |
+| Status | stable |
+| Exports | `Toolbar` |
+| Import | `import { Toolbar } from "@mycity/ui";` |
+| File | `packages/ui/src/data/Toolbar.tsx` |
+| Test | `packages/ui/src/data/Toolbar.test.tsx` |
+| Gallery | `packages/ui/src/data/Toolbar.gallery.tsx` (`npm run gallery`, `#/Toolbar`) |
+
+**Toolbar** props (`ToolbarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` |  | What the controls filter, for screen readers ("Employees"); "List controls" unless set. |
+| `children` | `ReactNode` | yes | The controls, left to right: the search box first, then filters, then actions. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<Toolbar label="Employees"><SearchInput value={list.q} onChange={list.setQ} /></Toolbar>
+```
+
+## Charts
+
+### AreaChart
+
+A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter.
+
+| | |
+|---|---|
+| Use | One series over a run of days, weeks or months, where the shape matters more than each figure. |
+| Avoid | Comparing categories (use BarChart); one share of a whole (use DonutChart); a figure inside a table cell (use Sparkline). |
+| Phone | No caption; the drawing scrolls inside its own card, so the page never scrolls sideways. |
+| Accessibility | The drawing is hidden from screen readers and the frame reads every point as a label and a figure instead. |
+| Status | stable |
+| Exports | `AreaChart` |
+| Import | `import { AreaChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/AreaChart.tsx` |
+| Test | `packages/ui/src/charts/AreaChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/AreaChart.gallery.tsx` (`npm run gallery`, `#/AreaChart`) |
+
+**AreaChart** props (`AreaChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `values` | `number[]` | yes | The figures, in order; an empty set draws nothing. |
+| `labels` | `string[]` | yes | What each figure is (a date, a month), in the same order: the screen reader's list and the point's tooltip. |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row (a period filter). |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The drawing's accessible name, when there is no title or the title is not words. |
+| `series` | `Series` |  | Which of the six series to draw it in; 1 unless set. |
+| `bare` | `boolean` |  | Drop the grid lines, for a small strip inside a card. |
+| `format` | `(value: number) => string` |  | Formats a figure for the screen reader's list; the figure itself unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<AreaChart title="Attendance" labels={days} values={present} caption="Dips are Saturdays, a half day" />
+```
+
+### BandChart
+
+Salary bands: each grade's range on one scale, with its midpoint marked and its figures beside it.
+
+| | |
+|---|---|
+| Use | The salary structure, a grade's range against the band above and below it, a budget envelope per department. |
+| Avoid | A single figure per row (use Bars); comparing categories (use BarChart); working money out from the positions. |
+| Phone | The grade and its range stack, with the scale under the name, so nothing is squeezed; no caption. |
+| Accessibility | Each row is a term and its range in words, so the figures are read even though the bars are decorative. |
+| Status | stable |
+| Exports | `BandChart` |
+| Import | `import { BandChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/BandChart.tsx` |
+| Test | `packages/ui/src/charts/BandChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/BandChart.gallery.tsx` (`npm run gallery`, `#/BandChart`) |
+
+**BandChart** props (`BandChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `rows` | `BandChartRow[]` | yes | The grades, lowest first. |
+| `scale` | `string` |  | What the scale runs from and to, at the right of the title row ("₦0 to ₦5M"). |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The drawing's accessible name, when there is no title or the title is not words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<BandChart title="Salary Structure" scale="₦0 to ₦5M" rows={grades} />
+```
+
+### BarChart
+
+Figures side by side as bars: headcount by department, claims by month, interviews by stage.
+
+| | |
+|---|---|
+| Use | Comparing a handful of categories, where each figure matters as much as the shape. |
+| Avoid | A run of days (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars). |
+| Phone | No caption; the drawing scrolls inside its own card, so the page never scrolls sideways. |
+| Accessibility | The drawing is hidden from screen readers and the frame reads every bar as a label and a figure instead. |
+| Status | stable |
+| Exports | `BarChart` |
+| Import | `import { BarChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/BarChart.tsx` |
+| Test | `packages/ui/src/charts/BarChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/BarChart.gallery.tsx` (`npm run gallery`, `#/BarChart`) |
+
+**BarChart** props (`BarChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `bars` | `BarChartBar[]` | yes | The bars, left to right. |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row (a period filter). |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The drawing's accessible name, when there is no title or the title is not words. |
+| `series` | `Series` |  | The series every bar takes unless it names its own; 1 unless set. |
+| `colourPerBar` | `boolean` |  | A colour per bar, for categories that are not one measure (departments, stages). |
+| `format` | `(value: number) => string` |  | Formats a figure for the screen reader's list; the figure itself unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<BarChart title="Claims by Month" bars={months} caption="Approved claims only" />
+```
+
+### ChartFrame
+
+The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it.
+
+| | |
+|---|---|
+| Use | Inside a chart component, around its drawing; a screen uses the chart itself, not this. |
+| Avoid | Wrapping a chart in a second Card; a caption that explains how the figures are worked out (that is the guide's). |
+| Phone | No caption at all (gate 8), and a wide drawing scrolls inside the card rather than the page. |
+| Accessibility | The drawing is one image named by the title, and every value is also a hidden list, so a chart is never a dead end for a screen reader. |
+| Status | stable |
+| Exports | `ChartFrame` |
+| Import | `import { ChartFrame } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/ChartFrame.tsx` |
+| Test | `packages/ui/src/charts/ChartFrame.test.tsx` |
+| Gallery | `packages/ui/src/charts/ChartFrame.gallery.tsx` (`npm run gallery`, `#/ChartFrame`) |
+
+**ChartFrame** props (`ChartFrameProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words: what the chart measures. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row: a filter, a pill, a menu. |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only ("Dips are Saturdays, a half day"). |
+| `label` | `string` |  | The drawing's accessible name, when the title is not enough or there is no title. |
+| `values` | `ChartValue[]` |  | Every value the chart draws, read out in order by a screen reader. |
+| `children` | `ReactNode` | yes | The drawing. |
+| `scrolls` | `boolean` |  | The drawing scrolls inside the card on a narrow screen (a chart with many points). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ChartFrame title="Attendance" caption="14 working days" values={points}>{drawing}</ChartFrame>
+```
+
+### DonutChart
+
+A ring: one share of a whole with the figure in its middle, or a few slices that add up to it.
+
+| | |
+|---|---|
+| Use | On time against late and absent, goals met against set, a budget drawn against its total. |
+| Avoid | More than four slices (use BarChart); a figure over time (use AreaChart); a share nobody compares to a whole. |
+| Phone | The ring with its lines beneath it rather than beside, so nothing is squeezed; no caption. |
+| Accessibility | The ring is hidden from screen readers and the frame reads the figure and each slice as words. |
+| Status | stable |
+| Exports | `DonutChart` |
+| Import | `import { DonutChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/DonutChart.tsx` |
+| Test | `packages/ui/src/charts/DonutChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/DonutChart.gallery.tsx` (`npm run gallery`, `#/DonutChart`) |
+
+**DonutChart** props (`DonutChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `middle` | `string` | yes | The figure in the middle, already formatted ("77%", "14", "₦1.3M"). |
+| `under` | `string` |  | The word under it, lower case, at most 2 words ("on time"). |
+| `slices` | `DonutSlice[]` |  | The slices, in order. Pass these or `percent`. |
+| `percent` | `number` |  | One share of the whole, 0 to 100, when there are no slices to draw. |
+| `lines` | `ReactNode[]` |  | The lines beside the ring: one figure each, at most 20 words a line. |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row. |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The ring's accessible name, when there is no title; the title and the middle figure otherwise. |
+| `series` | `Series` |  | The ring's series when it draws one share; 1 unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<DonutChart title="On Time" percent={77} middle="77%" under="on time" lines={["37 on time", "4 late", "7 absent"]} />
+<DonutChart title="Goals Met" slices={[{ label: "Met", value: 14 }, { label: "Missed", value: 3 }]} middle="14" under="met" />
+```
+
+### Sparkline
+
+A bare trend line with no axes, for inside a table cell or beside a figure.
+
+| | |
+|---|---|
+| Use | A KPI's own short trend, a per-row trend in a wide table, a goal's progress over its quarter. |
+| Avoid | Anywhere a person has to read a figure off it (use AreaChart); fewer than three points; a caption or a title. |
+| Phone | The same line, sized by the card it sits in; it carries no text of its own. |
+| Accessibility | One image named by what it trends, with its first and last figure in the name, so the direction is readable. |
+| Status | stable |
+| Exports | `Sparkline` |
+| Import | `import { Sparkline } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/Sparkline.tsx` |
+| Test | `packages/ui/src/charts/Sparkline.test.tsx` |
+| Gallery | `packages/ui/src/charts/Sparkline.gallery.tsx` (`npm run gallery`, `#/Sparkline`) |
+
+**Sparkline** props (`SparklineProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `values` | `number[]` | yes | The figures, in order; at least two. |
+| `label` | `string` | yes | What it trends, Title Case, at most 3 words: its accessible name. |
+| `series` | `Series` |  | Which of the six series to draw it in; 1 unless set. |
+| `className` | `string` |  | Layout classes only (width). |
+
+```tsx
+<Sparkline label="Attendance" values={[18, 21, 22, 20, 24]} />
+```
+
+## Documents
+
+### DocumentPreview
+
+A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both.
+
+| | |
+|---|---|
+| Use | Looking at what someone attached: a receipt, a CV, a signed offer, a mail attachment, an imported sheet. |
+| Avoid | A document the product generated itself (use Paper, which prints right); shipping a PDF renderer of our own; a preview with no way out to the file. |
+| Phone | Shorter, and anything the browser will not draw inline becomes a Download card instead of an empty frame. |
+| Accessibility | The frame is named by the file, Open in Tab and Download are real links, and a file that cannot be shown says so in words. |
+| Status | stable |
+| Exports | `DocumentPreview` |
+| Import | `import { DocumentPreview } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/DocumentPreview.tsx` |
+| Test | `packages/ui/src/documents/DocumentPreview.test.tsx` |
+| Gallery | `packages/ui/src/documents/DocumentPreview.gallery.tsx` (`npm run gallery`, `#/DocumentPreview`) |
+
+**DocumentPreview** props (`DocumentPreviewProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The file's name, as the person uploaded it. |
+| `mime` | `string` | yes | Its type, as the SERVER decided, not as the browser guessed. |
+| `href` | `string` | yes | Where the vault streams it (`/api/v1/documents/:id/file`). |
+| `sizeBytes` | `number` |  | Its size, for the line under the name. |
+| `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller. |
+| `actions` | `ReactNode` |  | What sits beside Open in Tab (Replace, Remove). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
+```
+
+### ImageViewer
+
+A picture at a readable size, with zoom and a way to open it full size in a new tab.
+
+| | |
+|---|---|
+| Use | A photographed receipt, a worksite picture, a scanned certificate, an uploaded profile photograph. |
+| Avoid | An illustration or an icon (use Illustration or Icon); a picture nobody needs to look at closely; a gallery of many (page them). |
+| Phone | Fits the width and zooms by the buttons rather than by pinching, so the page itself never zooms away under the person. |
+| Accessibility | The picture carries the file's name as its text, the zoom buttons say what they do, and the zoom is announced as a percentage. |
+| Status | stable |
+| Exports | `ImageViewer` |
+| Import | `import { ImageViewer } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/ImageViewer.tsx` |
+| Test | `packages/ui/src/documents/ImageViewer.test.tsx` |
+| Gallery | `packages/ui/src/documents/ImageViewer.gallery.tsx` (`npm run gallery`, `#/ImageViewer`) |
+
+**ImageViewer** props (`ImageViewerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `src` | `string` | yes | Where the picture is (the vault's own stream). |
+| `alt` | `string` | yes | The file's name, which is the picture's text. |
+| `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter. |
+| `noOpen` | `boolean` |  | Hide Open in Tab (DocumentPreview's bar already carries one). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ImageViewer src={`/api/v1/documents/${id}/file`} alt="Receipt.jpg" />
+```
+
+### Paper
+
+A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule.
+
+| | |
+|---|---|
+| Use | An offer, a payslip, an invoice, a letter, a certificate: anything the document engine will render as a PDF. |
+| Avoid | A file someone uploaded (use DocumentPreview); a screen's own content dressed as paper; colours of the theme rather than the paper tokens. |
+| Phone | The sheet keeps its proportions with tighter margins, so what is on screen is what will print. |
+| Accessibility | The document's text is content, not interface copy, so the copy gates skip it and a screen reader reads it as written. |
+| Status | stable |
+| Exports | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` |
+| Import | `import { Paper, PaperLogo, PaperTitle, PaperTable, PaperFoot, Signature } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/Paper.tsx` |
+| Test | `packages/ui/src/documents/Paper.test.tsx` |
+| Gallery | `packages/ui/src/documents/Paper.gallery.tsx` (`npm run gallery`, `#/Paper`) |
+
+**Paper** props (`PaperProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | What goes on the paper. |
+| `note` | `ReactNode` |  | One line above the sheet, at most 8 words: what this is. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**PaperLogo** props (`PaperLogoProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `reference` | `string` | yes | The document's own number, from `numbering.allocate()`. |
+
+**PaperTitle** props (`PaperTitleProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | What the document is ("Offer of Employment"). |
+| `sub` | `ReactNode` |  | The line under it: who it is for, the date it takes effect. |
+
+**PaperTable** props (`PaperTableProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `head` | `[ReactNode, ReactNode]` | yes | The two column headings. |
+| `rows` | `Array<[ReactNode, ReactNode]>` | yes | The lines, each a label and an amount. |
+| `totals` | `Array<[ReactNode, ReactNode]>` |  | The lines ruled off in City Green at the foot (Gross, Net). |
+
+**PaperFoot** props (`PaperFootProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The footer's pieces: who signed, when, the verification number. |
+
+**Signature** props (`SignatureProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The signed name. |
+
+```tsx
+<Paper note="This is how the letter will print"><PaperLogo reference="OFF/2026/0041" /><PaperTitle>Offer of Employment</PaperTitle></Paper>
+```
+
+### Reader
+
+An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time.
+
+| | |
+|---|---|
+| Use | The Knowledge Hub's articles and FAQs, a policy library, a set of runbooks a person reads one of. |
+| Avoid | A list of records (use DataView); a set of short answers (use Accordion); a single article with nothing to pick from. |
+| Phone | The list becomes a scrolling strip of chips above the article, so the article itself has the whole width. |
+| Accessibility | The list is a navigation landmark whose current article says it is current, and the article is an <article> with its own heading. |
+| Status | stable |
+| Exports | `Reader`, `ArticleBody` |
+| Import | `import { Reader, ArticleBody } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/Reader.tsx` |
+| Test | `packages/ui/src/documents/Reader.test.tsx` |
+| Gallery | `packages/ui/src/documents/Reader.gallery.tsx` (`npm run gallery`, `#/Reader`) |
+
+**Reader** props (`ReaderProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `groups` | `ReaderGroup[]` | yes | The list, grouped. |
+| `selected` | `string \| null` | yes | The article in view. |
+| `onSelect` | `(key: string) => void` | yes | Called with the article chosen. |
+| `label` | `string` |  | Names the list for screen readers; "Articles" unless set. |
+| `children` | `ReactNode` | yes | The article itself. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**ArticleBody** props (`ArticleBodyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The article's own title. |
+| `meta` | `ReactNode` |  | What sits under it: the author, the date, a pill. |
+| `children` | `ReactNode` | yes | The article. |
+
+```tsx
+<Reader groups={groups} selected={key} onSelect={setKey}><ArticleBody title={article.title}>{article.body}</ArticleBody></Reader>
+```
+
+## Maps
+
+### LocationLabel
+
+Where a point is, in words: the address our API looks up, with the coordinates until it arrives.
+
+| | |
+|---|---|
+| Use | Beside a clock-in or clock-out, on an attendance row, under a field visit, wherever a reading is shown to a person. |
+| Avoid | Showing bare coordinates to a person as the final answer; looking the address up from the browser; a label on a point nobody asked about. |
+| Phone | The same line, wrapping rather than truncating, since an address is content. |
+| Accessibility | The address is text in the reading order, and the coordinates stay available, so a failed lookup still says where it was. |
+| Status | stable |
+| Exports | `LocationLabel` |
+| Import | `import { LocationLabel } from "@mycity/ui";` |
+| File | `packages/ui/src/maps/LocationLabel.tsx` |
+| Test | `packages/ui/src/maps/LocationLabel.test.tsx` |
+| Gallery | `packages/ui/src/maps/LocationLabel.gallery.tsx` (`npm run gallery`, `#/LocationLabel`) |
+
+**LocationLabel** props (`LocationLabelProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `point` | `LatLon` | yes | The point itself. |
+| `label` | `string \| null` |  | The address, where the record already carries one; nothing is looked up then. |
+| `resolve` | `ResolveAddress` |  | Turns the point into an address; the app's own call through our proxy. |
+| `bare` | `boolean` |  | Drop the pin glyph (inside a row that already has one). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<LocationLabel point={punch} resolve={api.resolveAddress} />
+<LocationLabel point={punch} label={punch.address} />
+```
+
+### MapView
+
+A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves.
+
+| | |
+|---|---|
+| Use | Where a clock-in happened, a worksite and its geofence, a partner's address, a field visit. |
+| Avoid | A map nobody reads a position off; tiles straight from the provider (the key must stay on the server); a map as the only way to read a place. |
+| Phone | Fits the width at a shorter height, and never takes the page's own scroll: the wheel and pinch are off unless the screen asks for them. |
+| Accessibility | The drawing is hidden from screen readers and every point is listed as words beside it, so the map is never the only way to read a place. |
+| Status | stable |
+| Exports | `MapView` |
+| Import | `import { MapView } from "@mycity/ui";` |
+| File | `packages/ui/src/maps/MapView.tsx` |
+| Test | `packages/ui/src/maps/MapView.test.tsx` |
+| Gallery | `packages/ui/src/maps/MapView.gallery.tsx` (`npm run gallery`, `#/MapView`) |
+
+**MapView** props (`MapViewProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `markers` | `MapMarker[]` |  | The points to show. |
+| `centre` | `LatLon` |  | Where the map opens; the first marker, or Lagos, unless set. |
+| `zoom` | `number` |  | How close in; 15 unless set (a street), 11 for a city. |
+| `radiusMetres` | `number` |  | A circle around the first point, in metres: a worksite's geofence. |
+| `tileUrl` | `string` |  | Where the tiles come from; our own proxy unless a screen passes its own. |
+| `onPick` | `(point: LatLon) => void` |  | Called with the point pressed, for choosing a place (setting up a worksite). |
+| `interactive` | `boolean` |  | Let the person drag and zoom. Off by default, so a map inside a page cannot swallow its scroll. |
+| `height` | `"sm" \| "md" \| "lg"` |  | How tall; `sm` in a card, `md` on a page, `lg` on a screen of its own. |
+| `children` | `ReactNode` |  | What sits under the map: an address, a time, a button. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<MapView markers={[{ key: "in", lat, lon, label: "Clocked in 07:52" }]} />
+<MapView centre={site} radiusMetres={site.radius_metres} onPick={setPoint} interactive />
+```
+
+### PlaceSearch
+
+Finds an address through our own API and hands back the place with its coordinates.
+
+| | |
+|---|---|
+| Use | Setting up a worksite, giving a partner an address, naming where a field visit happened. |
+| Avoid | Calling the provider from the browser (the key must stay on the server); a free-text address box where a point is needed; a list of every result. |
+| Phone | Full width, each result a 44 px row; the chosen address shows above the box. |
+| Accessibility | A search box over a listbox of addresses, each a real option, with the count of what was found announced. |
+| Status | stable |
+| Exports | `PlaceSearch` |
+| Import | `import { PlaceSearch } from "@mycity/ui";` |
+| File | `packages/ui/src/maps/PlaceSearch.tsx` |
+| Test | `packages/ui/src/maps/PlaceSearch.test.tsx` |
+| Gallery | `packages/ui/src/maps/PlaceSearch.gallery.tsx` (`npm run gallery`, `#/PlaceSearch`) |
+
+**PlaceSearch** props (`PlaceSearchProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `search` | `SearchPlaces` | yes | Finds addresses; the app's own call through our proxy. |
+| `onPick` | `(place: Place) => void` | yes | Called with the address chosen. |
+| `value` | `Place \| null` |  | The address already chosen, shown above the box. |
+| `placeholder` | `string` |  | A format example of at most 3 words; "Search address" otherwise. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PlaceSearch search={api.searchPlaces} onPick={(place) => form.set("point", place)} />
 ```
 
 ## Shell
@@ -2550,3 +4097,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `Slot` (type) | `lib/slots.ts` | One slot name. |
 | `slot` | `lib/slots.ts` | Spread onto an element: `<h1 {...slot("page-title")}>`. |
 | `content` | `lib/slots.ts` | Spread onto an element that shows content a person wrote or received. |
+| `DocumentRef` (type) | `lib/upload.ts` | The upload engine's transport, one copy for both apps (gate 18, FRONTEND_GUIDE §8.7). |
+| `UploadOptions` (type) | `lib/upload.ts` |  |
+| `uploadFile` | `lib/upload.ts` | Send one file and report its progress. |
+| `Uploader` (type) | `lib/upload.ts` | How a file is sent, so a screen can pass a different one (a test, the in-browser mock). |

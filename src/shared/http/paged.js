@@ -15,14 +15,21 @@
  *
  * Usage, repo:
  *
- *   const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
+ *   const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+ *
+ *   // The fields the contract's listQuery allow-lists, and the SQL for each.
+ *   const SORTS = {
+ *     display_name: "e.last_name, e.first_name",
+ *     department: "d.name",
+ *     created_at: "e.created_at",
+ *   };
  *
  *   function list(client, query, scope) {
  *     return pageQuery(client,
  *       `SELECT e.employee_id, e.number, e.first_name, e.last_name, ${TOTAL_COL}
  *          FROM employee e
  *         WHERE ($1::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($1) || '%')
- *         ORDER BY e.last_name, e.first_name, e.employee_id`,
+ *         ORDER BY ${orderBy(query, SORTS, "e.employee_id")}`,
  *       [query.q ?? null],
  *       query);
  *   }
@@ -64,6 +71,47 @@ function pageOf(query = {}) {
   const n = Number.parseInt(query.page, 10);
   const number = Number.isInteger(n) && n >= 1 ? Math.min(n, 100000) : 1;
   return { number, size: PAGE_SIZE, offset: (number - 1) * PAGE_SIZE };
+}
+
+/**
+ * The ORDER BY of a paged list, for the `sort` the contract parsed
+ * (FRONTEND_FOUNDATION F20, common.js `sortParam`).
+ *
+ * The caller chooses a KEY; every character of SQL comes from `columns`, which
+ * the repo wrote, so nothing a caller typed reaches the query. An unknown key
+ * cannot arrive (listQuery refuses it with a 422) and falls back to the list's
+ * default order rather than throwing, so a list still answers if a contract and
+ * a repo drift apart.
+ *
+ * `tiebreak` is the unique column the order finishes on. pageQuery refuses a
+ * query without a unique ORDER BY for a reason: two rows that tie on the sorted
+ * column would otherwise swap places between page 1 and page 2, and a row would
+ * repeat while another was never seen.
+ *
+ * @param {{sort?: {field: string, dir: "asc"|"desc"}}} query  the validated list query
+ * @param {Record<string, string>} columns  sortable key → its SQL; the first is the default order
+ * @param {string} tiebreak  a unique column, usually the primary key
+ * @returns {string} SQL for the ORDER BY clause, without the keyword
+ */
+function orderBy(query, columns, tiebreak) {
+  const keys = Object.keys(columns || {});
+  if (keys.length === 0) {
+    throw new Error("orderBy: the list declares no sortable columns");
+  }
+  if (!tiebreak) {
+    throw new Error("orderBy: name the unique column the order finishes on");
+  }
+  const asked = query && query.sort;
+  const key = asked && columns[asked.field] ? asked.field : keys[0];
+  const descending = Boolean(asked && columns[asked.field] && asked.dir === "desc");
+  // Ascending already puts NULLs last in Postgres; descending needs telling,
+  // or a list sorted newest first opens on the rows with no date at all.
+  const direction = descending ? " DESC NULLS LAST" : "";
+  const expression = columns[key]
+    .split(",")
+    .map((column) => `${column.trim()}${direction}`)
+    .join(", ");
+  return `${expression}, ${tiebreak}`;
 }
 
 /**
@@ -214,6 +262,7 @@ module.exports = {
   TOTAL_COL,
   COMPLETE_CEILING,
   pageOf,
+  orderBy,
   envelope,
   pageQuery,
   sendPaged,

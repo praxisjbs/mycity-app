@@ -3,14 +3,10 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { FieldAssignment, LocationRequest, ReconCase, RegisterRow } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { AreaChart, Donut } from "@/components/ui/charts";
-import { StatStrip } from "@/components/ui/data";
-import { BackButton } from "@/components/ui/Profile";
-import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
-import { PersonPicker } from "@/components/form";
-import { Button, Banner, EmptyState, KeyValue, Pill, Who, Card, CardHeader, Grid, PhoneOnly, DesktopOnly, Grow, useModal, Chips, ErrorState, toast, cn, formatDate, ChoiceField, DateField, Field, FormFooter, rules, SearchInput, SelectField, TextAreaField, TextField, useContractForm, Wizard, Icon } from "@mycity/ui";
+import { AreaChart, BackButton, Banner, Button, Card, CardHeader, Chips, ChoiceField, cn, DataView, DateField, DesktopOnly, DonutChart, EmptyState, ErrorState, Field, formatDate, FormFooter, Grid, Grow, Icon, KeyValue, LoadingRows, Pager, PhoneOnly, Pill, rules, SearchInput, SelectField, StatStrip, TextAreaField, TextField, toast, Toolbar, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 type View = "register" | "assignments" | "requests" | "manager";
 const VIEWS: Array<[View, string]> = [["register", "Register"], ["assignments", "Field Assignments"], ["requests", "Location Requests"], ["manager", "Manager Preview"]];
@@ -33,14 +29,14 @@ export function PeopleAttendance() {
     <>
       <div className="mb-4 flex flex-wrap items-end gap-3 max-md:items-start">
         <div className="min-w-0">
-          <h1 data-ui="page-title" className="text-[20px]">Attendance</h1>
-          <p className="mt-[3px] text-[13px] text-muted-foreground">{summary.data ? `${formatDate(summary.data.date)} · Africa/Lagos · ${hr ? "the whole organisation" : "your team"}` : " "}</p>
+          <h1 data-ui="page-title" className="text-2xl">Attendance</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">{summary.data ? `${formatDate(summary.data.date)} · Africa/Lagos · ${hr ? "the whole organisation" : "your team"}` : " "}</p>
         </div>
         {hr && (
           <div className="flex flex-wrap gap-2 md:ml-auto max-md:w-full max-md:[&>button]:flex-1">
             <Button icon="plus" onClick={() => modal.open({ title: "Add Field Assignment", wide: true, body: (close) => <AssignmentForm close={close} /> })}>Field Assignment</Button>
             <Button variant="primary" icon="check" onClick={() => setParams({ view: "reconcile" })}>
-              Reconcile <span className="rounded-full bg-on-primary-badge px-[7px] text-[11px]">{recon}</span>
+              Reconcile <span className="rounded-full bg-on-primary-badge px-1.5 text-2xs">{recon}</span>
             </Button>
           </div>
         )}
@@ -50,7 +46,7 @@ export function PeopleAttendance() {
         <>
           <KpiTiles items={summary.data.kpis.slice(0, 4)} mobileCols={2} />
           <KpiTiles items={summary.data.kpis.slice(4)} mobileCols={2} />
-          <div className="no-scrollbar mb-3 max-w-[640px] overflow-x-auto max-md:max-w-none">
+          <div className="no-scrollbar mb-3 max-w-160 overflow-x-auto max-md:max-w-none">
             <ChoiceField value={view} onChange={(v) => setParams({ view: v === "register" ? null : v })} options={VIEWS} />
           </div>
         </>
@@ -74,16 +70,16 @@ function Register() {
     <>
       {s && (
         <Grid cols="1.4/1">
-          <AreaChart title="Clocked In by Hour" values={s.hours} labels={["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]} note="From 07:00, cumulative. The grace period closes at 09:10." />
-          <Donut pct={s.on_time_pct} label="clocked in" text={s.donut_text} />
+          <AreaChart title="Clocked In by Hour" values={s.hours} labels={["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]} caption="From 07:00, cumulative. The grace period closes at 09:10." />
+          <DonutChart percent={s.on_time_pct} middle={`${s.on_time_pct}%`} under="clocked in" lines={[s.donut_text]} />
         </Grid>
       )}
       <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or location" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or location" className="w-full md:w-64" />
       </Toolbar>
       {s && <Chips value={filter} onChange={setFilter} options={[["all", `All ${s.kpis[0].value.split(" / ")[1]}`], ...s.filters.map((f) => [f.value, `${f.label} ${f.count}`] as [string, string])]} />}
       <DesktopOnly>
-        <Table
+        <DataView
           title="Today’s Register"
           wide
           rows={list.rows}
@@ -101,7 +97,7 @@ function Register() {
             { key: "m", label: "Actual or Matched Location", render: (r) => r.matched_location ?? "Not yet" },
             { key: "d", label: "Device", render: (r) => (r.device ? <>{r.device}<br />{r.device_status && <Pill tone={r.device_status.tone}>{r.device_status.text}</Pill>}</> : <span className="text-subtle-foreground">None</span>) },
             { key: "s", label: "Status", render: (r) => <Pill tone={r.status.tone}>{r.status.text}</Pill> },
-            { key: "c", label: "Exception", render: (r) => (<>{r.exception && <span className="inline-block max-w-[240px] truncate align-bottom" title={r.exception}>{r.exception}</span>} {r.case_number && <Pill tone="warn">{r.case_number}</Pill>}{!r.exception && !r.case_number && <span className="text-subtle-foreground">None</span>}</>) },
+            { key: "c", label: "Exception", render: (r) => (<>{r.exception && <span className="inline-block max-w-60 truncate align-bottom" title={r.exception}>{r.exception}</span>} {r.case_number && <Pill tone="warn">{r.case_number}</Pill>}{!r.exception && !r.case_number && <span className="text-subtle-foreground">None</span>}</>) },
           ]}
           footer={<Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" />}
         />
@@ -109,21 +105,21 @@ function Register() {
       <PhoneOnly>
         <div className="grid gap-2.5">
           {list.rows.map((r) => (
-            <button key={r.employee.employee_id} type="button" onClick={() => open(r)} className="block w-full rounded-card border border-border bg-card p-[13px] text-left shadow-1">
+            <button key={r.employee.employee_id} type="button" onClick={() => open(r)} className="block w-full rounded-card border border-border bg-card p-3 text-left shadow-1">
               <span className="mb-2.5 flex items-start justify-between gap-2.5">
                 <Who name={r.employee.display_name} sub={r.employee.department} />
                 <Pill tone={r.status.tone}>{r.status.text}</Pill>
               </span>
               <span className="mb-2.5 block"><Pill>{r.arrangement}</Pill></span>
               <span className="flex gap-2.5 border-y border-border py-2.5">
-                <span className="min-w-0 flex-1"><small className="mb-[3px] block text-[9.5px] font-[650] tracking-[.08em] text-subtle-foreground uppercase">Clock in</small><span className="block text-[14px] font-[650]">{r.clock_in ?? "None"}</span></span>
-                <span className="min-w-0 flex-1"><small className="mb-[3px] block text-[9.5px] font-[650] tracking-[.08em] text-subtle-foreground uppercase">Clock out</small><span className="block text-[14px] font-[650]">{r.clock_out ?? "None"}</span></span>
+                <span className="min-w-0 flex-1"><small className="mb-0.5 block text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Clock in</small><span className="block text-base font-strong">{r.clock_in ?? "None"}</span></span>
+                <span className="min-w-0 flex-1"><small className="mb-0.5 block text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Clock out</small><span className="block text-base font-strong">{r.clock_out ?? "None"}</span></span>
               </span>
-              <span className="flex gap-2.5 pt-2.5 text-[12px] leading-snug">
-                <span className="min-w-0 flex-1"><small className="mb-[3px] block text-[9.5px] font-[650] tracking-[.08em] text-subtle-foreground uppercase">Expected</small>{r.expected_location}</span>
-                <span className="min-w-0 flex-1"><small className="mb-[3px] block text-[9.5px] font-[650] tracking-[.08em] text-subtle-foreground uppercase">Matched</small>{r.matched_location ?? "Not yet"}</span>
+              <span className="flex gap-2.5 pt-2.5 text-xs leading-snug">
+                <span className="min-w-0 flex-1"><small className="mb-0.5 block text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Expected</small>{r.expected_location}</span>
+                <span className="min-w-0 flex-1"><small className="mb-0.5 block text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Matched</small>{r.matched_location ?? "Not yet"}</span>
               </span>
-              <span className="mt-[9px] flex flex-wrap gap-2.5 border-t border-border pt-[9px] text-[11.5px] text-muted-foreground">
+              <span className="mt-2 flex flex-wrap gap-2.5 border-t border-border pt-2 text-2xs text-muted-foreground">
                 <span>{r.device ? `Device: ${r.device}` : "No device recorded"}</span>
                 <span>{r.case_number ? `Review ${r.case_number}` : (r.exception ?? "No exception")}</span>
               </span>
@@ -155,18 +151,18 @@ function DayDetailView({ id }: { id: string }) {
         <KeyValue items={[["Work arrangement", data.arrangement], ["Shift", data.shift], ["Attendance status", <Pill tone={data.status.tone}>{data.status.text}</Pill>], ["Hours", data.hours]]} />
       </div>
       <div className="overflow-x-auto rounded-card border border-border" tabIndex={0}>
-        <table className="w-full border-collapse text-[13px]">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th className="border-b border-border bg-muted px-3 py-[9px] text-left text-[10.5px] font-[650] tracking-[.09em] text-subtle-foreground uppercase">Field</th>
-              {data.events.map((e) => <th key={e.event_number} className="border-b border-border bg-muted px-3 py-[9px] text-left text-[10.5px] font-[650] tracking-[.09em] text-subtle-foreground uppercase">{e.event_number}</th>)}
+              <th className="border-b border-border bg-muted px-3 py-2 text-left text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Field</th>
+              {data.events.map((e) => <th key={e.event_number} className="border-b border-border bg-muted px-3 py-2 text-left text-2xs font-strong tracking-caps text-subtle-foreground uppercase">{e.event_number}</th>)}
             </tr>
           </thead>
           <tbody>
             {fields.map(([label, get]) => (
               <tr key={label}>
-                <td className="border-b border-border px-3 py-[9px] text-[11.5px] text-subtle-foreground">{label}</td>
-                {data.events.map((e) => <td key={e.event_number} className={cn("border-b border-border px-3 py-[9px]", e.superseded && "text-subtle-foreground line-through")}>{get(e)}</td>)}
+                <td className="border-b border-border px-3 py-2 text-2xs text-subtle-foreground">{label}</td>
+                {data.events.map((e) => <td key={e.event_number} className={cn("border-b border-border px-3 py-2", e.superseded && "text-subtle-foreground line-through")}>{get(e)}</td>)}
               </tr>
             ))}
           </tbody>
@@ -191,14 +187,14 @@ function Assignments() {
     <>
       <div className="mb-2.5 flex flex-wrap items-end gap-3">
         <div>
-          <h2 data-ui="title" className="text-[15px]">Field Assignments</h2>
-          <p className="mt-[3px] text-[13px] text-muted-foreground">An approved assignment overrides the office or home for its day and time window.</p>
+          <h2 data-ui="title" className="text-md">Field Assignments</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">An approved assignment overrides the office or home for its day and time window.</p>
         </div>
         <Button variant="primary" icon="plus" className="md:ml-auto" onClick={() => modal.open({ title: "Add Field Assignment", wide: true, body: (close) => <AssignmentForm close={close} /> })}>Add Field Assignment</Button>
       </div>
-      <Table
+      <DataView
         title="Assignments"
-        right={<span className="text-[11.5px] text-subtle-foreground">Default radius 150 m · 100 to 500 by venue</span>}
+        right={<span className="text-2xs text-subtle-foreground">Default radius 150 m · 100 to 500 by venue</span>}
         wide
         rows={list.rows}
         rowKey={(r) => r.assignment_id}
@@ -206,7 +202,7 @@ function Assignments() {
         error={list.error}
         columns={[
           { key: "n", label: "Assignment", render: (a) => (<><b>{a.number}</b><br />{a.name}</>) },
-          { key: "e", label: "Employee or Team", render: (a) => (<>{a.employees.map((e) => e.display_name).join(", ")}{a.team && <><br /><span className="text-[11.5px] text-subtle-foreground">{a.team}</span></>}</>) },
+          { key: "e", label: "Employee or Team", render: (a) => (<>{a.employees.map((e) => e.display_name).join(", ")}{a.team && <><br /><span className="text-2xs text-subtle-foreground">{a.team}</span></>}</>) },
           { key: "c", label: "Client, Event or Campaign", render: (a) => a.client },
           { key: "s", label: "Approved Sites", render: (a) => a.sites.map((s) => <div key={s.name}>{s.name}</div>) },
           { key: "r", label: "Radius", render: (a) => a.sites.map((s) => <div key={s.name}>{s.radius_m} m</div>) },
@@ -262,7 +258,7 @@ function AssignmentForm({ close }: { close: () => void }) {
             <>
               <Field label="Assignment Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Venue check" /></Field>
               <Field label="Client or Event" {...f.field("client")}><TextField {...f.field("client")} /></Field>
-              <Field label="Employees" state={triedWho && !who.length ? "bad" : undefined} message="Add at least one"><PersonPicker multiple value={who} onChange={setWho} /></Field>
+              <Field label="Employees" state={triedWho && !who.length ? "bad" : undefined} message="Add at least one"><EmployeePicker multiple value={who} onChange={setWho} /></Field>
             </>
           ),
         },
@@ -294,9 +290,9 @@ function Requests() {
   const waiting = list.rows.filter((r) => r.status === "Awaiting manager" || r.status === "Awaiting HR").length;
   return (
     <>
-      <Table
+      <DataView
         title="Work Location Requests"
-        right={<span className="text-[11.5px] text-subtle-foreground">{waiting} awaiting a decision</span>}
+        right={<span className="text-2xs text-subtle-foreground">{waiting} awaiting a decision</span>}
         wide
         rows={list.rows}
         rowKey={(r) => r.request_id}
@@ -308,9 +304,9 @@ function Requests() {
           { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} /> },
           { key: "t", label: "Type", render: (r) => r.type },
           { key: "d", label: "Dates", render: (r) => (r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} to ${formatDate(r.to)}`) },
-          { key: "l", label: "Location", render: (r) => (<>{r.area}<br /><span className="text-[11.5px] text-subtle-foreground">Full address in the request</span></>) },
+          { key: "l", label: "Location", render: (r) => (<>{r.area}<br /><span className="text-2xs text-subtle-foreground">Full address in the request</span></>) },
           { key: "r", label: "Radius", align: "n", render: (r) => `${r.radius_m} m` },
-          { key: "w", label: "Reason", render: (r) => <span className="inline-block max-w-[240px] truncate align-bottom" title={r.reason}>{r.reason}</span> },
+          { key: "w", label: "Reason", render: (r) => <span className="inline-block max-w-60 truncate align-bottom" title={r.reason}>{r.reason}</span> },
           { key: "s", label: "Status", render: (r) => <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill> },
           { key: "x", label: "", render: (r) => <Button onClick={(e) => (e.stopPropagation(), open(r))}>{r.status === "Awaiting manager" || r.status === "Awaiting HR" ? "Review" : "View"}</Button> },
         ]}
@@ -382,7 +378,7 @@ function ManagerView() {
         <b>Manager view.</b> What {me.display_name} sees as line manager of {list.page?.total ?? 0} people. Nothing outside this team is visible here.
       </Banner>
       {summary.data && <KpiTiles items={summary.data.kpis.slice(0, 4)} mobileCols={2} />}
-      <Table
+      <DataView
         title="My Team Today"
         rows={list.rows}
         rowKey={(r) => r.employee.employee_id}
@@ -410,7 +406,7 @@ function ManagerView() {
               <Button onClick={() => modal.open({ title: `Review Explanation · ${c.number}`, wide: true, body: (close) => <CaseRecommend c={c} close={close} /> })}>Review</Button>
             </Row>
           ))}
-          {!waiting && <p className="text-[11.5px] text-subtle-foreground">Nothing is waiting on you.</p>}
+          {!waiting && <p className="text-2xs text-subtle-foreground">Nothing is waiting on you.</p>}
         </Card>
       </Grid>
     </>
@@ -419,13 +415,13 @@ function ManagerView() {
 
 function Row({ icon, title, sub, children }: { icon: "target" | "alert" | "brief"; title: string; sub: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2.5 border-b border-border py-[9px] last:border-b-0">
-      <span className="flex size-[30px] flex-none items-center justify-center rounded-ctl bg-accent text-accent-foreground">
+    <div className="flex flex-wrap items-center gap-2.5 border-b border-border py-2 last:border-b-0">
+      <span className="flex size-7.5 flex-none items-center justify-center rounded-ctl bg-accent text-accent-foreground">
         <Icon name={icon} />
       </span>
-      <span className="flex min-w-[180px] flex-1 flex-col gap-0.5">
-        <b className="text-[12.5px] font-semibold">{title}</b>
-        <span className="text-[11.5px] text-subtle-foreground">{sub}</span>
+      <span className="flex min-w-44 flex-1 flex-col gap-0.5">
+        <b className="text-xs font-semibold">{title}</b>
+        <span className="text-2xs text-subtle-foreground">{sub}</span>
       </span>
       {children}
     </div>
@@ -499,17 +495,17 @@ function Reconcile({ onBack }: { onBack: () => void }) {
   const count = (s: string) => all.rows.filter((c) => c.status === s).length;
   return (
     <>
-      <BackButton label="Back to Attendance" onClick={onBack} />
+      <BackButton label="Back to Attendance" onBack={onBack} />
       <div className="mb-4">
-        <h1 data-ui="page-title" className="text-[20px]">Reconciliation Queue</h1>
-        <p className="mt-[3px] text-[13px] text-muted-foreground">{count("Awaiting HR")} awaiting People · {count("Awaiting manager")} awaiting a manager</p>
+        <h1 data-ui="page-title" className="text-2xl">Reconciliation Queue</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">{count("Awaiting HR")} awaiting People · {count("Awaiting manager")} awaiting a manager</p>
       </div>
       <StatStrip items={[{ label: "Awaiting People", value: String(count("Awaiting HR")), tone: count("Awaiting HR") ? "warn" : "ok" }, { label: "Awaiting a Manager", value: String(count("Awaiting manager")) }, { label: "More Information", value: String(count("Awaiting employee")) }, { label: "Escalated", value: String(count("Escalated")), desktop: true }, { label: "Total Cases", value: String(all.page?.total ?? 0) }]} />
       <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-64" />
       </Toolbar>
       <Chips value={status} onChange={setStatus} options={[["open", "Open"], ["Awaiting HR", "Awaiting People"], ["Awaiting manager", "Awaiting a manager"], ["Resolved", "Resolved"], ["all", "All"]]} />
-      <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-start gap-3 xl:cols-list-detail">
         <div className="overflow-hidden rounded-card border border-border bg-card shadow-1" role="list">
           {list.rows.map((c) => (
             <button
@@ -517,10 +513,10 @@ function Reconcile({ onBack }: { onBack: () => void }) {
               type="button"
               role="listitem"
               onClick={() => setSel(c.case_id)}
-              className={cn("flex w-full flex-col gap-1 border-b border-border px-[13px] py-[11px] text-left last:border-b-0 hover:bg-muted", current?.case_id === c.case_id && "bg-accent shadow-[inset_3px_0_0_var(--primary)]")}
+              className={cn("flex w-full flex-col gap-1 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-muted", current?.case_id === c.case_id && "bg-accent bar-selected")}
             >
-              <span className="flex items-center justify-between gap-2"><b className="text-[12.5px] font-[650]">{c.type}</b><Pill tone={CASE_TONE[c.status]}>{c.status}</Pill></span>
-              <span className="text-[11.5px] text-subtle-foreground">{c.number} · {c.employee.display_name} · {formatDate(c.date)} · payroll: {c.payroll_impact}</span>
+              <span className="flex items-center justify-between gap-2"><b className="text-xs font-strong">{c.type}</b><Pill tone={CASE_TONE[c.status]}>{c.status}</Pill></span>
+              <span className="text-2xs text-subtle-foreground">{c.number} · {c.employee.display_name} · {formatDate(c.date)} · payroll: {c.payroll_impact}</span>
             </button>
           ))}
           {!list.rows.length && !list.loading && <EmptyState bare title="No Cases Match" text="Clear the filter to see the whole queue." />}

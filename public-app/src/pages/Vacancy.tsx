@@ -3,8 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import { Page } from "@/shell/Page";
-import { Banner, Button, formatMoney, PageMessage, Pill, Skeleton } from "@mycity/ui";
-import { Sub } from "@/components/ui";
+import { Banner, Button, formatMoney, PageMessage, Pill, Skeleton, Sub } from "@mycity/ui";
 import { Link, useRouter } from "@/lib/router";
 import { PATTERN } from "./Careers";
 
@@ -51,11 +50,11 @@ export function Vacancy({ slug }: { slug: string }) {
 
   return (
     <Page title={d.title} index={d.state === "open"}>
-      <Link to="/jobs" className="mb-3 inline-flex items-center gap-1 text-[12px] font-semibold text-muted-foreground no-underline hover:text-foreground">
+      <Link to="/jobs" className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground no-underline hover:text-foreground">
         ← All Roles
       </Link>
-      <h1 className="text-[21px]">{d.title}</h1>
-      <Sub className="mt-[5px]">{where}</Sub>
+      <h1 className="text-2xl">{d.title}</h1>
+      <Sub className="mt-1">{where}</Sub>
       <div className="my-4 flex flex-wrap gap-1.5">
         <Pill>{d.employment_type}</Pill>
         {d.probation_months && <Pill>{d.probation_months} month probation</Pill>}
@@ -68,17 +67,17 @@ export function Vacancy({ slug }: { slug: string }) {
           </Banner>
         </div>
       )}
-      <p className="text-[13.5px] leading-[1.6] text-muted-foreground">{d.summary}</p>
-      <h2 className="mt-4 text-[13.5px]">Must Have</h2>
-      <p className="mt-[5px] text-[13px] leading-[1.6] text-muted-foreground">{d.must_have}</p>
+      <p className="text-sm leading-relaxed text-muted-foreground">{d.summary}</p>
+      <h2 className="mt-4 text-sm">Must Have</h2>
+      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.must_have}</p>
       {d.nice_to_have && (
         <>
-          <h2 className="mt-4 text-[13.5px]">Nice to Have</h2>
-          <p className="mt-[5px] text-[13px] leading-[1.6] text-muted-foreground">{d.nice_to_have}</p>
+          <h2 className="mt-4 text-sm">Nice to Have</h2>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.nice_to_have}</p>
         </>
       )}
-      <h2 className="mt-4 text-[13.5px]">How We Hire</h2>
-      <p className="mt-[5px] text-[13px] leading-[1.6] text-muted-foreground">{d.how_we_hire}</p>
+      <h2 className="mt-4 text-sm">How We Hire</h2>
+      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.how_we_hire}</p>
       {problem && (
         <div className="mt-4">
           <Banner tone="err">{problem}</Banner>

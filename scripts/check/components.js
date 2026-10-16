@@ -32,25 +32,13 @@ const { ROOT, GROUPS, STATUSES, REQUIRED } = gen;
 /**
  * Components from #18 still inside the apps, and the PR that moves each into
  * packages/ui (FRONTEND_FOUNDATION §7 mirrors this list). Entries only leave.
+ *
+ * EMPTY since PR 3 (Build kit): every shared component lives in packages/ui and
+ * both apps' components folders are gone. The list stays, and so does the check
+ * around it, so a file that appears in app/src/components or
+ * public-app/src/components again fails the build.
  */
-const LEGACY = [
-  ["app/src/components/form/index.ts", "the barrel for PersonPicker and Upload", "PR 3 (pickers, upload engine)"],
-  ["app/src/components/form/PersonPicker.tsx", "PersonPicker", "PR 3 (pickers)"],
-  ["app/src/components/form/Upload.tsx", "Upload", "PR 3 (upload engine)"],
-  ["app/src/components/ui/layout.tsx", "Sub", "PR 3 (display)"],
-  ["app/src/components/ui/data.tsx", "Kpi, StatStrip, Timeline, Bars, Chain, Accordion, TapList", "PR 3 (display)"],
-  ["app/src/components/ui/Table.tsx", "Table, Pager, Toolbar, LoadingRows", "PR 3 (DataView)"],
-  ["app/src/components/ui/Board.tsx", "Board", "PR 3 (kanban)"],
-  ["app/src/components/ui/Calendar.tsx", "Calendar", "PR 3 (calendar)"],
-  ["app/src/components/ui/charts.tsx", "AreaChart, Donut, Bands", "PR 3 (charts)"],
-  ["app/src/components/ui/Paper.tsx", "documents", "PR 3 (PDF and document preview)"],
-  ["app/src/components/ui/Profile.tsx", "360 header", "PR 3 (profile header)"],
-  ["app/src/components/ui/Reader.tsx", "articles", "PR 3 (reader)"],
-  ["public-app/src/components/ui.tsx", "Sub", "PR 3 (display)"],
-  ["public-app/src/components/form/index.ts", "the barrel for Upload", "PR 3 (upload engine)"],
-  ["public-app/src/components/form/Upload.tsx", "Upload", "PR 3 (upload engine)"],
-  ["public-app/src/components/SignaturePad.tsx", "SignaturePad", "PR 3 (signature field)"],
-];
+const LEGACY = [];
 
 const problems = [];
 const add = (where, message) => problems.push(`  ${where}: ${message}`);

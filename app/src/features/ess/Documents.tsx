@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { MyDocument } from "@/api/types/ess";
-import { StatStrip, TapList } from "@/components/ui/data";
-import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
-import { Pager, Table } from "@/components/ui/Table";
 import { useMe } from "@/auth/AuthProvider";
-import { UploadField } from "@/components/form";
-import { Button, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PhoneOnly, PageHeader, useModal, toast, formatDate, Field, TextField } from "@mycity/ui";
+import { Button, Card, CardHeader, DataView, DesktopOnly, Field, formatDate, Grid, KeyValue, PageHeader, Pager, Paper, PaperFoot, PaperLogo, PaperTitle, PhoneOnly, Pill, Signature, StatStrip, TapList, TextField, toast, UploadField, useModal } from "@mycity/ui";
+import { upload } from "@/api/upload";
 
 export function MyDocumentsPage() {
   const list = usePaged("GET /api/v1/ess/documents");
@@ -21,9 +18,9 @@ export function MyDocumentsPage() {
       <p>This agreement sets out the terms on which you are employed as {me.job_title}.</p>
       <p><b>Hours.</b> As set in your individual work schedule.</p>
       <p><b>Leave.</b> Twenty working days of paid annual leave in each calendar year.</p>
-      <div className="mt-5 flex gap-[30px]">
-        <div><Signature>{me.display_name.split(" ").map((n, i) => (i === 0 ? `${n[0]}.` : n)).join(" ")}</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-[10px] text-paper-faint">Employee</div></div>
-        <div><Signature>I. Chukwu</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-[10px] text-paper-faint">For MyCity App Ltd</div></div>
+      <div className="mt-5 flex gap-7.5">
+        <div><Signature>{me.display_name.split(" ").map((n, i) => (i === 0 ? `${n[0]}.` : n)).join(" ")}</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">Employee</div></div>
+        <div><Signature>I. Chukwu</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">For MyCity App Ltd</div></div>
       </div>
       <PaperFoot><span>Content hash verified</span><span>Artifact hash verified</span><span className="ml-auto">go.mycityapp.io/verify/CON-0004</span></PaperFoot>
     </Paper>
@@ -49,7 +46,7 @@ export function MyDocumentsPage() {
       </PhoneOnly>
       <DesktopOnly>
         <Grid cols="1/1.5">
-          <Table
+          <DataView
             title="Vault"
             rows={list.rows}
             rowKey={(d) => d.document_ref_id}
@@ -79,6 +76,7 @@ function UploadForm({ name: initial, close }: { name: string; close: () => void 
         <TextField value={name} onChange={setName} placeholder="NDPA certificate" />
       </Field>
       <UploadField
+        upload={upload}
         purpose="employee_document"
         accept=".pdf,image/*"
         multiple={false}

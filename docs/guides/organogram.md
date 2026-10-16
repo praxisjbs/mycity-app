@@ -242,3 +242,4 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
   seed from the staff spreadsheet, PDF and PNG export, internal only.
 - 15/10/2026 · AJ · Ratified as #92 and #91. Frontend built on mocks in `app/` (builder with drag to reassign, viewer, levels below two collapsed at start); not wired to the API yet.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: the ⓘ note under the chart is gone, the subtitle is shortened, and the chart is marked as content for gate 8.
+- 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): the screens around the org chart moved onto `@mycity/ui` (`DataView`, `KpiCard`, `ProfileHeader`, `Timeline`). The chart itself is unchanged: its connector lines are still the app's own CSS, since the tree is one screen's drawing rather than a shared component.

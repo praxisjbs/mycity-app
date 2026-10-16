@@ -2,12 +2,11 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { MyProfile, ProfilePatch } from "@/api/types/ess";
 import "@/api/types/ess";
-import { Timeline } from "@/components/ui/data";
-import { LoadingRows } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
-import { UploadField } from "@/components/form";
-import { Button, KeyValue, Pill, Icon, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, formatDate, initials, Field, FormFooter, rules, TextField, useContractForm, Wizard } from "@mycity/ui";
+import { Button, Card, CardHeader, DesktopOnly, ErrorState, Field, formatDate, FormFooter, Grid, Icon, initials, KeyValue, LoadingRows, PageHeader, Pill, rules, TextField, Timeline, toast, UploadField, useContractForm, useModal, Wizard } from "@mycity/ui";
+import { toTrail } from "@/features/shared/wire";
+import { upload } from "@/api/upload";
 
 export function MyProfilePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/profile");
@@ -20,13 +19,13 @@ export function MyProfilePage() {
 
   const personal = <Card><CardHeader title="Personal" /><KeyValue items={[["Full name", p.personal.full_name], ["Date of birth", formatDate(p.personal.date_of_birth)], ["Phone", p.personal.phone], ["Work email", p.personal.work_email], ["Address", p.personal.address]]} /></Card>;
   const schedule = (
-    <div className="mt-[14px] border-t border-border pt-3">
+    <div className="mt-3.5 border-t border-border pt-3">
       <CardHeader title="Work Schedule" right={<Pill>Set by People</Pill>} className="mb-1" />
       {p.schedule.map((s) => (
         <div key={s.day} className="flex flex-wrap items-center gap-2.5 border-b border-border py-2 last:border-b-0">
-          <b className="w-[84px] text-[12.5px]">{s.day}</b>
+          <b className="w-20 text-xs">{s.day}</b>
           <Pill tone={s.mode === "Office" ? "ok" : s.mode === "Off" ? "err" : "neutral"}>{s.mode}</Pill>
-          <span className="ml-auto text-[11.5px] text-subtle-foreground">{s.mode === "Off" ? "Not working" : `${s.hours} · ${s.where}`}</span>
+          <span className="ml-auto text-2xs text-subtle-foreground">{s.mode === "Off" ? "Not working" : `${s.hours} · ${s.where}`}</span>
         </div>
       ))}
     </div>
@@ -45,30 +44,30 @@ export function MyProfilePage() {
       <CardHeader title="Editable Fields" />
       {p.can_change.map((c) => (
         <div key={c.field} className="flex items-center gap-2.5 border-b border-border py-2">
-          <span className="flex-1 text-[12.5px] font-[550]">{c.field}</span>
+          <span className="flex-1 text-xs font-semibold">{c.field}</span>
           <Pill tone={c.how.tone}>{c.how.text}</Pill>
         </div>
       ))}
     </Card>
   );
-  const history = <Card><CardHeader title="My Record History" /><Timeline items={p.history} /></Card>;
+  const history = <Card><CardHeader title="My Record History" /><Timeline items={toTrail(p.history)} /></Card>;
 
   return (
     <>
       <PageHeader title="My Profile" sub="Your record as People see it" actions={<Button variant="primary" icon="plus" onClick={edit}>Edit</Button>} />
-      <div className="mb-3 flex flex-wrap items-start gap-4 rounded-card border border-border bg-card p-4 shadow-1 max-md:p-[14px]">
-        <button type="button" onClick={photo} title={p.photo_url ? "Change photo" : "Upload a photo"} className="relative flex size-[62px] flex-none items-center justify-center rounded-sheet bg-secondary text-[21px] font-bold tracking-[-.02em] text-secondary-foreground max-md:size-[52px] max-md:text-[18px]">
+      <div className="mb-3 flex flex-wrap items-start gap-4 rounded-card border border-border bg-card p-4 shadow-1 max-md:p-3.5">
+        <button type="button" onClick={photo} title={p.photo_url ? "Change photo" : "Upload a photo"} className="relative flex size-15 flex-none items-center justify-center rounded-sheet bg-secondary text-2xl font-bold tracking-tight text-secondary-foreground max-md:size-13 max-md:text-xl">
           {initials(p.display_name)}
-          <span className="absolute -right-[7px] -bottom-[7px] flex size-[26px] items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-2">
-            <Icon name="plus" className="size-[13px]" />
+          <span className="absolute -right-1.5 -bottom-1.5 flex size-6.5 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-2">
+            <Icon name="plus" className="size-3" />
           </span>
         </button>
-        <span data-copy="content" className="min-w-0 flex-1 max-md:basis-[180px]">
-          <h2 data-copy="content" className="text-[19px] tracking-[-.02em]">{p.display_name}</h2>
-          <div className="mt-0.5 text-[13px] text-muted-foreground">{p.job_title} · {p.department}</div>
-          <div className="mt-[9px] flex flex-wrap gap-1.5">{p.chips.map((c) => <Pill key={c.text} tone={c.tone}>{c.text}</Pill>)}</div>
+        <span data-copy="content" className="min-w-0 flex-1 max-md:basis-44">
+          <h2 data-copy="content" className="text-xl tracking-tight">{p.display_name}</h2>
+          <div className="mt-0.5 text-sm text-muted-foreground">{p.job_title} · {p.department}</div>
+          <div className="mt-2 flex flex-wrap gap-1.5">{p.chips.map((c) => <Pill key={c.text} tone={c.tone}>{c.text}</Pill>)}</div>
         </span>
-        <span className="flex flex-wrap gap-[7px] max-md:w-full">
+        <span className="flex flex-wrap gap-1.5 max-md:w-full">
           <Button onClick={() => toast("Preparing your data export for your Mailbox.")}>Download My Data</Button>
           <Button icon="shield" onClick={() => navigate(hrefFor("ess", "my-security"))}>Security</Button>
         </span>
@@ -166,8 +165,9 @@ function PhotoForm({ close }: { close: () => void }) {
   const [done, setDone] = useState(false);
   return (
     <>
-      <p className="mb-3 text-[12.5px] text-muted-foreground">A clear, recent photo. It shows on your profile, in Staff Community and on the org chart.</p>
+      <p className="mb-3 text-xs text-muted-foreground">A clear, recent photo. It shows on your profile, in Staff Community and on the org chart.</p>
       <UploadField
+        upload={upload}
         purpose="avatar"
         accept="image/*"
         multiple={false}

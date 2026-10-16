@@ -2,9 +2,8 @@ import { useCallback, useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import type { Notification } from "@/api/types/identity";
-import { Pager } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
-import { Button, ChoiceField, EmptyState, formatWhen, IconButton, NotificationRow, useModal, type IconName } from "@mycity/ui";
+import { Button, ChoiceField, EmptyState, formatWhen, IconButton, NotificationRow, Pager, useModal, type IconName } from "@mycity/ui";
 
 /**
  * The bell: things that happened to you. Read once and gone. Unresolved

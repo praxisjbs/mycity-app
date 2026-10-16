@@ -121,9 +121,13 @@ The rule from the 12 October meeting, for every table, list, card grid, picker a
 - Every list response is `{ data, page: { number, size, total, pages, has_next } }`. The shared
   pager reads `page`; show the true total ("312 employees"), never "showing 25". The pager is the
   only place the total appears; never a sentence explaining the page size.
-- **Search and filters go to the server** (`q` and the list's filter params). Never filter or sort
-  the 25 rows you have and present the result as the whole list: that is the praxis-ls bug where a
-  search said "no results" for records on page 4.
+- **Search, filters and sort go to the server** (`q`, the list's filter params, and one `sort`).
+  Never filter or sort the 25 rows you have and present the result as the whole list: that is the
+  praxis-ls bug where a search said "no results" for records on page 4.
+- **Sort is one key** (F20): the field name, with a leading `-` for descending (`?sort=-due_on`).
+  The list's contract schema allow-lists the fields, so a field it does not name is a 422. `DataView`
+  sends it for you: a sortable column's header cycles ascending, descending, none, and changing it
+  goes back to page 1.
 - Infinite scroll on mobile is the same API: fetch `page + 1` when `has_next`.
 - Never fetch "all" of anything to build a dropdown. Pickers search the server and show the first
   page.
@@ -280,8 +284,9 @@ that ships one layout scaled fails the gate. The test agreed on 8 October (00:23
 does it look like a mobile application, with less text?** On desktop, is it full desktop software?
 
 **The phone shell (up to 760 px wide).** The top bar, the bottom bar, More and the floating button
-are built (PR 2, the Shell group in `docs/COMPONENTS.md`); boards come with PR 3 (F19). Build every
-screen for them: the page keeps clear space under its content by itself, give the screen one New
+are built (PR 2, the Shell group in `docs/COMPONENTS.md`), and so is the build kit the screens are
+drawn with (PR 3: `DataView`, `Kanban`, the charts, the pickers, the editor, the previews, the maps).
+Build every screen for them: the page keeps clear space under its content by itself, give the screen one New
 action (`useScreenAction`, below), and never rely on dragging on a phone.
 
 - **Top bar and title rail** (PR 2 question 3): the pin alone at the left, which goes Home; search,
@@ -305,11 +310,14 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   Hide Here, which keeps it hidden until the person leaves that page. Desktop has none. A screen
   offers its New action with `useScreenAction({ label: "New Task", onSelect })` from
   `app/src/shell/screen-action.tsx`; on desktop the same action stays in its page header.
-- **Boards** (F19): a stage switcher (chips with counts) over a card list for that stage. Moving a
-  card is Move To in its sheet. No dragging on a phone.
+- **Boards** (F19): `Kanban` from `@mycity/ui`. On a phone it is a stage switcher (chips with
+  counts) over that stage's cards, and a card moves by Move To, never by dragging; Move To is a real
+  menu on desktop too, so a keyboard and a screen reader can move a card.
 - **Cards, not tables.** A list is a card list (the primary value as the title, two or three
-  label and value pairs, a status pill). The shared data view (`DataView`, PR 3, F20) draws the
-  table on desktop and the card list on a phone from the same rows. No visible `<table>` on a phone.
+  label and value pairs, a status pill). `DataView` (F20) draws the table on desktop and the card
+  list on a phone from the same columns, with the pager, server sort, selection, bulk actions and
+  Export; where a phone has no table header, sort moves into an action sheet. No visible `<table>`
+  on a phone.
 - **Sheets, not centred modals.** The shared `Modal` becomes a bottom sheet that slides with a
   spring and closes by dragging down (F6); a long form becomes a full screen sheet. `Menu` becomes
   an action sheet.
@@ -412,8 +420,10 @@ imports `react-hook-form`. Features import its parts from `@mycity/ui`: `Form`, 
 `TextField`, `PasswordField`, `NumberField`, `DateField`, `DateRangeField`, `TimeField`,
 `MoneyField`, `PhoneField`, `SelectField`, `ChoiceField`, `CheckboxField`, `Switch`, `ToggleRow`,
 `TextAreaField`, `SearchInput`, `FilterSelect`, `LoginField`, `OtpField`, `FormFooter`, `FormError`,
-`Wizard`, `InlineInput`, `InlineSelect`, `InlineLabel`, and the hook `useContractForm(initial, rules)`. `UploadField`, `PersonPicker` and
-`SignatureField` join them in PR 3. `docs/COMPONENTS.md` (Forms) has the props of each.
+`Wizard`, `InlineInput`, `InlineSelect`, `InlineLabel`, and the hook `useContractForm(initial, rules)`. PR 3 added `UploadField` (the
+only file input in the product), `PersonPicker` and `RecordPicker` (both searching the server, 25 at a
+time), `SignatureField`, `RichTextField` (TipTap in its own chunk), `VoiceField` (A18) and `Tick` (a
+list row's own checkbox). `docs/COMPONENTS.md` (Forms) has the props of each.
 
 **One hook, one field binding.** `useContractForm(initial, rules)` is react-hook-form checked by the
 module's contract schema (anything with `safeParse`) or, until it exists, by INTERIM rules (§8.3).
@@ -436,8 +446,11 @@ in `packages/ui`, approved by AJ (backup TB). Never build it inside a feature.
   `ConfirmDialog`; tell with a `toast`.
 - **One modal component** (`Modal`, a bottom sheet on a phone), used everywhere. A "new" or "edit"
   action opens it; editing a record you are looking at on desktop opens a `SidePanel`.
-- **Uploads** through the upload engine with a percentage; never a raw `<input type="file">`
-  (gate 18). The engine moves into `packages/ui` in PR 3; until then the merged `Upload` stands.
+- **Uploads** through `UploadField` with a percentage per file; never a raw `<input type="file">`
+  (gate 18). The engine is one copy in `packages/ui` (`lib/upload.ts` sends it, because `fetch`
+  cannot report how far a request body has travelled); each app passes its own `upload`, which adds
+  its session (`app/src/api/upload.ts`, `public-app/src/api/upload.ts`). A record stores the
+  answer's `document_id`, never a name or a path.
 - **Permissions**: the shell shows only the modules and actions the user's grants allow. Hiding is
   a courtesy; the API enforces. Never assume a hidden button means a forbidden action is safe.
 - **Home is role-sensitive.** Each role sees its own KPIs and main chart; "Needs you" is the same
@@ -452,12 +465,13 @@ in `packages/ui`, approved by AJ (backup TB). Never build it inside a feature.
 
 ## 9 · Foundation: `packages/ui` and the two apps
 
-Owner AJ, backup TB (CODEOWNERS). Built in three PRs (FRONTEND_FOUNDATION §1, §4): **PR 1 Ground**
-gives the package, the tokens, the primitives, overlays, help, toast, the form system, the data
-client, the catalogue, the gallery and the gates; **PR 2 Shell** puts both apps' shells on it;
-**PR 3 Build kit** adds the heavy components and empties the apps' own component folders. A section
-below says where PR 2 or PR 3 changes it. Fill a section as its work lands, so the next person
-builds on it instead of beside it.
+Owner AJ, backup TB (CODEOWNERS). Built in three PRs (FRONTEND_FOUNDATION §1, §4), **all three
+landed**: **PR 1 Ground** gave the package, the tokens, the primitives, overlays, help, toast, the
+form system, the data client, the catalogue, the gallery and the gates; **PR 2 Shell** put both
+apps' shells on it; **PR 3 Build kit** added the heavy components (DataView, the KPI pieces, the
+charts, the board, the calendar, the pickers, the upload engine, the editor, the previews, voice
+input and the maps), emptied both apps' component folders and converged every screen onto the token
+scales. The foundation is done: every component a screen uses lives in `packages/ui`.
 
 ### 9.1 Folder structure
 
@@ -498,7 +512,12 @@ packages/ui/
     help/                     HelpTerm, InfoButton, Details (§5.2)
     feedback/                 toast and Toaster, ErrorBoundary, ErrorState
     form/                     the form system: the only home of raw form elements (§8.6)
-    data/                     ApiError, createApiClient, useApi, usePaged, useInfinite, useMutation, invalidate
+    data/                     ApiError, createApiClient, useApi, usePaged, useInfinite, useMutation, invalidate,
+                              DataView (F20), Pager, Toolbar, ExportButton, Kanban (F19), Calendar
+    charts/                   AreaChart, BarChart, DonutChart, BandChart, Sparkline; each a boundary
+                              around its own *.draw.tsx chunk (F22)
+    documents/                DocumentPreview, ImageViewer, Paper, Reader
+    maps/                     MapView, PlaceSearch, LocationLabel on Leaflet, with Geoapify proxied (F21)
     illustrations/            Illustration, in token colours
     shell/                    the frame both apps' shells are built from (PR 2): Brand, StagingBar, ComingSoon,
                               PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
@@ -527,6 +546,7 @@ app/
       endpoints.ts  hooks.ts  the typed endpoint map; the shared hooks bound to this client
       realtime.ts             Socket.io for the bell and presence (§9.6); nothing on the mock
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
+      upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
     auth/                     AuthProvider (useAuth, useMe; the expired state), Login, SignInSheet
     shell/                    Shell (DesktopShell or PhoneShell from @mycity/ui), catalogue (modules, tab
@@ -534,7 +554,9 @@ app/
                               screens (lazy per module), More, Fab, screen-action (useScreenAction),
                               Search (⌘K), Bell, Notices, pwa (update, install), offline, Planned
                               (Coming Soon, the Prototype View switch), coming-soon, layout-context
-    components/               LEGACY only: #18 components not yet moved (§9.4); nothing new goes here
+    features/shared/          wiring, never components (§9.4): sections (PagedTable, ExportAction),
+                              pickers (EmployeePicker), wire (the API's shapes to the components'),
+                              KpiTiles, Letter
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
@@ -566,7 +588,6 @@ public-app/
       mock/                   the in-browser mock, laptops and CI only; demo-links.ts lists sample addresses
     shell/                    Page (PublicPage with the site's links and noindex), Planned (Coming Soon, the
                               Prototype View switch), DemoLinks (mock only)
-    components/               LEGACY only (§9.4): SignaturePad, Upload and ui (PR 3)
     pages/                    Careers, Vacancy, Apply, Assessment, SignOffer, Verify, LinkProblem
 ```
 
@@ -689,10 +710,13 @@ and set before first paint. `useTheme` and `setTheme` from `@mycity/ui` read and
 
 Typeface Geist (`@fontsource-variable/geist`), one family.
 
-**Styling (F4).** Inside `packages/ui`: Tailwind utilities on token classes; CSS variables are
-allowed; no hex outside `tokens.css`. In `app/` and `public-app/`: token classes and layout and
-spacing utilities from the named scales only. No arbitrary value (`w-[317px]`), no `style=` prop,
-no hex. ESLint refuses each (`eslint.shared.js`). Anything visual beyond that is a shared component.
+**Styling (F4).** Inside `packages/ui`: Tailwind utilities on token classes; a `style` prop may set
+a CSS **variable** that a class reads (`w-(--fill)`), which is how every measured bar, pane and
+swatch carries its one runtime value; no hex outside `tokens.css`. In `app/` and `public-app/`:
+token classes and layout and spacing utilities from the named scales only. No arbitrary value
+(`w-[317px]`), no `style=` prop at all, no hex. ESLint refuses each (`eslint.shared.js`), **with no
+exemptions**: PR 3 converged every screen #18 wrote onto the scales and deleted the list.
+Anything visual beyond that is a shared component.
 
 **Density (F5).** `--control-h`, `--row-h`, `--text-body`, `--text-field` and `--tap`: Compact by
 default (36, 40, 14, 14 and 36 px), `[data-density=comfortable]` (40, 48, 15, 15 and 40 px). At
@@ -717,13 +741,17 @@ app's `components/` folder, and a feature that declares a component with a share
 from a button without guessing from markup. Content a person wrote or received is marked
 `data-copy="content"` (`content()`) and is not counted as interface copy (§5.3).
 
-**LEGACY.** Components from #18 that have not moved yet stay where they are, in `app/src/components/`
-and `public-app/src/components/`, until the PR named for them moves them into `packages/ui`. The
-list is `LEGACY` in `scripts/check/components.js`; FRONTEND_FOUNDATION §7 mirrors it row for row,
-and the check fails when the two differ. Entries only leave. Nothing new is added beside them. When
-one moves, its screens import the shared component from `@mycity/ui` and its file leaves the list.
-`features/shared/sections.tsx` (`PagedTable`, `ExportButton`) is not in a components folder, but its
-table pieces move with `Table.tsx` to `DataView` in PR 3.
+**LEGACY is empty.** PR 3 moved the last of #18's own components into `packages/ui` and deleted
+`app/src/components/` and `public-app/src/components/`. `LEGACY` in `scripts/check/components.js` is
+an empty list and FRONTEND_FOUNDATION §7 an empty table, and the check around them stays: a file in
+either folder fails the build, and so does a feature that declares a component with a shared name. A
+missing component is added to `packages/ui` with `npm run new:component` (F11).
+
+What a feature may still keep beside its screens is **wiring**, not components:
+`features/shared/sections.tsx` binds `DataView` and `ExportButton` to this app's endpoints
+(`PagedTable`, `ExportAction`), `features/shared/pickers.tsx` binds `PersonPicker` to the employees
+endpoint (`EmployeePicker`), `features/shared/wire.ts` maps what the API sends to what the
+components take, and `api/upload.ts` gives the upload engine this app's session.
 
 **Submit is never disabled** (§8.3). `Button`'s `busy` ignores presses while a request is in flight
 but keeps the button enabled and reachable; a form shows what is wrong on its fields when Submit is
@@ -832,9 +860,8 @@ The same as the backend: nobody pushes to `main`; branch, push, pull request, CI
 owner's approval, merge. How to open a branch, keep it up to date, and what makes CI fail are in
 `BACKEND_GUIDE.md` §8. A change under `packages/ui/` needs AJ or TB (CODEOWNERS, F11).
 
-The gates that hold the frontend to this guide run in `npm run ci`. A row marked **PR 1** is still
-being built (FRONTEND_FOUNDATION §6) and joins `npm run ci` when it lands; `npm run ci -- --list`
-shows what runs today. The screen gates crawl the gallery, every app screen, and `demo.html` only
+The gates that hold the frontend to this guide run in `npm run ci`; `npm run ci -- --list` shows
+what runs today. The screen gates crawl the gallery, every app screen, and `demo.html` only
 when a change touches it (F23). Several gates are lint rules in
 `packages/ui/eslint.shared.js`, run by `fe:lint` in the package and both apps.
 
@@ -843,20 +870,19 @@ when a change touches it (F23). Several gates are lint rules in
 | 8 Five-second rule | `scripts/check/five-second.js` | A word limit broken (§5.3), an explainer title, chrome not in Title Case, help visible on load, a subtitle or chart caption on a phone, text in a modal footer |
 | 11 Two shells | `scripts/check/two-shells.js` | Sideways scrolling, the wrong navigation for the width, a table on a phone, a tap target under 44 px, a wordy first phone screen, a script error (§7) |
 | 12 Inline validation and the form system | `scripts/check/forms.js` | A raw form element or `react-hook-form` outside `packages/ui/src/form/`, a hand-made label, an asterisk, an instruction as a placeholder, a long field error, a Submit or OK button (§8) |
-| 13 Palette | lint `no-hex`; `scripts/check/palette.js` (**PR 1**) | A raw hex outside `tokens.css`; `#FFCD05` or `#004F70` anywhere; a colour or arbitrary value in a class (F4) |
-| 14 Contrast | `scripts/check/contrast.js` (**PR 1**) | A text pair in `tokens.css` below AA (4.5:1) in either theme, chart series included (§9.3) |
+| 13 Palette | lint `no-hex`; `scripts/check/palette.js` | A raw hex outside `tokens.css`; `#FFCD05` or `#004F70` anywhere; a colour, an arbitrary value or a `style` prop in an app (F4), with no exemptions |
+| 14 Contrast | `scripts/check/contrast.js` | A text pair in `tokens.css` below AA (4.5:1) in either theme, chart series included (§9.3) |
 | 15 Day-first dates | lint `no-date-input`, `no-bare-date-locale`; `scripts/check/date-format.js` is still empty (NOT BUILT in `npm run ci`) | `<input type="date">`, `toLocaleDateString()` with no locale (§6) |
-| 16 No native dialogs | lint; `scripts/check/native-dialogs.js` (**PR 1**) | `alert`, `confirm`, `prompt` and `window.` forms of them (§8.7) |
+| 16 No native dialogs | lint; `scripts/check/native-dialogs.js` | `alert`, `confirm`, `prompt` and `window.` forms of them (§8.7) |
 | 17 No dashes | `scripts/check/dashes.js` | An em dash, an en dash or a double hyphen in copy a person reads (§5.4) |
-| 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` (**PR 1**) | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
-| Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; a new file in an app's `components/`; a feature shadowing a shared component (§9.4) |
-| Mock-free (F12) | `scripts/check/mock-free.js` (**PR 1**) | A release build that contains the in-browser mock (§9.5) |
+| 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
+| Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; ANY file in an app's `components/` (both folders are gone); a feature shadowing a shared component (§9.4) |
+| Mock-free (F12) | `scripts/check/mock-free.js` | A release build that contains the in-browser mock (§9.5) |
 | Accessibility | `scripts/check/a11y.js` | An axe violation on any gallery state, in either theme, or on any app screen (shell and page together) at phone and desktop size |
 | Frontend typecheck, lint, test, build | `npm run fe:typecheck`, `fe:lint`, `fe:test`, `fe:build` | A type error, a lint error (the rules above, F4, F7, no local Zod), a failing Vitest test (each component's render, behaviour and axe check), a build that does not complete, in `packages/ui`, `app` or `public-app` |
 
 The screen gates need Chromium. CI installs it; locally, `npx playwright install chromium` once.
-The Stop hook runs them when a change touches `app/`, `public-app/` or `demo.html`; a change only in
-`packages/ui/` does not trigger them until PR 1 adds it (FRONTEND_FOUNDATION §6), so run them yourself.
+The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`.
 
 ## 11 · Done means
 

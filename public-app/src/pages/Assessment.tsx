@@ -3,9 +3,8 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { AssessmentQuestion, AssessmentSession } from "@/api/types/public";
-import { Banner, Button, cn, formatDate, Icon, PageMessage, Skeleton, TextAreaField } from "@mycity/ui";
+import { Banner, Button, cn, formatDate, Icon, Meter, PageMessage, Skeleton, Sub, TextAreaField } from "@mycity/ui";
 import { Page } from "@/shell/Page";
-import { Sub } from "@/components/ui";
 import { LinkProblem } from "./LinkProblem";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -67,16 +66,16 @@ function Intro({ d, token, onStarted }: { d: AssessmentSession; token: string; o
   return (
     <Page title={d.assessment.title}>
       <Sub>{d.vacancy_title}</Sub>
-      <h1 className="mt-1 text-[20px]">{d.assessment.title}</h1>
+      <h1 className="mt-1 text-2xl">{d.assessment.title}</h1>
       <div className="mt-3.5 grid grid-cols-3 gap-2">
         {[["Type", d.assessment.kind], ["Time", `${d.assessment.duration_min} minutes`], ["Questions", String(d.assessment.question_count)]].map(([k, val]) => (
-          <div key={k} className="rounded-[10px] border border-border px-3 py-2.5">
-            <div className="text-[11px] font-semibold tracking-[.07em] text-subtle-foreground uppercase">{k}</div>
-            <b className="text-[15px] max-md:text-[13.5px]">{val}</b>
+          <div key={k} className="rounded-box border border-border px-3 py-2.5">
+            <div className="text-2xs font-semibold tracking-caps text-subtle-foreground uppercase">{k}</div>
+            <b className="text-md max-md:text-sm">{val}</b>
           </div>
         ))}
       </div>
-      <p className="mt-4 text-[13.5px] leading-[1.6] text-muted-foreground">
+      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
         Hello {d.candidate_first_name}. {d.assessment.instructions}
       </p>
       <div className="mt-4">
@@ -179,26 +178,24 @@ function Running({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
 
   return (
     <Page title={d.assessment.title}>
-      <div className="mb-[18px] flex items-center gap-3">
+      <div className="mb-4.5 flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[18px]">{d.assessment.title}</h1>
+          <h1 className="text-xl">{d.assessment.title}</h1>
           <Sub>
             {d.assessment.kind} · Question {i + 1} of {total}
           </Sub>
         </div>
         <div className="text-right" role="timer" aria-live="off" aria-label={`${clock(left)} remaining`}>
-          <div className={cn("text-[20px] font-bold tracking-[-.02em]", left < 5 * 60000 ? "text-destructive" : "text-warning")}>{clock(left)}</div>
+          <div className={cn("text-2xl font-bold tracking-tight", left < 5 * 60000 ? "text-destructive" : "text-warning")}>{clock(left)}</div>
           <Sub>remaining</Sub>
         </div>
       </div>
-      <div className="mb-5 h-[5px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
-        <i className="block h-full rounded-full bg-chart-1 transition-[width]" style={{ width: `${((i + 1) / total) * 100}%` }} />
-      </div>
-      <p id={`p-${q.question_id}`} className="text-[14px] leading-normal font-semibold">
+      <Meter pct={((i + 1) / total) * 100} name={`Question ${i + 1} of ${total}`} className="mb-5" />
+      <p id={`p-${q.question_id}`} className="text-base leading-normal font-semibold">
         {q.prompt}
       </p>
       {q.kind === "text" ? (
-        <TextAreaField aria-labelledby={`p-${q.question_id}`} className="mt-3.5 min-h-[150px]" rows={6} value={answers[q.question_id] ?? ""} onChange={(val) => answer(q, val)} />
+        <TextAreaField aria-labelledby={`p-${q.question_id}`} className="mt-3.5 min-h-36" rows={6} value={answers[q.question_id] ?? ""} onChange={(val) => answer(q, val)} />
       ) : (
         <div role="radiogroup" aria-labelledby={`p-${q.question_id}`} className="mt-3.5 flex flex-col gap-2">
           {q.options!.map((o) => {
@@ -210,9 +207,9 @@ function Running({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
                 role="radio"
                 aria-checked={on}
                 onClick={() => answer(q, o.id, true)}
-                className={cn("flex items-center gap-3 rounded-[10px] border px-3.5 py-3 text-left text-[13.5px] transition-colors", on ? "border-secondary bg-accent font-semibold" : "border-border hover:border-subtle-foreground")}
+                className={cn("flex items-center gap-3 rounded-box border px-3.5 py-3 text-left text-sm transition-colors", on ? "border-secondary bg-accent font-semibold" : "border-border hover:border-subtle-foreground")}
               >
-                <span className={cn("flex size-[18px] flex-none items-center justify-center rounded-full border-2", on ? "border-secondary" : "border-input")}>{on && <i className="size-2 rounded-full bg-secondary" />}</span>
+                <span className={cn("flex size-4.5 flex-none items-center justify-center rounded-full border-2", on ? "border-secondary" : "border-input")}>{on && <i className="size-2 rounded-full bg-secondary" />}</span>
                 {o.text}
               </button>
             );
@@ -220,7 +217,7 @@ function Running({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
         </div>
       )}
       <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-        <span className={cn("inline-flex flex-1 items-center gap-1.5 text-[12.5px]", save.state === "error" ? "text-destructive" : "text-subtle-foreground")} aria-live="polite">
+        <span className={cn("inline-flex flex-1 items-center gap-1.5 text-xs", save.state === "error" ? "text-destructive" : "text-subtle-foreground")} aria-live="polite">
           {save.state === "saving" ? (
             "Saving"
           ) : save.state === "error" ? (
@@ -251,8 +248,8 @@ function Running({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
         )}
       </div>
       {confirm && (
-        <div className="mt-4 rounded-[10px] border border-border bg-muted p-3.5">
-          <b className="text-[13.5px]">Submit your answers?</b>
+        <div className="mt-4 rounded-box border border-border bg-muted p-3.5">
+          <b className="text-sm">Submit your answers?</b>
           <Sub className="mt-1">
             {answered} of {total} questions answered. After submitting you cannot change an answer.
           </Sub>

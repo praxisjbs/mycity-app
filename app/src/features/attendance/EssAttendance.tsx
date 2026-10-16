@@ -1,14 +1,12 @@
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AttendanceEvent, LocationRequestBody, LocationRequest } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { AreaChart } from "@/components/ui/charts";
-import { LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
 import { DEVICE_TONE } from "./Devices";
 import { CASE_TONE, REQ_TONE } from "./PeopleAttendance";
-import { Button, Banner, EmptyState, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, formatDate, formatDateTime, formatMonth, formatTime, todayIso, DateField, Field, FormFooter, rules, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { AreaChart, Banner, Button, Card, CardHeader, DataView, DateField, DesktopOnly, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, KeyValue, LoadingRows, PageHeader, Pager, Pill, rules, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm, useModal } from "@mycity/ui";
 
 const STATUS: Record<AttendanceEvent["status"], { tone: "ok" | "warn" | "err" | "info" | "neutral"; text: string }> = {
   on_time: { tone: "ok", text: "On Time" }, late: { tone: "warn", text: "Late" }, absent: { tone: "err", text: "Absent" }, leave: { tone: "info", text: "On Leave" },
@@ -42,9 +40,9 @@ export function MyAttendancePage() {
       <KeyValue items={[["Expected location", t.location_label], ["Schedule", `${t.work_pattern} · ${t.shift_start} to ${t.shift_end}`], ["Clock in", t.clock_in_at ? formatTime(t.clock_in_at) : "None"], ["Clock out", t.clock_out_at ? formatTime(t.clock_out_at) : "None"]]} />
     </Card>
   );
-  const chart = chartRows.length > 1 ? <AreaChart title="Net Hours per Day" values={chartRows.map((r) => Math.round((r.worked_minutes ?? 0) / 6) / 10)} labels={chartRows.map((r) => formatDate(r.date))} note="Saturdays run 09:00 to 15:00, so they show shorter." /> : <EmptyState icon="chart" title="Not Enough Days Yet" text="The chart appears after two complete days." />;
+  const chart = chartRows.length > 1 ? <AreaChart title="Net Hours per Day" values={chartRows.map((r) => Math.round((r.worked_minutes ?? 0) / 6) / 10)} labels={chartRows.map((r) => formatDate(r.date))} caption="Saturdays run 09:00 to 15:00, so they show shorter." /> : <EmptyState icon="chart" title="Not Enough Days Yet" text="The chart appears after two complete days." />;
   const events = (
-    <Table
+    <DataView
       title="My Clock Events"
       right={<Button onClick={() => toast(`${formatMonth(month)} exported. It arrives in your Mailbox.`)}>Export Month</Button>}
       rows={list.rows}
@@ -63,7 +61,7 @@ export function MyAttendancePage() {
   );
   const cases = summary.data?.open_cases ?? [];
   const casesTable = cases.length > 0 && (
-    <Table
+    <DataView
       title="My Corrections and Exceptions"
       rows={cases}
       rowKey={(c) => c.case_id}
@@ -113,7 +111,7 @@ export function WorkLocationRequestsPage() {
         <>
           <KeyValue items={[["Type", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason], ["Status", <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill>], ["People's note", r.hr_note ?? "None"]]} />
           <div className="mt-3 border-t border-border pt-3">
-            {r.history.map((h, i) => <p key={i} className="text-[11.5px] text-subtle-foreground">{formatDateTime(h.at)} · {h.by} · {h.text}</p>)}
+            {r.history.map((h, i) => <p key={i} className="text-2xs text-subtle-foreground">{formatDateTime(h.at)} · {h.by} · {h.text}</p>)}
           </div>
         </>
       ),
@@ -130,7 +128,7 @@ export function WorkLocationRequestsPage() {
           </Card>
         ) : <Card><LoadingRows /></Card>}
       </Grid>
-      <Table
+      <DataView
         title="My Requests"
         rows={list.rows}
         rowKey={(r) => r.request_id}
@@ -193,7 +191,7 @@ export function MyDevicesPage() {
       <PageHeader title="My Devices" sub="Phones and laptops you clock in from" actions={<Button variant="primary" icon="plus" disabled={active >= 3} onClick={() => modal.open({ title: "Register This Device", body: (close) => <DeviceForm close={close} /> })}>Register This Device</Button>} />
       <AckBanner />
       {active >= 3 && <Banner tone="info" icon="info">You have three devices. Ask People to remove one before registering another.</Banner>}
-      <Table
+      <DataView
         title="My Devices"
         rows={list.rows}
         rowKey={(d) => d.device_id}
@@ -256,11 +254,11 @@ export function PolicyUpdatesPage() {
   return (
     <>
       <PageHeader title="Policy Updates" sub={`Attendance policy · ${me.display_name}`} />
-      <div className="mb-3 rounded-card border border-border bg-background px-[15px] py-[13px]">
-        <h2 data-ui="title" className="text-[14.5px]">Policy v{p.version}</h2>
+      <div className="mb-3 rounded-card border border-border bg-background px-3.5 py-3">
+        <h2 data-ui="title" className="text-base">Policy v{p.version}</h2>
         <div data-copy="content">
-          <p className="mt-[5px] text-[13px] leading-normal text-muted-foreground">{p.summary}</p>
-          <ul className="mt-2 list-disc pl-5 text-[12.5px] text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>
+          <p className="mt-1 text-sm leading-normal text-muted-foreground">{p.summary}</p>
+          <ul className="mt-2 list-disc pl-5 text-xs text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button onClick={read}>Read Full Policy</Button>
@@ -281,7 +279,7 @@ export function PolicyUpdatesPage() {
           <KeyValue items={p.settings.filter((s) => ["grace", "mode_remote", "mode_office", "dev_warn_new", "late_rule"].includes(s.key)).map((s) => [s.label, String(typeof s.value === "boolean" ? (s.value ? "On" : "Off") : s.kind === "mode" ? { record: "Record only", warn: "Warn", block: "Block" }[s.value as string] : s.value)])} />
         </Card>
       </Grid>
-      <Table
+      <DataView
         title="All Versions"
         rows={versions.rows}
         rowKey={(v) => String(v.version)}

@@ -250,6 +250,68 @@ describe("query helpers", () => {
   });
 });
 
+describe("list sort (F20)", () => {
+  const { z } = require("zod");
+  const common = require("../../../packages/contract/schemas/common");
+  const { orderBy } = require("../../../src/shared/http/paged");
+
+  const Query = common.listQuery({ status: z.enum(["active", "left"]).optional() }, ["display_name", "created_at"]);
+  const SORTS = { display_name: "e.last_name, e.first_name", created_at: "e.created_at" };
+
+  test("one key, a leading minus for descending", () => {
+    expect(Query.parse({ sort: "display_name" }).sort).toEqual({ field: "display_name", dir: "asc" });
+    expect(Query.parse({ sort: "-created_at" }).sort).toEqual({ field: "created_at", dir: "desc" });
+  });
+
+  test("a field the list does not allow-list is a 422 naming sort", () => {
+    const bad = Query.safeParse({ sort: "salary" });
+    expect(bad.success).toBe(false);
+    expect(bad.error.issues[0].path).toEqual(["sort"]);
+  });
+
+  test("a list with no sortable fields has no sort key at all", () => {
+    expect(common.listQuery().safeParse({ sort: "anything" }).success).toBe(false);
+  });
+
+  test("sort cannot be redefined as a filter, and page and q still cannot", () => {
+    for (const key of common.RESERVED_CONTROLS) {
+      expect(() => common.listQuery({ [key]: z.string() })).toThrow(/standard list control/);
+    }
+  });
+
+  test("sortable fields are snake_case, named, and named once", () => {
+    expect(() => common.sortParam([])).toThrow(/at least one/);
+    expect(() => common.sortParam(["Bad-Name"])).toThrow(/snake_case/);
+    expect(() => common.sortParam(["a", "a"])).toThrow(/twice/);
+  });
+
+  test("orderBy builds SQL from the repo's map, never from the request", () => {
+    expect(orderBy(Query.parse({}), SORTS, "e.employee_id")).toBe("e.last_name, e.first_name, e.employee_id");
+    expect(orderBy(Query.parse({ sort: "created_at" }), SORTS, "e.employee_id")).toBe("e.created_at, e.employee_id");
+  });
+
+  test("descending puts NULLs last, on every column of the expression", () => {
+    expect(orderBy(Query.parse({ sort: "-display_name" }), SORTS, "e.employee_id"))
+      .toBe("e.last_name DESC NULLS LAST, e.first_name DESC NULLS LAST, e.employee_id");
+  });
+
+  test("every order finishes on the unique column, so pages cannot repeat a row", () => {
+    for (const sort of [undefined, "display_name", "-display_name", "created_at", "-created_at"]) {
+      expect(orderBy(Query.parse(sort ? { sort } : {}), SORTS, "e.employee_id")).toMatch(/, e\.employee_id$/);
+    }
+  });
+
+  test("a key the contract allowed but the repo has no SQL for falls back to the default order", () => {
+    expect(orderBy({ sort: { field: "nothing_here", dir: "desc" } }, SORTS, "e.employee_id"))
+      .toBe("e.last_name, e.first_name, e.employee_id");
+  });
+
+  test("orderBy refuses a list with no columns or no tiebreak", () => {
+    expect(() => orderBy({}, {}, "e.id")).toThrow(/no sortable columns/);
+    expect(() => orderBy({}, SORTS)).toThrow(/unique column/);
+  });
+});
+
 describe("effective dating", () => {
   test("asOf builds the inclusive-from, exclusive-to condition", () => {
     expect(ed.asOf("s", 2)).toBe("(s.effective_from <= $2::date AND (s.effective_to IS NULL OR s.effective_to > $2::date))");

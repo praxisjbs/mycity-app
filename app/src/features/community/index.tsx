@@ -6,14 +6,13 @@ import "@/api/types/organisation";
 import type { Announcement, Channel, Conversation, MessageCreate } from "@/api/types/community";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { StatStrip } from "@/components/ui/data";
-import { LoadingRows } from "@/components/ui/Table";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { ChatFrame, Composer, Row, ThreadBody, ThreadSearch, useSplit, useThread } from "./Chat";
-import { PersonPicker, UploadField } from "@/components/form";
-import { Button, IconButton, Avatar, KeyValue, Meter, Pill, Icon, Card, Grid, PageHeader, Menu, useModal, ErrorState, toast, cn, formatDate, formatDateTime, formatWhen, todayIso, useIsMobile, ChoiceField, DateField, Field, FormFooter, rules, SearchInput, Switch, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { Composer, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
+import { Avatar, Button, Card, ChoiceField, cn, DateField, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
+import { upload } from "@/api/upload";
 
 export default function Community({ tab }: ModuleScreenProps) {
   if (tab === "direct-messages") return <Direct />;
@@ -23,11 +22,11 @@ export default function Community({ tab }: ModuleScreenProps) {
 
 /** Modal footer row, inside the body so it can use the form's state. */
 
-const Group = ({ children }: { children: ReactNode }) => <div className="px-2 pt-2 pb-1 text-[10px] font-[650] tracking-[.12em] text-subtle-foreground uppercase">{children}</div>;
+const Group = ({ children }: { children: ReactNode }) => <div className="px-2 pt-2 pb-1 text-2xs font-strong tracking-caps text-subtle-foreground uppercase">{children}</div>;
 
 function ThreadHead({ children, onBack, backLabel }: { children: ReactNode; onBack: () => void; backLabel: string }) {
   return (
-    <div className="flex flex-none items-center gap-2.5 border-b border-border py-[11px] pr-3 pl-4 max-md:px-2 max-md:py-[9px]">
+    <div className="flex flex-none items-center gap-2.5 border-b border-border py-2.5 pr-3 pl-4 max-md:px-2 max-md:py-2">
       <IconButton icon="left" label={backLabel} className="md:hidden" onClick={onBack} />
       {children}
     </div>
@@ -44,7 +43,7 @@ function Channels() {
   const [sel, setSel] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
-  const split = useSplit("chat", 300);
+  const split = useSplitPanes("chat", 300);
   const rows = list.rows;
   const current = rows.find((c) => c.channel_id === sel) ?? (mobile ? undefined : rows.find((c) => !c.read_only) ?? rows[0]);
   const t = useThread("channel", current?.channel_id ?? null);
@@ -72,7 +71,7 @@ function Channels() {
       key={c.channel_id}
       on={c.channel_id === current?.channel_id && (!mobile || open)}
       unread={c.unread > 0}
-      lead={<span className={cn("flex size-[30px] flex-none items-center justify-center rounded-[9px] border font-bold", c.channel_id === current?.channel_id ? "border-secondary bg-secondary text-secondary-foreground" : "border-border bg-muted text-muted-foreground")}>#</span>}
+      lead={<span className={cn("flex size-7.5 flex-none items-center justify-center rounded-ctl border font-bold", c.channel_id === current?.channel_id ? "border-secondary bg-secondary text-secondary-foreground" : "border-border bg-muted text-muted-foreground")}>#</span>}
       title={<>{c.name}{c.read_only && <Icon name="lock" className="size-3.5 text-subtle-foreground" />}</>}
       sub={c.last_text ?? `${c.members} members`}
       when={formatWhen(c.last_at)}
@@ -89,7 +88,7 @@ function Channels() {
           <>
             {pinned.length > 0 && <><Group>Pinned</Group>{pinned.map(row)}</>}
             <Group>Channels</Group>
-            {rest.length ? rest.map(row) : <p className="p-2 text-[11.5px] text-subtle-foreground">No channel matches.</p>}
+            {rest.length ? rest.map(row) : <p className="p-2 text-2xs text-subtle-foreground">No channel matches.</p>}
           </>
         )}
       </div>
@@ -100,8 +99,8 @@ function Channels() {
     <>
       <ThreadHead onBack={() => setOpen(false)} backLabel="Back to channels">
         <span className="min-w-0 flex-1">
-          <b className="flex items-center gap-1.5 truncate text-[14.5px] font-[650]"># {current.name}{current.read_only && <Pill>Read Only</Pill>}</b>
-          <span className="block text-[11.5px] text-subtle-foreground">{current.members} members</span>
+          <b className="flex items-center gap-1.5 truncate text-base font-strong"># {current.name}{current.read_only && <Pill>Read Only</Pill>}</b>
+          <span className="block text-2xs text-subtle-foreground">{current.members} members</span>
         </span>
         <Menu
           trigger={(p) => <IconButton {...p} icon="dots" label="Channel menu" />}
@@ -136,7 +135,7 @@ function Channels() {
       />
     </>
   ) : (
-    <p className="m-auto text-[12.5px] text-subtle-foreground">Pick a channel.</p>
+    <p className="m-auto text-xs text-subtle-foreground">Pick a channel.</p>
   );
 
   return (
@@ -146,7 +145,7 @@ function Channels() {
         sub={list.page ? `${list.page.total} channels` : " "}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Channel", body: (close) => <NewChannel close={close} onMade={(c) => (list.reload(), pick(c))} /> })}>New Channel</Button>}
       />
-      <ChatFrame list={listPane} thread={thread} open={open} listWidth={split.w} split={split} />
+      <SplitPanes split={split} list={listPane} detail={thread} open={open} />
     </>
   );
 }
@@ -156,7 +155,7 @@ function Members({ c, close }: { c: Channel; close: () => void }) {
   return (
     <>
       <SearchInput value={list.q} onChange={list.setQ} placeholder="Search members" className="mb-2" />
-      <p className="mb-2 text-[11.5px] text-subtle-foreground">{c.members} members{list.page && list.page.total > list.rows.length ? `, showing ${list.rows.length}` : ""}</p>
+      <p className="mb-2 text-2xs text-subtle-foreground">{c.members} members{list.page && list.page.total > list.rows.length ? `, showing ${list.rows.length}` : ""}</p>
       <PeopleList people={list.rows} />
       {list.page?.has_next && <Button size="sm" className="mt-2" onClick={() => list.setPage(list.pageNumber + 1)}>Next Page</Button>}
       <FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter>
@@ -166,15 +165,15 @@ function Members({ c, close }: { c: Channel; close: () => void }) {
 
 function PeopleList({ people, right }: { people: PersonRef[]; right?: (p: PersonRef) => ReactNode }) {
   return (
-    <div className="max-h-[250px] overflow-y-auto rounded-box border border-border">
+    <div className="max-h-64 overflow-y-auto rounded-box border border-border">
       {people.map((p) => (
-        <div key={p.employee_id} className="flex items-center gap-2.5 border-b border-border px-[11px] py-[9px] last:border-b-0">
+        <div key={p.employee_id} className="flex items-center gap-2.5 border-b border-border px-2.5 py-2 last:border-b-0">
           <Avatar name={p.display_name} size={30} />
-          <span className="min-w-0 flex-1 text-[13px]"><b className="block truncate font-semibold">{p.display_name}</b><span className="text-[11.5px] text-subtle-foreground">{p.department ?? p.job_title}</span></span>
+          <span className="min-w-0 flex-1 text-sm"><b className="block truncate font-semibold">{p.display_name}</b><span className="text-2xs text-subtle-foreground">{p.department ?? p.job_title}</span></span>
           {right?.(p)}
         </div>
       ))}
-      {!people.length && <p className="p-3 text-[11.5px] text-subtle-foreground">Nobody here.</p>}
+      {!people.length && <p className="p-3 text-2xs text-subtle-foreground">Nobody here.</p>}
     </div>
   );
 }
@@ -206,11 +205,11 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
         <div className="flex flex-wrap gap-1.5">
           {(departments.data?.data ?? []).map((d) => {
             const on = depts.includes(d.name);
-            return <button key={d.department_id} type="button" aria-pressed={on} onClick={() => setDepts(on ? depts.filter((x) => x !== d.name) : [...depts, d.name])} className={cn("h-7 rounded-full border px-3 text-[12px] font-semibold", on ? "border-secondary bg-secondary text-secondary-foreground" : "border-input bg-background text-muted-foreground hover:bg-muted")}>{d.name}</button>;
+            return <button key={d.department_id} type="button" aria-pressed={on} onClick={() => setDepts(on ? depts.filter((x) => x !== d.name) : [...depts, d.name])} className={cn("h-7 rounded-full border px-3 text-xs font-semibold", on ? "border-secondary bg-secondary text-secondary-foreground" : "border-input bg-background text-muted-foreground hover:bg-muted")}>{d.name}</button>;
           })}
         </div>
       </Field>
-      <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><PersonPicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
+      <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><EmployeePicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
       <Field label="Who Can Post" info="Set when the channel is created. Everyone can read.">
         <ChoiceField value={who} onChange={setWho} options={[["everyone", "Every Member"], ["admins", "Only Admins"]]} />
       </Field>
@@ -237,7 +236,7 @@ function Recognise({ channel, close, done }: { channel: Channel; close: () => vo
   };
   return (
     <>
-      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are recognising" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are recognising" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="What Did They Do (Optional)" info="Leave it blank and a note is written for you."><TextAreaField value={text} onChange={setText} placeholder="Led the launch" /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -259,7 +258,7 @@ function Celebrate({ close, send }: { close: () => void; send: (b: MessageCreate
   };
   return (
     <>
-      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are celebrating" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are celebrating" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="What"><ChoiceField value={what} onChange={setWhat} options={[["birthday", "Birthday"], ["anniversary", "Work Anniversary"]]} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -296,8 +295,9 @@ function PollForm({ close, send }: { close: () => void; send: (b: MessageCreate)
 function Attach({ close, send }: { close: () => void; send: (b: MessageCreate) => Promise<void> }) {
   return (
     <>
-      <p className="mb-2.5 text-[11.5px] text-subtle-foreground">Files are stored in the vault and shared here.</p>
+      <p className="mb-2.5 text-2xs text-subtle-foreground">Files are stored in the vault and shared here.</p>
       <UploadField
+        upload={upload}
         purpose="community"
         multiple={false}
         onUploaded={(docs) => {
@@ -323,7 +323,7 @@ function Direct() {
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [info, setInfo] = useState(false);
-  const split = useSplit("chat", 300);
+  const split = useSplitPanes("chat", 300);
   const current = sel ?? (mobile ? null : list.rows[0] ?? null);
   const t = useThread("direct", current?.conversation_id ?? null);
   /* Reading a conversation clears its count on the server; show that in the list. */
@@ -369,7 +369,7 @@ function Direct() {
       <div className="flex-none px-3 pt-3 pb-2"><SearchInput value={list.q} onChange={list.setQ} placeholder="Search people" label="Search conversations" /></div>
       <div className="flex flex-none gap-1 px-3 pb-2" role="group" aria-label="Show">
         {(["all", "unread"] as const).map((v) => (
-          <button key={v} type="button" aria-pressed={filter === v} onClick={() => setFilter(v)} className={cn("h-[26px] max-md:h-11 max-md:min-w-11 rounded-full px-[11px] text-[11.5px] font-[650]", filter === v ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>{v === "all" ? "All" : "Unread"}</button>
+          <button key={v} type="button" aria-pressed={filter === v} onClick={() => setFilter(v)} className={cn("h-6.5 max-md:h-11 max-md:min-w-11 rounded-full px-2.5 text-2xs font-strong", filter === v ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted")}>{v === "all" ? "All" : "Unread"}</button>
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 max-md:overflow-visible">
@@ -386,7 +386,7 @@ function Direct() {
             onClick={() => pick(c)}
           />
         ))}
-        {!list.loading && !list.error && !list.rows.length && <p className="p-2.5 text-[11.5px] text-subtle-foreground">Nothing here.</p>}
+        {!list.loading && !list.error && !list.rows.length && <p className="p-2.5 text-2xs text-subtle-foreground">Nothing here.</p>}
       </div>
     </>
   );
@@ -397,8 +397,8 @@ function Direct() {
         <button type="button" onClick={showProfile} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" aria-label="View profile">
           <Avatar name={current.person.display_name} size={32} />
           <span className="min-w-0 flex-1">
-            <b className="block truncate text-[14.5px] font-[650]">{current.person.display_name}</b>
-            <span className="block truncate text-[11.5px] text-subtle-foreground">{current.online ? "Online" : "Last seen yesterday"} · {current.person.department}</span>
+            <b className="block truncate text-base font-strong">{current.person.display_name}</b>
+            <span className="block truncate text-2xs text-subtle-foreground">{current.online ? "Online" : "Last seen yesterday"} · {current.person.department}</span>
           </span>
         </button>
         <IconButton icon="srch" label="Search in conversation" onClick={() => setSearching(true)} />
@@ -421,13 +421,13 @@ function Direct() {
       />
     </>
   ) : (
-    <p className="m-auto text-[12.5px] text-subtle-foreground">Pick a conversation.</p>
+    <p className="m-auto text-xs text-subtle-foreground">Pick a conversation.</p>
   );
 
   const side = info && !mobile && current ? (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-card border border-border bg-card shadow-1">
-      <div className="flex flex-none items-center gap-2 border-b border-border py-[11px] pr-3 pl-4">
-        <h3 data-ui="title" className="flex-1 text-[13.5px] font-semibold">Profile</h3>
+      <div className="flex flex-none items-center gap-2 border-b border-border py-2.5 pr-3 pl-4">
+        <h3 data-ui="title" className="flex-1 text-sm font-semibold">Profile</h3>
         <IconButton icon="x" label="Close profile" onClick={() => setInfo(false)} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -443,7 +443,7 @@ function Direct() {
         sub={unread ? `${unread} unread` : "All caught up"}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Message", body: (close) => <NewMessage close={close} start={start} /> })}>New Message</Button>}
       />
-      <ChatFrame list={listPane} thread={thread} info={side} open={open} listWidth={split.w} split={split} />
+      <SplitPanes split={split} list={listPane} detail={thread} aside={side} open={open} />
     </>
   );
 }
@@ -457,7 +457,7 @@ function NewMessage({ close, start }: { close: () => void; start: (p: PersonRef)
   }, [who, close, start]);
   return (
     <>
-      <PersonPicker value={who} onChange={setWho} placeholder="Name or department" />
+      <EmployeePicker value={who} onChange={setWho} placeholder="Name or department" />
       <FormFooter><Button onClick={close}>Cancel</Button></FormFooter>
     </>
   );
@@ -472,23 +472,23 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
   if (card.error) return <ErrorState error={card.error} onRetry={card.reload} />;
   if (!p) return <LoadingRows count={4} />;
   const sec = "border-b border-border py-3.5 last:border-b-0";
-  const h4 = "mb-2 text-[10.5px] font-[650] tracking-[.12em] text-subtle-foreground uppercase";
+  const h4 = "mb-2 text-2xs font-strong tracking-caps text-subtle-foreground uppercase";
   const line = (icon: Parameters<typeof Icon>[0]["name"], text: ReactNode, right?: ReactNode) => (
-    <div className="flex min-w-0 items-center gap-2.5 py-[5px] text-[13px]">
+    <div className="flex min-w-0 items-center gap-2.5 py-1 text-sm">
       <Icon name={icon} className="flex-none text-subtle-foreground" />
       <span className="min-w-0 truncate">{text}</span>
-      {right && <span className="ml-auto flex-none text-[11.5px] text-subtle-foreground">{right}</span>}
+      {right && <span className="ml-auto flex-none text-2xs text-subtle-foreground">{right}</span>}
     </div>
   );
   return (
     <div>
       <div className="border-b border-border pb-3.5 text-center">
-        <span className="relative mx-auto mb-2.5 flex size-[76px] items-center justify-center rounded-full bg-primary text-[24px] font-[750] text-primary-foreground">
+        <span className="relative mx-auto mb-2.5 flex size-18 items-center justify-center rounded-full bg-primary text-3xl font-bold text-primary-foreground">
           {p.person.display_name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
-          {p.online && <i className="absolute right-[3px] bottom-[3px] size-3.5 rounded-full border-[3px] border-card bg-success" />}
+          {p.online && <i className="absolute right-0.5 bottom-0.5 size-3.5 rounded-full border-2 border-card bg-success" />}
         </span>
-        <h2 data-copy="content" className="text-[16px] font-semibold">{p.person.display_name}</h2>
-        <p className="mt-0.5 text-[11.5px] text-subtle-foreground">{p.person.job_title}</p>
+        <h2 data-copy="content" className="text-lg font-semibold">{p.person.display_name}</h2>
+        <p className="mt-0.5 text-2xs text-subtle-foreground">{p.person.job_title}</p>
         <p className="mt-1">{p.online ? <Pill tone="ok">Online</Pill> : <Pill>Last seen yesterday</Pill>}</p>
         <div className="mt-3 flex justify-center gap-2">
           <Button icon="msg" onClick={onMessage}>Message</Button>
@@ -504,14 +504,14 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
       </div>
       <div className={sec}>
         <h3 data-ui="title" className={h4}>Shared in this conversation</h3>
-        {p.shared_files.length ? p.shared_files.map((f) => <div key={f.document_id}>{line("doc", f.file_name, f.size_bytes != null ? `${Math.round(f.size_bytes / 1024)} KB` : undefined)}</div>) : <p className="text-[11.5px] text-subtle-foreground">Nothing shared yet.</p>}
+        {p.shared_files.length ? p.shared_files.map((f) => <div key={f.document_id}>{line("doc", f.file_name, f.size_bytes != null ? `${Math.round(f.size_bytes / 1024)} KB` : undefined)}</div>) : <p className="text-2xs text-subtle-foreground">Nothing shared yet.</p>}
       </div>
       <div className={sec}>
         <h3 data-ui="title" className={h4}>Channels in common</h3>
-        {p.shared_channels.map((n) => <div key={n} className="flex items-center gap-2.5 py-[5px] text-[13px]"><b className="text-subtle-foreground">#</b>{n}</div>)}
+        {p.shared_channels.map((n) => <div key={n} className="flex items-center gap-2.5 py-1 text-sm"><b className="text-subtle-foreground">#</b>{n}</div>)}
       </div>
       <div className={sec}>
-        <div className="flex items-center justify-between text-[13px]">Mute notifications<Switch checked={mute} onChange={(v) => (setMute(v), toast(v ? `Muted ${p.person.display_name}` : `Notifications on for ${p.person.display_name}`))} label="Mute notifications" /></div>
+        <div className="flex items-center justify-between text-sm">Mute notifications<Switch checked={mute} onChange={(v) => (setMute(v), toast(v ? `Muted ${p.person.display_name}` : `Notifications on for ${p.person.display_name}`))} label="Mute notifications" /></div>
         <Button icon="srch" className="mt-3 w-full justify-center" onClick={onSearch}>Search in Conversation</Button>
       </div>
     </div>
@@ -542,13 +542,13 @@ function Announcements() {
       {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
         <Grid cols={2} className="mt-3">
           {list.rows.map((a) => (
-            <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition-[box-shadow,transform] hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.title, body: (close) => <AnnouncementReads a={a} close={close} poster={poster} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
+            <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.title, body: (close) => <AnnouncementReads a={a} close={close} poster={poster} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
               <div className="mb-1.5 flex items-start gap-2">
-                <h2 data-copy="content" className="flex-1 text-[13.5px] font-semibold">{a.title}</h2>
+                <h2 data-copy="content" className="flex-1 text-sm font-semibold">{a.title}</h2>
                 {a.scheduled ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience ? "ok" : "neutral"}>{a.reads} of {a.audience} read</Pill>}
               </div>
-              <p className="text-[13px] text-muted-foreground">{a.body}</p>
-              <p className="mt-[9px] text-[11.5px] text-subtle-foreground">{a.scheduled ? "Goes out " : "Posted "}{a.scheduled ? formatDateTime(a.publish_at) : formatDate(a.publish_at)} by {a.author.display_name}</p>
+              <p className="text-sm text-muted-foreground">{a.body}</p>
+              <p className="mt-2 text-2xs text-subtle-foreground">{a.scheduled ? "Goes out " : "Posted "}{a.scheduled ? formatDateTime(a.publish_at) : formatDate(a.publish_at)} by {a.author.display_name}</p>
             </Card>
           ))}
         </Grid>
@@ -565,18 +565,18 @@ function AnnouncementReads({ a, close, poster }: { a: Announcement; close: () =>
   const nNot = notRead.page?.total ?? 0;
   return (
     <>
-      <p className="text-[11.5px] text-subtle-foreground">{a.scheduled ? "Goes out " : "Posted "}{formatWhen(a.publish_at)} by {a.author.display_name}</p>
-      <p className="mt-2.5 mb-3.5 text-[13.5px] text-muted-foreground">{a.body}</p>
+      <p className="text-2xs text-subtle-foreground">{a.scheduled ? "Goes out " : "Posted "}{formatWhen(a.publish_at)} by {a.author.display_name}</p>
+      <p className="mt-2.5 mb-3.5 text-sm text-muted-foreground">{a.body}</p>
       {a.scheduled ? <Pill tone="info">Scheduled. Not yet visible to staff</Pill> : poster && (
         <>
-          <h3 data-ui="title" className="mb-1.5 text-[13.5px] font-semibold">Read by {a.reads} of {a.audience}</h3>
+          <h3 data-ui="title" className="mb-1.5 text-sm font-semibold">Read by {a.reads} of {a.audience}</h3>
           <Meter pct={pct} label={`${pct}%`} />
           <div className="mt-4 mb-1.5 flex items-center gap-2">
-            <h3 data-ui="title" className="flex-1 text-[13.5px] font-semibold">Not Read · {nNot}</h3>
+            <h3 data-ui="title" className="flex-1 text-sm font-semibold">Not Read · {nNot}</h3>
             {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { const r = await remind.run({ params: { id: a.announcement_id }, body: {} }); toast(`Reminder sent to ${r.reminded} ${r.reminded === 1 ? "person" : "people"}`); }}>Remind Them</Button>}
           </div>
-          {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">Not Read</Pill>} /> : <p className="text-[11.5px] text-subtle-foreground">Everyone has read it.</p>}
-          <h3 data-ui="title" className="mt-4 mb-1.5 text-[13.5px] font-semibold">Read · {read.page?.total ?? 0}</h3>
+          {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">Not Read</Pill>} /> : <p className="text-2xs text-subtle-foreground">Everyone has read it.</p>}
+          <h3 data-ui="title" className="mt-4 mb-1.5 text-sm font-semibold">Read · {read.page?.total ?? 0}</h3>
           <PeopleList people={read.rows.map((r) => r.person)} right={() => <Pill tone="ok">Read</Pill>} />
         </>
       )}
@@ -610,7 +610,7 @@ function NewAnnouncement({ close }: { close: () => void }) {
       <Field label="Message" {...f.field("body")}><TextAreaField {...f.field("body")} placeholder="Details for staff" /></Field>
       <Field label="When"><ChoiceField value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>
       {when === "later" && <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>}
-      <p className="flex items-center gap-1.5 text-[11.5px] text-subtle-foreground"><Icon name="user" className="size-3.5" />Posting as {me?.display_name}</p>
+      <p className="flex items-center gap-1.5 text-2xs text-subtle-foreground"><Icon name="user" className="size-3.5" />Posting as {me?.display_name}</p>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>{when === "later" ? "Schedule" : "Publish"}</Button>

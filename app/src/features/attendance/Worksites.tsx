@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Worksite } from "@/api/types/attendance";
-import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { Button, Pill, Card, CardHeader, PageHeader, useModal, Chips, toast, Field, FormFooter, rules, SearchInput, TextField, useContractForm } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, DataView, Field, FormFooter, PageHeader, Pager, Pill, rules, SearchInput, TextField, toast, Toolbar, useContractForm, useModal } from "@mycity/ui";
 
 const COLOR: Record<Worksite["type"], string> = { Office: "var(--chart-1)", "Approved home": "var(--primary)", "Temporary location": "var(--primary)", "Field assignment": "var(--chart-2)" };
 
@@ -12,7 +11,7 @@ function FenceMap({ sites }: { sites: Worksite[] }) {
   return (
     <Card>
       <CardHeader title="Lagos Geofences Today" />
-      <div className="relative h-[300px] overflow-hidden rounded-card border border-border bg-muted max-md:h-[200px]">
+      <div className="relative h-72 overflow-hidden rounded-card border border-border bg-muted max-md:h-48">
         <svg data-copy="content" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" className="block size-full" role="img" aria-label="Schematic map of Lagos geofences">
           <rect width="1000" height="300" fill="var(--muted)" />
           <path d="M0 230 Q 250 205 500 240 T 1000 228 L1000 300 L0 300Z" fill="var(--chart-2)" opacity=".10" />
@@ -30,10 +29,10 @@ function FenceMap({ sites }: { sites: Worksite[] }) {
           })}
         </svg>
       </div>
-      <div className="mt-[11px] flex flex-wrap gap-[14px] text-[11.5px] text-muted-foreground">
-        <span className="flex items-center gap-1.5"><i className="size-[9px] rounded-full bg-chart-1" />Office worksite</span>
-        <span className="flex items-center gap-1.5"><i className="size-[9px] rounded-full bg-primary" />Approved home, masked</span>
-        <span className="flex items-center gap-1.5"><i className="size-[9px] rounded-full bg-chart-2" />Field assignment today</span>
+      <div className="mt-2.5 flex flex-wrap gap-3.5 text-2xs text-muted-foreground">
+        <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-chart-1" />Office worksite</span>
+        <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-primary" />Approved home, masked</span>
+        <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-chart-2" />Field assignment today</span>
       </div>
     </Card>
   );
@@ -55,10 +54,10 @@ export function Worksites() {
       <KpiTiles items={[{ label: "Office Worksites", value: String(count("Office")) }, { label: "Approved Homes", value: String(count("Approved home")) }, { label: "Field Sites Today", value: String(count("Field assignment")) }, { label: "Outside Any Fence Today", value: "1", tone: "warn" }]} />
       <FenceMap sites={map.rows} />
       <Toolbar className="mt-3">
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-[260px]" />
+        <SearchInput value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-64" />
       </Toolbar>
       <Chips value={type} onChange={setType} options={[["all", "All"], ["Office", "Offices"], ["Approved home", "Homes"], ["Temporary location", "Temporary"], ["Field assignment", "Field"]]} />
-      <Table
+      <DataView
         title="All Locations"
         wide
         rows={list.rows}
@@ -68,7 +67,7 @@ export function Worksites() {
         columns={[
           { key: "n", label: "Location", render: (r) => <b>{r.name}</b> },
           { key: "t", label: "Type", render: (r) => r.type },
-          { key: "a", label: "Address", render: (r) => (r.type === "Office" || r.type === "Field assignment" ? r.address : <span className="text-[11.5px] text-subtle-foreground">{r.address}</span>) },
+          { key: "a", label: "Address", render: (r) => (r.type === "Office" || r.type === "Field assignment" ? r.address : <span className="text-2xs text-subtle-foreground">{r.address}</span>) },
           { key: "r", label: "Radius", render: (r) => `${r.radius_m} m` },
           { key: "e", label: "Assigned Employees", render: (r) => r.assigned },
           { key: "d", label: "Attendance Today", align: "n", render: (r) => r.attendance_today },
