@@ -97,7 +97,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 **Notes**
 
 - 16/10/2026 · TB · Sign-in and sessions built (`docs/guides/identity.md`). Backend: migration
-  `0100_identity_sessions.sql` and seed `0101_seed_roles_and_grants.sql` (the seven real roles with
+  `0140_identity_sessions.sql` and seed `0190_seed_roles_and_grants.sql` (the seven real roles with
   a home view and rank, and the grants matrix); `identity` (sign-in, refresh with rotation and reuse
   detection, sign-out, the device cookie and new-device notice, forgot, reset and invitation links
   through the outbox, change password, own sessions, the throttle instead of a lockout, the breach
@@ -107,13 +107,35 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   characters with mixed case, a number and a symbol. Frontend: the four-city sign-in screen
   (`CityShowcase`), Forgot, Reset and Welcome, the lock screen (`LockScreen`) with the session clock
   and cross-tab locking in `AuthProvider`, refreshes serialised across tabs in `createApi`, the app
-  typed from `contract.gen.ts`. Fixed on the way: `emit()` wrote NULL into
-  `audit_ledger.changed_fields`; the rate limiters shared one counter. Left: two-step sign-in,
-  passkeys and the PIN (the second sign-in PR); the notifications and search routes (the bell and
+  typed from `contract.gen.ts`. `organisation` writes the employee columns of `0110`. Fixed on the
+  way: the rate limiters shared one counter. Left: two-step sign-in, passkeys and the PIN (the
+  second sign-in PR); the notifications and search routes (the bell and
   ⌘K still on INTERIM types); the organisation routes, so the employee screens still use the mock;
   `create-admin` on staging and production for the operations lead and the build account
-  (`docs/runbooks/first-accounts.md`); the migration round trip still stops at `0002_system.sql`,
-  as on `main`.
+  (`docs/runbooks/first-accounts.md`).
+- 16/10/2026 · TB · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
+  rebuilds the schema with `migrate.js` and `fixtures/shared-layer.sql` is gone; CI now has PostgreSQL 16
+  with pgvector and Redis, so the suite and gate 4's round trip run on every PR. `1100` lets the alerts
+  code raise an alert with no trigger and returns `over_by` to two places. 82 of 82 integration tests
+  pass. Left: the role permission matrix (M9), the staff-number counter after an import.
+- 16/10/2026 · TB · M0 schema made to match the foundation code: `0100` lets the shared layer write
+  what it writes (emit's empty diff, bell rows without a body, untitled uploads, 0-based import
+  header rows, refused AI runs, the AI settings defaults); `0110` gives `employee` the contract's
+  columns (`staff_number`, gender, date of birth, next of kin, bank, gross monthly, dotted line,
+  vacant seats in `org_seat`) with checks equal to the contract's enums; `0120` indexes the 43
+  unindexed M0 foreign keys; `0199` fixes `on_site`, adds employment types, makes Saturday
+  09:00 to 15:00 (A22) and staff numbers `00001`. `migrate.js --down` now rolls back to empty; the
+  health check reports the real head. Phone numbers abroad are accepted in international form.
+  `0130` lets the error reporter record an error with no extra detail (it was silently lost).
+  Left: `home_alert` (M1 block) and the integration suite on the real migrations (next PR); role
+  permissions wait on a role matrix; the importer must advance the staff-number counter past
+  imported IDs.
+- 16/10/2026 · TB · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
+  schema, and A26 added (reference seeds hold only what the code cannot run without). Left: a
+  fix-forward M0 file for the six columns the shared layer cannot write (`audit_ledger.changed_fields`,
+  `notification.body`, `document.title`, `import_batch.header_row`, `ai_run` vendor and prompt,
+  `home_alert.trigger`), the `0002` DOWN, the employee columns the contract and staff importer need,
+  and the integration suite moved onto the real migrations.
 - 16/10/2026 · GE · Alerts go to WhatsApp: one sender (`shared/observability/alert.js`) for errors,
   the backup, the restore drill and the uptime probe; `ALERT_WHATSAPP_URLS` holds one gateway link
   per person (CallMeBot, or TextMeBot), `ALERT_WEBHOOK_URL` stays for a Slack or Google Chat

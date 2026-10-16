@@ -25,7 +25,7 @@ jest.mock("../../src/jobs/queues", () => ({
   DEFAULTS: {},
 }));
 
-const { migrate } = require("../../scripts/db/migrate");
+const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
@@ -76,13 +76,7 @@ describeDb("identity against the real migrations", () => {
   const people = {};
 
   beforeAll(async () => {
-    const admin = await pool.connect();
-    try {
-      await admin.query("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;");
-      await migrate(admin);
-    } finally {
-      admin.release();
-    }
+    await rebuild(pool, config.DB_NAME);
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));
 
@@ -517,7 +511,7 @@ describeDb("identity against the real migrations", () => {
         tx((c) => createAdmin(c, { ...payload, employee: { ...payload.employee, work_email: "ops@mycity.test" } }, "Strong-pass99", { allowAdditional: true })),
       ).rejects.toMatchObject({ code: "LOGIN_EXISTS" });
       const ok = await tx((c) => createAdmin(c, payload, "Strong-pass99", { allowAdditional: true }));
-      expect(ok.employee.number).toMatch(/^MCA-\d{4}$/);
+      expect(ok.employee.staff_number).toMatch(/^\d{5}$/);
       expect(ok.user.email).toBe("tobi@mycity.test");
     });
   });

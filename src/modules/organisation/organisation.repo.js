@@ -8,10 +8,37 @@
  */
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
+/** What a create returns and the audit records: no restricted field (bank, pay). */
 const EMPLOYEE_COLUMNS = `
-  e.employee_id, e.number::text AS number, e.first_name, e.last_name, e.work_email::text AS work_email,
-  e.phone, e.job_title, e.department_id, e.line_manager_id, e.worksite_id, e.employment_type,
-  e.work_pattern, e.status, e.start_date, e.created_at`;
+  e.employee_id, e.staff_number::text AS staff_number, e.first_name, e.last_name,
+  e.work_email::text AS work_email, e.phone, e.job_title, e.department_id, e.line_manager_id,
+  e.dotted_manager_id, e.worksite_id, e.employment_type, e.work_pattern, e.status, e.start_date,
+  e.created_at`;
+
+/** The columns an EmployeeCreate fills (migrations 0040 and 0110), in insert order. */
+const INSERT_COLUMNS = [
+  "staff_number",
+  "first_name",
+  "last_name",
+  "work_email",
+  "phone",
+  "job_title",
+  "department_id",
+  "worksite_id",
+  "line_manager_id",
+  "dotted_manager_id",
+  "employment_type",
+  "work_pattern",
+  "start_date",
+  "gender",
+  "date_of_birth",
+  "next_of_kin_name",
+  "next_of_kin_phone",
+  "next_of_kin_relationship",
+  "bank_name",
+  "account_number",
+  "gross_monthly",
+];
 
 function findDepartmentByName(db, name) {
   return one(
@@ -46,28 +73,14 @@ function findEmployeeById(db, employeeId) {
 }
 
 function insertEmployee(db, e) {
+  const values = INSERT_COLUMNS.map((c) => (e[c] === undefined || e[c] === "" ? null : e[c]));
+  const marks = INSERT_COLUMNS.map((_, i) => `$${i + 1}`).join(", ");
   return one(
     db,
-    `INSERT INTO employee
-       (number, first_name, last_name, work_email, phone, job_title, department_id,
-        worksite_id, line_manager_id, employment_type, work_pattern, start_date, profile)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
+    `INSERT INTO employee (${INSERT_COLUMNS.join(", ")})
+     VALUES (${marks})
      RETURNING ${EMPLOYEE_COLUMNS.replace(/\be\./g, "")}`,
-    [
-      e.number,
-      e.first_name,
-      e.last_name,
-      e.work_email,
-      e.phone,
-      e.job_title,
-      e.department_id,
-      e.worksite_id || null,
-      e.line_manager_id || null,
-      e.employment_type,
-      e.work_pattern,
-      e.start_date,
-      JSON.stringify(e.profile || {}),
-    ],
+    values,
   );
 }
 

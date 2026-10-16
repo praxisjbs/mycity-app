@@ -217,7 +217,7 @@ async function emit(client, event) {
           entity_type, entity_id, before, after, changed_fields, is_sensitive, metadata, request_id,
           import_batch_id)
        SELECT ev.event_id, ev.occurred_at, $5, $9, $10, $11, $1, $2,
-              $3, $4, $12::jsonb, $13::jsonb, COALESCE($14::text[], '{}'), $15, $16::jsonb, $7,
+              $3, $4, $12::jsonb, $13::jsonb, $14::text[], $15, $16::jsonb, $7,
               $8
          FROM ev
      ), ob AS (

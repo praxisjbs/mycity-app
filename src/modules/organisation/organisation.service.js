@@ -7,23 +7,14 @@
  * transaction, takes its number from numbering and records itself with emit(), so a
  * script and a screen create the same thing.
  *
- * EmployeeCreate (packages/contract/schemas/organisation.js) carries a few fields
- * migration 0040 has no column for yet (date of birth, next of kin, bank, gross pay);
- * they are kept on `employee.profile` until the employee migration gives them columns.
+ * Every EmployeeCreate field is a column (migration 0110). The restricted ones (bank,
+ * account, gross pay) are written but never returned or put in the audit row.
  */
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const numbering = require("../../shared/numbering/numbering");
 const repo = require("./organisation.repo");
 const { EVENTS } = require("./organisation.events");
-
-const PROFILE_FIELDS = [
-  "date_of_birth",
-  "next_of_kin",
-  "bank_name",
-  "account_number",
-  "gross_monthly",
-];
 
 const findDepartmentByName = (client, name) => repo.findDepartmentByName(client, name);
 const findEmployeeByWorkEmail = (client, email) =>
@@ -68,7 +59,7 @@ async function createDepartment(client, { name }, actor) {
  * @param {import("pg").PoolClient} client  inside atomically()
  * @param {object} body  EmployeeCreate, already parsed
  * @param {object} actor
- * @returns {Promise<object>} the employee, with employee_id and number
+ * @returns {Promise<object>} the employee, with employee_id and staff_number
  */
 async function createEmployee(client, body, actor) {
   if (await repo.findEmployeeByWorkEmail(client, body.work_email)) {
@@ -76,19 +67,17 @@ async function createEmployee(client, body, actor) {
       work_email: ["Already in use"],
     });
   }
-  const number = body.staff_number
+  const staffNumber = body.staff_number
     ? body.staff_number
     : (await numbering.allocate(client, "employee", { date: body.start_date })).number;
-  const profile = {};
-  for (const k of PROFILE_FIELDS) if (body[k] !== undefined) profile[k] = body[k];
 
-  const employee = await repo.insertEmployee(client, { ...body, number, profile });
+  const employee = await repo.insertEmployee(client, { ...body, staff_number: staffNumber });
   await emit(client, {
     key: EVENTS.EMPLOYEE_CREATED,
     entity: { type: "employee", id: employee.employee_id },
     actor,
-    after: { ...employee, profile },
-    payload: { employee_id: employee.employee_id, number: employee.number },
+    after: employee,
+    payload: { employee_id: employee.employee_id, staff_number: employee.staff_number },
   });
   return employee;
 }

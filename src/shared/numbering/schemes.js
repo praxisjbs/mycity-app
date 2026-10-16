@@ -29,12 +29,12 @@ const RESETS = ["never", "yearly", "monthly"];
 /** doc_type → default scheme. Milestone of first use in the comment. */
 const SCHEMES = Object.freeze({
   employee: {
-    prefix: "MCA",
-    padding: 4,
-    separator: "-",
+    prefix: "",
+    padding: 5,
+    separator: "",
     reset: "never",
     include_period: false,
-  }, // M0 staff number
+  }, // M0 staff number: MyCity's own five digits, 00001 (decided with TB, 16/10/2026)
   document: {
     prefix: "DOC",
     padding: 4,
@@ -148,8 +148,11 @@ const DOC_TYPES = Object.freeze(Object.keys(SCHEMES));
 function validateScheme(s) {
   const p = [];
   if (!s || typeof s !== "object") return ["scheme must be an object"];
-  if (typeof s.prefix !== "string" || !/^[A-Z0-9]{1,8}$/.test(s.prefix))
-    p.push("prefix must be 1 to 8 capital letters or digits");
+  if (typeof s.prefix !== "string" || !/^[A-Z0-9]{0,8}$/.test(s.prefix))
+    p.push("prefix must be up to 8 capital letters or digits");
+  // With no prefix the number is the sequence alone (00001), so it must have one.
+  if (s.prefix === "" && !(Number.isInteger(s.padding) && s.padding > 0))
+    p.push("a scheme with no prefix needs a sequence part");
   if (!Number.isInteger(s.padding) || s.padding < 0 || s.padding > 10)
     p.push("padding must be 0 to 10");
   if (typeof s.separator !== "string" || !/^[-/._]?$/.test(s.separator))

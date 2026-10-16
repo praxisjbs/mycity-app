@@ -17,15 +17,17 @@ ALTER TABLE user_session ADD COLUMN IF NOT EXISTS end_reason text
     'password_changed', 'password_reset', 'ended_by_user', 'ended_by_admin', 'account_suspended'
   ));
 CREATE INDEX IF NOT EXISTS user_session_user_issued_idx ON user_session (user_id, issued_at DESC);
+CREATE INDEX IF NOT EXISTS user_session_known_device_id_fk_idx ON user_session (known_device_id);
 
 ALTER TABLE known_device ADD COLUMN IF NOT EXISTS last_ip inet;
 
 ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS purpose text NOT NULL DEFAULT 'reset'
   CHECK (purpose IN ('reset', 'invite'));
-ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS requested_by uuid REFERENCES app_user(user_id);
+ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS requested_by uuid REFERENCES app_user(user_id) ON DELETE SET NULL;
 ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS requested_ip inet;
 ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS source_event_id uuid UNIQUE;
 CREATE INDEX IF NOT EXISTS password_reset_open_idx ON password_reset (user_id) WHERE used_at IS NULL;
+CREATE INDEX IF NOT EXISTS password_reset_requested_by_fk_idx ON password_reset (requested_by);
 
 ALTER TABLE role ADD COLUMN IF NOT EXISTS home_view text
   CHECK (home_view IS NULL OR home_view IN ('operations', 'ceo', 'partnerships', 'staff'));
@@ -34,12 +36,14 @@ ALTER TABLE role ADD COLUMN IF NOT EXISTS rank integer NOT NULL DEFAULT 0;
 -- DOWN
 ALTER TABLE role DROP COLUMN IF EXISTS rank;
 ALTER TABLE role DROP COLUMN IF EXISTS home_view;
+DROP INDEX IF EXISTS password_reset_requested_by_fk_idx;
 DROP INDEX IF EXISTS password_reset_open_idx;
 ALTER TABLE password_reset DROP COLUMN IF EXISTS source_event_id;
 ALTER TABLE password_reset DROP COLUMN IF EXISTS requested_ip;
 ALTER TABLE password_reset DROP COLUMN IF EXISTS requested_by;
 ALTER TABLE password_reset DROP COLUMN IF EXISTS purpose;
 ALTER TABLE known_device DROP COLUMN IF EXISTS last_ip;
+DROP INDEX IF EXISTS user_session_known_device_id_fk_idx;
 DROP INDEX IF EXISTS user_session_user_issued_idx;
 ALTER TABLE user_session DROP COLUMN IF EXISTS end_reason;
 ALTER TABLE user_session DROP COLUMN IF EXISTS device_label;

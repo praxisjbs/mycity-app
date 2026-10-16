@@ -18,7 +18,7 @@ and the password is typed at a hidden prompt.
 
 ## 1 · Before you start
 
-- The release is deployed and migrated (`docs/runbooks/deploy.md`); `0101_seed_roles_and_grants`
+- The release is deployed and migrated (`docs/runbooks/deploy.md`); `0190_seed_roles_and_grants`
   has run, so the seven roles exist.
 - Mail works (`docs/runbooks/dns-and-mail.md`), or Forgot Password will not reach anyone later.
 - You can SSH to the server and `sudo`.

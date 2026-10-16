@@ -1,7 +1,7 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "ec4b222d3ecad321effcb43889d3ed0c44e31b7538ab92a4e66cd5ba14c22a7d",
-  "schemas": 63,
+  "source_hash": "c37efc76df049132ee06516a7660a8d3ae8b4d4086056337f901de88600ac4de",
+  "schemas": 64,
   "endpoints": 25,
   "inputs": {
     "packages/contract/schemas/access.js": "6d1b9948fa844e5d9ebcda71d85e1a30ed8a56e2b4d0245c4cb307ccd7854665",
@@ -16,7 +16,7 @@
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/calendar.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/candidates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/common.js": "c6de2c1395ba809803a5f89f4598cacc8d8786a8570a4b0e2eee6d3d7845c2a6",
+    "packages/contract/schemas/common.js": "546bd859e493bd07980135fbf8828e3627fb4c76e854f38a20abfbc536346921",
     "packages/contract/schemas/community.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/dashboard.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/deductions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -41,7 +41,7 @@
     "packages/contract/schemas/notifications.js": "e011eebd769fc4edd6f1401763b429470ec1239ee25b5440b813f9d913206a96",
     "packages/contract/schemas/offers.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/onboarding.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/organisation.js": "6a4dcbe3c783e8c29d555af972c4e8a117d2446d21c8b52de088295267b74436",
+    "packages/contract/schemas/organisation.js": "70ab9baa98f37308c962743fbff5bf888807f5e88375553fef7506157723f983",
     "packages/contract/schemas/partner_pipeline.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partners.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partnership_analytics.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

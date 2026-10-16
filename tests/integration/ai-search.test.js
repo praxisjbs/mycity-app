@@ -9,7 +9,7 @@
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/ai-search
  *
  * Refuses to run unless the database name ends in "_test": it rebuilds the public
- * schema from fixtures/shared-layer.sql.
+ * schema from the real migrations (helpers/schema.js).
  */
 // A key, so governance picks Gemini; every call goes to the fake vendor passed in.
 process.env.GEMINI_API_KEY = "test-key";
@@ -20,6 +20,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { z } = require("zod");
 const { config } = require("../../src/config/env");
+const schema = require("./helpers/schema");
 const { pool } = require("../../src/config/db");
 const ai = require("../../src/services/ai/llm.service");
 const governance = require("../../src/services/ai/governance");
@@ -76,23 +77,18 @@ const people = {};
 beforeAll(async () => {
   if (!config.DB_NAME.endsWith("_test"))
     throw new Error(`refusing: ${config.DB_NAME} is not a _test database`);
-  await q(
-    fs.readFileSync(
-      path.join(__dirname, "fixtures", "shared-layer.sql"),
-      "utf8",
-    ),
-  );
+  await schema.rebuild(pool, config.DB_NAME);
   await q("CREATE EXTENSION IF NOT EXISTS pg_trgm");
   const emp = async (first, last, manager = null) =>
     (
       await one(
-        "INSERT INTO employee (first_name, last_name, line_manager_id) VALUES ($1, $2, $3) RETURNING employee_id",
+        schema.sql.employee,
         [first, last, manager],
       )
     ).employee_id;
   const user = async (key, employeeId, isCeo = false) => {
     const u = await one(
-      "INSERT INTO app_user (employee_id, email, is_ceo) VALUES ($1, $2, $3) RETURNING user_id",
+      schema.sql.user,
       [employeeId, `${key}@mycity.test`, isCeo],
     );
     people[key] = {
@@ -105,7 +101,7 @@ beforeAll(async () => {
   };
   const role = async (code, scope, masked = []) => {
     const r = await one(
-      "INSERT INTO role (code) VALUES ($1) RETURNING role_id",
+      schema.sql.role,
       [code],
     );
     if (scope) {

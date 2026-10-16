@@ -167,7 +167,10 @@ const FIELDS = [
   ],
   ["date_of_birth", "Date of birth (YYYY-MM-DD, optional)"],
   ["staff_number", "Staff number (optional, issued automatically when blank)"],
-  ["next_of_kin", "Next of kin (optional)"],
+  ["gender", `Gender (${contract.organisation.GENDERS.join(", ")}, optional)`],
+  ["next_of_kin_name", "Next of kin name (optional)"],
+  ["next_of_kin_phone", "Next of kin phone (optional)"],
+  ["next_of_kin_relationship", "Next of kin relationship (optional)"],
 ];
 
 /** A complete, obviously sample profile. Staging, local and CI only. */
@@ -318,7 +321,7 @@ async function createAdmin(client, input, password, opts = {}) {
     if (await identity.findUserByEmployeeId(client, employee.employee_id)) {
       throw new AppError(
         "LOGIN_EXISTS",
-        `Employee ${employee.number} already has a login`,
+        `Employee ${employee.staff_number} already has a login`,
         409,
       );
     }
@@ -461,7 +464,7 @@ async function main() {
       `\n${args["dry-run"] ? "Dry run passed. Rolled back; nothing was kept." : "Done."}`,
     );
     console.log(
-      `  employee ${employee.number} ${employee_created ? "(created)" : "(existing, login added)"}`,
+      `  employee ${employee.staff_number} ${employee_created ? "(created)" : "(existing, login added)"}`,
     );
     console.log(`  login    ${user.email}`);
     console.log(`  role     ${role.code}`);

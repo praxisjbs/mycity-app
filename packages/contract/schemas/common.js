@@ -34,8 +34,9 @@ const optionalText = (max = 2000) =>
 const email = z.string().trim().toLowerCase().max(254).email();
 
 /**
- * Nigerian numbers normalised to E.164 (+234XXXXXXXXXX).
- * Accepts 0803 123 4567, 08031234567, 2348031234567, +234 803 123 4567.
+ * Phone numbers normalised to E.164. Nigerian numbers in any local form become +234XXXXXXXXXX:
+ * 0803 123 4567, 08031234567, 2348031234567, +234 803 123 4567. A number already written in
+ * international form (+41 77 953 9483, +44 7884 050144) is kept, since some staff are abroad.
  * Anything else is refused rather than guessed.
  */
 const phone = z
@@ -47,10 +48,11 @@ const phone = z
     if (/^\+234\d{10}$/.test(digits)) national = digits.slice(4);
     else if (/^234\d{10}$/.test(digits)) national = digits.slice(3);
     else if (/^0\d{10}$/.test(digits)) national = digits.slice(1);
+    else if (/^\+(?!234)[1-9]\d{7,14}$/.test(digits)) return digits;
     else {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "must be a Nigerian phone number",
+        message: "must be a phone number",
       });
       return z.NEVER;
     }

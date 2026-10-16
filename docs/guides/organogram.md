@@ -60,10 +60,10 @@ The organogram reads one tree and nobody keeps a second copy.
 |---|---|---|
 | `employee` | `line_manager_id` (self-FK, nullable for the CEO), `dotted_manager_id` (self-FK, nullable), `department_id` | `line_manager_id` already exists in the contract (`organisation.js`). `dotted_manager_id` is the net-new column for the matrix (full matrix in v1) |
 | `department` | `id`, `name` | Department name is the node chip |
-| `position` / vacant seat | role title, `department_id`, `line_manager_id` | A seat with no employee. A vacant seat can carry reports. Modelled so the line never breaks when a role is unfilled |
+| `org_seat` (vacant seat) | `title`, `department_id`, `line_manager_id` or `line_manager_seat_id`, `status` (vacant, filled, closed), `filled_by_employee_id` | A seat with no employee. A vacant seat can carry reports: an employee whose manager's post is empty points at it through `employee.line_manager_seat_id` (or `dotted_manager_seat_id` for a dotted line), never at both a person and a seat. Modelled so the line never breaks when a role is unfilled |
 
-Migration file(s): in the M0/M1 number block, adding `dotted_manager_id` and the vacant-seat
-representation (README §6.3). The reporting-line foundation itself is M0.
+Migration file: `migrations/0110_employee_profile.sql` (M0) adds `dotted_manager_id`, the two seat
+links and `org_seat`. The reporting-line foundation itself is M0.
 
 ## 5 · API
 
@@ -224,6 +224,9 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
 
 ## 14 · Change log
 
+- 16/10/2026 · TB · §4 names the built tables: `org_seat` for vacant seats, and on `employee` the
+  `dotted_manager_id`, `line_manager_seat_id` and `dotted_manager_seat_id` columns
+  (`migrations/0110_employee_profile.sql`). A person reports to a person or to a seat, never both.
 - 14/10/2026 · TB · §10 rewritten as On screen and mobile with the content tiers and phone layout
   tables, from the demo as built: the builder and viewer footnotes removed (tier 3, now pointing to
   §3, §5, §6 and §8), the drag instruction and the dotted-line meaning moved to help terms on the

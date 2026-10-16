@@ -56,7 +56,7 @@ has commit `9c42322` (restored deliverability, encryption and spreadsheet ports)
 uncommitted** changes from the reuse pass (20 files, listed in §3.2). He will commit them.
 `main` is branch-protected; work on branches named `m<N>/<short-name>`.
 
-**Document authority:** `MILESTONES.md` is binding for scope and decisions A1 to A25, and
+**Document authority:** `MILESTONES.md` is binding for scope and decisions A1 to A26, and
 `REUSE_MAP.md` wins where the two disagree. Then `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`
 and the guides. `README.MD` is the file map; `demo.html` is look only. If two disagree in a way that
 matters, stop and ask.
@@ -239,8 +239,8 @@ only), real SMTP delivery, web push (M6).
   §11.1, which now includes `setting`, `document`, `document_variant`, `template_version` and the
   three import tables, plus `schema_migration` (`name`, `sha256`, `applied_at`; migrate.js creates
   it with that DDL if missing) and `system_marker` (`environment`, one row; seed.js reads it).
-  Integration tests use fixture DDL in `tests/integration/fixtures/shared-layer.sql`; it is not a
-  migration.
+  Integration tests build their schema from the real migrations (`tests/integration/helpers/schema.js`),
+  and CI runs them against PostgreSQL 16 with pgvector on every PR.
 - The per-module contract schemas (only `common.js`, `organisation.js` and `notifications.js` have
   content). The generator is built; run `npm run gen:contract` after any schema or route change.
 - Gate 6 (`schema-drift.js`, `contract-columns.js`), still empty; both need the M0 migrations.
