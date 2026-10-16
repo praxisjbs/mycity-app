@@ -39,15 +39,16 @@ track owns the files listed; a track that needs another's file asks in its PR ra
 
 | Track | Builds | Owns | Migration block | Seed file |
 |---|---|---|---|---|
-| **A · People** | `organisation` (departments, employees, reporting lines, seats, employee 360), People · Employees (#24) full register, Org Chart (#91) and Organogram (#92) to `organogram.md`, the real staff roster load on staging and production, the staging demonstration seed | `src/modules/organisation/` (except `employee.import.js`), `seeds/staff/`, `seeds/staging/`, `scripts/db/seed.js`, `app/src/features/people/` (except the import wizard), `app/src/features/organogram/` | `0300` to `0349` | `seeds/reference/0349_*` |
-| **B · Imports and documents** | `imports` (the generic API, the Import wizard, Imports history), the staff importer `employee.import.js`, `documents` (gated upload, download, versions), ESS · My Documents (#14), documents on an employee's record | `src/modules/imports/`, `src/modules/documents/`, `src/modules/organisation/employee.import.js`, `app/src/features/imports/`, the My Documents tab | `0350` to `0399` | `seeds/reference/0399_*` |
+| **A · People** | `organisation` (departments, employees, reporting lines, seats, employee 360), the staff importer `employee.import.js`, People · Employees (#24) full register, Org Chart (#91) and Organogram (#92) to `organogram.md`, the real staff roster load on staging and production, the staging demonstration seed | `src/modules/organisation/`, `seeds/staff/`, `seeds/staging/`, `scripts/db/seed.js`, the deploy step that loads the roster, `app/src/features/people/`, `app/src/features/organogram/` | `0300` to `0349` | `seeds/reference/0349_*` |
+| **B · Imports and documents** | `imports` (the generic API over any registered importer, the Import wizard and Imports history as Settings · Imports, opened with `?importer=<key>`), `documents` (gated upload, download, versions), ESS · My Documents (#14), the Documents tab on an employee's record | `src/modules/imports/`, `src/modules/documents/`, `app/src/features/imports/`, the My Documents tab, the employee record's Documents tab (added after A merges) | `0350` to `0399` | `seeds/reference/0399_*` |
 | **C · Access, settings, audit** | `access` (roles and grants editing, field visibility, capabilities), `settings` (organisation profile, working week, holidays, numbering, editable security rules), `audit` (read, filter, export) and their Settings screens: Organisation (#69), Roles & Permissions (#71), Documents & Numbering (#76), Security (#78), Audit Log (#79) | `src/modules/access/`, `src/modules/settings/`, `src/modules/audit/`, `app/src/features/settings/` (except Users and Approvals) | `0400` to `0449` | `seeds/reference/0449_*` |
 | **D · Workflow and search** | `workflow` routes (my approvals, decide, withdraw), Settings · Approvals (#72) designer, the leave approval definition; ⌘K search over screens, actions, people, logins and departments; the search coverage gate | `src/modules/workflow/`, `src/shared/search/` route and providers, `app/src/shell/Search.tsx`, the Approvals screen, `scripts/check/search-coverage.js` | `0450` to `0499` | `seeds/reference/0499_*` |
 
 **Running them in parallel.** A, B and C can run at the same time. D can run at the same time too,
-but merges last: its gate checks every screen and record type the other three add. B's staff
-importer calls A's `organisation.service.importRow`; B writes that call against the signature in
-§5 and A provides it, so neither waits. Shared files (`docs/PROGRESS.md`, `README.MD`,
+but merges last: its gate checks every screen and record type the other three add. A owns the
+staff importer and registers it with the import engine; B's wizard and history work with any
+registered importer, so the two meet only at the engine (`shared/import`), which exists. People ·
+Employees' Import Staff opens B's wizard at Settings · Imports with `?importer=employees`. Shared files (`docs/PROGRESS.md`, `README.MD`,
 `packages/contract/contract.gen.ts`, `src/shared/route-map.js`) conflict on merge: merge `main` in,
 keep both sides of PROGRESS and README, regenerate `contract.gen.ts` with `npm run gen:contract`,
 never hand-merge it.
@@ -73,8 +74,7 @@ These finish M0 and no prompt can do them:
 | People · Employees (#24) | Staff app | `people` view; add, edit, archive with create, edit, delete | A | Mock | Real API: list at 25 with search and filters, the employee's record with tabs, Add, Edit, Archive, Send Invite, Import Staff |
 | Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | Mock | Profile, job, reporting line, documents, login, history on the real API |
 | Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | Mock | As `organogram.md` describes, on the real API |
-| Import Staff wizard | People · Employees | `people` create | B | None | Upload, map, preview with errors, commit, revert |
-| Imports history | Settings | `settings` view | B | None | Every batch with its counts, error file and Revert |
+| Settings · Imports (new screen: the wizard and history) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | None | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | Mock | Their documents, upload where allowed, download |
 | Settings · Organisation (#69) | Settings | `settings` view, edit | C | Mock | Organisation profile, working week, holidays |
 | Settings · Roles & Permissions (#71) | Settings | `settings` edit | C | Mock | Roles, the grants matrix, field visibility, capabilities, editable |
@@ -148,7 +148,7 @@ Every list pages at 25 through `shared/http/paged.js`. Every route has a contrac
 
 `organisation.service.importRow(client, values, ctx)` is the one write the staff importer calls:
 create or update by `staff_number` or `work_email`, returning `{ action: "create" | "update" | "none",
-target_id, before }`. Track A builds it; track B calls it.
+target_id, before }`. Track A builds both; the roster loader runs the same importer.
 
 **Track B · `imports` and `documents`**: BACKEND_STRUCTURE §9.3 exactly (`GET /imports/importers`,
 `/importers/:key/template`, `POST /imports`, `PUT /imports/:id/mapping`, `POST /imports/:id/preview`,
@@ -180,8 +180,8 @@ versions (BACKEND_STRUCTURE §5); `GET /ess/documents`, `POST /ess/documents` (o
   date, date of birth, line manager, email, phone, employment type, work arrangement, work hours and
   bank name.
 - **It loads by itself on staging and production.** No person runs a command. Each deploy, after
-  migrations, the loader runs the staff importer over the sheet (track B's importer, track A's
-  loader and deploy step) as the system actor, then applies `roles.json`. It is idempotent: a person
+  migrations, the loader runs the staff importer over the sheet (track A: the importer, the loader
+  and the deploy step) as the system actor, then applies `roles.json`. It is idempotent: a person
   already present (matched by staff number, then work email) is left as the app has them, so an edit
   made on screen is never overwritten; a new row in the sheet is added. A row that fails is reported
   in the deploy log and the batch in Imports history, and does not stop the deploy.
@@ -334,6 +334,8 @@ and actions (D), and the gate in §6.7.
 
 ## 14 · Change log
 
+- 16/10/2026 · TB · The staff importer moved to track A with the roster loader, so A and B meet only
+  at the import engine; Settings · Imports holds the wizard and history.
 - 16/10/2026 · TB · First version: the remaining M0 and foundation work in four tracks, with TB's
   twenty decisions of 16/10/2026 (§6); the staff sheet and role map go into `seeds/staff/` with
   track A, the repository being private.
