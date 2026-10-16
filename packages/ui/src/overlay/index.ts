@@ -9,3 +9,4 @@ export { Popover, type PopoverProps } from "./Popover";
 export { Menu, type MenuProps, type MenuItem, type MenuTriggerProps } from "./Menu";
 export { Tooltip, type TooltipProps } from "./Tooltip";
 export { useUnsavedChanges, useDismiss } from "./context";
+export * from "./LockScreen";

@@ -11,11 +11,6 @@ const ACTIONS: Array<[RoleAction, string]> = [["view", "View"], ["create", "Crea
 const SCOPES: Array<[RecordScope, string]> = [["all", "All"], ["team", "Team"], ["own", "Own"]];
 
 /** The role names a user can be given, from the roles the API holds (not a fixed list). */
-export function useRoleOptions(): Array<[string, string]> {
-  const list = usePaged("GET /api/v1/settings/roles");
-  return list.rows.map((r) => [r.name, r.name]);
-}
-
 /**
  * Settings · Roles & Permissions (MILESTONES §14). Four layers: module, action,
  * record scope, field. There is no entity layer: one company (A2). A custom
@@ -134,7 +129,7 @@ function RoleForm({ cat, role, canManage, close }: { cat: AccessCatalogue; role:
     try {
       const r = role ? await update.run({ params: { id: role.role_id }, body }) : await create.run({ body });
       invalidate("/api/v1/settings/roles");
-      invalidate("/api/v1/settings/users");
+      invalidate("/api/v1/users");
       close();
       toast(role ? `${r.name} saved. Its holders get the change at their next request` : `${r.name} created. Give it to a user from Users`);
     } catch (e) {

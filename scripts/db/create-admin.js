@@ -77,7 +77,8 @@ const { randomUUID } = require("node:crypto");
 const contract = require("../../packages/contract");
 
 const ACTOR = Object.freeze({ user_id: null, source: "script:create-admin" });
-const MIN_PASSWORD = 12;
+/** The rule is identity's (identity.password-policy.js); the length is the contract's. */
+const MIN_PASSWORD = contract.identity.PASSWORD_MIN;
 const LOCK_KEY = "mycity:create-admin";
 
 /* ------------------------------------------------------------------ *
@@ -212,10 +213,11 @@ async function askCeo(term) {
 async function askPassword(term) {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const p1 = await term.askHidden(
-      `Password (at least ${MIN_PASSWORD} characters)`,
+      `Password (at least ${MIN_PASSWORD} characters, upper and lower case, a number and a symbol)`,
     );
-    if (p1.length < MIN_PASSWORD) {
-      console.log(`  Too short. At least ${MIN_PASSWORD} characters.`);
+    const shape = contract.identity.NewPassword.safeParse(p1);
+    if (!shape.success) {
+      console.log(`  ${shape.error.issues[0].message}.`);
       continue;
     }
     const p2 = await term.askHidden("Repeat password");
@@ -319,7 +321,7 @@ async function createAdmin(client, input, password, opts = {}) {
     if (await identity.findUserByEmployeeId(client, employee.employee_id)) {
       throw new AppError(
         "LOGIN_EXISTS",
-        `Employee ${employee.number} already has a login`,
+        `Employee ${employee.staff_number} already has a login`,
         409,
       );
     }
@@ -462,7 +464,7 @@ async function main() {
       `\n${args["dry-run"] ? "Dry run passed. Rolled back; nothing was kept." : "Done."}`,
     );
     console.log(
-      `  employee ${employee.number} ${employee_created ? "(created)" : "(existing, login added)"}`,
+      `  employee ${employee.staff_number} ${employee_created ? "(created)" : "(existing, login added)"}`,
     );
     console.log(`  login    ${user.email}`);
     console.log(`  role     ${role.code}`);

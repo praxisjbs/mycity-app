@@ -97,7 +97,12 @@ export class ApiError extends Error {
 }
 
 export interface ApiConfig {
-  /** Staff only: a bearer token held in memory, and one refresh retry on a 401 through this path. */
+  /**
+   * Staff only: a bearer token held in memory, and one refresh retry on a 401
+   * through this path. The refresh token rotates on every use and a rotated one
+   * ends the session, so refreshes are taken one at a time across every open tab
+   * of the app (the Web Locks API, where the browser has it).
+   */
   auth?: { refreshPath: string };
   /** include for the staff app (the refresh cookie), omit for the public site. */
   credentials: RequestCredentials;
@@ -170,10 +175,18 @@ export interface PagedResult<R> {
   reload: () => void;
 }
 
+/** Runs `fn` while holding a lock every tab of this origin shares; in-tab only where the browser has no Web Locks. */
+function acrossTabs<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? (navigator as Navigator & { locks?: LockManager }).locks : undefined;
+  return locks ? (locks.request(name, fn) as Promise<T>) : fn();
+}
+
 export function createApi<E>(config: ApiConfig) {
   type K0 = Key<E>;
   let accessToken: string | null = null;
-  let onSessionEnded: (() => void) | null = null;
+  let onSessionEnded: ((code: string) => void) | null = null;
+  let onRefreshed: ((body: unknown) => void) | null = null;
+  let endCode = "SESSION_ENDED";
   let refreshing: Promise<boolean> | null = null;
   let mockTransport: Transport | null = null;
   const network = config.transport ?? fetchTransport(config.credentials, config.onHeaders);
@@ -208,15 +221,22 @@ export function createApi<E>(config: ApiConfig) {
     };
   }
 
-  /** Try the refresh cookie once. Concurrent 401s share one refresh. */
+  /**
+   * Try the refresh cookie once. Concurrent 401s in this tab share one refresh,
+   * and other tabs wait their turn, so each presents the cookie the last one
+   * rotated to. When it is refused, `session.endCode` says why (the server's
+   * code: SESSION_TIME_LIMIT, SESSION_IDLE, SESSION_ENDED, or NETWORK).
+   */
   function refreshSession(): Promise<boolean> {
     if (!config.auth) return Promise.resolve(false);
     const refreshPath = config.auth.refreshPath;
     if (!refreshing) {
-      refreshing = transport({ method: "POST", path: refreshPath, query: {}, body: {}, headers: {} })
+      refreshing = acrossTabs(`refresh ${refreshPath}`, () => transport({ method: "POST", path: refreshPath, query: {}, body: {}, headers: {} }))
         .then((res) => {
           const token = (res.body as { access_token?: string } | null)?.access_token;
           accessToken = res.status === 200 && token ? token : null;
+          if (accessToken) onRefreshed?.(res.body);
+          else endCode = (res.body as ErrorBody | null)?.error?.code ?? "SESSION_ENDED";
           return accessToken !== null;
         })
         .finally(() => {
@@ -231,7 +251,7 @@ export function createApi<E>(config: ApiConfig) {
     const isRefresh = !!config.auth && key.includes(config.auth.refreshPath.replace(/\/refresh$/, "/"));
     if (res.status === 401 && config.auth && !isRefresh) {
       if (await refreshSession()) res = await transport(build(key, opts));
-      else onSessionEnded?.();
+      else if (endCode !== "NETWORK") onSessionEnded?.(endCode);
     }
     if (res.status >= 200 && res.status < 300) return res.body as ResponseOf<E, K>;
     throw new ApiError(res.status, res.body as ErrorBody | null);
@@ -244,8 +264,17 @@ export function createApi<E>(config: ApiConfig) {
     get token() {
       return accessToken;
     },
-    onEnded(fn: () => void) {
+    /** Why the last refresh was refused. */
+    get endCode() {
+      return endCode;
+    },
+    /** The session ended: the refresh cookie was refused after a 401. Receives the server's code. */
+    onEnded(fn: (code: string) => void) {
       onSessionEnded = fn;
+    },
+    /** A refresh succeeded; receives its body (the new token and the session's clock). */
+    onRefreshed(fn: (body: unknown) => void) {
+      onRefreshed = fn;
     },
   };
 

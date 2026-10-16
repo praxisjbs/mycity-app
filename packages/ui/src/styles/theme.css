@@ -8,6 +8,7 @@
  * Features use the named scales, never arbitrary values (F4):
  *   type     text-2xs 11 · text-xs 12 · text-sm 13 · text-base 14 · text-md 15 · text-lg 16
  *            text-xl 18 · text-2xl 20 · text-3xl 24 · text-4xl 30 · text-body, text-field (density)
+ *            text-hero 52 (the sign-in screen's city and clock only)
  *   spacing  Tailwind's 4 px scale (p-1 = 4 px, gap-3 = 12 px), plus the density sizes
  *            h-control, h-row, size-tap, min-h-tap (36/40/36 compact, 40/48/40 comfortable, 44 on a phone)
  *   radius   rounded-ctl 9 · rounded-box 10 · rounded-card 14 · rounded-sheet 16 · rounded-md (--radius)
@@ -58,6 +59,9 @@
   --text-3xl--line-height: 1.3;
   --text-4xl: 30px;
   --text-4xl--line-height: 1.2;
+  /* The sign-in screen's city name and clock only. */
+  --text-hero: 52px;
+  --text-hero--line-height: 1.04;
 
   --font-weight-semibold: 600;
   --font-weight-strong: 650;
@@ -81,6 +85,15 @@
   --animate-spin-slow-reverse: spin 8s linear infinite reverse;
   --animate-bob: bob 2.4s ease-in-out infinite;
   --animate-shimmer: shimmer 1.1s linear infinite;
+  /* The sign-in screen's city scenes (CityScenes); all stop under reduced motion. */
+  --animate-drift: drift 16s ease-out both;
+  --animate-cloud: cloud 140s linear infinite;
+  --animate-twinkle: twinkle 3.4s ease-in-out infinite;
+  --animate-turn: spin 360s linear infinite;
+  --animate-ripple: ripple 7s ease-in-out infinite;
+  --animate-sway: sway 8s ease-in-out infinite;
+  --animate-graze: graze 11s ease-in-out infinite;
+  --animate-fill-x: fill-x var(--fill-time, 9s) linear both;
 }
 
 @theme inline {
@@ -112,6 +125,23 @@
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-deep: var(--deep);
+  --color-scene-night-top: var(--scene-night-top);
+  --color-scene-night-bottom: var(--scene-night-bottom);
+  --color-scene-dawn-top: var(--scene-dawn-top);
+  --color-scene-dawn-bottom: var(--scene-dawn-bottom);
+  --color-scene-day-top: var(--scene-day-top);
+  --color-scene-day-bottom: var(--scene-day-bottom);
+  --color-scene-dusk-top: var(--scene-dusk-top);
+  --color-scene-dusk-bottom: var(--scene-dusk-bottom);
+  --color-scene-far: var(--scene-far);
+  --color-scene-mid: var(--scene-mid);
+  --color-scene-near: var(--scene-near);
+  --color-scene-water: var(--scene-water);
+  --color-scene-glint: var(--scene-glint);
+  --color-scene-sun: var(--scene-sun);
+  --color-scene-moon: var(--scene-moon);
+  --color-scene-light: var(--scene-light);
+  --color-scene-window: var(--scene-window);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-subtle-foreground: var(--subtle-foreground);
@@ -179,3 +209,10 @@
 @keyframes celeb-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
 @keyframes bob { 50% { transform: translateY(-4px) rotate(-8deg); } }
 @keyframes shimmer { to { background-position: -200% 0; } }
+@keyframes drift { from { transform: scale(1.07) translateX(1.2%); } to { transform: scale(1) translateX(0); } }
+@keyframes cloud { from { transform: translateX(-30%); } to { transform: translateX(130%); } }
+@keyframes twinkle { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+@keyframes ripple { 0%, 100% { transform: translateX(0); opacity: .35; } 50% { transform: translateX(18px); opacity: .9; } }
+@keyframes sway { 0%, 100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.6deg); } }
+@keyframes graze { 0%, 55%, 100% { transform: rotate(0); } 70%, 85% { transform: rotate(34deg); } }
+@keyframes fill-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }

@@ -741,7 +741,7 @@ fails at the first query. Everything else in each table is the migration's call.
 | Table (migration) | Columns read or written by | |
 |---|---|---|
 | `app_user` (0010) | `user_id`, `employee_id` (NOT NULL), `email`, `status` (`active` / `suspended` / `left`), `is_ceo` | `shared/rbac/grants-cache` |
-| `user_session` (0010) | `session_id`, `user_id`, `killed_at`, `expires_at` | `middleware/auth` |
+| `user_session` (0010, 0100) | `session_id`, `user_id`, `killed_at`, `expires_at`, `last_seen_at`, `refresh_token_hash`, `end_reason` | `middleware/auth`; the session rules are `identity.session-policy.js` (`docs/guides/identity.md` §6) |
 | `role`, `user_role` (0020) | `role_id`, `code`; `user_id`, `role_id` | `shared/rbac/grants-cache` |
 | `permission` (0020) | `role_id`, `module_key`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_approve`, `can_export`, `scope` (`all` / `team` / `own`) | `middleware/rbac` |
 | `field_visibility` (0020) | `role_id`, `field_key`, `visibility` (`visible` / `masked`) | `shared/rbac/grants-cache` |
@@ -1075,7 +1075,7 @@ exists (imported before the first login was made), the login is attached to that
 | An existing login for that email or employee | It never changes an existing login; passwords are reset in the app. praxis-ls's `ON CONFLICT DO UPDATE SET password_hash` let the script take over any account |
 | A role that already has an active holder | It is a bootstrap. Everyone after the first is created in the app, by a person, under their own name in the audit log. `--allow-additional` overrides, deliberately |
 | A second CEO | `is_ceo` is unique |
-| A password on the command line or in a file | Typed at a hidden prompt, twice, at least 12 characters |
+| A password on the command line or in a file | Typed at a hidden prompt, twice, held to the contract's `NewPassword` rule: at least 8 characters with a lowercase and an uppercase letter, a number and a symbol |
 | A non-interactive run | Needs a terminal; seeds and tests call `createAdmin()` directly |
 | `--sample` on production | The production administrator is a real person |
 
@@ -1091,7 +1091,7 @@ calls the exported `createAdmin()` with the demonstration data.
 
 ### 17.4 What it needs from the M0 modules
 
-The script is written ahead of the services it calls. They must expose:
+The services it calls (built 16/10/2026, `docs/guides/identity.md`) expose:
 
 | Service | Functions |
 |---|---|
