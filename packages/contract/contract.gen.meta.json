@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "65c6e18381e2096d3c3bfdbfbbff0b0ce4e711074261a8cce017a18f16c3a0e2",
+  "source_hash": "1bedc6890cb519e4ca6e47b67fe27204efe12392220c9d5aa30a1fe5e0d9c5a6",
   "schemas": 64,
   "endpoints": 25,
   "inputs": {
@@ -41,7 +41,7 @@
     "packages/contract/schemas/notifications.js": "32106096b61b403e55ecd11e4bf76ecc12a08cbb383146d625a1e53e2bb8f777",
     "packages/contract/schemas/offers.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/onboarding.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/organisation.js": "73af6eef2db4e2d3d98ae262fb4f7cdf56f72378b163646b3a12faa2146121b1",
+    "packages/contract/schemas/organisation.js": "96e43d7ed866b6237bb2e7611be57e058f5ccd7d83126b02df4bba669dc5c355",
     "packages/contract/schemas/partner_pipeline.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partners.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partnership_analytics.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

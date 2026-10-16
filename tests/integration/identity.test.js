@@ -517,5 +517,66 @@ describeDb("identity against the real migrations", () => {
       expect(ok.employee.staff_number).toMatch(/^\d{5}$/);
       expect(ok.user.email).toBe("tobi@mycity.test");
     });
+
+    test("the build account is a complete employee with the implementation role, and signs in", async () => {
+      const { buildAccount } = require("../../scripts/db/create-admin");
+      const made = await tx((c) => createAdmin(c, buildAccount("build@mycity.test"), "Implement#2026x"));
+      expect(made.role.code).toBe("implementation");
+      // Every column is filled except the references a first, remote account has nothing to
+      // point at, and left_on.
+      const whole = await one(`SELECT to_jsonb(e) AS e FROM employee e WHERE employee_id = $1`, [
+        made.employee.employee_id,
+      ]);
+      const empty = Object.keys(whole.e).filter((k) => whole.e[k] === null).sort();
+      expect(empty).toEqual([
+        "dotted_manager_id",
+        "dotted_manager_seat_id",
+        "left_on",
+        "line_manager_id",
+        "line_manager_seat_id",
+        "worksite_id",
+      ]);
+      const row = await one(
+        `SELECT e.first_name, e.middle_name, e.last_name, e.preferred_name, e.work_email::text AS work_email,
+                e.personal_email::text AS personal_email, e.job_title, e.employment_type, e.work_pattern,
+                e.phone, e.status, e.start_date::text AS start_date, e.contract_ends_on::text AS contract_ends_on,
+                e.confirmation_due_on::text AS confirmation_due_on, e.confirmed_on::text AS confirmed_on,
+                e.home_address, e.gender, e.date_of_birth::text AS date_of_birth, e.next_of_kin_name,
+                e.next_of_kin_phone, e.next_of_kin_relationship, e.bank_name, e.account_number,
+                e.gross_monthly::text AS gross_monthly, d.name AS department
+           FROM employee e JOIN department d USING (department_id) WHERE e.employee_id = $1`,
+        [made.employee.employee_id],
+      );
+      expect(row).toEqual({
+        first_name: "JBS Praxis",
+        middle_name: "Implementation",
+        last_name: "Team",
+        preferred_name: "JBS Praxis",
+        work_email: "build@mycity.test",
+        personal_email: "build@mycity.test",
+        job_title: "Implementation Partner",
+        employment_type: "consultant",
+        work_pattern: "remote",
+        phone: "+2348027492738",
+        status: "active",
+        start_date: "2026-10-09",
+        contract_ends_on: "2026-12-09",
+        confirmation_due_on: "2026-10-09",
+        confirmed_on: "2026-10-09",
+        home_address: "14 Adeola Odeku Street, Victoria Island, Lagos",
+        gender: "male",
+        date_of_birth: "1990-03-12",
+        next_of_kin_name: "JBS Praxis Office",
+        next_of_kin_phone: "+2348027492738",
+        next_of_kin_relationship: "Employer",
+        bank_name: "Zenith Bank",
+        account_number: "0000000000",
+        gross_monthly: "1850000.00",
+        department: "Implementation",
+      });
+      const { res } = await signIn("build@mycity.test", "Implement#2026x");
+      expect(res.status).toBe(200);
+      expect(res.body.user.roles).toEqual([expect.objectContaining({ code: "implementation" })]);
+    });
   });
 });

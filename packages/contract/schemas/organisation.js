@@ -58,13 +58,21 @@ const staffNumber = z
 const employeeCore = {
   staff_number: staffNumber.optional(),
   first_name: text(100),
+  middle_name: optionalText(100),
   last_name: text(100),
+  /** What colleagues call them, when it is not the first name. */
+  preferred_name: optionalText(100),
   work_email: email,
   phone,
   job_title: text(150),
   start_date: isoDate,
   employment_type: EmploymentType,
   work_pattern: WorkPattern,
+  /** A consultant's or contractor's last day under contract; empty for permanent staff. */
+  contract_ends_on: isoDate.optional(),
+  /** End of probation; the same day as start_date for someone engaged without one. */
+  confirmation_due_on: isoDate.optional(),
+  confirmed_on: isoDate.optional(),
   gender: Gender.optional(),
   date_of_birth: isoDate.optional(),
   next_of_kin_name: optionalText(150),
@@ -74,6 +82,9 @@ const employeeCore = {
 
 /** Restricted fields (field-masked, BACKEND_STRUCTURE §9.4). Optional on create. */
 const employeeRestricted = {
+  /** Masked as personal details (field-mask.js employee.personal), as is personal_email. */
+  home_address: optionalText(300),
+  personal_email: email.optional(),
   bank_name: optionalText(100),
   account_number: z
     .string()

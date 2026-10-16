@@ -369,7 +369,7 @@ The summary:
 
 | Script | When |
 |---|---|
-| `scripts/db/create-admin.js` | Once per environment, to make the first administrator: a full employee, login and role in one transaction (BACKEND_STRUCTURE §17). Interactive only. `--sample` on staging and local fills the employee with a sample profile and asks only for email, role and password |
+| `scripts/db/create-admin.js` | Once per environment, to make the first administrator: a full employee, login and role in one transaction (BACKEND_STRUCTURE §17). Interactive only. `--sample` on staging and local fills the employee with a sample profile and asks only for email, role and password; `--build-account` creates the implementation team's complete record and asks only for the email and password; `--env=<name>` confirms the environment on the command line |
 | `scripts/db/seed.js --build` / `--staging` | Synthetic or demonstration data. Refuses on production (three checks) |
 | `scripts/db/migrate.js` | Locally. On servers, migrations run only inside `deploy-gate` |
 | `scripts/import/run.js` | First staff load on staging, through the import engine, as a named person: `upload employees staff.xlsx --as=<email>`, then `preview`, `errors`, `commit` (type the environment name, or `--yes`), `revert`. The file header has every command |
