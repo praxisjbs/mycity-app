@@ -1091,10 +1091,11 @@ gets a real employee record behind their login without typing twelve fields. `sc
 calls the exported `createAdmin()` with the demonstration data.
 
 `--build-account` is the implementation team's login, on staging and production alike: the complete
-employee record is `BUILD_ACCOUNT` in the script (JBS Praxis Team, consultant, remote, a two-month
-contract, address, next of kin, pay, and a bank account of ten zeros that no payment can reach),
-role `implementation`. Only the work email and the password are typed; neither is in the
-repository. It is suspended at handover (`docs/runbooks/first-accounts.md`).
+employee record is `BUILD_ACCOUNT` in the script (JBS Praxis Implementation Team, consultant,
+remote, a two-month contract, address, next of kin, pay, and a bank account of ten zeros that no
+payment can reach), role `implementation`. Every employee column is filled except the references
+(worksite, managers, seats) and `left_on`. Only the email and the password are typed, the email
+serving as work and personal email; neither is in the repository. It is suspended at handover (`docs/runbooks/first-accounts.md`).
 
 ### 17.4 What it needs from the M0 modules
 

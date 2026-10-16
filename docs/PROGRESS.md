@@ -97,10 +97,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 **Notes**
 
 - 16/10/2026 · TB · `create-admin --build-account --env=<name>` makes the implementation team's
-  login with a complete employee record (JBS Praxis Team, consultant, remote, contract 09/10/2026 to
-  09/12/2026 at ₦1,850,000.00 a month, address, next of kin, bank); only the email and password are
-  typed, so neither is in the repository. `employee` gained `home_address` and `contract_ends_on`
-  (`0210`). Left: run it on staging and production (`docs/runbooks/first-accounts.md`).
+  login with every employee field filled (JBS Praxis Implementation Team, known as JBS Praxis,
+  consultant, remote, contract 09/10/2026 to 09/12/2026 at ₦1,850,000.00 a month, phone 0802 749 2738,
+  address, next of kin, bank); only the email and password are typed, so neither is in the
+  repository. Empty by design: worksite, managers, seats and `left_on`. `employee` gained
+  `home_address` and `contract_ends_on` (`0210`); the contract now also takes `middle_name`,
+  `preferred_name`, `personal_email` and the confirmation dates. Left: run it on staging and
+  production (`docs/runbooks/first-accounts.md`).
 - 16/10/2026 · GE · Mail host values in (`docs/runbooks/dns-and-mail.md` §4): `mycityapp.io`,
   465 and 993, 50 recipients an hour, 30 IMAP connections per IP, 30 mailboxes. System mail is now
   paced to the hourly limit (`services/mail/pace.js`, `MAIL_SEND_PER_HOUR`: production 40, staging

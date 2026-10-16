@@ -29,9 +29,12 @@ script refuses if it is not this `.env`'s `APP_ENV`.
 ## 2 · The build account
 
 The whole employee record is in the script (`BUILD_ACCOUNT` in `scripts/db/create-admin.js`):
-JBS Praxis Team, Implementation Partner in the Implementation department, consultant, remote, on a
-contract from 09/10/2026 to 09/12/2026 at ₦1,850,000.00 a month, with phone, home address, date of
-birth, next of kin and bank details. You type two things: the email and the password.
+JBS Praxis Implementation Team (known as JBS Praxis), Implementation Partner in the Implementation
+department, consultant, remote, on a contract from 09/10/2026 to 09/12/2026 at ₦1,850,000.00 a
+month, confirmed from the start (a consultant has no probation), with phone 0802 749 2738, home
+address, date of birth, next of kin and bank details. Every field is filled except the worksite
+and managers, which a remote first account has none of, and the leaving date. You type two
+things: the email (kept as both work and personal email) and the password.
 
 ```sh
 cd /srv/mycity/<env>/current
@@ -74,9 +77,10 @@ placeholder:
 ```
 
 `employment_type` is one of `full_time`, `part_time`, `contractor`, `consultant`, `intern`;
-`work_pattern` one of `on_site`, `hybrid`, `remote`. The optional fields (`contract_ends_on`,
+`work_pattern` one of `on_site`, `hybrid`, `remote`. The optional fields (`middle_name`,
+`preferred_name`, `personal_email`, `contract_ends_on`, `confirmation_due_on`, `confirmed_on`,
 `home_address`, `date_of_birth`, `gender`, next of kin, bank, `gross_monthly`) can be added the
-same way. `chmod 600` the file, then:
+same way. A phone is 11 digits (`0803 123 4567`) or `+234` and ten. `chmod 600` the file, then:
 
 ```sh
 sudo -u mycity-<env> node --env-file=/srv/mycity/<env>/shared/.env \

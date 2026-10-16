@@ -163,9 +163,12 @@ function makeTerminal() {
 
 const FIELDS = [
   ["first_name", "First name"],
+  ["middle_name", "Middle name (optional)"],
   ["last_name", "Last name"],
+  ["preferred_name", "Preferred name (optional)"],
   ["work_email", "Work email"],
-  ["phone", "Phone (e.g. 0803 123 4567)"],
+  ["personal_email", "Personal email (optional)"],
+  ["phone", "Phone, 11 digits (e.g. 0803 123 4567)"],
   ["job_title", "Job title"],
   ["department_name", "Department"],
   ["start_date", "Start date (YYYY-MM-DD)"],
@@ -178,6 +181,8 @@ const FIELDS = [
     `Work pattern (${contract.organisation.WORK_PATTERNS.join(", ")})`,
   ],
   ["contract_ends_on", "Contract ends (YYYY-MM-DD, optional; consultants and contractors)"],
+  ["confirmation_due_on", "Confirmation due (YYYY-MM-DD, optional; end of probation)"],
+  ["confirmed_on", "Confirmed on (YYYY-MM-DD, optional)"],
   ["date_of_birth", "Date of birth (YYYY-MM-DD, optional)"],
   ["home_address", "Home address (optional)"],
   ["staff_number", "Staff number (optional, issued automatically when blank)"],
@@ -185,6 +190,9 @@ const FIELDS = [
   ["next_of_kin_name", "Next of kin name (optional)"],
   ["next_of_kin_phone", "Next of kin phone (optional)"],
   ["next_of_kin_relationship", "Next of kin relationship (optional)"],
+  ["bank_name", "Bank name (optional)"],
+  ["account_number", "Account number (10 digits, optional)"],
+  ["gross_monthly", "Gross monthly pay in naira (e.g. 450000.00, optional)"],
 ];
 
 /** A complete, obviously sample profile. Staging, local and CI only. */
@@ -205,21 +213,28 @@ function sampleEmployee(workEmail) {
 /**
  * The implementation team's login: a complete employee record, held by the Implementation Team
  * role for the length of the build and suspended at handover (docs/runbooks/first-accounts.md).
- * The work email is typed at the terminal, never kept here. A two-month consultancy of
- * N3,700,000, so N1,850,000 a month. The account number is ten zeros on purpose: it reaches no
- * one, so no payment run can ever send money to a real account.
+ * Every employee field is filled except the ones that point at other records (worksite, line
+ * and dotted managers, seats: a remote first account has none to point at) and left_on. The
+ * email is typed at the terminal and serves as both work and personal email, so it is never kept
+ * here. A consultant has no probation, so confirmation is due and done on the start date. A
+ * two-month consultancy of N3,700,000, so N1,850,000 a month. The account number is ten zeros on
+ * purpose: it reaches no one, so no payment run can ever send money to a real account.
  */
 const BUILD_ACCOUNT = Object.freeze({
   role_code: "implementation",
   is_ceo: false,
   employee: Object.freeze({
     first_name: "JBS Praxis",
+    middle_name: "Implementation",
     last_name: "Team",
+    preferred_name: "JBS Praxis",
     phone: "08027492738",
     job_title: "Implementation Partner",
     department_name: "Implementation",
     start_date: "2026-10-09",
     contract_ends_on: "2026-12-09",
+    confirmation_due_on: "2026-10-09",
+    confirmed_on: "2026-10-09",
     employment_type: "consultant",
     work_pattern: "remote",
     gender: "male",
@@ -234,12 +249,12 @@ const BUILD_ACCOUNT = Object.freeze({
   }),
 });
 
-/** The build account's payload with the email typed at the terminal. */
-function buildAccount(workEmail) {
+/** The build account's payload with the email typed at the terminal, as work and personal email. */
+function buildAccount(email) {
   return {
     role_code: BUILD_ACCOUNT.role_code,
     is_ceo: BUILD_ACCOUNT.is_ceo,
-    employee: { ...BUILD_ACCOUNT.employee, work_email: workEmail },
+    employee: { ...BUILD_ACCOUNT.employee, work_email: email, personal_email: email },
   };
 }
 
@@ -491,7 +506,7 @@ async function main() {
     const e = data.employee;
     console.log("\nAbout to create:");
     console.log(
-      `  ${e.first_name} ${e.last_name} <${e.work_email}>, ${e.job_title}, ${e.department_name}`,
+      `  ${[e.first_name, e.middle_name, e.last_name].filter(Boolean).join(" ")} <${e.work_email}>, ${e.job_title}, ${e.department_name}`,
     );
     const contractTerm = e.contract_ends_on ? `, contract ${e.start_date} to ${e.contract_ends_on}` : "";
     console.log(`  ${e.employment_type}, ${e.work_pattern}${contractTerm}`);
