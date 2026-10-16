@@ -1,0 +1,14 @@
+# Starts mycity-backup.service at 02:30 Lagos time every night, outside working hours and before
+# the Sunday restore drill. Persistent: a night the server was off runs at the next boot.
+# Next run:  systemctl list-timers mycity-backup.timer
+
+[Unit]
+Description=Nightly MyCity backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Africa/Lagos
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

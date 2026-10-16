@@ -14,7 +14,7 @@ file was read in the checked-out tree on 12 October. Backend source layout is in
                          Internet
                             │
             ┌───────────────┴────────────────┐
-            │ panel proxy (TLS only)         │   one server, 18 GB RAM / 240 GB SSD
+            │ nginx (TLS only)               │   one server, 18 GB RAM / 240 GB SSD
             └──┬──────────┬──────────┬───────┘
      hub.mycityapp.io  go.mycityapp.io  hub.staging…  go.staging…
             │          │                │          │
@@ -47,8 +47,9 @@ file was read in the checked-out tree on 12 October. Backend source layout is in
 Four systemd units: `mycity-api-prod`, `mycity-worker-prod`, `mycity-api-stg`, `mycity-worker-stg`.
 One codebase, one build, two running copies that differ only in their `.env`.
 
-The four virtual hosts are configured in the hosting panel's web server settings, not from files in
-the repository. The proxy terminates TLS and forwards every path to the environment's API process,
+The four virtual hosts are nginx files in the repository (`ops/nginx/`), installed with everything
+else by `ops/provision/provision.sh` on Ubuntu 24.04 (decided 15 October 2026; the server,
+108.181.196.53, came bare, so the earlier plan of a hosting panel was dropped). The proxy terminates TLS and forwards every path to the environment's API process,
 which serves both frontend builds and the API and keeps the hosts apart itself (§3). What the proxy
 must contain (forwarded headers, body size, WebSocket upgrade) is in `docs/runbooks/proxy.md`.
 
@@ -110,7 +111,7 @@ by the browser and the host guard rather than by a flag.
 ## 4 · Request lifecycle (staff)
 
 ```
-panel proxy (TLS only, forwards everything)
+nginx (TLS only, forwards everything)
   → async-safe (patches Express 4 so async throws reach the error handler)
   → request-id            X-Request-Id in, echoed out
   → request-context       AsyncLocalStorage { requestId, userId }
@@ -326,12 +327,13 @@ production.
 CI never gets a shell. The `mycity-deploy` user's `authorized_keys` carries a forced command:
 
 ```
-command="/srv/mycity/bin/deploy-gate",no-pty,no-port-forwarding,no-agent-forwarding <staging key>
-command="/srv/mycity/bin/deploy-gate",no-pty,no-port-forwarding,no-agent-forwarding <prod key>
+command="/srv/mycity/bin/deploy-gate --key=staging",no-pty,no-port-forwarding,no-agent-forwarding <staging key>
+command="/srv/mycity/bin/deploy-gate --key=production",no-pty,no-port-forwarding,no-agent-forwarding <prod key>
 ```
 
 `deploy-gate` reads `SSH_ORIGINAL_COMMAND`, accepts only `stage <sha>`, `seal <sha>`, `promote <sha>`,
-`rollback <env> <sha>`, and checks **which key** called it. The staging key can stage and seal and
+`rollback <env> <sha>`, and checks **which key** called it (the `--key=` its forced command
+passes; `ops/ssh/authorized_keys.template`). The staging key can stage and seal and
 nothing else. The prod key can promote and roll back production and nothing else. A leaked staging
 key cannot touch production even with a hand-typed command.
 
@@ -395,9 +397,20 @@ seed guard.
   live (Praxis `routes/health.js`).
 - **Errors.** `error_event` table + alert channel for 5xx only; 4xx are logged, not alerted (Praxis
   `shared/observability/error-reporter.js`).
-- **Backups.** Nightly `pg_dump` of both databases, 14 kept, media rsync; pre-deploy dump on every
-  stage and promote. Restore rehearsed into a scratch database before M11 (MILESTONES §16).
-- **Uptime.** External probe on both production hosts and `/api/health/ready`.
+- **Backups.** Nightly at 02:30 Lagos (`mycity-backup.timer`, `scripts/db/backup.sh`): `pg_dump` of
+  both databases with the migration head and every table's row count read from the same exported
+  snapshot, 14 kept; media as hard-linked rsync snapshots, 14 kept; then a mirror of all of it to
+  an offsite host over SSH when one is set. Pre-deploy dump on every stage and promote. The
+  secrets in `/root/mycity-secrets` never travel with the data.
+- **Restore drill.** Every Sunday (`mycity-restore-drill.timer`, `scripts/db/restore-drill.js`): the
+  newest nightly restored into a scratch database, which must hold exactly the row counts the
+  backup recorded; it fails when the newest nightly is over 36 hours old. Timed and logged, so the
+  M11 rehearsal (MILESTONES §16) is a record, not an event.
+- **Uptime.** `ops/monitoring/uptime-probe.js` from outside the server (`.github/workflows/uptime.yml`
+  every 10 minutes): both production hosts over HTTPS, `/api/health/ready`, the environment header
+  and the certificate's days left. Errors, backup, drill and probe all alert through one sender
+  (`shared/observability/alert.js`): WhatsApp links per person (`ALERT_WHATSAPP_URLS`) and/or a
+  chat webhook (`ALERT_WEBHOOK_URL`).
 
 ---
 

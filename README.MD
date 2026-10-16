@@ -85,13 +85,16 @@ mycity-app/
 │   │   │                     (read by check/palette.js and both apps' eslint configs)
 │   │   └── lib/sources.js    string literals, call arguments and frontend files for the static halves
 │   │                         of check/five-second.js, check/forms.js, check/dashes.js
-│   ├── db/                   migrate, seed, backup, restore-drill, create-admin
+│   ├── db/                   migrate, seed, create-admin; backup.sh (nightly) and restore-drill.js
+│   │                         (weekly), installed on the server as mycity-backup, mycity-restore-drill
 │   ├── import/               command-line import
 │   └── deploy/               deploy-gate, release-manifest, verify-staging, rollback
 ├── ops/
-│   ├── systemd/              four units + env templates
-│   ├── provision/            server packages
-│   ├── monitoring/           uptime probe (M11)
+│   ├── systemd/              four units + env templates; mycity-backup.service + .timer (nightly
+│   │                         02:30), mycity-restore-drill.service + .timer (Sundays 04:00)
+│   ├── provision/            provision.sh: a fresh Ubuntu 24.04 to a ready server (runbooks/server-setup.md)
+│   ├── nginx/                mycity.conf (shared) + one file per host (runbooks/proxy.md)
+│   ├── monitoring/           uptime-probe.js, run from outside by .github/workflows/uptime.yml
 │   └── ssh/                  authorized_keys template for the deploy user
 ├── tests/
 │   ├── unit/                 cross-module unit tests
@@ -106,10 +109,11 @@ mycity-app/
 │   ├── PROGRESS.md           86 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
-│   │                         proxy (the hosting panel's proxy settings), github-settings (TB applies)
+│   │                         proxy (nginx settings), server-setup (provisioning), github-settings
 │   └── manual/               user manual, one file per module (M11, written as each ships)
 ├── .github/
-│   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml
+│   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml, uptime.yml
+│   │                         (the uptime probe every 10 minutes)
 │   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
 │   └── pull_request_template.md
 ├── .claude/
@@ -170,7 +174,8 @@ src/
 │   ├── notifications/ categories · fanout
 │   ├── search/        provider · registry · search.service
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
-│   └── observability/ scrub · metrics · error-reporter
+│   └── observability/ scrub · metrics · error-reporter · alert (WhatsApp and webhook; also the
+│                      server's mycity-alert)
 ├── services/
 │   ├── storage/       storage.service
 │   ├── media/         image-pipeline · av-pipeline · scan · reconcile
@@ -399,9 +404,11 @@ The assistant **reads only** (A23). It answers from the manifests every module h
 
 ### 5.14 M11 · Handover & Training · TB, all · 14 to 18 Dec
 
-No new modules. Fills `docs/manual/*.md` (one per staff module plus the public site),
-`docs/runbooks/*.md`, `ops/monitoring/uptime-probe.js`, and runs the restore drill
-(`scripts/db/restore-drill.js`).
+No new modules. Fills `docs/manual/*.md` (one per staff module plus the public site) and brings
+`docs/runbooks/*.md` up to date. The nightly backup, the weekly restore drill and the uptime probe
+were built in M0 and run from then on; M11 shows them working for the handover: a restore drill
+timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
+`/srv/mycity/backups/drills.jsonl`) and an alert from the probe.
 
 ### 5.15 Background jobs by milestone
 

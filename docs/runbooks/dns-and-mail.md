@@ -1,0 +1,49 @@
+# MyCity App · DNS and mail request
+
+For the person who manages **mycityapp.io** (Namecheap hosting, cPanel). Three parts: the records to
+add, two checks, and the mail details we need back.
+
+## 1 · DNS records to add
+
+cPanel → **Zone Editor** → mycityapp.io → **Add Record**. Add these four. **Do not change or delete
+any existing record** (the main website, MX, SPF, DMARC, DKIM).
+
+| Name | Type | Value | TTL |
+|---|---|---|---|
+| hub | A | 108.181.196.53 | 14400 |
+| go | A | 108.181.196.53 | 14400 |
+| hub.staging | A | 108.181.196.53 | 14400 |
+| go.staging | A | 108.181.196.53 | 14400 |
+
+Do **not** add a CAA record: it could stop the main website's own certificate from renewing.
+
+## 2 · Mail checks
+
+cPanel → **Email Deliverability** → mycityapp.io:
+
+- [ ] **SPF** shows **Valid**. Today's record is
+  `v=spf1 +a +mx +ip4:198.54.114.120 +ip4:198.54.114.248 include:spf.web-hosting.com ~all`; leave it.
+- [ ] **DKIM** shows **Valid**. If not, click **Install the suggested record**.
+- [ ] **DMARC** exists (today `v=DMARC1; p=none;`); leave it.
+
+The app sends mail through the Namecheap mail server, not from 108.181.196.53, so no mail record
+needs the new server's address.
+
+## 3 · Mail details we need back
+
+cPanel → **Email Accounts** → **Create** `no-reply@mycityapp.io` with a strong password. The app
+sends its system mail (password resets, approvals, notifications) from it.
+
+Then **Connect Devices** for that account, **Mail Client Manual Settings**, and send us:
+
+| Detail | Example |
+|---|---|
+| Outgoing (SMTP) server | `mail.mycityapp.io` or `server123.web-hosting.com` |
+| SMTP port (SSL/TLS) | `465` |
+| Username | `no-reply@mycityapp.io` |
+| Password | sent separately, not in the same message |
+| Incoming (IMAP) server and port | `mail.mycityapp.io`, `993` (for staff mailboxes in the app) |
+| Hourly sending limit on the hosting plan | from Namecheap, if known |
+
+Staff mailboxes need nothing extra: each person signs in to the app's Mailbox with the address and
+password they already use for webmail.

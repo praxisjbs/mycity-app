@@ -1,0 +1,198 @@
+name: Release
+
+# Every green build of main goes to staging, is verified there and sealed, then waits for a
+# person to approve production (SYSTEM_ARCHITECTURE §9, docs/runbooks/deploy.md).
+#
+#   build ──► deploy-staging ──► verify-staging (seal) ──► production (approval, then promote)
+#
+# The server is reached only through deploy-gate (scripts/deploy/deploy-gate), as mycity-deploy,
+# whose keys are forced into it. The staging key can stage and seal; the production key can
+# promote and roll back. GitHub releases PROD_SSH_KEY to the production job only after a required
+# reviewer (GE or TB, not the person who triggered it) approves, so without approval no job ever
+# holds a key that can touch production.
+#
+# Settings this needs (docs/runbooks/deploy.md §1):
+#   environment staging      secret STAGING_SSH_KEY, deployment branch main
+#   environment production   secret PROD_SSH_KEY, required reviewers GE and TB, prevent
+#                            self-review, deployment branch main
+#   repository variables     DEPLOY_HOST (108.181.196.53), DEPLOY_KNOWN_HOSTS (the server's
+#                            ssh-keyscan line)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# One release at a time, and never two at once with a rollback.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the release
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - name: Check out the commit CI passed
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Commit
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build the staff app
+        run: npm ci --prefix app && npm run build --prefix app
+
+      - name: Build the public site
+        run: npm ci --prefix public-app && npm run build --prefix public-app
+
+      - name: Assemble the release and its manifest
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+          RUN: ${{ github.run_id }}
+        run: node scripts/deploy/release-manifest.js --out=release.tgz --sha="$SHA" --run="$RUN"
+
+      - name: Keep the release for the next jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.tgz
+          retention-days: 14
+          if-no-files-found: error
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: staging
+      url: https://hub.staging.mycityapp.io
+    steps:
+      - name: Fetch the release
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Load the staging key
+        env:
+          KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: deploy-gate stage
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          SHA: ${{ needs.build.outputs.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "mycity-deploy@$HOST" "stage $SHA" < release.tgz
+
+  verify-staging:
+    name: Verify staging and seal
+    needs: [build, deploy-staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://hub.staging.mycityapp.io
+    steps:
+      - name: Check out the release's commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.sha }}
+
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Verify staging over HTTPS
+        env:
+          SHA: ${{ needs.build.outputs.sha }}
+        run: node scripts/deploy/verify-staging.js --sha="$SHA"
+
+      - name: Load the staging key
+        env:
+          KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: deploy-gate seal
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          SHA: ${{ needs.build.outputs.sha }}
+          RUN: ${{ github.run_id }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "mycity-deploy@$HOST" "seal $SHA $RUN"
+
+  production:
+    name: Production (approve after testing staging)
+    needs: [build, verify-staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # The job waits here for a required reviewer. Before approving: open hub.staging, check the
+    # top bar shows this build, walk the demo script for what this release touches, and approve
+    # with a comment naming what was checked (SYSTEM_ARCHITECTURE §9.8).
+    environment:
+      name: production
+      url: https://hub.mycityapp.io
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the release's commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.sha }}
+
+      - name: Load the production key
+        env:
+          KEY: ${{ secrets.PROD_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: deploy-gate promote
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          SHA: ${{ needs.build.outputs.sha }}
+          RUN: ${{ github.run_id }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "mycity-deploy@$HOST" "promote $SHA $RUN"
+
+      - name: Tag the release
+        env:
+          SHA: ${{ needs.build.outputs.sha }}
+        run: |
+          tag="release-$(TZ=Africa/Lagos date +%Y%m%d-%H%M)-${SHA:0:12}"
+          git tag "$tag" "$SHA"
+          git push origin "$tag"

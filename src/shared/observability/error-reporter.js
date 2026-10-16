@@ -6,8 +6,8 @@
  *   report(err, { origin: "worker", severity: "error", extra: { queue: "email" } });
  *
  * Every report is scrubbed (observability/scrub.js), written to `error_event`,
- * and logged. Severities `fatal` and `error` (the 5xx class) are also posted to
- * ALERT_WEBHOOK_URL; `warning` and `notice` (4xx, validation) are recorded and
+ * and logged. Severities `fatal` and `error` (the 5xx class) are also sent to the alert
+ * channels (observability/alert.js: ALERT_WEBHOOK_URL, ALERT_WHATSAPP_URLS); `warning` and `notice` (4xx, validation) are recorded and
  * counted but never alert, so the channel stays worth reading
  * (SYSTEM_ARCHITECTURE §11).
  *
@@ -28,6 +28,7 @@ const { logger } = require("../../config/logger");
 const requestContext = require("../../config/request-context");
 const { scrub, scrubObject } = require("./scrub");
 const metrics = require("./metrics");
+const alert = require("./alert");
 
 const ALERT_SEVERITIES = new Set(["fatal", "error"]);
 const DEDUPE_WINDOW_MS = 5 * 60 * 1000;
@@ -109,18 +110,17 @@ function alertText(p) {
 }
 
 async function postAlert(payload) {
-  if (!config.ALERT_WEBHOOK_URL) return false;
-  try {
-    const res = await fetch(config.ALERT_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: alertText(payload) }),
-      signal: AbortSignal.timeout(5000),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  if (!config.ALERT_WEBHOOK_URL && !config.ALERT_WHATSAPP_URLS) return false;
+  const r = await alert.send(alertText(payload), {
+    webhook: config.ALERT_WEBHOOK_URL,
+    whatsapp: config.ALERT_WHATSAPP_URLS,
+  });
+  if (r.failed.length || r.skipped.length)
+    logger.warn(
+      { alert: alert.summary(r) },
+      "an alert channel did not take the alert",
+    );
+  return r.sent > 0;
 }
 
 /* ---------------- storage ---------------- */

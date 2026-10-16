@@ -1,0 +1,31 @@
+# MyCity restore drill · MILESTONES M11 (a restore rehearsed from the backup), runbooks/backup-restore.md.
+# Installed by ops/provision/provision.sh; started by mycity-restore-drill.timer every Sunday.
+# Run now:  sudo systemctl start mycity-restore-drill     Logs: journalctl -u mycity-restore-drill
+# Restores production's newest nightly dump into a scratch database, demands the row counts the
+# backup recorded, drops it, and appends the report to /srv/mycity/backups/drills.jsonl. It fails
+# (and alerts) when the newest nightly is over 36 hours old, so a backup that silently stopped
+# is found within a week.
+
+[Unit]
+Description=MyCity restore drill (newest nightly into a scratch database)
+After=postgresql.service
+Requires=postgresql.service
+ConditionPathExists=/srv/mycity/bin/mycity-restore-drill
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/srv/mycity/bin/mycity-restore-drill --env=prod
+TimeoutStartSec=4h
+Nice=10
+IOSchedulingClass=idle
+SyslogIdentifier=mycity-restore-drill
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/mycity/backups
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes

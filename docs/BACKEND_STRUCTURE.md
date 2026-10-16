@@ -13,7 +13,9 @@ carries every module's `.ai.js` (§14), and the position on offline and sync (§
 
 **Amended 13 October 2026** after the internal meeting of 12 October: the system-wide pagination
 rule (§16), how the first administrator is created (§17), AI reads paged (§14.3), and the reverse
-proxy configured in the hosting panel rather than from `ops/nginx/` (§1, §5.2).
+proxy configured in the hosting panel rather than from `ops/nginx/` (§1, §5.2). **Reversed 15 October
+2026**: the server is a bare Ubuntu 24.04, so the proxy is nginx from `ops/nginx/`, installed by
+`ops/provision/provision.sh`.
 
 Donor line counts are from the checked-out trees on 12 October. `praxis` = `praxis-ls`, `pixie` =
 `pixie-girl-hub`.
@@ -49,16 +51,18 @@ mycity-erp/
 │   ├── import/              CLI over the import engine (first staff load)
 │   └── deploy/              deploy-gate, release-manifest, verify-staging, rollback
 ├── ops/
-│   ├── systemd/             four units + env file templates
+│   ├── systemd/             four units + env file templates; the backup and restore-drill
+│   │                        services and timers
 │   ├── provision/           server packages: postgres 16 + pgvector, redis, chromium,
 │   │                        ffmpeg, clamav, fonts
-│   └── ssh/                 authorized_keys template for mycity-deploy
-│                            (proxy: hosting panel, settings in docs/runbooks/proxy.md)
+│   ├── monitoring/          uptime-probe.js (run from outside by .github/workflows/uptime.yml)
+│   ├── ssh/                 authorized_keys template for mycity-deploy
+│   └── nginx/               mycity.conf (shared) + one file per host; docs/runbooks/proxy.md
 ├── tests/
 │   ├── unit/
 │   ├── integration/         real Postgres + Redis, RUN_DB_TESTS=1
 │   └── staging/             runs against hub.staging / go.staging in verify-staging
-├── .github/workflows/       ci.yml, release.yml, rollback.yml
+├── .github/workflows/       ci.yml, release.yml, rollback.yml, uptime.yml
 ├── .env.example             generated from config/env.js, CI checks they match
 └── CLAUDE.md
 ```
@@ -66,10 +70,10 @@ mycity-erp/
 **Runtime files never live in the repo.** Per environment, on the server:
 
 ```
-/srv/mycity/<prod|stg>/
-├── releases/<sha>/          code
+/srv/mycity/<prod|stg>/           owned by mycity-deploy (deploy-gate switches current)
+├── releases/<sha>/          code, with RELEASE, BUILD.env, SHA256SUMS (+ STAGING_VERIFIED on staging)
 ├── current -> releases/<sha>
-├── shared/.env
+├── shared/.env              root's, readable by the environment's group only
 └── media/                   private, mode 750, owned by mycity-<env>
     ├── vault/<yyyy>/<mm>/<uuid>.<ext>          documents (masters)
     ├── derived/<uuid>/<w>.<avif|webp>          image derivatives
@@ -147,7 +151,7 @@ src/
 │   ├── ai/            manifest.js · registry.js · catalogue-sync.js · authorise.js ·
 │   │                  cite.js                                                   (§14)
 │   ├── route-map.js
-│   └── observability/ scrub.js · metrics.js · error-reporter.js
+│   └── observability/ scrub.js · metrics.js · error-reporter.js · alert.js
 │
 ├── services/
 │   ├── storage/       storage.service.js (local driver, keys per §1)
@@ -331,7 +335,7 @@ multipart (memory, 25 MB hard cap; per-type caps tighter)
   → document row, inside the caller's transaction
 ```
 
-The proxy → Express → multer size chain is set once in the hosting panel's proxy settings
+The proxy → Express → multer size chain is set once in `ops/nginx/mycity.conf`
 (`client_max_body_size 30m`, `docs/runbooks/proxy.md`) and `middleware/upload.js`, the "works locally, fails live 413" pixie documents in
 `docs/UPLOAD_SIZE_LIMITS.md`.
 

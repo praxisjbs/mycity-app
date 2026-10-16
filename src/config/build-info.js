@@ -3,7 +3,8 @@
  * What is running: the release the health check reports, the staging top bar
  * shows, and every error report carries (SYSTEM_ARCHITECTURE §10, §11).
  *
- * BUILD_SHA and BUILD_TIME are written into the server's .env by the deploy;
+ * BUILD_SHA and BUILD_TIME come from the release's BUILD.env, which the systemd
+ * units read after the environment's .env (scripts/deploy/release-manifest.js);
  * on a laptop they are empty and read as "local".
  */
 const { config } = require("./env");

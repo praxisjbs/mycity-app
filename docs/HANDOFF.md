@@ -167,6 +167,52 @@ plus round-trip and command-line tests in `tests/integration/worker.test.js` and
   history, as the person named by `--as`; commit and revert on staging or production ask for the
   environment name (or `--yes`).
 
+### 3.5b Release pipeline (15 October; not committed)
+
+- `scripts/deploy/deploy-gate`: bash, forced command of both deploy keys (`--key=staging` stages
+  and seals; `--key=production` promotes and rolls back; both may ask `status`). Tarball on stdin,
+  checked against `SHA256SUMS`; `npm ci --omit=dev` then every dependency confirmed present (npm
+  crashed once and exited 0); pre-deploy `pg_dump`; migrations and the AI catalogue sync as the
+  environment's user (`node --env-file=shared/.env`); `current` switched; units restarted;
+  readiness must report the sha, else switched back. Seal = tree hash of the release (written
+  after hashing). Promote = seal checks, freeze window, hard links (`cp -al`). One lock for all.
+  `DG_*` variables exist only for tests (sshd passes no client environment).
+- `release-manifest.js` (assemble, check), `verify-staging.js` (HTTPS checks; six PENDING checks
+  wait for modules), `rollback.sh`, `release.yml`, `rollback.yml`.
+- Server changes, need a provisioning re-run: `/srv/mycity/<env>` owned by `mycity-deploy`;
+  units add `EnvironmentFile=-.../current/BUILD.env` (BUILD_SHA no longer goes in `.env`).
+- Tested in the cloud with the server's users, modes and sudoers and real Postgres and Redis
+  (`docs/runbooks/deploy.md` §4); `tests/unit/foundation/deploy.test.js` (9 tests).
+
+### 3.5c Operations: backups, restore drill, uptime (16 October; built in the cloud overnight, not committed)
+
+- `scripts/db/backup.sh` (installed as `/srv/mycity/bin/mycity-backup`, run as root by
+  `mycity-backup.timer` at 02:30 Lagos): per environment a psql coprocess opens a read-only
+  REPEATABLE READ transaction and exports its snapshot; `pg_dump --snapshot` dumps it and the same
+  transaction reads the migration head and every table's exact row count into
+  `nightly-<time>.json` (with sha256). Media: `rsync --link-dest` snapshots. 14 of each. Offsite:
+  `/etc/mycity/backup.env` `OFFSITE_TARGET`, always into `mycity-backups/` under it (so `--delete`
+  cannot reach anything else), ssh with `BatchMode` and strict host keys; `rrsync` on the far side
+  recommended. Writes `backups/last-run.json`; failures alert production's channels.
+  No deploy lock is taken: the snapshot makes the head and counts consistent with the dump.
+- `scripts/db/restore-drill.js` (`/srv/mycity/bin/mycity-restore-drill`, Sundays 04:00): Node
+  built-ins only; drops to the postgres user by spawn uid/gid (no runuser, no PAM); stdin is the
+  dump opened as root. Exact counts against the record; live counts shown only. History in
+  `backups/drills.jsonl`.
+- `ops/monitoring/uptime-probe.js` + `.github/workflows/uptime.yml` (every 10 minutes; state in
+  actions/cache; repository secret `ALERT_WHATSAPP_URLS`). Public repo, so no Actions minutes.
+- Alerts (16 October, he chose WhatsApp): the team uses WhatsApp, which has no group webhook. One
+  sender, `src/shared/observability/alert.js`, used by the error reporter, the backup and drill
+  (installed as `/srv/mycity/bin/mycity-alert`) and the probe: `ALERT_WHATSAPP_URLS` (per-person
+  gateway links with `{text}`; CallMeBot free, TextMeBot if CallMeBot is full) and/or
+  `ALERT_WEBHOOK_URL`. Cut to 900 characters, 5 per person per 10 minutes, links never printed.
+- `provision.sh` installs the two tools and the four timer files, enables the timers, writes
+  `/etc/mycity/backup.env` once. Needs a provisioning re-run on the server.
+- Runbooks rewritten or written: `backup-restore.md`, `monitoring.md` (also the three lines
+  corrected against the code: what `error_event` records, what the logger redacts, what the
+  metrics are), `incident.md`, `add-a-module.md`; `server-setup.md`, `deploy.md`,
+  `github-settings.md` updated. Tests: `tests/unit/foundation/operations.test.js`.
+
 ### 3.6 Test state (15 October, Node 20, cloud bench)
 
 387 tests pass (305 unit, 82 integration against Postgres 16 and Redis, real Chromium and
@@ -200,12 +246,19 @@ only), real SMTP delivery, web push (M6).
 - Gate 6 (`schema-drift.js`, `contract-columns.js`), still empty; both need the M0 migrations.
   `ci.yml` has no Postgres service yet, so in CI the integration tests and gate 4's round trip do
   not run; add one (with `RUN_DB_TESTS=1` and `DATABASE_URL`) once the migrations exist.
-  `release.yml` and `rollback.yml` are empty. Release pipeline,
-  `deploy-gate`, staging seal, production approval (SYSTEM_ARCHITECTURE §9).
-- Server: four subdomains, TLS (`docs/runbooks/proxy.md`). GitHub settings by TB.
+  The release pipeline is built (15 October, in the cloud while he was away; see below). Before the
+  first release: `docs/runbooks/deploy.md` §1 (two deploy keys, GitHub environments and
+  variables, re-run provisioning with the keys), DNS and mail. Backups, the drill and the uptime
+  probe are built (§3.5c); the offsite host and the WhatsApp links (`ALERT_WHATSAPP_URLS`) are his to provide.
+- Server 108.181.196.53 (fresh Ubuntu 24.04, 15 October): `ops/provision/provision.sh`, the four
+  systemd units, both env templates, the nginx files and the deploy `authorized_keys` template are
+  written (not yet run on the server; tested in the cloud: shellcheck, nginx config and live
+  proxying, env files against `config/env.js`). He runs it: `docs/runbooks/server-setup.md`. DNS A
+  records for the four hosts are his to add. The proxy is nginx from `ops/nginx/` now, not a
+  hosting panel. GitHub settings by TB.
 - `assets/brand` and `assets/fonts` are empty, so PDFs show the text wordmark.
 - M3 and later letter templates are empty (each milestone writes its own). Web push waits for M6.
-- systemd or PM2 for the four processes is still open (§5.3); the worker is one entry point either way.
+- systemd it is (decided 15 October); the units are in `ops/systemd/`.
 
 ---
 
@@ -214,7 +267,7 @@ only), real SMTP delivery, web push (M6).
 1. A14: MILESTONES says the generic importer lands in M7; the engine was built in M0. One-line
    amendment offered.
 2. The 15 permission keys in README §5.2 were proposed, not confirmed.
-3. systemd (in the docs) or PM2 (his usual) for the four processes.
+3. Settled 15 October: systemd, and nginx from the repository instead of a hosting panel.
 4. Numbering prefixes in BACKEND_STRUCTURE §7 are proposals for MyCity to confirm.
 5. REUSE_MAP §1.3 public-site wording contradicts A9; he said leave it.
 6. Client pack: maintenance price contradiction (₦500,000 vs ₦300,000 a year); M11 "training on

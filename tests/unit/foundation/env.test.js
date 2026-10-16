@@ -69,6 +69,14 @@ describe("config/env parseEnv", () => {
     ]));
   });
 
+  test("WhatsApp alert links must be https and say where the message goes", () => {
+    const good = "https://api.callmebot.com/whatsapp.php?phone=+2348031234567&apikey=1&text={text}";
+    expect(parseEnv({ ...SERVER, ALERT_WHATSAPP_URLS: `${good} ${good.replace("1&", "2&")}` }).problems).toEqual([]);
+    expect(parseEnv({ ...SERVER, ALERT_WHATSAPP_URLS: `${good} https://x.example/?t=hi` }).problems).toEqual([
+      "ALERT_WHATSAPP_URLS: WhatsApp link 2 has no {text}",
+    ]);
+  });
+
   test("a value that is a leftover comment is treated as empty and reported", () => {
     const { config, misparsed } = parseEnv({ ALERT_WEBHOOK_URL: "   # e.g. https://hooks.example" });
     expect(misparsed).toEqual(["ALERT_WEBHOOK_URL"]);

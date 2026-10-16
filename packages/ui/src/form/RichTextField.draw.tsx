@@ -9,7 +9,7 @@
  * size itself: `.rte` in base.css styles the content with tokens.
  */
 import { useEffect, useState } from "react";
-import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import Link from "@tiptap/extension-link";
 import StarterKit from "@tiptap/starter-kit";
 import { cn } from "../lib/cn";
@@ -48,6 +48,18 @@ const BUTTONS: Array<{ icon: IconName; label: string; mark: string; attrs?: Reco
 /** A link may only point at a page or an address (docs/guides/mailbox.md §6). */
 const LINK_OK = /^(https:\/\/|mailto:)/;
 
+/**
+ * Puts a value that changed outside the box into the document. The editor
+ * useEditor hands back can already be destroyed: it arms a 1 ms timer at
+ * render that only the mount effect cancels, and on a slow machine the timer
+ * wins, the editor drops its schema and a new one replaces it. Reading the HTML
+ * of the dead one throws, so it is skipped and the new editor starts from value.
+ */
+export function syncDraft(editor: Editor | null, value: string) {
+  if (!editor || editor.isDestroyed || editor.isFocused) return;
+  if (value !== (editor.isEmpty ? "" : editor.getHTML())) editor.commands.setContent(value, { emitUpdate: false });
+}
+
 export default function RichTextDraw({ value, onChange, onBlur, placeholder, label, readOnly, bad, id, describedBy }: RichTextDrawProps) {
   const editor = useEditor({
     extensions: [
@@ -73,14 +85,10 @@ export default function RichTextDraw({ value, onChange, onBlur, placeholder, lab
 
   // A draft restored from elsewhere (a wizard step, a reopened composer) has to
   // reach the document, but replacing it on every keystroke would move the caret.
-  useEffect(() => {
-    if (editor && !editor.isFocused && value !== (editor.isEmpty ? "" : editor.getHTML())) {
-      editor.commands.setContent(value, { emitUpdate: false });
-    }
-  }, [editor, value]);
+  useEffect(() => syncDraft(editor, value), [editor, value]);
 
   useEffect(() => {
-    editor?.setEditable(!readOnly);
+    if (editor && !editor.isDestroyed) editor.setEditable(!readOnly);
   }, [editor, readOnly]);
 
   /*
@@ -92,7 +100,7 @@ export default function RichTextDraw({ value, onChange, onBlur, placeholder, lab
   const marks = useEditorState({
     editor,
     selector: ({ editor: e }) =>
-      e
+      e && !e.isDestroyed
         ? {
             active: Object.fromEntries(BUTTONS.map((b) => [b.mark, e.isActive(b.mark, b.attrs)])),
             linked: e.isActive("link"),

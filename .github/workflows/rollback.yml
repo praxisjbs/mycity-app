@@ -1,0 +1,49 @@
+name: Rollback
+
+# Switch production back to a release still on the server (the last five are kept), after a
+# production approver approves (SYSTEM_ARCHITECTURE §9.7, docs/runbooks/rollback.md). The database
+# is not rolled back: if the release being left migrated, restore its pre-deploy dump as the
+# runbook says.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Full 40-character sha of the production release to go back to"
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    name: Roll production back
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://hub.mycityapp.io
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Load the production key
+        env:
+          KEY: ${{ secrets.PROD_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: deploy-gate rollback
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          SSH_KEY_FILE: ~/.ssh/deploy_key
+          SHA: ${{ inputs.sha }}
+        run: bash scripts/deploy/rollback.sh "$SHA"

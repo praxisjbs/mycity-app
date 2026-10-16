@@ -1,0 +1,12 @@
+# Starts mycity-restore-drill.service every Sunday at 04:00 Lagos time, after that night's backup.
+# Next run:  systemctl list-timers mycity-restore-drill.timer
+
+[Unit]
+Description=Weekly MyCity restore drill
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00 Africa/Lagos
+Persistent=true
+
+[Install]
+WantedBy=timers.target

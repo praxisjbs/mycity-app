@@ -1,0 +1,65 @@
+name: Uptime
+
+# Probe production from outside the server every 10 minutes (ops/monitoring/uptime-probe.js,
+# docs/runbooks/monitoring.md §5): both hosts over HTTPS, readiness, the environment header and
+# the certificate's days left. Alerts go to the ALERT_WHATSAPP_URLS and ALERT_WEBHOOK_URL repository
+# secrets (src/shared/observability/alert.js); the state
+# kept between runs (actions/cache) makes it alert on a change, hourly while down, and once on
+# recovery. A run that finds a host down also fails, and GitHub emails whoever last edited this
+# schedule.
+#
+# The repository is public, so these runs cost no Actions minutes (if it ever goes private, about
+# 4,300 a month: widen the schedule to every 30 minutes). Anyone can read a public run's log; it
+# holds only what /api/health/ready already tells the world. GitHub runs schedules from the default
+# branch only, may start a run some minutes late, and pauses them in a public repository after 60
+# days without a push.
+
+on:
+  schedule:
+    - cron: "3-59/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the probe and the alert sender
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ops/monitoring
+            src/shared/observability
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Last run's state
+        uses: actions/cache/restore@v4
+        with:
+          path: .uptime-state.json
+          key: uptime-state-${{ github.run_id }}
+          restore-keys: uptime-state-
+
+      - name: Probe
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          ALERT_WHATSAPP_URLS: ${{ secrets.ALERT_WHATSAPP_URLS }}
+        run: node ops/monitoring/uptime-probe.js --state=.uptime-state.json
+
+      - name: Keep the state for the next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .uptime-state.json
+          key: uptime-state-${{ github.run_id }}
