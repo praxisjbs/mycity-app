@@ -105,6 +105,9 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
+| Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
+| Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
+| Maps | [PlaceSearch](#placesearch) | `PlaceSearch` | Finds an address through our own API and hands back the place with its coordinates. | stable |
 | Shell | [BottomBar](#bottombar) | `BottomBar` | The phone's bottom bar: Home, Workspace, Community, Self-Service and More, each an icon with one word, within thumb reach (F16). | stable |
 | Shell | [Brand](#brand) | `Brand` | The MyCity pin mark, alone or with the name beside it, in the brand colours of the surface it sits on. | stable |
 | Shell | [ComingSoon](#comingsoon) | `ComingSoon` | The card a screen shows before its milestone opens it: the milestone and date, one line, and what the screen will do. | stable |
@@ -3260,6 +3263,108 @@ An article list beside the article: the Knowledge Hub's shape, and anything else
 
 ```tsx
 <Reader groups={groups} selected={key} onSelect={setKey}><ArticleBody title={article.title}>{article.body}</ArticleBody></Reader>
+```
+
+## Maps
+
+### LocationLabel
+
+Where a point is, in words: the address our API looks up, with the coordinates until it arrives.
+
+| | |
+|---|---|
+| Use | Beside a clock-in or clock-out, on an attendance row, under a field visit, wherever a reading is shown to a person. |
+| Avoid | Showing bare coordinates to a person as the final answer; looking the address up from the browser; a label on a point nobody asked about. |
+| Phone | The same line, wrapping rather than truncating, since an address is content. |
+| Accessibility | The address is text in the reading order, and the coordinates stay available, so a failed lookup still says where it was. |
+| Status | stable |
+| Exports | `LocationLabel` |
+| Import | `import { LocationLabel } from "@mycity/ui";` |
+| File | `packages/ui/src/maps/LocationLabel.tsx` |
+| Test | `packages/ui/src/maps/LocationLabel.test.tsx` |
+| Gallery | `packages/ui/src/maps/LocationLabel.gallery.tsx` (`npm run gallery`, `#/LocationLabel`) |
+
+**LocationLabel** props (`LocationLabelProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `point` | `LatLon` | yes | The point itself. |
+| `label` | `string \| null` |  | The address, where the record already carries one; nothing is looked up then. |
+| `resolve` | `ResolveAddress` |  | Turns the point into an address; the app's own call through our proxy. |
+| `bare` | `boolean` |  | Drop the pin glyph (inside a row that already has one). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<LocationLabel point={punch} resolve={api.resolveAddress} />
+<LocationLabel point={punch} label={punch.address} />
+```
+
+### MapView
+
+A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves.
+
+| | |
+|---|---|
+| Use | Where a clock-in happened, a worksite and its geofence, a partner's address, a field visit. |
+| Avoid | A map nobody reads a position off; tiles straight from the provider (the key must stay on the server); a map as the only way to read a place. |
+| Phone | Fits the width at a shorter height, and never takes the page's own scroll: the wheel and pinch are off unless the screen asks for them. |
+| Accessibility | The drawing is hidden from screen readers and every point is listed as words beside it, so the map is never the only way to read a place. |
+| Status | stable |
+| Exports | `MapView` |
+| Import | `import { MapView } from "@mycity/ui";` |
+| File | `packages/ui/src/maps/MapView.tsx` |
+| Test | `packages/ui/src/maps/MapView.test.tsx` |
+| Gallery | `packages/ui/src/maps/MapView.gallery.tsx` (`npm run gallery`, `#/MapView`) |
+
+**MapView** props (`MapViewProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `markers` | `MapMarker[]` |  | The points to show. |
+| `centre` | `LatLon` |  | Where the map opens; the first marker, or Lagos, unless set. |
+| `zoom` | `number` |  | How close in; 15 unless set (a street), 11 for a city. |
+| `radiusMetres` | `number` |  | A circle around the first point, in metres: a worksite's geofence. |
+| `tileUrl` | `string` |  | Where the tiles come from; our own proxy unless a screen passes its own. |
+| `onPick` | `(point: LatLon) => void` |  | Called with the point pressed, for choosing a place (setting up a worksite). |
+| `interactive` | `boolean` |  | Let the person drag and zoom. Off by default, so a map inside a page cannot swallow its scroll. |
+| `height` | `"sm" \| "md" \| "lg"` |  | How tall; `sm` in a card, `md` on a page, `lg` on a screen of its own. |
+| `children` | `ReactNode` |  | What sits under the map: an address, a time, a button. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<MapView markers={[{ key: "in", lat, lon, label: "Clocked in 07:52" }]} />
+<MapView centre={site} radiusMetres={site.radius_metres} onPick={setPoint} interactive />
+```
+
+### PlaceSearch
+
+Finds an address through our own API and hands back the place with its coordinates.
+
+| | |
+|---|---|
+| Use | Setting up a worksite, giving a partner an address, naming where a field visit happened. |
+| Avoid | Calling the provider from the browser (the key must stay on the server); a free-text address box where a point is needed; a list of every result. |
+| Phone | Full width, each result a 44 px row; the chosen address shows above the box. |
+| Accessibility | A search box over a listbox of addresses, each a real option, with the count of what was found announced. |
+| Status | stable |
+| Exports | `PlaceSearch` |
+| Import | `import { PlaceSearch } from "@mycity/ui";` |
+| File | `packages/ui/src/maps/PlaceSearch.tsx` |
+| Test | `packages/ui/src/maps/PlaceSearch.test.tsx` |
+| Gallery | `packages/ui/src/maps/PlaceSearch.gallery.tsx` (`npm run gallery`, `#/PlaceSearch`) |
+
+**PlaceSearch** props (`PlaceSearchProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `search` | `SearchPlaces` | yes | Finds addresses; the app's own call through our proxy. |
+| `onPick` | `(place: Place) => void` | yes | Called with the address chosen. |
+| `value` | `Place \| null` |  | The address already chosen, shown above the box. |
+| `placeholder` | `string` |  | A format example of at most 3 words; "Search address" otherwise. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PlaceSearch search={api.searchPlaces} onPick={(place) => form.set("point", place)} />
 ```
 
 ## Shell

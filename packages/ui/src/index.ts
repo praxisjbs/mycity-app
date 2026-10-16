@@ -18,5 +18,6 @@ export * from "./form";
 export * from "./data";
 export * from "./charts";
 export * from "./documents";
+export * from "./maps";
 export * from "./illustrations";
 export * from "./shell";
