@@ -58,6 +58,15 @@ function schemaOf(kind, key) {
   return REGISTRY.get(`${kind}:${key}`) || null;
 }
 
+/** The keys of every declared template of one kind, sorted: what the code can produce. */
+function declaredKeys(kind) {
+  const prefix = `${kind}:`;
+  return [...REGISTRY.keys()]
+    .filter((id) => id.startsWith(prefix))
+    .map((id) => id.slice(prefix.length))
+    .sort();
+}
+
 /** Top-level names a Zod object declares, recursing through optional/nullable wrappers. */
 function shapeOf(schema) {
   let s = schema;
@@ -132,6 +141,7 @@ module.exports = {
   BUILT_INS,
   defineVariables,
   schemaOf,
+  declaredKeys,
   undeclared,
   assertTemplate,
   parseData,

@@ -94,7 +94,7 @@ describeDb("identity against the real migrations", () => {
     await tx(async (client) => {
       people.ceo = await createAdmin(
         client,
-        { employee: sample("Ifeoma", "Mbonu", "ceo@mycity.test", "Chief Executive Officer"), role_code: "management", is_ceo: true },
+        { employee: sample("Amaka", "Eze", "ceo@mycity.test", "Chief Executive Officer"), role_code: "management", is_ceo: true },
         CEO_PASSWORD,
       );
       people.ops = await createAdmin(

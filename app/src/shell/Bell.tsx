@@ -8,8 +8,9 @@ import { Button, ChoiceField, EmptyState, formatWhen, IconButton, NotificationRo
 /**
  * The bell: things that happened to you. Read once and gone. Unresolved
  * conditions (alerts) live on Home · Alerts, where someone acts on them. A new
- * notification arrives over realtime (`notification`), which reloads the dot,
- * the list and the badge counts; without a socket they reload when opened.
+ * notification arrives over realtime (`notification`), and a read mark made in
+ * another tab or on another device as `notification_read`; either reloads the
+ * dot, the list and the badge counts. Without a socket they reload when opened.
  */
 export function useBell() {
   const modal = useModal();
@@ -25,20 +26,46 @@ export function useBell() {
   );
 }
 
+const reload = () => invalidate("/api/v1/notifications");
+
 /** The top bar's bell, with a dot while anything is unread. */
 export function BellButton() {
-  const { data } = useApi("GET /api/v1/notifications", { query: { unread: true } });
+  const { data } = useApi("GET /api/v1/notifications/unread-count");
   const open = useBell();
-  useRealtime("notification", () => invalidate("/api/v1/notifications"));
-  return <IconButton icon="bell" label="Notifications" dot={!!data?.page.total} onClick={open} />;
+  useRealtime("notification", reload);
+  useRealtime("notification_read", reload);
+  return <IconButton icon="bell" label="Notifications" dot={!!data?.unread} onClick={open} />;
 }
 
-const ICONS: Record<string, IconName> = { approvals: "check", attendance: "clock", recruitment: "brief", community: "msg", leave: "check", partnerships: "link", payroll: "wallet", policy: "doc", device: "lock" };
+/** A glyph per notification category (src/shared/notifications/categories.js). */
+const ICONS: Record<string, IconName> = {
+  security: "lock",
+  approvals: "check",
+  tasks: "ticks",
+  alerts: "alert",
+  comms: "msg",
+  people: "clock",
+  performance: "target",
+  queries: "flag",
+  recruitment: "brief",
+  payroll: "wallet",
+  partnerships: "link",
+  expenses: "wallet",
+  knowledge: "book",
+  system: "cog",
+};
 
 function BellBody({ close }: { close: () => void }) {
   const [view, setView] = useState<"all" | "unread">("all");
-  const list = usePaged("GET /api/v1/notifications", { filters: view === "unread" ? { unread: true } : {} });
+  const list = usePaged("GET /api/v1/notifications", { filters: view === "unread" ? { status: "unread" } : {} });
+  const read = useMutation("POST /api/v1/notifications/:id/read");
   const { navigate } = useRouter();
+  const markRead = (n: Notification) => read.run({ params: { id: n.notification_id }, body: {} }).then(reload);
+  const open = (n: Notification) => {
+    if (!n.read_at) void markRead(n).catch(() => undefined);
+    close();
+    navigate(n.link!.path);
+  };
   return (
     <>
       <div className="mb-2.5">
@@ -51,12 +78,22 @@ function BellBody({ close }: { close: () => void }) {
           <NotificationRow
             key={n.notification_id}
             title={n.title}
-            body={n.body}
+            body={n.body ?? undefined}
             when={formatWhen(n.created_at)}
             icon={ICONS[n.category] ?? "bell"}
-            tone={n.tone}
+            tone={n.priority === "high" ? "warn" : "info"}
             unread={!n.read_at}
-            action={n.link ? <Button size="sm" onClick={() => (close(), navigate(n.link!.path))}>Open</Button> : undefined}
+            action={
+              n.link ? (
+                <Button size="sm" onClick={() => open(n)}>
+                  Open
+                </Button>
+              ) : !n.read_at ? (
+                <Button size="sm" busy={read.pending} onClick={() => void markRead(n)}>
+                  Mark Read
+                </Button>
+              ) : undefined
+            }
           />
         ))
       )}
@@ -69,7 +106,7 @@ function BellFoot({ close }: { close: () => void }) {
   const read = useMutation("POST /api/v1/notifications/read-all");
   return (
     <>
-      <Button busy={read.pending} onClick={() => read.run({ body: {} }).then(() => invalidate("/api/v1/notifications"))}>
+      <Button busy={read.pending} onClick={() => read.run({ body: {} }).then(reload)}>
         Mark All Read
       </Button>
       <Button variant="primary" onClick={close}>
