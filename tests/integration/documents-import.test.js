@@ -803,6 +803,9 @@ describeDb("documents, PDFs, mail and imports against Postgres", () => {
         expect(sent.html).toContain("Hello Chidi Eze");
         expect(sent.text).toContain("your letter LTR-0001 is attached");
       },
+      // A cold Chromium start on a CI runner takes longer than the suite's 15 s, as in
+      // worker.test.js's render test.
+      60_000,
     );
   });
 

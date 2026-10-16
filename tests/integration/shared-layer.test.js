@@ -131,6 +131,15 @@ describeDb("shared layer against Postgres", () => {
     await pool.end();
   });
 
+  describe("error reporter", () => {
+    test("an error reported with no extra detail is recorded, not lost", async () => {
+      const reporter = require("../../src/shared/observability/error-reporter");
+      reporter.report(new Error("integration probe without extra"), { origin: "server", severity: "warning" });
+      await reporter.flush();
+      expect(await one("SELECT extra FROM error_event WHERE message = 'integration probe without extra'")).toEqual({ extra: null });
+    });
+  });
+
   describe("emit", () => {
     test("writes event, audit and outbox together, and nothing on rollback", async () => {
       const id = "11111111-1111-4111-8111-111111111111";
