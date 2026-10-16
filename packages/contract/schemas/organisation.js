@@ -65,6 +65,8 @@ const employeeCore = {
   start_date: isoDate,
   employment_type: EmploymentType,
   work_pattern: WorkPattern,
+  /** A consultant's or contractor's last day under contract; empty for permanent staff. */
+  contract_ends_on: isoDate.optional(),
   gender: Gender.optional(),
   date_of_birth: isoDate.optional(),
   next_of_kin_name: optionalText(150),
@@ -74,6 +76,8 @@ const employeeCore = {
 
 /** Restricted fields (field-masked, BACKEND_STRUCTURE §9.4). Optional on create. */
 const employeeRestricted = {
+  /** Masked as personal details (field-mask.js employee.personal). */
+  home_address: optionalText(300),
   bank_name: optionalText(100),
   account_number: z
     .string()

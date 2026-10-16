@@ -41,6 +41,14 @@
  *       profile and asks only for the work email, role and password. Refused
  *       on production: the production administrator is a real person.
  *
+ *   node scripts/db/create-admin.js --build-account --env=staging
+ *       The implementation team's login (BUILD_ACCOUNT below): a complete
+ *       employee record, role Implementation Team, suspended at handover. Asks
+ *       only for the work email and the password; neither is ever in the
+ *       repository (docs/runbooks/first-accounts.md).
+ *
+ *   --env=<name>          confirm the environment on the command line instead of
+ *                         typing it; refused unless it is this .env's APP_ENV
  *   --allow-additional    create another holder of a role that already has one
  *   --dry-run             validate and run the whole transaction, then roll back
  *
@@ -95,6 +103,8 @@ function parseArgs(argv) {
   const known = new Set([
     "from",
     "sample",
+    "build-account",
+    "env",
     "allow-additional",
     "dry-run",
     "help",
@@ -102,8 +112,10 @@ function parseArgs(argv) {
   for (const k of Object.keys(args)) {
     if (!known.has(k)) throw new Error(`Unknown option --${k}`);
   }
-  if (args.from && args.sample)
-    throw new Error("--from and --sample cannot be used together");
+  const sources = ["from", "sample", "build-account"].filter((k) => args[k]);
+  if (sources.length > 1)
+    throw new Error(`--${sources.join(" and --")} cannot be used together`);
+  if (args.env === true) throw new Error("--env needs the environment's name: --env=staging");
   return args;
 }
 
@@ -165,7 +177,9 @@ const FIELDS = [
     "work_pattern",
     `Work pattern (${contract.organisation.WORK_PATTERNS.join(", ")})`,
   ],
+  ["contract_ends_on", "Contract ends (YYYY-MM-DD, optional; consultants and contractors)"],
   ["date_of_birth", "Date of birth (YYYY-MM-DD, optional)"],
+  ["home_address", "Home address (optional)"],
   ["staff_number", "Staff number (optional, issued automatically when blank)"],
   ["gender", `Gender (${contract.organisation.GENDERS.join(", ")}, optional)`],
   ["next_of_kin_name", "Next of kin name (optional)"],
@@ -185,6 +199,47 @@ function sampleEmployee(workEmail) {
     start_date: new Date().toISOString().slice(0, 10),
     employment_type: "full_time",
     work_pattern: "on_site",
+  };
+}
+
+/**
+ * The implementation team's login: a complete employee record, held by the Implementation Team
+ * role for the length of the build and suspended at handover (docs/runbooks/first-accounts.md).
+ * The work email is typed at the terminal, never kept here. A two-month consultancy of
+ * N3,700,000, so N1,850,000 a month. The account number is ten zeros on purpose: it reaches no
+ * one, so no payment run can ever send money to a real account.
+ */
+const BUILD_ACCOUNT = Object.freeze({
+  role_code: "implementation",
+  is_ceo: false,
+  employee: Object.freeze({
+    first_name: "JBS Praxis",
+    last_name: "Team",
+    phone: "08027492738",
+    job_title: "Implementation Partner",
+    department_name: "Implementation",
+    start_date: "2026-10-09",
+    contract_ends_on: "2026-12-09",
+    employment_type: "consultant",
+    work_pattern: "remote",
+    gender: "male",
+    date_of_birth: "1990-03-12",
+    home_address: "14 Adeola Odeku Street, Victoria Island, Lagos",
+    next_of_kin_name: "JBS Praxis Office",
+    next_of_kin_phone: "08027492738",
+    next_of_kin_relationship: "Employer",
+    bank_name: "Zenith Bank",
+    account_number: "0000000000",
+    gross_monthly: "1850000.00",
+  }),
+});
+
+/** The build account's payload with the email typed at the terminal. */
+function buildAccount(workEmail) {
+  return {
+    role_code: BUILD_ACCOUNT.role_code,
+    is_ceo: BUILD_ACCOUNT.is_ceo,
+    employee: { ...BUILD_ACCOUNT.employee, work_email: workEmail },
   };
 }
 
@@ -398,6 +453,11 @@ async function main() {
       "--sample is refused on production. The production administrator is a real person.",
     );
   }
+  if (args.env !== undefined && args.env !== env) {
+    throw new Error(
+      `--env=${args.env} does not match this .env (APP_ENV=${env}). Nothing was written.`,
+    );
+  }
 
   const { pool } = require("../../src/config/db");
   const { atomically } = require("../../src/shared/db/tx");
@@ -413,6 +473,8 @@ async function main() {
     if (args.from) {
       const file = path.resolve(process.cwd(), String(args.from));
       payload = JSON.parse(fs.readFileSync(file, "utf8"));
+    } else if (args["build-account"]) {
+      payload = buildAccount(await term.ask("Work email"));
     } else {
       const employee = args.sample
         ? sampleEmployee(await term.ask("Work email"))
@@ -431,12 +493,15 @@ async function main() {
     console.log(
       `  ${e.first_name} ${e.last_name} <${e.work_email}>, ${e.job_title}, ${e.department_name}`,
     );
+    const contractTerm = e.contract_ends_on ? `, contract ${e.start_date} to ${e.contract_ends_on}` : "";
+    console.log(`  ${e.employment_type}, ${e.work_pattern}${contractTerm}`);
     console.log(`  role ${data.role_code}${data.is_ceo ? ", CEO" : ""}`);
     console.log(
       `  database environment ${env}${args["dry-run"] ? " (dry run, nothing kept)" : ""}`,
     );
 
-    const typed = await term.ask(`\nType "${env}" to continue`);
+    // --env=<name> is the same confirmation, given on the command line.
+    const typed = args.env === env ? env : await term.ask(`\nType "${env}" to continue`);
     if (typed !== env) {
       console.log("Cancelled. Nothing was written.");
       return;
@@ -482,4 +547,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createAdmin, sampleEmployee, MIN_PASSWORD };
+module.exports = { createAdmin, sampleEmployee, buildAccount, BUILD_ACCOUNT, parseArgs, MIN_PASSWORD };

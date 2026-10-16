@@ -15,7 +15,7 @@ const EMPLOYEE_COLUMNS = `
   e.dotted_manager_id, e.worksite_id, e.employment_type, e.work_pattern, e.status, e.start_date,
   e.created_at`;
 
-/** The columns an EmployeeCreate fills (migrations 0040 and 0110), in insert order. */
+/** The columns an EmployeeCreate fills (migrations 0040, 0110 and 0210), in insert order. */
 const INSERT_COLUMNS = [
   "staff_number",
   "first_name",
@@ -30,11 +30,13 @@ const INSERT_COLUMNS = [
   "employment_type",
   "work_pattern",
   "start_date",
+  "contract_ends_on",
   "gender",
   "date_of_birth",
   "next_of_kin_name",
   "next_of_kin_phone",
   "next_of_kin_relationship",
+  "home_address",
   "bank_name",
   "account_number",
   "gross_monthly",

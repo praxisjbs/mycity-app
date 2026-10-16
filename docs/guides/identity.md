@@ -248,3 +248,4 @@ only their own sessions on My Security. The exact grants are the seed matrix
   the four-city sign-in screen, Forgot, Reset and Welcome, My Security on the real API, Settings ·
   Users and Send Invite on the employee record.
 - 16/10/2026 · TB · Each contract schema names its table for gate 6 (`TABLES` in `identity.js`, `users.js`, `access.js`); the seed `0290` closes the database design's open decision on the role matrix.
+- 16/10/2026 · TB · `create-admin --build-account --env=<name>`: the build account's complete employee record is in the script; only the email and password are typed (`docs/runbooks/first-accounts.md`).

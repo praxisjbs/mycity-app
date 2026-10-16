@@ -90,7 +90,8 @@ templates · `0085` imports · `0090` tokens and secrets · `0095` AI ledger · 
 `0100` shared-layer columns · `0110` employee profile, dotted line, `org_seat` · `0120` foreign key
 indexes · `0130` `error_event.extra` · `0199` code lists, Saturday, staff numbers · `0200` sessions
 (last seen, how opened, device, end reason), credential links for invitations, a role's Home view
-and rank · `0290` the seven roles and their permission matrix (`docs/guides/identity.md` §8).
+and rank · `0210` `employee.home_address` and `contract_ends_on` · `0290` the seven roles and
+their permission matrix (`docs/guides/identity.md` §8).
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).

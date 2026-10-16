@@ -96,6 +96,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · `create-admin --build-account --env=<name>` makes the implementation team's
+  login with a complete employee record (JBS Praxis Team, consultant, remote, contract 09/10/2026 to
+  09/12/2026 at ₦1,850,000.00 a month, address, next of kin, bank); only the email and password are
+  typed, so neither is in the repository. `employee` gained `home_address` and `contract_ends_on`
+  (`0210`). Left: run it on staging and production (`docs/runbooks/first-accounts.md`).
 - 16/10/2026 · TB · Sign-in and sessions built (`docs/guides/identity.md`). Backend: migration
   `0200_identity_sessions.sql` and seed `0290_seed_roles_and_grants.sql` (the seven real roles with
   a home view and rank, and the grants matrix); `identity` (sign-in, refresh with rotation and reuse

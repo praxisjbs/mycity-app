@@ -1080,7 +1080,8 @@ exists (imported before the first login was made), the login is attached to that
 | `--sample` on production | The production administrator is a real person |
 
 It reads the server's own `.env`, so it only works where the database credentials already are, and
-it asks the operator to type the environment name before writing.
+it asks the operator to type the environment name before writing, or takes it as `--env=<name>`,
+refused unless it is that `.env`'s `APP_ENV`.
 
 ### 17.3 Staging and local
 
@@ -1088,6 +1089,12 @@ it asks the operator to type the environment name before writing.
 department "Administration") and asks only for the work email, role and password, so a developer
 gets a real employee record behind their login without typing twelve fields. `scripts/db/seed.js`
 calls the exported `createAdmin()` with the demonstration data.
+
+`--build-account` is the implementation team's login, on staging and production alike: the complete
+employee record is `BUILD_ACCOUNT` in the script (JBS Praxis Team, consultant, remote, a two-month
+contract, address, next of kin, pay, and a bank account of ten zeros that no payment can reach),
+role `implementation`. Only the work email and the password are typed; neither is in the
+repository. It is suspended at handover (`docs/runbooks/first-accounts.md`).
 
 ### 17.4 What it needs from the M0 modules
 
