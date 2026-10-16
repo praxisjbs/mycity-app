@@ -41,15 +41,56 @@ What each check means when it is not `up`:
 ## 2 · Errors that alert
 
 Every 5xx, every job that has used up its retries and every outbox event that has used up its
-attempts is written to the `error_event` table and, when `ALERT_WEBHOOK_URL` is set in the `.env`,
-posted to it as `{"text": "..."}` (a Slack-style incoming webhook). A validation failure (422) is
-recorded with severity `notice`, so form problems can be counted, and never alerts; other 4xx
-answers are only logged. The same fault is alerted once per five minutes, at most 20 alerts a
-minute, so the channel stays worth reading.
+attempts is written to the `error_event` table and sent to the alert channels. A validation
+failure (422) is recorded with severity `notice`, so form problems can be counted, and never
+alerts; other 4xx answers are only logged. The same fault is alerted once per five minutes, at most
+20 alerts a minute, so the channel stays worth reading. The nightly backup, the restore drill and
+the uptime probe (§5) alert through the same channels, so there is one place to watch.
 
-The same webhook carries the backup, restore drill and uptime alerts (§5), so one channel is
-the one place to watch. Set `ALERT_WEBHOOK_URL` in both `.env` files (`sudoedit /srv/mycity/<env>/shared/.env`), then
-restart that environment's units. Without it, errors are still recorded and logged.
+**The channels** (`src/shared/observability/alert.js`), either or both:
+
+| Setting | What it holds |
+|---|---|
+| `ALERT_WHATSAPP_URLS` | One WhatsApp link per person, separated by spaces. Each is a gateway's send link with `{text}` where the message goes. The team uses this one |
+| `ALERT_WEBHOOK_URL` | A Slack or Google Chat incoming webhook, if the team ever moves to one |
+
+WhatsApp has no webhook for groups, so each person gets the alerts in their own WhatsApp, from the
+gateway's number. A message is cut to 900 characters, and at most 5 go to a person in 10 minutes
+from one process, so a burst of faults cannot get the free gateway to block the number. The links
+carry API keys: they are secrets, and nothing ever prints them.
+
+**Set up WhatsApp, once per person** (GE, TB, whoever should be woken), with CallMeBot (free, for
+personal use):
+
+1. Check the bot's current number on callmebot.com (WhatsApp section; it changes), save it as a
+   contact, and send it on WhatsApp: `I allow callmebot to send me messages`.
+2. It replies with an API key. (If it says it is full, or nothing comes within 2 minutes and again
+   after 24 hours, use TextMeBot instead, about USD 1 a month per person: its link is
+   `https://api.textmebot.com/send.php?recipient=+234...&apikey=<key>&text={text}`.)
+3. Your link, with your number in international form and no spaces:
+   `https://api.callmebot.com/whatsapp.php?phone=+2348031234567&apikey=<key>&text={text}`
+4. Test it from your own computer (PowerShell), with `hello` in place of `{text}`:
+   `Invoke-RestMethod "https://api.callmebot.com/whatsapp.php?phone=+2348031234567&apikey=<key>&text=hello"`
+
+**Put the links where they are read:**
+
+- On the server, `sudoedit /srv/mycity/prod/shared/.env` and set
+  `ALERT_WHATSAPP_URLS=<GE's link> <TB's link>` (one line, a space between links, no quotes). The
+  `.env` files written before this setting existed have no such line: add it. Staging too if you
+  want its errors (`/srv/mycity/stg/shared/.env`). The backup and the drill read the file each run;
+  the API and the worker read it when they start, so restart them once the app is running:
+  `sudo systemctl restart mycity-api-prod mycity-worker-prod`.
+- In GitHub, the repository secret `ALERT_WHATSAPP_URLS` with the same value, for the uptime probe
+  (`docs/runbooks/github-settings.md`).
+
+Test from the server, without breaking anything:
+
+```
+sudo node /srv/mycity/bin/mycity-alert --settings=/srv/mycity/prod/shared/.env "MyCity alert test"
+```
+
+It prints `alert sent to 2 channel(s)` (one per link) and the message arrives. Without any channel
+set, errors are still recorded and logged.
 
 The latest faults, grouped (once migration 0030 exists):
 
@@ -88,7 +129,8 @@ curl -s -H "Authorization: Bearer <METRICS_TOKEN>" localhost:7000/api/metrics | 
 
 `ops/monitoring/uptime-probe.js` checks production the way a person reaches it: over HTTPS,
 through DNS, the firewall, nginx and TLS. `.github/workflows/uptime.yml` runs it from GitHub every
-10 minutes; it needs the repository secret `ALERT_WEBHOOK_URL` (`docs/runbooks/github-settings.md`).
+10 minutes; it alerts through the repository secret `ALERT_WHATSAPP_URLS` (§2,
+`docs/runbooks/github-settings.md`).
 
 | Host | Down when | Listed, not alerted |
 |---|---|---|
@@ -110,7 +152,7 @@ external uptime service at `https://hub.mycityapp.io/api/health/ready` as well; 
 gives the environment and certificate checks it does not.
 
 The server alerts on its own too: the nightly backup and the weekly restore drill post to
-production's `ALERT_WEBHOOK_URL` when they fail (`docs/runbooks/backup-restore.md`).
+production's alert channels (§2) when they fail (`docs/runbooks/backup-restore.md`).
 
 Also worth a look each week, on the server:
 

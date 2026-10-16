@@ -172,9 +172,10 @@ for e in "${ENVS[@]}"; do
   install -d -m 700 -o mycity-deploy -g mycity-deploy "/srv/mycity/backups/$e"
 done
 # The server's own tools, root-owned in /srv/mycity/bin: deploy-gate (CI's forced command), the
-# nightly backup and the restore drill (their timers are set up in step 10).
+# nightly backup and the restore drill (their timers are set up in step 10), and the alert sender
+# those two use.
 for tool in scripts/deploy/deploy-gate:deploy-gate scripts/db/backup.sh:mycity-backup \
-  scripts/db/restore-drill.js:mycity-restore-drill; do
+  scripts/db/restore-drill.js:mycity-restore-drill src/shared/observability/alert.js:mycity-alert; do
   if [[ -s "$REPO/${tool%%:*}" ]]; then
     install -m 755 -o root -g root "$REPO/${tool%%:*}" "/srv/mycity/bin/${tool##*:}"
     note "${tool##*:} installed"

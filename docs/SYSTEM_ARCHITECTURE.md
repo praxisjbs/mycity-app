@@ -408,7 +408,9 @@ seed guard.
   M11 rehearsal (MILESTONES §16) is a record, not an event.
 - **Uptime.** `ops/monitoring/uptime-probe.js` from outside the server (`.github/workflows/uptime.yml`
   every 10 minutes): both production hosts over HTTPS, `/api/health/ready`, the environment header
-  and the certificate's days left. Backup, drill and probe all alert through `ALERT_WEBHOOK_URL`.
+  and the certificate's days left. Errors, backup, drill and probe all alert through one sender
+  (`shared/observability/alert.js`): WhatsApp links per person (`ALERT_WHATSAPP_URLS`) and/or a
+  chat webhook (`ALERT_WEBHOOK_URL`).
 
 ---
 

@@ -192,14 +192,19 @@ plus round-trip and command-line tests in `tests/integration/worker.test.js` and
   `nightly-<time>.json` (with sha256). Media: `rsync --link-dest` snapshots. 14 of each. Offsite:
   `/etc/mycity/backup.env` `OFFSITE_TARGET`, always into `mycity-backups/` under it (so `--delete`
   cannot reach anything else), ssh with `BatchMode` and strict host keys; `rrsync` on the far side
-  recommended. Writes `backups/last-run.json`; failures alert production's `ALERT_WEBHOOK_URL`.
+  recommended. Writes `backups/last-run.json`; failures alert production's channels.
   No deploy lock is taken: the snapshot makes the head and counts consistent with the dump.
 - `scripts/db/restore-drill.js` (`/srv/mycity/bin/mycity-restore-drill`, Sundays 04:00): Node
   built-ins only; drops to the postgres user by spawn uid/gid (no runuser, no PAM); stdin is the
   dump opened as root. Exact counts against the record; live counts shown only. History in
   `backups/drills.jsonl`.
 - `ops/monitoring/uptime-probe.js` + `.github/workflows/uptime.yml` (every 10 minutes; state in
-  actions/cache; repository secret `ALERT_WEBHOOK_URL`). Public repo, so no Actions minutes.
+  actions/cache; repository secret `ALERT_WHATSAPP_URLS`). Public repo, so no Actions minutes.
+- Alerts (16 October, he chose WhatsApp): the team uses WhatsApp, which has no group webhook. One
+  sender, `src/shared/observability/alert.js`, used by the error reporter, the backup and drill
+  (installed as `/srv/mycity/bin/mycity-alert`) and the probe: `ALERT_WHATSAPP_URLS` (per-person
+  gateway links with `{text}`; CallMeBot free, TextMeBot if CallMeBot is full) and/or
+  `ALERT_WEBHOOK_URL`. Cut to 900 characters, 5 per person per 10 minutes, links never printed.
 - `provision.sh` installs the two tools and the four timer files, enables the timers, writes
   `/etc/mycity/backup.env` once. Needs a provisioning re-run on the server.
 - Runbooks rewritten or written: `backup-restore.md`, `monitoring.md` (also the three lines
@@ -243,7 +248,7 @@ only), real SMTP delivery, web push (M6).
   The release pipeline is built (15 October, in the cloud while he was away; see below). Before the
   first release: `docs/runbooks/deploy.md` §1 (two deploy keys, GitHub environments and
   variables, re-run provisioning with the keys), DNS and mail. Backups, the drill and the uptime
-  probe are built (§3.5c); the offsite host and `ALERT_WEBHOOK_URL` are his to provide.
+  probe are built (§3.5c); the offsite host and the WhatsApp links (`ALERT_WHATSAPP_URLS`) are his to provide.
 - Server 108.181.196.53 (fresh Ubuntu 24.04, 15 October): `ops/provision/provision.sh`, the four
   systemd units, both env templates, the nginx files and the deploy `authorized_keys` template are
   written (not yet run on the server; tested in the cloud: shellcheck, nginx config and live

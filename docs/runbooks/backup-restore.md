@@ -16,7 +16,7 @@ MILESTONES §16: a restore rehearsed from the backup into a scratch database).
 | Restore drill (§4) | Sundays 04:00 Lagos, `mycity-restore-drill.timer` | report in `/srv/mycity/backups/drills.jsonl` | every run |
 | Secrets (database passwords, encryption keys) | once, at provisioning | `/root/mycity-secrets/` | **never in the backups**: keep a copy yourself (§2) |
 
-A failed backup or drill posts to production's `ALERT_WEBHOOK_URL` and leaves its unit failed
+A failed backup or drill alerts production's channels (WhatsApp, `docs/runbooks/monitoring.md` §2) and leaves its unit failed
 (`systemctl --failed`). The drill also fails when the newest nightly is over 36 hours old, so a
 backup that silently stopped is found within a week.
 
@@ -62,7 +62,8 @@ that JBS Praxis or MyCity controls, with an encrypted disk: the dumps hold perso
 manager once, and again whenever provisioning adds one. Without the encryption keys a restored
 database cannot read its stored mailbox passwords and integration secrets.
 
-**Alerts.** `ALERT_WEBHOOK_URL` in production's `.env` (`docs/runbooks/monitoring.md` §2).
+**Alerts.** `ALERT_WHATSAPP_URLS` in production's `.env` (`docs/runbooks/monitoring.md` §2). The
+backup and the drill send through `/srv/mycity/bin/mycity-alert`, which provisioning installs.
 
 ## 3 · Take a backup now
 

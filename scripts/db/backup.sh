@@ -28,7 +28,8 @@
 #     OFFSITE_PORT=22
 #
 # Every run writes backups/last-run.json. On any failure the run carries on with the rest, exits 1
-# (the unit shows as failed) and posts one message to production's ALERT_WEBHOOK_URL.
+# (the unit shows as failed) and sends one alert through mycity-alert to production's channels
+# (ALERT_WEBHOOK_URL, ALERT_WHATSAPP_URLS: src/shared/observability/alert.js).
 #
 # The BK_* variables exist for the tests and nothing else.
 
@@ -45,7 +46,7 @@ PG_DUMP="${BK_PG_DUMP:-pg_dump}"
 PG_RESTORE="${BK_PG_RESTORE:-pg_restore}"
 PSQL="${BK_PSQL:-psql}"
 RSYNC="${BK_RSYNC:-rsync}"
-CURL="${BK_CURL:-curl}"
+ALERT="${BK_ALERT:-/srv/mycity/bin/mycity-alert}"
 SNAP_TIMEOUT="${BK_SNAP_TIMEOUT:-1800}" # seconds the row counts may take
 
 BACKUPS="$ROOT/backups"
@@ -261,15 +262,11 @@ offsite() {
 }
 
 alert() { # text
-  local url
-  url="$(env_value prod ALERT_WEBHOOK_URL)"
-  if [[ -z "$url" ]]; then
-    say "no ALERT_WEBHOOK_URL in production's .env: nobody is told about this failure"
+  if [[ ! -f "$ALERT" ]]; then
+    say "$ALERT is missing (re-run provisioning): nobody is told about this failure"
     return
   fi
-  jq -n --arg text "$1" '{text: $text}' |
-    "$CURL" -fsS --max-time 10 -H 'Content-Type: application/json' --data-binary @- "$url" >/dev/null ||
-    say "the alert could not be posted to ALERT_WEBHOOK_URL"
+  say "$(node "$ALERT" --settings="$ROOT/prod/shared/.env" "$1" 2>&1)"
 }
 
 # ---------------------------------------------------------------------------------------

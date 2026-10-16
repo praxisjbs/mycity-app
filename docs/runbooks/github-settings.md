@@ -44,9 +44,11 @@ Settings → Environments:
 
 Settings → Secrets and variables → Actions → Repository secrets:
 
-- [ ] `ALERT_WEBHOOK_URL`: the same incoming webhook as in production's `.env`. The uptime probe
-  (`.github/workflows/uptime.yml`) posts to it; nothing else in GitHub reads it. It is not a
-  production key, so it may be a repository secret.
+- [ ] `ALERT_WHATSAPP_URLS`: the same WhatsApp links as in production's `.env`
+  (`docs/runbooks/monitoring.md` §2). The uptime probe (`.github/workflows/uptime.yml`) sends
+  through them; nothing else in GitHub reads it. It is not a production key, so it may be a
+  repository secret.
+- [ ] `ALERT_WEBHOOK_URL`: only if the team also uses a Slack or Google Chat webhook.
 
 ## Collaborators
 

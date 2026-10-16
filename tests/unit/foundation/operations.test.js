@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Operations: the nightly backup, the restore drill and the uptime probe. The rules each one
+ * Operations: the alert sender, the nightly backup, the restore drill and the uptime probe. The rules each one
  * judges by are tested here without a network or a database; backup.sh's file handling (media
  * snapshots, keeping 14, the run record, failures) runs for real in a temporary folder. The
  * dump, restore and offsite round trip needs Postgres and SSH; docs/runbooks/backup-restore.md
@@ -14,9 +14,72 @@ const { spawnSync } = require("node:child_process");
 process.env.PROBE_RETRY_MS = "0";
 const drill = require("../../../scripts/db/restore-drill");
 const probe = require("../../../ops/monitoring/uptime-probe");
+const alert = require("../../../src/shared/observability/alert");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const BACKUP = path.join(ROOT, "scripts", "db", "backup.sh");
+const ALERT = path.join(ROOT, "src", "shared", "observability", "alert.js");
+
+describe("alert sender", () => {
+  beforeEach(() => alert.__reset());
+  const LINK = "https://api.callmebot.com/whatsapp.php?phone=+2348031234567&apikey=111&text={text}";
+  const LINK2 = "https://api.callmebot.com/whatsapp.php?phone=+2348039999999&apikey=222&text={text}";
+  function recorder(status = 200) {
+    const calls = [];
+    const fetchImpl = async (url, init = {}) => {
+      calls.push({ url, method: init.method || "GET", body: init.body });
+      return { ok: status < 300, status };
+    };
+    return { calls, fetchImpl };
+  }
+
+  test("WhatsApp links: one GET each, the message encoded where {text} is; the webhook gets JSON", async () => {
+    const { calls, fetchImpl } = recorder();
+    const r = await alert.send("DOWN hub & go: HTTP 502", { webhook: "https://hooks.example/x", whatsapp: `${LINK}  ${LINK2}`, fetchImpl });
+    expect(r).toEqual({ sent: 3, failed: [], skipped: [] });
+    expect(calls).toContainEqual({ url: "https://hooks.example/x", method: "POST", body: JSON.stringify({ text: "DOWN hub & go: HTTP 502" }) });
+    expect(calls.filter((c) => c.method === "GET").map((c) => c.url)).toEqual([
+      LINK.replace("{text}", "DOWN%20hub%20%26%20go%3A%20HTTP%20502"),
+      LINK2.replace("{text}", "DOWN%20hub%20%26%20go%3A%20HTTP%20502"),
+    ]);
+  });
+
+  test("a long message is cut for WhatsApp, not for the webhook", async () => {
+    const { calls, fetchImpl } = recorder();
+    await alert.send("x".repeat(3000), { webhook: "https://hooks.example/x", whatsapp: LINK, fetchImpl });
+    const sent = decodeURIComponent(calls.find((c) => c.method === "GET").url.split("&text=")[1]);
+    expect(sent).toHaveLength(alert.WHATSAPP_MAX_CHARS);
+    expect(sent.endsWith("…")).toBe(true);
+    expect(JSON.parse(calls.find((c) => c.method === "POST").body).text).toHaveLength(3000);
+  });
+
+  test("bad links are skipped by position, never printed; at most 5 per person per 10 minutes", async () => {
+    const { fetchImpl } = recorder();
+    const r = await alert.send("x", { whatsapp: "http://insecure.example/?k=SECRET&t={text} https://no-placeholder.example/?k=SECRET", fetchImpl });
+    expect(r.skipped).toEqual(["WhatsApp link 1 is not https", "WhatsApp link 2 has no {text}"]);
+    expect(alert.summary(r)).not.toMatch(/SECRET|example/);
+    const t0 = Date.parse("2026-10-16T09:00:00Z");
+    for (let i = 0; i < 5; i += 1) expect((await alert.send("x", { whatsapp: LINK, fetchImpl, now: t0 + i })).sent).toBe(1);
+    expect((await alert.send("x", { whatsapp: LINK, fetchImpl, now: t0 + 6 })).skipped).toEqual(["WhatsApp 1: more than 5 in 10 minutes"]);
+    expect((await alert.send("x", { whatsapp: LINK, fetchImpl, now: t0 + 10 * 60000 + 1 })).sent).toBe(1);
+  });
+
+  test("a gateway that refuses or is unreachable is reported, never thrown", async () => {
+    const refused = await alert.send("x", { whatsapp: LINK, fetchImpl: recorder(403).fetchImpl });
+    expect(refused).toEqual({ sent: 0, failed: ["WhatsApp 1 answered 403"], skipped: [] });
+    const down = await alert.send("x", { webhook: "https://hooks.example/x", fetchImpl: async () => { throw new TypeError("fetch failed"); } });
+    expect(down.failed).toEqual(["webhook: unreachable"]);
+    expect(alert.summary(await alert.send("x", {}))).toBe("no alert channel set: nobody was told");
+  });
+
+  test("the channels from an environment's .env", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mycity-alert-"));
+    const file = path.join(dir, ".env");
+    fs.writeFileSync(file, `DB_NAME=x\nALERT_WEBHOOK_URL=\nALERT_WHATSAPP_URLS=${LINK} ${LINK2}\r\n`);
+    expect(alert.channelsFromFile(file)).toEqual({ webhook: "", whatsapp: `${LINK} ${LINK2}` });
+    expect(alert.channelsFromFile(path.join(dir, "none"))).toEqual({ webhook: "", whatsapp: "" });
+  });
+});
 
 describe("restore drill", () => {
   test("arguments", () => {
@@ -130,7 +193,7 @@ const tools = process.platform !== "win32" && ["bash", "jq", "rsync"].every((t) 
   const run = (root, extra = {}) =>
     spawnSync("bash", [BACKUP], {
       encoding: "utf8",
-      env: { ...process.env, BK_ROOT: root, BK_CONF: path.join(root, "none.env"), ...extra },
+      env: { ...process.env, BK_ROOT: root, BK_CONF: path.join(root, "none.env"), BK_ALERT: ALERT, ...extra },
     });
 
   test("media is snapshotted with hard links, 14 kept; a database it cannot reach fails the run", () => {
@@ -143,7 +206,7 @@ const tools = process.platform !== "win32" && ["bash", "jq", "rsync"].every((t) 
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/FAILED: prod database: no DB_NAME/);
     expect(r.stdout).toMatch(/offsite: not set up/);
-    expect(r.stdout).toMatch(/no ALERT_WEBHOOK_URL in production's \.env/);
+    expect(r.stdout).toMatch(/no alert channel set: nobody was told/);
     const snaps = fs.readdirSync(media).sort();
     expect(snaps).toHaveLength(2);
     expect(snaps[0]).toBe("20261012T013000Z");
@@ -159,7 +222,7 @@ const tools = process.platform !== "win32" && ["bash", "jq", "rsync"].every((t) 
     expect(last.items.map((i) => `${i.kind}:${i.env}`)).toEqual(["media:prod", "media:stg"]);
 
     // The next night, an unchanged file is the same inode: it costs nothing.
-    const again = spawnSync("bash", ["-c", `sleep 1.1; BK_ROOT='${root}' BK_CONF=/none BK_ENVS=prod bash '${BACKUP}'`], { encoding: "utf8" });
+    const again = spawnSync("bash", ["-c", `sleep 1.1; BK_ROOT='${root}' BK_CONF=/none BK_ALERT='${ALERT}' BK_ENVS=prod bash '${BACKUP}'`], { encoding: "utf8" });
     expect(again.status).toBe(1);
     const latest = fs.readdirSync(media).sort();
     const [a, b] = latest.slice(-2).map((d) => fs.statSync(path.join(media, d, "docs", "a.pdf")).ino);

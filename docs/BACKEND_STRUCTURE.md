@@ -150,7 +150,7 @@ src/
 │   ├── ai/            manifest.js · registry.js · catalogue-sync.js · authorise.js ·
 │   │                  cite.js                                                   (§14)
 │   ├── route-map.js
-│   └── observability/ scrub.js · metrics.js · error-reporter.js
+│   └── observability/ scrub.js · metrics.js · error-reporter.js · alert.js
 │
 ├── services/
 │   ├── storage/       storage.service.js (local driver, keys per §1)

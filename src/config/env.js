@@ -22,6 +22,10 @@
  * so a developer's own file cannot change what a unit test sees.
  */
 const { z } = require("zod");
+// Its link check only: the alert sender requires nothing, so this adds no cycle.
+const { parseWhatsapp } = require("../shared/observability/alert");
+
+const whatsappProblems = (value) => parseWhatsapp(value).problems;
 
 /* ------------------------------------------------------------------ *
  * Value helpers
@@ -486,7 +490,16 @@ const ENTRIES = [
     str(""),
     {
       group: "Observability",
-      doc: "Where 5xx errors are posted. Empty: recorded in error_event and logged only.",
+      doc: "Slack or Google Chat webhook for alerts (5xx, backups, uptime). Empty: not used.",
+      secret: true,
+    },
+  ],
+  [
+    "ALERT_WHATSAPP_URLS",
+    str(""),
+    {
+      group: "Observability",
+      doc: "WhatsApp alert links, one per person, separated by spaces; each a gateway link with {text} where the message goes (docs/runbooks/monitoring.md §2). Empty: not used.",
       secret: true,
     },
   ],
@@ -561,6 +574,9 @@ function serverProblems(c) {
     out.push("ENCRYPTION_KEY must be 64 hex characters");
   else if (isServer && devValue("ENCRYPTION_KEY"))
     out.push("ENCRYPTION_KEY is the development value");
+
+  for (const p of whatsappProblems(c.ALERT_WHATSAPP_URLS))
+    out.push(`ALERT_WHATSAPP_URLS: ${p}`);
 
   if (!isServer) return out;
 

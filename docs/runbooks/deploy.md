@@ -19,7 +19,7 @@ ssh-keygen -t ed25519 -N "" -C "mycity production deploy" -f mycity-prod-deploy
 ```
 
 **2. Their public halves on the server.** Copy the two `.pub` files and the latest `ops/` and
-`scripts/` up (the script installs `scripts/deploy/deploy-gate` and the two backup tools from there), then
+`scripts/` up (the script installs `scripts/deploy/deploy-gate`, the backup tools and the alert sender from there), then
 run the provisioning script again with them. It writes `~mycity-deploy/.ssh/authorized_keys` from
 `ops/ssh/authorized_keys.template`, forcing each key into deploy-gate with its own `--key=`:
 
@@ -29,21 +29,21 @@ sudo STAGING_DEPLOY_KEY="$(cat mycity-staging-deploy.pub)" \
      LE_EMAIL=mycityapp09@gmail.com bash ~/ops/provision/provision.sh
 ```
 
-That run also installs `deploy-gate`, `mycity-backup` and `mycity-restore-drill` into
+That run also installs `deploy-gate`, `mycity-backup`, `mycity-restore-drill` and `mycity-alert` into
 `/srv/mycity/bin` and starts the backup timers.
 
 **3. GitHub** (repository Settings; TB or GE):
 
-| Where | Name | Value |
-|---|---|---|
-| Environment `staging` | secret `STAGING_SSH_KEY` | the whole private file `mycity-staging-deploy` |
-| Environment `staging` | deployment branches | `main` only |
-| Environment `production` | secret `PROD_SSH_KEY` | the whole private file `mycity-prod-deploy` |
-| Environment `production` | required reviewers | GE and TB; **prevent self-review** on |
-| Environment `production` | deployment branches | `main` only |
-| Repository variables | `DEPLOY_HOST` | `108.181.196.53` |
-| Repository variables | `DEPLOY_KNOWN_HOSTS` | the output of `ssh-keyscan -t ed25519 108.181.196.53` |
-| Repository secret | `ALERT_WEBHOOK_URL` | the alert webhook, for the uptime probe (`uptime.yml`); not needed to deploy |
+| Where                    | Name                     | Value                                                                        |
+| ------------------------ | ------------------------ | ---------------------------------------------------------------------------- |
+| Environment `staging`    | secret `STAGING_SSH_KEY` | the whole private file `mycity-staging-deploy`                               |
+| Environment `staging`    | deployment branches      | `main` only                                                                  |
+| Environment `production` | secret `PROD_SSH_KEY`    | the whole private file `mycity-prod-deploy`                                  |
+| Environment `production` | required reviewers       | GE and TB; **prevent self-review** on                                        |
+| Environment `production` | deployment branches      | `main` only                                                                  |
+| Repository variables     | `DEPLOY_HOST`            | `108.181.196.53`                                                             |
+| Repository variables     | `DEPLOY_KNOWN_HOSTS`     | the output of `ssh-keyscan -t ed25519 108.181.196.53`                        |
+| Repository secret        | `ALERT_WHATSAPP_URLS`    | the WhatsApp alert links (`monitoring.md` §2), for the uptime probe (`uptime.yml`); not needed to deploy |
 
 **4. Delete the two private files** from wherever they were made. GitHub has the only copies; a
 lost key is replaced by making a new pair and repeating steps 2 and 3.
@@ -54,12 +54,12 @@ configuration, which refuses to start without SMTP.
 
 ## 2 · What a release does
 
-| Job | What happens | Stops when |
-|---|---|---|
-| Build | `npm ci`, both frontends built, `release-manifest.js` packs the release with `RELEASE`, `BUILD.env` and `SHA256SUMS` | anything fails to build |
-| Deploy to staging | `deploy-gate stage <sha>`, tarball over SSH: checked against `SHA256SUMS`, `npm ci --omit=dev`, every dependency confirmed installed, `pg_dump` of `mycity_stg`, migrations, `current` switched, units restarted, readiness must report this sha | the tarball is from another commit or altered; install fails; a migration fails (code not switched); the new build does not come up (staging switched back to the previous release) |
-| Verify staging | `verify-staging.js` over HTTPS: readiness on this sha, no module skipped, migrations at head, both frontends, each host refusing the other's API, staging markers, HTTPS redirect and HSTS. Then `deploy-gate seal` writes `STAGING_VERIFIED` (the tree's hash) | any check fails: no seal, so nothing can be promoted |
-| Production | **waits for an approver** (GE or TB, not the person who merged). Then `deploy-gate promote`: seal present, under 7 days old, staging still on this sha, tree hash unchanged, not 21 December to 5 January; `pg_dump` of `mycity_prod`; the sealed tree hard-linked into production; migrations; switch; restart; readiness on this sha; tag `release-<date>-<sha>` | any of those checks; a production build that does not come up is switched back to the previous release |
+| Job               | What happens                                                                                                                                                                                                                                                                                                                                                       | Stops when                                                                                                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build             | `npm ci`, both frontends built, `release-manifest.js` packs the release with `RELEASE`, `BUILD.env` and `SHA256SUMS`                                                                                                                                                                                                                                               | anything fails to build                                                                                                                                                             |
+| Deploy to staging | `deploy-gate stage <sha>`, tarball over SSH: checked against `SHA256SUMS`, `npm ci --omit=dev`, every dependency confirmed installed, `pg_dump` of `mycity_stg`, migrations, `current` switched, units restarted, readiness must report this sha                                                                                                                   | the tarball is from another commit or altered; install fails; a migration fails (code not switched); the new build does not come up (staging switched back to the previous release) |
+| Verify staging    | `verify-staging.js` over HTTPS: readiness on this sha, no module skipped, migrations at head, both frontends, each host refusing the other's API, staging markers, HTTPS redirect and HSTS. Then `deploy-gate seal` writes `STAGING_VERIFIED` (the tree's hash)                                                                                                    | any check fails: no seal, so nothing can be promoted                                                                                                                                |
+| Production        | **waits for an approver** (GE or TB, not the person who merged). Then `deploy-gate promote`: seal present, under 7 days old, staging still on this sha, tree hash unchanged, not 21 December to 5 January; `pg_dump` of `mycity_prod`; the sealed tree hard-linked into production; migrations; switch; restart; readiness on this sha; tag `release-<date>-<sha>` | any of those checks; a production build that does not come up is switched back to the previous release                                                                              |
 
 Before approving: open `https://hub.staging.mycityapp.io`, check the top bar shows the release's
 short sha, walk the demo script for what this release touches, and approve with a comment naming
@@ -67,21 +67,20 @@ what was checked (SYSTEM_ARCHITECTURE §9.8).
 
 ## 3 · On the server
 
-| Path | What |
-|---|---|
-| `/srv/mycity/<stg\|prod>/releases/<sha>` | a release; the last 5 are kept per environment |
-| `/srv/mycity/<env>/current` | the running release (a link) |
-| `/srv/mycity/stg/releases/<sha>/STAGING_VERIFIED` | the seal |
-| `/srv/mycity/backups/<env>/predeploy-*.dump` | the dump taken before each deploy's migrations; the last 10 kept |
-| `~mycity-deploy/deploy-gate.log` | every command deploy-gate ran and what it refused |
+| Path                                              | What                                                             |
+| ------------------------------------------------- | ---------------------------------------------------------------- |
+| `/srv/mycity/<stg\|prod>/releases/<sha>`          | a release; the last 5 are kept per environment                   |
+| `/srv/mycity/<env>/current`                       | the running release (a link)                                     |
+| `/srv/mycity/stg/releases/<sha>/STAGING_VERIFIED` | the seal                                                         |
+| `/srv/mycity/backups/<env>/predeploy-*.dump`      | the dump taken before each deploy's migrations; the last 10 kept |
+| `~mycity-deploy/deploy-gate.log`                  | every command deploy-gate ran and what it refused                |
 
 `/srv/mycity/<env>` belongs to `mycity-deploy` (it switches `current`); `shared/.env` stays
 root's, readable only by the environment's group. Each release is readable by everyone who can
 reach it, and only that environment's group can reach it; production reads the staging-verified
 files through hard links.
 
-Where things stand, from the server: `sudo -u mycity-deploy env SSH_ORIGINAL_COMMAND=status
-/srv/mycity/bin/deploy-gate --key=staging`.
+Where things stand, from the server: `sudo -u mycity-deploy env SSH_ORIGINAL_COMMAND=status /srv/mycity/bin/deploy-gate --key=staging`.
 
 ## 4 · How it was tested
 

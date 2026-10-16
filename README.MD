@@ -173,7 +173,8 @@ src/
 │   ├── notifications/ categories · fanout
 │   ├── search/        provider · registry · search.service
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
-│   └── observability/ scrub · metrics · error-reporter
+│   └── observability/ scrub · metrics · error-reporter · alert (WhatsApp and webhook; also the
+│                      server's mycity-alert)
 ├── services/
 │   ├── storage/       storage.service
 │   ├── media/         image-pipeline · av-pipeline · scan · reconcile
