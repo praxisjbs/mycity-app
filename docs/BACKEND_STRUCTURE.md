@@ -252,7 +252,8 @@ src/
 
 **Not ported:** `tenant-context.js`, `host-tenent-resolver.js`, `platform-auth.js` (521 loc, A2);
 `api-version.js`; `public-head.js`; `feature-gate.js` (A4); praxis `services/workflow/executor`;
-`webauthn.service.js`; praxis's base64 upload path.
+praxis's base64 upload path. (`webauthn.service.js` was on this list until 16/10/2026, when TB
+decided to build passkeys with two-step sign-in and the PIN; REUSE_MAP §1.1.)
 
 ---
 
@@ -718,7 +719,7 @@ The module catalogue gate lists catalogue keys no route enforces yet as a note; 
 |---|---|---|
 | 0001 | `extensions.sql` | `pgcrypto`, `citext`, `pg_trgm`, `unaccent`, `vector` (pgvector, used M10; installed now so M10 is not a server change); `search_fold()`; `set_updated_at()` |
 | 0002 | `system.sql` | `system_marker`, `schema_migration` |
-| 0010 | `identity.sql` | `app_user` (incl. `mfa_secret_enc`, `mfa_enrolled_at` for M9), `user_session`, `known_device`, `password_reset` |
+| 0010 | `identity.sql` | `app_user` (incl. `mfa_secret_enc`, `mfa_enrolled_at`, used by the `security` module with the rest of two-step from `0220`), `user_session`, `known_device`, `password_reset` |
 | 0020 | `access.sql` | `role`, `user_role`, `permission`, `field_visibility`, `capability`, `user_capability` |
 | 0030 | `audit_events.sql` | `event_log`, `audit_ledger` (append-only trigger), `event_outbox`, `idempotency_key`, `error_event` |
 | 0040 | `organisation.sql` | `department`, `worksite` (geofence centre + radius, used M1), `employee` (+ `number`), `reporting_line` (effective-dated), team closure view |

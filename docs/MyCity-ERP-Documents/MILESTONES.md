@@ -396,7 +396,7 @@ navigation. The split is at the shell, so a screen is written once and laid out 
 | praxis-ls | `src/shared/http/`, `observability/` | 4,040 | As is |
 | praxis-ls | `src/middleware/` ×5 | ~1,100 | Keep auth, rbac, idempotency, error-handler, request-id |
 | praxis-ls | `src/services/search/provider.js` + registry | 70 | As is — gate 10 depends on it |
-| praxis-ls | `src/modules/security/{app_user,audit_ledger,permission,scope,capability,field_visibility}` | ~6,600 | Drop `webauthn.service.js` (584). Keep `known-device.js` — M1 needs it |
+| praxis-ls | `src/modules/security/{app_user,audit_ledger,permission,scope,capability,field_visibility}` | ~6,600 | Keep `known-device.js` — M1 needs it. **Amended 16/10/2026 (TB):** `webauthn.service.js` is ported after all, with two-step sign-in and the PIN, in the second sign-in PR (REUSE_MAP §1.1) |
 | praxis-ls | `mail/deliverability/route-check.js`, `dns-check.js` | 468 | DNS and SPF verification for M0's mail setup |
 | pixie | `src/shared/hr_payroll/lagos-time.js` | 35 | As is |
 | pixie | `src/utils/money.js` + `decimal.js` | — | Replaces Praxis's raw `numeric` arithmetic |
@@ -1115,7 +1115,9 @@ becomes a gate here.
 
 Configurable approval hierarchies, notification rules and terminology all resolve to data, editable
 from Settings. MFA (TOTP) enrolment and enforcement by role. Session and device management with
-remote kill. Audit log searchable by actor, entity, action and date.
+remote kill. Audit log searchable by actor, entity, action and date. **Amended 16/10/2026 (TB):**
+personal two-step enrolment (with passkeys and the PIN) is brought forward to the second sign-in
+PR in M0, on ESS · My Security; enforcement by role stays here, with Settings · Security.
 
 ### Definition of done
 

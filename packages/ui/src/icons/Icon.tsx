@@ -30,6 +30,7 @@ import {
   CircleHelp,
   CircleStop,
   Clock,
+  Copy,
   Download,
   EllipsisVertical,
   ExternalLink,
@@ -37,6 +38,7 @@ import {
   EyeOff,
   FileText,
   Filter,
+  FingerprintPattern,
   Flag,
   Globe,
   GripVertical,
@@ -45,6 +47,7 @@ import {
   Image,
   Info,
   Italic,
+  KeyRound,
   LayoutGrid,
   Link,
   List,
@@ -75,6 +78,7 @@ import {
   Settings,
   Share,
   Shield,
+  Smartphone,
   Sparkles,
   SquarePlus,
   Sun,
@@ -180,6 +184,10 @@ export const ICONS = {
   quote: Quote,
   undo: Undo2,
   redo: Redo2,
+  fingerprint: FingerprintPattern,
+  key: KeyRound,
+  copy: Copy,
+  phone: Smartphone,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

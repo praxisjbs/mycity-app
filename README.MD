@@ -257,6 +257,7 @@ check ownership, not the `settings` grant.
 | Module | Files beyond the template | Does |
 |---|---|---|
 | `identity` | | Login, refresh, logout, me, sessions, known devices |
+| `security` | `.mfa` (TOTP codes, recovery codes), `.passkeys` (WebAuthn), `.pin`, `.challenge` (single-use tickets), `.signin` (what `identity`'s sign-in calls) | Each person's two-step sign-in, passkeys and PIN, the fresh-sign-in check, Reset Two-Step (`docs/guides/identity.md`); came forward from M9 (TB, 16/10/2026) |
 | `access` | | Roles, grants, record scope, field visibility |
 | `audit` | | Audit ledger read |
 | `organisation` | `employee.import.js`, `employee-360.service.js` (M1) | Departments, employees, reporting lines; staff importer; employee 360 |
@@ -390,7 +391,7 @@ Chain for every request: requester, line manager, Operations, requisition, CEO, 
 | Module | Files beyond the template |
 |---|---|
 | `users` | `.invite` |
-| `security` | `.mfa` (TOTP), `.sessions` (remote kill), `.events` |
+| `security` | `.sessions` (remote kill); requiring two-step by role. The rest of the module is M0 (§5.3) |
 | `integrations` | |
 | `settings` | `settings.appearance.js` |
 

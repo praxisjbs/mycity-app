@@ -4,8 +4,8 @@
 |---|---|
 | Owner | TB |
 | Milestone | M0 |
-| Backend modules | `identity`, `users`, `access` |
-| Frontend paths | `app/src/auth/`, `app/src/features/ess/Security.tsx`, `app/src/features/shared/InviteToSignIn.tsx` |
+| Backend modules | `identity`, `security`, `users`, `access` |
+| Frontend paths | `app/src/auth/`, `app/src/features/ess/Security.tsx`, `app/src/features/shared/InviteToSignIn.tsx`, `app/src/api/mock/modules/security.ts` |
 | Permission key(s) | none for sign-in and the person's own security (own account); `settings` view, create, edit for Users |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
@@ -13,8 +13,8 @@
 
 Sources: MILESTONES §5.3 (brand on the sign-in screen), §14 (roles) and A2; BACKEND_STRUCTURE §11
 and §17; the session rules of the donor product (REUSE_MAP), chosen by TB on 16/10/2026. Two-step
-sign-in, passkeys and the PIN are the second sign-in PR (the `security` module) and are not in this
-guide yet.
+sign-in, passkeys and the PIN: TB's decisions of 16/10/2026 (REUSE_MAP §1.1, MILESTONES §5 and §14 as
+amended, DATABASE_SCHEMA §4), built in the second sign-in PR (the `security` module).
 
 ---
 
@@ -26,18 +26,26 @@ a desk left open does not stay signed in. People and Operations give an employee
 inviting them; the employee chooses their own password from the email. Nobody else ever sets or
 sees it.
 
+Besides the password, each person can add three ways in from My Security: **two-step sign-in** (a
+code from an authenticator app after the password or the PIN), **passkeys** (the device's
+fingerprint, face or screen lock, which count as both steps) and a four-digit **PIN** that unlocks the
+lock screen and signs in on a browser they have used before. Adding or removing one needs a fresh
+sign-in. When a phone with the authenticator is lost, a recovery code gets the person in once, and an
+administrator can reset their two-step from Settings · Users.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Sign In (`/`) | Staff app, signed out | Anyone | The four cities (Lagos, London, Accra, Nairobi) at their local time; the sign-in card | Sign in; Forgot Password |
+| Sign In (`/`) | Staff app, signed out | Anyone | The four cities (Lagos, London, Accra, Nairobi) at their local time; the sign-in card; on a browser the person has used, Use Passkey and Use PIN for the ways they have set up | Sign in with the password, a passkey or the PIN; Forgot Password |
+| Code step | Staff app, the sign-in card and the lock screen | A person with two-step on, on a browser that has not given a code lately | Their email, Sign-In Code (six boxes), Use Recovery Code | Enter the authenticator app's code or a recovery code; Back |
 | Forgot Password | Staff app, the sign-in card | Anyone | Email field | Send a reset link |
 | Reset and Welcome (`/reset?token=`, `/welcome?token=`) | Staff app, from an email | The person the link was sent to | Their email or first name; New Password, Confirm Password | Choose a password; ask for a new link when it has expired |
-| Lock screen | Over any staff screen | The signed-in person | Their name, email, why it locked; Password | Unlock; Sign Out |
-| ESS · My Security (`my-security`) | Staff app | Every employee, own account | Password (last changed), Signed In (live sessions), Recent Sign-Ins, Clock-In Devices link | Change Password; sign out one device; Sign Out Others; Open My Devices |
-| Settings · Users (`users`) | Staff app | `settings` view | Counts, the logins with status and roles, Users by Role | Invite User; per login: Save Roles, Resend Invitation, Send Reset Link, Sign Out Everywhere, Suspend, Reactivate |
+| Lock screen | Over any staff screen | The signed-in person | Their name, email, why it locked; the PIN when they have one, else Password; Use Passkey; the code step when two-step asks | Unlock with the PIN, a passkey or the password; Sign Out |
+| ESS · My Security (`my-security`) | Staff app | Every employee, own account | Password (last changed), Two-Step Sign-In (On or Off, Ask for a Code, recovery codes left), PIN (On or Off, when changed), Passkeys (name, added, last used, This Device), Signed In (live sessions), Recent Sign-Ins with the Method, Clock-In Devices link | Change Password; Set Up Two-Step, Change App, New Codes, Turn Off, how often it asks; Set PIN, Change PIN, Remove PIN; Add Passkey, rename or remove one; Confirm It's You when asked; sign out one device; Sign Out Others; Open My Devices |
+| Settings · Users (`users`) | Staff app | `settings` view | Counts, the logins with status, roles and two-step (desktop), Users by Role | Invite User; per login: Save Roles, Resend Invitation, Send Reset Link, Sign Out Everywhere, Reset Two-Step, Suspend, Reactivate |
 | People · Employees, the 360 | Staff app | `settings` create | Send Invite on the record header | Invite this employee to sign in |
-| The bell and email | Everywhere | The person concerned | Security notices | Read them; they cannot be switched off |
+| The bell and email | Everywhere | The person concerned | Security notices, including every way in added, changed or removed | Read them; they cannot be switched off |
 
 ## 3 · How the screens relate
 
@@ -68,6 +76,34 @@ sees it.
    `GET /auth/sessions`; a device is signed out with `POST /auth/sessions/:id/end`.
 8. **Administration.** Suspend ends every session and refuses sign-in after the right password;
    Reactivate lifts it. Send Reset Link and Sign Out Everywhere notify the person.
+9. **Two-step set-up.** My Security → Set Up Two-Step posts `POST /security/two-step/setup`: a new
+   key, kept encrypted as pending for 15 minutes, shown as a QR code and as text in groups of four.
+   Nothing changes until the first code from the app (`POST /security/two-step`) proves it: two-step
+   is on, ten recovery codes are made and shown once (only their hashes are kept), and every browser
+   must give a code at its next sign-in. Change App runs the same steps while the old app keeps
+   working until the new one is proved (`auth.two_step_changed`).
+10. **Signing in with two-step.** When two-step is on and this browser has not given a code within the
+    person's chosen time (every sign-in, once a day, once a month; once a day unless they choose),
+    `POST /auth/login` and `POST /auth/pin` answer `{ step: "code", challenge_token }` instead of a
+    session, and set no cookie. `POST /auth/two-step` takes the ticket with the app's code or a
+    recovery code, opens the session (`password_totp` or `pin_totp`) and trusts the browser for that
+    time.
+11. **The PIN.** Set, changed and removed on My Security. `POST /auth/pin` is the first step on a
+    browser this person has signed in on before (the device cookie), and the code follows when
+    two-step asks. The lock screen offers the PIN first when there is one.
+12. **Passkeys.** Add Passkey posts `POST /security/passkeys/options`, the browser makes the passkey
+    with the fingerprint, face or screen lock, and `POST /security/passkeys` checks it and keeps its
+    public key, named after the browser. To sign in or unlock, `POST /auth/passkey/options` (bound to
+    the email on the lock screen and on a known browser), the browser signs, and `POST /auth/passkey`
+    checks it and opens a `passkey` session: both steps at once, so no code.
+13. **Fresh sign-in.** Turning two-step on or off, how often it asks, new recovery codes, adding or
+    removing a passkey, and setting, changing or removing the PIN need the session to have signed in
+    or confirmed in the last 15 minutes. Past that the API answers 403 `REAUTH_REQUIRED`; the screen
+    asks Confirm It's You (`POST /security/confirm` with the password, the PIN or a passkey) and runs
+    the change again. A form asks before it opens, so its save is not refused.
+14. **Reset Two-Step.** Settings · Users → a login → Reset Two-Step (`settings` edit, a fresh sign-in,
+    never your own login): the key, the recovery codes and every browser's trust go, every session
+    ends, the person and the access watchers are told, and the person sets two-step up again.
 
 ## 4 · Data
 
@@ -77,16 +113,26 @@ sees it.
 | `user_session` | `user_id`, `refresh_token_hash`, `issued_at`, `expires_at`, `last_seen_at`, `method`, `known_device_id`, `device_label`, `ip_address`, `killed_at`, `end_reason` | `refresh_token_hash` is the hash of the current refresh token's id; idle is `now() - last_seen_at` |
 | `known_device` | `user_id`, `fingerprint_hash`, `label`, `platform`, `last_seen_at`, `last_ip` | The device cookie's hash; drives the New Sign-In notice and the greeting |
 | `password_reset` | `user_id`, `token_hash`, `purpose` (reset, invite), `expires_at`, `used_at`, `requested_by`, `requested_ip`, `source_event_id` (unique) | Only the hash is stored; one row per requesting event |
+| `app_user`, two-step and PIN | `mfa_secret_enc`, `mfa_enrolled_at`, `mfa_frequency`, `mfa_pending_secret_enc`, `mfa_pending_until`, `mfa_last_step`, `pin_hash`, `pin_changed_at`, `pin_failed_count`, `pin_last_failed_at`, `pin_window_started_at`, `pin_window_failures` | The key encrypted (`services/secrets`), the last step accepted so a code works once; the PIN's Argon2id hash and its wrong-try counts. Owned by `security` |
+| `mfa_recovery_code` | `user_id`, `code_hash`, `used_at` | Ten per person, Argon2id, each used once; a new set replaces the old |
+| `passkey` | `user_id`, `credential_id` (unique), `public_key`, `sign_count`, `transports`, `backed_up`, `label`, `known_device_id`, `last_used_at` | Never the private key; the browser it was added on marks This Device |
+| `spent_challenge` | `challenge_hash` (unique), `purpose`, `user_id`, `expires_at` | Each ticket between steps works once; rows a day past expiry are pruned |
+| `known_device.mfa_trusted_until`, `user_session.reauthenticated_at` | | How long a browser may skip the code; when the session last confirmed it was the person |
 | `role`, `user_role`, `role_permission` | `role.code`, `home_view`, `rank` | Seven roles (§8); the grants matrix |
 
-Schema migration: `migrations/0200_identity_sessions.sql`. Reference data:
+Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sign_in_methods.sql`
+(two-step, the PIN, passkeys; `user_session.method` gains `pin_totp`). Reference data:
 `seeds/reference/0290_seed_roles_and_grants.sql`.
 
 ## 5 · API
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `POST /api/v1/auth/login` | `LoginBody` → `Session` | anonymous | | Sets the refresh and device cookies; 10 failures per address in 15 minutes |
+| `POST /api/v1/auth/login` | `LoginBody` → `SignInResult` | anonymous | | A session (sets the refresh and device cookies), or the code step; 10 failures per address in 15 minutes |
+| `POST /api/v1/auth/two-step` | `CodeStep` → `Session` | anonymous, the code step's ticket | | 401 `INVALID_CODE`, counted with the password; 400 `CHALLENGE_USED`; 10 failures per address |
+| `POST /api/v1/auth/pin` | `PinSignIn` → `SignInResult` | anonymous, device cookie | | 401 `PIN_UNAVAILABLE` off a known browser; 429 `PIN_THROTTLED`; 10 failures per address |
+| `POST /api/v1/auth/passkey/options` | `PasskeyStart` → `PasskeyChallenge` | anonymous | | Optional email binds it to that person; 60 per address in 15 minutes |
+| `POST /api/v1/auth/passkey` | `PasskeySignIn` → `Session` | anonymous | | 401 `PASSKEY_UNKNOWN`, `PASSKEY_NOT_YOURS`, `PASSKEY_FAILED` |
 | `POST /api/v1/auth/refresh` | `EmptyBody` → `SessionTokens` | anonymous, refresh cookie | | Rotates the cookie |
 | `POST /api/v1/auth/logout` | `LogoutBody` → 204 | anonymous | | `reason: idle` records `inactivity_timeout` |
 | `GET /api/v1/auth/device` | → `DeviceAccount` | anonymous, device cookie | | Who last signed in on this browser |
@@ -99,6 +145,15 @@ Schema migration: `migrations/0200_identity_sessions.sql`. Reference data:
 | `GET /api/v1/auth/sessions` | `SignInListQuery` → `SignInPage` | own account | yes, 25 | Filter `status` (active, ended); sort `issued_at` |
 | `POST /api/v1/auth/sessions/end-others` | `EmptyBody` → `SessionsEnded` | own account | | |
 | `POST /api/v1/auth/sessions/:id/end` | `EmptyBody` → 204 | own account | | 422 for the current session |
+| `GET /api/v1/security` | → `SignInMethods` | own account | | Two-step, passkeys, PIN, and `confirmed_for` (seconds of the window left) |
+| `POST /api/v1/security/confirm/options`, `/confirm` | `EmptyBody` → `PasskeyChallenge`; `Confirm` → `Confirmed` | own account | | 10 per person in 15 minutes |
+| `POST /api/v1/security/two-step/setup` | `EmptyBody` → `TwoStepSetup` | own account, fresh | | |
+| `POST /api/v1/security/two-step` | `TwoStepTurnOn` → `RecoveryCodes` | own account | | 422 `INVALID_CODE`, `SETUP_EXPIRED` |
+| `POST /api/v1/security/two-step/off`, `/recovery-codes`, `/frequency` | `EmptyBody`, `EmptyBody`, `TwoStepFrequencySet` → `SignInMethods` or `RecoveryCodes` | own account, fresh | | |
+| `GET /api/v1/security/passkeys` | `PageQuery` → `PasskeyPage` | own account | yes, 25 | Newest first |
+| `POST /api/v1/security/passkeys/options`, `/passkeys` | `EmptyBody` → `PasskeyChallenge`; `PasskeyAdd` → `Passkey` (201) | own account; the options fresh | | 422 `PASSKEY_LIMIT` at 10; 409 `PASSKEY_TAKEN` |
+| `POST /api/v1/security/passkeys/:id/rename`, `/remove` | `PasskeyRename` → `Passkey`; `EmptyBody` → `SignInMethods` | own account; remove fresh | | |
+| `POST /api/v1/security/pin`, `/pin/remove` | `PinSet` → `SignInMethods`; `EmptyBody` → `SignInMethods` | own account, fresh | | 422 `WEAK_PIN` (the birthday is the server's check) |
 | `GET /api/v1/users` | `UserListQuery` → `UserPage` | `settings` view | yes, 25 | Filters `status`, `role`; sort `display_name`, `last_seen_at`, `created_at` |
 | `GET /api/v1/users/summary` | → `UsersSummary` | `settings` view | | |
 | `GET /api/v1/users/candidates` | `CandidateListQuery` → `CandidatePage` | `settings` view | yes, 25 | Employees with no login |
@@ -108,9 +163,12 @@ Schema migration: `migrations/0200_identity_sessions.sql`. Reference data:
 | `POST /api/v1/users/:id/roles` | `UserRolesSet` → `UserRow` | `settings` edit | | |
 | `POST /api/v1/users/:id/suspend`, `/reactivate` | `UserSuspend`, `EmptyBody` → `UserRow` | `settings` edit | | Never on your own login |
 | `POST /api/v1/users/:id/end-sessions` | `EmptyBody` → `UserSessionsEnded` | `settings` edit | | |
+| `POST /api/v1/users/:id/reset-two-step` | `EmptyBody` → `UserRow` | `settings` edit, fresh | | Never your own login; 422 `TWO_STEP_OFF` |
 | `GET /api/v1/access/roles` | `RoleListQuery` → `RolePage` | `settings` view | yes, 25 | Sort `rank`, `name` |
 
-Schemas: `packages/contract/schemas/identity.js`, `users.js`, `access.js`.
+Schemas: `packages/contract/schemas/identity.js`, `security.js`, `users.js`, `access.js`. "Fresh"
+means signed in or confirmed in the last 15 minutes (§6); past it the answer is 403
+`REAUTH_REQUIRED`, never a 401, which the app would read as an ended session.
 
 ## 6 · Rules and calculations
 
@@ -147,6 +205,56 @@ the same kind. Setting a password spends every open link and ends every session.
 **Logins:** no login without an employee; a person cannot suspend, reactivate or change the roles of
 their own login.
 
+**Two-step sign-in** (`security.mfa.js`, `security.signin.js`):
+
+- Codes are RFC 6238: HMAC-SHA-1 over 30-second steps, six digits, the key 20 random bytes in base32,
+  on `node:crypto` (checked against the RFC's test vectors). One step either side of now counts.
+- Each step is accepted once (`mfa_last_step`), so a code seen over a shoulder is already spent.
+- A wrong code counts with the wrong passwords (the same wait, and the sixth tells the person, "Several
+  wrong codes on your account"): whoever types it has the password.
+- How often a browser is asked: `every_sign_in`, `daily` (the default) or `monthly`, per browser
+  (`known_device.mfa_trusted_until`). Changing the rule, turning two-step on or moving to a new app
+  asks every browser again.
+- Recovery codes: ten, of ten characters from letters and numbers nobody misreads (no 0, O, 1, I or
+  L), shown once as XXXXX-XXXXX; case, spaces and the dash do not matter when typed. Argon2id, each
+  used once; using one tells the person how many are left.
+- The set-up key waits 15 minutes for its first code; until then nothing changes.
+- The ticket between the first step and the code lasts 5 minutes and works once (`spent_challenge`);
+  it is signed like the tokens but cannot be used as one.
+
+**Passkeys** (`security.passkeys.js`, `@simplewebauthn/server`):
+
+- The fingerprint, face or screen lock is required at creation and at every use (user verification
+  required). A passkey is both steps, so two-step does not ask for a code after it.
+- The relying party and origin come from `WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN` (hub.mycityapp.io,
+  hub.staging.mycityapp.io), never from the request; empty, they are the host of `STAFF_ORIGIN`.
+  Servers refuse an origin that is not https, or an ID the origin does not sit under.
+- Discoverable passkeys: signing in names no passkeys, so the options say nothing about who has one.
+  On the lock screen and a known browser the options are bound to the email, and another person's
+  passkey is refused.
+- The signature counter must rise; a passkey synced by a password manager reports 0 and is allowed.
+  The same device cannot add a second passkey for the same person. At most 10 per person.
+
+**The PIN** (`security.pin.js`, `weakPinReason` in the contract):
+
+- Four digits, Argon2id. Refused: one digit repeated, a run (1234, 9876), a repeated pair (1212), two
+  doubles (1122), the most common PINs, and the person's birthday (DDMM, MMDD, the year), which only
+  the server knows.
+- It signs in only on a browser this person has signed in on before (the device cookie); anywhere
+  else the answer is the same as for no PIN.
+- Wrong PINs cost what wrong passwords cost: 5 free, then a doubling wait to 15 minutes (the sixth
+  tells the person). 10 wrong in a row, or 20 in 30 days, switch the PIN off and tell the person;
+  the password still works.
+- `verifyPin` is the one check, for signing in, unlocking and confirming, and for attendance later.
+
+**Fresh sign-in** (`assertFresh`; `CREDENTIAL_ENROL_WINDOW_MIN`, 15): a session may add or remove a
+way in for 15 minutes after it signed in or last confirmed (`user_session.reauthenticated_at`).
+Renaming a passkey changes no way in and needs no window.
+
+**Reset Two-Step:** an administrator never receives a working factor for anyone: the reset removes
+the key, the recovery codes and every browser's trust and ends every session; the person sets
+two-step up again.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -160,9 +268,20 @@ their own login.
 | `auth.password_set` | A password chosen from a link | Notice after a reset |
 | `app_user.created`, `app_user.suspended`, `app_user.reactivated` | Users actions | Audit (sensitive) |
 | `access.roles_set` | Roles changed | Audit (sensitive); the grants cache is dropped |
+| `auth.two_step_started` | A set-up began | Audit |
+| `auth.two_step_on`, `auth.two_step_changed`, `auth.two_step_off` | Two-step turned on, moved to a new app, turned off | Notice to the person |
+| `auth.two_step_frequency_set` | How often it asks changed | Audit with the rule before and after; notice to the person |
+| `auth.recovery_codes_renewed`, `auth.recovery_code_used` | New codes; a code used to sign in | Notice to the person (how many are left) |
+| `auth.two_step_reset` | An administrator reset someone's two-step | Audit (sensitive); notice to the person and the access watchers |
+| `auth.passkey_added`, `auth.passkey_removed`, `auth.passkey_renamed` | My Security | Notice to the person on added and removed; audit with the label before and after on renamed |
+| `auth.pin_set`, `auth.pin_changed`, `auth.pin_removed` | My Security | Notice to the person |
+| `auth.pin_failed`, `auth.pin_throttled`, `auth.pin_switched_off` | Wrong PINs | Audit; notice at the sixth in a row and when the PIN is switched off |
+| `auth.reauthenticated` | Confirm It's You | Audit, with the way used |
 
 Every `auth.*`, `app_user.*` and `access.*` notice is in the Security category: by email too, and
-not something a person can switch off.
+not something a person can switch off. A way in added, changed or removed tells its owner even when
+they did it themselves, with "If this was not you". No key, code, PIN or credential reaches an event
+or the audit.
 
 ## 8 · Permissions and visibility by role
 
@@ -177,16 +296,19 @@ not something a person can switch off.
 | Staff (`employee`) | Their own records | Self-service |
 
 The CEO is a flag on the login (`is_ceo`) and holds every action. Every person sees and manages
-only their own sessions on My Security. The exact grants are the seed matrix
+only their own sessions, two-step, passkeys and PIN on My Security (`self` routes: no grant, only the
+caller's own login). Reset Two-Step needs `settings` edit and is never on your own login. Requiring
+two-step by role is M9 (Settings · Security). The exact grants are the seed matrix
 (`seeds/reference/0290_seed_roles_and_grants.sql`).
 
 ## 9 · AI and search
 
-- **AI reads**: none. Sign-in, sessions and logins are not something the assistant answers
-  (`// ai:none` on the controllers).
+- **AI reads**: none. Sign-in, sessions, logins, keys, codes, passkeys and the PIN are not something
+  the assistant answers (`// ai:none` on the controllers).
 - **AI routes**: none in these modules.
 - **Search** (`users.search.js`): logins by name and email, opening Settings · Users, for
-  `settings` view.
+  `settings` view. A person's own ways in are found on My Security, not searched (`// search:none`
+  on the security controller).
 
 ## 10 · On screen and mobile
 
@@ -194,21 +316,23 @@ only their own sessions on My Security. The exact grants are the seed matrix
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Sign In | The brand, "Every city. One team." and one line on MyCity App; the shown city's country, name, local time and day; the four cities with their times; the greeting (with the first name on a known browser), Email, Password, Forgot Password, Sign In | None | The session rules, the throttle and why the error never says which emails exist: §6 |
+| Sign In | The brand, "Every city. One team." and one line on MyCity App; the shown city's country, name, local time and day; the four cities with their times; the greeting (with the first name on a known browser), Email, Password, Forgot Password, Sign In; Use Passkey and Use PIN on a known browser | None | The session rules, the throttle and why the error never says which emails exist: §6 |
+| Code step and PIN | The email or the greeting; Enter Code with "From your authenticator app" or "One of your recovery codes"; Sign-In Code or Recovery Code; Enter PIN and PIN; Sign In, Back, Use Recovery Code or Use App Code, Use Password; the refusal in one line | None | Single use, the drift window, how often a browser is asked, the PIN's wait and switch-off: §6 |
 | Forgot Password | Reset Password, "We will email you a link.", Email, Send Link, Back; then Check Your Email with the address | None | How long a link lasts and that only an active login gets one: §6 |
 | Reset and Welcome | The email (reset) or "Welcome, first name" (invitation); New Password, Confirm Password, Save Password or Set Password; an expired link says so with Request New Link | None | The password rules beyond the field's own mark: §6 |
-| Lock screen | Session Locked, Session Ended or Signed Out; why in one line; the person's photo or initials, name and email; Password; Sign Out, Unlock | None | The idle and time limits and the server-side end: §3 step 5, §6 |
-| ESS · My Security | Password with when it was changed; Signed In (device, address, when; Sign Out per device; Sign Out Others); Recent Sign-Ins (When, Device, Address, Status); Clock-In Devices with Open My Devices | None | Why other sessions end on a password change, the reuse rule: §6 |
-| Settings · Users | Users, Active, Invited, Suspended, Signed In Now; the status chips; the list (person, roles, status, last seen); Users by Role; a login's detail with its actions | None | What each role grants: Settings · Roles & Permissions, §8 |
+| Lock screen | Session Locked, Session Ended or Signed Out (Enter Code at the code step); why in one line; the person's photo or initials, name and email; PIN or Password, or Sign-In Code; Sign Out, Use Passkey, Use Password or Use PIN, Use Recovery Code, Unlock | None | The idle and time limits and the server-side end: §3 step 5, §6 |
+| ESS · My Security | Password with when it was changed; Two-Step Sign-In with On or Off, Ask for a Code (Every Sign-In, Once a Day, Once a Month), the recovery codes left, Set Up Two-Step, New Codes, Change App, Turn Off; PIN with On or Off and when changed, Set PIN, Change PIN, Remove PIN; Passkeys (Name with This Device, Added, Last Used; Add Passkey; a passkey's sheet with Name, Save Name, Remove Passkey); Signed In (device, address, when; Sign Out per device; Sign Out Others); Recent Sign-Ins (When, Device, Method, Address, Status); Clock-In Devices with Open My Devices. In the set-up: the QR code, the key, one line to scan it, Code From App, Turn On; then the ten codes, one line to keep them, Copy Codes. Confirm It's You: Confirm With, Password or PIN, Confirm or Use Passkey | Two-Step Sign-In and PIN: what each is, behind the card title | Why other sessions end on a password change, the reuse rule, the window, how codes and passkeys are checked: §6 |
+| Settings · Users | Users, Active, Invited, Suspended, Signed In Now; the status chips; the list (person, roles, last seen, two-step, status); Users by Role; a login's detail with its actions, Reset Two-Step among them, and its confirmation in one sentence | None | What each role grants: Settings · Roles & Permissions, §8; what a reset removes: §6 |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Sign In | A short band with the city, its country and time (still), the brand on it; the form under it | The headline, the four city buttons, the moving drawing | Sign In, full width | None (signed out) |
-| Lock screen | The same card, its buttons full width and stacked | Nothing | Unlock, full width | None until unlocked |
-| ESS · My Security | Icon cards: Password, Signed In, Recent Sign-Ins, Clock-In Devices | The tables (each opens as cards in its sheet) | Change Password, full width in its sheet | Bottom bar Self-Service |
-| Settings · Users | The counts two to a row, the status chips, logins as person cards | Users by Role | Invite User; a login's actions in its sheet | More, Settings |
+| Code step and PIN | The same card as sign-in: the boxes 44 px, the number keyboard; a full code or PIN goes on its own | Nothing | Sign In, full width | None (signed out) |
+| Lock screen | The same card, its buttons full width and stacked: the PIN first when set, Use Passkey (the fingerprint or face) | Nothing | Unlock, full width | None until unlocked |
+| ESS · My Security | Icon cards: Password, Two-Step Sign-In, Passkeys, PIN, Signed In, Recent Sign-Ins, Clock-In Devices | The cards and tables (each opens in its sheet; tables as cards) | Change Password, Save PIN, Turn On, full width in their sheets; Add Passkey makes the phone's own passkey | Bottom bar Self-Service |
+| Settings · Users | The counts two to a row, the status chips, logins as person cards | Users by Role; the Two-Step column | Invite User; a login's actions in its sheet, stacked | More, Settings |
 
 ## 11 · Edge cases
 
@@ -227,6 +351,17 @@ only their own sessions on My Security. The exact grants are the seed matrix
 - **A reset link opened while signed in.** The link page opens anyway; afterwards the browser is
   back at Home.
 - **The email cannot be sent.** The request still answers the same; the email job retries.
+- **Lost phone with two-step on.** A recovery code signs in once; with none left, an administrator's
+  Reset Two-Step, after which the person sets it up again.
+- **Two requests with the same code or the same passkey answer.** Spending is a guarded update or a
+  unique insert in the transaction that opens the session, so one session opens and the other is
+  refused.
+- **The window passes while a form is open.** Forms that end in a change check the window before they
+  open; a change refused anyway opens Confirm It's You and runs again.
+- **A passkey cloned or replayed.** A counter that went back is refused; a replayed ticket is spent.
+- **The PIN on someone else's browser.** Refused the same way as no PIN: nothing says whether the
+  account has one.
+- **A PIN switched off after wrong tries.** The lock screen moves to the password and says why.
 
 ## 12 · Donor code
 
@@ -234,11 +369,12 @@ only their own sessions on My Security. The exact grants are the seed matrix
 |---|---|---|
 | praxis-ls | the session policy (ceiling, idle, rotation with reuse detection, cooldown instead of lockout, refresh cookie) | Settings in `.env`; no tenant; the idle lock ends the session on the server |
 | praxis-ls | the device cookie and the new-device notice | A notification in the Security category (bell and email) |
+| praxis-ls | two-step sign-in, recovery codes, passkeys (WebAuthn), the fresh-sign-in check (`assertFresh`) | No TOTP library (RFC 6238 on `node:crypto`); recovery codes hashed with Argon2id; passkeys require the fingerprint or face; single-use tickets in a table, not Redis; the PIN and how often two-step asks are new |
 
 ## 13 · Open questions
 
-- Two-step sign-in, passkeys and the PIN: the second sign-in PR (security module), with fresh-auth
-  checks on sensitive actions.
+- ~~Two-step sign-in, passkeys and the PIN~~: closed 16/10/2026, built in the second sign-in PR (the
+  `security` module, §3 steps 9 to 14, §6). Requiring two-step by role stays in M9.
 - The sign-in drawings are drawn, not photographs: image hosts were not reachable from the build.
   Licensed photographs can replace them through `CityShowcase` later; TB to decide.
 
@@ -249,3 +385,7 @@ only their own sessions on My Security. The exact grants are the seed matrix
   Users and Send Invite on the employee record.
 - 16/10/2026 · TB · Each contract schema names its table for gate 6 (`TABLES` in `identity.js`, `users.js`, `access.js`); the seed `0290` closes the database design's open decision on the role matrix.
 - 16/10/2026 · TB · `create-admin --build-account --env=<name>`: the build account's complete employee record is in the script; only the email and password are typed (`docs/runbooks/first-accounts.md`).
+- 16/10/2026 · TB · Two-step sign-in, passkeys and the PIN (the `security` module, migration `0220`):
+  the code step, PIN and passkey sign-in, the lock screen's PIN, passkey and code, My Security's
+  Two-Step Sign-In, PIN and Passkeys cards, Confirm It's You inside the 15-minute window, Reset Two-Step
+  on Settings · Users, the Method on Recent Sign-Ins (§2 to §11); §13's open question closed.

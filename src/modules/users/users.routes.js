@@ -1,7 +1,7 @@
 "use strict";
 /**
  * /api/v1/users: Settings · Users. Reading needs `settings` view; inviting needs
- * create; everything that changes a login (roles, suspension, links, sessions)
+ * create; everything that changes a login (roles, suspension, links, sessions, two-step)
  * needs edit. Nobody acts on their own login here: My Security is for that.
  */
 const express = require("express");
@@ -59,5 +59,9 @@ route(router, "post", "/:id/reset-link",
 route(router, "post", "/:id/end-sessions",
   { body: c.common.EmptyBody, response: c.users.UserSessionsEnded, summary: "Sign a login out everywhere" },
   edit, controller.endSessions);
+
+route(router, "post", "/:id/reset-two-step",
+  { body: c.common.EmptyBody, response: c.users.UserRow, summary: "Reset a login's two-step sign-in" },
+  edit, controller.resetTwoStep);
 
 module.exports = { basePath: "/users", surface: "staff", router };

@@ -4,6 +4,7 @@ import type { Status } from "@/api/types/performance";
 import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, refKey, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
+import { waysOf } from "./security";
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const admin = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
@@ -51,7 +52,7 @@ const roleRef = (code: string) => {
   const r = ACCESS_ROLES.find((x) => x.code === code)!;
   return { code: r.code, name: r.name };
 };
-type MockUser = UserRow & { role: string; mfa: boolean };
+type MockUser = Omit<UserRow, "two_step"> & { role: string; mfa: boolean };
 const USERS: MockUser[] = PEOPLE.slice(0, 22).map((p, i) => ({
   user_id: sid(`user:${p.user_key}`),
   employee_id: p.employee_id,
@@ -68,10 +69,11 @@ const USERS: MockUser[] = PEOPLE.slice(0, 22).map((p, i) => ({
   mfa: ["ifeoma", "cynthia", "amara"].includes(p.user_key),
 }));
 const out = (u: MockUser): UserRow => {
-  const { role: _role, mfa: _mfa, ...row } = u;
+  const { role: _role, mfa, ...row } = u;
   void _role;
-  void _mfa;
-  return row;
+  // The demonstration accounts' two-step is the security mock's, which My Security changes.
+  const key = u.email.split("@")[0];
+  return { ...row, two_step: SIGN_INS[key] ? waysOf(key).twoStep.on : mfa };
 };
 const userOf = (id: string) => USERS.find((x) => x.user_id === id);
 const settingsEditor = (u: string) => admin(u);
@@ -148,6 +150,15 @@ act("POST /api/v1/users/:id/reactivate", (u, _b, actor) => {
 act("POST /api/v1/users/:id/invite", (u) => (u.status === "invited" ? ok({ sent: true as const, email: u.email }) : fail(422, "ALREADY_ACTIVE", "This person has already chosen a password.")));
 act("POST /api/v1/users/:id/reset-link", (u) => (u.status === "suspended" ? fail(422, "NOT_ACTIVE", "Reactivate this login before sending a link.") : ok({ sent: true as const, email: u.email })));
 act("POST /api/v1/users/:id/end-sessions", () => ok({ ended: 2 }));
+act("POST /api/v1/users/:id/reset-two-step", (u, _b, actor) => {
+  if (u.employee_id === byKey(actor)!.employee_id) return fail(422, "NOT_ON_YOURSELF", "Use My Security for your own two-step sign-in.");
+  const key = u.email.split("@")[0];
+  if (!out(u).two_step) return fail(422, "TWO_STEP_OFF", "Two-step sign-in is not on for this login.");
+  if (SIGN_INS[key]) Object.assign(waysOf(key).twoStep, { on: false, since: null, codesLeft: 0, trustedUntil: 0 });
+  u.mfa = false;
+  audit(who(actor), "Two-step reset", `User · ${u.display_name}`, "On", "Off", "Sessions ended", "Settings");
+  return ok(out(u));
+});
 route("GET /api/v1/access/roles", (req) =>
   paged(
     ACCESS_ROLES.map((r) => ({ role_id: sid(`role:${r.code}`), code: r.code, name: r.name, description: r.description, users: USERS.filter((u) => u.status === "active" && u.roles.some((x) => x.code === r.code)).length })),

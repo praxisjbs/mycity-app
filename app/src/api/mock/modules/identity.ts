@@ -2,12 +2,14 @@ import type { Me, SignIn } from "@mycity/contract/contract.gen.ts";
 import { at, fail, invalid, mockSession, ok, noContent, paged, route } from "../core";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
 import { SEARCH_INDEX } from "../data/search";
+import { codeGiven, codeOk, markFresh, needsCode, passkeyOwner, waysOf } from "./security";
 
 /**
  * Identity, as packages/contract/schemas/identity.js describes it. The four
  * demonstration accounts sign in with any password of eight characters or more
  * (the sign-in screen offers them in mock mode); a suspended one is refused.
- * Sessions here last as long as the browser tab, not two hours.
+ * Two-step sign-in, the PIN and passkeys follow the security mock
+ * (./security.ts). Sessions here last as long as the browser tab, not two hours.
  */
 
 const ROLE: Record<string, { code: string; name: string }> = {
@@ -40,6 +42,18 @@ const clock = { expires_in: 900, session_expires_in: 7200, session_max_age: 7200
 const token = (key: string) => `mock.${key}.${Date.now().toString(36)}`;
 let lastOnThisBrowser: string | null = null;
 
+/** A session opens: on this browser, inside the window for changing a way in. */
+function begin(key: string) {
+  mockSession.set(key);
+  lastOnThisBrowser = key;
+  markFresh(key);
+  return ok({ access_token: token(key), ...clock, user: me(key) });
+}
+
+/** The first step passed: the code step when two-step asks for one, else the session. */
+const afterFirstStep = (key: string, via: "password" | "pin") =>
+  needsCode(key) ? ok({ step: "code" as const, challenge_token: `mock-code.${via}.${key}`, expires_in: 300 }) : begin(key);
+
 route(
   "POST /api/v1/auth/login",
   (req) => {
@@ -53,9 +67,55 @@ route(
     const person = byKey(key);
     if (!person || !email.endsWith("@mycityapp.io") || password.length < 8) return fail(401, "INVALID_CREDENTIALS", "That email and password do not match.");
     if (person.status === "suspended") return fail(403, "ACCOUNT_SUSPENDED", "This account is suspended. Contact People.");
-    mockSession.set(key);
-    lastOnThisBrowser = key;
-    return ok({ access_token: token(key), ...clock, user: me(key) });
+    return afterFirstStep(key, "password");
+  },
+  { anonymous: true },
+);
+
+route(
+  "POST /api/v1/auth/two-step",
+  (req) => {
+    const [kind, , key] = String(req.body.challenge_token ?? "").split(".");
+    if (kind !== "mock-code" || !key || !byKey(key)) return fail(400, "CHALLENGE_EXPIRED", "This request has expired. Start again.");
+    if (!codeOk(key, String(req.body.code ?? ""))) return fail(401, "INVALID_CODE", "That code is not right.", { code: ["Not the right code"] });
+    codeGiven(key);
+    return begin(key);
+  },
+  { anonymous: true },
+);
+
+route(
+  "POST /api/v1/auth/pin",
+  (req) => {
+    const key = String(req.body.email ?? "").trim().toLowerCase().split("@")[0];
+    const pin = waysOf(key).pin.value;
+    if (!byKey(key) || key !== lastOnThisBrowser || !pin) return fail(401, "PIN_UNAVAILABLE", "Use your password to sign in on this device.");
+    if (String(req.body.pin ?? "") !== pin) return fail(401, "INVALID_PIN", "That PIN is not right.", { pin: ["Not the right PIN"] });
+    return afterFirstStep(key, "pin");
+  },
+  { anonymous: true },
+);
+
+route(
+  "POST /api/v1/auth/passkey/options",
+  (req) => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const challenge = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const email = String(req.body.email ?? "").toLowerCase();
+    return ok({ challenge_token: `mock-passkey.${email}`, options: { challenge, rpId: location.hostname, timeout: 90000, userVerification: "required", allowCredentials: [] } });
+  },
+  { anonymous: true },
+);
+
+route(
+  "POST /api/v1/auth/passkey",
+  (req) => {
+    const found = passkeyOwner(String((req.body.credential as { id?: string } | undefined)?.id ?? ""));
+    if (!found) return fail(401, "PASSKEY_UNKNOWN", "This passkey is not on any account here. Use your password.");
+    const email = String(req.body.challenge_token ?? "").replace(/^mock-passkey\./, "");
+    if (email && byKey(found.key)!.work_email.toLowerCase() !== email) return fail(401, "PASSKEY_NOT_YOURS", "That passkey belongs to someone else.");
+    found.passkey.last_used_at = new Date().toISOString();
+    return begin(found.key);
   },
   { anonymous: true },
 );
@@ -82,7 +142,10 @@ route(
   "GET /api/v1/auth/device",
   () => {
     const p = lastOnThisBrowser ? byKey(lastOnThisBrowser) : null;
-    return ok({ account: p ? { email: p.work_email, display_name: p.display_name, first_name: p.first_name } : null });
+    const w = lastOnThisBrowser ? waysOf(lastOnThisBrowser) : null;
+    return ok({
+      account: p && w ? { email: p.work_email, display_name: p.display_name, first_name: p.first_name, has_pin: !!w.pin.value, has_passkey: w.passkeys.length > 0 } : null,
+    });
   },
   { anonymous: true },
 );
@@ -133,7 +196,7 @@ const SIGN_INS_OF = (key: string): SignIn[] => {
       session_id: id,
       device_label: device,
       ip_address: ip,
-      method: "password" as const,
+      method: (["password_totp", "passkey", "pin", "password"] as const)[i],
       issued_at: at(day, time),
       last_seen_at: at(day, time),
       status: active ? ("active" as const) : ("ended" as const),

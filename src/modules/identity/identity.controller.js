@@ -14,17 +14,35 @@ const service = require("./identity.service");
 
 const userAgentOf = (req) => String(req.headers["user-agent"] || "").slice(0, 400);
 
-async function login(req, res) {
-  const result = await service.login({
-    ...req.validated.body,
-    ip: req.ip,
-    userAgent: userAgentOf(req),
-    deviceToken: cookies.readDevice(req),
-  });
-  cookies.setRefresh(res, result.refresh.token, result.refresh.seconds);
-  cookies.setDevice(res, result.device);
+/** Who is signing in from where: the request's half of every way in. */
+const from = (req) => ({ ip: req.ip, userAgent: userAgentOf(req), deviceToken: cookies.readDevice(req) });
+
+/**
+ * Answer a sign-in step. A session sets the refresh and device cookies; the code
+ * step's ticket sets nothing, because nobody is signed in yet.
+ */
+function signedIn(res, result) {
+  if (result.refresh) {
+    cookies.setRefresh(res, result.refresh.token, result.refresh.seconds);
+    cookies.setDevice(res, result.device);
+  }
   return ok(res, result.body);
 }
+
+const login = async (req, res) =>
+  signedIn(res, await service.login({ ...req.validated.body, ...from(req) }));
+
+const twoStep = async (req, res) =>
+  signedIn(res, await service.twoStep({ ...req.validated.body, ...from(req) }));
+
+const pinSignIn = async (req, res) =>
+  signedIn(res, await service.pinSignIn({ ...req.validated.body, ...from(req) }));
+
+const passkeyOptions = async (req, res) =>
+  ok(res, await service.passkeyOptions({ email: req.validated.body.email || null }));
+
+const passkeySignIn = async (req, res) =>
+  signedIn(res, await service.passkeySignIn({ ...req.validated.body, ...from(req) }));
 
 async function refresh(req, res) {
   try {
@@ -90,6 +108,10 @@ const endOtherSessions = async (req, res) =>
 
 module.exports = {
   login,
+  twoStep,
+  pinSignIn,
+  passkeyOptions,
+  passkeySignIn,
   refresh,
   logout,
   me,

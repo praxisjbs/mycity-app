@@ -6,6 +6,7 @@ import "@/api/types/organisation";
 import type { AuditEntry, FailedLogin, Hierarchy, Numbering, Organisation, Session } from "@/api/types/settings";
 import type { UserRow } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
+import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ExportAction, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
@@ -149,6 +150,7 @@ function Users() {
           { key: "u", label: "User", render: (u) => <Who name={u.display_name} sub={u.email} /> },
           { key: "r", label: "Roles", render: (u) => (u.is_ceo ? ["CEO", ...u.roles.map((r) => r.name)] : u.roles.map((r) => r.name)).join(", ") },
           { key: "l", label: "Last Seen", render: (u) => (u.last_seen_at ? formatWhen(u.last_seen_at) : "Never"), desktop: true },
+          { key: "t", label: "Two-Step", render: (u) => (u.two_step ? "On" : "Off"), desktop: true },
           { key: "s", label: "Status", render: (u) => <Pill tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].text}</Pill> },
         ]}
       />
@@ -178,6 +180,8 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   const resend = useMutation("POST /api/v1/users/:id/invite");
   const reset = useMutation("POST /api/v1/users/:id/reset-link");
   const end = useMutation("POST /api/v1/users/:id/end-sessions");
+  const resetTwoStep = useMutation("POST /api/v1/users/:id/reset-two-step");
+  const fresh = useFreshSignIn();
   const self = me?.user_id === u.user_id;
   const reasonBad = reason != null && reason.trim().length < 6;
   const params = { id: u.user_id };
@@ -212,6 +216,24 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
             }}
           >
             Sign Out Everywhere
+          </Button>
+        )}
+        {!self && u.two_step && (
+          <Button
+            busy={resetTwoStep.pending}
+            onClick={async () => {
+              if (!(await confirm({ title: "Reset Two-Step", body: `${u.display_name} sets up their authenticator app again, and is signed out now.`, confirmLabel: "Reset Two-Step", destructive: true }))) return;
+              try {
+                if (!(await fresh.guard(() => resetTwoStep.run({ params, body: {} })))) return;
+                invalidate("/api/v1/users");
+                close();
+                toast("Two-step reset, signed out everywhere");
+              } catch (e) {
+                fail(e);
+              }
+            }}
+          >
+            Reset Two-Step
           </Button>
         )}
         {!self && u.status !== "suspended" && !u.is_ceo && (reason == null ? <Button onClick={() => setReason("")}>Suspend</Button> : <Button variant="danger" busy={suspend.pending} onClick={() => (reasonBad ? setTried(true) : void run(() => suspend.run({ params, body: { reason: reason.trim() } }), "Login suspended"))}>Confirm Suspend</Button>)}

@@ -46,7 +46,7 @@ export interface FormFooterProps {
 /** Buttons only. Desktop: Cancel left, the primary right. Phone: the primary full width at the bottom. */
 export function FormFooter({ children, className }: FormFooterProps) {
   return (
-    <div data-ui="form-footer" className={cn("mt-4 flex flex-col-reverse gap-2 desk:flex-row desk:justify-end phone:[&>*]:w-full", className)}>
+    <div data-ui="form-footer" className={cn("mt-4 flex flex-col-reverse gap-2 desk:flex-row desk:flex-wrap desk:justify-end phone:[&>*]:w-full", className)}>
       {children}
     </div>
   );

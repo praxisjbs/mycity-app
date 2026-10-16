@@ -2413,10 +2413,10 @@ A one-time code in separate boxes: each digit moves to the next, a pasted code f
 
 | | |
 |---|---|
-| Use | Sign-in verification and authenticator codes (Security, M9). |
+| Use | An authenticator app's code at sign-in, and a PIN (`secret`, 4 boxes): the lock screen, My Security. |
 | Avoid | Any other number (use NumberField). |
-| Phone | Each box is 44 px; the one-time-code keyboard offers the code from a text message. |
-| Accessibility | A group named by its label; each box says which digit it is; autocomplete one-time-code on the first box. |
+| Phone | Each box is 44 px; the number keyboard opens, and the one-time-code keyboard offers a code from a text message. |
+| Accessibility | A group named by its label; each box says which digit it is; autocomplete one-time-code on the first box; a secret code is never offered to a password manager. Inside a Field, the label names the first box and the error is linked to the group. |
 | Status | stable |
 | Exports | `OtpField` |
 | Import | `import { OtpField } from "@mycity/ui";` |
@@ -2434,9 +2434,13 @@ A one-time code in separate boxes: each digit moves to the next, a pasted code f
 | `length` | `number` |  | How many digits; 6. |
 | `state` | `FieldState` |  | The mark. |
 | `message` | `string` |  | Unused here (a Field around it shows it). |
+| `secret` | `boolean` |  | Dots in place of the digits, for a PIN. |
+| `onComplete` | `(value: string) => void` |  | Called with the code once every box is filled, to go on without a button press. |
+| `id` | `string` |  | The first box's id; a Field around it gives one. |
 
 ```tsx
-<OtpField label="Sign-In Code" value={code} onChange={setCode} />
+<OtpField label="Sign-In Code" value={code} onChange={setCode} onComplete={signIn} />
+<OtpField label="PIN" length={4} secret value={pin} onChange={setPin} />
 ```
 
 ### PersonPicker

@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "1bedc6890cb519e4ca6e47b67fe27204efe12392220c9d5aa30a1fe5e0d9c5a6",
-  "schemas": 64,
-  "endpoints": 25,
+  "source_hash": "5c3367ab1e3a30bf8a9953937ef9818a37e4eb2c42d79bccc36b69080cf0e60a",
+  "schemas": 92,
+  "endpoints": 45,
   "inputs": {
     "packages/contract/schemas/access.js": "7d76c2be101d7ce5288e6ee3c44e60a2db721644db7f0b55e33498a19027c2e6",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -28,7 +28,7 @@
     "packages/contract/schemas/expense_categories.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/expenses.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/goals.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/identity.js": "de969257b6862a8c4eda3925139256fbea0c5e14bce83a0b2ab0ba17bed586cd",
+    "packages/contract/schemas/identity.js": "4e474570e40a7a63df65f875c5c4d66dd5984317fd7c756418f03d08b140959e",
     "packages/contract/schemas/imports.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/integrations.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/interactions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -55,7 +55,7 @@
     "packages/contract/schemas/reviews.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/salary_structure.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/sanctions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/security.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/security.js": "9228345d8f5f2823668d8fa0a96d2c37f6c086897af91620443a5c081156659a",
     "packages/contract/schemas/settings.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/signatures.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/statutory.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -63,13 +63,14 @@
     "packages/contract/schemas/targets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/tasks.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/templates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/users.js": "1d943f696d4d8776aa345f15ada177356873c8b08b250f75687d1049917040ec",
+    "packages/contract/schemas/users.js": "07a02e6964c887eae06598cbec08a3836c3d95ef4c0d93410908f5e5097e5060",
     "packages/contract/schemas/vacancies.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/workflow.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/worksites.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/workspace.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "src/modules/access/access.routes.js": "b2701c9c63b01069e391675c0d49cd3ab308ecff22e2dbab8e6a77746e2bf4e5",
-    "src/modules/identity/identity.routes.js": "cdead488e870e9b1c066414a48f2c9989ec1bd6066df9aa4b6df45068149a7f3",
-    "src/modules/users/users.routes.js": "75e7542f718d182b4f33f9fdec1071aa2dbf6c9d1dccc1de14e77d3634e40bce"
+    "src/modules/identity/identity.routes.js": "ca3aba8c260243ef780e9a26207e513afa6b39a0e3e4af245bbda148c9270f15",
+    "src/modules/security/security.routes.js": "2148273cc406a5725539fcfb75ff74008a69e3bb40a0c939e1eaeb33c74f0f4f",
+    "src/modules/users/users.routes.js": "c9afad57eaa4e584a792f9a779b1eb995df49de8c891f23bce8f98e75a648b26"
   }
 }

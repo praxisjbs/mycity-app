@@ -48,6 +48,7 @@
   },
   "dependencies": {
     "@mycity/contract": "file:packages/contract",
+    "@simplewebauthn/server": "^13.3.3",
     "@socket.io/redis-adapter": "^8.3.0",
     "@socket.io/redis-emitter": "^5.1.0",
     "argon2": "^0.44.0",

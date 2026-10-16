@@ -13,6 +13,14 @@
  * the time of one Argon2 check, so neither the message nor the clock says which
  * emails have an account.
  *
+ * Two-step sign-in, the PIN and passkeys (the security module, security.signin.js):
+ * the password or the PIN is the first step; when two-step is on and this browser
+ * has not proved a code within the person's chosen time, the answer is a ticket for
+ * the code step instead of a session. A passkey is both steps at once. A wrong code
+ * counts like a wrong password. Whatever a step spends (the ticket, the code, a
+ * recovery code, the passkey's counter) is spent in the transaction that opens the
+ * session, so a replay opens nothing.
+ *
  * Writes run in one transaction with emit(); what follows (the link emails, the
  * notifications) runs in the worker after commit. Argon2 runs outside the
  * transaction: it is slow on purpose, and a connection must not wait on it.
@@ -36,6 +44,7 @@ const cookies = require("./identity.cookies");
 const { deviceLabel, platformOf } = require("./identity.device-label");
 const repo = require("./identity.repo");
 const { EVENTS } = require("./identity.events");
+const waysIn = require("../security/security.signin");
 
 const ARGON = Object.freeze({ type: argon2.argon2id });
 const RESET_LINK_MINUTES = 30;
@@ -177,22 +186,23 @@ async function failedSignIn(user, { email, ip, reason }) {
       });
       return;
     }
-    const count =
-      reason === "bad_password"
-        ? await repo.recordFailure(client, user.user_id)
-        : user.failed_login_count;
+    // A wrong code after the right password counts too: whoever typed it has the password.
+    const counted = reason === "bad_password" || reason === "bad_code";
+    const count = counted
+      ? await repo.recordFailure(client, user.user_id)
+      : user.failed_login_count;
     await emit(client, {
       key: EVENTS.AUTH_SIGN_IN_FAILED,
       entity: account(user.user_id),
       actor: { user_id: null, ip },
       payload: { reason, failed_count: count },
     });
-    if (reason === "bad_password" && count === throttle.FIRST_THROTTLED) {
+    if (counted && count === throttle.FIRST_THROTTLED) {
       await emit(client, {
         key: EVENTS.AUTH_SIGN_IN_THROTTLED,
         entity: account(user.user_id),
         actor: { user_id: null, ip },
-        payload: { failed_count: count },
+        payload: { failed_count: count, reason },
       });
     }
   });
@@ -200,9 +210,14 @@ async function failedSignIn(user, { email, ip, reason }) {
 
 /**
  * Open a session for a person whose credentials have already been checked.
+ *
+ * `trustDays`: the browser just proved a two-step code and may skip the next ones
+ * for this long (0: it may not). `within(client)` runs in the same transaction,
+ * after the session row: it spends what the sign-in used (a ticket, a code, a
+ * passkey's counter), and when it throws nothing is opened.
  * @returns {Promise<{body: object, refresh: {token: string, seconds: number}, device: string}>}
  */
-async function startSession(user, { ip, userAgent, deviceToken, method }) {
+async function startSession(user, { ip, userAgent, deviceToken, method, trustDays = 0, within = null }) {
   const label = deviceLabel(userAgent);
   const token = deviceToken || cookies.newDeviceToken();
   const remaining = policy.maxAgeSeconds();
@@ -218,6 +233,7 @@ async function startSession(user, { ip, userAgent, deviceToken, method }) {
       platform: platformOf(userAgent),
       ip,
     });
+    if (trustDays > 0) await repo.trustDevice(client, known.known_device_id, trustDays);
     await repo.recordSuccess(client, user.user_id);
     await repo.insertSession(client, {
       sessionId,
@@ -230,6 +246,7 @@ async function startSession(user, { ip, userAgent, deviceToken, method }) {
       method,
       seconds: remaining,
     });
+    if (within) await within(client);
     await emit(client, {
       key: EVENTS.AUTH_SIGNED_IN,
       entity: account(user.user_id),
@@ -310,18 +327,123 @@ async function login({ email, password, ip, userAgent, deviceToken }) {
   }
 
   // Only after the right password: a stranger cannot learn an account is suspended.
-  if (user.status !== "active") {
-    await failedSignIn(user, { email, ip, reason: `status_${user.status}` });
+  await refuseInactive(user, { email, ip });
+
+  return afterFirstStep(user, { via: "password", ip, userAgent, deviceToken });
+}
+
+/** A login that cannot sign in, told so only once a first step has passed. */
+async function refuseInactive(user, { email, ip }) {
+  if (user.status === "active") return;
+  await failedSignIn(user, { email, ip, reason: `status_${user.status}` });
+  throw new AppError(
+    "ACCOUNT_SUSPENDED",
+    user.status === "left"
+      ? "This account is closed."
+      : "This account is suspended. Contact People.",
+    403,
+  );
+}
+
+/**
+ * The password or the PIN was right. With two-step on, a browser that has not
+ * proved a code within the person's chosen time gets the code step; otherwise the
+ * session opens.
+ * @param {{via: "password"|"pin", ip?: string, userAgent?: string, deviceToken?: string|null, within?: Function}} ctx
+ */
+async function afterFirstStep(user, ctx) {
+  const two = await waysIn.twoStepOf(pool, user.user_id);
+  if (two.on) {
+    const trusted =
+      two.trustDays > 0 && ctx.deviceToken
+        ? await repo.deviceTrusted(pool, user.user_id, cookies.hashToken(ctx.deviceToken))
+        : false;
+    if (!trusted) return { body: waysIn.codeRequired(user.user_id, ctx.via) };
+  }
+  return startSession(user, { ...ctx, method: ctx.via });
+}
+
+/**
+ * POST /auth/two-step: the code after the password or the PIN, from the
+ * authenticator app or a recovery code. Throttled with the password: a wrong code
+ * here means someone has the password.
+ */
+async function twoStep({ challenge_token, code, ip, userAgent, deviceToken }) {
+  const claims = waysIn.readCodeTicket(challenge_token);
+  const user = await repo.findLoginById(pool, claims.sub);
+  if (!user || user.status !== "active")
+    throw new AppError("CHALLENGE_EXPIRED", "This request has expired. Start again.", 400);
+  const wait = throttle.waitSeconds(user);
+  if (wait > 0) {
+    await failedSignIn(user, { email: user.email, ip, reason: "throttled" });
+    throw new AppError("LOGIN_THROTTLED", `Too many attempts. Try again in ${throttle.sayWait(wait)}.`, 429);
+  }
+  const second = await waysIn.checkSecondStep(user.user_id, code);
+  if (!second) {
+    await failedSignIn(user, { email: user.email, ip, reason: "bad_code" });
+    throw waysIn.codeRefused();
+  }
+  const two = await waysIn.twoStepOf(pool, user.user_id);
+  return startSession(user, {
+    ip,
+    userAgent,
+    deviceToken,
+    method: `${claims.via}_totp`,
+    trustDays: two.trustDays,
+    within: async (client) => {
+      await waysIn.spendSecondStep(client, user.user_id, second, claims, actorOf(user, ip));
+      if (claims.via === "pin") await waysIn.pinUsed(client, user.user_id);
+    },
+  });
+}
+
+/**
+ * POST /auth/pin: the PIN in place of the password, only on a browser this person
+ * has signed in on before. An unknown email, no PIN and a browser that is not theirs
+ * all get the same answer.
+ */
+async function pinSignIn({ email, pin, ip, userAgent, deviceToken }) {
+  const unavailable = () =>
+    new AppError("PIN_UNAVAILABLE", "Use your password to sign in on this device.", 401);
+  const user = await repo.findLoginByEmail(pool, email);
+  if (!user || !deviceToken) throw unavailable();
+  if (!(await repo.knownDeviceOf(pool, user.user_id, cookies.hashToken(deviceToken)))) throw unavailable();
+  const r = await waysIn.verifyPin(user.user_id, pin, { ip, purpose: "sign_in" });
+  if (!r.ok) {
+    if (r.code === "PIN_UNAVAILABLE") throw unavailable();
     throw new AppError(
-      "ACCOUNT_SUSPENDED",
-      user.status === "left"
-        ? "This account is closed."
-        : "This account is suspended. Contact People.",
-      403,
+      r.code,
+      r.message,
+      r.code === "PIN_THROTTLED" ? 429 : 401,
+      r.code === "INVALID_PIN" ? { pin: ["Not the right PIN"] } : null,
     );
   }
+  await refuseInactive(user, { email, ip });
+  return afterFirstStep(user, {
+    via: "pin",
+    ip,
+    userAgent,
+    deviceToken,
+    within: (client) => waysIn.pinUsed(client, user.user_id),
+  });
+}
 
-  return startSession(user, { ip, userAgent, deviceToken, method: "password" });
+/** POST /auth/passkey/options. Bound to the email when one is given (the lock screen). */
+const passkeyOptions = ({ email }) => waysIn.passkeySignInOptions({ email });
+
+/** POST /auth/passkey: a passkey is both steps, so the session opens on a good answer. */
+async function passkeySignIn({ challenge_token, credential, ip, userAgent, deviceToken }) {
+  const found = await waysIn.checkPasskeySignIn({ challenge_token, credential });
+  const user = await repo.findLoginById(pool, found.userId);
+  if (!user) throw new AppError("PASSKEY_UNKNOWN", "This passkey is not on any account here. Use your password.", 401);
+  await refuseInactive(user, { email: user.email, ip });
+  return startSession(user, {
+    ip,
+    userAgent,
+    deviceToken,
+    method: "passkey",
+    within: (client) => waysIn.spendPasskey(client, found),
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -697,16 +819,56 @@ async function security(actor) {
   };
 }
 
-/** GET /auth/device: who last signed in on this browser, for the greeting. */
+/**
+ * GET /auth/device: who last signed in on this browser, for the greeting, and
+ * whether to offer their PIN or a passkey.
+ */
 async function device(deviceToken) {
   if (!deviceToken) return { account: null };
   const row = await repo.deviceAccount(pool, cookies.hashToken(deviceToken));
   return {
     account: row
-      ? { email: row.email, display_name: row.display_name, first_name: row.first_name }
+      ? {
+          email: row.email,
+          display_name: row.display_name,
+          first_name: row.first_name,
+          has_pin: row.has_pin === true,
+          has_passkey: row.has_passkey === true,
+        }
       : null,
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Proving it is still you (the security module's changes ask for it)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Seconds this session has left in which a way to sign in may be added or removed
+ * without confirming again: the window after signing in, or after confirming.
+ * @param {{query: Function}} db
+ * @param {{user_id: string, session_id: string}} actor
+ */
+async function confirmedFor(db, actor) {
+  const s = await repo.sessionProof(db, actor.session_id, actor.user_id);
+  if (!s) return 0;
+  return Math.max(0, Math.floor(policy.confirmWindowSeconds() - Number(s.proved_ago)));
+}
+
+/** The session proved who it is again (in the caller's transaction). */
+async function markReauthenticated(client, actor) {
+  if (!(await repo.markReauthenticated(client, actor.session_id, actor.user_id)))
+    throw new AppError("SESSION_ENDED", "This session has ended. Sign in again.", 401);
+}
+
+/** The device the session is on, or null. */
+async function sessionDevice(db, actor) {
+  const s = await repo.sessionProof(db, actor.session_id, actor.user_id);
+  return s ? s.known_device_id : null;
+}
+
+/** No browser of this person may skip the two-step code any more (in the caller's transaction). */
+const clearDeviceTrust = (client, userId) => repo.clearDeviceTrust(client, userId);
 
 /* ------------------------------------------------------------------ *
  * Accounts (create-admin, Settings · Users). Each takes the caller's client:
@@ -821,6 +983,14 @@ const afterSessionsEnded = (userId, sessionIds) => forget(userId, sessionIds);
 module.exports = {
   me,
   login,
+  twoStep,
+  pinSignIn,
+  passkeyOptions,
+  passkeySignIn,
+  confirmedFor,
+  markReauthenticated,
+  sessionDevice,
+  clearDeviceTrust,
   refresh,
   logout,
   changePassword,

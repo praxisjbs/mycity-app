@@ -306,6 +306,24 @@ const ENTRIES = [
       doc: "Refuse a new password found in known breaches (Have I Been Pwned range API: only 5 characters of a hash leave the server). Allows the password if the service is unreachable.",
     },
   ],
+  [
+    "WEBAUTHN_RP_ID",
+    str(""),
+    {
+      group: "Sign-in",
+      doc: "Passkeys belong to this host (the relying party ID): hub.mycityapp.io, or hub.staging.mycityapp.io on staging. Empty: the host of WEBAUTHN_ORIGIN.",
+      example: "hub.mycityapp.io",
+    },
+  ],
+  [
+    "WEBAUTHN_ORIGIN",
+    str(""),
+    {
+      group: "Sign-in",
+      doc: "The page origin a passkey must be used from, https on servers: https://hub.mycityapp.io, or https://hub.staging.mycityapp.io on staging. Empty: STAFF_ORIGIN.",
+      example: "https://hub.mycityapp.io",
+    },
+  ],
 
   // Secrets at rest
   [
@@ -610,7 +628,24 @@ function serverProblems(c) {
   for (const p of whatsappProblems(c.ALERT_WHATSAPP_URLS))
     out.push(`ALERT_WHATSAPP_URLS: ${p}`);
 
+  // A passkey made on one host cannot be used on another, so the two must agree.
+  let rpOrigin = null;
+  try {
+    rpOrigin = new URL(c.WEBAUTHN_ORIGIN);
+  } catch {
+    out.push("WEBAUTHN_ORIGIN must be a URL");
+  }
+  if (
+    rpOrigin &&
+    rpOrigin.hostname !== c.WEBAUTHN_RP_ID &&
+    !rpOrigin.hostname.endsWith(`.${c.WEBAUTHN_RP_ID}`)
+  )
+    out.push("WEBAUTHN_RP_ID must be WEBAUTHN_ORIGIN's host, or a domain it sits under");
+
   if (!isServer) return out;
+
+  if (rpOrigin && rpOrigin.protocol !== "https:")
+    out.push(`WEBAUTHN_ORIGIN must be https on ${c.APP_ENV}`);
 
   if (c.NODE_ENV !== "production")
     out.push(`NODE_ENV must be production on ${c.APP_ENV}`);
@@ -673,6 +708,17 @@ function parseEnv(source) {
         problems: ["DATABASE_URL is not a valid URL"],
         misparsed,
       };
+    }
+  }
+
+  // Passkeys belong to the staff app's host unless set otherwise; the default is right by
+  // construction, so a server whose .env predates these two settings keeps working.
+  if (!c.WEBAUTHN_ORIGIN) c.WEBAUTHN_ORIGIN = c.STAFF_ORIGIN;
+  if (!c.WEBAUTHN_RP_ID) {
+    try {
+      c.WEBAUTHN_RP_ID = new URL(c.WEBAUTHN_ORIGIN).hostname;
+    } catch {
+      c.WEBAUTHN_RP_ID = "";
     }
   }
 

@@ -1,7 +1,8 @@
 "use strict";
 /**
  * Identity's SQL: logins (app_user), sessions (user_session), devices
- * (known_device) and credential links (password_reset). Migrations 0010 and 0100.
+ * (known_device) and credential links (password_reset). Migrations 0010, 0200 and
+ * 0220. The two-step and PIN columns of app_user are security's (security.repo.js).
  *
  * Every function takes the client it runs on, so a caller inside atomically()
  * keeps the work in its transaction. Nothing here emits or decides; the service does.
@@ -309,12 +310,17 @@ function rememberDevice(db, { userId, hash, label, platform, ip }) {
   );
 }
 
-/** Who last signed in on this device (an active account only), for the sign-in screen. */
+/**
+ * Who last signed in on this device (an active account only), for the sign-in
+ * screen: and whether they have a PIN or a passkey to offer instead of the password.
+ */
 function deviceAccount(db, hash) {
   return one(
     db,
     `SELECT u.email::text AS email, e.first_name,
-            trim(e.first_name || ' ' || e.last_name) AS display_name
+            trim(e.first_name || ' ' || e.last_name) AS display_name,
+            (u.pin_hash IS NOT NULL) AS has_pin,
+            EXISTS (SELECT 1 FROM passkey p WHERE p.user_id = u.user_id) AS has_passkey
        FROM known_device k
        JOIN app_user u ON u.user_id = k.user_id
        JOIN employee e ON e.employee_id = u.employee_id
@@ -323,6 +329,79 @@ function deviceAccount(db, hash) {
       LIMIT 1`,
     [hash],
   );
+}
+
+/** This person's device, by its cookie's hash, unless it was revoked. */
+function knownDeviceOf(db, userId, hash) {
+  return one(
+    db,
+    `SELECT known_device_id FROM known_device
+      WHERE user_id = $1 AND fingerprint_hash = $2 AND revoked_at IS NULL`,
+    [userId, hash],
+  );
+}
+
+/** May this browser still skip the two-step code for this person? */
+async function deviceTrusted(db, userId, hash) {
+  return Boolean(
+    await one(
+      db,
+      `SELECT 1 AS x FROM known_device
+        WHERE user_id = $1 AND fingerprint_hash = $2 AND revoked_at IS NULL
+          AND mfa_trusted_until > now()`,
+      [userId, hash],
+    ),
+  );
+}
+
+/** This browser proved a code: it may skip the next ones for `days`. */
+function trustDevice(db, knownDeviceId, days) {
+  return db.query(
+    `UPDATE known_device SET mfa_trusted_until = now() + make_interval(days => $2), updated_at = now()
+      WHERE known_device_id = $1`,
+    [knownDeviceId, days],
+  );
+}
+
+/** No browser of this person skips the code any more. */
+function clearDeviceTrust(db, userId) {
+  return db.query(
+    `UPDATE known_device SET mfa_trusted_until = NULL, updated_at = now()
+      WHERE user_id = $1 AND mfa_trusted_until IS NOT NULL`,
+    [userId],
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Proving it is still you
+ * ------------------------------------------------------------------ */
+
+/**
+ * How long ago this live session last proved who it is (signed in, or confirmed
+ * since), and the device it is on. Null for a session that is not this person's or
+ * has ended.
+ */
+function sessionProof(db, sessionId, userId) {
+  return one(
+    db,
+    `SELECT EXTRACT(EPOCH FROM (now() - GREATEST(s.issued_at, COALESCE(s.reauthenticated_at, s.issued_at)))) AS proved_ago,
+            s.known_device_id
+       FROM user_session s
+      WHERE s.session_id = $1 AND s.user_id = $2 AND s.killed_at IS NULL`,
+    [sessionId, userId],
+  );
+}
+
+/** The session proved who it is again. Returns whether it is live. */
+async function markReauthenticated(db, sessionId, userId) {
+  const row = await one(
+    db,
+    `UPDATE user_session SET reauthenticated_at = now(), updated_at = now()
+      WHERE session_id = $1 AND user_id = $2 AND killed_at IS NULL
+      RETURNING session_id`,
+    [sessionId, userId],
+  );
+  return Boolean(row);
 }
 
 /* ------------------------------------------------------------------ *
@@ -415,6 +494,12 @@ module.exports = {
   hasDevices,
   rememberDevice,
   deviceAccount,
+  knownDeviceOf,
+  deviceTrusted,
+  trustDevice,
+  clearDeviceTrust,
+  sessionProof,
+  markReauthenticated,
   recentLink,
   closeOpenLinks,
   upsertLink,

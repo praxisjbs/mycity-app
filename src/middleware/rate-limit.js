@@ -13,6 +13,10 @@
  *   resetLimiter        reset links    per IP, 10 per 15 minutes
  *   changePasswordLimiter  password change, per signed-in person, 10 per 15 minutes
  *   deviceLimiter       sign-in greeting  per IP, 300 per 15 minutes
+ *   twoStepLimiter      the code step     per IP, failed attempts only, 10 per 15 minutes
+ *   pinLimiter          PIN sign-in       per IP, failed attempts only, 10 per 15 minutes
+ *   passkeyLimiter      passkey sign-in   per IP, every request, 60 per 15 minutes
+ *   confirmLimiter      confirming it is you, per signed-in person, 10 per 15 minutes
  *
  * Limiters are built when this file loads, but Redis connects later at boot, so
  * each limiter asks for its store on every call and uses Redis once it exists.
@@ -188,6 +192,37 @@ const deviceLimiter = makeLimiter({
   windowMs: 15 * 60_000,
 });
 
+/*
+ * The second step and the other ways in. Each account also waits on its own
+ * (identity.throttle.js, security.pin.js); these stop one machine trying many.
+ */
+const twoStepLimiter = makeLimiter({
+  name: "two-step",
+  max: 10,
+  windowMs: 15 * 60_000,
+  failuresOnly: true,
+});
+const pinLimiter = makeLimiter({
+  name: "pin",
+  max: 10,
+  windowMs: 15 * 60_000,
+  failuresOnly: true,
+});
+const passkeyLimiter = makeLimiter({
+  name: "passkey",
+  max: 60,
+  windowMs: 15 * 60_000,
+});
+
+/** Confirming it is you before a sign-in method changes: per person, after auth. */
+const confirmLimiter = makeLimiter({
+  name: "confirm",
+  max: 10,
+  windowMs: 15 * 60_000,
+  key: (req) =>
+    req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
+});
+
 module.exports = {
   initRateLimitStore,
   storeKind,
@@ -201,5 +236,9 @@ module.exports = {
   resetLimiter,
   changePasswordLimiter,
   deviceLimiter,
+  twoStepLimiter,
+  pinLimiter,
+  passkeyLimiter,
+  confirmLimiter,
   TOO_MANY,
 };

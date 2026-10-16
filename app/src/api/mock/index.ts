@@ -3,6 +3,7 @@
  * requests. Imported only when VITE_API_MODE=mock (api/client.ts).
  */
 import "./modules/identity";
+import "./modules/security";
 import "./modules/attendance";
 import "./modules/home";
 import "./modules/organisation";

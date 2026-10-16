@@ -121,7 +121,8 @@ const SessionTokens = z
 
 /**
  * GET /auth/device: who this browser last signed in as, so the sign-in screen
- * can greet them. Read from an HttpOnly cookie the server set; it grants nothing.
+ * can greet them and offer their PIN or passkey. Read from an HttpOnly cookie the
+ * server set; on its own it grants nothing.
  */
 const DeviceAccount = z
   .object({
@@ -130,6 +131,10 @@ const DeviceAccount = z
         email: z.string(),
         display_name: z.string(),
         first_name: z.string(),
+        /** They have a PIN, which signs in on this browser. */
+        has_pin: z.boolean(),
+        /** They have at least one passkey. */
+        has_passkey: z.boolean(),
       })
       .strict()
       .nullable(),
@@ -187,13 +192,20 @@ const EndReason = z.enum([
   "account_suspended",
 ]);
 
+/**
+ * How a session began: the password or the PIN, each with or without the two-step
+ * code after it (a recovery code counts as the code), or a passkey, which is both
+ * steps at once.
+ */
+const SignInMethod = z.enum(["password", "password_totp", "pin", "pin_totp", "passkey"]);
+
 /** One sign-in: a session, live or ended. */
 const SignIn = z
   .object({
     session_id: uuid,
     device_label: z.string(),
     ip_address: z.string().nullable(),
-    method: z.enum(["password", "pin", "passkey", "password_totp"]),
+    method: SignInMethod,
     issued_at: isoDateTime,
     last_seen_at: isoDateTime,
     status: SessionStatus,
@@ -307,6 +319,7 @@ module.exports = {
   ResetDone,
   SessionStatus,
   EndReason,
+  SignInMethod,
   SignIn,
   SignInListQuery,
   SignInPage,
