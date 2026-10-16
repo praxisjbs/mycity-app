@@ -33,6 +33,26 @@ jobs:
     # The screen gates and the a11y gate crawl the gallery and every app screen at two
     # sizes (about 7 minutes on a laptop); the margin keeps a slow runner from timing out.
     timeout-minutes: 30
+    # A real PostgreSQL 16 with pgvector and Redis, so the integration suite and gate 4's round
+    # trip run the shared layer against the real migrations on every PR (docs/MIGRATIONS.md §12).
+    # A throwaway database for CI only; nothing here is staging or production.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mycity
+          POSTGRES_PASSWORD: mycity
+          POSTGRES_DB: mycity_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mycity -d mycity_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - name: Check out (full history, the process gates diff against main)
         uses: actions/checkout@v4
@@ -56,9 +76,18 @@ jobs:
       - name: Chromium for the screen gates
         run: npx playwright install --with-deps chromium
 
+      # The integration suite transcodes voice notes and reads media durations.
+      - name: ffmpeg for the integration suite
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+
       - name: All gates
         run: npm run ci
         env:
           # Every gate script is built (gate 6 was the last), so a gate whose script is
           # empty fails the run instead of being reported as NOT BUILT.
           CI_STRICT: "1"
+          # Integration suite and gate 4's live round trip, against the services above.
+          RUN_DB_TESTS: "1"
+          APP_ENV: test
+          DATABASE_URL: postgres://mycity:mycity@127.0.0.1:5432/mycity_test
+          REDIS_URL: redis://127.0.0.1:6379/15

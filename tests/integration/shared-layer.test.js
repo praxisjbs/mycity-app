@@ -6,11 +6,10 @@
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration
  *
  * Refuses to run unless the database name ends in "_test": it drops and rebuilds the
- * public schema from fixtures/shared-layer.sql.
+ * public schema from the real migrations (helpers/schema.js).
  */
-const fs = require("node:fs");
-const path = require("node:path");
 const { config } = require("../../src/config/env");
+const schema = require("./helpers/schema");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
 const { defineEvents } = require("../../src/shared/events/catalogue");
@@ -56,13 +55,13 @@ const people = {};
 
 async function seed() {
   const emp = async (first, last, manager = null) =>
-    (await one("INSERT INTO employee (first_name, last_name, line_manager_id) VALUES ($1, $2, $3) RETURNING employee_id", [first, last, manager])).employee_id;
+    (await one(schema.sql.employee, [first, last, manager])).employee_id;
   const user = async (key, employeeId, isCeo = false) => {
-    const u = await one("INSERT INTO app_user (employee_id, email, is_ceo) VALUES ($1, $2, $3) RETURNING user_id", [employeeId, `${key}@mycity.test`, isCeo]);
+    const u = await one(schema.sql.user, [employeeId, `${key}@mycity.test`, isCeo]);
     people[key] = { user_id: u.user_id, employee_id: employeeId, is_ceo: isCeo, role_ids: [], display_name: key, email: `${key}@mycity.test` };
   };
   const role = async (code, perms) => {
-    const r = await one("INSERT INTO role (code) VALUES ($1) RETURNING role_id", [code]);
+    const r = await one(schema.sql.role, [code]);
     for (const [module, scope, actions] of perms) {
       await q(
         `INSERT INTO permission (role_id, module_key, scope, can_view, can_create, can_edit, can_delete, can_approve, can_export)
@@ -97,7 +96,7 @@ async function seed() {
   await grant("chidi", staff);
   await grant("dayo", hr);
   await grant("eze", clerk);
-  await q("INSERT INTO numbering_scheme (doc_type, prefix, padding) VALUES ('query', 'QRY', 4)");
+  await q("INSERT INTO numbering_scheme (doc_type, prefix, padding) VALUES ('query', 'QRY', 4) ON CONFLICT (doc_type) DO UPDATE SET prefix = EXCLUDED.prefix, padding = EXCLUDED.padding");
 }
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -107,7 +106,7 @@ describeDb("shared layer against Postgres", () => {
   let flakyFailures = 1;
 
   beforeAll(async () => {
-    await q(fs.readFileSync(path.join(__dirname, "fixtures", "shared-layer.sql"), "utf8"));
+    await schema.rebuild(pool, config.DB_NAME);
     await seed();
     outbox.register(EV.TEST_THING_CREATED, "test.record", async (event) => {
       ran.push(event.entity.id);
@@ -130,6 +129,15 @@ describeDb("shared layer against Postgres", () => {
     // open, rather than on the reporter's timer after the test environment is gone.
     await require("../../src/shared/observability/error-reporter").flush();
     await pool.end();
+  });
+
+  describe("error reporter", () => {
+    test("an error reported with no extra detail is recorded, not lost", async () => {
+      const reporter = require("../../src/shared/observability/error-reporter");
+      reporter.report(new Error("integration probe without extra"), { origin: "server", severity: "warning" });
+      await reporter.flush();
+      expect(await one("SELECT extra FROM error_event WHERE message = 'integration probe without extra'")).toEqual({ extra: null });
+    });
   });
 
   describe("emit", () => {
@@ -522,7 +530,7 @@ describeDb("shared layer against Postgres", () => {
       expect(row.number).toBe("QRY-0001");
       expect((await one("SELECT count(*)::int AS n FROM event_log WHERE entity_id = $1", [row.test_thing_id])).n).toBe(1);
       await expect(service.create({ name: "x", number: "QRY-9999" }, people.dayo)).rejects.toMatchObject({ code: "FIELD_NOT_WRITABLE" });
-      expect((await one("SELECT last_value FROM numbering_counter WHERE doc_type = 'query'")).last_value).toBe(1);
+      expect((await one("SELECT last_value::int AS last_value FROM numbering_counter WHERE doc_type = 'query'")).last_value).toBe(1);
       await service.create({ name: "Other", owner_employee_id: people.bola.employee_id }, people.dayo);
     });
 
