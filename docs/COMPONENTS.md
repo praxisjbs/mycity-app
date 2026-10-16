@@ -77,6 +77,12 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox. | stable |
 | Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
+| Charts | [AreaChart](#areachart) | `AreaChart` | A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter. | stable |
+| Charts | [BandChart](#bandchart) | `BandChart` | Salary bands: each grade's range on one scale, with its midpoint marked and its figures beside it. | stable |
+| Charts | [BarChart](#barchart) | `BarChart` | Figures side by side as bars: headcount by department, claims by month, interviews by stage. | stable |
+| Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
+| Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
+| Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
 | Shell | [BottomBar](#bottombar) | `BottomBar` | The phone's bottom bar: Home, Workspace, Community, Self-Service and More, each an icon with one word, within thumb reach (F16). | stable |
 | Shell | [Brand](#brand) | `Brand` | The MyCity pin mark, alone or with the name beside it, in the brand colours of the surface it sits on. | stable |
 | Shell | [ComingSoon](#comingsoon) | `ComingSoon` | The card a screen shows before its milestone opens it: the milestone and date, one line, and what the screen will do. | stable |
@@ -2268,6 +2274,218 @@ The row of controls above a list: its search box, filter selects and actions, wr
 
 ```tsx
 <Toolbar label="Employees"><SearchInput value={list.q} onChange={list.setQ} /></Toolbar>
+```
+
+## Charts
+
+### AreaChart
+
+A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter.
+
+| | |
+|---|---|
+| Use | One series over a run of days, weeks or months, where the shape matters more than each figure. |
+| Avoid | Comparing categories (use BarChart); one share of a whole (use DonutChart); a figure inside a table cell (use Sparkline). |
+| Phone | No caption; the drawing scrolls inside its own card, so the page never scrolls sideways. |
+| Accessibility | The drawing is hidden from screen readers and the frame reads every point as a label and a figure instead. |
+| Status | stable |
+| Exports | `AreaChart` |
+| Import | `import { AreaChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/AreaChart.tsx` |
+| Test | `packages/ui/src/charts/AreaChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/AreaChart.gallery.tsx` (`npm run gallery`, `#/AreaChart`) |
+
+**AreaChart** props (`AreaChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `values` | `number[]` | yes | The figures, in order; an empty set draws nothing. |
+| `labels` | `string[]` | yes | What each figure is (a date, a month), in the same order: the screen reader's list and the point's tooltip. |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row (a period filter). |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The drawing's accessible name, when there is no title or the title is not words. |
+| `series` | `Series` |  | Which of the six series to draw it in; 1 unless set. |
+| `bare` | `boolean` |  | Drop the grid lines, for a small strip inside a card. |
+| `format` | `(value: number) => string` |  | Formats a figure for the screen reader's list; the figure itself unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<AreaChart title="Attendance" labels={days} values={present} caption="Dips are Saturdays, a half day" />
+```
+
+### BandChart
+
+Salary bands: each grade's range on one scale, with its midpoint marked and its figures beside it.
+
+| | |
+|---|---|
+| Use | The salary structure, a grade's range against the band above and below it, a budget envelope per department. |
+| Avoid | A single figure per row (use Bars); comparing categories (use BarChart); working money out from the positions. |
+| Phone | The grade and its range stack, with the scale under the name, so nothing is squeezed; no caption. |
+| Accessibility | Each row is a term and its range in words, so the figures are read even though the bars are decorative. |
+| Status | stable |
+| Exports | `BandChart` |
+| Import | `import { BandChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/BandChart.tsx` |
+| Test | `packages/ui/src/charts/BandChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/BandChart.gallery.tsx` (`npm run gallery`, `#/BandChart`) |
+
+**BandChart** props (`BandChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `rows` | `BandChartRow[]` | yes | The grades, lowest first. |
+| `scale` | `string` |  | What the scale runs from and to, at the right of the title row ("₦0 to ₦5M"). |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The drawing's accessible name, when there is no title or the title is not words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<BandChart title="Salary Structure" scale="₦0 to ₦5M" rows={grades} />
+```
+
+### BarChart
+
+Figures side by side as bars: headcount by department, claims by month, interviews by stage.
+
+| | |
+|---|---|
+| Use | Comparing a handful of categories, where each figure matters as much as the shape. |
+| Avoid | A run of days (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars). |
+| Phone | No caption; the drawing scrolls inside its own card, so the page never scrolls sideways. |
+| Accessibility | The drawing is hidden from screen readers and the frame reads every bar as a label and a figure instead. |
+| Status | stable |
+| Exports | `BarChart` |
+| Import | `import { BarChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/BarChart.tsx` |
+| Test | `packages/ui/src/charts/BarChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/BarChart.gallery.tsx` (`npm run gallery`, `#/BarChart`) |
+
+**BarChart** props (`BarChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `bars` | `BarChartBar[]` | yes | The bars, left to right. |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row (a period filter). |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The drawing's accessible name, when there is no title or the title is not words. |
+| `series` | `Series` |  | The series every bar takes unless it names its own; 1 unless set. |
+| `colourPerBar` | `boolean` |  | A colour per bar, for categories that are not one measure (departments, stages). |
+| `format` | `(value: number) => string` |  | Formats a figure for the screen reader's list; the figure itself unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<BarChart title="Claims by Month" bars={months} caption="Approved claims only" />
+```
+
+### ChartFrame
+
+The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it.
+
+| | |
+|---|---|
+| Use | Inside a chart component, around its drawing; a screen uses the chart itself, not this. |
+| Avoid | Wrapping a chart in a second Card; a caption that explains how the figures are worked out (that is the guide's). |
+| Phone | No caption at all (gate 8), and a wide drawing scrolls inside the card rather than the page. |
+| Accessibility | The drawing is one image named by the title, and every value is also a hidden list, so a chart is never a dead end for a screen reader. |
+| Status | stable |
+| Exports | `ChartFrame` |
+| Import | `import { ChartFrame } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/ChartFrame.tsx` |
+| Test | `packages/ui/src/charts/ChartFrame.test.tsx` |
+| Gallery | `packages/ui/src/charts/ChartFrame.gallery.tsx` (`npm run gallery`, `#/ChartFrame`) |
+
+**ChartFrame** props (`ChartFrameProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words: what the chart measures. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row: a filter, a pill, a menu. |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only ("Dips are Saturdays, a half day"). |
+| `label` | `string` |  | The drawing's accessible name, when the title is not enough or there is no title. |
+| `values` | `ChartValue[]` |  | Every value the chart draws, read out in order by a screen reader. |
+| `children` | `ReactNode` | yes | The drawing. |
+| `scrolls` | `boolean` |  | The drawing scrolls inside the card on a narrow screen (a chart with many points). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ChartFrame title="Attendance" caption="14 working days" values={points}>{drawing}</ChartFrame>
+```
+
+### DonutChart
+
+A ring: one share of a whole with the figure in its middle, or a few slices that add up to it.
+
+| | |
+|---|---|
+| Use | On time against late and absent, goals met against set, a budget drawn against its total. |
+| Avoid | More than four slices (use BarChart); a figure over time (use AreaChart); a share nobody compares to a whole. |
+| Phone | The ring with its lines beneath it rather than beside, so nothing is squeezed; no caption. |
+| Accessibility | The ring is hidden from screen readers and the frame reads the figure and each slice as words. |
+| Status | stable |
+| Exports | `DonutChart` |
+| Import | `import { DonutChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/DonutChart.tsx` |
+| Test | `packages/ui/src/charts/DonutChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/DonutChart.gallery.tsx` (`npm run gallery`, `#/DonutChart`) |
+
+**DonutChart** props (`DonutChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `middle` | `string` | yes | The figure in the middle, already formatted ("77%", "14", "₦1.3M"). |
+| `under` | `string` |  | The word under it, lower case, at most 2 words ("on time"). |
+| `slices` | `DonutSlice[]` |  | The slices, in order. Pass these or `percent`. |
+| `percent` | `number` |  | One share of the whole, 0 to 100, when there are no slices to draw. |
+| `lines` | `ReactNode[]` |  | The lines beside the ring: one figure each, at most 20 words a line. |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row. |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The ring's accessible name, when there is no title; the title and the middle figure otherwise. |
+| `series` | `Series` |  | The ring's series when it draws one share; 1 unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<DonutChart title="On Time" percent={77} middle="77%" under="on time" lines={["37 on time", "4 late", "7 absent"]} />
+<DonutChart title="Goals Met" slices={[{ label: "Met", value: 14 }, { label: "Missed", value: 3 }]} middle="14" under="met" />
+```
+
+### Sparkline
+
+A bare trend line with no axes, for inside a table cell or beside a figure.
+
+| | |
+|---|---|
+| Use | A KPI's own short trend, a per-row trend in a wide table, a goal's progress over its quarter. |
+| Avoid | Anywhere a person has to read a figure off it (use AreaChart); fewer than three points; a caption or a title. |
+| Phone | The same line, sized by the card it sits in; it carries no text of its own. |
+| Accessibility | One image named by what it trends, with its first and last figure in the name, so the direction is readable. |
+| Status | stable |
+| Exports | `Sparkline` |
+| Import | `import { Sparkline } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/Sparkline.tsx` |
+| Test | `packages/ui/src/charts/Sparkline.test.tsx` |
+| Gallery | `packages/ui/src/charts/Sparkline.gallery.tsx` (`npm run gallery`, `#/Sparkline`) |
+
+**Sparkline** props (`SparklineProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `values` | `number[]` | yes | The figures, in order; at least two. |
+| `label` | `string` | yes | What it trends, Title Case, at most 3 words: its accessible name. |
+| `series` | `Series` |  | Which of the six series to draw it in; 1 unless set. |
+| `className` | `string` |  | Layout classes only (width). |
+
+```tsx
+<Sparkline label="Attendance" values={[18, 21, 22, 20, 24]} />
 ```
 
 ## Shell
