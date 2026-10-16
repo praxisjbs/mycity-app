@@ -75,7 +75,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☑ | 14/10/2026 |
 | M0 migrations and reference seed 0001 to 0099 | LA | ☑ | 16/10/2026 |
 | Staging seed data | LA | ☐ | |
-| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE | ☐ | 16/10/2026 |
+| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE · TB | ☐ | 16/10/2026 |
 | Sign-in and sessions: `identity`, `access`, `users`; session rules, lock screen, credential links, the seven roles, the four-city sign-in screen (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | Two-step sign-in, passkeys and the PIN: the `security` module, the code step, PIN and passkey sign-in, the lock screen's PIN and passkey, the fresh-sign-in window, Reset Two-Step (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
@@ -97,6 +97,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · `docs/guides/foundation.md`: the rest of M0 and the foundation in four tracks (A
+  people and the staff roster, B imports and documents, C access, settings and audit, D workflow and
+  search), with TB's twenty decisions of 16/10/2026. TB claims the remaining M0 modules from GE's row
+  (GE reviews). The repository is private; MyCity's staff sheet and role map go into `seeds/staff/`
+  with track A and load on staging and production with each deploy (the one exception to
+  "production is never seeded"). CLAUDE.md gains that exception and the rule that search reaches every screen,
+  action and record type. Left: the four tracks; the people tasks in the guide's §1.2.
 - 16/10/2026 · TB · The bell on the real API, one of the nine M0 modules: `notifications`
   (`GET /notifications` at 25 a page with a `status` filter, `/unread-count`, `/badges`, `POST
   /notifications/:id/read` and `/read-all`), the caller's own rows only. Badges count unread

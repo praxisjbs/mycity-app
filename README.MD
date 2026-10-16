@@ -63,6 +63,9 @@ mycity-app/
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
+├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
+│                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
+│                             16/10/2026; docs/guides/foundation.md §6.1). The repository is private
 ├── templates/documents/      PDF templates (HTML)
 ├── templates/email/          mail templates (HTML)
 ├── templates/import/         import template definitions
