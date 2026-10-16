@@ -121,9 +121,13 @@ The rule from the 12 October meeting, for every table, list, card grid, picker a
 - Every list response is `{ data, page: { number, size, total, pages, has_next } }`. The shared
   pager reads `page`; show the true total ("312 employees"), never "showing 25". The pager is the
   only place the total appears; never a sentence explaining the page size.
-- **Search and filters go to the server** (`q` and the list's filter params). Never filter or sort
-  the 25 rows you have and present the result as the whole list: that is the praxis-ls bug where a
-  search said "no results" for records on page 4.
+- **Search, filters and sort go to the server** (`q`, the list's filter params, and one `sort`).
+  Never filter or sort the 25 rows you have and present the result as the whole list: that is the
+  praxis-ls bug where a search said "no results" for records on page 4.
+- **Sort is one key** (F20): the field name, with a leading `-` for descending (`?sort=-due_on`).
+  The list's contract schema allow-lists the fields, so a field it does not name is a 422. `DataView`
+  sends it for you: a sortable column's header cycles ascending, descending, none, and changing it
+  goes back to page 1.
 - Infinite scroll on mobile is the same API: fetch `page + 1` when `has_next`.
 - Never fetch "all" of anything to build a dropdown. Pickers search the server and show the first
   page.

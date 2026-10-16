@@ -75,7 +75,10 @@ const Thing = z.object({
   created_at: z.string(),
 }).strict();
 
-const ThingListQuery = listQuery({ status: z.enum(["open", "closed"]).optional() });
+const ThingListQuery = listQuery(
+  { status: z.enum(["open", "closed"]).optional() },
+  ["due_on", "title", "created_at"],            // the fields a caller may sort by (F20)
+);
 const ThingPage = Paged(Thing);
 const ThingCreate = z.object({ title: text(150), due_on: isoDate }).strict();
 
@@ -181,8 +184,11 @@ rolled-back transaction leaves nothing behind.
 previews, pickers or the AI** (internal meeting 12 October; BACKEND_STRUCTURE §16).
 
 ```js
-const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
+const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+
+/** The SQL for each field ThingListQuery allow-lists. The first is the default order. */
+const SORTS = { due_on: "t.due_on", title: "t.title", created_at: "t.created_at" };
 
 function list(client, query, scope) {
   const params = [query.status ?? null, query.q ?? null];
@@ -193,7 +199,7 @@ function list(client, query, scope) {
       WHERE ($1::text IS NULL OR t.status = $1)
         AND ($2::text IS NULL OR search_fold(t.title) LIKE '%' || search_fold($2) || '%')
         ${s.and}
-      ORDER BY t.due_on DESC, t.thing_id`,
+      ORDER BY ${orderBy(query, SORTS, "t.thing_id")}`,
     params,
     query);
 }
@@ -206,8 +212,13 @@ answers 404 when it is outside the caller's scope.
 - Put `TOTAL_COL` in the SELECT list. End with an `ORDER BY` that is unique (finish on the primary
   key) or rows repeat and vanish between pages. Do not write `LIMIT` or `OFFSET`; `pageQuery`
   appends them and throws if you do.
-- The client sends `page` and the list's filters. It cannot choose a page size: there is no
-  `limit`, `offset`, `per_page` or `page_size` anywhere in the contract.
+- The client sends `page`, the list's filters and at most one `sort`. It cannot choose a page size:
+  there is no `limit`, `offset`, `per_page` or `page_size` anywhere in the contract.
+- **Sorting is the contract's, not the caller's** (F20). `listQuery(filters, sortable)` allow-lists
+  the fields, so `?sort=-due_on` parses to `{ field, dir }` and `?sort=salary` is a 422 naming
+  `sort`. `orderBy(query, SORTS, tiebreak)` turns it into SQL **from the repo's own map**: the
+  caller picks a key, never a character of the query. Every order finishes on the unique column, or
+  rows that tie swap places between pages. Index what you allow-list.
 - Search, filters and sorting happen in SQL. Never filter one page in JavaScript and present it as
   the whole result (praxis-ls Finance hub showed "No invoices match" for invoices on row 80).
 - `LIMIT 1` for a single-row lookup is fine.

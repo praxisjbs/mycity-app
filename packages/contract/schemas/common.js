@@ -105,26 +105,78 @@ const q = z.string().trim().min(1).max(200).optional();
 /** The controls every list endpoint accepts. */
 const LIST_CONTROLS = { page, q };
 
+/** Names a list's own filters may not take, because a control already has them. */
+const RESERVED_CONTROLS = [...Object.keys(LIST_CONTROLS), "sort"];
+
 /**
- * A list endpoint's query schema: the standard controls plus this list's own
- * filters, and NOTHING else. `.strict()` turns an unknown key (a typo, or a
- * client trying `?limit=500`) into a 422 that names the key, instead of a
- * filter that silently does nothing.
+ * A list's sort control (FRONTEND_FOUNDATION F20, decided with TB 16/10/2026).
+ *
+ * ONE key. The value is a field name, with a leading `-` for descending:
+ * `?sort=display_name`, `?sort=-created_at`. The list declares the fields a
+ * caller may sort by, so a typo, a renamed field or a column nobody indexed is
+ * a 422 naming `sort`, exactly like an unknown filter, instead of an ORDER BY
+ * nobody meant. The value parses to `{ field, dir }` for the repo; the wire
+ * type stays the string the frontend sends.
+ *
+ * Sorting is not optional decoration: a list the server does not sort would be
+ * sorted inside one page of 25, which is the praxis-ls bug FRONTEND_GUIDE §4
+ * names. A list with no `sortable` has no `sort` key at all, and `.strict()`
+ * refuses one.
+ *
+ * @param {string[]} sortable field names, snake_case, in the list's own order
+ */
+function sortParam(sortable) {
+  if (!Array.isArray(sortable) || sortable.length === 0) {
+    throw new Error("sortParam: name at least one sortable field");
+  }
+  for (const f of sortable) {
+    if (!/^[a-z][a-z0-9_]*$/.test(f)) {
+      throw new Error(`sortParam: "${f}" is not a snake_case field name`);
+    }
+  }
+  if (new Set(sortable).size !== sortable.length) {
+    throw new Error("sortParam: the same field is listed twice");
+  }
+  const values = sortable.flatMap((f) => [f, `-${f}`]);
+  return z
+    .enum(values)
+    .transform((v) =>
+      v.startsWith("-")
+        ? { field: v.slice(1), dir: "desc" }
+        : { field: v, dir: "asc" },
+    )
+    .optional();
+}
+
+/**
+ * A list endpoint's query schema: the standard controls, this list's sortable
+ * fields, its own filters, and NOTHING else. `.strict()` turns an unknown key
+ * (a typo, or a client trying `?limit=500`) into a 422 that names the key,
+ * instead of a filter that silently does nothing.
+ *
+ *   listQuery({ status: EmployeeStatus }, ["display_name", "created_at"])
+ *
+ * The repo turns the parsed `sort` into an ORDER BY with `orderBy()` from
+ * shared/http/paged.js, which builds the SQL from its own allow-list, so
+ * nothing a caller typed reaches the query.
  *
  * @param {Record<string, z.ZodTypeAny>} [filters]
+ * @param {string[]} [sortable]  fields this list may be sorted by; the first is its default order
  */
-function listQuery(filters = {}) {
+function listQuery(filters = {}, sortable = []) {
   for (const key of Object.keys(filters)) {
-    if (key in LIST_CONTROLS) {
+    if (RESERVED_CONTROLS.includes(key)) {
       throw new Error(
         `listQuery: "${key}" is a standard list control and cannot be redefined`,
       );
     }
   }
-  return z.object({ ...LIST_CONTROLS, ...filters }).strict();
+  const controls = { ...LIST_CONTROLS };
+  if (sortable.length > 0) controls.sort = sortParam(sortable);
+  return z.object({ ...controls, ...filters }).strict();
 }
 
-/** Default list query for a list with no filters of its own. */
+/** Default list query for a list with no filters and no sort of its own. */
 const PageQuery = listQuery();
 
 /** Page metadata returned with every list. */
@@ -177,6 +229,8 @@ module.exports = {
   money,
   PAGE_SIZE,
   LIST_CONTROLS,
+  RESERVED_CONTROLS,
+  sortParam,
   listQuery,
   PageQuery,
   PageMeta,
