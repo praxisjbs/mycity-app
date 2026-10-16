@@ -1,9 +1,7 @@
 import { useApi, usePaged, useMutation, invalidate } from "@/api/hooks";
 import type { LeaveRequest } from "@/api/types/leave";
 import "@/api/types/leave";
-import { Button, formatDate, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, Meter, toast } from "@mycity/ui";
-import { Kpi, TapList } from "@/components/ui/data";
-import { Pager, Table } from "@/components/ui/Table";
+import { Button, Card, CardHeader, DataView, DesktopOnly, formatDate, Grid, KeyValue, KpiCard, Meter, PageHeader, Pager, Pill, TapList, toast, useModal } from "@mycity/ui";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { LEAVE_TONE, LeaveForm } from "@/features/people/Leave";
 
@@ -52,7 +50,7 @@ export function MyLeavePage() {
     </Card>
   );
   const reqTable = (
-    <Table
+    <DataView
       title="My Requests"
       rows={list.rows}
       rowKey={(r) => r.leave_id}
@@ -75,10 +73,10 @@ export function MyLeavePage() {
       <PageHeader title="My Leave" sub={`${bal.data?.year ?? ""} entitlement`} actions={<Button variant="primary" icon="plus" onClick={request}>Request Leave</Button>} />
       {annual && ent && (
         <Grid cols="4m2">
-          <Kpi opensOn="phone" label="Entitlement" value={`${annual.entitled} days`} trend={`Annual, ${bal.data!.year}`} onClick={() => modal.open({ title: "Entitlement", body: ent })} />
-          <Kpi opensOn="phone" label="Taken" value={String(annual.taken)} trend="This year" onClick={() => modal.open({ title: "Leave Taken", wide: true, body: reqTable })} />
-          <Kpi opensOn="phone" label="Approved Upcoming" value={String(annual.booked)} trend={next ? `${formatDate(next.from).slice(0, 5)} to ${formatDate(next.to).slice(0, 5)}` : "None booked"} onClick={() => next && open(next)} />
-          <Kpi opensOn="phone" label="Remaining" value={String(annual.left)} tone="ok" trend="Annual days left" onClick={() => modal.open({ title: "Entitlement", body: ent })} />
+          <KpiCard opensOn="phone" title="Entitlement" value={`${annual.entitled} days`} caption={`Annual, ${bal.data!.year}`} onOpen={() => modal.open({ title: "Entitlement", body: ent })} />
+          <KpiCard opensOn="phone" title="Taken" value={String(annual.taken)} caption="This year" onOpen={() => modal.open({ title: "Leave Taken", wide: true, body: reqTable })} />
+          <KpiCard opensOn="phone" title="Approved Upcoming" value={String(annual.booked)} caption={next ? `${formatDate(next.from).slice(0, 5)} to ${formatDate(next.to).slice(0, 5)}` : "None booked"} onOpen={() => next && open(next)} />
+          <KpiCard opensOn="phone" title="Remaining" value={String(annual.left)} tone="ok" caption="Annual days left" onOpen={() => modal.open({ title: "Entitlement", body: ent })} />
         </Grid>
       )}
       <PhoneCards

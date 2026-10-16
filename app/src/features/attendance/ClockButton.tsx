@@ -3,9 +3,8 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi } from "@/api/hooks";
 import type { AttendanceToday, ClockResponse } from "@/api/types/attendance";
 import { useAuth } from "@/auth/AuthProvider";
-import { Result } from "@/components/ui/data";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, Avatar, Banner, KeyValue, Icon, Card, useModal, toast, cn, formatDate, formatTime, Field, FormFooter, rules, TextAreaField, useContractForm } from "@mycity/ui";
+import { Avatar, Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, Icon, KeyValue, Result, rules, TextAreaField, toast, useContractForm, useModal } from "@mycity/ui";
 
 /**
  * Clocking in and out, for the shell: the desktop top bar's ClockButton and the

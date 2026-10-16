@@ -2,10 +2,7 @@ import { useState } from "react";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PayslipRow } from "@/api/types/payroll";
 import "@/api/types/payroll";
-import { Button, formatDate, formatMoney, formatMonth, EmptyState, Pill, Card, DesktopOnly, Grid, PhoneOnly, PageHeader, useModal, Money, ErrorState, toast, InlineSelect } from "@mycity/ui";
-import { TapList } from "@/components/ui/data";
-import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
-import { LoadingRows, Pager, Table } from "@/components/ui/Table";
+import { Button, Card, DataView, DesktopOnly, EmptyState, ErrorState, formatDate, formatMoney, formatMonth, Grid, InlineSelect, LoadingRows, Money, PageHeader, Pager, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, PhoneOnly, Pill, TapList, toast, useModal } from "@mycity/ui";
 import { hrefFor, useRouter } from "@/lib/router";
 
 const statusPill = (r: PayslipRow) => (r.status === "in_run" ? <Pill tone="warn">In the run</Pill> : r.has_query_deduction ? <Pill tone="warn">Paid, deduction</Pill> : <Pill tone="ok">Paid</Pill>);
@@ -74,7 +71,7 @@ export function MyPayslipsPage() {
       </PhoneOnly>
       <DesktopOnly>
         <Grid cols="1/1.5">
-          <Table
+          <DataView
             title={`Payslips, ${y ?? ""}`}
             rows={list.rows}
             rowKey={(r) => r.payslip_id}
@@ -121,7 +118,7 @@ function Deductions() {
   const { navigate } = useRouter();
   return (
     <>
-      <Table
+      <DataView
         rows={list.rows}
         rowKey={(r) => r.period}
         loading={list.loading}

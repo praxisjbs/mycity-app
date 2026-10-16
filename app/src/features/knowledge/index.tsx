@@ -6,14 +6,11 @@ import "@/api/types/community";
 import type { Announcement } from "@/api/types/community";
 import type { ArticleKind, Block, Overdue, Resource } from "@/api/types/knowledge";
 import { useAuth } from "@/auth/AuthProvider";
-import { Accordion, StatStrip } from "@/components/ui/data";
-import { ArticleBody, Reader } from "@/components/ui/Reader";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Button, Meter, Pill, Who, Card, Grid, PageHeader, useModal, Chips, ErrorState, toast, formatDate, todayIso, StatusPill, ChoiceField, DateField, Field, FormFooter, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { Accordion, ArticleBody, Button, Card, Chips, ChoiceField, DataView, DateField, ErrorState, Field, formatDate, FormFooter, Grid, LoadingRows, Meter, PageHeader, Pill, Reader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 
 export default function Knowledge({ tab, id }: ModuleScreenProps) {
   if (tab === "sops") return <Articles kind="sop" id={id} />;
@@ -201,7 +198,7 @@ function Training() {
         ))}
       </Grid>
       <Grid cols={2} className="mt-3">
-        <Table
+        <DataView
           title="Completion"
           right={<span className="text-[11.5px] text-subtle-foreground">Across all staff</span>}
           rows={list.rows}

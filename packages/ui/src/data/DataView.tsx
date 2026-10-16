@@ -9,7 +9,7 @@
  * @status stable
  * @exports LoadingRows
  * @example <DataView list={list} columns={columns} rowKey={(r) => r.employee_id} caption="Employees" noun="employee" search="Search People" />
- * @example <DataView rows={rows} columns={columns} rowKey={(r) => r.id} caption="Approval Steps" bare />
+ * @example <DataView rows={rows} loading={read.loading} error={read.error} columns={columns} rowKey={(r) => r.id} caption="Approval Steps" bare />
  */
 import { useId, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../lib/cn";
@@ -93,10 +93,23 @@ export interface DataViewProps<R> {
   columns: DataViewColumn<R>[];
   /** Names one row for the key, the pager's count and screen readers. */
   rowKey: (row: R) => string;
-  /** A server-paged list (a `usePaged()` result). Pass this or `rows`. */
+  /**
+   * A server-paged list (a `usePaged()` result): the rows, the page, the
+   * search, the sort and the state in one. Pass this or `rows`.
+   */
   list?: DataViewList<R>;
   /** A set already in hand (a record's own steps, a sheet's rows). Pass this or `list`. */
   rows?: R[];
+  /** A request is in flight, for a set passed as `rows`. */
+  loading?: boolean;
+  /** The read's error, for a set passed as `rows`. */
+  error?: ApiError | null;
+  /** The server's page, for a set passed as `rows`; the pager is drawn when `onPage` comes with it. */
+  page?: PageMeta;
+  /** Asks for a page number, for a set passed as `rows`. */
+  onPage?: (n: number) => void;
+  /** Asks for the rows again, behind Try Again, for a set passed as `rows`. */
+  onReload?: () => void;
   /** Names the table for screen readers; the title unless set. Required when there is no title. */
   caption?: string;
   /** The card's title above the list, at most 4 words. */
@@ -154,6 +167,11 @@ export function DataView<R>({
   rowKey,
   list,
   rows: given,
+  loading: givenLoading,
+  error: givenError,
+  page: givenPage,
+  onPage: givenOnPage,
+  onReload,
   caption,
   title,
   help,
@@ -174,9 +192,16 @@ export function DataView<R>({
 }: DataViewProps<R>) {
   const phone = useIsPhone();
   const captionId = useId();
+  /*
+   * A list hook gives all of this at once; a set already in hand gives the
+   * same things as plain props, so a record's own sub-list needs no hook.
+   */
   const rows = list ? list.rows : (given ?? []);
-  const loading = list?.loading ?? false;
-  const error = list?.error ?? null;
+  const loading = list?.loading ?? givenLoading ?? false;
+  const error = list?.error ?? givenError ?? null;
+  const page = list?.page ?? givenPage;
+  const setPage = list?.setPage ?? givenOnPage;
+  const reload = list?.reload ?? onReload;
   const sort = list?.sort;
   const setSort = list?.setSort;
   const sorted = readSort(sort);
@@ -370,11 +395,11 @@ export function DataView<R>({
       {picked}
       {rows.length > 0 && (phone ? cards : table)}
       {rows.length === 0 && loading && <LoadingRows />}
-      {rows.length === 0 && !loading && error && <ErrorState error={error} onRetry={list?.reload} />}
+      {rows.length === 0 && !loading && error && <ErrorState error={error} onRetry={reload} />}
       {rows.length === 0 && !loading && !error && (
         <EmptyState bare icon={empty?.icon ?? "rows"} title={empty?.title ?? (list?.q ? "Nothing Matches" : "Nothing Here Yet")} text={empty?.text ?? (list?.q ? "Try another search." : undefined)} />
       )}
-      {list?.page && list.setPage && <Pager page={list.page} onPage={list.setPage} noun={noun} nounPlural={nounPlural} />}
+      {page && setPage && <Pager page={page} onPage={setPage} noun={noun} nounPlural={nounPlural} />}
       {footer}
     </>
   );

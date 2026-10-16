@@ -3,9 +3,8 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { AssessmentQuestion, AssessmentSession } from "@/api/types/public";
-import { Banner, Button, cn, formatDate, Icon, PageMessage, Skeleton, TextAreaField } from "@mycity/ui";
+import { Banner, Button, cn, formatDate, Icon, PageMessage, Skeleton, Sub, TextAreaField } from "@mycity/ui";
 import { Page } from "@/shell/Page";
-import { Sub } from "@/components/ui";
 import { LinkProblem } from "./LinkProblem";
 
 const pad = (n: number) => String(n).padStart(2, "0");

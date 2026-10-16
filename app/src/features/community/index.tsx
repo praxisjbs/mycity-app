@@ -6,14 +6,13 @@ import "@/api/types/organisation";
 import type { Announcement, Channel, Conversation, MessageCreate } from "@/api/types/community";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { StatStrip } from "@/components/ui/data";
-import { LoadingRows } from "@/components/ui/Table";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { ChatFrame, Composer, Row, ThreadBody, ThreadSearch, useSplit, useThread } from "./Chat";
-import { PersonPicker, UploadField } from "@/components/form";
-import { Button, IconButton, Avatar, KeyValue, Meter, Pill, Icon, Card, Grid, PageHeader, Menu, useModal, ErrorState, toast, cn, formatDate, formatDateTime, formatWhen, todayIso, useIsMobile, ChoiceField, DateField, Field, FormFooter, rules, SearchInput, Switch, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { Avatar, Button, Card, ChoiceField, cn, DateField, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useIsMobile, useModal } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
+import { upload } from "@/api/upload";
 
 export default function Community({ tab }: ModuleScreenProps) {
   if (tab === "direct-messages") return <Direct />;
@@ -210,7 +209,7 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
           })}
         </div>
       </Field>
-      <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><PersonPicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
+      <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><EmployeePicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
       <Field label="Who Can Post" info="Set when the channel is created. Everyone can read.">
         <ChoiceField value={who} onChange={setWho} options={[["everyone", "Every Member"], ["admins", "Only Admins"]]} />
       </Field>
@@ -237,7 +236,7 @@ function Recognise({ channel, close, done }: { channel: Channel; close: () => vo
   };
   return (
     <>
-      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are recognising" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are recognising" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="What Did They Do (Optional)" info="Leave it blank and a note is written for you."><TextAreaField value={text} onChange={setText} placeholder="Led the launch" /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -259,7 +258,7 @@ function Celebrate({ close, send }: { close: () => void; send: (b: MessageCreate
   };
   return (
     <>
-      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are celebrating" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are celebrating" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="What"><ChoiceField value={what} onChange={setWhat} options={[["birthday", "Birthday"], ["anniversary", "Work Anniversary"]]} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -298,6 +297,7 @@ function Attach({ close, send }: { close: () => void; send: (b: MessageCreate) =
     <>
       <p className="mb-2.5 text-[11.5px] text-subtle-foreground">Files are stored in the vault and shared here.</p>
       <UploadField
+        upload={upload}
         purpose="community"
         multiple={false}
         onUploaded={(docs) => {
@@ -457,7 +457,7 @@ function NewMessage({ close, start }: { close: () => void; start: (p: PersonRef)
   }, [who, close, start]);
   return (
     <>
-      <PersonPicker value={who} onChange={setWho} placeholder="Name or department" />
+      <EmployeePicker value={who} onChange={setWho} placeholder="Name or department" />
       <FormFooter><Button onClick={close}>Cancel</Button></FormFooter>
     </>
   );

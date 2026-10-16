@@ -5,15 +5,13 @@ import "@/api/types/queries";
 import type { Firing, LetterTemplate, Outcome, QueryRow, Rule, RuleCreate, SanctionCreate, SanctionRow } from "@/api/types/queries";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Chain, StatStrip } from "@/components/ui/data";
 import { Letter } from "@/features/shared/Letter";
-import { LoadingRows } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { PersonPicker } from "@/components/form";
-import { Button, Banner, KeyValue, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, formatDate, formatDateTime, formatWhen, StatusPill, Field, FormFooter, MoneyField, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, Chain, Chips, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, KeyValue, LoadingRows, Money, MoneyField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useModal, Who } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Queries({ tab, id }: ModuleScreenProps) {
   if (tab === "rules") return <Rules />;
@@ -130,7 +128,7 @@ function RaiseQuery({ close }: { close: () => void }) {
   return (
     <>
       <Banner tone="info" icon="info">The employee has 48 hours to respond in writing. Their response is read before any decision.</Banner>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Subject" {...f.field("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out Thursday" /></Field>
       <Field label="What Happened" {...f.field("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
       <FormFooter>
@@ -346,7 +344,7 @@ function IssueSanction({ close }: { close: () => void }) {
   };
   return (
     <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Sanction"><SelectField options={[["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"], ["fine", "Fine"]]} {...f.field("kind")} /></Field>
       {f.values.kind === "fine" && <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>}
       <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Follows QRY-0042" /></Field>

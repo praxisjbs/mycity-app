@@ -1,9 +1,8 @@
 import { useApi } from "@/api/hooks";
 import type { MyPerformance } from "@/api/types/ess";
-import { Bars, StatStrip, TapList } from "@/components/ui/data";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
-import { cn, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState } from "@mycity/ui";
+import { Bars, Card, CardHeader, cn, DataView, DesktopOnly, ErrorState, Grid, KeyValue, LoadingRows, PageHeader, Pill, StatStrip, TapList, useModal } from "@mycity/ui";
+import { toBars } from "@/features/shared/wire";
 
 export function MyPerformancePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/performance");
@@ -28,7 +27,7 @@ export function MyPerformancePage() {
         </>
       ),
     });
-  const kpis = <Card><CardHeader title="My KPIs This Month" /><Bars rows={p.kpis.map((k) => ({ ...k, color: k.emphasis === "brand" ? "var(--primary)" : k.emphasis === "warn" ? "var(--chart-4)" : undefined }))} note="Weighted by KPI" /></Card>;
+  const kpis = <Card><CardHeader title="My KPIs This Month" /><Bars rows={toBars(p.kpis)} note="Weighted by KPI" /></Card>;
   const chain = (
     <Card>
       <CardHeader title="Rolls Up To" />
@@ -60,7 +59,7 @@ export function MyPerformancePage() {
       />
       <DesktopOnly>
         <Grid cols={2}>{kpis}{chain}</Grid>
-        <Table
+        <DataView
           title="My Reviews"
           rows={p.reviews}
           rowKey={(r) => r.review_id}

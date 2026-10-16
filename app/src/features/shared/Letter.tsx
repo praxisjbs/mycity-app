@@ -1,5 +1,5 @@
 import type { LetterPreview } from "@/api/types/queries";
-import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
+import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@mycity/ui";
 
 /** A letter as the document engine fills it; the words taken from the record are marked. */
 export function Letter({ l, note = "As it is sent. Everything underlined came from the record, not from typing." }: { l: LetterPreview; note?: string }) {

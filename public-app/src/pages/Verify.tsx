@@ -2,9 +2,8 @@ import { useState, type ReactNode } from "react";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { VerifyResult } from "@/api/types/public";
-import { Brand, Button, cn, Field, Form, formatDate, formatTime, Icon, Pill, Skeleton, TextField } from "@mycity/ui";
+import { Brand, Button, cn, Field, Form, formatDate, formatTime, Icon, Pill, Skeleton, Sub, TextField } from "@mycity/ui";
 import { Page } from "@/shell/Page";
-import { Sub } from "@/components/ui";
 import { useRouter } from "@/lib/router";
 
 /**
@@ -27,7 +26,7 @@ export function Verify({ number }: { number: string | null }) {
       <div className="text-center">
         <Brand name="MyCityApp" />
       </div>
-      {number ? <Result number={number} /> : <Lookup />}
+      {number ? <VerifyResult number={number} /> : <Lookup />}
     </Page>
   );
 }
@@ -54,7 +53,7 @@ function Lookup({ initial = "", heading }: { initial?: string; heading?: ReactNo
   );
 }
 
-function Result({ number }: { number: string }) {
+function VerifyResult({ number }: { number: string }) {
   const r = useApi("GET /api/public/v1/verify/:number", { params: { number } });
   if (r.error)
     return r.error.status === 404 ? (

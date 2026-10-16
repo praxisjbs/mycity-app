@@ -2,8 +2,7 @@ import { usePaged } from "@/api/hooks";
 import "@/api/types/public";
 import type { VacancyCard } from "@/api/types/public";
 import { Page } from "@/shell/Page";
-import { Brand, Button, PageMessage, Skeleton, TextField } from "@mycity/ui";
-import { Sub } from "@/components/ui";
+import { Brand, Button, PageMessage, Skeleton, Sub, TextField } from "@mycity/ui";
 import { Link, useRouter } from "@/lib/router";
 
 export const PATTERN: Record<VacancyCard["work_pattern"], string> = { on_site: "On site", hybrid: "Hybrid", remote: "Remote" };

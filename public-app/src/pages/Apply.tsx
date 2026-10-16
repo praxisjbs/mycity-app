@@ -5,11 +5,10 @@ import "@/api/types/public";
 import type { ApplicationReceipt } from "@/api/types/public";
 import type { DocumentRef } from "@/api/types/common";
 import { Page } from "@/shell/Page";
-import { Banner, Button, Field, Form, formatDate, formatTime, PageMessage, Skeleton, TextAreaField, TextField } from "@mycity/ui";
-import { Sub } from "@/components/ui";
+import { Banner, Button, Field, Form, formatDate, formatTime, PageMessage, Skeleton, Sub, TextAreaField, TextField, UploadField } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
-import { Upload } from "@/components/form";
+import { upload } from "@/api/upload";
 
 type Values = { full_name: string; email: string; phone: string; years: string; why: string };
 type Key = keyof Values | "cv";
@@ -110,13 +109,17 @@ export function Apply({ token }: { token: string }) {
           <TextField id="years" inputMode="numeric" value={v.years} onChange={set("years")} onBlur={blur("years")} state={state("years")} className="max-w-[140px]" />
         </Field>
         <Field label="CV" state={err("cv") ? "bad" : undefined} message={err("cv")}>
-          <Upload
+          <UploadField
             endpoint={`/api/public/v1/apply/${encodeURIComponent(token)}/cv`}
+            purpose="cv"
+            upload={upload}
+            multiple={false}
             accept=".pdf,.doc,.docx"
             kinds="PDF or Word"
             maxBytes={10 * 1024 * 1024}
-            state={err("cv") ? "bad" : undefined}
-            onUploaded={(doc) => {
+            label="Choose your CV"
+            onUploaded={(docs) => {
+              const doc = docs[0] ?? null;
               setCv(doc);
               setServer((s) => ({ ...s, cv: undefined }));
               if (doc) setTouched((t) => ({ ...t, cv: true }));

@@ -2,12 +2,11 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { MyProfile, ProfilePatch } from "@/api/types/ess";
 import "@/api/types/ess";
-import { Timeline } from "@/components/ui/data";
-import { LoadingRows } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
-import { UploadField } from "@/components/form";
-import { Button, KeyValue, Pill, Icon, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, formatDate, initials, Field, FormFooter, rules, TextField, useContractForm, Wizard } from "@mycity/ui";
+import { Button, Card, CardHeader, DesktopOnly, ErrorState, Field, formatDate, FormFooter, Grid, Icon, initials, KeyValue, LoadingRows, PageHeader, Pill, rules, TextField, Timeline, toast, UploadField, useContractForm, useModal, Wizard } from "@mycity/ui";
+import { toTrail } from "@/features/shared/wire";
+import { upload } from "@/api/upload";
 
 export function MyProfilePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/profile");
@@ -51,7 +50,7 @@ export function MyProfilePage() {
       ))}
     </Card>
   );
-  const history = <Card><CardHeader title="My Record History" /><Timeline items={p.history} /></Card>;
+  const history = <Card><CardHeader title="My Record History" /><Timeline items={toTrail(p.history)} /></Card>;
 
   return (
     <>
@@ -168,6 +167,7 @@ function PhotoForm({ close }: { close: () => void }) {
     <>
       <p className="mb-3 text-[12.5px] text-muted-foreground">A clear, recent photo. It shows on your profile, in Staff Community and on the org chart.</p>
       <UploadField
+        upload={upload}
         purpose="avatar"
         accept="image/*"
         multiple={false}

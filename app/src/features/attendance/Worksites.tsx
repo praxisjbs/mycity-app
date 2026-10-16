@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Worksite } from "@/api/types/attendance";
-import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { Button, Pill, Card, CardHeader, PageHeader, useModal, Chips, toast, Field, FormFooter, rules, SearchInput, TextField, useContractForm } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, DataView, Field, FormFooter, PageHeader, Pager, Pill, rules, SearchInput, TextField, toast, Toolbar, useContractForm, useModal } from "@mycity/ui";
 
 const COLOR: Record<Worksite["type"], string> = { Office: "var(--chart-1)", "Approved home": "var(--primary)", "Temporary location": "var(--primary)", "Field assignment": "var(--chart-2)" };
 
@@ -58,7 +57,7 @@ export function Worksites() {
         <SearchInput value={list.q} onChange={list.setQ} placeholder="Location or person" className="w-full md:w-[260px]" />
       </Toolbar>
       <Chips value={type} onChange={setType} options={[["all", "All"], ["Office", "Offices"], ["Approved home", "Homes"], ["Temporary location", "Temporary"], ["Field assignment", "Field"]]} />
-      <Table
+      <DataView
         title="All Locations"
         wide
         rows={list.rows}

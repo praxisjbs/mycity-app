@@ -4,9 +4,8 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
 import type { AccessCatalogue, RecordScope, Role, RoleAction, RoleBody, RoleDetail, RoleGrant } from "@/api/types/settings";
 import { useMe } from "@/auth/AuthProvider";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { KvCard, PagedTable } from "@/features/shared/sections";
-import { Button, Banner, Pill, Card, CardHeader, Grid, PageHeader, useModal, ErrorState, toast, cn, ChoiceField, Field, FormFooter, Switch, TextField } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, ChoiceField, cn, DataView, ErrorState, Field, FormFooter, Grid, LoadingRows, PageHeader, Pill, Switch, TextField, toast, useModal } from "@mycity/ui";
 
 const ACTIONS: Array<[RoleAction, string]> = [["view", "View"], ["create", "Create"], ["edit", "Edit"], ["delete", "Delete"], ["approve", "Approve"], ["export", "Export"]];
 const SCOPES: Array<[RecordScope, string]> = [["all", "All"], ["team", "Team"], ["own", "Own"]];
@@ -53,7 +52,7 @@ export function Roles() {
         ]}
       />
       <div className="mt-3">
-        <Table
+        <DataView
           title="Permission Matrix"
           rows={m.data?.rows ?? []}
           rowKey={(r) => r.module}

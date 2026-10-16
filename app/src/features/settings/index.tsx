@@ -6,16 +6,13 @@ import "@/api/types/organisation";
 import type { AuditEntry, FailedLogin, Hierarchy, Numbering, Organisation, Session, UserRow } from "@/api/types/settings";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Chain, StatStrip } from "@/components/ui/data";
-import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, KvCard, PagedTable } from "@/features/shared/sections";
+import { BarsCard, ExportAction, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AttendancePolicyTab } from "./Policy";
 import { Roles, useRoleOptions } from "./Roles";
-import { PersonPicker } from "@/components/form";
-import { Button, Pill, Who, Icon, HelpTerm, Card, CardHeader, Grid, PageHeader, useModal, Chips, toast, cn, formatDate, formatDateTime, formatWhen, useTheme, StatusPill, ChoiceField, Field, FormFooter, InlineInput, SelectField, Switch, TextAreaField } from "@mycity/ui";
+import { Button, Card, CardHeader, Chain, Chips, ChoiceField, cn, DataView, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, InlineInput, LoadingRows, PageHeader, Paper, PaperFoot, PaperLogo, PaperTitle, Pill, SelectField, Signature, StatStrip, StatusPill, Switch, TextAreaField, toast, useModal, useTheme, Who } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -62,7 +59,7 @@ function OrganisationTab() {
         <KvCard title="Addresses" items={d.hosts.map(([k, v]) => [k, k.startsWith("Why") ? v : <code key={k} className="text-[12px]">{v}</code>])} />
         <KvCard title="System" items={d.about.map(([k, v]) => [k, v === "JBS Praxis" ? <a key={k} href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer" className="font-[650] text-accent-foreground">{v}</a> : v])} />
       </Grid>
-      <Table
+      <DataView
         title="Working Week"
         right={<span className="text-[11.5px] text-subtle-foreground">Per day, not a fixed pattern</span>}
         rows={w}
@@ -103,7 +100,7 @@ function Users() {
         sub={s.data ? `${s.data.users} users · ${s.data.pending} pending invitation` : " "}
         actions={
           <>
-            <ExportButton source="settings.users" />
+            <ExportAction source="settings.users" />
             <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Invite User", body: (close) => <Invite close={close} /> })}>Invite User</Button>
           </>
         }
@@ -174,7 +171,7 @@ function Invite({ close }: { close: () => void }) {
   const inv = useMutation("POST /api/v1/settings/users/invite");
   return (
     <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message="Pick the employee"><PersonPicker value={who} onChange={setWho} /></Field>
+      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message="Pick the employee"><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Role"><SelectField value={role} onChange={setRole} options={roles} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -287,7 +284,7 @@ function Notifications() {
         ))}
       </Grid>
       <Grid cols={2}>
-        <Table
+        <DataView
           title="Every Category"
           rows={rows}
           rowKey={(r) => r.key}
@@ -425,7 +422,7 @@ function Integrations() {
         ))}
       </Grid>
       <Grid cols={2} className="mt-3">
-        <Table
+        <DataView
           title="Health"
           right={<span className="text-[11.5px] text-subtle-foreground">Last 7 days</span>}
           rows={d?.health ?? []}
@@ -508,7 +505,7 @@ function Audit() {
   const none = <span className="text-subtle-foreground">None</span>;
   return (
     <>
-      <PageHeader title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportButton source="audit" filters={mod ? { module: mod } : {}} />} />
+      <PageHeader title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportAction source="audit" filters={mod ? { module: mod } : {}} />} />
       {s.data && <KpiTiles items={[{ label: "Entries Today", value: String(s.data.today) }, { label: "This Month", value: s.data.this_month.toLocaleString("en-NG") }, { label: "Modules", value: String(s.data.modules.length) }, { label: "Retention", value: s.data.retention }]} />}
       {s.data && <Chips value={mod} onChange={setMod} options={[["", "Everything"], ...s.data.modules.map((m) => [m, m] as [string, string])]} />}
       <PagedTable<AuditEntry>

@@ -4,16 +4,14 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/recruitment";
 import type { Assessment, Candidate, InterviewRow, OfferRow, OnboardingRow, PoolRow, Stage, Vacancy } from "@/api/types/recruitment";
 import type { PersonRef } from "@/api/types/common";
-import { Board } from "@/components/ui/Board";
-import { Timeline } from "@/components/ui/data";
-import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportAction, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import { Letter } from "@/features/shared/Letter";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { PersonPicker } from "@/components/form";
-import { Button, KeyValue, Meter, Pill, Quote, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, cn, formatDate, formatDateTime, todayIso, StatusPill, ChoiceField, DateField, Field, FilterSelect, FormFooter, MoneyField, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@mycity/ui";
+import { Button, Card, CardHeader, ChoiceField, cn, DataView, DateField, ErrorState, Field, FilterSelect, formatDate, formatDateTime, FormFooter, Grid, Kanban, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Pill, Quote, SelectField, StatusPill, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
+import { toTrail } from "@/features/shared/wire";
 
 export default function Recruitment({ tab, id }: ModuleScreenProps) {
   if (tab === "candidates") return <Candidates id={id} />;
@@ -68,7 +66,7 @@ function Vacancies() {
       />
       <Grid cols={2} className="mt-3">
         {s.data ? <BarsCard title="Funnel, All Vacancies" rows={s.data.funnel} /> : <Card><LoadingRows /></Card>}
-        <Table
+        <DataView
           title="Vacancy Stages"
           rows={list.rows}
           rowKey={(v) => v.vacancy_id}
@@ -211,11 +209,11 @@ function Candidates({ id }: { id: string | null }) {
           </>
         }
       />
-      {s.data && <KpiTiles items={[{ label: "Candidates", value: String(s.data.candidates) }, { label: "In the Board", value: String(s.data.in_board) }, { label: "Awaiting a Human", value: String(s.data.awaiting_human), tone: s.data.awaiting_human ? "warn" : "ok" }, { label: "Average Score", value: String(s.data.average_score) }]} />}
+      {s.data && <KpiTiles items={[{ label: "Candidates", value: String(s.data.candidates) }, { label: "In the Kanban", value: String(s.data.in_board) }, { label: "Awaiting a Human", value: String(s.data.awaiting_human), tone: s.data.awaiting_human ? "warn" : "ok" }, { label: "Average Score", value: String(s.data.average_score) }]} />}
       <Toolbar>
         <FilterSelect label="Role" value={vac} onChange={setVac} options={[["", "All Roles"], ...vacs.rows.map((v) => [v.vacancy_id, v.title] as [string, string])]} />
       </Toolbar>
-      <Board
+      <Kanban
         onMove={onMove}
         columns={STAGES.map(([k, label, color], i) => ({
           key: k,
@@ -433,7 +431,7 @@ function Interviews({ id }: { id: string | null }) {
       />
       {x && (
         <Grid cols={2}>
-          <Table
+          <DataView
             title="Panel"
             right={<StatusPill s={x.round} />}
             rows={x.panel}
@@ -493,7 +491,7 @@ function ScheduleInterview({ close }: { close: () => void }) {
       <Field label="Candidate" {...f.field("candidate_id")}><SelectField placeholder="Shortlisted candidate" options={cands.rows.map((c) => [c.candidate_id, `${c.name} · ${c.vacancy.title}`])} {...f.field("candidate_id")} /></Field>
       <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>
       <Field label="Time (24 Hour)" {...f.field("time")}><TextField {...f.field("time")} inputMode="numeric" placeholder="10:00" /></Field>
-      <Field label="Panel" state={tried && !panel.length ? "bad" : undefined} message={tried && !panel.length ? "Add at least one panellist" : undefined}><PersonPicker multiple value={panel} onChange={setPanel} /></Field>
+      <Field label="Panel" state={tried && !panel.length ? "bad" : undefined} message={tried && !panel.length ? "Add at least one panellist" : undefined}><EmployeePicker multiple value={panel} onChange={setPanel} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Schedule</Button>
@@ -606,7 +604,7 @@ function Onboarding() {
       />
       {x && (
         <Grid cols={2} className="mt-3">
-          <Table
+          <DataView
             title="Document Checklist"
             right={<span className="w-[150px]"><Meter pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
             rows={x.checklist}
@@ -622,7 +620,7 @@ function Onboarding() {
           />
           <Card>
             <CardHeader title="Onboarding Plan" />
-            <Timeline items={x.plan.map((p) => ({ title: p.title, when: p.text, tone: p.done ? "ok" : undefined }))} />
+            <Timeline items={toTrail(x.plan.map((p) => ({ title: p.title, when: p.text, tone: p.done ? "ok" as const : null })))} />
           </Card>
         </Grid>
       )}
@@ -638,7 +636,7 @@ function Pool() {
   const list = usePaged("GET /api/v1/recruitment/pool");
   return (
     <>
-      <PageHeader title="Talent Pool" sub="Good candidates, wrong moment" actions={<ExportButton source="recruitment.pool" />} />
+      <PageHeader title="Talent Pool" sub="Good candidates, wrong moment" actions={<ExportAction source="recruitment.pool" />} />
       {s.data && <KpiTiles items={[{ label: "In the Pool", value: String(s.data.in_pool) }, { label: "Invited Back", value: String(s.data.invited_back) }, { label: "Hired From the Pool", value: String(s.data.hired_from_pool), tone: "ok" }, { label: "Average Score", value: String(s.data.average_score) }]} />}
       <Grid cols="1.4/1">
         <PagedTable<PoolRow>

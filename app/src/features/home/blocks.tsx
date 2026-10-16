@@ -1,14 +1,10 @@
 import type { ReactNode } from "react";
-import type { BarRow, HomeBlock, KpiCell } from "@/api/types/home";
-import { Bars, Kpi, StatStrip, Timeline } from "@/components/ui/data";
-import { AreaChart, Donut } from "@/components/ui/charts";
-import { Table } from "@/components/ui/Table";
+import type { HomeBlock, KpiCell } from "@/api/types/home";
+import { toBars, toTrail, toTrend } from "@/features/shared/wire";
 import { useRouter } from "@/lib/router";
 import { useKpiDetail } from "./KpiDetail";
-import { Meter, Pill, Who, Card, CardHeader, Grid, Money, formatDate } from "@mycity/ui";
+import { AreaChart, Bars, Card, CardHeader, DataView, DonutChart, formatDate, Grid, KpiCard, Meter, Money, Pill, StatStrip, Timeline, Who } from "@mycity/ui";
 
-const barColor = (b: BarRow) => (b.emphasis === "warn" ? "var(--chart-4)" : b.emphasis === "brand" ? "var(--primary)" : undefined);
-export const toBars = (rows: BarRow[]) => rows.map((r) => ({ label: r.label, pct: r.pct, value: r.value, color: barColor(r) }));
 
 /** A card with a title, the common frame of Home's blocks. `info` makes the title a help term (§5.2). */
 export function InfoCard({ title, info, right, children }: { title: string; info?: string; right?: ReactNode; children: ReactNode }) {
@@ -26,7 +22,7 @@ export function KpiRow({ items, mobileCols = 1 }: { mobileCols?: 1 | 2; items: A
   return (
     <Grid cols={mobileCols === 2 ? "4m2" : 4}>
       {items.map((k) => (
-        <Kpi key={k.key} label={k.label} value={k.value} tone={k.tone} trend={k.trend?.text} trendDir={k.trend?.dir} onClick={() => open(k.key, k.label)} />
+        <KpiCard key={k.key} title={k.label} value={k.value} tone={k.tone} caption={k.trend?.text} trend={toTrend(k.trend?.dir)} onOpen={() => open(k.key, k.label)} />
       ))}
     </Grid>
   );
@@ -50,9 +46,9 @@ export function Block({ block }: { block: HomeBlock }) {
         </Grid>
       );
     case "area":
-      return <AreaChart title={block.title} values={block.values} labels={block.labels} note={block.note} />;
+      return <AreaChart title={block.title} values={block.values} labels={block.labels ?? []} caption={block.note} />;
     case "donut":
-      return <Donut pct={block.pct} label={block.label} text={block.text} />;
+      return <DonutChart percent={block.pct} middle={`${block.pct}%`} under={block.label} lines={[block.text]} />;
     case "bars":
       return (
         <div className="mb-3 last:mb-0 [.grid_&]:mb-0">
@@ -63,7 +59,7 @@ export function Block({ block }: { block: HomeBlock }) {
       );
     case "need_you":
       return (
-        <Table
+        <DataView
           title={block.title}
           right={<Pill tone={block.badge.tone}>{block.badge.text}</Pill>}
           rows={block.rows}
@@ -91,7 +87,7 @@ export function Block({ block }: { block: HomeBlock }) {
       return (
         <Card>
           <CardHeader title={block.title} />
-          <Timeline items={block.items.map((i) => ({ title: i.title, when: i.when, text: i.text, tone: i.tone }))} />
+          <Timeline items={toTrail(block.items)} />
         </Card>
       );
     case "week":

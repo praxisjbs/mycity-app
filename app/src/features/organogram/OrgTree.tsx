@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { OrgNode } from "@/api/types/organisation";
-import { LoadingRows } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, Icon, Card, PageHeader, ErrorState, toast, cn, initials, SearchInput } from "@mycity/ui";
+import { Button, Card, cn, ErrorState, Icon, initials, LoadingRows, PageHeader, SearchInput, toast } from "@mycity/ui";
 
 /**
  * The live reporting tree (docs/guides/organogram.md). One render, two modes:

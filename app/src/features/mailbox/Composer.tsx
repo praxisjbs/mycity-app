@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailAttachment, MailDraftSave } from "@/api/types/mailbox";
-import { UploadField } from "@/components/form";
-import { Button, Pill, Icon, Menu, toast, cn, formatBytes, formatDate, todayIso, DateField, Field, InlineInput, InlineLabel, InlineSelect, TextField } from "@mycity/ui";
+import { Button, cn, DateField, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, Pill, TextField, toast, todayIso, UploadField } from "@mycity/ui";
+import { upload } from "@/api/upload";
 
 export interface ComposeInit {
   draft_id?: string;
@@ -219,6 +219,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           ),
         )}
         <UploadField
+          upload={upload}
           purpose="mail"
           endpoint="/api/v1/mailbox/attachments"
           onUploaded={(docs) => (setFiles((f) => [...f, ...docs.map((d) => ({ ...d, attachment_id: (d as MailAttachment).attachment_id ?? d.document_id }))]), touch())}

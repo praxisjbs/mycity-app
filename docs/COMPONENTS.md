@@ -2728,8 +2728,13 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 |---|---|---|---|
 | `columns` | `DataViewColumn<R>[]` | yes | The columns, left to right. The first is the card's title on a phone. |
 | `rowKey` | `(row: R) => string` | yes | Names one row for the key, the pager's count and screen readers. |
-| `list` | `DataViewList<R>` |  | A server-paged list (a `usePaged()` result). Pass this or `rows`. |
+| `list` | `DataViewList<R>` |  | A server-paged list (a `usePaged()` result): the rows, the page, the search, the sort and the state in one. Pass this or `rows`. |
 | `rows` | `R[]` |  | A set already in hand (a record's own steps, a sheet's rows). Pass this or `list`. |
+| `loading` | `boolean` |  | A request is in flight, for a set passed as `rows`. |
+| `error` | `ApiError \| null` |  | The read's error, for a set passed as `rows`. |
+| `page` | `PageMeta` |  | The server's page, for a set passed as `rows`; the pager is drawn when `onPage` comes with it. |
+| `onPage` | `(n: number) => void` |  | Asks for a page number, for a set passed as `rows`. |
+| `onReload` | `() => void` |  | Asks for the rows again, behind Try Again, for a set passed as `rows`. |
 | `caption` | `string` |  | Names the table for screen readers; the title unless set. Required when there is no title. |
 | `title` | `ReactNode` |  | The card's title above the list, at most 4 words. |
 | `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
@@ -2756,7 +2761,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 
 ```tsx
 <DataView list={list} columns={columns} rowKey={(r) => r.employee_id} caption="Employees" noun="employee" search="Search People" />
-<DataView rows={rows} columns={columns} rowKey={(r) => r.id} caption="Approval Steps" bare />
+<DataView rows={rows} loading={read.loading} error={read.error} columns={columns} rowKey={(r) => r.id} caption="Approval Steps" bare />
 ```
 
 ### ExportButton

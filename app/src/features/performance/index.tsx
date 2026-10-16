@@ -5,13 +5,11 @@ import "@/api/types/performance";
 import type { Goal, GoalLevel, KpiAssignment, ReviewRow, Target } from "@/api/types/performance";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { AreaChart } from "@/components/ui/charts";
-import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportAction, KvCard, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { PersonPicker } from "@/components/form";
-import { Button, Meter, Quote, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, toast, cn, formatDate, formatDateTime, formatMonth, StatusPill, DateField, Field, FilterSelect, FormFooter, SelectField, TextField, useContractForm, IconButton } from "@mycity/ui";
+import { AreaChart, Button, Card, CardHeader, cn, DataView, DateField, Field, FilterSelect, formatDate, formatDateTime, formatMonth, FormFooter, Grid, Icon, IconButton, LoadingRows, Meter, PageHeader, Quote, SelectField, StatusPill, TextField, toast, Toolbar, useContractForm, useModal, Who } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Performance({ tab }: ModuleScreenProps) {
   if (tab === "targets") return <Targets />;
@@ -37,7 +35,7 @@ function Goals() {
         sub="Organisational and annual, set by management"
         actions={
           <>
-            <ExportButton source="performance.goals" />
+            <ExportAction source="performance.goals" />
             <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Goal", body: (close) => <GoalForm close={close} /> })}>New Goal</Button>
           </>
         }
@@ -267,7 +265,7 @@ function Kpis() {
       />
       <Grid cols={2} className="mt-3">
         {shown ? <WeightsCard p={shown} onEdit={() => assign(shown)} /> : <Card><LoadingRows /></Card>}
-        <Table
+        <DataView
           title="KPI Sources"
           rows={s.data?.sources ?? []}
           rowKey={(r) => r.label}
@@ -325,7 +323,7 @@ function AssignKpis({ close, initial }: { close: () => void; initial?: PersonRef
   return (
     <>
       <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}>
-        <PersonPicker value={who} onChange={(v) => (setWho(v), setRows(null))} />
+        <EmployeePicker value={who} onChange={(v) => (setWho(v), setRows(null))} />
       </Field>
       {who.length > 0 && (
         <Field label="KPIs and Weights" state={tried && total !== 100 ? "bad" : undefined} message={tried && total !== 100 ? "Must total 100%" : undefined}>
@@ -462,7 +460,7 @@ function Analytics() {
         <BarsCard title="By Department" rows={d.by_department} />
       </Grid>
       <Grid cols={2}>
-        <Table
+        <DataView
           title="Self vs Manager Rating"
           right={<span className="text-[11.5px] text-subtle-foreground">{d.gap_cycle}</span>}
           rows={d.gap}

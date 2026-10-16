@@ -3,13 +3,11 @@ import { api } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/mailbox";
 import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/types/mailbox";
-import { StatStrip } from "@/components/ui/data";
-import { LoadingRows } from "@/components/ui/Table";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Splitter, useSplit } from "@/features/community/Chat";
 import { Composer, type ComposeInit } from "./Composer";
-import { Button, IconButton, Avatar, Banner, Pill, Icon, PageHeader, Menu, type MenuItem, useModal, ErrorState, toast, cn, formatBytes, formatDateTime, formatWhen, useIsMobile, FormFooter, SearchInput } from "@mycity/ui";
+import { Avatar, Banner, Button, cn, ErrorState, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, Pill, SearchInput, StatStrip, toast, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
@@ -79,7 +77,7 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
             </div>
           </>
         }
-        reader={current ? <Reader key={current.thread_id} row={current} onBack={() => setOpen(false)} compose={compose} onMoved={() => (setSel(null), setOpen(false))} /> : <p className="m-auto p-6 text-[12.5px] text-subtle-foreground">{list.loading ? "" : "Pick a message to read it."}</p>}
+        reader={current ? <ThreadReader key={current.thread_id} row={current} onBack={() => setOpen(false)} compose={compose} onMoved={() => (setSel(null), setOpen(false))} /> : <p className="m-auto p-6 text-[12.5px] text-subtle-foreground">{list.loading ? "" : "Pick a message to read it."}</p>}
       />
     </>
   );
@@ -149,7 +147,7 @@ function quote(m: MailMessage) {
   return `<p></p><p></p><p>On ${formatDateTime(m.sent_at)}, ${who(m.from)} wrote:</p><blockquote>${m.body_html ?? ""}</blockquote>`;
 }
 
-function Reader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBack: () => void; compose: (init: ComposeInit, title?: string) => void; onMoved: () => void }) {
+function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBack: () => void; compose: (init: ComposeInit, title?: string) => void; onMoved: () => void }) {
   const t = useApi("GET /api/v1/mailbox/threads/:id", { params: { id: row.thread_id } });
   const [images, setImages] = useState(false);
   /* Opening a thread marks it read on the server too (mailbox.md §3). */

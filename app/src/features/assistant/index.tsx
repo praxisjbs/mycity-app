@@ -3,13 +3,11 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/knowledge";
 import type { AiAnswer, AiTurn } from "@/api/types/knowledge";
-import { AreaChart } from "@/components/ui/charts";
-import { LoadingRows } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, PagedTable } from "@/features/shared/sections";
+import { BarsCard, ExportAction, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Button, Card, CardHeader, Grid, PageHeader, Icon, useModal, Money, toast, cn, formatDateTime, formatMoneyShort, Form, FormFooter, InlineInput } from "@mycity/ui";
+import { AreaChart, Button, Card, CardHeader, cn, Form, formatDateTime, formatMoneyShort, FormFooter, Grid, Icon, InlineInput, LoadingRows, Money, PageHeader, toast, useModal } from "@mycity/ui";
 
 export default function Assistant({ tab }: ModuleScreenProps) {
   return tab === "history" ? <History /> : <Ask />;
@@ -125,7 +123,7 @@ function History() {
         sub="Your questions, and what they read"
         actions={
           <>
-            <ExportButton source="ai.history" />
+            <ExportAction source="ai.history" />
             <Button onClick={() => modal.open({ title: "Clear History", body: (close) => <ClearHistory close={close} /> })}>Clear History</Button>
           </>
         }
@@ -148,7 +146,7 @@ function History() {
       />
       {s.data && (
         <Grid cols={2} className="mt-3">
-          <AreaChart title="Spend per Month, Naira" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} note={`Against a ${formatMoneyShort(s.data.cap)} monthly cap.`} />
+          <AreaChart title="Spend per Month, Naira" values={s.data.trend.values.map(Number)} labels={s.data.trend.labels} caption={`Against a ${formatMoneyShort(s.data.cap)} monthly cap.`} />
           <BarsCard title="Questions by Topic" rows={s.data.topics} />
         </Grid>
       )}

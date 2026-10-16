@@ -5,9 +5,8 @@ import "@/api/types/attendance";
 import "@/api/types/settings";
 import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
 import type { PolicyAck } from "@/api/types/settings";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { PagedTable } from "@/features/shared/sections";
-import { Button, Banner, Pill, Who, HelpTerm, Card, CardHeader, Grid, PageHeader, useModal, toast, cn, formatDate, formatDateTime, Field, FormFooter, InlineInput, rules, Switch, TextAreaField, useContractForm } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, cn, DataView, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, InlineInput, LoadingRows, PageHeader, Pill, rules, Switch, TextAreaField, toast, useContractForm, useModal, Who } from "@mycity/ui";
 
 const fmt = (s: PolicySetting) => (s.kind === "bool" ? (s.value ? "On" : "Off") : s.kind === "mode" ? String(s.value)[0].toUpperCase() + String(s.value).slice(1) : String(s.value));
 
@@ -145,7 +144,7 @@ function Review({ p, publish, close }: { p: AttendancePolicy; publish: boolean; 
   return (
     <>
       <p className="mb-2.5 text-[11.5px] text-subtle-foreground">Draft against v{p.version}. Nothing has been sent.</p>
-      <Table
+      <DataView
         rows={rows}
         rowKey={(r) => r.key}
         columns={[

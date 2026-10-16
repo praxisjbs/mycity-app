@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { MyQuery } from "@/api/types/ess";
-import { Pager, Table } from "@/components/ui/Table";
-import { Button, EmptyState, KeyValue, Pill, Icon, type IconName, Card, CardHeader, Grid, PageHeader, useModal, Money, toast, cn, formatDate, formatDateTime, Field, FormFooter, rules, TextAreaField, useContractForm } from "@mycity/ui";
+import { Button, Card, CardHeader, cn, DataView, EmptyState, Field, formatDate, formatDateTime, FormFooter, Grid, Icon, KeyValue, Money, PageHeader, Pager, Pill, rules, TextAreaField, toast, useContractForm, useModal, type IconName } from "@mycity/ui";
 
 type View = "open" | "archived" | "sanctions";
 
@@ -84,7 +83,7 @@ function Respond({ q, close }: { q: MyQuery; close: () => void }) {
 function Archived() {
   const list = usePaged("GET /api/v1/ess/queries", { filters: { view: "archived" } });
   return (
-    <Table
+    <DataView
       title="Archived Queries"
       rows={list.rows}
       rowKey={(r) => r.query_id}
@@ -105,7 +104,7 @@ function Archived() {
 function Sanctions() {
   const list = usePaged("GET /api/v1/ess/sanctions");
   return (
-    <Table
+    <DataView
       title="Sanctions"
       rows={list.rows}
       rowKey={(r) => r.sanction_id}

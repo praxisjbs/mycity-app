@@ -228,33 +228,43 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 
 ## 7 · Components still in the apps, and where they go
 
-Each #18 file below stays where it is until the PR named beside it moves its components into
-`packages/ui`; nothing new may be added beside them (`check/components.js` refuses a new file in
-`app/src/components/` or `public-app/src/components/`). PR 1 moved the form system, overlays,
-feedback, help, layout and the basic display parts; PR 2 moved the staging bars, the public page
-frame and Coming Soon into the Shell group; what is left moves in PR 3.
+**None. Both folders are gone.**
+
+PR 3 moved the last of #18's own components into `packages/ui` and deleted
+`app/src/components/` and `public-app/src/components/`. Every shared component
+a screen uses now comes from `@mycity/ui`, is listed in `docs/COMPONENTS.md`,
+and has its header, test and gallery page.
+
+`LEGACY` in `scripts/check/components.js` is an empty list, and the check
+around it stays: a file that appears in either folder again fails the build,
+and so does a feature that declares a component with a shared name. A missing
+component is added to `packages/ui` with `npm run new:component` (F11).
 
 | File | Holds | Moves in |
 |---|---|---|
-| `app/src/components/form/index.ts` | the barrel for PersonPicker and Upload | PR 3 (pickers, upload engine) |
-| `app/src/components/form/PersonPicker.tsx` | PersonPicker | PR 3 (pickers) |
-| `app/src/components/form/Upload.tsx` | Upload | PR 3 (upload engine) |
-| `app/src/components/ui/Board.tsx` | Board | PR 3 (kanban) |
-| `app/src/components/ui/Calendar.tsx` | Calendar | PR 3 (calendar) |
-| `app/src/components/ui/charts.tsx` | AreaChart, Donut, Bands | PR 3 (charts) |
-| `app/src/components/ui/data.tsx` | Kpi, StatStrip, Timeline, Bars, Chain, Accordion, TapList | PR 3 (display) |
-| `app/src/components/ui/layout.tsx` | Sub | PR 3 (display) |
-| `app/src/components/ui/Paper.tsx` | documents | PR 3 (PDF and document preview) |
-| `app/src/components/ui/Profile.tsx` | 360 header | PR 3 (profile header) |
-| `app/src/components/ui/Reader.tsx` | articles | PR 3 (reader) |
-| `app/src/components/ui/Table.tsx` | Table, Pager, Toolbar, LoadingRows | PR 3 (DataView) |
-| `public-app/src/components/form/index.ts` | the barrel for Upload | PR 3 (upload engine) |
-| `public-app/src/components/form/Upload.tsx` | Upload | PR 3 (upload engine) |
-| `public-app/src/components/SignaturePad.tsx` | SignaturePad | PR 3 (signature field) |
-| `public-app/src/components/ui.tsx` | Sub | PR 3 (display) |
+| _(none)_ | | |
 
-`app/src/features/shared/sections.tsx` (`PagedTable`, `ExportButton`) is not in a components folder,
-but its table pieces move with `Table.tsx` in PR 3 (DataView).
+What moved, and what it became (the new name first, so the §7 check above sees
+an empty table and not this history):
 
-The authoritative list is `LEGACY` in `scripts/check/components.js`. This table mirrors it row for
-row, and `check/components.js` fails when the two differ.
+| Now in `@mycity/ui` | Came from |
+|---|---|
+| `DataView` (F20), `Pager`, `Toolbar`, `LoadingRows` | `ui/Table.tsx` |
+| `KpiCard`, `StatStrip`, `Timeline`, `Bars`, `Chain`, `Accordion`, `TapList`, `Tile`, `Result` | `ui/data.tsx` |
+| `AreaChart`, `DonutChart`, `BandChart` (with `BarChart` and `Sparkline`, new) | `ui/charts.tsx` |
+| `Kanban` (F19) | `ui/Board.tsx` |
+| `Calendar` | `ui/Calendar.tsx` |
+| `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | `ui/Paper.tsx` |
+| `ProfileHeader`, `BackButton` | `ui/Profile.tsx` |
+| `Reader`, `ArticleBody` | `ui/Reader.tsx` |
+| `Sub` | `ui/layout.tsx` and the public site's `ui.tsx` |
+| `PersonPicker` on `RecordPicker` | `form/PersonPicker.tsx`, with the app's own `EmployeePicker` wiring |
+| `UploadField` on `lib/upload.ts` | both apps' `form/Upload.tsx`, with each app's own `upload` |
+| `SignatureField` | the public site's `SignaturePad.tsx` |
+
+`Soon` and `TextLink` were not moved: PR 2's `ComingSoon` replaced `Soon`, and
+nothing used `TextLink`.
+
+`app/src/features/shared/sections.tsx` keeps `PagedTable` and `ExportButton` as
+thin wrappers that bind `DataView` and `@mycity/ui`'s `ExportButton` to this
+app's endpoints; the table itself is no longer its own.

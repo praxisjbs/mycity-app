@@ -4,11 +4,9 @@ import type { PersonRef } from "@/api/types/common";
 import type { LeaveRequest, LeaveType } from "@/api/types/leave";
 import "@/api/types/leave";
 import { useMe } from "@/auth/AuthProvider";
-import { MonthCalendar } from "@/components/ui/Calendar";
-import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { PersonPicker } from "@/components/form";
-import { Button, Pill, Who, Card, CardHeader, Grid, PageHeader, Grow, useModal, Chips, toast, formatDate, monthName, todayIso, DateField, Field, FormFooter, rules, SearchInput, SelectField, TextAreaField, useContractForm } from "@mycity/ui";
+import { Button, Calendar, Card, CardHeader, Chips, DataView, DateField, Field, formatDate, FormFooter, Grid, Grow, LoadingRows, monthName, PageHeader, Pager, Pill, rules, SearchInput, SelectField, TextAreaField, toast, todayIso, Toolbar, useContractForm, useModal, Who } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export const LEAVE_TONE: Record<LeaveRequest["status"], "ok" | "warn" | "err" | "neutral"> = { Approved: "ok", Pending: "warn", Rejected: "err", Cancelled: "neutral" };
 export const LEAVE_TYPES: LeaveType[] = ["Annual", "Sick", "Compassionate", "Maternity", "Paternity", "Study", "Unpaid"];
@@ -45,7 +43,7 @@ export function PeopleLeave() {
             <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-[260px]" />
           </Toolbar>
           <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending", "Pending"], ["Approved", "Approved"], ["Rejected", "Rejected"]]} />
-          <Table
+          <DataView
             title="Requests"
             rows={list.rows}
             rowKey={(r) => r.leave_id}
@@ -118,7 +116,7 @@ function LeaveCalendar() {
     for (let d = new Date(`${r.from}T12:00:00Z`); d <= new Date(`${r.to}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) out.push({ date: d.toISOString().slice(0, 10), label: r.employee.display_name.split(" ")[0] });
     return out;
   });
-  return <MonthCalendar year={y} month={m} events={events} />;
+  return <Calendar year={y} month={m} events={events} />;
 }
 
 /** Request leave (ESS), or record it for someone (People). */
@@ -141,7 +139,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
     <>
       {onBehalf && (
         <Field label="Employee">
-          <PersonPicker value={who} onChange={setWho} />
+          <EmployeePicker value={who} onChange={setWho} />
         </Field>
       )}
       <Field label="Leave Type">

@@ -3,14 +3,10 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import type { FieldAssignment, LocationRequest, ReconCase, RegisterRow } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { AreaChart, Donut } from "@/components/ui/charts";
-import { StatStrip } from "@/components/ui/data";
-import { BackButton } from "@/components/ui/Profile";
-import { LoadingRows, Pager, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
-import { PersonPicker } from "@/components/form";
-import { Button, Banner, EmptyState, KeyValue, Pill, Who, Card, CardHeader, Grid, PhoneOnly, DesktopOnly, Grow, useModal, Chips, ErrorState, toast, cn, formatDate, ChoiceField, DateField, Field, FormFooter, rules, SearchInput, SelectField, TextAreaField, TextField, useContractForm, Wizard, Icon } from "@mycity/ui";
+import { AreaChart, BackButton, Banner, Button, Card, CardHeader, Chips, ChoiceField, cn, DataView, DateField, DesktopOnly, DonutChart, EmptyState, ErrorState, Field, formatDate, FormFooter, Grid, Grow, Icon, KeyValue, LoadingRows, Pager, PhoneOnly, Pill, rules, SearchInput, SelectField, StatStrip, TextAreaField, TextField, toast, Toolbar, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 type View = "register" | "assignments" | "requests" | "manager";
 const VIEWS: Array<[View, string]> = [["register", "Register"], ["assignments", "Field Assignments"], ["requests", "Location Requests"], ["manager", "Manager Preview"]];
@@ -74,8 +70,8 @@ function Register() {
     <>
       {s && (
         <Grid cols="1.4/1">
-          <AreaChart title="Clocked In by Hour" values={s.hours} labels={["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]} note="From 07:00, cumulative. The grace period closes at 09:10." />
-          <Donut pct={s.on_time_pct} label="clocked in" text={s.donut_text} />
+          <AreaChart title="Clocked In by Hour" values={s.hours} labels={["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]} caption="From 07:00, cumulative. The grace period closes at 09:10." />
+          <DonutChart percent={s.on_time_pct} middle={`${s.on_time_pct}%`} under="clocked in" lines={[s.donut_text]} />
         </Grid>
       )}
       <Toolbar>
@@ -83,7 +79,7 @@ function Register() {
       </Toolbar>
       {s && <Chips value={filter} onChange={setFilter} options={[["all", `All ${s.kpis[0].value.split(" / ")[1]}`], ...s.filters.map((f) => [f.value, `${f.label} ${f.count}`] as [string, string])]} />}
       <DesktopOnly>
-        <Table
+        <DataView
           title="Today’s Register"
           wide
           rows={list.rows}
@@ -196,7 +192,7 @@ function Assignments() {
         </div>
         <Button variant="primary" icon="plus" className="md:ml-auto" onClick={() => modal.open({ title: "Add Field Assignment", wide: true, body: (close) => <AssignmentForm close={close} /> })}>Add Field Assignment</Button>
       </div>
-      <Table
+      <DataView
         title="Assignments"
         right={<span className="text-[11.5px] text-subtle-foreground">Default radius 150 m · 100 to 500 by venue</span>}
         wide
@@ -262,7 +258,7 @@ function AssignmentForm({ close }: { close: () => void }) {
             <>
               <Field label="Assignment Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Venue check" /></Field>
               <Field label="Client or Event" {...f.field("client")}><TextField {...f.field("client")} /></Field>
-              <Field label="Employees" state={triedWho && !who.length ? "bad" : undefined} message="Add at least one"><PersonPicker multiple value={who} onChange={setWho} /></Field>
+              <Field label="Employees" state={triedWho && !who.length ? "bad" : undefined} message="Add at least one"><EmployeePicker multiple value={who} onChange={setWho} /></Field>
             </>
           ),
         },
@@ -294,7 +290,7 @@ function Requests() {
   const waiting = list.rows.filter((r) => r.status === "Awaiting manager" || r.status === "Awaiting HR").length;
   return (
     <>
-      <Table
+      <DataView
         title="Work Location Requests"
         right={<span className="text-[11.5px] text-subtle-foreground">{waiting} awaiting a decision</span>}
         wide
@@ -382,7 +378,7 @@ function ManagerView() {
         <b>Manager view.</b> What {me.display_name} sees as line manager of {list.page?.total ?? 0} people. Nothing outside this team is visible here.
       </Banner>
       {summary.data && <KpiTiles items={summary.data.kpis.slice(0, 4)} mobileCols={2} />}
-      <Table
+      <DataView
         title="My Team Today"
         rows={list.rows}
         rowKey={(r) => r.employee.employee_id}
@@ -499,7 +495,7 @@ function Reconcile({ onBack }: { onBack: () => void }) {
   const count = (s: string) => all.rows.filter((c) => c.status === s).length;
   return (
     <>
-      <BackButton label="Back to Attendance" onClick={onBack} />
+      <BackButton label="Back to Attendance" onBack={onBack} />
       <div className="mb-4">
         <h1 data-ui="page-title" className="text-[20px]">Reconciliation Queue</h1>
         <p className="mt-[3px] text-[13px] text-muted-foreground">{count("Awaiting HR")} awaiting People · {count("Awaiting manager")} awaiting a manager</p>

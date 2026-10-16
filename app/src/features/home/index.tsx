@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
-import { Bars, Tile } from "@/components/ui/data";
-import { LoadingRows, Pager, Table } from "@/components/ui/Table";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Block, InfoCard, KpiRow, toBars } from "./blocks";
-import { Button, KeyValue, Pill, Card, Grid, PageHeader, Grow, useModal, Chips, ErrorState, toast, Who, formatDateTime, Field, FormFooter, rules, SelectField, TextField, ToggleRow, useContractForm } from "@mycity/ui";
+import { Block, InfoCard, KpiRow } from "./blocks";
+import { toBars } from "@/features/shared/wire";
+import { Bars, Button, Card, Chips, DataView, ErrorState, Field, formatDateTime, FormFooter, Grid, Grow, KeyValue, LoadingRows, PageHeader, Pager, Pill, rules, SelectField, TextField, Tile, toast, ToggleRow, useContractForm, useModal, Who } from "@mycity/ui";
 
 export default function Home({ tab, id }: ModuleScreenProps) {
   if (tab === "team") return <Team />;
@@ -61,7 +60,7 @@ function Team() {
         onChange={setStatus}
         options={[["all", "Everyone"], ["late", "Late"], ["remote", "Remote"], ["leave", "On Leave"], ["no_clockout", "No Clock-Out"]]}
       />
-      <Table
+      <DataView
         title="Team Roster"
         right={list.page && <Pill>{`${list.page.total} people`}</Pill>}
         rows={list.rows}
@@ -129,7 +128,7 @@ function Alerts({ openId }: { openId: string | null }) {
       {summary.data && (
         <Chips value={cat} onChange={setCat} options={[["all", `All ${summary.data.categories.reduce((a, c) => a + c.count, 0)}`], ...summary.data.categories.map((c) => [c.value, c.label] as [string, string])]} />
       )}
-      <Table
+      <DataView
         title="Open Alerts"
         right={list.page && <Pill tone="warn">{`${list.page.total} open`}</Pill>}
         rows={list.rows}
@@ -289,7 +288,7 @@ function Reports() {
       </Grid>
       <Pager page={reports.page} onPage={reports.setPage} noun="report" className="px-0" />
       <Grid cols={2} className="mt-3">
-        <Table
+        <DataView
           title="Recent Runs"
           rows={runs.rows}
           rowKey={(r) => r.run_id}

@@ -1,8 +1,7 @@
 import { invalidate, useApi, useMutation } from "@/api/hooks";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, Pill, Icon, Card, CardHeader, DesktopOnly, Grid, PageHeader, useModal, ErrorState, toast, formatDate, formatDateTime, Field, FormFooter, rules, ToggleRow, useContractForm, PasswordField } from "@mycity/ui";
+import { Button, Card, CardHeader, DataView, DesktopOnly, ErrorState, Field, formatDate, formatDateTime, FormFooter, Grid, Icon, LoadingRows, PageHeader, PasswordField, Pill, rules, toast, ToggleRow, useContractForm, useModal } from "@mycity/ui";
 
 export function MySecurityPage() {
   const { data: s, error, reload } = useApi("GET /api/v1/ess/security");
@@ -57,7 +56,7 @@ export function MySecurityPage() {
     </Card>
   );
   const act = (
-    <Table
+    <DataView
       title="Recent Sign-Ins"
       rows={s.sign_ins}
       rowKey={(r) => r.at}

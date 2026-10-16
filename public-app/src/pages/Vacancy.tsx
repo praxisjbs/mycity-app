@@ -3,8 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import { Page } from "@/shell/Page";
-import { Banner, Button, formatMoney, PageMessage, Pill, Skeleton } from "@mycity/ui";
-import { Sub } from "@/components/ui";
+import { Banner, Button, formatMoney, PageMessage, Pill, Skeleton, Sub } from "@mycity/ui";
 import { Link, useRouter } from "@/lib/router";
 import { PATTERN } from "./Careers";
 

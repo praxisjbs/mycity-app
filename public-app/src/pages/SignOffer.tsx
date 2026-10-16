@@ -4,9 +4,7 @@ import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { OfferToSign } from "@/api/types/public";
 import { Page } from "@/shell/Page";
-import { SignaturePad, type SignaturePadHandle } from "@/components/SignaturePad";
-import { Banner, Brand, Button, Field, formatDate, formatTime, PageMessage, Skeleton, TextAreaField } from "@mycity/ui";
-import { Sub } from "@/components/ui";
+import { Banner, Brand, Button, Field, formatDate, formatTime, PageMessage, SignatureField, Skeleton, Sub, TextAreaField, type SignatureFieldHandle } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
 
@@ -45,7 +43,7 @@ function Head({ d }: { d: OfferToSign }) {
 }
 
 function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d: OfferToSign) => void }) {
-  const pad = useRef<SignaturePadHandle>(null);
+  const pad = useRef<SignatureFieldHandle>(null);
   const [inked, setInked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -87,7 +85,7 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
         <>
           <div className="mt-4">
             <span className="mb-1.5 block text-[12.5px] font-semibold text-muted-foreground">Sign Below</span>
-            <SignaturePad ref={pad} onChange={onInk} disabled={busy} label="Signature box. Draw your signature with a finger or a mouse." />
+            <SignatureField ref={pad} noClear onChange={onInk} disabled={busy} label="Signature box. Draw your signature with a finger or a mouse." />
             <div className="mt-2 flex justify-end">
               <Button disabled={!inked || busy} onClick={() => pad.current?.clear()}>
                 Clear

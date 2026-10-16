@@ -4,17 +4,12 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/partnerships";
 import type { Contract, Lead, PartnerRow, Proposal, ProposalDoc, Renewal } from "@/api/types/partnerships";
 import type { PersonRef } from "@/api/types/common";
-import { AreaChart } from "@/components/ui/charts";
-import { Chain, StatStrip } from "@/components/ui/data";
-import { Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle } from "@/components/ui/Paper";
-import { BackButton, ProfileHeader } from "@/components/ui/Profile";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ChainCard, ExportButton, KvCard, PagedTable, TrailCard } from "@/features/shared/sections";
+import { BarsCard, ChainCard, ExportAction, KvCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { PersonPicker } from "@/components/form";
-import { Button, KeyValue, Meter, Pill, Who, Card, CardHeader, Grid, PageHeader, useModal, Money, Chips, ErrorState, toast, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, todayIso, StatusPill, DateField, Field, FormFooter, MoneyField, rules, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@mycity/ui";
+import { AreaChart, BackButton, Button, Card, CardHeader, Chain, Chips, DataView, DateField, ErrorState, Field, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, FormFooter, Grid, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, Pill, ProfileHeader, rules, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   if (id && (tab === "partners" || tab === "pipeline")) return <Partner360View id={id} back={tab} />;
@@ -59,7 +54,7 @@ function Pipeline() {
           <KpiTiles items={[{ label: "In the Pipeline", value: String(d.in_pipeline) }, { label: "Signed This Year", value: String(d.signed_this_year), tone: "ok" }, { label: "Signed Value", value: formatMoneyShort(d.signed_value) }, { label: "Going Quiet", value: String(d.going_quiet), tone: d.going_quiet ? "err" : "ok" }]} />
           <BarsCard title="Stages" rows={d.stages} />
           <Grid cols={2} className="mt-3">
-            <Table
+            <DataView
               title="Longest at a Stage"
               right={<Pill tone="err">{d.longest.filter((x) => x.days_at_stage > 30).length} over 30 days</Pill>}
               rows={d.longest}
@@ -95,7 +90,7 @@ function Partners() {
         sub="The 360 opens from any row"
         actions={
           <>
-            <ExportButton source="partnerships.partners" />
+            <ExportAction source="partnerships.partners" />
             <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Partner", wide: true, body: (close) => <PartnerForm close={close} /> })}>New Partner</Button>
           </>
         }
@@ -171,7 +166,7 @@ function PartnerForm({ close }: { close: () => void }) {
               <Field label="Expected Value" optional><MoneyField {...f.field("value")} /></Field>
               <Field label="Headquarters"><TextField {...f.field("hq")} /></Field>
               <Field label="Website" optional><TextField {...f.field("website")} placeholder="example.com" /></Field>
-              <Field label="Lead Owner" state={tried && !owner.length ? "bad" : undefined} message={tried && !owner.length ? "Pick the owner" : undefined}><PersonPicker value={owner} onChange={setOwner} /></Field>
+              <Field label="Lead Owner" state={tried && !owner.length ? "bad" : undefined} message={tried && !owner.length ? "Pick the owner" : undefined}><EmployeePicker value={owner} onChange={setOwner} /></Field>
             </>
           ),
         },
@@ -187,12 +182,12 @@ function Partner360View({ id, back }: { id: string; back: string }) {
   const modal = useModal();
   const p = useApi("GET /api/v1/partnerships/partners/:id", { params: { id } });
   const goBack = () => navigate(`/partnerships?tab=${back}`);
-  if (p.error) return (<><BackButton label={`Back to ${back === "pipeline" ? "Pipeline" : "Partners"}`} onClick={goBack} /><ErrorState error={p.error} onRetry={p.reload} /></>);
+  if (p.error) return (<><BackButton label={`Back to ${back === "pipeline" ? "Pipeline" : "Partners"}`} onBack={goBack} /><ErrorState error={p.error} onRetry={p.reload} /></>);
   if (!p.data) return <LoadingRows count={8} />;
   const x = p.data;
   return (
     <>
-      <BackButton label={`Back to ${back === "pipeline" ? "Pipeline" : "Partners"}`} onClick={goBack} />
+      <BackButton label={`Back to ${back === "pipeline" ? "Pipeline" : "Partners"}`} onBack={goBack} />
       <ProfileHeader
         brand
         name={x.name}
@@ -229,14 +224,14 @@ function Partner360View({ id, back }: { id: string; back: string }) {
         <TrailCard title="Interaction Log" items={x.interactions.map((i) => ({ ...i, when: formatDateTime(i.when) }))} />
       </Grid>
       <Grid cols={2}>
-        <Table
+        <DataView
           title="Contracts and MOUs"
           rows={x.documents}
           rowKey={(d) => d.title}
           empty={{ title: "No Document Yet", text: "Proposals and MOUs appear here with their signature state." }}
           columns={[{ key: "t", label: "Document", render: (d) => d.title }, { key: "k", label: "Type", render: (d) => d.kind }, { key: "s", label: "Signed", render: (d) => (d.signed_on ? formatDate(d.signed_on) : "Not yet") }, { key: "st", label: "Status", render: (d) => <StatusPill s={d.status} /> }]}
         />
-        <Table
+        <DataView
           title="Our Deliverables"
           rows={x.deliverables}
           rowKey={(d) => d.title}
@@ -244,7 +239,7 @@ function Partner360View({ id, back }: { id: string; back: string }) {
         />
       </Grid>
       <Grid cols={2}>
-        <AreaChart title="Monthly In-App Downloads Attributed" values={x.downloads.values} labels={x.downloads.labels} note="Attributed from the partner’s own listing and campaign links." />
+        <AreaChart title="Monthly In-App Downloads Attributed" values={x.downloads.values} labels={x.downloads.labels} caption="Attributed from the partner’s own listing and campaign links." />
         <BarsCard title="Value by Line" rows={x.lines.map((l) => ({ ...l, value: /^\d/.test(l.value) ? formatMoney(l.value.split(" ")[0]) : l.value }))} note="Signed value against the MOU schedule." />
       </Grid>
     </>
@@ -618,7 +613,7 @@ function Analytics() {
     <>
       <PageHeader title="Analytics" sub="Monthly partnership performance by lead owner" />
       <KpiTiles items={[{ label: "Prospects This Month", value: String(d.prospects) }, { label: "Meetings Held", value: String(d.meetings) }, { label: "Proposals Sent", value: String(d.proposals) }, { label: "Signed", value: String(d.signed), tone: "ok" }]} />
-      <Table
+      <DataView
         title={formatMonth(d.period)}
         rows={d.by_owner}
         rowKey={(r) => r.owner.employee_id}
@@ -637,7 +632,7 @@ function Analytics() {
         <BarsCard title="Downloads Attributed by Partner" rows={d.downloads} note="Only a live partnership attributes anything." />
       </Grid>
       <Grid cols={2}>
-        <Table
+        <DataView
           title="Six Months"
           rows={d.months}
           rowKey={(r) => r.month}

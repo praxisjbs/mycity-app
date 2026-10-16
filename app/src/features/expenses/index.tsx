@@ -5,14 +5,11 @@ import "@/api/types/expenses";
 import type { Category, Disbursement, ExpenseRow, Requisition } from "@/api/types/expenses";
 import type { DocumentRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { AreaChart } from "@/components/ui/charts";
-import { Chain } from "@/components/ui/data";
-import { LoadingRows, Table } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportButton, PagedTable, TrailCard } from "@/features/shared/sections";
+import { BarsCard, ExportAction, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { UploadField } from "@/components/form";
-import { Button, KeyValue, Who, Icon, Card, CardHeader, Grid, PageHeader, useModal, Money, ErrorState, toast, cn, formatBytes, formatDate, formatDateTime, formatMoneyShort, todayIso, StatusPill, DateField, Field, FormFooter, MoneyField, rules, SelectField, TextAreaField, TextField, useContractForm, Wizard } from "@mycity/ui";
+import { AreaChart, Button, Card, CardHeader, Chain, cn, DataView, DateField, ErrorState, Field, formatBytes, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, Icon, KeyValue, LoadingRows, Money, MoneyField, PageHeader, rules, SelectField, StatusPill, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { upload } from "@/api/upload";
 
 export default function Expenses({ tab, id }: ModuleScreenProps) {
   if (tab === "approvals") return <Approvals id={id} />;
@@ -143,7 +140,7 @@ function RequestForm({ close }: { close: () => void }) {
             {invoice ? (
               <span className="flex items-center gap-2 rounded-ctl border border-border bg-muted px-3 py-2 text-[12.5px]"><Icon name="doc" />{invoice.file_name}<span className="text-subtle-foreground">{formatBytes(invoice.size_bytes)}</span><button type="button" className="ml-auto text-accent-foreground underline" onClick={() => setInvoice(null)}>Replace</button></span>
             ) : (
-              <UploadField purpose="expense_invoice" accept=".pdf,image/*" multiple={false} compact onUploaded={(d) => setInvoice(d[0])} />
+              <UploadField upload={upload} purpose="expense_invoice" accept=".pdf,image/*" multiple={false} compact onUploaded={(d) => setInvoice(d[0])} />
             )}
           </Field>
           ),
@@ -279,7 +276,7 @@ function RequisitionCard({ id }: { id: string }) {
   const total = kept.reduce((a, i) => a + Math.round(Number(i.amount) * 100), 0);
   const totalStr = `${Math.trunc(total / 100)}.${String(total % 100).padStart(2, "0")}`;
   return (
-    <Table
+    <DataView
       title={`Included in ${x.number}`}
       right={<b className="text-[13px]"><Money value={totalStr} /></b>}
       rows={x.items}
@@ -312,7 +309,7 @@ function NewRequisition({ close }: { close: () => void }) {
   const total = ready.rows.filter((r) => ids.includes(r.request_id)).reduce((a, r) => a + Math.round(Number(r.amount) * 100), 0);
   return (
     <>
-      <Table
+      <DataView
         rows={ready.rows}
         rowKey={(r) => r.request_id}
         loading={ready.loading}
@@ -349,7 +346,7 @@ function Disbursements() {
         sub="Logged after the bank confirms"
         actions={
           <>
-            <ExportButton source="expenses.disbursements" />
+            <ExportAction source="expenses.disbursements" />
             <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Log Disbursement", body: (close) => <LogDisbursement close={close} /> })}>Log Disbursement</Button>
           </>
         }
@@ -426,7 +423,7 @@ function BudgetsTab() {
       )}
       {d ? <BarsCard title="Budget vs Actual" rows={d.lines.map((l) => ({ label: l.department, pct: l.pct, value: `${formatMoneyShort(l.actual)} of ${formatMoneyShort(l.budget)}`, ...(l.pct >= 90 ? { emphasis: "warn" as const } : {}) }))} /> : <Card><LoadingRows /></Card>}
       <Grid cols={2} className="mt-3">
-        <Table
+        <DataView
           title="Example Only"
           right={<StatusPill s={{ tone: "info", text: "Illustrative" }} />}
           rows={d?.lines ?? []}

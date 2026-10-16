@@ -235,6 +235,34 @@ describe("DataView states", () => {
     expect(screen.queryByRole("navigation")).toBeNull();
   });
 
+  it("takes the state as plain props for a set already in hand", async () => {
+    desktop();
+    const onPage = vi.fn();
+    const onReload = vi.fn();
+    const { rerender, container } = view({ rows: [], loading: true });
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+
+    rerender(<DataView columns={COLUMNS} rowKey={(r) => r.employee_id} caption="Employees" rows={[]} error={new ApiError(500, null)} onReload={onReload} />);
+    await userEvent.click(screen.getByRole("button", { name: "Try Again" }));
+    expect(onReload).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <DataView
+        columns={COLUMNS}
+        rowKey={(r) => r.employee_id}
+        caption="Employees"
+        noun="employee"
+        rows={ROWS}
+        page={{ number: 1, size: 25, total: 312, pages: 13, has_next: true }}
+        onPage={onPage}
+      />,
+    );
+    expect(screen.getByText("1 to 25 of 312 employees")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(onPage).toHaveBeenLastCalledWith(2);
+    expect(container.querySelector("table")).not.toBeNull();
+  });
+
   it("has no accessibility violations as a table or as cards", async () => {
     desktop();
     const { container, unmount } = view({ list: list(), search: "Search People", onRowClick: vi.fn(), selection: { keys: ["e1"], onChange: vi.fn(), actions: null }, title: "Employees" });

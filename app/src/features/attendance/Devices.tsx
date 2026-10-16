@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { Device } from "@/api/types/attendance";
-import { StatStrip } from "@/components/ui/data";
-import { Pager, Table, Toolbar } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, KeyValue, Pill, Who, Card, CardHeader, Grid, PageHeader, Chips, toast, formatDate, formatDateTime, SearchInput } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, DataView, formatDate, formatDateTime, Grid, KeyValue, PageHeader, Pager, Pill, SearchInput, StatStrip, toast, Toolbar, Who } from "@mycity/ui";
 
 export const DEVICE_TONE: Record<Device["status"], "ok" | "warn" | "err" | "neutral"> = { Enrolled: "ok", "Pending Review": "warn", Blocked: "err", Revoked: "neutral", "Verification unavailable": "warn" };
 
@@ -32,7 +30,7 @@ export function Devices() {
       </Toolbar>
       <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending Review", "Pending Review"], ["Enrolled", "Enrolled"], ["Blocked", "Blocked"], ["Revoked", "Revoked"]]} />
       <Grid cols="1.4/1">
-        <Table
+        <DataView
           title="Devices"
           rows={list.rows}
           rowKey={(d) => d.device_id}
@@ -68,7 +66,7 @@ export function Devices() {
         )}
       </Grid>
       {summary.data && (
-        <Table
+        <DataView
           title={`Device Policy v${summary.data.policy_version}`}
           rows={summary.data.effects}
           rowKey={(r) => r.state}

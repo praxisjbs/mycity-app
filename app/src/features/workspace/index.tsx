@@ -4,16 +4,12 @@ import type { PersonRef } from "@/api/types/common";
 import type { Task, TaskStatus } from "@/api/types/workspace";
 import "@/api/types/workspace";
 import { useMe } from "@/auth/AuthProvider";
-import { Board } from "@/components/ui/Board";
-import { MonthCalendar } from "@/components/ui/Calendar";
-import { AreaChart } from "@/components/ui/charts";
-import { Bars, Timeline } from "@/components/ui/data";
-import { LoadingRows, Table, Toolbar } from "@/components/ui/Table";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { PersonPicker } from "@/components/form";
-import { Button, Avatar, KeyValue, Meter, Pill, Card, CardHeader, Grid, PageHeader, useModal, ErrorState, toast, formatDate, monthName, todayIso, DateField, Field, FormFooter, rules, SearchInput, SegmentedControl, SelectField, TextAreaField, TextField, useContractForm } from "@mycity/ui";
+import { AreaChart, Avatar, Bars, Button, Calendar, Card, CardHeader, DataView, DateField, ErrorState, Field, formatDate, FormFooter, Grid, Kanban, KeyValue, LoadingRows, Meter, monthName, PageHeader, Pill, rules, SearchInput, SegmentedControl, SelectField, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useModal } from "@mycity/ui";
+import { EmployeePicker } from "@/features/shared/pickers";
+import { toBars, toTrail } from "@/features/shared/wire";
 
 export default function Workspace({ tab }: ModuleScreenProps) {
   const [params, setParams] = useSearchParams();
@@ -107,7 +103,7 @@ function Today() {
         </Card>
         <Card>
           <CardHeader title="Since You Were Away" />
-          <Timeline items={data.activity} />
+          <Timeline items={toTrail(data.activity)} />
         </Card>
       </Grid>
     </>
@@ -143,7 +139,7 @@ function Tasks() {
       />
       {summary.data && <KpiTiles items={summary.data.kpis} mobileCols={2} />}
       <Toolbar><SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-[260px]" /></Toolbar>
-      <Board
+      <Kanban
         columns={COLS.map(([status, label, color], i) => ({
           key: status,
           label,
@@ -187,7 +183,7 @@ export function TaskForm({ close, title = "" }: { close: () => void; title?: str
       <Field label="Priority"><SelectField options={[["urgent", "Urgent"], ["high", "High"], ["normal", "Normal"], ["low", "Low"]]} {...f.field("priority")} /></Field>
       {me.manages_people && (
         <Field label="Assign To" info="Leave empty to keep it yourself. You can set tasks for the people who report to you.">
-          <PersonPicker value={owner} onChange={setOwner} placeholder="Search your team" />
+          <EmployeePicker value={owner} onChange={setOwner} placeholder="Search your team" />
         </Field>
       )}
       <Field label="Notes"><TextAreaField {...f.field("description")} /></Field>
@@ -222,7 +218,7 @@ function CalendarTab() {
         }
       />
       <Grid cols="1.4/1">
-        <MonthCalendar year={ym[0]} month={ym[1]} events={list.rows.map((e) => ({ date: e.date, label: e.title, highlight: e.highlight }))} />
+        <Calendar year={ym[0]} month={ym[1]} events={list.rows.map((e) => ({ date: e.date, label: e.title, highlight: e.highlight }))} />
         <Card>
           <CardHeader title="Coming Up" />
           {upcoming.map((e) => (
@@ -266,12 +262,12 @@ function Analytics() {
       <PageHeader title="Analytics" sub="Your team, last 30 days" />
       <KpiTiles items={data.kpis} mobileCols={2} />
       <Grid cols={2}>
-        <AreaChart title="Tasks Completed per Week" values={data.completed_per_week} />
-        <Card><CardHeader title="Workload by Person" /><Bars rows={data.workload} /></Card>
+        <AreaChart title="Tasks Completed per Week" values={data.completed_per_week} labels={data.completed_per_week.map((_, i) => `Week ${i + 1}`)} />
+        <Card><CardHeader title="Workload by Person" /><Bars rows={toBars(data.workload)} /></Card>
       </Grid>
       <Grid cols={2}>
-        <Card><CardHeader title="Tasks by Priority" /><Bars rows={data.priority.map((p) => ({ ...p, color: p.emphasis === "warn" ? "var(--chart-4)" : undefined }))} /></Card>
-        <Table
+        <Card><CardHeader title="Tasks by Priority" /><Bars rows={toBars(data.priority)} /></Card>
+        <DataView
           title="Overdue Reasons"
           rows={data.late_reasons}
           rowKey={(r) => r.reason}

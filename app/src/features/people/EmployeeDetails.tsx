@@ -2,10 +2,9 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { Arrangement } from "@/api/types/attendance";
 import "@/api/types/attendance";
-import { Timeline } from "@/components/ui/data";
-import { LoadingRows } from "@/components/ui/Table";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, Banner, KeyValue, Pill, Card, CardHeader, Grid, useModal, ErrorState, toast, formatDate, ChoiceField, Field, FormFooter, SelectField, TextField } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, ChoiceField, ErrorState, Field, formatDate, FormFooter, Grid, KeyValue, LoadingRows, Pill, SelectField, TextField, Timeline, toast, useModal } from "@mycity/ui";
+import { toTrail } from "@/features/shared/wire";
 
 /** The details modal from the Employees list: employment, and attendance and location (HR only). */
 export function EmployeeDetails({ id, close }: { id: string; close: () => void }) {
@@ -139,7 +138,7 @@ export function AttendanceSetupCard({ id, name }: { id: string; name: string }) 
       </Card>
       <Card>
         <CardHeader title="Attendance Setup History" />
-        <Timeline items={a.history.map((h, i) => ({ title: h.title, when: h.when, text: h.text, tone: i === 0 ? "hi" : "ok" }))} />
+        <Timeline items={toTrail(a.history.map((h, i) => ({ ...h, tone: i === 0 ? "hi" : "ok" })))} />
       </Card>
     </Grid>
   );

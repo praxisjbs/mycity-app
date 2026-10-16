@@ -2,12 +2,9 @@ import type { ReactNode } from "react";
 import { api } from "@/api/client";
 import { useApi, type PagedResult } from "@/api/hooks";
 import "@/api/types/organisation";
-import type { BarRow } from "@/api/types/home";
 import "@/api/types/shared";
-import { Bars, Chain, Timeline } from "@/components/ui/data";
-import { Pager, Table, type Column } from "@/components/ui/Table";
-import { toBars } from "@/features/home/blocks";
-import { Button, KeyValue, Card, CardHeader, toast, SearchInput } from "@mycity/ui";
+import { Bars, Card, CardHeader, Chain, DataView, ExportButton, KeyValue, Pager, SearchInput, Timeline, type DataViewColumn } from "@mycity/ui";
+import { toBars, toTrail, type WireBar, type WireTrailItem } from "./wire";
 
 /**
  * The building blocks the module screens share: the explanation card, the
@@ -33,7 +30,7 @@ export function ChainCard({ steps, note, title }: { steps: Array<{ label: string
   );
 }
 
-export function BarsCard({ title, rows, note, info, right }: { title: string; rows: BarRow[]; note?: string; info?: string; right?: ReactNode }) {
+export function BarsCard({ title, rows, note, info, right }: { title: string; rows: WireBar[]; note?: string; info?: string; right?: ReactNode }) {
   return (
     <Card>
       <CardHeader title={title} help={info} right={right} />
@@ -42,27 +39,28 @@ export function BarsCard({ title, rows, note, info, right }: { title: string; ro
   );
 }
 
-export function TrailCard({ title, items }: { title: string; items: Array<{ title: string; when: string; text?: string | null; tone?: "hi" | "ok" | null }> }) {
+export function TrailCard({ title, items }: { title: string; items: WireTrailItem[] }) {
   return (
     <Card>
       <CardHeader title={title} />
-      <Timeline items={items.map((x) => ({ title: x.title, when: x.when, text: x.text ?? undefined, tone: x.tone ?? undefined }))} />
+      <Timeline items={toTrail(items)} />
     </Card>
   );
 }
 
-/** Export goes to the worker; the file arrives in the Mailbox (FRONTEND_GUIDE §4: never a client-side dump of rows). */
-export function ExportButton({ source, filters, label = "Export" }: { source: string; filters?: Record<string, unknown>; label?: string }) {
+/**
+ * The shared ExportButton bound to this app's export route. Export goes to the
+ * worker and the file arrives in the Mailbox (FRONTEND_GUIDE §4: never a
+ * client-side dump of the rows on screen).
+ */
+export function ExportAction({ source, filters, label }: { source: string; filters?: Record<string, unknown>; label?: string }) {
   return (
-    <Button
-      icon="doc"
-      onClick={async () => {
-        await api.call("POST /api/v1/exports", { body: { source, filters: filters ?? {} } });
-        toast("Export queued. The file arrives in your Mailbox.");
-      }}
+    <ExportButton
+      message="Export queued, check your Mailbox"
+      onExport={() => api.call("POST /api/v1/exports", { body: { source, filters: filters ?? {} } })}
     >
       {label}
-    </Button>
+    </ExportButton>
   );
 }
 
@@ -74,7 +72,7 @@ export function PagedTable<R>({
   list, columns, title, right, search, onRowClick, noun, nounPlural, empty, wide, rowKey,
 }: {
   list: PagedResult<R>;
-  columns: Column<R>[];
+  columns: DataViewColumn<R>[];
   rowKey: (r: R) => string;
   title?: ReactNode;
   right?: ReactNode;
@@ -86,7 +84,7 @@ export function PagedTable<R>({
   wide?: boolean;
 }) {
   return (
-    <Table
+    <DataView
       title={title}
       right={
         (search || right) && (

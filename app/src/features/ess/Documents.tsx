@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { MyDocument } from "@/api/types/ess";
-import { StatStrip, TapList } from "@/components/ui/data";
-import { Paper, PaperFoot, PaperLogo, PaperTitle, Signature } from "@/components/ui/Paper";
-import { Pager, Table } from "@/components/ui/Table";
 import { useMe } from "@/auth/AuthProvider";
-import { UploadField } from "@/components/form";
-import { Button, KeyValue, Pill, Card, CardHeader, DesktopOnly, Grid, PhoneOnly, PageHeader, useModal, toast, formatDate, Field, TextField } from "@mycity/ui";
+import { Button, Card, CardHeader, DataView, DesktopOnly, Field, formatDate, Grid, KeyValue, PageHeader, Pager, Paper, PaperFoot, PaperLogo, PaperTitle, PhoneOnly, Pill, Signature, StatStrip, TapList, TextField, toast, UploadField, useModal } from "@mycity/ui";
+import { upload } from "@/api/upload";
 
 export function MyDocumentsPage() {
   const list = usePaged("GET /api/v1/ess/documents");
@@ -49,7 +46,7 @@ export function MyDocumentsPage() {
       </PhoneOnly>
       <DesktopOnly>
         <Grid cols="1/1.5">
-          <Table
+          <DataView
             title="Vault"
             rows={list.rows}
             rowKey={(d) => d.document_ref_id}
@@ -79,6 +76,7 @@ function UploadForm({ name: initial, close }: { name: string; close: () => void 
         <TextField value={name} onChange={setName} placeholder="NDPA certificate" />
       </Field>
       <UploadField
+        upload={upload}
         purpose="employee_document"
         accept=".pdf,image/*"
         multiple={false}
