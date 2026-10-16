@@ -76,10 +76,15 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
+| Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
+| Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row. | stable |
 | Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField` | Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField). | stable |
+| Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
 | Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
 | Forms | [TextField](#textfield) | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` | The text input of the form system, with its typed relatives: password, whole number, phone and long text. | stable |
+| Forms | [Tick](#tick) | `Tick` | A checkbox with no label beside it, named by what it picks: the tick on a list's row. | stable |
+| Forms | [UploadField](#uploadfield) | `UploadField` | The upload engine: the only file input in the product, with a percentage per file and the vault's document as its answer. | stable |
 | Forms | [Wizard](#wizard) | `Wizard` | A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result. | stable |
 | Data | [Calendar](#calendar) | `Calendar` | A month at a glance, Monday first, with what happens on each day. | stable |
 | Data | [DataView](#dataview) | `DataView`, `LoadingRows` | THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export. | stable |
@@ -2154,6 +2159,75 @@ A one-time code in separate boxes: each digit moves to the next, a pasted code f
 <OtpField label="Sign-In Code" value={code} onChange={setCode} />
 ```
 
+### PersonPicker
+
+Picks people the server searches: their name, job title and department, one page of 25 at a time.
+
+| | |
+|---|---|
+| Use | Any field that names a person: an approver, an interview panel, a task's owner, who a letter is for. |
+| Avoid | Loading every employee into a dropdown (FRONTEND_GUIDE §4); a free-text name box where a record exists; a picker for the person signed in. |
+| Phone | Full width, each person a 44 px row with their initials; the picked chips wrap above the search box. |
+| Accessibility | A search box over a listbox whose options say whether they are picked, and each person named by their own words. |
+| Status | stable |
+| Exports | `PersonPicker` |
+| Import | `import { PersonPicker } from "@mycity/ui";` |
+| File | `packages/ui/src/form/PersonPicker.tsx` |
+| Test | `packages/ui/src/form/PersonPicker.test.tsx` |
+| Gallery | `packages/ui/src/form/PersonPicker.gallery.tsx` (`npm run gallery`, `#/PersonPicker`) |
+
+**PersonPicker** props (`PersonPickerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `list` | `DataViewList<P>` | yes | The server-paged people to pick from (a `usePaged()` result). |
+| `value` | `P[]` | yes | Who is picked, held by the form. |
+| `onChange` | `(value: P[]) => void` | yes | Called with the new set. |
+| `multiple` | `boolean` |  | Pick several; one only unless set. |
+| `placeholder` | `string` |  | A format example of at most 3 words; "Search people" otherwise. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PersonPicker list={employees} value={panel} onChange={setPanel} multiple />
+```
+
+### RecordPicker
+
+Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything.
+
+| | |
+|---|---|
+| Use | A field that points at another record: a worksite, a department, a partner, a vacancy, an expense category. |
+| Avoid | Fetching every record to fill a `<select>` (FRONTEND_GUIDE §4); a picker over a list short enough to be a SelectField; filtering the 25 rows on screen. |
+| Phone | The search box and the results are full width, each result a 44 px row; the picked chips wrap above it. |
+| Accessibility | A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. |
+| Status | stable |
+| Exports | `RecordPicker` |
+| Import | `import { RecordPicker } from "@mycity/ui";` |
+| File | `packages/ui/src/form/RecordPicker.tsx` |
+| Test | `packages/ui/src/form/RecordPicker.test.tsx` |
+| Gallery | `packages/ui/src/form/RecordPicker.gallery.tsx` (`npm run gallery`, `#/RecordPicker`) |
+
+**RecordPicker** props (`RecordPickerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `list` | `DataViewList<R>` | yes | The server-paged records to pick from (a `usePaged()` result); the picker drives its search. |
+| `value` | `R[]` | yes | What is picked, held by the form. |
+| `onChange` | `(value: R[]) => void` | yes | Called with the new set. |
+| `id` | `(row: R) => string` | yes | Names one record, for the key and for what is already picked. |
+| `title` | `(row: R) => ReactNode` | yes | The record's own words (a name, a number). |
+| `sub` | `(row: R) => ReactNode` |  | The line under it (a department, a date, an amount). |
+| `lead` | `(row: R) => ReactNode` |  | What sits at the left of a row (an avatar, a glyph). |
+| `multiple` | `boolean` |  | Pick several; one only unless set. |
+| `placeholder` | `string` |  | A format example of at most 3 words; "Search" otherwise. |
+| `chip` | `(row: R) => string` |  | How a picked record reads on its chip; the title unless set. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<RecordPicker list={worksites} value={picked} onChange={setPicked} id={(w) => w.worksite_id} title={(w) => w.name} />
+```
+
 ### SearchInput
 
 The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row.
@@ -2239,6 +2313,37 @@ Pick one value: a select list, or for five options or fewer a segmented choice (
 
 ```tsx
 <ChoiceField options={[["remote", "Remote"], ["hybrid", "Hybrid"], ["on_site", "On Site"]]} {...form.field("work_pattern")} />
+```
+
+### SignatureField
+
+A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into.
+
+| | |
+|---|---|
+| Use | Signing an offer, an acknowledgement, a policy, an asset handover (MILESTONES §10: signed on a canvas from a phone). |
+| Avoid | A typed name as a signature; keeping the image anywhere but the document it belongs to; a pad nobody can clear. |
+| Phone | This is where it is used most: the pad is full width and drawn with a finger, and Clear is a 44 px target. |
+| Accessibility | The pad is named, and Clear says whether anything has been drawn, so the state is never only visual; a typed-name fallback stays the screen's choice. |
+| Status | stable |
+| Exports | `SignatureField` |
+| Import | `import { SignatureField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/SignatureField.tsx` |
+| Test | `packages/ui/src/form/SignatureField.test.tsx` |
+| Gallery | `packages/ui/src/form/SignatureField.gallery.tsx` (`npm run gallery`, `#/SignatureField`) |
+
+**SignatureField** props (`SignatureFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | Names the pad, Title Case, at most 4 words. |
+| `onChange` | `(hasInk: boolean) => void` | yes | Called true the moment the first stroke lands, and false when it is cleared. |
+| `disabled` | `boolean` |  | Nothing can be drawn (the document is already signed, or the link has been used). |
+| `noClear` | `boolean` |  | Hide the Clear button, where the screen offers its own. |
+| `className` | `string` |  | Layout classes only (spacing, height). |
+
+```tsx
+<SignatureField label="Your Signature" onChange={setInk} ref={pad} />
 ```
 
 ### Switch
@@ -2344,6 +2449,75 @@ The text input of the form system, with its typed relatives: password, whole num
 
 ```tsx
 <TextField type="email" placeholder="ada@mycity.app" {...form.field("work_email")} />
+```
+
+### Tick
+
+A checkbox with no label beside it, named by what it picks: the tick on a list's row.
+
+| | |
+|---|---|
+| Use | Row selection in DataView, and the one in a list's header that picks the whole page. |
+| Avoid | A yes or no answer in a form (use CheckboxField, which carries its label); a tick with no name; a tick that submits something on its own. |
+| Phone | A 44 px target around the box, so the tick is hittable without hitting the row it sits on. |
+| Accessibility | A real checkbox with its own name, so a screen reader says what is being picked, and it stops a press reaching the row underneath. |
+| Status | stable |
+| Exports | `Tick` |
+| Import | `import { Tick } from "@mycity/ui";` |
+| File | `packages/ui/src/form/Tick.tsx` |
+| Test | `packages/ui/src/form/Tick.test.tsx` |
+| Gallery | `packages/ui/src/form/Tick.gallery.tsx` (`npm run gallery`, `#/Tick`) |
+
+**Tick** props (`TickProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `checked` | `boolean` | yes | Ticked or not. |
+| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `label` | `string` | yes | What it picks, as words ("Select Page", "Select Ada Obi"): its accessible name. |
+| `disabled` | `boolean` |  | Nothing can be picked. |
+| `className` | `string` |  | Layout classes only (alignment). |
+
+```tsx
+<Tick checked={picked} onChange={toggle} label="Select Ada Obi" />
+```
+
+### UploadField
+
+The upload engine: the only file input in the product, with a percentage per file and the vault's document as its answer.
+
+| | |
+|---|---|
+| Use | Anywhere a person attaches a file: a CV, a receipt, a signed offer, a mail attachment, an import sheet. |
+| Avoid | A raw `<input type="file">` anywhere else (gate 18); storing a path or a name instead of the `document_id`; a silent wait on a large file. |
+| Phone | The drop zone is a full-width tap target, since a phone cannot drop; every file shows its own percentage as it travels. |
+| Accessibility | A real file input with a label, the progress a named meter per file, and each file's state said in words as well as a glyph. |
+| Status | stable |
+| Exports | `UploadField` |
+| Import | `import { UploadField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/UploadField.tsx` |
+| Test | `packages/ui/src/form/UploadField.test.tsx` |
+| Gallery | `packages/ui/src/form/UploadField.gallery.tsx` (`npm run gallery`, `#/UploadField`) |
+
+**UploadField** props (`UploadFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `endpoint` | `string` |  | Where the multipart goes; `/api/v1/documents` unless the route is its own. |
+| `purpose` | `string` | yes | What the file is for: the server reads it to decide which types it takes. |
+| `upload` | `Uploader` |  | How the file is sent; the app's own client, which adds its session. The bare engine otherwise. |
+| `multiple` | `boolean` |  | Several files at once (the default), or exactly one. |
+| `accept` | `string` |  | What the picker offers, as extensions (".pdf,.jpg"). |
+| `maxBytes` | `number` |  | The biggest file taken; 25 MB unless set. |
+| `onUploaded` | `(docs: DocumentRef[]) => void` |  | Called with the documents once they have all arrived. |
+| `label` | `string` |  | The words in the drop zone, at most 6 words. |
+| `kinds` | `string` |  | What kinds of file are wanted, lower case, for the line under the words ("PDF or Word"). |
+| `compact` | `boolean` |  | A tighter drop zone, inside a sheet or beside a form's footer. |
+| `trigger` | `(open: () => void) => ReactNode` |  | A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<UploadField purpose="receipt" endpoint="/api/v1/documents" upload={api.upload} onUploaded={(docs) => form.set("receipts", docs)} />
 ```
 
 ### Wizard
@@ -3373,3 +3547,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `Slot` (type) | `lib/slots.ts` | One slot name. |
 | `slot` | `lib/slots.ts` | Spread onto an element: `<h1 {...slot("page-title")}>`. |
 | `content` | `lib/slots.ts` | Spread onto an element that shows content a person wrote or received. |
+| `DocumentRef` (type) | `lib/upload.ts` | The upload engine's transport, one copy for both apps (gate 18, FRONTEND_GUIDE §8.7). |
+| `UploadOptions` (type) | `lib/upload.ts` |  |
+| `uploadFile` | `lib/upload.ts` | Send one file and report its progress. |
+| `Uploader` (type) | `lib/upload.ts` | How a file is sent, so a screen can pass a different one (a test, the in-browser mock). |

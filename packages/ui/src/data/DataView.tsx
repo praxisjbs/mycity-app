@@ -24,6 +24,7 @@ import { Skeleton } from "../display/Skeleton";
 import { ErrorState } from "../feedback/ErrorState";
 import { Menu, type MenuItem } from "../overlay/Menu";
 import { SearchInput } from "../form/SearchInput";
+import { Tick } from "../form/Tick";
 import { ApiError, type PageMeta } from "./createApi";
 import { ExportButton } from "./ExportButton";
 import { Pager } from "./Pager";
@@ -190,18 +191,6 @@ export function DataView<R>({
   const togglePage = () => selection?.onChange(allPicked ? keys.filter((k) => !pageKeys.includes(k)) : [...new Set([...keys, ...pageKeys])]);
   const toggleRow = (key: string) => selection?.onChange(keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]);
 
-  const tick = (checked: boolean, label: string, onToggle: () => void) => (
-    <span className="flex size-tap flex-none items-center justify-center">
-      <input
-        type="checkbox"
-        checked={checked}
-        aria-label={label}
-        onChange={onToggle}
-        onClick={(e) => e.stopPropagation()}
-        className="size-4 accent-secondary"
-      />
-    </span>
-  );
 
   /* ───── sort, as an action sheet where there is no table header ───── */
 
@@ -235,7 +224,7 @@ export function DataView<R>({
               (selectedKey === key || keys.includes(key)) && "bg-muted",
             )}
           >
-            {selection && tick(keys.includes(key), `Select ${typeof headCell === "string" ? headCell : "row"}`, () => toggleRow(key))}
+            {selection && <Tick checked={keys.includes(key)} onChange={() => toggleRow(key)} label={`Select ${typeof headCell === "string" ? headCell : "row"}`} />}
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="text-sm font-semibold wrap-any">
                 {onRowClick ? (
@@ -280,7 +269,7 @@ export function DataView<R>({
           <tr>
             {selection && (
               <th scope="col" className="w-10 border-b border-border bg-muted px-3 py-2">
-                {tick(allPicked, "Select Page", togglePage)}
+                <Tick checked={allPicked} onChange={togglePage} label="Select Page" />
               </th>
             )}
             {columns.map((c) => {
@@ -332,7 +321,11 @@ export function DataView<R>({
                   (selectedKey === key || keys.includes(key)) && "[&>td]:bg-muted",
                 )}
               >
-                {selection && <td className="border-b border-border px-3 py-2">{tick(keys.includes(key), `Select row ${i + 1}`, () => toggleRow(key))}</td>}
+                {selection && (
+                  <td className="border-b border-border px-3 py-2">
+                    <Tick checked={keys.includes(key)} onChange={() => toggleRow(key)} label={`Select row ${i + 1}`} />
+                  </td>
+                )}
                 {columns.map((c) => (
                   <td key={c.key} className={cn("border-b border-border px-3 py-2", c.align === "n" && "text-right tabular-nums", c.desktop && "max-md:hidden", c.className)}>
                     {cell(c.render(row, i))}

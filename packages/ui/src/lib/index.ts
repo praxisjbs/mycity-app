@@ -7,3 +7,4 @@ export { SLOTS, content, slot, type Slot } from "./slots";
 export { describedBy, useControlIds, type ControlIds } from "./ids";
 export * from "./environment";
 export * from "./plan";
+export { uploadFile, type UploadOptions, type DocumentRef, type Uploader } from "./upload";
