@@ -30,6 +30,7 @@ systemctl --no-pager status mycity-api-prod mycity-worker-prod postgresql redis-
 | **Database** (503) | Postgres stopped, disk full | `sudo systemctl status postgresql`; `df -h /`; `sudo systemctl start postgresql` |
 | Signed-in users thrown out, jobs stuck | Redis down | `sudo systemctl restart redis-server`, then both mycity units |
 | Mail, PDFs, notifications not happening | worker down or behind | `journalctl -u mycity-worker-prod -n 100`; `sudo systemctl restart mycity-worker-prod` |
+| Mail arrives hours late | the hourly limit reached (a batch of payslips or invitations): the rest wait their turn, by design | the `mail` check's `sent_last_hour`; `journalctl -u mycity-worker-prod \| grep postponed`. Nothing to fix unless it is urgent mail behind a batch |
 | Mail not delivered, worker fine | SMTP refused, password changed, sending limit on the Namecheap plan | the `mail` check's error; the worker log; cPanel for the account |
 | PDFs fail | Chrome missing or crashing | the `chromium` check; `google-chrome-stable --version` |
 | Public uploads stay "pending" | clamd down or signatures missing | `sudo systemctl status clamav-daemon clamav-freshclam` |

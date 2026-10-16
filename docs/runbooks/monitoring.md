@@ -34,7 +34,7 @@ What each check means when it is not `up`:
 | `outbox` | events are piling up (the worker is behind or down) | the worker |
 | `storage` | the media folder is missing or not writable | `/srv/mycity/<env>/media` |
 | `chromium`, `ffmpeg`, `clamd` | PDFs, voice and video, or upload scanning are unavailable | `ops/provision/provision.sh` installs them; `systemctl status clamav-daemon` |
-| `mail` | SMTP is not configured or refuses | `SMTP_*` in the `.env` |
+| `mail` | SMTP is not configured or refuses. When up it shows `sent_last_hour` of `per_hour`: at the limit, system mail waits for a slot (it is not lost) | `SMTP_*` and `MAIL_SEND_PER_HOUR` in the `.env`; `docs/runbooks/dns-and-mail.md` §4 |
 | `static` | a frontend build is missing from the release | the release; `deploy.md` |
 | `ai` | which AI vendor answers (Gemini or the stub), from settings only | AI settings |
 

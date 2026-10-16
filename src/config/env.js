@@ -431,6 +431,14 @@ const ENTRIES = [
     },
   ],
   [
+    "MAIL_SEND_PER_HOUR",
+    int(0, { min: 0, max: 100000 }),
+    {
+      group: "Mail",
+      doc: "System mail recipients per rolling hour (services/mail/pace.js); 0 sends unpaced. Production and staging share the mailbox's limit: 40 and 10 of the plan's 50. Required on servers.",
+    },
+  ],
+  [
     "MAIL_RBL_HOSTS",
     str(""),
     {
@@ -626,6 +634,10 @@ function serverProblems(c) {
   if (!c.SMTP_HOST)
     out.push(
       `SMTP_HOST is required on ${c.APP_ENV} (A4: system mail is really sent)`,
+    );
+  if (!c.MAIL_SEND_PER_HOUR)
+    out.push(
+      `MAIL_SEND_PER_HOUR is required on ${c.APP_ENV} (the mailbox's hourly limit; docs/runbooks/dns-and-mail.md)`,
     );
   if (!/<[^@\s]+@[^>\s]+>$|^[^@\s]+@[^@\s]+$/.test(c.MAIL_FROM))
     out.push("MAIL_FROM must be an address, or Name <address>");

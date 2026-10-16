@@ -14,7 +14,10 @@
  * committed. In CI only commits count.
  *
  * Exemptions are trailers, one per line, in the PR description or in any
- * commit message of the change:
+ * commit message of the change. After a merge, CI runs again on the push to
+ * main, where GitHub sends no PR description: the description of the pull
+ * request the pushed commit came from is read instead (gh, with the job's
+ * token), so an exemption accepted on the PR still counts on main.
  *   Progress-unchanged: <reason>
  *   Guide-unchanged: <reason>
  * A trailer with no reason does not count.
@@ -145,12 +148,39 @@ function addedLines(file) {
     .map((l) => l.slice(1));
 }
 
+/**
+ * On a push to main: the description of the pull request the pushed commit belongs to, or ""
+ * when it came from no pull request, or GitHub could not be asked (then the run says so).
+ */
+function mergedPullRequestText() {
+  const sha = process.env.GITHUB_SHA;
+  const repo = process.env.GITHUB_REPOSITORY;
+  if (!IN_CI || !sha || !repo) return "";
+  const r = spawnSync(
+    process.env.MYCITY_GH || "gh",
+    ["api", `repos/${repo}/commits/${sha}/pulls`, "--jq", ".[].body // empty"],
+    { encoding: "utf8", env: { ...process.env, GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN || "" } },
+  );
+  if (r.status !== 0) {
+    console.error(
+      `note: the merged pull request's description could not be read (${(r.stderr || r.error || "").toString().trim().split("\n")[0]}); only commit messages are searched for trailers`,
+    );
+    return "";
+  }
+  return r.stdout || "";
+}
+
+let cachedPrText;
 /** All text a trailer may live in: the PR description and the change's commit messages. */
 function changeText() {
   const parts = [];
   const event = githubEvent();
   if (event && event.pull_request && event.pull_request.body)
     parts.push(event.pull_request.body);
+  if (process.env.GITHUB_EVENT_NAME === "push") {
+    if (cachedPrText === undefined) cachedPrText = mergedPullRequestText();
+    parts.push(cachedPrText);
+  }
   if (process.env.MYCITY_PR_BODY) parts.push(process.env.MYCITY_PR_BODY);
   const b = base();
   if (b)

@@ -294,8 +294,11 @@ for e in "${ENVS[@]}"; do
     render "$OPS/systemd/$e.env.template" "$target" "$e"
     note "$target written"
   fi
-  if grep -q '^SMTP_HOST=$' "$target"; then
+  if grep -q '^SMTP_HOST=$' "$target" || grep -q '^SMTP_PASSWORD=$' "$target"; then
     later "fill SMTP_* in $target (${APP_ENV[$e]} refuses to boot without mail)"
+  fi
+  if ! grep -q '^MAIL_SEND_PER_HOUR=[1-9]' "$target"; then
+    later "add MAIL_SEND_PER_HOUR to $target (production 40, staging 10; ${APP_ENV[$e]} refuses to boot without it)"
   fi
 done
 

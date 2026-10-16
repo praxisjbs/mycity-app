@@ -101,6 +101,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   09/12/2026 at ₦1,850,000.00 a month, address, next of kin, bank); only the email and password are
   typed, so neither is in the repository. `employee` gained `home_address` and `contract_ends_on`
   (`0210`). Left: run it on staging and production (`docs/runbooks/first-accounts.md`).
+- 16/10/2026 · GE · Mail host values in (`docs/runbooks/dns-and-mail.md` §4): `mycityapp.io`,
+  465 and 993, 50 recipients an hour, 30 IMAP connections per IP, 30 mailboxes. System mail is now
+  paced to the hourly limit (`services/mail/pace.js`, `MAIL_SEND_PER_HOUR`: production 40, staging
+  10, required on servers); over it, jobs wait for a slot instead of failing. The env templates
+  carry the values. Left: the SMTP password and `MAIL_SEND_PER_HOUR` in both `.env` files on the
+  server; whether the 50 is per mailbox or per account; the IMAP limit is a rule for the Mailbox
+  module (`mailbox.md` §6).
 - 16/10/2026 · TB · Sign-in and sessions built (`docs/guides/identity.md`). Backend: migration
   `0200_identity_sessions.sql` and seed `0290_seed_roles_and_grants.sql` (the seven real roles with
   a home view and rank, and the grants matrix); `identity` (sign-in, refresh with rotation and reuse

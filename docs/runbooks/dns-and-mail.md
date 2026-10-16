@@ -47,3 +47,25 @@ Then **Connect Devices** for that account, **Mail Client Manual Settings**, and 
 
 Staff mailboxes need nothing extra: each person signs in to the app's Mailbox with the address and
 password they already use for webmail.
+
+## 4 · What came back (16/10/2026)
+
+| Detail | Value | Where it goes |
+|---|---|---|
+| SMTP server | `mycityapp.io`, port `465`, TLS from the first byte | `SMTP_HOST=mycityapp.io`, `SMTP_PORT=465`, `SMTP_SECURE=true` |
+| SMTP username | `no-reply@mycityapp.io` | `SMTP_USER`; the password only in the server's `.env` files |
+| IMAP server | `mycityapp.io`, port `993` | the Mailbox module's connection defaults |
+| Certificate name | `mycityapp.io` | the host must be exactly that: `mail.mycityapp.io` fails the certificate check |
+| Sending limit | **50 recipients an hour** | `MAIL_SEND_PER_HOUR`: production 40, staging 10 (both send from `no-reply`) |
+| IMAP connections | **30 at once from one IP address** | the Mailbox module's limit (guide `mailbox.md` §6); prod and staging share the server's IP |
+| Mailboxes on the plan | **30** | at most 30 staff mailboxes; more needs a bigger plan |
+
+System mail is paced to the limit (`src/services/mail/pace.js`): a batch larger than the hour's
+allowance (payslips for every employee, a round of invitations) goes out over several hours instead
+of being refused. Still to ask the domain manager: is the 50 for each mailbox, or for the whole
+hosting account? If it is the whole account, staff sending from their own mailboxes eats into the
+same 50, and the plan is too small for an office of 30.
+
+The two `.env` files on the server were written before these values were known: set the `SMTP_*`
+lines above and add `MAIL_SEND_PER_HOUR=40` (production) or `MAIL_SEND_PER_HOUR=10` (staging). A
+server refuses to start without it.
