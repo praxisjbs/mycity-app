@@ -17,6 +17,7 @@ const sharp = require("sharp");
 const ExcelJS = require("exceljs");
 const { z } = require("zod");
 const { config } = require("../../src/config/env");
+const schema = require("./helpers/schema");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
 const { defineEvents } = require("../../src/shared/events/catalogue");
@@ -77,13 +78,13 @@ async function seed() {
   const emp = async (first, last, manager = null) =>
     (
       await one(
-        "INSERT INTO employee (first_name, last_name, line_manager_id) VALUES ($1, $2, $3) RETURNING employee_id",
+        schema.sql.employee,
         [first, last, manager],
       )
     ).employee_id;
   const user = async (key, employeeId, isCeo = false) => {
     const u = await one(
-      "INSERT INTO app_user (employee_id, email, is_ceo) VALUES ($1, $2, $3) RETURNING user_id",
+      schema.sql.user,
       [employeeId, `${key}@mycity.test`, isCeo],
     );
     people[key] = {
@@ -97,7 +98,7 @@ async function seed() {
   };
   const role = async (code, perms) => {
     const r = await one(
-      "INSERT INTO role (code) VALUES ($1) RETURNING role_id",
+      schema.sql.role,
       [code],
     );
     for (const [module, scope, actions] of perms) {
@@ -147,7 +148,8 @@ async function seed() {
   await grant("chidi", staff);
   await grant("bola", staff);
   await q(
-    `INSERT INTO numbering_scheme (doc_type, prefix, padding) VALUES ('import_batch', 'IMP', 4), ('letter', 'LTR', 4)`,
+    `INSERT INTO numbering_scheme (doc_type, prefix, padding) VALUES ('import_batch', 'IMP', 4), ('letter', 'LTR', 4)
+     ON CONFLICT (doc_type) DO UPDATE SET prefix = EXCLUDED.prefix, padding = EXCLUDED.padding`,
   );
   await q(
     `INSERT INTO setting (key, value) VALUES ('organisation.profile', '{"name": "MyCity App Ltd", "email": "hello@mycityapp.io"}')`,
@@ -377,12 +379,7 @@ const describeDb = String(config.DB_NAME || "").endsWith("_test")
 
 describeDb("documents, PDFs, mail and imports against Postgres", () => {
   beforeAll(async () => {
-    await q(
-      fs.readFileSync(
-        path.join(__dirname, "fixtures", "shared-layer.sql"),
-        "utf8",
-      ),
-    );
+    await schema.rebuild(pool, config.DB_NAME);
     await seed();
     registry.defineImporter(IMPORTER);
     defineDocumentType("employee_photo", {
@@ -890,7 +887,7 @@ describeDb("documents, PDFs, mail and imports against Postgres", () => {
       ).toBe(1);
       expect(
         await one(
-          "SELECT last_value FROM numbering_counter WHERE doc_type = 'import_batch'",
+          "SELECT last_value::int AS last_value FROM numbering_counter WHERE doc_type = 'import_batch'",
         ),
       ).toEqual({ last_value: 1 });
       const errors = await engine.rowsOf(pool, first.import_batch_id, {

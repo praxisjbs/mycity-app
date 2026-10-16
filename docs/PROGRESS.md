@@ -95,6 +95,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
+  rebuilds the schema with `migrate.js` and `fixtures/shared-layer.sql` is gone; CI now has PostgreSQL 16
+  with pgvector and Redis, so the suite and gate 4's round trip run on every PR. `1100` lets the alerts
+  code raise an alert with no trigger and returns `over_by` to two places. 82 of 82 integration tests
+  pass. Left: the role permission matrix (M9), the staff-number counter after an import.
 - 16/10/2026 · TB · M0 schema made to match the foundation code: `0100` lets the shared layer write
   what it writes (emit's empty diff, bell rows without a body, untitled uploads, 0-based import
   header rows, refused AI runs, the AI settings defaults); `0110` gives `employee` the contract's
