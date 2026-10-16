@@ -99,7 +99,7 @@ describe("migration files and numbers", () => {
     ]);
   });
 
-  test("blocks, names and duplicates", () => {
+  test("blocks, names and duplicates apply across both folders", () => {
     expect(numbers.blockOf(0)).toEqual([1, 999]);
     expect(numbers.blockOf(11)).toEqual([11000, 11999]);
     expect(numbers.milestoneOf(1050)).toBe(1);
@@ -110,13 +110,13 @@ describe("migration files and numbers", () => {
 
     const root = tmp("mycity-num-");
     put(root, "migrations/0001_extensions.sql", MIG("SELECT 1;", "SELECT 1;"));
-    put(root, "migrations/0001_again.sql", MIG("SELECT 1;", "SELECT 1;"));
+    put(root, "seeds/reference/0001_seed_again.sql", MIG("SELECT 1;", "SELECT 1;"));
     put(root, "migrations/12000_too_far.sql", MIG("SELECT 1;", "SELECT 1;"));
     put(root, "migrations/0099_Bad-Name.sql", "");
     put(root, "migrations/00042_padded.sql", MIG("SELECT 1;", "SELECT 1;"));
     put(root, "migrations/.gitkeep", "");
     const { problems } = numbers.check({ root, branch: null, changes: [] });
-    expect(problems.join("\n")).toMatch(/number 1 is used 2 times/);
+    expect(problems.join("\n")).toMatch(/number 0001 is used 2 times/);
     expect(problems.join("\n")).toMatch(
       /12000_too_far\.sql: 12000 is in no milestone block/,
     );
@@ -127,21 +127,30 @@ describe("migration files and numbers", () => {
     expect(problems).toHaveLength(4);
   });
 
-  test("a new file on a milestone branch is in that milestone's block", () => {
+  test("a new schema or reference seed uses its branch milestone block", () => {
     const root = tmp("mycity-num-");
     put(root, "migrations/1000_leave.sql", MIG("SELECT 1;", "SELECT 1;"));
     put(root, "migrations/1010_later.sql", MIG("SELECT 1;", "SELECT 1;"));
-    put(root, "migrations/1005_new.sql", MIG("SELECT 1;", "SELECT 1;"));
-    const changes = [{ path: "migrations/1005_new.sql", status: "A" }];
+    put(root, "seeds/reference/1005_seed_new.sql", MIG("SELECT 1;", "SELECT 1;"));
+    const changes = [{ path: "seeds/reference/1005_seed_new.sql", status: "A" }];
     const onM1 = numbers.check({ root, branch: "m1/leave", changes });
     expect(onM1.problems).toEqual([]);
     expect(onM1.notes[0]).toMatch(
-      /1005_new\.sql is numbered below 1010_later\.sql/,
+      /1005_seed_new\.sql is numbered below migrations\/1010_later\.sql/,
     );
     const onM3 = numbers.check({ root, branch: "m3/payroll", changes });
     expect(onM3.problems[0]).toMatch(
-      /M3 branch, so a new migration is numbered 3000 to 3999/,
+      /M3 branch, so a new file is numbered 3000 to 3999/,
     );
+  });
+
+  test("seed names and locations are enforced", () => {
+    const root = tmp("mycity-num-");
+    put(root, "migrations/0001_seed_wrong.sql", MIG("SELECT 1;", "SELECT 1;"));
+    put(root, "seeds/reference/0002_reference.sql", MIG("SELECT 1;", "SELECT 1;"));
+    const result = numbers.check({ root });
+    expect(result.problems).toHaveLength(2);
+    expect(result.problems.join("\n")).toMatch(/reference seed files use _seed_/);
   });
 });
 

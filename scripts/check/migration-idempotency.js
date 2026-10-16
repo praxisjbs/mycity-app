@@ -224,7 +224,7 @@ function changedMigrations() {
   try {
     const { changedFiles } = require("./lib/changes");
     return changedFiles().filter((c) =>
-      /^migrations\/[^/]+\.sql$/.test(c.path),
+      /^(?:migrations|seeds\/reference)\/[^/]+\.sql$/.test(c.path),
     );
   } catch {
     return [];
@@ -237,22 +237,30 @@ function changedMigrations() {
  */
 function check({ root = ROOT, changes } = {}) {
   const problems = [];
-  const dir = path.join(root, "migrations");
-  const files = fs.existsSync(dir)
-    ? fs
-        .readdirSync(dir)
-        .filter((f) => f.endsWith(".sql"))
-        .sort()
-    : [];
-  for (const f of files) {
-    for (const v of violations(fs.readFileSync(path.join(dir, f), "utf8")))
+  const files = [
+    [path.join(root, "migrations"), "migrations"],
+    [path.join(root, "seeds", "reference"), "seeds/reference"],
+  ].flatMap(([dir, label]) =>
+    fs.existsSync(dir)
+      ? fs
+          .readdirSync(dir)
+          .filter((f) => f.endsWith(".sql"))
+          .map((f) => ({ dir, label, file: f }))
+      : [],
+  );
+  for (const { dir, label, file } of files) {
+    for (const v of violations(fs.readFileSync(path.join(dir, file), "utf8")))
       problems.push(
-        `migrations/${f}:${v.line} [${v.rule}] not safe to run twice; use ${v.fix}`,
+        `${label}/${file}:${v.line} [${v.rule}] not safe to run twice; use ${v.fix}`,
       );
   }
   const verb = { M: "edited", D: "deleted", R: "renamed" };
   for (const c of changes === undefined ? changedMigrations() : changes) {
-    if (!verb[c.status] || !/^migrations\/[^/]+\.sql$/.test(c.path)) continue;
+    if (
+      !verb[c.status] ||
+      !/^(?:migrations|seeds\/reference)\/[^/]+\.sql$/.test(c.path)
+    )
+      continue;
     problems.push(
       `${c.path}: a merged migration was ${verb[c.status]}. The ledger keys on its name and hash, so databases that have it and fresh ones would differ. Put the change in a new file`,
     );
