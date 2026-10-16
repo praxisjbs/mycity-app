@@ -97,6 +97,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · Release fix: staging deployed, but verify-staging refused to seal on two
+  checks. The migrations head now counts reference seeds, which share the ledger's numbering
+  (`10099_seed_knowledge_ai` is the head, not `10000_…`). `/socket.io` on the public host is now the
+  API's JSON 404 (docs/runbooks/proxy.md §5): Engine.IO hands a wrong-host request back to the app,
+  and refuses a wrong-host upgrade with a 404, where it answered 400 before. Left: the PENDING
+  checks wait for their modules.
 - 16/10/2026 · TB · `docs/guides/foundation.md`: the rest of M0 and the foundation in four tracks (A
   people and the staff roster, B imports and documents, C access, settings and audit, D workflow and
   search), with TB's twenty decisions of 16/10/2026. TB claims the remaining M0 modules from GE's row

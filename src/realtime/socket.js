@@ -122,24 +122,51 @@ function onConnection(socket) {
 }
 
 /**
+ * Engine.IO answers every /socket.io request itself, ahead of the app. A request from a host
+ * that may not use realtime (the public site) goes back to the app instead, so the host guard
+ * answers it with the same JSON 404 as any other wrong-host path (docs/runbooks/proxy.md §5);
+ * an upgrade from such a host is refused with a 404 and closed.
+ */
+function routeByHost(httpServer, appListeners, allowed) {
+  const engineRequest = httpServer.listeners("request").slice();
+  httpServer.removeAllListeners("request");
+  httpServer.on("request", (req, res) => {
+    for (const listener of allowed(req) ? engineRequest : appListeners) listener.call(httpServer, req, res);
+  });
+  const engineUpgrade = httpServer.listeners("upgrade").slice();
+  httpServer.removeAllListeners("upgrade");
+  httpServer.on("upgrade", (req, socket, head) => {
+    if (allowed(req)) {
+      for (const listener of engineUpgrade) listener.call(httpServer, req, socket, head);
+      return;
+    }
+    socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+  });
+}
+
+/**
  * Attach Socket.io to the API's HTTP server.
  * @param {import("node:http").Server} httpServer
+ * @param {{sites?: object}} [opts]  the hosts to tell apart (tests); the configured ones otherwise
  * @returns {import("socket.io").Server}
  */
-function attach(httpServer) {
+function attach(httpServer, opts = {}) {
   if (io) return io;
   const { Server } = require("socket.io");
   const { createAdapter } = require("@socket.io/redis-adapter");
+  const allowed = (req) => hostAllowed(req, opts.sites || sites());
+  const appListeners = httpServer.listeners("request").slice();
   io = new Server(httpServer, {
     path: "/socket.io",
     serveClient: false,
     cors: { origin: originsFor(config.STAFF_ORIGIN), credentials: true },
     maxHttpBufferSize: MAX_MESSAGE_BYTES,
     allowRequest: (req, cb) => {
-      const ok = hostAllowed(req);
+      const ok = allowed(req);
       cb(ok ? null : "WRONG_HOST", ok);
     },
   });
+  routeByHost(httpServer, appListeners, allowed);
   io.adapter(
     createAdapter(
       createConnection("realtime:pub"),
