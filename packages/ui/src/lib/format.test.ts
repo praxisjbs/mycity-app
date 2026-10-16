@@ -15,6 +15,7 @@ import {
   parseDayFirst,
   plural,
   todayIso,
+  zoneClock,
 } from "./format";
 
 describe("dates, day-first in Lagos time", () => {
@@ -37,6 +38,14 @@ describe("dates, day-first in Lagos time", () => {
     expect(formatMonth("2026-10")).toBe("October 2026");
     expect(monthName(0)).toBe("January");
     expect(todayIso(new Date("2026-10-13T23:30:00Z"))).toBe("2026-10-14");
+  });
+
+  it("reads the wall clock in another city, day first", () => {
+    const at = new Date("2026-10-14T18:42:00Z");
+    expect(zoneClock(at, "Africa/Lagos")).toEqual({ time: "19:42", day: "Wednesday 14 October", hour: 19.7 });
+    expect(zoneClock(at, "Europe/London").time).toBe("19:42");
+    expect(zoneClock(at, "Africa/Accra").time).toBe("18:42");
+    expect(zoneClock(new Date("2026-10-14T22:05:00Z"), "Africa/Nairobi")).toEqual({ time: "01:05", day: "Thursday 15 October", hour: 1 + 5 / 60 });
   });
 
   it("parses day-first text and refuses impossible dates", () => {

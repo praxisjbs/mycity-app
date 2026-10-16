@@ -1,25 +1,44 @@
-import { fail, invalid, mockSession, ok, noContent, paged, route, at } from "../core";
+import type { Me, SignIn } from "@mycity/contract/contract.gen.ts";
+import { at, fail, invalid, mockSession, ok, noContent, paged, route } from "../core";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
 import { SEARCH_INDEX } from "../data/search";
 
-function me(key: string) {
+/**
+ * Identity, as packages/contract/schemas/identity.js describes it. The four
+ * demonstration accounts sign in with any password of eight characters or more
+ * (the sign-in screen offers them in mock mode); a suspended one is refused.
+ * Sessions here last as long as the browser tab, not two hours.
+ */
+
+const ROLE: Record<string, { code: string; name: string }> = {
+  Operations: { code: "operations_people", name: "Operations & People" },
+  CEO: { code: "management", name: "Management" },
+  Partnerships: { code: "head_of_department", name: "Head of Department" },
+  Staff: { code: "employee", name: "Staff" },
+};
+
+function me(key: string): Me {
   const p = byKey(key)!;
   return {
     user_id: p.employee_id.replace(/^.{4}/, "u5e7"),
     employee_id: p.employee_id,
     email: p.work_email,
     display_name: p.display_name,
+    first_name: p.first_name,
     job_title: p.job_title,
     department: p.department,
     photo_url: null,
     is_ceo: key === "ifeoma",
-    grants: grantsFor(key),
+    grants: grantsFor(key) as Me["grants"],
+    roles: [ROLE[SIGN_INS[key]?.role ?? "Staff"] ?? ROLE.Staff],
     home_view: SIGN_INS[key]?.view ?? "staff",
     manages_people: teamOf(key).length > 0,
   };
 }
 
-const session = (key: string) => ({ access_token: `mock.${key}.${Date.now().toString(36)}`, expires_in: 900, user: me(key) });
+const clock = { expires_in: 900, session_expires_in: 7200, session_max_age: 7200, session_idle_limit: 1800 };
+const token = (key: string) => `mock.${key}.${Date.now().toString(36)}`;
+let lastOnThisBrowser: string | null = null;
 
 route(
   "POST /api/v1/auth/login",
@@ -27,17 +46,16 @@ route(
     const email = String(req.body.email ?? "").trim().toLowerCase();
     const password = String(req.body.password ?? "");
     const fields: Record<string, string[]> = {};
-    if (!email) fields.email = ["Enter your work email"];
-    if (password.length < 8) fields.password = ["At least 8 characters"];
+    if (!email) fields.email = ["Enter your email"];
+    if (!password) fields.password = ["Enter your password"];
     if (Object.keys(fields).length) return invalid(fields);
     const key = email.split("@")[0];
     const person = byKey(key);
-    if (!person || !email.endsWith("@mycityapp.io")) return fail(401, "INVALID_CREDENTIALS", "That email and password do not match an account.");
-    if (person.status === "suspended") {
-      return fail(403, "ACCOUNT_SUSPENDED", "Access to MyCity App, direct pages and attendance actions is disabled. Contact People or your line manager.");
-    }
+    if (!person || !email.endsWith("@mycityapp.io") || password.length < 8) return fail(401, "INVALID_CREDENTIALS", "That email and password do not match.");
+    if (person.status === "suspended") return fail(403, "ACCOUNT_SUSPENDED", "This account is suspended. Contact People.");
     mockSession.set(key);
-    return ok(session(key));
+    lastOnThisBrowser = key;
+    return ok({ access_token: token(key), ...clock, user: me(key) });
   },
   { anonymous: true },
 );
@@ -46,7 +64,7 @@ route(
   "POST /api/v1/auth/refresh",
   () => {
     const key = mockSession.get();
-    return key ? ok(session(key)) : fail(401, "UNAUTHENTICATED", "Sign in to continue.");
+    return key ? ok({ access_token: token(key), ...clock }) : fail(401, "SESSION_ENDED", "This session has ended. Sign in again.");
   },
   { anonymous: true },
 );
@@ -60,9 +78,96 @@ route(
   { anonymous: true },
 );
 
-route("GET /api/v1/auth/splash", () => ok({ staff: PEOPLE.length, cities: 8, partnerships: 23 }), { anonymous: true });
+route(
+  "GET /api/v1/auth/device",
+  () => {
+    const p = lastOnThisBrowser ? byKey(lastOnThisBrowser) : null;
+    return ok({ account: p ? { email: p.work_email, display_name: p.display_name, first_name: p.first_name } : null });
+  },
+  { anonymous: true },
+);
+
+route("POST /api/v1/auth/forgot", () => ok({ ok: true as const }), { anonymous: true });
+
+/** A link token of the right shape; one that starts with "x" has expired, one that starts with "i" is an invitation. */
+route(
+  "POST /api/v1/auth/link",
+  (req) => {
+    const t = String(req.body.token ?? "");
+    if (!/^[A-Za-z0-9_-]{43}$/.test(t) || t.startsWith("x")) return fail(404, "LINK_INVALID", "This link has expired or was already used.");
+    const p = byKey("chidera")!;
+    return ok({ purpose: t.startsWith("i") ? ("invite" as const) : ("reset" as const), email: p.work_email, first_name: p.first_name, expires_at: new Date(Date.now() + 30 * 60000).toISOString() });
+  },
+  { anonymous: true },
+);
+
+route(
+  "POST /api/v1/auth/reset",
+  (req) => {
+    const t = String(req.body.token ?? "");
+    if (!/^[A-Za-z0-9_-]{43}$/.test(t) || t.startsWith("x")) return fail(404, "LINK_INVALID", "This link has expired or was already used.");
+    return ok({ email: byKey("chidera")!.work_email });
+  },
+  { anonymous: true },
+);
 
 route("GET /api/v1/auth/me", (req) => ok(me(req.user!)));
+
+route("GET /api/v1/auth/security", () =>
+  ok({ password_changed_at: at(61, "09:12"), active_sessions: 2, session_max_age: 7200, session_idle_limit: 1800 }),
+);
+
+const ended = new Set<string>();
+const SIGN_INS_OF = (key: string): SignIn[] => {
+  const base = byKey(key)!.employee_id.slice(0, 8);
+  const rows: Array<[string, string, number, string, boolean]> = [
+    ["Chrome on Windows", "102.89.34.17", 0, "08:04", true],
+    ["Safari on iPhone", "102.89.40.2", 0, "07:41", true],
+    ["Chrome on Android", "197.210.53.9", 1, "17:22", false],
+    ["Edge on Windows", "102.89.34.17", 2, "08:15", false],
+  ];
+  return rows.map(([device, ip, day, time, live], i) => {
+    const id = `${base}-0000-4000-8000-00000000000${i}`;
+    const active = live && !ended.has(id);
+    return {
+      session_id: id,
+      device_label: device,
+      ip_address: ip,
+      method: "password" as const,
+      issued_at: at(day, time),
+      last_seen_at: at(day, time),
+      status: active ? ("active" as const) : ("ended" as const),
+      end_reason: active ? null : ended.has(id) ? ("ended_by_user" as const) : ("session_max_age" as const),
+      current: i === 0,
+    };
+  });
+};
+
+route("GET /api/v1/auth/sessions", (req) =>
+  paged(SIGN_INS_OF(req.user!), req, { filters: { status: (s, v) => s.status === v }, search: (s) => [s.device_label] }),
+);
+route("POST /api/v1/auth/sessions/:id/end", (req) => {
+  const s = SIGN_INS_OF(req.user!).find((x) => x.session_id === req.params.id);
+  if (!s) return fail(404, "NOT_FOUND", "That session has already ended.");
+  if (s.current) return fail(422, "CURRENT_SESSION", "Use Sign Out to end this session.");
+  ended.add(s.session_id);
+  return noContent();
+});
+route("POST /api/v1/auth/sessions/end-others", (req) => {
+  const others = SIGN_INS_OF(req.user!).filter((s) => !s.current && s.status === "active");
+  others.forEach((s) => ended.add(s.session_id));
+  return ok({ ended: others.length });
+});
+
+route("POST /api/v1/auth/password", (req) => {
+  const f: Record<string, string[]> = {};
+  const next = String(req.body.new_password ?? "");
+  if (String(req.body.current_password ?? "").length < 8) f.current_password = ["Not your password"];
+  if (next.length < 8) f.new_password = ["At least 8 characters"];
+  else if (!/[A-Z]/.test(next) || !/[a-z]/.test(next) || !/\d/.test(next) || !/[^A-Za-z0-9]/.test(next)) f.new_password = ["Mix cases, number, symbol"];
+  if (Object.keys(f).length) return invalid(f);
+  return ok({ sessions_signed_out: 1 });
+});
 
 route("GET /api/v1/notifications/badges", (req) => {
   const full = req.user === "cynthia" || req.user === "ifeoma";

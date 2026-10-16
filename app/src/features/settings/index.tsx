@@ -3,16 +3,17 @@ import { ApiError, api } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
 import "@/api/types/organisation";
-import type { AuditEntry, FailedLogin, Hierarchy, Numbering, Organisation, Session, UserRow } from "@/api/types/settings";
-import type { PersonRef } from "@/api/types/common";
+import type { AuditEntry, FailedLogin, Hierarchy, Numbering, Organisation, Session } from "@/api/types/settings";
+import type { UserRow } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ExportAction, KvCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AttendancePolicyTab } from "./Policy";
-import { Roles, useRoleOptions } from "./Roles";
-import { Button, Card, CardHeader, Chain, Chips, ChoiceField, cn, DataView, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, InlineInput, LoadingRows, PageHeader, Paper, PaperFoot, PaperLogo, PaperTitle, Pill, SelectField, Signature, StatStrip, StatusPill, Swatch, Switch, TextAreaField, toast, useModal, useTheme, Who } from "@mycity/ui";
-import { EmployeePicker } from "@/features/shared/pickers";
+import { Roles } from "./Roles";
+import { Button, Card, CardHeader, Chain, Chips, ChoiceField, cn, DataView, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, InlineInput, LoadingRows, PageHeader, Paper, PaperFoot, PaperLogo, PaperTitle, Pill, Signature, StatStrip, StatusPill, Swatch, Switch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
+import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
+import { RolePicker, type RoleRef } from "@/features/shared/pickers";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -89,57 +90,101 @@ function TimeBox({ value, onChange, label }: { value: string; onChange: (v: stri
 /* ───────────── Users ───────────── */
 
 
+const USER_STATUS: Record<UserRow["status"], { tone: "ok" | "warn" | "err" | "neutral"; text: string }> = {
+  active: { tone: "ok", text: "Active" },
+  invited: { tone: "warn", text: "Invited" },
+  suspended: { tone: "err", text: "Suspended" },
+  left: { tone: "neutral", text: "Left" },
+};
+
+/**
+ * Settings · Users: the logins. A person gets one from their employee record
+ * (Invite User): they receive a link and choose their own password. Roles,
+ * suspension, links and sessions are managed from a login's sheet; nobody acts
+ * on their own login here (My Security is for that).
+ */
 function Users() {
   const modal = useModal();
-  const s = useApi("GET /api/v1/settings/users/summary");
-  const list = usePaged("GET /api/v1/settings/users");
+  const { can } = useAuth();
+  const [status, setStatus] = useState<"" | UserRow["status"]>("");
+  const s = useApi("GET /api/v1/users/summary");
+  const list = usePaged("GET /api/v1/users", { filters: status ? { status } : {} });
   return (
     <>
       <PageHeader
         title="Users"
-        sub={s.data ? `${s.data.users} users · ${s.data.pending} pending invitation` : " "}
-        actions={
-          <>
-            <ExportAction source="settings.users" />
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Invite User", body: (close) => <Invite close={close} /> })}>Invite User</Button>
-          </>
-        }
+        sub={s.data ? `${s.data.users} users · ${s.data.invited} invited` : " "}
+        actions={can("settings", "create") ? <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Invite User", body: (close) => <InviteToSignIn close={close} /> })}>Invite User</Button> : undefined}
       />
-      {s.data && <KpiTiles items={[{ label: "Users", value: String(s.data.users) }, { label: "Active Now", value: String(s.data.active_now) }, { label: "Pending Invitation", value: String(s.data.pending), tone: s.data.pending ? "warn" : undefined }, { label: "MFA Enrolled", value: String(s.data.mfa), tone: "warn" }]} />}
+      {s.data && (
+        <KpiTiles
+          mobileCols={2}
+          items={[
+            { label: "Users", value: String(s.data.users) },
+            { label: "Signed In Now", value: String(s.data.signed_in_now), tone: "ok" },
+            { label: "Invited", value: String(s.data.invited), tone: s.data.invited ? "warn" : undefined },
+            { label: "Suspended", value: String(s.data.suspended), tone: s.data.suspended ? "err" : undefined },
+          ]}
+        />
+      )}
+      <Chips
+        label="Status"
+        value={status}
+        onChange={setStatus}
+        options={[
+          { value: "", label: "Everyone" },
+          { value: "active", label: "Active", count: s.data?.active },
+          { value: "invited", label: "Invited", count: s.data?.invited },
+          { value: "suspended", label: "Suspended", count: s.data?.suspended },
+        ]}
+      />
       <PagedTable<UserRow>
         title="Users"
         list={list}
-        search="Search name, email or role"
+        search="Name or email"
         rowKey={(u) => u.user_id}
         noun="user"
-        onRowClick={(u) => modal.open({ title: u.person.display_name, body: (close) => <UserDetail u={u} close={close} /> })}
+        onRowClick={(u) => modal.open({ title: u.display_name, body: (close) => <UserDetail u={u} close={close} /> })}
         columns={[
-          { key: "u", label: "User", render: (u) => <Who name={u.person.display_name} sub={u.email} /> },
-          { key: "r", label: "Role", render: (u) => u.role },
-          { key: "l", label: "Last Seen", render: (u) => (u.last_seen ? formatWhen(u.last_seen) : "Never"), desktop: true },
-          { key: "m", label: "MFA", render: (u) => <Pill tone={u.mfa ? "ok" : "neutral"}>{u.mfa ? "On" : "Off"}</Pill>, desktop: true },
-          { key: "s", label: "Status", render: (u) => <StatusPill s={u.status} /> },
+          { key: "u", label: "User", render: (u) => <Who name={u.display_name} sub={u.email} /> },
+          { key: "r", label: "Roles", render: (u) => (u.is_ceo ? ["CEO", ...u.roles.map((r) => r.name)] : u.roles.map((r) => r.name)).join(", ") },
+          { key: "l", label: "Last Seen", render: (u) => (u.last_seen_at ? formatWhen(u.last_seen_at) : "Never"), desktop: true },
+          { key: "s", label: "Status", render: (u) => <Pill tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].text}</Pill> },
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Users by Role" rows={s.data.by_role} /> : <Card><LoadingRows /></Card>}
+        {s.data ? (
+          <BarsCard
+            title="Users by Role"
+            rows={s.data.by_role.map((r) => ({ label: r.name, value: String(r.users), pct: Math.round((r.users * 100) / Math.max(1, ...s.data!.by_role.map((x) => x.users))) }))}
+          />
+        ) : (
+          <Card><LoadingRows /></Card>
+        )}
       </Grid>
     </>
   );
 }
 
 function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
-  const roles = useRoleOptions();
-  const [role, setRole] = useState(u.role);
+  const { me } = useAuth();
+  const confirm = useConfirm();
+  const [roles, setRoles] = useState<RoleRef[]>(u.roles);
   const [reason, setReason] = useState<string | null>(null);
-  const [tried, setTried] = useState<"role" | "disable" | null>(null);
+  const [tried, setTried] = useState(false);
+  const setR = useMutation("POST /api/v1/users/:id/roles");
+  const suspend = useMutation("POST /api/v1/users/:id/suspend");
+  const reactivate = useMutation("POST /api/v1/users/:id/reactivate");
+  const resend = useMutation("POST /api/v1/users/:id/invite");
+  const reset = useMutation("POST /api/v1/users/:id/reset-link");
+  const end = useMutation("POST /api/v1/users/:id/end-sessions");
+  const self = me?.user_id === u.user_id;
   const reasonBad = reason != null && reason.trim().length < 6;
-  const setR = useMutation("POST /api/v1/settings/users/:id/role");
-  const disable = useMutation("POST /api/v1/settings/users/:id/disable");
+  const params = { id: u.user_id };
   const run = async (fn: () => Promise<unknown>, msg: string) => {
     try {
       await fn();
-      invalidate("/api/v1/settings/users");
+      invalidate("/api/v1/users");
       close();
       toast(msg);
     } catch (e) {
@@ -148,34 +193,39 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   };
   return (
     <>
-      <Field label="Role" state={tried === "role" && role === u.role ? "bad" : undefined} message="Pick another role"><SelectField value={role} onChange={setRole} options={roles} /></Field>
+      <Field label="Roles" state={tried && !roles.length ? "bad" : undefined} message="Pick a role">
+        {self ? <span className="text-sm">{u.roles.map((r) => r.name).join(", ")}</span> : <RolePicker value={roles} onChange={setRoles} />}
+      </Field>
       {reason != null && (
-        <Field label="Why the Login Is Disabled" state={tried === "disable" && reasonBad ? "bad" : undefined} message="At least 6 characters">
-          <TextAreaField value={reason} onChange={setReason} placeholder="Role changed" state={tried === "disable" && reasonBad ? "bad" : undefined} />
+        <Field label="Reason" state={tried && reasonBad ? "bad" : undefined} message="At least 6 characters">
+          <TextAreaField value={reason} onChange={setReason} placeholder="Left the company" state={tried && reasonBad ? "bad" : undefined} />
         </Field>
       )}
       <FormFooter>
-        {u.status.text !== "Disabled" && (reason == null ? <Button className="mr-auto" onClick={() => setReason("")}>Disable Login</Button> : <Button className="mr-auto" busy={disable.pending} onClick={() => (reasonBad ? setTried("disable") : run(() => disable.run({ params: { id: u.user_id }, body: { reason } }), "Login disabled"))}>Confirm Disable</Button>)}
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={setR.pending} onClick={() => (role === u.role ? setTried("role") : run(() => setR.run({ params: { id: u.user_id }, body: { role } }), `${u.person.display_name} is now ${role}`))}>Save Role</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-function Invite({ close }: { close: () => void }) {
-  const roles = useRoleOptions();
-  const [who, setWho] = useState<PersonRef[]>([]);
-  const [role, setRole] = useState("Staff");
-  const [tried, setTried] = useState(false);
-  const inv = useMutation("POST /api/v1/settings/users/invite");
-  return (
-    <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message="Pick the employee"><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="Role"><SelectField value={role} onChange={setRole} options={roles} /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" busy={inv.pending} onClick={async () => { if (!who.length) return setTried(true); try { await inv.run({ body: { employee_id: who[0].employee_id, role } }); invalidate("/api/v1/settings/users"); close(); toast(`Invitation sent to ${who[0].display_name}`); } catch (e) { fail(e); } }}>Send Invitation</Button>
+        {!self && u.status === "invited" && <Button busy={resend.pending} onClick={() => void run(() => resend.run({ params, body: {} }), "Invitation sent again")}>Resend Invitation</Button>}
+        {!self && u.status === "active" && <Button busy={reset.pending} onClick={() => void run(() => reset.run({ params, body: {} }), "Reset link sent")}>Send Reset Link</Button>}
+        {!self && u.status === "active" && (
+          <Button
+            busy={end.pending}
+            onClick={async () => {
+              if (await confirm({ title: "Sign Out Everywhere", confirmLabel: "Sign Out" })) await run(() => end.run({ params, body: {} }), "Signed out everywhere");
+            }}
+          >
+            Sign Out Everywhere
+          </Button>
+        )}
+        {!self && u.status !== "suspended" && !u.is_ceo && (reason == null ? <Button onClick={() => setReason("")}>Suspend</Button> : <Button variant="danger" busy={suspend.pending} onClick={() => (reasonBad ? setTried(true) : void run(() => suspend.run({ params, body: { reason: reason.trim() } }), "Login suspended"))}>Confirm Suspend</Button>)}
+        {!self && u.status === "suspended" && <Button busy={reactivate.pending} onClick={() => void run(() => reactivate.run({ params, body: {} }), "Login reactivated")}>Reactivate</Button>}
+        <Button onClick={close}>Close</Button>
+        {!self && (
+          <Button
+            variant="primary"
+            busy={setR.pending}
+            onClick={() => (!roles.length ? setTried(true) : void run(() => setR.run({ params, body: { role_codes: roles.map((r) => r.code) } }), "Roles saved"))}
+          >
+            Save Roles
+          </Button>
+        )}
       </FormFooter>
     </>
   );

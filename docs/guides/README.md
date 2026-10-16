@@ -27,6 +27,7 @@ section exists to stop.
 | `ess.md` | Employee Self-Service: the seven approved tabs plus My Security; the attendance tabs inside ESS are LA's | AJ | M1 | ☐ |
 | `community.md` | Staff Community: Channels, Direct Messages, Announcements, recognition, celebrations | GE | M1 | ☑ |
 | `mailbox.md` | Mailbox client | GE | M1 | ☑ |
+| `identity.md` | Sign-in, sessions and the lock screen, credential links, My Security (password and sessions), Settings · Users | TB | M0 | ☑ |
 | `organogram.md` | Organogram: People · Organogram (HR builder) and ESS · Org Chart (read-only viewer) over the live reporting tree | TB | M1 | ☐ |
 
 Tick **Written** when the guide exists and has been read by the owner of every screen in its §2.

@@ -1,4 +1,5 @@
-import type { AccessCatalogue, FailedLogin, Hierarchy, NotificationPref, Organisation, RecordScope, Role, RoleAction, RoleBody, RoleDetail, RoleGrant, Session, UserRow } from "@/api/types/settings";
+import type { UserRow } from "@mycity/contract/contract.gen.ts";
+import type { AccessCatalogue, FailedLogin, Hierarchy, NotificationPref, Organisation, RecordScope, Role, RoleAction, RoleBody, RoleDetail, RoleGrant, Session } from "@/api/types/settings";
 import type { Status } from "@/api/types/performance";
 import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, refKey, SIGN_INS } from "../data/people";
@@ -33,47 +34,127 @@ route("PATCH /api/v1/settings/organisation", (req) => {
 });
 
 const ROLE_OF = (k: string) => (SIGN_INS[k]?.view === "ceo" ? "CEO" : SIGN_INS[k]?.view === "operations" ? "Operations" : ["amara", "blessing"].includes(k) ? "Finance" : PEOPLE.some((p) => p.manager === k) ? "Manager" : "Staff");
-const USERS: UserRow[] = PEOPLE.map((p, i) => ({ user_id: sid(`user:${p.user_key}`), person: refKey(p.user_key), email: p.work_email, role: ROLE_OF(p.user_key), last_seen: p.status === "suspended" ? at(30, "10:00") : at(i % 4 === 0 ? 0 : i % 4, `${String(8 + (i % 9)).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}`), mfa: ["ifeoma", "cynthia", "amara"].includes(p.user_key), status: p.status === "suspended" ? S("err", "Disabled") : i > 21 ? S("warn", "Invited") : S("ok", "Active") }));
-route("GET /api/v1/settings/users/summary", () => {
-  const roles = ["Staff", "Manager", "Operations", "Finance", "CEO"];
-  const max = Math.max(...roles.map((r) => USERS.filter((u) => u.role === r).length));
-  return ok({ users: USERS.length, active_now: USERS.filter((u) => u.last_seen && Date.now() - new Date(u.last_seen).getTime() < 8 * 3600000).length, pending: USERS.filter((u) => u.status.text === "Invited").length, mfa: USERS.filter((u) => u.mfa).length, by_role: roles.map((r, i) => { const n = USERS.filter((u) => u.role === r).length; return { label: r, pct: Math.round((n * 100) / max), value: String(n), ...(i === roles.length - 1 ? { emphasis: "brand" as const } : {}) }; }) });
+
+/* ── Users (Settings · Users), as packages/contract/schemas/users.js sends them ── */
+/** The seeded roles (seeds/reference/0101), most senior first. */
+const ACCESS_ROLES: Array<{ code: string; name: string; description: string }> = [
+  { code: "implementation", name: "Implementation Team", description: "Full access for the build team until handover." },
+  { code: "operations_people", name: "Operations & People", description: "People, HR and operations across every module." },
+  { code: "management", name: "Management", description: "Organisation-wide oversight and approvals." },
+  { code: "head_of_department", name: "Head of Department", description: "Runs a department and approves for it." },
+  { code: "administrator", name: "System Administrator", description: "Settings, users and roles." },
+  { code: "manager", name: "Line Manager", description: "Manages the people who report to them." },
+  { code: "employee", name: "Staff", description: "Their own work and records." },
+];
+const ROLE_CODE: Record<string, string> = { CEO: "management", Operations: "operations_people", Finance: "management", Manager: "manager", Staff: "employee" };
+const roleRef = (code: string) => {
+  const r = ACCESS_ROLES.find((x) => x.code === code)!;
+  return { code: r.code, name: r.name };
+};
+type MockUser = UserRow & { role: string; mfa: boolean };
+const USERS: MockUser[] = PEOPLE.slice(0, 22).map((p, i) => ({
+  user_id: sid(`user:${p.user_key}`),
+  employee_id: p.employee_id,
+  display_name: p.display_name,
+  email: p.work_email,
+  job_title: p.job_title,
+  department: p.department,
+  roles: [roleRef(ROLE_CODE[ROLE_OF(p.user_key)])],
+  is_ceo: p.user_key === "ifeoma",
+  status: p.status === "suspended" ? "suspended" : "active",
+  last_seen_at: p.status === "suspended" ? at(30, "10:00") : at(i % 4 === 0 ? 0 : i % 4, `${String(8 + (i % 9)).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}`),
+  created_at: at(40 - i, "09:00"),
+  role: ROLE_OF(p.user_key),
+  mfa: ["ifeoma", "cynthia", "amara"].includes(p.user_key),
+}));
+const out = (u: MockUser): UserRow => {
+  const { role: _role, mfa: _mfa, ...row } = u;
+  void _role;
+  void _mfa;
+  return row;
+};
+const userOf = (id: string) => USERS.find((x) => x.user_id === id);
+const settingsEditor = (u: string) => admin(u);
+
+route("GET /api/v1/users/summary", () =>
+  ok({
+    users: USERS.length,
+    active: USERS.filter((u) => u.status === "active").length,
+    invited: USERS.filter((u) => u.status === "invited").length,
+    suspended: USERS.filter((u) => u.status === "suspended").length,
+    signed_in_now: USERS.filter((u) => u.status === "active" && u.last_seen_at && Date.now() - new Date(u.last_seen_at).getTime() < 2 * 3600000).length,
+    by_role: ACCESS_ROLES.map((r) => ({ code: r.code, name: r.name, users: USERS.filter((u) => u.status === "active" && u.roles.some((x) => x.code === r.code)).length })),
+  }),
+);
+route("GET /api/v1/users", (req) =>
+  paged(
+    USERS.map(out),
+    req,
+    { search: (u) => [u.display_name, u.email, u.job_title], filters: { status: (u, v) => u.status === v, role: (u, v) => u.roles.some((r) => r.code === v) } },
+  ),
+);
+route("GET /api/v1/users/candidates", (req) =>
+  paged(
+    PEOPLE.filter((p) => !USERS.some((u) => u.employee_id === p.employee_id)).map((p) => ({ employee_id: p.employee_id, display_name: p.display_name, email: p.work_email, job_title: p.job_title, department: p.department })),
+    req,
+    { search: (c) => [c.display_name, c.email, c.job_title] },
+  ),
+);
+route("GET /api/v1/users/:id", (req) => {
+  const u = userOf(req.params.id);
+  return u ? ok(out(u)) : notFound();
 });
-route("GET /api/v1/settings/users", (req) => paged(USERS, req, { search: (u) => [u.person.display_name, u.email, u.role], filters: { role: (u, v) => u.role === v } }));
-route("POST /api/v1/settings/users/invite", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO invite users.");
-  const b = req.body as { employee_id?: string; role?: string };
+route("POST /api/v1/users", (req) => {
+  if (!settingsEditor(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const b = req.body as { employee_id?: string; role_codes?: string[] };
   const p = byId(b.employee_id);
   if (!p) return invalid({ employee_id: ["Pick the employee"] });
-  if (b.role && !ROLE_DEFS.some((r) => r.name === b.role)) return invalid({ role: ["Pick a role"] });
-  const u = USERS.find((x) => x.person.employee_id === p.employee_id)!;
-  if (u.status.text === "Active") return fail(409, "ALREADY_ACTIVE", `${p.display_name} already has a login.`);
-  u.status = S("warn", "Invited");
-  u.role = b.role ?? u.role;
-  audit(who(req.user!), "Invitation sent", `User · ${p.display_name}`, null, u.role, "Expires in 7 days", "Settings");
-  return created(u);
+  if (USERS.some((u) => u.employee_id === p.employee_id)) return fail(409, "LOGIN_EXISTS", "This employee already has a login.");
+  const codes = (b.role_codes ?? []).filter((c) => ACCESS_ROLES.some((r) => r.code === c));
+  if (!codes.length) return invalid({ role_codes: ["Pick a role"] });
+  const u: MockUser = { user_id: sid(`user:${p.user_key}`), employee_id: p.employee_id, display_name: p.display_name, email: p.work_email, job_title: p.job_title, department: p.department, roles: codes.map(roleRef), is_ceo: false, status: "invited", last_seen_at: null, created_at: new Date().toISOString(), role: "Staff", mfa: false };
+  USERS.unshift(u);
+  audit(who(req.user!), "Invitation sent", `User · ${p.display_name}`, null, u.roles.map((r) => r.name).join(", "), "Link valid 72 hours", "Settings");
+  return created(out(u));
 });
-route("POST /api/v1/settings/users/:id/role", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO change roles.");
-  const u = USERS.find((x) => x.user_id === req.params.id);
-  if (!u) return notFound();
-  const role = String(req.body.role ?? "");
-  if (!ROLE_DEFS.some((r) => r.name === role)) return invalid({ role: ["Pick a role"] });
-  audit(who(req.user!), "Role changed", `User · ${u.person.display_name}`, u.role, role, null, "Settings");
-  u.role = role;
-  return ok(u);
+const act = (path: string, fn: (u: MockUser, body: Record<string, unknown>, actor: string) => ReturnType<typeof ok>) =>
+  route(path, (req) => {
+    if (!settingsEditor(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+    const u = userOf(req.params.id);
+    if (!u) return notFound();
+    return fn(u, req.body, req.user!);
+  });
+act("POST /api/v1/users/:id/roles", (u, body, actor) => {
+  if (u.employee_id === byKey(actor)!.employee_id) return fail(422, "NOT_ON_YOURSELF", "You cannot change the roles of your own login here.");
+  const codes = ((body.role_codes as string[] | undefined) ?? []).filter((c) => ACCESS_ROLES.some((r) => r.code === c));
+  if (!codes.length) return invalid({ role_codes: ["Pick a role"] });
+  audit(who(actor), "Roles changed", `User · ${u.display_name}`, u.roles.map((r) => r.name).join(", "), codes.map((c) => roleRef(c).name).join(", "), null, "Settings");
+  u.roles = codes.map(roleRef);
+  return ok(out(u));
 });
-route("POST /api/v1/settings/users/:id/disable", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO disable logins.");
-  const u = USERS.find((x) => x.user_id === req.params.id);
-  if (!u) return notFound();
-  if (u.person.employee_id === byKey(req.user)!.employee_id) return fail(409, "SELF", "You cannot disable your own login.");
-  const reason = String(req.body.reason ?? "").trim();
-  if (reason.length < 6) return invalid({ reason: ["Say why. It stays on the audit log"] });
-  u.status = S("err", "Disabled");
-  audit(who(req.user!), "Login disabled", `User · ${u.person.display_name}`, "Active", "Disabled", reason, "Settings");
-  return ok(u);
+act("POST /api/v1/users/:id/suspend", (u, body, actor) => {
+  if (u.employee_id === byKey(actor)!.employee_id) return fail(422, "NOT_ON_YOURSELF", "You cannot suspend your own login here.");
+  const reason = String(body.reason ?? "").trim();
+  if (reason.length < 6) return invalid({ reason: ["At least 6 characters"] });
+  audit(who(actor), "Login suspended", `User · ${u.display_name}`, "Active", "Suspended", reason, "Settings");
+  u.status = "suspended";
+  return ok(out(u));
 });
+act("POST /api/v1/users/:id/reactivate", (u, _b, actor) => {
+  audit(who(actor), "Login reactivated", `User · ${u.display_name}`, "Suspended", "Active", null, "Settings");
+  u.status = u.last_seen_at ? "active" : "invited";
+  return ok(out(u));
+});
+act("POST /api/v1/users/:id/invite", (u) => (u.status === "invited" ? ok({ sent: true as const, email: u.email }) : fail(422, "ALREADY_ACTIVE", "This person has already chosen a password.")));
+act("POST /api/v1/users/:id/reset-link", (u) => (u.status === "suspended" ? fail(422, "NOT_ACTIVE", "Reactivate this login before sending a link.") : ok({ sent: true as const, email: u.email })));
+act("POST /api/v1/users/:id/end-sessions", () => ok({ ended: 2 }));
+route("GET /api/v1/access/roles", (req) =>
+  paged(
+    ACCESS_ROLES.map((r) => ({ role_id: sid(`role:${r.code}`), code: r.code, name: r.name, description: r.description, users: USERS.filter((u) => u.status === "active" && u.roles.some((x) => x.code === r.code)).length })),
+    req,
+    { search: (r) => [r.name, r.code] },
+  ),
+);
 
 /* ── Roles: module → action → record scope → field (MILESTONES §14; no entity layer, A2) ── */
 const ALL_ACTS: RoleAction[] = ["view", "create", "edit", "delete", "approve", "export"];

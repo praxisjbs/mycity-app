@@ -9,6 +9,10 @@
  *   publicWriteLimiter  /api/public    per IP, writes only, RATE_LIMIT_PUBLIC_WRITES_PER_MIN
  *   signInLimiter       sign-in        per IP, failed attempts only, 10 per 15 minutes
  *   refreshLimiter      token refresh  per IP, failed attempts only, 60 per 15 minutes
+ *   forgotLimiter       reset request  per IP, every request, 5 per 15 minutes
+ *   resetLimiter        reset links    per IP, 10 per 15 minutes
+ *   changePasswordLimiter  password change, per signed-in person, 10 per 15 minutes
+ *   deviceLimiter       sign-in greeting  per IP, 300 per 15 minutes
  *
  * Limiters are built when this file loads, but Redis connects later at boot, so
  * each limiter asks for its store on every call and uses Redis once it exists.
@@ -80,6 +84,10 @@ function makeLimiter({
     ...(skip ? { skip } : {}),
     keyGenerator: (req) => (key ? key(req) : `ip:${req.ip}`),
     store: {
+      // The library refuses one request counted twice under one store and key. Every
+      // limiter's store is this same plain shape, so the prefix tells them apart: the
+      // staff limiter and the sign-in limiter both key an anonymous caller by address.
+      prefix: `${name}:`,
       init(options) {
         this.options = options;
       },
@@ -147,6 +155,39 @@ const refreshLimiter = makeLimiter({
   failuresOnly: true,
 });
 
+/** Asking for a reset link: every request counts, so nobody can fill an inbox. */
+const forgotLimiter = makeLimiter({
+  name: "forgot",
+  max: 5,
+  windowMs: 15 * 60_000,
+});
+
+/** Opening and using a reset or invitation link. */
+const resetLimiter = makeLimiter({
+  name: "reset",
+  max: 10,
+  windowMs: 15 * 60_000,
+});
+
+/**
+ * Changing a password while signed in: per person, after auth has established who.
+ * A stolen access token must not be a licence to guess the current password.
+ */
+const changePasswordLimiter = makeLimiter({
+  name: "change-password",
+  max: 10,
+  windowMs: 15 * 60_000,
+  key: (req) =>
+    req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
+});
+
+/** The sign-in screen's greeting: cheap, public, and still bounded. */
+const deviceLimiter = makeLimiter({
+  name: "device",
+  max: 300,
+  windowMs: 15 * 60_000,
+});
+
 module.exports = {
   initRateLimitStore,
   storeKind,
@@ -156,5 +197,9 @@ module.exports = {
   publicWriteLimiter,
   signInLimiter,
   refreshLimiter,
+  forgotLimiter,
+  resetLimiter,
+  changePasswordLimiter,
+  deviceLimiter,
   TOO_MANY,
 };

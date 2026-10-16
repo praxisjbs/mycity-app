@@ -88,10 +88,11 @@ identity · `0020` access · `0030` events, audit, outbox, errors, idempotency �
 `0050` settings · `0055` numbering · `0060` notifications · `0070` workflow · `0080` documents and
 templates · `0085` imports · `0090` tokens and secrets · `0095` AI ledger · `0099` reference seed ·
 `0100` shared-layer columns · `0110` employee profile, dotted line, `org_seat` · `0120` foreign key
-indexes · `0130` `error_event.extra` · `0199` code lists, Saturday, staff numbers.
+indexes · `0130` `error_event.extra` · `0199` code lists, Saturday, staff numbers · `0200` sessions
+(last seen, how opened, device, end reason), credential links for invitations, a role's Home view
+and rank · `0290` the seven roles and their permission matrix (`docs/guides/identity.md` §8).
 
 **Owes:**
-- `permission` rows for the four system roles: no role-to-module matrix exists yet (decision 2 below).
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
 - The staff importer must advance the `employee` counter past imported staff numbers.
 - MFA per role: `app_user.mfa_secret_enc` exists, the per-role requirement does not (with M9).
@@ -202,7 +203,7 @@ and lines, disbursements · `8099` seed.
 reporting views · `9095` `updated_at` triggers (a one-time sweep of the tables that existed then;
 later tables create their own, `docs/MIGRATIONS.md` §6) · `9099` seed.
 
-**Owes:** MFA required per role, and the role-to-module permission matrix (with M0, decision 2).
+**Owes:** MFA required per role (the second sign-in PR). Editing roles and their grants on screen.
 
 ### M10 Staff Knowledge Hub & AI Assistance · 10000 to 10999 · TB
 
@@ -234,8 +235,9 @@ its milestone in §3.
 
 1. **The M6 payroll design** (pay components, statutory rates and their effective dating) waits on
    the payroll contract and the tax-reform rules. The block is reserved and the scope stands.
-2. **The role-to-module permission matrix** for the four system roles (administrator, management,
-   manager, employee). Until it is decided and seeded, only the CEO account can use the system.
+2. **The role-to-module permission matrix.** Decided with TB on 16/10/2026: the seven roles MyCity
+   runs on (from the staff list) and their grants, seeded by `0290_seed_roles_and_grants.sql`.
+   Changes after go-live are made in Settings · Roles & Permissions (M9), not in a seed.
 3. **The business choices PR 25 seeded** (expense categories, partner types and stages, the
    Standard attendance policy, alert thresholds, knowledge categories) move out of the seeds under
    A26, each when its milestone builds the screen that manages it.

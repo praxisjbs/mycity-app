@@ -1,10 +1,10 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "a4bd23afe7b27840edaaaa5af29012fe96ffe63601b61abe9868dd24558ef969",
-  "schemas": 15,
-  "endpoints": 0,
+  "source_hash": "65c6e18381e2096d3c3bfdbfbbff0b0ce4e711074261a8cce017a18f16c3a0e2",
+  "schemas": 64,
+  "endpoints": 25,
   "inputs": {
-    "packages/contract/schemas/access.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/access.js": "7d76c2be101d7ce5288e6ee3c44e60a2db721644db7f0b55e33498a19027c2e6",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/ai_governance.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/alerts.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -16,7 +16,7 @@
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/calendar.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/candidates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/common.js": "7b7d4d3dd23356619046145ee55d0386646a8ca4399de4405e152c8dde651305",
+    "packages/contract/schemas/common.js": "0cca96cc7bc547915e97d5b68904d2871901bf8892c479dcd85d598e7c39b4a8",
     "packages/contract/schemas/community.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/dashboard.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/deductions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -28,7 +28,7 @@
     "packages/contract/schemas/expense_categories.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/expenses.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/goals.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/identity.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/identity.js": "de969257b6862a8c4eda3925139256fbea0c5e14bce83a0b2ab0ba17bed586cd",
     "packages/contract/schemas/imports.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/integrations.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/interactions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -63,10 +63,13 @@
     "packages/contract/schemas/targets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/tasks.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/templates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/users.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/users.js": "1d943f696d4d8776aa345f15ada177356873c8b08b250f75687d1049917040ec",
     "packages/contract/schemas/vacancies.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/workflow.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/worksites.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/workspace.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "packages/contract/schemas/workspace.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "src/modules/access/access.routes.js": "b2701c9c63b01069e391675c0d49cd3ab308ecff22e2dbab8e6a77746e2bf4e5",
+    "src/modules/identity/identity.routes.js": "cdead488e870e9b1c066414a48f2c9989ec1bd6066df9aa4b6df45068149a7f3",
+    "src/modules/users/users.routes.js": "75e7542f718d182b4f33f9fdec1071aa2dbf6c9d1dccc1de14e77d3634e40bce"
   }
 }

@@ -45,6 +45,8 @@ module.exports = {
   testTimeout: 15000,
   // APP_ENV=test: responses are checked against their contract and a mismatch fails the test.
   setupFiles: ["<rootDir>/tests/setup-env.js"],
+  // The error reporter's batch timer never outlives the file that started it.
+  setupFilesAfterEnv: ["<rootDir>/tests/settle-reporter.js"],
   // The integration files share one test database and rebuild its schema: one at a time.
   maxWorkers: process.env.RUN_DB_TESTS === "1" ? 1 : 2,
 };

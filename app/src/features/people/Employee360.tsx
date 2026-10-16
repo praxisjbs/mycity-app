@@ -1,6 +1,7 @@
 import { useApi } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
-import { BackButton, Bars, Button, Card, CardHeader, DataView, ErrorState, formatDate, Grid, KeyValue, LoadingRows, Money, Pill, ProfileHeader, StatStrip, Timeline } from "@mycity/ui";
+import { BackButton, Bars, Button, Card, CardHeader, DataView, ErrorState, formatDate, Grid, KeyValue, LoadingRows, Money, Pill, ProfileHeader, StatStrip, Timeline, useModal } from "@mycity/ui";
+import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { hrefFor, useRouter } from "@/lib/router";
 import { AttendanceSetupCard } from "./EmployeeDetails";
 import { toBars, toTrail } from "@/features/shared/wire";
@@ -9,6 +10,7 @@ import { toBars, toTrail } from "@/features/shared/wire";
 export function Employee360({ id }: { id: string }) {
   const me = useMe();
   const { navigate } = useRouter();
+  const modal = useModal();
   const { data: e, error, reload } = useApi("GET /api/v1/employees/:id", { params: { id } });
   const back = () => navigate(hrefFor("people", "employees"));
   if (error) return (<><BackButton label="Back to Employees" onBack={back} /><ErrorState error={error} onRetry={reload} /></>);
@@ -32,6 +34,11 @@ export function Employee360({ id }: { id: string }) {
           <>
             {me.grants.queries?.includes("create") && <Button onClick={() => navigate(hrefFor("queries", "queries", { new: "1", employee: e.employee_id }))}>Raise a Query</Button>}
             <Button onClick={() => navigate(hrefFor("community", "direct-messages", { to: e.employee_id }))}>Message</Button>
+            {me.grants.settings?.includes("create") && (
+              <Button icon="lock" onClick={() => modal.open({ title: "Invite to Sign In", body: (close) => <InviteToSignIn close={close} person={{ employee_id: e.employee_id, display_name: e.display_name, job_title: e.job_title, department: e.department }} /> })}>
+                Send Invite
+              </Button>
+            )}
             {hr && <Button variant="primary">Edit</Button>}
           </>
         }

@@ -229,6 +229,8 @@ const ENTITY_ROUTES = Object.freeze({
   // Settings
   department: screen("settings", "organisation"),
   app_user: screen("settings", "users"),
+  // A person's own login, as they see it: sign-ins, sessions, their password.
+  account: screen("ess", "my-security"),
   role: screen("settings", "roles-and-permissions"),
   workflow_definition: screen("settings", "approvals"),
   numbering_scheme: screen("settings", "documents-and-numbering"),

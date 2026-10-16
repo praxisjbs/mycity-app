@@ -9,7 +9,7 @@
 | Permission key(s) | `ess` (always `own` scope) |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security |
 | Status | Draft |
-| Last changed | 15/10/2026 |
+| Last changed | 16/10/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -44,7 +44,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, open the leave calendar, open a request or a figure's list |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | Three cards: Open Queries, Archived, Sanctions | Open each list; respond to an open query |
 | ESS · My Documents (`my-documents`) | Staff app | Every employee | Their vault: contracts, certificates, ID; signed, verified, expiring, missing | Upload a requested document, preview, download |
-| ESS · My Security (`my-security`) | Staff app | Every employee | Password, two-step sign-in, passkeys, PIN, recent sign-ins; a link to My Devices | Change password, switch two-step sign-in methods on or off, add a passkey, set a PIN, open My Devices |
+| ESS · My Security (`my-security`) | Staff app | Every employee | Password (when it was changed), where they are signed in, recent sign-ins; a link to My Devices. Two-step sign-in, passkeys and the PIN join with the security module | Change password, sign out one device or all the others, open My Devices |
 | Shell avatar (rail, phone top bar, More) | Staff app | Every employee | The photo from My Profile, or initials | |
 | People · Employees (employee record) | Staff app | People | The same employee record | Where People edit the fields an employee cannot |
 | People · Employees · Attendance setup | Staff app | People | Owned by LA: arrangement and weekly schedule | Where the work schedule shown in My Profile is set |
@@ -117,8 +117,9 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `GET /documents`, `POST /documents` | `PageQuery` → `DocumentPage` | `ess` · own | yes | Upload engine and vault |
 | `GET /performance` | → `EssPerformance` | `ess` · own | | M2 |
 
-My Security calls the `security` and `identity` modules' own-account routes (password, two-step,
-passkeys, PIN, sessions); they check ownership, not the `settings` grant (README §5.2).
+My Security calls the `identity` module's own-account routes (`/auth/security`, `/auth/password`,
+`/auth/sessions`; `docs/guides/identity.md` §5), and later the `security` module's (two-step,
+passkeys, PIN); they check ownership, not the `settings` grant (README §5.2).
 
 ## 6 · Rules and calculations
 
@@ -147,8 +148,9 @@ passkeys, PIN, sessions); they check ownership, not the `settings` grant (README
   calendar shows clashes before a request is sent.
 - Signed documents carry two hashes (content and artifact) and a public verification link on
   `go.mycityapp.io/verify/<ref>`.
-- Changing the password ends the employee's other sessions. Passkeys sign in with a fingerprint or
-  face instead of a password; the PIN unlocks the app and confirms a clock-in on a registered device.
+- Changing the password ends the employee's other sessions. The password and session rules are
+  `docs/guides/identity.md` §6. Passkeys (later) sign in with a fingerprint or face instead of a
+  password; the PIN (later) unlocks the app and confirms a clock-in on a registered device.
 - Up to 3 registered devices (attendance guide).
 - Coming Soon: a tab whose module is not yet delivered shows a Coming Soon page naming the milestone
   and date (My Performance M2, My Queries M3, My Payslips M6). What each milestone delivers is in
@@ -211,7 +213,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | ESS · My Leave (`my-leave`) | "2026 entitlement" (desktop subtitle); View Calendar, Request Leave; Entitlement, Taken, Approved Upcoming, Remaining, each opening its list or request; My Requests (Type, From, To, Days, Approver, Status), a row opens the request; Entitlement by type (allowance, bar, taken, booked, left). Request Leave: Leave Type (Annual, Compassionate, Sick, Unpaid), From and To (DD/MM/YYYY), Note (Optional); Cancel, Send Request | None | "Leave is approved by your line manager in one step" and "The calendar shows clashes before you submit": §3 step 5, §6 |
 | ESS · My Queries (`my-queries`) | Open Queries, Archived, Sanctions: a count and one line each; the chosen list under them (desktop) or in a sheet (phone): "No Open Queries, Nothing is waiting on you."; Archived Queries (Subject, Raised By, Date, Your Response, Outcome); Sanctions (Sanction, Reason, Date, Deduction, Status) | None | The 48 hours to respond: §3 step 3 (an open query shows its own due time). "Most queries close with no action", the response kept beside the decision, disagreement read before the decision: §6. Who can see a query: §8. A deduction only after an upheld sanction: §3 step 3. The flowchart and the page subtitle are removed |
 | ESS · My Documents (`my-documents`) | Upload Document; Documents, Signed, Verified, Expiring, Missing; Vault (Document, Uploaded, Status, Expires); a row opens the document (Uploaded, Status, Expires; Upload Document on a missing one); the contract's PDF preview | None | "Signed documents carry two hashes and a public verification link": §6. A missing document blocks onboarding only for a new hire: §3 step 6, §11. The "Your vault" subtitle and "Click any row to preview it" are removed |
-| ESS · My Security (`my-security`) | Password (last changed; Change Password); Two-Step Sign-In (Authenticator App, Email Code as Fallback, each with its switch); Passkeys (count; each passkey with when it was added and last used; Add Passkey); PIN (Not set; Set PIN); Devices (Up to 3; Open My Devices); Recent Sign-Ins (When, Device, Where, Result). Change Password: Current Password, New Password, Confirm Password; Cancel, Update Password. Set PIN: New PIN (four digit boxes); Cancel, Save PIN | Help terms: Authenticator App, "A 6-digit code from any authenticator app, asked at sign-in."; Email Code as Fallback, "A code sent to your work email, used only when the app is unavailable."; Passkeys, "Sign in with your fingerprint or face instead of a password."; PIN, "A short PIN unlocks the app and confirms a clock-in on a registered device." (the New PIN label carries the same); Devices, "The phones and laptops you clock in from. A clock-in from any other device is flagged to People."; New Password, "At least 12 characters. Changing it signs you out on your other devices." | The page subtitle "How you sign in, and the devices you clock in from" is removed. Where devices are managed and the flag on others: §3 step 7. Organisation password and two-step rules: Settings · Security (M9) |
+| ESS · My Security (`my-security`) | Password (when it was changed, or Not changed yet; Change Password); Clock-In Devices (Open My Devices); Signed In (Device with its address, Signed In, This Device or Sign Out; Sign Out Others when there are others); Recent Sign-Ins (When, Device, Address, Status: This Device, Signed In, or how it ended). Change Password: Current Password, New Password, Confirm New Password; Cancel, Change Password. Sign Out on a device and Sign Out Others ask first | None | The page subtitle "How you sign in, and the devices you clock in from" is removed. Where devices are managed and the flag on others: §3 step 7. The password rules, the other sessions ending on a change, and the session limits: `docs/guides/identity.md` §6. Two-step sign-in, passkeys and the PIN come with the security module |
 | Shell avatar (rail, phone top bar, More) | The photo from My Profile, or initials | None | Where the photo is stored and who reads it: §3 step 1 |
 | People · Employees (employee record) | Owned by People: that module's guide | That module's guide | That module's guide |
 | People · Employees · Attendance setup | Owned by LA: the attendance guide §3 | The attendance guide | The attendance guide §3 |
@@ -240,7 +242,7 @@ Coming Soon from the module's delivery state.
 | ESS · My Leave (`my-leave`) | View Calendar, Request Leave; the four KPI cards two to a row, each opening its list as a sheet; icon cards My Requests and Entitlement | The subtitle; the requests table (a list in the My Requests sheet); the entitlement card (its sheet) | Request Leave opens the form as a full sheet, Send Request full width | As My Profile |
 | ESS · My Queries (`my-queries`) | The three cards, one to a row | The lists: each card opens its list as a sheet (archived queries and sanctions as cards) | Tap a card | As My Profile |
 | ESS · My Documents (`my-documents`) | Upload Document; the five stats; the documents as a list with a status pill | The contract preview beside the list: a document opens its preview or details as a sheet | Upload Document; on a missing document, Upload Document in its sheet | As My Profile |
-| ESS · My Security (`my-security`) | Icon cards two to a row: Password, Two-Step Sign-In, Passkeys, PIN, Devices, Sign-In Activity | Every card's detail, each in a sheet (Recent Sign-Ins as sign-in cards) | Change Password and Set PIN open their forms as full sheets, the primary full width | As My Profile |
+| ESS · My Security (`my-security`) | Icon cards two to a row: Password, Signed In, Recent Sign-Ins, Clock-In Devices | Every card's detail, each in a sheet (the sign-in lists as cards) | Change Password opens its form as a full sheet, the primary full width | As My Profile |
 | Shell avatar (rail, phone top bar, More) | The avatar at the right of the phone top bar; it opens More, whose top row is the person with Theme, Density and Settings | The rail itself | None | The phone top bar |
 | People · Employees (employee record) | Owned by People | That module's guide | That module's guide | That module's guide |
 | People · Employees · Attendance setup | Owned by LA | The attendance guide | The attendance guide | The attendance guide |
@@ -298,3 +300,4 @@ Deductions figure and every form open the shared modal.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: explainer cards and footnotes gone; Edit Profile is a three-step wizard; password, PIN, query response and device forms mark their fields on Submit instead of disabling it; Policy Updates shows the version and its changes as content.
 - 15/10/2026 · AJ · Frontend foundation PR 2 (Shell): Self-Service is a place in the phone's bottom bar (F16) and the avatar sits in the phone top bar, opening More (F17); the menu drawer is gone. §2 and §10 rows brought into line; no ESS screen changed.
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): every list on these screens is `DataView` (cards on a phone as before, with server sort where the contract allow-lists it), the KPI tiles are `KpiCard` (My Leave's still open only on a phone), the payslip and document previews are `Paper` and `DocumentPreview` (a PDF in the browser's own viewer, with Open in Tab and a Download card where it cannot be shown), and My Record History is the shared `Timeline`. §10 is unchanged.
+- 16/10/2026 · TB · My Security runs on the real API (`identity` module; `docs/guides/identity.md`): Password, Signed In with Sign Out per device and Sign Out Others, Recent Sign-Ins, the Clock-In Devices link. Two-step sign-in, passkeys and the PIN left the screen until the security module (the second sign-in PR); §2, §5, §6 and both §10 rows say so. New passwords follow the contract's rule (8 characters with mixed case, a number and a symbol), not 12.

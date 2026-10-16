@@ -1,8 +1,8 @@
 import { Brand, ModalProvider, StagingBar, Toaster, useEnvironment } from "@mycity/ui";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
-import { Login } from "@/auth/Login";
-import { SignInSheet } from "@/auth/SignInSheet";
-import { RouterProvider } from "@/lib/router";
+import { LINK_PATHS, Login } from "@/auth/Login";
+import { LockSheet } from "@/auth/LockSheet";
+import { RouterProvider, useRouter } from "@/lib/router";
 import { Shell } from "@/shell/Shell";
 
 export function App() {
@@ -27,12 +27,14 @@ function Staging() {
 
 function Gate() {
   const { status } = useAuth();
+  const { location } = useRouter();
   if (status === "loading") return <Splash />;
-  if (status === "signed-out") return <Login />;
+  // A reset or invitation link opens its own page, whoever is signed in on this browser.
+  if (status === "signed-out" || LINK_PATHS.includes(location.path)) return <Login />;
   return (
     <>
       <Shell />
-      <SignInSheet />
+      <LockSheet />
     </>
   );
 }

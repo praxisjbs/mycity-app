@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | items below | | | | | |
-| M1 Core Operations & Employee Management | 31 | 31 | 0 | 0 | 0 | 0 |
+| M1 Core Operations & Employee Management | 31 | 30 | 1 | 0 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 10 | 10 | 0 | 0 | 0 | 0 |
+| M9 Settings & Governance | 10 | 9 | 0 | 1 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **92** | **92** | **0** | **0** | **0** | **0** |
+| **Total** | **92** | **90** | **1** | **1** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -75,7 +75,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☑ | 14/10/2026 |
 | M0 migrations and reference seed 0001 to 0099 | LA | ☑ | 16/10/2026 |
 | Staging seed data | LA | ☐ | |
-| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE | ☐ | |
+| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE | ☐ | 16/10/2026 |
+| Sign-in and sessions: `identity`, `access`, `users`; session rules, lock screen, credential links, the seven roles, the four-city sign-in screen (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
 | Documents, media, uploads, PDF generation | GE | ☑ | 14/10/2026 |
 | Import engine + staff importer; real staff sheet imported on staging | GE · LA | ☐ | 15/10/2026 |
@@ -95,6 +96,23 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · Sign-in and sessions built (`docs/guides/identity.md`). Backend: migration
+  `0200_identity_sessions.sql` and seed `0290_seed_roles_and_grants.sql` (the seven real roles with
+  a home view and rank, and the grants matrix); `identity` (sign-in, refresh with rotation and reuse
+  detection, sign-out, the device cookie and new-device notice, forgot, reset and invitation links
+  through the outbox, change password, own sessions, the throttle instead of a lockout, the breach
+  check), `access` (roles), `users` (Settings · Users) and the first `organisation` service code;
+  contract schemas `identity`, `users`, `access`. Sessions last 2 hours, lock after 30 idle minutes,
+  every token capped at the session's end, the refresh token in an HttpOnly cookie. Passwords are 8
+  characters with mixed case, a number and a symbol. Frontend: the four-city sign-in screen
+  (`CityShowcase`), Forgot, Reset and Welcome, the lock screen (`LockScreen`) with the session clock
+  and cross-tab locking in `AuthProvider`, refreshes serialised across tabs in `createApi`, the app
+  typed from `contract.gen.ts`. `organisation` writes the employee columns of `0110`. Fixed on the
+  way: the rate limiters shared one counter. Left: two-step sign-in, passkeys and the PIN (the
+  second sign-in PR); the notifications and search routes (the bell and
+  ⌘K still on INTERIM types); the organisation routes, so the employee screens still use the mock;
+  `create-admin` on staging and production for the operations lead and the build account
+  (`docs/runbooks/first-accounts.md`).
 - 16/10/2026 · TB · `docs/DATABASE_SCHEMA.md` rewritten as the database design: the M0 core and how a
   module attaches to it, each milestone's block, owner, tables as built and what it still owes (from
   the coverage audit), what is not built and why (passkeys per REUSE_MAP; nothing for M11), and the
@@ -338,11 +356,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 88 | My Devices | `my-devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 90 | My Security | `my-security` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 90 | My Security | `my-security` | M1 | AJ | ☐ | ☐ | ☐ | In progress | 16/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 16/10/2026 · TB · My Security (#90) on the real API: Password (Change Password with the contract's rule), Signed In with Sign Out per device and Sign Out Others, Recent Sign-Ins, Clock-In Devices; desktop and phone. In progress until two-step sign-in, passkeys and the PIN arrive with the security module (the second sign-in PR); no ticks until then.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/ess/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/ess.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 15/10/2026 · AJ · My Leave: the four KPI tiles open their modal on a phone only (`Kpi` `opensOn="phone"`); on desktop they are plain tiles because the requests table and entitlement card already sit beside them. Home keeps desktop drill-down, as `docs/guides/home.md` asks.
 - 15/10/2026 · TB · Five ESS tabs ratified into the inventory (MILESTONES §18): Work Location Requests (#87), My Devices (#88) and Policy Updates (#89), owned by LA from the attendance work; My Security (#90, AJ); Org Chart (#91, TB). Inventory now 92 screens; SCREENS constant and `src/shared/route-map.js` updated.
@@ -528,7 +547,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 69 | Organisation | `organisation` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 70 | Users | `users` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 72 | Approvals | `approvals` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
@@ -541,6 +560,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · Users (#70) built on the real API, the lean screen agreed with TB: counts, status chips, the paged list, Users by Role, Invite User, and per login Save Roles, Resend Invitation, Send Reset Link, Sign Out Everywhere, Suspend with a reason, Reactivate; desktop and phone. The roles picker reads `GET /access/roles`. Left for M9: the role editor on the real API (Roles & Permissions is still on the mock).
 - 15/10/2026 · AJ · Frontend built in `app/src/features/settings/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/settings.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 15/10/2026 · AJ · Roles & Permissions: New Role and Edit Role (name, purpose, per module the actions and the record scope, and the three sensitive fields), delete for an unused custom role, the CEO role locked, built-in roles keep their names. The matrix, the roles list and the role pickers in Users read the saved roles; every change is audited. Copy now says four layers with no entity layer (MILESTONES §14, A2). INTERIM endpoints in `app/src/api/types/settings.ts`: `GET /settings/roles/catalogue`, `GET|PUT|DELETE /settings/roles/:id`, `POST /settings/roles`, for GE to confirm. Left: the mock's demo sign-ins do not yet take their access from these roles.
 
