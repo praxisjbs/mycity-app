@@ -73,7 +73,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Shared core: `db`, `crud`, `http`, `errors`, `events`, `workflow`, `numbering`, `money`, `time`, `access`, `rbac` | GE | ☑ | 14/10/2026 |
 | Pagination gate: `shared/http/paged.js`, `common.js` page schemas, `check/pagination.js` (§16) | GE | ☑ | 13/10/2026 |
 | Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☑ | 14/10/2026 |
-| M0 migrations 0001 to 0099 | LA | ☐ | |
+| M0 migrations and reference seed 0001 to 0099 | LA | ☑ | 16/10/2026 |
 | Staging seed data | LA | ☐ | |
 | Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE | ☐ | |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
@@ -94,16 +94,19 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · LA · Moved deterministic reference SQL to `seeds/reference/` while retaining CLAUDE.md's milestone blocks (`0099`, `1099`, and so on). `db:migrate` now interleaves both folders and the migration gates enforce unique numbers and milestone ownership across both. Payroll tables remain deferred; only shared numbering configuration required by the existing numbering contract is seeded. Left: create environment-specific staging people and transaction data through services.
+- 15/10/2026 · LA · PostgreSQL 16 migrations and deterministic reference seeds added for M0 to M10, with the table catalogue and relationship map in `docs/DATABASE_SCHEMA.md`. Payroll schema is deliberately deferred pending the tax-reform contract; sanction fines remain standalone. Migration number, idempotency, reversibility and PostgreSQL 16 UP/DOWN/UP checks pass (the local check substituted the vector type because pgvector is not installed). Left: verify the unchanged pgvector statements where the extension is installed, then create environment-specific staging people and transaction data through services.
 - 15/10/2026 · TB · Frontend foundation PR 1 (Ground) done, to `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F24). `packages/ui` (`@mycity/ui`) is the one design system for both apps: tokens, density and motion, 87 components (primitives, overlays, help, toast, the form system, the shared data client), the generated catalogue `docs/COMPONENTS.md`, `npm run new:component` and the gallery (`npm run gallery`). Both apps import every Ground part from `@mycity/ui`; the app copies are deleted and FRONTEND_FOUNDATION §7 lists what PR 2 and PR 3 still move. Merged with the screen conventions work: its screens and copy stay, and `@mycity/ui` takes its API (`useContractForm(initial, rules or schema)`, `Button busy`, `Wizard`, `CardHeader help`). New gates: components, palette, contrast, native dialogs, upload, mock-free, a11y, frontend typecheck, lint, test and build; gates 8 and 11 crawl the gallery and every app screen. Left: PR 2 (Shell) and PR 3 (Build kit).
 - 15/10/2026 · AJ · Screen conventions in the staff app (FRONTEND_GUIDE §5, §7, §8): gates 8 and 11 now crawl all 86 app screens at phone and desktop size (the build writes `dist/screens.json`; `scripts/check/lib/screens.js` builds and serves the demo app, CI installs `app/`), and both pass. `HelpTerm` and `Details` replace the ⓘ toggle; about 60 explainer cards, footnotes and long captions are gone; titles are Title Case and within the word limits; `Table` is a card list on a phone; controls are 44 px on a phone. Forms: `useContractForm` on react-hook-form, the §8.6 names, `FormFooter`, `Wizard` (seven long forms), `PhoneField`, `CheckboxField`, the Optional tag; Submit is never disabled. Left for this item: the contract client (waits on `contract.gen.ts`), Lucide icons and the illustration set (§5.5), and crawling as Staff and the CEO.
-- 15/10/2026 · GE · CI gates, first group. Gate 3 migration numbers (unique, in the milestone's
-  block, a new file in its branch's block), gate 4 reversibility (a DOWN or `-- IRREVERSIBLE:
+- 15/10/2026 · GE · CI gates, first group. Gate 3 migration numbers (unique across `migrations/`
+  and `seeds/reference/`, in the milestone's block), gate 4 reversibility (a DOWN or `-- IRREVERSIBLE:
   <reason>`, DOWN names what UP creates, `-- DESTRUCTIVE: <reason>` on destructive steps, and UP,
   DOWN, UP on a throwaway database when RUN_DB_TESTS=1), gate 5 idempotency (and a merged migration
   never edited, by git), gate 17's backend half widened to packages/ and AI prompts, gate 15 day-first dates
   (backend formats only through `shared/time`), gate 20 money, and the guards: module catalogue,
   production environment references, shell scripts LF and parse, every JavaScript file parses.
-  `migrate.js`: five-digit numbers for M10 and M11, ordered by number; `--down` refuses an
+  `migrate.js`: four digits through M9 and five from M10, with schema and reference-seed steps
+  ordered together; `--down` refuses an
   irreversible file. `scripts/import/run.js`: list, template, upload, map, preview, errors, commit,
   revert, as a named person. Left: gate 6 (schema-drift, contract-columns); the catalogue gate's
   `--exact` at M9; a Postgres service in `ci.yml` so the round trip and integration tests run in CI;
@@ -135,7 +138,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   notification email template, `WORKER_DB_POOL_MAX`, `import.expired`; Chromium no longer calls out; quoted template front matter.
   New packages: bullmq, socket.io, @socket.io/redis-adapter and redis-emitter (socket.io-client for
   tests): run `npm install`. 27 unit and 18 integration tests added, one starting the real worker
-  process and rendering a PDF through it. Left: phase 6 (AI and search); migrations 0001 to 0099
+  process and rendering a PDF through it. Left: phase 6 (AI and search); M0 migrations and reference seed 0001 to 0099
   (LA: `schema_migration` and `system_marker` columns in BACKEND_STRUCTURE §11.1); web push (M6).
 - 14/10/2026 · GE · M0 table brought up to date with phases 1 to 4. Ticked: root config, the shared
   core, and documents, media, uploads and PDF generation. Partly done, so not ticked: the app

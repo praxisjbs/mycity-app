@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Apply the migrations in migrations/ to this environment's database
+ * Apply schema migrations and reference seeds to this environment's database
  * (README §6.3, BACKEND_GUIDE §6).
  *
  *   npm run db:migrate                    apply every pending file, in order
@@ -12,8 +12,8 @@
  * pre-deploy dump (SYSTEM_ARCHITECTURE §9), which passes --deploy-gate. Run by hand
  * there, this script refuses.
  *
- * A migration file is migrations/NNNN_name.sql (five digits from M10's 10000 block, README
- * §6.3) with two sections:
+ * Schema files live in migrations/ and reference-data files in seeds/reference/. Both use their
+ * milestone's number block (four digits through M9, five from M10) and the same two sections:
  *
  *   -- UP
  *   CREATE TABLE IF NOT EXISTS ...;
@@ -44,7 +44,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 
-const DIR = path.resolve(__dirname, "..", "..", "migrations");
+const ROOT = path.resolve(__dirname, "..", "..");
+const DIR = path.join(ROOT, "migrations");
+const REFERENCE_SEED_DIR = path.join(ROOT, "seeds", "reference");
 const FILE_RE = /^(\d{4,5})_[a-z0-9_]+\.sql$/;
 const IRREVERSIBLE_RE = /^--\s*IRREVERSIBLE:[ \t]*(.*)$/m;
 const LOCK_KEY = "mycity:migrate";
@@ -61,13 +63,13 @@ function hashText(text) {
     .digest("hex");
 }
 
-/** The leading number of a migration name or file name ("1005_leave" → 1005). */
+/** The leading number of a migration or reference-seed name ("1099_seed_core" → 1099). */
 function numberOf(name) {
   const m = /^(\d+)_/.exec(String(name));
   return m ? Number(m[1]) : Number.NaN;
 }
 
-/** Order migrations by number, so 10000 (M10) comes after 9999 (M9). */
+/** Order schema and reference-data steps by milestone number. */
 const byNumber = (a, b) => numberOf(a) - numberOf(b) || a.localeCompare(b);
 
 /** The reason a DOWN section gives for being irreversible, or null. */
@@ -102,34 +104,44 @@ function parseMigration(text, name) {
 }
 
 /**
- * Every migration file, in order. A .sql file with a bad name is an error, not skipped.
+ * Every schema migration and reference seed, in one order. Passing `dir` retains the single-folder
+ * behaviour used by isolated tests and tools.
  * @param {string} [dir]
  * @returns {Array<{name: string, file: string, sha256: string, up: string, down: string}>}
  */
-function listMigrations(dir = DIR) {
-  if (!fs.existsSync(dir)) return [];
+function listMigrations(dir) {
+  const sources = dir
+    ? [{ dir, label: path.basename(dir) }]
+    : [
+        { dir: DIR, label: "migrations" },
+        { dir: REFERENCE_SEED_DIR, label: "seeds/reference" },
+      ];
   const out = [];
   const seen = new Map();
-  for (const f of fs
-    .readdirSync(dir)
-    .filter((x) => x.endsWith(".sql"))
-    .sort(byNumber)) {
-    const m = FILE_RE.exec(f);
-    if (!m) throw new Error(`migrations/${f}: name it NNNN_lower_snake.sql`);
-    if (seen.has(m[1]))
-      throw new Error(
-        `migrations/${f}: number ${m[1]} is already used by ${seen.get(m[1])}`,
-      );
-    seen.set(m[1], f);
-    const text = fs.readFileSync(path.join(dir, f), "utf8");
-    out.push({
-      name: f.replace(/\.sql$/, ""),
-      file: f,
-      sha256: hashText(text),
-      ...parseMigration(text, `migrations/${f}`),
-    });
+  for (const source of sources) {
+    if (!fs.existsSync(source.dir)) continue;
+    for (const f of fs
+      .readdirSync(source.dir)
+      .filter((x) => x.endsWith(".sql"))
+      .sort(byNumber)) {
+      const relative = `${source.label}/${f}`;
+      const m = FILE_RE.exec(f);
+      if (!m) throw new Error(`${relative}: name it NNNN_lower_snake.sql`);
+      if (seen.has(m[1]))
+        throw new Error(
+          `${relative}: number ${m[1]} is already used by ${seen.get(m[1])}`,
+        );
+      seen.set(m[1], relative);
+      const text = fs.readFileSync(path.join(source.dir, f), "utf8");
+      out.push({
+        name: f.replace(/\.sql$/, ""),
+        file: dir ? f : relative,
+        sha256: hashText(text),
+        ...parseMigration(text, relative),
+      });
+    }
   }
-  return out;
+  return out.sort((a, b) => byNumber(a.name, b.name));
 }
 
 /* ------------------------------------------------------------------ *
@@ -158,7 +170,7 @@ async function applied(client) {
  * @param {import("pg").ClientBase} client
  * @param {string} [dir]
  */
-async function status(client, dir = DIR) {
+async function status(client, dir) {
   await ensureLedger(client);
   const files = listMigrations(dir);
   const done = new Map((await applied(client)).map((r) => [r.name, r]));
@@ -205,7 +217,7 @@ async function inTransaction(client, fn) {
  *          one-file-at-a-time round trip)
  * @returns {Promise<{applied: string[], head: string|null}>}
  */
-async function migrate(client, { dir = DIR, log = () => {}, until } = {}) {
+async function migrate(client, { dir, log = () => {}, until } = {}) {
   await client.query("SET statement_timeout = 0");
   return withLock(client, async () => {
     const s = await status(client, dir);
@@ -256,7 +268,7 @@ async function migrate(client, { dir = DIR, log = () => {}, until } = {}) {
  * @param {{dir?: string}} [opts]
  * @returns {Promise<string|null>} the name undone
  */
-async function down(client, { dir = DIR } = {}) {
+async function down(client, { dir } = {}) {
   await client.query("SET statement_timeout = 0");
   return withLock(client, async () => {
     await ensureLedger(client);
@@ -382,6 +394,7 @@ if (require.main === module) {
 
 module.exports = {
   DIR,
+  REFERENCE_SEED_DIR,
   FILE_RE,
   numberOf,
   byNumber,

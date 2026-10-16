@@ -25,8 +25,9 @@ Donor line counts are from the checked-out trees on 12 October. `praxis` = `prax
 ```
 mycity-erp/
 ├── src/                     Express backend, CommonJS, Node 20
-├── migrations/              NNNN_name.sql, one scope, -- UP / -- DOWN in every file
+├── migrations/              NNNN_name.sql schema steps, -- UP / -- DOWN in every file
 ├── seeds/
+│   ├── reference/           NNNN_seed_name.sql product/reference rows, applied by db:migrate
 │   ├── build/               synthetic, CI and local only
 │   └── staging/             realistic demonstration data, staging only
 ├── packages/
@@ -707,7 +708,7 @@ The module catalogue gate lists catalogue keys no route enforces yet as a note; 
 
 ---
 
-## 11 · M0 migrations
+## 11 · Foundation migrations and reference seed
 
 | # | File | Contents |
 |---|---|---|
@@ -725,7 +726,7 @@ The module catalogue gate lists catalogue keys no route enforces yet as a note; 
 | 0085 | `imports.sql` | `import_batch`, `import_row`, `import_mapping_profile` |
 | 0090 | `security_store.sql` | `integration_secret`, `public_token` (hash, scope, subject, expires, used_at) |
 | 0095 | `ai.sql` | `ai_setting` (vendor, model, monthly cap, per-module switch), `ai_run`, `ai_run_step` (tokens, cost, latency, purpose, module, actor), `ai_catalogue` (synced from manifests). Prompts are files with a `version:` front matter, recorded on each run; `ai_prompt_version` waits for prompt editing in Settings, if MyCity wants it |
-| 0099 | `seed_reference.sql` | System roles, module catalogue rows, working week, numbering schemes, template defaults. **No people, no demo rows** |
+| 0099 | `seeds/reference/0099_seed_reference.sql` | System roles, module catalogue rows, working week, numbering schemes, template defaults. **No people, no demo rows** |
 
 ### 11.1 Columns the shared layer already reads
 
@@ -1091,4 +1092,3 @@ The script is written ahead of the services it calls. They must expose:
 | `config/env`, `config/db` | `{ config: { APP_ENV } }`, `{ pool }` |
 
 `actor` is `{ user_id: null, source: "script:create-admin" }`; the audit row records that source.
-

@@ -56,7 +56,9 @@ shows in ESS · My Payslips until HR waives it." Name the event or API that carr
 |---|---|---|
 | <`attendance_punch`> | <`employee_id`, `work_date`, `clock_in_at`> | <device timestamp stored beside server time> |
 
-Migration file(s): `<NNNN_name.sql>` (milestone block, README §6.3).
+Schema migration file(s): `migrations/<NNNN_name.sql>`. Reference-data file(s):
+`seeds/reference/<NNNN_seed_name.sql>`. Both use an unused number in the feature's milestone block
+(README §6.3).
 
 ## 5 · API
 

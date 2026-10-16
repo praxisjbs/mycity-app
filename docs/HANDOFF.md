@@ -147,8 +147,8 @@ Nine gates and the import command line, each with tests (`tests/unit/foundation/
 plus round-trip and command-line tests in `tests/integration/worker.test.js` and
 `documents-import.test.js`):
 
-- Gate 3 `migration-numbers.js`: names, unique numbers, milestone blocks; a new file on an `m<N>`
-  branch must be in M<N>'s block (branch from `GITHUB_HEAD_REF` or git).
+- Gate 3 `migration-numbers.js`: names, unique numbers across `migrations/` and
+  `seeds/reference/`, and milestone blocks; reference files must use `_seed_` in their names.
 - Gate 4 `migration-reversibility.js`: a DOWN or `-- IRREVERSIBLE: <reason>`; DOWN names what UP
   creates; `-- DESTRUCTIVE: <reason>` on destructive steps. With `RUN_DB_TESTS=1` and
   `DATABASE_URL` (or `--apply`): UP one file at a time, each DOWN compared with the catalogue as it
@@ -160,8 +160,9 @@ plus round-trip and command-line tests in `tests/integration/worker.test.js` and
   (unenforced keys are a note until `--exact` at M9), `production-environment-refs.js`, `shell.js`.
 - `check/lib/source.js`: the JavaScript reader the backend gates share. The screen gates from
   main have their own (`check/lib/sources.js`); folding the two together is a later tidy-up.
-- `migrate.js`: five-digit numbers (M10 10000, M11 11000) ordered by number, `migrate({until})`,
-  and `--down` refuses an irreversible file.
+- `migrate.js`: four-digit names through M9 and five-digit names from M10, with schema and
+  reference-seed files interleaved by number; `migrate({until})` and `--down` refuses an
+  irreversible file.
 - `scripts/import/run.js`: list, template, upload, map, preview, errors, commit, revert, status,
   history, as the person named by `--as`; commit and revert on staging or production ask for the
   environment name (or `--yes`).
