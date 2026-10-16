@@ -57,7 +57,7 @@ export const MORE_GROUPS: LauncherGroup[] = [
     label: "System",
     tiles: [
       { key: "knowledge", label: "Knowledge", icon: "book", href: "#/MoreSheet" },
-      { key: "praxis_ai", label: "Praxis", icon: "spark", href: "#/MoreSheet" },
+      { key: "praxis_ai", label: "Assistant", icon: "spark", href: "#/MoreSheet" },
       { key: "settings", label: "Settings", icon: "cog", href: "#/MoreSheet" },
     ],
   },

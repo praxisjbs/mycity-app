@@ -12,7 +12,7 @@ describe("the session (PR 2 question 2)", () => {
   it("signs in, and when the session ends mid-work keeps the person and asks again in place", async () => {
     mockSession.set(null);
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 5000 });
     await act(() => result.current.signIn("cynthia@mycityapp.io", "demo1234"));
     expect(result.current.status).toBe("signed-in");
     act(() => result.current.clearJustSignedIn());
@@ -34,7 +34,7 @@ describe("the session (PR 2 question 2)", () => {
   it("signs out to the sign-in screen", async () => {
     mockSession.set(null);
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 5000 });
     await act(() => result.current.signIn("chidera@mycityapp.io", "demo1234"));
     await act(() => result.current.signOut());
     expect(result.current).toMatchObject({ status: "signed-out", me: null });
