@@ -83,9 +83,9 @@ jobs:
       - name: All gates
         run: npm run ci
         env:
-          # Set to "1" once M0 is complete: a gate whose script is still empty
-          # then fails the run instead of being reported as NOT BUILT.
-          CI_STRICT: "0"
+          # Every gate script is built (gate 6 was the last), so a gate whose script is
+          # empty fails the run instead of being reported as NOT BUILT.
+          CI_STRICT: "1"
           # Integration suite and gate 4's live round trip, against the services above.
           RUN_DB_TESTS: "1"
           APP_ENV: test
