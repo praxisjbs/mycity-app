@@ -6,10 +6,18 @@
  * the server. The markers are our own `divIcon`s in token classes rather than
  * Leaflet's default images, so nothing depends on an asset path and both
  * themes read.
+ *
+ * Nothing inside the drawing takes the keyboard. The drawing is hidden from
+ * screen readers, because every point is listed in words beside it (MapView),
+ * and a hidden thing must not hold focus: Leaflet's keyboard panning, its
+ * focusable markers, its zoom control and the Leaflet link it puts in the
+ * attribution are all off. The zoom buttons are ours instead, outside the
+ * hidden part, so they are named, reachable and 44 px on a phone.
  */
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { IconButton } from "../actions/Button";
 import { ATTRIBUTION, describePoint, type LatLon } from "./geoapify";
 
 export interface MapDrawProps {
@@ -50,15 +58,17 @@ export default function MapDraw({ centre, zoom, tileUrl, markers, radiusMetres, 
     const made = L.map(box.current, {
       center: [centre.lat, centre.lon],
       zoom,
-      zoomControl: interactive,
+      zoomControl: false,
       dragging: interactive,
       scrollWheelZoom: false,
       doubleClickZoom: interactive,
       touchZoom: interactive,
-      keyboard: interactive,
-      attributionControl: true,
+      keyboard: false,
+      attributionControl: false,
     });
     L.tileLayer(tileUrl, { attribution: ATTRIBUTION, maxZoom: 20, crossOrigin: true }).addTo(made);
+    // The licence line only, with no link of Leaflet's own in front of it.
+    L.control.attribution({ prefix: false }).addTo(made);
     made.on("click", (e: L.LeafletMouseEvent) => pick.current?.({ lat: e.latlng.lat, lon: e.latlng.lng }));
     drawn.current = L.layerGroup().addTo(made);
     map.current = made;
@@ -79,7 +89,7 @@ export default function MapDraw({ centre, zoom, tileUrl, markers, radiusMetres, 
     if (!layer) return;
     layer.clearLayers();
     for (const marker of markers) {
-      L.marker([marker.lat, marker.lon], { icon: pin(marker.tone ?? "plain"), title: marker.label, alt: marker.label, keyboard: interactive })
+      L.marker([marker.lat, marker.lon], { icon: pin(marker.tone ?? "plain"), title: marker.label, alt: marker.label, keyboard: false })
         .bindTooltip(marker.label)
         .addTo(layer);
     }
@@ -87,15 +97,24 @@ export default function MapDraw({ centre, zoom, tileUrl, markers, radiusMetres, 
     if (radiusMetres && first) {
       L.circle([first.lat, first.lon], { radius: radiusMetres, interactive: false, className: "stroke-secondary fill-secondary", weight: 2, fillOpacity: 0.12 }).addTo(layer);
     }
-  }, [markers, radiusMetres, interactive]);
+  }, [markers, radiusMetres]);
 
   return (
-    <div
-      ref={box}
-      className="size-full"
-      /* The points are also written out by the component around this, so the map is never the only way to read them. */
-      aria-hidden="true"
-      data-points={markers.map((m) => describePoint(m)).join("; ")}
-    />
+    <div className="relative size-full">
+      <div
+        ref={box}
+        className="size-full"
+        /* The points are also written out by the component around this, so the map is never the only way to read them. */
+        aria-hidden="true"
+        data-points={markers.map((m) => describePoint(m)).join("; ")}
+      />
+      {interactive && (
+        /* Over the tiles and over Leaflet's own control corners, which sit at 400 and 1000. */
+        <div className="absolute top-2 right-2 z-1001 flex flex-col overflow-hidden rounded-ctl border border-border bg-card shadow-2">
+          <IconButton icon="zoomin" label="Zoom In" onClick={() => map.current?.zoomIn()} />
+          <IconButton icon="zoomout" label="Zoom Out" onClick={() => map.current?.zoomOut()} />
+        </div>
+      )}
+    </div>
   );
 }

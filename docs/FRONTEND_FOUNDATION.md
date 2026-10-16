@@ -137,7 +137,7 @@ app's session on the upload engine.
 - [x] Charts (lazy): area, bar, donut, bands, sparkline, each its own `*.draw.tsx` chunk; both palettes from the chart tokens (MILESTONES §5.2), with every value also read out as words
 - [x] Kanban (F19: stage chips and Move To on a phone, Move To as a real menu on desktop too), Calendar, Timeline, approval Chain, Accordion
 - [x] Pickers: PersonPicker and RecordPicker (server search, 25 per page, nothing filtered on the client); the upload engine with a percentage per file (gate 18), one copy for both apps; SignatureField
-- [x] Rich text editor (TipTap, lazy), PDF and document preview with an image viewer and Open in New Tab, Paper, Reader, voice input (A18), Profile header
+- [x] Rich text editor (TipTap, lazy), PDF and document preview with an image viewer and Open in Tab, Paper, Reader, voice input (A18), Profile header
 - [x] Maps (F21): MapView, PlaceSearch, LocationLabel on Leaflet, with the tiles, the address search and the reverse lookup all through our API
 - [x] `app/src/components/` and `public-app/src/components/` deleted; §7 cleared and `LEGACY` empty
 - [x] Every screen on the token scale: 804 arbitrary values converged, the 10 inline styles became shared components, and `styling-exemptions.json` is deleted with its readers
@@ -189,7 +189,7 @@ app's session on the upload engine.
    and announcements both take pasted mail. The toolbar and every style are ours, on tokens.
 4. How is a document previewed? **The browser's own viewer**: a PDF streams from the vault into an
    `<object>`, and anything that refuses it inline gets a Download card instead. An **image viewer**
-   sits beside it for pictures, and **both carry Open in New Tab**, so a preview opens full size.
+   sits beside it for pictures, and **both carry Open in Tab**, so a preview opens full size.
    Our own generated documents keep rendering through `Paper`.
 
 ---
@@ -217,8 +217,12 @@ app's session on the upload engine.
   ShareBar), because an app may not write `style` at all. The mailbox composer is on the shared
   editor instead of its own `contentEditable` on the deprecated `execCommand`. The celebration card,
   the rich text body, the timeline rail and the disclosure marker moved from the staff app's
-  stylesheet into the package's base.css, which cut it from 90 lines to 54. 660 tests green in the
-  package; the whole `npm run ci` green.
+  stylesheet into the package's base.css, which cut it from 90 lines to 54. The screen gates closed
+  the last of it: the map's drawing holds no focus at all now (Leaflet's keyboard panning, focusable
+  markers, zoom control and Leaflet link are off and the zoom buttons are ours, outside the hidden
+  part), a list's pages are a landmark named after that list, a board's stages are a screen's second
+  level, and the file input sits out of the reading order behind the words a person presses. 663
+  tests green in the package; the whole `npm run ci` green.
   Left: the Geoapify proxy routes are backend work (attendance, worksites), so the maps run against
   the paths `maps/geoapify.ts` names; voice input needs the M2 transcription route; and screens
   adopt server sort as their modules' contracts name their sortable fields.

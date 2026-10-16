@@ -6,11 +6,11 @@ import { DocumentPreview } from "./DocumentPreview";
 const HREF = "/api/v1/documents/d1/file";
 
 describe("DocumentPreview", () => {
-  it("names the file, says how big it is, and offers Open in New Tab", () => {
+  it("names the file, says how big it is, and offers Open in Tab", () => {
     render(<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={HREF} sizeBytes={2048} />);
     expect(screen.getByText("Receipt.pdf")).toHaveAttribute("data-copy", "content");
     expect(screen.getByText("2 KB")).toBeInTheDocument();
-    const open = screen.getByRole("link", { name: "Open in New Tab" });
+    const open = screen.getByRole("link", { name: "Open in Tab" });
     expect(open).toHaveAttribute("href", HREF);
     expect(open).toHaveAttribute("target", "_blank");
   });
@@ -42,7 +42,7 @@ describe("DocumentPreview", () => {
     expect(screen.queryByRole("img")).toBeNull();
   });
 
-  it("carries the screen's own actions beside Open in New Tab", () => {
+  it("carries the screen's own actions beside Open in Tab", () => {
     render(
       <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={HREF} actions={<button type="button">Remove File</button>} />,
     );

@@ -24,7 +24,7 @@ export interface ImageViewerProps {
   alt: string;
   /** How tall the frame is; `md` unless a sheet wants it shorter. */
   height?: "sm" | "md" | "lg";
-  /** Hide Open in New Tab (DocumentPreview's bar already carries one). */
+  /** Hide Open in Tab (DocumentPreview's bar already carries one). */
   noOpen?: boolean;
   /** Layout classes only (spacing). */
   className?: string;

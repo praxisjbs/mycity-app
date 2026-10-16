@@ -110,7 +110,8 @@ function Today() {
   );
 }
 
-const COLS: Array<[TaskStatus, string, string]> = [["todo", "To do", "var(--subtle-foreground)"], ["in_progress", "In progress", "var(--chart-2)"], ["in_review", "In review", "var(--chart-3)"], ["done", "Done", "var(--chart-1)"]];
+// The board's own titles, which are the stage tabs on a phone, so they are Title Case chrome.
+const COLS: Array<[TaskStatus, string, string]> = [["todo", "To Do", "var(--subtle-foreground)"], ["in_progress", "In Progress", "var(--chart-2)"], ["in_review", "In Review", "var(--chart-3)"], ["done", "Done", "var(--chart-1)"]];
 
 function Tasks() {
   const me = useMe();

@@ -5,7 +5,7 @@
  * @use Under any server-paged list: DataView draws one for you, and a card grid or a picker that pages itself takes one directly.
  * @avoid A page-size chooser, a jump-to-page box, or "showing 25 of many"; the size is the server's 25 and is never offered.
  * @phone The count sits above the buttons, which are full width and 44 px, so paging is a thumb reach.
- * @a11y A navigation landmark named for what is being paged; the count is a live region, so a screen reader hears the new range after Next.
+ * @a11y A navigation landmark named for the list it pages, so two lists on one screen stay apart; the count is a live region, so a screen reader hears the new range after Next.
  * @status stable
  * @example <Pager page={list.page} onPage={list.setPage} noun="employee" />
  */
@@ -23,6 +23,8 @@ export interface PagerProps {
   noun?: string;
   /** The plural, when it is not the noun with an s ("people", "queries"). */
   nounPlural?: string;
+  /** The list these pages belong to ("Annual Goals"), which names the landmark; the noun unless set. Two lists on one screen each need their own. */
+  label?: string;
   /** Layout classes only (spacing). */
   className?: string;
 }
@@ -31,7 +33,7 @@ export interface PagerProps {
  * The only place a list's total appears (FRONTEND_GUIDE §4). The range and the
  * total come from the server's `page`, so they cannot disagree with the rows.
  */
-export function Pager({ page, onPage, noun = "record", nounPlural, className }: PagerProps) {
+export function Pager({ page, onPage, noun = "record", nounPlural, label, className }: PagerProps) {
   if (!page) return null;
   const word = page.total === 1 ? noun : (nounPlural ?? `${noun}s`);
   const from = page.total === 0 ? 0 : (page.number - 1) * page.size + 1;
@@ -44,7 +46,7 @@ export function Pager({ page, onPage, noun = "record", nounPlural, className }: 
         : `${formatCount(from)} to ${formatCount(to)} of ${formatCount(page.total)} ${word}`;
 
   return (
-    <nav aria-label={`${word} pages`} className={cn("flex flex-wrap items-center gap-2.5 px-3.5 py-3 phone:flex-col phone:items-stretch", className)}>
+    <nav aria-label={`${label ?? word} pages`} className={cn("flex flex-wrap items-center gap-2.5 px-3.5 py-3 phone:flex-col phone:items-stretch", className)}>
       <span aria-live="polite" className="text-2xs text-subtle-foreground phone:text-center">
         {count}
       </span>

@@ -102,7 +102,8 @@ export function PagedTable<R>({
       onRowClick={onRowClick}
       empty={empty ?? (list.q ? { title: "Nothing Matches", text: "Try another search." } : undefined)}
       wide={wide}
-      footer={<Pager page={list.page} onPage={list.setPage} noun={noun} nounPlural={nounPlural} />}
+      /* The table's own title names its pages, so two lists on one screen are two landmarks a screen reader can tell apart. */
+      footer={<Pager page={list.page} onPage={list.setPage} noun={noun} nounPlural={nounPlural} label={typeof title === "string" ? title : undefined} />}
     />
   );
 }

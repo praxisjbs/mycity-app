@@ -23,7 +23,7 @@ const Poll = () => {
             type="button"
             onClick={() => setMine(i)}
             aria-pressed={mine === i}
-            className={cn("relative mb-1.5 block w-full overflow-hidden rounded-box border px-2.5 py-2 text-left text-xs", mine === i ? "border-secondary" : "border-border")}
+            className={cn("relative mb-1.5 block w-full overflow-hidden rounded-box border px-2.5 py-2 text-left text-xs phone:min-h-tap", mine === i ? "border-secondary" : "border-border")}
           >
             <ShareBar percent={percent} />
             <span className={cn("relative flex justify-between gap-2", mine === i && "font-strong")}>
@@ -42,7 +42,7 @@ export default {
   states: {
     "A Poll": Poll,
     Empty: () => (
-      <button type="button" className="relative block w-full overflow-hidden rounded-box border border-border px-2.5 py-2 text-left text-xs">
+      <button type="button" className="relative block w-full overflow-hidden rounded-box border border-border px-2.5 py-2 text-left text-xs phone:min-h-tap">
         <ShareBar percent={0} />
         <span className="relative">No votes yet</span>
       </button>

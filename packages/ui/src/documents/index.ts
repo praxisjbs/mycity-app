@@ -5,7 +5,7 @@
  *
  * PR 3 question 4: a PDF streams into an `<object>` and anything that refuses
  * it inline becomes a Download card; a picture goes to the image viewer; both
- * carry Open in New Tab, so a preview is never a dead end.
+ * carry Open in Tab, so a preview is never a dead end.
  */
 export { DocumentPreview, type DocumentPreviewProps } from "./DocumentPreview";
 export { ImageViewer, type ImageViewerProps } from "./ImageViewer";

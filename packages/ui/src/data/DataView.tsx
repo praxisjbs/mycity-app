@@ -399,7 +399,7 @@ export function DataView<R>({
       {rows.length === 0 && !loading && !error && (
         <EmptyState bare icon={empty?.icon ?? "rows"} title={empty?.title ?? (list?.q ? "Nothing Matches" : "Nothing Here Yet")} text={empty?.text ?? (list?.q ? "Try another search." : undefined)} />
       )}
-      {page && setPage && <Pager page={page} onPage={setPage} noun={noun} nounPlural={nounPlural} />}
+      {page && setPage && <Pager page={page} onPage={setPage} noun={noun} nounPlural={nounPlural} label={name} />}
       {footer}
     </>
   );

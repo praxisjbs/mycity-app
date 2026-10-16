@@ -10,7 +10,7 @@ export const SAMPLE_PDF =
 
 /** A small picture, drawn as a plain coloured square. */
 export const SAMPLE_IMAGE =
-  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMjgwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjI4MCIgZmlsbD0iI2UyZThlNiIvPjx0ZXh0IHg9IjIwMCIgeT0iMTQ1IiBmb250LWZhbWlseT0ic2Fuc-c2VyaWYiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiMwMTQzMzkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlJlY2VpcHQ8L3RleHQ+PC9zdmc+";
+  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMjgwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjI4MCIgZmlsbD0iI2UyZThlNiIvPjx0ZXh0IHg9IjIwMCIgeT0iMTQ1IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZmlsbD0iIzAxNDMzOSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+UmVjZWlwdDwvdGV4dD48L3N2Zz4=";
 
 export const ARTICLE_GROUPS = [
   { label: "Getting Started", items: [{ key: "a1", title: "Your first week" }, { key: "a2", title: "Clocking in and out" }] },

@@ -155,11 +155,12 @@ export function Kanban({ columns, onOpen, onMove, className }: KanbanProps) {
               : undefined
           }
         >
-          <h3 className="mb-2.5 flex items-center gap-2 text-2xs tracking-caps text-muted-foreground uppercase">
+          {/* The board sits straight under a screen's own title, so its stages are that screen's second level. */}
+          <h2 className="mb-2.5 flex items-center gap-2 text-2xs tracking-caps text-muted-foreground uppercase">
             <span aria-hidden="true" className="size-2 flex-none rounded-sm bg-(--stage-ink)" style={{ "--stage-ink": seriesInk(column.series ?? 1) } as CSSProperties} />
             {column.label}
             <em className="ml-auto text-2xs text-subtle-foreground not-italic tabular-nums">{column.count ?? column.cards.length}</em>
-          </h3>
+          </h2>
           <ul {...content} className="m-0 flex list-none flex-col gap-2 p-0">
             {column.cards.map((card) => (
               <li key={card.key} className="relative">

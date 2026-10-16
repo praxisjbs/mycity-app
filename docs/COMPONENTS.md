@@ -106,7 +106,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
-| Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in New Tab on both. | stable |
+| Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
@@ -2733,7 +2733,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 | Use | Anywhere a person attaches a file: a CV, a receipt, a signed offer, a mail attachment, an import sheet. |
 | Avoid | A raw `<input type="file">` anywhere else (gate 18); storing a path or a name instead of the `document_id`; a silent wait on a large file. |
 | Phone | The drop zone is a full-width tap target, since a phone cannot drop; every file shows its own percentage as it travels. |
-| Accessibility | A real file input with a label, the progress a named meter per file, and each file's state said in words as well as a glyph. |
+| Accessibility | The words in the drop zone are a real button, which opens the picker; the progress is a named meter per file, and each file's state is in words as well as a glyph. |
 | Status | stable |
 | Exports | `UploadField` |
 | Import | `import { UploadField } from "@mycity/ui";` |
@@ -2994,7 +2994,7 @@ Page controls under a list, showing the server's true total ("312 employees") an
 | Use | Under any server-paged list: DataView draws one for you, and a card grid or a picker that pages itself takes one directly. |
 | Avoid | A page-size chooser, a jump-to-page box, or "showing 25 of many"; the size is the server's 25 and is never offered. |
 | Phone | The count sits above the buttons, which are full width and 44 px, so paging is a thumb reach. |
-| Accessibility | A navigation landmark named for what is being paged; the count is a live region, so a screen reader hears the new range after Next. |
+| Accessibility | A navigation landmark named for the list it pages, so two lists on one screen stay apart; the count is a live region, so a screen reader hears the new range after Next. |
 | Status | stable |
 | Exports | `Pager` |
 | Import | `import { Pager } from "@mycity/ui";` |
@@ -3010,6 +3010,7 @@ Page controls under a list, showing the server's true total ("312 employees") an
 | `onPage` | `(number: number) => void` | yes | Asks for a page number. |
 | `noun` | `string` |  | What one row is, lower case ("employee"); "record" unless set. |
 | `nounPlural` | `string` |  | The plural, when it is not the noun with an s ("people", "queries"). |
+| `label` | `string` |  | The list these pages belong to ("Annual Goals"), which names the landmark; the noun unless set. Two lists on one screen each need their own. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3261,14 +3262,14 @@ A bare trend line with no axes, for inside a table cell or beside a figure.
 
 ### DocumentPreview
 
-A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in New Tab on both.
+A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both.
 
 | | |
 |---|---|
 | Use | Looking at what someone attached: a receipt, a CV, a signed offer, a mail attachment, an imported sheet. |
 | Avoid | A document the product generated itself (use Paper, which prints right); shipping a PDF renderer of our own; a preview with no way out to the file. |
 | Phone | Shorter, and anything the browser will not draw inline becomes a Download card instead of an empty frame. |
-| Accessibility | The frame is named by the file, Open in New Tab and Download are real links, and a file that cannot be shown says so in words. |
+| Accessibility | The frame is named by the file, Open in Tab and Download are real links, and a file that cannot be shown says so in words. |
 | Status | stable |
 | Exports | `DocumentPreview` |
 | Import | `import { DocumentPreview } from "@mycity/ui";` |
@@ -3285,7 +3286,7 @@ A file from the vault as the browser draws it: a PDF inline, a picture in the im
 | `href` | `string` | yes | Where the vault streams it (`/api/v1/documents/:id/file`). |
 | `sizeBytes` | `number` |  | Its size, for the line under the name. |
 | `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller. |
-| `actions` | `ReactNode` |  | What sits beside Open in New Tab (Replace, Remove). |
+| `actions` | `ReactNode` |  | What sits beside Open in Tab (Replace, Remove). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3316,7 +3317,7 @@ A picture at a readable size, with zoom and a way to open it full size in a new 
 | `src` | `string` | yes | Where the picture is (the vault's own stream). |
 | `alt` | `string` | yes | The file's name, which is the picture's text. |
 | `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter. |
-| `noOpen` | `boolean` |  | Hide Open in New Tab (DocumentPreview's bar already carries one). |
+| `noOpen` | `boolean` |  | Hide Open in Tab (DocumentPreview's bar already carries one). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx

@@ -5,6 +5,14 @@
  */
 import type { LatLon, Place, ResolveAddress, SearchPlaces } from "./geoapify";
 
+/**
+ * The tile the gallery draws with: one flat pixel, as a data URL, so a page of
+ * maps asks the network for nothing. A screen's tiles come from our own proxy
+ * (`TILES`), which the gallery has no server for.
+ */
+export const SAMPLE_TILE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mN49OIZAAVgArHOP1vTAAAAAElFTkSuQmCC";
+
 export const LEKKI: LatLon = { lat: 6.4321, lon: 3.4219 };
 export const IKEJA: LatLon = { lat: 6.6018, lon: 3.3515 };
 

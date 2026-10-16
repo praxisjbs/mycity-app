@@ -128,7 +128,7 @@ export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string;
         {p.options.map((o, i) => {
           const pc = Math.round((o.votes * 100) / tot);
           return (
-            <button key={i} type="button" onClick={() => onVote(i)} aria-pressed={p.my_vote === i} className={cn("relative mb-1.5 block w-full overflow-hidden rounded-box border px-2.5 py-2 text-left text-xs", p.my_vote === i ? "border-secondary" : "border-border")}>
+            <button key={i} type="button" onClick={() => onVote(i)} aria-pressed={p.my_vote === i} className={cn("relative mb-1.5 block w-full overflow-hidden rounded-box border px-2.5 py-2 text-left text-xs phone:min-h-tap", p.my_vote === i ? "border-secondary" : "border-border")}>
               <ShareBar percent={pc} />
               <span className={cn("relative flex justify-between gap-2", p.my_vote === i && "font-strong")}><span>{o.text}</span><span>{pc}%</span></span>
             </button>

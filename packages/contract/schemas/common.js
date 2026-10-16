@@ -118,10 +118,10 @@ const RESERVED_CONTROLS = [...Object.keys(LIST_CONTROLS), "sort"];
  * nobody meant. The value parses to `{ field, dir }` for the repo; the wire
  * type stays the string the frontend sends.
  *
- * Sorting is not optional decoration: a list the server does not sort would be
- * sorted inside one page of 25, which is the praxis-ls bug FRONTEND_GUIDE §4
- * names. A list with no `sortable` has no `sort` key at all, and `.strict()`
- * refuses one.
+ * Sorting is not optional decoration: a list the server does not sort comes
+ * back in whatever order the query planner chose, and the page the person
+ * reads is then sorted inside its own 25 rows (FRONTEND_GUIDE §4). A list with
+ * no `sortable` has no `sort` key at all, and `.strict()` refuses one.
  *
  * @param {string[]} sortable field names, snake_case, in the list's own order
  */

@@ -5,7 +5,7 @@
  * @use Anywhere a person attaches a file: a CV, a receipt, a signed offer, a mail attachment, an import sheet.
  * @avoid A raw `<input type="file">` anywhere else (gate 18); storing a path or a name instead of the `document_id`; a silent wait on a large file.
  * @phone The drop zone is a full-width tap target, since a phone cannot drop; every file shows its own percentage as it travels.
- * @a11y A real file input with a label, the progress a named meter per file, and each file's state said in words as well as a glyph.
+ * @a11y The words in the drop zone are a real button, which opens the picker; the progress is a named meter per file, and each file's state is in words as well as a glyph.
  * @status stable
  * @example <UploadField purpose="receipt" endpoint="/api/v1/documents" upload={api.upload} onUploaded={(docs) => form.set("receipts", docs)} />
  */
@@ -110,11 +110,16 @@ export function UploadField({
   };
 
   const open = () => input.current?.click();
+  /*
+   * Out of sight and out of the reading order: the words in the drop zone are
+   * the button a person presses, and this input only carries the picker. A
+   * display:none input still opens it when the button asks (`open` below).
+   */
   const picker = (
     <input
       ref={input}
       type="file"
-      className="sr-only"
+      className="hidden"
       accept={accept}
       multiple={multiple}
       aria-label={label}

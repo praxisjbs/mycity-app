@@ -1,11 +1,11 @@
 /**
  * @component DocumentPreview
  * @group Documents
- * @summary A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in New Tab on both.
+ * @summary A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both.
  * @use Looking at what someone attached: a receipt, a CV, a signed offer, a mail attachment, an imported sheet.
  * @avoid A document the product generated itself (use Paper, which prints right); shipping a PDF renderer of our own; a preview with no way out to the file.
  * @phone Shorter, and anything the browser will not draw inline becomes a Download card instead of an empty frame.
- * @a11y The frame is named by the file, Open in New Tab and Download are real links, and a file that cannot be shown says so in words.
+ * @a11y The frame is named by the file, Open in Tab and Download are real links, and a file that cannot be shown says so in words.
  * @status stable
  * @example <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
  */
@@ -34,7 +34,7 @@ export interface DocumentPreviewProps {
   sizeBytes?: number;
   /** How tall the frame is; `md` unless a sheet wants it shorter or a page taller. */
   height?: "sm" | "md" | "lg";
-  /** What sits beside Open in New Tab (Replace, Remove). */
+  /** What sits beside Open in Tab (Replace, Remove). */
   actions?: ReactNode;
   /** Layout classes only (spacing). */
   className?: string;
@@ -58,7 +58,7 @@ export function DocumentPreview({ name, mime, href, sizeBytes, height = "md", ac
       {actions}
       <Button asChild size="sm" iconRight="external">
         <a href={href} target="_blank" rel="noreferrer">
-          Open in New Tab
+          Open in Tab
         </a>
       </Button>
     </div>
@@ -91,13 +91,13 @@ export function DocumentPreview({ name, mime, href, sizeBytes, height = "md", ac
          * not draw the PDF here, iOS Safari included, and when the file itself
          * does not arrive. That is the standard fallback and needs no script,
          * so there is no error handler to go wrong. It offers the download
-         * rather than a second Open in New Tab, which the bar already carries.
+         * rather than a second Open in Tab, which the bar already carries.
          */}
-        {download("Cannot Show Here", "Download it, or open it in a new tab.")}
+        {download("Cannot Show Here", "Download it, or open it in a tab.")}
       </object>
     );
   } else {
-    body = download("Download To Read", "This kind of file opens in its own app.");
+    body = download("Download To Read", "This file opens in its own app.");
   }
 
   return (

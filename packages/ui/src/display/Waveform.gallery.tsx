@@ -11,7 +11,7 @@ const Playing = () => {
         type="button"
         onClick={() => setPlaying((p) => !p)}
         aria-label={playing ? "Pause voice note" : "Play voice note"}
-        className="flex size-7.5 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground"
+        className="flex size-7.5 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground phone:size-tap"
       >
         <Icon name={playing ? "pause" : "play"} />
       </button>
