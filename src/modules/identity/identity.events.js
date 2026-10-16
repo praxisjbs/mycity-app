@@ -61,10 +61,17 @@ defineNotification(EVENTS.AUTH_SIGNED_IN, {
   include_actor: true,
 });
 
+// A wrong two-step code comes after the right password, so it says more than a wrong password.
+const wrongCodes = (e) => Boolean(e.payload && e.payload.reason === "bad_code");
+
 defineNotification(EVENTS.AUTH_SIGN_IN_THROTTLED, {
   to: [{ users: self }],
-  title: "Several wrong passwords on your account",
-  body: "Sign-in now waits between attempts. If this was not you, reset your password.",
+  title: (e) =>
+    wrongCodes(e) ? "Several wrong codes on your account" : "Several wrong passwords on your account",
+  body: (e) =>
+    wrongCodes(e)
+      ? "Someone with your password is entering wrong codes. Change your password now."
+      : "Sign-in now waits between attempts. If this was not you, reset your password.",
   priority: "high",
   include_actor: true,
 });

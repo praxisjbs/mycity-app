@@ -11,6 +11,7 @@ const { AppError } = require("../../shared/errors");
 const access = require("../access/access.service");
 const identity = require("../identity/identity.service");
 const policy = require("../identity/identity.session-policy");
+const security = require("../security/security.service");
 const invites = require("./users.invite");
 const repo = require("./users.repo");
 
@@ -98,6 +99,22 @@ async function endSessions(userId, actor) {
   return { ended: ended.length };
 }
 
+/**
+ * Reset someone's two-step sign-in (a lost phone): their authenticator and recovery
+ * codes stop working and they are signed out everywhere; they set it up again on My
+ * Security. Removing a way in, so the administrator must have signed in, or
+ * confirmed it is them, within the window too.
+ */
+async function resetTwoStep(userId, actor) {
+  refuseSelf(userId, actor, "reset the two-step sign-in of");
+  const ended = await tx(async (client) => {
+    await security.assertFresh(client, actor);
+    return security.resetTwoStep(client, userId, actor);
+  });
+  await identity.afterSessionsEnded(userId, ended);
+  return rowOf(userId);
+}
+
 module.exports = {
   list,
   summary,
@@ -109,5 +126,6 @@ module.exports = {
   reactivate,
   sendResetLink,
   endSessions,
+  resetTwoStep,
   get: rowOf,
 };

@@ -30,4 +30,6 @@ module.exports = {
     ok(res, await service.sendResetLink(id(req), withActor(req))),
   endSessions: async (req, res) =>
     ok(res, await service.endSessions(id(req), withActor(req))),
+  resetTwoStep: async (req, res) =>
+    ok(res, await service.resetTwoStep(id(req), withActor(req))),
 };

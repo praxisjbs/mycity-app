@@ -36,6 +36,16 @@ function idleSeconds() {
 }
 
 /**
+ * How long after signing in, or after confirming it is them, a person may add or
+ * remove a way to sign in without proving who they are again (CREDENTIAL_ENROL_WINDOW_MIN,
+ * default 15). A token lifted from a browser is worth minutes; without this window it
+ * could be turned into a passkey or a PIN that outlives a password change.
+ */
+function confirmWindowSeconds() {
+  return Math.max(60, Number(config.CREDENTIAL_ENROL_WINDOW_MIN) * 60);
+}
+
+/**
  * Seconds a session of this age has left, never negative. An unknown age (a value
  * that is not a number) counts as a brand-new session, so a missing value can never
  * become a mass sign-out.
@@ -87,6 +97,7 @@ function endReason(s) {
 module.exports = {
   maxAgeSeconds,
   idleSeconds,
+  confirmWindowSeconds,
   remainingSeconds,
   accessTtlFor,
   refreshTtlFor,

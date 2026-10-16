@@ -12,7 +12,7 @@ const STATUS = `CASE WHEN u.status = 'active' AND u.password_changed_at IS NULL 
 const ROW = `
   u.user_id, u.employee_id, trim(e.first_name || ' ' || e.last_name) AS display_name,
   u.email::text AS email, e.job_title, d.name AS department, u.is_ceo,
-  ${STATUS} AS status,
+  ${STATUS} AS status, (u.mfa_enrolled_at IS NOT NULL) AS two_step,
   COALESCE((SELECT json_agg(json_build_object('code', r.code::text, 'name', r.name) ORDER BY r.rank DESC, r.name)
               FROM user_role ur JOIN role r ON r.role_id = ur.role_id
              WHERE ur.user_id = u.user_id

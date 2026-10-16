@@ -185,7 +185,13 @@ describeDb("identity against the real migrations", () => {
       const { agent } = await signIn("ops@mycity.test", OPS_PASSWORD);
       const res = await agent.get("/api/v1/auth/device");
       expect(res.status).toBe(200);
-      expect(res.body.account).toEqual({ email: "ops@mycity.test", display_name: "Ada Obi", first_name: "Ada" });
+      expect(res.body.account).toEqual({
+        email: "ops@mycity.test",
+        display_name: "Ada Obi",
+        first_name: "Ada",
+        has_pin: false,
+        has_passkey: false,
+      });
       const stranger = await request(app).get("/api/v1/auth/device");
       expect(stranger.body.account).toBeNull();
     });

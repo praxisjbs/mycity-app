@@ -16,8 +16,24 @@ const controller = require("./identity.controller");
 const router = express.Router();
 
 route(router, "post", "/login",
-  { body: c.identity.LoginBody, response: c.identity.Session, anonymous: true, summary: "Sign in" },
+  { body: c.identity.LoginBody, response: c.security.SignInResult, anonymous: true, summary: "Sign in: a session, or the code step" },
   limits.signInLimiter, controller.login);
+
+route(router, "post", "/two-step",
+  { body: c.security.CodeStep, response: c.identity.Session, anonymous: true, summary: "The code step of two-step sign-in" },
+  limits.twoStepLimiter, controller.twoStep);
+
+route(router, "post", "/pin",
+  { body: c.security.PinSignIn, response: c.security.SignInResult, anonymous: true, summary: "Sign in with the PIN on a known browser" },
+  limits.pinLimiter, controller.pinSignIn);
+
+route(router, "post", "/passkey/options",
+  { body: c.security.PasskeyStart, response: c.security.PasskeyChallenge, anonymous: true, summary: "Start signing in with a passkey" },
+  limits.passkeyLimiter, controller.passkeyOptions);
+
+route(router, "post", "/passkey",
+  { body: c.security.PasskeySignIn, response: c.identity.Session, anonymous: true, summary: "Sign in with a passkey" },
+  limits.passkeyLimiter, controller.passkeySignIn);
 
 route(router, "post", "/refresh",
   { body: c.common.EmptyBody, response: c.identity.SessionTokens, anonymous: true, summary: "New access token from the refresh cookie" },

@@ -38,6 +38,8 @@ const UserRow = z
     roles: z.array(UserRole),
     is_ceo: z.boolean(),
     status: UserStatus,
+    /** Two-step sign-in is on: an administrator may reset it (a lost phone). */
+    two_step: z.boolean(),
     last_seen_at: isoDateTime.nullable(),
     created_at: isoDateTime,
   })
@@ -108,6 +110,7 @@ const TABLES = {
       job_title: "the employee's job title, joined from employee",
       department: "the department's name, joined through employee",
       roles: "the login's roles, from user_role and role",
+      two_step: "whether app_user.mfa_enrolled_at is set",
       last_seen_at: "the latest user_session.last_seen_at of the login",
     },
   },
