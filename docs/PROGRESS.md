@@ -97,7 +97,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 **Notes**
 
 - 16/10/2026 · TB · Sign-in and sessions built (`docs/guides/identity.md`). Backend: migration
-  `0140_identity_sessions.sql` and seed `0190_seed_roles_and_grants.sql` (the seven real roles with
+  `0200_identity_sessions.sql` and seed `0290_seed_roles_and_grants.sql` (the seven real roles with
   a home view and rank, and the grants matrix); `identity` (sign-in, refresh with rotation and reuse
   detection, sign-out, the device cookie and new-device notice, forgot, reset and invitation links
   through the outbox, change password, own sessions, the throttle instead of a lockout, the breach

@@ -79,8 +79,8 @@ sees it.
 | `password_reset` | `user_id`, `token_hash`, `purpose` (reset, invite), `expires_at`, `used_at`, `requested_by`, `requested_ip`, `source_event_id` (unique) | Only the hash is stored; one row per requesting event |
 | `role`, `user_role`, `role_permission` | `role.code`, `home_view`, `rank` | Seven roles (§8); the grants matrix |
 
-Schema migration: `migrations/0140_identity_sessions.sql`. Reference data:
-`seeds/reference/0190_seed_roles_and_grants.sql`.
+Schema migration: `migrations/0200_identity_sessions.sql`. Reference data:
+`seeds/reference/0290_seed_roles_and_grants.sql`.
 
 ## 5 · API
 
@@ -178,7 +178,7 @@ not something a person can switch off.
 
 The CEO is a flag on the login (`is_ceo`) and holds every action. Every person sees and manages
 only their own sessions on My Security. The exact grants are the seed matrix
-(`seeds/reference/0190_seed_roles_and_grants.sql`).
+(`seeds/reference/0290_seed_roles_and_grants.sql`).
 
 ## 9 · AI and search
 
