@@ -26,3 +26,4 @@ export * from "./TapList";
 export * from "./Result";
 export * from "./Tile";
 export * from "./Sub";
+export * from "./ProfileHeader";

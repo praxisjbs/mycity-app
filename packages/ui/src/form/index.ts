@@ -29,6 +29,8 @@ export { OtpField, type OtpFieldProps } from "./OtpField";
 export { Form, FormFooter, type FormProps, type FormFooterProps } from "./Form";
 export { Wizard, type WizardProps, type WizardStep } from "./Wizard";
 export { Tick, type TickProps } from "./Tick";
+export { RichTextField, type RichTextFieldProps } from "./RichTextField";
+export { VoiceField, type VoiceFieldProps, type Transcribe } from "./VoiceField";
 export { UploadField, type UploadFieldProps } from "./UploadField";
 export { RecordPicker, type RecordPickerProps } from "./RecordPicker";
 export { PersonPicker, type PersonPickerProps, type PickedPerson } from "./PersonPicker";

@@ -44,6 +44,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [KpiGrid](#kpigrid) | `KpiGrid` | The row of KPI cards: four across on desktop, two to a row on a phone. | stable |
 | Display | [Money](#money) | `Money` | An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word. | stable |
 | Display | [Pill](#pill) | `Pill`, `StatusPill` | A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }). | stable |
+| Display | [ProfileHeader](#profileheader) | `ProfileHeader`, `BackButton` | The head of a record page: who or what it is, in big initials, with its chips and its actions. | stable |
 | Display | [ProgressBar](#progressbar) | `ProgressBar`, `Meter` | How far along something is: a bar with its percent, or a moving bar when the end is unknown; Meter is the thin inline bar with its figure (the merged Mini). | stable |
 | Display | [Quote](#quote) | `Quote` | A quoted passage a person wrote or received, with the yellow rule at its left. | stable |
 | Display | [Result](#result) | `Result` | The outcome of something a person just did: clocking in, signing, a check that passed or failed. | stable |
@@ -78,6 +79,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
+| Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row. | stable |
 | Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField` | Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField). | stable |
 | Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
@@ -85,6 +87,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [TextField](#textfield) | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` | The text input of the form system, with its typed relatives: password, whole number, phone and long text. | stable |
 | Forms | [Tick](#tick) | `Tick` | A checkbox with no label beside it, named by what it picks: the tick on a list's row. | stable |
 | Forms | [UploadField](#uploadfield) | `UploadField` | The upload engine: the only file input in the product, with a percentage per file and the vault's document as its answer. | stable |
+| Forms | [VoiceField](#voicefield) | `VoiceField` | Speak instead of typing: records, sends the audio to be transcribed, and drops the words into the field (A18). | stable |
 | Forms | [Wizard](#wizard) | `Wizard` | A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result. | stable |
 | Data | [Calendar](#calendar) | `Calendar` | A month at a glance, Monday first, with what happens on each day. | stable |
 | Data | [DataView](#dataview) | `DataView`, `LoadingRows` | THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export. | stable |
@@ -98,6 +101,10 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
+| Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in New Tab on both. | stable |
+| Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
+| Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
+| Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
 | Shell | [BottomBar](#bottombar) | `BottomBar` | The phone's bottom bar: Home, Workspace, Community, Self-Service and More, each an icon with one word, within thumb reach (F16). | stable |
 | Shell | [Brand](#brand) | `Brand` | The MyCity pin mark, alone or with the name beside it, in the brand colours of the surface it sits on. | stable |
 | Shell | [ComingSoon](#comingsoon) | `ComingSoon` | The card a screen shows before its milestone opens it: the milestone and date, one line, and what the screen will do. | stable |
@@ -996,6 +1003,48 @@ A small rounded label in a status tone, with a dot; StatusPill draws one from a 
 ```tsx
 <Pill tone="ok">Approved</Pill>
 <StatusPill status={leave.status} />
+```
+
+### ProfileHeader
+
+The head of a record page: who or what it is, in big initials, with its chips and its actions.
+
+| | |
+|---|---|
+| Use | A 360 page (an employee, a partner, a candidate, a vacancy), above the tabs or sections of that record. |
+| Avoid | A page title (use PageHeader); a list row (use DataView); more than four chips or three actions. |
+| Phone | The initials and the name sit together with the actions full width under them, so nothing is squeezed. |
+| Accessibility | The name is the page's own heading, and the initials are decorative, since the name is right beside them. |
+| Status | stable |
+| Exports | `ProfileHeader`, `BackButton` |
+| Import | `import { ProfileHeader, BackButton } from "@mycity/ui";` |
+| File | `packages/ui/src/display/ProfileHeader.tsx` |
+| Test | `packages/ui/src/display/ProfileHeader.test.tsx` |
+| Gallery | `packages/ui/src/display/ProfileHeader.gallery.tsx` (`npm run gallery`, `#/ProfileHeader`) |
+
+**ProfileHeader** props (`ProfileHeaderProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The record's own name, as the organisation holds it. |
+| `role` | `ReactNode` |  | What it is: a job title, a sector, a stage. |
+| `chips` | `ReactNode` |  | Up to four pills: status, department, grade. |
+| `actions` | `ReactNode` |  | Up to three actions, the primary last. |
+| `brand` | `boolean` |  | Draw the initials in the brand yellow instead of City Green (a partner, not a person). |
+| `avatar` | `ReactNode` |  | A picture instead of the initials. |
+| `level` | `1 \| 2` |  | The heading level; h1 on a record's own page, h2 inside one. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**BackButton** props (`BackButtonProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | Where it goes back to, Title Case, at most 3 words ("Back to Employees"). |
+| `onBack` | `() => void` | yes | Goes back. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ProfileHeader name={employee.display_name} role={employee.job_title} chips={pills} actions={buttons} />
 ```
 
 ### ProgressBar
@@ -2228,6 +2277,41 @@ Picks records the server searches: one page of 25, narrowed as the person types,
 <RecordPicker list={worksites} value={picked} onChange={setPicked} id={(w) => w.worksite_id} title={(w) => w.name} />
 ```
 
+### RichTextField
+
+Long text with the little formatting a message needs, loaded only when a composer opens.
+
+| | |
+|---|---|
+| Use | A mail body, an announcement, a letter's own paragraphs, a policy's text. |
+| Avoid | Any short answer (use TextField); a note nobody formats (use TextAreaField); pasting a whole page of foreign markup into a record. |
+| Phone | The toolbar wraps and every button is 44 px; the box grows with the text rather than scrolling inside itself. |
+| Accessibility | A named multi-line textbox with a formatting group whose buttons say whether they are on; the whole toolbar is reachable by Tab. |
+| Status | stable |
+| Exports | `RichTextField` |
+| Import | `import { RichTextField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/RichTextField.tsx` |
+| Test | `packages/ui/src/form/RichTextField.test.tsx` |
+| Gallery | `packages/ui/src/form/RichTextField.gallery.tsx` (`npm run gallery`, `#/RichTextField`) |
+
+**RichTextField** props (`RichTextFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The HTML, as the record stores it. |
+| `onChange` | `(html: string) => void` | yes | Called with the new HTML, or "" when the box is emptied. |
+| `onBlur` | `() => void` |  | Called when the person leaves the box: the moment it is first checked. |
+| `label` | `string` | yes | Names the box, Title Case, at most 4 words; the Field's label otherwise. |
+| `placeholder` | `string` |  | A format example of at most 3 words, never an instruction. |
+| `readOnly` | `boolean` |  | Read it without being able to change it (a sent message, a signed letter). |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `id` | `string` |  | The control's id, when the caller sets it; the Field's otherwise. |
+
+```tsx
+<Field label="Message" {...f.status("body")}><RichTextField label="Message" {...f.field("body")} /></Field>
+```
+
 ### SearchInput
 
 The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row.
@@ -2518,6 +2602,38 @@ The upload engine: the only file input in the product, with a percentage per fil
 
 ```tsx
 <UploadField purpose="receipt" endpoint="/api/v1/documents" upload={api.upload} onUploaded={(docs) => form.set("receipts", docs)} />
+```
+
+### VoiceField
+
+Speak instead of typing: records, sends the audio to be transcribed, and drops the words into the field (A18).
+
+| | |
+|---|---|
+| Use | Beside a long text field the feature guide marks for it: a review's comments, an interview note, a query's account. |
+| Avoid | A short field; a field where the exact words matter legally (a signature block); keeping the recording after the words arrive. |
+| Phone | Where it is used most: Record is a 44 px target and the level meter shows it is listening. |
+| Accessibility | The button says whether it is recording, the elapsed time is a live region, and the transcript lands in the field where a screen reader can read and edit it. |
+| Status | stable |
+| Exports | `VoiceField` |
+| Import | `import { VoiceField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/VoiceField.tsx` |
+| Test | `packages/ui/src/form/VoiceField.test.tsx` |
+| Gallery | `packages/ui/src/form/VoiceField.gallery.tsx` (`npm run gallery`, `#/VoiceField`) |
+
+**VoiceField** props (`VoiceFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What is being dictated, Title Case, at most 4 words: names the button. |
+| `transcribe` | `Transcribe` | yes | Sends the audio and answers with the words. An AI tidies them server side without changing the meaning (A18). |
+| `onTranscript` | `(text: string) => void` | yes | Called with the words once they arrive. |
+| `maxSeconds` | `number` |  | The longest recording taken, in seconds; 120 unless set. |
+| `disabled` | `boolean` |  | Nothing can be recorded (the form is closed, or the browser refused the microphone). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<VoiceField label="Comments" transcribe={api.transcribe} onTranscript={(text) => f.set("comments", text)} />
 ```
 
 ### Wizard
@@ -2976,6 +3092,174 @@ A bare trend line with no axes, for inside a table cell or beside a figure.
 
 ```tsx
 <Sparkline label="Attendance" values={[18, 21, 22, 20, 24]} />
+```
+
+## Documents
+
+### DocumentPreview
+
+A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in New Tab on both.
+
+| | |
+|---|---|
+| Use | Looking at what someone attached: a receipt, a CV, a signed offer, a mail attachment, an imported sheet. |
+| Avoid | A document the product generated itself (use Paper, which prints right); shipping a PDF renderer of our own; a preview with no way out to the file. |
+| Phone | Shorter, and anything the browser will not draw inline becomes a Download card instead of an empty frame. |
+| Accessibility | The frame is named by the file, Open in New Tab and Download are real links, and a file that cannot be shown says so in words. |
+| Status | stable |
+| Exports | `DocumentPreview` |
+| Import | `import { DocumentPreview } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/DocumentPreview.tsx` |
+| Test | `packages/ui/src/documents/DocumentPreview.test.tsx` |
+| Gallery | `packages/ui/src/documents/DocumentPreview.gallery.tsx` (`npm run gallery`, `#/DocumentPreview`) |
+
+**DocumentPreview** props (`DocumentPreviewProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The file's name, as the person uploaded it. |
+| `mime` | `string` | yes | Its type, as the SERVER decided, not as the browser guessed. |
+| `href` | `string` | yes | Where the vault streams it (`/api/v1/documents/:id/file`). |
+| `sizeBytes` | `number` |  | Its size, for the line under the name. |
+| `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller. |
+| `actions` | `ReactNode` |  | What sits beside Open in New Tab (Replace, Remove). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
+```
+
+### ImageViewer
+
+A picture at a readable size, with zoom and a way to open it full size in a new tab.
+
+| | |
+|---|---|
+| Use | A photographed receipt, a worksite picture, a scanned certificate, an uploaded profile photograph. |
+| Avoid | An illustration or an icon (use Illustration or Icon); a picture nobody needs to look at closely; a gallery of many (page them). |
+| Phone | Fits the width and zooms by the buttons rather than by pinching, so the page itself never zooms away under the person. |
+| Accessibility | The picture carries the file's name as its text, the zoom buttons say what they do, and the zoom is announced as a percentage. |
+| Status | stable |
+| Exports | `ImageViewer` |
+| Import | `import { ImageViewer } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/ImageViewer.tsx` |
+| Test | `packages/ui/src/documents/ImageViewer.test.tsx` |
+| Gallery | `packages/ui/src/documents/ImageViewer.gallery.tsx` (`npm run gallery`, `#/ImageViewer`) |
+
+**ImageViewer** props (`ImageViewerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `src` | `string` | yes | Where the picture is (the vault's own stream). |
+| `alt` | `string` | yes | The file's name, which is the picture's text. |
+| `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter. |
+| `noOpen` | `boolean` |  | Hide Open in New Tab (DocumentPreview's bar already carries one). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ImageViewer src={`/api/v1/documents/${id}/file`} alt="Receipt.jpg" />
+```
+
+### Paper
+
+A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule.
+
+| | |
+|---|---|
+| Use | An offer, a payslip, an invoice, a letter, a certificate: anything the document engine will render as a PDF. |
+| Avoid | A file someone uploaded (use DocumentPreview); a screen's own content dressed as paper; colours of the theme rather than the paper tokens. |
+| Phone | The sheet keeps its proportions with tighter margins, so what is on screen is what will print. |
+| Accessibility | The document's text is content, not interface copy, so the copy gates skip it and a screen reader reads it as written. |
+| Status | stable |
+| Exports | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` |
+| Import | `import { Paper, PaperLogo, PaperTitle, PaperTable, PaperFoot, Signature } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/Paper.tsx` |
+| Test | `packages/ui/src/documents/Paper.test.tsx` |
+| Gallery | `packages/ui/src/documents/Paper.gallery.tsx` (`npm run gallery`, `#/Paper`) |
+
+**Paper** props (`PaperProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | What goes on the paper. |
+| `note` | `ReactNode` |  | One line above the sheet, at most 8 words: what this is. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**PaperLogo** props (`PaperLogoProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `reference` | `string` | yes | The document's own number, from `numbering.allocate()`. |
+
+**PaperTitle** props (`PaperTitleProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | What the document is ("Offer of Employment"). |
+| `sub` | `ReactNode` |  | The line under it: who it is for, the date it takes effect. |
+
+**PaperTable** props (`PaperTableProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `head` | `[ReactNode, ReactNode]` | yes | The two column headings. |
+| `rows` | `Array<[ReactNode, ReactNode]>` | yes | The lines, each a label and an amount. |
+| `totals` | `Array<[ReactNode, ReactNode]>` |  | The lines ruled off in City Green at the foot (Gross, Net). |
+
+**PaperFoot** props (`PaperFootProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The footer's pieces: who signed, when, the verification number. |
+
+**Signature** props (`SignatureProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The signed name. |
+
+```tsx
+<Paper note="This is how the letter will print"><PaperLogo reference="OFF/2026/0041" /><PaperTitle>Offer of Employment</PaperTitle></Paper>
+```
+
+### Reader
+
+An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time.
+
+| | |
+|---|---|
+| Use | The Knowledge Hub's articles and FAQs, a policy library, a set of runbooks a person reads one of. |
+| Avoid | A list of records (use DataView); a set of short answers (use Accordion); a single article with nothing to pick from. |
+| Phone | The list becomes a scrolling strip of chips above the article, so the article itself has the whole width. |
+| Accessibility | The list is a navigation landmark whose current article says it is current, and the article is an <article> with its own heading. |
+| Status | stable |
+| Exports | `Reader`, `ArticleBody` |
+| Import | `import { Reader, ArticleBody } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/Reader.tsx` |
+| Test | `packages/ui/src/documents/Reader.test.tsx` |
+| Gallery | `packages/ui/src/documents/Reader.gallery.tsx` (`npm run gallery`, `#/Reader`) |
+
+**Reader** props (`ReaderProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `groups` | `ReaderGroup[]` | yes | The list, grouped. |
+| `selected` | `string \| null` | yes | The article in view. |
+| `onSelect` | `(key: string) => void` | yes | Called with the article chosen. |
+| `label` | `string` |  | Names the list for screen readers; "Articles" unless set. |
+| `children` | `ReactNode` | yes | The article itself. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**ArticleBody** props (`ArticleBodyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The article's own title. |
+| `meta` | `ReactNode` |  | What sits under it: the author, the date, a pill. |
+| `children` | `ReactNode` | yes | The article. |
+
+```tsx
+<Reader groups={groups} selected={key} onSelect={setKey}><ArticleBody title={article.title}>{article.body}</ArticleBody></Reader>
 ```
 
 ## Shell

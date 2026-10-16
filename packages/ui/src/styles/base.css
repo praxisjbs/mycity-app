@@ -123,6 +123,38 @@
   }
 }
 
+/* The reader's two columns on a wide screen: a fixed list beside the article
+   that takes the rest (Reader). */
+@utility reader-columns {
+  @media (min-width: 1181px) {
+    grid-template-columns: 250px 1fr;
+  }
+}
+
+/* The rich text box's own content: the editor sets no colour or size itself, so
+   the body reads in both themes and matches the rest of a record (RichTextField). */
+@layer components {
+  .rte:empty::before {
+    content: attr(data-ph);
+    color: var(--subtle-foreground);
+  }
+  .rte > :first-child { margin-top: 0; }
+  .rte p { margin: 6px 0; }
+  .rte h2 { font-size: var(--text-lg); margin: 10px 0 4px; }
+  .rte h3 { font-size: var(--text-md); margin: 8px 0 4px; }
+  .rte a { color: var(--accent-foreground); text-decoration: underline; text-underline-offset: 2px; }
+  .rte ul, .rte ol { margin: 6px 0; padding-left: 20px; }
+  .rte ul { list-style: disc; }
+  .rte ol { list-style: decimal; }
+  .rte li { margin-bottom: 3px; }
+  .rte blockquote {
+    border-left: 3px solid var(--input);
+    margin: 8px 0;
+    padding: 2px 12px;
+    color: var(--muted-foreground);
+  }
+}
+
 /* A disclosure's marker: a + that becomes a minus when it is open (Accordion,
    Details). The native triangle is turned off in base.css. */
 @utility plus-marker {

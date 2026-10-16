@@ -113,7 +113,12 @@ const ZOD_MESSAGE = "No Zod outside @mycity/contract: forms validate with the co
 const ZOD = { name: "zod", message: ZOD_MESSAGE };
 /** Zod's subpaths ("zod/v4", "zod/v4/core", "zod/mini") are other builds of Zod: a second instance by another door. */
 const ZOD_SUBPATHS = { group: ["zod/*"], message: `${ZOD_MESSAGE} Zod's subpaths are other builds of it, so they are refused too.` };
-const UI_ONLY = ["@radix-ui/*", "vaul", "sonner", "lucide-react", "react-hook-form", "@hookform/*"];
+/**
+ * Libraries only @mycity/ui may import (F7, F22). A feature composes the
+ * component instead, so an upgrade is one package's work and the heavy parts
+ * stay inside their own chunks.
+ */
+const UI_ONLY = ["@radix-ui/*", "vaul", "sonner", "lucide-react", "react-hook-form", "@hookform/*", "@tiptap/*", "leaflet"];
 
 /**
  * @param {object} options
