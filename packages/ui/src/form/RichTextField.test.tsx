@@ -25,9 +25,42 @@ describe("RichTextField", () => {
     render(<RichTextField label="Message" value="" onChange={vi.fn()} />);
     await open();
     expect(screen.getByRole("group", { name: "Message formatting" })).toBeInTheDocument();
-    for (const name of ["Bold", "Italic", "Heading", "Bulleted List", "Numbered List", "Quote"]) {
+    for (const name of ["Bold", "Italic", "Underline", "Strikethrough", "Heading", "Bulleted List", "Numbered List", "Quote"]) {
       expect(screen.getByRole("button", { name })).toHaveAttribute("aria-pressed", "false");
     }
+    // The mailbox's bar also carries Link and Clear Formatting (docs/guides/mailbox.md §10).
+    expect(screen.getByRole("button", { name: "Link" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear Formatting" })).toBeInTheDocument();
+  });
+
+  it("takes a link's address in the toolbar, never a native dialog", async () => {
+    render(<RichTextField label="Message" value="<p>Read this</p>" onChange={vi.fn()} />);
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Link" }));
+    const field = screen.getByRole("textbox", { name: "Link address" });
+    await userEvent.type(field, "https://mycityapp.io");
+    await userEvent.click(screen.getByRole("button", { name: "Add Link" }));
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Link address" })).toBeNull());
+  });
+
+  it("refuses an address that is not a page or an email", async () => {
+    render(<RichTextField label="Message" value="<p>Read this</p>" onChange={vi.fn()} />);
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Link" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Link address" }), "javascript:alert(1)");
+    await userEvent.click(screen.getByRole("button", { name: "Add Link" }));
+    expect(screen.getByText("Starts with https:// or mailto:")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Link address" })).toBeInTheDocument();
+  });
+
+  it("clears every mark the person has applied", async () => {
+    const onChange = vi.fn();
+    render(<RichTextField label="Message" value="<h2>A heading</h2>" onChange={onChange} />);
+    await open();
+    await userEvent.click(screen.getByRole("textbox", { name: "Message" }));
+    await userEvent.click(screen.getByRole("button", { name: "Clear Formatting" }));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(onChange.mock.calls.at(-1)![0]).not.toContain("<h2>");
   });
 
   it("reports the HTML as the person types", async () => {

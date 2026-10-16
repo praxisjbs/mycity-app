@@ -46,9 +46,14 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 mycity-app/
 ├── app/                      staff React + Vite app (frontend team), served at hub.mycityapp.io
 ├── public-app/               public React + Vite app (frontend team), served at go.mycityapp.io
-├── packages/ui/              @mycity/ui: the one design system both apps import (tokens, components,
-│                             form system, data client, the shells' frame), with gallery/ (npm run
-│                             gallery, served on staging at /gallery/) and its tests;
+├── packages/ui/              @mycity/ui: the one design system both apps import. 157 components in
+│                             groups: Foundations, Actions, Layout, Display, Navigation, Overlays,
+│                             Help, Feedback, Forms, Data (DataView, Kanban, Calendar), Charts,
+│                             Documents, Maps and Shell; plus the tokens, the form system, the data
+│                             client and lib/ (formats, preferences, the upload transport). A heavy
+│                             part is a boundary around its own *.draw.tsx chunk (F22: the charts,
+│                             the editor, the maps). With gallery/ (npm run gallery, served on
+│                             staging at /gallery/) and a test per component;
 │                             catalogue in docs/COMPONENTS.md (FRONTEND_GUIDE §9)
 ├── src/                      backend source (§4, §5)
 ├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2)
@@ -509,6 +514,15 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 15. **One form system.** Every field in both apps comes from `packages/ui/src/form/` and validates
     as it is filled from the contract schema (`useContractForm`); nobody writes a raw `<input>`,
     `<label>` or `react-hook-form` call in a feature (FRONTEND_GUIDE §8, gate 12).
+16. **Every shared component lives in `packages/ui`.** Neither app has a `components/` folder:
+    PR 3 moved the last of them and the gate refuses one being created again. What a feature keeps
+    beside its screens is wiring, not components (an endpoint bound to a shared component, the
+    API's shapes mapped to the components', the app's session on the upload engine)
+    (FRONTEND_FOUNDATION F8, F11, §7).
+17. **Styling is the token scale, with no exemptions.** Named type, spacing, radius and leading
+    steps; no arbitrary value, no raw hex, and no `style` prop in an app at all. A runtime value
+    belongs in a shared component, where a class reads it from a CSS variable
+    (FRONTEND_FOUNDATION F4, gate 13).
 
 ---
 

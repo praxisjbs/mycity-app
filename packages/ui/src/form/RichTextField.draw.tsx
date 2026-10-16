@@ -8,12 +8,14 @@
  * foreign markup into the body. Nothing below the toolbar sets a colour or a
  * size itself: `.rte` in base.css styles the content with tokens.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import Link from "@tiptap/extension-link";
 import StarterKit from "@tiptap/starter-kit";
 import { cn } from "../lib/cn";
 import { Icon, type IconName } from "../icons/Icon";
+import { Button } from "../actions/Button";
+import { InlineInput } from "./InlineInput";
 
 export interface RichTextDrawProps {
   value: string;
@@ -28,21 +30,29 @@ export interface RichTextDrawProps {
   describedBy?: string;
 }
 
-/** The toolbar: what mail and an announcement actually need, and nothing else. */
+/**
+ * The toolbar: what the mailbox's composer carries (docs/guides/mailbox.md §6,
+ * §10) and an announcement needs, and nothing else.
+ */
 const BUTTONS: Array<{ icon: IconName; label: string; mark: string; attrs?: Record<string, unknown> }> = [
   { icon: "bold", label: "Bold", mark: "bold" },
   { icon: "italic", label: "Italic", mark: "italic" },
+  { icon: "underline", label: "Underline", mark: "underline" },
+  { icon: "strike", label: "Strikethrough", mark: "strike" },
   { icon: "heading", label: "Heading", mark: "heading", attrs: { level: 2 } },
   { icon: "list", label: "Bulleted List", mark: "bulletList" },
   { icon: "listnum", label: "Numbered List", mark: "orderedList" },
   { icon: "quote", label: "Quote", mark: "blockquote" },
 ];
 
+/** A link may only point at a page or an address (docs/guides/mailbox.md §6). */
+const LINK_OK = /^(https:\/\/|mailto:)/;
+
 export default function RichTextDraw({ value, onChange, onBlur, placeholder, label, readOnly, bad, id, describedBy }: RichTextDrawProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [2, 3] } }),
-      Link.configure({ openOnClick: false, autolink: true, protocols: ["http", "https", "mailto"] }),
+      StarterKit.configure({ heading: { levels: [2, 3] }, link: false }),
+      Link.configure({ openOnClick: false, autolink: true, protocols: ["https", "mailto"] }),
     ],
     content: value,
     editable: !readOnly,
@@ -85,11 +95,28 @@ export default function RichTextDraw({ value, onChange, onBlur, placeholder, lab
       e
         ? {
             active: Object.fromEntries(BUTTONS.map((b) => [b.mark, e.isActive(b.mark, b.attrs)])),
+            linked: e.isActive("link"),
             canUndo: e.can().undo(),
             canRedo: e.can().redo(),
           }
         : null,
   });
+
+  // The link's address is typed in the toolbar, never in a native dialog (gate 16).
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [address, setAddress] = useState("");
+  const [addressBad, setAddressBad] = useState(false);
+
+  const addLink = () => {
+    const href = address.trim();
+    if (!LINK_OK.test(href)) {
+      setAddressBad(true);
+      return;
+    }
+    editor?.chain().focus().extendMarkRange("link").setLink({ href }).run();
+    setLinkOpen(false);
+    setAddress("");
+  };
 
   if (!editor) return null;
 
@@ -123,6 +150,29 @@ export default function RichTextDraw({ value, onChange, onBlur, placeholder, lab
               </button>
             );
           })}
+          <button
+            type="button"
+            aria-label="Link"
+            aria-expanded={linkOpen}
+            onClick={() => {
+              setAddressBad(false);
+              setLinkOpen((open) => !open);
+            }}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-accent-foreground phone:size-tap",
+              (linkOpen || marks?.linked) && "bg-accent text-accent-foreground",
+            )}
+          >
+            <Icon name="link" size="s" />
+          </button>
+          <button
+            type="button"
+            aria-label="Clear Formatting"
+            onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
+            className="flex size-8 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-accent-foreground phone:size-tap"
+          >
+            <Icon name="x" size="s" />
+          </button>
           <span className="ml-auto flex items-center gap-0.5">
             <button
               type="button"
@@ -143,6 +193,31 @@ export default function RichTextDraw({ value, onChange, onBlur, placeholder, lab
               <Icon name="redo" size="s" />
             </button>
           </span>
+          {linkOpen && (
+            <span className="flex basis-full items-center gap-1.5 pt-1.5">
+              <InlineInput
+                autoFocus
+                value={address}
+                onChange={(value) => {
+                  setAddress(value);
+                  setAddressBad(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addLink();
+                  }
+                }}
+                placeholder="https://"
+                aria-label="Link address"
+                className={cn("h-control min-w-0 flex-1 rounded-ctl border bg-background px-2.5 text-field outline-none", addressBad ? "border-destructive" : "border-input focus:border-ring")}
+              />
+              <Button size="sm" onClick={addLink}>
+                Add Link
+              </Button>
+              {addressBad && <span className="text-2xs text-destructive">Starts with https:// or mailto:</span>}
+            </span>
+          )}
         </div>
       )}
       <EditorContent editor={editor} />

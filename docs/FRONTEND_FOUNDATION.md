@@ -21,12 +21,16 @@ parallel produce one product:
 |---|---|---|
 | 1 | **Ground** | `packages/ui` (one design system for both apps), tokens, primitives, overlays, help, toast, the whole form system, the component catalogue and its gate, the gallery, the new gates, the playbook |
 | 2 | **Shell** | Both apps' shells on `packages/ui`: navigation, bottom bar and More, the floating button, sign-in and session, permissions, search, bell, realtime, PWA, the staging rules, the gallery on staging, the app as a gated crawl target, `new:screen` |
-| 3 | **Build kit** | DataView, KPI card, charts, kanban, calendar, timeline, pickers, upload, rich text editor, PDF preview, voice input, maps; every remaining component of #18 moved into `packages/ui` |
+| 3 | **Build kit** | DataView, KPI card, charts, kanban, calendar, timeline, pickers, upload, rich text editor, PDF preview, voice input, maps; every remaining component of #18 moved into `packages/ui`; every screen on the token scale and the F4 exemption list deleted |
 
 **Done**, for the foundation: every component a screen uses lives in `packages/ui`, is listed in
 `docs/COMPONENTS.md`, has a test and a gallery page, and passes every gate; `app/src/components/`
 and `public-app/src/components/` are empty; both apps build, typecheck, lint and test in
 `npm run ci`.
+
+**All three PRs have landed** (§6). What a feature keeps beside its screens is wiring, not
+components: an endpoint bound to a shared component, the API's shapes mapped to the components', the
+app's session on the upload engine.
 
 ---
 
@@ -128,14 +132,15 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 
 ### PR 3 · Build kit
 
-- [ ] DataView (F20): table on desktop, card list on a phone, the pager, server sort, selection and bulk actions, Export; `sort` in `listQuery` (contract, with GE)
-- [ ] KPI card and KPI grid, StatStrip, the KPI detail sheet
-- [ ] Charts (lazy): area, bar, donut, bands, sparkline; two palettes (MILESTONES §5.2), legible in both themes
-- [ ] Kanban (F19), Calendar, Timeline, approval Chain, Accordion
-- [ ] Pickers: PersonPicker, RecordPicker (server search, 25 per page); upload engine with progress (gate 18); SignatureField
-- [ ] Rich text editor, PDF and document preview, Reader, voice input (A18), Profile header
-- [ ] Maps (F21): MapView, PlaceSearch, LocationLabel
-- [ ] `app/src/components/` and `public-app/src/components/` empty; §7 cleared
+- [x] DataView (F20): table on desktop, card list on a phone, the pager, server sort, selection and bulk actions, Export; `sort` in `listQuery` (one key, a leading `-` for descending, allow-listed per list) with `orderBy()` in `shared/http/paged.js`
+- [x] KPI card and KPI grid, StatStrip, the KPI detail sheet (the report model: summary, group chips, search past a screenful, records paged at 25)
+- [x] Charts (lazy): area, bar, donut, bands, sparkline, each its own `*.draw.tsx` chunk; both palettes from the chart tokens (MILESTONES §5.2), with every value also read out as words
+- [x] Kanban (F19: stage chips and Move To on a phone, Move To as a real menu on desktop too), Calendar, Timeline, approval Chain, Accordion
+- [x] Pickers: PersonPicker and RecordPicker (server search, 25 per page, nothing filtered on the client); the upload engine with a percentage per file (gate 18), one copy for both apps; SignatureField
+- [x] Rich text editor (TipTap, lazy), PDF and document preview with an image viewer and Open in New Tab, Paper, Reader, voice input (A18), Profile header
+- [x] Maps (F21): MapView, PlaceSearch, LocationLabel on Leaflet, with the tiles, the address search and the reverse lookup all through our API
+- [x] `app/src/components/` and `public-app/src/components/` deleted; §7 cleared and `LEGACY` empty
+- [x] Every screen on the token scale: 804 arbitrary values converged, the 10 inline styles became shared components, and `styling-exemptions.json` is deleted with its readers
 
 ---
 
@@ -195,10 +200,28 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
 |---|---|---|---|
 | 1 Ground | Done | `claude/nifty-ptolemy-4fb7gz` | 15/10/2026 |
 | 2 Shell | Done | `m0/frontend-shell` | 15/10/2026 |
-| 3 Build kit | Not started | | |
+| 3 Build kit | Done | `m0/frontend-build-kit` | 16/10/2026 |
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 16/10/2026 · TB · PR 3 (Build kit) done, and with it the frontend foundation. `packages/ui` holds
+  157 components: a **Data** group (DataView, Pager, Toolbar, ExportButton, Kanban, Calendar), a
+  **Charts** group (five charts, each a boundary around its own lazy chunk), a **Documents** group
+  (DocumentPreview, ImageViewer, Paper, Reader), a **Maps** group (MapView, PlaceSearch,
+  LocationLabel on Leaflet with Geoapify proxied), the KPI pieces and the record display parts in
+  Display, and the pickers, the upload engine, SignatureField, RichTextField, VoiceField and Tick in
+  Forms. The contract gained one `sort` key per list, allow-listed, with `orderBy()` building the
+  ORDER BY from the repo's own map. Both apps' `components/` folders are deleted, `LEGACY` and §7 are
+  empty, and the F4 exemption list is gone: 804 arbitrary values converged onto the named scales and
+  the last 10 inline styles became shared components (SplitPanes, Confetti, Waveform, Swatch,
+  ShareBar), because an app may not write `style` at all. The mailbox composer is on the shared
+  editor instead of its own `contentEditable` on the deprecated `execCommand`. The celebration card,
+  the rich text body, the timeline rail and the disclosure marker moved from the staff app's
+  stylesheet into the package's base.css, which cut it from 90 lines to 54. 660 tests green in the
+  package; the whole `npm run ci` green.
+  Left: the Geoapify proxy routes are backend work (attendance, worksites), so the maps run against
+  the paths `maps/geoapify.ts` names; voice input needs the M2 transcription route; and screens
+  adopt server sort as their modules' contracts name their sortable fields.
 - 15/10/2026 · TB · PR 2 (Shell) done. A Shell group in `packages/ui` (15 components: Brand,
   StagingBar, ComingSoon, PublicPage and PageMessage, DesktopShell, PhoneShell, Rail, TopBar and
   SearchButton, PhoneHeader, BottomBar, MoreSheet, FloatingButton, CommandPalette, NotificationRow,
