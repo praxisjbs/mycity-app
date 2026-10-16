@@ -79,7 +79,12 @@ silently.
 - **Permissions** on every staff route; repos honour scope; public routes never import auth.
 - **No login without an employee.** Accounts are created with a full employee record
   (`scripts/db/create-admin.js` for the first one, the app for everyone else).
-- **Production is never seeded.** Nothing on a screen is hard-coded data.
+- **Production is never seeded** with demonstration data. The one exception is MyCity's real staff
+  (`seeds/staff/`), loaded on staging and production by each deploy (TB, 16/10/2026;
+  `docs/guides/foundation.md` §6.1). Nothing on a screen is hard-coded data.
+- **Search reaches everything.** Every new screen, action and record type is findable from ⌘K
+  (its module's `.search.js`, the route map, the screen's New action), or carries
+  `search:none <reason>`; the search coverage gate fails it otherwise (`docs/guides/foundation.md` §6.7).
 - **Three tiers of screen text** (FRONTEND_GUIDE §5, gate 8). Operational content is open. Support
   text sits behind a help term (hover on desktop, tap on a phone) or a Details row, closed by
   default. How the system works or why it was built never reaches a screen: no explainer cards
