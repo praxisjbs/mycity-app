@@ -97,6 +97,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · The bell on the real API, one of the nine M0 modules: `notifications`
+  (`GET /notifications` at 25 a page with a `status` filter, `/unread-count`, `/badges`, `POST
+  /notifications/:id/read` and `/read-all`), the caller's own rows only. Badges count unread
+  notifications per module the reader may open; a link is derived from the record and dropped when
+  the reader cannot open its module. A read mark is recorded and pushed to the person's other tabs
+  (`notification_read`). The shell's bell and the mock moved onto the contract: Open marks a notice
+  read, and a notice with no screen has Mark Read. Fixed: `password-reset.html` and `user-invite.html`
+  were empty, so every Forgot Password, invitation and reset link failed in the worker after the
+  screen said it was sent; both are written, and a test fails any declared email without a template.
+  Left: preferences and web push (M6, #74); badges count notifications only, so mail and tasks add
+  their own counts when built; audit, settings, workflow, documents and imports routes.
 - 16/10/2026 · TB · Two-step sign-in, passkeys and the PIN built (`docs/guides/identity.md` §3, §6),
   reversing "drop WebAuthn for now" (REUSE_MAP §1.1, MILESTONES §5 and §14 amended, DATABASE_SCHEMA
   §4). Backend: migration `0220_sign_in_methods.sql` (the `mfa_*` and `pin_*` columns, `mfa_recovery_code`,

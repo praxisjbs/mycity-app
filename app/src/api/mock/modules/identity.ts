@@ -232,38 +232,57 @@ route("POST /api/v1/auth/password", (req) => {
   return ok({ sessions_signed_out: 1 });
 });
 
-route("GET /api/v1/notifications/badges", (req) => {
-  const full = req.user === "cynthia" || req.user === "ifeoma";
-  return ok({ workspace: 4, community: 3, mailbox: 12, ...(full ? { queries: 2, recruitment: 12, expenses: 5 } : { expenses: 1 }) });
-});
-
+/** The bell's rows: [category, title, line, days ago, time, priority, module, tab, entity type]. */
 const NOTES = [
-  ["approvals", "Expense request waiting on you", "Bashir Lawal · Lagos activation transport, ₦185,000.00", 0, "08:41", "warn", "/expenses?tab=approvals"],
-  ["attendance", "3 late arrivals in 30 days", "A query was raised automatically for Bashir Lawal.", 0, "09:44", "err", "/queries?tab=queries"],
-  ["recruitment", "New application", "Adaeze Okonkwo applied for Content Producer.", 0, "07:20", "info", "/recruitment?tab=candidates"],
-  ["community", "You were recognised", "Ifeoma Chukwu: \"Kept the Enugu shoot on schedule.\"", 1, "16:12", "ok", "/community?tab=channels"],
-  ["leave", "Leave request", "Tobi Ojo requested 5 days from 20/10.", 1, "11:03", "info", "/people?tab=leave"],
-  ["partnerships", "Eko Hotels has gone quiet", "34 days since the last contact.", 2, "09:00", "warn", "/partnerships?tab=partners"],
-  ["payroll", "Payroll preview ready", "October run, 25 employees.", 3, "10:30", "info", "/payroll?tab=payroll-runs"],
+  ["approvals", "Expense request waiting on you", "Bashir Lawal · Lagos activation transport, ₦185,000.00", 0, "08:41", "high", "expenses", "approvals", "expense"],
+  ["queries", "3 late arrivals in 30 days", "A query was raised automatically for Bashir Lawal.", 0, "09:44", "high", "queries", "queries", "query"],
+  ["recruitment", "New application", "Adaeze Okonkwo applied for Content Producer.", 0, "07:20", "normal", "recruitment", "candidates", "candidate"],
+  ["comms", "You were recognised", "Ifeoma Chukwu: \"Kept the Enugu shoot on schedule.\"", 1, "16:12", "normal", "community", "channels", "recognition"],
+  ["people", "Leave request", "Tobi Ojo requested 5 days from 20/10.", 1, "11:03", "normal", "people", "leave", "leave_request"],
+  ["partnerships", "Eko Hotels has gone quiet", "34 days since the last contact.", 2, "09:00", "high", "partnerships", "partners", "partner"],
+  ["payroll", "Payroll preview ready", "October run, 25 employees.", 3, "10:30", "normal", "payroll", "payroll-runs", "payroll_run"],
 ] as const;
 
-route("GET /api/v1/notifications", (req) =>
-  paged(
-    NOTES.map((n, i) => ({
-      notification_id: `n-${i}`,
+const noteId = (i: number) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`;
+/** Read marks, kept for the session: the first three arrive unread. */
+const READ = new Set(NOTES.map((_, i) => noteId(i)).slice(3));
+
+const notes = () =>
+  NOTES.map((n, i) => {
+    const id = noteId(i);
+    const entityId = `${n[8]}-${i + 1}`;
+    return {
+      notification_id: id,
       category: n[0],
+      priority: n[5],
       title: n[1],
       body: n[2],
+      entity_type: n[8],
+      entity_id: entityId,
+      link: { module: n[6], tab: n[7], path: `/${n[6]}?tab=${n[7]}&id=${entityId}` },
+      read_at: READ.has(id) ? at(n[3], n[4]) : null,
       created_at: at(n[3], n[4]),
-      read_at: i > 2 ? at(n[3], n[4]) : null,
-      tone: n[5],
-      link: { path: n[6] },
-    })),
-    req,
-    { filters: { unread: (r, v) => (v === "true" ? r.read_at === null : true) } },
-  ),
+    };
+  });
+
+route("GET /api/v1/notifications", (req) =>
+  paged(notes(), req, { filters: { status: (r, v) => (v === "unread" ? r.read_at === null : r.read_at !== null) } }),
 );
-route("POST /api/v1/notifications/read-all", () => noContent());
+route("GET /api/v1/notifications/unread-count", () => ok({ unread: notes().filter((n) => n.read_at === null).length }));
+route("GET /api/v1/notifications/badges", () => {
+  const out: Record<string, number> = {};
+  for (const n of notes()) if (n.read_at === null) out[n.link.module] = (out[n.link.module] ?? 0) + 1;
+  return ok(out);
+});
+route("POST /api/v1/notifications/:id/read", (req) => {
+  if (!NOTES.some((_, i) => noteId(i) === req.params.id)) return fail(404, "NOT_FOUND", "There is no such notification.");
+  READ.add(req.params.id);
+  return noContent();
+});
+route("POST /api/v1/notifications/read-all", () => {
+  NOTES.forEach((_, i) => READ.add(noteId(i)));
+  return noContent();
+});
 
 route("GET /api/v1/search", (req) =>
   paged(SEARCH_INDEX(PEOPLE), req, { search: (r) => [r.title, r.subtitle, r.group] }),

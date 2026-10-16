@@ -168,10 +168,11 @@ function sortParam(sortable) {
  * shared/http/paged.js, which builds the SQL from its own allow-list, so
  * nothing a caller typed reaches the query.
  *
- * @param {Record<string, z.ZodTypeAny>} [filters]
+ * @template {Record<string, z.ZodTypeAny>} [F={}]
+ * @param {F} [filters]  typed per list, so the generated contract carries each list's own filters
  * @param {string[]} [sortable]  fields this list may be sorted by; the first is its default order
  */
-function listQuery(filters = {}, sortable = []) {
+function listQuery(filters = /** @type {F} */ ({}), sortable = []) {
   for (const key of Object.keys(filters)) {
     if (RESERVED_CONTROLS.includes(key)) {
       throw new Error(

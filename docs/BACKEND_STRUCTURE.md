@@ -183,7 +183,7 @@ src/
     ├── organisation/                 departments, employees (core record), reporting lines
     │   └── employee.import.js        the staff importer (§9.4)
     ├── settings/                     settings, working week, numbering schemes
-    ├── notifications/                caller's own inbox, read-only
+    ├── notifications/                caller's own inbox: list, unread count, badges, read marks
     ├── workflow/                     definitions admin, act on an instance, my approvals
     ├── documents/                    upload, download, versions, generated docs (gated)
     └── imports/                      the generic import API over shared/import (§9.3)

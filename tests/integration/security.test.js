@@ -111,7 +111,7 @@ describeDb("two-step sign-in, passkeys and the PIN against the real migrations",
       people.ceo = await createAdmin(
         client,
         {
-          employee: sample("Ifeoma", "Mbonu", "ceo@mycity.test", "Chief Executive Officer", { date_of_birth: "1988-07-24" }),
+          employee: sample("Amaka", "Eze", "ceo@mycity.test", "Chief Executive Officer", { date_of_birth: "1988-07-24" }),
           role_code: "management",
           is_ceo: true,
         },

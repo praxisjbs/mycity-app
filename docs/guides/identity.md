@@ -389,3 +389,4 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
   the code step, PIN and passkey sign-in, the lock screen's PIN, passkey and code, My Security's
   Two-Step Sign-In, PIN and Passkeys cards, Confirm It's You inside the 15-minute window, Reset Two-Step
   on Settings · Users, the Method on Recent Sign-Ins (§2 to §11); §13's open question closed.
+- 16/10/2026 · TB · The reset and invitation emails (`templates/email/password-reset.html`, `user-invite.html`) were empty, so the worker failed every link email after the screen said it was sent; both written. The New Sign-In and other security notices now show in the bell on the real API (`notifications` module), opening My Security.

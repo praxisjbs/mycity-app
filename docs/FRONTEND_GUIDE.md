@@ -839,11 +839,13 @@ person's own rooms and closes it when the token expires; the client then refresh
 and reconnects. A refused refresh leaves it closed and the session sheet takes over (§9.2).
 `useRealtime(event, handler)` hands an event to the components listening while they are mounted;
 `usePresence(userId)` keeps who is online from `presence` events. The bell listens for
-`notification` and reloads its dot, its list and the badge counts (`GET /api/v1/notifications`,
-`GET /api/v1/notifications/badges`, INTERIM). Realtime is best effort: everything also arrives over
-HTTP, so a dropped socket only means the bell refreshes when it is opened. The in-browser mock has no
-server, so nothing connects in mock mode. The server sends `presence` from M1 chat; the notification
-engine itself lands in M6.
+`notification` (a new one) and `notification_read` (a read mark made in another tab or on another
+device) and reloads its dot, its list and the badge counts (`GET /api/v1/notifications/unread-count`,
+`GET /api/v1/notifications`, `GET /api/v1/notifications/badges`, on the contract). Open marks a
+notice read before it navigates; a notice with no screen has Mark Read. Realtime is best effort:
+everything also arrives over HTTP, so a dropped socket only means the bell refreshes when it is
+opened. The in-browser mock has no server, so nothing connects in mock mode. The server sends
+`presence` from M1 chat; notification preferences and web push land in M6.
 
 ### 9.7 PWA (staff app only)
 
