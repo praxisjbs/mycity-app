@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | items below | | | | | |
-| M1 Core Operations & Employee Management | 31 | 30 | 1 | 0 | 0 | 0 |
+| M1 Core Operations & Employee Management | 31 | 30 | 0 | 1 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 9 | 0 | 1 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **92** | **90** | **1** | **1** | **0** | **0** |
+| **Total** | **92** | **90** | **0** | **2** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -77,6 +77,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Staging seed data | LA | ☐ | |
 | Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE | ☐ | 16/10/2026 |
 | Sign-in and sessions: `identity`, `access`, `users`; session rules, lock screen, credential links, the seven roles, the four-city sign-in screen (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
+| Two-step sign-in, passkeys and the PIN: the `security` module, the code step, PIN and passkey sign-in, the lock screen's PIN and passkey, the fresh-sign-in window, Reset Two-Step (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
 | Documents, media, uploads, PDF generation | GE | ☑ | 14/10/2026 |
 | Import engine + staff importer; real staff sheet imported on staging | GE · LA | ☐ | 15/10/2026 |
@@ -96,6 +97,21 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · Two-step sign-in, passkeys and the PIN built (`docs/guides/identity.md` §3, §6),
+  reversing "drop WebAuthn for now" (REUSE_MAP §1.1, MILESTONES §5 and §14 amended, DATABASE_SCHEMA
+  §4). Backend: migration `0220_sign_in_methods.sql` (the `mfa_*` and `pin_*` columns, `mfa_recovery_code`,
+  `passkey`, `spent_challenge`, `pin_totp` sessions); the `security` module (RFC 6238 codes on
+  `node:crypto`, ten Argon2id recovery codes used once each, passkeys through `@simplewebauthn/server`
+  with the fingerprint or face required, the four-digit PIN with the password's wait and a switch-off
+  after 10 wrong in a row or 20 in 30 days, single-use tickets between steps, the 15-minute fresh
+  sign-in window and `POST /security/confirm`); `/auth/two-step`, `/auth/pin`, `/auth/passkey`;
+  Reset Two-Step on Settings · Users; `WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN` (default: the staff
+  origin's host). Frontend: the code step and Use Passkey and Use PIN on the sign-in card, the lock
+  screen's PIN, passkey and code, My Security's Two-Step Sign-In, PIN and Passkeys, Confirm It's You,
+  `OtpField` `secret` and `onComplete`. Tests: unit, `tests/integration/security.test.js` on the
+  real migrations with a software authenticator, and a browser run on the real API with Chromium's
+  virtual authenticator. Left: passkeys on a real phone; enforcement by role (M9); the servers'
+  `.env` may add the two WebAuthn lines (optional: the default is right).
 - 16/10/2026 · TB · `create-admin --build-account --env=<name>` makes the implementation team's
   login with every employee field filled (JBS Praxis Implementation Team, known as JBS Praxis,
   consultant, remote, contract 09/10/2026 to 09/12/2026 at ₦1,850,000.00 a month, phone 0802 749 2738,
@@ -371,11 +387,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 88 | My Devices | `my-devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 90 | My Security | `my-security` | M1 | AJ | ☐ | ☐ | ☐ | In progress | 16/10/2026 |
+| 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 16/10/2026 · TB · My Security (#90) built: Two-Step Sign-In (set up from a QR code or the key, on
+  with the first code, ten recovery codes shown once, Ask for a Code every sign-in, once a day or once
+  a month, New Codes, Change App, Turn Off), Passkeys (Add Passkey on this device, rename, remove;
+  the fingerprint or face on a phone), the PIN (Set, Change, Remove; weak PINs and the birthday
+  refused), Recent Sign-Ins with the Method. Past the window, adding or removing a way in asks Confirm
+  It's You (password, PIN or passkey). Desktop and phone. Left: passkeys on a real phone.
 - 16/10/2026 · TB · My Security (#90) on the real API: Password (Change Password with the contract's rule), Signed In with Sign Out per device and Sign Out Others, Recent Sign-Ins, Clock-In Devices; desktop and phone. In progress until two-step sign-in, passkeys and the PIN arrive with the security module (the second sign-in PR); no ticks until then.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/ess/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/ess.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 15/10/2026 · AJ · My Leave: the four KPI tiles open their modal on a phone only (`Kpi` `opensOn="phone"`); on desktop they are plain tiles because the requests table and entitlement card already sit beside them. Home keeps desktop drill-down, as `docs/guides/home.md` asks.
@@ -575,6 +597,9 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · Users (#70): Reset Two-Step in a login's sheet (confirm, then the fresh-sign-in
+  check; the person is signed out everywhere, told, and sets two-step up again from My Security), and
+  a Two-Step column on desktop.
 - 16/10/2026 · TB · Users (#70) built on the real API, the lean screen agreed with TB: counts, status chips, the paged list, Users by Role, Invite User, and per login Save Roles, Resend Invitation, Send Reset Link, Sign Out Everywhere, Suspend with a reason, Reactivate; desktop and phone. The roles picker reads `GET /access/roles`. Left for M9: the role editor on the real API (Roles & Permissions is still on the mock).
 - 15/10/2026 · AJ · Frontend built in `app/src/features/settings/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/settings.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 15/10/2026 · AJ · Roles & Permissions: New Role and Edit Role (name, purpose, per module the actions and the record scope, and the three sensitive fields), delete for an unused custom role, the CEO role locked, built-in roles keep their names. The matrix, the roles list and the role pickers in Users read the saved roles; every change is audited. Copy now says four layers with no entity layer (MILESTONES §14, A2). INTERIM endpoints in `app/src/api/types/settings.ts`: `GET /settings/roles/catalogue`, `GET|PUT|DELETE /settings/roles/:id`, `POST /settings/roles`, for GE to confirm. Left: the mock's demo sign-ins do not yet take their access from these roles.

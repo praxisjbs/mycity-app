@@ -548,7 +548,9 @@ app/
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
-    auth/                     AuthProvider (useAuth, useMe; the session clock and the locked state), Login, LockSheet
+    auth/                     AuthProvider (useAuth, useMe; the session clock and the locked state; every way in),
+                              Login (with the code step and the PIN), LockSheet, passkey (the browser's WebAuthn
+                              calls), FreshSignIn (useFreshSignIn: Confirm It's You before a change)
     shell/                    Shell (DesktopShell or PhoneShell from @mycity/ui), catalogue (modules, tab
                               slugs, one-word names), access (grants), nav (rail, bottom bar, More),
                               screens (lazy per module), More, Fab, screen-action (useScreenAction),
@@ -644,8 +646,12 @@ reset or invitation link opens (`/reset`, `/welcome`). The access token is held 
 the refresh cookie restores the session on load (§9.5). The session locks at its two-hour ceiling,
 after the idle limit with no activity in any tab, or when the refresh cookie is refused; every open
 tab locks at once (a BroadcastChannel), the shell stays with the person's screen and any half-filled
-form, and `auth/LockSheet.tsx` (`LockScreen`) covers it: their password carries on and reloads what
-failed; Sign Out leaves. While the person is active the access token is renewed a minute before it
+form, and `auth/LockSheet.tsx` (`LockScreen`) covers it: their PIN, a passkey or their password
+carries on and reloads what failed; Sign Out leaves. When two-step sign-in asks for a code, the
+sign-in card and the lock screen show the code step. Use Passkey and Use PIN show on a browser the
+person has signed in on before. A change to a way in that the API refuses with 403
+`REAUTH_REQUIRED` goes through `useFreshSignIn` (`auth/FreshSignIn.tsx`), which asks Confirm It's
+You and runs it again. While the person is active the access token is renewed a minute before it
 expires. Sign Out is in the account menu and at the foot of More.
 
 **Search** (`shell/Search.tsx` on `CommandPalette`): ⌘K or Ctrl K anywhere, the top bar's search

@@ -2,9 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, ApiError, refreshSession, session } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { connectRealtime, disconnectRealtime } from "@/api/realtime";
-import type { Me } from "@/api/types/identity";
+import type { Me, Session } from "@/api/types/identity";
+import type { SignInResult } from "@mycity/contract/contract.gen.ts";
 import { hrefFor } from "@/lib/routes";
 import { toast } from "@mycity/ui";
+import { passkeyCancelled, signWithPasskey } from "./passkey";
 
 /**
  * Who is signed in, and the session's clock (FRONTEND_GUIDE §9.5,
@@ -18,8 +20,14 @@ import { toast } from "@mycity/ui";
  *   signed-in   the shell
  *   locked      the session ended mid-work: the shell stays, with the person's
  *               screen and any half-filled form, and the lock screen covers it
- *               (LockSheet). Their password carries on and reloads what failed;
- *               "Not You?" signs out.
+ *               (LockSheet). Their password, PIN or passkey carries on and
+ *               reloads what failed; Sign Out leaves.
+ *
+ * Every way in ends in the same place (`begin`): the password, the PIN on a
+ * browser the person has used before, the code after either when two-step sign-in
+ * asks for one, and a passkey, which is both steps at once. The password and the
+ * PIN resolve to the code step's ticket when a code is still needed; the screen
+ * asks for it and finishes with finishTwoStep.
  *
  * The session locks, in every open tab at once:
  *   time   at its two-hour ceiling (session_expires_in from the server);
@@ -46,7 +54,14 @@ interface AuthValue {
   me: Me | null;
   /** Why the screen is locked, while it is. */
   lockReason: LockReason | null;
-  signIn: (email: string, password: string) => Promise<void>;
+  /** The password. Resolves to the code step's ticket when two-step asks for a code, or null once signed in. */
+  signIn: (email: string, password: string) => Promise<string | null>;
+  /** The PIN, on a browser this person has signed in on before; resolves like signIn. */
+  signInWithPin: (email: string, pin: string) => Promise<string | null>;
+  /** The code after the password or the PIN: the authenticator app's six digits, or a recovery code. */
+  finishTwoStep: (ticket: string, code: string) => Promise<void>;
+  /** A passkey: the fingerprint, face or screen lock. With an email (the lock screen), only that person's. False when the prompt was closed. */
+  signInWithPasskey: (email?: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   /** Can the user perform `action` on `module`? Hiding is a courtesy; the API enforces. */
   can: (module: string, action?: string) => boolean;
@@ -251,9 +266,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [status, lock]);
 
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      const s = await api.call("POST /api/v1/auth/login", { body: { email, password } });
+  /** A session from any way in: the shell opens, or the lock lifts. */
+  const begin = useCallback(
+    (s: Session) => {
       const before = current.current;
       if (before.status === "locked" && before.me && before.me.user_id !== s.user.user_id) {
         // Another account: start again at Home, on the new session's refresh cookie.
@@ -278,6 +293,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyClock, tell],
   );
 
+  /** The first step's answer: the code step's ticket, or a session. */
+  const stepped = useCallback(
+    (r: SignInResult): string | null => {
+      if ("step" in r) return r.challenge_token;
+      begin(r);
+      return null;
+    },
+    [begin],
+  );
+
+  const signIn = useCallback(
+    async (email: string, password: string) => stepped(await api.call("POST /api/v1/auth/login", { body: { email, password } })),
+    [stepped],
+  );
+
+  const signInWithPin = useCallback(
+    async (email: string, pin: string) => stepped(await api.call("POST /api/v1/auth/pin", { body: { email, pin } })),
+    [stepped],
+  );
+
+  const finishTwoStep = useCallback(
+    async (ticket: string, code: string) => begin(await api.call("POST /api/v1/auth/two-step", { body: { challenge_token: ticket, code } })),
+    [begin],
+  );
+
+  const signInWithPasskey = useCallback(
+    async (email?: string) => {
+      const start = await api.call("POST /api/v1/auth/passkey/options", { body: email ? { email } : {} });
+      let credential: Record<string, unknown>;
+      try {
+        credential = await signWithPasskey(start.options);
+      } catch (e) {
+        if (passkeyCancelled(e)) return false;
+        throw e;
+      }
+      begin(await api.call("POST /api/v1/auth/passkey", { body: { challenge_token: start.challenge_token, credential } }));
+      return true;
+    },
+    [begin],
+  );
+
   const signOut = useCallback(async () => {
     try {
       await api.call("POST /api/v1/auth/logout", { body: {} });
@@ -291,8 +347,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const can = useCallback((module: string, action = "view") => !!me?.grants[module]?.includes(action), [me]);
 
   const value = useMemo(
-    () => ({ status, me, lockReason, signIn, signOut, can, justSignedIn, clearJustSignedIn: () => setJust(false) }),
-    [status, me, lockReason, signIn, signOut, can, justSignedIn],
+    () => ({
+      status,
+      me,
+      lockReason,
+      signIn,
+      signInWithPin,
+      finishTwoStep,
+      signInWithPasskey,
+      signOut,
+      can,
+      justSignedIn,
+      clearJustSignedIn: () => setJust(false),
+    }),
+    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, signInWithPasskey, signOut, can, justSignedIn],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -13,7 +13,7 @@ files.
 | `docs/MIGRATIONS.md` | How a migration or reference seed is written and checked |
 | `migrations/`, `seeds/reference/` | The schema itself. Where this file and the SQL disagree, the SQL is the fact and this file is fixed |
 
-Status as of 16/10/2026 (`main` after #26 and #27): 41 files, 141 tables and 5 views. Gate 6
+Status as of 16/10/2026 (`main` with the second sign-in PR, `0220`): 45 files, 144 tables and 5 views. Gate 6
 (`check/schema-drift.js`, `check/contract-columns.js`) checks the code and the contract against
 the same reading of the migrations on every PR.
 
@@ -60,7 +60,7 @@ erDiagram
 | Concern | Tables | Written by (the only writer) | How a module attaches |
 |---|---|---|---|
 | People and structure | `employee`, `department`, `worksite`, `org_seat`, `reporting_line` | organisation service, staff importer | `employee_id uuid REFERENCES employee`. Team scope follows `employee.line_manager_id` (the dotted line never grants scope) |
-| Sign-in | `app_user`, `user_session`, `password_reset`, `known_device` | identity service | `user_id` for who acted; never an email or a name |
+| Sign-in | `app_user`, `user_session`, `password_reset`, `known_device`, `mfa_recovery_code`, `passkey`, `spent_challenge` | identity service; the security service for two-step, the PIN and passkeys (the `mfa_*` and `pin_*` columns of `app_user`, `mfa_recovery_code`, `passkey`, `spent_challenge`) | `user_id` for who acted; never an email or a name. A key, a code, a PIN or a credential is never copied out |
 | Access | `role`, `permission`, `field_visibility`, `capability`, `user_role`, `user_capability` | access service | A module's permission key in `access.catalog.js`; restricted columns named in `field-mask.js` |
 | History | `event_log`, `audit_ledger` (append-only), `event_outbox`, `entity_state_history` | `emit()` in the same transaction as the write | Every write calls `emit()`; follow-on work is an outbox handler, never a second write path |
 | Approvals | `workflow_definition`, `workflow_instance`, `workflow_decision` | `shared/workflow` | `workflow_instance_id` on the record waiting for approval; definitions seeded only if they pass `validateDefinition()` |
@@ -90,13 +90,16 @@ templates · `0085` imports · `0090` tokens and secrets · `0095` AI ledger · 
 `0100` shared-layer columns · `0110` employee profile, dotted line, `org_seat` · `0120` foreign key
 indexes · `0130` `error_event.extra` · `0199` code lists, Saturday, staff numbers · `0200` sessions
 (last seen, how opened, device, end reason), credential links for invitations, a role's Home view
-and rank · `0210` `employee.home_address` and `contract_ends_on` · `0290` the seven roles and
-their permission matrix (`docs/guides/identity.md` §8).
+and rank · `0210` `employee.home_address` and `contract_ends_on` · `0220` sign-in methods: two-step
+(`mfa_frequency`, the pending key, the last step used, a browser's trust, `mfa_recovery_code`), the
+PIN and its wrong-try counts, `passkey`, `spent_challenge`, `user_session.reauthenticated_at` and
+`pin_totp` sessions (`docs/guides/identity.md` §4) · `0290` the seven roles and their permission
+matrix (`docs/guides/identity.md` §8).
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
 - The staff importer must advance the `employee` counter past imported staff numbers.
-- MFA per role: `app_user.mfa_secret_enc` exists, the per-role requirement does not (with M9).
+- Two-step required per role: each person's own two-step is built (`0220`); requiring it by role is M9.
 
 ### M1 Core Operations · 1000 to 1999 · TB (Home), LA (attendance), GE (community, mailbox), AJ (ESS)
 
@@ -110,8 +113,6 @@ seed · `1100` `home_alert` columns the alerts code writes.
   (screen #87), policy versions and acknowledgements (#89), a unique key for the auto-query
   upsert, the lateness deduction amount.
 - Devices (ess.md §6): enrolment requests, status and the three-device rule on `known_device`.
-- ESS My Security: two-step sign-in, passkeys and the PIN, built in the M0 block by the second
-  sign-in PR (decided 16/10/2026, §4).
 - Home (home.md §4): `home_report_run`, `role_kpi` (per-role tile defaults and locks), alert scope.
 - Community (community.md §4): post policy, pinned and system messages, read pointers, poll votes,
   `announcement_read`.
@@ -236,7 +237,8 @@ its milestone in §3.
 
 Passkeys (WebAuthn) were listed here until 16/10/2026, when TB decided to build them with two-step
 sign-in and the PIN in the second sign-in PR (M0 block), reversing REUSE_MAP's "drop WebAuthn for
-now"; REUSE_MAP §1.1 and MILESTONES §5 record it.
+now"; REUSE_MAP §1.1 and MILESTONES §5 record it. They are built: `passkey` in `0220`, with ESS My
+Security's two-step and PIN, which M1 owed until then.
 
 ## 5 · Open decisions
 
