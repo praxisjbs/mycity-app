@@ -247,3 +247,4 @@ only their own sessions on My Security. The exact grants are the seed matrix
 - 16/10/2026 · TB · First version, with the build: sessions to the donor rules, the lock screen,
   the four-city sign-in screen, Forgot, Reset and Welcome, My Security on the real API, Settings ·
   Users and Send Invite on the employee record.
+- 16/10/2026 · TB · Each contract schema names its table for gate 6 (`TABLES` in `identity.js`, `users.js`, `access.js`); the seed `0290` closes the database design's open decision on the role matrix.

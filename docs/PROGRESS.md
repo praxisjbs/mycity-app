@@ -85,7 +85,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Process gates: progress, guides, README map, CODEOWNERS; PR template; Claude Stop hook | GE | ☑ | 13/10/2026 |
 | GitHub settings applied by TB (`docs/runbooks/github-settings.md`) | TB | ☐ | |
 | CODEOWNERS usernames: GE `@swizfcodes`, TB `@tomblakeasaah196`, AJ `@Ghosted34`, LA `@LovedataX` | GE | ☑ | 13/10/2026 |
-| CI gates 1 to 8 and pipeline guards (gate 6, schema-drift and contract-columns, still empty, reported NOT BUILT) | GE | ☐ | 15/10/2026 |
+| CI gates 1 to 8 and pipeline guards (gate 6: schema-drift and contract-columns) | GE · TB | ☑ | 16/10/2026 |
 | Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | 15/10/2026 |
 | Operations: nightly backup, weekly restore drill, offsite copy, uptime probe; runbooks backup-restore, incident, monitoring, add-a-module | GE | ☐ | 16/10/2026 |
 | Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
@@ -113,6 +113,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   ⌘K still on INTERIM types); the organisation routes, so the employee screens still use the mock;
   `create-admin` on staging and production for the operations lead and the build account
   (`docs/runbooks/first-accounts.md`).
+- 16/10/2026 · TB · `docs/DATABASE_SCHEMA.md` rewritten as the database design: the M0 core and how a
+  module attaches to it, each milestone's block, owner, tables as built and what it still owes (from
+  the coverage audit), what is not built and why (passkeys per REUSE_MAP; nothing for M11), and the
+  open decisions (payroll design, the role permission matrix, moving business choices out of seeds).
+  M6 payroll is in scope (MILESTONES §11); the earlier "not modelled" note is withdrawn.
 - 16/10/2026 · TB · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
   rebuilds the schema with `migrate.js` and `fixtures/shared-layer.sql` is gone; CI now has PostgreSQL 16
   with pgvector and Redis, so the suite and gate 4's round trip run on every PR. `1100` lets the alerts
@@ -130,6 +135,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   Left: `home_alert` (M1 block) and the integration suite on the real migrations (next PR); role
   permissions wait on a role matrix; the importer must advance the staff-number counter past
   imported IDs.
+- 16/10/2026 · TB · Gate 6 built: `check/schema-drift.js` (every SQL string in `src/` and `scripts/` names only
+  tables and columns the migrations create: qualified columns, INSERT column lists, UPDATE SET lists,
+  dropped or unknown tables, a table created twice with different columns) and `check/contract-columns.js`
+  (each contract file's `TABLES` names the table every object schema's keys are columns of, with a
+  reason for any key that is not), over one catalogue read from the migrations (`check/lib/catalogue.js`,
+  checked column for column against a migrated database). Run against the schema PR 25 merged,
+  contract-columns reports the 12 employee mismatches. `CI_STRICT` is on: no gate can sit empty again.
+  Left: nothing for gate 6; every new contract file declares its `TABLES`.
 - 16/10/2026 · TB · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
   schema, and A26 added (reference seeds hold only what the code cannot run without). Left: a
   fix-forward M0 file for the six columns the shared layer cannot write (`audit_ledger.changed_fields`,

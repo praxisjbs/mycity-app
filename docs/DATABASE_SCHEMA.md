@@ -1,153 +1,249 @@
-# MyCity Database Schema
+# MyCity App ERP · Database Design
 
-This document describes the PostgreSQL 16 schema created by `migrations/`. The physical model uses
-UUID primary keys, foreign keys for durable relationships, `numeric(18,2)` for money, JSONB only for
-variable metadata, and `created_at` / `updated_at` timestamps on mutable records.
+The one map of the database: what exists, which milestone owns it, how a milestone's tables attach
+to the core, and what is still to be built, with what is deliberately not built and why. An
+engineer starting a milestone reads this first, then `docs/MIGRATIONS.md` for how to write the
+files.
 
-Payroll is deliberately not modelled. The M6 payroll block (`6000`–`6999`) is reserved until the
-tax-reform rules and payroll contract are approved. Sanction fines remain standalone and do not
-post to payroll.
+| Document | Settles |
+|---|---|
+| `docs/MyCity-ERP-Documents/MILESTONES.md` | Scope and decisions A1 to A26. Binding |
+| `docs/guides/<module>.md` §4 | The tables a feature needs, field by field |
+| **This file** | What is built, where, who owns it, and what each milestone still owes |
+| `docs/MIGRATIONS.md` | How a migration or reference seed is written and checked |
+| `migrations/`, `seeds/reference/` | The schema itself. Where this file and the SQL disagree, the SQL is the fact and this file is fixed |
 
-## Relationship map
+Status as of 16/10/2026 (`main` after #26 and #27): 41 files, 141 tables and 5 views. Gate 6
+(`check/schema-drift.js`, `check/contract-columns.js`) checks the code and the contract against
+the same reading of the migrations on every PR.
+
+---
+
+## 1 · Shape of the database
+
+- **Two databases, not two schemas:** `mycity_stg` and `mycity_prod`, each with its own role and
+  no cross-grants (SYSTEM_ARCHITECTURE §5). Every table is in `public`.
+- **One migration ledger,** `schema_migration` (name, sha256, applied_at), written only by
+  `scripts/db/migrate.js`. Files apply by number, `migrations/` and `seeds/reference/` interleaved.
+- **One environment marker,** `system_marker(environment)`, one row, written when the database is
+  created (provisioning on servers), never by a migration. Seed tooling refuses a database whose
+  marker is missing or says `production`.
+- **Extensions:** `pgcrypto`, `citext`, `pg_trgm`, `unaccent` (trusted, created by `0001`) and
+  `vector` (untrusted, created by `ops/provision/provision.sh` as the superuser first).
+- **Shared functions** (`0001`): `set_updated_at()` for every mutable table's trigger,
+  `prevent_ledger_mutation()` for append-only tables, `search_fold()` for accent-folded search.
+
+## 2 · The core every milestone builds on (M0)
+
+Every module's tables hang off a small core. A new table attaches to it in the ways below and never
+builds its own copy of any of them (CLAUDE.md: no second copy of a shared concern).
 
 ```mermaid
 erDiagram
-  APP_USER ||--o| EMPLOYEE : authenticates_as
-  APP_USER ||--o{ USER_ROLE : receives
-  ROLE ||--o{ USER_ROLE : assigned_through
   DEPARTMENT ||--o{ EMPLOYEE : contains
-  EMPLOYEE ||--o{ REPORTING_LINE : reports_through
-  EMPLOYEE ||--o{ ATTENDANCE_EVENT : records
-  EMPLOYEE ||--o{ LEAVE_REQUEST : requests
-  PROJECT ||--o{ TASK : contains
-  VACANCY ||--o{ APPLICATION : receives
-  CANDIDATE ||--o{ APPLICATION : submits
-  APPLICATION ||--o{ APPLICATION_ASSESSMENT : takes
-  APPLICATION ||--o| OFFER : receives
-  OFFER ||--o| ONBOARDING_CASE : starts
-  PARTNER ||--o{ PARTNERSHIP_OPPORTUNITY : develops
-  PARTNERSHIP_OPPORTUNITY ||--o{ PARTNERSHIP_PROPOSAL : produces
-  PARTNER ||--o{ PARTNERSHIP_AGREEMENT : signs
-  BUDGET ||--o{ BUDGET_LINE : allocates
-  BUDGET_LINE ||--o{ EXPENSE_REQUEST : funds
-  KNOWLEDGE_ARTICLE ||--o{ KNOWLEDGE_ARTICLE_VERSION : versions
-  AI_CONVERSATION ||--o{ AI_MESSAGE : contains
-  AI_MESSAGE ||--o{ AI_MESSAGE_CITATION : cites
+  EMPLOYEE ||--o{ EMPLOYEE : "line manager / dotted line"
+  ORG_SEAT ||--o{ EMPLOYEE : "reports to a vacant seat"
+  EMPLOYEE ||--|| APP_USER : "signs in as (no login without an employee)"
+  APP_USER ||--o{ USER_ROLE : holds
+  ROLE ||--o{ PERMISSION : grants
+  ROLE ||--o{ FIELD_VISIBILITY : masks
+  APP_USER ||--o{ USER_SESSION : opens
+  EVENT_LOG ||--|| AUDIT_LEDGER : "is audited by"
+  EVENT_LOG ||--o{ EVENT_OUTBOX : "queues follow-on work"
+  WORKFLOW_DEFINITION ||--o{ WORKFLOW_INSTANCE : runs
+  WORKFLOW_INSTANCE ||--o{ WORKFLOW_DECISION : records
+  DOCUMENT ||--o{ DOCUMENT_VARIANT : "has renditions"
+  NUMBERING_SCHEME ||--o{ NUMBERING_COUNTER : counts
+  APP_USER ||--o{ NOTIFICATION : receives
 ```
 
-## Table catalogue
+| Concern | Tables | Written by (the only writer) | How a module attaches |
+|---|---|---|---|
+| People and structure | `employee`, `department`, `worksite`, `org_seat`, `reporting_line` | organisation service, staff importer | `employee_id uuid REFERENCES employee`. Team scope follows `employee.line_manager_id` (the dotted line never grants scope) |
+| Sign-in | `app_user`, `user_session`, `password_reset`, `known_device` | identity service | `user_id` for who acted; never an email or a name |
+| Access | `role`, `permission`, `field_visibility`, `capability`, `user_role`, `user_capability` | access service | A module's permission key in `access.catalog.js`; restricted columns named in `field-mask.js` |
+| History | `event_log`, `audit_ledger` (append-only), `event_outbox`, `entity_state_history` | `emit()` in the same transaction as the write | Every write calls `emit()`; follow-on work is an outbox handler, never a second write path |
+| Approvals | `workflow_definition`, `workflow_instance`, `workflow_decision` | `shared/workflow` | `workflow_instance_id` on the record waiting for approval; definitions seeded only if they pass `validateDefinition()` |
+| Files | `document`, `document_variant`, `template`, `template_version` | `shared/documents/vault` | `document_id uuid REFERENCES document`; never a path or a URL |
+| Numbers | `numbering_scheme`, `numbering_counter` | `numbering.allocate()` | `number citext NOT NULL UNIQUE` (or the contract's name for it, `staff_number`) and a scheme in `schemes.js` |
+| Notifications | `notification`, `notification_preference`, `push_subscription`, `alert` | `shared/notifications` fan-out | An outbox handler that calls the fan-out; never an insert into `notification` |
+| Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
+| Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
+| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
 
-### Platform foundation (M0)
+Every core table above was checked against the shared code that writes it by running
+`tests/integration` on the real migrations (#26, #27): the code and the schema agree, and CI keeps
+them agreeing.
 
-| Tables | Representation and responsibility |
-|---|---|
-| `schema_migration`, `system_marker` | Applied-migration ledger and environment/system identity. |
-| `app_user`, `user_session`, `known_device`, `password_reset` | Login identity, active sessions, trusted devices and password recovery. |
-| `role`, `user_role`, `permission`, `field_visibility` | Role-based access and field masking. |
-| `capability`, `user_capability` | Temporary or explicitly scoped access beyond a role. |
-| `event_log`, `audit_ledger`, `event_outbox`, `error_event` | Business events, immutable audit facts, reliable event delivery and operational errors. |
-| `idempotency_key` | Prevents duplicate mutation processing. |
-| `department`, `worksite`, `employee`, `reporting_line` | Organisation structure, workplaces, staff records and effective-dated reporting lines. |
-| `setting`, `working_week`, `public_holiday`, `reference_value` | Governed configuration, calendar rules and controlled lookup values. |
-| `numbering_scheme`, `numbering_counter` | Configurable, transactional document-number allocation. |
-| `notification`, `notification_preference`, `push_subscription`, `alert` | In-app delivery, user channel choices, web-push endpoints and actionable alerts. |
-| `workflow_definition`, `workflow_instance`, `workflow_decision`, `entity_state_history` | Versioned approvals, running workflows, decisions and state audit history. |
-| `document`, `document_variant`, `template`, `template_version` | Governed file metadata, derived media and versioned document templates. |
-| `import_batch`, `import_row`, `import_mapping_profile` | Import lifecycle, row validation/results and reusable mappings. |
-| `integration_secret`, `public_token` | Encrypted integration credentials and hashed limited-purpose public tokens. |
-| `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue` | AI governance, cost/audit runs, execution steps and allowed operations. |
+## 3 · By milestone
 
-### Core operations (M1)
+Blocks are README §6.3. **Built** lists the tables in `main`. **Owes** is what the milestone's scope
+and guides need that is not built yet, from the coverage audit of 16/10/2026; each owner closes it
+with new files in their own block, following `docs/MIGRATIONS.md`. A merged file is never edited.
 
-| Tables | Representation and responsibility |
-|---|---|
-| `home_alert_rule`, `home_alert` | Rules that derive Home alerts and their user-facing instances. |
-| `attendance_policy`, `employee_attendance_policy` | Attendance rules and effective employee assignments. |
-| `attendance_event`, `attendance_day`, `attendance_exception` | Raw clock events, daily calculations and reviewable exceptions. |
-| `leave_type`, `leave_balance`, `leave_request` | Leave policy types, employee balances and approval requests. |
-| `community_channel`, `community_member`, `community_message`, `community_reaction` | Internal community conversations and reactions. |
-| `peer_recognition`, `announcement` | Staff recognition and governed organisation announcements. |
-| `mail_account`, `mail_folder`, `mail_thread`, `mail_message`, `mail_attachment` | Connected mail metadata and its document-backed attachments. |
-| `saved_report`, `report_schedule` | Saved reporting definitions and scheduled delivery. |
+### M0 Foundation · 0001 to 0999 · GE (architecture), LA (migrations and data)
 
-### Productivity and performance (M2)
+**Built:** `0001` extensions and functions · `0002` `schema_migration`, `system_marker` · `0010`
+identity · `0020` access · `0030` events, audit, outbox, errors, idempotency · `0040` organisation ·
+`0050` settings · `0055` numbering · `0060` notifications · `0070` workflow · `0080` documents and
+templates · `0085` imports · `0090` tokens and secrets · `0095` AI ledger · `0099` reference seed ·
+`0100` shared-layer columns · `0110` employee profile, dotted line, `org_seat` · `0120` foreign key
+indexes · `0130` `error_event.extra` · `0199` code lists, Saturday, staff numbers · `0200` sessions
+(last seen, how opened, device, end reason), credential links for invitations, a role's Home view
+and rank · `0290` the seven roles and their permission matrix (`docs/guides/identity.md` §8).
 
-| Tables | Representation and responsibility |
-|---|---|
-| `project`, `task`, `task_assignee`, `task_comment` | Work plans, actionable tasks, assignees and collaboration. |
-| `calendar_event` | Personal and shared scheduled events. |
-| `organisational_goal` | Five-level hierarchical organisational goals. |
-| `kpi_definition`, `employee_target` | Reusable KPI definitions and employee-period targets. |
-| `performance_cycle`, `performance_review`, `performance_review_item` | Review periods, employee reviews and scored KPI/competency lines. |
+**Owes:**
+- The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
+- The staff importer must advance the `employee` counter past imported staff numbers.
+- MFA per role: `app_user.mfa_secret_enc` exists, the per-role requirement does not (with M9).
 
-### Queries and sanctions (M3)
+### M1 Core Operations · 1000 to 1999 · TB (Home), LA (attendance), GE (community, mailbox), AJ (ESS)
 
-| Tables | Representation and responsibility |
-|---|---|
-| `query_rule`, `employee_query`, `query_response` | Disciplinary query rules, issued cases and employee responses. |
-| `sanction`, `sanction_fine`, `sanction_letter` | Approved consequences, standalone fines and generated letters. |
+**Built:** `1000` Home alerts and rules, reports and schedules, attendance (policy, events, day,
+exceptions), leave (types, balances, requests), community (channels, members, messages, reactions,
+recognition), announcements, mailbox (accounts, folders, threads, messages, attachments) · `1099`
+seed · `1100` `home_alert` columns the alerts code writes.
 
-### Recruitment (M4)
+**Owes:**
+- Attendance (attendance.md §4): employee home location, field assignment, location requests
+  (screen #87), policy versions and acknowledgements (#89), a unique key for the auto-query
+  upsert, the lateness deduction amount.
+- Devices (ess.md §6): enrolment requests, status and the three-device rule on `known_device`.
+- ESS My Security: a PIN on the user (passkeys are not built, §4).
+- Home (home.md §4): `home_report_run`, `role_kpi` (per-role tile defaults and locks), alert scope.
+- Community (community.md §4): post policy, pinned and system messages, read pointers, poll votes,
+  `announcement_read`.
+- Mailbox (mailbox.md §4): drafts, the send queue, flags, `uidvalidity`.
 
-| Tables | Representation and responsibility |
-|---|---|
-| `vacancy`, `vacancy_question` | Open roles and their application questions. |
-| `candidate`, `application`, `application_stage_history` | Candidate identity, per-vacancy applications and pipeline history. |
-| `recruitment_scorecard_criterion` | Weighted vacancy evaluation criteria. |
-| `assessment_definition`, `assessment_question`, `application_assessment`, `assessment_response` | Versioned assessments, assignments and candidate answers/scores. |
-| `interview_round`, `interview`, `interview_panelist`, `interview_feedback` | Interview scheduling and independent panel feedback. |
+### M2 Productivity & Performance · 2000 to 2999 · AJ
 
-### Offers and onboarding (M5)
+**Built:** `2000` projects, tasks, assignees, comments, calendar events, goals, KPIs, targets,
+performance cycles, reviews and review items · `2099` seed.
 
-| Tables | Representation and responsibility |
-|---|---|
-| `offer` | Approved employment offer and terms for an application. |
-| `signature_request`, `signature` | Document-signing workflow and signer evidence. |
-| `document_requirement` | Reusable onboarding evidence requirements. |
-| `onboarding_case`, `onboarding_checklist_item` | Candidate-to-employee onboarding and owned completion tasks. |
-| `employment_contract` | Signed, date-bounded employment contract metadata. |
-| `talent_pool`, `talent_pool_member` | Reusable candidate pools and membership. |
+**Owes:**
+- Goals cascade as A16 sets it (organisational, annual, monthly, departmental, individual KPI),
+  with code, strategic theme, success measure, baseline and the CEO's final approval.
+- Tasks: the record a task points at (`entity_type`, `entity_id`), the KPI it counts towards,
+  manager-set weekly and daily cadence (A24), the cancelled status.
+- Calendar: attendees, visibility, the interview it belongs to.
+- Reviews: the second-level and HR stages and their workflow; dictation transcript, cleaned text
+  and `ai_run_id` (A18).
+- Numbering: `project` has `number NOT NULL` and no scheme in `schemes.js`.
 
-### Partnerships (M7)
+### M3 Queries & Consequence Management · 3000 to 3999 · GE
 
-| Tables | Representation and responsibility |
-|---|---|
-| `partner`, `partner_contact` | Partner organisations and their contacts. |
-| `partnership_opportunity`, `partnership_stage_history` | Partnership pipeline and stage audit trail. |
-| `partner_interaction` | Calls, mail, meetings and notes against partners/opportunities. |
-| `partnership_proposal` | Versioned commercial or programme proposals. |
-| `partnership_agreement`, `agreement_obligation` | Executed agreements and tracked commitments. |
+**Built:** `3000` query rules, queries, responses, sanctions, fines, letters · `3099` seed.
 
-### Expenses (M8)
+**Owes:**
+- Query rules: the action, and the dedup key so three punches raise exactly one query.
+- Letters for a query, not only for a sanction.
+- Fines as pending deductions for the M6 payroll run (MILESTONES §8).
+- The consequence workflow: `3099`'s `employee_consequence` fails `validateDefinition()` and must
+  be replaced by a valid definition in a new seed.
 
-| Tables | Representation and responsibility |
-|---|---|
-| `expense_category` | Hierarchical controlled expense classification. |
-| `budget`, `budget_line` | Date-bounded budgets and category allocations. |
-| `expense_request` | Employee funding request and approval state. |
-| `requisition`, `requisition_line` | Purchase request header and itemised lines. |
-| `disbursement`, `expense_transaction` | Payment execution and financial movement history. |
+### M4 Recruitment · 4000 to 4999 · TB
 
-### Governance (M9)
+**Built:** `4000` vacancies and questions, candidates, applications and stage history, scorecard
+criteria (A10), assessments, interviews, rounds, panelists and blind feedback · `4099` seed.
 
-| Tables | Representation and responsibility |
-|---|---|
-| `security_event` | Investigable authentication, access and security events. |
-| `access_review`, `access_review_item` | Periodic certification of user roles and capabilities. |
-| `integration_connection` | Provider configuration linked to separately stored secrets. |
-| `webhook_endpoint`, `webhook_delivery` | Outbound subscriptions and retryable delivery history. |
+**Owes:** the final score beside the provisional one, and the AI-provisional flag.
 
-### Knowledge and AI assistance (M10)
+### M5 Offers, Documentation & Onboarding · 5000 to 5999 · LA
 
-| Tables | Representation and responsibility |
-|---|---|
-| `knowledge_category`, `knowledge_article`, `knowledge_article_version` | Categorised, reviewable and immutable-version knowledge content. |
-| `knowledge_embedding` | Searchable article chunks and vector embeddings. |
-| `ai_conversation`, `ai_message`, `ai_message_citation` | Assistant conversations, messages and verifiable source citations. |
+**Built:** `5000` offers, signature requests and signatures, document requirements, onboarding
+cases and checklist items, employment contracts, talent pool · `5099` seed.
 
-## Seed policy
+**Owes:**
+- **The two hashes on every signature row** (A12): `content_hash` and `artifact_hash`.
+- Offer approval: `workflow_instance_id` and its workflow definition.
+- The data-privacy acknowledgement, documentation verification status, onboarding plans and SOPs.
 
-Files containing `_seed_` live in `seeds/reference/`. They use the same milestone number blocks as
-the schema files in `migrations/`, and `db:migrate` interleaves both folders by number. They contain
-only deterministic product/reference data and use conflict handling so they can be run repeatedly.
-They do not create staff, candidates, transactions or other environment-specific/demo records.
+### M6 Payroll & Notifications · 6000 to 6999 · LA
+
+**Built:** nothing in the block. Notifications are M0 (`0060`).
+
+**Owes, all of payroll** (MILESTONES §11, in scope): payroll runs, payslips, salary structures
+and pay components, deductions (pending, accepted, in a run, including M3 fines and lateness),
+statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, the payroll approval workflow,
+and reminder settings. The `payroll_run` and `payslip` numbering schemes are already seeded.
+The earlier note that payroll was "deliberately not modelled" was not a decision and is withdrawn.
+
+### M7 Partnerships, CRM & Trackers · 7000 to 7999 · GE
+
+**Built:** `7000` partners, contacts, opportunities and stage history, interactions, proposals,
+agreements and obligations · `7099` seed.
+
+**Owes:**
+- Leads (new, contacted, qualified, converted, lost): no table.
+- The pipeline as MyCity's tracker has it (MILESTONES §12): region, objective, potential impact,
+  next action, date identified, comments; MyCity's twelve stages and partner types in place of the
+  seeded ones (A26: business choices are not seeded).
+- Mail threads bound to a record; proposal answers and `ai_run_id`; MOU and contract type, renewal
+  date, viewed and expiring states, the agreement workflow.
+- Numbering: `partner`, `partnership_opportunity`, `partnership_agreement` have no scheme in
+  `schemes.js`.
+
+### M8 Expenses & Budget Control · 8000 to 8999 · AJ
+
+**Built:** `8000` budgets and lines, expense categories, requests and transactions, requisitions
+and lines, disbursements · `8099` seed.
+
+**Owes:**
+- A requisition owns many requests (MILESTONES §13); `requisition.expense_request_id UNIQUE`
+  makes it one, so this is a fix-forward change of shape.
+- The approval threshold on the category; per-line flag, tick and remove; the vendor invoice
+  `document_id`; payee details; the project link; `workflow_instance_id`.
+- The trigger that refuses a disbursement without a payment reference.
+- Statuses as the M8 chain has them; one numbering type for expenses (`expense` and
+  `expense_request` are both seeded); `budget` has no scheme in `schemes.js`.
+
+### M9 Settings & Governance · 9000 to 9999 · GE
+
+**Built:** `9000` security events, access reviews and items, integrations, webhooks · `9090`
+reporting views · `9095` `updated_at` triggers (a one-time sweep of the tables that existed then;
+later tables create their own, `docs/MIGRATIONS.md` §6) · `9099` seed.
+
+**Owes:** MFA required per role (the second sign-in PR). Editing roles and their grants on screen.
+
+### M10 Staff Knowledge Hub & AI Assistance · 10000 to 10999 · TB
+
+**Built:** `10000` knowledge categories, articles, versions, embeddings, AI conversations,
+messages, citations · `10099` seed.
+
+**Owes:**
+- `updated_at` triggers for these seven tables (they came after `9095`).
+- Article audiences by role and department; MyCity's categories (SOPs, FAQs, Training).
+- Citations of a database record, not only an article or a document (MILESTONES §15).
+- The embedding dimension, fixed to the model `services/ai` uses, and its vector index.
+
+### M11 Handover · 11000 to 11999 · TB
+
+No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `restore-drill.js`).
+
+## 4 · Not covered, and why
+
+| What | Why it is not built | Decided by |
+|---|---|---|
+| Passkeys (WebAuthn) on ESS My Security | REUSE_MAP drops the passkey service "for now", and REUSE_MAP wins over the guides (CLAUDE.md Step 3). The ess.md screen keeps password, two-step, PIN and devices. Revisit as a decision if MyCity asks | REUSE_MAP (the `security/app_user` row), MILESTONES §5 reuse table |
+| Tables for M11 | Handover is scripts and documents, not records | MILESTONES §16 |
+| Demonstration and business data in production | Reference seeds hold only what the code cannot run without; categories, stages, policies and thresholds are entered by MyCity | A5, A26 |
+
+Anything else in MILESTONES that has no table yet is **owed**, not excluded, and is listed under
+its milestone in §3.
+
+## 5 · Open decisions
+
+1. **The M6 payroll design** (pay components, statutory rates and their effective dating) waits on
+   the payroll contract and the tax-reform rules. The block is reserved and the scope stands.
+2. **The role-to-module permission matrix.** Decided with TB on 16/10/2026: the seven roles MyCity
+   runs on (from the staff list) and their grants, seeded by `0290_seed_roles_and_grants.sql`.
+   Changes after go-live are made in Settings · Roles & Permissions (M9), not in a seed.
+3. **The business choices PR 25 seeded** (expense categories, partner types and stages, the
+   Standard attendance policy, alert thresholds, knowledge categories) move out of the seeds under
+   A26, each when its milestone builds the screen that manages it.
+
+## 6 · Changing this document
+
+A PR that adds or changes a table updates this file in the same PR: the milestone's **Built** line
+and, as items close, its **Owes** list. A new exclusion goes in §4 only with the document or
+decision that makes it. `docs/MIGRATIONS.md` §12 carries the checklist.

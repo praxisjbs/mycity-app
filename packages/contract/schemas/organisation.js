@@ -119,7 +119,29 @@ const AdminBootstrap = z
   })
   .strict();
 
+/**
+ * Which table each schema's keys are the columns of (gate 6, check/contract-columns.js).
+ * department_name is the one key that is not a column: create-admin finds or creates the
+ * department by that name and stores its department_id.
+ */
+const TABLES = {
+  EmployeeCreate: { table: "employee" },
+  AdminBootstrap: {
+    table: null,
+    reason: "script input to create-admin: one employee, a role code and the CEO flag",
+    nested: {
+      employee: {
+        table: "employee",
+        virtual: {
+          department_name: "named, not picked: create-admin finds or creates the department and stores its department_id",
+        },
+      },
+    },
+  },
+};
+
 module.exports = {
+  TABLES,
   EMPLOYMENT_TYPES,
   WORK_PATTERNS,
   GENDERS,

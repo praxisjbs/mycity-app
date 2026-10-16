@@ -241,7 +241,46 @@ const UserInviteEmailVars = z
   })
   .strict();
 
+/** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+const TABLES = {
+  RoleRef: { table: "role" },
+  Me: { table: null, reason: "the signed-in person, assembled from app_user, employee, their roles and the grants cache" },
+  LoginBody: { table: null, reason: "sign-in credentials, checked and never stored as sent" },
+  Session: { table: null, reason: "a new session's tokens and clock, with the signed-in person" },
+  SessionTokens: { table: null, reason: "a refreshed access token and the session's clock" },
+  LogoutBody: { table: null, reason: "why the client signed out; recorded as user_session.end_reason" },
+  DeviceAccount: { table: null, reason: "who last signed in on this browser, read through the device cookie" },
+  PasswordChange: { table: null, reason: "the current and the new password; only an Argon2 hash is stored" },
+  PasswordChanged: { table: null, reason: "how many other sessions a password change ended" },
+  ForgotBody: { table: null, reason: "the email a reset link is asked for" },
+  Accepted: { table: null, reason: "the same answer whether or not the email has an account" },
+  LinkCheckBody: { table: null, reason: "a link token as the email carried it; only its hash is stored" },
+  LinkCheck: {
+    table: "password_reset",
+    virtual: {
+      email: "the login's email (app_user), shown on the page the link opens",
+      first_name: "the employee's first name, for the invitation's greeting",
+    },
+  },
+  ResetBody: { table: null, reason: "a link token and the chosen password" },
+  ResetDone: { table: null, reason: "the email to sign in with after a password is set" },
+  SignIn: {
+    table: "user_session",
+    virtual: {
+      status: "active or ended, derived from killed_at, expires_at and the idle limit",
+      current: "whether this is the session making the request",
+    },
+  },
+  SignInListQuery: { table: null, reason: "list controls and the status filter for My Security's sign-ins" },
+  SignInPage: { table: null, reason: "a page of sign-ins" },
+  SessionsEnded: { table: null, reason: "how many sessions a request ended" },
+  SecuritySummary: { table: null, reason: "My Security's figures, counted from app_user and user_session and the session settings" },
+  PasswordResetEmailVars: { table: null, reason: "the variables of templates/email/password-reset.html, not a row" },
+  UserInviteEmailVars: { table: null, reason: "the variables of templates/email/user-invite.html, not a row" },
+};
+
 module.exports = {
+  TABLES,
   PASSWORD_MIN,
   PASSWORD_MAX,
   NewPassword,

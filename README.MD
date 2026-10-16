@@ -19,6 +19,7 @@ map, read §11 first.
 | `docs/SYSTEM_ARCHITECTURE.md` | Servers, processes, request lifecycle, events, release pipeline |
 | `docs/BACKEND_STRUCTURE.md` | The M0 foundation in detail: shared layer, contract, numbering, documents, imports, AI, pagination, first administrator |
 | `docs/BACKEND_GUIDE.md` | **How to write backend code here**: layers, a worked endpoint, what to reuse, done checklist. Read before any backend change |
+| `docs/DATABASE_SCHEMA.md` | **The database design**: the core every milestone attaches to, each milestone's tables as built and what it still owes, and what is not built and why. Read before any milestone's schema work |
 | `docs/MIGRATIONS.md` | **The migration and reference-seed conventions**: numbering, idempotency, DOWN, table shape, matching the code, what a seed may hold (A26), checks before the PR. Read before any migration |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
 | `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F24 (binding) and the three PRs that build `packages/ui` |

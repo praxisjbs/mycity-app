@@ -227,7 +227,16 @@ const EmptyBody = z.object({}).strict();
 /** Path of a route addressed by one id: `/:id`. */
 const IdParams = z.object({ id: uuid }).strict();
 
+/** Gate 6 (check/contract-columns.js): the shared wire shapes are not rows of any table. */
+const TABLES = {
+  PageQuery: { table: null, reason: "list controls on every list endpoint: page, q, sort" },
+  PageMeta: { table: null, reason: "the page block of every paged response" },
+  EmptyBody: { table: null, reason: "a request with no body" },
+  IdParams: { table: null, reason: "the :id path parameter" },
+};
+
 module.exports = {
+  TABLES,
   uuid,
   text,
   optionalText,

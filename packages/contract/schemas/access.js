@@ -23,4 +23,11 @@ const RoleOption = z
 const RoleListQuery = listQuery({}, ["rank", "name"]);
 const RolePage = Paged(RoleOption);
 
-module.exports = { RoleOption, RoleListQuery, RolePage };
+/** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+const TABLES = {
+  RoleOption: { table: "role", virtual: { users: "how many active logins hold the role, counted from user_role" } },
+  RoleListQuery: { table: null, reason: "list controls for the roles picker" },
+  RolePage: { table: null, reason: "a page of roles" },
+};
+
+module.exports = { TABLES, RoleOption, RoleListQuery, RolePage };

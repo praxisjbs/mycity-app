@@ -124,6 +124,9 @@ describeDb("identity against the real migrations", () => {
   });
 
   afterAll(async () => {
+    // Errors the suite provoked are written now, while the pool is open, rather than on the
+    // reporter's timer after the test environment is gone.
+    await require("../../src/shared/observability/error-reporter").flush();
     await pool.end();
   });
 

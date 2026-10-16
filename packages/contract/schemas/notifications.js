@@ -17,4 +17,9 @@ const NotificationEmailVars = z
   })
   .strict();
 
-module.exports = { NotificationEmailVars };
+/** Gate 6 (check/contract-columns.js): template variables, not a row. */
+const TABLES = {
+  NotificationEmailVars: { table: null, reason: "the variables of templates/email/notification.html, not a row" },
+};
+
+module.exports = { TABLES, NotificationEmailVars };
