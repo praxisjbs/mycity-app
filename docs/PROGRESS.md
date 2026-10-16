@@ -97,6 +97,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · Sign-in photographs: Lagos, London, Accra and Nairobi at dusk (TB's images, WebP
+  at 1280 and 640, about 250 KB for all four) behind the sign-in screen, each drifting and zooming on
+  its own path, the lights glowing, a few pixels of pointer parallax, crossfades with a short focus
+  pull. The drawings stay as the stand-in until a photograph loads. Left: sharper sources (the
+  images are 1280 wide, a little soft on large screens).
 - 16/10/2026 · TB · Release fix: staging deployed, but verify-staging refused to seal on two
   checks. The migrations head now counts reference seeds, which share the ledger's numbering
   (`10099_seed_knowledge_ai` is the head, not `10000_…`). `/socket.io` on the public host is now the
