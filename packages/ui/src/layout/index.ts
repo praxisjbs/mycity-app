@@ -6,3 +6,4 @@ export * from "./PageHeader";
 export * from "./Grid";
 export * from "./Stack";
 export * from "./PhoneOnly";
+export * from "./SplitPanes";

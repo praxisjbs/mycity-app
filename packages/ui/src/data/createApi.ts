@@ -9,9 +9,9 @@
  *
  * Every call is typed by its key ("METHOD /path") from the app's Endpoints map,
  * the interim types today and packages/contract/contract.gen.ts as modules land.
- * Lists are ALWAYS the server's pages: usePaged sends `page`, `q` and the list's
- * own filters and shows `page.total`; nothing here filters, sorts or slices rows,
- * and no page size is ever sent (the server's is fixed at 25).
+ * Lists are ALWAYS the server's pages: usePaged sends `page`, `q`, one `sort` and
+ * the list's own filters and shows `page.total`; nothing here filters, sorts or
+ * slices rows, and no page size is ever sent (the server's is fixed at 25).
  *
  * The mock transport is passed only by a laptop build (VITE_API_MODE=mock); a
  * release build passes none, so it never carries the mock (F12, check/mock-free.js).
@@ -52,6 +52,16 @@ export type ResponseOf<E, K extends Key<E>> = Shape<E, K>["response"];
 /** Keys whose response is a page envelope. */
 export type PagedKeyOf<E> = { [K in Key<E>]: ResponseOf<E, K> extends { data: unknown[]; page: unknown } ? K : never }[Key<E>];
 export type RowOf<E, K extends Key<E>> = ResponseOf<E, K> extends { data: Array<infer R> } ? R : never;
+/**
+ * A list's `sort` value: a field name, with a leading `-` for descending
+ * (common.js `sortParam`). The allow-list is the contract's and is enforced
+ * where it matters, on the server: a field the list does not name is a 422.
+ * The type here is whatever the endpoint declares for the key, and `string`
+ * for a list still on INTERIM types with no sort of its own.
+ */
+export type SortOf<E, K extends Key<E>> = "sort" extends keyof NonNullable<QueryOf<E, K>>
+  ? NonNullable<NonNullable<QueryOf<E, K>>["sort"]>
+  : string;
 
 /** What a transport receives: the method, the path with its params filled, the query, the body, the headers. */
 export interface RawRequest {
@@ -150,6 +160,13 @@ export interface PagedResult<R> {
   /** Search text as typed; the request follows 250 ms later. */
   q: string;
   setQ: (q: string) => void;
+  /**
+   * The list's one sort key, as the server takes it: a field name with a
+   * leading `-` for descending (F20). Undefined is the list's own default
+   * order. Changing it goes back to page 1.
+   */
+  sort: string | undefined;
+  setSort: (sort: string | undefined) => void;
   reload: () => void;
 }
 
@@ -317,13 +334,18 @@ export function createApi<E>(config: ApiConfig) {
   }
 
   type PagedKey = PagedKeyOf<E>;
-  type Filters<K extends K0> = Omit<NonNullable<QueryOf<E, K>>, "page" | "q">;
+  type Filters<K extends K0> = Omit<NonNullable<QueryOf<E, K>>, "page" | "q" | "sort">;
 
-  /** A server-paged list with search and filters. Changing q or a filter goes back to page 1. */
-  function usePaged<K extends PagedKey & K0>(key: K, opts: { params?: ParamsOf<E, K>; filters?: Filters<K>; enabled?: boolean } = {}): PagedResult<RowOf<E, K>> {
+  /** A server-paged list with search, filters and sort. Changing q, a filter or the sort goes back to page 1. */
+  function usePaged<K extends PagedKey & K0>(
+    key: K,
+    opts: { params?: ParamsOf<E, K>; filters?: Filters<K>; sort?: SortOf<E, K>; enabled?: boolean } = {},
+  ): PagedResult<RowOf<E, K>> {
     const [pageNumber, setPage] = useState(1);
     const [q, setQText] = useState("");
     const [qSent, setQSent] = useState("");
+    // The list's starting order is the caller's; after that the person's choice wins.
+    const [sort, setSortValue] = useState<string | undefined>(opts.sort as string | undefined);
     const filterKey = JSON.stringify(opts.filters ?? {});
     const lastFilters = useRef(filterKey);
 
@@ -342,10 +364,15 @@ export function createApi<E>(config: ApiConfig) {
       }
     }, [filterKey]);
 
-    const query = { ...(opts.filters ?? {}), page: pageNumber, ...(qSent ? { q: qSent } : {}) } as QueryOf<E, K>;
+    const setSort = useCallback((next: string | undefined) => {
+      setSortValue(next);
+      setPage(1);
+    }, []);
+
+    const query = { ...(opts.filters ?? {}), page: pageNumber, ...(qSent ? { q: qSent } : {}), ...(sort ? { sort } : {}) } as QueryOf<E, K>;
     const res = useApi(key, { params: opts.params, query, enabled: opts.enabled });
     const body = res.data as { data: RowOf<E, K>[]; page: PageMeta } | undefined;
-    return { rows: body?.data ?? [], page: body?.page, loading: res.loading, error: res.error, pageNumber, setPage, q, setQ: setQText, reload: res.reload };
+    return { rows: body?.data ?? [], page: body?.page, loading: res.loading, error: res.error, pageNumber, setPage, q, setQ: setQText, sort, setSort, reload: res.reload };
   }
 
   /** The same paged API for a phone: rows accumulate as the person scrolls, fetching page + 1 while has_next. */

@@ -1,6 +1,6 @@
 import type { ApiError } from "@/api/client";
-import { Message, Page } from "@/components/Layout";
-import { Button } from "@mycity/ui";
+import { Page } from "@/shell/Page";
+import { Button, PageMessage } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 
 /**
@@ -20,14 +20,14 @@ export function LinkProblem({ error, title, retry }: { error: ApiError; title: s
   }[kind];
   return (
     <Page title={title}>
-      <Message
+      <PageMessage
         icon={kind === "used" ? "ok" : kind === "offline" ? "globe" : "alert"}
         tone={kind === "used" ? "ok" : kind === "expired" ? "warn" : "neutral"}
         title={heading}
         action={kind === "offline" || kind === "other" ? retry && <Button variant="primary" onClick={retry}>Try Again</Button> : <Button onClick={() => navigate("/jobs")}>See Open Roles</Button>}
       >
         {error.message}
-      </Message>
+      </PageMessage>
     </Page>
   );
 }

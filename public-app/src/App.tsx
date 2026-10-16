@@ -1,9 +1,6 @@
 import { useEffect } from "react";
-import { Button } from "@mycity/ui";
-import { Message, Page } from "@/components/Layout";
-import { ComingSoon, ViewBar } from "@/components/Planned";
-import { StagingBar } from "@/components/StagingBar";
-import { useIsProduction, useScreenState } from "@/lib/plan";
+import { Button, PageMessage, StagingBar, useEnvironment } from "@mycity/ui";
+import { useScreenState, plan } from "@/lib/plan";
 import { parse, RouterProvider, useRouter } from "@/lib/router";
 import { Apply } from "@/pages/Apply";
 import { Assessment } from "@/pages/Assessment";
@@ -11,16 +8,24 @@ import { Careers } from "@/pages/Careers";
 import { SignOffer } from "@/pages/SignOffer";
 import { Vacancy } from "@/pages/Vacancy";
 import { Verify } from "@/pages/Verify";
+import { Page } from "@/shell/Page";
+import { PlannedPage, ViewBar } from "@/shell/Planned";
 
 /** The public site: six pages, no shell, no sign-in (A9). */
 export function App() {
   return (
     <RouterProvider>
-      <StagingBar />
+      <Staging />
       <Preview />
       <Routes />
     </RouterProvider>
   );
+}
+
+/** The staging bar (MILESTONES §6), sticky while the page scrolls. Nothing on production. */
+function Staging() {
+  if (useEnvironment() !== "staging") return null;
+  return <StagingBar placement="sticky" message="A test copy of the site. Applications and signatures here are not for real roles." short="A test copy of this site" />;
 }
 
 function Routes() {
@@ -32,7 +37,7 @@ function Routes() {
   const r = parse(path);
   const state = useScreenState(r.page);
   if (r.page !== "not-found" && !state.open)
-    return <ComingSoon page={r.page} title={TITLE[r.page]} m={state.plan?.m ?? "M11"} production={state.production} />;
+    return <PlannedPage page={r.page} title={TITLE[r.page]} m={state.screen?.m ?? "M11"} production={state.production} mock={import.meta.env.VITE_API_MODE === "mock" && state.rule === "mock"} />;
   switch (r.page) {
     case "careers": return <Careers />;
     case "vacancy": return <Vacancy key={r.slug} slug={r.slug} />;
@@ -46,18 +51,19 @@ function Routes() {
 
 const TITLE: Record<string, string> = { careers: "Careers", vacancy: "Vacancy", apply: "Apply", assess: "Assessment", sign: "Sign Offer", verify: "Verify a Document" };
 
-/** The prototype view switch, everywhere but production (lib/plan.ts). */
+/** The Prototype View switch, in mock mode only (lib/plan.ts). */
 function Preview() {
-  return useIsProduction() ? null : <ViewBar />;
+  const rule = plan.useOpenRule();
+  return import.meta.env.VITE_API_MODE === "mock" && rule === "mock" ? <ViewBar /> : null;
 }
 
 function NotFound() {
   const { navigate } = useRouter();
   return (
     <Page title="Page Not Found">
-      <Message title="There is nothing at this address" action={<Button variant="primary" onClick={() => navigate("/jobs")}>See Open Roles</Button>}>
+      <PageMessage title="There is nothing at this address" action={<Button variant="primary" onClick={() => navigate("/jobs")}>See Open Roles</Button>}>
         The link may be mistyped. If it came in an email from us, open it again from the email.
-      </Message>
+      </PageMessage>
     </Page>
   );
 }

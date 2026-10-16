@@ -12,7 +12,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { jsxProps, frontendFiles } = require("../../scripts/check/lib/sources");
-const { findHex, findStyling, tokenValues, grown, HEX_ALLOWED } = require("../../scripts/check/palette");
+const { findHex, findStyling, tokenValues, HEX_ALLOWED } = require("../../scripts/check/palette");
 const { findDialogs } = require("../../scripts/check/native-dialogs");
 const { findFileInputs, uploadHome, LEGACY_UPLOADS } = require("../../scripts/check/upload");
 const { sentinelOf, filesWith } = require("../../scripts/check/mock-free");
@@ -80,9 +80,10 @@ describe("palette (gate 13)", () => {
     expect(findStyling(src, ARBITRARY).map((f) => f.what)).toEqual(['arbitrary value "w-[317px]"', "inline style= prop"]);
   });
 
-  test("the exemption list only shrinks", () => {
-    expect(grown(["a.tsx", "b.tsx"], ["b.tsx"])).toEqual([]);
-    expect(grown(["a.tsx"], ["a.tsx", "c.tsx"])).toEqual(["c.tsx"]);
+  test("no screen is exempt: the list PR 3 converged every file off is gone", () => {
+    expect(fs.existsSync(path.join(__dirname, "../../scripts/check/lib/styling-exemptions.json"))).toBe(false);
+    const palette = fs.readFileSync(path.join(__dirname, "../../scripts/check/palette.js"), "utf8");
+    expect(palette).not.toMatch(/styling-exemptions/);
   });
 
   test("every allowed file gives its reason", () => {

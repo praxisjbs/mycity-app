@@ -1,23 +1,36 @@
-import { useState } from "react";
-import { useMutation, usePaged, invalidate } from "@/api/hooks";
+import { useCallback, useState } from "react";
+import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useRealtime } from "@/api/realtime";
 import type { Notification } from "@/api/types/identity";
-import { Pager } from "@/components/ui/Table";
 import { useRouter } from "@/lib/router";
-import { Button, EmptyState, Icon, type IconName, useModal, cn, formatDateTime, ChoiceField } from "@mycity/ui";
+import { Button, ChoiceField, EmptyState, formatWhen, IconButton, NotificationRow, Pager, useModal, type IconName } from "@mycity/ui";
 
 /**
  * The bell: things that happened to you. Read once and gone. Unresolved
- * conditions (alerts) live on Home · Alerts, where someone acts on them.
+ * conditions (alerts) live on Home · Alerts, where someone acts on them. A new
+ * notification arrives over realtime (`notification`), which reloads the dot,
+ * the list and the badge counts; without a socket they reload when opened.
  */
 export function useBell() {
   const modal = useModal();
-  return () =>
-    modal.open({
-      title: "Notifications and Alerts",
-      wide: true,
-      body: (close) => <BellBody close={close} />,
-      footer: (close) => <BellFoot close={close} />,
-    });
+  return useCallback(
+    () =>
+      modal.open({
+        title: "Notifications",
+        wide: true,
+        body: (close) => <BellBody close={close} />,
+        footer: (close) => <BellFoot close={close} />,
+      }),
+    [modal],
+  );
+}
+
+/** The top bar's bell, with a dot while anything is unread. */
+export function BellButton() {
+  const { data } = useApi("GET /api/v1/notifications", { query: { unread: true } });
+  const open = useBell();
+  useRealtime("notification", () => invalidate("/api/v1/notifications"));
+  return <IconButton icon="bell" label="Notifications" dot={!!data?.page.total} onClick={open} />;
 }
 
 const ICONS: Record<string, IconName> = { approvals: "check", attendance: "clock", recruitment: "brief", community: "msg", leave: "check", partnerships: "link", payroll: "wallet", policy: "doc", device: "lock" };
@@ -35,23 +48,16 @@ function BellBody({ close }: { close: () => void }) {
         <EmptyState bare icon="bell" title="Nothing Yet" text="New notifications appear here." />
       ) : (
         list.rows.map((n: Notification) => (
-          <div key={n.notification_id} className="flex flex-wrap items-center gap-2.5 border-b border-border py-[9px] last:border-b-0">
-            <span className={cn("flex size-[30px] flex-none items-center justify-center rounded-ctl", n.tone === "err" ? "bg-destructive-soft text-destructive" : n.tone === "ok" ? "bg-success-soft text-success" : "bg-accent text-accent-foreground")}>
-              <Icon name={ICONS[n.category] ?? "bell"} />
-            </span>
-            <span className="flex min-w-[180px] flex-1 flex-col gap-0.5">
-              <b className="text-[12.5px] font-semibold">
-                {!n.read_at && <i className="mr-1.5 inline-block size-[7px] rounded-full bg-primary align-middle" />}
-                {n.title}
-                {!n.read_at && <span className="sr-only"> unread</span>}
-              </b>
-              <span className="text-[11.5px] text-subtle-foreground">{n.body}</span>
-              <span className="text-[11.5px] text-subtle-foreground">{formatDateTime(n.created_at)}</span>
-            </span>
-            {n.link && (
-              <Button onClick={() => (close(), navigate(n.link!.path))}>Open</Button>
-            )}
-          </div>
+          <NotificationRow
+            key={n.notification_id}
+            title={n.title}
+            body={n.body}
+            when={formatWhen(n.created_at)}
+            icon={ICONS[n.category] ?? "bell"}
+            tone={n.tone}
+            unread={!n.read_at}
+            action={n.link ? <Button size="sm" onClick={() => (close(), navigate(n.link!.path))}>Open</Button> : undefined}
+          />
         ))
       )}
       <Pager page={list.page} onPage={list.setPage} noun="notification" className="px-0" />
@@ -64,7 +70,7 @@ function BellFoot({ close }: { close: () => void }) {
   return (
     <>
       <Button busy={read.pending} onClick={() => read.run({ body: {} }).then(() => invalidate("/api/v1/notifications"))}>
-        Mark All as Read
+        Mark All Read
       </Button>
       <Button variant="primary" onClick={close}>
         Done

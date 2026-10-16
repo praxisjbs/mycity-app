@@ -47,7 +47,7 @@ describe("CardHeader", () => {
         <CardHeader title="Leave Requests" actions={<Button size="sm" onClick={onClick}>View All</Button>} />
       </Card>,
     );
-    const heading = screen.getByRole("heading", { level: 3, name: "Leave Requests" });
+    const heading = screen.getByRole("heading", { level: 2, name: "Leave Requests" });
     expect(heading).toHaveAttribute("data-ui", "title");
     await user.tab();
     expect(screen.getByRole("button", { name: "View All" })).toHaveFocus();
@@ -56,8 +56,8 @@ describe("CardHeader", () => {
   });
 
   it("accepts the merged `right` prop and a heading level", () => {
-    render(<CardHeader title="Devices" level={2} right={<span>3 active</span>} />);
-    expect(screen.getByRole("heading", { level: 2, name: "Devices" })).toBeInTheDocument();
+    render(<CardHeader title="Devices" level={3} right={<span>3 active</span>} />);
+    expect(screen.getByRole("heading", { level: 3, name: "Devices" })).toBeInTheDocument();
     expect(screen.getByText("3 active")).toBeInTheDocument();
   });
 

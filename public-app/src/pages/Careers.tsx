@@ -1,9 +1,8 @@
 import { usePaged } from "@/api/hooks";
 import "@/api/types/public";
 import type { VacancyCard } from "@/api/types/public";
-import { Brand, Message, Page } from "@/components/Layout";
-import { Button, Skeleton, TextField } from "@mycity/ui";
-import { Sub } from "@/components/ui";
+import { Page } from "@/shell/Page";
+import { Brand, Button, PageMessage, Skeleton, Sub, TextField } from "@mycity/ui";
 import { Link, useRouter } from "@/lib/router";
 
 export const PATTERN: Record<VacancyCard["work_pattern"], string> = { on_site: "On site", hybrid: "Hybrid", remote: "Remote" };
@@ -17,9 +16,9 @@ export function Careers() {
   const searching = !!list.q.trim();
   return (
     <Page title="Careers" index brandInCard>
-      <div className="mb-[22px] text-center">
-        <Brand size="lg" />
-        <h1 className="mt-3.5 text-[24px]">Work With Us</h1>
+      <div className="mb-5.5 text-center">
+        <Brand name="MyCityApp" size="l" />
+        <h1 className="mt-3.5 text-3xl">Work With Us</h1>
         <Sub className="mt-1.5">Building the app that knows every Nigerian city.</Sub>
       </div>
       {((list.page?.total ?? 0) > 8 || searching) && (
@@ -28,19 +27,19 @@ export function Careers() {
         </div>
       )}
       {list.error ? (
-        <Message title="The roles could not load" action={<Button onClick={list.reload}>Try Again</Button>}>{list.error.message}</Message>
+        <PageMessage title="The roles could not load" action={<Button onClick={list.reload}>Try Again</Button>}>{list.error.message}</PageMessage>
       ) : list.loading && !list.page ? (
         <Skeleton lines={5} />
       ) : list.rows.length === 0 ? (
-        <Message icon="brief" title={searching ? "No role matches that search" : "No open roles right now"}>
+        <PageMessage icon="brief" title={searching ? "No role matches that search" : "No open roles right now"}>
           {searching ? "Try a shorter word, or clear the search." : "New roles are posted here first. Check back soon."}
-        </Message>
+        </PageMessage>
       ) : (
         <ul className="m-0 list-none p-0">
           {list.rows.map((v) => (
-            <li key={v.slug} className="mb-[9px] flex items-center gap-3 rounded-[10px] border border-border p-[13px]">
+            <li key={v.slug} className="mb-2 flex items-center gap-3 rounded-box border border-border p-3">
               <div className="min-w-0 flex-1">
-                <Link to={`/jobs/${v.slug}`} className="text-[14px] font-[650] text-foreground no-underline hover:underline">
+                <Link to={`/jobs/${v.slug}`} className="text-base font-strong text-foreground no-underline hover:underline">
                   {v.title}
                 </Link>
                 <Sub>{roleLine(v)}</Sub>
@@ -53,7 +52,7 @@ export function Careers() {
         </ul>
       )}
       {list.page && list.page.pages > 1 && (
-        <div className="mt-3 flex items-center justify-between text-[12px] text-subtle-foreground">
+        <div className="mt-3 flex items-center justify-between text-xs text-subtle-foreground">
           <span>
             Page {list.page.number} of {list.page.pages}
           </span>
@@ -63,7 +62,7 @@ export function Careers() {
           </span>
         </div>
       )}
-      <Sub className="mt-[18px] border-t border-border pt-3.5 text-center">New roles are posted here first. Every role is open to anyone who meets what it asks for.</Sub>
+      <Sub className="mt-4.5 border-t border-border pt-3.5 text-center">New roles are posted here first. Every role is open to anyone who meets what it asks for.</Sub>
     </Page>
   );
 }

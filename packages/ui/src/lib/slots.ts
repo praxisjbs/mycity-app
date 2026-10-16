@@ -25,6 +25,8 @@ export const SLOTS = {
   details: "details",
   modalFooter: "modal-footer",
   nav: "nav",
+  /** A navigation item's word (the rail, the bottom bar, the More tiles). */
+  navLabel: "nav-label",
   desktopNav: "desktop-nav",
   phoneNav: "phone-nav",
 } as const;

@@ -40,7 +40,7 @@ track who has read them.
 | Notification bell and web push | Staff app, phone | Recipients | New announcement, direct message, mention | Open the message |
 | People · Employees (employee record) | Staff app | People | `date_of_birth`, `start_date`, avatar | Source of the birthday and anniversary posts. Nothing is entered in Community for them |
 | Settings · Notifications (M6) | Staff app | Every employee | "Community messages" category | Choose in-app, push or email |
-| Mobile bottom bar "Chat" | Staff app, phone | Every employee | Opens Staff Community | |
+| Mobile bottom bar "Community" | Staff app, phone | Every employee | Opens Staff Community | |
 
 ## 3 · How the screens relate
 
@@ -221,7 +221,7 @@ received, not interface copy; the copy rules apply to the chrome around them.
 | Notification bell and web push | Owned by the frontend foundation (FRONTEND_GUIDE §9.6): the sender and first line; a tap opens the conversation | None | Fan-out, muting and who is notified: §3 step 1, §7 |
 | People · Employees (employee record) | Owned by People: that module's guide | That module's guide | How birthdays and anniversaries become posts: §3 step 3, §6 |
 | Settings · Notifications (M6) | Owned by Settings (M6): the Community Messages category with in-app, push and email | The M6 guide | The M6 guide |
-| Mobile bottom bar "Chat" | The Chat icon and word; it opens Staff Community | None | FRONTEND_GUIDE §7 |
+| Mobile bottom bar "Community" | The Community icon and word; it opens Staff Community | None | FRONTEND_GUIDE §7 |
 
 ### 10.2 Phone layout
 
@@ -235,7 +235,7 @@ received, not interface copy; the copy rules apply to the chrome around them.
 | Notification bell and web push | The bell in the top bar; push on the phone | None | A tap opens the conversation full screen | The top bar |
 | People · Employees (employee record) | Owned by People | That module's guide | That module's guide | That module's guide |
 | Settings · Notifications (M6) | Owned by Settings | The M6 guide | The M6 guide | The M6 guide |
-| Mobile bottom bar "Chat" | Chat, third of the five bottom bar items | The desktop rail | Tap: Staff Community opens on Channels | The bottom bar (FRONTEND_GUIDE §7) |
+| Mobile bottom bar "Community" | Community, third of the five bottom bar items (F16), with the unread count | The desktop rail | Tap: Staff Community opens on Channels | The bottom bar (FRONTEND_GUIDE §7) |
 
 Every modal opens as a bottom sheet on a phone (FRONTEND_GUIDE §7); a form's errors sit on its
 fields, never in a toast.
@@ -283,3 +283,5 @@ fields, never in a toast.
 - 14/10/2026 · TB · §10 rewritten to the template's content tiers and phone layout tables, from the demo as rebuilt to the screen conventions (FRONTEND_GUIDE §5, §7, §8): the Announcements subtitle and ⓘ text, the New Channel ⓘ text, the vault line, the Visibility row and "Posting as" left the screen; the channel name rule and the blank note became help terms; Average Read gained a help term; every community form uses the form helpers with errors on the field. §3 step 12 names the reads modal and defines Average Read; §6 gained the channel name rule, the fixed post policy and who posts.
 - 15/10/2026 · AJ · Channels, Direct Messages and Announcements built in `app/` against the mock API (load older paging, voice notes, ticks, profile panel, read report); not wired yet.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: the ⓘ texts on Announcements and Who Can Post are a help term or gone; chat lists, threads and announcements are marked as content for gate 8; filter chips are 44 px on a phone; forms use the shared footer and mark fields on Submit.
+- 15/10/2026 · AJ · Frontend foundation PR 2 (Shell): the third bottom bar place is Community (F16: Home, Workspace, Community, Self-Service, More), with its unread count; the rows that named it Chat follow. The bell and the chat panes are unchanged; the pane splitter now says its width to assistive technology, a read receipt is a named image, the info pane's headings are h3, a selected row and a recognition's quote keep AA contrast, for the a11y gate that crawls the app.
+- 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): Chat's two panes and its divider are now `SplitPanes` from `@mycity/ui`, shared with the Mailbox, and the celebration card, the voice note's bars and a poll's share bars are `Confetti`, `Waveform` and `ShareBar`, so no screen writes an inline style. The chat bubble's tail now uses the same two corners as the assistant's (`bubble-them`, `bubble-me`). §10 is unchanged: the same parts, drawn by shared components.

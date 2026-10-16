@@ -85,7 +85,7 @@ const GATES = [
   { id: "fe-test", label: "Frontend tests", npm: "fe:test" },
   { id: "fe-build", label: "Frontend build (gallery, app, public site)", npm: "fe:build" },
   { id: "mock-free", label: "Release builds carry no mock", script: "scripts/check/mock-free.js" },
-  { id: "a11y", label: "Accessibility (axe on the gallery)", script: "scripts/check/a11y.js" },
+  { id: "a11y", label: "Accessibility (axe on the gallery and the app)", script: "scripts/check/a11y.js" },
   // Process: the work is recorded where the team reads it
   { id: "progress", label: "PROGRESS.md updated and well formed", script: "scripts/check/progress.js" },
   { id: "guides", label: "Feature guides followed and complete", script: "scripts/check/guides.js" },
