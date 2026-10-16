@@ -148,7 +148,7 @@ These rules are the ones the first schema broke. Every one of them failed at run
    codes, notification categories, role codes, numbering doc types and workflow keys are spelled
    exactly as the contract and `src/` spell them.
 7. **Prove it by running the code against the migration** (§12): the integration suite runs the
-   real migrations, never a hand-written fixture.
+   real migrations, never a hand-written fixture, in CI on every PR.
 
 ## 8 · Changing what already exists
 
@@ -228,8 +228,10 @@ RUN_DB_TESTS=1 DATABASE_URL=... npx jest tests/integration
 npm run ci                                     # the whole suite
 ```
 
-CI has no database today, so the two `RUN_DB_TESTS` lines are yours to run. A migration PR that
-has not run them is not ready for review.
+CI runs both `RUN_DB_TESTS` lines on every PR, against PostgreSQL 16 with pgvector and Redis
+(`.github/workflows/ci.yml`). Run them locally first: a red CI run costs everyone a cycle. The
+integration suite builds its schema from the real migrations (`tests/integration/helpers/schema.js`);
+a test that inserts rows by hand fills every column the schema requires, and never relaxes one.
 
 Then check by hand:
 
