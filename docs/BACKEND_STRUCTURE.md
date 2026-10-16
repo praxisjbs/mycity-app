@@ -524,7 +524,7 @@ Seeded schemes (reference data, same in every environment):
 
 | doc_type | Format | First used |
 |---|---|---|
-| `employee` | `MCA-0001` (staff number) | M0 import |
+| `employee` | `00001` (staff number: MyCity's own five digits, no prefix; `0199_seed_foundation_fixes.sql`) | M0 import |
 | `query` | `QRY-0001` | M3 |
 | `sanction`, `letter` | `SAN-0001`, `LTR-0001` | M3 |
 | `vacancy` | `VAC-0001` | M4 |

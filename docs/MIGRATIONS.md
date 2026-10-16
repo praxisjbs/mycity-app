@@ -110,13 +110,13 @@ step, an enum value can never be removed.
 |---|---|---|
 | Name: singular `snake_case` noun (`leave_request`); PK `<table>_id uuid PRIMARY KEY DEFAULT gen_random_uuid()` | One convention for repos, the AI manifests and search | Review |
 | `created_at timestamptz NOT NULL DEFAULT now()` and `updated_at timestamptz NOT NULL DEFAULT now()` on every mutable table | Lists sort and audit on them | Review |
-| **The file that creates a table with `updated_at` also creates its trigger:** `CREATE OR REPLACE TRIGGER set_updated_at BEFORE UPDATE ON <table> FOR EACH ROW EXECUTE FUNCTION set_updated_at();` | 9095 only covered the tables that existed when it ran; every later table is on its own | Review |
+| **The file that creates a table with `updated_at` also creates its trigger, named after the table:** `CREATE OR REPLACE TRIGGER <table>_set_updated_at BEFORE UPDATE ON <table> FOR EACH ROW EXECUTE FUNCTION set_updated_at();` | 9095 only covered the tables that existed when it ran, and its DOWN drops every trigger called plain `set_updated_at`, so a table's own trigger must not use that name | Gate 4 round trip |
 | Append-only tables (`audit_ledger`, ledgers) have no `updated_at` and carry the `prevent_ledger_mutation()` trigger | They are never updated | Review |
 | Money `numeric(18,2)`, read and written as strings through `shared/money`. Never `numeric` without a scale, `float` or `money` | Unscaled numeric returns `"1"`, not `"1.00"` | Gate 20 (code), review (SQL) |
 | Quantities and scores: `numeric(p,s)` with the scale the contract uses | | Review |
 | Instants `timestamptz`; business days (start date, date of birth, leave day) `date`; never `timestamp` without a zone | Africa/Lagos, day-first for people | Review |
 | Emails and codes people type: `citext`. Compare citext with citext, never cast it to `text[]` | A cast to text makes the match case-sensitive again | Review |
-| A record's human number (`MCA-0001`, `EXP-2026-0004`) is `number citext NOT NULL UNIQUE`, filled by `numbering.allocate()`; never `serial` or a sequence | One numbering system | Review, §9 |
+| A record's human number (`EXP-2026-0004`) is `number citext NOT NULL UNIQUE`, or the name the contract gives it (`employee.staff_number`), filled by `numbering.allocate()`; never `serial` or a sequence | One numbering system | Review, §9 |
 | A file is a `document_id uuid REFERENCES document(document_id)`; never a path, URL or blob column | The vault owns files | Review |
 | Every foreign key says `ON DELETE` (`RESTRICT` by default, `CASCADE` only for rows that are part of their parent, `SET NULL` for optional links) | Deleting a person must never silently delete their history | Review |
 | **Every foreign key column has an index**, and so does every column a list allow-lists for sort or filter (BACKEND_GUIDE §3.5) | Scope and lists join on them; 205 of 254 had none in the first schema | Review |
@@ -188,8 +188,10 @@ Rules for every reference seed:
   has one; otherwise `allocate()` throws.
 - A workflow definition seeded is checked by running `validateDefinition()` on it before the PR.
 - Roles come with their `permission` rows. A role with no grants locks out everyone except the CEO.
-- Never seed a row a person will later edit on a screen: the next deploy's `DO UPDATE` silently
-  overwrites their edit.
+- A row a person will later edit on a screen (a numbering scheme, the working week) is seeded with
+  `DO NOTHING`, or with `DO UPDATE ... WHERE` the row still holds the old seeded value. A file runs
+  once per database, but it runs again after a failed attempt or on a rebuilt database, and a bare
+  `DO UPDATE` would then overwrite the person's edit.
 
 ## 10 · Extensions and privileges
 

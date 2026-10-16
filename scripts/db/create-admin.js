@@ -166,7 +166,10 @@ const FIELDS = [
   ],
   ["date_of_birth", "Date of birth (YYYY-MM-DD, optional)"],
   ["staff_number", "Staff number (optional, issued automatically when blank)"],
-  ["next_of_kin", "Next of kin (optional)"],
+  ["gender", `Gender (${contract.organisation.GENDERS.join(", ")}, optional)`],
+  ["next_of_kin_name", "Next of kin name (optional)"],
+  ["next_of_kin_phone", "Next of kin phone (optional)"],
+  ["next_of_kin_relationship", "Next of kin relationship (optional)"],
 ];
 
 /** A complete, obviously sample profile. Staging, local and CI only. */

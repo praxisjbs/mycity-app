@@ -123,7 +123,8 @@ registerCheck("ai", () =>
 registerCheck("migrations", async () => {
   try {
     const { rows } = await require("../config/db").pool.query(
-      "SELECT name, applied_at FROM schema_migration ORDER BY name DESC LIMIT 1",
+      // By the leading number, as migrate.js applies them: as text "9099_" sorts after "10099_".
+      "SELECT name, applied_at FROM schema_migration ORDER BY substring(name from '^[0-9]+')::int DESC, name DESC LIMIT 1",
     );
     return {
       status: rows[0] ? "up" : "degraded",

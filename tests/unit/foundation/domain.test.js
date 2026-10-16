@@ -35,10 +35,16 @@ function client(responses = []) {
 
 describe("numbering", () => {
   test("formats every default scheme as BACKEND_STRUCTURE §7 says", () => {
-    expect(numbering.format(SCHEMES.employee, "all", 1)).toBe("MCA-0001");
+    expect(numbering.format(SCHEMES.employee, "all", 1)).toBe("00001");
     expect(numbering.format(SCHEMES.query, "all", 28)).toBe("QRY-0028");
     expect(numbering.format(SCHEMES.payroll_run, "2026-10", 1)).toBe("PAY-2026-10");
     expect(numbering.format(SCHEMES.payslip, "2026-10", 1)).toBe("PAY-2026-10-0001");
+  });
+
+  test("a scheme may have no prefix only if it has a sequence part", () => {
+    const base = { prefix: "", separator: "", reset: "never", include_period: false };
+    expect(validateScheme({ ...base, padding: 5 })).toEqual([]);
+    expect(validateScheme({ ...base, padding: 0 })).toContain("a scheme with no prefix needs a sequence part");
   });
 
   test("every default scheme is valid", () => {
@@ -329,5 +335,24 @@ describe("effective dating", () => {
     const c = client([{ rows: [] }, { rows: [{ effective_from: "2026-12-01" }] }]);
     await expect(ed.addVersion(c, { table: "salary_assignment", key: { employee_id: "e1" }, from: "2026-11-01", data: {} }))
       .rejects.toMatchObject({ status: 409, code: "VERSION_EXISTS" });
+  });
+});
+
+describe("phone numbers (contract)", () => {
+  const { phone } = require("../../../packages/contract/schemas/common");
+
+  test("a Nigerian number in any local form becomes +234", () => {
+    expect(phone.parse("0704 136 2752")).toBe("+2347041362752");
+    expect(phone.parse("+234 803 123 4567")).toBe("+2348031234567");
+  });
+
+  test("a number abroad, written in international form, is kept", () => {
+    expect(phone.parse("+44 7884 050144")).toBe("+447884050144");
+    expect(phone.parse("+41779539483")).toBe("+41779539483");
+  });
+
+  test("a short +234 number is refused, not taken for a foreign one", () => {
+    expect(phone.safeParse("+2348031234").success).toBe(false);
+    expect(phone.safeParse("803 123").success).toBe(false);
   });
 });

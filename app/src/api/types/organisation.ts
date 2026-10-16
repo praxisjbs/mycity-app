@@ -7,6 +7,7 @@ import type { DocumentRef, IsoDate, Money, Paged, PersonRef, Tone, Uuid } from "
  */
 export type EmploymentType = "full_time" | "part_time" | "contractor" | "consultant" | "intern";
 export type WorkPattern = "on_site" | "hybrid" | "remote";
+export type Gender = "female" | "male";
 
 export interface EmployeeCreate {
   staff_number?: string;
@@ -18,13 +19,17 @@ export interface EmployeeCreate {
   start_date: IsoDate;
   employment_type: EmploymentType;
   work_pattern: WorkPattern;
+  gender?: Gender;
   date_of_birth?: IsoDate;
-  next_of_kin?: string;
+  next_of_kin_name?: string;
+  next_of_kin_phone?: string;
+  next_of_kin_relationship?: string;
   bank_name?: string;
   account_number?: string;
   gross_monthly?: Money;
   department_id: Uuid;
   line_manager_id?: Uuid;
+  dotted_manager_id?: Uuid;
   worksite_id?: Uuid;
 }
 
