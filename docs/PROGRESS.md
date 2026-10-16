@@ -95,6 +95,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · GE · Mail host values in (`docs/runbooks/dns-and-mail.md` §4): `mycityapp.io`,
+  465 and 993, 50 recipients an hour, 30 IMAP connections per IP, 30 mailboxes. System mail is now
+  paced to the hourly limit (`services/mail/pace.js`, `MAIL_SEND_PER_HOUR`: production 40, staging
+  10, required on servers); over it, jobs wait for a slot instead of failing. The env templates
+  carry the values. Left: the SMTP password and `MAIL_SEND_PER_HOUR` in both `.env` files on the
+  server; whether the 50 is per mailbox or per account; the IMAP limit is a rule for the Mailbox
+  module (`mailbox.md` §6).
 - 16/10/2026 · GE · Alerts go to WhatsApp: one sender (`shared/observability/alert.js`) for errors,
   the backup, the restore drill and the uptime probe; `ALERT_WHATSAPP_URLS` holds one gateway link
   per person (CallMeBot, or TextMeBot), `ALERT_WEBHOOK_URL` stays for a Slack or Google Chat

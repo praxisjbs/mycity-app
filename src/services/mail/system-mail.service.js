@@ -27,6 +27,10 @@
  *  - SMTP_HOST empty (development, test): nothing leaves the machine. Messages are kept in
  *    memory (captured()) for tests and logged at debug.
  *
+ * Paced: at most MAIL_SEND_PER_HOUR recipients in any 60 minutes (services/mail/pace.js), the
+ * mailbox's hourly limit. Over it, send() throws MailPacedError (code MAIL_PACED) before
+ * anything goes out, and the job that called it postpones itself until a slot frees.
+ *
  * Rendering is the same engine as documents (shared/documents/render.js): escaped values,
  * house formats, the subject a template too, inside templates/email/layout.html. A plain
  * text part is derived from the HTML for clients that want one.
@@ -41,6 +45,7 @@ const templates = require("../../shared/templates/template-store");
 const variables = require("../../shared/templates/variables");
 const storage = require("../storage/storage.service");
 const routeCheck = require("./deliverability/route-check");
+const pace = require("./pace");
 
 const EMAIL_RE = /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/;
 const MAX_RECIPIENTS = 50;
@@ -225,6 +230,10 @@ async function send(msg) {
   const rendered = await renderEmail(db, msg.template, msg.data || {}, {
     recipient,
   });
+  if (config.SMTP_HOST) {
+    const slot = await pace.reserve(to.length + (cc ? cc.length : 0));
+    if (!slot.ok) throw new pace.MailPacedError(slot.wait_ms);
+  }
   const info = await getTransport().sendMail({
     from: config.MAIL_FROM,
     replyTo: msg.reply_to || config.MAIL_REPLY_TO || undefined,
@@ -275,7 +284,12 @@ async function health() {
   if (!config.SMTP_HOST) return { status: "up", mode: "captured" };
   try {
     await getTransport().verify();
-    return { status: "up", mode: "smtp" };
+    const out = { status: "up", mode: "smtp" };
+    if (config.MAIL_SEND_PER_HOUR) {
+      out.sent_last_hour = await pace.usage();
+      out.per_hour = config.MAIL_SEND_PER_HOUR;
+    }
+    return out;
   } catch (err) {
     return {
       status: "degraded",

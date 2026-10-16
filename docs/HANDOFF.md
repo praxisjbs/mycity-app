@@ -213,6 +213,18 @@ plus round-trip and command-line tests in `tests/integration/worker.test.js` and
   metrics are), `incident.md`, `add-a-module.md`; `server-setup.md`, `deploy.md`,
   `github-settings.md` updated. Tests: `tests/unit/foundation/operations.test.js`.
 
+### 3.5d Mail host limits (16 October)
+
+The domain manager's values (`docs/runbooks/dns-and-mail.md` §4): SMTP and IMAP at `mycityapp.io`
+(465 implicit TLS, 993), certificate name `mycityapp.io`, **50 recipients an hour**, **30 IMAP
+connections per IP**, **30 mailboxes**. Built: `src/services/mail/pace.js`, a rolling-hour window in
+Redis (Lua, shared by every worker), checked in `system-mail.send()` before anything goes out;
+over the limit it throws `MailPacedError` and `email-send` / `notification-deliver` put the job
+back with `moveToDelayed` + `DelayedError` (no attempt used; registry logs it as postponed).
+`MAIL_SEND_PER_HOUR` (prod 40, stg 10, both send from `no-reply`) is required on servers; the
+`mail` readiness check reports `sent_last_hour`. Open: is the 50 per mailbox or per account (asked).
+The IMAP limit is a rule for the Mailbox module (`docs/guides/mailbox.md` §6), not built yet.
+
 ### 3.6 Test state (15 October, Node 20, cloud bench)
 
 387 tests pass (305 unit, 82 integration against Postgres 16 and Redis, real Chromium and
