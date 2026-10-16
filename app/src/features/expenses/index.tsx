@@ -419,7 +419,7 @@ function BudgetsTab() {
         <div className="mb-3 flex items-start gap-2.5 rounded-card bg-info-soft p-[14px] text-info">
           <Icon name="alert" className="mt-0.5 flex-none" />
           <div>
-            <h3 data-ui="title" className="text-[13.5px] font-semibold">Example Figures</h3>
+            <h2 data-ui="title" className="text-[13.5px] font-semibold">Example Figures</h2>
             <p className="mt-1 text-[11.5px]">Budgets start in 2027.</p>
           </div>
         </div>

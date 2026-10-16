@@ -126,7 +126,7 @@ export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string;
           <Avatar name={r.to.display_name} size={26} />
           <span><b>{m.author.display_name}</b> recognised <b>{r.to.display_name}</b></span>
         </div>
-        <q className="mt-[7px] mb-[9px] block text-[13px] text-muted-foreground">{m.text}</q>
+        <q className="mt-[7px] mb-[9px] block text-[13px] text-foreground">{m.text}</q>
         <button type="button" onClick={onCelebrate} className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-[11px] text-[12px] font-[650]", r.mine ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted")}>👍 {r.count}</button>
       </div>
     );
