@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { CityShowcase } from "./CityShowcase";
@@ -53,6 +53,28 @@ describe("CityShowcase", () => {
     expect(phaseOf(17, londonWinter.rise, londonWinter.set)).toBe("night");
     expect(phaseOf(13, lagos.rise, lagos.set)).toBe("day");
     expect(phaseOf(lagos.set, lagos.rise, lagos.set)).toBe("dusk");
+  });
+
+  it("shows a city's photograph once it has loaded, and keeps the drawing when it cannot", () => {
+    const { container } = render(<CityShowcase />);
+    const lagos = container.querySelector<HTMLElement>('[data-photo="lagos"]')!;
+    const img = lagos.querySelector("img")!;
+    expect(img).toHaveAttribute("alt", "");
+    expect(img.getAttribute("srcset")).toMatch(/lagos-640\.webp 640w, .*lagos-1280\.webp 1280w/);
+    expect(lagos).toHaveClass("opacity-0");
+    fireEvent.load(img);
+    expect(lagos).toHaveClass("opacity-100");
+    expect(img.className).toMatch(/animate-ken-1/);
+    fireEvent.error(container.querySelector('[data-photo="london"] img')!);
+    expect(container.querySelector('[data-photo="london"]')).toBeNull();
+  });
+
+  it("uses the small photographs and holds them still on a phone", () => {
+    const { container } = render(<CityShowcase variant="band" />);
+    const img = container.querySelector('[data-photo="lagos"] img')!;
+    expect(img.getAttribute("src")).toMatch(/lagos-640\.webp/);
+    expect(img.className).not.toMatch(/animate-ken/);
+    expect(container.querySelector(".city-parallax")).toBeNull();
   });
 
   it("is a short band on a phone", () => {

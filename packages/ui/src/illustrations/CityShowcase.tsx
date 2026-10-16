@@ -1,21 +1,29 @@
 /**
  * @component CityShowcase
  * @group Display
- * @summary The sign-in screen's moving picture: Lagos, London, Accra and Nairobi drawn at their own local hour, taking turns, each with its clock.
+ * @summary The sign-in screen's moving picture: photographs of Lagos, London, Accra and Nairobi at dusk taking turns, each with its clock, drifting slowly and crossfading; the drawings stand in until a photograph has loaded.
  * @use The staff sign-in screen only: `full` beside the form on desktop, `band` above it on a phone.
  * @avoid Any screen behind sign-in, and decoration anywhere else (use Illustration).
- * @phone variant="band": a short band with the city, its country and its time; the drawing holds still and the city changes each interval.
- * @a11y The drawings are decorative (aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too).
+ * @phone variant="band": a short band with the city, its country and its time; the picture holds still and the city changes each interval, from the small photographs.
+ * @a11y The photographs and drawings are decorative (empty alt, aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too).
  * @status beta
  * @example <CityShowcase>{brandAndHeadline}</CityShowcase>
  * @example <CityShowcase variant="band"><Brand tone="on-dark" /></CityShowcase>
  * @example <CityShowcase aside={<SignInCard />}>{brandAndHeadline}</CityShowcase>
  */
-import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { zoneClock } from "../lib/format";
 import { useMediaQuery } from "../lib/media";
 import type { CityKey } from "./CityShowcase.draw";
+import lagosLarge from "./photos/lagos-1280.webp";
+import lagosSmall from "./photos/lagos-640.webp";
+import londonLarge from "./photos/london-1280.webp";
+import londonSmall from "./photos/london-640.webp";
+import accraLarge from "./photos/accra-1280.webp";
+import accraSmall from "./photos/accra-640.webp";
+import nairobiLarge from "./photos/nairobi-1280.webp";
+import nairobiSmall from "./photos/nairobi-640.webp";
 
 export type { CityKey } from "./CityShowcase.draw";
 
@@ -34,6 +42,14 @@ export const SHOWCASE_CITIES: Record<CityKey, { name: string; country: string; t
 };
 
 const ALL: CityKey[] = ["lagos", "london", "accra", "nairobi"];
+
+/** Each city's photograph at dusk (1280 and 640 wide), and the path its slow drift takes. */
+const PHOTOS: Record<CityKey, { large: string; small: string; drift: string }> = {
+  lagos: { large: lagosLarge, small: lagosSmall, drift: "animate-ken-1" },
+  london: { large: londonLarge, small: londonSmall, drift: "animate-ken-2" },
+  accra: { large: accraLarge, small: accraSmall, drift: "animate-ken-3" },
+  nairobi: { large: nairobiLarge, small: nairobiSmall, drift: "animate-ken-4" },
+};
 
 export interface CityShowcaseProps {
   /** `full` fills its parent, with the clock and the city buttons at the foot; `band` is the phone's short strip. */
@@ -67,6 +83,12 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
   const [hold, setHold] = useState(false);
   const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
   const still = reduced || variant === "band";
+  /** Photographs that have arrived (their drawing is no longer needed) and those that cannot. */
+  const [loaded, setLoaded] = useState<Partial<Record<CityKey, true>>>({});
+  const [failed, setFailed] = useState<Partial<Record<CityKey, true>>>({});
+  /** How many times each city has come round: a new turn restarts its drift from the beginning. */
+  const [turns, setTurns] = useState<Partial<Record<CityKey, number>>>({});
+  const section = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 10_000);
@@ -83,13 +105,64 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
   const city = SHOWCASE_CITIES[current];
   const clock = clocks[current];
 
+  useEffect(() => setTurns((t) => ({ ...t, [current]: (t[current] ?? 0) + 1 })), [current]);
+
+  /** The parallax: where the pointer is over the picture, from -0.5 to 0.5 each way. */
+  const follow = (e: PointerEvent<HTMLElement>) => {
+    const el = section.current;
+    if (!el || still) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--px", ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
+    el.style.setProperty("--py", ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
+  };
+  const settle = () => {
+    section.current?.style.setProperty("--px", "0");
+    section.current?.style.setProperty("--py", "0");
+  };
+
   return (
-    <section aria-label="MyCity cities" data-ui="city-showcase" className={cn("relative isolate overflow-hidden bg-deep text-on-deep", className)}>
+    <section
+      ref={section}
+      aria-label="MyCity cities"
+      data-ui="city-showcase"
+      onPointerMove={variant === "full" ? follow : undefined}
+      onPointerLeave={variant === "full" ? settle : undefined}
+      className={cn("relative isolate overflow-hidden bg-deep text-on-deep", className)}
+    >
       <Suspense fallback={null}>
-        {order.map((c, i) => (
-          <CityScene key={c} city={c} hour={clocks[c].hour} offset={clocks[c].offset} now={now} active={i === index} still={still} />
-        ))}
+        {order.map((c, i) =>
+          loaded[c] ? null : <CityScene key={c} city={c} hour={clocks[c].hour} offset={clocks[c].offset} now={now} active={i === index} still={still} />,
+        )}
       </Suspense>
+      {order.map((c, i) =>
+        failed[c] ? null : (
+          <div
+            key={`photo-${c}`}
+            aria-hidden="true"
+            data-photo={c}
+            className={cn(
+              "absolute inset-0 overflow-hidden transition-all duration-1000 ease-out",
+              i === index && loaded[c] ? "opacity-100 blur-none" : "opacity-0 blur-sm",
+            )}
+          >
+            <div className={cn("absolute inset-0 transform-gpu", !still && "city-parallax")}>
+              <img
+                key={`${c}-${turns[c] ?? 0}`}
+                src={variant === "band" ? PHOTOS[c].small : PHOTOS[c].large}
+                srcSet={`${PHOTOS[c].small} 640w, ${PHOTOS[c].large} 1280w`}
+                sizes="100vw"
+                alt=""
+                decoding="async"
+                loading={i === index ? "eager" : "lazy"}
+                onLoad={() => setLoaded((l) => (l[c] ? l : { ...l, [c]: true }))}
+                onError={() => setFailed((f) => ({ ...f, [c]: true }))}
+                className={cn("absolute inset-0 size-full object-cover transform-gpu", !still && PHOTOS[c].drift)}
+              />
+              {!still && <div className="city-glow pointer-events-none absolute inset-0 animate-glow" />}
+            </div>
+          </div>
+        ),
+      )}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-linear-to-t from-deep/95 via-deep/40 via-30% to-transparent to-65%" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-linear-to-b from-deep/50 to-transparent" />
       {variant === "full" && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-linear-to-r from-deep/55 to-transparent" />}

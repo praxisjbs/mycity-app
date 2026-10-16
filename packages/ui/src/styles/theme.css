@@ -94,6 +94,13 @@
   --animate-sway: sway 8s ease-in-out infinite;
   --animate-graze: graze 11s ease-in-out infinite;
   --animate-fill-x: fill-x var(--fill-time, 9s) linear both;
+  /* The sign-in photographs: a slow drift and zoom, a different path for each city, longer than
+     a city's turn so the movement carries on through the crossfade; and the lights' slow glow. */
+  --animate-ken-1: ken-1 16s ease-out both;
+  --animate-ken-2: ken-2 16s ease-out both;
+  --animate-ken-3: ken-3 16s ease-out both;
+  --animate-ken-4: ken-4 16s ease-out both;
+  --animate-glow: glow 7s ease-in-out infinite;
 }
 
 @theme inline {
@@ -210,6 +217,11 @@
 @keyframes bob { 50% { transform: translateY(-4px) rotate(-8deg); } }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @keyframes drift { from { transform: scale(1.07) translateX(1.2%); } to { transform: scale(1) translateX(0); } }
+@keyframes ken-1 { from { transform: scale(1.05) translate3d(1%, 0, 0); } to { transform: scale(1.14) translate3d(-1.5%, -0.6%, 0); } }
+@keyframes ken-2 { from { transform: scale(1.05) translate3d(-1%, 0, 0); } to { transform: scale(1.14) translate3d(1.5%, -0.6%, 0); } }
+@keyframes ken-3 { from { transform: scale(1.16) translate3d(0, -1%, 0); } to { transform: scale(1.05) translate3d(0, 0, 0); } }
+@keyframes ken-4 { from { transform: scale(1.05) translate3d(0, 1%, 0); } to { transform: scale(1.13) translate3d(-0.6%, -1%, 0); } }
+@keyframes glow { 0%, 100% { opacity: .3; } 50% { opacity: .75; } }
 @keyframes cloud { from { transform: translateX(-30%); } to { transform: translateX(130%); } }
 @keyframes twinkle { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
 @keyframes ripple { 0%, 100% { transform: translateX(0); opacity: .35; } 50% { transform: translateX(18px); opacity: .9; } }
