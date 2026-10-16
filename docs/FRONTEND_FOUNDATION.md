@@ -168,7 +168,24 @@ and `public-app/src/components/` are empty; both apps build, typecheck, lint and
    once the app is installed (opened as an installed app, or the browser reports it installed). On
    an iPhone, Install App opens a sheet with the Add to Home Screen steps.
 
-**PR 3 · Build kit**: _asked at the start of its session._
+**PR 3 · Build kit** (16/10/2026, TB)
+
+1. How does a list ask the server to sort? **One `sort` key in `listQuery`**, the field name with a
+   leading `-` for descending (`?sort=-created_at`). Each list passes its own allow-list
+   (`listQuery(filters, ["display_name", "created_at"])`); a field that is not on it is a 422 that
+   names the key, like any other bad filter. `DataView` sends one value and a column header cycles
+   ascending, descending, none.
+2. How far does this PR take F4? **Both styling-exemption lists are emptied and the file deleted.**
+   All 58 files (49 in the staff app, 9 on the public site) move onto the token scale and
+   `@mycity/ui` components in this PR, and `styling-exemptions.json` goes with its readers in both
+   apps' ESLint configs and `check/palette.js`. F4 is then whole, with no list to shrink later.
+3. What draws the rich text editor? **TipTap (ProseMirror), in its own lazy chunk** (F22). Selection,
+   paste sanitising, lists and undo are the parts that are not worth hand-rolling, and the composer
+   and announcements both take pasted mail. The toolbar and every style are ours, on tokens.
+4. How is a document previewed? **The browser's own viewer**: a PDF streams from the vault into an
+   `<object>`, and anything that refuses it inline gets a Download card instead. An **image viewer**
+   sits beside it for pictures, and **both carry Open in New Tab**, so a preview opens full size.
+   Our own generated documents keep rendering through `Paper`.
 
 ---
 
