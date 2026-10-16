@@ -95,6 +95,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 16/10/2026 · TB · `docs/DATABASE_SCHEMA.md` rewritten as the database design: the M0 core and how a
+  module attaches to it, each milestone's block, owner, tables as built and what it still owes (from
+  the coverage audit), what is not built and why (passkeys per REUSE_MAP; nothing for M11), and the
+  open decisions (payroll design, the role permission matrix, moving business choices out of seeds).
+  M6 payroll is in scope (MILESTONES §11); the earlier "not modelled" note is withdrawn.
 - 16/10/2026 · TB · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
   rebuilds the schema with `migrate.js` and `fixtures/shared-layer.sql` is gone; CI now has PostgreSQL 16
   with pgvector and Redis, so the suite and gate 4's round trip run on every PR. `1100` lets the alerts

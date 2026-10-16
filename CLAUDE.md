@@ -37,7 +37,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 
 | Type | Read |
 |---|---|
-| Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/MIGRATIONS.md` in full |
+| Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
 | Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F24, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
