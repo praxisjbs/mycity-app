@@ -71,6 +71,15 @@ describe("release manifest", () => {
 });
 
 describe("verify-staging", () => {
+  test("the expected head is the newest migration or reference seed, as the ledger records them", () => {
+    const root = path.resolve(__dirname, "..", "..", "..");
+    const names = ["migrations", "seeds/reference"].flatMap((d) =>
+      fs.readdirSync(path.join(root, d)).filter((f) => /^\d+_.*\.sql$/.test(f)).map((f) => f.replace(/\.sql$/, "")),
+    );
+    const newest = names.sort((a, b) => Number(a.split("_")[0]) - Number(b.split("_")[0])).pop();
+    expect(staging.expectedHead()).toBe(newest);
+  });
+
   const head = "0099_seed_reference";
   const answer = (status, json, headers = {}, text = "") => ({
     status,
