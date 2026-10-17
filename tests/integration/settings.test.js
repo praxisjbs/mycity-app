@@ -446,30 +446,52 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect((await as("ops").put("/settings/working-week").send({ days: week })).status).toBe(200);
     });
 
-    test("holidays are entered on screen, one a date, and the calendar knows them", async () => {
-      expect((await as("ops").get("/settings/holidays")).body.page.total).toBe(0);
-      const add = await as("ops").post("/settings/holidays").send({ holiday_date: "2026-10-01", name: "Independence Day" });
+    test("Nigeria's holidays are seeded, the moon-dated and weekend ones expected until confirmed", async () => {
+      const in2026 = (await as("ops").get("/settings/holidays?year=2026")).body;
+      expect(in2026.page.total).toBe(14);
+      const byDate = Object.fromEntries(in2026.data.map((h) => [h.holiday_date, h]));
+      expect(byDate["2026-10-01"]).toEqual(expect.objectContaining({ name: "Independence Day", expected: false }));
+      expect(byDate["2026-03-20"]).toEqual(expect.objectContaining({ name: "Eid-el-Fitr", expected: true }));
+      const in2027 = (await as("ops").get("/settings/holidays?year=2027")).body;
+      expect(in2027.page.total).toBe(19);
+      const cal = await workingWeek.loadCalendar(pool);
+      expect(cal.holidays.has("2026-12-25")).toBe(true);
+      expect(cal.holidays.has("2027-03-09")).toBe(true);
+    });
+
+    test("holidays are added on screen, one a date, and saving an expected one confirms it", async () => {
+      const add = await as("ops").post("/settings/holidays").send({ holiday_date: "2026-11-02", name: "Election Day" });
       expect(add.status).toBe(201);
+      expect(add.body.expected).toBe(false);
       const twice = await as("ops").post("/settings/holidays").send({ holiday_date: "2026-10-01", name: "Again" });
       expect(twice.status).toBe(409);
       expect(twice.body.error.fields).toEqual({ holiday_date: ["Already a holiday"] });
-      await as("ops").post("/settings/holidays").send({ holiday_date: "2027-01-01", name: "New Year's Day" });
+      expect((await workingWeek.loadCalendar(pool)).holidays.has("2026-11-02")).toBe(true);
 
-      const in2026 = await as("ops").get("/settings/holidays?year=2026");
-      expect(in2026.body.data.map((h) => h.name)).toEqual(["Independence Day"]);
-      expect((await workingWeek.loadCalendar(pool)).holidays.has("2026-10-01")).toBe(true);
+      const eid = (await as("ops").get("/settings/holidays?year=2027")).body.data.find((h) => h.holiday_date === "2027-03-09");
+      const confirmed = await as("ops")
+        .patch(`/settings/holidays/${eid.public_holiday_id}`)
+        .send({ holiday_date: "2027-03-09", name: "Eid-el-Fitr" });
+      expect(confirmed.status).toBe(200);
+      expect(confirmed.body.expected).toBe(false);
+      const audit = await one(
+        "SELECT before, after FROM audit_ledger WHERE action = 'settings.changed' AND entity_id = $1",
+        [eid.public_holiday_id],
+      );
+      expect(audit.before.expected).toBe(true);
+      expect(audit.after.expected).toBe(false);
 
       const moved = await as("ops")
         .patch(`/settings/holidays/${add.body.public_holiday_id}`)
-        .send({ holiday_date: "2026-10-02", name: "Independence Day" });
+        .send({ holiday_date: "2026-11-03", name: "Election Day" });
       expect(moved.status).toBe(200);
-      expect(moved.body.holiday_date).toBe("2026-10-02");
+      expect(moved.body.holiday_date).toBe("2026-11-03");
       expect((await as("ops").delete(`/settings/holidays/${add.body.public_holiday_id}`)).status).toBe(204);
-      expect((await as("ops").get("/settings/holidays")).body.page.total).toBe(1);
+      expect((await as("ops").get("/settings/holidays?year=2026")).body.page.total).toBe(14);
 
       const staffUser = await grantsCache.getAuthUser(pool, people.staff.user.user_id);
-      const r = await authorise.runRead(pool, staffUser, "holidays.list", {});
-      expect(r.data.map((h) => h.name)).toEqual(["New Year's Day"]);
+      const r = await authorise.runRead(pool, staffUser, "holidays.list", { year: 2026 });
+      expect(r.data[0]).toEqual(expect.objectContaining({ name: "New Year's Day", holiday_date: "2026-01-01" }));
     });
   });
 

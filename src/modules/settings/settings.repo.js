@@ -65,7 +65,7 @@ function putDay(db, d) {
  * Public holidays
  * ------------------------------------------------------------------ */
 
-const HOLIDAY = "h.public_holiday_id, to_char(h.holiday_date, 'YYYY-MM-DD') AS holiday_date, h.name, h.created_at";
+const HOLIDAY = "h.public_holiday_id, to_char(h.holiday_date, 'YYYY-MM-DD') AS holiday_date, h.name, h.expected, h.created_at";
 const HOLIDAY_SORTS = { holiday_date: "h.holiday_date", name: "h.name" };
 
 function holidayPage(db, query) {
@@ -110,7 +110,7 @@ function insertHoliday(db, { holiday_date, name }) {
 function updateHoliday(db, id, { holiday_date, name }) {
   return one(
     db,
-    `UPDATE public_holiday h SET holiday_date = $2, name = $3, updated_at = now()
+    `UPDATE public_holiday h SET holiday_date = $2, name = $3, expected = false, updated_at = now()
       WHERE h.public_holiday_id = $1
       RETURNING ${HOLIDAY}`,
     [id, holiday_date, name],

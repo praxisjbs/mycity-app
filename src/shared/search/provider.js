@@ -17,6 +17,11 @@
  *     phones: ["e.phone"],                      // found by a number typed any way (below)
  *   });
  *
+ * `owner: { column }` is for records that belong to one person whatever their grant says
+ * (their own mail): the query always adds `column = <the caller's user_id>`, so a scope of
+ * `all` (the CEO, People) still finds only the caller's own rows. Without a caller it
+ * finds nothing.
+ *
  * What a provider may not do:
  *  - decide who sees it. The service checks the module's `view` grant before the query
  *    runs, and applies the caller's scope through the provider's scope column with
@@ -63,7 +68,7 @@ const REQUIRED = [
 
 /**
  * @param {object} spec  see the header
- * @returns {{type: string, module: string, label: string, words: string[], scoped: boolean,
+ * @returns {{type: string, module: string, label: string, words: string[], scoped: boolean, owned: boolean,
  *            columns: string[], search: Function}}
  */
 function recordProvider(spec) {
@@ -84,6 +89,8 @@ function recordProvider(spec) {
     );
   if (spec.scope && !spec.scope.column)
     throw new Error(`search provider ${spec.type}: scope is { column }`);
+  if (spec.owner && !spec.owner.column)
+    throw new Error(`search provider ${spec.type}: owner is { column }`);
   if (spec.phones !== undefined && (!Array.isArray(spec.phones) || spec.phones.some((col) => !col)))
     throw new Error(`search provider ${spec.type}: phones is a list of columns`);
   const words = (spec.words || [])
@@ -96,9 +103,10 @@ function recordProvider(spec) {
   /**
    * One page of matches.
    * @param {{query: Function}} c
-   * @param {{term: string, page?: number, fuzzy?: boolean, scope: {scope: string, scope_ids: string[]|null}}} q
+   * @param {{term: string, page?: number, fuzzy?: boolean, scope: {scope: string, scope_ids: string[]|null}, user?: {user_id: string}}} q
    */
-  async function search(c, { term, page = 1, fuzzy = false, scope }) {
+  async function search(c, { term, page = 1, fuzzy = false, scope, user }) {
+    if (spec.owner && !(user && user.user_id)) return { page: null, items: [] };
     const useFuzzy = fuzzy && term.length >= 4;
     // $3 (the bare term) only when the typo pass uses it: an unused parameter has no type.
     const params = [
@@ -127,9 +135,14 @@ function recordProvider(spec) {
       rank.push(...phones.map((p) => `CASE WHEN ${p} LIKE $${n}::text THEN 3 WHEN ${p} LIKE $${n - 1}::text THEN 2 ELSE 0 END`));
     }
     const s = spec.scope ? scopeClause(scope, spec.scope, params) : { and: "" };
+    let owned = "";
+    if (spec.owner) {
+      params.push(user.user_id);
+      owned = `AND ${spec.owner.column} = $${params.length}`;
+    }
     const sql = `SELECT ${spec.select}, GREATEST(${rank.join(", ")}) AS search_rank, ${TOTAL_COL}
                    FROM ${spec.from}
-                  WHERE (${like.join(" OR ")})${spec.where ? ` AND (${spec.where})` : ""} ${s.and}
+                  WHERE (${like.join(" OR ")})${spec.where ? ` AND (${spec.where})` : ""} ${s.and} ${owned}
                   ORDER BY search_rank DESC${spec.order ? `, ${spec.order}` : ""}, ${spec.key}`;
     const result = await pageQuery(c, sql, params, { page });
     return {
@@ -155,6 +168,7 @@ function recordProvider(spec) {
     label: spec.label,
     words,
     scoped: Boolean(spec.scope),
+    owned: Boolean(spec.owner),
     columns: spec.columns.slice(),
     search,
   });

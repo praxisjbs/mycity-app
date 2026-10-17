@@ -21,6 +21,7 @@ PR as the code. A rule that only lives in someone's head is not a rule.
    where the two disagree.
 4. **Check the map.** `README.MD` §4 and §5 list every file for M0 to M11. The file you need almost
    certainly exists already as an empty stub. If it does not, read README §11 before creating one.
+   When the module is done, delete the stubs it left empty and take them off the map (README §11.5).
 5. **Look in `src/shared/` and `src/services/` first** (§4 below). If two modules need it, it is
    shared. A module never grows its own mailer, money helper, date formatter, file store, pager or
    AI client.
@@ -274,6 +275,10 @@ module.exports = recordProvider({                // shared/search/provider.js
   scope: { column: "t.owner_employee_id" },     // team and own scope apply, as on the screen
 });
 ```
+
+Records that belong to one person whatever their grant says (their own mail) use
+`owner: { column: "a.user_id" }` instead of `scope`: every query is pinned to the caller's
+`user_id`, so a grant of `all` still finds only the caller's own rows (`mailbox.search.js`).
 
 A module with no AI surface or nothing to search says so at the top of its controller, with a
 reason: `// ai:none <reason>`, `// search:none <reason>` (gates 9 and 10). Feature AI inside a

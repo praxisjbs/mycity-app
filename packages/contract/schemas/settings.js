@@ -6,7 +6,9 @@
  *   organisation    the company's own profile (setting rows, entered on screen, never seeded)
  *   working week    per day, Monday 1 to Sunday 7 (A22: Monday to Friday 09:00 to 17:00,
  *                   Saturday 09:00 to 15:00, as seeded; edited here)
- *   holidays        public holidays, entered on screen, never seeded (A26)
+ *   holidays        public holidays: Nigeria's seeded for 2026 and 2027 (seeds/reference/0448,
+ *                   TB 17/10/2026), the moon-dated and weekend ones as expected until confirmed;
+ *                   any other entered on screen
  *   numbering       the scheme of every numbered document type (shared/numbering/schemes.js)
  *   security        session length, idle lock, password minimum and two-step by role, each
  *                   within the floor the server's .env sets: a rule may be made stricter here,
@@ -112,11 +114,16 @@ const WorkingWeekSave = z
  * Public holidays
  * ------------------------------------------------------------------ */
 
+/**
+ * `expected`: seeded before the Federal Government announces it (an Eid, or the working day given
+ * for a holiday on a weekend). Saving the holiday, moved or not, confirms it.
+ */
 const Holiday = z
   .object({
     public_holiday_id: uuid,
     holiday_date: isoDate,
     name: z.string(),
+    expected: z.boolean(),
     created_at: isoDateTime,
   })
   .strict();
@@ -128,7 +135,7 @@ const HolidayListQuery = listQuery(
 );
 const HolidayPage = Paged(Holiday);
 
-/** POST /settings/holidays, PATCH /settings/holidays/:id */
+/** POST /settings/holidays, PATCH /settings/holidays/:id (which also confirms an expected holiday) */
 const HolidaySave = z.object({ holiday_date: isoDate, name: text(80) }).strict();
 
 /* ------------------------------------------------------------------ *

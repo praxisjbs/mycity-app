@@ -175,6 +175,7 @@ says production holds no seeded data, so A26 limits what a reference seed may co
 | Numbering schemes for the doc types in `shared/numbering/schemes.js` | Business choices MyCity makes: expense categories, partner types and stages, attendance policies, alert thresholds, leave entitlements, knowledge categories |
 | Workflow definitions that pass `validateDefinition()` and are in `definitions.js DEFAULTS` | Demo or example rows, anything a screen shows as if it were data |
 | Code lists the code switches on (statuses, the contract's enums) | Anything "so the screen isn't empty" |
+| Public holidays set by law (Nigeria's, `0448`), those the government names late marked `expected` | Holidays MyCity gives on its own account |
 | Template defaults the generator needs to render | Secrets, keys, URLs of external services |
 
 Business choices are entered by MyCity on the screen that owns them, or loaded through the import

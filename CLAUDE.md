@@ -129,9 +129,11 @@ A task is not finished until:
    tick the M0 item and add a note there.
 3. The feature guide matches what you built.
 4. `README.MD` lists any new file you created (README §11).
-5. For a frontend change, the PR body's **Native app feel** section says what you did on the phone
+5. A finished module keeps no empty files: delete its stubs that stayed empty and take them off
+   `README.MD` and the guide (README §11.5). Stubs a later milestone fills stay.
+6. For a frontend change, the PR body's **Native app feel** section says what you did on the phone
    and desktop shells (gate 11). No screenshots needed.
-6. Your final message lists what changed, what is left, and anything you could not verify.
+7. Your final message lists what changed, what is left, and anything you could not verify.
 
 ## Working conventions
 

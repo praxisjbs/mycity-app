@@ -202,14 +202,20 @@ describeDb("leave against the real migrations", () => {
     expect((await ask("staff", "annual", d("02-07"), d("02-07"))).body.error.code).toBe("LEAVE_NO_WORKING_DAYS");
     expect((await ask("staff", "annual", d("02-05"), d("02-04"))).status).toBe(422);
 
-    // 17 left: four weeks of six working days is 24.
+    // 17 left: four weeks of six working days is 24, less the public holidays in them
+    // (seeds/reference/0448), which depend on the year the test runs in.
+    const { rows: off } = await q(
+      `SELECT count(*)::int AS n FROM public_holiday
+        WHERE holiday_date BETWEEN $1 AND $2 AND date_part('isodow', holiday_date) <> 7`,
+      [d("03-01"), d("03-27")],
+    );
     const tooMuch = await ask("staff", "annual", d("03-01"), d("03-27"));
     expect(tooMuch.status).toBe(422);
     expect(tooMuch.body.error.code).toBe("LEAVE_ALLOWANCE_EXCEEDED");
     // A type with no allowance has no ceiling.
     const unpaid = await ask("staff", "unpaid", d("03-01"), d("03-27"));
     expect(unpaid.status).toBe(201);
-    expect(unpaid.body.days).toBe(24);
+    expect(unpaid.body.days).toBe(24 - off[0].n);
     expect((await as("staff").post(`/ess/leave/${unpaid.body.leave_request_id}/cancel`, {})).body.status).toBe("cancelled");
   });
 

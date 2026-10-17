@@ -30,12 +30,16 @@ describe("job registry", () => {
     }
   });
 
-  test("the queue list is the README §5.15 M0 list", () => {
+  test("the queue list is the README §5.15 list: M0, and the M1 jobs built so far", () => {
     expect(registry.JOBS.map((j) => j.queue).sort()).toEqual([
+      "announcement-publish",
       "av-transcode",
+      "celebrations",
       "email-send",
       "import-commit",
       "import-validate",
+      "mail-send",
+      "mail-sync",
       "media-derive",
       "media-scan",
       "notification-deliver",
@@ -43,7 +47,10 @@ describe("job registry", () => {
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
       "alert-ageing",
+      "announcement-release",
+      "celebrations",
       "import-cleanup",
+      "mail-sync",
       "media-reconcile",
       "outbox-dispatch",
       "workflow-timeout",

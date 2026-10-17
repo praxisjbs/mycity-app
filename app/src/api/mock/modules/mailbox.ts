@@ -1,15 +1,23 @@
-import type { MailAddress, MailAttachment, MailDraftSave, MailFolder, MailMessage, MailSend, ThreadRow } from "@/api/types/mailbox";
-import { at, created, fail, invalid, notFound, ok, paged, route, sid, uuid } from "../core";
+import type { MailAttachment, MailDraftSave, MailFolder, MailMessage, MailSend, ThreadRow } from "@/api/types/mailbox";
+import type { DocumentRef } from "@/api/types/common";
+import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, uuid } from "../core";
 import { byKey } from "../data/people";
 import { UPLOADS } from "../uploads";
 
-/** Each signed-in person's own mailbox, built on first use. Nobody reaches another's. */
-interface MThread { thread_id: string; folder: MailFolder; subject: string; unread: boolean; messages: MailMessage[]; draft_id: string | null; scheduled: { queue_id: string; release_at: string } | null; _prev?: MailFolder }
-interface MBox { address: string; name: string; threads: MThread[]; drafts: Map<string, { draft_id: string; save: MailDraftSave; attachments: MailAttachment[]; updated_at: string; thread_id: string }>; sends: Set<string>; status: "connected" | "needs_reconnect" | "disconnected"; last_sync_at: string }
+/**
+ * Each signed-in person's own mailbox on the mock, in the contract's shapes
+ * (packages/contract/schemas/mailbox.js). Laptops and CI only (F12). Nobody reaches
+ * another's mail. The mailbox starts connected so the screens have mail to show;
+ * disconnecting shows the Connect sheet, and any password but "wrong" connects.
+ */
+type MailAddress = MailMessage["from"];
+interface MThread { mail_thread_id: string; folder: MailFolder; subject: string; unread: boolean; messages: MailMessage[] }
+interface MDraft { mail_draft_id: string; save: MailDraftSave; attachments: DocumentRef[]; updated_at: string; scheduled: { mail_send_queue_id: string; release_at: string } | null }
+interface MBox { address: string; name: string; threads: MThread[]; drafts: Map<string, MDraft>; status: "connected" | "needs_reconnect" | "disconnected"; last_synced_at: string }
 const BOXES = new Map<string, MBox>();
 
 const A = (name: string | null, address: string): MailAddress => ({ name, address });
-const att = (name: string, kb: number, mime = "application/pdf"): MailAttachment => ({ attachment_id: sid(`att:${name}`), document_id: sid(`doc:${name}`), file_name: name, size_bytes: kb * 1024, mime_type: mime });
+const att = (name: string, kb: number, mime = "application/pdf"): MailAttachment => ({ mail_attachment_id: sid(`att:${name}`), document_id: sid(`doc:${name}`), file_name: name, size_bytes: kb * 1024, mime_type: mime });
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const html = (...paras: string[]) => paras.map((p) => `<p>${p}</p>`).join("");
 
@@ -45,151 +53,159 @@ function boxOf(user: string): MBox {
   const me = A(p.display_name, p.work_email);
   const first = p.display_name.split(" ")[0];
   const threads: MThread[] = seed(first, me).map(([folder, from, subject, days, hm, unread, body, attachments, to], i) => ({
-    thread_id: sid(`mail:${user}:${i}`),
+    mail_thread_id: sid(`mail:${user}:${i}`),
     folder,
     subject,
     unread,
-    draft_id: null,
-    scheduled: null,
-    messages: [{ message_id: sid(`mailmsg:${user}:${i}`), from, to: to ?? [me], cc: [], sent_at: at(days, hm), body_html: body, attachments }],
+    messages: [{ mail_message_id: sid(`mailmsg:${user}:${i}`), from, to: (to ?? [me]).map((x) => x.address), cc: [], sent_at: at(days, hm), body_html: folder === "spam" ? null : body, attachments }],
   }));
-  b = { address: me.address, name: me.name!, threads, drafts: new Map(), sends: new Set(), status: "connected", last_sync_at: new Date().toISOString() };
-  const d1 = { to: [], cc: [], bcc: [], subject: "Enugu launch brief", body_html: html("The Enugu leg runs from the 22nd. Two content roles start on the 20th, so the brief needs to be ready before they arrive. Three locations, two shoot days, Emeka producing."), attachment_ids: [] };
-  const d2 = { to: ["bashir@mycityapp.io"], cc: [], bcc: [], subject: "Re: Eko Hotels, 34 days quiet", body_html: html("Bashir, the inactivity alert on Eko has been open for four days and the one on Kano for twenty-two. Can we agree today whether to re-engage or close them?"), attachment_ids: [] };
-  [[d1, 0, "10:02"], [d2, 1, "17:20"]].forEach(([save, days, hm], i) => saveDraft(b!, sid(`draft:${user}:${i}`), save as MailDraftSave, [], at(days as number, hm as string)));
+  b = { address: me.address, name: me.name!, threads, drafts: new Map(), status: "connected", last_synced_at: new Date().toISOString() };
+  const blank: MailDraftSave = { to_addresses: [], cc_addresses: [], bcc_addresses: [], subject: "", body_html: "", document_ids: [], in_reply_to: null };
+  const d1 = { ...blank, subject: "Enugu launch brief", body_html: html("The Enugu leg runs from the 22nd. Two content roles start on the 20th, so the brief needs to be ready before they arrive. Three locations, two shoot days, Emeka producing.") };
+  const d2 = { ...blank, to_addresses: ["bashir@mycityapp.io"], subject: "Re: Eko Hotels, 34 days quiet", body_html: html("Bashir, the inactivity alert on Eko has been open for four days and the one on Kano for twenty-two. Can we agree today whether to re-engage or close them?") };
+  [[d1, 0, "10:02"], [d2, 1, "17:20"]].forEach(([save, days, hm], i) => b!.drafts.set(sid(`draft:${user}:${i}`), { mail_draft_id: sid(`draft:${user}:${i}`), save: save as MailDraftSave, attachments: [], updated_at: at(days as number, hm as string), scheduled: null }));
   BOXES.set(user, b);
   return b;
-}
-
-function saveDraft(b: MBox, draft_id: string, save: MailDraftSave, attachments: MailAttachment[], when = new Date().toISOString()) {
-  const prev = b.drafts.get(draft_id);
-  const thread_id = prev?.thread_id ?? sid(`draftthread:${draft_id}`);
-  b.drafts.set(draft_id, { draft_id, save, attachments, updated_at: when, thread_id });
-  let t = b.threads.find((x) => x.thread_id === thread_id);
-  if (!t) {
-    t = { thread_id, folder: "drafts", subject: "", unread: false, draft_id, scheduled: null, messages: [] };
-    b.threads.push(t);
-  }
-  t.subject = save.subject;
-  t.messages = [{ message_id: sid(`draftmsg:${draft_id}`), from: A(b.name, b.address), to: save.to.map((x) => A(null, x)), cc: save.cc.map((x) => A(null, x)), sent_at: when, body_html: save.body_html, attachments }];
-  return b.drafts.get(draft_id)!;
 }
 
 const text = (h: string | null) => (h ?? "").replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 const last = (t: MThread) => t.messages[t.messages.length - 1];
 function row(t: MThread): ThreadRow {
   const m = last(t);
-  const outbound = t.folder === "sent" || t.folder === "drafts";
   return {
-    thread_id: t.thread_id, folder: t.folder, subject: t.subject || "(no subject)",
-    party: outbound ? m?.to[0] ?? null : m?.from ?? null,
-    snippet: t.folder === "spam" ? "Marked as spam by the filter." : text(m?.body_html ?? "").slice(0, 140),
+    mail_thread_id: t.mail_thread_id, folder: t.folder, subject: t.subject || "(no subject)",
+    party: t.folder === "sent" ? (m?.to[0] ? A(null, m.to[0]) : null) : m?.from ?? null,
+    snippet: t.folder === "spam" ? "" : text(m?.body_html ?? "").slice(0, 140),
     last_message_at: m?.sent_at ?? new Date().toISOString(), unread: t.unread, has_attachment: t.messages.some((x) => x.attachments.length > 0),
-    message_count: t.messages.length, draft_id: t.draft_id, scheduled: t.scheduled,
+    message_count: t.messages.length, mail_draft_id: null, scheduled: null,
   };
 }
-const fromUpload = (id: string): MailAttachment => ({ file_name: "attachment", size_bytes: 0, mime_type: "application/octet-stream", ...UPLOADS.get(id), attachment_id: id, document_id: id });
+function draftRow(d: MDraft): ThreadRow {
+  return {
+    mail_thread_id: d.mail_draft_id, folder: "drafts", subject: d.save.subject || "(no subject)",
+    party: d.save.to_addresses[0] ? A(null, d.save.to_addresses[0]) : null, snippet: text(d.save.body_html).slice(0, 140),
+    last_message_at: d.updated_at, unread: false, has_attachment: d.attachments.length > 0, message_count: 0,
+    mail_draft_id: d.mail_draft_id, scheduled: d.scheduled,
+  };
+}
+const draftOut = (d: MDraft) => ({ mail_draft_id: d.mail_draft_id, ...d.save, attachments: d.attachments, updated_at: d.updated_at });
+const docOf = (id: string): DocumentRef => UPLOADS.get(id) ?? { document_id: id, file_name: "attachment", size_bytes: 0, mime_type: "application/octet-stream" };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const findThread = (user: string, id: string) => boxOf(user).threads.find((t) => t.thread_id === id);
+const live = (user: string) => {
+  const b = boxOf(user);
+  return b.status === "disconnected" ? null : b;
+};
+const findThread = (user: string, id: string) => live(user)?.threads.find((t) => t.mail_thread_id === id);
+const connection = (user: string) => {
+  const b = boxOf(user);
+  return b.status === "disconnected"
+    ? { mail_account_id: null, email: null, status: "disconnected", last_synced_at: null, last_error_code: null }
+    : { mail_account_id: sid(`acct:${user}`), email: b.address, status: b.status, last_synced_at: b.last_synced_at, last_error_code: b.status === "needs_reconnect" ? "MAIL_AUTH_FAILED" : null };
+};
+const noMailbox = () => fail(409, "NO_MAILBOX", "Connect your mailbox first");
 
-route("GET /api/v1/mailbox/connection", (req) => {
+route("GET /api/v1/mailbox/connection", (req) => ok(connection(req.user!)));
+route("POST /api/v1/mailbox/connection", (req) => {
+  const email = String(req.body.email ?? "").trim().toLowerCase();
+  if (!EMAIL.test(email)) return invalid({ email: ["Not an email address"] });
+  if (/@(gmail|outlook|hotmail|yahoo)\./.test(email)) return invalid({ email: ["Use your company address"] });
+  if (req.body.password === "wrong") return fail(422, "MAIL_AUTH_FAILED", "The mail server refused the password", { password: ["Password refused"] });
   const b = boxOf(req.user!);
-  return ok({ connection_id: sid(`conn:${req.user}`), email_address: b.address, status: b.status, last_sync_at: b.last_sync_at, last_error_code: null });
+  b.status = "connected";
+  b.last_synced_at = new Date().toISOString();
+  return ok(connection(req.user!));
+});
+route("POST /api/v1/mailbox/connection/disconnect", (req) => {
+  boxOf(req.user!).status = "disconnected";
+  return ok(connection(req.user!));
 });
 route("POST /api/v1/mailbox/connection/sync", (req) => {
-  const b = boxOf(req.user!);
-  b.last_sync_at = new Date().toISOString();
-  return ok({ connection_id: sid(`conn:${req.user}`), email_address: b.address, status: b.status, last_sync_at: b.last_sync_at, last_error_code: null });
+  const b = live(req.user!);
+  if (!b) return noMailbox();
+  b.last_synced_at = new Date().toISOString();
+  return ok(connection(req.user!));
 });
 route("GET /api/v1/mailbox/threads", (req) => {
-  const b = boxOf(req.user!);
-  const rows = b.threads.map(row).sort((x, y) => y.last_message_at.localeCompare(x.last_message_at));
-  return paged(rows, req, { search: (r) => [r.subject, r.party?.name, r.party?.address, r.snippet], filters: { folder: (r, v) => r.folder === v, unread: (r, v) => (v === "true" ? r.unread : true) } });
+  const b = live(req.user!);
+  if (!b) return noMailbox();
+  const folder = req.query.folder || "inbox";
+  const rows = folder === "drafts" ? [...b.drafts.values()].map(draftRow) : b.threads.filter((t) => t.folder === folder).map(row);
+  rows.sort((x, y) => y.last_message_at.localeCompare(x.last_message_at));
+  return paged(rows, req, { search: (r) => [r.subject, r.party?.name, r.party?.address, r.snippet], filters: { folder: () => true, unread: (r, v) => (v === "true" ? r.unread : true) } });
 });
 route("GET /api/v1/mailbox/threads/:id", (req) => {
   const t = findThread(req.user!, req.params.id);
-  return t ? ok({ thread_id: t.thread_id, folder: t.folder, subject: t.subject || "(no subject)", messages: t.messages }) : notFound();
+  return t ? ok({ mail_thread_id: t.mail_thread_id, folder: t.folder, subject: t.subject || "(no subject)", messages: t.messages }) : notFound();
 });
 route("POST /api/v1/mailbox/threads/:id/read", (req) => {
   const t = findThread(req.user!, req.params.id);
   if (!t) return notFound();
   t.unread = false;
-  return ok(null);
+  return noContent();
 });
 route("POST /api/v1/mailbox/threads/:id/move", (req) => {
   const t = findThread(req.user!, req.params.id);
   if (!t) return notFound();
   const to = String(req.body.to) as MailFolder;
-  if (!["inbox", "archive", "spam", "trash"].includes(to)) return invalid({ to: ["must be inbox, archive, spam or trash"] });
-  if (t.folder === "drafts") return fail(409, "IS_DRAFT", "A draft is discarded, not moved.");
-  t._prev = t.folder;
-  t.folder = to === "inbox" && t._prev === "trash" && t.messages[0]?.from.address === boxOf(req.user!).address ? "sent" : to;
-  return ok(row(t));
+  if (!["inbox", "archive", "spam", "trash"].includes(to)) return invalid({ to: ["Not a folder"] });
+  t.folder = to;
+  return noContent();
 });
 route("POST /api/v1/mailbox/folders/:kind/empty", (req) => {
-  const b = boxOf(req.user!);
+  const b = live(req.user!);
+  if (!b) return noMailbox();
   const kind = req.params.kind;
-  if (kind !== "spam" && kind !== "trash") return invalid({ kind: ["Only spam and trash can be emptied"] });
+  if (kind !== "spam" && kind !== "trash") return notFound();
   const before = b.threads.length;
   b.threads = b.threads.filter((t) => t.folder !== kind);
   return ok({ removed: before - b.threads.length });
 });
 route("GET /api/v1/mailbox/drafts/:id", (req) => {
-  const d = boxOf(req.user!).drafts.get(req.params.id);
-  return d ? ok({ draft_id: d.draft_id, ...d.save, attachments: d.attachments, updated_at: d.updated_at }) : notFound();
+  const d = live(req.user!)?.drafts.get(req.params.id);
+  return d ? ok(draftOut(d)) : notFound();
 });
 route("PUT /api/v1/mailbox/drafts/:id", (req) => {
-  const b = boxOf(req.user!);
+  const b = live(req.user!);
+  if (!b) return noMailbox();
   const s = req.body as unknown as MailDraftSave;
+  const save: MailDraftSave = { to_addresses: s.to_addresses ?? [], cc_addresses: s.cc_addresses ?? [], bcc_addresses: s.bcc_addresses ?? [], subject: s.subject ?? "", body_html: s.body_html ?? "", document_ids: s.document_ids ?? [], in_reply_to: s.in_reply_to ?? null };
   const prev = b.drafts.get(req.params.id);
-  const known = new Map([...(prev?.attachments ?? [])].map((a) => [a.attachment_id, a]));
-  const attachments = (s.attachment_ids ?? []).map((id) => known.get(id) ?? fromUpload(id));
-  const d = saveDraft(b, req.params.id, { to: s.to ?? [], cc: s.cc ?? [], bcc: s.bcc ?? [], subject: s.subject ?? "", body_html: s.body_html ?? "", attachment_ids: s.attachment_ids ?? [] }, attachments);
-  return ok({ draft_id: d.draft_id, ...d.save, attachments: d.attachments, updated_at: d.updated_at });
+  const d: MDraft = { mail_draft_id: req.params.id, save, attachments: save.document_ids.map(docOf), updated_at: new Date().toISOString(), scheduled: prev?.scheduled ?? null };
+  b.drafts.set(d.mail_draft_id, d);
+  return ok(draftOut(d));
 });
 route("DELETE /api/v1/mailbox/drafts/:id", (req) => {
-  const b = boxOf(req.user!);
-  const d = b.drafts.get(req.params.id);
-  if (!d) return notFound();
-  b.drafts.delete(req.params.id);
-  b.threads = b.threads.filter((t) => t.thread_id !== d.thread_id);
-  return { status: 204, body: null };
+  live(req.user!)?.drafts.delete(req.params.id);
+  return noContent();
 });
 route("POST /api/v1/mailbox/messages", (req) => {
-  const b = boxOf(req.user!);
-  if (!req.idempotency_key) return fail(400, "IDEMPOTENCY_KEY_REQUIRED", "This request needs an Idempotency-Key header.");
-  if (b.sends.has(req.idempotency_key)) return fail(409, "ALREADY_SENT", "This message was already sent.");
+  const b = live(req.user!);
+  if (!b) return noMailbox();
   const s = req.body as unknown as MailSend;
-  const all = [...(s.to ?? []), ...(s.cc ?? []), ...(s.bcc ?? [])];
-  if (!s.to?.length) return invalid({ to: ["Add at least one recipient"] });
-  const bad = all.find((x) => !EMAIL.test(x));
-  if (bad) return invalid({ to: [`${bad} is not an email address`] });
-  if (s.release_at && new Date(s.release_at).getTime() <= Date.now()) return invalid({ release_at: ["That time has already passed"] });
-  b.sends.add(req.idempotency_key);
-  const prev = s.draft_id ? b.drafts.get(s.draft_id) : undefined;
-  const attachments = (s.attachment_ids ?? []).map((id) => prev?.attachments.find((a) => a.attachment_id === id) ?? fromUpload(id));
-  const queue_id = uuid();
+  if (!s.to_addresses?.length) return invalid({ to_addresses: ["Add a recipient"] });
+  const bad = [...s.to_addresses, ...(s.cc_addresses ?? []), ...(s.bcc_addresses ?? [])].find((x) => !EMAIL.test(x));
+  if (bad) return invalid({ to_addresses: ["Not an email address"] });
+  if (s.release_at && new Date(s.release_at).getTime() <= Date.now()) return invalid({ release_at: ["Time already passed"] });
+  const attachments = (s.document_ids ?? []).map(docOf);
+  const queue = uuid();
   if (s.release_at) {
     /* A scheduled message waits in Drafts, labelled Scheduled, until it is released. */
-    const draft_id = s.draft_id ?? uuid();
-    const d = saveDraft(b, draft_id, { to: s.to, cc: s.cc ?? [], bcc: s.bcc ?? [], subject: s.subject, body_html: s.body_html, attachment_ids: s.attachment_ids ?? [] }, attachments);
-    const t = b.threads.find((x) => x.thread_id === d.thread_id)!;
-    t.scheduled = { queue_id, release_at: s.release_at };
-    return created({ queue_id, status: "queued", release_at: s.release_at });
+    const save: MailDraftSave = { to_addresses: s.to_addresses, cc_addresses: s.cc_addresses ?? [], bcc_addresses: s.bcc_addresses ?? [], subject: s.subject ?? "", body_html: s.body_html ?? "", document_ids: s.document_ids ?? [], in_reply_to: s.in_reply_to ?? null };
+    b.drafts.set(s.mail_draft_id, { mail_draft_id: s.mail_draft_id, save, attachments, updated_at: new Date().toISOString(), scheduled: { mail_send_queue_id: queue, release_at: s.release_at } });
+    return created({ mail_send_queue_id: queue, status: "queued", release_at: s.release_at });
   }
-  if (s.draft_id && prev) {
-    b.drafts.delete(s.draft_id);
-    b.threads = b.threads.filter((t) => t.thread_id !== prev.thread_id);
-  }
+  b.drafts.delete(s.mail_draft_id);
+  const now = new Date().toISOString();
   b.threads.push({
-    thread_id: uuid(), folder: "sent", subject: s.subject || "(no subject)", unread: false, draft_id: null, scheduled: null,
-    messages: [{ message_id: uuid(), from: A(b.name, b.address), to: s.to.map((x) => A(null, x)), cc: (s.cc ?? []).map((x) => A(null, x)), sent_at: new Date().toISOString(), body_html: s.body_html || "<p></p>", attachments }],
+    mail_thread_id: uuid(), folder: "sent", subject: s.subject || "(no subject)", unread: false,
+    messages: [{ mail_message_id: uuid(), from: A(b.name, b.address), to: s.to_addresses, cc: s.cc_addresses ?? [], sent_at: now, body_html: s.body_html || "<p></p>", attachments: attachments.map((d) => ({ ...d, mail_attachment_id: d.document_id })) }],
   });
-  return created({ queue_id, status: "sent", release_at: null });
+  return created({ mail_send_queue_id: queue, status: "sent", release_at: now });
 });
 route("POST /api/v1/mailbox/queue/:id/cancel", (req) => {
-  const t = boxOf(req.user!).threads.find((x) => x.scheduled?.queue_id === req.params.id);
-  if (!t) return notFound();
-  t.scheduled = null;
-  return ok({ queue_id: req.params.id, status: "cancelled", release_at: null });
+  const d = [...(live(req.user!)?.drafts.values() ?? [])].find((x) => x.scheduled?.mail_send_queue_id === req.params.id);
+  if (!d) return fail(409, "ALREADY_SENT", "It has already gone");
+  const release = d.scheduled!.release_at;
+  d.scheduled = null;
+  return ok({ mail_send_queue_id: req.params.id, status: "cancelled", release_at: release });
 });
