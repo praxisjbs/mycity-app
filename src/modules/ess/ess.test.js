@@ -35,7 +35,9 @@ describe("the routes", () => {
     for (const route of routes) {
       expect(route.contract.self).toBe(true);
       expect(route.permission).toBeNull();
-      expect(route.path).not.toMatch(/:(id|employee_id)\b/);
+      expect(route.path).not.toMatch(/:employee_id\b/);
+      // A record id (one of my leave requests) is checked against the session in the service.
+      if (/:id\b/.test(route.path)) expect(route.path).toMatch(/^\/leave\/:id(\/cancel)?$/);
     }
   });
 
@@ -44,5 +46,20 @@ describe("the routes", () => {
     expect(Object.keys(list.contract.query.shape)).toEqual(
       expect.arrayContaining(["page", "q", "status"]),
     );
+  });
+});
+
+describe("My Profile", () => {
+  const { profileOf } = require("./ess.profile");
+
+  test("the bank account leaves as its last four digits only", () => {
+    const p = profileOf({ employee_id: "e1", account_number: "0123456789", confirmed_on: null }, []);
+    expect(p.account_last4).toBe("6789");
+    expect(JSON.stringify(p)).not.toContain("0123456789");
+    expect(p.confirmed).toBe(false);
+  });
+
+  test("no account, no digits", () => {
+    expect(profileOf({ employee_id: "e1", account_number: null }, []).account_last4).toBeNull();
   });
 });

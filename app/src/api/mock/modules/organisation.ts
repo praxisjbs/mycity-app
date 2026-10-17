@@ -1,7 +1,8 @@
-import type { LeaveRequest } from "@/api/types/leave";
+import type { LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
 import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
-import { at, created, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, fail, uuid } from "../core";
-import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, ref, refKey, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
+import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
+import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
+import roster from "../data/roster.json";
 
 /**
  * The organisation module on the mock, in the contract's own shapes
@@ -10,7 +11,7 @@ import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, ref, refKey, reportsOf, te
  *
  * The real API is built: this mock exists so the gallery, the screen crawl and a laptop
  * without a server have people to show, and it answers exactly what the API answers.
- * Leave (M1) is still at the foot of this file, on its own INTERIM shapes.
+ * Leave (M1) is at the foot of this file, in the leave contract's shapes.
  */
 
 /** The contract's employee status, from the demonstration roster's richer HR states. */
@@ -452,89 +453,236 @@ route("GET /api/v1/org-chart", (req) => {
 });
 
 /* ------------------------------------------------------------------ *
- * Leave
+ * Leave, in the contract's shapes (packages/contract/schemas/leave.js)
  * ------------------------------------------------------------------ */
-type L = [string, string, number, number, number, string, string | null];
-const L_ROWS: L[] = [
-  ["hauwa", "Annual", -2, 1, 3, "Approved", "Family visit"], ["amara", "Annual", 6, 10, 5, "Pending", "Trip to Enugu"], ["chidera", "Compassionate", 0, 0, 1, "Pending", "Family emergency"],
-  ["tolu", "Annual", 69, 78, 7, "Approved", "End of year break"], ["tobi", "Annual", -3, 2, 5, "Approved", null], ["kemi", "Sick", -12, -11, 2, "Approved", "Flu"],
-  ["seyi", "Study", 20, 21, 2, "Approved", "AWS exam"], ["grace", "Annual", 30, 34, 5, "Rejected", "Clashes with Ember to Remember"], ["bashir", "Annual", 45, 49, 5, "Pending", "Wedding"],
-  ["cynthia", "Annual", 72, 80, 6, "Approved", "Christmas"], ["obinna", "Paternity", -40, -27, 10, "Approved", null], ["blessing", "Annual", 14, 15, 2, "Cancelled", null],
-];
+type LeaveTypeCode = "annual" | "compassionate" | "sick" | "unpaid";
+const LEAVE_TYPES: LeaveType[] = (
+  [
+    ["annual", "Annual", 20],
+    ["compassionate", "Compassionate", 5],
+    ["sick", "Sick", 12],
+    ["unpaid", "Unpaid", null],
+  ] as Array<[LeaveTypeCode, string, number | null]>
+).map(([code, name, days]) => ({ leave_type_id: sid(`leave_type:${code}`), code, name, days_per_year: days, active: true }));
+const typeOf = (code: string) => LEAVE_TYPES.find((t) => t.code === code)!;
+const personRef = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department });
+
+/** The sample requests, in days from today; shared with the local seed (roster.json). */
+type L = { key: string; type: LeaveTypeCode; from: number; to: number; days: number; status: LeaveStatus; reason: string | null };
+const L_ROWS = roster.leave as L[];
 const iso = (n: number) => (n >= 0 ? isoDaysAhead(n) : isoDaysAgo(-n));
-const LEAVE = L_ROWS.map((l, i) => ({
-  leave_id: sid(`leave:${i}`), number: `LV-${String(88 - i).padStart(4, "0")}`, employee: refKey(l[0]), key: l[0], type: l[1] as LeaveRequest["type"], from: iso(l[2]), to: iso(l[3]), days: l[4],
-  reason: l[6], status: l[5] as LeaveRequest["status"], approver: l[5] === "Pending" ? null : "Cynthia Osakunih", submitted_at: at(5 + i, "10:00"),
+type MockLeave = LeaveRequest & { key: string };
+const LEAVE: MockLeave[] = L_ROWS.map((l, i) => ({
+  leave_request_id: sid(`leave:${i}`),
+  employee: personRef(byKey(l.key)!),
+  key: l.key,
+  leave_type_id: typeOf(l.type).leave_type_id,
+  leave_type_name: typeOf(l.type).name,
+  starts_on: iso(l.from),
+  ends_on: iso(l.to),
+  days: l.days,
+  reason: l.reason,
+  status: l.status,
+  workflow_instance_id: l.status === "submitted" ? sid(`leave-flow:${i}`) : null,
+  waiting_on: l.status === "submitted" ? (l.days > 5 ? "Operations & People" : "Line Manager") : null,
+  recorded: false,
+  submitted_at: at(5 + i, "10:00"),
+  decided_at: l.status === "submitted" ? null : at(4 + i, "12:00"),
+  created_at: at(5 + i, "10:00"),
 }));
-const leaveScope = (user: string, scope?: string) =>
-  scope === "own" ? LEAVE.filter((l) => l.key === user) : scope === "team" || !full(user) ? LEAVE.filter((l) => teamOf(user).some((p) => p.user_key === l.key)) : LEAVE;
+const out = ({ key: _k, ...r }: MockLeave): LeaveRequest => r;
+/** People's scope over leave: everyone for Operations & People and the CEO, else the reader's team. */
+const peopleScope = (user: string) => (full(user) ? LEAVE : LEAVE.filter((l) => teamOf(user).some((p) => p.user_key === l.key)));
+const workingDays = (from: string, to: string) => {
+  let n = 0;
+  for (let d = new Date(`${from}T12:00:00Z`); d <= new Date(`${to}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) if (d.getUTCDay() !== 0) n += 1;
+  return n;
+};
+const LIST_FILTERS = {
+  status: (r: MockLeave, v: string) => r.status === v,
+  leave_type_id: (r: MockLeave, v: string) => r.leave_type_id === v,
+  employee_id: (r: MockLeave, v: string) => r.employee.employee_id === v,
+  from: (r: MockLeave, v: string) => r.ends_on >= v,
+  to: (r: MockLeave, v: string) => r.starts_on <= v,
+};
+const LIST_SORT = {
+  starts_on: (a: MockLeave, b: MockLeave) => a.starts_on.localeCompare(b.starts_on),
+  submitted_at: (a: MockLeave, b: MockLeave) => (a.submitted_at ?? "").localeCompare(b.submitted_at ?? ""),
+  created_at: (a: MockLeave, b: MockLeave) => a.created_at.localeCompare(b.created_at),
+};
+const asPage = (res: ReturnType<typeof paged>) => {
+  const body = res.body as { data?: MockLeave[] } | undefined;
+  if (body && Array.isArray(body.data)) body.data = body.data.map(out) as MockLeave[];
+  return res;
+};
+
+route("GET /api/v1/leave/types", (req) =>
+  paged(LEAVE_TYPES, req, { search: (t) => [t.name, t.code], filters: { active: (t, v) => String(t.active) === v }, sort: { name: (a, b) => a.name.localeCompare(b.name) } }),
+);
+route("POST /api/v1/leave/types", (req) => {
+  if (!full(req.user!)) return fail(403, "PERMISSION_DENIED", "You need people create to add leave types.");
+  const b = req.body as { code: string; name: string; days_per_year?: number | null };
+  if (LEAVE_TYPES.some((t) => t.code === b.code)) return fail(409, "LEAVE_TYPE_EXISTS", "A leave type already has this code", { code: ["Already in use"] });
+  const t = { leave_type_id: uuid(), code: b.code, name: b.name, days_per_year: b.days_per_year ?? null, active: true };
+  LEAVE_TYPES.push(t);
+  return created(t);
+});
+route("PATCH /api/v1/leave/types/:id", (req) => {
+  const t = LEAVE_TYPES.find((x) => x.leave_type_id === req.params.id);
+  if (!t) return notFound();
+  Object.assign(t, req.body);
+  return ok(t);
+});
+
+route("DELETE /api/v1/leave/types/:id", (req) => {
+  if (!full(req.user!)) return fail(403, "PERMISSION_DENIED", "You need people delete to remove leave types.");
+  const i = LEAVE_TYPES.findIndex((x) => x.leave_type_id === req.params.id);
+  if (i < 0) return notFound();
+  if (LEAVE.some((l) => l.leave_type_id === req.params.id) || [...ALLOWANCES.keys()].some((k) => k.includes(req.params.id)))
+    return fail(409, "LEAVE_TYPE_IN_USE", "This type has leave on record. Retire it instead.");
+  LEAVE_TYPES.splice(i, 1);
+  return noContent();
+});
+
+/* One person's year. People's own figure for a type and year, when set, replaces the type's. */
+const ALLOWANCES = new Map<string, number>();
+const yearOf = (key: string, year: number) => {
+  const p = byKey(key)!;
+  const today = isoDaysAgo(0);
+  const rows = LEAVE.filter((l) => l.key === key && l.starts_on.slice(0, 4) === String(year));
+  const sum = (t: LeaveType, test: (l: MockLeave) => boolean) => rows.filter((l) => l.leave_type_id === t.leave_type_id && test(l)).reduce((a, l) => a + l.days, 0);
+  return {
+    year,
+    balances: LEAVE_TYPES.filter((t) => t.active).map((t) => {
+      const taken = sum(t, (l) => l.status === "approved" && l.starts_on <= today);
+      const booked = sum(t, (l) => l.status === "approved" && l.starts_on > today);
+      const pending = sum(t, (l) => l.status === "submitted");
+      const own = ALLOWANCES.get(`${p.employee_id}|${t.leave_type_id}|${year}`);
+      const entitled = own ?? t.days_per_year;
+      return { leave_type_id: t.leave_type_id, code: t.code, name: t.name, entitled, taken, booked, pending, remaining: entitled === null ? null : entitled - taken - booked - pending };
+    }),
+  };
+};
+route("GET /api/v1/leave/balances", (req) => {
+  const who = byId(req.query.employee_id);
+  if (!who) return notFound();
+  if (!full(req.user!) && !teamOf(req.user!).some((p) => p.employee_id === who.employee_id)) return notFound();
+  return ok(yearOf(who.user_key, Number(req.query.year || isoDaysAgo(0).slice(0, 4))));
+});
+route("PUT /api/v1/leave/balances", (req) => {
+  if (!full(req.user!)) return fail(403, "PERMISSION_DENIED", "You need people edit to set allowances.");
+  const b = req.body as { employee_id: string; leave_type_id: string; year: number; days: number | null };
+  const who = byId(b.employee_id);
+  if (!who) return notFound();
+  const k = `${b.employee_id}|${b.leave_type_id}|${b.year}`;
+  if (b.days === null) ALLOWANCES.delete(k);
+  else ALLOWANCES.set(k, b.days);
+  return ok(yearOf(who.user_key, b.year));
+});
 
 route("GET /api/v1/leave/requests", (req) =>
-  paged(leaveScope(req.user!, req.query.scope), { ...req, query: Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "scope")) }, {
-    search: (r) => [r.employee.display_name, r.type, r.number, r.reason],
-    filters: { status: (r, v) => r.status === v, type: (r, v) => r.type === v },
-  }),
+  asPage(paged(peopleScope(req.user!), req, { search: (r) => [r.employee.display_name, r.leave_type_name, r.reason], filters: LIST_FILTERS, sort: LIST_SORT })),
 );
 route("GET /api/v1/leave/summary", (req) => {
-  const l = leaveScope(req.user!, req.query.scope);
+  const l = peopleScope(req.user!);
   const today = isoDaysAgo(0);
-  return ok({ kpis: [
-    { key: "today", label: "On Leave Today", value: String(l.filter((x) => x.status === "Approved" && x.from <= today && x.to >= today).length) },
-    { key: "pending", label: "Pending Approval", value: String(l.filter((x) => x.status === "Pending").length), tone: "warn" },
-    { key: "month", label: "Approved This Month", value: String(l.filter((x) => x.status === "Approved" && x.from.slice(0, 7) === today.slice(0, 7)).length) },
-    { key: "clash", label: "Clashes", value: "0", tone: "ok" },
-  ] });
+  const soon = isoDaysAhead(14);
+  return ok({
+    pending: l.filter((x) => x.status === "submitted").length,
+    on_leave_today: l.filter((x) => x.status === "approved" && x.starts_on <= today && x.ends_on >= today).length,
+    starting_soon: l.filter((x) => x.status === "approved" && x.starts_on > today && x.starts_on <= soon).length,
+    approved_this_year: l.filter((x) => x.status === "approved" && x.starts_on.slice(0, 4) === today.slice(0, 4)).length,
+  });
 });
-route("GET /api/v1/leave/balances", (req) => {
-  const mine = LEAVE.filter((l) => l.key === req.user);
-  const taken = (t: string) => mine.filter((l) => l.type === t && l.status === "Approved" && l.to < isoDaysAgo(0)).reduce((a, l) => a + l.days, 0);
-  const booked = (t: string) => mine.filter((l) => l.type === t && (l.status === "Approved" || l.status === "Pending") && l.to >= isoDaysAgo(0)).reduce((a, l) => a + l.days, 0);
-  return ok({ year: new Date().getFullYear(), balances: [["Annual", 21], ["Sick", 10], ["Compassionate", 5], ["Study", 5]].map(([t, e]) => ({ type: t as "Annual", entitled: e as number, taken: taken(t as string) + (t === "Annual" ? 6 : 0), booked: booked(t as string), left: (e as number) - taken(t as string) - booked(t as string) - (t === "Annual" ? 6 : 0) })) });
+route("GET /api/v1/leave/requests/:id", (req) => {
+  const l = peopleScope(req.user!).find((x) => x.leave_request_id === req.params.id);
+  return l ? ok(out(l)) : notFound();
+});
+route("GET /api/v1/leave/requests/:id/clashes", (req) => {
+  const l = peopleScope(req.user!).find((x) => x.leave_request_id === req.params.id);
+  if (!l) return notFound();
+  const others = peopleScope(req.user!).filter(
+    (x) => x !== l && x.employee.department === l.employee.department && x.key !== l.key && ["submitted", "approved"].includes(x.status) && x.starts_on <= l.ends_on && x.ends_on >= l.starts_on,
+  );
+  return asPage(paged(others, req, { sort: { starts_on: LIST_SORT.starts_on } }));
 });
 route("POST /api/v1/leave/requests", (req) => {
-  const b = req.body as { type: string; from: string; to: string; reason: string; employee_id?: string };
-  const f: Record<string, string[]> = {};
-  if (!b.from) f.from = ["Pick the first day"];
-  if (!b.to) f.to = ["Pick the last day"];
-  if (b.from && b.to && b.to < b.from) f.to = ["Ends before it starts"];
-  if (b.type !== "Sick" && b.from && b.from < isoDaysAgo(0)) f.from = ["Starts in the past"];
-  if (!b.reason || b.reason.trim().length < 3) f.reason = ["Give a short reason"];
-  if (Object.keys(f).length) return invalid(f);
-  const who = b.employee_id ? byId(b.employee_id)! : byKey(req.user)!;
-  const days = Math.round((Date.parse(b.to) - Date.parse(b.from)) / 86400000) + 1;
-  const l = { leave_id: sid(`leave:${Date.now()}`), number: `LV-${String(89 + LEAVE.length).padStart(4, "0")}`, employee: ref(who)!, key: who.user_key, type: b.type as LeaveRequest["type"], from: b.from, to: b.to, days, reason: b.reason, status: (b.employee_id ? "Approved" : "Pending") as LeaveRequest["status"], approver: b.employee_id ? byKey(req.user)!.display_name : null, submitted_at: new Date().toISOString() };
+  if (!full(req.user!)) return fail(403, "PERMISSION_DENIED", "You need people create to record leave.");
+  const b = req.body as { employee_id: string; leave_type_id: string; starts_on: string; ends_on: string; reason?: string };
+  const who = byId(b.employee_id);
+  const t = LEAVE_TYPES.find((x) => x.leave_type_id === b.leave_type_id);
+  if (!who || !t) return invalid({ ...(who ? {} : { employee_id: ["Pick someone"] }), ...(t ? {} : { leave_type_id: ["Pick a type"] }) });
+  const l: MockLeave = {
+    leave_request_id: uuid(), employee: personRef(who), key: who.user_key, leave_type_id: t.leave_type_id, leave_type_name: t.name, starts_on: b.starts_on, ends_on: b.ends_on,
+    days: workingDays(b.starts_on, b.ends_on), reason: b.reason ?? null, status: "approved", workflow_instance_id: null, waiting_on: null, recorded: true,
+    submitted_at: new Date().toISOString(), decided_at: new Date().toISOString(), created_at: new Date().toISOString(),
+  };
   LEAVE.unshift(l);
-  return created(l);
-});
-route("POST /api/v1/leave/requests/:id/decision", (req) => {
-  const l = LEAVE.find((x) => x.leave_id === req.params.id);
-  if (!l) return notFound();
-  if (l.key === req.user) return fail(403, "SELF_APPROVAL", "You cannot approve your own leave.");
-  l.status = req.body.approve ? "Approved" : "Rejected";
-  l.approver = byKey(req.user)!.display_name;
-  return ok(l);
+  return created(out(l));
 });
 route("POST /api/v1/leave/requests/:id/cancel", (req) => {
-  const l = LEAVE.find((x) => x.leave_id === req.params.id);
+  const l = peopleScope(req.user!).find((x) => x.leave_request_id === req.params.id);
   if (!l) return notFound();
-  l.status = "Cancelled";
-  return ok(l);
+  if (l.status === "submitted") return fail(409, "LEAVE_AWAITING_APPROVAL", "Decide this request in My Approvals instead");
+  if (l.status !== "approved") return fail(409, "LEAVE_NOT_CANCELLABLE", "This leave can no longer be cancelled");
+  l.status = "cancelled";
+  return ok(out(l));
 });
-route("GET /api/v1/leave/requests/:id/cover", (req) => {
-  const l = LEAVE.find((x) => x.leave_id === req.params.id);
+
+/* The decision on a waiting request: the approval's own routes, for the mock's leave flows only. */
+const decide = (req: { params: Record<string, string>; user: string | null }, approve: boolean) => {
+  const l = LEAVE.find((x) => x.workflow_instance_id === req.params.id);
+  if (!l || l.status !== "submitted") return notFound();
+  if (l.key === req.user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  if (approve && l.days > 5 && l.waiting_on === "Line Manager") {
+    l.waiting_on = "Operations & People";
+    return ok({ workflow_instance_id: l.workflow_instance_id, state: "pending", stage_name: l.waiting_on });
+  }
+  l.status = approve ? "approved" : "rejected";
+  l.waiting_on = null;
+  l.decided_at = new Date().toISOString();
+  return ok({ workflow_instance_id: l.workflow_instance_id, state: l.status, stage_name: null });
+};
+route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));
+route("POST /api/v1/workflow/instances/:id/reject", (req) => decide(req, false));
+
+/* My Leave: the caller's own. */
+const myLeave = (user: string) => LEAVE.filter((l) => l.key === user);
+route("GET /api/v1/ess/leave", (req) =>
+  asPage(paged(myLeave(req.user!), req, { filters: { status: LIST_FILTERS.status, year: (r, v) => r.starts_on.slice(0, 4) === v }, sort: { starts_on: LIST_SORT.starts_on, submitted_at: LIST_SORT.submitted_at } })),
+);
+route("GET /api/v1/ess/leave/balances", (req) => ok(yearOf(req.user!, Number(req.query.year || isoDaysAgo(0).slice(0, 4)))));
+route("GET /api/v1/ess/leave/:id", (req) => {
+  const l = myLeave(req.user!).find((x) => x.leave_request_id === req.params.id);
+  return l ? ok(out(l)) : notFound();
+});
+route("POST /api/v1/ess/leave", (req) => {
+  const b = req.body as { leave_type_id: string; starts_on: string; ends_on: string; reason?: string };
+  const t = LEAVE_TYPES.find((x) => x.leave_type_id === b.leave_type_id);
+  const f: Record<string, string[]> = {};
+  if (!t) f.leave_type_id = ["Pick a type"];
+  if (b.starts_on && b.starts_on < isoDaysAgo(0)) f.starts_on = ["Already past"];
+  if (b.starts_on && b.ends_on && b.ends_on < b.starts_on) f.ends_on = ["Ends before it starts"];
+  if (Object.keys(f).length) return invalid(f);
+  const me = byKey(req.user)!;
+  if (myLeave(req.user!).some((x) => ["submitted", "approved"].includes(x.status) && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
+    return fail(409, "LEAVE_OVERLAP", "You already have leave on some of those days", { starts_on: ["Overlaps other leave"] });
+  const days = workingDays(b.starts_on, b.ends_on);
+  const l: MockLeave = {
+    leave_request_id: uuid(), employee: personRef(me), key: me.user_key, leave_type_id: t!.leave_type_id, leave_type_name: t!.name, starts_on: b.starts_on, ends_on: b.ends_on,
+    days, reason: b.reason ?? null, status: "submitted", workflow_instance_id: uuid(), waiting_on: "Line Manager", recorded: false,
+    submitted_at: new Date().toISOString(), decided_at: null, created_at: new Date().toISOString(),
+  };
+  LEAVE.unshift(l);
+  return created(out(l));
+});
+route("POST /api/v1/ess/leave/:id/cancel", (req) => {
+  const l = myLeave(req.user!).find((x) => x.leave_request_id === req.params.id);
   if (!l) return notFound();
-  const p = byKey(l.key)!;
-  const peers = PEOPLE.filter((x) => x.department === p.department && x !== p);
-  return ok({
-    title: `Cover Check, ${l.from.split("-").reverse().join("/")} to ${l.to.split("-").reverse().join("/")}`,
-    text: `${p.display_name} has requested ${l.days} day${l.days === 1 ? "" : "s"}. This is what is open in that window.`,
-    rows: [
-      { title: `${p.department} cover`, text: peers.length ? `${peers[0].display_name} is in that week` : `Nobody else in ${p.department}`, tone: peers.length ? "ok" : "err", result: peers.length ? "Clear" : "Conflict" },
-      { title: "Tasks due in the window", text: "2 tasks, both can move", tone: "warn", result: "Needs agreement" },
-      { title: "Others on leave", text: `${LEAVE.filter((x) => x !== l && x.status === "Approved" && x.from <= l.to && x.to >= l.from && byKey(x.key)!.department === p.department).length} in the same department`, tone: "ok", result: "Clear" },
-      { title: "Payroll run", text: "Not in the window", tone: "ok", result: "Clear" },
-    ],
-  });
+  if (!(l.status === "submitted" || (l.status === "approved" && l.starts_on > isoDaysAgo(0)))) return fail(409, "LEAVE_NOT_CANCELLABLE", "This leave can no longer be cancelled");
+  l.status = "cancelled";
+  l.waiting_on = null;
+  return ok(out(l));
 });
 
 export const _reports = reportsOf;

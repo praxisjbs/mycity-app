@@ -1,188 +1,193 @@
-import { useState } from "react";
-import { invalidate, useApi, useMutation } from "@/api/hooks";
-import type { MyProfile, ProfilePatch } from "@/api/types/ess";
-import "@/api/types/ess";
+import ess from "@mycity/contract/schemas/ess.js";
+import type { EssProfile } from "@mycity/contract/contract.gen.ts";
+import { ApiError } from "@/api/client";
+import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { employmentType, workPattern } from "@/features/people/status";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, Card, CardHeader, DesktopOnly, ErrorState, Field, formatDate, FormFooter, Grid, Icon, initials, KeyValue, LoadingRows, PageHeader, Pill, rules, TextField, Timeline, toast, UploadField, useContractForm, useModal, Wizard } from "@mycity/ui";
-import { toTrail } from "@/features/shared/wire";
-import { upload } from "@/api/upload";
+import { Button, Card, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, useContractForm, useModal, Wizard } from "@mycity/ui";
+
+/**
+ * ESS · My Profile (#8, `my-profile`): the caller's own record (docs/guides/ess.md §10).
+ * People set the job, the manager and the schedule; the employee changes their
+ * contact, next-of-kin and bank details with Edit Profile.
+ */
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const or = (v: string | null | undefined) => v || "Not given";
 
 export function MyProfilePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/profile");
+  const history = usePaged("GET /api/v1/ess/profile/history");
   const modal = useModal();
   const { navigate } = useRouter();
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!p) return <LoadingRows count={8} />;
-  const edit = () => modal.open({ title: "Edit My Details", body: (close) => <EditProfile p={p} close={close} /> });
-  const photo = () => modal.open({ title: "Profile Photo", body: (close) => <PhotoForm close={close} /> });
+  const edit = () => modal.open({ title: "Edit Profile", body: (close) => <EditProfile p={p} close={close} /> });
+  const manager = p.line_manager ? p.line_manager.display_name : null;
 
-  const personal = <Card><CardHeader title="Personal" /><KeyValue items={[["Full name", p.personal.full_name], ["Date of birth", formatDate(p.personal.date_of_birth)], ["Phone", p.personal.phone], ["Work email", p.personal.work_email], ["Address", p.personal.address]]} /></Card>;
+  const personal = (
+    <Card>
+      <CardHeader title="Personal" />
+      <KeyValue items={[["Full Name", p.display_name], ["Date of Birth", p.date_of_birth ? formatDate(p.date_of_birth) : "Not given"], ["Phone", or(p.phone)], ["Work Email", p.work_email], ["Address", or(p.home_address)]]} />
+    </Card>
+  );
   const schedule = (
     <div className="mt-3.5 border-t border-border pt-3">
-      <CardHeader title="Work Schedule" right={<Pill>Set by People</Pill>} className="mb-1" />
-      {p.schedule.map((s) => (
-        <div key={s.day} className="flex flex-wrap items-center gap-2.5 border-b border-border py-2 last:border-b-0">
-          <b className="w-20 text-xs">{s.day}</b>
-          <Pill tone={s.mode === "Office" ? "ok" : s.mode === "Off" ? "err" : "neutral"}>{s.mode}</Pill>
-          <span className="ml-auto text-2xs text-subtle-foreground">{s.mode === "Off" ? "Not working" : `${s.hours} · ${s.where}`}</span>
+      <CardHeader title="Work Schedule" help="Lateness is measured against these hours." right={<Pill>Set by People</Pill>} className="mb-1" />
+      {p.working_week.map((d) => (
+        <div key={d.weekday} className="flex flex-wrap items-center gap-2.5 border-b border-border py-2 last:border-b-0">
+          <b className="w-20 text-xs">{DAYS[d.weekday - 1]}</b>
+          <Pill tone={d.is_working_day ? "ok" : "neutral"}>{d.is_working_day ? "Working" : "Off"}</Pill>
+          <span className="ml-auto text-2xs text-subtle-foreground">{d.is_working_day ? `${d.starts_at} to ${d.ends_at}` : "Not working"}</span>
         </div>
       ))}
     </div>
   );
   const employment = (
     <Card>
-      <CardHeader title="Employment" />
-      <KeyValue items={[["Job title", p.employment.job_title], ["Department", p.employment.department], ["Line manager", p.employment.line_manager], ["Start date", formatDate(p.employment.start_date)], ["Employment type", p.employment.employment_type], ["Work arrangement", p.employment.arrangement], ["Status", <Pill tone={p.employment.status.tone}>{p.employment.status.text}</Pill>]]} />
+      <CardHeader title="Employment" help="Only People can change these, including your work schedule." />
+      <KeyValue
+        items={[
+          ["Job Title", p.job_title],
+          ["Department", or(p.department)],
+          ["Line Manager", manager ?? "None"],
+          ["Start Date", p.start_date ? formatDate(p.start_date) : "Not given"],
+          ["Employment Type", employmentType(p.employment_type)],
+          ["Work Arrangement", workPattern(p.work_pattern)],
+          ["Status", <Pill tone={p.confirmed ? "ok" : "warn"}>{p.confirmed ? "Confirmed" : "On Probation"}</Pill>],
+        ]}
+      />
       {schedule}
     </Card>
   );
-  const bank = <Card><CardHeader title="Bank Details" /><KeyValue items={[["Bank", p.bank.bank_name], ["Account name", p.bank.account_name], ["Account number", `•••• ${p.bank.account_last4}`]]} /></Card>;
-  const nok = <Card><CardHeader title="Next of Kin" /><KeyValue items={[["Name", p.next_of_kin.name], ["Relationship", p.next_of_kin.relationship], ["Phone", p.next_of_kin.phone]]} /></Card>;
-  const can = (
+  const bank = (
     <Card>
-      <CardHeader title="Editable Fields" />
-      {p.can_change.map((c) => (
-        <div key={c.field} className="flex items-center gap-2.5 border-b border-border py-2">
-          <span className="flex-1 text-xs font-semibold">{c.field}</span>
-          <Pill tone={c.how.tone}>{c.how.text}</Pill>
-        </div>
-      ))}
+      <CardHeader title="Bank Details" help="Expense refunds are paid into this account. A change is logged and People are notified." />
+      <KeyValue items={[["Bank", or(p.bank_name)], ["Account Name", p.display_name], ["Account Number", p.account_last4 ? `•••• ${p.account_last4}` : "Not given"]]} />
     </Card>
   );
-  const history = <Card><CardHeader title="My Record History" /><Timeline items={toTrail(p.history)} /></Card>;
+  const nok = (
+    <Card>
+      <CardHeader title="Next of Kin" />
+      <KeyValue items={[["Name", or(p.next_of_kin_name)], ["Relationship", or(p.next_of_kin_relationship)], ["Phone", or(p.next_of_kin_phone)]]} />
+    </Card>
+  );
+  const trail = (
+    <Card>
+      <CardHeader title="Record History" />
+      <Timeline items={history.rows.map((h) => ({ title: h.summary, when: formatDate(h.occurred_at.slice(0, 10)), text: h.actor_name ?? undefined }))} />
+      <Pager page={history.page} onPage={history.setPage} noun="change" />
+    </Card>
+  );
 
   return (
     <>
-      <PageHeader title="My Profile" sub="Your record as People see it" actions={<Button variant="primary" icon="plus" onClick={edit}>Edit</Button>} />
+      <PageHeader title="My Profile" actions={<Button variant="primary" icon="edit" onClick={edit}>Edit Profile</Button>} />
       <div className="mb-3 flex flex-wrap items-start gap-4 rounded-card border border-border bg-card p-4 shadow-1 max-md:p-3.5">
-        <button type="button" onClick={photo} title={p.photo_url ? "Change photo" : "Upload a photo"} className="relative flex size-15 flex-none items-center justify-center rounded-sheet bg-secondary text-2xl font-bold tracking-tight text-secondary-foreground max-md:size-13 max-md:text-xl">
+        <span className="flex size-15 flex-none items-center justify-center rounded-sheet bg-secondary text-2xl font-bold tracking-tight text-secondary-foreground max-md:size-13 max-md:text-xl">
           {initials(p.display_name)}
-          <span className="absolute -right-1.5 -bottom-1.5 flex size-6.5 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-2">
-            <Icon name="plus" className="size-3" />
-          </span>
-        </button>
+        </span>
         <span data-copy="content" className="min-w-0 flex-1 max-md:basis-44">
           <h2 data-copy="content" className="text-xl tracking-tight">{p.display_name}</h2>
-          <div className="mt-0.5 text-sm text-muted-foreground">{p.job_title} · {p.department}</div>
-          <div className="mt-2 flex flex-wrap gap-1.5">{p.chips.map((c) => <Pill key={c.text} tone={c.tone}>{c.text}</Pill>)}</div>
+          <div className="mt-0.5 text-sm text-muted-foreground">{p.job_title}{p.department ? ` · ${p.department}` : ""}</div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Pill tone={p.confirmed ? "ok" : "warn"}>{p.confirmed ? "Confirmed" : "On Probation"}</Pill>
+            <Pill tone="neutral">{workPattern(p.work_pattern)}</Pill>
+            {manager && <Pill tone="neutral">{`Reports to ${manager}`}</Pill>}
+          </div>
         </span>
         <span className="flex flex-wrap gap-1.5 max-md:w-full">
-          <Button onClick={() => toast("Preparing your data export for your Mailbox.")}>Download My Data</Button>
-          <Button icon="shield" onClick={() => navigate(hrefFor("ess", "my-security"))}>Security</Button>
+          <Button icon="shield" onClick={() => navigate(`${hrefFor("ess", "my-security")}&action=password`)}>Change Password</Button>
         </span>
       </div>
       <PhoneCards
         items={[
-          { icon: "user", title: "Personal", sub: "Phone, email, address", body: personal },
-          { icon: "brief", title: "Employment", sub: "Role, manager and your work schedule", body: employment },
-          { icon: "wallet", title: "Bank", sub: `${p.bank.bank_name} · ${p.bank.account_last4}`, body: bank },
-          { icon: "users", title: "Next of Kin", sub: p.next_of_kin.name, body: nok },
-          { icon: "check", title: "Editable Fields", sub: `${p.can_change.filter((c) => c.how.tone !== "neutral").length} things you can change yourself`, body: can },
-          { icon: "doc", title: "Record History", sub: `${p.history.length} changes`, body: history },
+          { icon: "user", title: "Personal", sub: or(p.phone), body: personal },
+          { icon: "brief", title: "Employment", sub: `${p.job_title}${manager ? `, reports to ${manager}` : ""}`, body: employment },
+          { icon: "wallet", title: "Bank Details", sub: p.bank_name ? `${p.bank_name}${p.account_last4 ? ` · ${p.account_last4}` : ""}` : "Not given", body: bank },
+          { icon: "users", title: "Next of Kin", sub: or(p.next_of_kin_name), body: nok },
+          { icon: "doc", title: "Record History", sub: `${history.page?.total ?? 0} changes`, body: trail },
         ]}
       />
       <DesktopOnly>
         <Grid cols={2}>{personal}{employment}</Grid>
         <Grid cols={2}>{bank}{nok}</Grid>
-        <Grid cols={2}>{can}{history}</Grid>
+        {trail}
       </DesktopOnly>
     </>
   );
 }
 
-function EditProfile({ p, close }: { p: MyProfile; close: () => void }) {
-  const f = useContractForm(
-    { phone: p.personal.phone, address: p.personal.address, next_of_kin_name: p.next_of_kin.name, next_of_kin_relationship: p.next_of_kin.relationship, next_of_kin_phone: p.next_of_kin.phone, bank_name: p.bank.bank_name, account_number: "" },
-    { phone: (v) => (/^(\+?234|0)\d{10}$/.test(v.replace(/[\s\-().]/g, "")) ? null : "A Nigerian number"), address: rules.min(5, "Enter the address"), account_number: (v) => (!v || /^\d{10}$/.test(v) ? null : "10 digits") },
-  );
+/** The fields an employee changes themselves (EssProfileUpdate). Only what changed is sent. */
+function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
+  const start = {
+    phone: p.phone ?? "",
+    home_address: p.home_address ?? "",
+    next_of_kin_name: p.next_of_kin_name ?? "",
+    next_of_kin_relationship: p.next_of_kin_relationship ?? "",
+    next_of_kin_phone: p.next_of_kin_phone ?? "",
+    bank_name: p.bank_name ?? "",
+    account_number: "",
+  };
+  const f = useContractForm(start, ess.EssProfileUpdate);
   const save = useMutation("PATCH /api/v1/ess/profile");
   const submit = async () => {
     if (!f.check()) return;
-    const v = f.values;
-    const body: ProfilePatch = {};
-    if (v.phone !== p.personal.phone) body.phone = v.phone;
-    if (v.address !== p.personal.address) body.address = v.address;
-    if (v.next_of_kin_name !== p.next_of_kin.name) body.next_of_kin_name = v.next_of_kin_name;
-    if (v.next_of_kin_relationship !== p.next_of_kin.relationship) body.next_of_kin_relationship = v.next_of_kin_relationship;
-    if (v.next_of_kin_phone !== p.next_of_kin.phone) body.next_of_kin_phone = v.next_of_kin_phone;
-    if (v.bank_name !== p.bank.bank_name) body.bank_name = v.bank_name;
-    if (v.account_number) body.account_number = v.account_number;
-    if (!Object.keys(body).length) return close();
+    const changed = Object.fromEntries(
+      Object.entries(f.values).filter(([k, v]) => v.trim() !== "" && v !== start[k as keyof typeof start]),
+    );
+    if (!Object.keys(changed).length) return close();
     try {
-      await save.run({ body });
+      await save.run({ body: changed });
       invalidate("/api/v1/ess/profile");
       close();
-      toast(body.bank_name || body.account_number ? "Saved. People are told of the bank change." : "Saved");
-    } catch {
-      f.setServerErrors(save.fields);
+      toast(changed.bank_name || changed.account_number ? "Saved. People are told of the bank change." : "Profile saved");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
     }
   };
+  const last4 = p.account_last4 ? `Leave blank to keep the account ending ${p.account_last4}. A bank change is logged and People are notified.` : "A bank change is logged and People are notified.";
   return (
     <Wizard
-      finish="Save Changes"
+      finish="Save Profile"
       busy={save.pending}
       onFinish={() => void submit()}
       onCancel={close}
       steps={[
         {
           title: "Contact",
-          check: () => f.check(["phone", "address"]),
+          check: () => f.check(["phone", "home_address"]),
           body: (
             <>
-              <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" {...f.field("phone")} /></Field>
-              <Field label="Address" {...f.field("address")}><TextField {...f.field("address")} /></Field>
+              <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" {...f.field("phone")} placeholder="0803 123 4567" /></Field>
+              <Field label="Address" {...f.field("home_address")}><TextField {...f.field("home_address")} /></Field>
             </>
           ),
         },
         {
           title: "Next of Kin",
+          check: () => f.check(["next_of_kin_name", "next_of_kin_relationship", "next_of_kin_phone"]),
           body: (
             <>
-              <Field label="Name"><TextField {...f.field("next_of_kin_name")} /></Field>
-              <Field label="Relationship"><TextField {...f.field("next_of_kin_relationship")} /></Field>
-              <Field label="Phone"><TextField inputMode="tel" {...f.field("next_of_kin_phone")} /></Field>
+              <Field label="Next of Kin" {...f.field("next_of_kin_name")}><TextField {...f.field("next_of_kin_name")} /></Field>
+              <Field label="Relationship" optional {...f.field("next_of_kin_relationship")}><TextField {...f.field("next_of_kin_relationship")} placeholder="Sister" /></Field>
+              <Field label="Next of Kin Phone" {...f.field("next_of_kin_phone")}><TextField inputMode="tel" {...f.field("next_of_kin_phone")} /></Field>
             </>
           ),
         },
         {
           title: "Bank",
-          check: () => f.check(["account_number"]),
+          check: () => f.check(["bank_name", "account_number"]),
           body: (
             <>
-              <Field label="Bank" info="A bank change is logged, and People are told the same day: expenses are paid into it."><TextField {...f.field("bank_name")} /></Field>
-              <Field label="New Account Number" optional info="Leave it empty to keep the account you have." {...f.field("account_number")}><TextField inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="Unchanged" /></Field>
+              <Field label="Bank" {...f.field("bank_name")}><TextField {...f.field("bank_name")} /></Field>
+              <Field label="New Account Number" optional info={last4} {...f.field("account_number")}><TextField inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="0123456789" /></Field>
             </>
           ),
         },
       ]}
     />
-  );
-}
-
-function PhotoForm({ close }: { close: () => void }) {
-  const save = useMutation("PATCH /api/v1/ess/profile");
-  const [done, setDone] = useState(false);
-  return (
-    <>
-      <p className="mb-3 text-xs text-muted-foreground">A clear, recent photo. It shows on your profile, in Staff Community and on the org chart.</p>
-      <UploadField
-        upload={upload}
-        purpose="avatar"
-        accept="image/*"
-        multiple={false}
-        maxBytes={8 * 1024 * 1024}
-        label="Drop a photo here, or browse"
-        onUploaded={async ([doc]) => {
-          await save.run({ body: { photo_document_id: doc.document_id } });
-          invalidate("/api/v1/ess/profile");
-          setDone(true);
-          toast("Photo updated");
-        }}
-      />
-      <FormFooter>
-        <Button variant={done ? "primary" : "default"} onClick={close}>{done ? "Done" : "Cancel"}</Button>
-      </FormFooter>
-    </>
   );
 }

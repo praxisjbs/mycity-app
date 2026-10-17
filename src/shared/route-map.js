@@ -167,7 +167,6 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
-  // search:none not built yet (src/modules/leave)
   leave_request: {
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),
