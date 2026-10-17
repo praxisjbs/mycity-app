@@ -41,7 +41,7 @@ function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }
           {bday ? "Birthday" : "Work Anniversary"}
         </span>
         <h2 data-copy="content" className="mt-2 text-xl leading-tight tracking-tight max-md:text-lg">
-          {bday ? <>Happy birthday, <em className="text-primary not-italic">{first}</em></> : <><em className="text-primary not-italic">{c.years} years</em> at MyCity, {first}</>}
+          {bday ? <>Happy birthday, <em className="text-primary not-italic">{first}</em></> : c.years ? <><em className="text-primary not-italic">{c.years} {c.years === 1 ? "year" : "years"}</em> at MyCity, {first}</> : <><em className="text-primary not-italic">Another year</em> at MyCity, {first}</>}
         </h2>
         <p className="mt-1 text-sm text-on-deep-soft">{m.body}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2.5">

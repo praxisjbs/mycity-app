@@ -361,3 +361,4 @@ fields, never in a toast.
 - 17/10/2026 · GE · Personal pinning, up to 3 (§3 step 16, §4, §5, §6); a muted bell on muted rows; messages and the composer keep their line breaks.
 
 - 17/10/2026 · GE · #announcements has no composer and a lock on its row; announcements come only from the tab. The tab's figures come from the server (`GET /announcements/stats`): Audience is the active staff an all-staff announcement reaches, not the largest past audience on the first page. Polls sit on the sender's side at up to 560 px; Ctrl+Enter starts a new line.
+- 17/10/2026 · GE · A hand-posted work anniversary carries its years from the start date, as the 05:00 ones do ("Another year" with no start date). The phone's Channels drawer closes when a channel is picked.

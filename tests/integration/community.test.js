@@ -357,6 +357,10 @@ describeDb("Staff Community against the real migrations", () => {
     const bday = { message_type: "birthday", subject_employee_id: people.ceo.employee.employee_id };
     expect((await post("tunde", bday)).status).toBe(403);
     expect((await post("bola", bday)).status).toBe(201);
+    // A hand-posted anniversary carries its years, as the 05:00 ones do.
+    const anniv = await post("bola", { message_type: "anniversary", subject_employee_id: people.tunde.employee.employee_id });
+    expect(anniv.status).toBe(201);
+    expect(anniv.body.celebration).toMatchObject({ years: 3 });
   });
 
   test("a deleted recognition leaves the counts; People and the CEO moderate #general; an announcement's post stays", async () => {
