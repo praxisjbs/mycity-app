@@ -1,15 +1,14 @@
 /**
  * @component CityShowcase
  * @group Display
- * @summary The sign-in screen's picture: photographs of eight cities at dusk taking turns, each with its clock; on desktop they drift slowly and crossfade, on a phone they hold still behind a frosted panel.
- * @use The staff sign-in screen only: `full` beside the form on desktop, `phone` behind it on a phone.
+ * @summary The sign-in screen's picture: photographs of eight cities at dusk taking turns, drifting slowly under a film grain and rising points of light, each with its ticking clock, and the sign-in form in a panel of smoked glass.
+ * @use The staff sign-in screen only: `full` fills the screen on desktop with the form beside the city, `phone` fills a phone's screen with the form under it.
  * @avoid Any screen behind sign-in, and decoration anywhere else (use Illustration).
- * @phone variant="phone": the photograph fills the top of the screen, still, with the brand, a glass clock and the city; the form sits in a frosted dark panel below it. The city changes each interval with a plain crossfade, nothing moves.
- * @a11y The photographs and drawings are decorative (empty alt, aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too). The phone's panel takes the dark theme's colours, so its text keeps AA over any photograph.
+ * @phone variant="phone": the portrait photograph fills the screen and drifts, with the brand and a glass clock at the top, the city and its turn below them, and the form in the smoked glass panel at the foot.
+ * @a11y The photographs, drawings, grain and lights are decorative (empty alt, aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them; under reduced motion nothing moves and the cities stop turning. The glass panel takes the dark theme's colours (data-theme="dark"), so its text keeps AA over any photograph.
  * @status beta
- * @example <CityShowcase>{brandAndHeadline}</CityShowcase>
+ * @example <CityShowcase aside={<SignInForm />}>{brandAndHeadline}</CityShowcase>
  * @example <CityShowcase variant="phone" aside={<SignInForm />}><Brand tone="on-dark" /></CityShowcase>
- * @example <CityShowcase aside={<SignInCard />}>{brandAndHeadline}</CityShowcase>
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { cn } from "../lib/cn";
@@ -100,10 +99,66 @@ export interface CityShowcaseProps {
   start?: CityKey;
   /** What sits at the top over the picture: the brand, and on `full` a headline. */
   children?: ReactNode;
-  /** The sign-in form. `full`: stands at the right over the picture, centred, as given; the clock and the cities keep clear of it. `phone`: set in the frosted panel under the city. */
+  /** The sign-in form, set in the smoked glass panel: `full` at the right over the picture, centred, with the clock and the cities clear of it; `phone` at the foot, under the city. */
   aside?: ReactNode;
   /** Layout classes only (height, the grid cell); the look is the component's own. */
   className?: string;
+}
+
+/**
+ * The points of light: each one's place, size, pace and head start come from its index,
+ * so the drift looks scattered without a random number and is the same on every visit.
+ */
+const MOTES = Array.from(
+  { length: 14 },
+  (_, i) =>
+    ({
+      "--mote-x": `${(i * 37 + 11) % 100}%`,
+      "--mote-size": `${4 + ((i * 5) % 7)}px`,
+      "--mote-blur": `${(i % 3) * 0.6}px`,
+      "--mote-time": `${16 + ((i * 7) % 12)}s`,
+      "--mote-delay": `-${(i * 2.3) % 18}s`,
+      "--mote-sway": `${((i % 5) - 2) * 14}px`,
+      "--mote-glow": `${0.35 + ((i * 3) % 5) * 0.1}`,
+    }) as CSSProperties,
+);
+
+/** The air over the picture: the rising lights (not under reduced motion), the darkened edges and a film's grain. */
+function Atmosphere({ still }: { still: boolean }) {
+  return (
+    <>
+      {!still && (
+        <span aria-hidden="true" className="city-motes pointer-events-none absolute inset-0 overflow-hidden">
+          {MOTES.map((m, i) => (
+            <i key={i} style={m} />
+          ))}
+        </span>
+      )}
+      <div aria-hidden="true" className="city-vignette pointer-events-none absolute inset-0" />
+      <div aria-hidden="true" className="city-grain pointer-events-none absolute inset-0" />
+    </>
+  );
+}
+
+/** A city's clock: the colon keeps the seconds. */
+function Time({ value, className }: { value: string; className?: string }) {
+  const [hours, minutes] = value.split(":");
+  return (
+    <time className={className}>
+      {hours}
+      <span className="animate-tick">:</span>
+      {minutes}
+    </time>
+  );
+}
+
+/** The sign-in form's panel: smoked glass in the dark theme's colours, rising in as the screen opens. */
+function Glass({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div data-theme="dark" className={cn("city-glass animate-rise rounded-sheet text-card-foreground", className)}>
+      {children}
+    </div>
+  );
 }
 
 function clockOf(now: Date, timeZone: string) {
@@ -121,7 +176,7 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
   const [hold, setHold] = useState(false);
   const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
   const phone = variant === "phone";
-  const still = reduced || phone;
+  const still = reduced;
   /** Photographs that have arrived (their drawing is no longer needed) and those that cannot. */
   const [loaded, setLoaded] = useState<Partial<Record<CityKey, true>>>({});
   const [failed, setFailed] = useState<Partial<Record<CityKey, true>>>({});
@@ -177,14 +232,13 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
             aria-hidden="true"
             data-photo={c}
             className={cn(
-              "absolute inset-0 overflow-hidden ease-out",
-              phone ? "transition-opacity duration-1000" : "transition-all duration-1000",
-              i === index && loaded[c] ? "opacity-100 blur-none" : cn("opacity-0", !phone && "blur-sm"),
+              "absolute inset-0 overflow-hidden transition-all duration-1000 ease-out",
+              i === index && loaded[c] ? "opacity-100 blur-none" : "opacity-0 blur-sm",
             )}
           >
-            <div className={cn("absolute inset-0 transform-gpu", !still && "city-parallax")}>
+            <div className={cn("absolute inset-0 transform-gpu", !still && !phone && "city-parallax")}>
               <img
-                key={still ? c : `${c}-${turns[c] ?? 0}`}
+                key={`${c}-${turns[c] ?? 0}`}
                 src={phone ? PHOTOS[c].phone : PHOTOS[c].large}
                 srcSet={phone ? undefined : `${PHOTOS[c].small} 640w, ${PHOTOS[c].large} 1280w`}
                 sizes={phone ? undefined : "100vw"}
@@ -207,33 +261,40 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
       <section aria-label="MyCity cities" data-ui="city-showcase" className={cn("relative isolate overflow-hidden bg-deep text-on-deep", className)}>
         <div className="absolute inset-x-0 top-0 h-2/3">
           {pictures}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-linear-to-t from-deep via-deep/60 via-35% to-transparent to-70%" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-linear-to-t from-deep via-deep/55 via-30% to-transparent to-65%" />
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-linear-to-b from-deep/60 to-transparent" />
         </div>
+        <Atmosphere still={still} />
         <div className="relative flex min-h-full flex-col px-4 pt-safe pb-safe-5">
           <div className="flex items-center justify-between gap-3 pt-4">
             {children}
-            <time className="flex flex-none items-center gap-2 rounded-full border border-on-deep/15 bg-deep/35 px-3 py-1.5 text-sm font-semibold tabular-nums shadow-2 backdrop-blur-md">
+            <span className="city-glass city-glass-soft flex flex-none items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums">
               <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
-              {clock.time}
-            </time>
+              <Time value={clock.time} />
+            </span>
           </div>
-          <div className="min-h-36 flex-1" />
-          <p className="text-2xs font-semibold tracking-caps text-primary uppercase">{city.country}</p>
-          <p className="text-4xl font-strong tracking-tight">{city.name}</p>
+          <div className="min-h-40 flex-1" />
+          <p key={`k${current}`} className="animate-rise text-2xs font-semibold tracking-caps text-primary uppercase">
+            {city.country}
+          </p>
+          <p key={`n${current}`} className="animate-title-in text-4xl font-strong tracking-tight">
+            {city.name}
+          </p>
           <div className="mt-1 flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-on-deep-soft">{clock.day}</span>
             <span aria-hidden="true" className="flex items-center gap-1">
-              {order.map((c, i) => (
-                <span key={c} className={cn("h-1 rounded-full", i === index ? "w-4 bg-primary" : "w-1 bg-on-deep-faint")} />
-              ))}
+              {order.map((c, i) =>
+                i === index ? (
+                  <span key={c} className="h-1 w-6 overflow-hidden rounded-full bg-on-deep/25">
+                    <span key={index} className={cn("block h-full origin-left bg-primary", !reduced && "animate-fill-x")} style={{ "--fill-time": `${interval}ms` } as CSSProperties} />
+                  </span>
+                ) : (
+                  <span key={c} className="size-1 rounded-full bg-on-deep-faint" />
+                ),
+              )}
             </span>
           </div>
-          {aside && (
-            <div data-theme="dark" className="mt-5 rounded-sheet border border-glass-border bg-glass p-5 text-card-foreground shadow-3 backdrop-blur-xl">
-              {aside}
-            </div>
-          )}
+          {aside && <Glass className="mt-5 p-5">{aside}</Glass>}
         </div>
       </section>
     );
@@ -252,6 +313,7 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-linear-to-t from-deep/95 via-deep/40 via-30% to-transparent to-65%" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-linear-to-b from-deep/50 to-transparent" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-linear-to-r from-deep/55 to-transparent" />
+      <Atmosphere still={still} />
 
       <div className="relative flex h-full gap-10 p-12 xl:p-14">
         <div className="flex min-w-0 flex-1 flex-col">
@@ -261,16 +323,16 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
               {city.country}
             </p>
             <div className="mt-1.5 flex flex-wrap items-baseline gap-x-5">
-              <h2 key={`n${current}`} className="animate-rise text-hero font-strong tracking-tight">
+              <h2 key={`n${current}`} className="animate-title-in text-hero font-strong tracking-tight">
                 {city.name}
               </h2>
-              <time className="text-hero font-light tabular-nums text-on-deep-soft">{clock.time}</time>
+              <Time value={clock.time} className="text-hero font-light tabular-nums text-on-deep-soft" />
             </div>
             <p className="mt-2 text-md text-on-deep-muted">{clock.day}</p>
             <div
               role="group"
               aria-label="Cities"
-              className="mt-8 grid max-w-2xl grid-cols-4 gap-x-4 gap-y-2"
+              className="city-glass city-glass-soft mt-8 grid max-w-2xl grid-cols-2 gap-x-5 rounded-sheet px-5 pt-3 pb-1 desk:grid-cols-4"
               onPointerEnter={() => setHold(true)}
               onPointerLeave={() => setHold(false)}
               onFocus={() => setHold(true)}
@@ -282,7 +344,7 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
                   type="button"
                   aria-current={i === index ? "true" : undefined}
                   onClick={() => setIndex(i)}
-                  className="group min-h-tap rounded-ctl text-left outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="group min-h-tap rounded-ctl pb-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <span className="block h-0.5 overflow-hidden rounded-full bg-on-deep/20">
                     {i === index && (
@@ -302,7 +364,11 @@ export function CityShowcase({ variant = "full", cities = ALL, interval = 9000, 
             </div>
           </div>
         </div>
-        {aside && <div className="flex flex-none items-center">{aside}</div>}
+        {aside && (
+          <div className="flex flex-none items-center">
+            <Glass className="w-100 p-8">{aside}</Glass>
+          </div>
+        )}
       </div>
     </section>
   );

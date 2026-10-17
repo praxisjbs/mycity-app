@@ -101,6 +101,9 @@
   --animate-ken-3: ken-3 16s ease-out both;
   --animate-ken-4: ken-4 16s ease-out both;
   --animate-glow: glow 7s ease-in-out infinite;
+  /* The sign-in city's name arriving out of focus, and its clock's colon keeping the seconds. */
+  --animate-title-in: title-in 1.2s cubic-bezier(.2, .7, .2, 1) both;
+  --animate-tick: tick 1s step-end infinite;
 }
 
 @theme inline {
@@ -222,6 +225,8 @@
 @keyframes ken-3 { from { transform: scale(1.16) translate3d(0, -1%, 0); } to { transform: scale(1.05) translate3d(0, 0, 0); } }
 @keyframes ken-4 { from { transform: scale(1.05) translate3d(0, 1%, 0); } to { transform: scale(1.13) translate3d(-0.6%, -1%, 0); } }
 @keyframes glow { 0%, 100% { opacity: .3; } 50% { opacity: .75; } }
+@keyframes title-in { from { opacity: 0; filter: blur(12px); transform: translateY(10px) scale(.985); } }
+@keyframes tick { 50% { opacity: .35; } }
 @keyframes cloud { from { transform: translateX(-30%); } to { transform: translateX(130%); } }
 @keyframes twinkle { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
 @keyframes ripple { 0%, 100% { transform: translateX(0); opacity: .35; } 50% { transform: translateX(18px); opacity: .9; } }

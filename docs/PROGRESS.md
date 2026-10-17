@@ -154,6 +154,10 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   process and download; a direct `/media/vault/...` request is a JSON 404; a letter template
   generates a numbered, hashed, locked PDF that only its readers can fetch. Left for the row above:
   the staff importer and the real sheet on staging, which are track A's.
+- 17/10/2026 · TB · Sign-in made luxurious on both shells (TB: slight glassmorphism, motion on
+  the phone too): smoked glass for the form and the desktop's city dock, film grain, darkened
+  edges, rising points of city light, the city's name arriving out of focus and a ticking colon.
+  The phone now drifts, glows and crossfades like desktop. Left: nothing.
 - 17/10/2026 · TB · Sign-in: four more cities (Johannesburg, Rabat, Abidjan, Douala; TB's images),
   eight in turn, each photograph fetched only when its city is shown or next. The phone sign-in is
   redesigned: a still portrait crop of the photograph at the top, the brand and a glass clock on it,

@@ -33,7 +33,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
 | Display | [Bars](#bars) | `Bars` | Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target. | stable |
 | Display | [Chain](#chain) | `Chain` | An approval route: the steps already done, the one in hand, and what is still to come. | stable |
-| Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's picture: photographs of eight cities at dusk taking turns, each with its clock; on desktop they drift slowly and crossfade, on a phone they hold still behind a frosted panel. | beta |
+| Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's picture: photographs of eight cities at dusk taking turns, drifting slowly under a film grain and rising points of light, each with its ticking clock, and the sign-in form in a panel of smoked glass. | beta |
 | Display | [Confetti](#confetti) | `Confetti` | Pieces of paper or stars drifting down behind a celebration card. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
@@ -610,14 +610,14 @@ An approval route: the steps already done, the one in hand, and what is still to
 
 ### CityShowcase
 
-The sign-in screen's picture: photographs of eight cities at dusk taking turns, each with its clock; on desktop they drift slowly and crossfade, on a phone they hold still behind a frosted panel.
+The sign-in screen's picture: photographs of eight cities at dusk taking turns, drifting slowly under a film grain and rising points of light, each with its ticking clock, and the sign-in form in a panel of smoked glass.
 
 | | |
 |---|---|
-| Use | The staff sign-in screen only: `full` beside the form on desktop, `phone` behind it on a phone. |
+| Use | The staff sign-in screen only: `full` fills the screen on desktop with the form beside the city, `phone` fills a phone's screen with the form under it. |
 | Avoid | Any screen behind sign-in, and decoration anywhere else (use Illustration). |
-| Phone | variant="phone": the photograph fills the top of the screen, still, with the brand, a glass clock and the city; the form sits in a frosted dark panel below it. The city changes each interval with a plain crossfade, nothing moves. |
-| Accessibility | The photographs and drawings are decorative (empty alt, aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too). The phone's panel takes the dark theme's colours, so its text keeps AA over any photograph. |
+| Phone | variant="phone": the portrait photograph fills the screen and drifts, with the brand and a glass clock at the top, the city and its turn below them, and the form in the smoked glass panel at the foot. |
+| Accessibility | The photographs, drawings, grain and lights are decorative (empty alt, aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them; under reduced motion nothing moves and the cities stop turning. The glass panel takes the dark theme's colours (data-theme="dark"), so its text keeps AA over any photograph. |
 | Status | beta |
 | Exports | `CityShowcase` |
 | Import | `import { CityShowcase } from "@mycity/ui";` |
@@ -634,13 +634,12 @@ The sign-in screen's picture: photographs of eight cities at dusk taking turns, 
 | `interval` | `number` |  | How long each city shows, in milliseconds. |
 | `start` | `CityKey` |  | The first city shown. |
 | `children` | `ReactNode` |  | What sits at the top over the picture: the brand, and on `full` a headline. |
-| `aside` | `ReactNode` |  | The sign-in form. `full`: stands at the right over the picture, centred, as given; the clock and the cities keep clear of it. `phone`: set in the frosted panel under the city. |
+| `aside` | `ReactNode` |  | The sign-in form, set in the smoked glass panel: `full` at the right over the picture, centred, with the clock and the cities clear of it; `phone` at the foot, under the city. |
 | `className` | `string` |  | Layout classes only (height, the grid cell); the look is the component's own. |
 
 ```tsx
-<CityShowcase>{brandAndHeadline}</CityShowcase>
+<CityShowcase aside={<SignInForm />}>{brandAndHeadline}</CityShowcase>
 <CityShowcase variant="phone" aside={<SignInForm />}><Brand tone="on-dark" /></CityShowcase>
-<CityShowcase aside={<SignInCard />}>{brandAndHeadline}</CityShowcase>
 ```
 
 ### Confetti

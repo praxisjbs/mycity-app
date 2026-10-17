@@ -37,9 +37,9 @@ const greeting = (d = new Date()) => (d.getHours() < 12 ? "Good morning" : d.get
 
 /**
  * Sign in (docs/guides/identity.md §10). Brand intensity is high here
- * (MILESTONES §5.3): on desktop the cities' photographs fill the screen, each
- * with its clock, and the card stands over them; on a phone the photograph
- * holds still at the top and the form sits in a frosted panel under it. The same card
+ * (MILESTONES §5.3): the cities' photographs fill the screen on both shells,
+ * drifting, each with its ticking clock, and the form sits in a panel of smoked
+ * glass: beside the city on desktop, under it on a phone. The same card
  * holds Forgot Password, the page a reset or invitation link opens, the code
  * step when two-step sign-in asks for one, setting two-step up when the person's
  * role requires it and they have not, and the PIN. On a browser the person
@@ -112,7 +112,7 @@ export function Login() {
       <CityShowcase
         className="absolute inset-0"
         aside={
-          <div className="w-100 animate-rise rounded-sheet border border-border bg-card p-8 text-card-foreground shadow-3">
+          <>
             {body}
             <p className="mt-7 border-t border-border pt-4 text-xs text-muted-foreground">
               Engineered by{" "}
@@ -120,7 +120,7 @@ export function Login() {
                 JBS Praxis
               </a>
             </p>
-          </div>
+          </>
         }
       >
         <Brand tone="on-dark" size="l" name="MyCity App" />

@@ -84,19 +84,19 @@ describe("CityShowcase", () => {
     expect(photos()).toEqual(["lagos", "london", "accra"]);
   });
 
-  it("uses the portrait photographs on a phone and holds them still", () => {
+  it("drifts the portrait photographs on a phone, under the grain and the rising lights", () => {
     const { container } = render(<CityShowcase variant="phone" start="rabat" />);
-    const layer = container.querySelector<HTMLElement>('[data-photo="rabat"]')!;
-    const img = layer.querySelector("img")!;
+    const img = container.querySelector('[data-photo="rabat"] img')!;
     expect(img.getAttribute("src")).toMatch(/rabat-phone\.webp/);
     expect(img).not.toHaveAttribute("srcset");
-    expect(img.className).not.toMatch(/animate-ken/);
-    expect(layer.className).not.toMatch(/blur/);
-    expect(container.querySelector(".city-parallax, .animate-glow, .animate-rise")).toBeNull();
+    expect(img.className).toMatch(/animate-ken-2/);
+    expect(container.querySelectorAll(".city-motes > i").length).toBeGreaterThan(8);
+    expect(container.querySelector(".city-grain")).not.toBeNull();
+    expect(container.querySelector(".city-parallax")).toBeNull();
   });
 
-  it("sets the form in a dark frosted panel under the city on a phone", () => {
-    render(
+  it("sets the form in smoked glass in the dark theme's colours, on a phone and on desktop", () => {
+    const { unmount } = render(
       <CityShowcase variant="phone" start="abidjan" aside={<p>The form</p>}>
         <span>Brand</span>
       </CityShowcase>,
@@ -104,7 +104,36 @@ describe("CityShowcase", () => {
     expect(screen.getByText("Abidjan")).toBeInTheDocument();
     expect(screen.getByText("Côte d'Ivoire")).toBeInTheDocument();
     expect(screen.getByText("The form").closest("[data-theme]")).toHaveAttribute("data-theme", "dark");
+    expect(screen.getByText("The form").closest("[data-theme]")).toHaveClass("city-glass");
     expect(screen.queryByRole("group", { name: "Cities" })).toBeNull();
+    unmount();
+    render(<CityShowcase aside={<p>The form</p>} />);
+    expect(screen.getByText("The form").closest("[data-theme]")).toHaveClass("city-glass");
+  });
+
+  it("keeps the colon of the shown city's clock ticking", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-14T18:42:00Z"));
+    const { container } = render(<CityShowcase />);
+    const time = container.querySelector("h2 + time")!;
+    expect(time).toHaveTextContent("19:42");
+    expect(time.querySelector(".animate-tick")).toHaveTextContent(":");
+  });
+
+  it("holds everything still under reduced motion", () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((q: string) => {
+      const list = real(q);
+      return { ...list, matches: q.includes("reduced-motion") || list.matches };
+    }) as typeof window.matchMedia;
+    try {
+      const { container } = render(<CityShowcase variant="phone" />);
+      expect(container.querySelector('[data-photo="lagos"] img')!.className).not.toMatch(/animate-ken/);
+      expect(container.querySelector(".city-motes")).toBeNull();
+      expect(container.querySelector(".animate-glow")).toBeNull();
+    } finally {
+      window.matchMedia = real;
+    }
   });
 
   it("has no accessibility violations", async () => {
