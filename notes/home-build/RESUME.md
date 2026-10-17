@@ -1,4 +1,4 @@
-# Resume point (paused 17/10/2026)
+# Resume point (paused 17/10/2026, resumed the same evening)
 
 Branch `m1/home-foundation` @ 046a11a (WIP, CI not run, no PR opened). PR 1 was built in five slices:
 
@@ -18,3 +18,9 @@ Next steps:
    section for the new gate), DATABASE_SCHEMA forward Owes notes, REUSE_MAP §3.2 note, `npm run gen:contract`.
 4. `npm run ci` (Node 20) + `RUN_DB_TESTS=1` integration suite, review, squash the WIP commits, open PR 1, then PRs 2-5.
 Local test infra used: Postgres 16 + pgvector, Redis, DBs `mycity_test` and `mycity_[a-e]_test`.
+
+## Update after resuming
+- `origin/main` (PR #52, leave module) merged into `m1/home-foundation`; contract regenerated; doc conflicts kept both sides.
+- Home's schema file renumbered `1140` → `migrations/1150_home_foundation.sql` (main took `1140` for community pins).
+  Home now claims `1150`-`1159` and `1199`. The redundant `leave_request` index was dropped (1200 indexes it).
+- Slices C (finish contract + guide), D (roster) and E (catalogue + sources) relaunched; autosave pushes every 5 minutes.
