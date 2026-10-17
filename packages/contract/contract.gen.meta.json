@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "e8a5ebe14c508a14f76405af11978ff70e83e07287e57585554c2b930840f678",
-  "schemas": 190,
-  "endpoints": 103,
+  "source_hash": "35effbe97f9cdb0c7a0734d28d5c762a5aa528a588fec3ecde16a15e16c55270",
+  "schemas": 221,
+  "endpoints": 119,
   "inputs": {
     "packages/contract/schemas/access.js": "5e42b1010a52ff1650bd20a6430a3cf96617799b8312f9dd002fa37d324e2df4",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -16,7 +16,7 @@
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/calendar.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/candidates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/common.js": "dbad97bb039dbf8ee59dbe25c793c8b925ed83b53d3cff261bfd311ac1d37948",
+    "packages/contract/schemas/common.js": "0e690f26fdd6643c9b9c7fd30c6d53702fa3875ce8a031a3e02296959cb5215e",
     "packages/contract/schemas/community.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/dashboard.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/deductions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -41,7 +41,7 @@
     "packages/contract/schemas/notifications.js": "825e1c3fef00bc4b56773cfc5e17a1d91b6cb8c9dc5b87659df642eca5f07223",
     "packages/contract/schemas/offers.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/onboarding.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/organisation.js": "96e43d7ed866b6237bb2e7611be57e058f5ccd7d83126b02df4bba669dc5c355",
+    "packages/contract/schemas/organisation.js": "ec28b2f63f4687d8380bc4cd919b6123e9f04180f43c670d41b082525c534d40",
     "packages/contract/schemas/partner_pipeline.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partners.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partnership_analytics.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -75,6 +75,7 @@
     "src/modules/identity/identity.routes.js": "c2f88374e78efe933dcbc6a7d988e41adf56a4729329b6fead313532e7978f83",
     "src/modules/imports/imports.routes.js": "581a544f9a5a30e45bdbc8ce6e13c91a360e031362d543e690c5e29561127fb0",
     "src/modules/notifications/notifications.routes.js": "6a225f2fe527f8525aa9a54995fb38b63cc67066c145fb4f8707d1ec4d4d6f9e",
+    "src/modules/organisation/organisation.routes.js": "44837fda18c6ec886e32e3712489d1c6d592e560e52c3ecc595d25cb8eba594e",
     "src/modules/security/security.routes.js": "2148273cc406a5725539fcfb75ff74008a69e3bb40a0c939e1eaeb33c74f0f4f",
     "src/modules/settings/settings.routes.js": "e3642231b35ce83cd737e8aa421424427b89807d1b61e21f58e5440ec99a6737",
     "src/modules/users/users.routes.js": "c9afad57eaa4e584a792f9a779b1eb995df49de8c891f23bce8f98e75a648b26"

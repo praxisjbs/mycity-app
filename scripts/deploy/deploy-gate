@@ -10,7 +10,8 @@
 # What the caller asked for arrives in SSH_ORIGINAL_COMMAND. Each key may do only this:
 #
 #   staging key      stage <sha>              release tarball on stdin; install, dump, migrate,
-#                                             switch, restart, wait for readiness on that sha
+#                                             load the staff roster, switch, restart, wait for
+#                                             readiness on that sha
 #                    seal <sha> <run-id>      after verify-staging passed: write STAGING_VERIFIED
 #                    status
 #   production key   promote <sha> <run-id>   the sealed staging tree, byte for byte, to production
@@ -163,6 +164,16 @@ migrate() { # env sha
   (cd "$ROOT/$1/releases/$2" &&
     as_env_user "$1" "$NODE" --env-file="$ROOT/$1/shared/.env" scripts/db/migrate.js --deploy-gate) ||
     die "migrations failed on $1; the failing file applied nothing (each runs in a transaction). Code not switched"
+  # MyCity's own staff, from the release's seeds/staff/ (docs/guides/foundation.md §6.1).
+  # It runs on staging AND production, as the system, after the migrations and before the
+  # new code is live: the one exception to "production is never seeded" (TB, 16/10/2026),
+  # because the real staff list is not demonstration data. It is idempotent, it is quiet
+  # when the sheet has not changed, it sends no email, and it never writes over an edit
+  # made in the app. A row the sheet gets wrong is reported here and in Imports history,
+  # and never stops a deploy.
+  (cd "$ROOT/$1/releases/$2" &&
+    as_env_user "$1" "$NODE" --env-file="$ROOT/$1/shared/.env" scripts/db/load-staff.js) ||
+    say "warning: the staff roster did not load on $1; the next deploy tries again (see Imports history)"
   # The AI catalogue follows the release's manifests. The worker syncs it at boot as well, so a
   # failure here is reported, not fatal.
   (cd "$ROOT/$1/releases/$2" &&

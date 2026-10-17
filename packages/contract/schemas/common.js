@@ -89,6 +89,28 @@ const money = z
   .string()
   .regex(/^-?\d{1,16}\.\d{2}$/, "must be an amount like 1250000.00");
 
+/**
+ * An optional typed value a form may send as an empty cell.
+ *
+ * `optionalText()` already treats "" as "not given". A typed optional (a date, an
+ * amount, an email, a phone number) is in the same position on a screen: a field the
+ * person left alone sends "", not nothing, because a form holds every one of its fields.
+ * This says the same thing for those: "" and null mean the field was left alone, and
+ * anything else is held to the type's own rules.
+ *
+ * So one Zod schema checks a form as it is filled (useContractForm) and the request it
+ * sends, and no screen strips its empty fields before it saves.
+ *
+ *   date_of_birth: blank(isoDate),      // "" → undefined, "2026-13-01" → a 422
+ *
+ * @param {z.ZodTypeAny} schema  the type the value has when it is given
+ */
+const blank = (schema) =>
+  schema
+    .or(z.literal(""))
+    .nullish()
+    .transform((v) => (v === "" || v === null ? undefined : v));
+
 /* ------------------------------------------------------------------ *
  * Pagination: the one rule for every list in the system
  * ------------------------------------------------------------------ *
@@ -246,6 +268,7 @@ module.exports = {
   isoDate,
   isoDateTime,
   money,
+  blank,
   PAGE_SIZE,
   LIST_CONTROLS,
   RESERVED_CONTROLS,

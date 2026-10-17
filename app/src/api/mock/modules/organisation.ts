@@ -1,171 +1,454 @@
 import type { LeaveRequest } from "@/api/types/leave";
-import { at, created, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, fail } from "../core";
+import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
+import { at, created, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, ref, refKey, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
-import { HISTORY, STATUS_PILL, TODAY } from "../data/attendance";
 
-const ARR: Record<string, string> = { hybrid: "Hybrid", remote: "Remote", on_site: "Office-only" };
-const arrangement = (p: MockPerson) => (p.user_key === "adedotun" || p.user_key === "grace" ? "Field" : ARR[p.work_pattern]);
-const statusPill = (p: MockPerson) =>
-  p.status === "suspended" ? { tone: "err" as const, text: "Suspended" } : p.status === "probation" ? { tone: "warn" as const, text: "Probation" } : p.status === "on_leave" ? { tone: "info" as const, text: "On Leave" } : { tone: "ok" as const, text: "Active" };
-const full = (user: string) => ["operations", "ceo"].includes(SIGN_INS[user]?.view ?? "");
+/**
+ * The organisation module on the mock, in the contract's own shapes
+ * (packages/contract/schemas/organisation.js): the staff register, the employee 360,
+ * departments, vacant seats and the reporting tree. Laptops and CI only (F12).
+ *
+ * The real API is built: this mock exists so the gallery, the screen crawl and a laptop
+ * without a server have people to show, and it answers exactly what the API answers.
+ * Leave (M1) is still at the foot of this file, on its own INTERIM shapes.
+ */
 
-const row = (p: MockPerson) => {
-  const t = TODAY.find((x) => x.person.user_key === p.user_key)!;
-  return {
-    employee_id: p.employee_id, staff_number: p.staff_number, display_name: p.display_name, job_title: p.job_title, department: p.department,
-    line_manager: ref(managerOf(p)), arrangement: arrangement(p), attendance_today: STATUS_PILL[t.status], status: statusPill(p), _s: p.status,
-  };
+/** The contract's employee status, from the demonstration roster's richer HR states. */
+const statusOf = (p: MockPerson): EmployeeRow["status"] => (p.status === "suspended" ? "suspended" : "active");
+const probationDue = (p: MockPerson) => (p.status === "probation" ? isoDaysAhead(18) : null);
+const confirmedOn = (p: MockPerson) => (p.status === "probation" ? null : p.start_date);
+
+/** Who has a login on the mock: the four who sign in, and two invited but never signed in. */
+const INVITED = ["damilola", "tolu"];
+const loginOf = (p: MockPerson): EmployeeRow["login"] =>
+  SIGN_INS[p.user_key] ? "active" : INVITED.includes(p.user_key) ? "invited" : p.status === "suspended" ? "suspended" : "none";
+
+const DEPTS = DEPARTMENTS.map((name, i) => ({
+  department_id: sid(`dept:${name}`),
+  code: name.toUpperCase().replace(/[^A-Z0-9]+/g, "_"),
+  name,
+  parent_department_id: null,
+  active: true,
+  order: i,
+}));
+const deptOf = (name: string) => DEPTS.find((d) => d.name === name) ?? DEPTS[0];
+
+/** A manager above someone: a person, or the one vacant seat the mock carries. */
+const managerRef = (p: MockPerson): ManagerRef | null => {
+  if (p.user_key === "amara") return { employee_id: null, org_seat_id: SEATS[0].org_seat_id, display_name: SEATS[0].title, job_title: SEATS[0].title, vacant: true };
+  const m = managerOf(p);
+  return m ? { employee_id: m.employee_id, org_seat_id: null, display_name: m.display_name, job_title: m.job_title, vacant: false } : null;
+};
+const dottedRef = (p: MockPerson): ManagerRef | null => {
+  const key = DOTTED[p.user_key];
+  const m = key ? byKey(key) : undefined;
+  return m ? { employee_id: m.employee_id, org_seat_id: null, display_name: m.display_name, job_title: m.job_title, vacant: false } : null;
 };
 
+/** The dotted lines on the mock's tree: the matrix the organogram draws. */
+const DOTTED: Record<string, string> = { adedotun: "tolu" };
+
+/** Vacant seats, as the sheet's VACANT rows become them on the real API. */
+const SEATS: Array<OrgSeat & { manager_key: string | null }> = [
+  {
+    org_seat_id: sid("seat:head-finance"),
+    title: "Head of Finance",
+    department_id: deptOf("Finance").department_id,
+    department: "Finance",
+    status: "vacant",
+    line_manager: null,
+    filled_by_employee_id: null,
+    filled_on: null,
+    reports: 1,
+    created_at: at(40, "09:00"),
+    manager_key: "ifeoma",
+  },
+];
+
+const row = (p: MockPerson): EmployeeRow => ({
+  employee_id: p.employee_id,
+  staff_number: p.staff_number,
+  display_name: p.display_name,
+  job_title: p.job_title,
+  department_id: deptOf(p.department).department_id,
+  department: p.department,
+  line_manager: managerRef(p),
+  work_pattern: p.work_pattern,
+  employment_type: p.employment_type,
+  status: statusOf(p),
+  login: loginOf(p),
+  start_date: p.start_date,
+  confirmation_due_on: probationDue(p),
+  confirmed_on: confirmedOn(p),
+});
+
+/** Archived records, so Archive and Restore work on a laptop too. */
+const ARCHIVED = new Set<string>();
+const visible = (p: MockPerson) => !ARCHIVED.has(p.employee_id);
+const full = (user: string) => ["operations", "ceo"].includes(SIGN_INS[user]?.view ?? "");
+const scopeOf = (user: string) => (full(user) ? PEOPLE : [byKey(user)!, ...teamOf(user)]);
+
+/** The row, with its real status: an archived record says so. */
+const listRow = (p: MockPerson): EmployeeRow => ({
+  ...row(p),
+  status: ARCHIVED.has(p.employee_id) ? "archived" : statusOf(p),
+});
+
+const text = (a: string | null, b: string | null) => String(a ?? "").localeCompare(String(b ?? ""));
+
 route("GET /api/v1/employees", (req) => {
-  const scope = full(req.user!) ? PEOPLE : [byKey(req.user)!, ...teamOf(req.user!)];
-  return paged(scope.map(row), req, {
+  const asked = req.query.status;
+  return paged(scopeOf(req.user!).filter((p) => (asked === "archived" ? true : visible(p))).map(listRow), req, {
     search: (r) => [r.display_name, r.job_title, r.department, r.staff_number],
-    filters: { department: (r, v) => r.department === v, status: (r, v) => r._s === v, arrangement: (r, v) => r.arrangement === v },
+    filters: {
+      department_id: (r, v) => r.department_id === v,
+      status: (r, v) => r.status === v,
+      work_pattern: (r, v) => r.work_pattern === v,
+      employment_type: (r, v) => r.employment_type === v,
+      line_manager_id: (r, v) => r.line_manager?.employee_id === v,
+    },
+    sort: {
+      display_name: (a, b) => text(a.display_name, b.display_name),
+      staff_number: (a, b) => text(a.staff_number, b.staff_number),
+      job_title: (a, b) => text(a.job_title, b.job_title),
+      department: (a, b) => text(a.department, b.department),
+      start_date: (a, b) => text(a.start_date, b.start_date),
+      created_at: (a, b) => text(a.staff_number, b.staff_number),
+    },
   });
 });
 
-route("GET /api/v1/employees/summary", () => {
-  const counts = DEPARTMENTS.map((d) => [d, PEOPLE.filter((p) => p.department === d).length] as const).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
-  const max = counts[0][1];
-  const arrs = ["Remote", "Hybrid", "Field", "Office-only"];
+route("GET /api/v1/employees/summary", (req) => {
+  const scope = scopeOf(req.user!).filter(visible);
+  const counts = DEPTS.map((d) => [d.name, scope.filter((p) => p.department === d.name).length] as const).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  const max = counts[0] ? counts[0][1] : 1;
+  const probation = scope.filter((p) => p.status === "probation");
+  const PATTERNS: Array<[MockPerson["work_pattern"], string]> = [["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]];
   return ok({
     kpis: [
-      { key: "headcount", label: "Headcount", value: String(PEOPLE.length) },
-      { key: "confirmed", label: "Confirmed", value: String(PEOPLE.filter((p) => p.status === "confirmed").length), tone: "ok" },
-      { key: "probation", label: "On Probation", value: String(PEOPLE.filter((p) => p.status === "probation").length), tone: "warn" },
+      { key: "headcount", label: "Headcount", value: String(scope.filter((p) => statusOf(p) === "active").length) },
+      { key: "confirmed", label: "Confirmed", value: String(scope.filter((p) => p.status !== "probation").length), tone: "ok" },
+      { key: "probation", label: "On Probation", value: String(probation.length), tone: "warn" },
       { key: "attrition", label: "Attrition, 90 Days", value: "1" },
     ],
-    arrangements: arrs.map((a) => ({ label: a, value: `${PEOPLE.filter((p) => arrangement(p) === a).length} staff` })),
+    arrangements: PATTERNS.map(([key, label]) => ({ label, value: `${scope.filter((p) => p.work_pattern === key).length} staff` })),
     departments: counts.map(([label, n]) => ({ label, pct: Math.round((n / max) * 100), value: String(n) })),
     decisions: [
-      { title: "Chidera Nwosu", text: `Probation ends ${isoDaysAhead(10).split("-").reverse().join("/")}`, action: { tone: "warn", text: "Confirm or extend" }, link: `/people?tab=employees&id=${byKey("chidera")!.employee_id}` },
-      { title: "Seyi Balogun", text: "New device pending review", action: { tone: "warn", text: "Enrol or reject" }, link: "/people?tab=devices" },
-      { title: "Bashir Lawal", text: "Query open since last week", action: { tone: "err", text: "Awaiting his response" }, link: "/queries?tab=queries" },
+      ...(probation.length ? [{ title: "Probation Ending", text: `${probation.length} people in the next 30 days`, action: { tone: "warn" as const, text: "Confirm or extend" }, link: "/people?tab=employees" }] : []),
+      { title: "No Line Manager", text: "1 person", action: { tone: "warn" as const, text: "Set a manager" }, link: "/people?tab=organogram" },
+      { title: "Open Seats", text: "1 seat with nobody in it", action: { tone: "info" as const, text: "Create vacancy" }, link: "/people?tab=organogram" },
+      { title: "Not Yet Invited", text: `${PEOPLE.filter((p) => loginOf(p) === "none").length} people with no login`, action: { tone: "info" as const, text: "Send invites" }, link: "/settings?tab=users" },
     ],
   });
 });
 
-function profile(p: MockPerson, viewer: string) {
-  const mgr = managerOf(p);
-  const rows = HISTORY.filter((h) => h.person.user_key === p.user_key);
-  const last30 = rows.slice(0, 26);
-  const onTime = last30.filter((h) => h.clock_in_at && h.status !== "late").length;
-  const worked = last30.filter((h) => h.clock_in_at).length;
-  const isBashir = p.user_key === "bashir";
-  const t = TODAY.find((x) => x.person.user_key === p.user_key)!;
-  const canPay = full(viewer) || viewer === p.user_key;
-  const hm = (iso: string | null) => (iso ? new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso)) : null);
+/** The 360, masked exactly as the API masks it: restricted fields are null for a viewer without the grant. */
+function record(p: MockPerson, viewer: string): Employee360 {
+  const canSee = full(viewer) || viewer === p.user_key;
+  const [first, ...rest] = p.display_name.split(" ");
   return {
-    employee_id: p.employee_id, staff_number: p.staff_number, display_name: p.display_name, job_title: p.job_title, department: p.department, grade: p.grade,
-    line_manager: ref(mgr), start_date: p.start_date, employment_type: p.employment_type.replace("_", " ").replace(/^./, (c) => c.toUpperCase()), arrangement: arrangement(p), status: statusPill(p),
-    work_email: p.work_email, phone: p.phone, gross_monthly: canPay ? p.gross_monthly : null, bank_name: canPay ? p.bank_name : null, account_last4: canPay ? p.account_last4 : null, next_of_kin: p.next_of_kin,
-    stats: [
-      { label: "Attendance, 30d", value: `${onTime} / ${worked}`, tone: onTime < worked ? ("warn" as const) : undefined },
-      { label: "KPI Score", value: `${t.kpi_pct}%` },
-      { label: "Open Tasks", value: String(t.open_tasks) },
-      { label: "Leave Left", value: `${8 + (PEOPLE.indexOf(p) % 9)} days` },
-      { label: "Open Queries", value: isBashir ? "1" : "0", tone: isBashir ? ("warn" as const) : ("ok" as const) },
-    ],
-    kpis: isBashir
-      ? [{ label: "3 MOUs Signed", pct: 33, value: "1 of 3", emphasis: "warn" as const }, { label: "Partner Contact Cadence", pct: 48, value: "11 of 23", emphasis: "warn" as const }, { label: "Proposals Sent", pct: 50, value: "1 of 2" }, { label: "Pipeline Added", pct: 70, value: "3 prospects" }]
-      : [{ label: "Quarter Goal", pct: t.kpi_pct, value: `${t.kpi_pct}%` }, { label: "Tasks on Time", pct: 80, value: "8 of 10" }, { label: "Reviews Filed", pct: 50, value: "2 of 4" }, { label: "Training Complete", pct: 100, value: "Done", emphasis: "brand" as const }],
-    activity: isBashir
-      ? [
-          { title: "Query raised, 3 late arrivals in 30 days", when: `${isoDaysAgo(7).split("-").reverse().join("/")} 09:41`, text: "Raised by a system rule, not a manager. Awaiting his response.", tone: "hi" as const },
-          { title: "Clocked in 09:41 · 41 minutes late", when: "Today 09:41" },
-          { title: "Eko Hotels flagged, 34 days no contact", when: isoDaysAgo(9).split("-").reverse().join("/"), text: "Follow-up task raised automatically." },
-          { title: "Warning served, repeated lateness", when: isoDaysAgo(46).split("-").reverse().join("/"), text: "₦12,500.00 deduction applied in the August run." },
-          { title: "Q3 review closed, 3.2 manager rating", when: isoDaysAgo(14).split("-").reverse().join("/"), tone: "ok" as const },
-        ]
-      : [
-          { title: "Recognised by Cynthia Osakunih", when: `${isoDaysAgo(5).split("-").reverse().join("/")} 09:04`, text: "\"Turned the Enugu shot list around in a day.\"", tone: "hi" as const },
-          { title: `Clocked in · ${p.worksite}`, when: t.clock_in ? `Today ${t.clock_in}` : "Not today", tone: "ok" as const },
-          { title: "Q3 review closed, 4.0 manager rating", when: isoDaysAgo(14).split("-").reverse().join("/"), tone: "ok" as const },
-          { title: "Departmental target approved", when: isoDaysAgo(8).split("-").reverse().join("/") },
-        ],
-    punches: rows.slice(0, 6).map((h) => ({ date: h.date, in: hm(h.clock_in_at), out: hm(h.clock_out_at), location: h.location, status: h.status === "late" ? { tone: "err" as const, text: `Late ${h.late_minutes}m` } : h.status === "leave" ? { tone: "info" as const, text: "On Leave" } : h.status === "absent" ? { tone: "err" as const, text: "Absent" } : { tone: "ok" as const, text: h.status === "weekend" ? "Saturday" : "On Time" } })),
-    documents: [
-      { name: "Employment contract", status: { tone: "ok" as const, text: "Signed" }, expires: null, document: null },
-      { name: "Valid ID", status: { tone: "ok" as const, text: "Verified" }, expires: null, document: null },
-      { name: "NDPA certificate", status: isBashir ? { tone: "err" as const, text: "Missing" } : { tone: "warn" as const, text: "Expiring" }, expires: isBashir ? null : isoDaysAhead(47), document: null },
-      { name: "Academic certificates", status: { tone: "ok" as const, text: "Received" }, expires: null, document: null },
-    ],
-    queries: isBashir
-      ? [
-          { subject: "3 late arrivals in 30 days", raised_by: "System rule", date: isoDaysAgo(7), outcome: { tone: "warn" as const, text: "Awaiting response" } },
-          { subject: "Repeated lateness, August", raised_by: "Cynthia Osakunih", date: isoDaysAgo(47), outcome: { tone: "neutral" as const, text: "Warning, ₦12,500.00" } },
-          { subject: "Missed partner follow-up", raised_by: "Cynthia Osakunih", date: isoDaysAgo(94), outcome: { tone: "neutral" as const, text: "Closed, caution" } },
-        ]
-      : [],
-    open_queries: isBashir ? 1 : 0,
+    employee_id: p.employee_id,
+    staff_number: p.staff_number,
+    display_name: p.display_name,
+    first_name: first,
+    middle_name: null,
+    last_name: rest.join(" ") || first,
+    preferred_name: null,
+    job_title: p.job_title,
+    department_id: deptOf(p.department).department_id,
+    department: p.department,
+    worksite_id: null,
+    status: ARCHIVED.has(p.employee_id) ? "archived" : statusOf(p),
+    employment_type: p.employment_type,
+    work_pattern: p.work_pattern,
+    start_date: p.start_date,
+    contract_ends_on: p.employment_type === "contractor" ? isoDaysAhead(120) : null,
+    confirmation_due_on: probationDue(p),
+    confirmed_on: confirmedOn(p),
+    left_on: null,
+    archived_at: ARCHIVED.has(p.employee_id) ? at(0, "09:00") : null,
+    archive_reason: ARCHIVED.has(p.employee_id) ? "Archived on this laptop" : null,
+    work_email: p.work_email,
+    phone: p.phone,
+    gender: null,
+    line_manager: managerRef(p),
+    dotted_manager: dottedRef(p),
+    direct_reports: reportsOf(p.user_key).length,
+    login: {
+      user_id: loginOf(p) === "none" ? null : sid(`user:${p.user_key}`),
+      email: loginOf(p) === "none" ? null : p.work_email,
+      state: loginOf(p),
+      roles: SIGN_INS[p.user_key] ? [{ code: SIGN_INS[p.user_key].view === "ceo" ? "management" : "operations_people", name: SIGN_INS[p.user_key].role }] : loginOf(p) === "none" ? [] : [{ code: "employee", name: "Staff" }],
+      last_sign_in_at: SIGN_INS[p.user_key] ? at(0, "08:40") : null,
+    },
+    date_of_birth: canSee ? p.date_of_birth : null,
+    home_address: canSee ? `${12 + PEOPLE.indexOf(p)} Bourdillon Road, Ikoyi, Lagos` : null,
+    personal_email: canSee ? `${p.user_key}@gmail.com` : null,
+    next_of_kin_name: canSee ? p.next_of_kin : null,
+    next_of_kin_phone: canSee ? p.phone : null,
+    next_of_kin_relationship: canSee ? "Sibling" : null,
+    bank_name: canSee ? p.bank_name : null,
+    account_number: canSee ? `00000${p.account_last4}` : null,
+    gross_monthly: canSee ? p.gross_monthly : null,
+    created_at: at(200, "09:00"),
   };
 }
 
-route("GET /api/v1/employees/:id", (req) => {
+const mine = (req: { user: string | null; params: Record<string, string> }) => {
   const p = byId(req.params.id);
+  if (!p) return null;
+  if (!full(req.user!) && p.user_key !== req.user && !teamOf(req.user!).includes(p)) return null;
+  return p;
+};
+
+route("GET /api/v1/employees/:id", (req) => {
+  const p = mine(req);
+  return p ? ok(record(p, req.user!)) : notFound();
+});
+
+route("GET /api/v1/employees/:id/history", (req) => {
+  const p = mine(req);
   if (!p) return notFound();
-  if (!full(req.user!) && p.user_key !== req.user && !teamOf(req.user!).includes(p)) return fail(403, "FORBIDDEN", "You can only open people you manage.");
-  return ok(profile(p, req.user!));
+  const entries = [
+    { event_id: uuid(), occurred_at: at(2, "11:20"), action: "employee.updated", actor_name: "Cynthia Osakunih", changed_fields: ["job_title"], summary: "Record changed: job_title" },
+    { event_id: uuid(), occurred_at: at(40, "09:05"), action: "employee.reporting_line_changed", actor_name: "Cynthia Osakunih", changed_fields: ["line_manager_id"], summary: "Reporting line changed" },
+    { event_id: uuid(), occurred_at: at(200, "09:00"), action: "employee.created", actor_name: "System", changed_fields: [], summary: "Record created" },
+  ];
+  return paged(entries, req);
 });
 
 const NG_PHONE = /^(\+?234|0)\d{10}$/;
+
 route("POST /api/v1/employees", (req) => {
   const b = req.body as Record<string, string>;
   const f: Record<string, string[]> = {};
   const need = ["first_name", "last_name", "work_email", "phone", "job_title", "start_date", "employment_type", "work_pattern", "department_id"];
   for (const k of need) if (!b[k] || !String(b[k]).trim()) f[k] = ["Required"];
   if (b.work_email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(b.work_email)) f.work_email = ["Check the spelling"];
-  if (b.work_email && PEOPLE.some((p) => p.work_email === b.work_email.toLowerCase())) f.work_email = ["is already in use"];
+  if (b.work_email && PEOPLE.some((p) => p.work_email === b.work_email.toLowerCase())) f.work_email = ["Already in use"];
   if (b.phone && !NG_PHONE.test(b.phone.replace(/[\s\-().]/g, ""))) f.phone = ["must be a Nigerian phone number"];
   if (b.account_number && !/^\d{10}$/.test(b.account_number)) f.account_number = ["must be a 10-digit NUBAN"];
   if (b.gross_monthly && !/^\d{1,16}\.\d{2}$/.test(b.gross_monthly)) f.gross_monthly = ["must be an amount like 1250000.00"];
   if (Object.keys(f).length) return invalid(f);
   const key = b.work_email.split("@")[0];
-  const dept = DEPTS.find((d) => d.department_id === b.department_id)?.name ?? "Operations & People";
+  const dept = DEPTS.find((d) => d.department_id === b.department_id) ?? deptOf("Operations & People");
   const p: MockPerson = {
-    employee_id: sid(`employee:${key}`), user_key: key, staff_number: b.staff_number || `MCA-${String(PEOPLE.length + 1).padStart(4, "0")}`, first_name: b.first_name, last_name: b.last_name,
-    display_name: `${b.first_name} ${b.last_name}`, job_title: b.job_title, department: dept, grade: "G1 · Associate", manager: byId(b.line_manager_id)?.user_key ?? "cynthia", work_email: b.work_email.toLowerCase(),
-    phone: b.phone, start_date: b.start_date, date_of_birth: b.date_of_birth || "1998-01-01", employment_type: b.employment_type as "full_time", work_pattern: b.work_pattern as "hybrid", status: "probation",
-    worksite: "MTN Head Office, Ikoyi", gross_monthly: b.gross_monthly || "0.00", bank_name: b.bank_name || "", account_last4: (b.account_number || "0000").slice(-4), next_of_kin: b.next_of_kin_name || "",
+    employee_id: sid(`employee:${key}`),
+    user_key: key,
+    staff_number: String(PEOPLE.length + 1).padStart(5, "0"),
+    first_name: b.first_name,
+    last_name: b.last_name,
+    display_name: `${b.first_name} ${b.last_name}`,
+    job_title: b.job_title,
+    department: dept.name,
+    grade: "G1 · Associate",
+    manager: byId(b.line_manager_id)?.user_key ?? null,
+    work_email: b.work_email.toLowerCase(),
+    phone: b.phone,
+    start_date: b.start_date,
+    date_of_birth: b.date_of_birth || "1998-01-01",
+    employment_type: b.employment_type as MockPerson["employment_type"],
+    work_pattern: b.work_pattern as MockPerson["work_pattern"],
+    status: b.confirmed_on ? "confirmed" : "probation",
+    worksite: "MTN Head Office, Ikoyi",
+    gross_monthly: b.gross_monthly || "0.00",
+    bank_name: b.bank_name || "",
+    account_last4: (b.account_number || "0000").slice(-4),
+    next_of_kin: b.next_of_kin_name || "",
   };
   PEOPLE.push(p);
-  TODAY.push({ person: p, mode: "None", clock_in: null, status: "not_yet", late_min: 0, kpi_pct: 0, open_tasks: 0 });
-  return created(profile(p, req.user!));
+  return created(record(p, req.user!));
 });
 
-const DEPTS = DEPARTMENTS.map((name) => ({ department_id: sid(`dept:${name}`), name }));
+route("PATCH /api/v1/employees/:id", (req) => {
+  const p = mine(req);
+  if (!p) return notFound();
+  const b = req.body as Record<string, string>;
+  if (!Object.keys(b).length) return invalid({ first_name: ["Change at least one field"] });
+  if (b.work_email && PEOPLE.some((x) => x !== p && x.work_email === b.work_email.toLowerCase())) return invalid({ work_email: ["Already in use"] });
+  if (b.first_name) p.first_name = b.first_name;
+  if (b.last_name) p.last_name = b.last_name;
+  if (b.first_name || b.last_name) p.display_name = `${p.first_name} ${p.last_name}`;
+  if (b.job_title) p.job_title = b.job_title;
+  if (b.work_email) p.work_email = b.work_email.toLowerCase();
+  if (b.phone) p.phone = b.phone;
+  if (b.work_pattern) p.work_pattern = b.work_pattern as MockPerson["work_pattern"];
+  if (b.employment_type) p.employment_type = b.employment_type as MockPerson["employment_type"];
+  if (b.department_id) p.department = (DEPTS.find((d) => d.department_id === b.department_id) ?? deptOf(p.department)).name;
+  if (b.gross_monthly) p.gross_monthly = b.gross_monthly;
+  if (b.bank_name) p.bank_name = b.bank_name;
+  if (b.confirmed_on) p.status = "confirmed";
+  return ok(record(p, req.user!));
+});
+
+route("POST /api/v1/employees/:id/archive", (req) => {
+  const p = mine(req);
+  if (!p) return notFound();
+  if (!(req.body as { archive_reason?: string }).archive_reason) return invalid({ archive_reason: ["Say why"] });
+  if (ARCHIVED.has(p.employee_id)) return fail(422, "ALREADY_ARCHIVED", "This record is already archived.");
+  if (p.user_key === "ifeoma") return fail(422, "CEO_PROTECTED", "The CEO's record cannot be archived.");
+  ARCHIVED.add(p.employee_id);
+  return ok(record(p, req.user!));
+});
+
+route("POST /api/v1/employees/:id/restore", (req) => {
+  const p = mine(req);
+  if (!p) return notFound();
+  if (!ARCHIVED.has(p.employee_id)) return fail(422, "NOT_ARCHIVED", "This record is not archived.");
+  ARCHIVED.delete(p.employee_id);
+  return ok(record(p, req.user!));
+});
+
+route("PATCH /api/v1/employees/:id/line-manager", (req) => {
+  const p = mine(req);
+  if (!p) return notFound();
+  const b = req.body as { line_manager_id?: string | null; line_manager_seat_id?: string | null; dotted_manager_id?: string | null; dotted_manager_seat_id?: string | null };
+  if ("line_manager_id" in b) {
+    const m = b.line_manager_id ? byId(b.line_manager_id) : null;
+    if (b.line_manager_id && !m) return invalid({ line_manager_id: ["Not an employee"] });
+    if (m === p) return fail(422, "REPORTS_TO_SELF", "Nobody reports to themselves.");
+    if (m && teamOf(p.user_key).includes(m)) return fail(422, "REPORTING_LOOP", "That would make a loop in the reporting line.");
+    p.manager = m ? m.user_key : null;
+  }
+  if ("dotted_manager_id" in b) {
+    const d = b.dotted_manager_id ? byId(b.dotted_manager_id) : null;
+    if (d) DOTTED[p.user_key] = d.user_key;
+    else delete DOTTED[p.user_key];
+  }
+  return ok(record(p, req.user!));
+});
+
 route("GET /api/v1/departments", (req) =>
-  paged(DEPTS.map((d) => {
-    const members = PEOPLE.filter((p) => p.department === d.name);
-    const head = members.find((p) => /Head|Lead|Chief/.test(p.job_title)) ?? members[0];
-    return { department_id: d.department_id, name: d.name, head: ref(head), headcount: members.length };
-  }), req, { search: (r) => [r.name] }),
+  paged(
+    DEPTS.map((d) => ({
+      department_id: d.department_id,
+      code: d.code,
+      name: d.name,
+      parent_department_id: d.parent_department_id,
+      active: d.active,
+      headcount: PEOPLE.filter((p) => p.department === d.name && visible(p)).length,
+    })),
+    req,
+    { search: (r) => [r.name], filters: { active: (r, v) => String(r.active) === v } },
+  ),
 );
 
+route("POST /api/v1/departments", (req) => {
+  const name = String((req.body as { name?: string }).name ?? "").trim();
+  if (!name) return invalid({ name: ["Name the department"] });
+  if (DEPTS.some((d) => d.name.toLowerCase() === name.toLowerCase())) return fail(409, "DEPARTMENT_EXISTS", "There is already a department with this name.", { name: ["Already in use"] });
+  const d = { department_id: uuid(), code: name.toUpperCase().replace(/[^A-Z0-9]+/g, "_"), name, parent_department_id: null, active: true, order: DEPTS.length };
+  DEPTS.push(d);
+  DEPARTMENTS.push(name);
+  return created({ ...d, headcount: 0, order: undefined, department_id: d.department_id, code: d.code, name, parent_department_id: null, active: true });
+});
+
+route("PATCH /api/v1/departments/:id", (req) => {
+  const d = DEPTS.find((x) => x.department_id === req.params.id);
+  if (!d) return notFound();
+  const b = req.body as { name?: string; active?: boolean };
+  if (b.name) d.name = b.name;
+  if (typeof b.active === "boolean") d.active = b.active;
+  return ok({ department_id: d.department_id, code: d.code, name: d.name, parent_department_id: null, active: d.active, headcount: PEOPLE.filter((p) => p.department === d.name).length });
+});
+
+const seatRow = (s: (typeof SEATS)[number]): OrgSeat => {
+  const m = s.manager_key ? byKey(s.manager_key) : undefined;
+  return {
+    org_seat_id: s.org_seat_id,
+    title: s.title,
+    department_id: s.department_id,
+    department: s.department,
+    status: s.status,
+    line_manager: m ? { employee_id: m.employee_id, org_seat_id: null, display_name: m.display_name, job_title: m.job_title, vacant: false } : null,
+    filled_by_employee_id: null,
+    filled_on: null,
+    reports: PEOPLE.filter((p) => p.user_key === "amara").length,
+    created_at: s.created_at,
+  };
+};
+
+route("GET /api/v1/org-seats", (req) => paged(SEATS.map(seatRow), req, { search: (r) => [r.title], filters: { status: (r, v) => r.status === v } }));
+
+route("POST /api/v1/org-seats", (req) => {
+  const b = req.body as { title?: string; department_id?: string; line_manager_id?: string };
+  if (!b.title) return invalid({ title: ["Name the role"] });
+  if (!b.department_id) return invalid({ department_id: ["Pick a department"] });
+  const dept = DEPTS.find((d) => d.department_id === b.department_id) ?? DEPTS[0];
+  const seat = {
+    org_seat_id: uuid(),
+    title: b.title,
+    department_id: dept.department_id,
+    department: dept.name,
+    status: "vacant" as const,
+    line_manager: null,
+    filled_by_employee_id: null,
+    filled_on: null,
+    reports: 0,
+    created_at: at(0, "09:00"),
+    manager_key: byId(b.line_manager_id ?? "")?.user_key ?? null,
+  };
+  SEATS.push(seat);
+  return created(seatRow(seat));
+});
+
+route("PATCH /api/v1/org-seats/:id", (req) => {
+  const seat = SEATS.find((s) => s.org_seat_id === req.params.id);
+  if (!seat) return notFound();
+  const b = req.body as { title?: string; status?: "vacant" | "closed"; line_manager_id?: string | null };
+  if (b.title) seat.title = b.title;
+  if (b.status) seat.status = b.status;
+  if ("line_manager_id" in b) seat.manager_key = b.line_manager_id ? (byId(b.line_manager_id)?.user_key ?? null) : null;
+  return ok(seatRow(seat));
+});
+
 /* The reporting tree. A complete set by design: a tree with a missing branch is wrong. */
-const VACANT = [{ seat_id: sid("seat:head-finance"), display_name: "Head, Finance", job_title: "Open role", department: "Finance", manager: "ifeoma" }];
-const DOTTED: Record<string, string> = { adedotun: "Content Lead" };
 route("GET /api/v1/org-chart", (req) => {
   const builder = req.query.view === "builder" && full(req.user!);
-  const seatOf = (key: string | null) => (key ? sid(`seat:${key}`) : null);
-  const nodes = [
-    ...PEOPLE.filter((p) => p.status !== "suspended").map((p) => ({
-      employee_id: p.employee_id, seat_id: seatOf(p.user_key)!, display_name: p.display_name, job_title: p.job_title, department: p.department,
-      manager_seat_id: p.user_key === "amara" ? VACANT[0].seat_id : seatOf(p.manager), is_ceo: p.user_key === "ifeoma", vacant: false, dotted_line_to: DOTTED[p.user_key] ?? null,
-      meta: builder ? `Since ${p.start_date.slice(0, 4)} · ${ARR[p.work_pattern].replace("Office-only", "On Site")}` : null,
+  const PATTERNS: Record<string, string> = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
+  const nodes: OrgNode[] = [
+    ...PEOPLE.filter((p) => statusOf(p) === "active" && visible(p)).map((p) => {
+      const manager = managerRef(p);
+      const dotted = dottedRef(p);
+      return {
+        node_id: p.employee_id,
+        node_kind: "employee" as const,
+        employee_id: p.employee_id,
+        org_seat_id: null,
+        display_name: p.display_name,
+        job_title: p.job_title,
+        department: p.department,
+        manager_node_id: manager ? (manager.employee_id ?? manager.org_seat_id) : null,
+        dotted_manager_node_id: dotted ? dotted.employee_id : null,
+        dotted_line_to: dotted ? dotted.display_name : null,
+        is_ceo: p.user_key === "ifeoma",
+        vacant: false,
+        meta: builder ? [`Since ${p.start_date.slice(0, 4)}`, PATTERNS[p.work_pattern]].join(" · ") : null,
+      };
+    }),
+    ...SEATS.filter((s) => s.status === "vacant").map((s) => ({
+      node_id: s.org_seat_id,
+      node_kind: "seat" as const,
+      employee_id: null,
+      org_seat_id: s.org_seat_id,
+      display_name: s.title,
+      job_title: s.title,
+      department: s.department,
+      manager_node_id: s.manager_key ? (byKey(s.manager_key)?.employee_id ?? null) : null,
+      dotted_manager_node_id: null,
+      dotted_line_to: null,
+      is_ceo: false,
+      vacant: true,
+      meta: null,
     })),
-    ...VACANT.map((v) => ({ employee_id: null, seat_id: v.seat_id, display_name: v.display_name, job_title: v.job_title, department: v.department, manager_seat_id: seatOf(v.manager), is_ceo: false, vacant: true, dotted_line_to: null, meta: null })),
   ];
-  return ok({ nodes, seats: nodes.length, filled: nodes.filter((n) => !n.vacant).length });
-});
-route("PATCH /api/v1/employees/:id/line-manager", (req) => {
-  const p = byId(req.params.id);
-  const m = byId(req.body.line_manager_id as string);
-  if (!p || !m) return notFound();
-  if (p === m || teamOf(p.user_key).includes(m)) return invalid({ line_manager_id: ["would make a loop in the reporting line"] });
-  p.manager = m.user_key;
-  return ok({ ok: true });
+  return ok({
+    nodes,
+    seats: nodes.length,
+    filled: nodes.filter((n) => !n.vacant).length,
+    open: nodes.filter((n) => n.vacant).length,
+    roots: nodes.filter((n) => !n.manager_node_id).length,
+  });
 });
 
 /* ------------------------------------------------------------------ *

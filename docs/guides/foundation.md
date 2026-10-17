@@ -71,16 +71,16 @@ These finish M0 and no prompt can do them:
 
 | Screen | Where | Who | Track | Today | After |
 |---|---|---|---|---|---|
-| People · Employees (#24) | Staff app | `people` view; add, edit, archive with create, edit, delete | A | Mock | Real API: list at 25 with search and filters, the employee's record with tabs, Add, Edit, Archive, Send Invite, Import Staff |
-| Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | Mock | Profile, job, reporting line, documents, login, history on the real API |
-| Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | Mock | As `organogram.md` describes, on the real API |
-| Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | None | Built 17/10/2026: upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
-| ESS · My Documents (#14) | ESS | The person (own) | B | Mock | Built 17/10/2026: their documents and the ones People asked for, upload, download, preview |
-| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | Mock | Built 17/10/2026: organisation profile, working week, public holidays entered on screen |
-| Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | Mock | Built 17/10/2026: roles created, edited and deleted; the grants matrix, field visibility and capabilities per role |
-| Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | Mock | Built 17/10/2026: every numbering scheme with its next number, editable. No other document setting is specified yet |
-| Settings · Security (#78) | Settings | `settings` view, edit | C | Mock | Built 17/10/2026: session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
-| Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | Mock | Built 17/10/2026: the log at 25 with filters, the summary, Excel export by email, values masked per reader |
+| People · Employees (#24) | Staff app | `people` view; add, edit, archive with create, edit, delete | A | **Built** (17/10/2026) | Real API: list at 25 with search, filters and server sort, the record with tabs, Add, Edit, Archive, Restore, Send Invite, Import Staff |
+| Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | **Built** (17/10/2026) | Profile, job, reporting line, login and history on the real API; the Documents tab is track B's, on the `documents` module that has landed |
+| Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | **Built** (17/10/2026) | As `organogram.md` describes, on the real API, with the phone focus view |
+| Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | **Built** (17/10/2026) | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
+| ESS · My Documents (#14) | ESS | The person (own) | B | **Built** (17/10/2026) | Their documents and the ones People asked for, upload, download, preview |
+| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | **Built** (17/10/2026) | Organisation profile, working week, public holidays entered on screen |
+| Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | **Built** (17/10/2026) | Roles created, edited and deleted; the grants matrix, field visibility and capabilities per role |
+| Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Every numbering scheme with its next number, editable. No other document setting is specified yet |
+| Settings · Security (#78) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
+| Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export by email, values masked per reader |
 | Settings · Approvals (#72) | Settings | `settings` edit | D | Mock | Every approval flow and its stages, editable as new versions |
 | ⌘K Search | Everywhere | Everyone, by permission | D | Mock (INTERIM) | Screens, actions, employees, logins, departments; each later module adds its own |
 | Settings · Integrations (#77), Appearance (#75), Notifications (#74), Attendance Policy (#73) | Settings | | none | Mock | Coming Soon (#74 is M6; #73 is LA's attendance) |
@@ -235,7 +235,21 @@ Users keeps `GET /access/roles`.
 - FTE is `full_time`; Remote and Hybrid are `remote` and `hybrid`. The working hours column (Monday
   to Friday 09:00 to 17:00, Saturday 09:00 to 15:00) is the organisation's working week (A22), set by
   track C, not per person.
-- A person with no staff ID gets one from `numbering.allocate()`.
+- A person with no staff ID gets one from `numbering.allocate()`, and the counter is moved past
+  every number the sheet brought (`numbering.advanceTo()`), so the next person added on screen
+  cannot be given one that is taken.
+- **A column the whole sheet gets wrong is not imported**, and the deploy log says why. MyCity's own
+  sheet holds a day and month with no year under DOB, and the same placeholder under Phone, in every
+  row: mapping either would fail every row instead of loading the person. A column with one good
+  cell among bad ones is imported, and its bad cells are row problems as usual. Work Hours and S/N
+  are not fields of a person at all (the working week is one organisation setting, A22).
+- The loader asks the import engine for two things no person asks for, as batch options: **keep what
+  the app already has** (an existing person is left exactly as People hold them, and the reporting
+  line is filled only where it is empty), and **the work email `roles.json` gives a post** whose
+  sheet cell is blank. The Import wizard sets neither.
+- **A deploy that changes no file changes no record.** The loader keeps the sheet's checksum on its
+  batch; a later deploy with the same sheet checks the logins and stops. A corrected sheet loads
+  again, adding what is new and leaving the rest alone.
 
 ### 6.2 Staging demonstration data
 
@@ -380,8 +394,8 @@ screen.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| People · Employees | Staff list: name, staff number, job title, department, line manager, work pattern, status, login; Add Employee, Import Staff, filters | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here |
-| Employee record | Profile, job, reporting line, login state with Send Invite, documents, history; Edit, Archive | Masked fields show Restricted with a help term naming who may see them | Field mask rules: §6.3, §8 |
+| People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
+| Employee record | Profile, Job, Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Public Holidays by year; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week | None | Who reads the working week and holidays: §3 |
@@ -445,6 +459,9 @@ screen.
 
 ## 13 · Open questions
 
+- Attendance Today on the register, and the attendance and location modal a row used to open: both
+  wait on LA's attendance routes (M1). The screen pieces are kept in
+  `app/src/features/people/EmployeeDetails.tsx` and nothing links to them until then.
 - The leave flow's day threshold for the second stage: Operations & People decide on screen; the
   seed sets 5 days until they do.
 - Home's Waiting on You card: D provides the count; Home wires it when its API lands (TB, M1).
@@ -452,6 +469,19 @@ screen.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · Track A built: the `organisation` module on the real API (the register, the
+  employee 360, departments, vacant seats, reporting lines and the bounded tree), the staff importer,
+  the roster loader that every deploy runs on staging and production, the staging seed, and People ·
+  Employees (#24) with Org Chart (#91) and Organogram (#92). §2 marks the three screens built; §6.1
+  gains the three things the sheet itself taught us (a column the whole sheet gets wrong is not
+  imported, the two batch options only the loader sets, and a deploy that changes no file changes no
+  record); §10.1 lists the register and the record as built; §13 records that Attendance Today waits
+  on LA's attendance routes. Three additive changes outside the module, each in the PR: the import
+  engine takes batch `options` and honours a service that answers "nothing to write",
+  `numbering.advanceTo()`, and `blank()` in the contract for an optional field a form leaves empty.
+  Import Staff on the register opens track B's Settings · Imports, which landed first. The API now
+  registers every module's importers at boot, the way the worker already did (`http/module-loader.js`):
+  the two tracks meet at the registry, and without it B's screen would list nothing to import.
 - 17/10/2026 · TB · Track C built: `access` (roles created, edited and deleted, the grants matrix,
   field visibility and capabilities per role), `settings` (organisation profile, working week, public
   holidays, numbering schemes, the security rules within the `.env` floor) and `audit` (the log at 25
@@ -466,7 +496,7 @@ screen.
   verification and document requests) and ESS · My Documents (#14) on the real API. Migration `0350`
   adds `document_request` and `document.verified_at`; §5 lists every route as built, §6.9 says what a
   document's status means, §10 carries the new screen's rows. The employee record's Documents tab
-  waits for track A.
+  waits for track A, which has now landed.
 - 16/10/2026 · TB · The staff importer moved to track A with the roster loader, so A and B meet only
   at the import engine; Settings · Imports holds the wizard and history.
 - 16/10/2026 · TB · First version: the remaining M0 and foundation work in four tracks, with TB's

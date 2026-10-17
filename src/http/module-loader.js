@@ -21,6 +21,10 @@
  *    contract generator and the tests load strict;
  *  - a routes file that is still empty (the repository map creates every file
  *    before its module is built) is skipped quietly;
+ *  - a module's importers (`<module>/*.import.js`) are registered as the routers are
+ *    mounted, so the imports API can list and run what each module declares (the worker
+ *    loads the same files for the import jobs). One that fails to load is reported like a
+ *    module: the process serves an incomplete API rather than none;
  *  - every route on a module's router must have been defined through
  *    http/route.js, so no route exists without a contract.
  */
@@ -32,7 +36,50 @@ const { routesOf } = require("./route");
 const MODULES_DIR = path.resolve(__dirname, "../modules");
 const NAME_RE = /^[a-z][a-z0-9_]*$/;
 
-let lastReport = { mounted: [], skipped: [], routes: [] };
+let lastReport = { mounted: [], skipped: [], routes: [], importers: [] };
+
+/**
+ * Register every module's importers (`src/modules/<m>/*.import.js`).
+ *
+ * An importer is a declaration, like a routes file: the module that owns the records
+ * declares it (BACKEND_STRUCTURE §9.4) and `shared/import/registry.js` holds it. The
+ * imports API lists and runs what is registered, so without this a staff sheet would
+ * have nowhere to go on a screen while the worker, which loads the same files, could
+ * still run one. Files the repository map created and nobody has written yet are skipped.
+ *
+ * @param {{strict?: boolean, dir?: string}} [opts]
+ * @returns {{loaded: string[], skipped: Array<{importer: string, error: string}>}}
+ */
+function loadImporters({ strict = false, dir = MODULES_DIR } = {}) {
+  const loaded = [];
+  const skipped = [];
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return { loaded, skipped };
+  }
+  for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!e.isDirectory() || !NAME_RE.test(e.name)) continue;
+    for (const f of fs.readdirSync(path.join(dir, e.name)).sort()) {
+      if (!f.endsWith(".import.js")) continue;
+      const full = path.join(dir, e.name, f);
+      if (fs.statSync(full).size === 0) continue;
+      try {
+        require(full);
+        loaded.push(`${e.name}/${f}`);
+      } catch (err) {
+        if (strict) throw err;
+        logger.error(
+          { importer: `${e.name}/${f}`, err },
+          "importer skipped: it failed to load, and nothing can be imported with it",
+        );
+        skipped.push({ importer: `${e.name}/${f}`, error: err.message });
+      }
+    }
+  }
+  return { loaded, skipped };
+}
 
 /** @returns {Array<{module: string, surface: "staff"|"public", file: string}>} */
 function discover(dir = MODULES_DIR) {
@@ -122,6 +169,8 @@ function mountModules(targets, { strict = false, dir = MODULES_DIR } = {}) {
   const skipped = [];
   const routes = [];
   const seen = new Map();
+  const importers = loadImporters({ strict, dir });
+  for (const bad of importers.skipped) skipped.push({ module: bad.importer, error: bad.error });
 
   for (const found of discover(dir)) {
     const label = `${found.module}${found.surface === "public" ? " (public)" : ""}`;
@@ -171,7 +220,7 @@ function mountModules(targets, { strict = false, dir = MODULES_DIR } = {}) {
       "this process is serving an incomplete API",
     );
   }
-  lastReport = { mounted, skipped, routes };
+  lastReport = { mounted, skipped, routes, importers: importers.loaded };
   return lastReport;
 }
 
@@ -180,4 +229,4 @@ function mountReport() {
   return lastReport;
 }
 
-module.exports = { discover, mountModules, mountReport, MODULES_DIR };
+module.exports = { discover, loadImporters, mountModules, mountReport, MODULES_DIR };

@@ -96,6 +96,44 @@ async function allocate(client, docType, { date } = {}) {
 }
 
 /**
+ * Move a counter up to `seq`, never down (docs/DATABASE_SCHEMA.md M0: the staff
+ * importer must advance the employee counter past imported staff numbers).
+ *
+ * A sheet brings its own numbers: MyCity's staff list already holds 00001 to 00031.
+ * Without this, the next person added on screen would be given 00001 again and the
+ * insert would fail on the unique index. Called in the same transaction as the import,
+ * so a rolled-back import leaves the counter where it was.
+ *
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {string} docType  a key of SCHEMES
+ * @param {number} seq      the highest sequence already in use
+ * @param {{date?: string}} [opts]  the period to move, for a scheme that resets
+ * @returns {Promise<{period: string, last_value: number}>}
+ */
+async function advanceTo(client, docType, seq, { date } = {}) {
+  if (!SCHEMES[docType])
+    throw new Error(`numbering: "${docType}" is not in shared/numbering/schemes.js`);
+  if (!inTransaction(client))
+    throw new Error("numbering.advanceTo must run inside atomically()");
+  const value = Number(seq);
+  if (!Number.isInteger(value) || value < 0)
+    throw new Error("numbering.advanceTo: seq is a whole number");
+  const day = date
+    ? lagos.assertDate(String(date).slice(0, 10), "date")
+    : lagos.today();
+  const scheme = await schemeOf(client, docType);
+  const period = periodOf(scheme, day);
+  const { rows } = await client.query(
+    `INSERT INTO numbering_counter (doc_type, period, last_value) VALUES ($1, $2, $3)
+     ON CONFLICT (doc_type, period)
+     DO UPDATE SET last_value = GREATEST(numbering_counter.last_value, EXCLUDED.last_value)
+     RETURNING last_value`,
+    [docType, period, value],
+  );
+  return { period, last_value: Number(rows[0].last_value) };
+}
+
+/**
  * What the next number WOULD be, without taking it (the Settings screen's
  * preview). Never use it as a number: another save can take it first.
  */
@@ -139,4 +177,4 @@ async function checkSchemes(client) {
   }
 }
 
-module.exports = { allocate, preview, format, periodOf, checkSchemes };
+module.exports = { allocate, advanceTo, preview, format, periodOf, checkSchemes };

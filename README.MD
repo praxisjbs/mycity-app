@@ -90,8 +90,10 @@ mycity-app/
 │   │   │                     (read by check/palette.js and both apps' eslint configs)
 │   │   └── lib/sources.js    string literals, call arguments and frontend files for the static halves
 │   │                         of check/five-second.js, check/forms.js, check/dashes.js
-│   ├── db/                   migrate, seed, create-admin; backup.sh (nightly) and restore-drill.js
-│   │                         (weekly), installed on the server as mycity-backup, mycity-restore-drill
+│   ├── db/                   migrate, seed, create-admin, load-staff.js (MyCity's own staff from
+│   │                         seeds/staff/, run by every deploy); backup.sh (nightly) and
+│   │                         restore-drill.js (weekly), installed on the server as mycity-backup,
+│   │                         mycity-restore-drill
 │   ├── import/               command-line import
 │   └── deploy/               deploy-gate, release-manifest, verify-staging, rollback
 ├── ops/
@@ -263,7 +265,7 @@ check ownership, not the `settings` grant.
 | `security` | `.mfa` (TOTP codes, recovery codes), `.passkeys` (WebAuthn), `.pin`, `.challenge` (single-use tickets), `.signin` (what `identity`'s sign-in calls) | Each person's two-step sign-in, passkeys and PIN, the fresh-sign-in check, Reset Two-Step (`docs/guides/identity.md`); came forward from M9 (TB, 16/10/2026) |
 | `access` | | Roles created, edited and deleted with their grants, record scope, field visibility and capabilities; the matrix; two-step required by role (`docs/guides/foundation.md` §6.3) |
 | `audit` | `audit.events.js` (the emailed Excel export) | Audit ledger read at 25 with filters, the summary, masked per reader |
-| `organisation` | `employee.import.js`, `employee-360.service.js` (M1) | Departments, employees, reporting lines; staff importer; employee 360 |
+| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
 | `notifications` | `notifications.preferences.js`, `notifications.reminders.js` (M6) | Caller's own inbox |
 | `workflow` | | Definitions, act on an instance, my approvals |
@@ -478,6 +480,11 @@ another module; call that module's service.
   never runs those folders. Reference SQL runs in every environment, so it holds only what the code
   cannot run without (A26): roles and permissions, numbering schemes, validated workflow
   definitions, code lists. No people, no transactions, no business choices.
+- `seeds/staff/` is neither of those: it is MyCity's real staff list, and the deploy loads it on
+  staging **and production** through the staff importer, as the system
+  (`scripts/db/load-staff.js`, run by `scripts/deploy/deploy-gate` after the migrations). It is
+  idempotent, sends no email, and never writes over an edit made in the app
+  (`docs/guides/foundation.md` §6.1).
 - The full rules, and the checks to run before a migration PR: `docs/MIGRATIONS.md`.
 - Every table has `created_at` and `updated_at timestamptz` unless its documented infrastructure
   contract requires an exact shape.
@@ -527,8 +534,12 @@ data, not code. Services call `openInstance()` inside their transaction and reac
     chrome. On a screen, three tiers: operational content open, support text behind a help term
     or a Details row, system explanations never; hard word limits (`scripts/check/lib/copy.js`,
     FRONTEND_GUIDE §5).
-12. **Production data**: never seeded. Real records reach production by people using the product or
-    through the import engine.
+12. **Production data**: never seeded, with one exception. Real records reach production by people
+    using the product or through the import engine. The exception is **MyCity's own staff**
+    (`seeds/staff/`), which every deploy loads on staging and production through the staff importer,
+    as the system: a staff list is not demonstration data (TB, 16/10/2026;
+    `docs/guides/foundation.md` §6.1). `seeds/build/` and `seeds/staging/` never reach production,
+    and `scripts/db/seed.js` refuses it three times over.
 13. **Pagination**: every list pages at 25 on the server through `shared/http/paged.js`
     (`pageQuery`, `sendPaged`). No `LIMIT`/`OFFSET` in a repo, no page-size key in the contract or
     the frontend, AI reads included. The one exception is `completeQuery()` with a

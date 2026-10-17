@@ -535,6 +535,9 @@ describeDb("identity against the real migrations", () => {
       ]);
       const empty = Object.keys(whole.e).filter((k) => whole.e[k] === null).sort();
       expect(empty).toEqual([
+        /* 0300 added archiving: a record that was never archived carries neither. */
+        "archive_reason",
+        "archived_at",
         "dotted_manager_id",
         "dotted_manager_seat_id",
         "left_on",

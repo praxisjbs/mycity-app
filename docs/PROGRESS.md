@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | items below | | | | | |
-| M1 Core Operations & Employee Management | 32 | 29 | 0 | 3 | 0 | 0 |
+| M1 Core Operations & Employee Management | 32 | 26 | 0 | 6 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 4 | 0 | 6 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **84** | **0** | **9** | **0** | **0** |
+| **Total** | **93** | **81** | **0** | **12** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -80,7 +80,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Two-step sign-in, passkeys and the PIN: the `security` module, the code step, PIN and passkey sign-in, the lock screen's PIN and passkey, the fresh-sign-in window, Reset Two-Step (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
 | Documents, media, uploads, PDF generation | GE | ☑ | 17/10/2026 |
-| Import engine + staff importer; real staff sheet imported on staging | GE · LA | ☐ | 17/10/2026 |
+| Import engine + staff importer; real staff sheet imported on staging | GE · LA · TB | ☑ | 17/10/2026 |
 | AI foundation: `services/ai`, manifests, registry, gate 9 | GE | ☑ | 15/10/2026 |
 | CI wiring: `package.json`, lockfile, ESLint, Jest, `ci-local.js`, `ci.yml` | GE | ☑ | 13/10/2026 |
 | Process gates: progress, guides, README map, CODEOWNERS; PR template; Claude Stop hook | GE | ☑ | 13/10/2026 |
@@ -97,6 +97,27 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · Foundation track A (`docs/guides/foundation.md` §1.1): the `organisation`
+  module on the real API, the staff importer, and MyCity's real staff loaded by every deploy.
+  Backend: the register at 25 with search, filters and server sort, the employee 360 masked per
+  viewer, Add, Edit, Archive and Restore, reporting lines to a person or to a vacant seat with a
+  dotted line beside it, departments, `org_seat` writes, the whole tree in one bounded read (2,000
+  nodes), `organisation.search.js` (employees and departments) and `organisation.ai.js` (three
+  reads, no writes); migration `0300` (archiving, a start date that may be unknown, the register's
+  indexes) and reference seed `0349`. The staff importer `employee.import.js` reads one Name cell, a
+  department by name and a line manager in prose (a name, a post, or a post with a dotted line
+  beside it), and a VACANT row becomes a seat that carries reports. `scripts/db/load-staff.js` runs
+  on every deploy, on staging AND production, as the system: it is quiet when the sheet has not
+  changed, drops a column the whole sheet gets wrong (MyCity's DOB holds a day and month with no
+  year; Phone is a placeholder in every row), commits the valid rows, gives each person a login in
+  the invited state with the roles `seeds/staff/roles.json` grants their post, sends no email, and
+  never writes over an edit made in the app. `seeds/staff/staff-list.xlsx` (18 people, 2 open seats)
+  and `roles.json` are committed, the repository being private. `seeds/staging/10_staff.js` loads the
+  same roster for a demonstration. Shared, additive: `numbering.advanceTo()` (the counter past the
+  numbers a sheet brings), `blank()` in the contract (an optional field a form leaves empty), the
+  import engine takes batch `options` and honours a service that answers "nothing to write".
+  Left: track D (`workflow`); the Documents tab on the employee record, which arrives with the
+  documents work; the people tasks in the guide's §1.2.
 - 17/10/2026 · TB · Track C of `docs/guides/foundation.md` built, three more of the nine M0 modules:
   `access` (roles created, edited and deleted with their grants, field visibility and capabilities
   in one save; the matrix; nobody can take away their own Settings), `settings` (the organisation
@@ -447,9 +468,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 88 | My Devices | `my-devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 16/10/2026 |
-| 91 | Org Chart | `org-chart` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
+| 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
+
+- 17/10/2026 · TB · ESS · Org Chart (#91) on the real API, read only for every member of staff:
+  the whole company from one bounded read (`GET /api/v1/org-chart`, 2,000 nodes), open seats drawn as
+  vacant, dotted lines tagged, no restricted field on any card. On a phone it starts on the signed-in
+  person as a focus view. Built with People · Organogram (#92) from `docs/guides/organogram.md`.
 
 - 17/10/2026 · TB · My Documents (#14) built on the real API (M0, track B): the Vault list is what is
   held and what People have asked for in one paged list, the counts come from
@@ -513,14 +539,30 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 24 | Employees | `employees` | M0 | GE | ☐ | ☐ | ☐ | Not started | |
+| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 25 | Attendance | `attendance` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 26 | Leave | `leave` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 27 | Devices | `devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 28 | Worksites | `worksites` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 92 | Organogram | `organogram` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
+| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
+
+- 17/10/2026 · TB · People · Employees (#24) and People · Organogram (#92) on the real API, with
+  ESS · Org Chart (#91): the register lists 25 a page with search, the department, status and work
+  pattern filters and the server's own sort, each row opening the record; Add Employee and Edit are
+  the contract's `EmployeeCreate` and `EmployeeUpdate`, Archive asks why and Restore brings a record
+  back, Send Invite gives a person a login, and Import Staff opens Settings · Imports on the
+  employees importer (track B builds that screen, so the link lands on Settings until it does). The
+  record has Profile, Job, Reporting Line, Login and History as tabs; a field the viewer may not see
+  shows Restricted behind a help term. Change Manager sets a person or an open seat, with a dotted
+  line beside it. The organogram draws people and open seats from one bounded read, drag moves a
+  card (desktop), Add Role adds a seat, and the legend carries the two help terms; on a phone it is
+  the focus view the guide asks for (Reports To, the person, Direct Reports, tap to refocus, Show Me
+  or Show Top). The in-browser mock answers the contract's shapes, sort included. Left: the
+  Documents tab (track B); Attendance Today and the attendance and location modal come back to the
+  register with LA's attendance API (`app/src/features/people/EmployeeDetails.tsx` holds them and
+  nothing links to it until then); PDF export on the chart.
 
 - 15/10/2026 · AJ · Frontend built in `app/src/features/people/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/organisation.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 15/10/2026 · TB · Organogram ratified as #92 (`organogram`, M1, TB) alongside ESS · Org Chart (#91). Owner and milestone assigned; build follows `docs/guides/organogram.md`.

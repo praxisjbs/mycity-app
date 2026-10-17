@@ -1,0 +1,29 @@
+{
+  "note": "Which roles a post is given when the staff roster creates its login, by job title as seeds/staff/staff-list.xlsx spells it. No names: a person is matched by their post, so a new holder of the post is given the same roles. Roles are applied only when the login is created, so a role taken away on screen is not added back by the next deploy (docs/guides/foundation.md §6.1, §11). TB, 16/10/2026.",
+  "default": {
+    "roles": ["employee"]
+  },
+  "by_job_title": {
+    "Chief Executive Officer": {
+      "roles": ["management"],
+      "is_ceo": true
+    },
+    "Program Manager": {
+      "roles": ["management"]
+    },
+    "Chief Technology Officer": {
+      "roles": ["management", "administrator"]
+    },
+    "Operations& People Lead": {
+      "roles": ["operations_people"],
+      "work_email": "cynthia@mycityapp.io",
+      "work_email_note": "The sheet has no email for this post. TB gave it on 16/10/2026."
+    },
+    "Head PR, Markerting & Brand Strategy": {
+      "roles": ["head_of_department"]
+    },
+    "Back-end Manager": {
+      "roles": ["manager"]
+    }
+  }
+}
