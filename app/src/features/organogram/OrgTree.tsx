@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { OrgNode } from "@/api/types/organisation";
+import type { PersonRef } from "@/api/types/common";
+import { EmployeePicker } from "@/features/shared/pickers";
 import { useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
@@ -51,6 +53,11 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
   const [collapsed, setCollapsed] = useState<Set<string> | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const addRole = () => modal.open({ title: "Add Open Role", body: (close) => <SeatForm close={close} onSaved={reload} /> });
+  const editRole = (n: OrgNode) =>
+    modal.open({
+      title: "Edit Open Role",
+      body: (close) => <SeatForm close={close} onSaved={reload} seat={n} manager={n.manager_node_id ? byId.get(n.manager_node_id) : undefined} />,
+    });
   useScreenAction(builder ? { label: "Add Role", onSelect: addRole } : null);
 
   const nodes = useMemo(() => data?.nodes ?? [], [data]);
@@ -117,14 +124,24 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
           <b className="block text-sm leading-tight font-strong">{n.display_name}</b>
           <span className="mt-0.5 block text-2xs text-muted-foreground">{`Vacant · ${n.department}`}</span>
           {builder ? (
-            <button
-              type="button"
-              onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: n.display_name }))}
-              className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-2xs font-strong text-primary-foreground"
-            >
-              <Icon name="plus" className="size-3" />
-              Create Vacancy
-            </button>
+            <span className="mt-2 flex flex-wrap items-center justify-center gap-1">
+              <button
+                type="button"
+                onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: n.display_name }))}
+                className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-2xs font-strong text-primary-foreground"
+              >
+                <Icon name="plus" className="size-3" />
+                Create Vacancy
+              </button>
+              <button
+                type="button"
+                onClick={() => editRole(n)}
+                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-2xs font-strong text-subtle-foreground"
+              >
+                <Icon name="edit" className="size-3" />
+                Edit Role
+              </button>
+            </span>
           ) : (
             <span className="mt-2 inline-block rounded-full border border-dashed border-input px-2 py-0.5 text-2xs font-strong text-subtle-foreground">Open role</span>
           )}
@@ -251,6 +268,7 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
           childrenOf={(id) => (children.get(id) ?? []).length}
           onFocus={setFocus}
           onOpen={openNode}
+          onEditRole={editRole}
           builder={builder}
           atStart={!focus || focus === start}
           onStart={() => setFocus(null)}
@@ -274,6 +292,7 @@ function Focus({
   childrenOf,
   onFocus,
   onOpen,
+  onEditRole,
   builder,
   atStart,
   onStart,
@@ -284,6 +303,7 @@ function Focus({
   childrenOf: (id: string) => number;
   onFocus: (id: string) => void;
   onOpen: (n: OrgNode) => void;
+  onEditRole: (n: OrgNode) => void;
   builder: boolean;
   atStart: boolean;
   onStart: () => void;
@@ -326,9 +346,14 @@ function Focus({
       )}
       <section>{tile(focused, "lg")}</section>
       {focused.vacant && builder && (
-        <Button variant="primary" className="w-full" icon="plus" onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: focused.display_name }))}>
-          Create Vacancy
-        </Button>
+        <>
+          <Button variant="primary" className="w-full" icon="plus" onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: focused.display_name }))}>
+            Create Vacancy
+          </Button>
+          <Button className="w-full" icon="edit" onClick={() => onEditRole(focused)}>
+            Edit Role
+          </Button>
+        </>
       )}
       {!focused.vacant && (
         <Button className="w-full" onClick={() => onOpen(focused)}>
@@ -350,25 +375,43 @@ function Focus({
   );
 }
 
-/** Add an open role: a seat in the structure that carries reports until somebody fills it. */
-function SeatForm({ close, onSaved }: { close: () => void; onSaved: () => void }) {
+/**
+ * An open role: a seat in the structure that carries reports until somebody fills it.
+ * The same form adds one and corrects one, including who the seat itself reports to,
+ * which is how a seat the sheet left at the top of the tree gets its line.
+ */
+function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSaved: () => void; seat?: OrgNode; manager?: OrgNode }) {
   const departments = usePaged("GET /api/v1/departments");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(seat?.display_name ?? "");
   const [department, setDepartment] = useState("");
+  const [reportsTo, setReportsTo] = useState<PersonRef[]>(
+    manager && manager.employee_id
+      ? [{ employee_id: manager.employee_id, display_name: manager.display_name, job_title: manager.job_title, department: manager.department }]
+      : [],
+  );
   const [tried, setTried] = useState(false);
-  const save = useMutation("POST /api/v1/org-seats");
-  const bad = { title: title.trim().length < 2, department: !department };
+  const add = useMutation("POST /api/v1/org-seats");
+  const edit = useMutation("PATCH /api/v1/org-seats/:id");
+  const save = seat ? edit : add;
+  const chosen = department || departments.rows.find((d) => d.name === seat?.department)?.department_id || "";
+  const bad = { title: title.trim().length < 2, department: !chosen };
   const submit = async () => {
     setTried(true);
     if (bad.title || bad.department) return;
+    const body = {
+      title: title.trim(),
+      department_id: chosen,
+      ...(seat ? { line_manager_id: reportsTo[0]?.employee_id ?? null } : reportsTo[0] ? { line_manager_id: reportsTo[0].employee_id } : {}),
+    };
     try {
-      await save.run({ body: { title: title.trim(), department_id: department } });
+      if (seat) await edit.run({ params: { id: seat.node_id }, body });
+      else await add.run({ body });
       invalidate("/api/v1/org-chart", "/api/v1/org-seats");
       onSaved();
       close();
-      toast(`${title.trim()} added as an open role`);
+      toast(seat ? `${title.trim()} saved` : `${title.trim()} added as an open role`);
     } catch {
-      toast(save.error?.message ?? "Not added");
+      toast(save.error?.message ?? "Not saved");
     }
   };
   return (
@@ -378,16 +421,19 @@ function SeatForm({ close, onSaved }: { close: () => void; onSaved: () => void }
       </Field>
       <Field label="Department" state={tried && bad.department ? "bad" : undefined} message="Pick a department">
         <SelectField
-          value={department}
+          value={chosen}
           onChange={setDepartment}
           placeholder="Pick a department"
           options={departments.rows.map((d) => [d.department_id, d.name] as [string, string])}
         />
       </Field>
+      <Field label="Reports To" optional>
+        <EmployeePicker value={reportsTo} onChange={setReportsTo} placeholder="Manager's name" />
+      </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={() => void submit()}>
-          Add Role
+          {seat ? "Save Role" : "Add Role"}
         </Button>
       </FormFooter>
     </>

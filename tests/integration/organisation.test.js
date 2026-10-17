@@ -514,6 +514,47 @@ describeDb("the organisation module against the real migrations", () => {
       expect(seats.body.data.find((s) => s.org_seat_id === seatId).reports).toBe(1);
     });
 
+    test("a seat can be corrected, and naming a manager clears the other kind", async () => {
+      /* Its own two seats, closed at the end, so no other test's structure moves. */
+      const above = await asOps()(request(app).post("/api/v1/org-seats")).send({
+        title: "Head of Clearing",
+        department_id: people.delivery.department_id,
+      });
+      const below = await asOps()(request(app).post("/api/v1/org-seats")).send({
+        title: "Clearing Lead",
+        department_id: people.delivery.department_id,
+      });
+      expect(above.status).toBe(201);
+      expect(below.status).toBe(201);
+
+      const underSeat = await asOps()(request(app).patch(`/api/v1/org-seats/${below.body.org_seat_id}`)).send({
+        line_manager_seat_id: above.body.org_seat_id,
+      });
+      expect(underSeat.status).toBe(200);
+      expect(underSeat.body.line_manager).toMatchObject({ display_name: "Head of Clearing", vacant: true });
+
+      const underPerson = await asOps()(request(app).patch(`/api/v1/org-seats/${below.body.org_seat_id}`)).send({
+        title: "Clearing Lead, Lagos",
+        line_manager_id: people.ops.employee.employee_id,
+      });
+      expect(underPerson.status).toBe(200);
+      expect(underPerson.body.title).toBe("Clearing Lead, Lagos");
+      expect(underPerson.body.line_manager).toMatchObject({ display_name: "Ada Obi", vacant: false });
+      const row = await one("SELECT line_manager_id, line_manager_seat_id FROM org_seat WHERE org_seat_id = $1", [
+        below.body.org_seat_id,
+      ]);
+      expect(row.line_manager_seat_id).toBeNull();
+      expect(row.line_manager_id).toBe(people.ops.employee.employee_id);
+
+      const itself = await asOps()(request(app).patch(`/api/v1/org-seats/${below.body.org_seat_id}`)).send({
+        line_manager_seat_id: below.body.org_seat_id,
+      });
+      expect(itself.status).toBe(422);
+
+      for (const id of [below.body.org_seat_id, above.body.org_seat_id])
+        expect((await asOps()(request(app).patch(`/api/v1/org-seats/${id}`)).send({ status: "closed" })).status).toBe(200);
+    });
+
     test("the whole tree is one read, seats included, and every member of staff may read it", async () => {
       const res = await asManager()(request(app).get("/api/v1/org-chart?view=viewer"));
       expect(res.status).toBe(200);

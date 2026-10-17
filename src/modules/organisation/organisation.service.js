@@ -313,7 +313,12 @@ async function updateSeat(client, seatId, patch, actor) {
     });
   if (before.status === "filled" && patch.status)
     throw new AppError("SEAT_FILLED", "This seat is filled; archive the person instead.", 422);
-  const after = await repo.updateSeat(client, seatId, patch);
+  /* A seat reports to a person or to another seat, never both: naming one clears the
+     other, exactly as setting an employee's line does. */
+  const change = { ...patch };
+  if ("line_manager_id" in change && change.line_manager_id) change.line_manager_seat_id = null;
+  if ("line_manager_seat_id" in change && change.line_manager_seat_id) change.line_manager_id = null;
+  const after = await repo.updateSeat(client, seatId, change);
   await emit(client, {
     key: EVENTS.ORG_SEAT_UPDATED,
     entity: { type: "org_seat", id: seatId },
