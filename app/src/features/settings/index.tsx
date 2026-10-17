@@ -15,6 +15,7 @@ import { Roles } from "./Roles";
 import { Button, Card, CardHeader, Chain, Chips, ChoiceField, cn, DataView, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, InlineInput, LoadingRows, PageHeader, Paper, PaperFoot, PaperLogo, PaperTitle, Pill, Signature, StatStrip, StatusPill, Swatch, Switch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { RolePicker, type RoleRef } from "@/features/shared/pickers";
+import { Imports } from "./Imports";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -28,6 +29,8 @@ export default function Settings({ tab }: ModuleScreenProps) {
     case "integrations": return <Integrations />;
     case "security": return <Security />;
     case "audit-log": return <Audit />;
+    case "imports":
+      return <Imports />;
     default: return <OrganisationTab />;
   }
 }

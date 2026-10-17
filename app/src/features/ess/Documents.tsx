@@ -1,89 +1,218 @@
 import { useState } from "react";
-import { invalidate, useMutation, usePaged } from "@/api/hooks";
-import type { MyDocument } from "@/api/types/ess";
-import { useMe } from "@/auth/AuthProvider";
-import { Button, Card, CardHeader, DataView, DesktopOnly, Field, formatDate, Grid, KeyValue, PageHeader, Pager, Paper, PaperFoot, PaperLogo, PaperTitle, PhoneOnly, Pill, Signature, StatStrip, TapList, TextField, toast, UploadField, useModal } from "@mycity/ui";
+import { invalidate, useApi, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
+import { saveFile, useFileUrl } from "@/api/download";
+import type { DocumentRow } from "@mycity/contract/contract.gen.ts";
+import {
+  Button,
+  Card,
+  CardHeader,
+  DataView,
+  DesktopOnly,
+  DocumentPreview,
+  EmptyState,
+  Field,
+  formatDate,
+  Grid,
+  KeyValue,
+  PageHeader,
+  PhoneOnly,
+  Pill,
+  StatStrip,
+  TapList,
+  TextField,
+  toast,
+  UploadField,
+  useModal,
+} from "@mycity/ui";
+
+/**
+ * ESS · My Documents (#14, `my-documents`). The employee's own vault: what is
+ * held, what is signed, what expires soon and what People have asked for and
+ * has not been given yet (docs/guides/ess.md §10).
+ */
+
+const STATUS: Record<DocumentRow["status"], { tone: "ok" | "warn" | "err" | "neutral"; text: string }> = {
+  signed: { tone: "ok", text: "Signed" },
+  verified: { tone: "ok", text: "Verified" },
+  expiring: { tone: "warn", text: "Expiring" },
+  awaiting_verification: { tone: "warn", text: "Awaiting Check" },
+  missing: { tone: "err", text: "Missing" },
+};
+
+const pill = (d: DocumentRow) => <Pill tone={STATUS[d.status].tone}>{STATUS[d.status].text}</Pill>;
 
 export function MyDocumentsPage() {
   const list = usePaged("GET /api/v1/ess/documents");
+  const summary = useApi("GET /api/v1/ess/documents/summary");
   const modal = useModal();
-  const me = useMe();
-  const count = (t: string) => list.rows.filter((d) => d.status.text === t).length;
-  const upload = (name = "") => modal.open({ title: "Upload a Document", body: (close) => <UploadForm name={name} close={close} /> });
-  const contract = (
-    <Paper note="Signed documents carry two hashes and a public verification link.">
-      <PaperLogo reference="CON-0004" />
-      <PaperTitle sub={`Between MyCity App Ltd and ${me.display_name}`}>Contract of Employment</PaperTitle>
-      <p>This agreement sets out the terms on which you are employed as {me.job_title}.</p>
-      <p><b>Hours.</b> As set in your individual work schedule.</p>
-      <p><b>Leave.</b> Twenty working days of paid annual leave in each calendar year.</p>
-      <div className="mt-5 flex gap-7.5">
-        <div><Signature>{me.display_name.split(" ").map((n, i) => (i === 0 ? `${n[0]}.` : n)).join(" ")}</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">Employee</div></div>
-        <div><Signature>I. Chukwu</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">For MyCity App Ltd</div></div>
-      </div>
-      <PaperFoot><span>Content hash verified</span><span>Artifact hash verified</span><span className="ml-auto">go.mycityapp.io/verify/CON-0004</span></PaperFoot>
-    </Paper>
-  );
-  const open = (d: MyDocument) =>
-    d.signed_number
-      ? modal.open({ title: d.name, wide: true, body: contract })
-      : modal.open({
-          title: d.name,
-          body: (
-            <>
-              <Card><CardHeader title={d.name} /><KeyValue items={[["Uploaded", d.uploaded ? formatDate(d.uploaded) : "Not uploaded"], ["Status", <Pill tone={d.status.tone}>{d.status.text}</Pill>], ["Expires", d.expires ? formatDate(d.expires) : "None"]]} /></Card>
-              {(d.status.text === "Missing" || d.status.text === "Expiring") && <Button variant="primary" icon="plus" className="mt-3" onClick={() => upload(d.name)}>Upload Now</Button>}
-            </>
-          ),
-        });
+  const [chosen, setChosen] = useState<DocumentRow | null>(null);
+
+  const add = (row?: DocumentRow) =>
+    modal.open({
+      title: "Upload Document",
+      body: (close) => (
+        <UploadForm
+          row={row ?? null}
+          close={() => {
+            close();
+            invalidate("/api/v1/ess/documents");
+          }}
+        />
+      ),
+    });
+
+  const open = (d: DocumentRow) => {
+    setChosen(d);
+    modal.open({
+      title: d.name,
+      body: (
+        <>
+          <KeyValue
+            items={[
+              ["Uploaded", d.uploaded_at ? formatDate(d.uploaded_at) : "Not uploaded"],
+              ["Status", pill(d)],
+              ["Expires", d.expires_on ? formatDate(d.expires_on) : "None"],
+              ...(d.number ? [["Reference", d.number] as [string, string]] : []),
+            ]}
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {d.document_id && (
+              <Button
+                icon="download"
+                onClick={() => saveFile(`/api/v1/documents/${d.document_id}/content`, d.name)}
+              >
+                Download
+              </Button>
+            )}
+            {!d.document_id && (
+              <Button variant="primary" icon="plus" onClick={() => add(d)}>
+                Upload Document
+              </Button>
+            )}
+          </div>
+        </>
+      ),
+    });
+  };
+
+  const s = summary.data;
+  const columns = [
+    { key: "name", label: "Document", sortable: true, render: (d: DocumentRow) => d.name },
+    {
+      key: "uploaded_at",
+      label: "Uploaded",
+      sortable: true,
+      render: (d: DocumentRow) => (d.uploaded_at ? formatDate(d.uploaded_at) : null),
+    },
+    { key: "status", label: "Status", render: pill },
+    {
+      key: "expires",
+      label: "Expires",
+      desktop: true,
+      render: (d: DocumentRow) => (d.expires_on ? formatDate(d.expires_on) : null),
+    },
+  ];
+
   return (
     <>
-      <PageHeader title="My Documents" sub="Your vault" actions={<Button variant="primary" icon="plus" onClick={() => upload()}>Upload</Button>} />
-      <StatStrip items={[{ label: "Documents", value: String(list.page?.total ?? 0) }, { label: "Signed", value: String(count("Signed")), tone: "ok" }, { label: "Verified", value: String(count("Verified")), tone: "ok" }, { label: "Expiring", value: String(count("Expiring")), tone: "warn" }, { label: "Missing", value: String(count("Missing")), tone: "err" }]} />
+      <PageHeader
+        title="My Documents"
+        actions={
+          <Button variant="primary" icon="plus" onClick={() => add()}>
+            Upload Document
+          </Button>
+        }
+      />
+      <StatStrip
+        items={[
+          { label: "Documents", value: String(s?.documents ?? 0) },
+          { label: "Signed", value: String(s?.signed ?? 0), tone: "ok" },
+          { label: "Verified", value: String(s?.verified ?? 0), tone: "ok" },
+          { label: "Expiring", value: String(s?.expiring ?? 0), tone: "warn" },
+          { label: "Missing", value: String(s?.missing ?? 0), tone: "err" },
+        ]}
+      />
       <PhoneOnly>
-        <TapList items={list.rows.map((d) => ({ key: d.document_ref_id, title: d.name, sub: d.uploaded ? `Uploaded ${formatDate(d.uploaded)}` : "Not uploaded", right: <Pill tone={d.status.tone}>{d.status.text}</Pill>, onClick: () => open(d) }))} />
+        <TapList
+          items={list.rows.map((d) => ({
+            key: d.row_key,
+            title: d.name,
+            sub: d.uploaded_at ? `Uploaded ${formatDate(d.uploaded_at)}` : "Not uploaded",
+            right: pill(d),
+            onClick: () => open(d),
+          }))}
+        />
       </PhoneOnly>
       <DesktopOnly>
         <Grid cols="1/1.5">
           <DataView
+            list={list}
+            columns={columns}
+            rowKey={(d) => d.row_key}
+            caption="Vault"
             title="Vault"
-            rows={list.rows}
-            rowKey={(d) => d.document_ref_id}
-            loading={list.loading}
+            noun="document"
             onRowClick={open}
-            columns={[
-              { key: "n", label: "Document", render: (d) => d.name },
-              { key: "u", label: "Uploaded", render: (d) => (d.uploaded ? formatDate(d.uploaded) : "None") },
-              { key: "s", label: "Status", render: (d) => <Pill tone={d.status.tone}>{d.status.text}</Pill> },
-              { key: "e", label: "Expires", render: (d) => (d.expires ? formatDate(d.expires) : "None") },
-            ]}
-            footer={<Pager page={list.page} onPage={list.setPage} noun="document" />}
+            selectedKey={chosen?.row_key ?? null}
+            empty={{ title: "Nothing Here Yet", text: "Documents you upload appear here.", icon: "doc" }}
           />
-          {contract}
+          <Preview row={chosen} />
         </Grid>
       </DesktopOnly>
     </>
   );
 }
 
-function UploadForm({ name: initial, close }: { name: string; close: () => void }) {
-  const [name, setName] = useState(initial);
-  const save = useMutation("POST /api/v1/ess/documents");
+/** The chosen document, as the browser draws it. */
+function Preview({ row }: { row: DocumentRow | null }) {
+  const href = useFileUrl(row?.document_id ? `/api/v1/documents/${row.document_id}/content` : null);
+  if (!row || !row.document_id) {
+    return (
+      <Card>
+        <CardHeader title="Preview" />
+        <EmptyState bare title="Pick a Document" text="Its preview opens here." icon="doc" />
+      </Card>
+    );
+  }
+  if (!href) {
+    return (
+      <Card>
+        <CardHeader title="Preview" />
+        <EmptyState bare title="Opening" text="This takes a moment." icon="doc" />
+      </Card>
+    );
+  }
+  return (
+    <DocumentPreview
+      name={row.name}
+      mime={row.mime ?? "application/octet-stream"}
+      sizeBytes={row.bytes ?? undefined}
+      href={href}
+    />
+  );
+}
+
+function UploadForm({ row, close }: { row: DocumentRow | null; close: () => void }) {
+  const [title, setTitle] = useState(row?.name ?? "");
   return (
     <>
-      <Field label="What Is It" state={name ? "good" : undefined}>
-        <TextField value={name} onChange={setName} placeholder="NDPA certificate" />
+      <Field label="What Is It" state={title ? "good" : undefined}>
+        <TextField value={title} onChange={setTitle} placeholder="NDPA certificate" />
       </Field>
       <UploadField
+        purpose="document"
+        endpoint="/api/v1/ess/documents"
         upload={upload}
-        purpose="employee_document"
+        fields={{
+          ...(title ? { title } : {}),
+          ...(row?.document_request_id ? { document_request_id: row.document_request_id } : {}),
+        }}
         accept=".pdf,image/*"
         multiple={false}
-        onUploaded={async ([doc]) => {
-          await save.run({ body: { name: name || doc.file_name, document_id: doc.document_id } });
-          invalidate("/api/v1/ess/documents");
-          toast("Uploaded. People will verify it.");
+        kinds="PDF or a picture"
+        onUploaded={() => {
+          toast("Uploaded. People will check it");
           close();
         }}
       />

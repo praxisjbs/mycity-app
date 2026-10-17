@@ -36,6 +36,12 @@ export interface UploadFieldProps {
   endpoint?: string;
   /** What the file is for: the server reads it to decide which types it takes. */
   purpose: string;
+  /**
+   * More text fields to send beside the file, for a route that needs to know
+   * what the file is being attached to (the import it starts, the request it
+   * answers). The server still decides everything it can decide itself.
+   */
+  fields?: Record<string, string>;
   /** How the file is sent; the app's own client, which adds its session. The bare engine otherwise. */
   upload?: Uploader;
   /** Several files at once (the default), or exactly one. */
@@ -61,6 +67,7 @@ export interface UploadFieldProps {
 export function UploadField({
   endpoint = "/api/v1/documents",
   purpose,
+  fields,
   upload = uploadFile,
   multiple = true,
   accept,
@@ -96,7 +103,7 @@ export function UploadField({
 
     added.forEach((item, i) => {
       if (item.error) return;
-      upload({ endpoint, file: chosen[i]!, fields: { purpose }, onProgress: (percent) => patch(item.key, { percent }) })
+      upload({ endpoint, file: chosen[i]!, fields: { purpose, ...fields }, onProgress: (percent) => patch(item.key, { percent }) })
         .then((doc) => {
           patch(item.key, { percent: 100, doc });
           arrived.push(doc);

@@ -2824,6 +2824,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 |---|---|---|---|
 | `endpoint` | `string` |  | Where the multipart goes; `/api/v1/documents` unless the route is its own. |
 | `purpose` | `string` | yes | What the file is for: the server reads it to decide which types it takes. |
+| `fields` | `Record<string, string>` |  | More text fields to send beside the file, for a route that needs to know what the file is being attached to (the import it starts, the request it answers). The server still decides everything it can decide itself. |
 | `upload` | `Uploader` |  | How the file is sent; the app's own client, which adds its session. The bare engine otherwise. |
 | `multiple` | `boolean` |  | Several files at once (the default), or exactly one. |
 | `accept` | `string` |  | What the picker offers, as extensions (".pdf,.jpg"). |
