@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 27 items below: 25 done, 2 open | | | | | |
+| M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 26 | 0 | 6 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
@@ -84,11 +84,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | AI foundation: `services/ai`, manifests, registry, gate 9 | GE | ☑ | 15/10/2026 |
 | CI wiring: `package.json`, lockfile, ESLint, Jest, `ci-local.js`, `ci.yml` | GE | ☑ | 13/10/2026 |
 | Process gates: progress, guides, README map, CODEOWNERS; PR template; Claude Stop hook | GE | ☑ | 13/10/2026 |
-| GitHub settings applied by TB (`docs/runbooks/github-settings.md`) | TB | ☐ | 17/10/2026 |
+| GitHub settings applied by TB (`docs/runbooks/github-settings.md`; branch protection and required reviewers wait for a public repository or a plan that offers them) | TB | ☑ | 17/10/2026 |
 | CODEOWNERS usernames: GE `@swizfcodes`, TB `@tomblakeasaah196`, AJ `@Ghosted34`, LA `@LovedataX` | GE | ☑ | 13/10/2026 |
 | CI gates 1 to 8 and pipeline guards (gate 6: schema-drift and contract-columns) | GE · TB | ☑ | 16/10/2026 |
 | Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval (manual run by GE or TB while the repository is private) | GE | ☑ | 17/10/2026 |
-| Operations: nightly backup, weekly restore drill, offsite copy, uptime probe; runbooks backup-restore, incident, monitoring, add-a-module | GE | ☐ | 16/10/2026 |
+| Operations: nightly backup, weekly restore drill, offsite copy, uptime probe; runbooks backup-restore, incident, monitoring, add-a-module | GE | ☐ | 17/10/2026 |
 | Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
 | Screen gates 8, 11, 12, 17: `five-second`, `two-shells`, `forms`, `dashes`; screen conventions in FRONTEND_GUIDE §5, §7, §8 | TB | ☑ | 14/10/2026 |
 | Frontend foundation PR 1 · Ground: `packages/ui` (tokens, primitives, overlays, help, toast, form system, data client), catalogue and gallery, new gates, docs (FRONTEND_FOUNDATION §4) | AJ | ☑ | 15/10/2026 |
@@ -97,6 +97,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · GitHub settings ticked: TB restricted the production environment to `main`, and
+  the team accepted the rest as it stands for M0. Left: branch protection on `main` and required
+  reviewers on production, once the repository is public or on a plan that offers them.
+  Operations: provisioning re-run on the server, confirmed over SSH, so the backup and restore-drill
+  timers are installed. Still open: the offsite backup host and the WhatsApp alert links.
 - 17/10/2026 · TB · Release pipeline ticked: the team accepted the manual production run by GE or TB
   (`release.yml` approver job) as M0's production approval while the repository is private. Left:
   required reviewers on the production environment once the repository is public or on a plan
