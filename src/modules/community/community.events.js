@@ -20,6 +20,8 @@ const EVENTS = defineEvents("community", {
   "channel.members_changed": { summary: "People were added to or removed from a channel" },
   "channel_message.posted": { summary: "A message was posted in a channel" },
   "channel_message.reacted": { summary: "Someone celebrated, thumbed up or voted on a message" },
+  "channel_message.edited": { summary: "A message was edited, or a poll closed" },
+  "channel_message.deleted": { summary: "A message was deleted by its author or a moderator" },
   "direct_message.sent": { summary: "A direct message was sent" },
   "direct_thread.opened": { summary: "A direct conversation was started" },
   "direct_thread.read": { summary: "A direct conversation was read" },
@@ -69,9 +71,9 @@ for (const key of [
 ]) {
   outbox.register(key, `community.push_message.${key.split(".")[0]}`, (event) => pushToMembers(event, "community.message"));
 }
-outbox.register(EVENTS.CHANNEL_MESSAGE_REACTED, "community.push_update", (event) =>
-  pushToMembers(event, "community.message_updated"),
-);
+for (const key of [EVENTS.CHANNEL_MESSAGE_REACTED, EVENTS.CHANNEL_MESSAGE_EDITED, EVENTS.CHANNEL_MESSAGE_DELETED]) {
+  outbox.register(key, `community.push_update.${key.split(".")[1]}`, (event) => pushToMembers(event, "community.message_updated"));
+}
 for (const key of [EVENTS.DIRECT_THREAD_READ, EVENTS.DIRECT_THREAD_DELIVERED]) {
   outbox.register(key, `community.push_receipt.${key.split(".")[1]}`, (event) => pushToMembers(event, "community.receipt"));
 }

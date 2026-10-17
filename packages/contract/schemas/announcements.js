@@ -10,7 +10,7 @@ const { z } = require("zod");
 const { uuid, text, isoDateTime, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
 
-const ANNOUNCEMENT_STATUSES = ["draft", "scheduled", "published", "archived"];
+const ANNOUNCEMENT_STATUSES = ["draft", "scheduled", "published", "archived", "cancelled"];
 const AnnouncementStatus = z.enum(ANNOUNCEMENT_STATUSES);
 
 /** Who an announcement is for: all staff, or the people of chosen departments. */
@@ -58,6 +58,19 @@ const AnnouncementCreate = z
   })
   .strict();
 
+/**
+ * PUT /community/announcements/:id: change a scheduled announcement before it goes out.
+ * publish_at stays required, and in the future: an edit never publishes.
+ */
+const AnnouncementUpdate = z
+  .object({
+    title: text(120),
+    body: text(4000),
+    audience: Audience,
+    publish_at: isoDateTime,
+  })
+  .strict();
+
 /** GET /community/announcements/:id/reads: one person in the audience. */
 const AnnouncementReader = z
   .object({ person: PersonRef, read_at: isoDateTime.nullable() })
@@ -80,6 +93,7 @@ const TABLES = {
   AnnouncementListQuery: { table: null, reason: "list controls for the tracking tab" },
   AnnouncementPage: { table: null, reason: "a page of announcements" },
   AnnouncementCreate: { table: "announcement" },
+  AnnouncementUpdate: { table: "announcement" },
   AnnouncementReader: {
     table: "announcement_read",
     virtual: { person: "the reader's employee, as a PersonRef" },
@@ -99,6 +113,7 @@ module.exports = {
   AnnouncementListQuery,
   AnnouncementPage,
   AnnouncementCreate,
+  AnnouncementUpdate,
   AnnouncementReader,
   AnnouncementReadQuery,
   AnnouncementReadPage,

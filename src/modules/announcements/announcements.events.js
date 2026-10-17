@@ -13,6 +13,8 @@ const realtime = require("../../services/realtime/emitter");
 
 const EVENTS = defineEvents("community", {
   "announcement.created": { summary: "An announcement was written, to go out now or later" },
+  "announcement.updated": { summary: "A scheduled announcement was changed before it went out" },
+  "announcement.cancelled": { summary: "A scheduled announcement was called off" },
   "announcement.published": { summary: "An announcement went out to its audience" },
   "announcement.reminded": { summary: "People who had not read an announcement were reminded" },
 });
@@ -26,6 +28,20 @@ outbox.register(EVENTS.ANNOUNCEMENT_CREATED, "announcements.schedule_release", a
     "release",
     { announcement_id: event.payload.announcement_id },
     { delay: Math.max(0, new Date(at).getTime() - Date.now()), jobId: `announcement-publish-${event.payload.announcement_id}` },
+  );
+});
+
+/*
+ * An edit queues a release at the new time under its own job id (the first one may still
+ * be waiting, and a queue keeps one job per id). Whichever runs first and finds it not yet
+ * due, or no longer scheduled, does nothing.
+ */
+outbox.register(EVENTS.ANNOUNCEMENT_UPDATED, "announcements.reschedule_release", async (event) => {
+  await queues.enqueue(
+    "announcement-publish",
+    "release",
+    { announcement_id: event.payload.announcement_id },
+    { delay: Math.max(0, new Date(event.payload.publish_at).getTime() - Date.now()), jobId: `announcement-publish-${event.payload.announcement_id}-${event.event_id}` },
   );
 });
 

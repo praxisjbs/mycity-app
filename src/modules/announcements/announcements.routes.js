@@ -15,6 +15,8 @@ const poster = () => requireCapability("announcements.post");
 
 route(router, "get", "/", { query: an.AnnouncementListQuery, response: an.AnnouncementPage, summary: "Announcements and their reads" }, requirePermission("community", "view"), poster(), controller.list);
 route(router, "post", "/", { body: an.AnnouncementCreate, response: an.Announcement, summary: "Publish or schedule an announcement" }, requirePermission("community", "create"), poster(), controller.create);
+route(router, "put", "/:id", { body: an.AnnouncementUpdate, response: an.Announcement, summary: "Change a scheduled announcement" }, requirePermission("community", "create"), poster(), controller.update);
+route(router, "post", "/:id/cancel", { body: c.common.EmptyBody, response: an.Announcement, summary: "Cancel a scheduled announcement" }, requirePermission("community", "create"), poster(), controller.cancel);
 route(router, "get", "/:id/reads", { query: an.AnnouncementReadQuery, response: an.AnnouncementReadPage, summary: "Who has and has not read an announcement" }, requirePermission("community", "view"), poster(), controller.readers);
 route(router, "post", "/:id/remind", { body: c.common.EmptyBody, response: an.RemindResult, summary: "Remind those who have not read it" }, requirePermission("community", "view"), poster(), controller.remind);
 

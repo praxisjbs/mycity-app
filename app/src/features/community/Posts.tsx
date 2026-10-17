@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/api/client";
 import { saveFile, useFileUrl } from "@/api/download";
 import type { Message } from "@/api/types/community";
-import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, initials, ShareBar, Waveform } from "@mycity/ui";
+import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, initials, Pill, ShareBar, Waveform } from "@mycity/ui";
 
 /** Highlight search hits inside a message. */
 export function Hl({ text, q }: { text: string; q: string }) {
@@ -125,11 +125,13 @@ function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
 const TICK = { sent: ["tick", "Sent"], delivered: ["ticks", "Delivered"], read: ["ticks", "Read"] } as const;
 
 /** One post in a channel or a conversation. */
-export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void }) {
-  if (m.message_type === "birthday" || m.message_type === "anniversary") return m.celebration ? <Celebration m={m} onCelebrate={onCelebrate} /> : null;
-  if (m.message_type === "recognition" && m.recognition) {
+export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void; menu?: ReactNode }) {
+  /* A card keeps its look; its menu sits beside it. */
+  const withMenu = (card: ReactNode) => (menu ? <div className="flex items-start gap-1">{card}{menu}</div> : card);
+  if (!m.deleted && (m.message_type === "birthday" || m.message_type === "anniversary")) return m.celebration ? withMenu(<Celebration m={m} onCelebrate={onCelebrate} />) : null;
+  if (!m.deleted && m.message_type === "recognition" && m.recognition) {
     const r = m.recognition!;
-    return (
+    return withMenu(
       <div className="max-w-136 rounded-card border border-l-2 border-border border-l-primary bg-accent px-3.5 py-3">
         <div className="flex items-center gap-2 text-sm">
           <Avatar name={r.to.display_name} size={26} />
@@ -137,27 +139,30 @@ export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string;
         </div>
         <q className="mt-1.5 mb-2 block text-sm text-foreground">{m.body}</q>
         <button type="button" onClick={onCelebrate} className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-strong", r.mine ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted")}>👍 {r.count}</button>
-      </div>
+      </div>,
     );
   }
-  if (m.message_type === "poll" && m.poll) {
+  if (!m.deleted && m.message_type === "poll" && m.poll) {
     const p = m.poll!;
     const votes = p.options.reduce((a, o) => a + o.votes, 0);
     const tot = votes || 1;
-    return (
+    return withMenu(
       <div className="max-w-136 rounded-card border border-border bg-background px-3.5 py-3">
-        <div className="mb-1 text-2xs text-subtle-foreground">Poll by {m.author?.display_name} · {votes} vote{votes === 1 ? "" : "s"}</div>
+        <div className="mb-1 flex items-center gap-2 text-2xs text-subtle-foreground">
+          <span className="flex-1">Poll by {m.author?.display_name} · {votes} vote{votes === 1 ? "" : "s"}{m.edited_at ? " · Edited" : ""}</span>
+          {p.closed && <Pill>Closed</Pill>}
+        </div>
         <h3 data-copy="content" className="mb-2 text-sm">{p.question}</h3>
         {p.options.map((o, i) => {
           const pc = Math.round((o.votes * 100) / tot);
           return (
-            <button key={i} type="button" onClick={() => onVote(i)} aria-pressed={p.my_vote === i} className={cn("relative mb-1.5 block w-full overflow-hidden rounded-box border px-2.5 py-2 text-left text-xs phone:min-h-tap", p.my_vote === i ? "border-secondary" : "border-border")}>
+            <button key={i} type="button" disabled={p.closed} onClick={() => onVote(i)} aria-pressed={p.my_vote === i} className={cn("relative mb-1.5 block w-full overflow-hidden rounded-box border px-2.5 py-2 text-left text-xs phone:min-h-tap", p.my_vote === i ? "border-secondary" : "border-border")}>
               <ShareBar percent={pc} />
               <span className={cn("relative flex justify-between gap-2", p.my_vote === i && "font-strong")}><span>{o.text}</span><span>{pc}%</span></span>
             </button>
           );
         })}
-      </div>
+      </div>,
     );
   }
   if (m.message_type === "announcement") {
@@ -192,12 +197,14 @@ export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string;
           {!m.mine && m.author?.display_name}
           <span className="text-2xs font-normal text-subtle-foreground">
             {formatTime(m.sent_at)}
+            {m.edited_at && !m.deleted && " · Edited"}
             {m.mine && dm && m.status && (
               <span role="img" className={cn("ml-1 inline-flex align-text-bottom", m.status === "read" ? "text-info" : "text-subtle-foreground")} title={TICK[m.status][1]} aria-label={TICK[m.status][1]}>
                 <Icon name={TICK[m.status][0]} className="size-3.5" />
               </span>
             )}
           </span>
+          {menu}
         </div>
         <div className={cn("px-3 py-2 text-sm leading-normal wrap-any", m.mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground")}>
           {inner}

@@ -3,14 +3,14 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import "@/api/types/organisation";
-import type { Announcement, Channel, Conversation, Member } from "@/api/types/community";
+import type { Announcement, Channel, Conversation, Member, Message } from "@/api/types/community";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
-import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
+import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
 import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
 import { upload } from "@/api/upload";
 
@@ -142,7 +142,17 @@ function Channels() {
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
-      <ThreadBody t={t} />
+      <ThreadBody
+        t={t}
+        editPoll={(m) => modal.open({ title: "Edit Poll", body: (close) => <PollForm close={close} edit={m} send={(b) =>
+              api
+                .call("PUT /api/v1/community/messages/:id", { params: { id: m.community_message_id }, body: { body: b.body, options: b.options } })
+                .then(t.replace)
+                .catch((e: unknown) => {
+                  if (e instanceof ApiError) toast(e.message);
+                })
+            } /> })}
+      />
       <Composer
         key={current.community_channel_id}
         placeholder={`Message #${current.name}`}
@@ -155,8 +165,8 @@ function Channels() {
             trigger={(p) => <button {...p} type="button" className={cls} aria-label="Add to message"><Icon name="plus" /></button>}
             items={[
               { label: "Recognise a Colleague", icon: "thumb", onSelect: () => modal.open({ title: "Recognise a Colleague", body: (close) => <Recognise close={close} done={() => (t.reload(), reloadList())} /> }) },
-              { label: "Celebrate", icon: "flag", onSelect: () => modal.open({ title: "Celebrate", body: (close) => <Celebrate close={close} send={(b) => after(t.send(b))} /> }) },
-              { label: "Start a Poll", icon: "chart", onSelect: () => modal.open({ title: "Start a Poll", body: (close) => <PollForm close={close} send={(b) => after(t.send(b))} /> }) },
+              ...(current.can_moderate ? [{ label: "Celebrate", icon: "flag" as const, onSelect: () => modal.open({ title: "Celebrate", body: (close) => <Celebrate close={close} send={(b) => after(t.send(b))} /> }) }] : []),
+              ...(current.can_poll ? [{ label: "Start a Poll", icon: "chart" as const, onSelect: () => modal.open({ title: "Start a Poll", body: (close) => <PollForm close={close} send={(b) => after(t.send(b))} /> }) }] : []),
               { label: "Attach a File", icon: "clip", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
             ]}
           />
@@ -199,6 +209,16 @@ function Members({ c, close, edit = false, onChanged }: { c: Channel; close: () 
     list.reload();
     onChanged?.();
   };
+  const setRole = async (m: Member, member_role: "admin" | "member") => {
+    try {
+      await api.call("PUT /api/v1/community/channels/:id/members/:user_id/role", { params: { id: c.community_channel_id, user_id: m.user_id }, body: { member_role } });
+      toast(member_role === "admin" ? `${m.person.display_name} is now an admin` : `${m.person.display_name} is no longer an admin`);
+      list.reload();
+      onChanged?.();
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.code === "LAST_ADMIN" ? "A channel needs an admin" : e.message);
+    }
+  };
   if (adding) return <AddMembers c={c} close={() => setAdding(false)} done={() => (setAdding(false), list.reload(), onChanged?.())} />;
   return (
     <>
@@ -208,8 +228,14 @@ function Members({ c, close, edit = false, onChanged }: { c: Channel; close: () 
         people={list.rows.map((m) => m.person)}
         right={(p) => {
           const m = list.rows.find((x) => x.person.employee_id === p.employee_id)!;
-          if (m.member_role === "admin") return <Pill tone="ok">Admin</Pill>;
-          return edit ? <Button size="sm" onClick={() => void remove(m)}>Remove</Button> : null;
+          const admin = m.member_role === "admin";
+          if (!edit) return admin ? <Pill tone="ok">Admin</Pill> : null;
+          return (
+            <span className="flex flex-none items-center gap-1.5">
+              <Button size="sm" onClick={() => void setRole(m, admin ? "member" : "admin")}>{admin ? "Remove Admin" : "Make Admin"}</Button>
+              {!admin && <Button size="sm" onClick={() => void remove(m)}>Remove</Button>}
+            </span>
+          );
         }}
       />
       {list.page?.has_next && <Button size="sm" className="mt-2" onClick={() => list.setPage(list.pageNumber + 1)}>Next Page</Button>}
@@ -341,8 +367,10 @@ function Celebrate({ close, send }: { close: () => void; send: (b: { message_typ
   );
 }
 
-function PollForm({ close, send }: { close: () => void; send: (b: { message_type: "poll"; body: string; options: string[] }) => Promise<void> }) {
-  const f = useContractForm({ q: "", o1: "", o2: "", o3: "", o4: "" }, { q: (v) => (v.trim().length > 3 ? null : "Add a question"), o1: rules.required("Add an option"), o2: rules.required("Add an option") });
+/** Start a Poll, or with `edit` the same form filled in (before its first vote). */
+function PollForm({ close, send, edit }: { close: () => void; send: (b: { message_type: "poll"; body: string; options: string[] }) => Promise<unknown>; edit?: Message }) {
+  const opt = (i: number) => edit?.poll?.options[i]?.text ?? "";
+  const f = useContractForm({ q: edit?.poll?.question ?? "", o1: opt(0), o2: opt(1), o3: opt(2), o4: opt(3) }, { q: (v) => (v.trim().length > 3 ? null : "Add a question"), o1: rules.required("Add an option"), o2: rules.required("Add an option") });
   const go = async () => {
     if (!f.check()) return;
     close();
@@ -356,7 +384,7 @@ function PollForm({ close, send }: { close: () => void; send: (b: { message_type
       ))}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="chart" onClick={go}>Post Poll</Button>
+        <Button variant="primary" icon="chart" onClick={go}>{edit ? "Save Changes" : "Post Poll"}</Button>
       </FormFooter>
     </>
   );
@@ -383,7 +411,9 @@ function Attach({ channelId, close, send }: { channelId: string; close: () => vo
 
 /* ───────────────────────── Direct messages ───────────────────────── */
 
-const seenLine = (c: { online: boolean; last_seen_at: string | null }) => (c.online ? "Online" : c.last_seen_at ? `Last seen ${formatWhen(c.last_seen_at)}` : "Offline");
+const seenLine = (c: { online: boolean; last_seen_at: string | null; is_self?: boolean }) => (c.is_self ? "Message yourself" : c.online ? "Online" : c.last_seen_at ? `Last seen ${formatWhen(c.last_seen_at)}` : "Offline");
+/** A conversation's name: "You" for a conversation with oneself, as on WhatsApp. */
+const chatName = (c: Conversation) => (c.is_self ? "You" : c.person.display_name);
 
 function Direct() {
   const mobile = useIsMobile();
@@ -421,10 +451,15 @@ function Direct() {
   };
   const start = useCallback(
     async (p: PersonRef) => {
-      const c = await api.call("POST /api/v1/community/direct", { body: { employee_id: p.employee_id } });
-      reloadList();
-      setSel(c);
-      setOpen(true);
+      try {
+        const c = await api.call("POST /api/v1/community/direct", { body: { employee_id: p.employee_id } });
+        reloadList();
+        setSel(c);
+        setOpen(true);
+      } catch (e) {
+        if (e instanceof ApiError) toast(e.message);
+        else throw e;
+      }
     },
     [reloadList],
   );
@@ -433,7 +468,12 @@ function Direct() {
   useEffect(() => {
     if (!to) return;
     setParams({ to: null }, { replace: true });
-    void api.call("POST /api/v1/community/direct", { body: { employee_id: to } }).then((c) => (setSel(c), setOpen(true), invalidate("/api/v1/community/direct")));
+    void api
+      .call("POST /api/v1/community/direct", { body: { employee_id: to } })
+      .then((c) => (setSel(c), setOpen(true), invalidate("/api/v1/community/direct")))
+      .catch((e: unknown) => {
+        if (e instanceof ApiError) toast(e.message);
+      });
   }, [to, setParams]);
 
   const after = async (work: Promise<void>) => {
@@ -442,7 +482,7 @@ function Direct() {
   };
   const mute = async (c: Conversation) => {
     await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
-    toast(c.muted ? `Notifications on for ${c.person.display_name}` : `Muted ${c.person.display_name}`);
+    toast(c.muted ? `Notifications on for ${chatName(c)}` : `Muted ${chatName(c)}`);
     reloadList();
   };
   const showProfile = () => {
@@ -466,8 +506,8 @@ function Direct() {
             key={c.community_channel_id}
             on={c.community_channel_id === current?.community_channel_id && (!mobile || open)}
             unread={c.unread > 0}
-            lead={<Avatar name={c.person.display_name} size={32} online={c.online} />}
-            title={c.person.display_name}
+            lead={<Avatar name={c.person.display_name} size={32} online={c.online && !c.is_self} />}
+            title={chatName(c)}
             sub={`${c.last_mine ? "You: " : ""}${c.last_text ?? "No messages yet"}`}
             when={formatWhen(c.last_at)}
             count={c.unread}
@@ -483,10 +523,10 @@ function Direct() {
     <>
       <ThreadHead onBack={() => setOpen(false)} backLabel="Back to conversations">
         <button type="button" onClick={showProfile} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" aria-label="View profile">
-          <Avatar name={current.person.display_name} size={32} online={current.online} />
+          <Avatar name={current.person.display_name} size={32} online={current.online && !current.is_self} />
           <span className="min-w-0 flex-1">
-            <b className="block truncate text-base font-strong">{current.person.display_name}</b>
-            <span className="block truncate text-2xs text-subtle-foreground">{seenLine(current)} · {current.person.department}</span>
+            <b className="block truncate text-base font-strong">{chatName(current)}</b>
+            <span className="block truncate text-2xs text-subtle-foreground">{current.is_self ? seenLine(current) : `${seenLine(current)} · ${current.person.department}`}</span>
           </span>
         </button>
         <IconButton icon="srch" label="Search in conversation" onClick={() => setSearching(true)} />
@@ -504,7 +544,7 @@ function Direct() {
       <ThreadBody t={t} dm />
       <Composer
         key={current.community_channel_id}
-        placeholder={`Message ${current.person.display_name.split(" ")[0]}`}
+        placeholder={current.is_self ? "Message yourself" : `Message ${current.person.display_name.split(" ")[0]}`}
         onSend={(b) => after(t.send(b))}
         onVoice={(file, secs) => after(t.sendFile(file, secs))}
         plus={(cls) => (
@@ -556,7 +596,7 @@ function NewMessage({ close, start }: { close: () => void; start: (p: PersonRef)
   }, [who, close, start]);
   return (
     <>
-      <EmployeePicker value={who} onChange={setWho} placeholder="Name or department" />
+      <EmployeePicker value={who} onChange={setWho} placeholder="Name or department" withSelf />
       <FormFooter><Button onClick={close}>Cancel</Button></FormFooter>
     </>
   );
@@ -668,6 +708,21 @@ function Announcements() {
 
 function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => void; done: () => void }) {
   const live = a.status === "published";
+  const [editing, setEditing] = useState(false);
+  const confirm = useConfirm();
+  const cancel = useMutation("POST /api/v1/community/announcements/:id/cancel");
+  const callOff = async () => {
+    if (!(await confirm({ title: "Cancel Announcement", body: `"${a.title}" will not be posted.`, confirmLabel: "Cancel Announcement", cancelLabel: "Keep It", destructive: true }))) return;
+    try {
+      await cancel.run({ params: { id: a.announcement_id }, body: {} });
+      invalidate("/api/v1/community");
+      close();
+      done();
+      toast("Announcement cancelled");
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.message);
+    }
+  };
   const notRead = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "not_read" }, enabled: live });
   const read = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "read" }, enabled: live });
   const remind = useMutation("POST /api/v1/community/announcements/:id/remind");
@@ -682,6 +737,7 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       if (e instanceof ApiError) toast(e.message);
     }
   };
+  if (editing) return <NewAnnouncement edit={a} close={() => setEditing(false)} done={() => (close(), done())} />;
   return (
     <>
       <div data-copy="content">
@@ -702,33 +758,45 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
           <PeopleList people={read.rows.map((r) => r.person)} right={() => <Pill tone="ok">Read</Pill>} />
         </>
       )}
-      <FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter>
+      <FormFooter>
+        {!live && <Button variant="danger" busy={cancel.pending} onClick={() => void callOff()}>Cancel Announcement</Button>}
+        {!live && <Button icon="edit" onClick={() => setEditing(true)}>Edit</Button>}
+        <Button variant="primary" onClick={close}>Close</Button>
+      </FormFooter>
     </>
   );
 }
 
-function NewAnnouncement({ close, done }: { close: () => void; done: () => void }) {
-  const [when, setWhen] = useState<"now" | "later">("now");
-  const [kind, setKind] = useState<"all" | "departments">("all");
-  const [depts, setDepts] = useState<string[]>([]);
+/** New Announcement, or with `edit` the same form filled in for a scheduled one. */
+function NewAnnouncement({ close, done, edit }: { close: () => void; done: () => void; edit?: Announcement }) {
+  const [when, setWhen] = useState<"now" | "later">(edit ? "later" : "now");
+  const [kind, setKind] = useState<"all" | "departments">(edit?.audience.kind ?? "all");
+  const [depts, setDepts] = useState<string[]>(edit?.audience.department_ids ?? []);
   const [deptsBad, setDeptsBad] = useState(false);
-  const f = useContractForm({ title: "", body: "", date: "" }, { title: (v) => (v.trim().length > 3 ? null : "Add a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
+  const f = useContractForm({ title: edit?.title ?? "", body: edit?.body ?? "", date: edit?.publish_at ? todayIso(new Date(edit.publish_at)) : "" }, { title: (v) => (v.trim().length > 3 ? null : "Add a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
   const save = useMutation("POST /api/v1/community/announcements");
+  const change = useMutation("PUT /api/v1/community/announcements/:id");
   const submit = async () => {
     const noDate = when === "later" && !f.values.date;
     if (noDate) f.setServerErrors({ date: ["Not a real date"] });
     const noDepts = kind === "departments" && !depts.length;
     setDeptsBad(noDepts);
     if (!f.check() || noDate || noDepts) return;
+    const audience = { kind, department_ids: kind === "departments" ? depts : [] };
+    const publish_at = `${f.values.date}T09:00:00+01:00`;
     try {
-      await save.run({ body: { title: f.values.title.trim(), body: f.values.body.trim(), audience: { kind, department_ids: kind === "departments" ? depts : [] }, ...(when === "later" && { publish_at: `${f.values.date}T09:00:00+01:00` }) } });
+      if (edit) {
+        await change.run({ params: { id: edit.announcement_id }, body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, publish_at } });
+      } else {
+        await save.run({ body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, ...(when === "later" && { publish_at }) } });
+      }
       invalidate("/api/v1/community");
       close();
       done();
-      toast(when === "later" ? `Scheduled for ${formatDate(f.values.date)}` : "Published to #announcements");
+      toast(edit ? `Scheduled for ${formatDate(f.values.date)}` : when === "later" ? `Scheduled for ${formatDate(f.values.date)}` : "Published to #announcements");
     } catch (e) {
-      if (e instanceof ApiError && e.status === 403) toast(e.message);
-      const fields = save.fields ?? {};
+      if (e instanceof ApiError && (e.status === 403 || e.status === 409)) toast(e.message);
+      const fields = (edit ? change.fields : save.fields) ?? {};
       f.setServerErrors({ ...fields, ...(fields.publish_at ? { date: fields.publish_at } : {}) });
     }
   };
@@ -742,11 +810,11 @@ function NewAnnouncement({ close, done }: { close: () => void; done: () => void 
           <DepartmentChips value={depts} onChange={(v) => (setDepts(v), setDeptsBad(false))} />
         </Field>
       )}
-      <Field label="When"><ChoiceField value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>
+      {!edit && <Field label="When"><ChoiceField value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>}
       {when === "later" && <Field label="Publish Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>{when === "later" ? "Schedule Announcement" : "Publish Announcement"}</Button>
+        <Button variant="primary" busy={save.pending || change.pending} onClick={submit}>{edit ? "Save Changes" : when === "later" ? "Schedule Announcement" : "Publish Announcement"}</Button>
       </FormFooter>
     </>
   );

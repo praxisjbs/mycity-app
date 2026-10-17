@@ -52,7 +52,10 @@ track who has read them.
    message in #announcements, in the same transaction → `announcement.published` → notification to
    the whole audience (all staff, or chosen departments). A scheduled announcement is stored with
    `publish_at` and released by a delayed job; until then it is visible only on the Announcements
-   tab, marked Scheduled. Opening the message marks it read; the Announcements tab shows the
+   tab, marked Scheduled, and its poster (anyone with `announcements.post`) can **Edit** its
+   headline, message, audience and date, or **Cancel Announcement**. A cancelled one leaves the
+   list and is never posted. The release checks the announcement is still scheduled and due, so a
+   job queued for a date since moved does nothing. Opening the message marks it read; the Announcements tab shows the
    counts and the list of who has not read it.
 3. **Celebrations.** The `celebrations` scheduler runs at 05:00 Africa/Lagos, reads employees whose
    `date_of_birth` (day and month) or `start_date` anniversary is today, and posts one celebration
@@ -65,11 +68,16 @@ track who has read them.
    voting, no employee of the month (Cynthia).
 5. **Channels are created** from New Channel: name, purpose, members (whole departments and/or
    individuals), and **who can post, decided at creation** (every member, or admins only). The
-   creator is the channel's admin. Channels are internal: there is no public or join link.
+   creator is the channel's first admin. Channels are internal: there is no public or join link.
 6. **Members** are reached from the channel's ⋮ menu (View Members, Edit Members for admins), never
-   from a button on the page.
+   from a button on the page. In Edit Members each person's row carries **Make Admin** or
+   **Remove Admin** beside Remove; a channel always keeps at least one admin, so the last one's
+   Remove Admin is refused.
 7. **Direct messages** start from New Message → employee picker → the conversation appears in the
-   list once the first message is sent.
+   list once the first message is sent. The picker offers the caller too: a conversation with
+   oneself keeps notes, drafts and files (GE, 17/10/2026). As on WhatsApp it is named **You** in the
+   list and the header, "Message yourself" under it, and its profile is the caller's own. It has
+   one member and shows no ticks or online dot.
 8. **View Profile** (the person's name in the thread header, or ⋮ → View Profile): a third column on
    desktop, a sheet on mobile. It shows title, status, work email, phone, worksite and local time,
    the files and voice notes shared in this conversation, channels in common, a mute switch, and
@@ -90,7 +98,7 @@ track who has read them.
     The transcript is stored once per voice note, so the second person to ask gets it at once.
 12. **Announcement read tracking** (Announcements tab): each card shows its title, an "N of 25 read"
     pill (or Scheduled), the body and who posted it. Clicking a card opens **Announcement Reads**
-    (**Scheduled Announcement** before it goes out): the headline, the posted line, the body, "Read
+    (**Scheduled Announcement** before it goes out, with **Edit** and **Cancel Announcement**): the headline, the posted line, the body, "Read
     by N of 25" with its bar, and under that two lists, **Not Read** (with a **Remind Them** button
     that notifies only those people) and **Read**. The lists live in the modal only, never on the
     card. **Average Read** on the tab is the mean, across published announcements, of the share of
@@ -98,6 +106,20 @@ track who has read them.
 13. **Resizable list.** On desktop the divider between the list and the conversation can be dragged
     (or moved with the arrow keys; double click resets). The width is remembered per browser. The
     list and the conversation each scroll on their own; the page never scrolls behind them.
+14. **Edit, delete and close.** Each message has a menu (⋮ beside its time, shown on hover on
+    desktop and always on a phone; none when there is nothing to do) with only what the caller may
+    do: **Edit** on their own text message for 15 minutes (Edit Message, the text and Save
+    Changes), marked "Edited" after; **Edit** on their own poll until its first vote (Edit Poll, the Start a Poll form filled in),
+    and **Close Poll** after
+    (by its author or a moderator), which stops voting and keeps the result; **Delete** on their own
+    message, or on anyone's for a moderator (the channel's admins; People and the CEO in #general
+    and #announcements). A deleted message stays in its place as "Message deleted". Deleting a
+    recognition also takes it out of the counts Home and M2 read. An announcement's post is not
+    deleted from the channel: it is managed from the Announcements tab.
+15. **Who posts what.** Recognition is open to every member of staff, always (A19). A poll in
+    #general is posted by People and the CEO only; in any other channel it follows Who Can Post. A
+    celebration posted by hand (Celebrate) comes from the channel's admins, or People and the CEO in
+    #general; the 05:00 posts (step 3) need nobody. The ＋ menu offers only what the caller may post.
 
 ## 4 · Data
 
@@ -113,7 +135,7 @@ are the contract's keys (gate 6).
 | `community_poll_vote` | `community_message_id`, `user_id`, `option_index` | One vote per person; voting again moves it |
 | `peer_recognition` | `from_employee_id`, `to_employee_id`, `message`, `community_message_id`, `note_written_by_system` | Kept separately so M2 performance and Home can count recognitions |
 | `community_presence` | `user_id`, `last_seen_at` | Touched by the socket on connect, every 30 seconds and on disconnect; online means a touch in the last 90 seconds |
-| `announcement` | `announcement_id`, `title`, `body`, `audience` jsonb (`{ kind: all \| departments, department_ids }`), `status` (`scheduled` / `published`), `publish_at`, `published_at`, `published_by`, `community_message_id`, `audience_size`, `last_reminded_at` | The record. #announcements and the M10 Knowledge Hub both read it |
+| `announcement` | `announcement_id`, `title`, `body`, `audience` jsonb (`{ kind: all \| departments, department_ids }`), `status` (`scheduled` / `published` / `cancelled`), `publish_at`, `published_at`, `published_by`, `community_message_id`, `audience_size`, `last_reminded_at` | The record. #announcements and the M10 Knowledge Hub both read it |
 | `announcement_read` | `announcement_id`, `user_id`, `read_at` | One row per person in the audience, written when it is published; `read_at` is set when they open #announcements |
 
 Files (images, voice notes, video, documents) are uploaded to the conversation first
@@ -135,20 +157,26 @@ member of answers 404, whatever their grants.
 | `GET /channels/:id` | → `Channel` | member | | |
 | `GET /channels/:id/members` | `MemberListQuery` → `MemberPage` | member | yes | Admins first |
 | `POST /channels/:id/members`, `DELETE /channels/:id/members/:user_id` | `MemberAdd` | channel admin | | Not on #general or #announcements |
+| `PUT /channels/:id/members/:user_id/role` | `MemberRoleSet` → `Member` | channel admin | | `admin` or `member`; the last admin cannot step down. Not on #general or #announcements |
 | `POST /channels/:id/mute`, `POST /channels/:id/read` | `MuteSet`, empty | member | | |
 | `POST /channels/:id/delivered` | `DeliveredAck` | member | | The client acknowledges direct messages it received: the delivered tick |
 | `GET /channels/:id/messages` | `MessageListQuery` → `MessagePage` | member | yes | Newest page first, each page oldest to newest; "Load Older" asks for the next page. `q` returns only the matches, and the screen steps between them |
 | `POST /channels/:id/media` | multipart `file` → `DocumentRef` | member, `post_policy` | | Upload first, then post the message with its `document_id` |
 | `POST /channels/:id/messages` | `MessageCreate` → `Message` | member, `post_policy` | | `text`, `image`/`audio`/`video`/`file` with `document_id` (`audio` with `duration_s`), `poll` with 2 to 4 `options`, `birthday`/`anniversary` with `subject_employee_id`. Idempotency-Key honoured |
 | `POST /recognitions` | `RecognitionCreate` → `Message` | `community` create | | Always posted to #general (A19). `to_employee_id` cannot be the sender |
+| `PUT /messages/:id` | `MessageEdit` → `Message` | author | | Text within 15 minutes; a poll's question and options before its first vote (409 after) |
+| `DELETE /messages/:id` | → 204 | author or moderator | | Soft delete (`deleted_at`); a recognition's `peer_recognition` row goes too; not an announcement's post |
+| `POST /messages/:id/close` | empty → `Message` | poll author or moderator | | Polls only; votes are refused after |
 | `POST /messages/:id/reactions`, `POST /messages/:id/vote` | empty, `PollVote` → `Message` | member | | |
 | `POST /messages/:id/transcript` | → `Transcript` | member | | Voice notes only, through `services/ai/transcription.js`; stored on the message |
 | `GET /direct` | `ConversationListQuery` → `ConversationPage` | own | yes | Filters `q`, `unread` |
 | `POST /direct` | `{ employee_id }` → `Conversation` | `community` create | | Returns the existing conversation if there is one (one per pair, under a lock) |
-| `GET /people` | `ColleagueListQuery` → `ColleaguePage` | `community` view | yes | Colleagues with a login, for the people pickers (New Message, Recognise, Celebrate, members): public work fields only, open to every member of staff. The staff register needs People |
+| `GET /people` | `ColleagueListQuery` → `ColleaguePage` | `community` view | yes | Colleagues with a login, for the people pickers (New Message, Recognise, Celebrate, members): public work fields only, open to every member of staff. The caller is left out unless `with_self` is set: New Message offers a conversation with oneself; Recognise, Celebrate and the member pickers never offer the caller. The staff register needs People |
 | `GET /people/:id/card` | → `ProfileCard` | `community` view | | The profile panel: public work fields only (work email, phone, worksite), presence, what this conversation shares |
 | `GET /announcements` | `AnnouncementListQuery` → `AnnouncementPage` | `announcements.post` capability | yes | The tracking tab |
 | `POST /announcements` | `AnnouncementCreate` → `Announcement` | `announcements.post` capability | | `audience` all staff or departments; `publish_at` optional and in the future (day-first on screen, ISO on the wire) |
+| `PUT /announcements/:id` | `AnnouncementUpdate` → `Announcement` | capability | | Scheduled only (409 once posted or cancelled): headline, message, audience, `publish_at` in the future |
+| `POST /announcements/:id/cancel` | empty → `Announcement` | capability | | Scheduled only; it is never posted |
 | `GET /announcements/:id/reads` | `AnnouncementReadQuery` → `AnnouncementReadPage` | capability | yes | Filter `read` / `not_read` |
 | `POST /announcements/:id/remind` | → `RemindResult` | capability | | Notifies only those who have not read it; once per day per announcement (429 after) |
 
@@ -161,6 +189,10 @@ in #announcements, which every member of staff reads.
 
 - A user reads and writes only in channels they are a member of. Removed members lose the channel's
   history.
+- A channel has at least one admin. Admins add and remove members and make or unmake admins; the
+  creator is the first. An admin cannot remove themselves, and the last admin cannot step down.
+- A scheduled announcement can be edited or cancelled until it goes out, by anyone holding
+  `announcements.post`; once posted it is never edited, because people may have read it.
 - `post_policy` is chosen when a channel is created and cannot be changed afterwards. #announcements
   is `people_ceo`.
 - The author of a message, recognition, poll, channel or announcement is always the signed-in user.
@@ -172,7 +204,14 @@ in #announcements, which every member of staff reads.
   A recognition to oneself is refused.
 - Celebrations post at 05:00 Africa/Lagos, every day of the week, one card per person per occasion.
   An employee with no `date_of_birth` gets no birthday post. Only the day and month are ever shown.
-- A poll has 2 to 4 options and one vote per person; voting again moves the vote.
+- A poll has 2 to 4 options and one vote per person; voting again moves the vote. A closed poll takes
+  no votes.
+- A moderator of a channel is one of its admins; in #general and #announcements, which have none,
+  People and the CEO (`announcements.post`). In a direct conversation only the author edits or
+  deletes.
+- Text is editable by its author for 15 minutes after it was sent; a poll until its first vote.
+  Recognitions, celebrations, files and voice notes are not edited: they are deleted and posted
+  again.
 - Read counts on announcements are visible to the poster and to holders of `announcements.post` only.
 - Calls are **not** part of this module (no call button, no WebRTC): they do not work on the donor
   either (TB, 12 October).
@@ -185,7 +224,10 @@ in #announcements, which every member of staff reads.
 | `community.message.posted` | After a message commits | Realtime push to `channel:<id>`; notifications to non-muted members not viewing; mentions notify |
 | `community.recognition.posted` | After a recognition commits | As above; counted for Home and M2 |
 | `announcement.published` | On publish, or when a scheduled one is released | Message in #announcements; notification and push to the audience |
-| `announcement-publish` (delayed job) | At `publish_at` | Releases a scheduled announcement (README §5.15) |
+| `announcement-publish` (delayed job) | At `publish_at` | Releases a scheduled announcement (README §5.15) if it is still scheduled and due |
+| `announcement.updated` | A scheduled announcement edited | A new delayed release at its new `publish_at`; audit |
+| `announcement.cancelled` | A scheduled announcement cancelled | Audit; nothing is posted |
+| `community.channel.members_changed` | Members added or removed, or an admin made or unmade | Audit; the channel list refreshes for those affected |
 | `celebrations` (scheduler + handler) | 05:00 Africa/Lagos daily | Birthday and anniversary cards in #general |
 | `av-transcode`, `media-scan` | After an upload | Voice note to Opus, video to MP4; a file from outside scanned. Image variants are made at upload; `media-derive` makes a file's variants again on request |
 
@@ -194,8 +236,8 @@ in #announcements, which every member of staff reads.
 | Role | Sees | Can do |
 |---|---|---|
 | Employee | Channels they belong to, their own DMs, #announcements | Post where `post_policy` allows, react, vote, recognise, create channels, start DMs |
-| Channel admin (creator) | As employee | Edit members, archive the channel |
-| People (Operations and HR) | As employee, plus the Announcements tab | Publish and schedule announcements, see read receipts, post in #announcements |
+| Channel admin (the creator, and anyone an admin makes admin) | As employee | Add and remove members, make or unmake admins, delete any message and close any poll in the channel, post polls and celebrations |
+| People (Operations and HR) | As employee, plus the Announcements tab | Moderate #general and #announcements (delete, close polls, post polls and celebrations in #general), publish and schedule announcements, edit or cancel them until they go out, see read receipts, post in #announcements |
 | CEO | As People | As People |
 
 Nobody, including People and the CEO, can read a direct message they are not part of.
@@ -227,9 +269,9 @@ received, not interface copy; the copy rules apply to the chrome around them.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Staff Community · Channels (`channels`) | "6 channels · 25 staff" (desktop subtitle); New Channel; Search Channels; Pinned and Channels, each row the channel name (a lock when read only), its last message, time and unread count; the open channel: name, member count, a Read Only pill, the ⋮ menu (View Members, Edit Members, Channel Details, Search in Channel, Mute Notifications), the messages and the celebration, recognition and poll cards (Celebrate, votes), the composer with ＋ (Recognise a Colleague, Celebrate, Start a Poll, Attach a File), record a voice note and Send; voice notes (Play, Transcribe, Hide Transcript); where the user may not post, "Only People and the CEO post here" in place of the composer. New Channel: Channel Name, Purpose (Optional), Departments (Optional), People (Optional, with the count selected), Who Can Post (Every Member, Admins Only); Cancel, Create Channel. Channel Members and Edit Members (Remove, Add People, Close); Channel Details (Channel, Members, Who Can Post). Recognise a Colleague (Colleague, Note Optional; Post Recognition; the toast "Posted to #general"); Celebrate (Colleague, Occasion: Birthday or Work Anniversary; Post Celebration); Start a Poll (Question, Option 1 to 4, the last two Optional; Post Poll); Attach a File (the files, then the upload percentage). Field errors of at most 4 words on the field: "Not a valid name", "Choose a colleague", "Add a question", "Add an option" | Help term on Channel Name: "Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name." Help term on Note in Recognise a Colleague: "Leave it blank and a thank you note is written for you." | Who can post being fixed when the channel is created, that only members read a channel, that channels are internal with no join link: §3 step 5, §6 (the New Channel ⓘ text is removed, and so is the Visibility row of Channel Details). Files going to the vault: §4 (the "Files are stored in the vault" line is removed). Who posts: §6 |
+| Staff Community · Channels (`channels`) | "6 channels · 25 staff" (desktop subtitle); New Channel; Search Channels; Pinned and Channels, each row the channel name (a lock when read only), its last message, time and unread count; the open channel: name, member count, a Read Only pill, the ⋮ menu (View Members, Edit Members, Channel Details, Search in Channel, Mute Notifications), the messages and the celebration, recognition and poll cards (Celebrate, votes), each message's menu (Edit, Close Poll, Delete, only those the caller may use), an "Edited" mark and "Message deleted" in place; the composer with ＋ (Recognise a Colleague, Celebrate and Start a Poll where the caller may, Attach a File), record a voice note and Send; Edit Message (Message; Cancel, Save Changes; "Too late to edit" on the field when the 15 minutes have passed) and Edit Poll (the poll form; Save Changes); Delete asks once (Keep It, Delete Message); Close Poll asks once (Keep Open, Close Poll) and the poll shows a Closed pill; voice notes (Play, Transcribe, Hide Transcript); where the user may not post, "Only People and the CEO post here" in place of the composer. New Channel: Channel Name, Purpose (Optional), Departments (Optional), People (Optional, with the count selected), Who Can Post (Every Member, Admins Only); Cancel, Create Channel. Channel Members and Edit Members (Make Admin or Remove Admin, Remove, Add People, Close); Channel Details (Channel, Members, Who Can Post). Recognise a Colleague (Colleague, Note Optional; Post Recognition; the toast "Posted to #general"); Celebrate (Colleague, Occasion: Birthday or Work Anniversary; Post Celebration); Start a Poll (Question, Option 1 to 4, the last two Optional; Post Poll); Attach a File (the files, then the upload percentage). Field errors of at most 4 words on the field: "Not a valid name", "Choose a colleague", "Add a question", "Add an option" | Help term on Channel Name: "Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name." Help term on Note in Recognise a Colleague: "Leave it blank and a thank you note is written for you." | Who can post being fixed when the channel is created, that only members read a channel, that channels are internal with no join link: §3 step 5, §6 (the New Channel ⓘ text is removed, and so is the Visibility row of Channel Details). Files going to the vault: §4 (the "Files are stored in the vault" line is removed). Who posts: §6 |
 | Staff Community · Direct Messages (`direct-messages`) | "N unread" or "All caught up" (desktop subtitle); New Message; Search People; All and Unread; each conversation: avatar with the online dot, name, last message ("You:" when it was the user's), time, unread count; the open conversation: name, Online or Last Seen, department, search, ⋮ (View Profile, Search in Conversation, Mute Notifications), the messages with their ticks, voice notes (Play, Transcribe, Hide Transcript), the composer (Attach: Photo or Video, Document; record a voice note; Send). Profile: avatar, name, title, status pill, Message, View in People; Contact (work email, phone, worksite, local time); Shared in Conversation; Channels in Common; Mute Notifications; Search in Conversation. New Message: the person picker | None | What one tick, two grey and two blue mean: §3 step 10. Transcripts stored once per voice note: §3 step 11. The profile reading the employee record and showing no work details: §3 step 8. Search covering only the caller's own conversation: §3 step 9 |
-| Staff Community · Announcements (`announcements`) | New Announcement; Published, Scheduled, Average Read, Audience, This Month (desktop); a card per announcement: headline, a Scheduled or "N of 25 read" pill, the body, "Posted" or "Goes out" with the date and author. A card opens Announcement Reads (or Scheduled Announcement): headline, posted line, body, "Read by N of 25" with its bar, Not Read with Remind Them, Read; Close. New Announcement: Headline, Message, Audience (All Staff or Departments, then the department chips), When (Now or Schedule, then Publish Date, DD/MM/YYYY); Cancel, Publish Announcement (Schedule Announcement when scheduled) | Help term on Average Read: "Across published announcements, the share of the audience who have opened each one." | Who may post, #announcements being pinned and read only, the notification on publish, scheduling, read counts visible to the poster only: §3 step 2, §6, §7, §8 (the page subtitle "Posted by People and the CEO · staff read them in #announcements" and its ⓘ text are removed). "Not yet visible to staff" on the scheduled pill: §3 step 2. "Posting as" in the form: §6 |
+| Staff Community · Announcements (`announcements`) | New Announcement; Published, Scheduled, Average Read, Audience, This Month (desktop); a card per announcement: headline, a Scheduled or "N of 25 read" pill, the body, "Posted" or "Goes out" with the date and author. A card opens Announcement Reads (or Scheduled Announcement, with Edit and Cancel Announcement; Edit opens Edit Announcement, the New Announcement form filled in, with Save Changes; Cancel Announcement asks once, Keep It or Cancel Announcement): headline, posted line, body, "Read by N of 25" with its bar, Not Read with Remind Them, Read; Close. New Announcement: Headline, Message, Audience (All Staff or Departments, then the department chips), When (Now or Schedule, then Publish Date, DD/MM/YYYY); Cancel, Publish Announcement (Schedule Announcement when scheduled) | Help term on Average Read: "Across published announcements, the share of the audience who have opened each one." | Who may post, #announcements being pinned and read only, the notification on publish, scheduling, read counts visible to the poster only: §3 step 2, §6, §7, §8 (the page subtitle "Posted by People and the CEO · staff read them in #announcements" and its ⓘ text are removed). "Not yet visible to staff" on the scheduled pill: §3 step 2. "Posting as" in the form: §6 |
 | #announcements channel | As Channels: the published announcements as cards (author, date, headline, body), newest last; the Read Only pill; for staff, "Only People and the CEO post here" in place of the composer | None | The `announcements.post` capability: §5, §8 |
 | Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub (M10): the same announcement records, read only | The M10 guide | The M10 guide. That it reads the same records, no second copy: §2 |
 | Notification bell and web push | Owned by the frontend foundation (FRONTEND_GUIDE §9.6): the sender and first line; a tap opens the conversation | None | Fan-out, muting and who is notified: §3 step 1, §7 |
@@ -281,7 +323,7 @@ fields, never in a toast.
 
 - Can any employee create a channel, or only managers and People? (Default here: any employee.)
 - Birthday privacy: offer an opt-out for staff who do not want their birthday posted (NDPA)?
-- Message edit and delete windows (Praxis allows edit of your own message; proposed: 15 minutes).
+- Answered 17/10/2026 (GE): text edits for 15 minutes; delete by the author or a moderator (§6).
 - Voice note maximum length (proposed: 5 minutes).
 - Is the donor's certified (SHA-256) channel export wanted?
 - Transcription runs through the AI service (cost per minute of audio): on request only, as in the
@@ -302,3 +344,5 @@ fields, never in a toast.
 - 17/10/2026 · GE · Decisions after comparing the demo with the built screens: a recognition always posts to #general (A19), from whichever channel it was started; voice notes are recorded in channels as well as direct messages; search in a conversation runs on the server and the screen steps between the matches it highlights (§3 step 9, unchanged); New Announcement keeps its Audience (all staff or departments).
 - 17/10/2026 · GE · Backend built: §4 and §5 now describe the tables (migrations 1000 and 1110) and the routes as built; contract keys follow the columns (`community_channel_id`, `community_message_id`, `message_type`, `audio` for a voice note). Files are uploaded to the conversation first and readable by its members only; presence is a socket heartbeat; #general and #announcements are made on first use; ⌘K finds published announcements only (§9).
 - 17/10/2026 · GE · Status Built. The stubs left empty (`community.media`, `.links`, `.export`; `announcements.ai`, `.search`) were deleted: uploads live in `community.service`, announcements are read and found through `community.ai.js` and `community.search.js`. The certified channel export stays an open question (§13).
+- 17/10/2026 · GE · A scheduled announcement can be edited or cancelled until it goes out (§3 step 2, §5, §6); the release now checks it is still scheduled and due. Channel admins are chosen in Edit Members with Make Admin and Remove Admin; a channel keeps at least one admin (§3 step 6, §5, §6, §8).
+- 17/10/2026 · GE · Messages can be edited, deleted and polls closed (§3 step 14, §5, §6); polls in #general and hand-posted celebrations are for moderators, recognition stays open to all (§3 step 15, A19). The people pickers leave the caller out.

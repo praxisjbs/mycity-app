@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
 import type { Message, MessageCreate } from "@/api/types/community";
 import type { PageMeta } from "@/api/types/common";
-import { Button, cn, formatDate, Icon, IconButton, InlineInput, toast, todayIso } from "@mycity/ui";
+import { Button, cn, Field, formatDate, FormFooter, Icon, IconButton, InlineInput, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useModal, type MenuItem } from "@mycity/ui";
 import { Post } from "./Posts";
 
 /** A list row: a channel or a person. */
@@ -114,8 +114,33 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
   return { id, msgs, page, q, setQ, loading, older, send, sendFile, reload, replace };
 }
 
+/** Edit Message: the author's text, within 15 minutes of sending it. */
+function EditMessage({ m, close, done }: { m: Message; close: () => void; done: (m: Message) => void }) {
+  const f = useContractForm({ body: m.body ?? "" }, { body: (v) => (v.trim() ? null : "Write something") });
+  const save = async () => {
+    if (!f.check()) return;
+    try {
+      done(await api.call("PUT /api/v1/community/messages/:id", { params: { id: m.community_message_id }, body: { body: f.values.body.trim() } }));
+      close();
+    } catch (e) {
+      if (e instanceof ApiError) f.setServerErrors(e.fields.body ? { body: e.fields.body } : { body: [e.message] });
+    }
+  };
+  return (
+    <>
+      <Field label="Message" {...f.field("body")}><TextAreaField {...f.field("body")} /></Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" onClick={() => void save()}>Save Changes</Button>
+      </FormFooter>
+    </>
+  );
+}
+
 /** Messages, with a day marker wherever the date changes. */
-export function ThreadBody({ t, dm }: { t: ReturnType<typeof useThread>; dm?: boolean }) {
+export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread>; dm?: boolean; editPoll?: (m: Message) => void }) {
+  const modal = useModal();
+  const confirm = useConfirm();
   const box = useRef<HTMLDivElement>(null);
   const last = t.msgs[t.msgs.length - 1]?.community_message_id;
   useEffect(() => {
@@ -127,6 +152,42 @@ export function ThreadBody({ t, dm }: { t: ReturnType<typeof useThread>; dm?: bo
   let lastDay = "";
   const react = async (m: Message) => t.replace(await api.call("POST /api/v1/community/messages/:id/reactions", { params: { id: m.community_message_id }, body: {} }));
   const vote = async (m: Message, i: number) => t.replace(await api.call("POST /api/v1/community/messages/:id/vote", { params: { id: m.community_message_id }, body: { option_index: i } }));
+  const failed = (e: unknown) => {
+    if (e instanceof ApiError) toast(e.message);
+    else throw e;
+  };
+  const remove = async (m: Message) => {
+    if (!(await confirm({ title: "Delete Message", body: "It is removed for everyone in this conversation.", confirmLabel: "Delete Message", cancelLabel: "Keep It", destructive: true }))) return;
+    try {
+      await api.call("DELETE /api/v1/community/messages/:id", { params: { id: m.community_message_id } });
+      await t.reload();
+      toast("Message deleted");
+    } catch (e) {
+      failed(e);
+    }
+  };
+  const closePoll = async (m: Message) => {
+    if (!(await confirm({ title: "Close Poll", body: "No more votes are taken. The result stays.", confirmLabel: "Close Poll", cancelLabel: "Keep Open" }))) return;
+    try {
+      t.replace(await api.call("POST /api/v1/community/messages/:id/close", { params: { id: m.community_message_id }, body: {} }));
+    } catch (e) {
+      failed(e);
+    }
+  };
+  /** Only what the caller may do with this message; nothing when there is nothing. */
+  const menuOf = (m: Message) => {
+    const items: MenuItem[] = [];
+    if (m.can_edit && m.message_type === "text") items.push({ label: "Edit", icon: "edit", onSelect: () => modal.open({ title: "Edit Message", body: (close) => <EditMessage m={m} close={close} done={t.replace} /> }) });
+    if (m.can_edit && m.message_type === "poll" && editPoll) items.push({ label: "Edit", icon: "edit", onSelect: () => editPoll(m) });
+    if (m.can_close) items.push({ label: "Close Poll", icon: "lock", onSelect: () => void closePoll(m) });
+    if (m.can_delete) items.push({ label: "Delete", icon: "trash", danger: true, onSelect: () => void remove(m) });
+    if (!items.length) return undefined;
+    return (
+      <span className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+        <Menu label="Message actions" trigger={(p) => <IconButton {...p} icon="dots" label="Message actions" size="sm" />} items={items} />
+      </span>
+    );
+  };
   return (
     <div ref={box} data-thread data-copy="content" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 [&>*]:flex-shrink-0">
       {t.page?.has_next && (
@@ -139,9 +200,9 @@ export function ThreadBody({ t, dm }: { t: ReturnType<typeof useThread>; dm?: bo
         const marker = day !== lastDay ? (day === today ? "Today" : day === yesterday ? "Yesterday" : formatDate(day)) : null;
         lastDay = day;
         return (
-          <div key={m.community_message_id} className={cn("flex flex-col gap-3", m.mine && m.message_type !== "poll" && "items-end")}>
+          <div key={m.community_message_id} className={cn("group flex flex-col gap-3", m.mine && m.message_type !== "poll" && "items-end")}>
             {marker && <span className="self-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-2xs text-subtle-foreground">{marker}</span>}
-            <Post m={m} q={t.q} dm={dm} onCelebrate={() => void react(m)} onVote={(i) => void vote(m, i)} />
+            <Post m={m} q={t.q} dm={dm} onCelebrate={() => void react(m)} onVote={(i) => void vote(m, i)} menu={menuOf(m)} />
           </div>
         );
       })}

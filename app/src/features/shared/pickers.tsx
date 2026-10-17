@@ -50,8 +50,8 @@ export function EmployeePicker({
  * Colleagues to message or recognise (Staff Community): anyone with a login, open to
  * every member of staff, where the employee register above needs the People grant.
  */
-export function ColleaguePicker({ value, onChange, multiple, placeholder }: { value: PersonRef[]; onChange: (value: PersonRef[]) => void; multiple?: boolean; placeholder?: string }) {
-  const list = usePaged("GET /api/v1/community/people");
+export function ColleaguePicker({ value, onChange, multiple, placeholder, withSelf }: { value: PersonRef[]; onChange: (value: PersonRef[]) => void; multiple?: boolean; placeholder?: string; withSelf?: boolean }) {
+  const list = usePaged("GET /api/v1/community/people", { filters: withSelf ? { with_self: true } : {} });
   return (
     <PersonPicker
       list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
