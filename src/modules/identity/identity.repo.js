@@ -273,6 +273,47 @@ function listSessions(db, userId, query, { currentSessionId, idleSeconds }) {
   );
 }
 
+const LIVE_SORTS = { last_seen_at: "s.last_seen_at", issued_at: "s.issued_at" };
+
+/**
+ * Everyone's live sessions, for an administrator (Settings · Security), most
+ * recently used first unless sorted otherwise.
+ * @param {{q?: string, page?: number, sort?: object}} query
+ */
+function liveSessionPage(db, query, { currentSessionId, idleSeconds }) {
+  const sort = query.sort || { field: "last_seen_at", dir: "desc" };
+  return pageQuery(
+    db,
+    `SELECT s.session_id, s.user_id, trim(e.first_name || ' ' || e.last_name) AS display_name,
+            u.email::text AS email, COALESCE(s.device_label, 'Unknown device') AS device_label,
+            host(s.ip_address) AS ip_address, s.method, s.issued_at, s.last_seen_at,
+            (s.session_id = $1::uuid) AS current,
+            ${TOTAL_COL}
+       FROM user_session s
+       JOIN app_user u ON u.user_id = s.user_id
+       JOIN employee e ON e.employee_id = u.employee_id
+      WHERE ${LIVE(idleSeconds)}
+        AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name || ' ' || u.email || ' ' ||
+             COALESCE(s.device_label, '')) LIKE '%' || search_fold($2) || '%')
+      ORDER BY ${orderBy({ sort }, LIVE_SORTS, "s.session_id")}`,
+    [currentSessionId || null, query.q || null],
+    query,
+  );
+}
+
+/** End one live session, whoever's it is. Returns its login, or null when it had already ended. */
+async function endAnySession(db, sessionId, { reason, by = null }) {
+  const row = await one(
+    db,
+    `UPDATE user_session
+        SET killed_at = now(), killed_by = $2, end_reason = $3, updated_at = now()
+      WHERE session_id = $1 AND killed_at IS NULL
+      RETURNING user_id`,
+    [sessionId, by, reason],
+  );
+  return row ? row.user_id : null;
+}
+
 async function countLiveSessions(db, userId, idleSeconds) {
   const row = await one(
     db,
@@ -490,6 +531,8 @@ module.exports = {
   endSession,
   endUserSessions,
   listSessions,
+  liveSessionPage,
+  endAnySession,
   countLiveSessions,
   hasDevices,
   rememberDevice,

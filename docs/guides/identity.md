@@ -9,7 +9,7 @@
 | Permission key(s) | none for sign-in and the person's own security (own account); `settings` view, create, edit for Users |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
-| Last changed | 16/10/2026 |
+| Last changed | 17/10/2026 |
 
 Sources: MILESTONES §5.3 (brand on the sign-in screen), §14 (roles) and A2; BACKEND_STRUCTURE §11
 and §17; the session rules of the donor product (REUSE_MAP), chosen by TB on 16/10/2026. Two-step
@@ -39,10 +39,11 @@ administrator can reset their two-step from Settings · Users.
 |---|---|---|---|---|
 | Sign In (`/`) | Staff app, signed out | Anyone | Eight cities (Lagos, London, Accra, Nairobi, Johannesburg, Rabat, Abidjan, Douala) at their local time; the sign-in card; on a browser the person has used, Use Passkey and Use PIN for the ways they have set up | Sign in with the password, a passkey or the PIN; Forgot Password |
 | Code step | Staff app, the sign-in card and the lock screen | A person with two-step on, on a browser that has not given a code lately | Their email, Sign-In Code (six boxes), Use Recovery Code | Enter the authenticator app's code or a recovery code; Back |
+| Set-up step | Staff app, the sign-in card | A person whose role requires two-step and who has not set it up | Their email, the new key as a QR code and as text, Code From App; then the ten recovery codes | Turn two-step on with the app's first code; Copy Codes; Continue into the app; Back |
 | Forgot Password | Staff app, the sign-in card | Anyone | Email field | Send a reset link |
 | Reset and Welcome (`/reset?token=`, `/welcome?token=`) | Staff app, from an email | The person the link was sent to | Their email or first name; New Password, Confirm Password | Choose a password; ask for a new link when it has expired |
-| Lock screen | Over any staff screen | The signed-in person | Their name, email, why it locked; the PIN when they have one, else Password; Use Passkey; the code step when two-step asks | Unlock with the PIN, a passkey or the password; Sign Out |
-| ESS · My Security (`my-security`) | Staff app | Every employee, own account | Password (last changed), Two-Step Sign-In (On or Off, Ask for a Code, recovery codes left), PIN (On or Off, when changed), Passkeys (name, added, last used, This Device), Signed In (live sessions), Recent Sign-Ins with the Method, Clock-In Devices link | Change Password; Set Up Two-Step, Change App, New Codes, Turn Off, how often it asks; Set PIN, Change PIN, Remove PIN; Add Passkey, rename or remove one; Confirm It's You when asked; sign out one device; Sign Out Others; Open My Devices |
+| Lock screen | Over any staff screen | The signed-in person | Their name, email, why it locked; the PIN when they have one, else Password; Use Passkey; the code step when two-step asks; when their role now requires two-step, one line asking them to sign out and sign in | Unlock with the PIN, a passkey or the password; Sign Out |
+| ESS · My Security (`my-security`) | Staff app | Every employee, own account | Password (last changed), Two-Step Sign-In (On or Off, Ask for a Code, recovery codes left), PIN (On or Off, when changed), Passkeys (name, added, last used, This Device), Signed In (live sessions), Recent Sign-Ins with the Method, Clock-In Devices link | Change Password; Set Up Two-Step, Change App, New Codes, Turn Off (not while a role they hold requires two-step), how often it asks; Set PIN, Change PIN, Remove PIN; Add Passkey, rename or remove one; Confirm It's You when asked; sign out one device; Sign Out Others; Open My Devices |
 | Settings · Users (`users`) | Staff app | `settings` view | Counts, the logins with status, roles and two-step (desktop), Users by Role | Invite User; per login: Save Roles, Resend Invitation, Send Reset Link, Sign Out Everywhere, Reset Two-Step, Suspend, Reactivate |
 | People · Employees, the 360 | Staff app | `settings` create | Send Invite on the record header | Invite this employee to sign in |
 | The bell and email | Everywhere | The person concerned | Security notices, including every way in added, changed or removed | Read them; they cannot be switched off |
@@ -104,6 +105,16 @@ administrator can reset their two-step from Settings · Users.
 14. **Reset Two-Step.** Settings · Users → a login → Reset Two-Step (`settings` edit, a fresh sign-in,
     never your own login): the key, the recovery codes and every browser's trust go, every session
     ends, the person and the access watchers are told, and the person sets two-step up again.
+15. **Two-step required by role.** Settings · Security marks a role as requiring two-step
+    (`role.two_step_required`; `foundation.md` §6.4). When the password or the PIN is right and the
+    person holds such a role without two-step on, `POST /auth/login` and `POST /auth/pin` answer
+    `{ step: "setup", challenge_token }` and set no cookie. The sign-in card posts
+    `POST /auth/two-step/setup` with the ticket for a new key and its QR code, then
+    `POST /auth/two-step/enrol` with the app's first code: two-step turns on, the session opens
+    (`password_totp` or `pin_totp`, the browser trusted for the person's chosen time) and the ten
+    recovery codes come back once, shown before the app opens. The lock screen does not run the
+    set-up; it asks the person to sign out and sign in. A passkey is both steps, so it signs in
+    without the set-up.
 
 ## 4 · Data
 
@@ -128,8 +139,10 @@ Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sig
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `POST /api/v1/auth/login` | `LoginBody` → `SignInResult` | anonymous | | A session (sets the refresh and device cookies), or the code step; 10 failures per address in 15 minutes |
+| `POST /api/v1/auth/login` | `LoginBody` → `SignInResult` | anonymous | | A session (sets the refresh and device cookies), the code step, or the set-up step when a role requires two-step (§3 step 15); 10 failures per address in 15 minutes |
 | `POST /api/v1/auth/two-step` | `CodeStep` → `Session` | anonymous, the code step's ticket | | 401 `INVALID_CODE`, counted with the password; 400 `CHALLENGE_USED`; 10 failures per address |
+| `POST /api/v1/auth/two-step/setup` | `SetupStart` → `TwoStepSetup` | anonymous, the set-up step's ticket | | The new key and its QR code; 400 `CHALLENGE_EXPIRED`; 10 failures per address |
+| `POST /api/v1/auth/two-step/enrol` | `SetupFinish` → `EnrolledSession` | anonymous, the set-up step's ticket | | Turns two-step on and opens the session with the recovery codes; 401 `INVALID_CODE`; the ticket works once |
 | `POST /api/v1/auth/pin` | `PinSignIn` → `SignInResult` | anonymous, device cookie | | 401 `PIN_UNAVAILABLE` off a known browser; 429 `PIN_THROTTLED`; 10 failures per address |
 | `POST /api/v1/auth/passkey/options` | `PasskeyStart` → `PasskeyChallenge` | anonymous | | Optional email binds it to that person; 60 per address in 15 minutes |
 | `POST /api/v1/auth/passkey` | `PasskeySignIn` → `Session` | anonymous | | 401 `PASSKEY_UNKNOWN`, `PASSKEY_NOT_YOURS`, `PASSKEY_FAILED` |
@@ -149,7 +162,7 @@ Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sig
 | `POST /api/v1/security/confirm/options`, `/confirm` | `EmptyBody` → `PasskeyChallenge`; `Confirm` → `Confirmed` | own account | | 10 per person in 15 minutes |
 | `POST /api/v1/security/two-step/setup` | `EmptyBody` → `TwoStepSetup` | own account, fresh | | |
 | `POST /api/v1/security/two-step` | `TwoStepTurnOn` → `RecoveryCodes` | own account | | 422 `INVALID_CODE`, `SETUP_EXPIRED` |
-| `POST /api/v1/security/two-step/off`, `/recovery-codes`, `/frequency` | `EmptyBody`, `EmptyBody`, `TwoStepFrequencySet` → `SignInMethods` or `RecoveryCodes` | own account, fresh | | |
+| `POST /api/v1/security/two-step/off`, `/recovery-codes`, `/frequency` | `EmptyBody`, `EmptyBody`, `TwoStepFrequencySet` → `SignInMethods` or `RecoveryCodes` | own account, fresh | | Off: 422 `TWO_STEP_REQUIRED` while a role the person holds requires it |
 | `GET /api/v1/security/passkeys` | `PageQuery` → `PasskeyPage` | own account | yes, 25 | Newest first |
 | `POST /api/v1/security/passkeys/options`, `/passkeys` | `EmptyBody` → `PasskeyChallenge`; `PasskeyAdd` → `Passkey` (201) | own account; the options fresh | | 422 `PASSKEY_LIMIT` at 10; 409 `PASSKEY_TAKEN` |
 | `POST /api/v1/security/passkeys/:id/rename`, `/remove` | `PasskeyRename` → `Passkey`; `EmptyBody` → `SignInMethods` | own account; remove fresh | | |
@@ -173,7 +186,8 @@ means signed in or confirmed in the last 15 minutes (§6); past it the answer is
 ## 6 · Rules and calculations
 
 **Sessions** (`identity.session-policy.js`; `SESSION_MAX_AGE_MIN` 120, `SESSION_INACTIVITY_MIN`
-30, `ACCESS_TOKEN_MIN` 15):
+30, `ACCESS_TOKEN_MIN` 15). The two `.env` limits are the floor: Settings · Security can shorten
+either, never lengthen it (`foundation.md` §6.4); the minutes below are the defaults.
 
 - A session ends 120 minutes after sign-in, however active the person is.
 - A refresh more than 30 minutes after the last one ends the session (`inactivity_timeout`).
@@ -188,7 +202,9 @@ means signed in or confirmed in the last 15 minutes (§6); past it the answer is
 
 **Passwords** (`NewPassword` in the contract, `identity.password-policy.js`):
 
-- At least 8 characters, with a lowercase letter, an uppercase letter, a number and a symbol.
+- At least 8 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Settings ·
+  Security can ask for more characters (`security.password_min_length`, never below
+  `PASSWORD_MIN_LENGTH`); it applies to the next password each person chooses.
 - Not one of the common passwords, not the name part of the person's email.
 - Not in a known breach (the k-anonymity range lookup; only five characters of the hash leave
   the server). The check fails open after 3 seconds. `PASSWORD_BREACH_CHECK=false` turns it off.
@@ -221,6 +237,10 @@ their own login.
 - The set-up key waits 15 minutes for its first code; until then nothing changes.
 - The ticket between the first step and the code lasts 5 minutes and works once (`spent_challenge`);
   it is signed like the tokens but cannot be used as one.
+- Required by role: any role the person holds with `two_step_required` makes two-step required for
+  them. The set-up ticket at sign-in (`two_step_setup`) lasts 15 minutes, the set-up key's own life,
+  and is spent when two-step turns on. While it is required the person cannot turn two-step off; an
+  administrator's Reset Two-Step still can, and the next sign-in asks for the set-up again.
 
 **Passkeys** (`security.passkeys.js`, `@simplewebauthn/server`):
 
@@ -298,7 +318,8 @@ or the audit.
 The CEO is a flag on the login (`is_ceo`) and holds every action. Every person sees and manages
 only their own sessions, two-step, passkeys and PIN on My Security (`self` routes: no grant, only the
 caller's own login). Reset Two-Step needs `settings` edit and is never on your own login. Requiring
-two-step by role is M9 (Settings · Security). The exact grants are the seed matrix
+two-step by role is set on Settings · Security (`settings` edit; brought forward from M9,
+`foundation.md` §6.4). The exact grants are the seed matrix
 (`seeds/reference/0290_seed_roles_and_grants.sql`).
 
 ## 9 · AI and search
@@ -318,6 +339,7 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 |---|---|---|---|
 | Sign In | The brand, "Every city. One team." and one line on MyCity App; the shown city's country, name, local time and day; the eight cities with their times; the greeting (with the first name on a known browser), Email, Password, Forgot Password, Sign In; Use Passkey and Use PIN on a known browser | None | The session rules, the throttle and why the error never says which emails exist: §6 |
 | Code step and PIN | The email or the greeting; Enter Code with "From your authenticator app" or "One of your recovery codes"; Sign-In Code or Recovery Code; Enter PIN and PIN; Sign In, Back, Use Recovery Code or Use App Code, Use Password; the refusal in one line | None | Single use, the drift window, how often a browser is asked, the PIN's wait and switch-off: §6 |
+| Set-up step | The email; Set Up Two-Step with "Your role needs a code from an authenticator app."; the QR code and the key; Code From App; Turn On, Back; then Recovery Codes with one line to keep them, the ten codes, Copy Codes, Continue | None | Which roles require it and why: `foundation.md` §6.4 |
 | Forgot Password | Reset Password, "We will email you a link.", Email, Send Link, Back; then Check Your Email with the address | None | How long a link lasts and that only an active login gets one: §6 |
 | Reset and Welcome | The email (reset) or "Welcome, first name" (invitation); New Password, Confirm Password, Save Password or Set Password; an expired link says so with Request New Link | None | The password rules beyond the field's own mark: §6 |
 | Lock screen | Session Locked, Session Ended or Signed Out (Enter Code at the code step); why in one line; the person's photo or initials, name and email; PIN or Password, or Sign-In Code; Sign Out, Use Passkey, Use Password or Use PIN, Use Recovery Code, Unlock | None | The idle and time limits and the server-side end: §3 step 5, §6 |
@@ -330,6 +352,7 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 |---|---|---|---|---|
 | Sign In | The city's photograph at the top, still, with the brand, a glass clock, the city's country, name and day, and a dot per city; the form in a frosted dark panel under it. Cities change by a plain crossfade; nothing moves | The headline, the eight city buttons, the photograph's drift and glow | Sign In, full width | None (signed out) |
 | Code step and PIN | The same card as sign-in: the boxes 44 px, the number keyboard; a full code or PIN goes on its own | Nothing | Sign In, full width | None (signed out) |
+| Set-up step | The same card: the QR code at 192 px, the key under it, the code boxes; a full code goes on its own | Nothing | Turn On, then Continue, full width | None (signed out) |
 | Lock screen | The same card, its buttons full width and stacked: the PIN first when set, Use Passkey (the fingerprint or face) | Nothing | Unlock, full width | None until unlocked |
 | ESS · My Security | Icon cards: Password, Two-Step Sign-In, Passkeys, PIN, Signed In, Recent Sign-Ins, Clock-In Devices | The cards and tables (each opens in its sheet; tables as cards) | Change Password, Save PIN, Turn On, full width in their sheets; Add Passkey makes the phone's own passkey | Bottom bar Self-Service |
 | Settings · Users | The counts two to a row, the status chips, logins as person cards | Users by Role; the Two-Step column | Invite User; a login's actions in its sheet, stacked | More, Settings |
@@ -362,6 +385,11 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 - **The PIN on someone else's browser.** Refused the same way as no PIN: nothing says whether the
   account has one.
 - **A PIN switched off after wrong tries.** The lock screen moves to the password and says why.
+- **A role made to require two-step while its people are signed in.** Their sessions carry on; the
+  next sign-in asks for the set-up; unlocking with the password or the PIN asks them to sign out and
+  sign in first.
+- **The set-up left half done.** Nothing changes until the first code; after 15 minutes the ticket
+  has expired, the card goes back to sign-in and says so, and signing in again starts afresh.
 
 ## 12 · Donor code
 
@@ -374,7 +402,8 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 ## 13 · Open questions
 
 - ~~Two-step sign-in, passkeys and the PIN~~: closed 16/10/2026, built in the second sign-in PR (the
-  `security` module, §3 steps 9 to 14, §6). Requiring two-step by role stays in M9.
+  `security` module, §3 steps 9 to 14, §6). Requiring two-step by role: built 17/10/2026 with
+  Settings · Security (§3 step 15, `foundation.md` §6.4).
 - ~~The sign-in drawings or licensed photographs~~: closed 17/10/2026. TB supplied photographs of the
   four cities at dusk, then four more (Johannesburg, Rabat, Abidjan, Douala); `CityShowcase` shows
   them, the drawings standing in for the first four until they load.
@@ -392,4 +421,11 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
   on Settings · Users, the Method on Recent Sign-Ins (§2 to §11); §13's open question closed.
 - 16/10/2026 · TB · The reset and invitation emails (`templates/email/password-reset.html`, `user-invite.html`) were empty, so the worker failed every link email after the screen said it was sent; both written. The New Sign-In and other security notices now show in the bell on the real API (`notifications` module), opening My Security.
 - 17/10/2026 · TB · The sign-in screen shows photographs of Lagos, London, Accra and Nairobi at dusk (`packages/ui/src/illustrations/photos/`, WebP at 1280 and 640): each drifts and zooms slowly on its own path, the lit horizon glows softly, the picture follows the pointer by a few pixels, and cities crossfade with a short focus pull. The drawings stand in while a photograph loads or if it fails; reduced motion and the phone band hold them still. §10 and §13 updated.
+- 17/10/2026 · TB · Two-step required by role and the security rules within the `.env` floor, with
+  Settings · Security (`foundation.md` track C): sign-in answers the set-up step when a role requires
+  two-step that the person has not set up, `POST /auth/two-step/setup` and `/enrol` finish it on the
+  sign-in card with the recovery codes, My Security has no Turn Off while it is required, and the
+  session length, idle lock and password minimum read the saved rules. Migration `0400` widens
+  `spent_challenge`'s purposes; `PASSWORD_MIN_LENGTH` is the new floor. §2, §3, §5, §6, §8, §10, §11
+  and §13 updated.
 - 17/10/2026 · TB · Four more cities on the sign-in screen: Johannesburg, Rabat, Abidjan and Douala (photographs only; their screen is the deep green until one loads). A photograph is fetched only when its city is shown or next. On a phone the photograph fills the top of the screen behind the brand, a glass clock and the city, and the form sits in a frosted panel in the dark theme's colours; nothing moves but the crossfade. The staging bar is gone from both apps (MILESTONES §6). §10 and §13 updated.

@@ -23,6 +23,14 @@ route(router, "post", "/two-step",
   { body: c.security.CodeStep, response: c.identity.Session, anonymous: true, summary: "The code step of two-step sign-in" },
   limits.twoStepLimiter, controller.twoStep);
 
+route(router, "post", "/two-step/setup",
+  { body: c.security.SetupStart, response: c.security.TwoStepSetup, anonymous: true, summary: "Set two-step up when a role requires it: the key to scan" },
+  limits.twoStepLimiter, controller.twoStepSetup);
+
+route(router, "post", "/two-step/enrol",
+  { body: c.security.SetupFinish, response: c.security.EnrolledSession, anonymous: true, summary: "Turn two-step on with the app's first code, and sign in" },
+  limits.twoStepLimiter, controller.enrolTwoStep);
+
 route(router, "post", "/pin",
   { body: c.security.PinSignIn, response: c.security.SignInResult, anonymous: true, summary: "Sign in with the PIN on a known browser" },
   limits.pinLimiter, controller.pinSignIn);

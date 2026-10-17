@@ -35,6 +35,11 @@ const login = async (req, res) =>
 const twoStep = async (req, res) =>
   signedIn(res, await service.twoStep({ ...req.validated.body, ...from(req) }));
 
+const twoStepSetup = async (req, res) => ok(res, await service.twoStepSetup(req.validated.body));
+
+const enrolTwoStep = async (req, res) =>
+  signedIn(res, await service.enrolTwoStep({ ...req.validated.body, ...from(req) }));
+
 const pinSignIn = async (req, res) =>
   signedIn(res, await service.pinSignIn({ ...req.validated.body, ...from(req) }));
 
@@ -109,6 +114,8 @@ const endOtherSessions = async (req, res) =>
 module.exports = {
   login,
   twoStep,
+  twoStepSetup,
+  enrolTwoStep,
   pinSignIn,
   passkeyOptions,
   passkeySignIn,

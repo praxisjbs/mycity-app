@@ -9,6 +9,8 @@
  *  - the shape is the contract's NewPassword: at least 8 characters, a lowercase
  *    letter, an uppercase letter, a number and a symbol. One definition, so the form
  *    marks the field with the same rule the API applies;
+ *  - at least the minimum in force, when Settings · Security has raised it above the
+ *    contract's eight (settings.security-rules.js; the caller loads the rules first);
  *  - not the name part of the person's own email ("ada" in ada@...);
  *  - not in the Have I Been Pwned breach corpus. The k-anonymity range API is sent
  *    the first 5 characters of the password's SHA-1 and nothing else; the match is
@@ -22,6 +24,7 @@ const c = require("@mycity/contract");
 const { config } = require("../../config/env");
 const { logger } = require("../../config/logger");
 const { AppError } = require("../../shared/errors");
+const rules = require("../settings/settings.security-rules");
 
 const RANGE_URL = "https://api.pwnedpasswords.com/range/";
 const TIMEOUT_MS = 3000;
@@ -76,6 +79,8 @@ async function assert(password, ctx = {}) {
   const field = ctx.field || "new_password";
   const shape = c.identity.NewPassword.safeParse(password);
   if (!shape.success) throw refuse(field, shape.error.issues[0].message);
+  const min = rules.current().password_min_length;
+  if (String(password).length < min) throw refuse(field, `At least ${min} characters`);
 
   const local = String(ctx.email || "")
     .toLowerCase()

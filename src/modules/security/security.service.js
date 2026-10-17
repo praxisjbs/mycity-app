@@ -22,6 +22,7 @@ const { AppError } = require("../../shared/errors");
 const encryption = require("../../services/secrets/encryption.service");
 const qr = require("../../services/qr/qr");
 const identity = require("../identity/identity.service");
+const access = require("../access/access.service");
 const { deviceLabel } = require("../identity/identity.device-label");
 const challenge = require("./security.challenge");
 const mfa = require("./security.mfa");
@@ -79,6 +80,7 @@ async function methods(actor) {
       mfa_frequency: s.mfa_frequency,
       mfa_enrolled_at: iso(s.mfa_enrolled_at),
       recovery_codes_left: s.mfa_enrolled_at ? s.recovery_left : 0,
+      required: await access.requiresTwoStep(pool, actor.user_id),
     },
     passkeys: s.passkeys,
     pin: { on: Boolean(s.pin_hash), pin_changed_at: iso(s.pin_changed_at) },
@@ -143,9 +145,14 @@ async function turnOnTwoStep(actor, { code }) {
   return { recovery_codes: codes };
 }
 
-/** POST /security/two-step/off: no code any more; the recovery codes and every browser's window go. */
+/**
+ * POST /security/two-step/off: no code any more; the recovery codes and every browser's
+ * window go. Refused while a role the person holds requires two-step (Settings · Security).
+ */
 async function turnOffTwoStep(actor) {
   await tx(async (client) => {
+    if (await access.requiresTwoStep(client, actor.user_id))
+      throw new AppError("TWO_STEP_REQUIRED", "Your role needs two-step sign-in, so it stays on.", 422);
     await assertFresh(client, actor);
     if (!(await repo.turnOff(client, actor.user_id))) throw twoStepOff();
     await repo.deleteRecoveryCodes(client, actor.user_id);

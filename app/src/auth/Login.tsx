@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import identity from "@mycity/contract/schemas/identity.js";
-import type { DeviceAccount, LinkCheck } from "@mycity/contract/contract.gen.ts";
+import type { DeviceAccount, LinkCheck, TwoStepSetup } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
-import { Banner, BigButton, Brand, Button, CityShowcase, Field, Form, Icon, Inline, LoadingRows, LoginField, OtpField, useIsPhone } from "@mycity/ui";
-import { useAuth } from "./AuthProvider";
+import { Banner, BigButton, Brand, Button, CityShowcase, Field, Form, Icon, Inline, LoadingRows, LoginField, OtpField, toast, useIsPhone } from "@mycity/ui";
+import { useAuth, type NextStep } from "./AuthProvider";
 import { passkeyProblem, passkeysWork } from "./passkey";
 
 export const vEmail = (v: string) => (!v.trim() ? "Enter your email" : !v.includes("@") ? "Needs an @" : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? "Check the spelling" : "");
@@ -28,6 +28,7 @@ type Mode =
   | { kind: "sign-in"; notice?: string; warning?: string }
   | { kind: "pin" }
   | { kind: "code"; ticket: string; email: string }
+  | { kind: "setup"; ticket: string; email: string }
   | { kind: "forgot" }
   | { kind: "sent"; email: string }
   | { kind: "link"; token: string };
@@ -40,7 +41,8 @@ const greeting = (d = new Date()) => (d.getHours() < 12 ? "Good morning" : d.get
  * with its clock, and the card stands over them; on a phone the photograph
  * holds still at the top and the form sits in a frosted panel under it. The same card
  * holds Forgot Password, the page a reset or invitation link opens, the code
- * step when two-step sign-in asks for one, and the PIN. On a browser the person
+ * step when two-step sign-in asks for one, setting two-step up when the person's
+ * role requires it and they have not, and the PIN. On a browser the person
  * has signed in on before, Use Passkey and Use PIN sit under Sign In for the ways
  * they have set up. Fields validate as they are typed once touched.
  */
@@ -57,12 +59,14 @@ export function Login() {
   }, [known]);
 
   const signIn = (notice?: string, warning?: string) => setMode({ kind: "sign-in", notice, warning });
-  const toCode = (ticket: string, who: string) => setMode({ kind: "code", ticket, email: who });
+  const toStep = (next: NextStep, who: string) => setMode({ kind: next.kind, ticket: next.ticket, email: who });
   const body: ReactNode =
     mode.kind === "code" ? (
       <CodeForm ticket={mode.ticket} email={mode.email} onBack={() => signIn()} />
+    ) : mode.kind === "setup" ? (
+      <SetupForm ticket={mode.ticket} email={mode.email} onBack={(warning) => signIn(undefined, warning)} />
     ) : mode.kind === "pin" && known ? (
-      <PinForm account={known} onCode={(t) => toCode(t, known.email)} onPassword={(warning) => signIn(undefined, warning)} />
+      <PinForm account={known} onStep={(next) => toStep(next, known.email)} onPassword={(warning) => signIn(undefined, warning)} />
     ) : mode.kind === "forgot" ? (
       <ForgotForm email={email} setEmail={setEmail} onSent={(e) => setMode({ kind: "sent", email: e })} onBack={() => signIn()} />
     ) : mode.kind === "sent" ? (
@@ -88,7 +92,7 @@ export function Login() {
         notice={mode.kind === "sign-in" ? mode.notice : undefined}
         warning={mode.kind === "sign-in" ? mode.warning : undefined}
         onForgot={() => setMode({ kind: "forgot" })}
-        onCode={(t) => toCode(t, email.trim())}
+        onStep={(next) => toStep(next, email.trim())}
         onPin={() => setMode({ kind: "pin" })}
       />
     );
@@ -142,7 +146,7 @@ function SignInForm({
   notice,
   warning,
   onForgot,
-  onCode,
+  onStep,
   onPin,
 }: {
   email: string;
@@ -151,7 +155,7 @@ function SignInForm({
   notice?: string;
   warning?: string;
   onForgot: () => void;
-  onCode: (ticket: string) => void;
+  onStep: (next: NextStep) => void;
   onPin: () => void;
 }) {
   const { signIn, signInWithPasskey } = useAuth();
@@ -178,8 +182,8 @@ function SignInForm({
     setBusy(true);
     setProblem(null);
     try {
-      const ticket = await signIn(email.trim(), pass);
-      if (ticket) onCode(ticket);
+      const next = await signIn(email.trim(), pass);
+      if (next) onStep(next);
     } catch (err) {
       const a = err as ApiError;
       setPass("");
@@ -325,8 +329,123 @@ function CodeForm({ ticket, email, onBack }: { ticket: string; email: string; on
   );
 }
 
+/**
+ * Setting two-step up during sign-in, when the person's role requires it and they
+ * have not: the new key as a QR code and as text, the app's first code, then the
+ * ten recovery codes, shown once, before the session opens.
+ */
+function SetupForm({ ticket, email, onBack }: { ticket: string; email: string; onBack: (warning?: string) => void }) {
+  const { finishSetup } = useAuth();
+  const [setup, setSetup] = useState<TwoStepSetup | null>(null);
+  const [code, setCode] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [done, setDone] = useState<{ recovery_codes: string[]; start: () => void } | null>(null);
+  const err = vCode(code);
+
+  useEffect(() => {
+    let live = true;
+    api
+      .call("POST /api/v1/auth/two-step/setup", { body: { challenge_token: ticket } })
+      .then((s) => live && setSetup(s))
+      .catch((e: ApiError) => live && onBack(e.message));
+    return () => {
+      live = false;
+    };
+  }, [ticket]); // eslint-disable-line react-hooks/exhaustive-deps -- once per ticket
+
+  const submit = async (value = code) => {
+    setTouched(true);
+    if (vCode(value)) {
+      document.getElementById("setup-code")?.focus();
+      return;
+    }
+    setBusy(true);
+    setProblem(null);
+    try {
+      setDone(await finishSetup(ticket, value));
+    } catch (e) {
+      const a = e as ApiError;
+      setCode("");
+      setTouched(false);
+      if (a.code === "CHALLENGE_EXPIRED") onBack(a.message);
+      else {
+        setProblem(a.message);
+        document.getElementById("setup-code")?.focus();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (done) {
+    const copy = async () => {
+      try {
+        await navigator.clipboard.writeText(done.recovery_codes.join("\n"));
+        toast("Recovery codes copied");
+      } catch {
+        toast("Copy them by hand");
+      }
+    };
+    return (
+      <div>
+        <h2 className="text-3xl font-strong">Recovery Codes</h2>
+        <p className="mt-1.5 text-muted-foreground">Each one signs you in once without your phone.</p>
+        <ul className="my-4 grid grid-cols-2 gap-2 font-mono text-sm" data-copy="content">
+          {done.recovery_codes.map((c) => (
+            <li key={c} className="rounded-box bg-muted px-3 py-2 text-center tracking-wide">
+              {c}
+            </li>
+          ))}
+        </ul>
+        <Button icon="copy" className="w-full" onClick={() => void copy()}>
+          Copy Codes
+        </Button>
+        <BigButton icon="right" className="mt-3" onClick={done.start}>
+          Continue
+        </BigButton>
+      </div>
+    );
+  }
+
+  return (
+    <Form onSubmit={() => void submit()}>
+      <p className="text-sm text-muted-foreground wrap-any">{email}</p>
+      <h2 className="mt-1 text-3xl font-strong">Set Up Two-Step</h2>
+      <p className="mt-1.5 text-muted-foreground">Your role needs a code from an authenticator app.</p>
+      {!setup ? (
+        <LoadingRows count={3} />
+      ) : (
+        <>
+          <div className="my-4 flex flex-col items-center gap-2">
+            <img src={setup.qr_code} alt="QR code for your authenticator app" className="size-48 rounded-box" />
+            <p className="text-center font-mono text-sm tracking-wide wrap-any" data-copy="content">
+              {setup.secret}
+            </p>
+          </div>
+          <Field label="Code From App" htmlFor="setup-code" state={touched && err ? "bad" : undefined} message={err}>
+            <OtpField id="setup-code" label="Code From App" value={code} onChange={(v) => (setCode(v), setProblem(null))} onComplete={(v) => void submit(v)} />
+          </Field>
+          <BigButton type="submit" icon="shield" busy={busy} className="mt-3">
+            Turn On
+          </BigButton>
+        </>
+      )}
+      <Button variant="ghost" icon="left" className="mt-3" onClick={() => onBack()}>
+        Back
+      </Button>
+      {problem && (
+        <Banner tone="err" icon="lock" className="mt-4 mb-0">
+          {problem}
+        </Banner>
+      )}
+    </Form>
+  );
+}
+
 /** The PIN, on a browser the person has signed in on before. Four digits go on their own. */
-function PinForm({ account, onCode, onPassword }: { account: NonNullable<Known>; onCode: (ticket: string) => void; onPassword: (warning?: string) => void }) {
+function PinForm({ account, onStep, onPassword }: { account: NonNullable<Known>; onStep: (next: NextStep) => void; onPassword: (warning?: string) => void }) {
   const { signInWithPin } = useAuth();
   const [pin, setPin] = useState("");
   const [touched, setTouched] = useState(false);
@@ -346,8 +465,8 @@ function PinForm({ account, onCode, onPassword }: { account: NonNullable<Known>;
     setBusy(true);
     setProblem(null);
     try {
-      const ticket = await signInWithPin(account.email, value);
-      if (ticket) onCode(ticket);
+      const next = await signInWithPin(account.email, value);
+      if (next) onStep(next);
     } catch (e) {
       const a = e as ApiError;
       setPin("");
