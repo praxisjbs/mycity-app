@@ -394,6 +394,54 @@ describe("realtime", () => {
   });
 });
 
+describe("realtime on the public host", () => {
+  test("on the public host, /socket.io is the app's JSON 404, and an upgrade is refused", async () => {
+    await socket.close();
+    const app = (req, res) => {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: { code: "NOT_FOUND" } }));
+    };
+    const split = { split: true, staff: { host: "hub.mycity.test" }, public: { host: "go.mycity.test" } };
+    const hosts = http.createServer(app);
+    socket.attach(hosts, { sites: split });
+    await new Promise((r) => hosts.listen(0, "127.0.0.1", r));
+    const port = hosts.address().port;
+    const get = (host) =>
+      new Promise((resolve, reject) => {
+        http
+          .get({ host: "127.0.0.1", port, path: "/socket.io/?EIO=4&transport=polling", headers: { host } }, (res) => {
+            let body = "";
+            res.on("data", (d) => (body += d));
+            res.on("end", () => resolve({ status: res.statusCode, body }));
+          })
+          .on("error", reject);
+      });
+    const upgrade = (host) =>
+      new Promise((resolve) => {
+        const req = http.request({
+          host: "127.0.0.1",
+          port,
+          path: "/socket.io/?EIO=4&transport=websocket",
+          headers: { host, connection: "Upgrade", upgrade: "websocket", "sec-websocket-version": "13", "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==" },
+        });
+        req.on("response", (res) => resolve(res.statusCode));
+        req.on("upgrade", () => resolve(101));
+        req.end();
+      });
+    try {
+      const go = await get("go.mycity.test");
+      expect(go.status).toBe(404);
+      expect(JSON.parse(go.body).error.code).toBe("NOT_FOUND");
+      expect(await upgrade("go.mycity.test")).toBe(404);
+      const hub = await get("hub.mycity.test");
+      expect(hub.status).toBe(200);
+      expect(hub.body).toMatch(/"sid"/);
+    } finally {
+      await socket.close();
+    }
+  });
+});
+
 describe("handler failure paths", () => {
   async function pendingDoc() {
     return one(

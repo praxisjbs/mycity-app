@@ -118,7 +118,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   import engine takes batch `options` and honours a service that answers "nothing to write".
   Left: tracks B, C and D; the Documents tab on the record (B); Settings · Imports, which Import
   Staff opens (B); the people tasks in the guide's §1.2.
-
+- 17/10/2026 · TB · Sign-in photographs: Lagos, London, Accra and Nairobi at dusk (TB's images, WebP
+  at 1280 and 640, about 250 KB for all four) behind the sign-in screen, each drifting and zooming on
+  its own path, the lights glowing, a few pixels of pointer parallax, crossfades with a short focus
+  pull. The drawings stay as the stand-in until a photograph loads. Left: sharper sources (the
+  images are 1280 wide, a little soft on large screens).
+- 16/10/2026 · TB · Release fix: staging deployed, but verify-staging refused to seal on two
+  checks. The migrations head now counts reference seeds, which share the ledger's numbering
+  (`10099_seed_knowledge_ai` is the head, not `10000_…`). `/socket.io` on the public host is now the
+  API's JSON 404 (docs/runbooks/proxy.md §5): Engine.IO hands a wrong-host request back to the app,
+  and refuses a wrong-host upgrade with a 404, where it answered 400 before. Left: the PENDING
+  checks wait for their modules.
 - 16/10/2026 · TB · `docs/guides/foundation.md`: the rest of M0 and the foundation in four tracks (A
   people and the staff roster, B imports and documents, C access, settings and audit, D workflow and
   search), with TB's twenty decisions of 16/10/2026. TB claims the remaining M0 modules from GE's row

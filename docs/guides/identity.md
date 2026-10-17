@@ -328,7 +328,7 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Sign In | A short band with the city, its country and time (still), the brand on it; the form under it | The headline, the four city buttons, the moving drawing | Sign In, full width | None (signed out) |
+| Sign In | A short band with the city's photograph, its country and time (still), the brand on it; the form under it | The headline, the four city buttons, the photograph's drift and glow | Sign In, full width | None (signed out) |
 | Code step and PIN | The same card as sign-in: the boxes 44 px, the number keyboard; a full code or PIN goes on its own | Nothing | Sign In, full width | None (signed out) |
 | Lock screen | The same card, its buttons full width and stacked: the PIN first when set, Use Passkey (the fingerprint or face) | Nothing | Unlock, full width | None until unlocked |
 | ESS · My Security | Icon cards: Password, Two-Step Sign-In, Passkeys, PIN, Signed In, Recent Sign-Ins, Clock-In Devices | The cards and tables (each opens in its sheet; tables as cards) | Change Password, Save PIN, Turn On, full width in their sheets; Add Passkey makes the phone's own passkey | Bottom bar Self-Service |
@@ -375,8 +375,8 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 
 - ~~Two-step sign-in, passkeys and the PIN~~: closed 16/10/2026, built in the second sign-in PR (the
   `security` module, §3 steps 9 to 14, §6). Requiring two-step by role stays in M9.
-- The sign-in drawings are drawn, not photographs: image hosts were not reachable from the build.
-  Licensed photographs can replace them through `CityShowcase` later; TB to decide.
+- ~~The sign-in drawings or licensed photographs~~: closed 17/10/2026. TB supplied photographs of the
+  four cities at dusk; `CityShowcase` shows them, the drawings standing in until they load.
 
 ## 14 · Change log
 
@@ -390,3 +390,4 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
   Two-Step Sign-In, PIN and Passkeys cards, Confirm It's You inside the 15-minute window, Reset Two-Step
   on Settings · Users, the Method on Recent Sign-Ins (§2 to §11); §13's open question closed.
 - 16/10/2026 · TB · The reset and invitation emails (`templates/email/password-reset.html`, `user-invite.html`) were empty, so the worker failed every link email after the screen said it was sent; both written. The New Sign-In and other security notices now show in the bell on the real API (`notifications` module), opening My Security.
+- 17/10/2026 · TB · The sign-in screen shows photographs of Lagos, London, Accra and Nairobi at dusk (`packages/ui/src/illustrations/photos/`, WebP at 1280 and 640): each drifts and zooms slowly on its own path, the lit horizon glows softly, the picture follows the pointer by a few pixels, and cities crossfade with a short focus pull. The drawings stand in while a photograph loads or if it fails; reduced motion and the phone band hold them still. §10 and §13 updated.
