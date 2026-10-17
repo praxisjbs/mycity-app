@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "688c538efb7c5c05662b525a5df45b883acdebc8d1c1cd8e16409bbb345f62be",
-  "schemas": 341,
-  "endpoints": 198,
+  "source_hash": "6774bf4c9e47808613b625f6f10aad2575430a38295815ef9111de20020ee065",
+  "schemas": 400,
+  "endpoints": 227,
   "inputs": {
     "packages/contract/schemas/access.js": "5e42b1010a52ff1650bd20a6430a3cf96617799b8312f9dd002fa37d324e2df4",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -11,7 +11,7 @@
     "packages/contract/schemas/announcements.js": "5cd70606c066142704bd8a92320fc371b5117936b611f141e3c114f1488514c7",
     "packages/contract/schemas/assessments.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/assistant.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/attendance.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/attendance.js": "5c9c7c23a239624d3f1cb80fb5eb18608672816db7ee4d33585df2522b66c742",
     "packages/contract/schemas/audit.js": "0c00d7df362ac816400e63ebcf1c825649a9b9e763eb937aa5d7865d7171e0d9",
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/calendar.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -20,7 +20,7 @@
     "packages/contract/schemas/community.js": "388d6edb36a857bb6132e44a2025bcd2e7bfb61d412a15526169dea4a6932171",
     "packages/contract/schemas/dashboard.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/deductions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/devices.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/devices.js": "8de4f49564eb2aee09fa0505652fe4b8c8d579e8f488eadfe72ade2be1394017",
     "packages/contract/schemas/disbursements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/documents.js": "a78e217e7b6556ff208639c5eeea9fe3c2ffac166d92bc57adb8ec4afc1a312c",
     "packages/contract/schemas/employment_contracts.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -67,12 +67,14 @@
     "packages/contract/schemas/users.js": "07a02e6964c887eae06598cbec08a3836c3d95ef4c0d93410908f5e5097e5060",
     "packages/contract/schemas/vacancies.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/workflow.js": "ad6cb8b65ecee968ba9da4106009bcb0633e2c1287733011a56061acab45c986",
-    "packages/contract/schemas/worksites.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/worksites.js": "ec708009b2a3eed1ef9f1d2b21766797f3c6307eceb939f6348ba6b94b71ecf9",
     "packages/contract/schemas/workspace.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "src/modules/access/access.routes.js": "b2701c9c63b01069e391675c0d49cd3ab308ecff22e2dbab8e6a77746e2bf4e5",
     "src/modules/announcements/announcements.routes.js": "dea9797f6ae5ced210fb734fba20fed5e600d17074c0c8a71af79d420150e1e4",
+    "src/modules/attendance/attendance.routes.js": "4f399a9158a4ed55bbea0dfdb8fc68e20920984737b85d0533a0599c911a60bc",
     "src/modules/audit/audit.routes.js": "22f7a660678e7dbb8d78ec5a9adc59668ce88da452c0a284c10ad4d36dbbdde8",
     "src/modules/community/community.routes.js": "13f20c9a186ea906de6ab29d34a99faa322848b48ef6c53c6ccc521fc354041e",
+    "src/modules/devices/devices.routes.js": "bbf96fe4435f210b0b6361e33ceed8358b516b030812fc5c9ca747b033f11483",
     "src/modules/documents/documents.routes.js": "73a5476bb414205b143e2318f0033683756937e359b7f1c8ebcccd41a654d9cf",
     "src/modules/ess/ess.routes.js": "35b169ebeff9251ee72d4b6cb47643b97a641e60d928bb8b51eaf4a679d646bf",
     "src/modules/identity/identity.routes.js": "c2f88374e78efe933dcbc6a7d988e41adf56a4729329b6fead313532e7978f83",
@@ -85,6 +87,7 @@
     "src/modules/security/security.routes.js": "2148273cc406a5725539fcfb75ff74008a69e3bb40a0c939e1eaeb33c74f0f4f",
     "src/modules/settings/settings.routes.js": "e3642231b35ce83cd737e8aa421424427b89807d1b61e21f58e5440ec99a6737",
     "src/modules/users/users.routes.js": "c9afad57eaa4e584a792f9a779b1eb995df49de8c891f23bce8f98e75a648b26",
-    "src/modules/workflow/workflow.routes.js": "ff43be65f65f035e02c355eb24668d1f4217b955a8690cf5ced982fa22904af5"
+    "src/modules/workflow/workflow.routes.js": "ff43be65f65f035e02c355eb24668d1f4217b955a8690cf5ced982fa22904af5",
+    "src/modules/worksites/worksites.routes.js": "7daf0982081974fffa0b2bca02029fef5d0e35b7f0af723599e5229146bcb7a1"
   }
 }

@@ -1,0 +1,336 @@
+"use strict";
+/**
+ * What a day comes to, and the loop that settles it (docs/guides/attendance.md §6.4,
+ * §6.8, §7): the day recalculated from its punches, People's decision on an exception,
+ * the person's explanation, and the day-close.
+ *
+ * The source punch is never edited (attendance_event is append-only). A decision is
+ * written on the exception; a rejected punch stops counting because its exception says
+ * so; a missing clock-out People supply is a new `admin` event. Every change
+ * recalculates the day in the same transaction and is audited with before and after.
+ *
+ * The day-close (jobs/schedulers/attendance-day-close.js, 01:30 Lagos) closes every day
+ * before today within 14 days that is still open: an open shift becomes one
+ * missing_clock_out exception, an expected working day with no clock-in becomes absent,
+ * granted leave becomes leave. It never invents a clock-out time. Run twice, or
+ * stopped half way and run again, it closes nothing twice and opens no exception twice:
+ * a closed day is skipped, and each exception has a unique key.
+ */
+const { pool } = require("../../config/db");
+const { atomically } = require("../../shared/db/tx");
+const { AppError } = require("../../shared/errors");
+const { emit } = require("../../shared/events/emit");
+const { assertInScope } = require("../../shared/rbac/scope");
+const lagos = require("../../shared/time/lagos");
+const workingWeek = require("../../shared/time/working-week");
+const calendar = require("./attendance.calendar");
+const guard = require("./attendance.clock-guard");
+const lateness = require("./attendance.lateness");
+const rules = require("./attendance.rules");
+const repo = require("./attendance.repo");
+const { EVENTS } = require("./attendance.events");
+
+/** How far back the day-close looks for days still open. */
+const CLOSE_LOOKBACK_DAYS = 14;
+
+async function tx(fn) {
+  const client = await pool.connect();
+  try {
+    return await atomically(client, () => fn(client));
+  } finally {
+    client.release();
+  }
+}
+
+const notFound = () => new AppError("NOT_FOUND", "That exception does not exist", 404);
+
+/** The punches that count for the day: active, and not excluded by a decision. */
+const counted = (events) => events.filter((e) => !e.excluded);
+
+/**
+ * Recalculate a person's day from its punches, in the caller's transaction (after the
+ * person's lock). A day with nothing to say (no counted punch, not closed, no leave) gets
+ * no row; one that has a row keeps it.
+ * @returns {Promise<{day: object|null, events: object[], ctx: object, leave: object|null}>}
+ */
+async function recomputeDay(client, person, date, { close = false } = {}) {
+  const ctx = await calendar.contextFor(client, person, date);
+  const leave = await repo.grantedLeave(client, person.employee_id, date);
+  const existing = await repo.getDay(client, person.employee_id, date);
+  const events = await repo.eventsOn(client, person.employee_id, date);
+  const projection = rules.projectDay({
+    events: counted(events),
+    shift: ctx.shift,
+    date,
+    timeZone: ctx.timeZone,
+    onLeave: Boolean(leave),
+    closed: close || Boolean(existing && existing.closed_at),
+    late: lateness.minutesLate,
+    overtime: lateness.minutesOvertime,
+  });
+  if (!existing && projection.status === null) return { day: null, events, ctx, leave };
+  const day = await repo.upsertDay(client, person.employee_id, date, projection, { closed: close });
+  return { day, events, ctx, leave };
+}
+
+/* ------------------------------------------------------------------ *
+ * Exceptions
+ * ------------------------------------------------------------------ */
+
+const LOCATION_REASON = Object.freeze({
+  denied: "location was not shared",
+  unavailable: "no location reading",
+  timeout: "the location reading timed out",
+  unsupported: "the device cannot share its location",
+  no_location: "no location reading",
+  poor_accuracy: "the reading was not accurate enough",
+});
+
+/** One line saying what an exception is about, from its evidence. */
+function detailOf(type, evidence = {}) {
+  const ev = evidence || {};
+  switch (type) {
+    case "outside_worksite":
+      return `${ev.distance_m} m from ${ev.worksite_name}, radius ${ev.radius_m} m`;
+    case "location_unverified":
+      return ev.reason === "poor_accuracy" && ev.accuracy_m
+        ? `Reading accurate to ${Math.round(ev.accuracy_m)} m`
+        : `No location: ${LOCATION_REASON[ev.reason] || "no location reading"}`;
+    case "unknown_device":
+      return ev.device_label ? `Unregistered device: ${ev.device_label}` : "No registered device";
+    case "suspicious_timestamp":
+      return `Device clock ${Math.max(1, Math.round(Math.abs(ev.skew_seconds || 0) / 60))} min ahead`;
+    case "missing_clock_out":
+      return ev.clock_in_at
+        ? `Clocked in ${rules.localTime(ev.clock_in_at, ev.timezone || rules.DEFAULT_TZ)}, no clock-out`
+        : "No clock-out";
+    default:
+      return type;
+  }
+}
+
+/** A repo row as the contract's AttendanceException. */
+function present(row) {
+  if (!row) return row;
+  const { evidence, employee_id: _e, ...out } = row;
+  return { ...out, detail: detailOf(row.exception_type, evidence) };
+}
+
+const presentPage = (page) => ({ ...page, data: page.data.map(present) });
+
+const OUTCOME = Object.freeze({ accept: "accepted", reject: "rejected", add_clock_out: "corrected" });
+const OUTCOME_TEXT = Object.freeze({
+  accepted: "the record stands",
+  rejected: "the punch does not count",
+  corrected: "a clock-out was added",
+});
+
+/**
+ * People decide an open exception: accept it, reject the punch, or add the missing
+ * clock-out. Only `people` approve with scope all, and never on their own record.
+ */
+async function decide(actor, scope, id, body) {
+  if (scope.scope !== "all")
+    throw new AppError("FORBIDDEN", "Only People with access to everyone decide attendance exceptions", 403);
+  const x = await repo.getException(pool, id);
+  if (!x) throw notFound();
+  if (x.employee_id === actor.employee_id)
+    throw new AppError("OWN_RECORD", "Someone else decides your own attendance", 403);
+  if (x.status !== "open") throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
+  if (body.decision === "add_clock_out" && x.exception_type !== "missing_clock_out")
+    throw new AppError("DECISION_INVALID", "Only a missing clock-out takes a time", 422, { decision: ["Not for this"] });
+  if (body.decision === "reject" && !x.attendance_event_id)
+    throw new AppError("DECISION_INVALID", "There is no punch to reject", 422, { decision: ["Not for this"] });
+
+  const outcome = OUTCOME[body.decision];
+  await tx(async (client) => {
+    await repo.lockEmployee(client, x.employee_id);
+    const person = await repo.person(client, x.employee_id);
+    if (body.decision === "add_clock_out") {
+      const ctx = await calendar.contextFor(client, person, x.work_date);
+      const events = counted(await repo.eventsOn(client, x.employee_id, x.work_date));
+      const clockIn = events.find((e) => e.event_type === "clock_in");
+      const at = rules.zonedInstant(x.work_date, body.clock_out_time, ctx.timeZone);
+      if (!clockIn || at <= new Date(clockIn.occurred_at) || at > new Date())
+        throw new AppError("CLOCK_OUT_TIME", "Give a time after the clock-in", 422, {
+          clock_out_time: ["After the clock-in"],
+        });
+      try {
+        await repo.insertEvent(client, {
+          employee_id: x.employee_id,
+          event_type: "clock_out",
+          occurred_at: at,
+          work_date: x.work_date,
+          worksite_id: ctx.fence ? ctx.fence.worksite_id : null,
+          attendance_policy_id: ctx.policy.attendance_policy_id,
+          source: "admin",
+          validation_state: "accepted",
+          validation: { correction: { attendance_exception_id: id }, reasons: [] },
+          recorded_by: actor.user_id,
+          reason: body.resolution,
+        });
+      } catch (err) {
+        if (err && err.code === "23505")
+          throw new AppError("ALREADY_CLOCKED_OUT", "This day already has a clock-out", 409);
+        throw err;
+      }
+    }
+    const done = await repo.resolveException(client, id, { outcome, resolution: body.resolution, by: actor.user_id });
+    if (!done) throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
+    await recomputeDay(client, person, x.work_date);
+    await emit(client, {
+      key: EVENTS.ATTENDANCE_EXCEPTION_DECIDED,
+      entity: { type: "attendance_exception", id },
+      actor,
+      before: { status: "open", outcome: null },
+      after: { status: "resolved", outcome, resolution: body.resolution, clock_out_time: body.clock_out_time || null },
+      payload: {
+        attendance_exception_id: id,
+        employee_id: x.employee_id,
+        subject_employee_id: x.employee_id,
+        work_date: x.work_date,
+        exception_type: x.exception_type,
+        outcome,
+        outcome_text: OUTCOME_TEXT[outcome],
+      },
+    });
+  });
+  return present(await repo.getException(pool, id));
+}
+
+/** The person explains an open exception of their own. */
+async function explain(user, id, body) {
+  const x = await repo.getException(pool, id);
+  if (!x || x.employee_id !== user.employee_id) throw notFound();
+  if (x.status !== "open") throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
+  await tx(async (client) => {
+    if (!(await repo.explainException(client, id, body.employee_note)))
+      throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
+    await emit(client, {
+      key: EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED,
+      entity: { type: "attendance_exception", id },
+      actor: user,
+      before: { employee_note: x.employee_note },
+      after: { employee_note: body.employee_note },
+      payload: {
+        attendance_exception_id: id,
+        employee_id: x.employee_id,
+        subject_employee_id: x.employee_id,
+        employee_name: x.employee.display_name,
+        work_date: x.work_date,
+      },
+    });
+  });
+  return present(await repo.getException(pool, id));
+}
+
+/** One exception, within a scope. */
+async function getFor(id, scope) {
+  const x = await repo.getException(pool, id);
+  if (!x) throw notFound();
+  assertInScope(scope, x.employee_id);
+  return present(x);
+}
+
+/* ------------------------------------------------------------------ *
+ * The day-close
+ * ------------------------------------------------------------------ */
+
+/**
+ * Close one person's day, once. In its own transaction, after the person's lock, so a
+ * late clock-out arriving at the same moment is either in the day or refused.
+ * @returns {Promise<null|{status: string|null, missing_clock_out: boolean}>}
+ */
+async function closeDay(employeeId, date) {
+  return tx(async (client) => {
+    await repo.lockEmployee(client, employeeId);
+    const existing = await repo.getDay(client, employeeId, date);
+    if (existing && existing.closed_at) return null;
+    const person = await repo.person(client, employeeId);
+    if (!person) return null;
+    const r = await recomputeDay(client, person, date, { close: true });
+    if (!r.day) return null;
+
+    const active = counted(r.events);
+    let missing = false;
+    if (guard.isOpen(active)) {
+      const clockIn = active.find((e) => e.event_type === "clock_in");
+      const x = await repo.insertException(client, {
+        attendance_day_id: r.day.attendance_day_id,
+        attendance_event_id: null,
+        exception_type: "missing_clock_out",
+        severity: "medium",
+        evidence: { clock_in_at: clockIn ? clockIn.occurred_at : null, timezone: r.ctx.timeZone },
+      });
+      if (x) {
+        missing = true;
+        await emit(client, {
+          key: EVENTS.ATTENDANCE_REVIEW_REQUIRED,
+          entity: { type: "attendance_exception", id: x.attendance_exception_id },
+          actor: null,
+          payload: {
+            attendance_day_id: r.day.attendance_day_id,
+            employee_id: employeeId,
+            subject_employee_id: employeeId,
+            employee_name: person.ref.display_name,
+            work_date: date,
+            types: ["missing_clock_out"],
+          },
+          dedup_key: `attendance-missing-out:${r.day.attendance_day_id}`,
+        });
+      }
+    }
+    await emit(client, {
+      key: EVENTS.ATTENDANCE_DAY_CLOSED,
+      entity: { type: "attendance_record", id: r.day.attendance_day_id },
+      actor: null,
+      after: { status: r.day.status, closed: true },
+      payload: { attendance_day_id: r.day.attendance_day_id, employee_id: employeeId, work_date: date, status: r.day.status },
+      dedup_key: `attendance-day-closed:${r.day.attendance_day_id}`,
+    });
+    return { status: r.day.status, missing_clock_out: missing };
+  });
+}
+
+/**
+ * Close every open day before today (Lagos) within the lookback, and the working days
+ * people did not come in, from the first day anyone punched. Idempotent.
+ * @param {{now?: Date}} [opts]
+ */
+async function closeDays({ now = new Date() } = {}) {
+  const today = lagos.today(now);
+  const since = lagos.addDays(today, -CLOSE_LOOKBACK_DAYS);
+  const tally = { closed: 0, absent: 0, leave: 0, missing_clock_out: 0 };
+  const count = (r) => {
+    if (!r) return;
+    tally.closed += 1;
+    if (r.status === "absent") tally.absent += 1;
+    if (r.status === "leave") tally.leave += 1;
+    if (r.missing_clock_out) tally.missing_clock_out += 1;
+  };
+
+  for (const d of await repo.unclosedDays(pool, since, today)) count(await closeDay(d.employee_id, d.attendance_date));
+
+  const start = await repo.attendanceStart(pool);
+  if (start) {
+    const cal = await workingWeek.loadCalendar(pool);
+    for (let d = start > since ? start : since; d < today; d = lagos.addDays(d, 1)) {
+      if (!workingWeek.isWorkingDay(d, cal)) continue;
+      for (const e of await repo.withoutDay(pool, d)) count(await closeDay(e.employee_id, d));
+    }
+  }
+  return { today, ...tally };
+}
+
+module.exports = {
+  CLOSE_LOOKBACK_DAYS,
+  recomputeDay,
+  detailOf,
+  present,
+  presentPage,
+  decide,
+  explain,
+  getFor,
+  closeDay,
+  closeDays,
+};

@@ -1,0 +1,67 @@
+"use strict";
+/**
+ * What a person's work date is made of: the policy that applies, the worksite their
+ * punch is matched to, the shift and the zone (docs/guides/attendance.md §6.1, §6.5).
+ * The I/O beside the pure rules in attendance.rules.js.
+ *
+ *   policy     their own active policy for the date (employee_attendance_policy), else the
+ *              organisation's (the oldest active one), else the code's defaults. MyCity
+ *              enters policies; none is seeded (A26)
+ *   worksite   the policy row's worksite for the date when it names one, else the
+ *              employee's own (employee.worksite_id); only an active worksite fences
+ *   zone       the worksite's timezone, else Africa/Lagos
+ *   shift      the working week's hours for that weekday, the policy's grace, and whether
+ *              the day is worked at all (shared/time/working-week)
+ */
+const workingWeek = require("../../shared/time/working-week");
+const worksites = require("../worksites/worksites.service");
+const rules = require("./attendance.rules");
+const repo = require("./attendance.repo");
+
+/** The policy for a person on a date, defaults filled in. */
+async function policyFor(db, employeeId, date) {
+  const row = (await repo.assignedPolicy(db, employeeId, date)) || (await repo.defaultPolicy(db));
+  if (!row) return { ...rules.DEFAULT_POLICY, override_worksite_id: null };
+  return {
+    attendance_policy_id: row.attendance_policy_id,
+    name: row.name,
+    grace_minutes: Number(row.grace_minutes) || 0,
+    latest_clock_out_minutes: Number(row.latest_clock_out_minutes),
+    geofence_mode: row.geofence_mode || rules.DEFAULT_POLICY.geofence_mode,
+    device_mode: row.device_mode || rules.DEFAULT_POLICY.device_mode,
+    max_accuracy_m: Number(row.max_accuracy_m) || rules.DEFAULT_POLICY.max_accuracy_m,
+    override_worksite_id: row.override_worksite_id || null,
+  };
+}
+
+/** The zone a person's dates are read in, before their date is known. */
+const zoneOf = (person) => (person && person.timezone) || rules.DEFAULT_TZ;
+
+/**
+ * Everything a punch or a day of a person on `date` is judged with.
+ * @param {{query: Function}} db
+ * @param {{employee_id: string, worksite_id: string|null, work_pattern: string}} person  repo.person()
+ * @param {string} date
+ */
+async function contextFor(db, person, date) {
+  const policy = await policyFor(db, person.employee_id, date);
+  const fence =
+    (await worksites.fenceFor(db, policy.override_worksite_id)) || (await worksites.fenceFor(db, person.worksite_id));
+  const calendar = await workingWeek.loadCalendar(db);
+  return {
+    policy,
+    fence: fence
+      ? {
+          worksite_id: fence.worksite_id,
+          name: fence.name,
+          latitude: Number(fence.latitude),
+          longitude: Number(fence.longitude),
+          radius_m: Number(fence.radius_m),
+        }
+      : null,
+    timeZone: (fence && fence.timezone) || zoneOf(person),
+    shift: rules.shiftFor(date, calendar, policy),
+  };
+}
+
+module.exports = { policyFor, contextFor, zoneOf };

@@ -126,13 +126,20 @@ mailbox: connection status and errors, folder kinds and sync cursor, thread keys
 message fields, `mail_draft` and `mail_send_queue` · `1130` an announcement can be `cancelled` ·
 `1140` each member's own pin (`community_member.pinned_at`) · `1200` leave requests as the leave
 module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list indexes) ·
-`1290` the leave status code list (Cancelled added, Draft switched off) and the four leave types.
+`1290` the leave status code list (Cancelled added, Draft switched off) and the four leave types ·
+`1300` attendance as the clock writes it: the policy's `geofence_mode`, `device_mode` and
+`max_accuracy_m`; `attendance_device` (a person's clock-in devices on `known_device`, observed,
+registered or removed); the event's `work_date`, `device_at`, device, policy, `idempotency_key`
+and correction fields, one active clock-in and one active clock-out a day (a partial unique
+index), the ledger made append-only; the day's status nullable; the exception's event, outcome,
+the person's note and the five types, deduplicated by partial unique indexes · `1390` the two
+new exception types' names in the code list.
 
 **Owes:**
-- Attendance (attendance.md §4): employee home location, field assignment, location requests
+- Attendance (attendance.md §4, §13): employee home location, field assignment, location requests
   (screen #87), policy versions and acknowledgements (#89), a unique key for the auto-query
-  upsert, the lateness deduction amount.
-- Devices (ess.md §6): enrolment requests, status and the three-device rule on `known_device`.
+  upsert, the lateness deduction amount; dropping the superseded booleans `require_geofence` and
+  `require_known_device` (MIGRATIONS §8).
 - Home (home.md §4): `home_report_run`, `role_kpi` (per-role tile defaults and locks), alert scope.
 
 ### M2 Productivity & Performance · 2000 to 2999 · AJ

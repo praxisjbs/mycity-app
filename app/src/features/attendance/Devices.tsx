@@ -1,81 +1,122 @@
-import { useState } from "react";
+import devices from "@mycity/contract/schemas/devices.js";
+import type { Device, DeviceStatus } from "@mycity/contract/contract.gen.ts";
+import { useEffect, useRef, useState } from "react";
+import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import type { Device } from "@/api/types/attendance";
-import { hrefFor, useRouter } from "@/lib/router";
-import { Button, Card, CardHeader, Chips, DataView, formatDate, formatDateTime, Grid, KeyValue, PageHeader, Pager, Pill, SearchInput, StatStrip, toast, Toolbar, Who } from "@mycity/ui";
+import { useAuth } from "@/auth/AuthProvider";
+import { useSearchParams } from "@/lib/router";
+import { Button, Chips, DataView, Field, formatDate, formatDateTime, FormFooter, HelpTerm, KeyValue, PageHeader, Pill, TextAreaField, toast, useContractForm, useModal, Who } from "@mycity/ui";
+import { DEVICE_STATUS, DEVICE_STATUS_HELP } from "./labels";
 
-export const DEVICE_TONE: Record<Device["status"], "ok" | "warn" | "err" | "neutral"> = { Enrolled: "ok", "Pending Review": "warn", Blocked: "err", Revoked: "neutral", "Verification unavailable": "warn" };
-
-/** People · Devices: devices used to clock in, and what the current policy does with each. */
+/**
+ * People · Devices (#27, docs/guides/attendance.md §10): the devices people clock in from, within
+ * the reader's `people` scope. People with edit take one off, saying why; the person registers
+ * their own from My Devices, so nothing here approves one.
+ */
 export function Devices() {
-  const { navigate } = useRouter();
-  const summary = useApi("GET /api/v1/attendance/devices/summary");
-  const [status, setStatus] = useState("all");
-  const list = usePaged("GET /api/v1/attendance/devices", { filters: status === "all" ? {} : { status } });
-  const [selId, setSelId] = useState<string | null>(null);
-  const sel = list.rows.find((d) => d.device_id === selId) ?? list.rows.find((d) => d.status === "Pending Review") ?? list.rows[0];
-  const act = useMutation("POST /api/v1/attendance/devices/:id/status");
-  const set = async (d: Device, s: Device["status"]) => {
-    await act.run({ params: { id: d.device_id }, body: { status: s } });
-    invalidate("/api/v1/attendance/devices");
-    toast(`${d.name}: ${s.toLowerCase()}. ${d.employee.display_name} has been told.`);
-  };
-  const others = (d: Device) => list.rows.filter((x) => x.employee.employee_id === d.employee.employee_id && x.device_id !== d.device_id);
+  const [params] = useSearchParams();
+  const id = params.get("id");
+  const { can } = useAuth();
+  const modal = useModal();
+  const [status, setStatus] = useState<DeviceStatus | "all">("all");
+  const list = usePaged("GET /api/v1/devices", { filters: status === "all" ? {} : { status } });
+  const open = (d: Device) => modal.open({ title: d.label, body: (close) => <DeviceView d={d} close={close} canRemove={can("people", "edit")} /> });
+
+  const link = useApi("GET /api/v1/devices/:id", { params: { id: id ?? "" }, enabled: !!id });
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (link.data && opened.current !== link.data.attendance_device_id) {
+      opened.current = link.data.attendance_device_id;
+      open(link.data);
+    }
+  });
+
   return (
     <>
-      <PageHeader title="Devices" sub="Devices used to clock in" actions={<Button onClick={() => navigate(hrefFor("settings", "attendance-policy"))}>Device Policy</Button>} />
-      {summary.data && <StatStrip items={summary.data.counts} />}
-      <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Device or person" className="w-full md:w-64" />
-      </Toolbar>
-      <Chips value={status} onChange={setStatus} options={[["all", "All"], ["Pending Review", "Pending Review"], ["Enrolled", "Enrolled"], ["Blocked", "Blocked"], ["Revoked", "Revoked"]]} />
-      <Grid cols="1.4/1">
-        <DataView
-          title="Devices"
-          rows={list.rows}
-          rowKey={(d) => d.device_id}
-          selectedKey={sel?.device_id}
-          loading={list.loading}
-          error={list.error}
-          onRowClick={(d) => setSelId(d.device_id)}
-          columns={[
-            { key: "e", label: "Employee", render: (d) => <Who name={d.employee.display_name} sub={d.employee.department} /> },
-            { key: "n", label: "Device", render: (d) => d.name },
-            { key: "f", label: "First Seen", desktop: true, render: (d) => formatDate(d.first_seen) },
-            { key: "l", label: "Last Punch", desktop: true, render: (d) => (d.last_punch ? formatDateTime(d.last_punch) : "None") },
-            { key: "s", label: "Status", render: (d) => <Pill tone={DEVICE_TONE[d.status]}>{d.status}</Pill> },
-            { key: "x", label: "Effect on a Punch", desktop: true, render: (d) => <Pill tone={d.effect.tone}>{d.effect.text}</Pill> },
-          ]}
-          footer={<Pager page={list.page} onPage={list.setPage} noun="device" />}
-        />
-        {sel && (
-          <Card>
-            <CardHeader record title={`${sel.employee.display_name} · ${sel.name}`} right={<Pill tone={DEVICE_TONE[sel.status]}>{sel.status}</Pill>} />
-            <KeyValue items={[["First seen", formatDateTime(sel.first_seen)], ["Last punch", sel.last_punch ? formatDateTime(sel.last_punch) : "None"], ["Note", sel.note ?? "None"], ["Other devices", others(sel).map((d) => `${d.name} (${d.status.toLowerCase()})`).join(", ") || "None"], ["Next punch", <Pill tone={sel.effect.tone}>{sel.effect.text}</Pill>]]} />
-            <div className="mt-3.5 flex flex-wrap gap-2">
-              {sel.status !== "Enrolled" && <Button variant="primary" icon="ok" busy={act.pending} onClick={() => set(sel, "Enrolled")}>Enrol This Device</Button>}
-              {sel.status === "Pending Review" && <Button busy={act.pending} onClick={() => set(sel, "Blocked")}>Reject</Button>}
-              {sel.status === "Enrolled" && (
-                <>
-                  <Button busy={act.pending} onClick={() => set(sel, "Revoked")}>Revoke</Button>
-                  <Button busy={act.pending} onClick={() => set(sel, "Blocked")}>Block</Button>
-                </>
-              )}
-            </div>
-          </Card>
-        )}
-      </Grid>
-      {summary.data && (
-        <DataView
-          title={`Device Policy v${summary.data.policy_version}`}
-          rows={summary.data.effects}
-          rowKey={(r) => r.state}
-          columns={[
-            { key: "s", label: "Device State", render: (r) => r.state },
-            { key: "e", label: "Punch Outcome", render: (r) => <Pill tone={r.effect.tone}>{r.effect.text}</Pill> },
-          ]}
-        />
+      <PageHeader title="Devices" sub="Devices used to clock in" />
+      <Chips
+        label="Status"
+        value={status}
+        onChange={setStatus}
+        options={[
+          ["all", "All"],
+          ["registered", "Registered"],
+          ["observed", "New"],
+          ["removed", "Removed"],
+        ]}
+      />
+      <DataView
+        title="Devices"
+        list={list}
+        search="Device or Person"
+        rowKey={(d) => d.attendance_device_id}
+        onRowClick={open}
+        noun="device"
+        empty={{ icon: "lock", title: "No Devices", text: "Devices appear after their first punch." }}
+        columns={[
+          { key: "e", label: "Employee", render: (d) => <Who name={d.employee.display_name} sub={d.employee.department} /> },
+          { key: "n", label: "Device", render: (d) => d.label },
+          { key: "s", label: <HelpTerm help={DEVICE_STATUS_HELP}>Status</HelpTerm>, render: (d) => <Pill tone={DEVICE_STATUS[d.status].tone}>{DEVICE_STATUS[d.status].text}</Pill> },
+          { key: "f", label: "First Seen", desktop: true, render: (d) => formatDate(d.first_seen_at) },
+          { key: "l", label: "Last Punch", desktop: true, render: (d) => (d.last_punch_at ? formatDateTime(d.last_punch_at) : null) },
+        ]}
+      />
+    </>
+  );
+}
+
+function DeviceView({ d, close, canRemove }: { d: Device; close: () => void; canRemove: boolean }) {
+  const f = useContractForm({ removal_reason: "" }, devices.DeviceRemove);
+  const remove = useMutation("POST /api/v1/devices/:id/remove");
+  const [asking, setAsking] = useState(false);
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await remove.run({ params: { id: d.attendance_device_id }, body: { removal_reason: f.values.removal_reason.trim() } });
+      invalidate("/api/v1/devices");
+      close();
+      toast("Device removed");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else toast(e instanceof ApiError ? e.message : "Device not removed");
+    }
+  };
+  return (
+    <>
+      <KeyValue
+        items={[
+          ["Employee", d.employee.display_name],
+          ["Status", <Pill key="s" tone={DEVICE_STATUS[d.status].tone}>{DEVICE_STATUS[d.status].text}</Pill>],
+          ["First Seen", formatDateTime(d.first_seen_at)],
+          ["Last Punch", d.last_punch_at ? formatDateTime(d.last_punch_at) : null],
+          ["Registered", d.registered_at ? formatDate(d.registered_at) : null],
+          ...(d.status === "removed"
+            ? ([
+                ["Removed", d.removed_at ? formatDate(d.removed_at) : null],
+                ["Removed By", d.removed_by_name],
+                ["Reason", d.removal_reason],
+              ] as Array<[string, string | null]>)
+            : []),
+        ]}
+      />
+      {asking && (
+        <Field label="Reason" className="mt-3" {...f.status("removal_reason")}>
+          <TextAreaField {...f.field("removal_reason")} placeholder="Phone lost" rows={3} />
+        </Field>
       )}
+      <FormFooter>
+        {asking ? (
+          <>
+            <Button onClick={() => setAsking(false)}>Cancel</Button>
+            <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => void submit()}>Remove Device</Button>
+          </>
+        ) : (
+          <>
+            {canRemove && d.status !== "removed" && <Button variant="danger" icon="trash" onClick={() => setAsking(true)}>Remove Device</Button>}
+            <Button variant="primary" onClick={close}>Close</Button>
+          </>
+        )}
+      </FormFooter>
     </>
   );
 }

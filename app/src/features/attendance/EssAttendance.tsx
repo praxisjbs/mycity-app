@@ -1,18 +1,318 @@
+import attendance from "@mycity/contract/schemas/attendance.js";
+import devices from "@mycity/contract/schemas/devices.js";
+import type { AttendanceDay, AttendanceEvent, AttendanceException, MyDevice } from "@mycity/contract/contract.gen.ts";
+import { useEffect, useRef, useState } from "react";
+import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import type { AttendanceEvent, LocationRequestBody, LocationRequest } from "@/api/types/attendance";
+import type { LocationRequest, LocationRequestBody } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
-import { KpiTiles } from "@/features/shared/KpiTiles";
-import { PhoneCards } from "@/features/shared/PhoneCards";
-import { hrefFor, useRouter } from "@/lib/router";
-import { DEVICE_TONE } from "./Devices";
-import { CASE_TONE, REQ_TONE } from "./PeopleAttendance";
-import { AreaChart, Banner, Button, Card, CardHeader, DataView, DateField, DesktopOnly, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, KeyValue, LoadingRows, PageHeader, Pager, Pill, rules, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm, useModal } from "@mycity/ui";
+import { useFreshSignIn } from "@/auth/FreshSignIn";
+import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
+import { useScreenAction } from "@/shell/screen-action";
+import { useClock } from "./ClockButton";
+import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
+import { Banner, Button, Card, CardHeader, DataView, DateField, ErrorState, ExportButton, Field, FilterSelect, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, rules, SelectField, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 
-const STATUS: Record<AttendanceEvent["status"], { tone: "ok" | "warn" | "err" | "info" | "neutral"; text: string }> = {
-  on_time: { tone: "ok", text: "On Time" }, late: { tone: "warn", text: "Late" }, absent: { tone: "err", text: "Absent" }, leave: { tone: "info", text: "On Leave" },
-  review: { tone: "warn", text: "Under Review" }, remote: { tone: "ok", text: "Remote" }, weekend: { tone: "ok", text: "Saturday" },
-};
-const hours = (m: number | null) => (m == null ? "None" : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`);
+/**
+ * ESS · My Attendance (#9), My Devices (#88), and the two attendance screens still on INTERIM
+ * shapes, Work Location Requests (#87) and Policy Updates (#89) (docs/guides/attendance.md §10).
+ * Everything here is the caller's own: the routes take no employee id.
+ */
+
+export const REQ_TONE: Record<LocationRequest["status"], "ok" | "warn" | "err" | "neutral" | "info"> = { Approved: "ok", Rejected: "err", "Awaiting manager": "warn", "Awaiting HR": "info", Draft: "neutral", Expired: "neutral" };
+
+/* ------------------------------------------------------------------ *
+ * My Attendance
+ * ------------------------------------------------------------------ */
+
+export function MyAttendancePage() {
+  const [params] = useSearchParams();
+  const id = params.get("id");
+  const modal = useModal();
+  const clock = useClock();
+  const months = recentMonths(todayIso());
+  const [month, setMonth] = useState(months[0]);
+  const summary = useApi("GET /api/v1/attendance/me/summary", { query: { month } });
+  const days = usePaged("GET /api/v1/attendance/me", { filters: { month } });
+  const open = usePaged("GET /api/v1/attendance/me/exceptions", { filters: { status: "open" } });
+  const t = clock.today;
+  const s = summary.data;
+
+  const openDay = (date: string, d?: AttendanceDay) => modal.open({ title: formatDate(date), wide: true, body: <MyDay date={date} day={d} /> });
+  const link = useApi("GET /api/v1/attendance/me/records/:id", { params: { id: id ?? "" }, enabled: !!id });
+  const linked = useRef<string | null>(null);
+  useEffect(() => {
+    if (link.data && linked.current !== link.data.attendance_day_id) {
+      linked.current = link.data.attendance_day_id;
+      openDay(link.data.date, days.rows.find((d) => d.attendance_day_id === link.data?.attendance_day_id));
+    }
+  });
+  const explain = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], body: (close) => <ExplainForm x={x} close={close} /> });
+
+  const todayCard = t && (
+    <Card>
+      <CardHeader
+        title="Today"
+        right={
+          <Pill tone={t.state === "clocked_in" ? (t.review ? "warn" : "ok") : t.state === "unavailable" ? "info" : "neutral"}>
+            {t.state === "clocked_in" ? (t.review ? "Review Required" : "Clocked In") : t.state === "clocked_out" ? "Clocked Out" : t.state === "unavailable" ? "On Leave" : "Not Clocked In"}
+          </Pill>
+        }
+      />
+      <KeyValue
+        items={[
+          ["Clock In", t.clock_in_at ? formatTime(t.clock_in_at) : null],
+          ["Clock Out", t.clock_out_at ? formatTime(t.clock_out_at) : null],
+          ["Location", t.location.kind === "worksite" ? t.location.name : t.location.kind === "remote" ? "Remote" : "No Worksite"],
+        ]}
+      />
+      {clock.ready && !clock.unavailable && (
+        <div className="mt-3 flex justify-end">
+          <Button variant="primary" icon="clock" onClick={clock.open}>{clock.label}</Button>
+        </div>
+      )}
+    </Card>
+  );
+
+  if (summary.error && !s) return <ErrorState error={summary.error} onRetry={summary.reload} />;
+  return (
+    <>
+      <PageHeader
+        title="My Attendance"
+        sub={formatMonth(month)}
+        actions={<ExportButton message="Export queued for your email" onExport={() => api.call("POST /api/v1/attendance/me/export", { body: { month } })}>Export Month</ExportButton>}
+      >
+        <FilterSelect label="Month" value={month} onChange={(m) => m && setMonth(m)} options={months.map((m) => [m, formatMonth(m)] as [string, string])} />
+      </PageHeader>
+      {todayCard}
+      <Grid cols="4m2" className="mt-3">
+        <KpiCard title="Days Present" value={s ? String(s.days_present) : ""} />
+        <KpiCard title="Late Days" value={s ? String(s.late_days) : ""} tone={s && s.late_days > 0 ? "warn" : undefined} />
+        <KpiCard title="Absent" value={s ? String(s.absent_days) : ""} tone={s && s.absent_days > 0 ? "err" : undefined} />
+        <KpiCard title="Hours Worked" value={s ? hours(s.worked_minutes) : ""} help="From the first clock-in to the last clock-out of each day." />
+      </Grid>
+      {open.rows.length > 0 && (
+        <DataView
+          title="Open Exceptions"
+          list={open}
+          rowKey={(x) => x.attendance_exception_id}
+          onRowClick={explain}
+          noun="exception"
+          columns={[
+            { key: "t", label: "Exception", render: (x) => EXCEPTION_TYPE[x.exception_type] },
+            { key: "d", label: "Date", render: (x) => formatDate(x.work_date) },
+            { key: "w", label: "Detail", desktop: true, render: (x) => x.detail },
+            { key: "n", label: "Your Note", render: (x) => (x.employee_note ? <Pill tone="ok">Sent</Pill> : <Pill tone="warn">Explain</Pill>) },
+          ]}
+        />
+      )}
+      <DataView
+        title="My Days"
+        list={days}
+        rowKey={(d) => d.attendance_day_id}
+        onRowClick={(d) => openDay(d.attendance_date, d)}
+        noun="day"
+        empty={{ icon: "clock", title: "No Days Yet", text: "Your clock-ins this month appear here." }}
+        columns={[
+          { key: "attendance_date", label: "Date", sortable: true, render: (d) => formatDate(d.attendance_date) },
+          { key: "i", label: "Clock In", render: (d) => (d.first_clock_in_at ? formatTime(d.first_clock_in_at) : null) },
+          { key: "o", label: "Clock Out", render: (d) => (d.last_clock_out_at ? formatTime(d.last_clock_out_at) : null) },
+          { key: "h", label: "Hours", align: "n", render: (d) => (d.worked_minutes ? hours(d.worked_minutes) : null) },
+          { key: "s", label: "Status", render: (d) => <Pill tone={dayStatus(d).tone}>{dayStatus(d).text}</Pill> },
+          { key: "r", label: "Review", desktop: true, render: (d) => (d.open_exceptions ? <Pill tone="warn">{`${d.open_exceptions} Open`}</Pill> : null) },
+        ]}
+      />
+    </>
+  );
+}
+
+/** One of my days: its punches with what the server decided about each. */
+function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
+  const events = usePaged("GET /api/v1/attendance/me/events", { filters: { date } });
+  return (
+    <>
+      {day && (
+        <KeyValue
+          items={[
+            ["Status", <Pill key="s" tone={dayStatus(day).tone}>{dayStatus(day).text}</Pill>],
+            ["Hours", day.worked_minutes ? hours(day.worked_minutes) : null],
+            ...(day.late_minutes ? ([["Late By", lateBy(day.late_minutes)]] as Array<[string, string]>) : []),
+          ]}
+        />
+      )}
+      <DataView
+        className="mt-3"
+        title="Punches"
+        list={events}
+        rowKey={(e) => e.attendance_event_id}
+        noun="punch"
+        nounPlural="punches"
+        columns={[
+          { key: "t", label: "Punch", render: (e: AttendanceEvent) => (e.event_type === "clock_in" ? "Clock In" : "Clock Out") },
+          { key: "a", label: "Time", render: (e: AttendanceEvent) => formatTime(e.occurred_at) },
+          { key: "l", label: "Location", render: (e: AttendanceEvent) => (e.worksite_name ? `${VERDICT[e.geofence]}${e.distance_m !== null ? `, ${e.distance_m} m` : ""}` : VERDICT[e.geofence]) },
+          { key: "d", label: "Device", desktop: true, render: (e: AttendanceEvent) => e.device_label },
+          { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Not Counted" : PUNCH_STATE[e.validation_state].text}</Pill> },
+        ]}
+      />
+    </>
+  );
+}
+
+/** Say why an exception happened; People read it when they decide. */
+function ExplainForm({ x, close }: { x: AttendanceException; close: () => void }) {
+  const f = useContractForm({ employee_note: x.employee_note ?? "" }, attendance.ExceptionExplanation);
+  const save = useMutation("POST /api/v1/attendance/me/exceptions/:id/explanation");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id: x.attendance_exception_id }, body: { employee_note: f.values.employee_note.trim() } });
+      invalidate("/api/v1/attendance");
+      close();
+      toast("Note sent to People");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else toast(e instanceof ApiError ? e.message : "Note not sent");
+    }
+  };
+  return (
+    <>
+      <KeyValue items={[["Date", formatDate(x.work_date)], ["Detail", x.detail]]} />
+      <Field label="Your Note" className="mt-3" {...f.status("employee_note")}>
+        <TextAreaField {...f.field("employee_note")} placeholder="Client visit" rows={3} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" icon="send" busy={save.pending} onClick={() => void submit()}>Send Note</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * My Devices
+ * ------------------------------------------------------------------ */
+
+export function MyDevicesPage() {
+  const [params] = useSearchParams();
+  const id = params.get("id");
+  const modal = useModal();
+  const confirm = useConfirm();
+  const list = usePaged("GET /api/v1/devices/mine");
+  const today = useApi("GET /api/v1/attendance/me/today");
+  const remove = useMutation("POST /api/v1/devices/mine/:id/remove");
+  const d = today.data?.device;
+  const thisRegistered = d?.state === "registered";
+  const full = !!d && !thisRegistered && !d.can_register;
+  const register = () => modal.open({ title: "Register This Device", body: (close) => <RegisterForm close={close} /> });
+  useScreenAction(d && !thisRegistered && d.can_register ? { label: "Register This Device", onSelect: register } : null);
+
+  const drop = async (row: MyDevice) => {
+    if (!(await confirm({ title: "Remove Device", body: `${row.label} will no longer count as registered.`, confirmLabel: "Remove Device", destructive: true }))) return;
+    try {
+      await remove.run({ params: { id: row.attendance_device_id }, body: {} });
+      invalidate("/api/v1/devices");
+      invalidate("/api/v1/attendance/me/today");
+      toast("Device removed");
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Device not removed");
+    }
+  };
+  const open = (row: MyDevice) =>
+    modal.open({
+      title: row.label,
+      body: (close) => (
+        <>
+          <KeyValue
+            items={[
+              ["Status", <Pill key="s" tone={DEVICE_STATUS[row.status].tone}>{DEVICE_STATUS[row.status].text}</Pill>],
+              ["First Seen", formatDateTime(row.first_seen_at)],
+              ["Last Punch", row.last_punch_at ? formatDateTime(row.last_punch_at) : null],
+              ["Registered", row.registered_at ? formatDate(row.registered_at) : null],
+              ["This Device", row.this_device ? "Yes" : "No"],
+            ]}
+          />
+          <FormFooter>
+            {row.status !== "removed" && (
+              <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => (close(), void drop(row))}>Remove Device</Button>
+            )}
+            <Button variant="primary" onClick={close}>Close</Button>
+          </FormFooter>
+        </>
+      ),
+    });
+
+  const linked = useRef<string | null>(null);
+  useEffect(() => {
+    const row = id ? list.rows.find((r) => r.attendance_device_id === id) : undefined;
+    if (row && linked.current !== id) {
+      linked.current = id ?? null;
+      open(row);
+    }
+  });
+
+  return (
+    <>
+      <PageHeader
+        title="My Devices"
+        sub="Up to three registered"
+        actions={d && !thisRegistered && d.can_register ? <Button variant="primary" icon="plus" onClick={register}>Register This Device</Button> : undefined}
+      />
+      {full && <Banner tone="info" icon="info">You have three registered devices. Remove one to add this one.</Banner>}
+      <DataView
+        title="Devices"
+        list={list}
+        rowKey={(r) => r.attendance_device_id}
+        onRowClick={open}
+        noun="device"
+        empty={{ icon: "lock", title: "No Devices Yet", text: "The device you clock in from appears here." }}
+        columns={[
+          { key: "n", label: "Device", render: (r) => (r.this_device ? <>{r.label} <Pill tone="info">This Device</Pill></> : r.label) },
+          { key: "s", label: <HelpTerm help={DEVICE_STATUS_HELP}>Status</HelpTerm>, render: (r) => <Pill tone={DEVICE_STATUS[r.status].tone}>{DEVICE_STATUS[r.status].text}</Pill> },
+          { key: "f", label: "First Seen", render: (r) => formatDate(r.first_seen_at) },
+          { key: "l", label: "Last Punch", desktop: true, render: (r) => (r.last_punch_at ? formatDateTime(r.last_punch_at) : null) },
+        ]}
+      />
+    </>
+  );
+}
+
+/** Register the device this session is on. A recent sign-in is asked for first when it has lapsed. */
+function RegisterForm({ close }: { close: () => void }) {
+  const fresh = useFreshSignIn();
+  const f = useContractForm({ label: "" }, devices.DeviceRegister);
+  const save = useMutation("POST /api/v1/devices/mine");
+  const submit = async () => {
+    if (!f.check()) return;
+    const label = f.values.label.trim();
+    try {
+      const r = await fresh.guard(() => save.run({ body: label ? { label } : {} }));
+      if (!r) return;
+      invalidate("/api/v1/devices");
+      invalidate("/api/v1/attendance/me/today");
+      close();
+      toast("Device registered");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else toast(e instanceof ApiError ? e.message : "Device not registered");
+    }
+  };
+  return (
+    <>
+      <Field label="Device Name" optional {...f.status("label")}>
+        <TextField {...f.field("label")} placeholder="Work Phone" maxLength={80} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Register Device</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * INTERIM: Work Location Requests (#87) and Policy Updates (#89)
+ * ------------------------------------------------------------------ */
 
 /** Shows the acknowledgment banner while the latest policy version waits on this person. */
 function AckBanner() {
@@ -26,75 +326,6 @@ function AckBanner() {
   );
 }
 
-export function MyAttendancePage() {
-  const me = useMe();
-  const month = todayIso().slice(0, 7);
-  const today = useApi("GET /api/v1/attendance/me/today");
-  const summary = useApi("GET /api/v1/attendance/me/summary", { query: { month } });
-  const list = usePaged("GET /api/v1/attendance/me");
-  const t = today.data;
-  const chartRows = [...list.rows].reverse().filter((r) => r.worked_minutes != null);
-  const todayCard = t && (
-    <Card>
-      <CardHeader title={`Today, ${formatDate(t.date)}`} right={<Pill tone={t.state === "clocked_in" || t.state === "complete" ? "ok" : t.state === "unavailable" ? "info" : "neutral"}>{t.state === "clocked_in" ? "Clocked in" : t.state === "complete" ? "Complete" : t.state === "unavailable" ? "On Leave" : "Not clocked in"}</Pill>} />
-      <KeyValue items={[["Expected location", t.location_label], ["Schedule", `${t.work_pattern} · ${t.shift_start} to ${t.shift_end}`], ["Clock in", t.clock_in_at ? formatTime(t.clock_in_at) : "None"], ["Clock out", t.clock_out_at ? formatTime(t.clock_out_at) : "None"]]} />
-    </Card>
-  );
-  const chart = chartRows.length > 1 ? <AreaChart title="Net Hours per Day" values={chartRows.map((r) => Math.round((r.worked_minutes ?? 0) / 6) / 10)} labels={chartRows.map((r) => formatDate(r.date))} caption="Saturdays run 09:00 to 15:00, so they show shorter." /> : <EmptyState icon="chart" title="Not Enough Days Yet" text="The chart appears after two complete days." />;
-  const events = (
-    <DataView
-      title="My Clock Events"
-      right={<Button onClick={() => toast(`${formatMonth(month)} exported. It arrives in your Mailbox.`)}>Export Month</Button>}
-      rows={list.rows}
-      rowKey={(r) => r.event_id}
-      loading={list.loading}
-      columns={[
-        { key: "d", label: "Date", render: (r) => formatDate(r.date) },
-        { key: "i", label: "Clock In", render: (r) => (r.clock_in_at ? formatTime(r.clock_in_at) : "None") },
-        { key: "o", label: "Clock Out", render: (r) => (r.clock_out_at ? formatTime(r.clock_out_at) : "None") },
-        { key: "l", label: "Location", desktop: true, render: (r) => r.location },
-        { key: "h", label: "Hours", align: "n", render: (r) => hours(r.worked_minutes) },
-        { key: "s", label: "Status", render: (r) => <Pill tone={STATUS[r.status].tone}>{r.status === "late" ? `Late ${r.late_minutes}m` : STATUS[r.status].text}</Pill> },
-      ]}
-      footer={<Pager page={list.page} onPage={list.setPage} noun="day" />}
-    />
-  );
-  const cases = summary.data?.open_cases ?? [];
-  const casesTable = cases.length > 0 && (
-    <DataView
-      title="My Corrections and Exceptions"
-      rows={cases}
-      rowKey={(c) => c.case_id}
-      columns={[
-        { key: "n", label: "Case", render: (c) => c.number },
-        { key: "t", label: "Type", render: (c) => c.type },
-        { key: "d", label: "Date", render: (c) => formatDate(c.date) },
-        { key: "s", label: "Status", render: (c) => <Pill tone={CASE_TONE[c.status]}>{c.status}</Pill> },
-      ]}
-    />
-  );
-  if (today.error) return <ErrorState error={today.error} onRetry={today.reload} />;
-  return (
-    <>
-      <PageHeader title="My Attendance" sub={`${formatMonth(month)} · ${me.display_name}${t ? ` · ${t.work_pattern.split(" · ")[0]}` : ""}`} />
-      <AckBanner />
-      {summary.data && <KpiTiles items={summary.data.kpis} mobileCols={2} />}
-      <PhoneCards
-        items={[
-          ...(todayCard ? [{ icon: "clock" as const, title: "Today", sub: t?.clock_in_at ? `In at ${formatTime(t.clock_in_at)}` : "Not clocked in", body: todayCard }] : []),
-          { icon: "chart", title: "My Net Hours", sub: `${chartRows.length} days`, body: chart },
-          { icon: "clock", title: "My Clock Events", sub: `${list.page?.total ?? 0} records`, body: events, wide: true },
-          ...(casesTable ? [{ icon: "alert" as const, title: "My Corrections", sub: `${cases.length} open`, body: casesTable }] : []),
-        ]}
-      />
-      <DesktopOnly>
-        <Grid cols="1.4/1">{todayCard ?? <LoadingRows />}{chart}</Grid>
-        {events}
-        {casesTable && <div className="mt-3">{casesTable}</div>}
-      </DesktopOnly>
-    </>
-  );
-}
 
 const TYPES: Array<[LocationRequestBody["type"], string]> = [["Temporary home-location change", "Temporary home-location change"], ["Remote day", "One-day remote-work exception"], ["Client visit", "Client-site visit"], ["Field correction", "Field-assignment correction"]];
 
@@ -177,51 +408,6 @@ function RequestForm({ close }: { close: () => void }) {
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Submit Request</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-export function MyDevicesPage() {
-  const modal = useModal();
-  const list = usePaged("GET /api/v1/attendance/devices", { filters: { scope: "own" } });
-  const active = list.rows.filter((d) => d.status === "Enrolled" || d.status === "Pending Review").length;
-  return (
-    <>
-      <PageHeader title="My Devices" sub="Phones and laptops you clock in from" actions={<Button variant="primary" icon="plus" disabled={active >= 3} onClick={() => modal.open({ title: "Register This Device", body: (close) => <DeviceForm close={close} /> })}>Register This Device</Button>} />
-      <AckBanner />
-      {active >= 3 && <Banner tone="info" icon="info">You have three devices. Ask People to remove one before registering another.</Banner>}
-      <DataView
-        title="My Devices"
-        rows={list.rows}
-        rowKey={(d) => d.device_id}
-        loading={list.loading}
-        empty={{ icon: "lock", title: "No Devices Yet", text: "The device you clock in from is recorded on your first punch." }}
-        columns={[
-          { key: "n", label: "Device", render: (d) => d.name },
-          { key: "f", label: "First Seen", render: (d) => formatDate(d.first_seen) },
-          { key: "l", label: "Last Punch", desktop: true, render: (d) => (d.last_punch ? formatDateTime(d.last_punch) : "None") },
-          { key: "s", label: "Status", render: (d) => <Pill tone={DEVICE_TONE[d.status]}>{d.status}</Pill> },
-          { key: "e", label: "Next Punch", render: (d) => <Pill tone={d.effect.tone}>{d.effect.text}</Pill> },
-        ]}
-        footer={<Pager page={list.page} onPage={list.setPage} noun="device" />}
-      />
-    </>
-  );
-}
-
-function DeviceForm({ close }: { close: () => void }) {
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  const guess = `${/iPhone/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android phone" : /Mac/.test(ua) ? "Mac" : "This computer"} · ${/Edg\//.test(ua) ? "Edge" : /Chrome/.test(ua) ? "Chrome" : /Safari/.test(ua) ? "Safari" : "Browser"}`;
-  const f = useContractForm({ name: guess, why: "" }, { name: rules.required("Name the device") });
-  const save = useMutation("POST /api/v1/attendance/devices");
-  return (
-    <>
-      <Field label="Device Name" {...f.field("name")}><TextField {...f.field("name")} /></Field>
-      <Field label="Reason" optional><TextField {...f.field("why")} placeholder="Replaced broken phone" /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={async () => { if (!f.check()) return; try { await save.run({ body: { name: f.values.name, reason: f.values.why } }); invalidate("/api/v1/attendance/devices"); close(); toast("Sent to People for review"); } catch { toast(save.error?.message ?? "Not registered"); } }}>Send for Review</Button>
       </FormFooter>
     </>
   );

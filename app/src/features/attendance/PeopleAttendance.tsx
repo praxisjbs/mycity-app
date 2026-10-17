@@ -1,577 +1,344 @@
-import { useState } from "react";
+import attendance from "@mycity/contract/schemas/attendance.js";
+import type { AttendanceEvent, AttendanceException, ExceptionDecision, RegisterRow, RegisterStatus } from "@mycity/contract/contract.gen.ts";
+import { useEffect, useRef, useState } from "react";
+import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import type { PersonRef } from "@/api/types/common";
-import type { FieldAssignment, LocationRequest, ReconCase, RegisterRow } from "@/api/types/attendance";
-import { useMe } from "@/auth/AuthProvider";
-import { KpiTiles } from "@/features/shared/KpiTiles";
+import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
-import { AreaChart, BackButton, Banner, Button, Card, CardHeader, Chips, ChoiceField, cn, DataView, DateField, DesktopOnly, DonutChart, EmptyState, ErrorState, Field, formatDate, FormFooter, Grid, Grow, Icon, KeyValue, LoadingRows, Pager, PhoneOnly, Pill, rules, SearchInput, SelectField, StatStrip, TextAreaField, TextField, toast, Toolbar, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
-import { EmployeePicker } from "@/features/shared/pickers";
-
-type View = "register" | "assignments" | "requests" | "manager";
-const VIEWS: Array<[View, string]> = [["register", "Register"], ["assignments", "Field Assignments"], ["requests", "Location Requests"], ["manager", "Manager Preview"]];
+import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { EXCEPTION_TYPE, hours, lateBy, PATTERN, PUNCH_STATE, REGISTER_STATUS, VERDICT } from "./labels";
 
 /**
- * People · Attendance. People and HR see the whole register; a line manager
- * sees only their direct reports (the same data, narrower scope).
+ * People · Attendance (#25, docs/guides/attendance.md §10): one day's register for everyone in the
+ * reader's `people` scope, with its figures, each person's day and the evidence of every punch,
+ * and the exceptions waiting on People. A manager sees their team; the coordinates and the
+ * decisions are for People with scope all, which the API enforces.
  */
-export function PeopleAttendance() {
-  const me = useMe();
-  const hr = !!me.grants.people?.includes("edit");
-  const [params, setParams] = useSearchParams();
-  const view = (hr ? (params.get("view") as View | "reconcile" | null) : "manager") ?? "register";
-  const summary = useApi("GET /api/v1/attendance/summary", { query: { scope: hr ? "all" : "team" } });
-  const modal = useModal();
 
-  if (view === "reconcile") return <Reconcile onBack={() => setParams({ view: null })} />;
-  const recon = summary.data?.kpis.find((k) => k.key === "recon")?.value ?? "0";
-  return (
-    <>
-      <div className="mb-4 flex flex-wrap items-end gap-3 max-md:items-start">
-        <div className="min-w-0">
-          <h1 data-ui="page-title" className="text-2xl">Attendance</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">{summary.data ? `${formatDate(summary.data.date)} · Africa/Lagos · ${hr ? "the whole organisation" : "your team"}` : " "}</p>
-        </div>
-        {hr && (
-          <div className="flex flex-wrap gap-2 md:ml-auto max-md:w-full max-md:[&>button]:flex-1">
-            <Button icon="plus" onClick={() => modal.open({ title: "Add Field Assignment", wide: true, body: (close) => <AssignmentForm close={close} /> })}>Field Assignment</Button>
-            <Button variant="primary" icon="check" onClick={() => setParams({ view: "reconcile" })}>
-              Reconcile <span className="rounded-full bg-on-primary-badge px-1.5 text-2xs">{recon}</span>
-            </Button>
-          </div>
-        )}
-      </div>
-      {summary.error && <ErrorState error={summary.error} onRetry={summary.reload} />}
-      {summary.data && hr && (
-        <>
-          <KpiTiles items={summary.data.kpis.slice(0, 4)} mobileCols={2} />
-          <KpiTiles items={summary.data.kpis.slice(4)} mobileCols={2} />
-          <div className="no-scrollbar mb-3 max-w-160 overflow-x-auto max-md:max-w-none">
-            <ChoiceField value={view} onChange={(v) => setParams({ view: v === "register" ? null : v })} options={VIEWS} />
-          </div>
-        </>
-      )}
-      {view === "register" && hr && <Register />}
-      {view === "assignments" && <Assignments />}
-      {view === "requests" && <Requests />}
-      {(view === "manager" || !hr) && <ManagerView />}
-    </>
-  );
-}
-
-function Register() {
-  const summary = useApi("GET /api/v1/attendance/summary", { query: { scope: "all" } });
-  const [filter, setFilter] = useState("all");
-  const list = usePaged("GET /api/v1/attendance/register", { filters: filter === "all" ? {} : { filter } });
-  const modal = useModal();
-  const open = (r: RegisterRow) => modal.open({ title: `${r.employee.display_name} · Today`, wide: true, body: <DayDetailView id={r.employee.employee_id} /> });
-  const s = summary.data;
-  return (
-    <>
-      {s && (
-        <Grid cols="1.4/1">
-          <AreaChart title="Clocked In by Hour" values={s.hours} labels={["07", "08", "09", "10", "11", "12", "13", "14", "15", "16"]} caption="From 07:00, cumulative. The grace period closes at 09:10." />
-          <DonutChart percent={s.on_time_pct} middle={`${s.on_time_pct}%`} under="clocked in" lines={[s.donut_text]} />
-        </Grid>
-      )}
-      <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or location" className="w-full md:w-64" />
-      </Toolbar>
-      {s && <Chips value={filter} onChange={setFilter} options={[["all", `All ${s.kpis[0].value.split(" / ")[1]}`], ...s.filters.map((f) => [f.value, `${f.label} ${f.count}`] as [string, string])]} />}
-      <DesktopOnly>
-        <DataView
-          title="Today’s Register"
-          wide
-          rows={list.rows}
-          rowKey={(r) => r.employee.employee_id}
-          loading={list.loading}
-          error={list.error}
-          onRowClick={open}
-          empty={{ icon: "srch", title: "Nobody Matches This Filter", text: "Choose All to see the whole register." }}
-          columns={[
-            { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} /> },
-            { key: "a", label: "Arrangement", render: (r) => <Pill>{r.arrangement}</Pill> },
-            { key: "i", label: "Clock In", render: (r) => r.clock_in ?? <span className="text-subtle-foreground">None</span> },
-            { key: "o", label: "Clock Out", render: (r) => r.clock_out ?? <span className="text-subtle-foreground">None</span> },
-            { key: "x", label: "Expected Location", render: (r) => r.expected_location },
-            { key: "m", label: "Actual or Matched Location", render: (r) => r.matched_location ?? "Not yet" },
-            { key: "d", label: "Device", render: (r) => (r.device ? <>{r.device}<br />{r.device_status && <Pill tone={r.device_status.tone}>{r.device_status.text}</Pill>}</> : <span className="text-subtle-foreground">None</span>) },
-            { key: "s", label: "Status", render: (r) => <Pill tone={r.status.tone}>{r.status.text}</Pill> },
-            { key: "c", label: "Exception", render: (r) => (<>{r.exception && <span className="inline-block max-w-60 truncate align-bottom" title={r.exception}>{r.exception}</span>} {r.case_number && <Pill tone="warn">{r.case_number}</Pill>}{!r.exception && !r.case_number && <span className="text-subtle-foreground">None</span>}</>) },
-          ]}
-          footer={<Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" />}
-        />
-      </DesktopOnly>
-      <PhoneOnly>
-        <div className="grid gap-2.5">
-          {list.rows.map((r) => (
-            <button key={r.employee.employee_id} type="button" onClick={() => open(r)} className="block w-full rounded-card border border-border bg-card p-3 text-left shadow-1">
-              <span className="mb-2.5 flex items-start justify-between gap-2.5">
-                <Who name={r.employee.display_name} sub={r.employee.department} />
-                <Pill tone={r.status.tone}>{r.status.text}</Pill>
-              </span>
-              <span className="mb-2.5 block"><Pill>{r.arrangement}</Pill></span>
-              <span className="flex gap-2.5 border-y border-border py-2.5">
-                <span className="min-w-0 flex-1"><small className="mb-0.5 block text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Clock in</small><span className="block text-base font-strong">{r.clock_in ?? "None"}</span></span>
-                <span className="min-w-0 flex-1"><small className="mb-0.5 block text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Clock out</small><span className="block text-base font-strong">{r.clock_out ?? "None"}</span></span>
-              </span>
-              <span className="flex gap-2.5 pt-2.5 text-xs leading-snug">
-                <span className="min-w-0 flex-1"><small className="mb-0.5 block text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Expected</small>{r.expected_location}</span>
-                <span className="min-w-0 flex-1"><small className="mb-0.5 block text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Matched</small>{r.matched_location ?? "Not yet"}</span>
-              </span>
-              <span className="mt-2 flex flex-wrap gap-2.5 border-t border-border pt-2 text-2xs text-muted-foreground">
-                <span>{r.device ? `Device: ${r.device}` : "No device recorded"}</span>
-                <span>{r.case_number ? `Review ${r.case_number}` : (r.exception ?? "No exception")}</span>
-              </span>
-            </button>
-          ))}
-          {list.rows.length === 0 && !list.loading && <EmptyState icon="srch" title="Nobody Matches This Filter" text="Choose All to see the whole register." />}
-          <Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" className="px-0" />
-        </div>
-      </PhoneOnly>
-    </>
-  );
-}
-
-function DayDetailView({ id }: { id: string }) {
-  const { data, error } = useApi("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: id } });
-  if (error) return <ErrorState error={error} />;
-  if (!data) return <LoadingRows />;
-  if (!data.events.length) return <EmptyState bare icon="clock" title="No Clock Events Today" text={data.status.text === "On Leave" ? "On approved leave." : "Nothing has been recorded yet."} />;
-  type Ev = (typeof data.events)[number];
-  const fields: Array<[string, (e: Ev) => string]> = [
-    ["Event", (e) => (e.kind === "out" ? "Clock-out" : "Clock-in")], ["System time", (e) => e.system_time], ["Employee device time", (e) => e.device_time ?? "Not applicable"],
-    ["Submitted GPS", (e) => e.gps], ["GPS accuracy", (e) => (e.accuracy_m == null ? "Not captured" : `${e.accuracy_m} m`)], ["Expected location", (e) => e.expected],
-    ["Matched worksite or assignment", (e) => e.matched], ["Distance from expected", (e) => e.distance], ["Device", (e) => e.device], ["Device enrolment", (e) => e.device_status],
-    ["Server result", (e) => e.result + (e.superseded ? " · superseded, kept" : "")], ["Exception or warning", (e) => e.exception ?? "None"], ["Policy version", (e) => e.policy_version], ["Source", (e) => e.source],
-  ];
-  return (
-    <>
-      <div className="mb-3">
-        <KeyValue items={[["Work arrangement", data.arrangement], ["Shift", data.shift], ["Attendance status", <Pill tone={data.status.tone}>{data.status.text}</Pill>], ["Hours", data.hours]]} />
-      </div>
-      <div className="overflow-x-auto rounded-card border border-border" tabIndex={0}>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="border-b border-border bg-muted px-3 py-2 text-left text-2xs font-strong tracking-caps text-subtle-foreground uppercase">Field</th>
-              {data.events.map((e) => <th key={e.event_number} className="border-b border-border bg-muted px-3 py-2 text-left text-2xs font-strong tracking-caps text-subtle-foreground uppercase">{e.event_number}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {fields.map(([label, get]) => (
-              <tr key={label}>
-                <td className="border-b border-border px-3 py-2 text-2xs text-subtle-foreground">{label}</td>
-                {data.events.map((e) => <td key={e.event_number} className={cn("border-b border-border px-3 py-2", e.superseded && "text-subtle-foreground line-through")}>{get(e)}</td>)}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-const FA_TONE: Record<FieldAssignment["status"], "ok" | "neutral" | "err" | "warn"> = { Approved: "ok", Completed: "neutral", Rejected: "err", "Awaiting manager": "warn" };
-
-function Assignments() {
-  const list = usePaged("GET /api/v1/attendance/assignments");
-  const approve = useMutation("POST /api/v1/attendance/assignments/:id/approve");
-  const modal = useModal();
-  const ok = async (a: FieldAssignment) => {
-    await approve.run({ params: { id: a.assignment_id }, body: {} });
-    invalidate("/api/v1/attendance");
-    toast(`${a.number} approved. Clock In now uses it.`);
-  };
-  return (
-    <>
-      <div className="mb-2.5 flex flex-wrap items-end gap-3">
-        <div>
-          <h2 data-ui="title" className="text-md">Field Assignments</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">An approved assignment overrides the office or home for its day and time window.</p>
-        </div>
-        <Button variant="primary" icon="plus" className="md:ml-auto" onClick={() => modal.open({ title: "Add Field Assignment", wide: true, body: (close) => <AssignmentForm close={close} /> })}>Add Field Assignment</Button>
-      </div>
-      <DataView
-        title="Assignments"
-        right={<span className="text-2xs text-subtle-foreground">Default radius 150 m · 100 to 500 by venue</span>}
-        wide
-        rows={list.rows}
-        rowKey={(r) => r.assignment_id}
-        loading={list.loading}
-        error={list.error}
-        columns={[
-          { key: "n", label: "Assignment", render: (a) => (<><b>{a.number}</b><br />{a.name}</>) },
-          { key: "e", label: "Employee or Team", render: (a) => (<>{a.employees.map((e) => e.display_name).join(", ")}{a.team && <><br /><span className="text-2xs text-subtle-foreground">{a.team}</span></>}</>) },
-          { key: "c", label: "Client, Event or Campaign", render: (a) => a.client },
-          { key: "s", label: "Approved Sites", render: (a) => a.sites.map((s) => <div key={s.name}>{s.name}</div>) },
-          { key: "r", label: "Radius", render: (a) => a.sites.map((s) => <div key={s.name}>{s.radius_m} m</div>) },
-          { key: "d", label: "Date", render: (a) => formatDate(a.date) },
-          { key: "v", label: "Valid", render: (a) => `${a.start} to ${a.end}` },
-          { key: "p", label: "Approving Manager", render: (a) => a.approver },
-          { key: "t", label: "Status", render: (a) => <Pill tone={FA_TONE[a.status]}>{a.status}</Pill> },
-          { key: "x", label: "", render: (a) => a.status === "Awaiting manager" && <Button busy={approve.pending} onClick={() => ok(a)}>Approve</Button> },
-        ]}
-        footer={<Pager page={list.page} onPage={list.setPage} noun="assignment" />}
-      />
-    </>
-  );
-}
-
-function AssignmentForm({ close }: { close: () => void }) {
-  const [who, setWho] = useState<PersonRef[]>([]);
-  const [triedWho, setTriedWho] = useState(false);
-  const f = useContractForm(
-    { name: "", client: "", site_name: "", radius_m: "150", date: "", start: "09:00", end: "17:00", note: "" },
-    {
-      name: rules.required("Name the assignment"), client: rules.required("Name the client"), site_name: rules.required("Name the site"), date: rules.required("Pick a date"),
-      radius_m: (v) => (/^\d+$/.test(v) && Number(v) >= 100 && Number(v) <= 500 ? null : "Between 100 and 500"),
-      start: (v) => (/^\d{2}:\d{2}$/.test(v) ? null : "HH:MM"), end: (v, a) => (!/^\d{2}:\d{2}$/.test(v) ? "HH:MM" : v <= (a.start as string) ? "After the start" : null),
-    },
-  );
-  const save = useMutation("POST /api/v1/attendance/assignments");
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      const a = await save.run({ body: { ...f.values, radius_m: Number(f.values.radius_m), employee_ids: who.map((w) => w.employee_id) } });
-      invalidate("/api/v1/attendance");
-      close();
-      toast(`${a.number} created. The line manager confirms it.`);
-    } catch {
-      f.setServerErrors(save.fields);
-    }
-  };
-  return (
-    <Wizard
-      finish="Add Assignment"
-      busy={save.pending}
-      onFinish={() => void submit()}
-      onCancel={close}
-      steps={[
-        {
-          title: "Assignment",
-          check: () => {
-            setTriedWho(true);
-            return f.check(["name", "client"]) && who.length > 0;
-          },
-          body: (
-            <>
-              <Field label="Assignment Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Venue check" /></Field>
-              <Field label="Client or Event" {...f.field("client")}><TextField {...f.field("client")} /></Field>
-              <Field label="Employees" state={triedWho && !who.length ? "bad" : undefined} message="Add at least one"><EmployeePicker multiple value={who} onChange={setWho} /></Field>
-            </>
-          ),
-        },
-        {
-          title: "Place and Time",
-          check: () => f.check(["site_name", "radius_m", "date", "start", "end"]),
-          body: (
-            <>
-              <Field label="Approved Site" {...f.field("site_name")}><TextField {...f.field("site_name")} placeholder="Venue, area" /></Field>
-              <Field label="Radius, Metres" {...f.field("radius_m")} info="100 m for a single building, up to 500 m for a park or an open venue."><TextField inputMode="numeric" {...f.field("radius_m")} /></Field>
-              <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} /></Field>
-              <Field label="From" {...f.field("start")}><TextField inputMode="numeric" {...f.field("start")} placeholder="09:00" /></Field>
-              <Field label="To" {...f.field("end")}><TextField inputMode="numeric" {...f.field("end")} placeholder="17:00" /></Field>
-              <Field label="Note" optional><TextField {...f.field("note")} /></Field>
-            </>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-export const REQ_TONE: Record<LocationRequest["status"], "ok" | "warn" | "err" | "neutral" | "info"> = { Approved: "ok", Rejected: "err", "Awaiting manager": "warn", "Awaiting HR": "info", Draft: "neutral", Expired: "neutral" };
-
-function Requests() {
-  const list = usePaged("GET /api/v1/attendance/location-requests", { filters: { scope: "all" } });
-  const modal = useModal();
-  const open = (r: LocationRequest) => modal.open({ title: `Review ${r.number}`, wide: true, body: (close) => <RequestDecision r={r} close={close} /> });
-  const waiting = list.rows.filter((r) => r.status === "Awaiting manager" || r.status === "Awaiting HR").length;
-  return (
-    <>
-      <DataView
-        title="Work Location Requests"
-        right={<span className="text-2xs text-subtle-foreground">{waiting} awaiting a decision</span>}
-        wide
-        rows={list.rows}
-        rowKey={(r) => r.request_id}
-        loading={list.loading}
-        error={list.error}
-        onRowClick={open}
-        columns={[
-          { key: "n", label: "Request", render: (r) => r.number },
-          { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} /> },
-          { key: "t", label: "Type", render: (r) => r.type },
-          { key: "d", label: "Dates", render: (r) => (r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} to ${formatDate(r.to)}`) },
-          { key: "l", label: "Location", render: (r) => (<>{r.area}<br /><span className="text-2xs text-subtle-foreground">Full address in the request</span></>) },
-          { key: "r", label: "Radius", align: "n", render: (r) => `${r.radius_m} m` },
-          { key: "w", label: "Reason", render: (r) => <span className="inline-block max-w-60 truncate align-bottom" title={r.reason}>{r.reason}</span> },
-          { key: "s", label: "Status", render: (r) => <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill> },
-          { key: "x", label: "", render: (r) => <Button onClick={(e) => (e.stopPropagation(), open(r))}>{r.status === "Awaiting manager" || r.status === "Awaiting HR" ? "Review" : "View"}</Button> },
-        ]}
-        footer={<Pager page={list.page} onPage={list.setPage} noun="request" />}
-      />
-    </>
-  );
-}
-
-function RequestDecision({ r, close }: { r: LocationRequest; close: () => void }) {
-  const me = useMe();
-  const decide = useMutation("POST /api/v1/attendance/location-requests/:id/decision");
-  const [note, setNote] = useState("");
-  const own = r.employee.employee_id === me.employee_id;
-  const open = r.status === "Awaiting manager" || r.status === "Awaiting HR";
-  const act = async (approve: boolean) => {
-    try {
-      await decide.run({ params: { id: r.request_id }, body: { approve, note } });
-      invalidate("/api/v1/attendance");
-      close();
-      toast(approve ? `${r.number} approved. Clock In will use it on its dates.` : `${r.number} rejected. The employee has been told.`);
-    } catch {
-      toast(decide.error?.message ?? "Not saved");
-    }
-  };
-  return (
-    <>
-      {own && <Banner tone="info" icon="info">This is your own request. You cannot approve it yourself; it goes to the CEO.</Banner>}
-      {r.status === "Awaiting manager" && <Banner tone="info" icon="info">The line manager has not recommended this yet. People can still decide.</Banner>}
-      <Grid cols={2} className="mb-0">
-        <Card>
-          <CardHeader title="Request" />
-          <KeyValue items={[["Employee", r.employee.display_name], ["Type", r.type], ["Dates", r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Reason", r.reason], ["Evidence", r.evidence ?? "None"], ["Manager", r.manager_note ?? "No recommendation yet"]]} />
-        </Card>
-        <Card>
-          <CardHeader title="Location, Old and New" />
-          <KeyValue items={[["Requested", `${r.area} · ${r.radius_m} m`], ["Full address", r.address ?? "Not needed for this type"], ["After it ends", "The permanent location applies again. Both stay in history."], ["Status", <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill>]]} />
-        </Card>
-      </Grid>
-      {open && (
-        <Field label="Note to the Employee" className="mt-3">
-          <TextField value={note} onChange={setNote} placeholder="Optional" />
-        </Field>
-      )}
-      <FormFooter>
-        <Button onClick={close}>{open ? "Cancel" : "Close"}</Button>
-        {open && !own && (
-          <>
-            <Button busy={decide.pending} onClick={() => act(false)}>Reject</Button>
-            <Button variant="primary" icon="ok" busy={decide.pending} onClick={() => act(true)}>Approve</Button>
-          </>
-        )}
-      </FormFooter>
-    </>
-  );
-}
-
-function ManagerView() {
-  const me = useMe();
-  const list = usePaged("GET /api/v1/attendance/register", { filters: { scope: "team" } });
-  const summary = useApi("GET /api/v1/attendance/summary", { query: { scope: "team" } });
-  const reqs = usePaged("GET /api/v1/attendance/location-requests", { filters: { scope: "team", status: "Awaiting manager" } });
-  const cases = usePaged("GET /api/v1/attendance/cases", { filters: { scope: "team", status: "Awaiting manager" } });
-  const modal = useModal();
-  const waiting = (reqs.page?.total ?? 0) + (cases.page?.total ?? 0);
-  return (
-    <>
-      <Banner tone="info" icon="users">
-        <b>Manager view.</b> What {me.display_name} sees as line manager of {list.page?.total ?? 0} people. Nothing outside this team is visible here.
-      </Banner>
-      {summary.data && <KpiTiles items={summary.data.kpis.slice(0, 4)} mobileCols={2} />}
-      <DataView
-        title="My Team Today"
-        rows={list.rows}
-        rowKey={(r) => r.employee.employee_id}
-        loading={list.loading}
-        columns={[
-          { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} /> },
-          { key: "a", label: "Arrangement", render: (r) => <Pill>{r.arrangement}</Pill> },
-          { key: "t", label: "Today", render: (r) => <Pill tone={r.status.tone}>{r.status.text}</Pill> },
-          { key: "x", label: "Expected Location", desktop: true, render: (r) => r.expected_location },
-          { key: "m", label: "Matched Location", desktop: true, render: (r) => r.matched_location ?? "Not yet" },
-        ]}
-        empty={{ title: "Nobody Reports to You", text: "Your direct reports appear here." }}
-        footer={<Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" />}
-      />
-      <Grid cols={2} className="mt-3">
-        <Card>
-          <CardHeader title="Needs Your Recommendation" right={<Pill tone={waiting ? "warn" : "ok"}>{String(waiting)}</Pill>} />
-          {reqs.rows.map((q) => (
-            <Row key={q.request_id} icon="target" title={`${q.type} · ${q.employee.display_name}`} sub={`${q.area} · ${formatDate(q.from)} to ${formatDate(q.to)} · ${q.reason}`}>
-              <Button onClick={() => modal.open({ title: `Recommend ${q.number}`, body: (close) => <Recommend r={q} close={close} /> })}>Recommend</Button>
-            </Row>
-          ))}
-          {cases.rows.map((c) => (
-            <Row key={c.case_id} icon="alert" title={`${c.type} · ${c.employee.display_name}`} sub={`${formatDate(c.date)} · ${c.explanation ?? "No explanation yet"}`}>
-              <Button onClick={() => modal.open({ title: `Review Explanation · ${c.number}`, wide: true, body: (close) => <CaseRecommend c={c} close={close} /> })}>Review</Button>
-            </Row>
-          ))}
-          {!waiting && <p className="text-2xs text-subtle-foreground">Nothing is waiting on you.</p>}
-        </Card>
-      </Grid>
-    </>
-  );
-}
-
-function Row({ icon, title, sub, children }: { icon: "target" | "alert" | "brief"; title: string; sub: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2.5 border-b border-border py-2 last:border-b-0">
-      <span className="flex size-7.5 flex-none items-center justify-center rounded-ctl bg-accent text-accent-foreground">
-        <Icon name={icon} />
-      </span>
-      <span className="flex min-w-44 flex-1 flex-col gap-0.5">
-        <b className="text-xs font-semibold">{title}</b>
-        <span className="text-2xs text-subtle-foreground">{sub}</span>
-      </span>
-      {children}
-    </div>
-  );
-}
-
-function Recommend({ r, close }: { r: LocationRequest; close: () => void }) {
-  const [note, setNote] = useState("");
-  const rec = useMutation("POST /api/v1/attendance/location-requests/:id/recommendation");
-  const send = async (recommend: boolean) => {
-    if (note.trim().length < 3) return;
-    await rec.run({ params: { id: r.request_id }, body: { recommend, note } });
-    invalidate("/api/v1/attendance");
-    close();
-    toast("Sent to People with your comment.");
-  };
-  return (
-    <>
-      <KeyValue items={[["Employee", r.employee.display_name], ["Request", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason]]} />
-      <Field label="Your Comment for People" className="mt-3" state={note ? (note.trim().length < 3 ? "bad" : "good") : undefined} message="Add a comment">
-        <TextField value={note} onChange={setNote} placeholder="I support this" />
-      </Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button busy={rec.pending} onClick={() => send(false)}>Do Not Recommend</Button>
-        <Button variant="primary" busy={rec.pending} onClick={() => send(true)}>Recommend</Button>
-      </FormFooter>
-    </>
-  );
-}
-
-export const OUTCOMES: Array<[string, string]> = [
-  ["add_in", "Add missing clock-in"], ["add_out", "Add missing clock-out"], ["correct", "Correct recorded time"], ["approve_loc", "Approve location exception"],
-  ["attach_fa", "Attach field assignment"], ["leave", "Classify as approved leave"], ["auth_abs", "Classify as authorised absence"], ["unauth_abs", "Classify as unauthorised absence"],
-  ["exclude_dup", "Exclude duplicate from calculation"], ["reject", "Reject correction"], ["info", "Request more information"], ["escalate", "Escalate to Queries & Sanctions"],
+type View = "register" | "exceptions";
+const STATUS_CHIPS: Array<[RegisterStatus | "all", string]> = [
+  ["all", "All"],
+  ["present", "Present"],
+  ["late", "Late"],
+  ["absent", "Absent"],
+  ["leave", "On Leave"],
+  ["not_in", "Not In"],
 ];
 
-function CaseRecommend({ c, close }: { c: ReconCase; close: () => void }) {
-  const [out, setOut] = useState(c.suggested_outcome);
-  const f = useContractForm({ note: "" }, { note: rules.min(10, "At least 10 characters") });
-  const send = () => {
-    if (!f.check()) return;
-    close();
-    toast(`Recommendation on ${c.number} sent to People.`);
-    void out;
-  };
+export function PeopleAttendance() {
+  const [params] = useSearchParams();
+  const id = params.get("id");
+  const { can } = useAuth();
+  const modal = useModal();
+  const [date, setDate] = useState(todayIso());
+  const [view, setView] = useState<View>("register");
+  const [status, setStatus] = useState<RegisterStatus | "all">("all");
+  const summary = useApi("GET /api/v1/attendance/summary", { query: { date } });
+  const s = summary.data;
+  const openDay = (employeeId: string, name: string, day: string) => modal.open({ title: name, wide: true, body: <DayView employeeId={employeeId} date={day} /> });
+  useRecordLink(id, openDay);
+
+  const exportRange = () => modal.open({ title: "Export Register", body: (close) => <ExportForm close={close} date={date} status={status} /> });
+  const tile = (title: string, value: number | undefined, filter: RegisterStatus | null, tone?: "ok" | "warn" | "err", help?: string) => (
+    <KpiCard title={title} value={value === undefined ? "" : String(value)} tone={value ? tone : undefined} help={help} onOpen={filter ? () => (setView("register"), setStatus(filter)) : undefined} />
+  );
+
   return (
     <>
-      <KeyValue items={[["Employee", c.employee.display_name], ["Case", `${c.type} · ${formatDate(c.date)}`], ["Employee explanation", c.explanation ?? "None given"]]} />
-      <Field label="Recommended Outcome"><SelectField value={out} onChange={setOut} options={OUTCOMES.filter(([k]) => k !== "escalate")} /></Field>
-      <Field label="Your Comment" {...f.field("note")}>
-        <TextAreaField {...f.field("note")} placeholder="Approved site visit" />
-      </Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={send}>Recommend</Button>
-      </FormFooter>
+      <PageHeader
+        title="Attendance"
+        sub={formatDate(date)}
+        actions={can("people", "export") ? <Button icon="download" onClick={exportRange}>Export</Button> : undefined}
+      >
+        <Field label="Date">
+          <DateField value={date} onChange={(d) => d && setDate(d)} max={todayIso()} />
+        </Field>
+      </PageHeader>
+      {summary.error && !s && <ErrorState error={summary.error} onRetry={summary.reload} />}
+      <Grid cols="4m2">
+        {tile("Expected", s?.expected, null)}
+        {tile("Present", s?.present, "present", "ok")}
+        {tile("Late", s?.late, "late", "warn")}
+        {tile("Absent", s?.absent, "absent", "err")}
+      </Grid>
+      <Grid cols="4m2" className="mt-3">
+        {tile("On Leave", s?.on_leave, "leave")}
+        {tile("Not In", s?.not_in, "not_in")}
+        <KpiCard
+          title="Open Exceptions"
+          value={s ? String(s.open_exceptions) : ""}
+          tone={s?.open_exceptions ? "warn" : undefined}
+          help="Punches recorded for review on this day, waiting on People to accept, reject or correct."
+          onOpen={() => setView("exceptions")}
+        />
+      </Grid>
+      <div className="my-3">
+        <SegmentedControl label="View" value={view} onChange={setView} options={[["register", "Register"], ["exceptions", "Exceptions"]]} />
+      </div>
+      {view === "register" ? <Register date={date} status={status} setStatus={setStatus} openDay={openDay} /> : <Exceptions date={date} />}
     </>
   );
 }
 
-export const CASE_TONE: Record<ReconCase["status"], "warn" | "info" | "ok" | "err" | "neutral"> = { "Awaiting HR": "warn", "Awaiting manager": "info", "Awaiting employee": "info", Resolved: "ok", Escalated: "err" };
-
-/** The reconciliation queue: decide what a day's record should say, never editing a punch. */
-function Reconcile({ onBack }: { onBack: () => void }) {
-  const [status, setStatus] = useState("open");
-  const list = usePaged("GET /api/v1/attendance/cases", { filters: { ...(status !== "all" && { status }) } });
-  const all = usePaged("GET /api/v1/attendance/cases");
-  const [sel, setSel] = useState<string | null>(null);
-  const current = list.rows.find((c) => c.case_id === sel) ?? list.rows[0] ?? null;
-  const count = (s: string) => all.rows.filter((c) => c.status === s).length;
-  return (
-    <>
-      <BackButton label="Back to Attendance" onBack={onBack} />
-      <div className="mb-4">
-        <h1 data-ui="page-title" className="text-2xl">Reconciliation Queue</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">{count("Awaiting HR")} awaiting People · {count("Awaiting manager")} awaiting a manager</p>
-      </div>
-      <StatStrip items={[{ label: "Awaiting People", value: String(count("Awaiting HR")), tone: count("Awaiting HR") ? "warn" : "ok" }, { label: "Awaiting a Manager", value: String(count("Awaiting manager")) }, { label: "More Information", value: String(count("Awaiting employee")) }, { label: "Escalated", value: String(count("Escalated")), desktop: true }, { label: "Total Cases", value: String(all.page?.total ?? 0) }]} />
-      <Toolbar>
-        <SearchInput value={list.q} onChange={list.setQ} placeholder="Case, name, type" className="w-full md:w-64" />
-      </Toolbar>
-      <Chips value={status} onChange={setStatus} options={[["open", "Open"], ["Awaiting HR", "Awaiting People"], ["Awaiting manager", "Awaiting a manager"], ["Resolved", "Resolved"], ["all", "All"]]} />
-      <div className="grid grid-cols-1 items-start gap-3 xl:cols-list-detail">
-        <div className="overflow-hidden rounded-card border border-border bg-card shadow-1" role="list">
-          {list.rows.map((c) => (
-            <button
-              key={c.case_id}
-              type="button"
-              role="listitem"
-              onClick={() => setSel(c.case_id)}
-              className={cn("flex w-full flex-col gap-1 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-muted", current?.case_id === c.case_id && "bg-accent bar-selected")}
-            >
-              <span className="flex items-center justify-between gap-2"><b className="text-xs font-strong">{c.type}</b><Pill tone={CASE_TONE[c.status]}>{c.status}</Pill></span>
-              <span className="text-2xs text-subtle-foreground">{c.number} · {c.employee.display_name} · {formatDate(c.date)} · payroll: {c.payroll_impact}</span>
-            </button>
-          ))}
-          {!list.rows.length && !list.loading && <EmptyState bare title="No Cases Match" text="Clear the filter to see the whole queue." />}
-          <Pager page={list.page} onPage={list.setPage} noun="case" />
-        </div>
-        <div className="min-w-0">{current ? <CaseDetail key={current.case_id} c={current} /> : <EmptyState icon="check" title="Nothing Selected" text="Choose a case on the left." />}</div>
-      </div>
-    </>
-  );
-}
-
-function CaseDetail({ c }: { c: ReconCase }) {
-  const done = c.status === "Resolved" || c.status === "Escalated";
-  const [out, setOut] = useState(c.suggested_outcome);
-  const timed = ["add_in", "add_out", "correct"].includes(out);
-  const f = useContractForm(
-    { time: c.suggested_outcome === "add_out" ? "17:00" : "08:00", why: "" },
-    { time: (v) => (timed && !/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? "HH:MM, 24 hour" : null), why: rules.min(10, "At least 10 characters") },
-  );
-  const decide = useMutation("POST /api/v1/attendance/cases/:id/decision");
-  const save = async () => {
-    if (!f.check()) return;
-    try {
-      await decide.run({ params: { id: c.case_id }, body: { outcome: out, note: f.values.why, ...(timed && { time: f.values.time }) } });
-      invalidate("/api/v1/attendance");
-      toast(out === "escalate" ? `${c.number} sent to Queries & Sanctions` : `${c.number} resolved. The original punch is kept.`);
-    } catch {
-      /* the field shows the server's message */
+/** A link from search or a notice opens the day it names, once. */
+function useRecordLink(id: string | null | undefined, openDay: (employeeId: string, name: string, date: string) => void) {
+  const ref = useApi("GET /api/v1/attendance/records/:id", { params: { id: id ?? "" }, enabled: !!id });
+  const done = useRef<string | null>(null);
+  useEffect(() => {
+    if (ref.data && done.current !== ref.data.attendance_day_id) {
+      done.current = ref.data.attendance_day_id;
+      openDay(ref.data.employee_id, formatDate(ref.data.date), ref.data.date);
     }
-  };
+  }, [ref.data, openDay]);
+}
+
+function Register({ date, status, setStatus, openDay }: { date: string; status: RegisterStatus | "all"; setStatus: (s: RegisterStatus | "all") => void; openDay: (employeeId: string, name: string, date: string) => void }) {
+  const list = usePaged("GET /api/v1/attendance/register", { filters: { date, ...(status !== "all" && { status }) } });
+  const open = (r: RegisterRow) => openDay(r.employee.employee_id, r.employee.display_name, r.date);
+  return (
+    <>
+      <Chips label="Status" value={status} onChange={setStatus} options={STATUS_CHIPS} />
+      <DataView
+        title="Register"
+        wide
+        list={list}
+        search="Name or Location"
+        rowKey={(r) => r.employee.employee_id}
+        onRowClick={open}
+        noun="person"
+        nounPlural="people"
+        empty={{ icon: "srch", title: "Nobody Matches", text: "Choose All to see everyone." }}
+        columns={[
+          { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} /> },
+          { key: "s", label: "Status", render: (r) => <Pill tone={REGISTER_STATUS[r.status].tone}>{r.status === "late" ? `Late ${lateBy(r.late_minutes)}` : REGISTER_STATUS[r.status].text}</Pill> },
+          { key: "clock_in_at", label: "Clock In", sortable: true, render: (r) => (r.clock_in_at ? formatTime(r.clock_in_at) : null) },
+          { key: "o", label: "Clock Out", render: (r) => (r.clock_out_at ? formatTime(r.clock_out_at) : null) },
+          { key: "a", label: "Arrangement", desktop: true, render: (r) => PATTERN[r.work_pattern] },
+          { key: "l", label: "Location", desktop: true, render: (r) => (r.location_verdict ? `${r.expected_location ?? "None"} · ${VERDICT[r.location_verdict]}` : r.expected_location) },
+          { key: "d", label: "Device", desktop: true, render: (r) => r.device_label },
+          { key: "r", label: "Review", desktop: true, render: (r) => (r.open_exceptions ? <Pill tone="warn">{`${r.open_exceptions} Open`}</Pill> : null) },
+        ]}
+      />
+    </>
+  );
+}
+
+/** One person's day: the record, every punch with its evidence, and the day's exceptions. */
+function DayView({ employeeId, date }: { employeeId: string; date: string }) {
+  const day = useApi("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: employeeId }, query: { date } });
+  const events = usePaged("GET /api/v1/attendance/events", { filters: { employee_id: employeeId, date } });
+  const exceptions = usePaged("GET /api/v1/attendance/exceptions", { filters: { employee_id: employeeId, date } });
+  const modal = useModal();
+  const d = day.data;
+  if (day.error) return <ErrorState error={day.error} onRetry={day.reload} />;
+  if (!d) return <LoadingRows />;
+  const decideOne = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
   return (
     <>
       <Card>
-        <CardHeader record title={`${c.number} · ${c.type}`} right={<Pill tone={CASE_TONE[c.status]}>{c.status}</Pill>} />
-        <KeyValue items={[["Employee", `${c.employee.display_name} · ${c.department}`], ["Work arrangement", c.arrangement], ["Date", formatDate(c.date)], ...c.evidence, ["Employee explanation", c.explanation ?? "None given"], ["Manager comment", c.manager_note ?? "None yet"], ["Payroll impact", c.payroll_impact]]} />
+        <CardHeader record title={formatDate(d.date)} right={<Pill tone={REGISTER_STATUS[d.status].tone}>{REGISTER_STATUS[d.status].text}</Pill>} />
+        <KeyValue
+          items={[
+            ["Shift", d.shift.working_day && d.shift.starts_at ? `${d.shift.starts_at} to ${d.shift.ends_at}${d.shift.grace_minutes ? `, ${d.shift.grace_minutes} min grace` : ""}` : "Day Off"],
+            ["Arrangement", PATTERN[d.work_pattern]],
+            ["Expected Location", d.expected_location ? `${d.expected_location.name} · ${d.expected_location.radius_m} m` : null],
+            ["Clock In", d.clock_in_at ? formatTime(d.clock_in_at) : null],
+            ["Clock Out", d.clock_out_at ? formatTime(d.clock_out_at) : null],
+            ["Hours", d.worked_minutes ? hours(d.worked_minutes) : null],
+            ["Late By", d.late_minutes ? lateBy(d.late_minutes) : null],
+            ["Overtime", d.overtime_minutes ? `${d.overtime_minutes} min` : null],
+          ]}
+        />
       </Card>
-      {!done && (
-        <Card className="mt-3">
-          <CardHeader title="Decide the Record" />
-          {c.status === "Awaiting manager" && <Banner tone="info" icon="info">The line manager has not recommended yet. People can still decide.</Banner>}
-          <Field label="Outcome"><SelectField value={out} onChange={setOut} options={OUTCOMES} /></Field>
-          {["add_in", "add_out", "correct"].includes(out) && (
-            <Field label="Time" {...f.field("time")}>
-              <TextField {...f.field("time")} inputMode="numeric" placeholder="17:00" />
-            </Field>
-          )}
-          <Field label="Resolution Reason" {...f.field("why")} state={decide.fields.note ? "bad" : f.field("why").state} message={decide.fields.note?.[0] ?? f.field("why").message}>
-            <TextAreaField {...f.field("why")} placeholder="Matches gate log" />
-          </Field>
-          <div className="flex justify-end gap-2">
-            <Grow />
-            <Button variant="primary" busy={decide.pending} onClick={save}>Record Decision</Button>
-          </div>
-        </Card>
+      <DataView
+        className="mt-3"
+        title="Punches"
+        wide
+        list={events}
+        rowKey={(e) => e.attendance_event_id}
+        noun="punch"
+        nounPlural="punches"
+        empty={{ icon: "clock", title: "No Punches", text: "Nothing was recorded on this day." }}
+        columns={evidenceColumns}
+      />
+      {exceptions.rows.length > 0 && (
+        <DataView
+          className="mt-3"
+          title="Exceptions"
+          list={exceptions}
+          rowKey={(x) => x.attendance_exception_id}
+          onRowClick={decideOne}
+          noun="exception"
+          columns={exceptionColumns(false)}
+        />
       )}
+    </>
+  );
+}
+
+const evidenceColumns = [
+  { key: "t", label: "Punch", render: (e: AttendanceEvent) => (e.event_type === "clock_in" ? "Clock In" : "Clock Out") },
+  { key: "a", label: "Server Time", render: (e: AttendanceEvent) => formatTime(e.occurred_at) },
+  { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Not Counted" : PUNCH_STATE[e.validation_state].text}</Pill> },
+  { key: "v", label: "Device Time", desktop: true, render: (e: AttendanceEvent) => (e.device_at ? `${formatTime(e.device_at)}${e.skew_seconds && Math.abs(e.skew_seconds) >= 60 ? `, ${Math.round(e.skew_seconds / 60)} min` : ""}` : null) },
+  { key: "l", label: "Location", render: (e: AttendanceEvent) => `${VERDICT[e.geofence]}${e.distance_m !== null ? `, ${e.distance_m} m` : ""}` },
+  { key: "c", label: "Accuracy", desktop: true, render: (e: AttendanceEvent) => (e.accuracy_m !== null ? `${Math.round(e.accuracy_m)} m` : null) },
+  { key: "g", label: "Coordinates", desktop: true, render: (e: AttendanceEvent) => (e.latitude !== null && e.longitude !== null ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}` : null) },
+  { key: "d", label: "Device", desktop: true, render: (e: AttendanceEvent) => e.device_label },
+  { key: "s", label: "Source", desktop: true, render: (e: AttendanceEvent) => (e.source === "admin" ? `Added by ${e.recorded_by_name ?? "People"}` : "Clock") },
+];
+
+const exceptionColumns = (withPerson: boolean) => [
+  ...(withPerson ? [{ key: "e", label: "Employee", render: (x: AttendanceException) => <Who name={x.employee.display_name} sub={x.employee.department} /> }] : []),
+  { key: "t", label: "Exception", render: (x: AttendanceException) => EXCEPTION_TYPE[x.exception_type] },
+  { key: "w", label: "Date", render: (x: AttendanceException) => formatDate(x.work_date) },
+  { key: "d", label: "Detail", desktop: true, render: (x: AttendanceException) => x.detail },
+  { key: "n", label: "Note", desktop: true, render: (x: AttendanceException) => (x.employee_note ? <Pill tone="info">Explained</Pill> : null) },
+  {
+    key: "s",
+    label: "Status",
+    render: (x: AttendanceException) =>
+      x.status === "open" ? <Pill tone="warn">Open</Pill> : <Pill tone={x.outcome === "rejected" ? "err" : "ok"}>{x.outcome === "rejected" ? "Rejected" : x.outcome === "corrected" ? "Corrected" : "Accepted"}</Pill>,
+  },
+];
+
+function Exceptions({ date }: { date: string }) {
+  const modal = useModal();
+  const [status, setStatus] = useState<"open" | "resolved" | "day">("open");
+  const list = usePaged("GET /api/v1/attendance/exceptions", { filters: status === "day" ? { date } : { status } });
+  const open = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
+  return (
+    <>
+      <Chips label="Exceptions" value={status} onChange={setStatus} options={[["open", "Open"], ["resolved", "Decided"], ["day", formatDate(date)]]} />
+      <DataView
+        title="Exceptions"
+        list={list}
+        search="Name or Detail"
+        rowKey={(x) => x.attendance_exception_id}
+        onRowClick={open}
+        noun="exception"
+        empty={{ icon: "check", title: "Nothing Waiting", text: "Every exception here is decided." }}
+        columns={exceptionColumns(true)}
+      />
+    </>
+  );
+}
+
+/** An exception: what happened, the person's note, the punch's evidence, and the decision. */
+function ExceptionView({ x, close }: { x: AttendanceException; close: () => void }) {
+  const { can } = useAuth();
+  const events = usePaged("GET /api/v1/attendance/events", { filters: { employee_id: x.employee.employee_id, date: x.work_date } });
+  return (
+    <>
+      <Card>
+        <CardHeader record title={x.employee.display_name} right={x.status === "open" ? <Pill tone="warn">Open</Pill> : <Pill tone="ok">Decided</Pill>} />
+        <KeyValue
+          items={[
+            ["Date", formatDate(x.work_date)],
+            ["Detail", x.detail],
+            ["Severity", x.severity === "high" ? "High" : x.severity === "medium" ? "Medium" : "Low"],
+            ["Their Note", x.employee_note],
+            ...(x.status === "resolved"
+              ? ([
+                  ["Decided By", x.reviewed_by_name],
+                  ["Decided", x.reviewed_at ? formatDateTime(x.reviewed_at) : null],
+                  ["Reason", x.resolution],
+                ] as Array<[string, string | null]>)
+              : []),
+          ]}
+        />
+      </Card>
+      <DataView className="mt-3" title="Punches" wide list={events} rowKey={(e) => e.attendance_event_id} noun="punch" nounPlural="punches" columns={evidenceColumns} />
+      {x.status === "open" && can("people", "approve") ? (
+        <DecisionForm x={x} close={close} />
+      ) : (
+        <FormFooter>
+          <Button variant="primary" onClick={close}>Close</Button>
+        </FormFooter>
+      )}
+    </>
+  );
+}
+
+const DECISIONS: Record<ExceptionDecision["decision"], string> = { accept: "Accept", reject: "Reject", add_clock_out: "Add Clock-Out" };
+
+/** Decide: accept the punch, stop it counting, or add the missing clock-out. The punch itself never changes. */
+function DecisionForm({ x, close }: { x: AttendanceException; close: () => void }) {
+  const options = (x.exception_type === "missing_clock_out" ? ["add_clock_out", "accept"] : ["accept", "reject"]) as Array<ExceptionDecision["decision"]>;
+  const f = useContractForm({ decision: options[0], resolution: "", clock_out_time: "" }, {
+    safeParse: (v: { decision: ExceptionDecision["decision"]; resolution: string; clock_out_time: string }) =>
+      attendance.ExceptionDecision.safeParse({ decision: v.decision, resolution: v.resolution, ...(v.decision === "add_clock_out" && v.clock_out_time ? { clock_out_time: v.clock_out_time } : {}) }),
+  });
+  const save = useMutation("POST /api/v1/attendance/exceptions/:id/decision");
+  const v = f.values;
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({
+        params: { id: x.attendance_exception_id },
+        body: { decision: v.decision, resolution: v.resolution.trim(), ...(v.decision === "add_clock_out" && { clock_out_time: v.clock_out_time }) },
+      });
+      invalidate("/api/v1/attendance");
+      close();
+      toast("Decision recorded");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else toast(e instanceof ApiError ? e.message : "Decision not recorded");
+    }
+  };
+  return (
+    <Card className="mt-3">
+      <CardHeader title="Decide" />
+      <Field label={<HelpTerm help="Accept keeps the punch. Reject stops it counting for the day. Add Clock-Out records the time the person left.">Outcome</HelpTerm>} {...f.status("decision")}>
+        <ChoiceField value={v.decision} onChange={(d) => f.set("decision", d)} options={options.map((o) => [o, DECISIONS[o]] as [ExceptionDecision["decision"], string])} />
+      </Field>
+      {v.decision === "add_clock_out" && (
+        <Field label="Clock-Out Time" {...f.status("clock_out_time")}>
+          <TimeField {...f.field("clock_out_time")} />
+        </Field>
+      )}
+      <Field label="Reason" {...f.status("resolution")}>
+        <TextAreaField {...f.field("resolution")} placeholder="Matches gate log" rows={3} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Record Decision</Button>
+      </FormFooter>
+    </Card>
+  );
+}
+
+/** The register between two dates as a workbook, emailed to the person asking. */
+function ExportForm({ close, date, status }: { close: () => void; date: string; status: RegisterStatus | "all" }) {
+  const f = useContractForm({ period: { from: `${date.slice(0, 8)}01`, to: date } }, {
+    safeParse: (v: { period: { from: string; to: string } }) => {
+      const r = attendance.RegisterExportRequest.safeParse({ from: v.period.from, to: v.period.to });
+      return r.success ? r : { success: false, error: { issues: (r.error?.issues ?? []).map((i) => ({ ...i, path: ["period"] })) } };
+    },
+  });
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!f.check()) return;
+    setBusy(true);
+    try {
+      await api.call("POST /api/v1/attendance/export", { body: { from: f.values.period.from, to: f.values.period.to, ...(status !== "all" && { status }) } });
+      close();
+      toast("Export queued for your email");
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Export not queued");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Field label="Period" {...f.status("period")}>
+        <DateRangeField value={f.values.period} onChange={(p) => f.set("period", p)} max={todayIso()} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" icon="download" busy={busy} onClick={() => void submit()}>Export Register</Button>
+      </FormFooter>
     </>
   );
 }
