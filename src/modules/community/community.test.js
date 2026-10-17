@@ -12,7 +12,8 @@ describe("who may post", () => {
     expect(service.mayPost({ post_policy: "admins", member_role: "member" }, true)).toBe(false);
     expect(service.mayPost({ post_policy: "admins", member_role: "admin" }, false)).toBe(true);
     expect(service.mayPost({ post_policy: "people_ceo", member_role: "admin" }, false)).toBe(false);
-    expect(service.mayPost({ post_policy: "people_ceo", member_role: "member" }, true)).toBe(true);
+    // Nothing is posted straight into #announcements, People and the CEO included: they publish from the tab.
+    expect(service.mayPost({ post_policy: "people_ceo", member_role: "member" }, true)).toBe(false);
   });
 });
 

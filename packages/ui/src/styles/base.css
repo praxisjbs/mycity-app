@@ -235,6 +235,66 @@
   max-height: calc(100dvh - 140px);
 }
 
+/* The scrolling columns of a two-column Grid (data-panes, from the width they sit side by
+   side): a thin scrollbar kept inside the card's rounded corners, and a card's header that
+   stays put while its body scrolls under it, as a pane's does. */
+@layer components {
+  @media (width >= theme(--breakpoint-lg)) {
+    [data-panes="lg"] > * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    [data-panes="lg"] > *::-webkit-scrollbar {
+      width: 8px;
+    }
+    [data-panes="lg"] > *::-webkit-scrollbar-track {
+      background: transparent;
+      margin-block: var(--radius-card);
+    }
+    [data-panes="lg"] > *::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 9999px;
+    }
+    [data-panes="lg"] > [data-card] > [data-card-header]:first-child {
+      position: sticky;
+      top: -0.875rem;
+      z-index: 1;
+      margin-top: -0.875rem;
+      margin-bottom: 0;
+      padding-top: 0.875rem;
+      padding-bottom: 0.75rem;
+      background: var(--card);
+    }
+  }
+  @media (width >= theme(--breakpoint-xl)) {
+    [data-panes="xl"] > * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    [data-panes="xl"] > *::-webkit-scrollbar {
+      width: 8px;
+    }
+    [data-panes="xl"] > *::-webkit-scrollbar-track {
+      background: transparent;
+      margin-block: var(--radius-card);
+    }
+    [data-panes="xl"] > *::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 9999px;
+    }
+    [data-panes="xl"] > [data-card] > [data-card-header]:first-child {
+      position: sticky;
+      top: -0.875rem;
+      z-index: 1;
+      margin-top: -0.875rem;
+      margin-bottom: 0;
+      padding-top: 0.875rem;
+      padding-bottom: 0.75rem;
+      background: var(--card);
+    }
+  }
+}
+
 /* The split panes: the list at the width the person dragged (--pane), the
    divider, the record, and optionally a third pane at the right. */
 @utility cols-panes {

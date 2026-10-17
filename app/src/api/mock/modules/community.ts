@@ -1,4 +1,4 @@
-import type { Announcement, Channel, Conversation, Member, Message, ProfileCard } from "@/api/types/community";
+import type { Announcement, AnnouncementStats, Channel, Conversation, Member, Message, ProfileCard } from "@/api/types/community";
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, fold } from "../core";
 import { byId, byKey, DEPARTMENTS, PEOPLE } from "../data/people";
 import { UPLOADS } from "../uploads";
@@ -186,7 +186,8 @@ const isMember = (c: Chan | undefined, user: string) => !!c && c.members.include
 /** A channel's moderators: its admins; People and the CEO in the company channels; nobody in a direct conversation. */
 const moderates = (c: Chan, user: string) => (c.channel_type === "direct" ? false : c.channel_type === "company" ? ANN_POSTERS.has(user) : c.admins.includes(user));
 const canPoll = (c: Chan, user: string) => canPost(c, user) && (c.name === "general" ? ANN_POSTERS.has(user) : true);
-const canPost = (c: Chan, user: string) => (c.post_policy === "people_ceo" ? ANN_POSTERS.has(user) : c.post_policy === "admins" ? c.admins.includes(user) : true);
+/* #announcements takes nothing posted straight in: announcements come from the tab. */
+const canPost = (c: Chan, user: string) => (c.post_policy === "people_ceo" ? false : c.post_policy === "admins" ? c.admins.includes(user) : true);
 
 function lineOf(m: Message | undefined): string | null {
   if (!m) return null;
@@ -555,6 +556,20 @@ const poster = (user: string | null) => !!user && ANN_POSTERS.has(user);
 const denied = () => fail(403, "CAPABILITY_REQUIRED", "This needs an authority you do not hold");
 
 route("GET /api/v1/community/announcements", (req) => (poster(req.user) ? paged(ANNOUNCEMENTS.map(announcementOut), req, { search: (a) => [a.title, a.body] }) : denied()));
+route("GET /api/v1/community/announcements/stats", (req) => {
+  if (!poster(req.user)) return denied();
+  const all = ANNOUNCEMENTS.map(announcementOut);
+  const pub = all.filter((a) => a.status === "published");
+  const month = new Date().toISOString().slice(0, 7);
+  const out: AnnouncementStats = {
+    published: pub.length,
+    scheduled: all.length - pub.length,
+    average_read: pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience_size), 0) * 100) / pub.length) : 0,
+    audience: PEOPLE.length,
+    this_month: pub.filter((a) => (a.published_at ?? "").slice(0, 7) === month).length,
+  };
+  return ok(out);
+});
 route("POST /api/v1/community/announcements", (req) => {
   if (!poster(req.user)) return denied();
   const f: Record<string, string[]> = {};

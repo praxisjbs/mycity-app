@@ -160,8 +160,8 @@ describeDb("Staff Community against the real migrations", () => {
     const ann = list.body.data.find((c) => c.name === "announcements");
     expect(ann).toMatchObject({ pinned: true, post_policy: "people_ceo", can_post: false });
     expect(list.body.data.find((c) => c.name === "general")).toMatchObject({ can_post: true });
-    // The CEO holds every authority, so they may post in #announcements.
-    expect((await channelsOf("ceo")).find((c) => c.name === "announcements").can_post).toBe(true);
+    // Nobody posts straight into #announcements, the CEO included: announcements come from the tab.
+    expect((await channelsOf("ceo")).find((c) => c.name === "announcements").can_post).toBe(false);
     await channelsOf("tunde");
   });
 
@@ -503,6 +503,16 @@ describeDb("Staff Community against the real migrations", () => {
     const msgs = await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`);
     expect(msgs.body.data.at(-1)).toMatchObject({ message_type: "announcement", announcement: { title: "Saturday hours" } });
     expect((await as("bola").post(`/community/channels/${ann.community_channel_id}/messages`).send({ message_type: "text", body: "hi" })).status).toBe(403);
+    // Nothing is posted straight into #announcements, the CEO included; it has no composer.
+    expect((await as("ceo").post(`/community/channels/${ann.community_channel_id}/messages`).send({ message_type: "text", body: "hi" })).status).toBe(403);
+    expect(ann.can_post).toBe(false);
+
+    // The tab's figures come from the server; the audience is the active staff, not a past announcement's.
+    const figures = await as("ceo").get("/community/announcements/stats");
+    expect(figures.status).toBe(200);
+    expect(figures.body).toMatchObject({ audience: 3 });
+    expect(figures.body.published).toBeGreaterThanOrEqual(1);
+    expect((await as("bola").get("/community/announcements/stats")).status).toBe(403);
 
     const reads = await as("ceo").get(`/community/announcements/${made.body.announcement_id}/reads?read=read`);
     expect(reads.body.data.map((r) => r.person.display_name)).toEqual(["Bola Ade"]);

@@ -105,6 +105,7 @@ export function Grid({ cols, phoneCols, gap = "md", flush, scroll = true, classN
     <div
       ref={ref}
       data-grid={String(cols)}
+      data-panes={scroll && PANES[key] ? (key === 2 ? "lg" : "xl") : undefined}
       className={cn(
         "grid min-w-0",
         gap === "md" ? "gap-3" : "gap-2",

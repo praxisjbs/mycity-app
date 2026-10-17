@@ -64,7 +64,7 @@ export function CardHeader({ title, help, record, actions, right, level = 2, chi
   const H = `h${level}` as "h2" | "h3" | "h4";
   const end = actions ?? right;
   return (
-    <div className={cn("mb-3 flex min-w-0 flex-wrap items-center gap-2", className)}>
+    <div data-card-header="" className={cn("mb-3 flex min-w-0 flex-wrap items-center gap-2", className)}>
       {title != null && (
         <H {...(record ? { "data-copy": "content" } : { "data-ui": "title" })} className="min-w-0 text-base font-strong">
           {help ? <HelpTerm help={help}>{title}</HelpTerm> : title}

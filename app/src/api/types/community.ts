@@ -8,6 +8,7 @@ export type {
   Announcement,
   AnnouncementCreate,
   AnnouncementReader,
+  AnnouncementStats,
   Audience,
   Channel,
   ChannelCreate,

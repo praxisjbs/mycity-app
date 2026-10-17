@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
@@ -165,10 +165,12 @@ function Channels() {
                 })
             } /> })}
       />
+      {/* #announcements takes nothing posted straight in: no composer, for anyone. */}
+      {current.post_policy !== "people_ceo" && (
       <Composer
         key={current.community_channel_id}
         placeholder={`Message #${current.name}`}
-        readOnly={current.can_post ? undefined : "Only People and the CEO post here"}
+        readOnly={current.can_post ? undefined : "Only admins post here"}
         onSend={(b) => after(t.send(b))}
         onVoice={(file, secs) => after(t.sendFile(file, secs))}
         plus={(cls) => (
@@ -184,6 +186,7 @@ function Channels() {
           />
         )}
       />
+      )}
     </>
   ) : (
     <p className="m-auto text-xs text-subtle-foreground">Pick a channel.</p>
@@ -688,13 +691,10 @@ function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onM
 function Announcements() {
   const modal = useModal();
   const list = usePaged("GET /api/v1/community/announcements");
-  const stats = useMemo(() => {
-    const pub = list.rows.filter((a) => a.status === "published");
-    const avg = pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience_size), 0) * 100) / pub.length) : 0;
-    const month = todayIso().slice(0, 7);
-    const audience = Math.max(0, ...pub.map((a) => a.audience_size));
-    return { pub: pub.length, sch: list.rows.length - pub.length, avg, audience, month: pub.filter((a) => (a.published_at ?? "").slice(0, 7) === month).length };
-  }, [list.rows]);
+  /* Counted on the server over every announcement, not from the page on screen. */
+  const figures = useApi("GET /api/v1/community/announcements/stats");
+  const f = figures.data;
+  const stats = { pub: f?.published ?? 0, sch: f?.scheduled ?? 0, avg: f?.average_read ?? 0, audience: f?.audience ?? 0, month: f?.this_month ?? 0 };
   const denied = list.error instanceof ApiError && list.error.status === 403;
   if (denied) return <><PageHeader title="Announcements" /><EmptyState illustration="Locked" title="People and the CEO" text="Read them in #announcements." /></>;
   return (

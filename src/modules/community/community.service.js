@@ -44,8 +44,9 @@ async function canAnnounce(db, user) {
   return held.includes("announcements.post");
 }
 
-function mayPost(channel, announcer) {
-  if (channel.post_policy === "people_ceo") return announcer;
+function mayPost(channel) {
+  // #announcements takes nothing posted straight in: announcements come from the tab (§6).
+  if (channel.post_policy === "people_ceo") return false;
   if (channel.post_policy === "admins") return channel.member_role === "admin";
   return true;
 }
@@ -87,7 +88,7 @@ function isModerator(row, announcer) {
 
 /** A poll follows Who Can Post, except in #general, where moderators alone start one (§3 step 15). */
 function mayPoll(row, announcer) {
-  if (!mayPost(row, announcer)) return false;
+  if (!mayPost(row)) return false;
   return row.system_key === "general" ? announcer : true;
 }
 
@@ -104,7 +105,7 @@ function channelView(row, announcer) {
     pinned: Boolean(row.pinned_for_me),
     pin_locked: Boolean(row.pinned),
     members: row.members,
-    can_post: mayPost(row, announcer),
+    can_post: mayPost(row),
     is_admin: row.member_role === "admin",
     can_moderate: isModerator(row, announcer),
     can_poll: mayPoll(row, announcer),
@@ -433,7 +434,7 @@ function kindOfFile(mime) {
 async function storeMedia(channelId, upload, user) {
   return tx(async (client) => {
     const m = await member(client, channelId, user);
-    if (!mayPost(m, await canAnnounce(client, user))) {
+    if (!mayPost(m)) {
       throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
     }
     const doc = await vault.store(client, {
@@ -451,7 +452,7 @@ async function postMessage(channelId, body, user) {
   const posted = await tx(async (client) => {
     const m = await member(client, channelId, user);
     const announcer = await canAnnounce(client, user);
-    if (!mayPost(m, announcer)) throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
+    if (!mayPost(m)) throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
     if (body.message_type === "poll" && !mayPoll(m, announcer)) {
       throw new AppError("CANNOT_POLL", "Only moderators start a poll here", 403);
     }

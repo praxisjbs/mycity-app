@@ -204,7 +204,7 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
         const marker = day !== lastDay ? (day === today ? "Today" : day === yesterday ? "Yesterday" : formatDate(day)) : null;
         lastDay = day;
         return (
-          <div key={m.community_message_id} className={cn("group flex flex-col gap-3", m.mine && m.message_type !== "poll" && "items-end")}>
+          <div key={m.community_message_id} className={cn("group flex flex-col gap-3", m.mine && m.message_type !== "announcement" && "items-end")}>
             {marker && <span className="self-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-2xs text-subtle-foreground">{marker}</span>}
             <Post m={m} q={t.q} dm={dm} onCelebrate={() => void react(m)} onVote={(i) => void vote(m, i)} menu={menuOf(m)} />
           </div>
@@ -289,6 +289,16 @@ const MAX_VOICE_S = 300;
 export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { placeholder: string; onSend: (b: MessageCreate) => Promise<void>; onVoice: (file: File, seconds: number) => Promise<void>; plus?: (cls: string) => ReactNode; readOnly?: string }) {
   const [text, setText] = useState("");
   const phone = useIsMobile();
+  const box = useRef<HTMLTextAreaElement>(null);
+  /* Ctrl+Enter (Cmd+Enter on a Mac) starts a new line too; a textarea only does that for Shift+Enter by itself. */
+  const newLine = () => {
+    const el = box.current;
+    if (!el) return;
+    const at = el.selectionStart ?? text.length;
+    const end = el.selectionEnd ?? at;
+    setText(text.slice(0, at) + "\n" + text.slice(end));
+    requestAnimationFrame(() => el.setSelectionRange(at + 1, at + 1));
+  };
   const [rec, setRec] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -383,15 +393,21 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
   return (
     <div className={base}>
       {plus?.(cbtn)}
-      {/* Desktop: Enter sends, Shift+Enter starts a new line. A phone keeps Enter for a new line and sends with Send, as WhatsApp does. */}
+      {/* Desktop: Enter sends; Shift+Enter or Ctrl+Enter starts a new line. A phone keeps Enter for a new line and sends with Send, as WhatsApp does. */}
       <InlineTextArea
+        ref={box}
         className="min-h-10 min-w-0 flex-1 resize-none rounded-card border border-input bg-muted px-3.5 py-2 leading-normal outline-none focus:border-ring"
         placeholder={placeholder}
         aria-label="Message"
         autoComplete="off"
         value={text}
         onChange={setText}
-        onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !phone && (e.preventDefault(), void send())}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" || e.shiftKey || phone) return;
+          e.preventDefault();
+          if (e.ctrlKey || e.metaKey) newLine();
+          else void send();
+        }}
       />
       {!text && <button type="button" className={cbtn} aria-label="Record a voice note" disabled={busy} onClick={() => void start()}><Icon name="mic" /></button>}
       <button type="button" disabled={busy} className={cn(cbtn, "on-primary border-primary bg-primary text-primary-foreground hover:bg-primary")} aria-label="Send" onClick={() => void send()}>

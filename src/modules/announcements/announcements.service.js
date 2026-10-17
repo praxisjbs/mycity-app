@@ -192,6 +192,10 @@ async function releaseDue() {
   return { released: ids.length };
 }
 
+function stats() {
+  return repo.stats(pool);
+}
+
 async function readers(id, query) {
   await get(id);
   return repo.readers(pool, id, query);
@@ -223,4 +227,4 @@ function markReadByMessages(userId, messageIds) {
   return repo.markReadByMessages(pool, userId, messageIds);
 }
 
-module.exports = { view, list, get, create, update, cancel, publish, release, releaseDue, readers, remind, markReadByMessages };
+module.exports = { view, list, stats, get, create, update, cancel, publish, release, releaseDue, readers, remind, markReadByMessages };
