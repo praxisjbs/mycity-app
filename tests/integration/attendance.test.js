@@ -794,6 +794,27 @@ describeDb("attendance against the real migrations", () => {
     expect((await as("staff").post("/attendance/export", { from: "2026-10-01", to: "2026-10-05" })).status).toBe(403);
     expect((await as("ops").post("/attendance/export", { from: "2026-09-01", to: "2026-10-05" })).status).toBe(422);
     expect((await as("ops").post("/attendance/export", { from: "2026-10-01", to: "2026-10-05" })).status).toBe(200);
+
+    // After commit the outbox builds each workbook, keeps it restricted in the vault and mails it.
+    const queues = require("../../src/jobs/queues");
+    const mails = [];
+    const spy = jest.spyOn(queues, "enqueue").mockImplementation(async (queue, name, data) => {
+      mails.push({ queue, name, data });
+      return { id: String(mails.length) };
+    });
+    await drain();
+    spy.mockRestore();
+    const docs = await q("SELECT sensitivity, title FROM document WHERE doc_type = 'attendance_export' ORDER BY title", []);
+    expect(docs.rows).toEqual([
+      { sensitivity: "restricted", title: "Attendance Register export" },
+      { sensitivity: "restricted", title: "My Attendance export" },
+    ]);
+    const sentOut = mails.filter((m) => m.name === "attendance-export");
+    expect(sentOut.map((m) => m.data.to.email).sort()).toEqual(["manager@mycity.test", "ops@mycity.test"]);
+    expect(sentOut.find((m) => m.data.to.email === "ops@mycity.test").data.data).toMatchObject({ title: "Attendance Register", capped: false });
+    expect(sentOut.every((m) => m.data.attachments.length === 1)).toBe(true);
+    const failed = await q("SELECT count(*)::int AS n FROM event_outbox WHERE event_key = 'attendance.export_requested' AND status <> 'done'", []);
+    expect(failed.rows[0].n).toBe(0);
   });
 
   test("the assistant reads a page of 25 within the asker's scope, with no coordinates or device identifiers", async () => {
