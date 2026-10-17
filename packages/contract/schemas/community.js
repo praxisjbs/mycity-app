@@ -58,6 +58,7 @@ const Channel = z
     channel_type: ChannelType,
     post_policy: PostPolicy,
     pinned: z.boolean(),
+    pin_locked: z.boolean(),
     members: z.number().int().min(0),
     can_post: z.boolean(),
     is_admin: z.boolean(),
@@ -121,6 +122,9 @@ const MemberRoleSet = z.object({ member_role: z.enum(["admin", "member"]) }).str
 
 /** POST /community/channels/:id/mute: on or off. */
 const MuteSet = z.object({ muted: z.boolean() }).strict();
+
+/** PUT /community/channels/:id/pin: the caller's own pin, at most 3 (§3 step 16). */
+const PinSet = z.object({ pinned: z.boolean() }).strict();
 
 /** POST /community/channels/:id/delivered: the client has received up to this instant. */
 const DeliveredAck = z.object({ up_to: isoDateTime }).strict();
@@ -250,6 +254,7 @@ const Conversation = z
     is_self: z.boolean(),
     online: z.boolean(),
     last_seen_at: isoDateTime.nullable(),
+    pinned: z.boolean(),
     muted: z.boolean(),
     unread: z.number().int().min(0),
     last_text: z.string().nullable(),
@@ -295,6 +300,7 @@ const TABLES = {
       members: "how many members, counted from community_member",
       can_post: "whether the caller may post, from post_policy, their role and the announcements.post capability",
       is_admin: "whether the caller is an admin of the channel, from community_member.member_role",
+      pin_locked: "pinned for everyone (#general, #announcements), from community_channel.pinned; pinned is that or the caller's own pin",
       can_moderate: "whether the caller moderates it: an admin, or People and the CEO in #general and #announcements",
       can_poll: "whether the caller may start a poll: as can_post, and in #general moderators only",
       muted: "whether the caller muted it, from community_member.muted_until",
@@ -325,6 +331,7 @@ const TABLES = {
   MemberParams: { table: null, reason: "the channel and the member's user in the path" },
   MemberRoleSet: { table: "community_member" },
   MuteSet: { table: null, reason: "sets community_member.muted_until for the caller" },
+  PinSet: { table: null, reason: "sets community_member.pinned_at for the caller" },
   DeliveredAck: { table: null, reason: "moves the caller's community_member.last_delivered_at" },
   PollOption: { table: null, reason: "one option of a poll, its text from metadata and its votes counted" },
   Message: {
@@ -398,6 +405,7 @@ module.exports = {
   MemberParams,
   MemberRoleSet,
   MuteSet,
+  PinSet,
   DeliveredAck,
   PollOption,
   Message,

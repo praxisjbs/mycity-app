@@ -75,6 +75,23 @@ function markPublished(db, id, { messageId, audienceSize }) {
 }
 
 /** Active logins of the audience: everyone, or the people of the chosen departments. */
+/** The tab's figures, over every announcement; the audience is who an all-staff one reaches now. */
+function stats(db) {
+  return one(
+    db,
+    `SELECT count(*) FILTER (WHERE a.status = 'published')::int AS published,
+            count(*) FILTER (WHERE a.status = 'scheduled')::int AS scheduled,
+            COALESCE(round(avg(r.reads * 100.0 / a.audience_size) FILTER (WHERE a.status = 'published' AND a.audience_size > 0)), 0)::int AS average_read,
+            count(*) FILTER (WHERE a.status = 'published'
+                               AND a.published_at >= (date_trunc('month', now() AT TIME ZONE 'Africa/Lagos') AT TIME ZONE 'Africa/Lagos'))::int AS this_month,
+            (SELECT count(*)::int FROM app_user u JOIN employee e ON e.employee_id = u.employee_id
+              WHERE u.status = 'active' AND e.status <> 'left') AS audience
+       FROM announcement a
+       LEFT JOIN LATERAL (SELECT count(*) AS reads FROM announcement_read x
+                           WHERE x.announcement_id = a.announcement_id AND x.read_at IS NOT NULL) r ON true`,
+  );
+}
+
 async function audienceUsers(db, audience) {
   const all = !audience || audience.kind !== "departments";
   const { rows } = await db.query(
@@ -150,6 +167,7 @@ async function due(db) {
 }
 
 module.exports = {
+  stats,
   updateScheduled,
   cancelScheduled,
   list,

@@ -23,6 +23,7 @@ route(router, "get", "/channels/:id/members", { query: cm.MemberListQuery, respo
 route(router, "post", "/channels/:id/members", { body: cm.MemberAdd, response: cm.Channel, summary: "Add people to a channel" }, create(), controller.addMembers);
 route(router, "put", "/channels/:id/members/:user_id/role", { params: cm.MemberParams, body: cm.MemberRoleSet, response: cm.Member, summary: "Make or unmake a channel admin" }, create(), controller.setRole);
 route(router, "delete", "/channels/:id/members/:user_id", { no_content: true, summary: "Remove someone from a channel" }, create(), controller.removeMember);
+route(router, "put", "/channels/:id/pin", { body: cm.PinSet, no_content: true, summary: "Pin or unpin a conversation for oneself" }, view(), controller.pin);
 route(router, "post", "/channels/:id/mute", { body: cm.MuteSet, no_content: true, summary: "Mute or unmute a conversation" }, view(), controller.mute);
 route(router, "post", "/channels/:id/read", { body: c.common.EmptyBody, no_content: true, summary: "Mark a conversation read" }, view(), controller.read);
 route(router, "post", "/channels/:id/delivered", { body: cm.DeliveredAck, no_content: true, summary: "Acknowledge direct messages received" }, view(), controller.delivered);

@@ -44,8 +44,9 @@ async function canAnnounce(db, user) {
   return held.includes("announcements.post");
 }
 
-function mayPost(channel, announcer) {
-  if (channel.post_policy === "people_ceo") return announcer;
+function mayPost(channel) {
+  // #announcements takes nothing posted straight in: announcements come from the tab (§6).
+  if (channel.post_policy === "people_ceo") return false;
   if (channel.post_policy === "admins") return channel.member_role === "admin";
   return true;
 }
@@ -74,7 +75,8 @@ function lineOf(type, body) {
   }
 }
 
-const muted = (until) => Boolean(until && new Date(until).getTime() > Date.now());
+/** Muted until a time still ahead; pg reads 'infinity' (muted for good) as Infinity, which new Date() cannot hold. */
+const muted = (until) => until === Infinity || Boolean(until && new Date(until).getTime() > Date.now());
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
 /** Who moderates a channel: its admins; People and the CEO in #general and #announcements; nobody in a direct conversation. */
@@ -86,7 +88,7 @@ function isModerator(row, announcer) {
 
 /** A poll follows Who Can Post, except in #general, where moderators alone start one (§3 step 15). */
 function mayPoll(row, announcer) {
-  if (!mayPost(row, announcer)) return false;
+  if (!mayPost(row)) return false;
   return row.system_key === "general" ? announcer : true;
 }
 
@@ -100,9 +102,10 @@ function channelView(row, announcer) {
     description: row.description ?? null,
     channel_type: row.channel_type,
     post_policy: row.post_policy,
-    pinned: row.pinned,
+    pinned: Boolean(row.pinned_for_me),
+    pin_locked: Boolean(row.pinned),
     members: row.members,
-    can_post: mayPost(row, announcer),
+    can_post: mayPost(row),
     is_admin: row.member_role === "admin",
     can_moderate: isModerator(row, announcer),
     can_poll: mayPoll(row, announcer),
@@ -119,6 +122,7 @@ function conversationView(row) {
     person: row.person,
     user_id: row.user_id,
     is_self: Boolean(row.is_self),
+    pinned: Boolean(row.pinned),
     online: row.online,
     last_seen_at: iso(row.last_seen_at),
     muted: row.muted,
@@ -256,6 +260,23 @@ async function setRole(channelId, userId, role, user) {
 async function setMuted(channelId, muteOn, user) {
   await member(pool, channelId, user);
   await repo.setMuted(pool, channelId, user.user_id, muteOn);
+}
+
+/** The most conversations one person pins for themselves (§3 step 16). */
+const PIN_LIMIT = 3;
+
+/** The caller's own pin on a channel or a direct conversation. */
+async function setPinned(channelId, on, user) {
+  await tx(async (client) => {
+    const m = await member(client, channelId, user);
+    if (m.system_key) throw new AppError("ALWAYS_PINNED", "This channel is pinned for everyone", 422);
+    if (on && !(await repo.membershipPinned(client, channelId, user.user_id))) {
+      if ((await repo.pinsLocked(client, user.user_id)) >= PIN_LIMIT) {
+        throw new AppError("PIN_LIMIT", "Unpin one first", 409);
+      }
+    }
+    await repo.setPinned(client, channelId, user.user_id, on);
+  });
 }
 
 async function markRead(channelId, user) {
@@ -413,7 +434,7 @@ function kindOfFile(mime) {
 async function storeMedia(channelId, upload, user) {
   return tx(async (client) => {
     const m = await member(client, channelId, user);
-    if (!mayPost(m, await canAnnounce(client, user))) {
+    if (!mayPost(m)) {
       throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
     }
     const doc = await vault.store(client, {
@@ -431,7 +452,7 @@ async function postMessage(channelId, body, user) {
   const posted = await tx(async (client) => {
     const m = await member(client, channelId, user);
     const announcer = await canAnnounce(client, user);
-    if (!mayPost(m, announcer)) throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
+    if (!mayPost(m)) throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
     if (body.message_type === "poll" && !mayPoll(m, announcer)) {
       throw new AppError("CANNOT_POLL", "Only moderators start a poll here", 403);
     }
@@ -758,6 +779,7 @@ function touchPresence(userId) {
 }
 
 module.exports = {
+  setPinned,
   isModerator,
   mayPoll,
   editMessage,

@@ -23,7 +23,7 @@ export { Switch, ToggleRow, CheckboxField, type SwitchProps, type ToggleRowProps
 export { DateField, DateRangeField, TimeField, type DateFieldProps, type DateRangeFieldProps, type TimeFieldProps, type DateRange } from "./DateField";
 export { MoneyField, toMoneyString, type MoneyFieldProps } from "./MoneyField";
 export { SearchInput, FilterSelect, type SearchInputProps, type FilterSelectProps } from "./SearchInput";
-export { InlineInput, InlineSelect, InlineLabel, type InlineInputProps, type InlineSelectProps, type InlineLabelProps } from "./InlineInput";
+export { InlineInput, InlineSelect, InlineLabel, InlineTextArea, type InlineInputProps, type InlineSelectProps, type InlineLabelProps, type InlineTextAreaProps } from "./InlineInput";
 export { LoginField, type LoginFieldProps } from "./LoginField";
 export { OtpField, type OtpFieldProps } from "./OtpField";
 export { Form, FormFooter, type FormProps, type FormFooterProps } from "./Form";

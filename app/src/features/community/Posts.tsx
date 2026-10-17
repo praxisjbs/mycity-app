@@ -127,7 +127,7 @@ const TICK = { sent: ["tick", "Sent"], delivered: ["ticks", "Delivered"], read: 
 /** One post in a channel or a conversation. */
 export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void; menu?: ReactNode }) {
   /* A card keeps its look; its menu sits beside it. */
-  const withMenu = (card: ReactNode) => (menu ? <div className="flex items-start gap-1">{card}{menu}</div> : card);
+  const withMenu = (card: ReactNode) => (menu ? <div className={cn("flex items-start gap-1", m.mine && "flex-row-reverse")}>{card}{menu}</div> : card);
   if (!m.deleted && (m.message_type === "birthday" || m.message_type === "anniversary")) return m.celebration ? withMenu(<Celebration m={m} onCelebrate={onCelebrate} />) : null;
   if (!m.deleted && m.message_type === "recognition" && m.recognition) {
     const r = m.recognition!;
@@ -146,8 +146,8 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
     const p = m.poll!;
     const votes = p.options.reduce((a, o) => a + o.votes, 0);
     const tot = votes || 1;
-    return withMenu(
-      <div className="max-w-136 rounded-card border border-border bg-background px-3.5 py-3">
+    const card = (
+      <div className="w-full min-w-0 flex-1 rounded-card border border-border bg-background px-3.5 py-3">
         <div className="mb-1 flex items-center gap-2 text-2xs text-subtle-foreground">
           <span className="flex-1">Poll by {m.author?.display_name} · {votes} vote{votes === 1 ? "" : "s"}{m.edited_at ? " · Edited" : ""}</span>
           {p.closed && <Pill>Closed</Pill>}
@@ -162,15 +162,17 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
             </button>
           );
         })}
-      </div>,
+      </div>
     );
+    /* A poll reads as a block up to 560 px, as in the demo, not shrunk to its words. */
+    return <div className={cn("flex w-full max-w-140 items-start gap-1", m.mine && "flex-row-reverse")}>{card}{menu}</div>;
   }
   if (m.message_type === "announcement") {
     return (
       <div className="max-w-152 rounded-card border border-border bg-background px-3.5 py-3">
         <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground"><Icon name="flag" />{m.author?.display_name} · {formatDate(m.sent_at)}</div>
         <h3 data-copy="content" className="text-base"><Hl text={m.announcement?.title ?? ""} q={q} /></h3>
-        <p className="mt-1 text-sm leading-normal text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
+        <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
       </div>
     );
   }
@@ -206,7 +208,7 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
           </span>
           {menu}
         </div>
-        <div className={cn("px-3 py-2 text-sm leading-normal wrap-any", m.mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground")}>
+        <div className={cn("px-3 py-2 text-sm leading-normal whitespace-pre-wrap wrap-any", m.mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground")}>
           {inner}
         </div>
       </div>

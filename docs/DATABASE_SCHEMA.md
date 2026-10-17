@@ -124,9 +124,9 @@ and system channels, delivered pointer, the wider message kinds, transcripts, po
 presence, `announcement_read` and the announcement's message, audience size and reminder · `1120`
 mailbox: connection status and errors, folder kinds and sync cursor, thread keys, the reader's
 message fields, `mail_draft` and `mail_send_queue` · `1130` an announcement can be `cancelled` ·
-`1200` leave requests as the leave module writes them (the four statuses checked, `recorded_by`,
-`cancelled_at`, the list indexes) · `1290` the leave status code list (Cancelled added, Draft
-switched off) and the four leave types.
+`1140` each member's own pin (`community_member.pinned_at`) · `1200` leave requests as the leave
+module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list indexes) ·
+`1290` the leave status code list (Cancelled added, Draft switched off) and the four leave types.
 
 **Owes:**
 - Attendance (attendance.md §4): employee home location, field assignment, location requests

@@ -78,6 +78,17 @@ const AnnouncementReader = z
 const AnnouncementReadQuery = listQuery({ read: z.enum(["read", "not_read"]).optional() });
 const AnnouncementReadPage = Paged(AnnouncementReader);
 
+/** GET /community/announcements/stats: the tab's figures, over every announcement. */
+const AnnouncementStats = z
+  .object({
+    published: z.number().int().min(0),
+    scheduled: z.number().int().min(0),
+    average_read: z.number().int().min(0).max(100),
+    audience: z.number().int().min(0),
+    this_month: z.number().int().min(0),
+  })
+  .strict();
+
 /** POST /community/announcements/:id/remind. */
 const RemindResult = z.object({ reminded: z.number().int().min(0) }).strict();
 
@@ -101,6 +112,7 @@ const TABLES = {
   AnnouncementReadQuery: { table: null, reason: "list controls and the read filter" },
   AnnouncementReadPage: { table: null, reason: "a page of the audience with their read marks" },
   RemindResult: { table: null, reason: "how many people were reminded" },
+  AnnouncementStats: { table: null, reason: "counts over announcement and the active staff, for the tracking tab" },
   Audience: { table: null, reason: "the value of announcement.audience (jsonb)" },
 };
 
@@ -118,4 +130,5 @@ module.exports = {
   AnnouncementReadQuery,
   AnnouncementReadPage,
   RemindResult,
+  AnnouncementStats,
 };

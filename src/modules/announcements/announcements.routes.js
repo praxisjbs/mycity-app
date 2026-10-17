@@ -14,6 +14,7 @@ const an = c.announcements;
 const poster = () => requireCapability("announcements.post");
 
 route(router, "get", "/", { query: an.AnnouncementListQuery, response: an.AnnouncementPage, summary: "Announcements and their reads" }, requirePermission("community", "view"), poster(), controller.list);
+route(router, "get", "/stats", { response: an.AnnouncementStats, summary: "The tab's figures" }, requirePermission("community", "view"), poster(), controller.stats);
 route(router, "post", "/", { body: an.AnnouncementCreate, response: an.Announcement, summary: "Publish or schedule an announcement" }, requirePermission("community", "create"), poster(), controller.create);
 route(router, "put", "/:id", { body: an.AnnouncementUpdate, response: an.Announcement, summary: "Change a scheduled announcement" }, requirePermission("community", "create"), poster(), controller.update);
 route(router, "post", "/:id/cancel", { body: c.common.EmptyBody, response: an.Announcement, summary: "Cancel a scheduled announcement" }, requirePermission("community", "create"), poster(), controller.cancel);

@@ -23,6 +23,10 @@ module.exports = {
     await service.removeMember(p(req).id, p(req).user_id, req.user);
     noContent(res);
   },
+  pin: async (req, res) => {
+    await service.setPinned(p(req).id, req.validated.body.pinned, req.user);
+    noContent(res);
+  },
   mute: async (req, res) => {
     await service.setMuted(p(req).id, req.validated.body.muted, req.user);
     noContent(res);

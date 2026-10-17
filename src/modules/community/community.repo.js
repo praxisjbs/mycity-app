@@ -153,7 +153,7 @@ function listChannels(db, userId, query) {
   return pageQuery(
     db,
     `SELECT c.community_channel_id, c.name, c.description, c.channel_type, c.post_policy, c.pinned, c.system_key,
-            m.member_role, m.muted_until,
+            m.member_role, m.muted_until, (c.pinned OR m.pinned_at IS NOT NULL) AS pinned_for_me,
             (SELECT count(*)::int FROM community_member mm WHERE mm.community_channel_id = c.community_channel_id) AS members,
             ${UNREAD} AS unread, lm.last_body, lm.last_type, lm.last_at, ${TOTAL_COL}
        FROM community_channel c
@@ -161,7 +161,7 @@ function listChannels(db, userId, query) {
        ${LAST}
       WHERE c.channel_type <> 'direct' AND c.archived_at IS NULL
         AND ($2::text IS NULL OR search_fold(c.name) LIKE '%' || search_fold($2) || '%')
-      ORDER BY c.pinned DESC, COALESCE(lm.last_at, c.created_at) DESC, c.community_channel_id`,
+      ORDER BY c.pinned DESC, m.pinned_at DESC NULLS LAST, COALESCE(lm.last_at, c.created_at) DESC, c.community_channel_id`,
     [userId, query.q ?? null],
     query,
   );
@@ -172,7 +172,7 @@ function channelFor(db, channelId, userId) {
   return one(
     db,
     `SELECT c.community_channel_id, c.name, c.description, c.channel_type, c.post_policy, c.pinned, c.system_key,
-            m.member_role, m.muted_until,
+            m.member_role, m.muted_until, (c.pinned OR m.pinned_at IS NOT NULL) AS pinned_for_me,
             (SELECT count(*)::int FROM community_member mm WHERE mm.community_channel_id = c.community_channel_id) AS members,
             ${UNREAD} AS unread, lm.last_body, lm.last_type, lm.last_at
        FROM community_channel c
@@ -214,6 +214,25 @@ function setMuted(db, channelId, userId, muted) {
     `UPDATE community_member SET muted_until = CASE WHEN $3 THEN 'infinity'::timestamptz ELSE NULL END
       WHERE community_channel_id = $1 AND user_id = $2`,
     [channelId, userId, muted],
+  );
+}
+
+async function membershipPinned(db, channelId, userId) {
+  const row = await one(db, "SELECT pinned_at FROM community_member WHERE community_channel_id = $1 AND user_id = $2", [channelId, userId]);
+  return Boolean(row && row.pinned_at);
+}
+
+/** The caller's pins, their row locked so two pins at once cannot pass the limit. */
+async function pinsLocked(db, userId) {
+  await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`community:pins:${userId}`]);
+  const row = await one(db, "SELECT count(*)::int AS n FROM community_member WHERE user_id = $1 AND pinned_at IS NOT NULL", [userId]);
+  return row.n;
+}
+
+function setPinned(db, channelId, userId, on) {
+  return db.query(
+    "UPDATE community_member SET pinned_at = CASE WHEN $3 THEN COALESCE(pinned_at, now()) ELSE NULL END WHERE community_channel_id = $1 AND user_id = $2",
+    [channelId, userId, on],
   );
 }
 
@@ -262,7 +281,7 @@ function lockPair(db, userA, userB) {
 const CONVERSATION = `
   SELECT c.community_channel_id, other.user_id, (other.user_id = $1) AS is_self, ${PERSON("e", "d")} AS person,
          ${ONLINE()} AS online, p.last_seen_at,
-         (m.muted_until IS NOT NULL AND m.muted_until > now()) AS muted,
+         (m.muted_until IS NOT NULL AND m.muted_until > now()) AS muted, (m.pinned_at IS NOT NULL) AS pinned,
          ${UNREAD} AS unread, lm.last_body, lm.last_type, lm.last_at, (lm.last_sender = $1) AS last_mine`;
 const CONVERSATION_FROM = `
     FROM community_channel c
@@ -284,7 +303,7 @@ function listConversations(db, userId, query) {
         AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($2) || '%')
         AND (NOT $3::boolean OR ${UNREAD} > 0)
         AND (lm.last_at IS NOT NULL OR c.created_by = $1)
-      ORDER BY COALESCE(lm.last_at, c.created_at) DESC, c.community_channel_id`,
+      ORDER BY m.pinned_at DESC NULLS LAST, COALESCE(lm.last_at, c.created_at) DESC, c.community_channel_id`,
     [userId, query.q ?? null, Boolean(query.unread)],
     query,
   );
@@ -618,6 +637,9 @@ function celebrationPosted(db, channelId, employeeId, occasion, date) {
 }
 
 module.exports = {
+  membershipPinned,
+  pinsLocked,
+  setPinned,
   lockMessage,
   editMessage,
   setMetadata,

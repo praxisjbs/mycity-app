@@ -23,7 +23,12 @@ announcements. Open it from **Community** in the menu.
   and the CEO can in #general.
 - Birthdays and work anniversaries are posted for you each morning from the People records.
 - **Search in Channel** finds words in the open channel and steps between the matches.
-- **Mute Notifications** stops a channel from notifying you. Its messages still arrive.
+- **Mute Notifications** stops a channel from notifying you. Its messages still arrive, and its
+  row shows a crossed-out bell. **Unmute Notifications** turns them back on.
+- **Pin to Top** keeps a channel or a conversation at the top of your list, under #general and
+  #announcements. You can pin 3; **Unpin** one to pin another. Your pins are yours alone.
+- Press Enter to send. Shift and Enter starts a new line; on a phone, Enter starts a new line and
+  the send button sends.
 
 ## Direct Messages
 

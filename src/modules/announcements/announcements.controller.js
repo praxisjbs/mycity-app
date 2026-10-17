@@ -7,6 +7,7 @@ const service = require("./announcements.service");
 
 module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.validated.query)),
+  stats: async (req, res) => ok(res, await service.stats()),
   create: async (req, res) => created(res, await service.create(req.validated.body, req.user)),
   update: async (req, res) => ok(res, await service.update(req.validated.params.id, req.validated.body, req.user)),
   cancel: async (req, res) => ok(res, await service.cancel(req.validated.params.id, req.user)),
