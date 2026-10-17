@@ -58,7 +58,8 @@ export const markFresh = (key: string) => {
   freshUntil[key] = Date.now() + WINDOW_MS;
 };
 const freshFor = (key: string) => Math.max(0, Math.floor(((freshUntil[key] ?? 0) - Date.now()) / 1000));
-const stale = (key: string) => (freshFor(key) > 0 ? null : fail(403, "REAUTH_REQUIRED", "Confirm it is you to continue."));
+/** A change that needs a recent sign-in: null while the window is open, else the 403 the API sends. */
+export const stale = (key: string) => (freshFor(key) > 0 ? null : fail(403, "REAUTH_REQUIRED", "Confirm it is you to continue."));
 
 /* ───── the code step ───── */
 

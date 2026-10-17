@@ -4,132 +4,247 @@
 |---|---|
 | Owner | LA |
 | Milestone | M1 |
-| Backend modules | `attendance` |
+| Backend modules | `attendance`, `devices`, `worksites` |
 | Frontend paths | `app/src/features/attendance/` |
-| Permission key(s) | `attendance` |
-| Screens (PROGRESS.md rows) | #9 My Attendance, #25 Attendance, #27 Devices, #28 Worksites, #73 Attendance Policy |
+| Permission key(s) | `people` (all, team, own) for the register, devices and worksites; none for the person's own clock, attendance and devices (`self`, own only) |
+| Screens (PROGRESS.md rows) | #9 My Attendance, #88 My Devices, #25 Attendance, #27 Devices, #28 Worksites; later in this guide: #87 Work Location Requests, #89 Policy Updates; #73 Attendance Policy is M9 (MILESTONES §18) |
 | Status | Draft |
-| Last changed | 15/10/2026 |
+| Last changed | 17/10/2026 |
 
-This guide records the attendance behaviour demonstrated in `docs/MyCity-ERP-Documents/demo.html`.
-The demo date is 9 October 2026 and its displayed times use Africa/Lagos.
+Sources, in their order of authority (CLAUDE.md step 3): MILESTONES §6.2 and A22, A26; REUSE_MAP §2.2
+(the policy model and the donor files); the 12 and 13 October meetings (three devices, enrolment
+without People's approval, the 100 m office fence); BACKEND_STRUCTURE §15 (the device's own time
+beside the server's). `demo.html` is look only.
 
 ---
 
 ## 1 · What it is for
 
-Attendance lets employees record the beginning and end of a workday from an approved location. It
-also gives line managers and People/HR a review trail for remote work, field assignments, missing
-punches, location exceptions and policy changes without overwriting the original evidence.
+Attendance lets an employee clock in and out from the place they are expected to work, on a device
+they registered, and gives People and line managers a register of who is in, late, absent or on
+leave, with the evidence behind every punch. A punch the rules cannot accept outright is still
+recorded, as evidence, and opens an exception People review; nothing is overwritten.
 
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Clock In / Clock Out modal (`clock`) | Global header and sign-in | Active employees | Shift, expected location, verification result and current system time | Clock in or out, retry location, or provide exception details |
-| ESS · My Attendance (`my-attendance`) | Employee Self-Service | Employee, own scope | Today, history, hours, status and review references | Review own record and open relevant cases |
-| ESS · Work Location Requests (`work-location-requests`) | Employee Self-Service | Employee, own scope | Draft, pending, approved and expired requests | Request a temporary home, remote day, client visit or field correction |
-| ESS · My Devices (`my-devices`) | Employee Self-Service | Employee, own scope | Enrolled and pending attendance devices | Request device enrolment |
-| ESS · Policy Updates (`policy-updates`) | Employee Self-Service | Employee, own scope | Published versions, changes and acknowledgment | Read and acknowledge an attendance policy |
-| People · Employees (`employees`) | People | Authorised People users | Work arrangement and attendance setup | View or change arrangement and approved home geofence |
-| People · Attendance (`attendance`) | People | People/HR; managers see team scope | Register, assignments, requests and manager recommendations | Review a day, approve locations and open Reconcile |
-| People · Devices (`devices`) | People | Authorised People users | Device history and review state | Enrol, block or revoke a device |
-| People · Worksites (`worksites`) | People | Authorised People users | Offices, coordinates, radii and status | Add or retire a worksite |
-| Settings · Attendance Policy (`attendance-policy`) | Settings | Authorised People users | Draft and published attendance rules | Edit, review and publish a version |
-| Notifications and Alerts (`notifications`) | Global header | Recipient within their scope | Attendance events requiring information or action | Open the relevant record or review screen |
+| Clock In / Clock Out panel (`clock`) | Desktop top bar, the phone's floating button, and on its own after sign-in | Every employee, own record | Today's date and time at the workplace, the shift, the clock location and radius, the state (Clocked Out, Clocked In since, Review Required), this device's state, the result of a punch | Clock in or out, allow location, retry location, register this device, add a note to a punch under review |
+| ESS · My Attendance (`my-attendance`) | Employee Self-Service | Every employee, own record | Today, the month's figures, the days of the month, each day's punches, open exceptions | Pick a month, open a day, explain an exception, export the month |
+| ESS · My Devices (`my-devices`) | Employee Self-Service | Every employee, own devices | The devices they clock in from, each with its status, up to three registered | Register this device, remove one of theirs |
+| People · Attendance (`attendance`) | People | `people` view: Operations & People and Management everyone, line managers and heads their team | The day's figures, the register, a day's evidence, exceptions | Pick a day, filter, open a person's day, decide an exception (scope all, `people` approve), export the register |
+| People · Devices (`devices`) | People | `people` view, within scope | Every device used to clock in, its owner and status | Remove a device (`people` edit) |
+| People · Worksites (`worksites`) | People | `people` view | Offices with their centre, radius and who is assigned | Add, change, retire and restore a worksite (`people` create, edit); assign employees |
+| ESS · Work Location Requests (`work-location-requests`) | Employee Self-Service | Employee, own | Not built in this delivery (§13) | |
+| ESS · Policy Updates (`policy-updates`) | Employee Self-Service | Employee, own | Not built in this delivery (§13) | |
+| Settings · Attendance Policy (`attendance-policy`) | Settings | Authorised People users | M9 (MILESTONES §18); the policy is read from the database meanwhile (§6.1) | |
+| Notifications (bell) | Global header | The person and People within scope | Review needed, a missing clock-out, a decision on an exception, a device registered or removed | Open the record |
 
 ## 3 · How the screens relate
 
-1. People assigns an employee's work arrangement, schedule, office and approved home coordinates.
-2. At sign-in, an active employee without a clock-in sees the Clock In modal. A suspended employee
-   cannot enter the app; an employee on approved leave can enter permitted screens but cannot punch.
-3. The attendance service resolves the expected location from an effective field assignment,
-   approved location request, hybrid schedule, registered home or assigned office.
-4. A punch stores fresh location and device evidence and appears in ESS and the People register.
-5. A non-compliant or incomplete record creates a reconciliation case and actionable notifications.
-6. A manager may add a recommendation for their direct report. People/HR makes the final attendance
-   decision in Reconcile; the original punch remains visible beside any adjustment.
-7. Published policy changes notify affected employees and appear in ESS · Policy Updates.
+1. People add a worksite (People · Worksites) with its centre, radius and timezone, and assign the
+   employees who work there. The employee's worksite is `employee.worksite_id`, written through the
+   organisation service; an effective `employee_attendance_policy` row can override it and the policy.
+2. An employee registers the browser they clock in from (ESS · My Devices, Register This Device). It
+   is the device identity sign-in already keeps (`known_device`, from the device cookie), confirmed
+   by a fresh sign-in (`security.assertFresh`), at most three at a time.
+3. The employee presses Clock In. With a worksite to match, the panel names it (Location Check) and
+   asks the browser for one reading only when Allow Location is pressed (straight away when this site
+   was already allowed); a reading less accurate than the policy's `max_accuracy_m` offers Retry
+   Location or Clock In Anyway. Remote and unassigned people are not asked. It sends
+   `POST /attendance/punches` with an `Idempotency-Key`, and shows the server's answer.
+4. The service decides the punch (§6): the clock guard, the geofence against the expected worksite,
+   the device against the registered ones, the device's time against the server's. It records an
+   `accepted`, `review` or `rejected` event with structured evidence, updates the day
+   (`attendance_day`), opens exceptions, and emits `attendance.punched` in the same transaction.
+5. After commit the outbox pushes `attendance.updated` to the employee and to People within scope
+   (both screens reload), and `attendance.review_required` notifies People and the employee.
+6. People open the person's day from the register, read the evidence and decide the exception:
+   accept, reject (the punch stops counting, and stays visible), or add the missing clock-out time.
+   The source event is never edited; a correction is a new event with `source = 'admin'`.
+7. At 01:30 Lagos time the day-close job closes yesterday (and any day left open within 14 days):
+   an open clock-in becomes a missing clock-out exception, an expected working day with no clock-in
+   becomes absent, approved leave becomes leave. It never invents a clock-out time.
 
 ## 4 · Data
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `attendance_session` | `session_id`, `employee_id`, `work_date`, `arrangement`, `expected_location_id`, `policy_version` | One calculated workday; points to immutable events |
-| `attendance_event` | `event_id`, `session_id`, `kind`, `server_at`, `device_at`, `latitude`, `longitude`, `accuracy_m`, `result` | Original clock evidence is append-only |
-| `attendance_location` | `location_id`, `employee_id`, `kind`, `address`, `latitude`, `longitude`, `radius_m`, `valid_from`, `valid_to`, `status` | Permanent and temporary home locations; home radius is 100 m |
-| `attendance_assignment` | `assignment_id`, `employee_id`, `date`, `starts_at`, `ends_at`, `sites`, `approver_id`, `status` | An approved field assignment overrides the normal location |
-| `attendance_location_request` | `request_id`, `employee_id`, `type`, `valid_from`, `valid_to`, `location`, `reason`, `status` | Carries employee request, manager recommendation and HR decision |
-| `attendance_case` | `case_id`, `session_id`, `type`, `status`, `employee_explanation`, `manager_note`, `outcome` | Reconciliation history and supporting evidence |
-| `attendance_policy_version` | `version`, `published_at`, `effective_from`, `settings`, `published_by` | Old records retain the version used when evaluated |
-| `attendance_policy_ack` | `version`, `employee_id`, `read_at`, `acknowledged_at` | Drives employee update and HR acknowledgment report |
+| `attendance_policy` (1000, 1300) | `name`, `grace_minutes`, `geofence_mode` (`off`, `warn`, `block`), `device_mode` (`off`, `warn`, `block`), `max_accuracy_m`, `latest_clock_out_minutes`, `active` | The modes came in `1300`; the booleans `require_geofence` and `require_known_device` of `1000` are superseded and dropped in a later release (MIGRATIONS §8) |
+| `employee_attendance_policy` (1000) | `employee_id`, `attendance_policy_id`, `worksite_id`, `effective_from`, `effective_to` | Effective-dated override of the policy and the worksite for one person; read only in this delivery |
+| `attendance_event` (1000, 1300) | `employee_id`, `event_type` (`clock_in`, `clock_out`), `work_date`, `occurred_at` (server time), `device_at`, `latitude`, `longitude`, `accuracy_m`, `distance_m`, `worksite_id`, `known_device_id`, `attendance_device_id`, `source` (`pwa`, `admin`), `validation_state` (`accepted`, `review`, `rejected`), `validation` (evidence), `idempotency_key`, `attendance_policy_id`, `note`, `recorded_by`, `reason` | Append-only. Unique: one active (`accepted` or `review`) event of each type per person per work date; one event per person per idempotency key |
+| `attendance_day` (1000, 1300) | `employee_id`, `attendance_date`, `status` (`present`, `late`, `absent`, `leave`, or none while nothing on an open day counts), `first_clock_in_at`, `last_clock_out_at`, `worked_minutes`, `late_minutes`, `overtime_minutes`, `closed_at` | The projection, recalculated from the day's events in the punch's transaction and by the day-close job |
+| `attendance_exception` (1000, 1300) | `attendance_day_id`, `attendance_event_id`, `exception_type` (`outside_worksite`, `location_unverified`, `unknown_device`, `suspicious_timestamp`, `missing_clock_out`), `severity`, `status` (`open`, `resolved`), `outcome` (`accepted`, `rejected`, `corrected`), `evidence`, `employee_note`, `reviewed_by`, `reviewed_at`, `resolution` | One per event and type, one day-level `missing_clock_out` per day (partial unique indexes), so a retried job adds none |
+| `attendance_device` (1300) | `employee_id`, `known_device_id` (unique), `label`, `status` (`observed`, `registered`, `removed`), `first_seen_at`, `last_punch_at`, `registered_at`, `removed_at`, `removed_by`, `removal_reason` | Owned by `devices`. A device first seen on a punch is `observed`; the employee registers it; a removed one may be registered again. The device cookie and its hash never leave identity |
+| `worksite` (0040) | `code`, `name`, `address` (jsonb `{ text }`), `latitude`, `longitude`, `radius_m`, `timezone`, `active` | Written by `worksites` from this delivery; the employee's assignment is `employee.worksite_id` |
 
-Migration file(s): to be assigned in the M1 attendance migration block.
+Schema migration: `migrations/1300_attendance_clock.sql`. Reference data:
+`seeds/reference/1390_seed_attendance.sql` (the two new exception types). Nothing about a person,
+a device, a punch, a holiday or a coordinate is seeded (A26).
 
 ## 5 · API
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `POST /api/v1/attendance/punches` | Clock action and fresh evidence → punch result | `attendance` · own | no | Requires an idempotency key; server time is authoritative |
-| `GET /api/v1/attendance/me` | Date range → own sessions | `attendance` · own | yes, 25 | Supports month export separately |
-| `GET /api/v1/attendance/register` | Date, arrangement and status filters → register page | `attendance` · team/all | yes, 25 | Managers are restricted to direct reports |
-| `POST /api/v1/attendance/location-requests` | Temporary-location request → request | `attendance` · own | no | Employee cannot choose a home radius |
-| `POST /api/v1/attendance/location-requests/:id/recommendation` | Manager decision and note → request | `attendance` · team | no | Recommendation is advisory unless policy makes it mandatory |
-| `POST /api/v1/attendance/cases/:id/decision` | Reconciliation outcome → adjusted result | `attendance` · all | no | Appends an adjustment; never edits the source event |
-| `GET /api/v1/attendance/policies` | Published policy versions | `attendance` · own/all | yes, 25 | Own view contains only applicable versions |
+| `GET /api/v1/attendance/me/today` | → `AttendanceToday` | self, own | no | The authoritative state, the shift, the clock location (name and radius, no coordinates), the policy's modes and accuracy limit, this device |
+| `POST /api/v1/attendance/punches` | `PunchCreate` → `PunchResult` | self, own | no | `Idempotency-Key` required (428 without). The person is the session's; the body names nobody. 409 for a refused transition, 422 on leave or not employed |
+| `GET /api/v1/attendance/me` | `MyDayListQuery` (`month`) → `AttendanceDayPage` | self, own | yes, 25 | Days of the month, newest first |
+| `GET /api/v1/attendance/me/summary` | `MySummaryQuery` → `MyAttendanceSummary` | self, own | no | The month's figures |
+| `GET /api/v1/attendance/me/events` | `MyEventListQuery` (`date`) → `AttendanceEventPage` | self, own | yes, 25 | One day's punches, own coordinates not returned |
+| `GET /api/v1/attendance/me/exceptions` | `MyExceptionListQuery` → `AttendanceExceptionPage` | self, own | yes, 25 | |
+| `POST /api/v1/attendance/me/exceptions/:id/explanation` | `ExceptionExplanation` → `AttendanceException` | self, own | no | While the exception is open |
+| `POST /api/v1/attendance/me/export` | `MyExportRequest` (`month`) → `ExportQueued` | self, own | no | The month's workbook arrives by email |
+| `GET /api/v1/attendance/register` | `RegisterQuery` (`date`, `status`, `department_id`, `q`, `sort`) → `RegisterPage` | `people` view · all/team/own | yes, 25 | One row per active employee in scope; status worked out in SQL before the page is cut |
+| `GET /api/v1/attendance/summary` | `RegisterSummaryQuery` (`date`) → `RegisterSummary` | `people` view · scope | no | |
+| `GET /api/v1/attendance/register/:employee_id` | `DayDetailQuery` (`date`) → `DayDetail` | `people` view · scope | no | 404 outside scope |
+| `GET /api/v1/attendance/events` | `EventListQuery` (`employee_id`, `date`) → `AttendanceEventPage` | `people` view · scope | yes, 25 | Coordinates only for scope all |
+| `GET /api/v1/attendance/exceptions` | `ExceptionListQuery` (`status`, `exception_type`, `date`, `employee_id`, `q`) → `AttendanceExceptionPage` | `people` view · scope | yes, 25 | |
+| `POST /api/v1/attendance/exceptions/:id/decision` | `ExceptionDecision` → `AttendanceException` | `people` approve · all | no | Reason required; never your own; a correction appends an event |
+| `GET /api/v1/attendance/records/:id` | → `AttendanceRecordRef` | `people` view · scope | no | A day's id or an exception's, to the person and day a link opens (⌘K, the bell) |
+| `GET /api/v1/attendance/me/records/:id` | → `AttendanceRecordRef` | self, own | no | The same for the person's own |
+| `POST /api/v1/attendance/export` | `RegisterExportRequest` (`from`, `to`, at most 31 days) → `ExportQueued` | `people` export · scope | no | The register's workbook arrives by email |
+| `GET /api/v1/devices/mine` | `PageQuery` → `MyDevicePage` | self, own | yes, 25 | |
+| `POST /api/v1/devices/mine` | `DeviceRegister` → `MyDevice` | self, own | no | This session's device; fresh sign-in (403 `REAUTH_REQUIRED`); 409 past three |
+| `POST /api/v1/devices/mine/:id/remove` | `EmptyBody` → `MyDevice` | self, own | no | |
+| `GET /api/v1/devices` | `DeviceListQuery` (`status`, `employee_id`, `q`) → `DevicePage` | `people` view · scope | yes, 25 | |
+| `GET /api/v1/devices/:id` | → `Device` | `people` view · scope | no | |
+| `POST /api/v1/devices/:id/remove` | `DeviceRemove` (`reason`) → `Device` | `people` edit · scope | no | The person is told |
+| `GET /api/v1/worksites` | `WorksiteListQuery` (`active`, `q`, `sort`) → `WorksitePage` | `people` view | yes, 25 | |
+| `GET /api/v1/worksites/:id` | → `Worksite` | `people` view | no | |
+| `POST /api/v1/worksites` | `WorksiteCreate` → `Worksite` | `people` create | no | Coordinates typed until the map proxy exists (§13) |
+| `PATCH /api/v1/worksites/:id` | `WorksiteUpdate` → `Worksite` | `people` edit | no | `active: false` retires, `true` restores |
+| `GET /api/v1/worksites/:id/employees` | `PageQuery` → `WorksiteEmployeePage` | `people` view · scope | yes, 25 | |
+| `POST /api/v1/worksites/:id/employees` | `WorksiteAssign` → `WorksiteEmployee` | `people` edit · scope | no | Through `organisation.service.updateEmployee`; assigning someone to another worksite moves them |
 
 ## 6 · Rules and calculations
 
-- A remote day uses the employee's active approved home coordinates and a mandatory 100 m fence.
-- An approved temporary home applies only from its start date through its end date; the permanent
-  home resumes automatically afterward.
-- An approved field assignment overrides the normal office or home for its approved date and window.
-- Distance is calculated between captured and approved coordinates; a result equal to the radius is
-  inside, and any greater distance is outside.
-- GPS accuracy of 50 m or better is good by default. Accuracy above 100 m requires a retry and does
-  not produce a compliant geofence decision.
-- Missing coordinates, denied permission or unavailable location are explicit unverified outcomes.
-- Duplicate clock-ins and clock-outs without an open clock-in are refused using server-side
-  idempotency and database uniqueness in production.
-- Deduction and overtime tiers are independent. Disabling one preserves its configured tiers.
-- Attendance never applies a monetary deduction or sanction automatically.
+### 6.1 The policy
+
+- The policy for a person on a work date is the active `attendance_policy` of their effective
+  `employee_attendance_policy` row; else the oldest active policy; else the code's defaults. A
+  policy is a business choice (A26): MyCity sets it on Settings · Attendance Policy (M9).
+- `geofence_mode` defaults to `warn` and `device_mode` to `off` (MILESTONES §6.2, REUSE_MAP §2.2).
+  `off` judges nothing but records the evidence; `warn` accepts for review and opens an exception;
+  `block` rejects.
+- Grace is the policy's `grace_minutes` (code default 0). The day's start and end are the working
+  week's hours for that weekday (Settings · Organisation, A22); public holidays come from the same
+  calendar (`shared/time/working-week`).
+
+### 6.2 The clock guard (`attendance.clock-guard.js`, pure)
+
+- Active events are `accepted` and `review` ones; a `rejected` event never changes the state.
+- A clock-in is allowed when the work date has no active clock-in. Once the day has a clock-in and a
+  clock-out, another clock-in is refused (`SHIFT_DONE`): one shift a day, as both donors run it.
+- A clock-out is allowed after an active clock-in with no active clock-out; refused with no clock-in
+  (`NOT_CLOCKED_IN`) and after a clock-out (`ALREADY_CLOCKED_OUT`). A clock-in after an active
+  clock-in is `ALREADY_CLOCKED_IN`.
+- A clock-out closes today's open shift, or yesterday's while yesterday is not closed (a late shift).
+- A refused transition writes nothing and answers 409.
+- Two punches from one person are decided one after the other (`pg_advisory_xact_lock` on the
+  person, inside the transaction); the unique index on active events is the backstop, and its
+  violation answers the same 409.
+
+### 6.3 Idempotency
+
+- Every punch carries an `Idempotency-Key`; without one it is refused (428). The shared middleware
+  replays a finished request's stored answer. The key is also stored on the event, unique per
+  person, so a replay the middleware no longer remembers (48 hours) still returns the original
+  result instead of a second punch. A key sent with a different body is the middleware's 422.
+
+### 6.4 Time
+
+- The server's receipt time is the punch's time (`occurred_at`); the device's own time is kept
+  beside it (`device_at`) with the gap, never in its place (BACKEND_STRUCTURE §15).
+- The work date and the wall clock are read in the worksite's timezone (`worksite.timezone`,
+  Africa/Lagos when there is no worksite), never the host's (`attendance.rules.wallClock`).
+- A device time more than 2 minutes ahead of the server is implausible: the punch goes to review
+  with a `suspicious_timestamp` exception. A device time more than 5 minutes behind is a delayed
+  submission: recorded with both times, judged on the server's.
+- Lateness: minutes after the day's start plus grace, on a working day only (0 otherwise). Worked
+  minutes: last clock-out minus first clock-in. Overtime: minutes after the day's end, on a working
+  day with a clock-out. No money is worked out in M1 (payroll is M6).
+- A day's status: approved leave first (`leave`), then a clock-in (`late` when late minutes are
+  above 0, else `present`), then, once closed, an expected working day with no clock-in (`absent`).
+  A weekend or holiday with no punch has no day row.
+
+### 6.5 The geofence (`attendance.geofence.js`, pure, distances from `shared/geo`)
+
+- The expected location is the person's worksite (the override, else `employee.worksite_id`), if
+  active. A `remote` work pattern and a person with no worksite have no fence: the punch is not
+  judged on location (evidence `not_applied`) until approved homes exist (§13).
+- Distance is the server's, from the coordinates sent; a client distance or inside flag is never
+  read. Equal to the radius is inside; more is outside.
+- Accuracy of 50 m or better is good, up to `max_accuracy_m` (100) fair; worse is not a compliant
+  reading: the location is `unverified` (`poor_accuracy`), and the panel offers Retry Location.
+- No coordinates (denied, unavailable, timed out, unsupported) is `unverified` with that reason.
+- `off`: accepted, the verdict kept as evidence. `warn`: outside or unverified is `review` with an
+  `outside_worksite` or `location_unverified` exception. `block`: outside is `rejected`; unverified
+  is `review` (a reading that could not be taken is not proof of being elsewhere).
+
+### 6.6 The device (`devices.guard.js`, pure)
+
+- The device is the session's `known_device` (set at sign-in from the device cookie). A client
+  `known` flag or label is never read.
+- First seen on a punch, it is recorded as `observed` (devices register even when the policy is
+  `off`). Known means `registered`; `observed`, `removed` or no device is unknown.
+- `off`: accepted. `warn`: unknown is `review` with an `unknown_device` exception. `block`: unknown
+  is `rejected`.
+- At most three registered devices per person (the 12 and 13 October meetings). Registering needs a
+  fresh sign-in; nobody at People approves it. People may remove any device in scope, with a reason.
+
+### 6.7 The result
+
+- The punch's result is the strictest of the geofence, the device and the time checks (`rejected`,
+  then `review`, then `accepted`). A rejected punch is recorded with its evidence and opens no
+  exception: there is nothing to decide, the person punches again from the right place or device.
+
+### 6.8 Deciding an exception
+
+- People with `people` approve and scope all decide; never their own. A reason of at least 10
+  characters is required.
+- `accept`: the punch stands. `reject`: the punch stops counting for the day (still shown, marked
+  excluded). `add_clock_out` (missing clock-out only): an `admin` clock-out at the time given, after
+  the clock-in, on the work date. Each recalculates the day and is audited with before and after.
 
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
 |---|---|---|
-| `attendance.punched` | A punch commits | Updates own attendance and the authorised register; sends confirmation |
-| `attendance.review_required` | Evidence is non-compliant or incomplete | Creates a case and notifies People/HR and the employee |
-| `attendance.location_request.submitted` | Employee submits a request | Notifies the assigned line manager, then People/HR |
-| `attendance.location_request.decided` | People/HR approves or rejects | Notifies the employee and activates an approved location for its dates |
-| `attendance.policy.published` | A policy version is published | Notifies affected employees and creates acknowledgment rows |
-| Missing-punch checks | 11:00 same day / next morning per policy | Opens reconciliation cases without inventing punch times |
-
-Notification destinations are permission-aware and open the relevant request, device, policy or
-reconciliation record.
+| `attendance.punched` | A punch commits (any result) | Audit; outbox `attendance.push_updated`: `attendance.updated` to the person and to `people` view holders above them |
+| `attendance.review_required` | A punch or the day-close opens an exception | Notifies the person and `people` approve holders within scope |
+| `attendance.exception_explained` | The person explains an exception | Notifies `people` approve holders within scope |
+| `attendance.exception_decided` | People decide an exception | Notifies the person; realtime refresh |
+| `attendance.day_closed` | The day-close job closes a person's day | Audit; realtime refresh |
+| `attendance.export_requested` | My Attendance or the register asks for a workbook | Outbox `attendance.send_export`: gathered 25 at a time, kept in the vault, emailed |
+| `device.registered`, `device.removed` | My Devices, People · Devices | Notifies the person when People removed it |
+| `worksite.created`, `worksite.updated` | People · Worksites | Audit |
+| Job `attendance-day-close` (scheduler, 01:30 Africa/Lagos; queue of the same name for a given date) | Daily | Closes every open day before today within 14 days, under the cron lock; idempotent |
 
 ## 8 · Permissions and visibility by role
 
 | Role | Sees | Can do |
 |---|---|---|
-| Employee | Own attendance, requests, devices and policies | Clock, request a temporary location, acknowledge policy, explain a case |
-| Line manager | Attendance and pending recommendations for direct reports | Recommend a request or correction and confirm an assignment |
-| People / HR | Organisation register and attendance administration | Configure homes, approve requests, reconcile and publish policy |
-| CEO / authorised Operations | Organisation scope where explicitly granted | Review or decide without self-approving their own request |
-| Finance / Payroll | Reviewed pay-impact outcomes only | Accept or waive an authorised payroll proposal |
+| Employee | Own clock, days, punches, exceptions and devices | Clock in and out, explain an exception, export the month, register and remove own devices |
+| Line Manager, Head of Department (`people` team) | The register, days, devices and exceptions of their reporting tree; no coordinates | Read only; export (heads) |
+| Operations & People, Management (`people` all) | Everyone, with the punch coordinates | Decide exceptions (approve), remove devices (edit), manage worksites (create, edit), export |
+| CEO | Everything, as the access rules give the CEO | The same as `people` all, never on their own exception |
 
-Full home addresses and coordinates are restricted to authorised People users. Register and map
-views show masked area labels. Every full-address view is audited.
+The punch's coordinates go only to `people` scope all; the person's own screens and team scope get
+the verdict, the distance and the worksite's name. The device cookie, its hash and any raw identifier
+never leave identity, and no log line carries them.
 
 ## 9 · AI and search
 
-- **AI reads** (`attendance.ai.js`): own attendance for employees, team attendance for managers and
-  organisation summaries for authorised People users; every list is paged at 25.
-- **AI routes**: clock status opens ESS · My Attendance; pending reviews open People · Attendance or
-  Reconcile according to permission.
-- **Search** (`attendance.search.js`): employees, request references, assignment references,
-  reconciliation references and policy versions. Search results apply the same own/team/all scope.
-- AI does not create punches, approve exceptions, change policy or infer missing location evidence.
+- **AI reads** (`attendance.ai.js`): `attendance.my_days` (ess view, own), `attendance.register`
+  and `attendance.exceptions` (`people` view, the caller's scope); `devices.ai.js`: `devices.mine`,
+  `devices.list`; `worksites.ai.js`: `worksites.list`. Every list is a page of 25, through the same
+  service and scope as the screen; no coordinates, no device identifier, no evidence blob.
+- **AI routes**: clock in or see my attendance → ESS · My Attendance; review attendance → People ·
+  Attendance; register a device → ESS · My Devices; add a worksite → People · Worksites.
+- **Search**: `attendance.search.js` finds attendance days and exceptions by the person's name;
+  `devices.search.js` devices by label or owner; `worksites.search.js` worksites by name or code.
+  Each within the reader's `people` scope. AI does not create punches, decide exceptions or infer
+  missing location evidence.
 
 ## 10 · On screen and mobile
 
@@ -140,64 +255,75 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Clock In / Clock Out modal | Shift, work arrangement, clock location and radius, current time, the verification result; Clock In or Clock Out, Retry Location, Report Issue, Not Now | None; the policy line says only that the latest version needs acknowledgment | "location is read only and not continuously tracked", "one time and location reading will be recorded", blocked and rejected stage explanations: §6 and §11 here |
-| ESS · My Attendance | Today, history, net hours, status and review references | Clock In row: the time is the system time, not the phone's clock | "a correction never overwrites a punch": §6 |
-| ESS · Work Location Requests | Active location, requests and their status; New Request | Active Location row: a temporary location applies for its dates, then the permanent home; request Address label: 100 m home radius against the field radius | "How a request moves" card, "goes to your line manager", the simulated map pin note: §3 |
-| ESS · My Devices | Approved devices and every device with its status; Register This Device | Approved Devices title: an enrolled device raises no warning; Status header: what new, revoked and blocked mean | "How device checks work" card, the People review and identifier sentences: §6 |
-| ESS · Policy Updates | Published versions, what changed, acknowledgment state; Acknowledge | None | "records before that date are never recalculated": §6 |
-| People · Employees (attendance setup) | Work arrangement, approved home geofence; Change Arrangement, Edit Home | None | Arrangement explanations: §6 |
-| People · Attendance | KPI cards, the view switch, register, field assignments, location requests, manager preview; Reconcile | Needs Reconciliation KPI: what reconciliation records and where breaches go; Valid header (assignments); Status header (requests); the Outcome field when deciding a record | The page explainer, "Click a row for every recorded field", the reconcile footnote, "What a manager can and cannot do": §3, §6, §8 |
-| People · Devices | Device list with first seen, last punch, next punch and status; Device Policy, Enrol Device | Next Punch header: the effect under the current policy | "How the current device policy affects a punch" card, "devices register on every punch": §6 |
-| People · Worksites | Office worksites, approved homes, field sites, outside-fence count, the location list; Add Field Assignment, Add Worksite | Address header: homes show the area only, People and the CEO open the full address; Enforcement Mode header | "How the geofence behaves" and "Why homes are masked" cards, the HR detail audit banner: §6, §8 |
-| Settings · Attendance Policy | The six setting groups, configured tiers, acknowledgment report, policy versions; Discard, Review and Publish Changes, Reset Demo Data | A help term on each setting's name; "draft" in the draft bar; the outside-geofence modes as a closed Details row; Effective Date: no recalculation, no backdating | Every card footnote (seeded values, independent toggles, no automatic deduction, no overtime rates), "Employees have not been told": §6, §13 |
-| Settings · Audit Log | Entries today and this month, attendance entries, recent entries | Retention KPI: append only, archived after seven years | "What append only means" card, the chart caption: §7 |
-| Notifications and Alerts | Each alert or notification and the record it opens | None | What an alert is, what staff were sent, what a notification is: §7 |
+| Clock In / Clock Out panel | The date and the workplace's current time, the state pill (Clocked Out, Clocked In with its time, Review Required), Shift, Work Arrangement, Clock Location with its radius, This Device with its status; the step before the browser asks (Location Check, one line naming the worksite); Clock In or Clock Out, Allow Location, Retry Location, Register Device, Not Now; the result after a punch with its reasons; Add Note when it is under review | Clock Location: the punch is matched to this place; This Device: why an unregistered device is flagged under the current policy | "location is read only and not continuously tracked", how block and warn decide, idempotency: §6 here |
+| ESS · My Attendance | Today's card, the month picker, Days Present, Late Days, Absent, Hours Worked, the days with clock in, clock out, hours, status and Review, a day's punches, open exceptions with Explain; Export Month | Hours Worked: from the first clock-in to the last clock-out | "a correction never overwrites a punch": §6.8 |
+| ESS · My Devices | The devices with status, first seen, last punch and This Device; Register This Device, Remove | Status header: what New, Registered and Removed mean | "How device checks work", the three-device reason: §6.6 |
+| People · Attendance | The date, Expected, Present, Late, Absent, On Leave, Not In, Open Exceptions; Register and Exceptions; the register (person, arrangement, clock in, clock out, location, device, status, review); a day's evidence; Decide; Export | Open Exceptions: what waits on People; Outcome on the decision form: accept, reject or add the clock-out | The page explainer, "what a manager can and cannot do", reconciliation mechanics: §3, §6.8, §8 |
+| People · Devices | Device list with employee, device, status, first seen, last punch; Remove Device | Status header: as on My Devices | "devices register on every punch": §6.6 |
+| People · Worksites | Worksites with code, address, radius, assigned and status; Add Worksite; a worksite's details, Edit, Retire or Restore, its employees with Assign Employee | Radius: punches inside count as on site | "How the geofence behaves", why homes are not fenced yet: §6.5, §13 |
+| Settings · Attendance Policy | M9 (MILESTONES §18) | | |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Clock In / Clock Out modal | A full sheet: shift, location, current time, the result | Nothing | Clock In or Clock Out, full width at the foot | Opens from the floating button's Clock In or Clock Out (F18); on desktop from the top bar clock button. After sign-in it opens by itself for anyone not yet clocked in, on both shells |
-| ESS · My Attendance | Today's card, then history as cards | Subtitle, chart captions | None; a card opens its record | Bottom bar Self-Service; ESS tabs scroll sideways under the title rail |
-| ESS · Work Location Requests | The active location card, then request cards | Subtitle | New Request opens a full sheet | ESS tabs |
-| ESS · My Devices | Approved devices as cards | Subtitle | Register This Device | ESS tabs |
-| ESS · Policy Updates | The latest version card with its changes | Subtitle | Acknowledge, full width | ESS tabs |
-| People · Employees (attendance setup) | The employee sheet with arrangement and home | Nothing | Change Arrangement, Edit Home | From the Employees card list |
-| People · Attendance | KPI cards two to a row, the view switch scrolling sideways, filters scrolling sideways, then register cards per employee with status, clock in and out, expected and matched location, device and exception | Open Clock Panel (the floating button's clock does the same), subtitle, chart captions | Reconcile, full width in the header | More, then People; tapping a register card opens the full evidence |
-| People · Devices | Device cards with status | Subtitle | Enrol Device | People tabs |
-| People · Worksites | KPI cards, then location cards | The Lagos geofence map | Add Worksite | People tabs |
-| Settings · Attendance Policy | The draft bar, then setting groups with label and value pairs | Header Reset button, the raw tier tables | Publish Policy in the draft bar | Settings tabs |
-| Settings · Audit Log | KPI cards, then entry cards, 25 per page | Chart caption | None | Settings tabs; Previous and Next |
-| Notifications and Alerts | The bell sheet with the three tabs | Tab explanation lines | Open the record | Top bar bell |
+| Clock In / Clock Out panel | A bottom sheet: the state, the time, the shift and location, then the result (no toast over it) | Nothing | Clock In or Clock Out, full width at the foot | The floating button's Clock In or Out (F18); the top bar's clock on desktop; it opens by itself after sign-in for anyone not yet clocked in on a working day |
+| ESS · My Attendance | Today's card, the four figures two to a row, then days as cards | Subtitle | Export Month in the header | Bottom bar Self-Service; ESS tabs scroll sideways |
+| ESS · My Devices | Device cards with their status | Subtitle | Register This Device, full width | ESS tabs |
+| People · Attendance | The figures two to a row (a figure filters the register), the view switch, the status chips scrolling sideways, then register cards with status, clock in and clock out | Subtitle; the arrangement, location, device and review columns (in the day's sheet) | A card opens the day's evidence in a sheet | More, then People |
+| People · Devices | Device cards with status | Subtitle | A card opens it; Remove Device in its sheet | People tabs |
+| People · Worksites | Worksite cards | Subtitle | Add Worksite, full width | People tabs |
+| Settings · Attendance Policy | M9 | | | Settings tabs |
 
 ## 11 · Edge cases
 
-- Suspended employee: terminate or reject the session and deny direct navigation and punches.
-- Approved leave: permit allowed app features but reject clock-in and clock-out with the leave dates.
-- Missing home coordinates: reject remote verification and direct the employee to People/HR.
-- GPS denied, unavailable or insufficiently accurate: never mark the punch compliant; retry or review.
-- Outside geofence: retain original evidence and show Pending HR review until a decision is recorded.
-- Temporary location expiry: revert to the permanent home automatically and retain both in history.
-- Duplicate submission or concurrent request: return the original idempotent result.
-- Offline: production behaviour is unresolved; the browser demo does not queue punches.
-- Demo reload: interactive demo punches reset so presentations start at Clock In; production records
-  must remain durable.
+- Suspended login: auth refuses the session, so no punch arrives. Archived or left employee: 422
+  `NOT_EMPLOYED`.
+- Approved leave covering the work date: clock-in and clock-out are refused with the leave's dates
+  (422 `ON_LEAVE`); the day is `leave`.
+- No worksite, or a remote employee: punches are recorded, not judged on location; the panel says
+  No Worksite Assigned.
+- GPS denied, unavailable, timed out or worse than 100 m: never compliant; review under warn or
+  block, accepted with the evidence under off; Retry Location reuses the same Idempotency-Key only
+  for the same reading, a new reading is a new request.
+- Outside the fence: warn reviews, block rejects; the original evidence stays.
+- A double tap, two tabs, or a retry after a lost answer: one punch; the replay gets the first
+  answer. Two different keys at once: one punch and a 409.
+- Offline, a server that did not answer, or the first press still running: the panel says No
+  Connection and keeps the punch's body and key for Try Again, so the retry is answered with the
+  first punch if it did land; nothing is queued and nothing pretends to have been recorded.
+- Remote, or no worksite: the panel does not ask for the location; the punch is not judged on it.
+- A second press while a punch is being recorded is ignored (the button stays busy).
+- Midnight: the work date is the workplace's date at the server's time of the punch; a clock-out
+  after midnight closes yesterday's shift until the day-close runs.
+- A fourth device: refused; the person removes one first.
+- The day-close run twice, or a run that died half way: no second exception, no second absence.
 
 ## 12 · Donor code
 
 | From | File | Change on the way in |
 |---|---|---|
-| MyCity attendance demo | `docs/MyCity-ERP-Documents/demo.html` | Replace localStorage, simulated GPS and front-end identity checks with authenticated APIs, trusted server time and durable evidence storage |
-
-No external donor attendance implementation has been approved for M1.
+| pixie | `src/shared/hr_payroll/clock.guard.js` (`evaluateClockTransition`) | Review events count as active, rejected never do; an explicit `SHIFT_DONE` after the day's clock-out; messages without dashes |
+| pixie | `src/shared/hr_payroll/device.guard.js` (`evaluateDeviceRecognition`) | No CEO exemption and no "no device enrolled yet means neutral": an unregistered device is unknown, judged by `device_mode`; the device is the session's `known_device`, never a client fingerprint |
+| pixie | `src/shared/hr_payroll/devices.service.js`, `devices.repo.js` | Cap 3 (MyCity's meetings), not 2; registration confirmed by a fresh sign-in, not an email code; no change log table (the event log and audit ledger carry every change) |
+| pixie | `src/shared/attendance/geo.calc.js` | Already in `shared/geo` (M0); the policy decision is `attendance.geofence.js` |
+| pixie | `src/shared/hr_payroll/lateness.calc.js` (`minutesLate`, `minutesOvertime`) | Lateness after start plus grace, overtime after the end, on the work date's wall clock; the money half (daily rate, tiers) waits for M6 |
+| pixie | `src/shared/hr_payroll/hr_ops.service.js` (`selfClock`) and `migrations/000303` | The per-day unique index on active events, the advisory lock first; location is not mandatory (praxis's "always record" with the policy deciding) |
+| praxis-ls | `src/modules/hr/attendance/attendance.rules.js` (`wallClock`, `localDate`, `reconcileDay`) | Statuses `present`, `late`, `absent`, `leave` (no weekend or holiday rows); grace as pixie measures it (§6.4); no deductions |
+| praxis-ls | `src/modules/hr/attendance/attendance.export.js` | The register and the month as workbooks through `shared/spreadsheet`, gathered 25 at a time, emailed |
+| praxis-ls | `doc/CLOCKIN_REVAMP_ENGINEERING_GUIDE.md` §1.2 (the policy model) | `block` rejects, as MyCity asked; praxis holds every punch instead |
 
 ## 13 · Open questions
 
-- Which production geocoding and map provider will validate employee and worksite coordinates?
-- Must a line manager recommendation be mandatory before People/HR decides a location request?
-- What offline behaviour, if any, is acceptable for field employees?
-- Which monetary overtime and deduction rates will Finance approve? The demo intentionally defines none.
-- Which frontend feature path will replace the provisional `app/src/attendance/` path?
+- Remote and hybrid homes: the client's decision on registering home addresses is pending (13
+  October meeting); until then remote punches are not fenced. Work Location Requests (#87) and field
+  assignments follow that decision.
+- The map and address search proxy (F21, Geoapify through our API) is not built; worksite
+  coordinates are typed in.
+- Policy Updates (#89) and policy versions with acknowledgement come with Settings · Attendance
+  Policy (M9).
+- A late punch raising a query (MILESTONES §6 definition of done) waits for the query rules (M3).
+- Offline punching for field staff is not in scope (BACKEND_STRUCTURE §15).
 
 ## 14 · Change log
 
@@ -207,3 +333,5 @@ No external donor attendance implementation has been approved for M1.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions (FRONTEND_GUIDE §5, §7, §8): the ⓘ texts and explainer cards (how requests are decided, why devices are recorded, the geofence and masked-home cards, what a manager can do) are gone; setting help is a help term on its label; Add Field Assignment is a two-step wizard; every form marks its fields on Submit instead of disabling it; lists are cards on a phone. Gates 8 and 11 now crawl these screens.
 - 15/10/2026 · AJ · Frontend foundation PR 2 (Shell): the clock moved into the shell's reach on both shells. `ClockButton.tsx` now exports `useClock` (the desktop top bar's button and the phone's floating button share it) and `useClockPrompt` (the after-sign-in panel, called once by the shell, so it opens on a phone too, where the top bar has no clock). §10.2 navigation follows the new phone shell: bottom bar Self-Service, More for People, Clock In or Out in the floating button.
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): these screens now draw from `@mycity/ui` rather than the app's own components. The registers are `DataView` (the same table on desktop, the same cards on a phone, and now server sort on the columns the contract allow-lists); the hours chart, the on-time donut and the trail are the shared `AreaChart`, `DonutChart` and `Timeline`; People · Attendance's list beside its day is `SplitPanes`, with the divider the keyboard can move; the worksite map and its geofence are `MapView` (F21, Leaflet with Geoapify through our API), and the clock-in address is `LocationLabel`. §10 is unchanged: every screen shows what it showed.
+- 17/10/2026 · LA · Clock-in and clock-out built on the real API with the geofence and device checks: the guide rewritten to what is built. The policy modes `off`, `warn`, `block` (geofence warn, device off by default) from MILESTONES §6.2 and REUSE_MAP §2.2 replace the booleans; the permission key is `people` (README §5.2) with own-scope `self` routes for the person's clock; `devices` and `worksites` join the backend modules; three registered devices without People's approval (12 and 13 October); §4 to §9 describe the tables, routes, rules, events and reads as built; §10 drops field assignments, location requests, the manager preview and the map from these screens until their API exists (§13); Settings · Attendance Policy is M9 (MILESTONES §18).
+- 17/10/2026 · LA · The five screens on the real API through `contract.gen.ts`: the clock panel (location asked only after the press, the reason first; Retry Location and Clock In Anyway; No Connection with the same key and body on Try Again; the server's result with Send Note for a punch under review), ESS · My Attendance and My Devices (Register This Device behind a fresh sign-in), People · Attendance (figures, register, a person's day with every punch's evidence, exceptions and the decision, Export Register for up to 31 days), People · Devices (Remove Device with a reason) and People · Worksites (add, edit, retire, restore, assign). `AttendanceToday.policy` gained `max_accuracy_m` so the panel offers Retry Location without a rule of its own. The INTERIM attendance types keep only Work Location Requests, Policy Updates, the policy settings and the employee setup tab; the mock answers the built routes in the contract's shapes. §3, §5, §10.2 and §11 updated.

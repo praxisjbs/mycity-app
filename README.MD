@@ -281,7 +281,7 @@ The settings modules that every user touches (`identity` login, own `notificatio
 | `dashboard` | TB | `kpi-catalog/{index, eligibility, guards}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js` |
 | `alerts` | TB | |
 | `reports` | TB | |
-| `attendance` | LA | `.rules` (wall clock, working week), `.lateness`, `.clock-guard`, `.reconcile`, `.auto-query`, `.analytics`, `.export`, `.calendar` |
+| `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, worksite and shift for a date), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
 | `devices` | LA | `.guard` |
 | `worksites` | LA | |
 | `leave` | AJ | `.balance` (the dates and allowance rules), `.clash` (who else in the department is away); requests open the `leave.approval` flow, decided in `workflow` |
