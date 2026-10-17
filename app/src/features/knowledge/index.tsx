@@ -272,8 +272,8 @@ function Announcements() {
   const { navigate } = useRouter();
   const { can } = useAuth();
   const list = usePaged("GET /api/v1/community/announcements");
-  const pub = list.rows.filter((a) => !a.scheduled);
-  const avg = pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience), 0) * 100) / pub.length) : 0;
+  const pub = list.rows.filter((a) => a.status === "published");
+  const avg = pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience_size), 0) * 100) / pub.length) : 0;
   return (
     <>
       <PageHeader title="Announcements" sub="Also posted to the staff community" actions={can("people", "create") && <Button variant="primary" icon="plus" onClick={() => navigate("/community?tab=announcements")}>New Announcement</Button>} />
@@ -286,15 +286,15 @@ function Announcements() {
         noun="announcement"
         columns={[
           { key: "t", label: "Title", render: (a) => <span className="font-semibold">{a.title}</span> },
-          { key: "b", label: "Posted By", render: (a) => a.author.display_name, desktop: true },
-          { key: "d", label: "Date", render: (a) => formatDate(a.publish_at) },
-          { key: "a", label: "Audience", render: () => "Everyone", desktop: true },
-          { key: "r", label: "Read", align: "n", render: (a) => (a.scheduled ? "None yet" : `${a.reads} of ${a.audience}`) },
-          { key: "s", label: "Status", render: (a) => (a.scheduled ? <Pill>Scheduled {formatDate(a.publish_at)}</Pill> : <Pill tone="ok">Published</Pill>) },
+          { key: "b", label: "Posted By", render: (a) => a.author?.display_name ?? "", desktop: true },
+          { key: "d", label: "Date", render: (a) => formatDate((a.published_at ?? a.publish_at)!) },
+          { key: "a", label: "Audience", render: (a) => (a.audience.kind === "all" ? "Everyone" : a.departments.join(", ")), desktop: true },
+          { key: "r", label: "Read", align: "n", render: (a) => (a.status === "scheduled" ? "None yet" : `${a.reads} of ${a.audience_size}`) },
+          { key: "s", label: "Status", render: (a) => (a.status === "scheduled" ? <Pill>Scheduled {formatDate(a.publish_at!)}</Pill> : <Pill tone="ok">Published</Pill>) },
         ]}
       />
       <Grid cols={2} className="mt-3">
-        <TrailCard title="Recent" items={pub.slice(0, 4).map((a) => ({ title: a.title, when: formatDate(a.publish_at), text: `Posted by ${a.author.display_name}. ${a.reads} of ${a.audience} have read it.`, tone: a.reads === a.audience ? "ok" : "hi" }))} />
+        <TrailCard title="Recent" items={pub.slice(0, 4).map((a) => ({ title: a.title, when: formatDate(a.published_at!), text: `Posted by ${a.author?.display_name}. ${a.reads} of ${a.audience_size} have read it.`, tone: a.reads === a.audience_size ? "ok" : "hi" }))} />
       </Grid>
     </>
   );

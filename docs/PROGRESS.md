@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 32 | 26 | 0 | 6 | 0 | 0 |
+| M1 Core Operations & Employee Management | 32 | 17 | 0 | 15 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **80** | **0** | **13** | **0** | **0** |
+| **Total** | **93** | **71** | **0** | **22** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -97,6 +97,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · GE · Two cards side by side now scroll on their own on desktop, as the mailbox's panes do: `Grid` (2, "1.4/1", "1/1.5") caps each column at the window's height under the top bar (`max-h-card-pane`) with its own scroll, from the width the columns sit side by side; the page still scrolls around them, and `scroll={false}` opts a grid out. Phones are unchanged (one column, the page scrolls). Checked on Settings · Security at 1440 by 520: the role card scrolls alone while the rules card and the page stay put. Left: nothing.
 - 17/10/2026 · TB · GitHub settings ticked: TB restricted the production environment to `main`, and
   the team accepted the rest as it stands for M0. Left: branch protection on `main` and required
   reviewers on production, once the repository is public or on a plan that offers them.
@@ -551,12 +552,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 15 | Channels | `channels` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 16 | Direct Messages | `direct-messages` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 17 | Announcements | `announcements` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
+| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 17 | Announcements | `announcements` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 17/10/2026 · GE · Backend built: contract (`community.js`, `announcements.js`), migration 1110, the `community` and `announcements` modules (channels, members, messages, uploads, voice notes, polls, reactions, transcripts, direct messages with sent, delivered and read ticks, presence, profile card, recognition always to #general per A19, announcements with audience, scheduling, reads and reminders), the 05:00 celebrations job, the announcement release job and its safety net, ⌘K for announcements, the AI read manifest; unit tests and an integration suite on the real migrations. AJ's screens moved onto the contract and the mock rewritten in its shapes; voice notes record and upload in channels too; search steps between matches; Edit Members, Mute and the copy in §10 done. Walked on the live API on a laptop, desktop and phone, two people: announcement, text, a recorded voice note, a direct message with its read ticks arriving over the socket, presence; the dev server now proxies the socket too. A new `GET /community/people` lets every member of staff pick a colleague (the staff register needs People). Left: the Average Read help term needs StatStrip to take one; the Knowledge Hub (M10) needs its own read route for announcements, as `/community/announcements` is for People and the CEO.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/community/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/community.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · GE · Demo updated per the 12 October meeting (guides removed, ＋ menu, members behind ⋮, fixed
   composer, read-only pinned #announcements, birthday and recognition cards, Praxis-style DMs with
@@ -566,15 +568,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 18 | Inbox | `inbox` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 19 | Sent | `sent` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 20 | Drafts | `drafts` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 21 | Archive | `archive` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 22 | Spam | `spam` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 23 | Trash | `trash` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
+| 18 | Inbox | `inbox` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 19 | Sent | `sent` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 20 | Drafts | `drafts` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 21 | Archive | `archive` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 22 | Spam | `spam` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 23 | Trash | `trash` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 17/10/2026 · GE · ⌘K now finds a person's own mail by subject, address or sender name, pinned to the caller so the CEO and People find nobody else's; a result opens the conversation in any folder. Connecting uses `mycityapp.io` as the mail host, the certificate's name, instead of `mail.mycityapp.io`. Virus scanning checked against a real clamd with a local test signature (the signature download is blocked here): an inbound attachment carrying the EICAR string stays in quarantine marked infected, a clean one is released. Left: the real host and clamd's real signatures on staging; disconnecting a leaver needs a deactivation event.
+- 17/10/2026 · GE · Built on the real API: contract `mailbox.js`, migration 1120 (connection status, folder kinds and UID cursor, thread keys, `mail_draft`, `mail_send_queue`), the `mailbox` module (IMAP and SMTP provider, autodiscover to `mail.<domain>` on 993 and 465, threading by References, sanitised HTML in and out, send queue with Bcc in the envelope only, a copy to the server's Sent, deferrals retried three times, paced to 50 an hour), `mail-sync` and `mail-send` jobs, IMAP IDLE in the worker, `mailbox.updated` over the socket. Screens on the contract: the Connect sheet opens over Mailbox ("Password refused" on the field), Reconnect banner, scheduled mail in Drafts with Cancel Schedule, field errors in the composer, Discard with buttons only. Unit tests and an integration suite on a fake provider; checked against a real Dovecot IMAP server and an SMTP relay (15 of 15), then walked on a laptop and a phone: connect, sync with an attachment, reply, Sent, the reply arriving in the other person's inbox. Empty stubs deleted. Left: the real `mycityapp.io` host (Namecheap) is untested; disconnecting a leaver needs a deactivation event; ⌘K inside mail needs an owner-scoped provider.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/mailbox/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/mailbox.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · GE · Demo composer added (rich text, recipient chips, attachments with progress, schedule,
   inline discard), reader full screen on mobile. Engineering guide `docs/guides/mailbox.md` written.

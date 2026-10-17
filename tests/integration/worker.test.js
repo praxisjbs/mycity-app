@@ -584,7 +584,10 @@ describe("schedules and heartbeat", () => {
       .sort();
     expect(ids).toEqual([
       "alert-ageing",
+      "announcement-release",
+      "celebrations",
       "import-cleanup",
+      "mail-sync",
       "media-reconcile",
       "workflow-timeout",
     ]);

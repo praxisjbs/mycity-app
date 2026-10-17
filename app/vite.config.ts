@@ -47,7 +47,11 @@ export default defineConfig(({ mode }) =>
     },
     server: {
       port: 5173,
-      proxy: { "/api": { target: "http://localhost:3000", changeOrigin: false } },
+      // The socket rides the same origin on a server; on a laptop against the live API it needs the proxy too.
+      proxy: {
+        "/api": { target: "http://localhost:3000", changeOrigin: false },
+        "/socket.io": { target: "http://localhost:3000", changeOrigin: false, ws: true },
+      },
     },
     build: {
       target: "es2022",

@@ -119,6 +119,9 @@ function onConnection(socket) {
   const timer = setTimeout(() => socket.disconnect(true), ms);
   if (timer.unref) timer.unref();
   socket.on("disconnect", () => clearTimeout(timer));
+
+  // Staff Community: online while connected, last seen when the socket closes.
+  require("../modules/community/community.presence").track(socket, userId);
 }
 
 /**

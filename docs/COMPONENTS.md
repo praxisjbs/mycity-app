@@ -268,9 +268,9 @@ The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsin
 
 | | |
 |---|---|
-| Use | Laying out cards on a page: KPI tiles (4), two cards side by side (2), a list beside its detail ("1.4/1"). |
+| Use | Laying out cards on a page: KPI tiles (4), two cards side by side (2), a list beside its detail ("1.4/1"). On desktop two columns side by side each stop at the window's height and scroll on their own, as the mailbox's panes do; `scroll={false}` lets them grow with the page. |
 | Avoid | Laying out controls inside a card (use Stack or Inline); a table's columns. |
-| Phone | One column, except `phoneCols={2}` (or the merged "4m2"), which keeps KPI tiles two to a row. |
+| Phone | One column, except `phoneCols={2}` (or the merged "4m2"), which keeps KPI tiles two to a row. Nothing scrolls on its own. |
 | Accessibility | A plain container; reading order is the source order at every width. |
 | Status | stable |
 | Exports | `Grid` |
@@ -287,6 +287,7 @@ The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsin
 | `phoneCols` | `1 \| 2` |  | Columns on a phone: 1 (the default) or 2 (KPI tiles). |
 | `gap` | `"sm" \| "md"` |  | Space between cells: `md` 12 px (the default) or `sm` 8 px. |
 | `flush` | `boolean` |  | Drop the 12 px space under the grid (the merged grids carry it so blocks stack apart). |
+| `scroll` | `boolean` |  | Two columns side by side scroll on their own on desktop (the default); `false` lets them grow with the page. |
 
 ```tsx
 <Grid cols={4} phoneCols={2}>{kpis}</Grid>

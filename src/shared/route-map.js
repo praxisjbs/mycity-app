@@ -128,14 +128,14 @@ const ENTITY_ROUTES = Object.freeze({
   calendar_event: screen("workspace", "calendar"), // search:none not built yet (src/modules/calendar)
 
   // Staff Community and Mailbox
-  channel: screen("community", "channels"), // search:none not built yet (src/modules/community)
-  channel_message: screen("community", "channels"), // search:none not built yet (src/modules/community)
-  direct_thread: screen("community", "direct-messages"), // search:none not built yet (src/modules/community)
-  direct_message: screen("community", "direct-messages"), // search:none not built yet (src/modules/community)
-  announcement: screen("community", "announcements"), // search:none not built yet (src/modules/announcements)
-  recognition: screen("community", "channels"), // search:none not built yet (src/modules/community)
-  mail_thread: screen("mailbox", "inbox"), // search:none not built yet (src/modules/mailbox)
-  mail_message: screen("mailbox", "inbox"), // search:none not built yet (src/modules/mailbox)
+  channel: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  channel_message: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  direct_thread: screen("community", "direct-messages"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  direct_message: screen("community", "direct-messages"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  announcement: screen("community", "announcements"),
+  recognition: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  mail_thread: screen("mailbox", "inbox"), // opens the conversation by id, whichever folder it is in
+  mail_message: screen("mailbox", "inbox"), // search:none a message is found through its conversation (mailbox.search.js)
 
   // People
   employee: {
