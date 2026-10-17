@@ -9,7 +9,7 @@
 | Permission key(s) | `people`, `settings`, `ess` (own records) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 16/10/2026 |
+| Last changed | 17/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -74,8 +74,8 @@ These finish M0 and no prompt can do them:
 | People · Employees (#24) | Staff app | `people` view; add, edit, archive with create, edit, delete | A | Mock | Real API: list at 25 with search and filters, the employee's record with tabs, Add, Edit, Archive, Send Invite, Import Staff |
 | Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | Mock | Profile, job, reporting line, documents, login, history on the real API |
 | Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | Mock | As `organogram.md` describes, on the real API |
-| Settings · Imports (new screen: the wizard and history) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | None | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
-| ESS · My Documents (#14) | ESS | The person (own) | B | Mock | Their documents, upload where allowed, download |
+| Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | None | Built 17/10/2026: upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
+| ESS · My Documents (#14) | ESS | The person (own) | B | Mock | Built 17/10/2026: their documents and the ones People asked for, upload, download, preview |
 | Settings · Organisation (#69) | Settings | `settings` view, edit | C | Mock | Organisation profile, working week, holidays |
 | Settings · Roles & Permissions (#71) | Settings | `settings` edit | C | Mock | Roles, the grants matrix, field visibility, capabilities, editable |
 | Settings · Documents & Numbering (#76) | Settings | `settings` edit | C | Mock | Numbering schemes and document settings |
@@ -117,7 +117,8 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 | `department`, `employee`, `org_seat`, `reporting_line` | 0040, 0110, 0210 | A | Employees carry every column of 0110 and 0210; vacant seats are `org_seat` rows |
 | `app_user`, `user_role` | 0010, 0020, 0200 | A | Roster logins: `password_hash = '!invited'`, roles from `seeds/staff/roles.json` |
 | `import_batch`, `import_row`, `import_mapping_profile` | 0085 | B | BACKEND_STRUCTURE §9.3 |
-| `document`, document versions | 0080 | B | Through the vault and upload engine only |
+| `document`, document versions | 0080 | B | Through the vault and upload engine only. `0350` adds `verified_at` and `verified_by`: People accepting a file is a person's judgement, not the virus scan (§6.9) |
+| `document_request` | 0350 | B | What People asked an employee for; a Missing row until it is given (§6.9) |
 | `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3) |
 | `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | Security rules become settings rows with an `.env` floor (§6.4) |
 | `audit_ledger`, `event_log` | 0030 | C | Read only |
@@ -150,11 +151,29 @@ Every list pages at 25 through `shared/http/paged.js`. Every route has a contrac
 create or update by `staff_number` or `work_email`, returning `{ action: "create" | "update" | "none",
 target_id, before }`. Track A builds both; the roster loader runs the same importer.
 
-**Track B · `imports` and `documents`**: BACKEND_STRUCTURE §9.3 exactly (`GET /imports/importers`,
-`/importers/:key/template`, `POST /imports`, `PUT /imports/:id/mapping`, `POST /imports/:id/preview`,
-`/commit`, `/revert`, `GET /imports/:id/rows`, `/report`, `GET /imports`); documents: upload, download,
-versions (BACKEND_STRUCTURE §5); `GET /ess/documents`, `POST /ess/documents` (own records);
-`GET /employees/:id/documents`, `POST /employees/:id/documents` (`people`).
+**Track B · `imports` and `documents`** (built 17/10/2026)
+
+| Route | Permission |
+|---|---|
+| `GET /imports/importers`, `/importers/:key/template` | the importer's own (`people` create for staff), checked in the service |
+| `POST /imports`, `PUT /imports/:id/mapping`, `POST /imports/:id/preview`, `/commit`, `/revert` | the same |
+| `GET /imports/:id`, `/imports/:id/rows`, `/imports/:id/report` | the importer's own, or `settings` view |
+| `GET /imports` (history) | `settings` view |
+| `POST /documents` (a file before the record that will hold it) | a session; it belongs to the uploader |
+| `GET /documents/:id`, `/content`, `/variant/:kind`, `/versions` | `vault.canRead` per document; a document the caller may not read is a 404 |
+| `POST /documents/:id/versions` | the same, and the document must not be locked |
+| `POST /documents/:id/verify` | `people` edit |
+| `GET /employees/:id/documents`, `/documents/summary` | `people` view, within scope |
+| `POST /employees/:id/documents`, `/employees/:id/document-requests` | `people` edit |
+| `GET /ess/documents`, `/ess/documents/summary`, `POST /ess/documents` | the caller's own record |
+
+Beyond BACKEND_STRUCTURE §9.3's list, the wizard also reads `GET /imports/:id`, so a batch survives a
+reload; the two `/summary` routes carry the counts above a Vault list, which a page of 25 cannot; and
+`POST /documents` is the upload field's own endpoint, for a voice note or a photograph that has no
+record yet. The import routes are `self` at the edge because the permission is the importer's and the
+importer arrives in the request: `engine.assertMay()` makes the real check and refuses with a 403.
+The `documents` module mounts at the API root, because an employee's documents are read where the
+employee is (`/employees/:id/documents`) while `src/modules/organisation/` is track A's.
 
 **Track C · `access`, `settings`, `audit`**: the mock's `GET/PATCH /settings/organisation`;
 `GET /settings/roles`, `/roles/catalogue`, `/roles/matrix`, `/roles/:id`, `POST /settings/roles`,
@@ -249,13 +268,34 @@ a written `search:none <reason>`. CLAUDE.md says so.
 Integrations (#77), Appearance (#75) and Notifications (#74, M6) stay Coming Soon. Attendance Policy
 (#73) belongs to LA's attendance work.
 
+### 6.9 What a document's status means (TB, 17/10/2026)
+
+One status per row of a Vault list, worked out from the record rather than stored, so nothing can
+drift from the file:
+
+| Status | When |
+|---|---|
+| Missing | People asked for it and it has not been given |
+| Signed | The document is locked: signed, sent or filed, and it can never be replaced |
+| Expiring | Its expiry is inside 60 days |
+| Verified | People have looked at the file and accepted it |
+| Awaiting Verification | Uploaded, not yet looked at |
+
+Signed wins over Expiring, and Expiring over Verified, because the more urgent fact is the one a
+person needs. **Verification is a person's judgement, not the virus scan**: `scan_status` says the
+file is safe to open, never that the right document arrived, so `document.verified_at` is its own
+column (migration `0350`). A request (`document_request`, the same migration) is cancelled, never
+deleted, so the ask stays on the record.
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
 |---|---|---|
 | `employee.created`, `employee.updated`, `employee.archived`, `employee.restored`, `employee.reporting_line_changed`, `department.*` | A | Search reindex; the team cache version (`grants-cache`) on a reporting change |
-| `import_batch.committed`, `import_batch.reverted` | B | The person who ran it is told |
-| `document.uploaded`, `document.version_added` | B | Scan and derive (existing jobs) |
+| `import.committed`, `import.reverted` | B | The person who ran it is told (`imports.events.js`) |
+| `document.stored`, `document.superseded` (the vault's own) | B | Scan and derive (existing jobs) |
+| `document.requested` | B | The employee it is about is told; the notice opens My Documents |
+| `document.verified`, `document.request_cancelled` | B | Audit only |
 | `role.*`, `permission.changed`, `field_visibility.changed`, `capability.changed`, `settings.security_changed` | C | `security: true`: the watchers are told; the grants cache cleared |
 | `settings.changed` (organisation, working week, holidays, numbering) | C | Audit only |
 | The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
@@ -272,11 +312,19 @@ Integrations (#77), Appearance (#75) and Notifications (#74, M6) stay Coming Soo
 ## 9 · AI and search
 
 Each module ships a read manifest (`<module>.ai.js`) or `// ai:none <reason>`: employees and
-departments (A), import history (B), roles and settings (C, reads only), my approvals (D). Search
-providers: `organisation.search.js` (employees, departments; A), `users.search.js` (exists), screens
-and actions (D), and the gate in §6.7.
+departments (A), import history and the caller's own documents (B, `imports.ai.js` and `ess.ai.js`),
+roles and settings (C, reads only), my approvals (D). `documents` carries `ai:none`: a document is a
+file, and what it says about a person is read through that person's own module.
+
+Search providers: `organisation.search.js` (employees, departments; A), `imports.search.js` (a batch
+by its number or the file; B), `users.search.js` (exists), screens and actions (D), and the gate in
+§6.7. `documents` and `ess` carry `search:none`: a document is found from the record it belongs to,
+and who may open one is decided per document by the vault, which no single query can express.
 
 ## 10 · On screen and mobile
+
+ESS · My Documents (#14) is track B's too; its rows are in `docs/guides/ess.md` §10, which owns the
+screen.
 
 ### 10.1 Content tiers
 
@@ -284,7 +332,8 @@ and actions (D), and the gate in §6.7.
 |---|---|---|---|
 | People · Employees | Staff list: name, staff number, job title, department, line manager, work pattern, status, login; Add Employee, Import Staff, filters | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here |
 | Employee record | Profile, job, reporting line, login state with Send Invite, documents, history; Edit, Archive | Masked fields show Restricted with a help term naming who may see them | Field mask rules: §6.3, §8 |
-| Import Staff | Steps Upload, Map, Preview, Commit; counts to create, update, skip, errors; Download Errors, Revert | Help term on Unchanged | The two-pass manager matching: §6.1, BACKEND_STRUCTURE §9.4 |
+| Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
+| Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Roles & Permissions | Roles, the grants matrix, field visibility, capabilities; Save | Help term on scope (all, team, own) | Grants cache and security events: §7 |
 | Settings · Security | Session length, idle lock, password minimum, two-step by role, failed sign-ins, sessions; Save, End Session | Help term naming the floor a rule cannot go below | Why `.env` is the floor: §6.4 |
 | Settings · Audit Log | Who, what, record, when, filters; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
@@ -297,7 +346,8 @@ and actions (D), and the gate in §6.7.
 |---|---|---|---|---|
 | People · Employees | Search, then employee cards (name, title, department, status pill) | Bulk actions, column choice | Add Employee in the floating button | More, People |
 | Employee record | Profile card, then sections as tabs that scroll sideways | History detail | Send Invite or Edit, full width in a sheet | Back to the list |
-| Import Staff | One step per sheet, counts as cards | The full row table (Download Errors instead) | Commit, full width | From Employees |
+| Settings · Imports (#93) | Import cards: reference, file, status pill | File, Who, Updated, Problems | Start Import in the floating button | More, Settings |
+| Settings · Imports, the wizard | One step per sheet, counts as cards | The rows with problems (Download Errors instead) | Commit Import, full width | From Employees or Settings |
 | Settings · Roles & Permissions | Role cards; a role opens its grants as grouped toggles | The full matrix grid | Save, full width | More, Settings |
 | Settings · Audit Log | Entry cards: who, what, when | Export | Filter in a sheet | More, Settings |
 | ⌘K Search | Full-screen search with grouped results | None | Tap a result | The search bar in More and the top bar |
@@ -315,6 +365,11 @@ and actions (D), and the gate in §6.7.
   reassign (D).
 - A security rule set looser than the floor: refused with the floor named.
 - A search provider that throws: its group is left out and logged; the rest answer.
+- A document asked for twice: two requests, two Missing rows. People cancel the one they do not want.
+- An upload answering a request somebody already answered: refused, naming the document that arrived.
+- A locked document (signed, sent, filed): it can never be replaced; a new version is refused.
+- A file whose scan has not finished: reading it waits rather than serving an unchecked file.
+- A sheet whose first row is the header: the header row is 0, which `0100` already allows.
 
 ## 12 · Donor code
 
@@ -334,6 +389,12 @@ and actions (D), and the gate in §6.7.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · Track B built: the `imports` API over any registered importer, Settings · Imports
+  (#93, the wizard and the history), the `documents` module (gated upload, download, versions,
+  verification and document requests) and ESS · My Documents (#14) on the real API. Migration `0350`
+  adds `document_request` and `document.verified_at`; §5 lists every route as built, §6.9 says what a
+  document's status means, §10 carries the new screen's rows. The employee record's Documents tab
+  waits for track A.
 - 16/10/2026 · TB · The staff importer moved to track A with the roster loader, so A and B meet only
   at the import engine; Settings · Imports holds the wizard and history.
 - 16/10/2026 · TB · First version: the remaining M0 and foundation work in four tracks, with TB's

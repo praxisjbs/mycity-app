@@ -1,4 +1,4 @@
-import { at, created, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
+import { at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
 import { byKey, managerOf } from "../data/people";
 
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
@@ -117,28 +117,80 @@ const SANC = (user: string) =>
     : [];
 route("GET /api/v1/ess/sanctions", (req) => paged(SANC(req.user!), req));
 
-const DOCS = new Map<string, Array<{ document_ref_id: string; name: string; uploaded: string | null; status: { tone: "ok" | "warn" | "err"; text: string }; expires: string | null; document: null | { document_id: string; file_name: string; size_bytes: number; mime_type: string }; signed_number: string | null }>>();
+/**
+ * My Documents on the mock: the Vault list the contract describes, a document
+ * that is held and one People have asked for and is still Missing. Uploading
+ * is multipart, which the mock cannot carry, so it says so instead.
+ */
+const DOCS = new Map<string, Array<{
+  row_key: string;
+  document_id: string | null;
+  document_request_id: string | null;
+  name: string;
+  status: "signed" | "verified" | "expiring" | "awaiting_verification" | "missing";
+  uploaded_at: string | null;
+  expires_on: string | null;
+  number: string | null;
+  mime: string | null;
+  bytes: number | null;
+  version: number | null;
+}>>();
+
 const docsOf = (user: string) => {
   if (!DOCS.has(user)) {
     const p = byKey(user)!;
+    const doc = (n: number, name: string, status: "signed" | "verified" | "expiring" | "awaiting_verification", when: string | null, expires: string | null, ref: string | null) => ({
+      row_key: `doc:${sid(`d:${user}:${n}`)}`,
+      document_id: sid(`d:${user}:${n}`),
+      document_request_id: null,
+      name,
+      status,
+      uploaded_at: when,
+      expires_on: expires,
+      number: ref,
+      mime: "application/pdf",
+      bytes: 184320,
+      version: 1,
+    });
     DOCS.set(user, [
-      { document_ref_id: sid(`d:${user}:1`), name: "Employment contract", uploaded: p.start_date, status: { tone: "ok", text: "Signed" }, expires: null, document: null, signed_number: "CON-0004" },
-      { document_ref_id: sid(`d:${user}:2`), name: "Data privacy acknowledgement", uploaded: p.start_date, status: { tone: "ok", text: "Signed" }, expires: null, document: null, signed_number: null },
-      { document_ref_id: sid(`d:${user}:3`), name: "NDPA training certificate", uploaded: isoDaysAgo(276), status: { tone: "warn", text: "Expiring" }, expires: isoDaysAhead(47), document: null, signed_number: null },
-      { document_ref_id: sid(`d:${user}:4`), name: "Passport photograph", uploaded: null, status: { tone: "err", text: "Missing" }, expires: null, document: null, signed_number: null },
-      { document_ref_id: sid(`d:${user}:5`), name: "Bank verification number", uploaded: p.start_date, status: { tone: "ok", text: "Verified" }, expires: null, document: null, signed_number: null },
+      doc(1, "Employment contract", "signed", at(400, "09:00"), null, "CON-0004"),
+      doc(2, "Data privacy acknowledgement", "signed", at(400, "09:05"), null, null),
+      doc(3, "NDPA training certificate", "expiring", at(276, "14:20"), isoDaysAhead(47), null),
+      {
+        row_key: `req:${sid(`r:${user}:1`)}`,
+        document_id: null,
+        document_request_id: sid(`r:${user}:1`),
+        name: "Passport photograph",
+        status: "missing",
+        uploaded_at: null,
+        expires_on: null,
+        number: null,
+        mime: null,
+        bytes: null,
+        version: null,
+      },
+      doc(5, "Bank verification number", "verified", p.start_date ? at(300, "11:00") : null, null, null),
     ]);
   }
   return DOCS.get(user)!;
 };
-route("GET /api/v1/ess/documents", (req) => paged(docsOf(req.user!), req, { search: (r) => [r.name] }));
-route("POST /api/v1/ess/documents", (req) => {
-  const list = docsOf(req.user!);
-  const name = String(req.body.name ?? "");
-  const existing = list.find((d) => d.name === name);
-  const doc = { document_id: String(req.body.document_id), file_name: name, size_bytes: 0, mime_type: "application/pdf" };
-  if (existing) Object.assign(existing, { uploaded: isoDaysAgo(0), status: { tone: "warn", text: "Awaiting verification" }, document: doc });
-  else list.unshift({ document_ref_id: sid(`d:${Date.now()}`), name, uploaded: isoDaysAgo(0), status: { tone: "warn", text: "Awaiting verification" }, expires: null, document: doc, signed_number: null });
-  return created(existing ?? list[0]);
+
+route("GET /api/v1/ess/documents", (req) =>
+  paged(docsOf(req.user!), req, {
+    search: (r) => [r.name],
+    filters: { status: (r, v) => r.status === v },
+  }),
+);
+
+route("GET /api/v1/ess/documents/summary", (req) => {
+  const rows = docsOf(req.user!);
+  const n = (s: string) => rows.filter((r) => r.status === s).length;
+  return ok({
+    documents: rows.filter((r) => r.document_id).length,
+    signed: n("signed"),
+    verified: n("verified"),
+    expiring: n("expiring"),
+    missing: n("missing"),
+  });
 });
 
