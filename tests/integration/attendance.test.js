@@ -29,6 +29,20 @@ const authorise = require("../../src/shared/ai/authorise");
 const service = require("../../src/modules/attendance/attendance.service");
 const repo = require("../../src/modules/attendance/attendance.repo");
 const reconcile = require("../../src/modules/attendance/attendance.reconcile");
+const realtime = require("../../src/services/realtime/emitter");
+
+// The queues and the socket emitter would hold Redis connections open past the run: the jobs a
+// handler queues are kept here, and every push is recorded on the spy below.
+const sent = [];
+jest.mock("../../src/jobs/queues", () => ({
+  enqueue: jest.fn(async (queue, name, data, opts) => {
+    sent.push({ queue, name, data, opts });
+    return { id: String(sent.length) };
+  }),
+  getQueue: jest.fn(),
+  closeQueues: jest.fn(async () => undefined),
+  DEFAULTS: {},
+}));
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -130,6 +144,7 @@ describeDb("attendance against the real migrations", () => {
   }
 
   beforeAll(async () => {
+    jest.spyOn(realtime, "toUser").mockReturnValue(true);
     await rebuild(pool, config.DB_NAME);
     outbox.markReady();
     aiRegistry.load();
@@ -782,6 +797,12 @@ describeDb("attendance against the real migrations", () => {
     expect(users.has(people.staff.user.user_id)).toBe(true);
     const failed = await q("SELECT count(*)::int AS n FROM event_outbox WHERE event_key LIKE 'attendance.%' AND status = 'failed'", []);
     expect(failed.rows[0].n).toBe(0);
+    // The screens reload on the push: the person and People with the view both get it.
+    const pushed = realtime.toUser.mock.calls.filter((c) => c[1] === "attendance.updated");
+    const to = (who) => pushed.filter((c) => c[0] === people[who].user.user_id && c[2].employee_id === people.staff.employee.employee_id);
+    expect(to("staff").length).toBeGreaterThan(0);
+    expect(to("ops").length).toBeGreaterThan(0);
+    expect(to("outsider")).toHaveLength(0);
   });
 
   test("an export is queued after commit and its rows are the month's days", async () => {
@@ -796,20 +817,13 @@ describeDb("attendance against the real migrations", () => {
     expect((await as("ops").post("/attendance/export", { from: "2026-10-01", to: "2026-10-05" })).status).toBe(200);
 
     // After commit the outbox builds each workbook, keeps it restricted in the vault and mails it.
-    const queues = require("../../src/jobs/queues");
-    const mails = [];
-    const spy = jest.spyOn(queues, "enqueue").mockImplementation(async (queue, name, data) => {
-      mails.push({ queue, name, data });
-      return { id: String(mails.length) };
-    });
     await drain();
-    spy.mockRestore();
     const docs = await q("SELECT sensitivity, title FROM document WHERE doc_type = 'attendance_export' ORDER BY title", []);
     expect(docs.rows).toEqual([
       { sensitivity: "restricted", title: "Attendance Register export" },
       { sensitivity: "restricted", title: "My Attendance export" },
     ]);
-    const sentOut = mails.filter((m) => m.name === "attendance-export");
+    const sentOut = sent.filter((m) => m.name === "attendance-export");
     expect(sentOut.map((m) => m.data.to.email).sort()).toEqual(["manager@mycity.test", "ops@mycity.test"]);
     expect(sentOut.find((m) => m.data.to.email === "ops@mycity.test").data.data).toMatchObject({ title: "Attendance Register", capped: false });
     expect(sentOut.every((m) => m.data.attachments.length === 1)).toBe(true);
