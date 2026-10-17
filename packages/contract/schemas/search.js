@@ -19,9 +19,14 @@ const SearchKind = z.enum(["screen", "action", "record"]);
 
 /**
  * What the app does itself when an action is chosen, instead of opening `link`:
- * `clock` opens Clock In or Out, `read_all` marks every notification read.
+ *   clock        opens Clock In or Out
+ *   read_all     marks every notification read
+ *   theme_dark   the dark theme;  theme_light  the light theme
+ *   density      Compact or Comfortable, whichever is not on
+ *   install      installs the app (offered only where the browser can)
+ *   sign_out     signs out
  */
-const SearchRun = z.enum(["clock", "read_all"]);
+const SearchRun = z.enum(["clock", "read_all", "theme_dark", "theme_light", "density", "install", "sign_out"]);
 
 /** GET /search: `type` keeps one group, to page through it. */
 const SearchQuery = listQuery({

@@ -12,7 +12,7 @@ export default function People({ tab, id }: ModuleScreenProps) {
     case "employees":
       return id ? <Employee360 id={id} /> : <Employees />;
     case "organogram":
-      return <OrgTree mode="builder" />;
+      return <OrgTree mode="builder" openId={id} />;
     case "attendance":
       return <PeopleAttendance />;
     case "leave":

@@ -235,12 +235,11 @@ async function saveSteps(actor, id, { stages }) {
  * My Approvals
  * ------------------------------------------------------------------ */
 
-async function mine(user, query) {
-  const [roleCodes, modules] = await Promise.all([
-    approvers.roleCodesOf(pool, user.role_ids || []),
-    approveModules(user),
-  ]);
-  const page = await repo.waiting(pool, user, roleCodes, modules, query);
+/** My Approvals; `client` is the caller's when it reads inside its own transaction (⌘K). */
+async function mine(user, query, client = pool) {
+  const roleCodes = await approvers.roleCodesOf(client, user.role_ids || []);
+  const modules = await approveModules(user);
+  const page = await repo.waiting(client, user, roleCodes, modules, query);
   return {
     ...page,
     data: page.data.map(({ stages, ...r }) => {

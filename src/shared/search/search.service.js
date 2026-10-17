@@ -26,6 +26,10 @@
  * Type words. "staff ada" or "ada staff": a word a provider declares (`words`) at
  * either end narrows the search to that type and searches the rest. A term that is
  * only the word is a search for the page, which the app's own registry answers.
+ *
+ * Beyond recordProvider, a provider may answer an empty line (`empty: true`: what waits on
+ * the reader), ask to come first (`pinned: true`), and read the reader themselves (`user`
+ * is passed to its search), for a list that is the reader's own rather than a table's.
  */
 const { logger } = require("../../config/logger");
 const { atomically } = require("../db/tx");
@@ -90,16 +94,17 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
     term = hint.term;
   }
   const out = { q: term, hint: hint ? hint.type : null, groups: [] };
-  if (term.length < MIN_TERM) return out;
+  // Nothing typed: only the providers that answer an empty line (what waits on the reader).
+  const blank = term === "";
+  if (!blank && term.length < MIN_TERM) return out;
+  const candidates = all.filter((p) => (!blank || p.empty === true) && (!wanted || wanted.has(p.type)));
 
   const scopes = new Map();
-  for (const module of new Set(all.map((p) => p.module))) {
+  for (const module of new Set(candidates.map((p) => p.module))) {
     const s = await scopeFor(user, module, "view");
     if (s) scopes.set(module, s);
   }
-  const run = all.filter(
-    (p) => scopes.has(p.module) && (!wanted || wanted.has(p.type)),
-  );
+  const run = candidates.filter((p) => scopes.has(p.module));
   if (run.length === 0) return out;
 
   const client = await db.connect();
@@ -117,6 +122,7 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
             page,
             fuzzy,
             scope: scopes.get(p.module),
+            user,
           });
           await client.query("RELEASE SAVEPOINT search_provider");
           if (r.items.length)
@@ -157,10 +163,35 @@ function fold(value) {
     .trim();
 }
 
+/** One edit apart, or the same: a letter added, dropped or changed, or two letters swapped. */
+function withinOne(a, b) {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+  if (a.length === b.length) {
+    if (a.slice(i + 1) === b.slice(i + 1)) return true;
+    return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2);
+  }
+  const [long, short] = a.length > b.length ? [a, b] : [b, a];
+  return long.slice(i + 1) === short.slice(i);
+}
+
+/**
+ * Does a typed word (four letters or more) sit one slip from a word of the text, or from
+ * its start? "payslp" finds Payslips, "organsation" Organisation, "aproval" Approvals.
+ */
+function nearWord(part, text) {
+  if (part.length < 4) return false;
+  return text
+    .split(" ")
+    .some((w) => withinOne(part, w) || withinOne(part, w.slice(0, part.length)) || withinOne(part, w.slice(0, part.length + 1)));
+}
+
 /**
  * How well an entry answers the term: 0 (not at all) to 5 (its name). Every word typed
  * must appear in the name, a synonym or the module's name; the name beats a synonym,
- * and a start beats a middle.
+ * and a start beats a middle. A word one slip from those still counts, last of all.
  * @param {{title: string, words: readonly string[], context: string}} entry
  * @param {string} term  folded
  */
@@ -169,7 +200,10 @@ function rankOf(entry, term) {
   const title = fold(entry.title);
   const words = entry.words.map(fold);
   const hay = [title, ...words, fold(entry.context)];
-  if (!term.split(" ").every((part) => hay.some((h) => h.includes(part)))) return 0;
+  const parts = term.split(" ");
+  if (!parts.every((part) => hay.some((h) => h.includes(part)))) {
+    return parts.every((part) => hay.some((h) => h.includes(part) || nearWord(part, h))) ? 0.5 : 0;
+  }
   if (title === term) return 5;
   if (title.startsWith(term)) return 4;
   if (words.includes(term)) return 3;
@@ -292,6 +326,17 @@ async function everything(db, user, { q = "", type = null, page = 1 } = {}) {
       ? { q: line, hint: null, groups: [] }
       : await search(db, user, { q: line, types: type ? [type] : null, page });
   const groups = [];
+  // A provider marked pinned (what waits on the reader) comes before the screens.
+  const pinned = new Set(registry.providers().filter((p) => p.pinned === true).map((p) => p.type));
+  const recordGroup = (g) => ({
+    kind: "record",
+    type: g.type,
+    label: g.label,
+    module: g.module,
+    page: g.page,
+    items: g.items.map((item) => ({ ...item, title: item.title || item.ref || item.id, kind: "record", run: null })),
+  });
+  for (const g of records.groups) if (pinned.has(g.type)) groups.push(recordGroup(g));
   if (!type || type === "screen" || type === "action") {
     // The whole line: a type word narrows the records, never the screens and actions
     // ("staff sheet" is Import Staff as well as imports of a staff sheet).
@@ -308,17 +353,8 @@ async function everything(db, user, { q = "", type = null, page = 1 } = {}) {
         groups.push({ kind, type: kind, label, module: null, page: result.page, items: result.data });
     }
   }
-  for (const g of records.groups) {
-    groups.push({
-      kind: "record",
-      type: g.type,
-      label: g.label,
-      module: g.module,
-      page: g.page,
-      items: g.items.map((item) => ({ ...item, title: item.title || item.ref || item.id, kind: "record", run: null })),
-    });
-  }
+  for (const g of records.groups) if (!pinned.has(g.type)) groups.push(recordGroup(g));
   return { q: records.q, hint: records.hint, groups };
 }
 
-module.exports = { search, everything, readerOf, rankOf, fold, typeHint, trigramReady, MIN_TERM };
+module.exports = { search, everything, readerOf, rankOf, fold, withinOne, nearWord, typeHint, trigramReady, MIN_TERM };

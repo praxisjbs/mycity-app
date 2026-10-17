@@ -32,7 +32,7 @@ const {
   escapeLike,
   dialled,
 } = require("../../../src/shared/search/provider");
-const { typeHint } = require("../../../src/shared/search/search.service");
+const { typeHint, rankOf, fold, withinOne } = require("../../../src/shared/search/search.service");
 const aiCoverage = require("../../../scripts/check/ai-manifest-coverage");
 const searchCoverage = require("../../../scripts/check/search-coverage");
 const noWrites = require("../../../scripts/check/ai-no-writes");
@@ -496,6 +496,17 @@ describe("search providers", () => {
     expect(() => recordProvider({ ...spec, phones: "e.phone" })).toThrow(
       /phones is a list/,
     );
+  });
+
+  test("a screen or an action forgives one slip in a word of four letters or more", () => {
+    const screen = (title, words = []) => ({ title, words, context: "" });
+    for (const [title, typed] of [["My Payslips", "payslp"], ["Organisation", "organsation"], ["Approvals", "apporvals"], ["My Leave", "leve"]])
+      expect(rankOf(screen(title), fold(typed))).toBe(0.5);
+    expect(rankOf(screen("My Leave"), fold("leave"))).toBeGreaterThan(0.5);
+    expect(rankOf(screen("Users"), fold("usr"))).toBe(0);
+    expect(rankOf(screen("Inbox"), fold("xyzq"))).toBe(0);
+    expect(withinOne("form", "from")).toBe(true);
+    expect(withinOne("payslp", "payslips")).toBe(false);
   });
 
   test("a type word at either end narrows the search", () => {

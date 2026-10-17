@@ -8,6 +8,7 @@
  * Tables (migration 0070, 0450): workflow_definition, workflow_instance, workflow_decision.
  */
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
+const { escapeLike } = require("../../shared/search/provider");
 const approvers = require("../../shared/workflow/approvers");
 
 const NAME = (alias) => `NULLIF(btrim(${alias}.first_name || ' ' || ${alias}.last_name), '')`;
@@ -100,10 +101,12 @@ function waitingWhere(user, roleCodes, modules, moduleKey, params) {
      AND ${named}`;
 }
 
-/** My Approvals: oldest waiting first, 25 a page. */
+/** My Approvals: oldest waiting first, 25 a page; `q` finds a flow, the person it is about or who asked. */
 function waiting(client, user, roleCodes, modules, query) {
   const params = [];
   const where = waitingWhere(user, roleCodes, modules, query.module_key, params);
+  params.push(query.q ? `%${escapeLike(query.q)}%` : null);
+  const q = params.length;
   return pageQuery(
     client,
     `SELECT i.workflow_instance_id, i.definition_key, d.name AS definition_name, d.stages, i.module_key,
@@ -117,6 +120,8 @@ function waiting(client, user, roleCodes, modules, query) {
        LEFT JOIN app_user ou ON ou.user_id = i.opened_by
        LEFT JOIN employee oe ON oe.employee_id = ou.employee_id
       WHERE ${where}
+        AND ($${q}::text IS NULL OR search_fold(d.name || ' ' || coalesce(${NAME("se")}, '') || ' ' || coalesce(${NAME("oe")}, ''))
+                                   LIKE search_fold($${q}::text))
       ORDER BY i.stage_entered_at, i.workflow_instance_id`,
     params,
     query,

@@ -9,7 +9,8 @@
  *   ?importer=<key>    Settings, Imports opens its wizard on that importer
  *
  * `run` is for an action with no screen of its own, which the app does itself: Clock In
- * or Out (the clock sheet) and Mark All Read (the bell).
+ * or Out (the clock sheet), Mark All Read (the bell), the theme and density the person
+ * prefers, Install App (the app drops it where the browser cannot install) and Sign Out.
  *
  * Every screen's New action is here: the search coverage gate fails a
  * `useScreenAction({ label })` in the app whose label is not an action below, unless the
@@ -22,7 +23,7 @@
 const routeMap = require("../route-map");
 const catalog = require("../access/access.catalog");
 
-const RUNS = new Set(["clock", "read_all"]);
+const RUNS = new Set(["clock", "read_all", "theme_dark", "theme_light", "density", "install", "sign_out"]);
 
 /**
  * @param {string} key  snake_case, unique
@@ -111,6 +112,31 @@ const ACTIONS = Object.freeze([
     run: "read_all",
     need: null,
     words: ["notifications", "read all", "clear notifications", "bell"],
+  }),
+  a("theme_dark", "Use Dark Theme", {
+    run: "theme_dark",
+    need: null,
+    words: ["dark mode", "dark", "night mode", "theme"],
+  }),
+  a("theme_light", "Use Light Theme", {
+    run: "theme_light",
+    need: null,
+    words: ["light mode", "light", "day mode", "theme"],
+  }),
+  a("density", "Change Density", {
+    run: "density",
+    need: null,
+    words: ["compact", "comfortable", "spacing", "bigger rows", "smaller rows"],
+  }),
+  a("install_app", "Install App", {
+    run: "install",
+    need: null,
+    words: ["install", "add to home screen", "app", "download app"],
+  }),
+  a("sign_out", "Sign Out", {
+    run: "sign_out",
+    need: null,
+    words: ["log out", "logout", "sign off", "exit"],
   }),
 ]);
 

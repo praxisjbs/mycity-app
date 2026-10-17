@@ -131,8 +131,9 @@ employee 360 and ESS · My Profile under their own rules, not here.
   optionally focused on a named person.
 - **Search** (`organisation.search.js`): a person by name, role, staff number, work email or work
   phone reaches their record; the phone is matched however it is typed (0803 123 4567, +234 803...,
-  the last four digits). Words people use include "org chart", "organogram", "structure", "who is my
-  manager", "reporting line".
+  the last four digits) or the name they go by. An open seat is found by its title or department and
+  opens the Organogram focused on it (`?id=` the seat: the phone focuses it, the desktop tree marks it).
+  Words people use include "org chart", "organogram", "structure", "who is my manager", "reporting line".
 
 ## 10 · On screen and mobile
 
@@ -241,6 +242,8 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · §9: open seats are searchable and the Organogram opens focused on one (`?id=`);
+  people are also found by preferred and middle name.
 - 17/10/2026 · TB · §9: a person is also found by their work phone, typed any way. The work phone is
   not a masked field; personal and next-of-kin numbers are, and search never reads them.
 - 17/10/2026 · TB · Built (#92 and #91). §4 and §5 are the API as built: one `OrgNode` shape for a

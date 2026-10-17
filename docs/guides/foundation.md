@@ -355,10 +355,17 @@ As built (17/10/2026):
 - `GET /search` answers in groups, each the first page of 25: **Screens** (every tab of the staff app by
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
   Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
-  Set PIN, Mark All Read), then one group per kind of record from each `<module>.search.js` (Employees,
-  Departments, Users, Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's). With nothing typed it offers the screens and actions; `type`
+  Set PIN, Mark All Read, Use Dark Theme, Use Light Theme, Change Density, Install App, Sign Out), then
+  one group per kind of record from each `<module>.search.js` (Employees, Departments, Open Seats, Users,
+  Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's).
+- **Waiting on You** comes first: the requests waiting on the reader's decision (the My Approvals list),
+  shown with nothing typed and found by flow, subject or requester when typing. A result opens the record
+  the request is about. Its provider answers an empty line (`empty`) and is placed first (`pinned`).
+- Screens and actions forgive one slip in a word of four letters or more ("payslp" finds My Payslips),
+  ranked after every exact match. Records already forgive typos through trigrams. With nothing typed it offers the screens and actions; `type`
   pages through one group.
-- Employees are found by name, staff number, work email, post or work phone. A term made of digits,
+- Employees are found by name (first, last, middle or preferred), staff number, work email, post or
+  work phone; an open seat by its title or department, opening the Organogram focused on it. A term made of digits,
   spaces and + ( ) - (four digits or more) is compared with the phone digit for digit, a leading local
   0 dropped, so 0803 123 4567, +234 803 123 4567 and the last four digits find the same person
   (`phones` in `shared/search/provider.js`). Masked numbers (personal, next of kin) are never searched.
@@ -469,7 +476,7 @@ screen.
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
 | Settings · Audit Log | Today, This Week, This Month, Sensitive; who, what, record, module, when; Module and Dates filters, search; an entry opens its fields before and after with Open Record; Entries by Module; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
 | Settings · Approvals | Flows, Open Requests, Overdue, Needs Fixing; the flows (Flow, Stages, Version, Open Requests, Status); a flow's route and each stage's Approver, Applies When, Time Limit; Edit Stages, then per stage Move Up, Move Down, Edit, Remove, Add Stage, Save Stages; a stage's Stage Name, Approver, Role or Person, Applies When, Comparison and value, Time Limit, Hours | Help term on Applies When | Versioning of open requests, who decides: §6.5 |
-| ⌘K Search | Results grouped Screens, Actions, then each kind of record (Employees, Departments, Users, Roles, Numbering, Holidays, Approval Flows, Imports) | None | The coverage gate: §6.7 |
+| ⌘K Search | Results grouped Waiting on You (first, when anything waits), Screens, Actions, then each kind of record (Employees, Departments, Open Seats, Users, Roles, Numbering, Holidays, Approval Flows, Imports) | None | The coverage gate: §6.7 |
 
 ### 10.2 Phone layout
 
@@ -539,6 +546,9 @@ screen.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · §6.7, §10.1: ⌘K gains Waiting on You (first, with nothing typed), open seats,
+  preferred and middle names, the theme, density, Install App and Sign Out as actions, and one forgiven
+  slip in screens and actions.
 - 17/10/2026 · TB · §6.7: employees are also found by their work phone, typed any way (a `phones`
   option on search providers). §6.7 already promised it; track A's provider lacked the column.
 - 17/10/2026 · TB · Track D built: the `workflow` routes (My Approvals and its count, one request,

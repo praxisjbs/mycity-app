@@ -97,6 +97,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · ⌘K additions (`docs/guides/foundation.md` §6.7): Waiting on You first with nothing
+  typed (the requests waiting on the reader, opening the record each is about), open seats (opening
+  the Organogram focused on the seat), preferred and middle names, Use Dark Theme, Use Light Theme,
+  Change Density, Install App and Sign Out as actions the app runs, and one forgiven slip in screens
+  and actions. Left: nothing.
 - 17/10/2026 · TB · Track D of `docs/guides/foundation.md` built: the `workflow` module's routes (My
   Approvals and `/workflow/mine/count` for Home's Waiting on You, one request with its route and
   decisions, approve, reject and request changes with a reason, withdraw, and reassign from the guide's
