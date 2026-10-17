@@ -360,8 +360,11 @@ The summary:
 - Add the numbering schemes and workflow definitions your milestone introduces in its migration.
 - **Two databases, not two schemas**: `mycity_stg` and `mycity_prod`, separate roles, no
   cross-grants. Staging gets realistic demonstration data from `scripts/db/seed.js --staging`.
-  Production is never seeded. The code reads everything from the database; nothing a screen shows
-  is hard-coded, so the same build shows seeded data on staging and real data on production.
+  Production is never seeded, with one exception: MyCity's own staff list (`seeds/staff/`), which
+  every deploy loads on both environments through the staff importer, as the system
+  (`scripts/db/load-staff.js`; `docs/guides/foundation.md` §6.1). The code reads everything from the
+  database; nothing a screen shows is hard-coded, so the same build shows seeded data on staging and
+  real data on production.
 
 ---
 

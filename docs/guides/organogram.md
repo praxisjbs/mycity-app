@@ -8,8 +8,8 @@
 | Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram tab), `app/src/features/ess/` (Org Chart tab) |
 | Permission key(s) | `people` (builder, manage), `org_chart` (viewer, read for all staff) |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
-| Status | Agreed |
-| Last changed | 16/10/2026 |
+| Status | Built |
+| Last changed | 17/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -63,19 +63,29 @@ The organogram reads one tree and nobody keeps a second copy.
 | `org_seat` (vacant seat) | `title`, `department_id`, `line_manager_id` or `line_manager_seat_id`, `status` (vacant, filled, closed), `filled_by_employee_id` | A seat with no employee. A vacant seat can carry reports: an employee whose manager's post is empty points at it through `employee.line_manager_seat_id` (or `dotted_manager_seat_id` for a dotted line), never at both a person and a seat. Modelled so the line never breaks when a role is unfilled |
 
 Migration file: `migrations/0110_employee_profile.sql` (M0) adds `dotted_manager_id`, the two seat
-links and `org_seat`. The reporting-line foundation itself is M0.
+links and `org_seat`. The reporting-line foundation itself is M0; `migrations/0300_employee_register.sql`
+adds archiving, so a record that leaves the tree keeps its history.
+
+**On the wire** the two kinds of node are one shape (`OrgNode`): `node_id` with `node_kind`
+("employee" or "seat"), the name and post, the department, `manager_node_id`,
+`dotted_manager_node_id` and `dotted_line_to` (the dotted manager's name, ready to draw). A manager
+who is no longer an active node (archived, or left) is dropped from the line, so their former
+reports show as roots the builder flags rather than vanishing (§11).
 
 ## 5 · API
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /api/v1/org-chart` | `OrgChartQuery` to `OrgChartTree` | `people` or `org_chart` · all | see note | Returns the bounded company tree (nodes, solid and dotted edges, vacant seats). Restricted fields are never in the payload for the `org_chart` read |
-| `PATCH /api/v1/employees/:id` | `EmployeeReportingUpdate` | `people` · team/all | n/a | Reassigns `line_manager_id` and/or `dotted_manager_id`. This is the existing employee write path, not a new one |
+| `GET /api/v1/org-chart?view=builder\|viewer` | `OrgChartQuery` to `OrgChartTree` | `ess` view (every member of staff) | no, bounded | The whole company: a node is a person or a vacant seat (`node_id`, `node_kind`), the solid line above it is `manager_node_id` and the dotted one `dotted_manager_node_id`. `view=builder` adds the since and arrangement line; nothing restricted is in the payload for anybody |
+| `PATCH /api/v1/employees/:id/line-manager` | `EmployeeReportingUpdate` | `people` edit · team/all | n/a | Sets `line_manager_id` **or** `line_manager_seat_id`, and the dotted one beside it. A loop, reporting to oneself, and naming both a person and a seat are each refused |
+| `GET /api/v1/org-seats`, `POST /api/v1/org-seats`, `PATCH /api/v1/org-seats/:id` | `OrgSeat*` | `people` view, create, edit | list at 25 | The seats themselves: Add Role on the builder, and the seat a sheet's VACANT row becomes |
 
 A drag on the chart calls the same employee write a form would. Export is client side (no endpoint).
-**Paging note:** a tree must load whole to draw, so the org-chart read is a bounded graph, not a
-25-per-page list. This is in tension with the "25 everywhere" rule (CLAUDE.md step 4); confirm the
-exemption, or a lazy-load-children scheme for very large orgs, with the backend owner (§13).
+**Paging:** a tree must load whole to draw, so the org-chart read is the one bounded read in the
+module: `completeQuery()` with a ceiling of **2,000 nodes** and the `// pagination:complete` marker
+(BACKEND_STRUCTURE §16.3, `docs/guides/foundation.md` §6.6). Past the ceiling it fails loudly rather
+than drawing part of a tree as if it were whole. Settled 17/10/2026; the lazy-load-children scheme
+stays off the table until MyCity is near that size.
 
 ## 6 · Rules and calculations
 
@@ -137,7 +147,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | People · Organogram (`organogram`) | Organogram; the seat count on desktop (12 seats · 11 filled · 1 open); Search, Expand All, Download PDF, Add Role; the legend (Reporting Line, Dotted Line, CEO, Vacant Seat); the whole tree. Each node card carries initials, name, title, the department chip, the since and arrangement line, a dotted-line tag where set, and Create Vacancy on a vacant seat. Node text is data | Help term on the legend's Reporting Line: "Drag a card onto a new manager to change its reporting line." Help term on Dotted Line: "A second manager for matrix work. It does not change who approves leave, expenses or tasks." | That a drag is the same employee write as the form and is audited: §3, §5. That a vacant seat becomes a suggested vacancy in Recruitment: §3. That salary, bank details and phone never show on a card: §6, §8. The subtitle "The live reporting structure … drag a card to reassign" and the footnote paragraph under the tree are removed |
 | ESS · Org Chart (`org-chart`) | Org Chart; the seat count on desktop; Search, Download PDF; the legend; the whole tree with the standard node card (no since and arrangement line; "Open role" on a vacant seat) | Help term on the legend's Dotted Line, the same text as the builder | "Read only", "Every employee sees the whole company here" and the restricted fields never shown: §6, §8. "On a phone this becomes a focus view": §10.2. The subtitle "Who reports to whom across MyCity · read only" and the footnote paragraph are removed |
 | Recruitment · Vacancies (`vacancies`) | Not in the demo yet. The suggested vacancies list: role title, department, reporting line; Create Vacancy | None | That nothing is auto-created from a seat, and the hand-off event: §3, §7 |
-| People · Employees (`employees`) | Employees; 25 staff · 6 departments on desktop; Import, Add Employee; Headcount, Confirmed, On Probation, Attrition, 90 Days; the count per work arrangement; All Employees (employee, department, Line Manager, arrangement, Attendance Today, Employment Status, View Details) with 9 of 25; Headcount by Department; Needs a Decision. A row opens the employee modal: Employment, Attendance and Location; Close, Edit Home, Change Arrangement, Open Full Record. The 360 behind Open Full Record, with Send Invite for those who manage logins (`docs/guides/identity.md`) | On the 360, help term on KPIs This Month: "Weighted to 100%. Progress counts from the tasks linked to each KPI." In Edit Home Geofence, help term on Radius: "Fixed at 100 m for registered and temporary homes. It cannot be changed." | "Select a row for details and actions": the rows carry View Details. "Sensitive home addresses appear only in the authorised details modal": attendance guide §1. "A department is a setting, not a code change": §6. The audit banner in the employee modal, "the change applies from the next punch and is written to the audit log", "the old home is kept in history": §3, attendance guide §3 |
+| People · Employees (`employees`) | Employees; the staff and department count on desktop; Import Staff, Add Employee; Headcount, Confirmed, On Probation, Attrition 90 Days; the count per work pattern; All Employees (employee and job title, number, department, Line Manager, Work Pattern, Status, Login, View Record), 25 a page, sorted by the server; Headcount by Department; Needs a Decision. A row opens the record: Profile, Job, Reporting Line, Login, History, with Edit Record, Archive Record, Send Invite and Change Manager (`docs/guides/foundation.md` §10) | Help term on Invited: what an invited login is. On the record, a masked field shows Restricted behind a help term naming who may see it, and Dotted line carries the matrix help term | "Select a row for details and actions": the rows carry View Record. "A department is a setting, not a code change": §6. Attendance Today, the attendance and location modal and the home-address banner: they return with the attendance routes (attendance guide §1, §3) |
 
 ### 10.2 Phone layout
 
@@ -209,21 +219,37 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
   87 (MILESTONES §18). Needs a recorded decision, then rows in PROGRESS, the summary counts, the
   `SCREENS` constant in `scripts/check/progress.js`, the ⌘K and permission registry. Who signs off,
   by when.
-- **Paging exemption.** Is the org-chart read exempt from the 25-per-page rule as a bounded tree,
-  or do large orgs lazy-load children? Backend owner to confirm (§5).
-- **Permission keys.** Confirm `org_chart` as the all-staff read capability, separate from `people`.
+- ~~**Paging exemption.**~~ Settled 17/10/2026: the tree is one bounded read, `completeQuery()` with
+  a ceiling of 2,000 nodes (§5).
+- ~~**Permission keys.**~~ Settled 17/10/2026: the read takes `ess` view, which every member of
+  staff holds, rather than a key of its own; nothing restricted is in the payload for anybody. A
+  separate `org_chart` key would be a migration against a grant nobody needs (§5, §8).
 - **Owner and milestone.** The builder rides on People · Employees (GE, M0) and the viewer on ESS
   (AJ, M1); the feature is being driven by TB. Confirm the real owner and milestone with the team.
 - **Avatars.** Initials chips to start (the spreadsheet has no photos); real photo upload via the
   upload engine and vault is a later pass. Confirm.
-- **Data cleanup on import.** The spreadsheet's Line Manager is free text and mixes names with
-  roles; a few rows are column-shifted. Agree the cleanup pass before seeding.
+- ~~**Data cleanup on import.**~~ Settled 17/10/2026: the Line Manager cell is read by
+  `src/modules/organisation/manager-text.js` (a name, a name with a post, a post, or a post with a
+  dotted line beside it), resolved to a person or to the seat holding that post, and a cell that
+  matches nothing is a problem on that row, never a guess. The sheet's own DOB and Phone columns are
+  not imported at all (`docs/guides/foundation.md` §6.1).
 - **Seed reporting-line gaps (§12.1).** The sheet does not state who the vacant Head Sales & Revenue
   reports to, and Cynthia Osakunih's line manager is inferred from a column-shifted row. Confirm both
   with People before import.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · Built (#92 and #91). §4 and §5 are the API as built: one `OrgNode` shape for a
+  person and a seat (`node_id`, `node_kind`, `manager_node_id`, `dotted_manager_node_id`), the
+  employee write that moves a line to a person or a seat, and the three `org-seats` routes behind Add
+  Role. The whole-tree read is settled as one bounded `completeQuery()` of 2,000 nodes, and the
+  all-staff read takes `ess` view rather than a key of its own, so §13's paging and permission
+  questions are closed, as is the cleanup pass (the Line Manager cell is read by `manager-text.js`).
+  §10.1 records People · Employees as built, with Attendance Today waiting on LA's attendance
+  routes. The phone focus view of §10.2 is built for both screens, and the legend's two help terms
+  with it. §12.1 is now what the deploy actually loads: the CEO over the CTO and the Program
+  Manager, the back-end line, the PR branch, and the seven marketing people under the vacant Head
+  Sales & Revenue with their dotted line to the Head of PR.
 - 16/10/2026 · TB · §4 names the built tables: `org_seat` for vacant seats, and on `employee` the
   `dotted_manager_id`, `line_manager_seat_id` and `dotted_manager_seat_id` columns
   (`migrations/0110_employee_profile.sql`). A person reports to a person or to a seat, never both.

@@ -69,15 +69,23 @@ export const fold = (s: unknown) =>
 
 /**
  * One page of a list. `search` names the text a row is matched on; `filters`
- * maps a query key to a test. Unknown query keys are refused with a 422 naming
- * the key, as the API's `.strict()` list schemas do.
+ * maps a query key to a test; `sort` maps each field the list's contract
+ * allow-lists to a comparison, so `?sort=-display_name` is answered here and
+ * never by a screen (F20). Unknown query keys, and a sort field the list does
+ * not name, are refused with a 422 naming the key, as the API's `.strict()`
+ * list schemas do.
  */
 export function paged<T>(
   rows: T[],
   req: Req,
-  opts: { search?: (row: T) => unknown[]; filters?: Record<string, (row: T, value: string) => boolean> } = {},
+  opts: {
+    search?: (row: T) => unknown[];
+    filters?: Record<string, (row: T, value: string) => boolean>;
+    sort?: Record<string, (a: T, b: T) => number>;
+  } = {},
 ): RawResponse {
-  const allowed = new Set(["page", "q", ...Object.keys(opts.filters ?? {})]);
+  const sortable = opts.sort ?? {};
+  const allowed = new Set(["page", "q", ...Object.keys(opts.filters ?? {}), ...(Object.keys(sortable).length ? ["sort"] : [])]);
   for (const k of Object.keys(req.query)) {
     if (!allowed.has(k)) return invalid({ [k]: ["is not a filter on this list"] });
   }
@@ -87,6 +95,16 @@ export function paged<T>(
   for (const [k, test] of Object.entries(opts.filters ?? {})) {
     const v = req.query[k];
     if (v !== undefined && v !== "" && v !== "all") out = out.filter((r) => test(r, v));
+  }
+  const asked = req.query.sort;
+  if (asked) {
+    const field = asked.replace(/^-/, "");
+    const compare = sortable[field];
+    if (!compare) return invalid({ sort: ["is not a field this list sorts by"] });
+    out = [...out].sort(asked.startsWith("-") ? (a, b) => compare(b, a) : compare);
+  } else if (Object.keys(sortable).length) {
+    const first = Object.values(sortable)[0];
+    out = [...out].sort(first);
   }
   const size = __CONTRACT_PAGE_SIZE__;
   const n = Math.max(1, Math.min(100000, Number.parseInt(req.query.page ?? "1", 10) || 1));

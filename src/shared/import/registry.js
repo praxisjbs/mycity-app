@@ -33,7 +33,10 @@
  *   find(client, { key, value })               existing record by one match key → { id, values } | null
  *   resolve(client, field, value, ctx)         a reference → id | null
  *   create(client, field, value, ctx)          create a missing referenced record → id   (createMissing)
- *   write(client, values, ctx)                 create or update one row → { id }; ctx.existing tells which
+ *   write(client, values, ctx)                 create or update one row → { id }; ctx.existing tells
+ *                                              which. It may answer { id, action: "none" } when the
+ *                                              module decided the row needed no write, and the batch
+ *                                              then counts the row as unchanged
  *   link(client, id, refs, ctx)                pass 2: set the pass-2 references on a row's record
  *   archive(client, id, ctx)                   revert a create
  *   restore(client, id, before, ctx)           revert an update to its before-snapshot

@@ -90,7 +90,11 @@ templates · `0085` imports · `0090` tokens and secrets · `0095` AI ledger · 
 `0100` shared-layer columns · `0110` employee profile, dotted line, `org_seat` · `0120` foreign key
 indexes · `0130` `error_event.extra` · `0199` code lists, Saturday, staff numbers · `0200` sessions
 (last seen, how opened, device, end reason), credential links for invitations, a role's Home view
-and rank · `0210` `employee.home_address` and `contract_ends_on` · `0220` sign-in methods: two-step
+and rank · `0210` `employee.home_address` and `contract_ends_on` · `0300` the register: archiving
+(`archived_at`, `archive_reason`, `archived` in the status check), `start_date` no longer NOT NULL (a
+joining date MyCity does not hold is absent rather than wrong), and the indexes every allow-listed
+sort, filter and search of the register reads, with a trigram index on name and post ·
+`0349` the `archived` code list · `0220` sign-in methods: two-step
 (`mfa_frequency`, the pending key, the last step used, a browser's trust, `mfa_recovery_code`), the
 PIN and its wrong-try counts, `passkey`, `spent_challenge`, `user_session.reauthenticated_at` and
 `pin_totp` sessions (`docs/guides/identity.md` §4) · `0290` the seven roles and their permission
@@ -98,7 +102,9 @@ matrix (`docs/guides/identity.md` §8).
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
-- The staff importer must advance the `employee` counter past imported staff numbers.
+- ~~The staff importer must advance the `employee` counter past imported staff numbers.~~ Built
+  17/10/2026: `numbering.advanceTo()`, called by the organisation service whenever a staff number
+  arrives with its record, and by the roster loader at the end of a load.
 - Two-step required per role: each person's own two-step is built (`0220`); requiring it by role is M9.
 
 ### M1 Core Operations · 1000 to 1999 · TB (Home), LA (attendance), GE (community, mailbox), AJ (ESS)

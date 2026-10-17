@@ -318,10 +318,17 @@ const moduleOf = (imp) => imp.permission[0];
 
 /**
  * Upload: store the source file, parse it, find the header, map the columns.
+ *
+ * `options` is the importer's own, kept on the batch and handed to every row as
+ * `ctx.options`, so a caller that is not a person can say how the importer should
+ * behave (the staff roster loader asks it to keep what the app already has:
+ * docs/guides/foundation.md §6.1). The Import wizard sends none.
+ *
  * @param {import("pg").PoolClient} client  inside atomically()
- * @param {{importer_key: string, file: {buffer: Buffer, originalname: string}, actor: object}} opts
+ * @param {{importer_key: string, file: {buffer: Buffer, originalname: string}, actor: object,
+ *          options?: object}} opts
  */
-async function createBatch(client, { importer_key: key, file, actor }) {
+async function createBatch(client, { importer_key: key, file, actor, options = {} }) {
   if (!inTransaction(client))
     throw new Error("import.createBatch must run inside atomically()");
   const imp = importerOf(key);
@@ -376,7 +383,7 @@ async function createBatch(client, { importer_key: key, file, actor }) {
   const { rows } = await client.query(
     `INSERT INTO import_batch
        (import_batch_id, number, importer_key, document_id, file_name, sheet, header_row, mapping, options, status, stats, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, '{}'::jsonb, $9, $10::jsonb, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $12::jsonb, $9, $10::jsonb, $11)
      RETURNING ${BATCH_COLUMNS}`,
     [
       id,
@@ -395,6 +402,7 @@ async function createBatch(client, { importer_key: key, file, actor }) {
         profile_applied: Boolean(profile),
       }),
       actor ? actor.user_id : null,
+      JSON.stringify(options || {}),
     ],
   );
   await emit(client, {
@@ -645,6 +653,15 @@ async function processRows(client, imp, rows, ctx) {
       continue;
     }
     row.target_id = String(res.out.id);
+    // The module's service may answer that the row needed no write after all (it keeps
+    // what a person edited on screen). The batch then reports it as unchanged, not as an
+    // update that did nothing.
+    if (res.out.action === "none") {
+      row.action = "none";
+      row.diff = null;
+      row.status = row.problems.length ? "warning" : "unchanged";
+      continue;
+    }
     if (row.problems.length) row.status = "warning";
   }
 

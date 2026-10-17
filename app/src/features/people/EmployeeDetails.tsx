@@ -5,8 +5,18 @@ import "@/api/types/attendance";
 import { hrefFor, useRouter } from "@/lib/router";
 import { Banner, Button, Card, CardHeader, ChoiceField, ErrorState, Field, formatDate, FormFooter, Grid, KeyValue, LoadingRows, Pill, SelectField, TextField, Timeline, toast, useModal } from "@mycity/ui";
 import { toTrail } from "@/features/shared/wire";
+import { employmentStatus } from "./status";
 
-/** The details modal from the Employees list: employment, and attendance and location (HR only). */
+/**
+ * Employment, attendance and location for one person: the quick look People had from the
+ * register before the register moved onto the real API (#24).
+ *
+ * **Nothing links to it today.** Everything it shows beyond the employment card comes
+ * from the attendance module's routes (`docs/guides/attendance.md`), which are LA's M1
+ * work and still answer on the in-browser mock, so the register opens the employee
+ * record instead. It comes back, from the record, when those routes land; the pieces
+ * below (the arrangement form and the attendance setup card) are what it will use.
+ */
 export function EmployeeDetails({ id, close }: { id: string; close: () => void }) {
   const e = useApi("GET /api/v1/employees/:id", { params: { id } });
   const s = useApi("GET /api/v1/attendance/setup/:employee_id", { params: { employee_id: id } });
@@ -21,7 +31,7 @@ export function EmployeeDetails({ id, close }: { id: string; close: () => void }
       <Banner tone="info" icon="lock">Home-address details are visible to authorised People users and are recorded in the audit trail when opened.</Banner>
       <Grid cols={2} className="mb-0">
         <Card>
-          <CardHeader title="Employment" right={<Pill tone={x.status.tone}>{x.status.text}</Pill>} />
+          <CardHeader title="Employment" right={<Pill tone={employmentStatus(x).tone}>{employmentStatus(x).text}</Pill>} />
           <KeyValue items={[["Employee", `${x.display_name} · ${x.job_title}`], ["Department", x.department], ["Line manager", x.line_manager?.display_name ?? "None"], ["Work arrangement", a.arrangement], ["Primary location", a.primary_location], ["Assigned office", a.office]]} />
         </Card>
         <Card>

@@ -181,6 +181,14 @@ Business choices are entered by MyCity on the screen that owns them, or loaded t
 engine, on staging and production alike. Demonstration data belongs in `seeds/staging/` (JavaScript,
 through services, never on production; `scripts/db/seed.js` refuses there).
 
+**The one thing production is loaded with** is MyCity's own staff list, and it is not a reference
+seed: `seeds/staff/staff-list.xlsx` and `roles.json` go through the staff importer, as the system,
+on every deploy to staging and to production (`scripts/db/load-staff.js`, run by
+`scripts/deploy/deploy-gate` after the migrations). A26 still holds here: `seeds/reference/` carries
+no people, and nothing about a person is in SQL. The loader is idempotent, it sends no email, a row
+it cannot write is reported in the deploy log and in Imports history, and an edit made in the app is
+never written over (TB, 16/10/2026; `docs/guides/foundation.md` §6.1).
+
 Rules for every reference seed:
 
 - `INSERT ... ON CONFLICT (<natural key>) DO UPDATE` (or `DO NOTHING`), so it re-runs cleanly

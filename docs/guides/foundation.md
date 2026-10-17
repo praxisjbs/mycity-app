@@ -9,7 +9,7 @@
 | Permission key(s) | `people`, `settings`, `ess` (own records) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 16/10/2026 |
+| Last changed | 17/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -71,9 +71,9 @@ These finish M0 and no prompt can do them:
 
 | Screen | Where | Who | Track | Today | After |
 |---|---|---|---|---|---|
-| People · Employees (#24) | Staff app | `people` view; add, edit, archive with create, edit, delete | A | Mock | Real API: list at 25 with search and filters, the employee's record with tabs, Add, Edit, Archive, Send Invite, Import Staff |
-| Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | Mock | Profile, job, reporting line, documents, login, history on the real API |
-| Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | Mock | As `organogram.md` describes, on the real API |
+| People · Employees (#24) | Staff app | `people` view; add, edit, archive with create, edit, delete | A | **Built** (17/10/2026) | Real API: list at 25 with search, filters and server sort, the record with tabs, Add, Edit, Archive, Restore, Send Invite, Import Staff |
+| Employee record (360) | People · Employees, opened from a row | `people` view, field masks apply | A | **Built** (17/10/2026) | Profile, job, reporting line, login and history on the real API; Documents arrives with track B |
+| Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | **Built** (17/10/2026) | As `organogram.md` describes, on the real API, with the phone focus view |
 | Settings · Imports (new screen: the wizard and history) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | None | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | Mock | Their documents, upload where allowed, download |
 | Settings · Organisation (#69) | Settings | `settings` view, edit | C | Mock | Organisation profile, working week, holidays |
@@ -201,7 +201,21 @@ versions (BACKEND_STRUCTURE §5); `GET /ess/documents`, `POST /ess/documents` (o
 - FTE is `full_time`; Remote and Hybrid are `remote` and `hybrid`. The working hours column (Monday
   to Friday 09:00 to 17:00, Saturday 09:00 to 15:00) is the organisation's working week (A22), set by
   track C, not per person.
-- A person with no staff ID gets one from `numbering.allocate()`.
+- A person with no staff ID gets one from `numbering.allocate()`, and the counter is moved past
+  every number the sheet brought (`numbering.advanceTo()`), so the next person added on screen
+  cannot be given one that is taken.
+- **A column the whole sheet gets wrong is not imported**, and the deploy log says why. MyCity's own
+  sheet holds a day and month with no year under DOB, and the same placeholder under Phone, in every
+  row: mapping either would fail every row instead of loading the person. A column with one good
+  cell among bad ones is imported, and its bad cells are row problems as usual. Work Hours and S/N
+  are not fields of a person at all (the working week is one organisation setting, A22).
+- The loader asks the import engine for two things no person asks for, as batch options: **keep what
+  the app already has** (an existing person is left exactly as People hold them, and the reporting
+  line is filled only where it is empty), and **the work email `roles.json` gives a post** whose
+  sheet cell is blank. The Import wizard sets neither.
+- **A deploy that changes no file changes no record.** The loader keeps the sheet's checksum on its
+  batch; a later deploy with the same sheet checks the logins and stops. A corrected sheet loads
+  again, adding what is new and leaving the rest alone.
 
 ### 6.2 Staging demonstration data
 
@@ -282,8 +296,8 @@ and actions (D), and the gate in §6.7.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| People · Employees | Staff list: name, staff number, job title, department, line manager, work pattern, status, login; Add Employee, Import Staff, filters | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here |
-| Employee record | Profile, job, reporting line, login state with Send Invite, documents, history; Edit, Archive | Masked fields show Restricted with a help term naming who may see them | Field mask rules: §6.3, §8 |
+| People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
+| Employee record | Profile, Job, Reporting Line, Login and History as tabs (Documents with track B); the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Import Staff | Steps Upload, Map, Preview, Commit; counts to create, update, skip, errors; Download Errors, Revert | Help term on Unchanged | The two-pass manager matching: §6.1, BACKEND_STRUCTURE §9.4 |
 | Settings · Roles & Permissions | Roles, the grants matrix, field visibility, capabilities; Save | Help term on scope (all, team, own) | Grants cache and security events: §7 |
 | Settings · Security | Session length, idle lock, password minimum, two-step by role, failed sign-ins, sessions; Save, End Session | Help term naming the floor a rule cannot go below | Why `.env` is the floor: §6.4 |
@@ -327,6 +341,9 @@ and actions (D), and the gate in §6.7.
 
 ## 13 · Open questions
 
+- Attendance Today on the register, and the attendance and location modal a row used to open: both
+  wait on LA's attendance routes (M1). The screen pieces are kept in
+  `app/src/features/people/EmployeeDetails.tsx` and nothing links to them until then.
 - The leave flow's day threshold for the second stage: Operations & People decide on screen; the
   seed sets 5 days until they do.
 - Home's Waiting on You card: D provides the count; Home wires it when its API lands (TB, M1).
@@ -334,6 +351,16 @@ and actions (D), and the gate in §6.7.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · Track A built: the `organisation` module on the real API (the register, the
+  employee 360, departments, vacant seats, reporting lines and the bounded tree), the staff importer,
+  the roster loader that every deploy runs on staging and production, the staging seed, and People ·
+  Employees (#24) with Org Chart (#91) and Organogram (#92). §2 marks the three screens built; §6.1
+  gains the three things the sheet itself taught us (a column the whole sheet gets wrong is not
+  imported, the two batch options only the loader sets, and a deploy that changes no file changes no
+  record); §10.1 lists the register and the record as built; §13 records that Attendance Today waits
+  on LA's attendance routes. Three additive changes outside the module, each in the PR: the import
+  engine takes batch `options` and honours a service that answers "nothing to write",
+  `numbering.advanceTo()`, and `blank()` in the contract for an optional field a form leaves empty.
 - 16/10/2026 · TB · The staff importer moved to track A with the roster loader, so A and B meet only
   at the import engine; Settings · Imports holds the wizard and history.
 - 16/10/2026 · TB · First version: the remaining M0 and foundation work in four tracks, with TB's
