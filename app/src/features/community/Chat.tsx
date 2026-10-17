@@ -4,11 +4,11 @@ import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
 import type { Message, MessageCreate } from "@/api/types/community";
 import type { PageMeta } from "@/api/types/common";
-import { Button, cn, Field, formatDate, FormFooter, Icon, IconButton, InlineInput, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useModal, type MenuItem } from "@mycity/ui";
+import { Button, cn, Field, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
 import { Post } from "./Posts";
 
 /** A list row: a channel or a person. */
-export function Row({ on, unread, lead, title, sub, when, count, onClick }: { on: boolean; unread: boolean; lead: ReactNode; title: ReactNode; sub: string; when: string; count: number; onClick: () => void }) {
+export function Row({ on, unread, lead, title, sub, when, count, onClick, pinned, muted }: { on: boolean; unread: boolean; lead: ReactNode; title: ReactNode; sub: string; when: string; count: number; onClick: () => void; pinned?: boolean; muted?: boolean }) {
   return (
     <button type="button" data-copy="content" onClick={onClick} aria-current={on || undefined} className={cn("flex w-full items-center gap-2.5 rounded-box px-2 py-2 text-left max-md:min-h-11", on ? "bg-muted bar-selected" : "hover:bg-muted")}>
       {lead}
@@ -18,7 +18,11 @@ export function Row({ on, unread, lead, title, sub, when, count, onClick }: { on
       </span>
       <span className="flex flex-none flex-col items-end gap-0.5">
         <em className={cn("text-2xs not-italic", unread ? "font-strong text-accent-foreground" : "text-subtle-foreground")}>{when}</em>
-        {count > 0 && <i className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-primary px-1 text-2xs font-bold text-primary-foreground not-italic">{count}</i>}
+        <span className="flex items-center gap-1 text-subtle-foreground">
+          {muted && <Icon name="muted" className="size-3.5" label="Muted" />}
+          {pinned && <Icon name="pinned" className="size-3.5" label="Pinned" />}
+          {count > 0 && <i className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-primary px-1 text-2xs font-bold text-primary-foreground not-italic">{count}</i>}
+        </span>
       </span>
     </button>
   );
@@ -284,6 +288,7 @@ const MAX_VOICE_S = 300;
 /** The composer for a channel or a conversation, with voice notes in both. */
 export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { placeholder: string; onSend: (b: MessageCreate) => Promise<void>; onVoice: (file: File, seconds: number) => Promise<void>; plus?: (cls: string) => ReactNode; readOnly?: string }) {
   const [text, setText] = useState("");
+  const phone = useIsMobile();
   const [rec, setRec] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -360,7 +365,7 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
     // eslint-disable-next-line react-hooks/exhaustive-deps -- stop reads the latest recording when the cap is reached
   }, [rec]);
 
-  const base = "flex flex-none items-center gap-2 border-t border-border bg-card px-3 py-2.5 max-md:px-2 max-md:pb-safe-2";
+  const base = "flex flex-none items-end gap-2 border-t border-border bg-card px-3 py-2.5 max-md:px-2 max-md:pb-safe-2";
   const cbtn = "flex size-10 flex-none items-center justify-center rounded-full border border-input bg-background text-muted-foreground hover:bg-muted";
   if (readOnly) return <div className={base}><span className="flex flex-1 items-center gap-2 text-xs text-subtle-foreground"><Icon name="lock" />{readOnly}</span></div>;
   if (rec != null)
@@ -378,14 +383,15 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
   return (
     <div className={base}>
       {plus?.(cbtn)}
-      <InlineInput
-        className="h-10 min-w-0 flex-1 rounded-full border border-input bg-muted px-3.5 outline-none focus:border-ring"
+      {/* Desktop: Enter sends, Shift+Enter starts a new line. A phone keeps Enter for a new line and sends with Send, as WhatsApp does. */}
+      <InlineTextArea
+        className="min-h-10 min-w-0 flex-1 resize-none rounded-card border border-input bg-muted px-3.5 py-2 leading-normal outline-none focus:border-ring"
         placeholder={placeholder}
         aria-label="Message"
         autoComplete="off"
         value={text}
         onChange={setText}
-        onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), void send())}
+        onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !phone && (e.preventDefault(), void send())}
       />
       {!text && <button type="button" className={cbtn} aria-label="Record a voice note" disabled={busy} onClick={() => void start()}><Icon name="mic" /></button>}
       <button type="button" disabled={busy} className={cn(cbtn, "on-primary border-primary bg-primary text-primary-foreground hover:bg-primary")} aria-label="Send" onClick={() => void send()}>

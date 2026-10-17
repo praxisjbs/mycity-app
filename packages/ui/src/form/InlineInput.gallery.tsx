@@ -1,10 +1,15 @@
 import { useState } from "react";
 import type { GalleryEntry } from "../testing/gallery";
-import { InlineInput, InlineLabel, InlineSelect } from "./InlineInput";
+import { InlineInput, InlineLabel, InlineSelect, InlineTextArea } from "./InlineInput";
 
 function Message() {
   const [v, setV] = useState("");
   return <InlineInput aria-label="Message" placeholder="Message" value={v} onChange={setV} className="h-control w-full rounded-full border border-input bg-background px-3" />;
+}
+
+function Lines() {
+  const [v, setV] = useState("Venue walk at 4\nBring the shot list");
+  return <InlineTextArea aria-label="Message" placeholder="Message" value={v} onChange={setV} className="w-full resize-none rounded-card border border-input bg-background px-3.5 py-2" />;
 }
 
 function Row() {
@@ -24,5 +29,6 @@ export default {
   states: {
     "Message Box": () => <Message />,
     "Composer Row": () => <Row />,
+    "Message Lines": () => <Lines />,
   },
 } satisfies GalleryEntry;

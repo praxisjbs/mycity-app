@@ -170,7 +170,7 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
       <div className="max-w-152 rounded-card border border-border bg-background px-3.5 py-3">
         <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground"><Icon name="flag" />{m.author?.display_name} · {formatDate(m.sent_at)}</div>
         <h3 data-copy="content" className="text-base"><Hl text={m.announcement?.title ?? ""} q={q} /></h3>
-        <p className="mt-1 text-sm leading-normal text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
+        <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
       </div>
     );
   }
@@ -206,7 +206,7 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
           </span>
           {menu}
         </div>
-        <div className={cn("px-3 py-2 text-sm leading-normal wrap-any", m.mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground")}>
+        <div className={cn("px-3 py-2 text-sm leading-normal whitespace-pre-wrap wrap-any", m.mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground")}>
           {inner}
         </div>
       </div>

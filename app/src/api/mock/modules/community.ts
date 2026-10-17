@@ -98,6 +98,8 @@ interface Chan {
   channel_type: Channel["channel_type"];
   post_policy: Channel["post_policy"];
   pinned: boolean;
+  /** Each person's own pin, as the time they pinned it. */
+  pins: Map<string, string>;
   members: string[];
   admins: string[];
   muted: Set<string>;
@@ -106,7 +108,7 @@ interface Chan {
 }
 const everyone = PEOPLE.map((p) => p.user_key);
 const chan0 = (name: string, members: string[], msgs: MMsg[], over: Partial<Chan> = {}): Chan => {
-  const c: Chan = { community_channel_id: sid(`ch:${name}`), name, description: null, channel_type: "group", post_policy: "everyone", pinned: false, members, admins: [members[0]], muted: new Set(), unread: {}, msgs, ...over };
+  const c: Chan = { community_channel_id: sid(`ch:${name}`), name, description: null, channel_type: "group", post_policy: "everyone", pinned: false, pins: new Map(), members, admins: [members[0]], muted: new Set(), unread: {}, msgs, ...over };
   for (const m of c.msgs) m.community_channel_id = c.community_channel_id;
   return c;
 };
@@ -241,7 +243,8 @@ function channelOut(c: Chan, user: string): Channel {
     description: c.description,
     channel_type: c.channel_type,
     post_policy: c.post_policy,
-    pinned: c.pinned,
+    pinned: c.pinned || c.pins.has(user),
+    pin_locked: c.pinned,
     members: c.members.length,
     can_post: canPost(c, user),
     is_admin: c.admins.includes(user),
@@ -264,6 +267,7 @@ function conversationOut(c: Chan, user: string): Conversation {
     is_self: other === user,
     online: ONLINE.has(other),
     last_seen_at: ONLINE.has(other) ? null : at(1, "21:14"),
+    pinned: c.pins.has(user),
     muted: c.muted.has(user),
     unread: c.unread[user] ?? 0,
     last_text: lineOf(last),
@@ -281,8 +285,8 @@ const usersOf = (employeeIds: unknown, departmentIds: unknown) => {
 route("GET /api/v1/community/channels", (req) =>
   paged(
     CHANNELS.filter((c) => c.channel_type !== "direct" && isMember(c, req.user!))
-      .map((c) => channelOut(c, req.user!))
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || String(b.last_at).localeCompare(String(a.last_at))),
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || String(b.pins.get(req.user!) ?? "").localeCompare(String(a.pins.get(req.user!) ?? "")) || String(b.msgs.at(-1)?.sent_at).localeCompare(String(a.msgs.at(-1)?.sent_at)))
+      .map((c) => channelOut(c, req.user!)),
     req,
     { search: (c) => [c.name] },
   ),
@@ -342,6 +346,17 @@ route("POST /api/v1/community/channels/:id/mute", (req) => {
   if (!isMember(c, req.user!)) return notFound();
   if (req.body.muted) c!.muted.add(req.user!);
   else c!.muted.delete(req.user!);
+  return noContent();
+});
+route("PUT /api/v1/community/channels/:id/pin", (req) => {
+  const c = chan(req.params.id);
+  if (!isMember(c, req.user!)) return notFound();
+  if (c!.pinned) return fail(422, "ALWAYS_PINNED", "This channel is pinned for everyone");
+  if (!req.body.pinned) c!.pins.delete(req.user!);
+  else if (!c!.pins.has(req.user!)) {
+    if (CHANNELS.filter((x) => x.pins.has(req.user!)).length >= 3) return fail(409, "PIN_LIMIT", "Unpin one first");
+    c!.pins.set(req.user!, new Date().toISOString());
+  }
   return noContent();
 });
 route("POST /api/v1/community/channels/:id/read", (req) => {
@@ -482,8 +497,8 @@ route("POST /api/v1/community/messages/:id/transcript", async (req) => {
 route("GET /api/v1/community/direct", (req) =>
   paged(
     CHANNELS.filter((c) => c.channel_type === "direct" && isMember(c, req.user!) && c.msgs.length > 0)
-      .map((c) => conversationOut(c, req.user!))
-      .sort((a, b) => String(b.last_at).localeCompare(String(a.last_at))),
+      .sort((a, b) => String(b.pins.get(req.user!) ?? "").localeCompare(String(a.pins.get(req.user!) ?? "")) || String(b.msgs.at(-1)?.sent_at).localeCompare(String(a.msgs.at(-1)?.sent_at)))
+      .map((c) => conversationOut(c, req.user!)),
     req,
     { search: (d) => [d.person.display_name], filters: { unread: (d, v) => (v === "true" ? d.unread > 0 : true) } },
   ),

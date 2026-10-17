@@ -403,6 +403,44 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("bola").post("/community/recognitions").send({ to_employee_id: people.bola.employee.employee_id })).status).toBe(422);
   });
 
+  test("pinning is each person's own, at most 3, under the two company channels; muting stays per person", async () => {
+    const names = ["pin-a", "pin-b", "pin-c", "pin-d"];
+    const ids = {};
+    for (const name of names) ids[name] = (await as("tunde").post("/community/channels").send({ name, member_ids: [people.bola.employee.employee_id] })).body.community_channel_id;
+    const pin = (who, id, pinned = true) => as(who).put(`/community/channels/${id}/pin`).send({ pinned });
+
+    for (const name of ["pin-a", "pin-b", "pin-c"]) expect((await pin("bola", ids[name])).status).toBe(204);
+    const full = await pin("bola", ids["pin-d"]);
+    expect(full.status).toBe(409);
+    expect(full.body.error.code).toBe("PIN_LIMIT");
+
+    const list = await channelsOf("bola");
+    expect(list.slice(2, 5).map((c) => c.name)).toEqual(["pin-c", "pin-b", "pin-a"]);
+    expect(list.filter((c) => c.pin_locked).map((c) => c.name).sort()).toEqual(["announcements", "general"]);
+    expect(list.filter((c) => c.pinned && !c.pin_locked).map((c) => c.name)).toEqual(["pin-c", "pin-b", "pin-a"]);
+    // Tunde pinned nothing: Bola's pins are Bola's.
+    expect((await channelsOf("tunde")).filter((c) => c.pinned && !c.pin_locked)).toEqual([]);
+
+    // The company channels stay pinned for everyone.
+    const g = await general("bola");
+    expect((await pin("bola", g.community_channel_id, false)).status).toBe(422);
+
+    // Unpin one, and a direct conversation can take the place.
+    expect((await pin("bola", ids["pin-a"], false)).status).toBe(204);
+    const dm = await as("bola").post("/community/direct").send({ employee_id: people.tunde.employee.employee_id });
+    expect((await pin("bola", dm.body.community_channel_id)).status).toBe(204);
+    const convs = await as("bola").get("/community/direct");
+    expect(convs.body.data[0]).toMatchObject({ community_channel_id: dm.body.community_channel_id, pinned: true });
+
+    // Muting is per person too.
+    expect((await as("bola").post(`/community/channels/${ids["pin-b"]}/mute`).send({ muted: true })).status).toBe(204);
+    expect((await channelsOf("bola")).find((c) => c.name === "pin-b").muted).toBe(true);
+    expect((await channelsOf("tunde")).find((c) => c.name === "pin-b").muted).toBe(false);
+    // And it can be undone: a channel muted for good must read as muted, or the screen could never unmute it.
+    expect((await as("bola").post(`/community/channels/${ids["pin-b"]}/mute`).send({ muted: false })).status).toBe(204);
+    expect((await channelsOf("bola")).find((c) => c.name === "pin-b").muted).toBe(false);
+  });
+
   test("direct messages: one conversation per pair, ticks from sent to delivered to read, private to the two", async () => {
     const opened = await as("bola").post("/community/direct").send({ employee_id: people.tunde.employee.employee_id });
     expect(opened.status).toBe(200);

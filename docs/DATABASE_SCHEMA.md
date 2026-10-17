@@ -123,7 +123,8 @@ seed · `1100` `home_alert` columns the alerts code writes · `1110` community: 
 and system channels, delivered pointer, the wider message kinds, transcripts, poll votes,
 presence, `announcement_read` and the announcement's message, audience size and reminder · `1120`
 mailbox: connection status and errors, folder kinds and sync cursor, thread keys, the reader's
-message fields, `mail_draft` and `mail_send_queue` · `1130` an announcement can be `cancelled`.
+message fields, `mail_draft` and `mail_send_queue` · `1130` an announcement can be `cancelled` · `1140` each member's own pin
+(`community_member.pinned_at`).
 
 **Owes:**
 - Attendance (attendance.md §4): employee home location, field assignment, location requests

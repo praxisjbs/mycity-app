@@ -80,7 +80,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot. | stable |
-| Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel` | Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
+| Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
@@ -2308,8 +2308,8 @@ Unstyled controls for a field built into a larger widget: the chat message box, 
 | Phone | The caller's widget decides its size; keep 16 px text so iOS never zooms. |
 | Accessibility | Every one needs a visible label or an aria-label; InlineLabel gives a widget a label it lays out itself. |
 | Status | stable |
-| Exports | `InlineInput`, `InlineSelect`, `InlineLabel` |
-| Import | `import { InlineInput, InlineSelect, InlineLabel } from "@mycity/ui";` |
+| Exports | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` |
+| Import | `import { InlineInput, InlineSelect, InlineLabel, InlineTextArea } from "@mycity/ui";` |
 | File | `packages/ui/src/form/InlineInput.tsx` |
 | Test | `packages/ui/src/form/InlineInput.test.tsx` |
 | Gallery | `packages/ui/src/form/InlineInput.gallery.tsx` (`npm run gallery`, `#/InlineInput`) |
@@ -2332,6 +2332,14 @@ Unstyled controls for a field built into a larger widget: the chat message box, 
 **InlineLabel** props (`InlineLabelProps`)
 
 No props of its own.
+
+**InlineTextArea** props (`InlineTextAreaProps`, extends `Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange" | "rows">`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The text; its line breaks are kept. |
+| `onChange` | `(value: string) => void` | yes | Called on each key with the new text. |
+| `maxRows` | `number` |  | The most lines it grows to before it scrolls. Default 6. |
 
 ```tsx
 <InlineInput aria-label="Message" value={text} onChange={setText} />

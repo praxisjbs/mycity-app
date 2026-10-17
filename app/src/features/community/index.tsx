@@ -95,6 +95,8 @@ function Channels() {
       sub={c.last_text ?? `${c.members} ${c.members === 1 ? "member" : "members"}`}
       when={formatWhen(c.last_at)}
       count={c.unread}
+      pinned={c.pinned && !c.pin_locked}
+      muted={c.muted}
       onClick={() => pick(c)}
     />
   );
@@ -115,6 +117,15 @@ function Channels() {
     </>
   );
 
+  const pinChannel = async (c: Channel) => {
+    try {
+      await api.call("PUT /api/v1/community/channels/:id/pin", { params: { id: c.community_channel_id }, body: { pinned: !c.pinned } });
+      toast(c.pinned ? `Unpinned #${c.name}` : `Pinned #${c.name}`);
+      reloadList();
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.message);
+    }
+  };
   const muteChannel = async (c: Channel) => {
     await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
     toast(c.muted ? `Notifications on for #${c.name}` : `#${c.name} muted`);
@@ -137,7 +148,8 @@ function Channels() {
             { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: "Channel Details", body: (close) => <><KeyValue items={[["Channel", `#${current.name}`], ["Members", current.members], ["Who Can Post", WHO_POSTS[current.post_policy]]]} /><FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter></> }) },
             { label: "Search in Channel", icon: "srch", onSelect: () => setSearching(true) },
             "sep",
-            { label: current.muted ? "Unmute Notifications" : "Mute Notifications", icon: "bell", onSelect: () => void muteChannel(current) },
+            ...(current.pin_locked ? [] : [{ label: current.pinned ? "Unpin" : "Pin to Top", icon: "pinned" as const, onSelect: () => void pinChannel(current) }]),
+            { label: current.muted ? "Unmute Notifications" : "Mute Notifications", icon: current.muted ? ("bell" as const) : ("muted" as const), onSelect: () => void muteChannel(current) },
           ]}
         />
       </ThreadHead>
@@ -480,6 +492,15 @@ function Direct() {
     await work;
     reloadList();
   };
+  const pinConversation = async (c: Conversation) => {
+    try {
+      await api.call("PUT /api/v1/community/channels/:id/pin", { params: { id: c.community_channel_id }, body: { pinned: !c.pinned } });
+      toast(c.pinned ? `Unpinned ${chatName(c)}` : `Pinned ${chatName(c)}`);
+      reloadList();
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.message);
+    }
+  };
   const mute = async (c: Conversation) => {
     await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
     toast(c.muted ? `Notifications on for ${chatName(c)}` : `Muted ${chatName(c)}`);
@@ -510,6 +531,8 @@ function Direct() {
             title={chatName(c)}
             sub={`${c.last_mine ? "You: " : ""}${c.last_text ?? "No messages yet"}`}
             when={formatWhen(c.last_at)}
+            pinned={c.pinned}
+            muted={c.muted}
             count={c.unread}
             onClick={() => pick(c)}
           />
@@ -536,7 +559,8 @@ function Direct() {
             { label: "View Profile", icon: "user", onSelect: showProfile },
             { label: "Search in Conversation", icon: "srch", onSelect: () => setSearching(true) },
             "sep",
-            { label: current.muted ? "Unmute Notifications" : "Mute Notifications", icon: "bell", onSelect: () => void mute(current) },
+            { label: current.pinned ? "Unpin" : "Pin to Top", icon: "pinned", onSelect: () => void pinConversation(current) },
+            { label: current.muted ? "Unmute Notifications" : "Mute Notifications", icon: current.muted ? "bell" : "muted", onSelect: () => void mute(current) },
           ]}
         />
       </ThreadHead>
@@ -696,7 +720,7 @@ function Announcements() {
                 <h2 data-copy="content" className="flex-1 text-sm font-semibold">{a.title}</h2>
                 {a.status === "scheduled" ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience_size ? "ok" : "neutral"}>{a.reads} of {a.audience_size} read</Pill>}
               </div>
-              <p className="text-sm text-muted-foreground">{a.body}</p>
+              <p className="line-clamp-3 text-sm whitespace-pre-wrap text-muted-foreground">{a.body}</p>
               <p className="mt-2 text-2xs text-subtle-foreground">{a.status === "scheduled" ? `Goes out ${formatDateTime(a.publish_at!)}` : `Posted ${formatDate(a.published_at!)}`} by {a.author?.display_name}</p>
             </Card>
           ))}
@@ -743,7 +767,7 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       <div data-copy="content">
         <h4 className="text-md font-semibold">{a.title}</h4>
         <p className="mt-0.5 text-2xs text-subtle-foreground">{live ? `Posted ${formatDateTime(a.published_at!)}` : `Goes out ${formatDateTime(a.publish_at!)}`} by {a.author?.display_name}</p>
-        <p className="mt-2.5 mb-3.5 text-sm text-muted-foreground">{a.body}</p>
+        <p className="mt-2.5 mb-3.5 text-sm whitespace-pre-wrap text-muted-foreground">{a.body}</p>
       </div>
       {!live ? <Pill tone="info">Scheduled</Pill> : (
         <>

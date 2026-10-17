@@ -7,10 +7,10 @@
  * @phone The caller's widget decides its size; keep 16 px text so iOS never zooms.
  * @a11y Every one needs a visible label or an aria-label; InlineLabel gives a widget a label it lays out itself.
  * @status stable
- * @exports InlineSelect, InlineLabel
+ * @exports InlineSelect, InlineLabel, InlineTextArea
  * @example <InlineInput aria-label="Message" value={text} onChange={setText} />
  */
-import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type SelectHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 export interface InlineInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
   /** The text. */
@@ -21,6 +21,21 @@ export interface InlineInputProps extends Omit<InputHTMLAttributes<HTMLInputElem
 
 export const InlineInput = forwardRef<HTMLInputElement, InlineInputProps>(function InlineInput({ value, onChange, ...rest }, ref) {
   return <input ref={ref} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />;
+});
+
+export interface InlineTextAreaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange" | "rows"> {
+  /** The text; its line breaks are kept. */
+  value: string;
+  /** Called on each key with the new text. */
+  onChange: (value: string) => void;
+  /** The most lines it grows to before it scrolls. Default 6. */
+  maxRows?: number;
+}
+
+/** A message box that grows a line at a time as lines are added, up to maxRows, then scrolls. */
+export const InlineTextArea = forwardRef<HTMLTextAreaElement, InlineTextAreaProps>(function InlineTextArea({ value, onChange, maxRows = 6, ...rest }, ref) {
+  const rows = Math.min(Math.max(1, value.split("\n").length), maxRows);
+  return <textarea ref={ref} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />;
 });
 
 export interface InlineSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange"> {
