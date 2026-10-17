@@ -1,56 +1,79 @@
 import { at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
+import type { EmployeeHistoryEntry, EssProfile } from "@mycity/contract/contract.gen.ts";
 import { byKey, managerOf } from "../data/people";
 
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
-const ARR: Record<string, string> = { hybrid: "Hybrid", remote: "Remote", on_site: "Office-only" };
+
+/* My Profile, in the contract's shapes (packages/contract/schemas/ess.js EssProfile). */
 const AREA = ["Lekki Phase 1", "Surulere", "Gbagada", "Yaba", "Ikeja", "Ajah", "Magodo"];
 const PATCHES = new Map<string, Record<string, string>>();
+const HISTORY = new Map<string, EmployeeHistoryEntry[]>();
+const WEEK: EssProfile["working_week"] = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
+  weekday,
+  is_working_day: weekday <= 6,
+  starts_at: weekday <= 6 ? "09:00" : null,
+  ends_at: weekday === 6 ? "15:00" : weekday <= 5 ? "17:00" : null,
+}));
+const TYPES: EssProfile["employment_type"][] = ["full_time", "part_time", "contractor", "consultant"];
 
-function profile(key: string) {
+function profile(key: string): EssProfile {
   const p = byKey(key)!;
   const m = managerOf(p);
   const x = PATCHES.get(key) ?? {};
   const idx = p.employee_id.charCodeAt(0) % AREA.length;
-  const status = p.status === "probation" ? { tone: "warn" as const, text: "Probation" } : { tone: "ok" as const, text: "Confirmed" };
-  const arr = ARR[p.work_pattern];
-  const sched = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, i) => {
-    if (i === 6) return { day, mode: "Off" as const, hours: "", where: "" };
-    const mode = arr === "Remote" ? "Remote" : arr === "Hybrid" ? (i === 2 || i === 5 ? "Remote" : "Office") : "Office";
-    return { day, mode: mode as "Office", hours: i === 5 ? "09:00 to 15:00" : "09:00 to 17:00", where: mode === "Remote" ? `Home · ${AREA[idx]}` : p.worksite };
-  });
+  const [first, ...rest] = p.display_name.split(" ");
   return {
-    employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: x.photo ?? null,
-    chips: [status, { tone: "neutral" as const, text: arr }, { tone: "neutral" as const, text: p.grade }, ...(m ? [{ tone: "neutral" as const, text: `Reports to ${m.display_name}` }] : [])],
-    personal: { full_name: p.display_name, date_of_birth: p.date_of_birth, phone: x.phone ?? p.phone, work_email: p.work_email, address: x.address ?? `${AREA[idx]}, Lagos` },
-    employment: { job_title: p.job_title, department: p.department, line_manager: m ? `${m.display_name}, ${m.job_title}` : "None", start_date: p.start_date, employment_type: p.employment_type.replace("_", " ").replace(/^./, (c) => c.toUpperCase()), arrangement: arr, status },
-    bank: { bank_name: x.bank_name ?? p.bank_name, account_name: p.display_name, account_last4: (x.account_number ?? p.account_last4).slice(-4) },
-    next_of_kin: { name: x.next_of_kin_name ?? p.next_of_kin, relationship: x.next_of_kin_relationship ?? "Sibling", phone: x.next_of_kin_phone ?? "+234 806 554 2210" },
-    schedule: sched,
-    can_change: [
-      ["Phone number", "ok", "Immediately"], ["Address", "ok", "Immediately"], ["Bank details", "warn", "Logged, People notified"], ["Next of kin", "ok", "Immediately"], ["Photo", "ok", "Immediately"],
-      ["Job title", "neutral", "Only People can"], ["Salary", "neutral", "Only People can"], ["Line manager", "neutral", "Only People can"], ["Work schedule", "neutral", "Only People can"],
-    ].map(([field, tone, text]) => ({ field, how: { tone: tone as "ok", text } })),
-    history: [
-      ...(x.changed ? [{ title: x.changed, when: "Just now", text: "Logged in the audit trail.", tone: "hi" as const }] : []),
-      { title: "Bank details updated", when: fmt(isoDaysAgo(61)), text: "Logged. People were notified the same day.", tone: x.changed ? undefined : ("hi" as const) },
-      { title: `Grade confirmed as ${p.grade}`, when: fmt(isoDaysAgo(105)), tone: "ok" as const },
-      { title: "Phone number updated", when: fmt(isoDaysAgo(206)) },
-      { title: "Started at MyCity App Ltd", when: fmt(p.start_date), tone: "ok" as const },
-    ],
+    employee_id: p.employee_id,
+    staff_number: `MCA-${String(idx + 10).padStart(4, "0")}`,
+    display_name: p.display_name,
+    first_name: first,
+    last_name: rest.join(" "),
+    job_title: p.job_title,
+    department: p.department,
+    status: p.status === "suspended" ? "suspended" : "active",
+    confirmed: p.status !== "probation",
+    employment_type: TYPES.includes(p.employment_type as EssProfile["employment_type"]) ? (p.employment_type as EssProfile["employment_type"]) : "full_time",
+    work_pattern: p.work_pattern,
+    start_date: p.start_date,
+    line_manager: m ? { employee_id: m.employee_id, org_seat_id: null, display_name: m.display_name, job_title: m.job_title, vacant: false } : null,
+    work_email: p.work_email,
+    phone: x.phone ?? p.phone,
+    date_of_birth: p.date_of_birth,
+    home_address: x.home_address ?? `${AREA[idx]}, Lagos`,
+    next_of_kin_name: x.next_of_kin_name ?? p.next_of_kin,
+    next_of_kin_relationship: x.next_of_kin_relationship ?? "Sibling",
+    next_of_kin_phone: x.next_of_kin_phone ?? "+2348065542210",
+    bank_name: x.bank_name ?? p.bank_name,
+    account_last4: (x.account_number ?? p.account_last4).slice(-4),
+    working_week: WEEK,
   };
 }
 
+function historyOf(key: string): EmployeeHistoryEntry[] {
+  const p = byKey(key)!;
+  return [
+    ...(HISTORY.get(key) ?? []),
+    { event_id: sid(`hist:${key}:bank`), occurred_at: at(61, "10:00"), action: "employee.updated", actor_name: p.display_name, changed_fields: ["bank_name", "account_number"], summary: "Record changed: bank_name, account_number" },
+    { event_id: sid(`hist:${key}:created`), occurred_at: `${p.start_date}T09:00:00.000Z`, action: "employee.created", actor_name: "Operations & People", changed_fields: [], summary: "Record created" },
+  ];
+}
+
 route("GET /api/v1/ess/profile", (req) => ok(profile(req.user!)));
+route("GET /api/v1/ess/profile/history", (req) => paged(historyOf(req.user!), req));
 route("PATCH /api/v1/ess/profile", (req) => {
-  const b = req.body as Record<string, string>;
+  const b = Object.fromEntries(Object.entries(req.body as Record<string, string>).filter(([, v]) => v !== undefined && v !== ""));
   const f: Record<string, string[]> = {};
   if (b.phone !== undefined && !/^(\+?234|0)\d{10}$/.test(b.phone.replace(/[\s\-().]/g, ""))) f.phone = ["must be a Nigerian phone number"];
+  if (b.next_of_kin_phone !== undefined && !/^(\+?234|0)\d{10}$/.test(b.next_of_kin_phone.replace(/[\s\-().]/g, ""))) f.next_of_kin_phone = ["must be a Nigerian phone number"];
   if (b.account_number !== undefined && !/^\d{10}$/.test(b.account_number)) f.account_number = ["must be a 10-digit NUBAN"];
-  if (b.address !== undefined && b.address.trim().length < 5) f.address = ["Enter the address"];
   if (Object.keys(f).length) return invalid(f);
-  const prev = PATCHES.get(req.user!) ?? {};
-  const changed = b.photo_document_id ? "Photo updated" : b.bank_name || b.account_number ? "Bank details updated" : b.phone ? "Phone number updated" : b.address ? "Address updated" : "Next of kin updated";
-  PATCHES.set(req.user!, { ...prev, ...b, ...(b.photo_document_id ? { photo: "" } : {}), changed });
+  if (!Object.keys(b).length) return invalid({ phone: ["change at least one field"] });
+  PATCHES.set(req.user!, { ...(PATCHES.get(req.user!) ?? {}), ...b });
+  const fields = Object.keys(b);
+  HISTORY.set(req.user!, [
+    { event_id: sid(`hist:${req.user}:${Date.now()}`), occurred_at: new Date().toISOString(), action: "employee.updated", actor_name: byKey(req.user)!.display_name, changed_fields: fields, summary: `Record changed: ${fields.join(", ")}` },
+    ...(HISTORY.get(req.user!) ?? []),
+  ]);
   return ok(profile(req.user!));
 });
 

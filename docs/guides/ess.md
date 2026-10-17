@@ -4,10 +4,10 @@
 |---|---|
 | Owner | AJ |
 | Milestone | M1 |
-| Backend modules | `ess` |
-| Frontend paths | `app/src/features/ess/`, `app/src/features/attendance/EssAttendance.tsx` |
-| Permission key(s) | `ess` (always `own` scope) |
-| Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security |
+| Backend modules | `ess`, `leave` |
+| Frontend paths | `app/src/features/ess/`, `app/src/features/attendance/EssAttendance.tsx`, `app/src/features/people/Leave.tsx` |
+| Permission key(s) | `ess` (always `own` scope); `people` for People · Leave |
+| Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
 | Last changed | 17/10/2026 |
 
@@ -41,13 +41,14 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · Policy Updates (`policy-updates`) | Staff app | Every employee | Owned by LA: attendance policy versions | Read and acknowledge |
 | ESS · My Performance (`my-performance`) | Staff app | Every employee | KPIs this month, the goal chain above them, reviews | Read; open a review; self rating opens with the review cycle (M2) |
 | ESS · My Payslips (`my-payslips`) | Staff app | Every employee | Payslips by year, gross, net, deductions, next payday, a preview | Change year, preview a month, download a PDF, email a copy, open the deductions breakdown |
-| ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, open the leave calendar, open a request or a figure's list |
+| ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, cancel a request while it waits or before it starts, open a request or a figure's list |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | Three cards: Open Queries, Archived, Sanctions | Open each list; respond to an open query |
 | ESS · My Documents (`my-documents`) | Staff app | Every employee | Their vault: contracts, certificates, ID; signed, verified, expiring, missing | Upload a requested document, preview, download |
 | ESS · My Security (`my-security`) | Staff app | Every employee | Password (when it was changed), two-step sign-in, the PIN, passkeys, where they are signed in, recent sign-ins with how each began; a link to My Devices | Change password; set up, change or turn off two-step (no Turn Off while a role they hold requires it) and choose how often it asks; new recovery codes; set, change or remove the PIN; add, rename or remove a passkey; sign out one device or all the others; open My Devices |
 | Shell avatar (rail, phone top bar, More) | Staff app | Every employee | The photo from My Profile, or initials | |
 | People · Employees (employee record) | Staff app | People | The same employee record | Where People edit the fields an employee cannot |
 | People · Employees · Attendance setup | Staff app | People | Owned by LA: arrangement and weekly schedule | Where the work schedule shown in My Profile is set |
+| People · Leave (`leave`) | Staff app | `people` view: Operations & People everyone, a line manager their team | Everyone's requests within that scope, the figures above them, who else in the department is away, this month's calendar | Approve or reject a request that waits on them, record leave for someone (`people` create), cancel granted leave before it ends (`people` edit) |
 | Payroll · Payslips (M6) | Staff app | Payroll | The payslips ESS shows | Approving a run is what makes a payslip visible in ESS |
 | Queries & Sanctions (M3) | Staff app | Managers, People, CEO | The queries and sanctions ESS shows | Raising and deciding them |
 | Settings · Security (#78) | Staff app | `settings` view, edit | Session length, idle lock and password minimum within the server's floor; two-step by role; everyone's sessions; failed sign-ins | The rules My Security follows; a role that requires two-step makes its people set it up at their next sign-in (`docs/guides/foundation.md` §6.4) |
@@ -89,12 +90,13 @@ services, always for the caller's own `employee_id`.
 | `employee` (organisation) | `employee_id`, `phone`, `address`, `next_of_kin`, `bank`, `photo_document_id` | The editable fields are written through the organisation service |
 | attendance tables (LA) | see the attendance guide | Read for the work schedule |
 | `payslip` (M6) | `payslip_id`, `employee_id`, `period`, `gross`, `net`, `locked_at` | Only locked payslips are returned |
-| `leave_request`, `leave_balance` | `employee_id`, `type`, `from`, `to`, `status` | |
+| `leave_type` (leave) | `code`, `name`, `policy.days_per_year`, `active` | The types People offer and each one's yearly allowance. Four are seeded (`1290`: Annual 20, Compassionate 5, Sick 12, Unpaid), by the team lead's decision of 17/10/2026; People add, change, retire and delete the rest on People · Leave |
+| `leave_request`, `leave_balance` (leave) | `employee_id`, `leave_type_id`, `starts_on`, `ends_on`, `amount` (working days), `status`, `workflow_instance_id`, `recorded_by` | `leave_balance` holds People's figure for one person and year; without one the type's allowance applies. `1200` checks the status and indexes the lists |
 | `query`, `sanction` (M3) | `employee_id`, `status`, `outcome`, `deduction` | |
 | `document` (vault) | `document_id`, `entity_type`, `entity_id`, `sensitivity` | `restricted` documents are readable by the subject in ESS (BACKEND_STRUCTURE §5) |
 | identity and security tables | password, two-step, passkeys, PIN, sessions | Owned by `identity` and `security` |
 
-Migration file(s): none; ESS adds no tables.
+Migration file(s): none for ESS. Leave: `migrations/1200_leave_requests.sql`, `seeds/reference/1290_seed_leave.sql` (the status list and the four types).
 
 ## 5 · API
 
@@ -104,14 +106,19 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /profile` | → `EssProfile` | `ess` · own | | Includes the work schedule |
-| `PATCH /profile` | `EssProfileUpdate` → `EssProfile` | `ess` · own | | Only phone, address, next of kin, bank. Bank change is logged and People notified |
-| `POST /profile/photo` | multipart → `EssProfile` | `ess` · own | | Upload engine; image only |
+| `GET /profile` | → `EssProfile` | `ess` · own | | Built 17/10/2026. From the employee 360; the account by its last four digits; the organisation's working week (each person's arrangement waits on attendance) |
+| `PATCH /profile` | `EssProfileUpdate` → `EssProfile` | `ess` · own | | Built 17/10/2026. Only phone, home address, next of kin, bank, through the organisation service; an empty field is left as it is. A bank change is audited and tells `people` edit holders |
+| `GET /profile/history` | `PageQuery` → `EmployeeHistoryPage` | `ess` · own | yes | Built 17/10/2026. Record History |
+| `POST /profile/photo` | multipart → `EssProfile` | `ess` · own | | Not built: needs `employee.photo_document_id` and the organisation module writing it, and the readers (shell, Community, People) reading it |
 | `GET /payslips` | `EssPayslipQuery` (`year`) → `PayslipPage` | `ess` · own | yes | Locked payslips only |
 | `GET /payslips/:id/pdf` | → PDF | `ess` · own | | |
 | `POST /payslips/:id/email` | → `{ sent }` | `ess` · own | | To the work email |
 | `GET /deductions` | `PageQuery` → `DeductionPage` | `ess` · own | yes | Month, amount, reason, query |
-| `GET /leave`, `POST /leave` | → `LeaveSummary`, `LeaveRequestCreate` | `ess` · own | yes | Write through the leave service |
+| `GET /leave` | `EssLeaveListQuery` (`status`, `year`) → `LeavePage` | `ess` · own | yes | Built 17/10/2026. The caller's own requests |
+| `GET /leave/balances` | `EssLeaveBalanceQuery` (`year`) → `LeaveBalances` | `ess` · own | | Built 17/10/2026. Every active type: entitled, taken, booked, pending, remaining |
+| `GET /leave/:id` | → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Someone else's is a 404 |
+| `POST /leave` | `LeaveRequestCreate` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Opens the `leave.approval` flow in the same transaction |
+| `POST /leave/:id/cancel` | `LeaveCancel` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. While it waits (the approval is withdrawn too) or once granted until it starts |
 | `GET /queries` | `EssQueryList` (`status`: open, archived) → `QueryPage` | `ess` · own | yes | |
 | `POST /queries/:id/response` | `QueryResponse` | `ess` · own | | Through the queries service |
 | `GET /sanctions` | `PageQuery` → `SanctionPage` | `ess` · own | yes | |
@@ -119,6 +126,8 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `GET /documents/summary` | → `DocumentSummary` | `ess` · own | | Built 17/10/2026. The five counts, over every row, not the page |
 | `POST /documents` | multipart `EssDocumentUpload` → `DocumentRow` | `ess` · own | | Built 17/10/2026. Upload engine and vault; `document_request_id` answers a Missing row |
 | `GET /performance` | → `EssPerformance` | `ess` · own | | M2 |
+
+People · Leave calls the `leave` module under `/api/v1/leave` (`schemas/leave.js`): `GET /requests` (`LeaveListQuery`: status, type, employee, `from` and `to` overlap, search, sort), `GET /summary`, `GET /requests/:id`, `GET /requests/:id/clashes`, all `people` view within scope; `POST /requests` (`LeaveRecordCreate`, `people` create, approved at once); `POST /requests/:id/cancel` (`people` edit); `GET /types` (`ess` view, so every form can list them), `POST /types` and `PATCH /types/:id` (`people` create, edit), `DELETE /types/:id` (`people` delete; refused with `LEAVE_TYPE_IN_USE` once a request or allowance names it, so it is retired instead); `GET /balances` (`LeaveBalanceQuery`: one person's year, `people` view within scope) and `PUT /balances` (`LeaveAllowanceSet`: one person's allowance of a type for a year, `null` back to the type's, `people` edit; the person is told). A waiting request is decided with the approval's own routes (`POST /workflow/instances/:id/approve`, `reject`), never a leave route.
 
 My Security calls the `identity` module's own-account routes (`/auth/security`, `/auth/password`,
 `/auth/sessions`) and the `security` module's (`/security`, `/security/two-step*`,
@@ -149,8 +158,22 @@ check ownership, not the `settings` grant (README §5.2).
   it is read before the decision is made, so disagreement goes in the response. Most queries close
   with no action. Who can see a query: §8.
 - Leave is approved by the line manager, and by Operations & People too when it is over 5 days (a
-  number they change on Settings · Approvals); the screen does not say so. The leave calendar shows
-  clashes before a request is sent.
+  number they change on Settings · Approvals); the screen does not say so. People · Leave shows who
+  else in the department is away on the same days (Also Away) before a request is decided.
+- A request is counted in working days: the configured week (Monday to Saturday, A22) with public
+  holidays left out, both ends included. It is refused when it ends before it starts, crosses New
+  Year (two requests instead), has no working day in it, starts in the past (the employee's own),
+  overlaps leave already waiting or granted, or would take the year past the type's allowance,
+  counting what is granted and what still waits. A type with no allowance (Unpaid) has no ceiling.
+- The allowance is People's figure for that person and year (`leave_balance`, set in Allowances) when
+  they set one, otherwise the type's days a year. Taken is granted leave already started, Booked granted leave
+  still to come, Pending what waits in the flow.
+- The approval decides; the request copies the outcome after commit, and every read takes the
+  approval's outcome until the copy lands, so a decided request never shows as Pending.
+- The employee cancels their own request while it waits (the approval is withdrawn with it) or once
+  granted until it starts. People cancel granted leave until it ends; a waiting request is theirs
+  to decide in My Approvals. Leave People record is approved at once, with no flow, and the person
+  is told.
 - Signed documents carry two hashes (content and artifact) and a public verification link on
   `go.mycityapp.io/verify/<ref>`.
 - Changing the password ends the employee's other sessions. The password, two-step, passkey, PIN
@@ -172,8 +195,9 @@ check ownership, not the `settings` grant (README §5.2).
 
 | Event / job | When | Does |
 |---|---|---|
-| `employee.profile_updated` | After an own-profile change commits | Audit row; for bank details, a notification to People |
-| `employee.photo_updated` | After a photo upload | Shell and Community pick up the new avatar |
+| `employee.updated` (organisation) | After an own-profile change commits | Audit row with before and after |
+| `employee.bank_details_changed` (`ess.events.js`) | After a bank change commits | "Bank details changed" to `people` edit holders within scope; never the account |
+| `employee.photo_updated` | After a photo upload (not built) | Shell and Community pick up the new avatar |
 | `payroll.run_approved` (M6) | Run approved | Payslips become visible; notification "Your payslip is ready" |
 | `query.raised` (M3) | Query raised against the employee | Notification opening My Queries |
 | `document.requested` | People request a document | Notification opening My Documents |
@@ -193,7 +217,9 @@ only with the owning module's grant.
 
 ## 9 · AI and search
 
-- **AI reads** (`ess.ai.js`): the caller's own profile summary, leave balance, latest payslip
+- **AI reads** (`ess.ai.js`): built: the caller's own documents, leave requests (`my_leave.list`) and
+  year (`my_leave.balances`); `leave.ai.js` reads leave requests within the asker's `people` scope.
+  Still to come: the caller's own profile summary, latest payslip
   summary, open queries count. Never another person's record. Paged at 25.
 - **AI routes**: "my payslip" → My Payslips; "request leave" → My Leave · Request Leave; "change my
   password" → My Security; "upload my photo" → My Profile.
@@ -212,20 +238,21 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| ESS · My Profile (`my-profile`) | The photo, or initials with a + to upload; name, role and pills (Confirmed, arrangement, grade, Reports To); Edit Profile, Download My Data, Change Password (opens My Security); Personal (Full Name, Date of Birth, Phone, Work Email, Address); Employment (Job Title, Department, Line Manager, Start Date, Employment Type, Work Arrangement, Status) with the Work Schedule inside it (each day Office, Remote or Off, hours and place; a Set by People pill); Bank Details (Bank, Account Name, masked Account Number); Next of Kin; Record History. Edit Profile: Phone, Address, Next of Kin, Next of Kin Phone, Bank, New Account Number (Optional); Cancel, Save Profile | Help terms on the card titles: Employment, "Only People can change these, including your work schedule."; Work Schedule, "Lateness is measured against these hours."; Bank Details, "Expense refunds are paid into this account. A change is logged and People are notified." On the New Account Number label: "Leave blank to keep the account ending 4417. A bank change is logged and People are notified." | The What You Can Change card (which fields an employee may change; a bank change logged): §6, and Edit Profile offers only those fields. "Every change to this record is written to the audit log": §6, §7. Where the schedule comes from and that approved leave never counts as absence: §3 steps 2 and 5. The page subtitle "What People see, and what you can change yourself" is removed |
+| ESS · My Profile (`my-profile`) | Initials (the photo, with a + to upload, comes with `employee.photo_document_id`); name, role and pills (Confirmed or On Probation, arrangement, Reports To); Edit Profile, Change Password (opens My Security; Download My Data is not built); Personal (Full Name, Date of Birth, Phone, Work Email, Address); Employment (Job Title, Department, Line Manager, Start Date, Employment Type, Work Arrangement, Status) with the Work Schedule inside it (each day Office, Remote or Off, hours and place; a Set by People pill); Bank Details (Bank, Account Name, masked Account Number); Next of Kin; Record History. Edit Profile: Phone, Address, Next of Kin, Next of Kin Phone, Bank, New Account Number (Optional); Cancel, Save Profile | Help terms on the card titles: Employment, "Only People can change these, including your work schedule."; Work Schedule, "Lateness is measured against these hours."; Bank Details, "Expense refunds are paid into this account. A change is logged and People are notified." On the New Account Number label: "Leave blank to keep the account ending 4417. A bank change is logged and People are notified." | The What You Can Change card (which fields an employee may change; a bank change logged): §6, and Edit Profile offers only those fields. "Every change to this record is written to the audit log": §6, §7. Where the schedule comes from and that approved leave never counts as absence: §3 steps 2 and 5. The page subtitle "What People see, and what you can change yourself" is removed |
 | ESS · My Attendance (`my-attendance`) | Owned by LA: the attendance guide §1, §2 | The attendance guide | The attendance guide. ESS strips the "A correction never overwrites a punch" footnote from LA's page (attendance guide §5) |
 | ESS · Work Location Requests (`work-location-requests`) | Owned by LA: the attendance guide §6 | The attendance guide | The attendance guide §6 |
 | ESS · My Devices (`my-devices`) | Owned by LA: the attendance guide §1 | The attendance guide | The attendance guide §1, §7 (device rules) |
 | ESS · Policy Updates (`policy-updates`) | Owned by LA: the attendance guide §7 | The attendance guide | The attendance guide §7 |
 | ESS · My Performance (`my-performance`) | "October 2026 · set by Ifeoma Chukwu" (desktop subtitle); KPI Score, On Track, Weight Assigned, Last Review, Next Cycle; My KPIs This Month (each KPI with its bar and progress); Rolls Up To (the goal chain from the organisational goal down to the employee's KPI); My Reviews (Cycle, Self Rating, Manager, Second Level, Status). A review opens Your Rating, Manager, Second Level, Status and, once closed, the Manager Comment | Help term on the KPI Score label: "Your KPIs, weighted to 100%. It updates as the tasks against each KPI close." | The chart caption "Weighted. Your score updates as tasks against each KPI close" became the KPI Score help; the "Five levels… you can see the whole chain" footnote: §6. "Click a review to open it" is removed: rows show as links |
 | ESS · My Payslips (`my-payslips`) | The year (‹ year ›), Email a Copy, Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; Payslips, 2026 (Month, Net, Status: Paid, Paid with a deduction, In the run); the selected payslip's PDF preview with Email a Copy and Download PDF. Deductions opens Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries). A month still in the run opens "In This Month's Run, Appears once the run is approved." | None | "This is the document the engine produces": §6. A deduction only from an upheld query, waived means nothing deducted: §3 step 3, §6. No PAYE or pension line: §6. Visible once Payroll approves, normally the 27th: §3 step 4. The Salary Deductions subtitle and "Click a month to preview it" are removed |
-| ESS · My Leave (`my-leave`) | "2026 entitlement" (desktop subtitle); View Calendar, Request Leave; Entitlement, Taken, Approved Upcoming, Remaining, each opening its list or request; My Requests (Type, From, To, Days, Approver, Status), a row opens the request; Entitlement by type (allowance, bar, taken, booked, left). Request Leave: Leave Type (Annual, Compassionate, Sick, Unpaid), From and To (DD/MM/YYYY), Note (Optional); Cancel, Send Request | None | "Leave is approved by your line manager in one step" and "The calendar shows clashes before you submit": §3 step 5, §6 |
+| ESS · My Leave (`my-leave`) | "2026 entitlement" (desktop subtitle); Request Leave; Entitlement, Taken, Approved Upcoming, Remaining, each opening its list or request; My Requests (Type, From, To, Days, Approver, Status), a row opens the request with Cancel Request while it waits or before it starts; Entitlement by type (allowance, bar, taken, booked, pending, left; No set allowance for a type without one). Request Leave: Leave Type (the types People offer), First Day and Last Day (DD/MM/YYYY), Note (Optional); Cancel, Send Request | None | "Leave is approved by your line manager in one step" and "The calendar shows clashes before you submit": §3 step 5, §6 |
 | ESS · My Queries (`my-queries`) | Open Queries, Archived, Sanctions: a count and one line each; the chosen list under them (desktop) or in a sheet (phone): "No Open Queries, Nothing is waiting on you."; Archived Queries (Subject, Raised By, Date, Your Response, Outcome); Sanctions (Sanction, Reason, Date, Deduction, Status) | None | The 48 hours to respond: §3 step 3 (an open query shows its own due time). "Most queries close with no action", the response kept beside the decision, disagreement read before the decision: §6. Who can see a query: §8. A deduction only after an upheld sanction: §3 step 3. The flowchart and the page subtitle are removed |
 | ESS · My Documents (`my-documents`) | Upload Document; Documents, Signed, Verified, Expiring, Missing; Vault (Document, Uploaded, Status, Expires); a row opens the document (Uploaded, Status, Expires, Reference; Download, or Upload Document on a missing one); the chosen document's preview | None | "Signed documents carry two hashes and a public verification link": §6. What each status means: `docs/guides/foundation.md` §6.9. A missing document blocks onboarding only for a new hire: §3 step 6, §11. The "Your vault" subtitle and "Click any row to preview it" are removed |
 | ESS · My Security (`my-security`) | Password (when it was changed, or Not changed yet; Change Password); Two-Step Sign-In (On or Off; Ask for a Code: Every Sign-In, Once a Day, Once a Month; the recovery codes left; Set Up Two-Step, New Codes, Change App, Turn Off); PIN (On or Off, Changed or Not set; Set PIN, Change PIN, Remove PIN); Passkeys (Name with This Device, Added, Last Used; Add Passkey; a passkey opens Name, Save Name, Remove Passkey); Clock-In Devices (Open My Devices); Signed In (Device with its address, Signed In, This Device or Sign Out; Sign Out Others when there are others); Recent Sign-Ins (When, Device, Method, Address, Status). Change Password, Set PIN (New PIN, Confirm PIN), Set Up Two-Step (the QR code, the key, Code From App, Turn On; then the ten codes and Copy Codes) and Confirm It's You (Confirm With; Password or PIN; Confirm or Use Passkey) are forms. Sign Out, Turn Off, New Codes, Remove PIN and Remove Passkey ask first | Help terms on the card titles: Two-Step Sign-In, "A code from an authenticator app on your phone after your password or PIN, on a device that has not given one lately. A passkey needs no code."; PIN, "Four digits that unlock the app, and sign you in on a device you have signed in on before." | The page subtitle "Your password and where you are signed in" is removed. Where devices are managed and the flag on others: §3 step 7. The password, two-step, passkey and PIN rules, the window, the other sessions ending on a change, and the session limits: `docs/guides/identity.md` §6 |
 | Shell avatar (rail, phone top bar, More) | The photo from My Profile, or initials | None | Where the photo is stored and who reads it: §3 step 1 |
 | People · Employees (employee record) | Owned by People: that module's guide | That module's guide | That module's guide |
 | People · Employees · Attendance setup | Owned by LA: the attendance guide §3 | The attendance guide | The attendance guide §3 |
+| People · Leave (`leave`) | The month (desktop subtitle); Leave Calendar, Record Leave (`people` create); On Leave Today, Pending Approval, Starting Soon (Next 14 days), Approved This Year; search and the status chips (All, Pending, Approved, Rejected, Cancelled); Requests (Employee, Type, From, To, Days, Status); the chosen request: Employee, Type, From, To, Days, Status, Waiting On, Recorded By, Reason, Also Away (who else in the department, with their dates), Approve and Reject (Reject asks for a Reason) when it waits, Cancel Leave when granted and not ended. Record Leave: Employee, Leave Type, First Day, Last Day, Note (Optional); Cancel, Record Leave. Leave Types: Add Type (`people` create); Type, Allowance, Status (Offered, Retired); a type opens Name, Days a Year (Optional), Offered, with Delete Type (`people` delete), Cancel, Save Type. Allowances: Employee, Year, each type's entitled, taken, booked and left; Set opens Days (Optional), Cancel, Save Allowance | Help terms: Days a Year, "Working days each person gets a year. Leave empty for a type with no limit, such as unpaid leave."; Days, "Leave empty to use the type's usual allowance." | Who approves at which length: §6 and Settings · Approvals. The checks a request must pass: §6 |
 | Payroll · Payslips (M6) | Owned by Payroll (M6 guide) | The M6 guide | The M6 guide |
 | Queries & Sanctions (M3) | Owned by Queries & Sanctions (M3 guide) | The M3 guide | The M3 guide |
 | Settings · Security (M9) | Owned by Settings (M9 guide) | The M9 guide | The M9 guide |
@@ -241,20 +268,21 @@ Coming Soon from the module's delivery state.
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| ESS · My Profile (`my-profile`) | Edit Profile beside the title; the profile card (photo with +, name, role, pills, Download My Data, Change Password); then icon cards two to a row: Personal, Employment (with the work schedule), Bank Details, Next of Kin, Record History | Every card's detail: each icon card opens it as a bottom sheet, with its help terms; the Prototype View switch | Edit Profile opens the form as a full sheet, Save Profile full width at its foot | ESS from the menu drawer; the tabs along the top scroll sideways |
+| ESS · My Profile (`my-profile`) | Edit Profile beside the title; the profile card (initials, name, role, pills, Change Password); then icon cards two to a row: Personal, Employment (with the work schedule), Bank Details, Next of Kin, Record History | Every card's detail: each icon card opens it as a bottom sheet, with its help terms; the Prototype View switch | Edit Profile opens the form as a full sheet, Save Profile full width at its foot | ESS from the menu drawer; the tabs along the top scroll sideways |
 | ESS · My Attendance (`my-attendance`) | ESS draws it from LA's page: the header, banners and stat cards on top, then every card or table as an icon card | The cards' detail, each in a bottom sheet where LA's buttons keep working; LA's footnote | As the attendance guide | As My Profile |
 | ESS · Work Location Requests (`work-location-requests`) | As My Attendance: header and banners, then icon cards | As My Attendance | New request, as the attendance guide | As My Profile |
 | ESS · My Devices (`my-devices`) | As My Attendance: header, then icon cards | As My Attendance | Register this device, as the attendance guide | As My Profile |
 | ESS · Policy Updates (`policy-updates`) | As My Attendance: header, the announcement and stat strip, then icon cards | As My Attendance | Acknowledge, as the attendance guide | As My Profile |
 | ESS · My Performance (`my-performance`) | The five stats two to a row (KPI Score's help opens as a sheet), then icon cards: My KPIs This Month, Rolls Up To, My Reviews | The subtitle; the reviews table (a list of reviews in the My Reviews sheet) | Tap a review: its sheet | As My Profile |
 | ESS · My Payslips (`my-payslips`) | The year switcher (44 px targets), Email a Copy, Download All; the stats two to a row; then the months as a list with a status pill | The subtitle and the preview beside the list: a month opens its preview as a sheet with Email a Copy and Download PDF | Download PDF, at the foot of the month's sheet | As My Profile |
-| ESS · My Leave (`my-leave`) | View Calendar, Request Leave; the four KPI cards two to a row, each opening its list as a sheet; icon cards My Requests and Entitlement | The subtitle; the requests table (a list in the My Requests sheet); the entitlement card (its sheet) | Request Leave opens the form as a full sheet, Send Request full width | As My Profile |
+| ESS · My Leave (`my-leave`) | Request Leave; the four KPI cards two to a row, each opening its list as a sheet; icon cards My Requests and Entitlement | The subtitle; the requests table (a list in the My Requests sheet); the entitlement card (its sheet) | Request Leave opens the form as a full sheet, Send Request full width | As My Profile |
 | ESS · My Queries (`my-queries`) | The three cards, one to a row | The lists: each card opens its list as a sheet (archived queries and sanctions as cards) | Tap a card | As My Profile |
 | ESS · My Documents (`my-documents`) | Upload Document; the five stats; the documents as a list with a status pill | The Expires column, and the preview beside the list: a document opens its details as a sheet, with Download | Upload Document; on a missing document, Upload Document in its sheet | As My Profile |
 | ESS · My Security (`my-security`) | Icon cards two to a row: Password, Two-Step Sign-In, Passkeys, PIN, Signed In, Recent Sign-Ins, Clock-In Devices, each with its state (Changed date, On or Off, how many passkeys or devices) | Every card's detail, each in a sheet (the sign-in and passkey lists as cards) | Change Password, Save PIN and Turn On open their forms as sheets, the primary full width; Add Passkey makes the phone's own passkey (the fingerprint or face) | As My Profile |
 | Shell avatar (rail, phone top bar, More) | The avatar at the right of the phone top bar; it opens More, whose top row is the person with Theme, Density and Settings | The rail itself | None | The phone top bar |
 | People · Employees (employee record) | Owned by People | That module's guide | That module's guide | That module's guide |
 | People · Employees · Attendance setup | Owned by LA | The attendance guide | The attendance guide | The attendance guide |
+| People · Leave (`leave`) | The four figures two to a row, the search and chips, then the requests as cards | The subtitle | Tap a request: its card below the list with Approve or Reject; Record Leave opens the form as a full sheet | People from the menu; the tabs along the top scroll sideways |
 | Payroll · Payslips (M6) | Owned by Payroll | The M6 guide | The M6 guide | The M6 guide |
 | Queries & Sanctions (M3) | Owned by Queries & Sanctions | The M3 guide | The M3 guide | The M3 guide |
 | Settings · Security (M9) | Owned by Settings | The M9 guide | The M9 guide | The M9 guide |
@@ -299,7 +327,9 @@ Deductions figure and every form open the shared modal.
   have them yet. LA and AJ to agree who adds them.
 - **My Payslips visibility** while Payroll is an advanced option: hide the tab, or show Coming Soon?
 - **Editable fields**: confirm the list in §6 with Cynthia (phone and address were the examples).
-- **Leave calendar**: whose calendar it shows (own, team) and across which years.
+- **Leave calendar**: People · Leave's Leave Calendar shows this month's granted leave within the
+  reader's scope. My Leave has no calendar of its own yet (the demo's View Calendar): whose it would
+  show (own, team) and across which years is still to agree.
 
 ## 14 · Change log
 
@@ -326,3 +356,7 @@ Deductions figure and every form open the shared modal.
   flow of `docs/guides/foundation.md` §6.5, TB 16/10/2026), where §3 and §6 said one step. My Leave's
   Request Leave also opens from ⌘K (`?action=new`), and My Security's Change Password and Set PIN
   (`?action=password`, `?action=pin`).
+- 17/10/2026 · AJ · My Leave (#12) and People · Leave (#26) on the real API: the `leave` module (`/api/v1/leave`) and `/ess/leave`, contract `schemas/leave.js`, `1200` and `1290`. Requests in working days, the checks in §6, the approval flow deciding and the request copying its outcome, cancelling, Record Leave approved at once, Also Away, leave types through the API and a staging seed. §2, §4, §5, §6, §9, both §10 tables and §13 updated; People · Leave added to them. The demo's View Calendar is not on My Leave.
+- 17/10/2026 · AJ · My Profile (#8) on the real API: `GET /ess/profile`, `PATCH /ess/profile` (through the organisation service; a bank change tells People) and `GET /ess/profile/history`, contract `EssProfile`, `EssProfileUpdate`, `EssWorkDay`. The screen drops the Editable Fields card and the subtitle (§10), shows the organisation's working week until attendance gives each person's own, and keeps initials for the photo. Not built, as they need modules AJ does not own: the photo (§3 step 1), each person's schedule (§3 step 2), Download My Data.
+- 17/10/2026 · AJ · Leave types: the four are seeded in `1290` (the team lead's decision, an exception to A26), and People add, change, retire and delete types on People · Leave (Leave Types); a type with leave on record is retired, never deleted. Allowances: People set one person's allowance of a type for a year (`GET`, `PUT /leave/balances`), and the person is told. The staging leave-types seed is gone.
+- 17/10/2026 · AJ · Local data: `seeds/build/20_mock_data.js` loads the mock's 25 people, their logins and its leave into a laptop's database through the services (`npm run db:seed -- --build`, with `SEED_PASSWORD` in `.env`), so the real API shows what the mock shows. The roster moved to `app/src/api/mock/data/roster.json`, which the mock and the seed both read. Local and CI only: besides `seed.js`'s three refusals it needs APP_ENV development or test and no SMTP_HOST, and a release does not carry the roster.

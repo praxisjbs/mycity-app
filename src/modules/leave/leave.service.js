@@ -1,0 +1,424 @@
+"use strict";
+/**
+ * Leave: the one write path for a leave request and a leave type (docs/guides/ess.md
+ * §3 step 5, §6; docs/guides/foundation.md §6.5).
+ *
+ * Three ways a request arrives, one set of checks:
+ *
+ *   request()   the employee asks, from My Leave (/ess/leave). It is saved as
+ *               `submitted` and opens the `leave.approval` flow in the same
+ *               transaction: the line manager, then Operations & People over 5 days.
+ *   record()    People record leave for someone (People · Leave, Record Leave). It is
+ *               approved at once, with no flow; who recorded it is kept on the row.
+ *   settle()    after commit, an approval's outcome is copied onto the request
+ *               (leave.events.js). Idempotent: it changes only a request still waiting.
+ *
+ * Every request is refused when it ends before it starts, crosses New Year, has no
+ * working day in it, overlaps a request already waiting or granted, or would take the
+ * year past the type's allowance (leave.balance.js). Two requests from one person are
+ * checked one after the other (an advisory lock per person), so both cannot pass.
+ *
+ * An employee cancels their own request while it waits (the approval is withdrawn with
+ * it) or once granted until it starts. People cancel granted leave until it ends; a
+ * waiting request is theirs to decide in My Approvals instead.
+ */
+const { pool } = require("../../config/db");
+const { atomically } = require("../../shared/db/tx");
+const { AppError } = require("../../shared/errors");
+const { emit } = require("../../shared/events/emit");
+const { assertInScope } = require("../../shared/rbac/scope");
+const lagos = require("../../shared/time/lagos");
+const workingWeek = require("../../shared/time/working-week");
+const engine = require("../../shared/workflow/engine");
+const repo = require("./leave.repo");
+const rules = require("./leave.balance");
+const { clashesOf } = require("./leave.clash");
+const { EVENTS, DEFINITION_KEY } = require("./leave.events");
+
+/** Leave types a year can show at once (LeaveBalances holds at most 25). */
+const MAX_ACTIVE_TYPES = 25;
+
+const ALL = Object.freeze({ scope: "all", scope_ids: null });
+
+async function tx(fn) {
+  const client = await pool.connect();
+  try {
+    return await atomically(client, () => fn(client));
+  } finally {
+    client.release();
+  }
+}
+
+const notFound = () => new AppError("NOT_FOUND", "That leave request does not exist", 404);
+
+/** The facts every leave event carries, for the audit line and the notifications. */
+const payloadOf = (row, type) => ({
+  leave_request_id: row.leave_request_id,
+  employee_id: row.employee_id,
+  subject_employee_id: row.employee_id,
+  leave_type_name: type ? type.name : row.leave_type_name,
+  starts_on: row.starts_on,
+  ends_on: row.ends_on,
+  days: Number(row.amount !== undefined ? row.amount : row.days), // @money:ok working days, not an amount
+});
+
+/* ------------------------------------------------------------------ *
+ * Reading
+ * ------------------------------------------------------------------ */
+
+/** People's list, within the caller's scope. */
+const list = (query, scope) => repo.list(pool, query, scope);
+
+/** One request People may see. */
+async function getFor(id, scope) {
+  const row = await repo.get(pool, id);
+  if (!row) throw notFound();
+  assertInScope(scope, row.employee_id);
+  return repo.publicRow(row);
+}
+
+const summary = (scope) => repo.summary(pool, lagos.today(), scope);
+
+const clashes = (id, query, scope) => clashesOf(id, query, scope);
+
+/** One person's requests (My Leave). The person is the caller; nothing names another. */
+const listFor = (employeeId, query) =>
+  repo.list(pool, { ...query, employee_id: employeeId }, ALL);
+
+/** One of the caller's own requests, or a 404 when it is someone else's. */
+async function getOwn(employeeId, id) {
+  const row = await repo.get(pool, id);
+  if (!row || row.employee_id !== employeeId) throw notFound();
+  return repo.publicRow(row);
+}
+
+/** One person's year, every active type. */
+async function balancesFor(employeeId, year) {
+  const y = year || Number(lagos.today().slice(0, 4));
+  return { year: y, balances: await repo.balances(pool, employeeId, y, lagos.today()) };
+}
+
+/** One person's year, for People within their scope. */
+async function balancesOf(scope, employeeId, year) {
+  assertInScope(scope, employeeId);
+  return balancesFor(employeeId, year);
+}
+
+/** People set one person's allowance of one type for one year (null: the type's figure). */
+async function setAllowance(actor, scope, body) {
+  assertInScope(scope, body.employee_id);
+  const person = await repo.employeeOf(pool, body.employee_id);
+  if (!person) throw new AppError("NOT_FOUND", "That employee does not exist", 404);
+  const type = await repo.getType(pool, body.leave_type_id);
+  if (!type)
+    throw new AppError("LEAVE_TYPE_UNAVAILABLE", "Pick a leave type that exists", 422, {
+      leave_type_id: ["Not a type"],
+    });
+  await tx(async (client) => {
+    const before = await repo.setAllowance(client, body);
+    await emit(client, {
+      key: EVENTS.LEAVE_BALANCE_SET,
+      entity: { type: "employee", id: body.employee_id },
+      actor,
+      before: { days: before },
+      after: { days: body.days },
+      payload: {
+        employee_id: body.employee_id,
+        subject_employee_id: body.employee_id,
+        leave_type_name: type.name,
+        year: body.year,
+        days: body.days,
+      },
+    });
+  });
+  return balancesFor(body.employee_id, body.year);
+}
+
+/* ------------------------------------------------------------------ *
+ * Requesting and recording
+ * ------------------------------------------------------------------ */
+
+/** The type a request names: it must exist and be offered. */
+async function activeType(db, leaveTypeId) {
+  const type = await repo.getType(db, leaveTypeId);
+  if (!type || !type.active)
+    throw new AppError("LEAVE_TYPE_UNAVAILABLE", "Pick a leave type that is offered", 422, {
+      leave_type_id: ["Not offered"],
+    });
+  return type;
+}
+
+/**
+ * Every check a request must pass, on the transaction's client after the person's lock.
+ * @returns {Promise<number>} its length in working days
+ */
+async function checked(client, employeeId, body, type) {
+  const days = rules.daysOf(body.starts_on, body.ends_on, await workingWeek.loadCalendar(client));
+  const clash = await repo.overlapping(client, employeeId, body.starts_on, body.ends_on);
+  if (clash)
+    throw new AppError(
+      "LEAVE_OVERLAP",
+      "You already have leave on some of those days",
+      409,
+      { starts_on: ["Overlaps other leave"] },
+    );
+  const year = Number(body.starts_on.slice(0, 4));
+  const balance = (await repo.balances(client, employeeId, year, lagos.today())).find(
+    (b) => b.leave_type_id === type.leave_type_id,
+  );
+  rules.assertWithinAllowance(balance, days);
+  return days;
+}
+
+/** The employee asks for leave. Opens the approval in the same transaction. */
+async function request(user, employeeId, body) {
+  if (body.starts_on < lagos.today())
+    throw new AppError("LEAVE_IN_THE_PAST", "Pick a first day from today on", 422, {
+      starts_on: ["Already past"],
+    });
+  const id = await tx(async (client) => {
+    const type = await activeType(client, body.leave_type_id);
+    await repo.lockEmployee(client, employeeId);
+    const days = await checked(client, employeeId, body, type);
+    const row = await repo.insertRequest(client, {
+      employee_id: employeeId,
+      leave_type_id: type.leave_type_id,
+      starts_on: body.starts_on,
+      ends_on: body.ends_on,
+      amount: days,
+      reason: body.reason,
+      status: "submitted",
+    });
+    await emit(client, {
+      key: EVENTS.LEAVE_REQUEST_SUBMITTED,
+      entity: { type: "leave_request", id: row.leave_request_id },
+      actor: user,
+      after: row,
+      payload: payloadOf(row, type),
+    });
+    const instance = await engine.openInstance(client, {
+      definition_key: DEFINITION_KEY,
+      entity: { type: "leave_request", id: row.leave_request_id },
+      subject_employee_id: employeeId,
+      context: { days },
+      actor: user,
+    });
+    await repo.setWorkflow(client, row.leave_request_id, instance.workflow_instance_id);
+    return row.leave_request_id;
+  });
+  return getOwn(employeeId, id);
+}
+
+/** People record leave for someone in their scope. Approved at once, no flow. */
+async function record(actor, scope, body) {
+  assertInScope(scope, body.employee_id);
+  const person = await repo.employeeOf(pool, body.employee_id);
+  if (!person || person.status !== "active")
+    throw new AppError("EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", 422, {
+      employee_id: ["Not active"],
+    });
+  const id = await tx(async (client) => {
+    const type = await activeType(client, body.leave_type_id);
+    await repo.lockEmployee(client, body.employee_id);
+    const days = await checked(client, body.employee_id, body, type);
+    const row = await repo.insertRequest(client, {
+      employee_id: body.employee_id,
+      leave_type_id: type.leave_type_id,
+      starts_on: body.starts_on,
+      ends_on: body.ends_on,
+      amount: days,
+      reason: body.reason,
+      status: "approved",
+      recorded_by: actor.user_id,
+    });
+    await emit(client, {
+      key: EVENTS.LEAVE_REQUEST_RECORDED,
+      entity: { type: "leave_request", id: row.leave_request_id },
+      actor,
+      after: row,
+      payload: payloadOf(row, type),
+    });
+    return row.leave_request_id;
+  });
+  return getFor(id, scope);
+}
+
+/* ------------------------------------------------------------------ *
+ * Cancelling
+ * ------------------------------------------------------------------ */
+
+async function cancelRow(client, row, actor, reason) {
+  const done = await repo.cancel(client, row.leave_request_id);
+  if (!done) throw new AppError("LEAVE_NOT_CANCELLABLE", "This leave can no longer be cancelled", 409);
+  await emit(client, {
+    key: EVENTS.LEAVE_REQUEST_CANCELLED,
+    entity: { type: "leave_request", id: row.leave_request_id },
+    actor,
+    before: { status: row.status },
+    after: { status: "cancelled" },
+    payload: { ...payloadOf(row), reason: reason || null },
+  });
+}
+
+/** The employee cancels their own request: while it waits, or once granted until it starts. */
+async function cancelOwn(user, employeeId, id, body) {
+  const row = await repo.get(pool, id);
+  if (!row || row.employee_id !== employeeId) throw notFound();
+  const waiting = row.status === "submitted";
+  const notStarted = row.status === "approved" && row.starts_on > lagos.today();
+  if (!waiting && !notStarted)
+    throw new AppError("LEAVE_NOT_CANCELLABLE", "This leave can no longer be cancelled", 409);
+  await tx(async (client) => {
+    if (waiting && row.workflow_instance_id) {
+      await engine.cancel(client, {
+        instance_id: row.workflow_instance_id,
+        actor: user,
+        reason: body.reason || null,
+      });
+    }
+    await cancelRow(client, row, user, body.reason);
+  });
+  return getOwn(employeeId, id);
+}
+
+/** People cancel granted leave, until it ends. A waiting request is decided in My Approvals. */
+async function cancelFor(actor, scope, id, body) {
+  const row = await repo.get(pool, id);
+  if (!row) throw notFound();
+  assertInScope(scope, row.employee_id);
+  if (row.status === "submitted")
+    throw new AppError(
+      "LEAVE_AWAITING_APPROVAL",
+      "Decide this request in My Approvals instead",
+      409,
+    );
+  if (row.status !== "approved" || row.ends_on < lagos.today())
+    throw new AppError("LEAVE_NOT_CANCELLABLE", "This leave can no longer be cancelled", 409);
+  await tx((client) => cancelRow(client, row, actor, body.reason));
+  return getFor(id, scope);
+}
+
+/* ------------------------------------------------------------------ *
+ * After an approval ends
+ * ------------------------------------------------------------------ */
+
+const SETTLED_EVENT = {
+  approved: EVENTS.LEAVE_REQUEST_APPROVED,
+  rejected: EVENTS.LEAVE_REQUEST_REJECTED,
+  cancelled: EVENTS.LEAVE_REQUEST_CANCELLED,
+};
+
+/**
+ * Copy an approval's outcome onto its request. Runs after commit, at least once; a
+ * request already settled (or one that does not exist) is left alone.
+ * @param {string} id      the leave_request_id the approval is about
+ * @param {string|null} status  approved, rejected or cancelled
+ */
+async function settle(id, status) {
+  if (!SETTLED_EVENT[status]) return;
+  await tx(async (client) => {
+    const row = await repo.settle(client, id, status);
+    if (!row) return;
+    // The approval already told the person; this is the request's own audit line. A
+    // withdrawal from My Leave was recorded there, so a second line is not written.
+    if (status === "cancelled") return;
+    await emit(client, {
+      key: SETTLED_EVENT[status],
+      entity: { type: "leave_request", id },
+      actor: null,
+      before: { status: "submitted" },
+      after: { status },
+      payload: { leave_request_id: id, employee_id: row.employee_id, subject_employee_id: row.employee_id },
+    });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Leave types
+ * ------------------------------------------------------------------ */
+
+const listTypes = (query) => repo.listTypes(pool, query);
+
+async function createType(actor, body) {
+  if (await repo.typeByCode(pool, body.code))
+    throw new AppError("LEAVE_TYPE_EXISTS", "A leave type already has this code", 409, {
+      code: ["Already in use"],
+    });
+  if ((await repo.countActiveTypes(pool)) >= MAX_ACTIVE_TYPES)
+    throw new AppError("LEAVE_TYPES_FULL", `Retire a type first: ${MAX_ACTIVE_TYPES} is the most offered at once`, 409);
+  return tx(async (client) => {
+    const type = await repo.insertType(client, body);
+    await emit(client, {
+      key: EVENTS.LEAVE_TYPE_CREATED,
+      entity: { type: "leave_type", id: type.leave_type_id },
+      actor,
+      after: type,
+    });
+    return type;
+  });
+}
+
+async function updateType(actor, id, patch) {
+  const before = await repo.getType(pool, id);
+  if (!before) throw new AppError("NOT_FOUND", "That leave type does not exist", 404);
+  if (patch.active === true && !before.active && (await repo.countActiveTypes(pool)) >= MAX_ACTIVE_TYPES)
+    throw new AppError("LEAVE_TYPES_FULL", `Retire a type first: ${MAX_ACTIVE_TYPES} is the most offered at once`, 409);
+  return tx(async (client) => {
+    const after = await repo.updateType(client, id, patch);
+    await emit(client, {
+      key: EVENTS.LEAVE_TYPE_UPDATED,
+      entity: { type: "leave_type", id },
+      actor,
+      before,
+      after,
+    });
+    return after;
+  });
+}
+
+/**
+ * Delete a type nothing has used. A type with requests or balances is part of their
+ * history, so it is refused and People retire it instead (PATCH active: false).
+ */
+async function deleteType(actor, id) {
+  const before = await repo.getType(pool, id);
+  if (!before) throw new AppError("NOT_FOUND", "That leave type does not exist", 404);
+  const inUse = () =>
+    new AppError(
+      "LEAVE_TYPE_IN_USE",
+      "This type has leave on record. Retire it instead.",
+      409,
+    );
+  if (await repo.typeInUse(pool, id)) throw inUse();
+  await tx(async (client) => {
+    if (!(await repo.deleteType(client, id))) throw inUse();
+    await emit(client, {
+      key: EVENTS.LEAVE_TYPE_DELETED,
+      entity: { type: "leave_type", id },
+      actor,
+      before,
+    });
+  });
+}
+
+module.exports = {
+  MAX_ACTIVE_TYPES,
+  list,
+  getFor,
+  summary,
+  clashes,
+  listFor,
+  getOwn,
+  balancesFor,
+  balancesOf,
+  setAllowance,
+  request,
+  record,
+  cancelOwn,
+  cancelFor,
+  settle,
+  listTypes,
+  createType,
+  updateType,
+  deleteType,
+};

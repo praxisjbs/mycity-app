@@ -119,7 +119,9 @@ line manager, then Operations & People over 5 days; §6.5).
 **Built:** `1000` Home alerts and rules, reports and schedules, attendance (policy, events, day,
 exceptions), leave (types, balances, requests), community (channels, members, messages, reactions,
 recognition), announcements, mailbox (accounts, folders, threads, messages, attachments) · `1099`
-seed · `1100` `home_alert` columns the alerts code writes.
+seed · `1100` `home_alert` columns the alerts code writes · `1200` leave requests as the leave
+module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list indexes) ·
+`1290` the leave status code list (Cancelled added, Draft switched off) and the four leave types.
 
 **Owes:**
 - Attendance (attendance.md §4): employee home location, field assignment, location requests
@@ -244,6 +246,7 @@ No tables needed: backups and drills are scripts (`scripts/db/backup.sh`, `resto
 |---|---|---|
 | Tables for M11 | Handover is scripts and documents, not records | MILESTONES §16 |
 | Demonstration and business data in production | Reference seeds hold only what the code cannot run without; categories, stages, policies and thresholds are entered by MyCity | A5, A26 |
+| (Exception) The four default leave types in production | Seeded in `1290` (Annual 20, Compassionate 5, Sick 12, Unpaid) with DO NOTHING; People change, retire or add types on People · Leave | The team lead, 17/10/2026 |
 
 Anything else in MILESTONES that has no table yet is **owed**, not excluded, and is listed under
 its milestone in §3.

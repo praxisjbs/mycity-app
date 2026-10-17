@@ -3,32 +3,6 @@ import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Tone, Uuid } from "
 /** INTERIM Employee Self-Service shapes (owner AJ; docs/guides/ess.md). Scope is always own. */
 type Pill = { tone: Tone; text: string };
 
-export interface MyProfile {
-  employee_id: Uuid;
-  display_name: string;
-  job_title: string;
-  department: string;
-  photo_url: string | null;
-  chips: Pill[];
-  personal: { full_name: string; date_of_birth: IsoDate; phone: string; work_email: string; address: string };
-  employment: { job_title: string; department: string; line_manager: string; start_date: IsoDate; employment_type: string; arrangement: string; status: Pill };
-  bank: { bank_name: string; account_name: string; account_last4: string };
-  next_of_kin: { name: string; relationship: string; phone: string };
-  schedule: Array<{ day: string; mode: "Office" | "Remote" | "Field" | "Off"; hours: string; where: string }>;
-  can_change: Array<{ field: string; how: Pill }>;
-  history: Array<{ title: string; when: string; text?: string; tone?: "hi" | "ok" }>;
-}
-export interface ProfilePatch {
-  phone?: string;
-  address?: string;
-  next_of_kin_name?: string;
-  next_of_kin_relationship?: string;
-  next_of_kin_phone?: string;
-  bank_name?: string;
-  account_number?: string;
-  photo_document_id?: Uuid;
-}
-
 export interface MyPerformance {
   period: string;
   set_by: string;
@@ -68,8 +42,6 @@ type Q<T = object> = T & { page?: number; q?: string };
 
 declare module "@/api/endpoints" {
   interface Endpoints {
-    "GET /api/v1/ess/profile": { query: never; body: never; params: never; response: MyProfile };
-    "PATCH /api/v1/ess/profile": { query: never; body: ProfilePatch; params: never; response: MyProfile };
     "GET /api/v1/ess/performance": { query: never; body: never; params: never; response: MyPerformance };
     "GET /api/v1/ess/queries/summary": { query: never; body: never; params: never; response: MyQueriesSummary };
     "GET /api/v1/ess/queries": { query: Q<{ view: "open" | "archived" }>; body: never; params: never; response: Paged<MyQuery> };
