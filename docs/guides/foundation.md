@@ -76,7 +76,7 @@ These finish M0 and no prompt can do them:
 | Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | **Built** (17/10/2026) | As `organogram.md` describes, on the real API, with the phone focus view |
 | Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | **Built** (17/10/2026) | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | **Built** (17/10/2026) | Their documents and the ones People asked for, upload, download, preview |
-| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | **Built** (17/10/2026) | Organisation profile, working week, public holidays entered on screen |
+| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | **Built** (17/10/2026) | Organisation profile, working week, public holidays (Nigeria's seeded, the moon-dated and weekend ones Expected until confirmed; others entered on screen) |
 | Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | **Built** (17/10/2026) | Roles created, edited and deleted; the grants matrix, field visibility and capabilities per role |
 | Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Every numbering scheme with its next number, editable. No other document setting is specified yet |
 | Settings · Security (#78) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
@@ -121,7 +121,7 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 | `document_request` | 0350 | B | What People asked an employee for; a Missing row until it is given (§6.9) |
 | `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3). `0400` adds `role.two_step_required` (§6.4) |
 | `role_capability` | 0400 | C | A capability given to everyone holding a role; `user_capability` still gives one to a single person, and a person has the union |
-| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows; security rules are `security.<rule>` rows with an `.env` floor (§6.4) |
+| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows; security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026) |
 | `audit_ledger`, `event_log` | 0030 | C | Read only. `0400` adds the indexes the Audit Log filters on (when, module, action, record) and one on live sessions |
 | `spent_challenge` | 0230 | C | `0400` widens its purpose check with `two_step_setup`, the ticket of the set-up step at sign-in (§6.4) |
 | `workflow_definition`, `workflow_instance`, `workflow_decision` | 0070 | D | The leave definition in `0499` |
@@ -470,7 +470,7 @@ screen.
 | Employee record | Profile, Job, Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
-| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Public Holidays by year; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week | None | Who reads the working week and holidays: §3 |
+| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | None | Who reads the working week and holidays: §3; why some are Expected: §4 |
 | Settings · Roles & Permissions | Roles: name, people, modules, record scope, sensitive fields; the grants matrix; a role opens its modules with actions and scope, Sensitive Fields and Capabilities; New Role, Save Role, Create Role, Delete Role | Help term on Record Scope (all, team, own); Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
@@ -512,6 +512,9 @@ screen.
   the session: refused, "Within the session length".
 - A role change that would leave the person saving it without Settings: refused (`LOCKOUT`).
 - Two public holidays on one date: refused, "Already a holiday".
+- An expected holiday the Federal Government moves: open it, change the date, Confirm Holiday. One
+  it does not declare at all: Delete Holiday. Attendance and leave count an expected holiday from
+  the start, so a move changes the working days of leave already requested over it.
 - A numbering scheme that starts again each year or month without the period in the number:
   refused, since numbers would repeat.
 - Ending your own session from Settings · Security: refused; Sign Out does that.
@@ -546,6 +549,10 @@ screen.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · §2, §4, §10.1, §11: Nigeria's public holidays for 2026 and 2027 are seeded
+  (`seeds/reference/0448`): the days the Public Holidays Act fixes as declared, and the Eids (from the
+  Umm al-Qura calendar) and the weekday given for a weekend holiday as Expected, which `0410` adds and
+  Confirm Holiday clears. A26 amended: a holiday set by law is not a business choice.
 - 17/10/2026 · TB · §6.7, §10.1: ⌘K gains Waiting on You (first, with nothing typed), open seats,
   preferred and middle names, the theme, density, Install App and Sign Out as actions, and one forgiven
   slip in screens and actions.

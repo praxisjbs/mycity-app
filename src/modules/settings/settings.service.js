@@ -7,7 +7,9 @@
  *                  screen and never seeded
  *   working week   Monday to Sunday (A22); attendance, leave and SLAs read it
  *                  through shared/time/working-week, whose cache is cleared here
- *   holidays       entered on screen, never seeded (A26); the same calendar
+ *   holidays       Nigeria's seeded for 2026 and 2027 (seeds/reference/0448), the
+ *                  moon-dated and weekend ones expected until saved here, which confirms
+ *                  them; others entered on screen; the same calendar
  *   numbering      a scheme per numbered document type; a change applies to the
  *                  next number, never to one already issued
  *   security       session length, idle lock and password minimum within the .env
@@ -174,14 +176,14 @@ async function updateHoliday(id, body, actor) {
     if (!before) throw notFound();
     const clash = await repo.holidayOn(client, body.holiday_date, id);
     if (clash) throw dateTaken(clash);
-    if (before.holiday_date === body.holiday_date && before.name === body.name) return before;
+    if (before.holiday_date === body.holiday_date && before.name === body.name && !before.expected) return before;
     const after = await repo.updateHoliday(client, id, body);
     await emit(client, {
       key: EVENTS.SETTINGS_CHANGED,
       entity: { type: "public_holiday", id },
       actor,
-      before: { holiday_date: before.holiday_date, name: before.name },
-      after: { holiday_date: after.holiday_date, name: after.name },
+      before: { holiday_date: before.holiday_date, name: before.name, expected: before.expected },
+      after: { holiday_date: after.holiday_date, name: after.name, expected: after.expected },
       payload: { area: "holidays" },
     });
     return after;
