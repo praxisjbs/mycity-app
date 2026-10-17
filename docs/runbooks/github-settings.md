@@ -37,7 +37,10 @@ Settings → Environments:
 - [ ] `staging`: deployment branches and tags → selected branches → `main` only. Holds
   `STAGING_SSH_KEY`.
 - [ ] `production`: required reviewers **@tomblakeasaah196 and @swizfcodes**, **prevent self-review**
-  on, deployment branches `main` only. Holds `PROD_SSH_KEY`. Never store the production key as a
+  on, deployment branches `main` only. Holds `PROD_SSH_KEY`. While the repository is private on a
+  free plan the reviewers section is not offered at all: set **Selected branches and tags** to
+  `main` (not "Protected branches only", which allows every branch when no rule exists), and
+  production runs only by hand (SYSTEM_ARCHITECTURE §9.3, interim). Never store the production key as a
   repository secret: it must be released only after approval (SYSTEM_ARCHITECTURE §9.3).
 
 ## Repository secret

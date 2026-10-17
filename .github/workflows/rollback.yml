@@ -1,7 +1,9 @@
 name: Rollback
 
-# Switch production back to a release still on the server (the last five are kept), after a
-# production approver approves (SYSTEM_ARCHITECTURE §9.7, docs/runbooks/rollback.md). The database
+# Switch production back to a release still on the server (the last five are kept), run by a
+# production approver from main (SYSTEM_ARCHITECTURE §9.7, docs/runbooks/rollback.md). Required
+# reviewers on the environment add a second person where the plan offers them; the approver job
+# below holds while it does not (release.yml says why). The database
 # is not rolled back: if the release being left migrated, restore its pre-deploy dump as the
 # runbook says.
 
@@ -21,8 +23,34 @@ permissions:
   contents: read
 
 jobs:
+  approver:
+    name: Check the approver
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Production approvers: GE and TB (SYSTEM_ARCHITECTURE §9.3). The same list is in release.yml.
+      - name: Only a production approver, from main, with a full sha
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+          REF: ${{ github.ref }}
+          SHA: ${{ inputs.sha }}
+          APPROVERS: "swizfcodes tomblakeasaah196"
+        run: |
+          case " $APPROVERS " in
+            *" $ACTOR "*) ;;
+            *) echo "::error::$ACTOR is not a production approver (GE or TB)"; exit 1 ;;
+          esac
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::run it from main, not $REF"; exit 1
+          fi
+          if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::sha must be the full 40 lowercase hex characters"; exit 1
+          fi
+          echo "$ACTOR rolls production back to ${SHA:0:12}"
+
   rollback:
     name: Roll production back
+    needs: approver
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:

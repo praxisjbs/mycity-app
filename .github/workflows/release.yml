@@ -1,20 +1,27 @@
 name: Release
 
-# Every green build of main goes to staging, is verified there and sealed, then waits for a
-# person to approve production (SYSTEM_ARCHITECTURE §9, docs/runbooks/deploy.md).
+# Every green build of main goes to staging, is verified there and sealed. Production is a
+# separate run of this workflow, started by hand by a production approver (SYSTEM_ARCHITECTURE §9,
+# docs/runbooks/deploy.md).
 #
-#   build ──► deploy-staging ──► verify-staging (seal) ──► production (approval, then promote)
+#   after CI on main:   build ──► deploy-staging ──► verify-staging (seal)
+#   run by hand:        approver ──► production (promote the sealed staging release)
+#
+# While the repository is private on a free plan, GitHub offers no required reviewers on an
+# environment, so an automatic production job would run with nobody approving it
+# (docs/runbooks/github-settings.md). Until that changes, production runs only when GE or TB start
+# it from main with the sha staging runs; the approver job refuses anyone else. It is weaker than
+# required reviewers: a change to this file can remove it, so the CODEOWNERS review of .github/
+# is part of the control.
 #
 # The server is reached only through deploy-gate (scripts/deploy/deploy-gate), as mycity-deploy,
 # whose keys are forced into it. The staging key can stage and seal; the production key can
-# promote and roll back. GitHub releases PROD_SSH_KEY to the production job only after a required
-# reviewer (GE or TB, not the person who triggered it) approves, so without approval no job ever
-# holds a key that can touch production.
+# promote and roll back.
 #
 # Settings this needs (docs/runbooks/deploy.md §1):
 #   environment staging      secret STAGING_SSH_KEY, deployment branch main
-#   environment production   secret PROD_SSH_KEY, required reviewers GE and TB, prevent
-#                            self-review, deployment branch main
+#   environment production   secret PROD_SSH_KEY, deployment branch main (and required reviewers
+#                            GE and TB with self-review prevented, where the plan offers them)
 #   repository variables     DEPLOY_HOST (108.181.196.53), DEPLOY_KNOWN_HOSTS (the server's
 #                            ssh-keyscan line)
 
@@ -23,6 +30,12 @@ on:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Full 40-character sha of the release staging runs and has sealed"
+        required: true
+        type: string
 
 # One release at a time, and never two at once with a rollback.
 concurrency:
@@ -35,7 +48,10 @@ permissions:
 jobs:
   build:
     name: Build the release
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -164,14 +180,52 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "mycity-deploy@$HOST" "seal $SHA $RUN"
 
+      - name: Say how to release it
+        env:
+          SHA: ${{ needs.build.outputs.sha }}
+        run: |
+          {
+            echo "### Staging is sealed on \`${SHA:0:12}\`"
+            echo
+            echo "To release it, a production approver tests staging, then runs **Release** from \`main\` (Actions, Run workflow) with this sha:"
+            echo
+            echo "\`$SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  approver:
+    name: Check the approver
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Production approvers: GE and TB (SYSTEM_ARCHITECTURE §9.3). The same list is in rollback.yml.
+      - name: Only a production approver, from main, with a full sha
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+          REF: ${{ github.ref }}
+          SHA: ${{ inputs.sha }}
+          APPROVERS: "swizfcodes tomblakeasaah196"
+        run: |
+          case " $APPROVERS " in
+            *" $ACTOR "*) ;;
+            *) echo "::error::$ACTOR is not a production approver (GE or TB)"; exit 1 ;;
+          esac
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::run it from main, not $REF"; exit 1
+          fi
+          if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::sha must be the full 40 lowercase hex characters"; exit 1
+          fi
+          echo "$ACTOR releases ${SHA:0:12} to production"
+
   production:
-    name: Production (approve after testing staging)
-    needs: [build, verify-staging]
+    name: Production (run by an approver after testing staging)
+    needs: approver
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # The job waits here for a required reviewer. Before approving: open hub.staging/api/health,
-    # check its build is this one, walk the demo script for what this release touches, and approve
-    # with a comment naming what was checked (SYSTEM_ARCHITECTURE §9.8).
+    # Before running it: open hub.staging/api/health, check its build is this sha, and walk the
+    # demo script for what this release touches (SYSTEM_ARCHITECTURE §9.8). deploy-gate still
+    # refuses a sha that staging does not run or never sealed.
     environment:
       name: production
       url: https://hub.mycityapp.io
@@ -181,7 +235,7 @@ jobs:
       - name: Check out the release's commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.build.outputs.sha }}
+          ref: ${{ inputs.sha }}
 
       - name: Load the production key
         env:
@@ -201,7 +255,7 @@ jobs:
       - name: deploy-gate promote
         env:
           HOST: ${{ vars.DEPLOY_HOST }}
-          SHA: ${{ needs.build.outputs.sha }}
+          SHA: ${{ inputs.sha }}
           RUN: ${{ github.run_id }}
         run: |
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
@@ -209,7 +263,7 @@ jobs:
 
       - name: Tag the release
         env:
-          SHA: ${{ needs.build.outputs.sha }}
+          SHA: ${{ inputs.sha }}
         run: |
           tag="release-$(TZ=Africa/Lagos date +%Y%m%d-%H%M)-${SHA:0:12}"
           git tag "$tag" "$SHA"

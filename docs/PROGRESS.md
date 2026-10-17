@@ -97,6 +97,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · Production runs only by hand while the repository is private: GitHub offers no
+  required reviewers there, so releases 130 to 134 reached production seconds after the seal. The
+  automatic `release.yml` run now stops at the seal and names the sha; an approver (GE or TB)
+  starts Release from `main` with it, and an `approver` job in `release.yml` and `rollback.yml`
+  refuses anyone else (SYSTEM_ARCHITECTURE §9.3, deploy runbook §2). Left: TB sets the production
+  environment to Selected branches `main`; the server-side approval if the repository stays private.
 - 17/10/2026 · TB · Track D of `docs/guides/foundation.md` built: the `workflow` module's routes (My
   Approvals and `/workflow/mine/count` for Home's Waiting on You, one request with its route and
   decisions, approve, reject and request changes with a reason, withdraw, and reassign from the guide's
