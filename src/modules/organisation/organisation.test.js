@@ -7,6 +7,8 @@
  * The rest of the module (the register, the 360, the tree, the importer and the roster
  * loader) is tested against the real schema in tests/integration/organisation.test.js.
  */
+const fs = require("node:fs");
+const path = require("node:path");
 const managerText = require("./manager-text");
 const service = require("./organisation.service");
 const employee360 = require("./employee-360.service");
@@ -152,6 +154,36 @@ describe("the roles a post is given", () => {
 
   test("a work email is offered for a post whose sheet cell is empty", () => {
     expect(loader.emailsByJobTitle(roles)).toEqual({ "Head of Delivery": "delivery@mycity.test" });
+  });
+});
+
+describe("the staff importer the register offers", () => {
+  const modules = require("../../http/module-loader");
+  const registry = require("../../shared/import/registry");
+
+  test("the API registers it, so Import Staff has somewhere to go", () => {
+    /* The imports API lists what the registry holds (B's Settings · Imports), and the
+       worker runs the same files. If the API process did not load them, a staff sheet
+       would have nowhere to go on a screen (docs/guides/foundation.md §1.1). */
+    modules.loadImporters({ strict: true });
+    expect(registry.all().map((i) => i.key)).toContain("employees");
+    const employees = registry.get("employees");
+    expect(employees.permission).toEqual(["people", "create"]);
+    expect(employees.entity).toBe("employee");
+    expect(employees.matchKeys).toEqual(["staff_number", "work_email"]);
+  });
+
+  test("the deploy loads the roster on both environments, after the migrations", () => {
+    const gate = fs.readFileSync(path.join(__dirname, "..", "..", "..", "scripts", "deploy", "deploy-gate"), "utf8");
+    const migrate = gate.slice(gate.indexOf("migrate() {"), gate.indexOf("# Switch, restart"));
+    expect(migrate).toMatch(/scripts\/db\/migrate\.js/);
+    expect(migrate).toMatch(/scripts\/db\/load-staff\.js/);
+    expect(migrate.indexOf("migrate.js")).toBeLessThan(migrate.indexOf("load-staff.js"));
+    /* migrate() is what both stage (staging) and promote (production) call. */
+    expect(gate).toMatch(/migrate stg "\$sha"/);
+    expect(gate).toMatch(/migrate prod "\$sha"/);
+    /* A row the sheet gets wrong is a warning, never a stopped deploy. */
+    expect(migrate).toMatch(/load-staff\.js\) \|\|\n?\s*say "warning/);
   });
 });
 

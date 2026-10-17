@@ -416,7 +416,9 @@ screen.
   on LA's attendance routes. Three additive changes outside the module, each in the PR: the import
   engine takes batch `options` and honours a service that answers "nothing to write",
   `numbering.advanceTo()`, and `blank()` in the contract for an optional field a form leaves empty.
-  Import Staff on the register opens track B's Settings · Imports, which landed first.
+  Import Staff on the register opens track B's Settings · Imports, which landed first. The API now
+  registers every module's importers at boot, the way the worker already did (`http/module-loader.js`):
+  the two tracks meet at the registry, and without it B's screen would list nothing to import.
 - 17/10/2026 · TB · Track B built: the `imports` API over any registered importer, Settings · Imports
   (#93, the wizard and the history), the `documents` module (gated upload, download, versions,
   verification and document requests) and ESS · My Documents (#14) on the real API. Migration `0350`
