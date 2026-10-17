@@ -121,7 +121,9 @@ exceptions), leave (types, balances, requests), community (channels, members, me
 recognition), announcements, mailbox (accounts, folders, threads, messages, attachments) · `1099`
 seed · `1100` `home_alert` columns the alerts code writes · `1110` community: post policy, pinned
 and system channels, delivered pointer, the wider message kinds, transcripts, poll votes,
-presence, `announcement_read` and the announcement's message, audience size and reminder.
+presence, `announcement_read` and the announcement's message, audience size and reminder · `1120`
+mailbox: connection status and errors, folder kinds and sync cursor, thread keys, the reader's
+message fields, `mail_draft` and `mail_send_queue`.
 
 **Owes:**
 - Attendance (attendance.md §4): employee home location, field assignment, location requests
@@ -129,7 +131,6 @@ presence, `announcement_read` and the announcement's message, audience size and 
   upsert, the lateness deduction amount.
 - Devices (ess.md §6): enrolment requests, status and the three-device rule on `known_device`.
 - Home (home.md §4): `home_report_run`, `role_kpi` (per-role tile defaults and locks), alert scope.
-- Mailbox (mailbox.md §4): drafts, the send queue, flags, `uidvalidity`.
 
 ### M2 Productivity & Performance · 2000 to 2999 · AJ
 

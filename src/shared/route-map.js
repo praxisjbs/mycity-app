@@ -134,8 +134,8 @@ const ENTITY_ROUTES = Object.freeze({
   direct_message: screen("community", "direct-messages"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
   announcement: screen("community", "announcements"),
   recognition: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
-  mail_thread: screen("mailbox", "inbox"), // search:none not built yet (src/modules/mailbox)
-  mail_message: screen("mailbox", "inbox"), // search:none not built yet (src/modules/mailbox)
+  mail_thread: screen("mailbox", "inbox"), // search:none mail is reached only by its owner, and a provider is gated by the module grant alone
+  mail_message: screen("mailbox", "inbox"), // search:none mail is reached only by its owner, and a provider is gated by the module grant alone
 
   // People
   employee: {

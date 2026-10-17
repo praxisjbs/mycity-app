@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "c27eebd61c7b12d3ab709d0e3532509e302986103ad1d618a08a68a16ab84c3c",
-  "schemas": 294,
-  "endpoints": 155,
+  "source_hash": "47b5a6add44a29c25f2ed14905392d29f3a112cea37e49535c9b3c7f79f4d37b",
+  "schemas": 313,
+  "endpoints": 170,
   "inputs": {
     "packages/contract/schemas/access.js": "5e42b1010a52ff1650bd20a6430a3cf96617799b8312f9dd002fa37d324e2df4",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -37,7 +37,7 @@
     "packages/contract/schemas/kpis.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/leads.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/leave.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/mailbox.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/mailbox.js": "bb51b73577767756343bda0aa9aa6624dc6fd0feaabcce4f0bbfc35cbb3fdf54",
     "packages/contract/schemas/notifications.js": "825e1c3fef00bc4b56773cfc5e17a1d91b6cb8c9dc5b87659df642eca5f07223",
     "packages/contract/schemas/offers.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/onboarding.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -77,6 +77,7 @@
     "src/modules/ess/ess.routes.js": "97762cebfdf616bc9bacf2e19b9741195cc0d015cd53bf6972904a53ae5c333a",
     "src/modules/identity/identity.routes.js": "c2f88374e78efe933dcbc6a7d988e41adf56a4729329b6fead313532e7978f83",
     "src/modules/imports/imports.routes.js": "581a544f9a5a30e45bdbc8ce6e13c91a360e031362d543e690c5e29561127fb0",
+    "src/modules/mailbox/mailbox.routes.js": "b408566f404b8fd76b4c49812d0af2171f1028965cc284cc7ef7d9cdf668d696",
     "src/modules/notifications/notifications.routes.js": "6a225f2fe527f8525aa9a54995fb38b63cc67066c145fb4f8707d1ec4d4d6f9e",
     "src/modules/organisation/organisation.routes.js": "44837fda18c6ec886e32e3712489d1c6d592e560e52c3ecc595d25cb8eba594e",
     "src/modules/search/search.routes.js": "0e82222d55484d42635f18d0da8068d4665bb070e4407a57b498ef829a7e44bd",

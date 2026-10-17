@@ -286,9 +286,9 @@ The settings modules that every user touches (`identity` login, own `notificatio
 | `worksites` | LA | |
 | `leave` | AJ | `.balance`, `.clash` |
 | `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents` (aggregator) |
-| `community` | GE | `.presence`, `.media`, `.links`, `.recognition` (A19), `.celebrations` (A20), `.export` |
+| `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
 | `announcements` | GE | |
-| `mailbox` | GE | `providers/imap-smtp.provider.js`, `threads.{repo,service}`, `threading`, `send-queue.{repo,service}`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `access`, `visible`, `find`, `presend`, `attachments.service`, `schedule`, `origin`, `mail-notify` |
+| `mailbox` | GE | `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7) |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
 `services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `shared/geo`,
@@ -427,7 +427,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
 | M0 | `email-send`, `pdf-render`, `notification-deliver`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
-| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `scheduled-report`, `announcement-publish` (delayed, scheduled announcements) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `scheduled-reports`; loop `loops/mail-idle` |
+| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `scheduled-reports`; loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |
 | M4 | `assessment-expire`, `interview-feedback-reminder` | `assessment-expiry`, `interview-reminders` |
@@ -686,9 +686,13 @@ On production, run it without `--sample` and enter the real person's details
    what it is; add it to §4 of this README in the same PR.
 3. A new module needs: its folder in the §5.1 shape, its schema file in `packages/contract`, its
    permission key mapped in `access.catalog.js` and §5.2 above, its migration in its milestone's
-   block, and its `.ai.js` and `.search.js`.
+   block, and its `.ai.js` and `.search.js` (or `// ai:none` and `// search:none` with a reason in its controller).
 4. Never a second copy of a shared concern (a module-local mailer, money helper, date formatter,
    file store or AI client). CI checks several of these; review checks the rest.
+5. **A finished module keeps no empty files.** The map creates every file empty before its module is
+   built. When the module's milestone work is done, delete each of its files that is still empty and
+   take it off this map in the same PR (and out of the feature guide's file list). A file kept empty
+   for a later milestone stays, and its row says which milestone fills it, as `binding/` (M7) does.
 
 ---
 

@@ -474,6 +474,51 @@ const ENTRIES = [
     },
   ],
 
+  // Mailbox (docs/guides/mailbox.md §6): each person's own company mailbox over IMAP and SMTP.
+  [
+    "MAILBOX_IMAP_HOST",
+    str(""),
+    {
+      group: "Mailbox",
+      doc: "IMAP host for every mailbox. Empty: mail.<the address's domain>, which is MyCity's cPanel host.",
+      example: "mycityapp.io",
+    },
+  ],
+  ["MAILBOX_IMAP_PORT", int(993, { min: 1, max: 65535 }), { group: "Mailbox", doc: "IMAP port (993, TLS)." }],
+  [
+    "MAILBOX_SMTP_HOST",
+    str(""),
+    {
+      group: "Mailbox",
+      doc: "SMTP host for every mailbox. Empty: mail.<the address's domain>.",
+      example: "mycityapp.io",
+    },
+  ],
+  ["MAILBOX_SMTP_PORT", int(465, { min: 1, max: 65535 }), { group: "Mailbox", doc: "SMTP port (465, TLS)." }],
+  [
+    "MAILBOX_TLS",
+    bool(true),
+    { group: "Mailbox", doc: "TLS to the mail host, with the certificate checked against its name. Off only for a local test server." },
+  ],
+  [
+    "MAILBOX_SEND_PER_HOUR",
+    int(50, { min: 1, max: 10000 }),
+    { group: "Mailbox", doc: "Recipients one mailbox may send to in an hour; the send queue waits beyond it (the host's plan allows 50)." },
+  ],
+  [
+    "MAILBOX_SYNC_EVERY_MIN",
+    int(2, { min: 1, max: 60 }),
+    { group: "Mailbox", doc: "Minutes between syncs of every connected mailbox, the safety net behind IMAP IDLE." },
+  ],
+  [
+    "MAILBOX_IDLE_MAX",
+    int(0, { min: 0, max: 30 }),
+    {
+      group: "Mailbox",
+      doc: "Mailboxes held open on IMAP IDLE by the worker, so new mail arrives without waiting for a sync. The host allows 30 connections per IP for production and staging together: 24 on production, 0 on staging and laptops.",
+    },
+  ],
+
   // AI (BACKEND_STRUCTURE §14). No key: every AI call uses the stub and is still recorded.
   [
     "GEMINI_API_KEY",

@@ -587,6 +587,7 @@ describe("schedules and heartbeat", () => {
       "announcement-release",
       "celebrations",
       "import-cleanup",
+      "mail-sync",
       "media-reconcile",
       "workflow-timeout",
     ]);

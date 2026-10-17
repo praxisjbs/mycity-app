@@ -142,6 +142,8 @@ async function start() {
   const workers = registry.startConsumers();
   const schedules = await registry.startSchedules();
   const stopHeartbeat = registry.startHeartbeat();
+  // Mailbox: IMAP IDLE on up to MAILBOX_IDLE_MAX inboxes (none on staging and laptops).
+  const mailIdle = require("./jobs/loops/mail-idle").start();
   logger.info(
     {
       queues: workers.map((w) => w.name),
@@ -159,6 +161,7 @@ async function start() {
     const force = setTimeout(() => process.exit(1), FORCE_EXIT_MS);
     force.unref();
     schedules.stop();
+    await mailIdle.stop();
     await Promise.allSettled(workers.map((w) => w.close()));
     await stopHeartbeat();
     await require("./jobs/queues").closeQueues();

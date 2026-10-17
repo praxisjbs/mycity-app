@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
-import type { MailAttachment, MailDraftSave } from "@/api/types/mailbox";
+import type { MailDraftSave } from "@/api/types/mailbox";
+import type { DocumentRef } from "@/api/types/common";
 import { Button, cn, DateField, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, Pill, RichTextField, TextField, toast, todayIso, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
 
@@ -12,14 +13,15 @@ export interface ComposeInit {
   bcc?: string[];
   subject?: string;
   body_html?: string;
-  attachments?: MailAttachment[];
+  attachments?: DocumentRef[];
+  in_reply_to?: string | null;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 
 /** Recipients as chips: Enter, comma or semicolon adds one; a bad address is marked as it is typed. */
-function Recipients({ id, label, list, onChange, bad, right }: { id: string; label: string; list: string[]; onChange: (v: string[]) => void; bad?: boolean; right?: React.ReactNode }) {
+function Recipients({ id, label, list, onChange, bad, error, right }: { id: string; label: string; list: string[]; onChange: (v: string[]) => void; bad?: boolean; error?: string | null; right?: React.ReactNode }) {
   const [text, setText] = useState("");
   const add = () => {
     const v = text.replace(/[,;\s]+$/, "").trim();
@@ -50,6 +52,7 @@ function Recipients({ id, label, list, onChange, bad, right }: { id: string; lab
           } else if (e.key === "Backspace" && !text && list.length) onChange(list.slice(0, -1));
         }}
       />
+      {error && <span role="alert" className="text-2xs font-semibold text-destructive">{error}</span>}
       {right}
     </div>
   );
@@ -75,17 +78,17 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   const [bcc, setBcc] = useState(init.bcc ?? []);
   const [showCc, setShowCc] = useState(!!(init.cc?.length || init.bcc?.length));
   const [subject, setSubject] = useState(init.subject ?? "");
-  const [files, setFiles] = useState<MailAttachment[]>(init.attachments ?? []);
+  const [files, setFiles] = useState<DocumentRef[]>(init.attachments ?? []);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved">("idle");
   const [stored, setStored] = useState(!!init.draft_id);
   const [sched, setSched] = useState<{ open: boolean; date: string; time: string; tried: boolean; past: boolean }>({ open: false, date: "", time: "", tried: false, past: false });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [toBad, setToBad] = useState(false);
+  const [toBad, setToBad] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [body, setBody] = useState(init.body_html ?? "");
   const dirty = useRef(0);
 
-  const payload = (): MailDraftSave => ({ to, cc, bcc, subject, body_html: body, attachment_ids: files.map((f) => f.attachment_id) });
+  const payload = (): MailDraftSave => ({ to_addresses: to, cc_addresses: cc, bcc_addresses: bcc, subject, body_html: body, document_ids: files.map((f) => f.document_id), in_reply_to: init.in_reply_to ?? null });
 
   /* Autosave 700 ms after the last change. */
   const [tick, setTick] = useState(0);
@@ -108,22 +111,20 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   }, [tick, to, cc, bcc, subject, body, files]);
 
   const send = async (release_at?: string) => {
-    if (!to.length) {
-      setToBad(true);
-      toast("Add at least one recipient");
+    if (!to.length || [...to, ...cc, ...bcc].some((a) => !EMAIL.test(a))) {
+      setToBad(to.length ? "Not an email address" : "Add a recipient");
       return document.getElementById("mto")?.focus();
     }
-    const bad = [...to, ...cc, ...bcc].find((a) => !EMAIL.test(a));
-    if (bad) return toast(`${bad} is not an email address`);
     setBusy(true);
     try {
-      await api.call("POST /api/v1/mailbox/messages", { body: { ...payload(), subject: subject.trim(), ...(stored && { draft_id: draftId }), ...(release_at && { release_at }) }, idempotencyKey: sendKey });
+      await api.call("POST /api/v1/mailbox/messages", { body: { ...payload(), subject: subject.trim(), mail_draft_id: draftId, ...(release_at && { release_at }) }, idempotencyKey: sendKey });
       invalidate("/api/v1/mailbox");
       close();
       toast(release_at ? `Scheduled for ${formatDate(release_at.slice(0, 10))} ${release_at.slice(11, 16)}` : `Sent to ${to.join(", ")}`);
     } catch (e) {
       setBusy(false);
-      if (e instanceof ApiError && e.fields?.release_at) setSched((s) => ({ ...s, past: true }));
+      if (e instanceof ApiError && e.fields?.release_at) setSched((s) => ({ ...s, open: true, past: true }));
+      else if (e instanceof ApiError && e.fields?.to_addresses) setToBad("Not an email address");
       else toast(e instanceof ApiError ? e.message : "Could not send");
     }
   };
@@ -150,7 +151,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
         <InlineLabel htmlFor="mfrom" className="w-14 flex-none text-xs font-semibold text-subtle-foreground">From</InlineLabel>
         <InlineSelect id="mfrom" className="h-7.5 rounded-ctl border border-border bg-background px-2 text-sm" value={from} onChange={() => undefined} options={[from]} />
       </div>
-      <Recipients id="mto" label="To" list={to} onChange={(v) => (setTo(v), setToBad(false), touch())} bad={toBad} right={!showCc && <button type="button" className="text-xs font-semibold text-accent-foreground" onClick={() => setShowCc(true)}>Cc Bcc</button>} />
+      <Recipients id="mto" label="To" list={to} onChange={(v) => (setTo(v), setToBad(null), touch())} bad={!!toBad} error={toBad} right={!showCc && <button type="button" className="text-xs font-semibold text-accent-foreground" onClick={() => setShowCc(true)}>Cc Bcc</button>} />
       {showCc && <Recipients id="mcc" label="Cc" list={cc} onChange={(v) => (setCc(v), touch())} />}
       {showCc && <Recipients id="mbcc" label="Bcc" list={bcc} onChange={(v) => (setBcc(v), touch())} />}
       <div className="flex min-h-10.5 items-center gap-2 border-b border-border py-1.5">
@@ -162,7 +163,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           upload={upload}
           purpose="mail"
           endpoint="/api/v1/mailbox/attachments"
-          onUploaded={(docs) => (setFiles((f) => [...f, ...docs.map((d) => ({ ...d, attachment_id: (d as MailAttachment).attachment_id ?? d.document_id }))]), touch())}
+          onUploaded={(docs) => (setFiles((f) => [...f, ...docs]), touch())}
           trigger={(open) => (
             <button type="button" title="Attach a File" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground"><Icon name="clip" /></button>
           )}
@@ -180,9 +181,9 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-2">
           {files.map((f) => (
-            <span key={f.attachment_id} className="flex items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold">
+            <span key={f.document_id} className="flex items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold">
               <Icon name="doc" />{f.file_name}<span className="text-2xs text-subtle-foreground">{formatBytes(f.size_bytes)}</span>
-              <button type="button" aria-label={`Remove ${f.file_name}`} className="flex size-5 items-center justify-center rounded-full hover:bg-card" onClick={() => (setFiles((x) => x.filter((y) => y.attachment_id !== f.attachment_id)), touch())}><Icon name="x" className="size-3" /></button>
+              <button type="button" aria-label={`Remove ${f.file_name}`} className="flex size-5 items-center justify-center rounded-full hover:bg-card" onClick={() => (setFiles((x) => x.filter((y) => y.document_id !== f.document_id)), touch())}><Icon name="x" className="size-3" /></button>
             </span>
           ))}
         </div>
@@ -191,26 +192,24 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
         <div className="mt-3 rounded-xl border border-border bg-muted p-3">
           <h3 data-ui="title" className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Icon name="clock" />Schedule Send</h3>
           <div className="grid cols-two-and-action items-end gap-2.5 max-md:grid-cols-2">
-            <Field label="Date" state={sched.tried && !sched.date ? "bad" : undefined} message={sched.tried && !sched.date ? "A real date, today or later" : undefined} className="mb-0">
+            <Field label="Send Date" state={sched.tried && !sched.date ? "bad" : undefined} message={sched.tried && !sched.date ? "Not a real date" : undefined} className="mb-0">
               <DateField value={sched.date} onChange={(v) => setSched((s) => ({ ...s, date: v, past: false }))} min={todayIso()} />
             </Field>
-            <Field label="Time (24 Hour)" htmlFor="stime" state={timeBad ? "bad" : undefined} message={timeBad ? "HH:MM, in Lagos time" : undefined} className="mb-0">
-              <TextField id="stime" inputMode="numeric" autoComplete="off" placeholder="08:30" state={timeBad ? "bad" : undefined} value={sched.time} onChange={(v) => setSched((s) => ({ ...s, time: v.trim(), past: false }))} />
+            <Field label="Send Time" help="Lagos time, on the 24 hour clock: 08:30, 17:45." htmlFor="stime" state={timeBad || sched.past ? "bad" : undefined} message={timeBad ? "Not a valid time" : sched.past ? "Time already passed" : undefined} className="mb-0">
+              <TextField id="stime" inputMode="numeric" autoComplete="off" placeholder="HH:MM" state={timeBad || sched.past ? "bad" : undefined} value={sched.time} onChange={(v) => setSched((s) => ({ ...s, time: v.trim(), past: false }))} />
             </Field>
             <div className="flex justify-end gap-2 max-md:col-span-2">
               <Button onClick={() => setSched((s) => ({ ...s, open: false }))}>Cancel</Button>
-              <Button variant="primary" icon="clock" busy={busy} onClick={schedule}>Schedule</Button>
+              <Button variant="primary" icon="clock" busy={busy} onClick={schedule}>Schedule Send</Button>
             </div>
           </div>
-          {sched.past && <p className="mt-2 text-2xs text-destructive">That time has already passed.</p>}
         </div>
       )}
       <div className="sticky -bottom-4 z-1 -mx-4.5 mt-3 -mb-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card px-4.5 py-3 max-md:pb-safe-3">
         {confirmDiscard ? (
           <>
-            <span className="mr-auto text-xs">Discard this draft and its attachments?</span>
             <Button onClick={() => setConfirmDiscard(false)}>Keep Editing</Button>
-            <Button variant="primary" onClick={discard}>Discard</Button>
+            <Button variant="danger" icon="x" onClick={discard}>Discard Draft</Button>
           </>
         ) : (
           <>

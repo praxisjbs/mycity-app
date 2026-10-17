@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/community/` |
 | Permission key(s) | `community` |
 | Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements; reads shared with #66 Knowledge Hub · Announcements (M10) |
-| Status | Agreed |
+| Status | Built |
 | Last changed | 17/10/2026 |
 
 Sources: MILESTONES §6.4 and A19, A20; REUSE_MAP §2.4; the internal workflow meeting of 12 October
@@ -301,3 +301,4 @@ fields, never in a toast.
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): Chat's two panes and its divider are now `SplitPanes` from `@mycity/ui`, shared with the Mailbox, and the celebration card, the voice note's bars and a poll's share bars are `Confetti`, `Waveform` and `ShareBar`, so no screen writes an inline style. The chat bubble's tail now uses the same two corners as the assistant's (`bubble-them`, `bubble-me`). §10 is unchanged: the same parts, drawn by shared components.
 - 17/10/2026 · GE · Decisions after comparing the demo with the built screens: a recognition always posts to #general (A19), from whichever channel it was started; voice notes are recorded in channels as well as direct messages; search in a conversation runs on the server and the screen steps between the matches it highlights (§3 step 9, unchanged); New Announcement keeps its Audience (all staff or departments).
 - 17/10/2026 · GE · Backend built: §4 and §5 now describe the tables (migrations 1000 and 1110) and the routes as built; contract keys follow the columns (`community_channel_id`, `community_message_id`, `message_type`, `audio` for a voice note). Files are uploaded to the conversation first and readable by its members only; presence is a socket heartbeat; #general and #announcements are made on first use; ⌘K finds published announcements only (§9).
+- 17/10/2026 · GE · Status Built. The stubs left empty (`community.media`, `.links`, `.export`; `announcements.ai`, `.search`) were deleted: uploads live in `community.service`, announcements are read and found through `community.ai.js` and `community.search.js`. The certified channel export stays an open question (§13).

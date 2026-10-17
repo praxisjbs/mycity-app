@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 32 | 23 | 0 | 9 | 0 | 0 |
+| M1 Core Operations & Employee Management | 32 | 17 | 0 | 15 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **77** | **0** | **16** | **0** | **0** |
+| **Total** | **93** | **71** | **0** | **22** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -567,15 +567,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 18 | Inbox | `inbox` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 19 | Sent | `sent` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 20 | Drafts | `drafts` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 21 | Archive | `archive` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 22 | Spam | `spam` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 23 | Trash | `trash` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
+| 18 | Inbox | `inbox` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 19 | Sent | `sent` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 20 | Drafts | `drafts` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 21 | Archive | `archive` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 22 | Spam | `spam` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 23 | Trash | `trash` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 17/10/2026 · GE · Built on the real API: contract `mailbox.js`, migration 1120 (connection status, folder kinds and UID cursor, thread keys, `mail_draft`, `mail_send_queue`), the `mailbox` module (IMAP and SMTP provider, autodiscover to `mail.<domain>` on 993 and 465, threading by References, sanitised HTML in and out, send queue with Bcc in the envelope only, a copy to the server's Sent, deferrals retried three times, paced to 50 an hour), `mail-sync` and `mail-send` jobs, IMAP IDLE in the worker, `mailbox.updated` over the socket. Screens on the contract: the Connect sheet opens over Mailbox ("Password refused" on the field), Reconnect banner, scheduled mail in Drafts with Cancel Schedule, field errors in the composer, Discard with buttons only. Unit tests and an integration suite on a fake provider; checked against a real Dovecot IMAP server and an SMTP relay (15 of 15), then walked on a laptop and a phone: connect, sync with an attachment, reply, Sent, the reply arriving in the other person's inbox. Empty stubs deleted. Left: the real `mycityapp.io` host (Namecheap) is untested; disconnecting a leaver needs a deactivation event; ⌘K inside mail needs an owner-scoped provider.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/mailbox/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/mailbox.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · GE · Demo composer added (rich text, recipient chips, attachments with progress, schedule,
   inline discard), reader full screen on mobile. Engineering guide `docs/guides/mailbox.md` written.

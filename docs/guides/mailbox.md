@@ -8,8 +8,8 @@
 | Frontend paths | `app/src/features/mailbox/` |
 | Permission key(s) | `mailbox` |
 | Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash; connection under Settings · Integrations |
-| Status | Agreed |
-| Last changed | 15/10/2026 |
+| Status | Built |
+| Last changed | 17/10/2026 |
 
 Sources: MILESTONES §6.5 and D6; REUSE_MAP §2.5; the internal workflow meeting of 12 October 2026.
 The demo (`demo.html`, Mailbox) was updated the same day with the composer described here.
@@ -41,19 +41,27 @@ password, as with any mail app.
 
 1. **Connect** (the Connect sheet, which opens over Mailbox the first time it is opened with no
    connection; GE, 17/10/2026): address and password →
-   `autodiscover` finds the IMAP and SMTP hosts from the domain → `POST /connections` tests both →
-   the password is stored encrypted in `integration_secret` under `mail_conn:<id>`, never on the
-   connection row.
+   `autodiscover` finds the IMAP and SMTP hosts from the domain (the `MAILBOX_*` settings override
+   it) → `POST /connection` signs in to both before anything is saved → the password is stored
+   encrypted in `integration_secret` under `mail_conn:<id>`, never on the connection row. The first
+   sync starts at once (`mail_account.connected` → `mail-sync`).
 2. **Sync**: the worker's `mail-sync` scheduler and the `mail-idle` loop (IMAP IDLE) pull new mail
-   into the six folders. New mail raises `mailbox.message.received` → notification. **Refresh** in
-   the page header asks for a sync now (`POST /connection/sync`).
-3. **Read**: opening a thread marks it read on the server too. Remote images are not loaded until the
-   reader asks.
+   into the six folders, reading each from its last UID (a folder whose UIDVALIDITY changed is read
+   again from the start). New mail raises `mail_message.received` → notification, and every change
+   pushes `mailbox.updated` to the owner's socket so the open list refreshes. **Refresh** in the
+   page header asks for a sync now (`POST /connection/sync`). A refused password marks the
+   connection `needs_reconnect` and stops syncing it until the person reconnects.
+3. **Read**: opening a thread marks it read on the server too (`\Seen`), and read state comes back
+   from the server's `\Seen` flag on each sync. Remote images are held back until the reader presses
+   Load Images.
 4. **Compose / Reply / Forward**: the composer opens prefilled for Reply (To = sender, `Re:` subject,
    the original quoted) and Forward (`Fwd:`, original quoted, attachments carried). Drafts save as
    the person types; a Draft Saved pill at the end of the formatting bar confirms it.
-5. **Send**: `POST /messages` puts the message on the send queue (`send-queue`) → `email-send`
-   delivers through SMTP → the message lands in Sent. Scheduled mail waits on the queue until its
+5. **Send**: `POST /messages` puts the message on `mail_send_queue` (Idempotency-Key required) →
+   the `mail-send` job, delayed to the release time, delivers through SMTP (Bcc in the envelope
+   only), appends a copy to the server's Sent folder and files it in Sent here. A deferral is
+   retried three times; a permanent refusal fails at once and notifies the sender. The `mail-sync`
+   scheduler also flushes anything due, so a lost delayed job still goes out. Scheduled mail waits on the queue until its
    release time and can be cancelled until then. Schedule offers tomorrow 08:00, next Monday 08:00,
    or **any date and time** (day-first date, 24 hour time, Lagos); a time already passed is refused.
    A scheduled message waits in Drafts, labelled Scheduled, until it is released.
@@ -63,17 +71,17 @@ password, as with any mail app.
 
 ## 4 · Data
 
-Proposed for the M1 migration block. Ported from praxis-ls `mail/mail` without the tenant columns.
+The tables come from `1000_core_operations.sql`; `1120_mailbox.sql` adds what M1 needs.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `mail_connection` | `connection_id`, `user_id`, `email_address`, `imap_host`, `imap_port`, `smtp_host`, `smtp_port`, `status`, `last_sync_at`, `last_error_code` | One per user in M1. Secret in `integration_secret` (`mail_conn:<id>`) |
-| `mail_folder` | `folder_id`, `connection_id`, `kind` (`inbox` / `sent` / `drafts` / `archive` / `spam` / `trash` / `user`), `remote_name`, `uidvalidity` | The six canonical folders; server folders beyond them are read only |
-| `mail_thread` | `thread_id`, `connection_id`, `subject`, `last_message_at`, `unread_count`, `has_attachment` | Threading by Message-ID / In-Reply-To / References (`threading.js`) |
-| `mail_message` | `message_id`, `thread_id`, `folder_id`, `remote_uid`, `from_address`, `to` / `cc` jsonb, `subject`, `snippet`, `body_html_ref`, `flags`, `sent_at` | Bodies stored once; HTML sanitised before it is ever rendered |
-| `mail_attachment` | `attachment_id`, `message_id`, `document_id`, `filename`, `mime`, `bytes` | Stored through the vault like any other file |
-| `mail_draft` | `draft_id`, `user_id`, `to` / `cc` / `bcc` jsonb, `subject`, `body_html`, `attachment_ids`, `updated_at` | Autosaved |
-| `mail_send_queue` | `queue_id`, `user_id`, `payload` jsonb, `status` (`queued` / `sending` / `sent` / `failed` / `cancelled`), `release_at`, `attempts`, `smtp_error_code` | Scheduled send and retry |
+| `mail_account` | `mail_account_id`, `user_id` (unique), `email`, hosts and ports, `status` (`connected` / `needs_reconnect` / `disconnected`), `last_synced_at`, `last_error_code`, `consecutive_failures`, `integration_secret_id` | One per user. Secret in `integration_secret` (`mail_conn:<id>`) |
+| `mail_folder` | `mail_folder_id`, `mail_account_id`, `remote_key`, `name`, `special_use`, `kind` (the six, or null), `uidvalidity`, `last_uid`, `last_sync_at`, `last_error` | Each kind claimed once per account (`folders.js`); folders with no kind are kept but not synced |
+| `mail_thread` | `mail_thread_id`, `mail_account_id`, `thread_key` (unique per account), `subject`, `participant_addresses`, `last_message_at`, `unread_count`, `has_attachment`, `message_count` | Keyed by the root of References, else In-Reply-To, else the message's own id (`threading.js`); never by subject |
+| `mail_message` | `mail_message_id`, `mail_account_id`, `mail_thread_id`, `mail_folder_id`, `remote_id` (the UID), `internet_message_id` (unique per account), `direction`, `from_address`, `from_name`, `to_addresses` / `cc_addresses`, `subject`, `snippet`, `body_text`, `body_html`, `in_reply_to`, `references_header`, `has_attachment`, `sent_at`, `received_at`, `read_at` | One row per message per mailbox; a move on the server moves the row. HTML sanitised on the way in (`visible.js`) |
+| `mail_attachment` | `mail_attachment_id`, `mail_message_id`, `document_id`, `content_id`, `inline` (name, type and size come from the document) | Stored through the vault, doc type `mail_attachment`, owner-only access rule |
+| `mail_draft` | `mail_draft_id`, `user_id`, `mail_account_id`, `to_addresses` / `cc_addresses` / `bcc_addresses`, `subject`, `body_html`, `document_ids`, `in_reply_to` | Autosaved; listed in Drafts |
+| `mail_send_queue` | `mail_send_queue_id`, `user_id`, `mail_draft_id`, `payload`, `status` (`queued` / `sending` / `sent` / `failed` / `cancelled`), `release_at`, `attempts`, `error_code`, `idempotency_key` (unique), `sent_message_id` | Scheduled send and retry |
 
 ## 5 · API
 
@@ -81,18 +89,21 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /connection` | → `MailConnection` | `mailbox` view · own | | |
-| `POST /connection` | `MailConnect` → `MailConnection` | `mailbox` create · own | | Address and password; autodiscover; test both directions before saving |
-| `POST /connection/test`, `POST /connection/sync`, `POST /connection/disconnect` | | own | | |
-| `GET /threads` | `ThreadListQuery` → `ThreadPage` | own | yes | Filters: `folder`, `q`, `unread` |
-| `GET /threads/:id` | → `Thread` (messages) | own | | |
-| `POST /threads/:id/read`, `POST /threads/:id/move` | `ThreadMove` | own | | Move to archive, spam, trash, inbox |
-| `POST /folders/:kind/empty` | | own | | Spam and trash only |
-| `GET /drafts/:id`, `PUT /drafts/:id`, `DELETE /drafts/:id` | `MailDraft` | own | | |
-| `POST /messages` | `MailSend` → `QueuedMail` | `mailbox` create · own | | Send now or `release_at`; Idempotency-Key required |
-| `POST /queue/:id/cancel` | | own | | Scheduled mail only |
-| `POST /attachments` | multipart → `MailAttachment` | own | | Through `middleware/upload`, 25 MB |
-| `GET /attachments/:id/content` | file | own | | Served through the gated document route |
+| `GET /connection` | → `MailConnection` | `mailbox` view · own | | `status` `disconnected` when there is none |
+| `POST /connection` | `MailConnect` → `MailConnection` | `mailbox` create · own | | Address and password; autodiscover; signs in to IMAP and SMTP before saving; also reconnects |
+| `POST /connection/sync`, `POST /connection/disconnect` | empty → `MailConnection` | view · own | | Disconnect deletes the stored password |
+| `GET /threads` | `ThreadListQuery` → `ThreadPage` | view · own | yes | Filters: `folder` (default `inbox`), `unread`. Drafts lists `mail_draft` rows, scheduled ones with `scheduled` |
+| `GET /threads/:id` | → `Thread` (messages, attachments) | view · own | | |
+| `POST /threads/:id/read` | empty → 204 | view · own | | Sets `\Seen` on the server |
+| `POST /threads/:id/move` | `ThreadMove` → 204 | view · own | | To inbox, archive, spam or trash, on the server too |
+| `POST /folders/:kind/empty` | `FolderParams` → `EmptyResult` | `mailbox` delete · own | | Spam and trash only |
+| `GET /drafts/:id`, `PUT /drafts/:id`, `DELETE /drafts/:id` | `MailDraftSave` → `MailDraft`; 204 | create · own | | `PUT` creates the draft on first save |
+| `POST /messages` | `MailSend` → `QueuedMail` | create · own | | Send now or at `release_at`; Idempotency-Key required |
+| `POST /queue/:id/cancel` | empty → `QueuedMail` | create · own | | Scheduled mail only, until it is released |
+| `POST /attachments` | multipart `file` → `DocumentRef` | create · own | | Through `middleware/upload` (purpose `attachment`) |
+
+Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule on
+`mail_message` and `mail_account` lets only the mailbox owner open them.
 
 ## 6 · Rules and calculations
 
@@ -127,11 +138,18 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 
 | Event / job | When | Does |
 |---|---|---|
-| `mail-sync` (scheduler + handler) | Every few minutes per connection | Pulls folders and new mail |
-| `loops/mail-idle` | Continuously in the worker | IMAP IDLE: new mail arrives without polling |
-| `email-send` | When a queued message is released | Delivers through SMTP; moves it to Sent; classifies failures (`smtp-errors`) |
-| `mailbox.message.received` | New inbound message | Notification to the owner (`mail-notify`) |
-| `mailbox.message.sent` / `mailbox.send.failed` | After delivery or a hard failure | Updates the queue; notifies on failure |
+| `mail-sync` (scheduler, every `MAILBOX_SYNC_EVERY_MIN` minutes) | On schedule | Syncs every connected mailbox, then flushes due mail from the send queue |
+| `mail-sync` (handler) | `mail_account.connected`, `mail_account.sync_requested`, IDLE | Syncs one mailbox |
+| `loops/mail-idle` | Continuously in the worker, up to `MAILBOX_IDLE_MAX` mailboxes (0 on staging) | IMAP IDLE on the inbox; new mail enqueues `mail-sync` |
+| `mail-send` | `mail_message.queued`, delayed to `release_at` | Delivers through SMTP, paced to `MAILBOX_SEND_PER_HOUR`; files it in Sent; classifies failures (`smtp-errors`) |
+| `mail_message.received` | New inbound message | Notification to the owner |
+| `mail_account.needs_reconnect` | The server refused the saved password | Notification to the owner; banner in Mailbox |
+| `mail_message.sent` / `mail_send.failed` | After delivery or a permanent failure | Updates the queue; notifies on failure |
+| `mail_account.connected` / `disconnected`, `mail_thread.moved`, `mail_folder.emptied` | As named | Audit; `mailbox.updated` to the owner's socket |
+
+Settings (`.env`, group Mailbox): `MAILBOX_IMAP_HOST`, `MAILBOX_IMAP_PORT`, `MAILBOX_SMTP_HOST`,
+`MAILBOX_SMTP_PORT`, `MAILBOX_TLS`, `MAILBOX_SEND_PER_HOUR`, `MAILBOX_SYNC_EVERY_MIN`,
+`MAILBOX_IDLE_MAX`.
 
 ## 8 · Permissions and visibility by role
 
@@ -139,14 +157,15 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 |---|---|---|
 | Every employee with `mailbox` view | Their own mailbox only | Connect, read, send, manage their folders |
 | People, CEO | Their own mailbox only | Same. No access to other mailboxes |
-| Leaver | Nothing | Connection disconnected and secret deleted on deactivation |
+| Leaver | Nothing | Connection to be disconnected and secret deleted on deactivation (not built: nothing raises a deactivation event yet, §13) |
 
 ## 9 · AI and search
 
 - **AI reads**: `// ai:none` in M1. Mail is private correspondence; the donor's mail assist is not
   ported (REUSE_MAP §2.5) and nothing in M1 asks for it.
-- **Search** (`mailbox.search.js`, ⌘K): the caller's own threads by sender and subject, through the
-  donor's `search.js`. Never another person's mail.
+- **Search**: `// search:none` in M1. A search provider is gated by the module grant alone, and a
+  person may find only their own mail; ⌘K reaches the Mailbox screen and its folders through the
+  route map. Finding a message by its words waits for an owner-scoped provider (§13).
 
 ## 10 · On screen and mobile
 
@@ -184,11 +203,13 @@ interface copy; the copy rules apply to the chrome around them.
 ## 11 · Edge cases
 
 - **Wrong password / server refuses**: the connection test fails with the classified reason and
-  the fix (`smtp-error.map.js`); nothing is saved.
+  the fix (`smtp-errors.js`): "Password refused" or "Mail server not found" on the field; nothing is
+  saved.
 - **Password changed on the mail server**: sync fails → connection marked `needs_reconnect` → a
   banner in Mailbox with **Reconnect**, which opens the Connect sheet with the address filled in.
-- **First sync of a large mailbox**: newest first, paged; older mail fills in in the background.
-- **Hard-bounced recipient**: warned on the chip before sending again.
+- **First sync of a large mailbox**: read in batches from the last UID; each run takes the next
+  batch until the folder is caught up.
+- **Hard-bounced recipient**: the send fails with `RECIPIENT_REFUSED` and the sender is notified.
 - **Double send** on a bad connection: refused by the Idempotency-Key.
 - **Offline**: not supported; the draft is kept.
 - **Dangerous attachment types**: refused by the mime policy; inbound ones are listed but not opened
@@ -211,6 +232,9 @@ interface copy; the copy rules apply to the chrome around them.
 - Is the 50 an hour sending limit per mailbox or for the whole hosting account? (asked of the
   domain manager)
 - Undo send window, and how long scheduled mail may wait.
+- Leavers: which event disconnects a deactivated person's mailbox (needs a deactivation event from
+  identity).
+- Search inside mail (by sender, subject and words) needs a ⌘K provider scoped to the owner.
 
 ## 14 · Change log
 
@@ -223,4 +247,5 @@ interface copy; the copy rules apply to the chrome around them.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: the ⓘ text on the folder title is gone; message rows are marked as content for gate 8; the composer's fields come from the form system.
 - 15/10/2026 · AJ · Frontend foundation PR 2 (Shell): Mailbox opens from the rail on desktop and from More on a phone (F17); the list's pane splitter now says its width to assistive technology (the a11y gate crawls the app). No Mailbox behaviour changed.
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): the composer's body is now the shared `RichTextField` (TipTap, its own lazy chunk) instead of its own `contentEditable` on the deprecated `execCommand`. Paste from Word and Gmail is parsed into the document rather than carried in as foreign markup, which is why TipTap was chosen (FRONTEND_FOUNDATION §5, PR 3 question 3). The bar carries exactly what §6 and §10 list: Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link (`https://` or `mailto:` only, typed in a field under the bar, never a native dialog) and Clear Formatting, with Undo and Redo at its end and Attach a File beside it. The list beside the reader is `SplitPanes`, shared with Chat.
+- 17/10/2026 · GE · Built on the real API: `1120_mailbox.sql`, the `mailbox` module (IMAP and SMTP provider, threading, folders, send queue), `mail-sync`, `mail-send` and `loops/mail-idle` in the worker. §3 to §5, §7, §9 and §11 rewritten as built; the empty stubs the donor list implied (`threads.*`, `send-queue.*`, `access`, `find`, `presend`, `schedule`, `origin`, `mail-notify`, `attachments.service`, `.ai`, `.search`) were deleted: their work lives in `mailbox.service`, `mailbox.repo` and `mailbox.events`. Search is `search:none`.
 - 17/10/2026 · GE · Connecting moved into Mailbox: a Connect sheet opens over it when there is no connection, and the refused-password banner carries Reconnect, which opens the same sheet. Settings · Integrations only shows the connection.
