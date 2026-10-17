@@ -61,6 +61,8 @@ const Channel = z
     members: z.number().int().min(0),
     can_post: z.boolean(),
     is_admin: z.boolean(),
+    can_moderate: z.boolean(),
+    can_poll: z.boolean(),
     muted: z.boolean(),
     unread: z.number().int().min(0),
     last_text: z.string().nullable(),
@@ -114,6 +116,9 @@ const MemberAdd = z
   });
 const MemberParams = z.object({ id: uuid, user_id: uuid }).strict();
 
+/** PUT /community/channels/:id/members/:user_id/role: make or unmake an admin. */
+const MemberRoleSet = z.object({ member_role: z.enum(["admin", "member"]) }).strict();
+
 /** POST /community/channels/:id/mute: on or off. */
 const MuteSet = z.object({ muted: z.boolean() }).strict();
 
@@ -158,12 +163,17 @@ const Message = z
         question: z.string(),
         options: z.array(PollOption).min(2).max(4),
         my_vote: z.number().int().min(0).max(3).nullable(),
+        closed: z.boolean(),
       })
       .strict()
       .nullable(),
     announcement: z.object({ announcement_id: uuid, title: z.string() }).strict().nullable(),
     status: MessageStatus.nullable(),
     deleted: z.boolean(),
+    edited_at: isoDateTime.nullable(),
+    can_edit: z.boolean(),
+    can_delete: z.boolean(),
+    can_close: z.boolean(),
   })
   .strict();
 
@@ -211,6 +221,17 @@ const RecognitionCreate = z
   .strict();
 
 /** POST /community/messages/:id/vote. */
+/**
+ * PUT /community/messages/:id: the author's text within 15 minutes, or their poll's
+ * question (body) and options before its first vote (community.md §3 step 14).
+ */
+const MessageEdit = z
+  .object({
+    body: text(4000),
+    options: z.array(text(80)).min(2).max(4).optional(),
+  })
+  .strict();
+
 const PollVote = z.object({ option_index: z.number().int().min(0).max(3) }).strict();
 
 /** POST /community/messages/:id/transcript. */
@@ -226,6 +247,7 @@ const Conversation = z
     community_channel_id: uuid,
     person: PersonRef,
     user_id: uuid,
+    is_self: z.boolean(),
     online: z.boolean(),
     last_seen_at: isoDateTime.nullable(),
     muted: z.boolean(),
@@ -245,7 +267,8 @@ const DirectCreate = z.object({ employee_id: uuid }).strict();
  * GET /community/people: colleagues to message or recognise, for every member of staff.
  * Public work fields only (the people picker); the staff register itself needs People.
  */
-const ColleagueListQuery = listQuery();
+/** with_self: New Message offers the caller too (a conversation with oneself); every other picker leaves them out. */
+const ColleagueListQuery = listQuery({ with_self: z.coerce.boolean().optional() });
 const ColleaguePage = Paged(PersonRef);
 
 /** GET /community/people/:id/card: the profile panel (§3 step 8). */
@@ -272,6 +295,8 @@ const TABLES = {
       members: "how many members, counted from community_member",
       can_post: "whether the caller may post, from post_policy, their role and the announcements.post capability",
       is_admin: "whether the caller is an admin of the channel, from community_member.member_role",
+      can_moderate: "whether the caller moderates it: an admin, or People and the CEO in #general and #announcements",
+      can_poll: "whether the caller may start a poll: as can_post, and in #general moderators only",
       muted: "whether the caller muted it, from community_member.muted_until",
       unread: "messages after the caller's community_member.last_read_at, counted",
       last_text: "the latest message, as one line",
@@ -298,6 +323,7 @@ const TABLES = {
     reason: "who to add: users and departments, each becoming a community_member row",
   },
   MemberParams: { table: null, reason: "the channel and the member's user in the path" },
+  MemberRoleSet: { table: "community_member" },
   MuteSet: { table: null, reason: "sets community_member.muted_until for the caller" },
   DeliveredAck: { table: null, reason: "moves the caller's community_member.last_delivered_at" },
   PollOption: { table: null, reason: "one option of a poll, its text from metadata and its votes counted" },
@@ -314,9 +340,16 @@ const TABLES = {
       announcement: "the announcement this message publishes, from announcement",
       status: "a direct message's ticks, from the other member's read and delivered pointers",
       deleted: "whether it was deleted, from deleted_at",
+      can_edit: "whether the caller may edit it now: the author, text within 15 minutes or a poll before its first vote",
+      can_delete: "whether the caller may delete it: the author or a moderator, never an announcement's post",
+      can_close: "whether the caller may close it: an open poll, by its author or a moderator",
     },
   },
   MessageListQuery: { table: null, reason: "list controls for a conversation's messages" },
+  MessageEdit: {
+    table: "community_message",
+    virtual: { options: "a poll's options, kept in metadata" },
+  },
   MessagePage: { table: null, reason: "a page of messages" },
   MessageCreate: {
     table: "community_message",
@@ -336,7 +369,7 @@ const TABLES = {
   ConversationListQuery: { table: null, reason: "list controls and the unread filter for direct messages" },
   ConversationPage: { table: null, reason: "a page of conversations" },
   DirectCreate: { table: null, reason: "the colleague to talk to; becomes a direct community_channel and two members" },
-  ColleagueListQuery: { table: null, reason: "list controls for the colleague picker" },
+  ColleagueListQuery: { table: null, reason: "list controls for the colleague picker, and whether to offer the caller" },
   ColleaguePage: { table: null, reason: "a page of colleagues, each a PersonRef" },
   ProfileCard: {
     table: null,
@@ -363,6 +396,7 @@ module.exports = {
   MemberPage,
   MemberAdd,
   MemberParams,
+  MemberRoleSet,
   MuteSet,
   DeliveredAck,
   PollOption,
@@ -371,6 +405,7 @@ module.exports = {
   MessagePage,
   MessageCreate,
   RecognitionCreate,
+  MessageEdit,
   PollVote,
   Transcript,
   Conversation,

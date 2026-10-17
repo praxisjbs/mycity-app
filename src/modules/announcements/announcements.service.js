@@ -5,7 +5,9 @@
  * Publishing writes the announcement, one message in #announcements and a read row for
  * each person in the audience, in one transaction. A scheduled announcement is stored
  * with publish_at and released by the announcement-publish job at that instant (and by
- * the scheduler's safety net if a job is lost), through the same publish().
+ * the scheduler's safety net if a job is lost), through the same publish(). Until then it
+ * can be edited or cancelled; a release only publishes one still scheduled and due, so a
+ * job queued for a time since moved, or for one cancelled, does nothing.
  *
  * Read counts and the read lists are for the poster and holders of announcements.post;
  * the routes check the capability.
@@ -92,11 +94,24 @@ async function publish(client, id) {
   return published;
 }
 
-async function create(body, user) {
-  const when = body.publish_at ? new Date(body.publish_at) : null;
-  if (when && when.getTime() <= Date.now()) {
+function future(at) {
+  const when = new Date(at);
+  if (when.getTime() <= Date.now()) {
     throw new AppError("PUBLISH_AT_PASSED", "That time has already passed", 422, { publish_at: ["Time already passed"] });
   }
+  return when;
+}
+
+/** A scheduled announcement, locked, or the reason it cannot be changed. */
+async function scheduled(client, id) {
+  const a = await repo.lockForUpdate(client, id);
+  if (!a || a.status === "cancelled") throw new AppError("NOT_FOUND", "There is no such announcement", 404);
+  if (a.status !== "scheduled") throw new AppError("ALREADY_POSTED", "It has already gone out", 409);
+  return a;
+}
+
+async function create(body, user) {
+  const when = body.publish_at ? future(body.publish_at) : null;
   const id = await tx(async (client) => {
     const made = await repo.insert(client, {
       title: body.title,
@@ -119,9 +134,56 @@ async function create(body, user) {
   return get(id);
 }
 
-/** The delayed job and the scheduler's safety net call this. */
+/** Change a scheduled announcement before it goes out; its release moves with it. */
+async function update(id, body, user) {
+  const when = future(body.publish_at);
+  await tx(async (client) => {
+    const before = await scheduled(client, id);
+    const after = await repo.updateScheduled(client, id, {
+      title: body.title,
+      body: body.body,
+      audience: body.audience,
+      publish_at: when.toISOString(),
+    });
+    await emit(client, {
+      key: EVENTS.ANNOUNCEMENT_UPDATED,
+      entity: { type: "announcement", id },
+      actor: user,
+      before,
+      after,
+      payload: { announcement_id: id, publish_at: when.toISOString() },
+    });
+  });
+  return get(id);
+}
+
+/** Call off a scheduled announcement: it is never posted. */
+async function cancel(id, user) {
+  await tx(async (client) => {
+    const before = await scheduled(client, id);
+    const after = await repo.cancelScheduled(client, id);
+    await emit(client, {
+      key: EVENTS.ANNOUNCEMENT_CANCELLED,
+      entity: { type: "announcement", id },
+      actor: user,
+      before,
+      after,
+      payload: { announcement_id: id },
+    });
+  });
+  return get(id);
+}
+
+/**
+ * The delayed job and the scheduler's safety net call this. Only an announcement still
+ * scheduled and due goes out: an edit may have moved it later, or it may be cancelled.
+ */
 async function release(id) {
-  return tx((client) => publish(client, id));
+  return tx(async (client) => {
+    const a = await repo.lockForUpdate(client, id);
+    if (!a || a.status !== "scheduled" || new Date(a.publish_at).getTime() > Date.now()) return a;
+    return publish(client, id);
+  });
 }
 
 async function releaseDue() {
@@ -161,4 +223,4 @@ function markReadByMessages(userId, messageIds) {
   return repo.markReadByMessages(pool, userId, messageIds);
 }
 
-module.exports = { view, list, get, create, publish, release, releaseDue, readers, remind, markReadByMessages };
+module.exports = { view, list, get, create, update, cancel, publish, release, releaseDue, readers, remind, markReadByMessages };

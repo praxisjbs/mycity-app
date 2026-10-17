@@ -67,6 +67,34 @@ async function addMembers(db, channelId, userIds, role = "member") {
   return rowCount;
 }
 
+/** One member with their person, as the members list shows them. */
+function memberRow(db, channelId, userId) {
+  return one(
+    db,
+    `SELECT m.user_id, m.member_role, m.joined_at, ${PERSON()} AS person
+       FROM community_member m
+       JOIN app_user u ON u.user_id = m.user_id
+       JOIN employee e ON e.employee_id = u.employee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE m.community_channel_id = $1 AND m.user_id = $2`,
+    [channelId, userId],
+  );
+}
+
+/** The channel's admins, its row locked so two admins stepping down at once cannot leave it with none. */
+async function adminsLocked(db, channelId) {
+  await db.query("SELECT 1 FROM community_channel WHERE community_channel_id = $1 FOR UPDATE", [channelId]);
+  const { rows } = await db.query(
+    "SELECT user_id FROM community_member WHERE community_channel_id = $1 AND member_role = 'admin' ORDER BY user_id",
+    [channelId],
+  );
+  return rows.map((r) => r.user_id);
+}
+
+function setRole(db, channelId, userId, role) {
+  return db.query("UPDATE community_member SET member_role = $3 WHERE community_channel_id = $1 AND user_id = $2", [channelId, userId, role]);
+}
+
 function removeMember(db, channelId, userId) {
   return db.query("DELETE FROM community_member WHERE community_channel_id = $1 AND user_id = $2", [channelId, userId]);
 }
@@ -124,7 +152,7 @@ const UNREAD = `(SELECT count(*)::int FROM community_message x
 function listChannels(db, userId, query) {
   return pageQuery(
     db,
-    `SELECT c.community_channel_id, c.name, c.description, c.channel_type, c.post_policy, c.pinned,
+    `SELECT c.community_channel_id, c.name, c.description, c.channel_type, c.post_policy, c.pinned, c.system_key,
             m.member_role, m.muted_until,
             (SELECT count(*)::int FROM community_member mm WHERE mm.community_channel_id = c.community_channel_id) AS members,
             ${UNREAD} AS unread, lm.last_body, lm.last_type, lm.last_at, ${TOTAL_COL}
@@ -143,7 +171,7 @@ function listChannels(db, userId, query) {
 function channelFor(db, channelId, userId) {
   return one(
     db,
-    `SELECT c.community_channel_id, c.name, c.description, c.channel_type, c.post_policy, c.pinned,
+    `SELECT c.community_channel_id, c.name, c.description, c.channel_type, c.post_policy, c.pinned, c.system_key,
             m.member_role, m.muted_until,
             (SELECT count(*)::int FROM community_member mm WHERE mm.community_channel_id = c.community_channel_id) AS members,
             ${UNREAD} AS unread, lm.last_body, lm.last_type, lm.last_at
@@ -219,6 +247,7 @@ async function findDirect(db, userA, userB) {
        JOIN community_member a ON a.community_channel_id = c.community_channel_id AND a.user_id = $1
        JOIN community_member b ON b.community_channel_id = c.community_channel_id AND b.user_id = $2
       WHERE c.channel_type = 'direct'
+        AND (SELECT count(*) FROM community_member z WHERE z.community_channel_id = c.community_channel_id) = CASE WHEN $1 = $2 THEN 1 ELSE 2 END
       LIMIT 1`,
     [userA, userB],
   );
@@ -231,14 +260,16 @@ function lockPair(db, userA, userB) {
 }
 
 const CONVERSATION = `
-  SELECT c.community_channel_id, other.user_id, ${PERSON("e", "d")} AS person,
+  SELECT c.community_channel_id, other.user_id, (other.user_id = $1) AS is_self, ${PERSON("e", "d")} AS person,
          ${ONLINE()} AS online, p.last_seen_at,
          (m.muted_until IS NOT NULL AND m.muted_until > now()) AS muted,
          ${UNREAD} AS unread, lm.last_body, lm.last_type, lm.last_at, (lm.last_sender = $1) AS last_mine`;
 const CONVERSATION_FROM = `
     FROM community_channel c
     JOIN community_member m ON m.community_channel_id = c.community_channel_id AND m.user_id = $1
-    JOIN community_member other ON other.community_channel_id = c.community_channel_id AND other.user_id <> $1
+    -- The other member; in a conversation with oneself, the caller.
+    JOIN LATERAL (SELECT (array_agg(mm.user_id ORDER BY (mm.user_id = $1), mm.user_id))[1] AS user_id
+                    FROM community_member mm WHERE mm.community_channel_id = c.community_channel_id) other ON true
     JOIN app_user u ON u.user_id = other.user_id
     JOIN employee e ON e.employee_id = u.employee_id
     LEFT JOIN department d ON d.department_id = e.department_id
@@ -290,7 +321,7 @@ function otherPointers(db, channelId, userId) {
 
 const MESSAGE = `
   SELECT x.community_message_id, x.community_channel_id, x.message_type, x.sender_user_id, x.sent_at,
-         x.body, x.metadata, x.transcript, x.deleted_at, x.document_id,
+         x.body, x.metadata, x.transcript, x.deleted_at, x.edited_at, x.document_id,
          ${PERSON("e", "d")} AS author,
          CASE WHEN doc.document_id IS NULL THEN NULL ELSE json_build_object(
            'document_id', doc.document_id,
@@ -327,6 +358,37 @@ function listMessages(db, channelId, userId, query) {
 
 function messageFor(db, messageId, userId) {
   return one(db, `${MESSAGE} ${MESSAGE_FROM} WHERE x.community_message_id = $2`, [userId, messageId]);
+}
+
+/** The message row itself, locked for an edit, a delete or a close. */
+function lockMessage(db, messageId) {
+  return one(db, "SELECT * FROM community_message WHERE community_message_id = $1 FOR UPDATE", [messageId]);
+}
+
+function editMessage(db, messageId, { body, metadata }) {
+  return one(
+    db,
+    "UPDATE community_message SET body = $2, metadata = $3, edited_at = now() WHERE community_message_id = $1 RETURNING *",
+    [messageId, body, metadata],
+  );
+}
+
+function setMetadata(db, messageId, metadata) {
+  return one(db, "UPDATE community_message SET metadata = $2 WHERE community_message_id = $1 RETURNING *", [messageId, metadata]);
+}
+
+function deleteMessage(db, messageId) {
+  return one(db, "UPDATE community_message SET deleted_at = now() WHERE community_message_id = $1 AND deleted_at IS NULL RETURNING *", [messageId]);
+}
+
+/** A deleted recognition leaves the counts Home and M2 read. */
+function deleteRecognitionOf(db, messageId) {
+  return db.query("DELETE FROM peer_recognition WHERE community_message_id = $1", [messageId]);
+}
+
+async function voteCount(db, messageId) {
+  const row = await one(db, "SELECT count(*)::int AS n FROM community_poll_vote WHERE community_message_id = $1", [messageId]);
+  return row.n;
 }
 
 function insertMessage(db, m) {
@@ -444,18 +506,19 @@ function touchPresence(db, userId) {
 }
 
 /** Active colleagues with a login, by name, for the picker: public work fields only. */
-function listColleagues(db, query) {
+/** Colleagues for the pickers; the caller only when asked (New Message: a conversation with oneself). */
+function listColleagues(db, query, userId) {
   return pageQuery(
     db,
     `SELECT ${PERSON()} AS person, ${TOTAL_COL}
        FROM employee e
        JOIN app_user u ON u.employee_id = e.employee_id AND u.status = 'active'
        LEFT JOIN department d ON d.department_id = e.department_id
-      WHERE e.status = 'active' AND e.archived_at IS NULL
+      WHERE e.status = 'active' AND e.archived_at IS NULL AND ($3::boolean OR u.user_id <> $2)
         AND ($1::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name || ' ' || COALESCE(d.name, '') || ' ' || e.job_title)
                                  LIKE '%' || search_fold($1) || '%')
       ORDER BY e.first_name, e.last_name, e.employee_id`,
-    [query.q ?? null],
+    [query.q ?? null, userId, Boolean(query.with_self)],
     query,
   );
 }
@@ -555,6 +618,15 @@ function celebrationPosted(db, channelId, employeeId, occasion, date) {
 }
 
 module.exports = {
+  lockMessage,
+  editMessage,
+  setMetadata,
+  deleteMessage,
+  deleteRecognitionOf,
+  voteCount,
+  memberRow,
+  adminsLocked,
+  setRole,
   PERSON,
   systemChannel,
   channelById,

@@ -21,6 +21,7 @@ route(router, "post", "/channels", { body: cm.ChannelCreate, response: cm.Channe
 route(router, "get", "/channels/:id", { response: cm.Channel, summary: "One of my channels" }, view(), controller.getChannel);
 route(router, "get", "/channels/:id/members", { query: cm.MemberListQuery, response: cm.MemberPage, summary: "A channel's members" }, view(), controller.listMembers);
 route(router, "post", "/channels/:id/members", { body: cm.MemberAdd, response: cm.Channel, summary: "Add people to a channel" }, create(), controller.addMembers);
+route(router, "put", "/channels/:id/members/:user_id/role", { params: cm.MemberParams, body: cm.MemberRoleSet, response: cm.Member, summary: "Make or unmake a channel admin" }, create(), controller.setRole);
 route(router, "delete", "/channels/:id/members/:user_id", { no_content: true, summary: "Remove someone from a channel" }, create(), controller.removeMember);
 route(router, "post", "/channels/:id/mute", { body: cm.MuteSet, no_content: true, summary: "Mute or unmute a conversation" }, view(), controller.mute);
 route(router, "post", "/channels/:id/read", { body: c.common.EmptyBody, no_content: true, summary: "Mark a conversation read" }, view(), controller.read);
@@ -29,6 +30,9 @@ route(router, "get", "/channels/:id/messages", { query: cm.MessageListQuery, res
 route(router, "post", "/channels/:id/messages", { body: cm.MessageCreate, response: cm.Message, summary: "Post a message" }, create(), controller.postMessage);
 route(router, "post", "/channels/:id/media", { body: c.documents.DocumentUpload, response: c.documents.DocumentRef, summary: "Upload a file or voice note to post" }, create(), upload.single("file", { purpose: "attachment" }), controller.uploadMedia);
 route(router, "post", "/recognitions", { body: cm.RecognitionCreate, response: cm.Message, summary: "Recognise a colleague in #general" }, create(), controller.recognise);
+route(router, "put", "/messages/:id", { body: cm.MessageEdit, response: cm.Message, summary: "Edit a message" }, create(), controller.editMessage);
+route(router, "delete", "/messages/:id", { no_content: true, summary: "Delete a message" }, create(), controller.deleteMessage);
+route(router, "post", "/messages/:id/close", { body: c.common.EmptyBody, response: cm.Message, summary: "Close a poll" }, create(), controller.closePoll);
 route(router, "post", "/messages/:id/reactions", { body: c.common.EmptyBody, response: cm.Message, summary: "Celebrate or thumb up a message" }, view(), controller.react);
 route(router, "post", "/messages/:id/vote", { body: cm.PollVote, response: cm.Message, summary: "Vote in a poll" }, view(), controller.vote);
 route(router, "post", "/messages/:id/transcript", { body: c.common.EmptyBody, response: cm.Transcript, summary: "Transcribe a voice note" }, view(), controller.transcript);

@@ -52,6 +52,19 @@ function insert(db, a) {
   );
 }
 
+function updateScheduled(db, id, a) {
+  return one(
+    db,
+    `UPDATE announcement SET title = $2, body = $3, audience = $4, publish_at = $5
+      WHERE announcement_id = $1 AND status = 'scheduled' RETURNING *`,
+    [id, a.title, a.body, a.audience, a.publish_at],
+  );
+}
+
+function cancelScheduled(db, id) {
+  return one(db, "UPDATE announcement SET status = 'cancelled' WHERE announcement_id = $1 AND status = 'scheduled' RETURNING *", [id]);
+}
+
 function markPublished(db, id, { messageId, audienceSize }) {
   return one(
     db,
@@ -137,6 +150,8 @@ async function due(db) {
 }
 
 module.exports = {
+  updateScheduled,
+  cancelScheduled,
   list,
   get,
   lockForUpdate,

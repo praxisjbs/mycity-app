@@ -80,6 +80,7 @@ describeDb("Staff Community against the real migrations", () => {
     return {
       get: (path) => auth(request(app).get(`/api/v1${path}`)),
       post: (path) => auth(request(app).post(`/api/v1${path}`)),
+      put: (path) => auth(request(app).put(`/api/v1${path}`)),
       del: (path) => auth(request(app).delete(`/api/v1${path}`)),
     };
   };
@@ -195,6 +196,30 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("ceo").get(`/community/channels/${id}`)).status).toBe(404);
   });
 
+  test("admins are chosen in Edit Members: only an admin makes one, and the last admin cannot step down", async () => {
+    const made = await as("bola").post("/community/channels").send({ name: "dev-hub", member_ids: [people.tunde.employee.employee_id], post_policy: "admins" });
+    const id = made.body.community_channel_id;
+    const role = (who, userId, member_role) => as(who).put(`/community/channels/${id}/members/${userId}/role`).send({ member_role });
+
+    expect((await role("tunde", people.tunde.user.user_id, "admin")).status).toBe(403);
+    expect((await as("tunde").post(`/community/channels/${id}/messages`).send({ message_type: "text", body: "hi" })).status).toBe(403);
+
+    const up = await role("bola", people.tunde.user.user_id, "admin");
+    expect(up.status).toBe(200);
+    expect(up.body).toMatchObject({ user_id: people.tunde.user.user_id, member_role: "admin", person: { display_name: "Tunde Ola" } });
+    expect((await as("tunde").get(`/community/channels/${id}`)).body).toMatchObject({ is_admin: true, can_post: true });
+
+    // Two admins: one may step down; then the one left may not.
+    expect((await role("tunde", people.bola.user.user_id, "member")).status).toBe(200);
+    const last = await role("tunde", people.tunde.user.user_id, "member");
+    expect(last.status).toBe(422);
+    expect(last.body.error.code).toBe("LAST_ADMIN");
+    expect((await role("tunde", people.ceo.user.user_id, "admin")).status).toBe(404);
+
+    const g = await general("bola");
+    expect((await as("bola").put(`/community/channels/${g.community_channel_id}/members/${people.tunde.user.user_id}/role`).send({ member_role: "admin" })).status).toBe(422);
+  });
+
   test("posting text, an image and a voice note in a channel; unread counts; realtime to members", async () => {
     const ch = (await channelsOf("bola")).find((c) => c.name === "studio-crew");
     const id = ch.community_channel_id;
@@ -271,11 +296,12 @@ describeDb("Staff Community against the real migrations", () => {
 
   test("a poll: one vote each, moved by voting again, taken back by voting the same", async () => {
     const g = await general("tunde");
-    const poll = await as("tunde").post(`/community/channels/${g.community_channel_id}/messages`).send({
-      message_type: "poll",
-      body: "Team lunch on Friday?",
-      options: ["Jollof Joint", "Order in"],
-    });
+    const lunch = { message_type: "poll", body: "Team lunch on Friday?", options: ["Jollof Joint", "Order in"] };
+    // In #general only moderators (People and the CEO) start a poll.
+    const refused = await as("tunde").post(`/community/channels/${g.community_channel_id}/messages`).send(lunch);
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.code).toBe("CANNOT_POLL");
+    const poll = await as("ceo").post(`/community/channels/${g.community_channel_id}/messages`).send(lunch);
     expect(poll.status).toBe(201);
     const id = poll.body.community_message_id;
     let v = await as("bola").post(`/community/messages/${id}/vote`).send({ option_index: 0 });
@@ -285,6 +311,96 @@ describeDb("Staff Community against the real migrations", () => {
     v = await as("bola").post(`/community/messages/${id}/vote`).send({ option_index: 1 });
     expect(v.body.poll.my_vote).toBeNull();
     expect((await as("bola").post(`/community/messages/${id}/vote`).send({ option_index: 3 })).status).toBe(422);
+  });
+
+  test("edit, delete and close: the author's text for 15 minutes, a poll before its first vote, moderators delete", async () => {
+    const made = await as("bola").post("/community/channels").send({ name: "edit-desk", member_ids: [people.tunde.employee.employee_id, people.ceo.employee.employee_id] });
+    const id = made.body.community_channel_id;
+    const post = (who, body) => as(who).post(`/community/channels/${id}/messages`).send(body);
+
+    // Text: the author edits within 15 minutes, nobody else does, and not after.
+    const text = await post("tunde", { message_type: "text", body: "Shoot at 9" });
+    expect(text.body).toMatchObject({ can_edit: true, can_delete: true, edited_at: null });
+    const edited = await as("tunde").put(`/community/messages/${text.body.community_message_id}`).send({ body: "Shoot at 10" });
+    expect(edited.status).toBe(200);
+    expect(edited.body.body).toBe("Shoot at 10");
+    expect(edited.body.edited_at).not.toBeNull();
+    expect((await as("ceo").put(`/community/messages/${text.body.community_message_id}`).send({ body: "x" })).status).toBe(403);
+    await q("UPDATE community_message SET sent_at = now() - interval '16 minutes' WHERE community_message_id = $1", [text.body.community_message_id]);
+    const late = await as("tunde").put(`/community/messages/${text.body.community_message_id}`).send({ body: "Shoot at 11" });
+    expect(late.status).toBe(409);
+    expect(late.body.error.fields.body).toEqual(["Too late to edit"]);
+
+    // A poll: edited until its first vote, then only closed; a closed poll takes no votes.
+    const poll = await post("tunde", { message_type: "poll", body: "Studio day?", options: ["Tue", "Wed"] });
+    const pid = poll.body.community_message_id;
+    const changed = await as("tunde").put(`/community/messages/${pid}`).send({ body: "Studio day next week?", options: ["Tue", "Wed", "Thu"] });
+    expect(changed.body.poll).toMatchObject({ question: "Studio day next week?", closed: false });
+    expect(changed.body.poll.options).toHaveLength(3);
+    await as("ceo").post(`/community/messages/${pid}/vote`).send({ option_index: 2 });
+    expect((await as("tunde").put(`/community/messages/${pid}`).send({ body: "Other?" })).status).toBe(409);
+    expect((await as("ceo").post(`/community/messages/${pid}/close`).send({})).status).toBe(403);
+    const closed = await as("bola").post(`/community/messages/${pid}/close`).send({});
+    expect(closed.body.poll).toMatchObject({ closed: true, options: [{ votes: 0 }, { votes: 0 }, { votes: 1 }] });
+    expect(closed.body.can_close).toBe(false);
+    expect((await as("ceo").post(`/community/messages/${pid}/vote`).send({ option_index: 0 })).status).toBe(409);
+
+    // Delete: the author, or the channel's admin; a member may not delete another's.
+    expect((await as("ceo").del(`/community/messages/${text.body.community_message_id}`)).status).toBe(403);
+    expect((await as("bola").del(`/community/messages/${text.body.community_message_id}`)).status).toBe(204);
+    const page = await as("tunde").get(`/community/channels/${id}/messages`);
+    const gone = page.body.data.find((m) => m.community_message_id === text.body.community_message_id);
+    expect(gone).toMatchObject({ deleted: true, body: null, can_edit: false, can_delete: false });
+    expect((await as("bola").del(`/community/messages/${text.body.community_message_id}`)).status).toBe(404);
+
+    // Celebrations by hand: the channel's admins only.
+    const bday = { message_type: "birthday", subject_employee_id: people.ceo.employee.employee_id };
+    expect((await post("tunde", bday)).status).toBe(403);
+    expect((await post("bola", bday)).status).toBe(201);
+  });
+
+  test("a deleted recognition leaves the counts; People and the CEO moderate #general; an announcement's post stays", async () => {
+    const rec = await as("tunde").post("/community/recognitions").send({ to_employee_id: people.bola.employee.employee_id, message: "Great edit" });
+    const rid = rec.body.community_message_id;
+    expect((await one("SELECT count(*)::int AS n FROM peer_recognition WHERE community_message_id = $1", [rid])).n).toBe(1);
+    expect((await as("bola").del(`/community/messages/${rid}`)).status).toBe(403);
+    expect((await as("ceo").del(`/community/messages/${rid}`)).status).toBe(204);
+    expect((await one("SELECT count(*)::int AS n FROM peer_recognition WHERE community_message_id = $1", [rid])).n).toBe(0);
+
+    const g = await general("ceo");
+    expect(g).toMatchObject({ can_moderate: true, can_poll: true });
+    expect(await general("bola")).toMatchObject({ can_moderate: false, can_poll: false, can_post: true });
+
+    const made = await as("ceo").post("/community/announcements").send({ title: "Office closed Monday", body: "Public holiday." });
+    const ann = await one("SELECT community_message_id FROM announcement WHERE announcement_id = $1", [made.body.announcement_id]);
+    const refused = await as("ceo").del(`/community/messages/${ann.community_message_id}`);
+    expect(refused.status).toBe(422);
+    expect(refused.body.error.code).toBe("ANNOUNCEMENT_POST");
+  });
+
+  test("a conversation with oneself: offered by New Message only, named for the caller, one member, no ticks", async () => {
+    expect((await as("bola").get("/community/people")).body.data.map((p) => p.display_name)).not.toContain("Bola Ade");
+    const mine = await as("bola").get("/community/people?with_self=true");
+    expect(mine.body.data.map((p) => p.display_name)).toContain("Bola Ade");
+
+    const me = await as("bola").post("/community/direct").send({ employee_id: people.bola.employee.employee_id });
+    expect(me.status).toBe(200);
+    expect(me.body).toMatchObject({ is_self: true, person: { display_name: "Bola Ade" } });
+    const again = await as("bola").post("/community/direct").send({ employee_id: people.bola.employee.employee_id });
+    expect(again.body.community_channel_id).toBe(me.body.community_channel_id);
+    expect((await one("SELECT count(*)::int AS n FROM community_member WHERE community_channel_id = $1", [me.body.community_channel_id])).n).toBe(1);
+
+    const note = await as("bola").post(`/community/channels/${me.body.community_channel_id}/messages`).send({ message_type: "text", body: "Buy printer ink" });
+    expect(note.body.status).toBeNull();
+    const list = await as("bola").get("/community/direct");
+    expect(list.body.data.find((c) => c.community_channel_id === me.body.community_channel_id)).toMatchObject({ is_self: true, last_text: "Buy printer ink" });
+
+    // A conversation with a colleague is still found as before, not the one with oneself.
+    const pair = await as("bola").post("/community/direct").send({ employee_id: people.tunde.employee.employee_id });
+    expect(pair.body).toMatchObject({ is_self: false });
+    expect(pair.body.community_channel_id).not.toBe(me.body.community_channel_id);
+    // Recognising oneself stays refused (A19 is peer to peer).
+    expect((await as("bola").post("/community/recognitions").send({ to_employee_id: people.bola.employee.employee_id })).status).toBe(422);
   });
 
   test("direct messages: one conversation per pair, ticks from sent to delivered to read, private to the two", async () => {
@@ -312,7 +428,6 @@ describeDb("Staff Community against the real migrations", () => {
 
     // Nobody else reads it, the CEO included.
     expect((await as("ceo").get(`/community/channels/${id}/messages`)).status).toBe(404);
-    expect((await as("bola").post("/community/direct").send({ employee_id: people.bola.employee.employee_id })).status).toBe(422);
 
     // Muted: no notification for the next message.
     expect((await as("tunde").post(`/community/channels/${id}/mute`).send({ muted: true })).status).toBe(204);
@@ -325,6 +440,10 @@ describeDb("Staff Community against the real migrations", () => {
     const found = await as("bola").get("/community/people?q=tunde");
     expect(found.status).toBe(200);
     expect(found.body.data.map((p) => p.display_name)).toEqual(["Tunde Ola"]);
+    // Nobody is offered themselves: the list leaves the caller out.
+    const everyone = await as("bola").get("/community/people");
+    expect(everyone.body.data.map((p) => p.display_name)).not.toContain("Bola Ade");
+    expect(everyone.body.page.total).toBe(2);
 
     const card = await as("bola").get(`/community/people/${people.tunde.employee.employee_id}/card`);
     expect(card.status).toBe(200);
@@ -339,8 +458,8 @@ describeDb("Staff Community against the real migrations", () => {
     expect(made.status).toBe(201);
     expect(made.body).toMatchObject({ status: "published", audience: { kind: "all" }, audience_size: 3, reads: 0 });
     await drain();
-    const told = await one("SELECT title FROM notification WHERE user_id = $1 AND event_key = 'announcement.published'", [people.bola.user.user_id]);
-    expect(told.title).toBe("Saturday hours");
+    const told = await one("SELECT title FROM notification WHERE user_id = $1 AND event_key = 'announcement.published' AND title = 'Saturday hours'", [people.bola.user.user_id]);
+    expect(told).toBeTruthy();
 
     const ann = (await channelsOf("bola")).find((c) => c.name === "announcements");
     const msgs = await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`);
@@ -370,6 +489,36 @@ describeDb("Staff Community against the real migrations", () => {
     expect(done.released).toBe(1);
     const list = await as("ceo").get("/community/announcements");
     expect(list.body.data.find((a) => a.title === "Q4 reviews").status).toBe("published");
+  });
+
+  test("a scheduled announcement is edited or cancelled until it goes out; a stale release does nothing", async () => {
+    const svc = require("../../src/modules/announcements/announcements.service");
+    const at = (mins) => new Date(Date.now() + mins * 60_000).toISOString();
+    const sched = await as("ceo").post("/community/announcements").send({ title: "Town hall", body: "Friday at 4.", publish_at: at(60) });
+    const id = sched.body.announcement_id;
+    expect((await as("bola").put(`/community/announcements/${id}`).send({ title: "x", body: "y", audience: { kind: "all" }, publish_at: at(90) })).status).toBe(403);
+    expect((await as("ceo").put(`/community/announcements/${id}`).send({ title: "Town hall", body: "Friday at 4.", audience: { kind: "all" }, publish_at: at(-1) })).status).toBe(422);
+
+    queues.enqueue.mockClear();
+    const moved = await as("ceo").put(`/community/announcements/${id}`).send({ title: "Town hall moved", body: "Monday at 4.", audience: { kind: "all" }, publish_at: at(120) });
+    expect(moved.status).toBe(200);
+    expect(moved.body).toMatchObject({ status: "scheduled", title: "Town hall moved", body: "Monday at 4." });
+    await drain();
+    expect(queues.enqueue).toHaveBeenCalledWith("announcement-publish", "release", { announcement_id: id }, expect.objectContaining({ jobId: expect.stringMatching(new RegExp(`^announcement-publish-${id}-`)) }));
+
+    // The job queued for the first time runs: it is not due yet, so nothing goes out.
+    expect((await svc.release(id)).status).toBe("scheduled");
+
+    const cancelled = await as("ceo").post(`/community/announcements/${id}/cancel`).send({});
+    expect(cancelled.body.status).toBe("cancelled");
+    await q("UPDATE announcement SET publish_at = now() - interval '1 minute' WHERE announcement_id = $1", [id]);
+    expect((await svc.release(id)).status).toBe("cancelled");
+    expect((await as("ceo").get("/community/announcements")).body.data.find((a) => a.announcement_id === id)).toBeUndefined();
+    expect((await as("ceo").post(`/community/announcements/${id}/cancel`).send({})).status).toBe(404);
+
+    const live = await as("ceo").post("/community/announcements").send({ title: "Now", body: "Now." });
+    expect((await as("ceo").put(`/community/announcements/${live.body.announcement_id}`).send({ title: "Now", body: "Edited", audience: { kind: "all" }, publish_at: at(30) })).status).toBe(409);
+    expect((await as("ceo").post(`/community/announcements/${live.body.announcement_id}/cancel`).send({})).status).toBe(409);
   });
 
   test("celebrations post today's birthday and anniversary cards to #general once, and Celebrate counts", async () => {

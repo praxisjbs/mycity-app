@@ -44,6 +44,10 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     announcement: null,
     status: null,
     deleted: false,
+    edited_at: null,
+    can_edit: false,
+    can_delete: false,
+    can_close: false,
     ...over,
     _by: by,
     _fans: [],
@@ -112,7 +116,7 @@ const rec = msg("recognition", "cynthia", at(0, "07:10"), { body: "Turned the En
 rec.recognition = { to: person("tolu"), count: 6, mine: false };
 rec._fans = ["ngozi", "emeka", "adedotun", "amara", "bashir", "kemi"];
 const poll = msg("poll", "cynthia", at(0, "08:40"), { body: "Team lunch on Friday: where?" });
-poll.poll = { question: "Team lunch on Friday: where?", options: [{ text: "Jollof Joint, VI", votes: 0 }, { text: "Bukka Hut", votes: 0 }, { text: "Order in to the office", votes: 0 }], my_vote: null };
+poll.poll = { question: "Team lunch on Friday: where?", options: [{ text: "Jollof Joint, VI", votes: 0 }, { text: "Bukka Hut", votes: 0 }, { text: "Order in to the office", votes: 0 }], my_vote: null, closed: false };
 poll._votes = Object.fromEntries(PEOPLE.slice(0, 14).map((p, i) => [p.user_key, i < 7 ? 0 : i < 11 ? 1 : 2]));
 
 const CHANNELS: Chan[] = [
@@ -177,6 +181,9 @@ for (const [other, unread, rows] of DM_ROWS) {
 
 const chan = (id: string) => CHANNELS.find((c) => c.community_channel_id === id);
 const isMember = (c: Chan | undefined, user: string) => !!c && c.members.includes(user);
+/** A channel's moderators: its admins; People and the CEO in the company channels; nobody in a direct conversation. */
+const moderates = (c: Chan, user: string) => (c.channel_type === "direct" ? false : c.channel_type === "company" ? ANN_POSTERS.has(user) : c.admins.includes(user));
+const canPoll = (c: Chan, user: string) => canPost(c, user) && (c.name === "general" ? ANN_POSTERS.has(user) : true);
 const canPost = (c: Chan, user: string) => (c.post_policy === "people_ceo" ? ANN_POSTERS.has(user) : c.post_policy === "admins" ? c.admins.includes(user) : true);
 
 function lineOf(m: Message | undefined): string | null {
@@ -189,15 +196,24 @@ function lineOf(m: Message | undefined): string | null {
 function view(m: MMsg, user: string, c: Chan): Message {
   const { _by, _fans, _votes, ...rest } = m;
   const mine = _by === user;
-  const out: Message = { ...rest, mine };
+  const voted = Object.keys(_votes).length > 0;
+  const closed = Boolean(m.poll?.closed);
+  const fresh = Date.now() - new Date(m.sent_at).getTime() < 15 * 60 * 1000;
+  const out: Message = {
+    ...rest,
+    mine,
+    can_edit: !m.deleted && mine && ((m.message_type === "text" && fresh) || (m.message_type === "poll" && !closed && !voted)),
+    can_delete: !m.deleted && m.message_type !== "announcement" && (mine || moderates(c, user)),
+    can_close: !m.deleted && m.message_type === "poll" && !closed && (mine || moderates(c, user)),
+  };
   if (m.celebration) out.celebration = { ...m.celebration, count: _fans.length, mine: _fans.includes(user), fans: _fans.slice(0, 3).map(person) };
   if (m.recognition) out.recognition = { ...m.recognition, count: _fans.length, mine: _fans.includes(user) };
   if (m.poll) {
     const votes = Object.values(_votes);
-    out.poll = { ...m.poll, options: m.poll.options.map((o, i) => ({ text: o.text, votes: votes.filter((v) => v === i).length })), my_vote: _votes[user] ?? null };
+    out.poll = { ...m.poll, options: m.poll.options.map((o, i) => ({ text: o.text, votes: votes.filter((v) => v === i).length })), my_vote: _votes[user] ?? null, closed };
   }
-  if (c.channel_type === "direct" && mine) {
-    const other = c.members.find((k) => k !== user)!;
+  if (c.channel_type === "direct" && mine && c.members.length > 1) {
+    const other = c.members.find((k) => k !== user) ?? user;
     out.status = (c.unread[other] ?? 0) === 0 ? (ONLINE.has(other) ? "read" : "delivered") : "sent";
   }
   return out;
@@ -229,6 +245,8 @@ function channelOut(c: Chan, user: string): Channel {
     members: c.members.length,
     can_post: canPost(c, user),
     is_admin: c.admins.includes(user),
+    can_moderate: moderates(c, user),
+    can_poll: canPoll(c, user),
     muted: c.muted.has(user),
     unread: c.unread[user] ?? 0,
     last_text: lineOf(last),
@@ -237,12 +255,13 @@ function channelOut(c: Chan, user: string): Channel {
 }
 
 function conversationOut(c: Chan, user: string): Conversation {
-  const other = c.members.find((k) => k !== user)!;
+  const other = c.members.find((k) => k !== user) ?? user;
   const last = c.msgs[c.msgs.length - 1];
   return {
     community_channel_id: c.community_channel_id,
     person: person(other),
     user_id: uid(other),
+    is_self: other === user,
     online: ONLINE.has(other),
     last_seen_at: ONLINE.has(other) ? null : at(1, "21:14"),
     muted: c.muted.has(user),
@@ -303,6 +322,21 @@ route("DELETE /api/v1/community/channels/:id/members/:user_id", (req) => {
   c!.members = c!.members.filter((k) => k !== key);
   return noContent();
 });
+route("PUT /api/v1/community/channels/:id/members/:user_id/role", (req) => {
+  const c = chan(req.params.id);
+  if (!isMember(c, req.user!)) return notFound();
+  if (!c!.admins.includes(req.user!)) return fail(403, "NOT_CHANNEL_ADMIN", "Only the channel's admins can do this");
+  const key = keyOfUser(req.params.user_id);
+  if (!key || !c!.members.includes(key)) return notFound();
+  if (req.body.member_role === "admin") {
+    if (!c!.admins.includes(key)) c!.admins.push(key);
+  } else {
+    if (c!.admins.length === 1 && c!.admins[0] === key) return fail(422, "LAST_ADMIN", "A channel needs at least one admin");
+    c!.admins = c!.admins.filter((k) => k !== key);
+  }
+  const out: Member = { person: person(key), user_id: uid(key), member_role: c!.admins.includes(key) ? "admin" : "member", joined_at: at(30, "09:00") };
+  return ok(out);
+});
 route("POST /api/v1/community/channels/:id/mute", (req) => {
   const c = chan(req.params.id);
   if (!isMember(c, req.user!)) return notFound();
@@ -334,7 +368,7 @@ function build(user: string, b: Record<string, unknown>): MMsg | Record<string, 
     if (!b.body) return { body: ["Add a question"] };
     if (opts.length < 2) return { options: ["Add an option"] };
     const m = msg("poll", user, now, { body: String(b.body) });
-    m.poll = { question: String(b.body), options: opts.map((text) => ({ text, votes: 0 })), my_vote: null };
+    m.poll = { question: String(b.body), options: opts.map((text) => ({ text, votes: 0 })), my_vote: null, closed: false };
     return m;
   }
   if (type === "birthday" || type === "anniversary") {
@@ -354,6 +388,8 @@ route("POST /api/v1/community/channels/:id/messages", (req) => {
   const c = chan(req.params.id);
   if (!isMember(c, req.user!)) return notFound();
   if (!canPost(c!, req.user!)) return fail(403, "CANNOT_POST", "You cannot post in this channel");
+  if (req.body.message_type === "poll" && !canPoll(c!, req.user!)) return fail(403, "CANNOT_POLL", "Only moderators start a poll here");
+  if ((req.body.message_type === "birthday" || req.body.message_type === "anniversary") && !moderates(c!, req.user!)) return fail(403, "CANNOT_CELEBRATE", "Only moderators post a celebration here");
   const m = build(req.user!, req.body);
   if (!isMsg(m)) return invalid(m);
   m.community_channel_id = c!.community_channel_id;
@@ -380,6 +416,45 @@ const located = (id: string) => {
   }
   return null;
 };
+route("PUT /api/v1/community/messages/:id", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted) return notFound();
+  if (f.m._by !== req.user) return fail(403, "NOT_YOURS", "Only its author edits a message");
+  const body = String(req.body.body ?? "").trim();
+  if (!body) return invalid({ body: ["Write something"] });
+  if (f.m.message_type === "text") {
+    if (Date.now() - new Date(f.m.sent_at).getTime() >= 15 * 60 * 1000) return fail(409, "EDIT_WINDOW_PASSED", "Too late to edit this message", { body: ["Too late to edit"] });
+    f.m.body = body;
+  } else if (f.m.message_type === "poll" && f.m.poll) {
+    if (f.m.poll.closed) return fail(409, "POLL_CLOSED", "This poll is closed");
+    if (Object.keys(f.m._votes).length) return fail(409, "POLL_HAS_VOTES", "People have voted on this poll", { body: ["Already has votes"] });
+    const options = (req.body.options as string[] | undefined) ?? f.m.poll.options.map((o) => o.text);
+    f.m.body = body;
+    f.m.poll = { ...f.m.poll, question: body, options: options.map((text) => ({ text, votes: 0 })) };
+  } else return fail(422, "NOT_EDITABLE", "This kind of message is not edited");
+  f.m.edited_at = new Date().toISOString();
+  return ok(view(f.m, req.user!, f.c));
+});
+route("DELETE /api/v1/community/messages/:id", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted) return notFound();
+  if (f.m.message_type === "announcement") return fail(422, "ANNOUNCEMENT_POST", "Announcements are managed from the Announcements tab");
+  if (f.m._by !== req.user && !moderates(f.c, req.user!)) return fail(403, "NOT_YOURS", "Only its author or a moderator deletes a message");
+  f.m.deleted = true;
+  f.m.body = null;
+  f.m.document = null;
+  f.m.celebration = null;
+  f.m.recognition = null;
+  f.m.poll = null;
+  return noContent();
+});
+route("POST /api/v1/community/messages/:id/close", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted || !f.m.poll) return notFound();
+  if (f.m._by !== req.user && !moderates(f.c, req.user!)) return fail(403, "NOT_YOURS", "Only its author or a moderator closes a poll");
+  f.m.poll = { ...f.m.poll, closed: true };
+  return ok(view(f.m, req.user!, f.c));
+});
 route("POST /api/v1/community/messages/:id/reactions", (req) => {
   const f = located(req.params.id);
   if (!f || !isMember(f.c, req.user!)) return notFound();
@@ -388,7 +463,8 @@ route("POST /api/v1/community/messages/:id/reactions", (req) => {
 });
 route("POST /api/v1/community/messages/:id/vote", (req) => {
   const f = located(req.params.id);
-  if (!f || !isMember(f.c, req.user!) || !f.m.poll) return notFound();
+  if (!f || !isMember(f.c, req.user!) || !f.m.poll || f.m.deleted) return notFound();
+  if (f.m.poll.closed) return fail(409, "POLL_CLOSED", "This poll is closed");
   const o = Number(req.body.option_index);
   if (!(o >= 0 && o < f.m.poll.options.length)) return invalid({ option_index: ["Not an option"] });
   if (f.m._votes[req.user!] === o) delete f.m._votes[req.user!];
@@ -415,15 +491,15 @@ route("GET /api/v1/community/direct", (req) =>
 route("POST /api/v1/community/direct", (req) => {
   const p = byId(String(req.body.employee_id));
   if (!p) return notFound();
-  if (p.user_key === req.user) return invalid({ employee_id: ["Choose a colleague"] });
-  let c = CHANNELS.find((x) => x.channel_type === "direct" && x.members.includes(req.user!) && x.members.includes(p.user_key));
+  const pair = [...new Set([req.user!, p.user_key])];
+  let c = CHANNELS.find((x) => x.channel_type === "direct" && x.members.length === pair.length && pair.every((k) => x.members.includes(k)));
   if (!c) {
-    c = chan0(`dm-${req.user}-${p.user_key}`, [req.user!, p.user_key], [], { channel_type: "direct", admins: [] });
+    c = chan0(`dm-${pair.join("-")}`, pair, [], { channel_type: "direct", admins: [] });
     CHANNELS.push(c);
   }
   return ok(conversationOut(c, req.user!));
 });
-route("GET /api/v1/community/people", (req) => paged(PEOPLE.map((p) => person(p.user_key)), req, { search: (p) => [p.display_name, p.department, p.job_title] }));
+route("GET /api/v1/community/people", (req) => paged(PEOPLE.filter((p) => p.user_key !== req.user || String(req.query.with_self) === "true").map((p) => person(p.user_key)), req, { search: (p) => [p.display_name, p.department, p.job_title], filters: { with_self: () => true } }));
 route("GET /api/v1/community/people/:id/card", (req) => {
   const p = byId(req.params.id);
   if (!p) return notFound();
@@ -483,6 +559,38 @@ route("POST /api/v1/community/announcements", (req) => {
     CHANNELS[0].msgs.push(m);
   }
   return created(announcementOut(a));
+});
+/** A scheduled one, or the reason it cannot be changed. */
+function scheduledAnn(id: string) {
+  const a = ANNOUNCEMENTS.find((x) => x.announcement_id === id);
+  if (!a) return { err: notFound() };
+  if (!a.scheduled) return { err: fail(409, "ALREADY_POSTED", "It has already gone out") };
+  return { a };
+}
+route("PUT /api/v1/community/announcements/:id", (req) => {
+  if (!poster(req.user)) return denied();
+  const { a, err } = scheduledAnn(req.params.id);
+  if (!a) return err;
+  const f: Record<string, string[]> = {};
+  if (!String(req.body.title ?? "").trim()) f.title = ["Add a headline"];
+  if (!String(req.body.body ?? "").trim()) f.body = ["Write the message"];
+  const audience = (req.body.audience as { kind?: string; department_ids?: string[] } | undefined) ?? { kind: "all" };
+  if (audience.kind === "departments" && !audience.department_ids?.length) f["audience.department_ids"] = ["Choose a department"];
+  const when = String(req.body.publish_at ?? "");
+  if (!when || when <= new Date().toISOString()) f.publish_at = ["Time already passed"];
+  if (Object.keys(f).length) return invalid(f);
+  a.title = String(req.body.title);
+  a.body = String(req.body.body);
+  a.publish_at = when;
+  a.departments = audience.kind === "departments" ? DEPARTMENTS.filter((d) => audience.department_ids!.includes(sid(`dept:${d}`))) : [];
+  return ok(announcementOut(a));
+});
+route("POST /api/v1/community/announcements/:id/cancel", (req) => {
+  if (!poster(req.user)) return denied();
+  const { a, err } = scheduledAnn(req.params.id);
+  if (!a) return err;
+  ANNOUNCEMENTS.splice(ANNOUNCEMENTS.indexOf(a), 1);
+  return ok({ ...announcementOut(a), status: "cancelled" as const });
 });
 route("GET /api/v1/community/announcements/:id/reads", (req) => {
   if (!poster(req.user)) return denied();

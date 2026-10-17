@@ -77,6 +77,22 @@ function lineOf(type, body) {
 const muted = (until) => Boolean(until && new Date(until).getTime() > Date.now());
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
+/** Who moderates a channel: its admins; People and the CEO in #general and #announcements; nobody in a direct conversation. */
+function isModerator(row, announcer) {
+  if (row.channel_type === "direct") return false;
+  if (row.system_key) return announcer;
+  return row.member_role === "admin";
+}
+
+/** A poll follows Who Can Post, except in #general, where moderators alone start one (§3 step 15). */
+function mayPoll(row, announcer) {
+  if (!mayPost(row, announcer)) return false;
+  return row.system_key === "general" ? announcer : true;
+}
+
+/** How long the author may still edit a text message. */
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
+
 function channelView(row, announcer) {
   return {
     community_channel_id: row.community_channel_id,
@@ -88,6 +104,8 @@ function channelView(row, announcer) {
     members: row.members,
     can_post: mayPost(row, announcer),
     is_admin: row.member_role === "admin",
+    can_moderate: isModerator(row, announcer),
+    can_poll: mayPoll(row, announcer),
     muted: muted(row.muted_until),
     unread: row.unread,
     last_text: lineOf(row.last_type, row.last_body),
@@ -100,6 +118,7 @@ function conversationView(row) {
     community_channel_id: row.community_channel_id,
     person: row.person,
     user_id: row.user_id,
+    is_self: Boolean(row.is_self),
     online: row.online,
     last_seen_at: iso(row.last_seen_at),
     muted: row.muted,
@@ -211,6 +230,29 @@ async function removeMember(channelId, userId, user) {
   });
 }
 
+/** Make a member an admin, or an admin a member. A channel always keeps one admin. */
+async function setRole(channelId, userId, role, user) {
+  await tx(async (client) => {
+    await assertAdmin(client, channelId, user);
+    const target = await repo.memberRow(client, channelId, userId);
+    if (!target) throw notFound();
+    if (target.member_role === role) return;
+    const admins = await repo.adminsLocked(client, channelId);
+    if (role === "member" && admins.length === 1 && admins[0] === userId) {
+      throw new AppError("LAST_ADMIN", "A channel needs at least one admin", 422);
+    }
+    await repo.setRole(client, channelId, userId, role);
+    await emit(client, {
+      key: EVENTS.CHANNEL_MEMBERS_CHANGED,
+      entity: { type: "channel", id: channelId },
+      actor: user,
+      payload: { community_channel_id: channelId, member_role: role, user_id: userId },
+    });
+  });
+  const row = await repo.memberRow(pool, channelId, userId);
+  return { person: row.person, user_id: row.user_id, member_role: row.member_role, joined_at: new Date(row.joined_at).toISOString() };
+}
+
 async function setMuted(channelId, muteOn, user) {
   await member(pool, channelId, user);
   await repo.setMuted(pool, channelId, user.user_id, muteOn);
@@ -258,7 +300,7 @@ function statusOf(row, other) {
 }
 
 /** Rows from the repo, completed with people, fans and votes, in the contract's shape. */
-async function present(db, rows, user, { direct = false, other = null } = {}) {
+async function present(db, rows, user, { direct = false, other = null, moderator = false } = {}) {
   const meta = (r) => r.metadata || {};
   const subjects = rows
     .filter((r) => ["birthday", "anniversary"].includes(r.message_type))
@@ -292,6 +334,10 @@ async function present(db, rows, user, { direct = false, other = null } = {}) {
       r.message_type === "recognition" && persons.get(r.recognised_employee_id)
         ? { to: persons.get(r.recognised_employee_id), count: r.reactions, mine: r.reacted }
         : null;
+    const votesOf = voteMap.get(r.community_message_id)?.counts || {};
+    const voted = Object.values(votesOf).reduce((n, v) => n + v, 0) > 0;
+    const closed = Boolean(m.closed);
+    const fresh = Date.now() - new Date(r.sent_at).getTime() < EDIT_WINDOW_MS;
     const poll =
       r.message_type === "poll"
         ? {
@@ -301,6 +347,7 @@ async function present(db, rows, user, { direct = false, other = null } = {}) {
               votes: (voteMap.get(r.community_message_id)?.counts || {})[i] || 0,
             })),
             my_vote: voteMap.get(r.community_message_id)?.mine ?? null,
+            closed,
           }
         : null;
     return {
@@ -318,8 +365,12 @@ async function present(db, rows, user, { direct = false, other = null } = {}) {
       recognition,
       poll,
       announcement: r.announcement_id ? { announcement_id: r.announcement_id, title: r.announcement_title } : null,
-      status: direct && mine ? statusOf(r, other) : null,
+      status: direct && mine && other ? statusOf(r, other) : null,
       deleted,
+      edited_at: iso(r.edited_at),
+      can_edit: !deleted && mine && ((r.message_type === "text" && fresh) || (r.message_type === "poll" && !closed && !voted)),
+      can_delete: !deleted && r.message_type !== "announcement" && (mine || moderator),
+      can_close: !deleted && r.message_type === "poll" && !closed && (mine || moderator),
     };
   });
 }
@@ -329,7 +380,8 @@ async function listMessages(channelId, user, query) {
   const page = await repo.listMessages(pool, channelId, user.user_id, query);
   const direct = m.channel_type === "direct";
   const other = direct ? await repo.otherPointers(pool, channelId, user.user_id) : null;
-  const data = await present(pool, page.data, user, { direct, other });
+  const moderator = isModerator(m, await canAnnounce(pool, user));
+  const data = await present(pool, page.data, user, { direct, other, moderator });
   if (m.system_key === "announcements") {
     const seen = data.filter((x) => x.message_type === "announcement").map((x) => x.community_message_id);
     await require("../announcements/announcements.service").markReadByMessages(user.user_id, seen);
@@ -345,7 +397,8 @@ async function messageView(db, messageId, user) {
   if (!ch) throw notFound();
   const direct = ch.channel_type === "direct";
   const other = direct ? await repo.otherPointers(db, row.community_channel_id, user.user_id) : null;
-  return (await present(db, [row], user, { direct, other }))[0];
+  const moderator = isModerator(ch, await canAnnounce(db, user));
+  return (await present(db, [row], user, { direct, other, moderator }))[0];
 }
 
 /** The kind of message a stored file makes, from its type. */
@@ -379,6 +432,12 @@ async function postMessage(channelId, body, user) {
     const m = await member(client, channelId, user);
     const announcer = await canAnnounce(client, user);
     if (!mayPost(m, announcer)) throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
+    if (body.message_type === "poll" && !mayPoll(m, announcer)) {
+      throw new AppError("CANNOT_POLL", "Only moderators start a poll here", 403);
+    }
+    if ((body.message_type === "birthday" || body.message_type === "anniversary") && !isModerator(m, announcer)) {
+      throw new AppError("CANNOT_CELEBRATE", "Only moderators post a celebration here", 403);
+    }
 
     let type = body.message_type;
     const metadata = {};
@@ -488,6 +547,8 @@ async function vote(messageId, optionIndex, user) {
     const row = await repo.messageFor(client, messageId, user.user_id);
     if (!row || !(await repo.membership(client, row.community_channel_id, user.user_id))) throw notFound();
     if (row.message_type !== "poll") throw new AppError("NOT_A_POLL", "This message is not a poll", 422);
+    if (row.deleted_at) throw notFound();
+    if (row.metadata && row.metadata.closed) throw new AppError("POLL_CLOSED", "This poll is closed", 409);
     const options = (row.metadata && row.metadata.options) || [];
     if (optionIndex >= options.length) {
       throw new AppError("NO_SUCH_OPTION", "That option is not on the poll", 422, { option_index: ["Not an option"] });
@@ -499,6 +560,77 @@ async function vote(messageId, optionIndex, user) {
       actor: user,
       payload: { community_channel_id: row.community_channel_id, community_message_id: messageId, vote: optionIndex },
     });
+  });
+  return messageView(pool, messageId, user);
+}
+
+/** A message the caller may act on, locked, with their membership and whether they moderate it. */
+async function lockedForChange(client, messageId, user) {
+  const row = await repo.lockMessage(client, messageId);
+  if (!row || row.deleted_at) throw notFound();
+  const ch = await repo.membership(client, row.community_channel_id, user.user_id);
+  if (!ch) throw notFound();
+  const moderator = isModerator(ch, await canAnnounce(client, user));
+  return { row, ch, mine: row.sender_user_id === user.user_id, moderator };
+}
+
+async function changed(client, key, row, user, extra = {}) {
+  await emit(client, {
+    key,
+    entity: { type: "channel_message", id: row.community_message_id },
+    actor: user,
+    payload: { community_channel_id: row.community_channel_id, community_message_id: row.community_message_id, ...extra },
+  });
+}
+
+/** The author's text within 15 minutes, or their poll before its first vote (§3 step 14). */
+async function editMessage(messageId, body, user) {
+  await tx(async (client) => {
+    const { row, mine } = await lockedForChange(client, messageId, user);
+    if (!mine) throw new AppError("NOT_YOURS", "Only its author edits a message", 403);
+    const metadata = { ...(row.metadata || {}) };
+    if (row.message_type === "text") {
+      if (Date.now() - new Date(row.sent_at).getTime() >= EDIT_WINDOW_MS) {
+        throw new AppError("EDIT_WINDOW_PASSED", "Too late to edit this message", 409, { body: ["Too late to edit"] });
+      }
+    } else if (row.message_type === "poll") {
+      if (metadata.closed) throw new AppError("POLL_CLOSED", "This poll is closed", 409);
+      if ((await repo.voteCount(client, messageId)) > 0) {
+        throw new AppError("POLL_HAS_VOTES", "People have voted on this poll", 409, { body: ["Already has votes"] });
+      }
+      if (body.options) metadata.options = body.options;
+    } else {
+      throw new AppError("NOT_EDITABLE", "This kind of message is not edited", 422);
+    }
+    const after = await repo.editMessage(client, messageId, { body: body.body, metadata });
+    await changed(client, EVENTS.CHANNEL_MESSAGE_EDITED, after, user);
+  });
+  return messageView(pool, messageId, user);
+}
+
+/** By its author, or a moderator; an announcement's post is managed from Announcements. */
+async function deleteMessage(messageId, user) {
+  await tx(async (client) => {
+    const { row, mine, moderator } = await lockedForChange(client, messageId, user);
+    if (row.message_type === "announcement") {
+      throw new AppError("ANNOUNCEMENT_POST", "Announcements are managed from the Announcements tab", 422);
+    }
+    if (!mine && !moderator) throw new AppError("NOT_YOURS", "Only its author or a moderator deletes a message", 403);
+    const after = await repo.deleteMessage(client, messageId);
+    if (row.message_type === "recognition") await repo.deleteRecognitionOf(client, messageId);
+    await changed(client, EVENTS.CHANNEL_MESSAGE_DELETED, after, user, { message_type: row.message_type });
+  });
+}
+
+/** Stop a poll taking votes; its result stays. */
+async function closePoll(messageId, user) {
+  await tx(async (client) => {
+    const { row, mine, moderator } = await lockedForChange(client, messageId, user);
+    if (row.message_type !== "poll") throw new AppError("NOT_A_POLL", "This message is not a poll", 422);
+    if (!mine && !moderator) throw new AppError("NOT_YOURS", "Only its author or a moderator closes a poll", 403);
+    if (row.metadata && row.metadata.closed) return;
+    const after = await repo.setMetadata(client, messageId, { ...(row.metadata || {}), closed: true });
+    await changed(client, EVENTS.CHANNEL_MESSAGE_EDITED, after, user, { closed: true });
   });
   return messageView(pool, messageId, user);
 }
@@ -530,7 +662,7 @@ async function openDirect(employeeId, user) {
   const channelId = await tx(async (client) => {
     const other = await repo.userOfEmployee(client, employeeId);
     if (!other) throw new AppError("NO_LOGIN", "That colleague has no login yet", 422, { employee_id: ["No login yet"] });
-    if (other === user.user_id) throw new AppError("SELF_MESSAGE", "Choose a colleague, not yourself", 422, { employee_id: ["Choose a colleague"] });
+    // A conversation with oneself is allowed: notes, drafts, files to keep (one member).
     await repo.lockPair(client, user.user_id, other);
     const found = await repo.findDirect(client, user.user_id, other);
     if (found) return found.community_channel_id;
@@ -541,7 +673,7 @@ async function openDirect(employeeId, user) {
       channel_type: "direct",
       created_by: user.user_id,
     });
-    await repo.addMembers(client, made.community_channel_id, [user.user_id, other]);
+    await repo.addMembers(client, made.community_channel_id, [...new Set([user.user_id, other])]);
     await emit(client, {
       key: EVENTS.DIRECT_THREAD_OPENED,
       entity: { type: "direct_thread", id: made.community_channel_id },
@@ -554,8 +686,8 @@ async function openDirect(employeeId, user) {
   return conversationView(row);
 }
 
-async function listColleagues(query) {
-  const page = await repo.listColleagues(pool, query);
+async function listColleagues(query, user) {
+  const page = await repo.listColleagues(pool, query, user.user_id);
   return { ...page, data: page.data.map((r) => r.person) };
 }
 
@@ -626,6 +758,11 @@ function touchPresence(userId) {
 }
 
 module.exports = {
+  isModerator,
+  mayPoll,
+  editMessage,
+  deleteMessage,
+  closePoll,
   lineOf,
   mayPost,
   kindOfFile,
@@ -636,6 +773,7 @@ module.exports = {
   listMembers,
   addMembers,
   removeMember,
+  setRole,
   setMuted,
   markRead,
   markDelivered,

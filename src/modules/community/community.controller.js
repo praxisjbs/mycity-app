@@ -12,6 +12,13 @@ module.exports = {
   createChannel: async (req, res) => created(res, await service.createChannel(req.validated.body, req.user)),
   listMembers: async (req, res) => sendPaged(res, await service.listMembers(p(req).id, req.user, req.validated.query)),
   addMembers: async (req, res) => ok(res, await service.addMembers(p(req).id, req.validated.body, req.user)),
+  editMessage: async (req, res) => ok(res, await service.editMessage(p(req).id, req.validated.body, req.user)),
+  deleteMessage: async (req, res) => {
+    await service.deleteMessage(p(req).id, req.user);
+    noContent(res);
+  },
+  closePoll: async (req, res) => ok(res, await service.closePoll(p(req).id, req.user)),
+  setRole: async (req, res) => ok(res, await service.setRole(p(req).id, p(req).user_id, req.validated.body.member_role, req.user)),
   removeMember: async (req, res) => {
     await service.removeMember(p(req).id, p(req).user_id, req.user);
     noContent(res);
@@ -37,6 +44,6 @@ module.exports = {
   transcript: async (req, res) => ok(res, await service.transcript(p(req).id, req.user)),
   listConversations: async (req, res) => sendPaged(res, await service.listConversations(req.user, req.validated.query)),
   openDirect: async (req, res) => ok(res, await service.openDirect(req.validated.body.employee_id, req.user)),
-  listColleagues: async (req, res) => sendPaged(res, await service.listColleagues(req.validated.query)),
+  listColleagues: async (req, res) => sendPaged(res, await service.listColleagues(req.validated.query, req.user)),
   profileCard: async (req, res) => ok(res, await service.profileCard(p(req).id, req.user)),
 };
