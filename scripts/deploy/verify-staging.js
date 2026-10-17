@@ -12,7 +12,7 @@
  * Checks now:
  *   readiness      200, ok, status not "unavailable", this exact build, APP_ENV staging
  *   modules        none skipped for an error (health/ready "modules")
- *   migrations     the database head is the newest file in migrations/
+ *   migrations     the database head is the newest file in migrations/ or seeds/reference/
  *   frontends      both builds present (health/ready "static"); a deep link on hub. serves
  *                  index.html uncached; hashed assets are immutable
  *   surfaces       each host refuses the other's API; go. has no socket.io (runbooks/proxy.md §5)
@@ -41,12 +41,15 @@ const PENDING = [
   ["Playwright smoke, phone and desktop", "app/ wired to the API"],
 ];
 
-/** The newest migration name in the checkout, or null when there are none yet. */
+/**
+ * The newest step in the checkout, or null when there are none yet. Migrations and reference
+ * seeds are one numbered sequence in the database's ledger, so the head is the newest of both.
+ */
 function expectedHead(root = ROOT) {
   const { listMigrations } = require(
     path.join(root, "scripts", "db", "migrate"),
   );
-  const all = listMigrations(path.join(root, "migrations"));
+  const all = listMigrations();
   return all.length ? all[all.length - 1].name : null;
 }
 
