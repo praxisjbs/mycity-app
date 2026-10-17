@@ -5,9 +5,11 @@
  * this is the one door the controller comes through, so a tab added later
  * cannot quietly reach another person's record from somewhere else.
  *
- * My Documents is on the real API (M0, track B). My Profile, attendance, pay,
- * leave, queries and performance arrive with their own milestones.
+ * My Profile, My Documents (M0, track B) and My Leave (M1) are on the real API.
+ * Attendance, pay, queries and performance arrive with their own milestones.
  */
 const documents = require("./ess.documents");
+const leave = require("./ess.leave");
+const profile = require("./ess.profile");
 
-module.exports = { documents };
+module.exports = { documents, leave, profile };

@@ -43,19 +43,20 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 32 | 17 | 0 | 15 | 0 | 0 |
-| M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
-| M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
+| M1 Core Operations & Employee Management | 29 | 11 | 0 | 18 | 0 | 0 |
+| M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
+| M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
-| M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
+| M6 Payroll & Notifications | 7 | 7 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **71** | **0** | **22** | **0** | **0** |
+| **Total** | **93** | **68** | **0** | **25** | **0** | **0** |
 
-M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
+M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
+milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
 
 ---
@@ -503,12 +504,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 8 | My Profile | `my-profile` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 9 | My Attendance | `my-attendance` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 10 | My Performance | `my-performance` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 11 | My Payslips | `my-payslips` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 12 | My Leave | `my-leave` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 13 | My Queries | `my-queries` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 88 | My Devices | `my-devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
@@ -518,6 +519,9 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · AJ · My Profile (#8) on the real API: the caller's record from the employee 360 (account by its last four digits), Edit Profile for phone, home address, next of kin and bank through the organisation service (a bank change tells `people` edit holders), Record History, the organisation's working week (Saturday 09:00 to 15:00). Screen on `contract.gen.ts`, INTERIM `MyProfile` gone, mock in the contract's shapes; 5 integration tests. Left, each needing a module AJ does not own: the photo (`employee.photo_document_id`, written by the organisation module, read by the shell and Community; GE, TB), each person's own schedule (LA, attendance), Download My Data.
+- 17/10/2026 · AJ · My Performance (#10), My Queries (#13) and My Payslips (#11) now carry the milestone of the module they show (M2, M3, M6), as `docs/guides/ess.md` §6 already said, so the shell's Coming Soon names that milestone and its date instead of M1 (AJ, 17/10/2026). Summary counts moved with them. MILESTONES §18 still lists all twelve ESS tabs under M1: TB to note.
+- 17/10/2026 · AJ · My Leave (#12) on the real API: `/ess/leave` (list, one request, the year per type, ask, cancel), the caller's own only. A request is counted in working days (Monday to Saturday, holidays out) and refused when it overlaps other leave, crosses New Year, has no working day, starts in the past or passes the type's allowance; it opens `leave.approval` (line manager, then Operations & People over 5 days) and the request copies the outcome after commit, every read taking the approval's outcome meanwhile. Cancel while it waits (the approval is withdrawn) or before it starts. Screen on `contract.gen.ts`; the INTERIM `app/src/api/types/leave.ts` is deleted and the mock answers in the contract's shapes. 13 integration tests on the real migrations. Left: a personal leave calendar (the demo's View Calendar, `ess.md` §13); the screen gates that crawl a browser (8, 11, a11y) were not run here and need `npm run ci`.
 - 17/10/2026 · TB · ESS · Org Chart (#91) on the real API, read only for every member of staff:
   the whole company from one bounded read (`GET /api/v1/org-chart`, 2,000 nodes), open seats drawn as
   vacant, dotted lines tagged, no restricted field on any card. On a phone it starts on the signed-in
@@ -593,13 +597,15 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 25 | Attendance | `attendance` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
-| 26 | Leave | `leave` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 28 | Worksites | `worksites` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 17/10/2026 · AJ · People · Leave (#26): Leave Types (add, change, retire; delete only a type nothing has used, `LEAVE_TYPE_IN_USE` otherwise) and Allowances (one person's allowance of a type for a year, or back to the type's; the person is told). The four types are seeded in `seeds/reference/1290_seed_leave.sql` with DO NOTHING, by the team lead's decision of 17/10/2026 (an exception to A26), replacing the staging seed. 15 leave integration tests.
+- 17/10/2026 · AJ · People · Leave (#26) on the real API: the `leave` module (`/api/v1/leave`): requests within the `people` scope (Operations & People everyone, a line manager their team) with search, status, type, employee and date filters; the four figures; Also Away (who else in the department is away on those days); Record Leave for someone, approved at once and the person told (`people` create); cancel granted leave before it ends (`people` edit); leave types listed for every form and added or changed by People. Approve and Reject use the approval's own routes. `1200` checks the four statuses and indexes the lists, `1290` adds Cancelled to the code list. Leave types and allowances followed the same day (note above).
 - 17/10/2026 · TB · ⌘K finds an employee by their work phone, typed any way (0803 123 4567,
   +234 803 123 4567, the last four digits), as `docs/guides/foundation.md` §6.7 promised: a `phones`
   option on search providers compares the digits. Masked numbers (personal, next of kin) are never

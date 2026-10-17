@@ -1,0 +1,82 @@
+"use strict";
+/**
+ * Leave: the rules a request's dates must meet, and the shape of the routes. The whole
+ * flow (asking, the approval, People's scope, cancelling) runs against Postgres in
+ * tests/integration/leave.test.js.
+ */
+const { routesOf } = require("../../http/route");
+const workingWeek = require("../../shared/time/working-week");
+const rules = require("./leave.balance");
+const { OUTCOME } = require("./leave.events");
+
+// Monday to Saturday, as MyCity works (A22), with one public holiday.
+const cal = workingWeek.makeCalendar({
+  days: [1, 2, 3, 4, 5, 6],
+  holidays: [{ holiday_date: "2027-04-02", name: "Good Friday" }],
+});
+
+describe("how long a request is", () => {
+  test("working days, both ends included; Sunday and a public holiday are not counted", () => {
+    expect(rules.daysOf("2027-03-29", "2027-04-04", cal)).toBe(5); // Mon to Sun, Friday a holiday
+    expect(rules.daysOf("2027-02-06", "2027-02-06", cal)).toBe(1); // a Saturday
+  });
+
+  test("a span with no working day, a span over New Year and a backwards span are refused", () => {
+    expect(() => rules.daysOf("2027-02-07", "2027-02-07", cal)).toThrow(
+      expect.objectContaining({ code: "LEAVE_NO_WORKING_DAYS", status: 422 }),
+    );
+    expect(() => rules.daysOf("2027-12-30", "2028-01-03", cal)).toThrow(
+      expect.objectContaining({ code: "LEAVE_SPANS_YEARS" }),
+    );
+    expect(() => rules.daysOf("2027-02-05", "2027-02-04", cal)).toThrow(
+      expect.objectContaining({ code: "LEAVE_ENDS_BEFORE_START" }),
+    );
+  });
+});
+
+describe("the allowance", () => {
+  const annual = { name: "Annual", entitled: 20, remaining: 4 };
+
+  test("a request that fits is let through; one that does not names what is left", () => {
+    expect(() => rules.assertWithinAllowance(annual, 4)).not.toThrow();
+    expect(() => rules.assertWithinAllowance(annual, 5)).toThrow(
+      expect.objectContaining({ code: "LEAVE_ALLOWANCE_EXCEEDED", message: "Only 4 Annual days are left this year" }),
+    );
+  });
+
+  test("a type with no allowance has no ceiling", () => {
+    expect(() => rules.assertWithinAllowance({ name: "Unpaid", entitled: null, remaining: null }, 200)).not.toThrow();
+    expect(() => rules.assertWithinAllowance(undefined, 3)).not.toThrow();
+  });
+});
+
+describe("an approval's end", () => {
+  test("every end state of the flow maps to a request status", () => {
+    expect(OUTCOME).toEqual({
+      approved: "approved",
+      timeout_approved: "approved",
+      rejected: "rejected",
+      timeout_rejected: "rejected",
+      cancelled: "cancelled",
+    });
+  });
+});
+
+describe("the routes", () => {
+  const routes = routesOf(require("./leave.routes").router);
+
+  test("every People route carries a permission; nothing decides a request here", () => {
+    expect(routes.length).toBeGreaterThan(0);
+    for (const r of routes) {
+      expect(r.permission).not.toBeNull();
+      expect(r.path).not.toMatch(/approve|reject|decision/);
+    }
+  });
+
+  test("the lists page through the contract's controls, with no page size", () => {
+    const list = routes.find((r) => r.method === "GET" && r.path === "/requests");
+    const keys = Object.keys(list.contract.query.shape);
+    expect(keys).toEqual(expect.arrayContaining(["page", "q", "sort", "status", "from", "to"]));
+    expect(keys).not.toEqual(expect.arrayContaining(["limit"]));
+  });
+});

@@ -284,8 +284,8 @@ The settings modules that every user touches (`identity` login, own `notificatio
 | `attendance` | LA | `.rules` (wall clock, working week), `.lateness`, `.clock-guard`, `.reconcile`, `.auto-query`, `.analytics`, `.export`, `.calendar` |
 | `devices` | LA | `.guard` |
 | `worksites` | LA | |
-| `leave` | AJ | `.balance`, `.clash` |
-| `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents` (aggregator) |
+| `leave` | AJ | `.balance` (the dates and allowance rules), `.clash` (who else in the department is away); requests open the `leave.approval` flow, decided in `workflow` |
+| `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service) |
 | `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
 | `announcements` | GE | |
 | `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7) |
@@ -655,6 +655,7 @@ npm ci                       # exact versions from package-lock.json
 cp .env.example .env         # fill DB, Redis, JWT secrets
 npm run db:migrate           # against your local database
 npm run db:seed -- --build   # synthetic data; refuses on staging and production
+                             # set SEED_PASSWORD in .env first: the mock's people sign in with it
 npm run dev                  # API
 npm run dev:worker           # worker
 npm run gen:contract         # after any schema or route change

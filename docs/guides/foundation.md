@@ -320,7 +320,9 @@ As built (17/10/2026):
 - **The leave flow** is `leave.approval` (module `people`, context `days`), seeded in `0499` and in
   `shared/workflow/definitions.js` DEFAULTS: stage `line_manager` (the subject's line manager, 48 hours),
   then `operations_people` (the role, 48 hours) when `days > 5`. A subject with no line manager goes
-  to the CEO (the engine's rule). The leave module (M1) opens it with `{ days }`.
+  to the CEO (the engine's rule). The leave module (M1, `src/modules/leave`) opens it with `{ days }`
+  in the transaction that saves the request, and copies its outcome onto the request after commit
+  (`docs/guides/ess.md` §6). People · Leave decides with the same approve and reject routes.
 - **Editing** changes a stage's name, its approver (Line Manager, a role, one login, or the CEO), when
   it applies (Always, or one comparison on a number the flow carries: Over, At Least, Under, At Most,
   Exactly) and its time limit in hours; stages are added, removed and moved up or down. Save Stages
@@ -553,6 +555,7 @@ screen.
   (`seeds/reference/0448`): the days the Public Holidays Act fixes as declared, and the Eids (from the
   Umm al-Qura calendar) and the weekday given for a weekend holiday as Expected, which `0410` adds and
   Confirm Holiday clears. A26 amended: a holiday set by law is not a business choice.
+- 17/10/2026 · AJ · §6.5: the leave module now opens `leave.approval` and settles the request from its outcome; People · Leave (#26) approves and rejects through the workflow routes (`docs/guides/ess.md`).
 - 17/10/2026 · TB · §6.7, §10.1: ⌘K gains Waiting on You (first, with nothing typed), open seats,
   preferred and middle names, the theme, density, Install App and Sign Out as actions, and one forgiven
   slip in screens and actions.

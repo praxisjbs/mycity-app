@@ -820,7 +820,7 @@ query keys with a 422. Each mock response is checked against the contract once t
 exists, and a module's mock is deleted when its real routes ship. The identity mock is the exception:
 it stays, in the contract's shapes, because the gallery, the crawl and a laptop all need to sign in. API mode is set in
 `vite.config.ts`: `mock` for `npm run dev` and `npm run build:demo`, `live` for a production build;
-`VITE_API_MODE=live npm run dev` proxies `/api` to `localhost:3000`.
+`VITE_API_MODE=live npm run dev` (or `npm run dev:live` in `app/`, which sets it on any shell) proxies `/api` to `localhost:3000`.
 
 **One dataset (F13).** The mock's records are the source of `seeds/staging`. When a module's routes
 land, its owner writes the staging seed that loads the same records through the services (LA
