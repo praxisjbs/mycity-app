@@ -49,11 +49,11 @@ describeDb("⌘K search against the real migrations", () => {
     await rebuild(pool, config.DB_NAME);
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));
-    const sample = (first, last, email, job) => ({
+    const sample = (first, last, email, job, phone) => ({
       first_name: first,
       last_name: last,
       work_email: email,
-      phone: "08031234567",
+      phone,
       job_title: job,
       department_name: "Operations",
       start_date: "2026-02-02",
@@ -61,13 +61,13 @@ describeDb("⌘K search against the real migrations", () => {
       work_pattern: "hybrid",
     });
     const people = [
-      ["ops", "Halima", "Garba", "operations_people", "Operations Lead"],
-      ["staff", "Obinna", "Eke", "employee", "Field Officer"],
+      ["ops", "Halima", "Garba", "operations_people", "Operations Lead", "08031234567"],
+      ["staff", "Obinna", "Eke", "employee", "Field Officer", "0809 765 4321"],
     ];
     let ip = 0;
-    for (const [key, first, last, role, job] of people) {
+    for (const [key, first, last, role, job, phone] of people) {
       await tx((client) =>
-        createAdmin(client, { employee: sample(first, last, `${key}@mycity.test`, job), role_code: role, is_ceo: false }, PASSWORD, {
+        createAdmin(client, { employee: sample(first, last, `${key}@mycity.test`, job, phone), role_code: role, is_ceo: false }, PASSWORD, {
           allowAdditional: true,
         }),
       );
@@ -149,6 +149,16 @@ describeDb("⌘K search against the real migrations", () => {
     const logins = await search("ops", { q: "obinna" });
     expect(titles(logins, "app_user")).toEqual(["Obinna Eke"]);
     expect(group(await search("staff", { q: "halima" }), "app_user")).toBeUndefined();
+  });
+
+  test("an employee is found by their work phone, typed any way", async () => {
+    for (const q of ["0809 765 4321", "08097654321", "+234 809 765 4321", "4321"])
+      expect(titles(await search("ops", { q }), "employee")).toEqual(["Obinna Eke"]);
+    const halima = group(await search("ops", { q: "0803 123 4567" }), "employee").items;
+    expect(halima.map((i) => i.title)).toEqual(["Halima Garba"]);
+    expect(halima[0].link).toMatch(/^\/people\?tab=employees&id=/);
+    // Staff hold no people grant: a number finds nobody for them.
+    expect(group(await search("staff", { q: "0803 123 4567" }), "employee")).toBeUndefined();
   });
 
   test("a type word narrows to that kind of record", async () => {

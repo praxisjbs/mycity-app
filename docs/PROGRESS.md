@@ -560,6 +560,10 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · ⌘K finds an employee by their work phone, typed any way (0803 123 4567,
+  +234 803 123 4567, the last four digits), as `docs/guides/foundation.md` §6.7 promised: a `phones`
+  option on search providers compares the digits. Masked numbers (personal, next of kin) are never
+  searched. Left: nothing.
 - 17/10/2026 · TB · People · Employees (#24) and People · Organogram (#92) on the real API, with
   ESS · Org Chart (#91): the register lists 25 a page with search, the department, status and work
   pattern filters and the server's own sort, each row opening the record; Add Employee and Edit are

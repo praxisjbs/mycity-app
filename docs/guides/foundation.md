@@ -358,6 +358,10 @@ As built (17/10/2026):
   Set PIN, Mark All Read), then one group per kind of record from each `<module>.search.js` (Employees,
   Departments, Users, Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's). With nothing typed it offers the screens and actions; `type`
   pages through one group.
+- Employees are found by name, staff number, work email, post or work phone. A term made of digits,
+  spaces and + ( ) - (four digits or more) is compared with the phone digit for digit, a leading local
+  0 dropped, so 0803 123 4567, +234 803 123 4567 and the last four digits find the same person
+  (`phones` in `shared/search/provider.js`). Masked numbers (personal, next of kin) are never searched.
 - A screen or an action is offered only when the shell would show its tab to the reader
   (`shared/search/screens.js` mirrors `app/src/shell/access.ts`) and they hold the grant it needs. A
   record group runs only for a reader with `view` on its module, within their scope.
@@ -535,6 +539,8 @@ screen.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · §6.7: employees are also found by their work phone, typed any way (a `phones`
+  option on search providers). §6.7 already promised it; track A's provider lacked the column.
 - 17/10/2026 · TB · Track D built: the `workflow` routes (My Approvals and its count, one request,
   approve, reject, request changes, withdraw, and reassign from §11 with `0450`), Settings · Approvals
   (#72) on the real API (flows edited as new versions), the leave flow in `0499` (line manager, then

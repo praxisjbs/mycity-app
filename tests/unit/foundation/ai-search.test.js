@@ -30,6 +30,7 @@ const { citationsFor } = require("../../../src/shared/ai/cite");
 const {
   recordProvider,
   escapeLike,
+  dialled,
 } = require("../../../src/shared/search/provider");
 const { typeHint } = require("../../../src/shared/search/search.service");
 const aiCoverage = require("../../../scripts/check/ai-manifest-coverage");
@@ -483,6 +484,18 @@ describe("search providers", () => {
       /key is required/,
     );
     expect(escapeLike("50%_off\\")).toBe("50\\%\\_off\\\\");
+  });
+
+  test("a phone number typed any way is compared digit for digit", () => {
+    for (const typed of ["0803 123 4567", "08031234567", "(0803) 123-4567"])
+      expect(dialled(typed)).toBe("8031234567");
+    expect(dialled("+234 803 123 4567")).toBe("2348031234567");
+    expect(dialled("4567")).toBe("4567");
+    expect(dialled("080")).toBeNull();
+    expect(dialled("ada 0803")).toBeNull();
+    expect(() => recordProvider({ ...spec, phones: "e.phone" })).toThrow(
+      /phones is a list/,
+    );
   });
 
   test("a type word at either end narrows the search", () => {

@@ -129,8 +129,10 @@ employee 360 and ESS · My Profile under their own rules, not here.
   25. No write.
 - **AI routes**: "show me the org chart" opens ESS · Org Chart (or People · Organogram for HR),
   optionally focused on a named person.
-- **Search** (`organisation.search.js`): a person by name or role reaches their node; words people
-  use include "org chart", "organogram", "structure", "who is my manager", "reporting line".
+- **Search** (`organisation.search.js`): a person by name, role, staff number, work email or work
+  phone reaches their record; the phone is matched however it is typed (0803 123 4567, +234 803...,
+  the last four digits). Words people use include "org chart", "organogram", "structure", "who is my
+  manager", "reporting line".
 
 ## 10 · On screen and mobile
 
@@ -239,6 +241,8 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · §9: a person is also found by their work phone, typed any way. The work phone is
+  not a masked field; personal and next-of-kin numbers are, and search never reads them.
 - 17/10/2026 · TB · Built (#92 and #91). §4 and §5 are the API as built: one `OrgNode` shape for a
   person and a seat (`node_id`, `node_kind`, `manager_node_id`, `dotted_manager_node_id`), the
   employee write that moves a line to a person or a seat, and the three `org-seats` routes behind Add

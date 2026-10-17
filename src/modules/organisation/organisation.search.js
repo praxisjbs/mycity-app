@@ -3,8 +3,10 @@
  * ⌘K: the people and the departments of the organisation (docs/guides/foundation.md §6.7,
  * docs/guides/organogram.md §9).
  *
- * A person is found by name, staff number, work email or post, and a result opens their
- * record. Record scope narrows it exactly as it narrows the register: Operations and
+ * A person is found by name, staff number, work email, post or work phone (typed any way:
+ * 0803 123 4567, +234 803..., the last four digits), and a result opens their record. The
+ * work phone is not a masked field; personal and next-of-kin numbers are, and are never
+ * searched. Record scope narrows it exactly as it narrows the register: Operations and
  * People find everyone, a line manager their team, everybody else themselves. An
  * archived record is out of the way until People restore it.
  */
@@ -22,6 +24,7 @@ const employees = recordProvider({
     "e.employee_id AS id, e.staff_number::text AS ref, btrim(e.first_name || ' ' || e.last_name) AS title, e.job_title || ' · ' || d.name AS sub, e.status AS status",
   where: "e.status <> 'archived'",
   scope: { column: "e.employee_id" },
+  phones: ["e.phone"],
 });
 
 const departments = recordProvider({
