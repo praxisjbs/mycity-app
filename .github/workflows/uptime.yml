@@ -1,22 +1,22 @@
 name: Uptime
 
-# Probe production from outside the server every 10 minutes (ops/monitoring/uptime-probe.js,
-# docs/runbooks/monitoring.md §5): both hosts over HTTPS, readiness, the environment header and
-# the certificate's days left. Alerts go to the ALERT_WHATSAPP_URLS and ALERT_WEBHOOK_URL repository
+# Probe production and staging from outside the server every 30 minutes
+# (ops/monitoring/uptime-probe.js, docs/runbooks/monitoring.md §5): all four hosts over HTTPS,
+# readiness, the environment header and the certificate's days left. Alerts go to the ALERT_WHATSAPP_URLS and ALERT_WEBHOOK_URL repository
 # secrets (src/shared/observability/alert.js); the state
 # kept between runs (actions/cache) makes it alert on a change, hourly while down, and once on
 # recovery. A run that finds a host down also fails, and GitHub emails whoever last edited this
 # schedule.
 #
-# The repository is public, so these runs cost no Actions minutes (if it ever goes private, about
-# 4,300 a month: widen the schedule to every 30 minutes). Anyone can read a public run's log; it
-# holds only what /api/health/ready already tells the world. GitHub runs schedules from the default
-# branch only, may start a run some minutes late, and pauses them in a public repository after 60
-# days without a push.
+# The repository is private, so every run costs Actions minutes: one minute a run, about 1,440 a
+# month at this schedule, from the same allowance CI and releases use. GitHub runs schedules from
+# the default branch only, starts them late or skips them when it is busy (on 16 and 17 October it
+# ran 7 of about 120 ten-minute runs), so this is a safety net, not a pager: an external uptime
+# service (monitoring.md §5) is what notices an outage within minutes.
 
 on:
   schedule:
-    - cron: "3-59/10 * * * *"
+    - cron: "3,33 * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   probe:
-    name: Probe production
+    name: Probe production and staging
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -55,7 +55,7 @@ jobs:
         env:
           ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
           ALERT_WHATSAPP_URLS: ${{ secrets.ALERT_WHATSAPP_URLS }}
-        run: node ops/monitoring/uptime-probe.js --state=.uptime-state.json
+        run: node ops/monitoring/uptime-probe.js --with-staging --state=.uptime-state.json
 
       - name: Keep the state for the next run
         if: always()

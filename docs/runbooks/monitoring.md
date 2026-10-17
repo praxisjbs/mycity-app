@@ -127,17 +127,20 @@ curl -s -H "Authorization: Bearer <METRICS_TOKEN>" localhost:7000/api/metrics | 
 
 ## 5 · Outside checks
 
-`ops/monitoring/uptime-probe.js` checks production the way a person reaches it: over HTTPS,
-through DNS, the firewall, nginx and TLS. `.github/workflows/uptime.yml` runs it from GitHub every
-10 minutes; it alerts through the repository secret `ALERT_WHATSAPP_URLS` (§2,
-`docs/runbooks/github-settings.md`).
+`ops/monitoring/uptime-probe.js` checks production and staging the way a person reaches them:
+over HTTPS, through DNS, the firewall, nginx and TLS. `.github/workflows/uptime.yml` runs it from
+GitHub every 30 minutes (`--with-staging`), costing Actions minutes now the repository is private;
+it alerts through the repository secret `ALERT_WHATSAPP_URLS` (§2,
+`docs/runbooks/github-settings.md`). **Until that secret is set it tells nobody**: the run log says
+"no alert channel set" and the run fails, which emails only whoever last edited the schedule.
 
 | Host | Down when | Listed, not alerted |
 |---|---|---|
 | `hub.mycityapp.io` | `/api/health/ready` is not 200 with `ok: true`, after three tries 15 s apart | degraded checks (mail, clamd...) |
 | `go.mycityapp.io` | `/api/health` is not 200 | |
-| both | `X-Mycity-Environment` is not `production` (a DNS or proxy mistake pointing at staging); no answer; TLS refused | |
-| both | the certificate has under 14 days left (renewal runs at 30): alerted once a day | |
+| `hub.staging.` and `go.staging.mycityapp.io` | the same as their production host | |
+| all | `X-Mycity-Environment` is not the host's own environment (a DNS or proxy mistake pointing one at the other); no answer; TLS refused | |
+| all | the certificate has under 14 days left (renewal runs at 30): alerted once a day | |
 
 It alerts when a host goes down, every hour while it stays down, and once when it recovers. Run it
 yourself from any machine with Node 20:
@@ -147,8 +150,8 @@ node ops/monitoring/uptime-probe.js                  # production
 node ops/monitoring/uptime-probe.js --with-staging   # and staging
 ```
 
-GitHub may start a scheduled run some minutes late. For a faster first line, point a free
-external uptime service at `https://hub.mycityapp.io/api/health/ready` as well; the probe still
+GitHub starts scheduled runs late and skips them when busy (7 of about 120 ran on 16 and 17
+October). For a faster first line, point a free external uptime service at `https://hub.mycityapp.io/api/health/ready` as well; the probe still
 gives the environment and certificate checks it does not.
 
 The server alerts on its own too: the nightly backup and the weekly restore drill post to

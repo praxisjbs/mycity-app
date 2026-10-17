@@ -97,6 +97,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · verify-staging checks sign-in for real: the staff API refuses a call with no session
+  and a wrong password is refused as one, on every release; with the QA login (secrets
+  `STAGING_QA_EMAIL`, `STAGING_QA_PASSWORD`, `docs/runbooks/deploy.md` §1) a sign-in round trip and a
+  Staff session refused Settings. The uptime probe covers staging too, every 30 minutes (the
+  repository is private, so runs cost minutes; GitHub ran 7 of about 120 ten-minute runs). Left: make
+  the QA login and its two secrets; set `ALERT_WHATSAPP_URLS` (the probe has told nobody so far);
+  workflow, PDF and mail checks stay PENDING. The A26 seed move stays with each milestone's screen
+  (DATABASE_SCHEMA §5.3).
 - 17/10/2026 · TB · `create-admin`: the password and repeat prompts no longer vanish (readline's redraw
   erased them once the echo was muted, so on a phone the script looked frozen); passwords are read
   without readline, tested at phone width. Build account created on staging. BACKEND_STRUCTURE §13 now

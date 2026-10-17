@@ -111,14 +111,26 @@ describe("verify-staging", () => {
       "https://go.test/socket.io/": answer(404, { code: "NOT_FOUND" }),
       "https://go.test/": answer(200, null, { "content-type": "text/html" }),
       "http://hub.test/api/health": answer(301, null, { location: "https://hub.test/api/health" }),
+      "https://hub.test/api/v1/auth/me": (o) =>
+        o.headers?.authorization === "Bearer qa-token"
+          ? answer(200, { email: "QA@mycityapp.io" })
+          : answer(401, { error: { code: "AUTH_REQUIRED" } }),
+      "https://hub.test/api/v1/auth/login": (o) =>
+        o.body.email === QA.email && o.body.password === QA.password
+          ? answer(200, { access_token: "qa-token" })
+          : answer(401, { error: { code: "INVALID_CREDENTIALS" } }),
+      "https://hub.test/api/v1/settings/approvals": answer(403, { error: { code: "FORBIDDEN" } }),
+      "https://hub.test/api/v1/auth/logout": answer(204, null),
       ...overrides,
     };
-    return async (url) => {
+    return async (url, opts = {}) => {
       if (!routes[url]) throw new Error(`unexpected ${url}`);
-      return routes[url];
+      return typeof routes[url] === "function" ? routes[url](opts) : routes[url];
     };
   }
-  const run = (fetchImpl) => staging.verify({ sha: SHA, hub: "https://hub.test", go: "https://go.test", head, fetchImpl });
+  const QA = { email: "qa@mycityapp.io", password: "Qa-login-pw-9!" };
+  const run = (fetchImpl, qa = null) =>
+    staging.verify({ sha: SHA, hub: "https://hub.test", go: "https://go.test", head, qa, fetchImpl });
 
   test("a healthy staging passes; a degraded tool is a warning, not a failure", async () => {
     const r = await run(fakeFetch());
@@ -140,6 +152,45 @@ describe("verify-staging", () => {
     expect(r.failed.join("\n")).toMatch(/migrations at head: database 0098_x, repository 0099_seed_reference/);
     expect(r.failed.join("\n")).toMatch(/frontend builds present/);
     expect(r.failed.join("\n")).toMatch(/go refuses the staff API: HTTP 401/);
+  });
+
+  test("without the QA login, sign-in and RBAC are pending; the wrong-password probe still runs", async () => {
+    const r = await run(fakeFetch());
+    expect(r.passed).toEqual(expect.arrayContaining(["staff API needs a session: HTTP 401", "sign-in refuses a wrong password: HTTP 401 INVALID_CREDENTIALS"]));
+    expect(r.pending.map(([what]) => what)).toEqual(expect.arrayContaining(["sign-in round trip", "RBAC deny check", "PDF render"]));
+  });
+
+  test("with the QA login: sign in, own account, sign out, and a Staff session refused Settings", async () => {
+    const r = await run(fakeFetch(), QA);
+    expect(r.failed).toEqual([]);
+    expect(r.passed).toEqual(expect.arrayContaining([
+      "sign-in round trip: sign in 200, own account 200, sign out 204",
+      "RBAC deny check: a Staff session asking for Settings, Approvals: HTTP 403",
+    ]));
+    expect(r.pending.map(([what]) => what)).not.toContain("sign-in round trip");
+  });
+
+  test("a sign-in that errors, a QA login with two-step, or a grant that leaks: each fails", async () => {
+    let r = await run(fakeFetch({ "https://hub.test/api/v1/auth/login": answer(500, { error: { code: "INTERNAL" } }) }));
+    expect(r.failed.join("\n")).toMatch(/sign-in refuses a wrong password: HTTP 500 INTERNAL/);
+
+    r = await run(fakeFetch({
+      "https://hub.test/api/v1/auth/login": (o) =>
+        o.body.email === QA.email ? answer(200, { step: "code", challenge_token: "t", expires_in: 300 }) : answer(401, { error: { code: "INVALID_CREDENTIALS" } }),
+    }), QA);
+    expect(r.failed).toEqual([
+      "sign-in round trip: the QA login asks for a code; turn two-step off for it",
+      "RBAC deny check: no session to check with",
+    ]);
+
+    r = await run(fakeFetch({ "https://hub.test/api/v1/settings/approvals": answer(200, { data: [] }) }), QA);
+    expect(r.failed).toEqual(["RBAC deny check: a Staff session asking for Settings, Approvals: HTTP 200"]);
+  });
+
+  test("the QA login comes from the environment, both values or neither", () => {
+    expect(staging.qaFromEnv({})).toBeNull();
+    expect(staging.qaFromEnv({ STAGING_QA_EMAIL: "qa@x.io", STAGING_QA_PASSWORD: "p" })).toEqual({ email: "qa@x.io", password: "p" });
+    expect(() => staging.qaFromEnv({ STAGING_QA_EMAIL: "qa@x.io" })).toThrow(/both/);
   });
 
   test("an unreachable staging fails at once", async () => {

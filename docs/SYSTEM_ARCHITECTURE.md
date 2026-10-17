@@ -422,7 +422,7 @@ seed guard.
   backup recorded; it fails when the newest nightly is over 36 hours old. Timed and logged, so the
   M11 rehearsal (MILESTONES §16) is a record, not an event.
 - **Uptime.** `ops/monitoring/uptime-probe.js` from outside the server (`.github/workflows/uptime.yml`
-  every 10 minutes): both production hosts over HTTPS, `/api/health/ready`, the environment header
+  every 30 minutes): the production and staging hosts over HTTPS, `/api/health/ready`, the environment header
   and the certificate's days left. Errors, backup, drill and probe all alert through one sender
   (`shared/observability/alert.js`): WhatsApp links per person (`ALERT_WHATSAPP_URLS`) and/or a
   chat webhook (`ALERT_WEBHOOK_URL`).

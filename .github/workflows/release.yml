@@ -154,6 +154,9 @@ jobs:
       - name: Verify staging over HTTPS
         env:
           SHA: ${{ needs.build.outputs.sha }}
+          # The QA login (docs/runbooks/deploy.md §1); unset, its two checks are listed PENDING.
+          STAGING_QA_EMAIL: ${{ secrets.STAGING_QA_EMAIL }}
+          STAGING_QA_PASSWORD: ${{ secrets.STAGING_QA_PASSWORD }}
         run: node scripts/deploy/verify-staging.js --sha="$SHA"
 
       - name: Load the staging key
