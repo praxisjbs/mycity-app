@@ -759,6 +759,10 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   time limit, add, remove and reorder stages, Save Stages as the next version (open requests keep
   theirs; a stale version is refused). Desktop table and side panel; phone cards and full sheets. Left:
   `3099`'s consequence flow shows Needs Fixing until M3 seeds a valid one.
+- 17/10/2026 · TB · Organisation (#69): Nigeria's public holidays for 2026 and 2027 are seeded
+  (`seeds/reference/0448`, 33 days): the eight the Public Holidays Act fixes as Declared, and the
+  Eids and the weekday given for a weekend holiday as Expected (`0410`), confirmed or moved on the
+  card with Confirm Holiday. Left: 2028's list, in a later seed or a yearly job.
 - 17/10/2026 · TB · Organisation (#69), Roles & Permissions (#71), Documents & Numbering (#76),
   Security (#78) and Audit Log (#79) built on the real API, track C of `docs/guides/foundation.md`,
   desktop and phone; the mock follows the same paths and contract shapes. Organisation: the company

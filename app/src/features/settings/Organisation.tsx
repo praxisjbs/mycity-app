@@ -41,9 +41,10 @@ const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Something
 
 /**
  * Settings · Organisation (docs/guides/foundation.md §10): the company's own
- * profile, the working week by day (A22), and the public holidays, entered here
- * and never seeded (A26). Attendance, leave and every deadline read the week and
- * the holidays.
+ * profile, the working week by day (A22), and the public holidays: Nigeria's are
+ * seeded, the moon-dated and weekend ones Expected until someone confirms or moves
+ * them here, and any other is added here. Attendance, leave and every deadline
+ * read the week and the holidays.
  */
 export function OrganisationTab() {
   const { can } = useAuth();
@@ -296,6 +297,7 @@ function Holidays({ canEdit }: { canEdit: boolean }) {
       columns={[
         { key: "holiday_date", label: "Date", sortable: true, render: (h) => formatDate(h.holiday_date) },
         { key: "name", label: "Holiday", sortable: true, render: (h) => h.name },
+        { key: "expected", label: "Status", render: (h) => <Pill tone={h.expected ? "warn" : "ok"}>{h.expected ? "Expected" : "Declared"}</Pill> },
       ]}
     />
   );
@@ -316,7 +318,7 @@ function HolidayForm({ holiday, close }: { holiday: Holiday | null; close: () =>
     try {
       if (holiday) await update.run({ params: { id: holiday.public_holiday_id }, body: f.values });
       else await add.run({ body: f.values });
-      done(holiday ? "Holiday saved" : "Holiday added");
+      done(holiday?.expected ? "Holiday confirmed" : holiday ? "Holiday saved" : "Holiday added");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
@@ -347,7 +349,7 @@ function HolidayForm({ holiday, close }: { holiday: Holiday | null; close: () =>
         )}
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" type="submit" busy={add.pending || update.pending}>
-          {holiday ? "Save Holiday" : "Add Holiday"}
+          {holiday?.expected ? "Confirm Holiday" : holiday ? "Save Holiday" : "Add Holiday"}
         </Button>
       </FormFooter>
     </Form>
