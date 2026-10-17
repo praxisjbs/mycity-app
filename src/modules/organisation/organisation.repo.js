@@ -507,9 +507,23 @@ function insertEmployee(db, e) {
   );
 }
 
-/** Apply an EmployeeUpdate. Only the keys the caller sent are touched. */
+/**
+ * Apply an EmployeeUpdate. Only the keys that carry a value are touched: a key that
+ * arrives empty means "not given", never "clear it".
+ *
+ * A form holds every one of its fields, and a field the person may not see arrives
+ * masked (null). Writing those through would blank a salary or a date of birth because
+ * somebody corrected a job title, so the one write path refuses to: clearing a field is
+ * its own change, not a side effect of an edit.
+ */
 function updateEmployee(db, employeeId, patch) {
-  const keys = UPDATE_COLUMNS.filter((k) => Object.prototype.hasOwnProperty.call(patch, k));
+  const keys = UPDATE_COLUMNS.filter(
+    (k) =>
+      Object.prototype.hasOwnProperty.call(patch, k) &&
+      patch[k] !== undefined &&
+      patch[k] !== null &&
+      patch[k] !== "",
+  );
   if (keys.length === 0) return findEmployeeById(db, employeeId);
   const sets = keys.map((k, i) => `${k} = $${i + 2}`);
   return one(
@@ -517,7 +531,7 @@ function updateEmployee(db, employeeId, patch) {
     `UPDATE employee SET ${sets.join(", ")}, updated_at = now()
       WHERE employee_id = $1
       RETURNING ${EMPLOYEE_COLUMNS.replace(/\be\./g, "")}`,
-    [employeeId, ...keys.map((k) => (patch[k] === "" ? null : patch[k]))],
+    [employeeId, ...keys.map((k) => patch[k])],
   );
 }
 

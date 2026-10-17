@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import organisation from "@mycity/contract/schemas/organisation.js";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { Employee360, EmployeeCreate } from "@/api/types/organisation";
@@ -201,8 +201,8 @@ export function AddEmployee({ close }: { close: () => void }) {
 /** Edit: the record's own fields, checked by `EmployeeUpdate`. */
 export function EditEmployee({ employee, close }: { employee: Employee360; close: () => void }) {
   const departments = useDepartments();
-  const f = useContractForm<Values>(
-    {
+  const start = useMemo<Values>(
+    () => ({
       ...blank,
       first_name: employee.first_name,
       middle_name: employee.middle_name ?? "",
@@ -226,15 +226,27 @@ export function EditEmployee({ employee, close }: { employee: Employee360; close
       bank_name: employee.bank_name ?? "",
       account_number: employee.account_number ?? "",
       gross_monthly: employee.gross_monthly ?? "",
-    },
-    organisation.EmployeeUpdate,
+    }),
+    [employee],
   );
+  const f = useContractForm<Values>(start, organisation.EmployeeUpdate);
   const save = useMutation("PATCH /api/v1/employees/:id");
 
   const submit = async () => {
     if (!f.check()) return;
+    /* Only what the person changed: a field they may not see arrives masked, and sending
+       it back as it looks on screen would blank it (the API refuses that too). */
+    const changed = Object.fromEntries(
+      (Object.keys(f.values) as Array<keyof Values>)
+        .filter((k) => f.values[k] !== start[k])
+        .map((k) => [k, f.values[k]]),
+    );
+    if (Object.keys(changed).length === 0) {
+      close();
+      return;
+    }
     try {
-      await save.run({ params: { id: employee.employee_id }, body: f.values as never });
+      await save.run({ params: { id: employee.employee_id }, body: changed as never });
       invalidate("/api/v1/employees", "/api/v1/org-chart");
       close();
       toast(`${employee.display_name} saved`);

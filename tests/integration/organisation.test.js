@@ -378,6 +378,37 @@ describeDb("the organisation module against the real migrations", () => {
       expect(audit.changed_fields.sort()).toEqual(["job_title", "work_pattern"]);
     });
 
+    test("an edit leaves every field it was not given alone, masked ones included", async () => {
+      const before = await one(
+        "SELECT gross_monthly, bank_name, account_number, date_of_birth, home_address FROM employee WHERE employee_id = $1",
+        [people.staff.employee_id],
+      );
+      expect(before.gross_monthly).not.toBeNull();
+      /* What a viewer without the field grant sees: those fields come back null, and a
+         form that sent them back as they look (empty, or null for a typed field) would
+         blank them. */
+      const res = await asOps()(request(app).patch(`/api/v1/employees/${people.staff.employee_id}`)).send({
+        job_title: "Senior Analyst",
+        gross_monthly: null,
+        bank_name: "",
+        account_number: null,
+        date_of_birth: "",
+        home_address: "",
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.job_title).toBe("Senior Analyst");
+      const after = await one(
+        "SELECT gross_monthly, bank_name, account_number, date_of_birth, home_address FROM employee WHERE employee_id = $1",
+        [people.staff.employee_id],
+      );
+      expect(after).toEqual(before);
+      const audit = await one(
+        "SELECT changed_fields FROM audit_ledger WHERE entity_id = $1 AND action = 'employee.updated' ORDER BY occurred_at DESC",
+        [people.staff.employee_id],
+      );
+      expect(audit.changed_fields).toEqual(["job_title"]);
+    });
+
     test("an empty edit is refused by the contract", async () => {
       const res = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({});
       expect(res.status).toBe(422);
