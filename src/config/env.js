@@ -299,6 +299,14 @@ const ENTRIES = [
     },
   ],
   [
+    "PASSWORD_MIN_LENGTH",
+    int(8, { min: 8, max: 64 }),
+    {
+      group: "Sign-in",
+      doc: "The shortest new password allowed. Settings, Security may raise it, never lower it; the session and idle limits above are floors in the same way.",
+    },
+  ],
+  [
     "PASSWORD_BREACH_CHECK",
     bool(true),
     {

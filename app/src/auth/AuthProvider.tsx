@@ -26,8 +26,9 @@ import { passkeyCancelled, signWithPasskey } from "./passkey";
  * Every way in ends in the same place (`begin`): the password, the PIN on a
  * browser the person has used before, the code after either when two-step sign-in
  * asks for one, and a passkey, which is both steps at once. The password and the
- * PIN resolve to the code step's ticket when a code is still needed; the screen
- * asks for it and finishes with finishTwoStep.
+ * PIN resolve to the next step's ticket when a code is still needed, or when the
+ * person's role requires two-step and they have not set it up; the screen asks for
+ * the code (finishTwoStep) or walks them through setting it up (finishSetup).
  *
  * The session locks, in every open tab at once:
  *   time   at its two-hour ceiling (session_expires_in from the server);
@@ -54,12 +55,20 @@ interface AuthValue {
   me: Me | null;
   /** Why the screen is locked, while it is. */
   lockReason: LockReason | null;
-  /** The password. Resolves to the code step's ticket when two-step asks for a code, or null once signed in. */
-  signIn: (email: string, password: string) => Promise<string | null>;
+  /**
+   * The password. Resolves to the next step and its ticket when two-step asks for a
+   * code, or a role requires setting it up; to null once signed in.
+   */
+  signIn: (email: string, password: string) => Promise<NextStep | null>;
   /** The PIN, on a browser this person has signed in on before; resolves like signIn. */
-  signInWithPin: (email: string, pin: string) => Promise<string | null>;
+  signInWithPin: (email: string, pin: string) => Promise<NextStep | null>;
   /** The code after the password or the PIN: the authenticator app's six digits, or a recovery code. */
   finishTwoStep: (ticket: string, code: string) => Promise<void>;
+  /**
+   * The set-up step's first code turns two-step on. Resolves to the recovery codes,
+   * shown once, and `start`, which opens the session once the person has kept them.
+   */
+  finishSetup: (ticket: string, code: string) => Promise<{ recovery_codes: string[]; start: () => void }>;
   /** A passkey: the fingerprint, face or screen lock. With an email (the lock screen), only that person's. False when the prompt was closed. */
   signInWithPasskey: (email?: string) => Promise<boolean>;
   signOut: () => Promise<void>;
@@ -67,6 +76,12 @@ interface AuthValue {
   can: (module: string, action?: string) => boolean;
   justSignedIn: boolean;
   clearJustSignedIn: () => void;
+}
+
+/** What follows a first step that did not sign in: the code, or setting two-step up. */
+export interface NextStep {
+  kind: "code" | "setup";
+  ticket: string;
 }
 
 /** What the server says about the session's time (contract identity.js sessionClock). */
@@ -293,10 +308,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyClock, tell],
   );
 
-  /** The first step's answer: the code step's ticket, or a session. */
+  /** The first step's answer: the next step's ticket, or a session. */
   const stepped = useCallback(
-    (r: SignInResult): string | null => {
-      if ("step" in r) return r.challenge_token;
+    (r: SignInResult): NextStep | null => {
+      if ("step" in r) return { kind: r.step, ticket: r.challenge_token };
       begin(r);
       return null;
     },
@@ -315,6 +330,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const finishTwoStep = useCallback(
     async (ticket: string, code: string) => begin(await api.call("POST /api/v1/auth/two-step", { body: { challenge_token: ticket, code } })),
+    [begin],
+  );
+
+  const finishSetup = useCallback(
+    async (ticket: string, code: string) => {
+      const r = await api.call("POST /api/v1/auth/two-step/enrol", { body: { challenge_token: ticket, code } });
+      const { recovery_codes, ...signedIn } = r;
+      return { recovery_codes, start: () => begin(signedIn) };
+    },
     [begin],
   );
 
@@ -354,13 +378,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signInWithPin,
       finishTwoStep,
+      finishSetup,
       signInWithPasskey,
       signOut,
       can,
       justSignedIn,
       clearJustSignedIn: () => setJust(false),
     }),
-    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, signInWithPasskey, signOut, can, justSignedIn],
+    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, finishSetup, signInWithPasskey, signOut, can, justSignedIn],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

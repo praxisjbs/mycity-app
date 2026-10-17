@@ -4,7 +4,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { api } from "@/api/client";
 import { mockSession } from "@/api/mock/core";
-import { AuthProvider, useAuth } from "./AuthProvider";
+import { AuthProvider, useAuth, type NextStep } from "./AuthProvider";
 
 const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>;
 
@@ -48,14 +48,15 @@ describe("the session", () => {
     mockSession.set(null);
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 5000 });
-    let ticket: string | null = null;
+    let next = null as NextStep | null;
     await act(async () => {
-      ticket = await result.current.signIn("ifeoma@mycityapp.io", "demo1234");
+      next = await result.current.signIn("ifeoma@mycityapp.io", "demo1234");
     });
-    expect(ticket).toEqual(expect.any(String));
+    expect(next).toEqual({ kind: "code", ticket: expect.any(String) });
     expect(result.current.status).toBe("signed-out");
-    await expect(result.current.finishTwoStep(ticket!, "000000")).rejects.toMatchObject({ code: "INVALID_CODE" });
-    await act(() => result.current.finishTwoStep(ticket!, "482913"));
+    const ticket = next!.ticket;
+    await expect(result.current.finishTwoStep(ticket, "000000")).rejects.toMatchObject({ code: "INVALID_CODE" });
+    await act(() => result.current.finishTwoStep(ticket, "482913"));
     expect(result.current.status).toBe("signed-in");
     expect(result.current.me?.email).toBe("ifeoma@mycityapp.io");
   }, 15000);
@@ -70,11 +71,11 @@ describe("the session", () => {
     });
     await act(() => result.current.signOut());
     await expect(result.current.signInWithPin("chidera@mycityapp.io", "9157")).rejects.toMatchObject({ code: "INVALID_PIN" });
-    let ticket: string | null = "unset";
+    let next: NextStep | null | "unset" = "unset";
     await act(async () => {
-      ticket = await result.current.signInWithPin("chidera@mycityapp.io", "5821");
+      next = await result.current.signInWithPin("chidera@mycityapp.io", "5821");
     });
-    expect(ticket).toBeNull();
+    expect(next).toBeNull();
     expect(result.current.status).toBe("signed-in");
   }, 15000);
 
