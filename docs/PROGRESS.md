@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 10 | 9 | 0 | 1 | 0 | 0 |
+| M9 Settings & Governance | 10 | 4 | 0 | 6 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **86** | **0** | **7** | **0** | **0** |
+| **Total** | **93** | **81** | **0** | **12** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -75,7 +75,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☑ | 14/10/2026 |
 | M0 migrations and reference seed 0001 to 0099 | LA | ☑ | 16/10/2026 |
 | Staging seed data | LA | ☐ | |
-| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE · TB | ☐ | 16/10/2026 |
+| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE · TB | ☐ | 17/10/2026 |
 | Sign-in and sessions: `identity`, `access`, `users`; session rules, lock screen, credential links, the seven roles, the four-city sign-in screen (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | Two-step sign-in, passkeys and the PIN: the `security` module, the code step, PIN and passkey sign-in, the lock screen's PIN and passkey, the fresh-sign-in window, Reset Two-Step (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
@@ -116,8 +116,20 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   same roster for a demonstration. Shared, additive: `numbering.advanceTo()` (the counter past the
   numbers a sheet brings), `blank()` in the contract (an optional field a form leaves empty), the
   import engine takes batch `options` and honours a service that answers "nothing to write".
-  Left: tracks B, C and D; the Documents tab on the record (B); Settings · Imports, which Import
-  Staff opens (B); the people tasks in the guide's §1.2.
+  Left: track D (`workflow`); the Documents tab on the employee record, which arrives with the
+  documents work; the people tasks in the guide's §1.2.
+- 17/10/2026 · TB · Track C of `docs/guides/foundation.md` built, three more of the nine M0 modules:
+  `access` (roles created, edited and deleted with their grants, field visibility and capabilities
+  in one save; the matrix; nobody can take away their own Settings), `settings` (the organisation
+  profile, the working week, public holidays entered on screen, numbering schemes, the security
+  rules) and `audit` (`GET /audit` at 25 with filters, the summary, the Excel export emailed through
+  the outbox, values masked per reader; Settings view with scope all, or the CEO). Migration `0400`
+  (`role_capability`, `role.two_step_required`, audit and session indexes, the `two_step_setup`
+  ticket) and seed `0449` (the §6.3 field visibility and capabilities). Security rules are settings
+  within the `.env` floor (`PASSWORD_MIN_LENGTH` is new); requiring two-step by role came forward
+  from M9 and adds a set-up step to sign-in, so `identity`, `security` and the grants cache changed
+  too. Each module has an `.ai.js` (reads only) and a `.search.js`, or `audit`'s written none. Left
+  for the row above: `organisation` (track A) and `workflow` (track D).
 - 17/10/2026 · TB · Track B of `docs/guides/foundation.md` built: the `imports` module (the
   BACKEND_STRUCTURE §9.3 API over any registered importer, plus `GET /imports/:id` so the wizard
   survives a reload), the `documents` module (`POST /documents` for a file with no record yet,
@@ -672,21 +684,33 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 69 | Organisation | `organisation` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
-| 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 74 | Notifications | `notifications` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 78 | Security | `security` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 79 | Audit Log | `audit-log` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 17/10/2026 · TB · Organisation (#69), Roles & Permissions (#71), Documents & Numbering (#76),
+  Security (#78) and Audit Log (#79) built on the real API, track C of `docs/guides/foundation.md`,
+  desktop and phone; the mock follows the same paths and contract shapes. Organisation: the company
+  profile, public holidays by year and the working week (Monday to Friday 09:00 to 17:00, Saturday
+  09:00 to 15:00). Roles: the role list and matrix, a role's modules with actions and scope,
+  sensitive fields and capabilities, New Role and Delete Role. Numbering: every scheme with its next
+  number, editable. Security: session minutes, idle lock and password minimum within the server's
+  floor, two-step by role, everyone's sessions with End Session, failed sign-ins. Audit Log:
+  filters, entries with their changes (Restricted where masked), Export by email. Left: no document
+  setting other than numbering is specified for #76; the organisation profile is empty until
+  entered on staging and production; Integrations, Appearance and Notifications stay Coming Soon;
+  Attendance Policy (#73) is LA's.
 - 17/10/2026 · TB · Imports (#93) built on the real API, track B of `docs/guides/foundation.md`: the
   wizard (Upload, Map, Preview with the rows that have problems, Commit, with Blank Sheet, the new
   values to tick and Commit Valid Rows) over ANY registered importer, opened with `?importer=<key>`;

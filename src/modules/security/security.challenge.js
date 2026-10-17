@@ -8,7 +8,8 @@
  *   const claims = challenge.read(token, "two_step");   // AppError when expired, forged or another kind
  *   await challenge.spend(client, claims, userId);       // in the transaction that acts on it
  *
- * A ticket is a JWT (HS256 on the access secret, typ "challenge", five minutes).
+ * A ticket is a JWT (HS256 on the access secret, typ "challenge", five minutes; fifteen
+ * for setting two-step up at sign-in, which waits while the person installs an app).
  * middleware/auth.js refuses any token whose typ is not "access", so a ticket can
  * never stand in for a session. Reading one needs no table, so starting a ceremony
  * writes nothing for a stranger to fill up; spending one records its id in
@@ -22,10 +23,15 @@ const { AppError } = require("../../shared/errors");
 const repo = require("./security.repo");
 
 const TTL_SECONDS = 5 * 60;
-const PURPOSES = Object.freeze(["two_step", "passkey_sign_in", "passkey_add", "passkey_confirm"]);
+/** As long as a new key waits for its first code (security.service SETUP_SECONDS). */
+const SETUP_TTL_SECONDS = 15 * 60;
+const PURPOSES = Object.freeze(["two_step", "two_step_setup", "passkey_sign_in", "passkey_add", "passkey_confirm"]);
+
+/** Seconds a ticket of this purpose lasts. */
+const ttlOf = (purpose) => (purpose === "two_step_setup" ? SETUP_TTL_SECONDS : TTL_SECONDS);
 
 /**
- * @param {"two_step"|"passkey_sign_in"|"passkey_add"|"passkey_confirm"} purpose
+ * @param {"two_step"|"two_step_setup"|"passkey_sign_in"|"passkey_add"|"passkey_confirm"} purpose
  * @param {object} [claims]  what the next step needs back: sub, via, the WebAuthn challenge, an email
  * @returns {string}
  */
@@ -33,7 +39,7 @@ function issue(purpose, claims = {}) {
   if (!PURPOSES.includes(purpose)) throw new Error(`challenge: unknown purpose "${purpose}"`);
   return jwt.sign({ ...claims, typ: "challenge", purpose }, config.JWT_ACCESS_SECRET, {
     algorithm: "HS256",
-    expiresIn: TTL_SECONDS,
+    expiresIn: ttlOf(purpose),
     jwtid: crypto.randomUUID(),
   });
 }
@@ -70,4 +76,4 @@ async function spend(client, claims, userId) {
     throw new AppError("CHALLENGE_USED", "This request was already used. Start again.", 400);
 }
 
-module.exports = { issue, read, spend, TTL_SECONDS, PURPOSES };
+module.exports = { issue, read, spend, ttlOf, TTL_SECONDS, SETUP_TTL_SECONDS, PURPOSES };

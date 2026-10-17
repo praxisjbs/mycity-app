@@ -25,7 +25,8 @@
  *                   can_approve, can_export, scope ('all' | 'team' | 'own')
  *   field_visibility role_id, field_key, visibility ('visible' | 'masked')
  *   capability      capability_id, code
- *   user_capability user_id, capability_id
+ *   user_capability user_id, capability_id, expires_at
+ *   role_capability role_id, capability_id (migration 0400)
  */
 const { tryClient, rkey } = require("../../config/redis");
 
@@ -134,15 +135,22 @@ async function getTeamEmployeeIds(client, employeeId) {
   });
 }
 
-/** Field keys masked from this user by any of their roles ("employee.account_number"). */
+/**
+ * Field keys masked from this user ("employee.bank"). Roles add up, as grants do: a
+ * field is masked when every role of theirs that says anything about it masks it, so
+ * one role that shows it shows it. A role with no row for a field says nothing.
+ */
 function getMaskedFieldKeys(client, userId) {
   if (!userId) return Promise.resolve([]);
   return cached(keys.masked(userId), TTL_S, async () => {
     const { rows } = await client.query(
-      `SELECT DISTINCT fv.field_key
+      `SELECT fv.field_key
          FROM field_visibility fv
          JOIN user_role ur ON ur.role_id = fv.role_id
-        WHERE ur.user_id = $1 AND fv.visibility = 'masked'
+        WHERE ur.user_id = $1
+          AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)
+        GROUP BY fv.field_key
+       HAVING bool_and(fv.visibility = 'masked')
         ORDER BY fv.field_key`,
       [userId],
     );
@@ -150,16 +158,26 @@ function getMaskedFieldKeys(client, userId) {
   });
 }
 
-/** Capability codes held directly by the user (segregation of duties, e.g. "disburser"). */
+/**
+ * Capability codes the user holds: given to them directly (segregation of duties, e.g.
+ * "disburser"), or held by one of their roles ("announcements.post").
+ */
 function getCapabilities(client, userId) {
   if (!userId) return Promise.resolve([]);
   return cached(keys.caps(userId), TTL_S, async () => {
     const { rows } = await client.query(
-      `SELECT DISTINCT c.code
+      `SELECT c.code::text AS code
          FROM user_capability uc
          JOIN capability c ON c.capability_id = uc.capability_id
-        WHERE uc.user_id = $1
-        ORDER BY c.code`,
+        WHERE uc.user_id = $1 AND (uc.expires_at IS NULL OR uc.expires_at > now())
+       UNION
+       SELECT c.code::text
+         FROM role_capability rc
+         JOIN user_role ur ON ur.role_id = rc.role_id
+         JOIN capability c ON c.capability_id = rc.capability_id
+        WHERE ur.user_id = $1
+          AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)
+        ORDER BY 1`,
       [userId],
     );
     return rows.map((r) => r.code);
@@ -190,10 +208,12 @@ async function invalidateUser(userId) {
       .catch(() => {});
 }
 
-/** After any role, grant or field-visibility change. */
+/** After any role, grant, field-visibility or role capability change. */
 async function invalidateGrants() {
   const redis = tryClient();
-  if (redis) await scanDelete(redis, rkey("idc", "grants", "*"));
+  if (!redis) return;
+  await scanDelete(redis, rkey("idc", "grants", "*"));
+  await scanDelete(redis, rkey("idc", "caps", "*"));
 }
 
 /** After any reporting line change (event employee.reporting_line_changed). */

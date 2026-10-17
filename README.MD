@@ -263,10 +263,10 @@ check ownership, not the `settings` grant.
 |---|---|---|
 | `identity` | | Login, refresh, logout, me, sessions, known devices |
 | `security` | `.mfa` (TOTP codes, recovery codes), `.passkeys` (WebAuthn), `.pin`, `.challenge` (single-use tickets), `.signin` (what `identity`'s sign-in calls) | Each person's two-step sign-in, passkeys and PIN, the fresh-sign-in check, Reset Two-Step (`docs/guides/identity.md`); came forward from M9 (TB, 16/10/2026) |
-| `access` | | Roles, grants, record scope, field visibility |
-| `audit` | | Audit ledger read |
+| `access` | | Roles created, edited and deleted with their grants, record scope, field visibility and capabilities; the matrix; two-step required by role (`docs/guides/foundation.md` §6.3) |
+| `audit` | `audit.events.js` (the emailed Excel export) | Audit ledger read at 25 with filters, the summary, masked per reader |
 | `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram |
-| `settings` | `settings.appearance.js` (M9) | Settings, working week, holidays, numbering schemes |
+| `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
 | `notifications` | `notifications.preferences.js`, `notifications.reminders.js` (M6) | Caller's own inbox |
 | `workflow` | | Definitions, act on an instance, my approvals |
 | `documents` | | Upload, download, versions, generated documents |
@@ -396,7 +396,7 @@ Chain for every request: requester, line manager, Operations, requisition, CEO, 
 | Module | Files beyond the template |
 |---|---|
 | `users` | `.invite` |
-| `security` | `.sessions` (remote kill); requiring two-step by role. The rest of the module is M0 (§5.3) |
+| `security` | Nothing left: `.sessions` (End Session on Settings · Security) and requiring two-step by role came forward to M0 with foundation track C (§5.3) |
 | `integrations` | |
 | `settings` | `settings.appearance.js` |
 

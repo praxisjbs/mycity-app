@@ -1,8 +1,8 @@
-import type { UserRow } from "@mycity/contract/contract.gen.ts";
-import type { AccessCatalogue, FailedLogin, Hierarchy, NotificationPref, Organisation, RecordScope, Role, RoleAction, RoleBody, RoleDetail, RoleGrant, Session } from "@/api/types/settings";
+import type { AccessCatalogue, AuditEntry, FailedSignIn, Holiday, LiveSession, NumberingScheme, Organisation, RoleDetail, RoleGrant, RoleRow, RoleSave, UserRow, WorkingDay } from "@mycity/contract/contract.gen.ts";
+import type { Hierarchy, NotificationPref } from "@/api/types/settings";
 import type { Status } from "@/api/types/performance";
-import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid } from "../core";
-import { byId, byKey, PEOPLE, refKey, SIGN_INS } from "../data/people";
+import { accepted, at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
 import { waysOf } from "./security";
 
@@ -10,28 +10,76 @@ const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const admin = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
 const who = (u: string) => byKey(u)!.display_name;
 
-const ORG: Organisation = {
-  legal_name: "MyCity App Ltd", trading_name: "MyCityApp", country: "Nigeria", currency: "Naira (NGN)", time_zone: "Africa/Lagos (UTC+1)", financial_year: "January to December",
-  hosts: [["Admin, this app", "hub.mycityapp.io"], ["Public site", "go.mycityapp.io"], ["Staging, admin", "hub.staging.mycityapp.io"], ["Staging, public", "go.staging.mycityapp.io"], ["Why two hosts", "A different origin shares no cookie, no storage and no service worker with this app"]],
-  about: [["Product", "MyCity App ERP"], ["Version", "1.0.0"], ["Built by", "JBS Praxis"], ["Handover", "18 December 2026"], ["Support", "Three months from handover"], ["Source", "Handed over in full, with the deployment runbook"]],
-  week: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => ({ day, working: day !== "Sunday", start: day === "Sunday" ? null : "09:00", end: day === "Sunday" ? null : day === "Saturday" ? "15:00" : "17:00", grace_min: day === "Sunday" ? null : 10 })),
-  holidays: [["01-01", "New Year’s Day"], ["05-01", "Workers’ Day"], ["06-12", "Democracy Day"], ["10-01", "Independence Day"], ["12-25", "Christmas Day"], ["12-26", "Boxing Day"]].map(([d, name]) => ({ date: `${new Date().getUTCFullYear()}-${d}`, name })),
-};
+/* ── Organisation: the profile, the working week (A22), holidays (entered on screen, A26) ── */
+const PROFILE_KEYS = ["legal_name", "trading_name", "registration_number", "tax_id", "address", "phone", "email", "website"] as const;
+const ORG: Organisation = { legal_name: "MyCity App Ltd", trading_name: "MyCityApp", registration_number: null, tax_id: null, address: null, phone: null, email: "hello@mycityapp.io", website: "https://mycityapp.io", currency: "NGN", time_zone: "Africa/Lagos" };
 route("GET /api/v1/settings/organisation", () => ok(ORG));
 route("PATCH /api/v1/settings/organisation", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO change organisation settings.");
-  const b = req.body as Partial<Organisation>;
-  if (b.week) {
-    const bad = b.week.find((d) => d.working && (!/^\d{2}:\d{2}$/.test(d.start ?? "") || !/^\d{2}:\d{2}$/.test(d.end ?? "") || (d.start ?? "") >= (d.end ?? "")));
-    if (bad) return invalid({ week: [`${bad.day}: the end must be after the start, as HH:MM`] });
-    b.week.forEach((d, i) => {
-      const o = ORG.week[i];
-      if (JSON.stringify(o) !== JSON.stringify(d)) audit(who(req.user!), "Working week changed", `Organisation · ${d.day}`, o.working ? `${o.start} to ${o.end}` : "Not working", d.working ? `${d.start} to ${d.end}` : "Not working", null, "Settings");
-    });
-    ORG.week = b.week;
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const b = req.body as Partial<Record<(typeof PROFILE_KEYS)[number], string | null>>;
+  if (b.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email)) return invalid({ email: ["Check the email"] });
+  if (b.website && !/^https?:\/\//.test(b.website)) return invalid({ website: ["Not a web address"] });
+  for (const k of PROFILE_KEYS) {
+    if (b[k] === undefined) continue;
+    const next = b[k] === "" ? null : b[k];
+    if (next !== ORG[k]) audit(who(req.user!), "A setting was changed", `Organisation · ${k.replace(/_/g, " ")}`, ORG[k], next, null, "Settings");
+    ORG[k] = next as never;
   }
-  if (b.trading_name) ORG.trading_name = b.trading_name;
   return ok(ORG);
+});
+
+let WEEK: WorkingDay[] = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ weekday, is_working_day: weekday < 7, starts_at: weekday < 7 ? "09:00" : null, ends_at: weekday === 7 ? null : weekday === 6 ? "15:00" : "17:00" }));
+route("GET /api/v1/settings/working-week", () => ok({ days: WEEK }));
+route("PUT /api/v1/settings/working-week", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const days = (req.body.days as WorkingDay[] | undefined) ?? [];
+  if (days.length !== 7) return invalid({ days: ["Each day once"] });
+  const bad = days.find((d) => d.is_working_day && (!d.starts_at || !d.ends_at || d.ends_at <= d.starts_at));
+  if (bad) return invalid({ days: ["After the start"] });
+  if (!days.some((d) => d.is_working_day)) return invalid({ days: ["Work at least one day"] });
+  audit(who(req.user!), "A setting was changed", "Working week · Week", null, "Changed", null, "Settings");
+  WEEK = days.map((d) => ({ ...d, starts_at: d.is_working_day ? d.starts_at : null, ends_at: d.is_working_day ? d.ends_at : null }));
+  return ok({ days: WEEK });
+});
+
+const YEAR = new Date().getUTCFullYear();
+const HOLIDAYS: Holiday[] = [["01-01", "New Year's Day"], ["05-01", "Workers' Day"], ["06-12", "Democracy Day"], ["10-01", "Independence Day"], ["12-25", "Christmas Day"], ["12-26", "Boxing Day"]].map(([d, name]) => ({ public_holiday_id: sid(`holiday:${d}`), holiday_date: `${YEAR}-${d}`, name, created_at: at(30, "09:00") }));
+const byDate = (a: Holiday, b: Holiday) => a.holiday_date.localeCompare(b.holiday_date);
+route("GET /api/v1/settings/holidays", (req) => paged([...HOLIDAYS].sort(byDate), req, { search: (h) => [h.name], filters: { year: (h, v) => h.holiday_date.startsWith(v), sort: () => true } }));
+const holidayBody = (req: Req) => {
+  const date = String(req.body.holiday_date ?? "");
+  const name = String(req.body.name ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: invalid({ holiday_date: ["Not a real date"] }) };
+  if (!name) return { error: invalid({ name: ["Required"] }) };
+  return { date, name };
+};
+route("POST /api/v1/settings/holidays", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const b = holidayBody(req);
+  if (b.error) return b.error;
+  if (HOLIDAYS.some((h) => h.holiday_date === b.date)) return fail(409, "HOLIDAY_EXISTS", "There is already a holiday on that date.", { holiday_date: ["Already a holiday"] });
+  const h: Holiday = { public_holiday_id: sid(`holiday:${b.date}:${Date.now()}`), holiday_date: b.date!, name: b.name!, created_at: new Date().toISOString() };
+  HOLIDAYS.push(h);
+  audit(who(req.user!), "A setting was changed", `Public holiday · ${h.name}`, null, h.holiday_date, null, "Settings");
+  return created(h);
+});
+route("PATCH /api/v1/settings/holidays/:id", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const h = HOLIDAYS.find((x) => x.public_holiday_id === req.params.id);
+  if (!h) return notFound();
+  const b = holidayBody(req);
+  if (b.error) return b.error;
+  if (HOLIDAYS.some((x) => x !== h && x.holiday_date === b.date)) return fail(409, "HOLIDAY_EXISTS", "There is already a holiday on that date.", { holiday_date: ["Already a holiday"] });
+  Object.assign(h, { holiday_date: b.date, name: b.name });
+  return ok(h);
+});
+route("DELETE /api/v1/settings/holidays/:id", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const i = HOLIDAYS.findIndex((x) => x.public_holiday_id === req.params.id);
+  if (i < 0) return notFound();
+  audit(who(req.user!), "A setting was changed", `Public holiday · ${HOLIDAYS[i].name}`, HOLIDAYS[i].holiday_date, null, null, "Settings");
+  HOLIDAYS.splice(i, 1);
+  return noContent();
 });
 
 const ROLE_OF = (k: string) => (SIGN_INS[k]?.view === "ceo" ? "CEO" : SIGN_INS[k]?.view === "operations" ? "Operations" : ["amara", "blessing"].includes(k) ? "Finance" : PEOPLE.some((p) => p.manager === k) ? "Manager" : "Staff");
@@ -167,125 +215,135 @@ route("GET /api/v1/access/roles", (req) =>
   ),
 );
 
-/* ── Roles: module → action → record scope → field (MILESTONES §14; no entity layer, A2) ── */
-const ALL_ACTS: RoleAction[] = ["view", "create", "edit", "delete", "approve", "export"];
+/* ── Roles: module → action → record scope → field, and capabilities (MILESTONES §14; no entity layer, A2) ── */
+type Action = RoleGrant["actions"][number];
+type Scope = RoleGrant["scope"];
+const ALL: Action[] = ["view", "create", "edit", "delete", "approve", "export"];
+const MODULE_LIST: Array<[string, string, string, string]> = [
+  ["home", "Home", "top", "Overview, team, alerts and reports"], ["workspace", "My Workspace", "top", "Today, tasks, calendar and analytics"], ["ess", "Employee Self-Service", "top", "Your own record, attendance, pay, leave and documents"],
+  ["community", "Staff Community", "work", "Channels, direct messages and announcements"], ["mailbox", "Mailbox", "work", "Your work email"], ["people", "People", "people", "Employees, attendance, leave, devices and worksites"],
+  ["performance", "Performance", "people", "Goals, targets, KPIs and reviews"], ["queries", "Queries & Sanctions", "people", "Queries, rules, sanctions and letter templates"], ["recruitment", "Recruitment", "people", "Vacancies through to onboarding"],
+  ["payroll", "Payroll", "people", "Payroll runs, payslips, salary structure and statutory"], ["partnerships", "Partnerships", "business", "Pipeline, partners, leads, proposals and contracts"], ["expenses", "Expenses", "business", "Requests, approvals, requisitions, disbursements and budgets"],
+  ["knowledge", "Knowledge Hub", "system", "Policies, SOPs, FAQs, training and announcements"], ["praxis_ai", "Praxis AI", "system", "The assistant, and AI controls"], ["settings", "Settings", "system", "Organisation, users, roles, approvals and system settings"],
+];
+const FIELDS = [["employee.salary", "Salary and pay"], ["employee.bank", "Bank details"], ["employee.personal", "Personal details"], ["employee.statutory", "Tax and pension numbers"]] as const;
 const CATALOGUE: AccessCatalogue = {
-  modules: [
-    ["home", "Home", ["view", "export"], true], ["workspace", "My Workspace", ["view", "create", "edit", "delete"], true], ["ess", "Employee Self-Service", ["view", "create", "edit"], true],
-    ["community", "Staff Community", ["view", "create", "edit", "delete"], false], ["mailbox", "Mailbox", ["view", "create", "delete"], true], ["people", "People", ALL_ACTS, true],
-    ["performance", "Performance", ALL_ACTS, true], ["queries", "Queries & Sanctions", ALL_ACTS, true], ["recruitment", "Recruitment", ALL_ACTS, true], ["payroll", "Payroll", ALL_ACTS, true],
-    ["partnerships", "Partnerships", ALL_ACTS, true], ["expenses", "Expenses", ALL_ACTS, true], ["knowledge", "Knowledge Hub", ["view", "create", "edit", "delete", "approve"], false],
-    ["praxis_ai", "Praxis AI", ["view"], false], ["settings", "Settings", ["view", "edit", "export"], false],
-  ].map(([key, label, actions, scoped]) => ({ key: key as string, label: label as string, actions: actions as RoleAction[], scoped: scoped as boolean })),
-  fields: [
-    { key: "salary", label: "Salary and Pay", help: "Gross, net, allowances and payslips of other people" },
-    { key: "bank", label: "Bank Details", help: "Account numbers and bank names" },
-    { key: "query_history", label: "Query History", help: "Queries, cautions and sanctions on a person's record" },
+  modules: MODULE_LIST.map(([key, label, area, description]) => ({ key, label, area, description, own_only: key === "ess" })),
+  actions: ALL,
+  scopes: ["all", "team", "own"],
+  fields: FIELDS.map(([key, label]) => ({ key, label })),
+  capabilities: [
+    { code: "alerts.clear", name: "Clear Alerts", description: "Clear or dismiss an alert on Home." },
+    { code: "announcements.post", name: "Post Announcements", description: "Post to the announcements channel and track who has read a post." },
   ],
 };
-const g = (module: string, actions: RoleAction[], scope: RecordScope = "all"): RoleGrant => ({ module, actions, scope });
-const every = (scope: RecordScope = "all") => CATALOGUE.modules.map((m) => g(m.key, m.actions, m.scoped ? scope : "all"));
-const BASE = (scope: RecordScope): RoleGrant[] => [g("home", ["view"], scope), g("workspace", ["view", "create", "edit"], "own"), g("ess", ["view", "create", "edit"], "own"), g("community", ["view", "create"]), g("mailbox", ["view", "create", "delete"], "own"), g("knowledge", ["view"]), g("praxis_ai", ["view"])];
-type Def = Omit<RoleDetail, "users">;
-const def = (name: string, description: string, grants: RoleGrant[], visible_fields: string[], locked = false): Def => ({ role_id: sid(`role:${name}`), name, description, system: true, locked, grants, visible_fields });
-const ROLE_DEFS: Def[] = [
-  def("CEO", "Everything, everywhere. Final approver.", every(), ["salary", "bank", "query_history"], true),
-  def("Operations", "Runs the company day to day: people, payroll, expenses and settings.", every(), ["salary", "bank", "query_history"]),
-  def("Finance", "Payroll, expenses and budgets across the company.", [...BASE("own"), g("people", ["view"]), g("payroll", ["view", "edit", "approve", "export"]), g("expenses", ["view", "approve", "export"])], ["salary", "bank"]),
-  def("Manager", "Their own team: attendance, leave, KPIs and expense approvals.", [...BASE("team"), g("people", ["view"], "team"), g("performance", ["view", "create", "edit", "approve"], "team"), g("queries", ["view", "create"], "team"), g("expenses", ["view", "create", "approve"], "team"), g("recruitment", ["view"], "own")], []),
-  def("Staff", "Their own record, their own work.", [...BASE("own"), g("performance", ["view"], "own"), g("expenses", ["view", "create"], "own")], []),
-];
-const usersOf = (name: string) => USERS.filter((u) => u.role === name).length;
-const detail = (d: Def): RoleDetail => ({ ...d, users: usersOf(d.name) });
-const row = (d: Def): Role => {
-  const scopes = [...new Set(d.grants.filter((x) => CATALOGUE.modules.find((m) => m.key === x.module)?.scoped).map((x) => x.scope))];
-  const scope = scopes.length === 1 ? (({ all: "All", team: "Team", own: "Own" }) as const)[scopes[0]] : "Mixed";
-  const n = d.visible_fields.length;
-  return { role_id: d.role_id, name: d.name, users: usersOf(d.name), modules: d.grants.filter((x) => x.actions.includes("view")).length, scope, sensitive: n === 0 ? "Masked" : n === CATALOGUE.fields.length ? "Visible" : "Partly", system: d.system };
+const g = (module_key: string, actions: Action[], scope: Scope = "all"): RoleGrant => ({ module_key, actions, scope: module_key === "ess" ? "own" : scope });
+const everything = (scope: Scope = "all") => MODULE_LIST.map(([k]) => g(k, ALL, k === "mailbox" ? "own" : scope));
+const own = (mods: string[], acts: Action[] = ["view", "create", "edit"]) => mods.map((m) => g(m, acts, "own"));
+const SENSITIVE = FIELDS.map(([k]) => k);
+type MockRole = Omit<RoleDetail, "users" | "role_id">;
+const role = (code: string, name: string, description: string, rank: number, home: RoleDetail["home_view"], grants: RoleGrant[], visible: string[], caps: string[]): MockRole => ({ code, name, description, rank, home_view: home, is_system: true, two_step_required: false, grants, visible_fields: visible as RoleDetail["visible_fields"], capabilities: caps });
+const CAPS = ["alerts.clear", "announcements.post"];
+const ROLES = new Map<string, MockRole>(
+  [
+    role("implementation", "Implementation Team", "Full access for the build team until handover.", 100, "operations", everything(), SENSITIVE, CAPS),
+    role("operations_people", "Operations & People", "People, HR and operations across every module.", 90, "operations", everything(), SENSITIVE, CAPS),
+    role("management", "Management", "Organisation-wide oversight and approvals.", 80, "operations", everything().map((x) => (x.module_key === "settings" ? g("settings", ["view", "export"]) : x)), SENSITIVE, CAPS),
+    role("head_of_department", "Head of Department", "Runs a department and approves for it.", 60, "partnerships", [...own(["ess", "community", "mailbox"]), g("home", ["view", "approve"], "team"), g("people", ["view", "approve"], "team"), g("partnerships", ["view", "create", "edit", "approve"], "team"), g("knowledge", ["view"])], [], []),
+    role("administrator", "System Administrator", "Settings, users and roles.", 50, "staff", [...own(["home", "workspace", "ess", "community", "mailbox"]), g("knowledge", ["view"]), g("settings", ALL)], [], []),
+    role("manager", "Line Manager", "Manages the people who report to them.", 40, "staff", [...own(["ess", "community", "mailbox"]), g("home", ["view"], "team"), g("people", ["view", "approve"], "team"), g("performance", ["view", "create", "edit", "approve"], "team"), g("knowledge", ["view"])], [], []),
+    role("employee", "Staff", "Their own work and records.", 10, "staff", [...own(["home", "workspace", "ess", "community", "mailbox", "performance", "expenses"]), g("knowledge", ["view"])], [], []),
+  ].map((r) => [sid(`role:${r.code}`), r]),
+);
+const holders = (code: string) => USERS.filter((u) => u.status === "active" && u.roles.some((r) => r.code === code)).length;
+const detail = (id: string, r: MockRole): RoleDetail => ({ role_id: id, users: holders(r.code), ...r });
+const rowOf = (id: string, r: MockRole): RoleRow => {
+  const viewed = r.grants.filter((x) => x.actions.includes("view") && x.module_key !== "ess");
+  const counts = { all: 0, team: 0, own: 0 };
+  for (const x of viewed) counts[x.scope] += 1;
+  const scope = viewed.length ? (["all", "team", "own"] as const).reduce((best, s) => (counts[s] > counts[best] ? s : best), "all" as Scope) : "none";
+  return { role_id: id, code: r.code, name: r.name, description: r.description, is_system: r.is_system, two_step_required: r.two_step_required, users: holders(r.code), modules: r.grants.filter((x) => x.actions.includes("view")).length, scope, fields_visible: r.visible_fields.length };
 };
-const ACT_LABEL: Record<RoleAction, string> = { view: "View", create: "create", edit: "edit", delete: "delete", approve: "approve", export: "export" };
-const describe = (d: Def) => d.grants.map((x) => `${x.module}:${x.actions.join("/")}@${x.scope}`).join(" ") + ` fields:${d.visible_fields.join("/") || "none"}`;
+const ordered = () => [...ROLES.entries()].sort(([, a], [, b]) => b.rank - a.rank || a.name.localeCompare(b.name));
+const describe = (r: MockRole) => r.grants.map((x) => `${x.module_key} ${x.actions.join(", ")} · ${x.scope}`).join("; ");
 
-function checkRole(b: Partial<RoleBody>, self: Def | null): Record<string, string[]> | null {
-  const e: Record<string, string[]> = {};
+function checkRole(b: RoleSave, self: MockRole | null): RawProblem | null {
   const name = String(b.name ?? "").trim();
-  if (name.length < 2 || name.length > 40) e.name = ["Between 2 and 40 characters"];
-  else if (ROLE_DEFS.some((r) => r !== self && r.name.toLowerCase() === name.toLowerCase())) e.name = ["Another role already has this name"];
-  else if (self?.system && name !== self.name) e.name = ["A built-in role keeps its name"];
-  const grants = Array.isArray(b.grants) ? b.grants : [];
-  for (const x of grants) {
-    const m = CATALOGUE.modules.find((c) => c.key === x.module);
-    if (!m) { e.grants = [`Unknown module ${x.module}`]; break; }
-    if (x.actions.some((a) => !m.actions.includes(a))) { e.grants = [`${m.label} does not offer that action`]; break; }
-    if (x.actions.length && !x.actions.includes("view")) { e.grants = [`${m.label}: every other action needs View`]; break; }
-    if (!["all", "team", "own"].includes(x.scope)) { e.grants = [`${m.label}: pick a record scope`]; break; }
-  }
-  if (!e.grants && !grants.some((x) => x.actions.includes("view"))) e.grants = ["Grant at least one module"];
-  if ((b.visible_fields ?? []).some((f) => !CATALOGUE.fields.some((c) => c.key === f))) e.visible_fields = ["Unknown field"];
-  return Object.keys(e).length ? e : null;
+  if (name.length < 2 || name.length > 40) return { status: 422, fields: { name: ["At least 2 characters"] } };
+  if (ordered().some(([, r]) => r !== self && r.name.toLowerCase() === name.toLowerCase())) return { status: 409, fields: { name: ["Name already used"] } };
+  if (self?.is_system && name !== self.name) return { status: 422, fields: { name: ["Built-in name stays"] } };
+  const grants = (b.grants ?? []).filter((x) => x.actions.length);
+  if (grants.some((x) => !x.actions.includes("view"))) return { status: 422, fields: { grants: ["Every action needs View"] } };
+  if (!grants.length) return { status: 422, fields: { grants: ["Grant a module"] } };
+  return null;
 }
-const clean = (b: RoleBody): Pick<Def, "name" | "description" | "grants" | "visible_fields"> => ({
+type RawProblem = { status: number; fields: Record<string, string[]> };
+const refuse = (p: RawProblem) => (p.status === 409 ? fail(409, "ROLE_NAME_TAKEN", "Another role has this name.", p.fields) : invalid(p.fields));
+const saved = (b: RoleSave, base: Pick<MockRole, "code" | "rank" | "is_system" | "two_step_required">): MockRole => ({
+  ...base,
   name: b.name.trim(),
-  description: String(b.description ?? "").trim(),
-  grants: b.grants.filter((x) => x.actions.length).map((x) => ({ module: x.module, actions: ALL_ACTS.filter((a) => x.actions.includes(a)), scope: CATALOGUE.modules.find((m) => m.key === x.module)!.scoped ? x.scope : "all" })),
-  visible_fields: CATALOGUE.fields.map((f) => f.key).filter((k) => (b.visible_fields ?? []).includes(k)),
+  description: b.description?.trim() || null,
+  home_view: b.home_view ?? "staff",
+  grants: b.grants.filter((x) => x.actions.length).map((x) => g(x.module_key, ALL.filter((a) => x.actions.includes(a)), x.scope)),
+  visible_fields: SENSITIVE.filter((k) => b.visible_fields.includes(k as never)) as RoleDetail["visible_fields"],
+  capabilities: CAPS.filter((c) => b.capabilities.includes(c)),
 });
 
-route("GET /api/v1/settings/roles", (req) => paged(ROLE_DEFS.map(row), req, { search: (r) => [r.name] }));
+route("GET /api/v1/settings/roles", (req) => paged(ordered().map(([id, r]) => rowOf(id, r)), req, { search: (r) => [r.name, r.code], filters: { sort: () => true } }));
 route("GET /api/v1/settings/roles/catalogue", () => ok(CATALOGUE));
-route("GET /api/v1/settings/roles/matrix", () =>
-  ok({
-    roles: ROLE_DEFS.map((r) => r.name),
-    rows: CATALOGUE.modules.map((m) => ({
-      module: m.label,
-      cells: ROLE_DEFS.map((r) => {
-        const x = r.grants.find((y) => y.module === m.key);
-        if (!x?.actions.length) return "None";
-        const acts = x.actions.map((a, i) => (i === 0 ? ACT_LABEL[a][0].toUpperCase() + ACT_LABEL[a].slice(1) : ACT_LABEL[a])).join(", ");
-        return m.scoped && x.scope !== "all" ? `${acts} · ${x.scope === "team" ? "Team" : "Own"}` : acts;
+route("GET /api/v1/settings/roles/matrix", () => {
+  const roles = ordered();
+  return ok({
+    roles: roles.map(([id, r]) => ({ role_id: id, code: r.code, name: r.name, is_system: r.is_system })),
+    rows: MODULE_LIST.map(([key, label]) => ({
+      module_key: key,
+      label,
+      cells: roles.map(([id, r]) => {
+        const x = r.grants.find((y) => y.module_key === key);
+        return x ? { role_id: id, actions: x.actions, scope: x.scope } : { role_id: id, actions: [], scope: null };
       }),
     })),
-  }),
-);
+  });
+});
 route("GET /api/v1/settings/roles/:id", (req) => {
-  const d = ROLE_DEFS.find((r) => r.role_id === req.params.id);
-  return d ? ok(detail(d)) : notFound();
+  const r = ROLES.get(req.params.id);
+  return r ? ok(detail(req.params.id, r)) : notFound();
 });
 route("POST /api/v1/settings/roles", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO manage roles.");
-  const b = req.body as unknown as RoleBody;
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const b = req.body as unknown as RoleSave;
   const bad = checkRole(b, null);
-  if (bad) return invalid(bad);
-  const d: Def = { role_id: sid(`role:${b.name.trim()}:${Date.now()}`), system: false, locked: false, ...clean(b) };
-  ROLE_DEFS.push(d);
-  audit(who(req.user!), "Role created", `Role · ${d.name}`, null, describe(d), null, "Settings");
-  return created(detail(d));
+  if (bad) return refuse(bad);
+  const base = b.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "role";
+  let code = base;
+  for (let n = 2; [...ROLES.values()].some((r) => r.code === code); n += 1) code = `${base}_${n}`;
+  const id = sid(`role:${code}:${Date.now()}`);
+  const r = saved(b, { code, rank: 0, is_system: false, two_step_required: false });
+  ROLES.set(id, r);
+  audit(who(req.user!), "A role was created", `Role · ${r.name}`, null, describe(r), null, "Settings");
+  return created(detail(id, r));
 });
 route("PUT /api/v1/settings/roles/:id", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO manage roles.");
-  const d = ROLE_DEFS.find((r) => r.role_id === req.params.id);
-  if (!d) return notFound();
-  if (d.locked) return fail(409, "LOCKED", "The CEO role holds every permission and cannot be changed.");
-  const b = req.body as unknown as RoleBody;
-  const bad = checkRole(b, d);
-  if (bad) return invalid(bad);
-  const before = describe(d);
-  const next = clean(b);
-  if (next.name !== d.name) USERS.filter((u) => u.role === d.name).forEach((u) => (u.role = next.name));
-  Object.assign(d, next);
-  audit(who(req.user!), "Role changed", `Role · ${d.name}`, before, describe(d), null, "Settings");
-  return ok(detail(d));
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const r = ROLES.get(req.params.id);
+  if (!r) return notFound();
+  const b = req.body as unknown as RoleSave;
+  const bad = checkRole(b, r);
+  if (bad) return refuse(bad);
+  const next = saved(b, r);
+  if (describe(next) !== describe(r)) audit(who(req.user!), "What a role grants was changed", `Role · ${r.name}`, describe(r), describe(next), null, "Settings");
+  ROLES.set(req.params.id, next);
+  return ok(detail(req.params.id, next));
 });
 route("DELETE /api/v1/settings/roles/:id", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO manage roles.");
-  const i = ROLE_DEFS.findIndex((r) => r.role_id === req.params.id);
-  if (i < 0) return notFound();
-  const d = ROLE_DEFS[i];
-  if (d.system) return fail(409, "SYSTEM_ROLE", "A built-in role cannot be deleted.");
-  const n = usersOf(d.name);
-  if (n) return fail(409, "ROLE_IN_USE", `${n} ${n === 1 ? "user holds" : "users hold"} this role. Move them to another role first.`);
-  ROLE_DEFS.splice(i, 1);
-  audit(who(req.user!), "Role deleted", `Role · ${d.name}`, describe(d), null, null, "Settings");
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const r = ROLES.get(req.params.id);
+  if (!r) return notFound();
+  if (r.is_system) return fail(409, "SYSTEM_ROLE", "A built-in role cannot be deleted.");
+  const n = holders(r.code);
+  if (n) return fail(409, "ROLE_IN_USE", `${n} ${n === 1 ? "person holds" : "people hold"} this role. Give them another role first.`);
+  ROLES.delete(req.params.id);
+  audit(who(req.user!), "A role was deleted", `Role · ${r.name}`, describe(r), null, null, "Settings");
   return noContent();
 });
 
@@ -345,9 +403,47 @@ route("PATCH /api/v1/settings/appearance", (req) => {
   return ok(APPEAR());
 });
 
-const NUM = [["Expense Request", "EXP", "0123"], ["Requisition", "REQ", "0043"], ["Offer letter", "OFF", "0020"], ["Employment contract", "CON", "0017"], ["Proposal", "PRO", "0031"], ["MOU", "MOU", "0012"], ["Query", "QRY", "0016"]].map(([document, prefix, next]) => ({ key: prefix, document, prefix, format: `${prefix}-0000`, next }));
-route("GET /api/v1/settings/numbering/summary", () => ok({ types: NUM.length, templates: 9, issued_this_year: 118, signed: 32 }));
-route("GET /api/v1/settings/numbering", (req) => paged(NUM, req, { search: (n) => [n.document, n.prefix] }));
+/* ── Numbering: a scheme per numbered document type (shared/numbering/schemes.js) ── */
+const LABELS: Array<[NumberingScheme["doc_type"], string, string, number, string, NumberingScheme["reset"], number]> = [
+  ["employee", "Staff Number", "", 5, "", "never", 18], ["document", "Document", "DOC", 4, "-", "never", 240], ["import_batch", "Import", "IMP", 4, "-", "never", 3],
+  ["query", "Query", "QRY", 4, "-", "never", 15], ["sanction", "Sanction", "SAN", 4, "-", "never", 4], ["letter", "Letter", "LTR", 4, "-", "never", 9],
+  ["vacancy", "Vacancy", "VAC", 4, "-", "never", 6], ["offer", "Offer Letter", "OFF", 4, "-", "never", 19], ["contract", "Employment Contract", "CON", 4, "-", "never", 16],
+  ["payroll_run", "Payroll Run", "PAY", 0, "-", "monthly", 1], ["payslip", "Payslip", "PAY", 4, "-", "monthly", 18], ["proposal", "Proposal", "PRO", 4, "-", "never", 30],
+  ["mou", "MOU", "MOU", 4, "-", "never", 11], ["expense", "Expense Request", "EXP", 4, "-", "never", 122], ["requisition", "Requisition", "REQ", 4, "-", "never", 42], ["disbursement", "Disbursement", "DSB", 4, "-", "never", 37],
+];
+const period = (reset: NumberingScheme["reset"]) => {
+  const d = isoDaysAgo(0);
+  return reset === "never" ? "" : reset === "yearly" ? d.slice(0, 4) : d.slice(0, 7);
+};
+const nextOf = (s: Omit<NumberingScheme, "next">) => {
+  const parts = [s.prefix];
+  const p = period(s.reset);
+  if (s.include_period && p) parts.push(p.replace("-", s.separator || "-"));
+  if (s.padding > 0) parts.push(String(s.issued + 1).padStart(s.padding, "0"));
+  return parts.filter((x, i) => x !== "" || i > 0).join(s.separator);
+};
+const SCHEMES: NumberingScheme[] = LABELS.map(([doc_type, label, prefix, padding, separator, reset, issued]) => {
+  const base = { doc_type, label, prefix, padding, separator, reset, include_period: reset !== "never", issued, updated_at: at(20, "09:00") };
+  return { ...base, next: nextOf(base) };
+});
+route("GET /api/v1/settings/numbering/summary", () => ok({ types: SCHEMES.length, issued: SCHEMES.reduce((a, x) => a + x.issued, 0), resetting: SCHEMES.filter((x) => x.reset !== "never").length }));
+route("GET /api/v1/settings/numbering", (req) => paged(SCHEMES, req, { search: (n) => [n.label, n.prefix, n.doc_type], filters: { sort: () => true } }));
+route("PUT /api/v1/settings/numbering/:doc_type", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const s = SCHEMES.find((x) => x.doc_type === req.params.doc_type);
+  if (!s) return notFound();
+  const b = req.body as Pick<NumberingScheme, "prefix" | "padding" | "separator" | "reset" | "include_period">;
+  const prefix = String(b.prefix ?? "").toUpperCase();
+  if (!/^[A-Z0-9]{0,8}$/.test(prefix)) return invalid({ prefix: ["Up to 8 letters"] });
+  if (b.reset !== "never" && !b.include_period) return invalid({ include_period: ["Needed when it resets"] });
+  if (!prefix && !(b.padding > 0)) return invalid({ padding: ["Add sequence digits"] });
+  if (b.padding === 0 && !(b.include_period && b.reset !== "never")) return invalid({ padding: ["Add digits or a period"] });
+  const before = s.next;
+  Object.assign(s, { prefix, padding: b.padding, separator: b.separator, reset: b.reset, include_period: b.include_period, updated_at: new Date().toISOString() });
+  s.next = nextOf(s);
+  audit(who(req.user!), "A setting was changed", `Numbering · ${s.label}`, before, s.next, null, "Settings");
+  return ok(s);
+});
 
 route("GET /api/v1/settings/integrations", () =>
   ok({
@@ -356,34 +452,82 @@ route("GET /api/v1/settings/integrations", () =>
   }),
 );
 
-const RULES = [["mfa_privileged", "Require MFA for CEO, Operations and Finance", true], ["remember_devices", "Remember devices for 30 days", true], ["idle_8h", "Sign out after 8 hours idle", true], ["new_countries", "Allow sign in from new countries", false]].map(([key, label, on]) => ({ key: key as string, label: label as string, on: on as boolean }));
-const SESSIONS: Session[] = [["cynthia", "MacBook · Chrome", "07:58"], ["tolu", "iPhone · Safari", "07:52"], ["seyi", "Pixel 7 · Chrome", "08:58"], ["ngozi", "Windows · Edge", "08:31"], ["ifeoma", "iPad · Safari", "07:15"]].map(([u, device, t]) => ({ session_id: sid(`sess:${u}`), person: refKey(u), device, started_at: at(0, t) }));
-const FAILED: FailedLogin[] = [[1, "22:41", "bashir@mycityapp.io", "Lagos, Nigeria", "Wrong password"], [1, "22:40", "bashir@mycityapp.io", "Lagos, Nigeria", "Wrong password"], [3, "11:02", "unknown@example.com", "Unknown", "No such user"], [5, "08:14", "emeka@mycityapp.io", "Lagos, Nigeria", "Wrong password"]].map((f, i) => ({ attempt_id: sid(`fail:${i}`), at: at(f[0] as number, f[1] as string), email: f[2] as string, place: f[3] as string, outcome: S("err", f[4] as string) }));
-const sec = () => ({ active_sessions: SESSIONS.length + 14, mfa_enrolled: USERS.filter((u) => u.mfa).length, users: USERS.length, failed_7d: FAILED.length, devices: 31, rules: RULES });
-route("GET /api/v1/settings/security", () => ok(sec()));
-route("PATCH /api/v1/settings/security", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO set security policy.");
-  for (const [k, v] of Object.entries(req.body as Record<string, boolean>)) {
-    const r = RULES.find((x) => x.key === k);
-    if (!r) return invalid({ [k]: ["Not a security setting"] });
-    audit(who(req.user!), "Security setting changed", r.label, r.on ? "On" : "Off", v ? "On" : "Off", null, "Settings");
-    r.on = !!v;
-  }
-  return ok(sec());
+/* ── Security: rules within the .env floor, two-step by role, failed sign-ins, live sessions ── */
+const FLOOR = { session_max_age_min: 120, idle_lock_min: 30, password_min_length: 8 };
+const RULES = { ...FLOOR };
+const LIVE: LiveSession[] = (
+  [["cynthia", "MacBook · Chrome", "07:58", "password_totp"], ["tolu", "iPhone · Safari", "07:52", "passkey"], ["seyi", "Pixel 7 · Chrome", "08:58", "pin"], ["ngozi", "Windows · Edge", "08:31", "password"], ["ifeoma", "iPad · Safari", "07:15", "passkey"]] as const
+).map(([u, device_label, t, method]) => {
+  const p = byKey(u)!;
+  return { session_id: sid(`sess:${u}`), user_id: sid(`user:${u}`), display_name: p.display_name, email: p.work_email, device_label, ip_address: "102.89.0.14", method, issued_at: at(0, t), last_seen_at: at(0, "09:10"), current: false };
 });
-route("GET /api/v1/settings/security/sessions", (req) => paged(SESSIONS, req, { search: (s) => [s.person.display_name, s.device] }));
+const FAILED: FailedSignIn[] = (
+  [[1, "22:41", "bashir@mycityapp.io", "Bashir Lawal", "bad_password"], [1, "22:40", "bashir@mycityapp.io", "Bashir Lawal", "bad_password"], [3, "11:02", "unknown@example.com", null, "no_such_account"], [5, "08:14", "emeka@mycityapp.io", "Emeka Obi", "bad_code"]] as const
+).map(([d, t, email, display_name, reason], i) => ({ audit_ledger_id: sid(`fail:${i}`), occurred_at: at(d, t), email, display_name, ip_address: "102.89.0.21", reason }));
+const twoStepRoles = () => ordered().map(([id, r]) => {
+  const people = USERS.filter((u) => u.status === "active" && u.roles.some((x) => x.code === r.code));
+  return { role_id: id, code: r.code, name: r.name, two_step_required: r.two_step_required, holders: people.length, enrolled: people.filter((u) => out(u).two_step).length };
+});
+const policy = () => ({
+  session_max_age_min: RULES.session_max_age_min, session_max_age_floor: FLOOR.session_max_age_min,
+  idle_lock_min: RULES.idle_lock_min, idle_lock_floor: FLOOR.idle_lock_min,
+  password_min_length: RULES.password_min_length, password_min_floor: FLOOR.password_min_length,
+  two_step_roles: twoStepRoles(),
+  active_sessions: LIVE.length + 14, users: USERS.filter((u) => u.status === "active").length, two_step_on: USERS.filter((u) => out(u).two_step).length, failed_7d: FAILED.length,
+});
+route("GET /api/v1/settings/security", () => ok(policy()));
+route("PATCH /api/v1/settings/security", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const b = req.body as Partial<typeof RULES> & { two_step_roles?: string[] };
+  const fields: Record<string, string[]> = {};
+  if (b.session_max_age_min !== undefined && b.session_max_age_min > FLOOR.session_max_age_min) fields.session_max_age_min = [`At most ${FLOOR.session_max_age_min} minutes`];
+  if (b.idle_lock_min !== undefined && b.idle_lock_min > FLOOR.idle_lock_min) fields.idle_lock_min = [`At most ${FLOOR.idle_lock_min} minutes`];
+  if (b.password_min_length !== undefined && b.password_min_length < FLOOR.password_min_length) fields.password_min_length = [`At least ${FLOOR.password_min_length}`];
+  const session = b.session_max_age_min ?? RULES.session_max_age_min;
+  if (!fields.idle_lock_min && (b.idle_lock_min ?? RULES.idle_lock_min) > session) fields.idle_lock_min = ["Within the session length"];
+  if (Object.keys(fields).length) return fail(422, "RULE_BELOW_FLOOR", "A rule would be looser than the server allows.", fields);
+  const before = JSON.stringify(RULES);
+  Object.assign(RULES, { session_max_age_min: b.session_max_age_min ?? RULES.session_max_age_min, idle_lock_min: b.idle_lock_min ?? RULES.idle_lock_min, password_min_length: b.password_min_length ?? RULES.password_min_length });
+  if (b.two_step_roles) for (const [, r] of ROLES) r.two_step_required = b.two_step_roles.includes(r.code);
+  audit(who(req.user!), "The security rules were changed", "Setting · Security", before, JSON.stringify(RULES), null, "Settings");
+  return ok(policy());
+});
+route("GET /api/v1/settings/security/sessions", (req) => paged(LIVE.map((x) => ({ ...x, current: x.user_id === sid(`user:${req.user}`) })), req, { search: (x) => [x.display_name, x.email, x.device_label], filters: { sort: () => true } }));
 route("POST /api/v1/settings/security/sessions/:id/end", (req) => {
-  const i = SESSIONS.findIndex((s) => s.session_id === req.params.id);
-  if (i < 0) return notFound();
-  audit(who(req.user!), "Session ended", `Session · ${SESSIONS[i].person.display_name}`, SESSIONS[i].device, null, "Takes effect on the next request", "Settings");
-  SESSIONS.splice(i, 1);
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const i = LIVE.findIndex((x) => x.session_id === req.params.id);
+  if (i < 0) return fail(404, "NOT_FOUND", "That session has already ended.");
+  if (LIVE[i].user_id === sid(`user:${req.user}`)) return fail(422, "CURRENT_SESSION", "Use Sign Out to end your own session.");
+  audit(who(req.user!), "A session was ended", `Account · ${LIVE[i].display_name}`, LIVE[i].device_label, null, "Ended by an administrator", "Settings");
+  LIVE.splice(i, 1);
   return noContent();
 });
-route("GET /api/v1/settings/security/failed-logins", (req) => paged(FAILED, req, { search: (f) => [f.email, f.place] }));
+route("GET /api/v1/settings/security/failed-logins", (req) => paged(FAILED, req, { search: (f) => [f.email, f.display_name], filters: { days: () => true, sort: () => true } }));
 
-route("GET /api/v1/audit/summary", () => {
-  const mods = [...new Set(AUDIT.map((a) => a.module))];
-  const month = [["People and attendance", 1840], ["Expenses", 882], ["Performance", 571], ["Queries & Sanctions", 404], ["Partnerships", 349], ["Payroll", 202], ["Settings", 74]] as const;
-  return ok({ today: 184 + AUDIT.filter((a) => a.at.slice(0, 10) === isoDaysAgo(0)).length, this_month: 4912, modules: mods, by_module: month.map(([label, n], i) => ({ label, pct: Math.round((n * 100) / 1840), value: n.toLocaleString("en-NG"), ...(i === month.length - 1 ? { emphasis: "brand" as const } : {}) })), retention: "7 years" });
+/* ── Audit Log: Settings view over everything, and the CEO ── */
+const auditRows = (req: Req) => (req.query.sort === "occurred_at" ? [...AUDIT].reverse() : AUDIT);
+const day = (e: AuditEntry) => e.occurred_at.slice(0, 10);
+route("GET /api/v1/audit/summary", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const today = isoDaysAgo(0);
+  const month = AUDIT.filter((a) => a.occurred_at.slice(0, 7) === today.slice(0, 7));
+  const counts = new Map<string, number>();
+  for (const a of month) counts.set(a.module_key, (counts.get(a.module_key) ?? 0) + 1);
+  return ok({
+    today: AUDIT.filter((a) => day(a) === today).length,
+    this_week: AUDIT.filter((a) => day(a) >= isoDaysAgo(6)).length,
+    this_month: month.length,
+    sensitive_this_month: month.filter((a) => a.is_sensitive).length,
+    by_module: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([module_key, entries]) => ({ module_key, label: MODULE_LIST.find(([k]) => k === module_key)?.[1] ?? module_key, entries })),
+    modules: MODULE_LIST.map(([key, label]) => ({ key, label })),
+  });
 });
-route("GET /api/v1/audit", (req) => (admin(req.user!) ? paged(AUDIT, req, { search: (a) => [a.actor, a.action, a.entity, a.reason], filters: { module: (a, v) => a.module === v } }) : fail(403, "FORBIDDEN", "The audit log is for Operations and the CEO.")));
+route("GET /api/v1/audit", (req) =>
+  admin(req.user!)
+    ? paged(auditRows(req), req, {
+        search: (a) => [a.actor_name, a.actor_email, a.summary, a.action, a.entity_type, a.entity_id],
+        filters: { module: (a, v) => a.module_key === v, action: (a, v) => a.action === v, actor_user_id: (a, v) => a.actor_user_id === v, entity_type: (a, v) => a.entity_type === v, entity_id: (a, v) => a.entity_id === v, from: (a, v) => day(a) >= v, to: (a, v) => day(a) <= v, sort: () => true },
+      })
+    : fail(403, "PERMISSION_DENIED", "You do not have access to this"),
+);
+route("POST /api/v1/audit/exports", (req) => (admin(req.user!) ? { ...accepted(), body: { queued: true, email: byKey(req.user!)!.work_email } } : fail(403, "PERMISSION_DENIED", "You do not have access to this")));

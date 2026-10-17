@@ -21,6 +21,7 @@ const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const encryption = require("../../services/secrets/encryption.service");
+const qr = require("../../services/qr/qr");
 const challenge = require("./security.challenge");
 const mfa = require("./security.mfa");
 const passkeys = require("./security.passkeys");
@@ -114,6 +115,93 @@ async function spendSecondStep(client, userId, second, claims, actor) {
     entity: account(userId),
     actor,
     payload: { codes_left: await repo.countRecoveryLeft(client, userId) },
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Two-step required by a role: set it up before the session opens
+ * ------------------------------------------------------------------ */
+
+/**
+ * The answer when the first step passed, two-step is off, and a role the person holds
+ * requires it: a ticket for setting it up, never a session. The ticket lasts as long
+ * as a new key waits for its first code.
+ */
+function setupRequired(userId, via) {
+  return {
+    step: "setup",
+    challenge_token: challenge.issue("two_step_setup", { sub: userId, via }),
+    expires_in: challenge.SETUP_TTL_SECONDS,
+  };
+}
+
+/** The set-up step's ticket: who passed the first step, and with what. */
+function readSetupTicket(token) {
+  const claims = challenge.read(token, "two_step_setup");
+  if (!claims.sub || !["password", "pin"].includes(claims.via))
+    throw new AppError("CHALLENGE_EXPIRED", "This request has expired. Start again.", 400);
+  return claims;
+}
+
+/**
+ * A new key for the person the ticket names, waiting for its first code, exactly as
+ * My Security's set-up makes one. The ticket itself is the proof of the first step.
+ * @returns {Promise<{secret: string, otpauth_url: string, qr_code: string, expires_in: number}>}
+ */
+async function startSetup(claims) {
+  const s = await repo.stateOf(pool, claims.sub);
+  if (!s || s.status !== "active")
+    throw new AppError("CHALLENGE_EXPIRED", "This request has expired. Start again.", 400);
+  if (s.mfa_enrolled_at)
+    throw new AppError("TWO_STEP_ON", "Two-step sign-in is already on. Sign in again.", 409);
+  const key = mfa.newKey();
+  await tx(async (client) => {
+    await repo.setPendingKey(client, claims.sub, encryption.encrypt(key), challenge.SETUP_TTL_SECONDS);
+    await emit(client, {
+      key: EVENTS.AUTH_TWO_STEP_STARTED,
+      entity: account(claims.sub),
+      actor: { user_id: claims.sub },
+      payload: { replacing: false, required: true },
+    });
+  });
+  const url = mfa.otpauthUrl(s.email, key);
+  return {
+    secret: mfa.groupKey(key),
+    otpauth_url: url,
+    qr_code: await qr.authenticator(url),
+    expires_in: challenge.SETUP_TTL_SECONDS,
+  };
+}
+
+/**
+ * Does the code prove the key waiting for this person? Writes nothing.
+ * @returns {Promise<{pendingEncrypted: string, step: number}|null>}
+ */
+async function checkSetupCode(userId, code) {
+  const s = await repo.stateOf(pool, userId);
+  if (!s || s.mfa_enrolled_at || !s.mfa_pending_secret_enc || !s.pending_live) return null;
+  const r = mfa.checkCode(encryption.decrypt(s.mfa_pending_secret_enc), code, null);
+  return r.ok ? { pendingEncrypted: s.mfa_pending_secret_enc, step: r.step } : null;
+}
+
+/** Ten recovery codes for the set-up: the codes to show once, and their hashes to keep. */
+const newRecoveryCodes = () => mfa.newRecoveryCodes();
+
+/**
+ * Inside the transaction that opens the session: spend the ticket, turn two-step on
+ * with the proved key, keep the recovery codes' hashes. Anything already spent or
+ * expired throws, and the session is not opened.
+ */
+async function enrolOnSignIn(client, userId, proof, hashes, claims, actor) {
+  await challenge.spend(client, claims, userId);
+  if (!(await repo.turnOn(client, userId, proof))) throw codeRefused();
+  await repo.replaceRecoveryCodes(client, userId, hashes);
+  const s = await repo.stateOf(client, userId);
+  await emit(client, {
+    key: EVENTS.AUTH_TWO_STEP_ON,
+    entity: account(userId),
+    actor,
+    payload: { mfa_frequency: s ? s.mfa_frequency : "daily", required: true },
   });
 }
 
@@ -216,6 +304,12 @@ module.exports = {
   checkSecondStep,
   spendSecondStep,
   codeRefused,
+  setupRequired,
+  readSetupTicket,
+  startSetup,
+  checkSetupCode,
+  newRecoveryCodes,
+  enrolOnSignIn,
   verifyPin,
   pinUsed,
   passkeySignInOptions,

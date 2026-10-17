@@ -190,7 +190,7 @@ describeDb("two-step sign-in, passkeys and the PIN against the real migrations",
 
       const before = await me.get("/security");
       expect(before.status).toBe(200);
-      expect(before.body.two_step).toEqual({ on: false, mfa_frequency: "daily", mfa_enrolled_at: null, recovery_codes_left: 0 });
+      expect(before.body.two_step).toEqual({ on: false, mfa_frequency: "daily", mfa_enrolled_at: null, recovery_codes_left: 0, required: false });
       expect(before.body.confirmed_for).toBeGreaterThan(14 * 60);
 
       const setup = await me.post("/security/two-step/setup").send({});

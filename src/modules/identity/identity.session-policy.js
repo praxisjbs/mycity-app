@@ -22,17 +22,25 @@
  * Times are relative seconds on the wire (session_expires_in), never a timestamp:
  * a laptop whose clock is five minutes out would otherwise lock five minutes early,
  * or late.
+ *
+ * Both limits may be made shorter on Settings · Security, never longer than the
+ * .env values, which are their floor (settings.security-rules.js). The work that
+ * applies them calls load() first; the functions below then read the rules in force.
  */
 const { config } = require("../../config/env");
+const rules = require("../settings/settings.security-rules");
+
+/** Read the rules in force (cached 30 seconds) before applying them. */
+const load = (db) => rules.load(db);
 
 /** The session's full length, in seconds. */
 function maxAgeSeconds() {
-  return Math.max(60, Number(config.SESSION_MAX_AGE_MIN) * 60);
+  return Math.max(60, rules.current().session_max_age_min * 60);
 }
 
 /** How long a session may go without a refresh, in seconds. */
 function idleSeconds() {
-  return Math.max(60, Number(config.SESSION_INACTIVITY_MIN) * 60);
+  return Math.max(60, rules.current().idle_lock_min * 60);
 }
 
 /**
@@ -95,6 +103,7 @@ function endReason(s) {
 }
 
 module.exports = {
+  load,
   maxAgeSeconds,
   idleSeconds,
   confirmWindowSeconds,

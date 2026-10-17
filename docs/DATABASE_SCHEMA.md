@@ -100,14 +100,17 @@ PIN and its wrong-try counts, `passkey`, `spent_challenge`, `user_session.reauth
 `pin_totp` sessions (`docs/guides/identity.md` §4) · `0290` the seven roles and their permission
 matrix (`docs/guides/identity.md` §8) · `0350` `document_request` (what People asked an employee for)
 and `document.verified_at` and `verified_by` (People accepting a file, which the virus check does
-not say; `docs/guides/foundation.md` §6.9).
+not say; `docs/guides/foundation.md` §6.9) · `0400` `role_capability` (a capability given with a
+role), `role.two_step_required`, the Audit Log's indexes on `audit_ledger` and live sessions, and the
+`two_step_setup` purpose on `spent_challenge` (`docs/guides/foundation.md` §4, §6.4) · `0449` the
+field visibility of every role and the two capabilities given to Implementation, Operations & People
+and Management (`docs/guides/foundation.md` §6.3).
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
 - ~~The staff importer must advance the `employee` counter past imported staff numbers.~~ Built
   17/10/2026: `numbering.advanceTo()`, called by the organisation service whenever a staff number
   arrives with its record, and by the roster loader at the end of a load.
-- Two-step required per role: each person's own two-step is built (`0220`); requiring it by role is M9.
 
 ### M1 Core Operations · 1000 to 1999 · TB (Home), LA (attendance), GE (community, mailbox), AJ (ESS)
 
@@ -214,9 +217,9 @@ and lines, disbursements · `8099` seed.
 reporting views · `9095` `updated_at` triggers (a one-time sweep of the tables that existed then;
 later tables create their own, `docs/MIGRATIONS.md` §6) · `9099` seed.
 
-**Owes:** MFA required per role, with Settings · Security (personal enrolment came forward to the
-second sign-in PR; enforcement by role stays in M9, TB 16/10/2026). Editing roles and their grants
-on screen.
+**Owes:** nothing from this list since 17/10/2026: two-step required per role and editing roles and
+their grants on screen came forward to M0 with foundation track C (`0400`, `0449`;
+`docs/guides/foundation.md` §6.3, §6.4).
 
 ### M10 Staff Knowledge Hub & AI Assistance · 10000 to 10999 · TB
 
@@ -254,7 +257,8 @@ Security's two-step and PIN, which M1 owed until then.
    the payroll contract and the tax-reform rules. The block is reserved and the scope stands.
 2. **The role-to-module permission matrix.** Decided with TB on 16/10/2026: the seven roles MyCity
    runs on (from the staff list) and their grants, seeded by `0290_seed_roles_and_grants.sql`.
-   Changes after go-live are made in Settings · Roles & Permissions (M9), not in a seed.
+   Changes after go-live are made in Settings · Roles & Permissions (built in M0, 17/10/2026), not in
+   a seed.
 3. **The business choices PR 25 seeded** (expense categories, partner types and stages, the
    Standard attendance policy, alert thresholds, knowledge categories) move out of the seeds under
    A26, each when its milestone builds the screen that manages it.

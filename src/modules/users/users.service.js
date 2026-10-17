@@ -33,6 +33,7 @@ async function rowOf(userId) {
 const list = (query) => repo.list(pool, query);
 
 async function summary() {
+  await policy.load(pool);
   const counts = await repo.summary(pool, policy.idleSeconds());
   return { ...counts, by_role: await repo.byRole(pool) };
 }
