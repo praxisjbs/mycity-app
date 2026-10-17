@@ -43,7 +43,25 @@ route("PUT /api/v1/settings/working-week", (req) => {
 });
 
 const YEAR = new Date().getUTCFullYear();
-const HOLIDAYS: Holiday[] = [["01-01", "New Year's Day"], ["05-01", "Workers' Day"], ["06-12", "Democracy Day"], ["10-01", "Independence Day"], ["12-25", "Christmas Day"], ["12-26", "Boxing Day"]].map(([d, name]) => ({ public_holiday_id: sid(`holiday:${d}`), holiday_date: `${YEAR}-${d}`, name, created_at: at(30, "09:00") }));
+/** Nigeria's holidays as seeds/reference/0448 seeds them: the moon-dated and weekend ones expected until confirmed. */
+const HOLIDAYS: Holiday[] = (
+  [
+    ["01-01", "New Year's Day", false],
+    ["03-20", "Eid-el-Fitr", true],
+    ["03-23", "Eid-el-Fitr Holiday", true],
+    ["04-03", "Good Friday", false],
+    ["04-06", "Easter Monday", false],
+    ["05-01", "Workers' Day", false],
+    ["05-27", "Eid-el-Kabir", true],
+    ["05-28", "Eid-el-Kabir Holiday", true],
+    ["06-12", "Democracy Day", false],
+    ["08-25", "Eid-el-Maulud", true],
+    ["10-01", "Independence Day", false],
+    ["12-25", "Christmas Day", false],
+    ["12-26", "Boxing Day", false],
+    ["12-28", "Boxing Day Holiday", true],
+  ] as const
+).map(([d, name, expected]) => ({ public_holiday_id: sid(`holiday:${d}`), holiday_date: `${YEAR}-${d}`, name, expected, created_at: at(30, "09:00") }));
 const byDate = (a: Holiday, b: Holiday) => a.holiday_date.localeCompare(b.holiday_date);
 route("GET /api/v1/settings/holidays", (req) => paged([...HOLIDAYS].sort(byDate), req, { search: (h) => [h.name], filters: { year: (h, v) => h.holiday_date.startsWith(v), sort: () => true } }));
 const holidayBody = (req: Req) => {
@@ -58,7 +76,7 @@ route("POST /api/v1/settings/holidays", (req) => {
   const b = holidayBody(req);
   if (b.error) return b.error;
   if (HOLIDAYS.some((h) => h.holiday_date === b.date)) return fail(409, "HOLIDAY_EXISTS", "There is already a holiday on that date.", { holiday_date: ["Already a holiday"] });
-  const h: Holiday = { public_holiday_id: sid(`holiday:${b.date}:${Date.now()}`), holiday_date: b.date!, name: b.name!, created_at: new Date().toISOString() };
+  const h: Holiday = { public_holiday_id: sid(`holiday:${b.date}:${Date.now()}`), holiday_date: b.date!, name: b.name!, expected: false, created_at: new Date().toISOString() };
   HOLIDAYS.push(h);
   audit(who(req.user!), "A setting was changed", `Public holiday · ${h.name}`, null, h.holiday_date, null, "Settings");
   return created(h);
@@ -70,7 +88,7 @@ route("PATCH /api/v1/settings/holidays/:id", (req) => {
   const b = holidayBody(req);
   if (b.error) return b.error;
   if (HOLIDAYS.some((x) => x !== h && x.holiday_date === b.date)) return fail(409, "HOLIDAY_EXISTS", "There is already a holiday on that date.", { holiday_date: ["Already a holiday"] });
-  Object.assign(h, { holiday_date: b.date, name: b.name });
+  Object.assign(h, { holiday_date: b.date, name: b.name, expected: false });
   return ok(h);
 });
 route("DELETE /api/v1/settings/holidays/:id", (req) => {
