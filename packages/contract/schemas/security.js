@@ -188,6 +188,8 @@ const SignInMethods = z
         mfa_frequency: TwoStepFrequency,
         mfa_enrolled_at: isoDateTime.nullable(),
         recovery_codes_left: z.number().int().min(0),
+        /** A role this person holds requires two-step sign-in, so it cannot be turned off. */
+        required: z.boolean(),
       })
       .strict(),
     /** How many passkeys can sign in as this person. */
@@ -228,8 +230,31 @@ const CodeRequired = z
   })
   .strict();
 
-/** POST /auth/login and POST /auth/pin: a session, or the code step first. */
-const SignInResult = z.union([Session, CodeRequired]);
+/**
+ * The first step passed, two-step is off, and a role the person holds requires it:
+ * a ticket for setting it up, never a session. The session opens once the app's
+ * first code proves the new key (POST /auth/two-step/enrol).
+ */
+const SetupRequired = z
+  .object({
+    step: z.literal("setup"),
+    challenge_token: z.string(),
+    /** Seconds the ticket lasts. */
+    expires_in: seconds,
+  })
+  .strict();
+
+/** POST /auth/login and POST /auth/pin: a session, the code step, or the set-up step first. */
+const SignInResult = z.union([Session, CodeRequired, SetupRequired]);
+
+/** POST /auth/two-step/setup: the set-up step's ticket; answers with the key to scan. */
+const SetupStart = z.object({ challenge_token: ChallengeToken }).strict();
+
+/** POST /auth/two-step/enrol: the ticket and the app's first code. */
+const SetupFinish = z.object({ challenge_token: ChallengeToken, code: TotpCode }).strict();
+
+/** A session opened by setting two-step up, with the recovery codes shown this once. */
+const EnrolledSession = Session.extend({ recovery_codes: z.array(z.string()).length(10) }).strict();
 
 /** POST /auth/two-step */
 const CodeStep = z
@@ -266,6 +291,10 @@ const TABLES = {
   Confirmed: { table: null, reason: "how long the confirmed window lasts; user_session.reauthenticated_at records it" },
   CodeRequired: { table: null, reason: "the code step's ticket after the first step; no session exists yet" },
   CodeStep: { table: null, reason: "a code-step ticket and the code typed; neither is stored" },
+  SetupRequired: { table: null, reason: "the set-up step's ticket after the first step; no session exists yet" },
+  SetupStart: { table: null, reason: "a set-up ticket; the new key is stored encrypted as app_user.mfa_pending_secret_enc" },
+  SetupFinish: { table: null, reason: "a set-up ticket and the app's first code; neither is stored" },
+  EnrolledSession: { table: null, reason: "a new session's tokens and clock, with the recovery codes in plain text shown once" },
   PinSignIn: { table: null, reason: "sign-in with an email and a PIN, checked against app_user.pin_hash" },
   PasskeyStart: { table: null, reason: "the email a passkey sign-in is bound to, when there is one" },
   PasskeySignIn: { table: null, reason: "a ceremony ticket and the browser's signed answer; neither is stored" },
@@ -297,7 +326,11 @@ module.exports = {
   Confirm,
   Confirmed,
   CodeRequired,
+  SetupRequired,
   SignInResult,
+  SetupStart,
+  SetupFinish,
+  EnrolledSession,
   CodeStep,
   PinSignIn,
   PasskeyStart,

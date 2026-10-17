@@ -1,10 +1,10 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "7903f3ee829cc04b79cebea68e78bb7c2b5137a968bc80b1c53fb4880e40eb73",
-  "schemas": 98,
-  "endpoints": 50,
+  "source_hash": "4d7619039a2fe18e6f76f8c7db085cbaaddee7d962f3042d95de9e85732ef87f",
+  "schemas": 150,
+  "endpoints": 78,
   "inputs": {
-    "packages/contract/schemas/access.js": "7d76c2be101d7ce5288e6ee3c44e60a2db721644db7f0b55e33498a19027c2e6",
+    "packages/contract/schemas/access.js": "892803f6c6bb1d76602c9e293fab99961b74425e3c1b197cd5d43d66fe87f29d",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/ai_governance.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/alerts.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -12,7 +12,7 @@
     "packages/contract/schemas/assessments.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/assistant.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/attendance.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/audit.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/audit.js": "0c00d7df362ac816400e63ebcf1c825649a9b9e763eb937aa5d7865d7171e0d9",
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/calendar.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/candidates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -55,8 +55,8 @@
     "packages/contract/schemas/reviews.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/salary_structure.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/sanctions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/security.js": "9228345d8f5f2823668d8fa0a96d2c37f6c086897af91620443a5c081156659a",
-    "packages/contract/schemas/settings.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/security.js": "6cf6f6a58006e811045e71036358fd5a74aeccc27f82db0174acc5cfd4c329e0",
+    "packages/contract/schemas/settings.js": "a781ca6929521f31605dc6c8fb12fe115973e5208d6222c417829cfac62bfd74",
     "packages/contract/schemas/signatures.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/statutory.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/talent_pool.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -69,9 +69,11 @@
     "packages/contract/schemas/worksites.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/workspace.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "src/modules/access/access.routes.js": "b2701c9c63b01069e391675c0d49cd3ab308ecff22e2dbab8e6a77746e2bf4e5",
-    "src/modules/identity/identity.routes.js": "ca3aba8c260243ef780e9a26207e513afa6b39a0e3e4af245bbda148c9270f15",
+    "src/modules/audit/audit.routes.js": "22f7a660678e7dbb8d78ec5a9adc59668ce88da452c0a284c10ad4d36dbbdde8",
+    "src/modules/identity/identity.routes.js": "c2f88374e78efe933dcbc6a7d988e41adf56a4729329b6fead313532e7978f83",
     "src/modules/notifications/notifications.routes.js": "6a225f2fe527f8525aa9a54995fb38b63cc67066c145fb4f8707d1ec4d4d6f9e",
     "src/modules/security/security.routes.js": "2148273cc406a5725539fcfb75ff74008a69e3bb40a0c939e1eaeb33c74f0f4f",
+    "src/modules/settings/settings.routes.js": "0a63237ee8c1a1491b42871fd7a979f26735889ba0241326423c1cfe0b258388",
     "src/modules/users/users.routes.js": "c9afad57eaa4e584a792f9a779b1eb995df49de8c891f23bce8f98e75a648b26"
   }
 }

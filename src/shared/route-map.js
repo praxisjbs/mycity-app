@@ -234,6 +234,7 @@ const ENTITY_ROUTES = Object.freeze({
   role: screen("settings", "roles-and-permissions"),
   workflow_definition: screen("settings", "approvals"),
   numbering_scheme: screen("settings", "documents-and-numbering"),
+  public_holiday: screen("settings", "organisation"),
   template: screen("settings", "documents-and-numbering"),
   integration: screen("settings", "integrations"),
 });

@@ -17,7 +17,9 @@
  * the password or the PIN is the first step; when two-step is on and this browser
  * has not proved a code within the person's chosen time, the answer is a ticket for
  * the code step instead of a session. A passkey is both steps at once. A wrong code
- * counts like a wrong password. Whatever a step spends (the ticket, the code, a
+ * counts like a wrong password. When two-step is off and a role the person holds
+ * requires it (Settings · Security), the answer is the set-up step instead: the
+ * session opens only once the app's first code proves the new key. Whatever a step spends (the ticket, the code, a
  * recovery code, the passkey's counter) is spent in the transaction that opens the
  * session, so a replay opens nothing.
  *
@@ -45,6 +47,7 @@ const { deviceLabel, platformOf } = require("./identity.device-label");
 const repo = require("./identity.repo");
 const { EVENTS } = require("./identity.events");
 const waysIn = require("../security/security.signin");
+const access = require("../access/access.service");
 
 const ARGON = Object.freeze({ type: argon2.argon2id });
 const RESET_LINK_MINUTES = 30;
@@ -220,6 +223,7 @@ async function failedSignIn(user, { email, ip, reason }) {
 async function startSession(user, { ip, userAgent, deviceToken, method, trustDays = 0, within = null }) {
   const label = deviceLabel(userAgent);
   const token = deviceToken || cookies.newDeviceToken();
+  await policy.load(pool);
   const remaining = policy.maxAgeSeconds();
   const sessionId = crypto.randomUUID();
   const jti = crypto.randomUUID();
@@ -353,6 +357,8 @@ async function refuseInactive(user, { email, ip }) {
  */
 async function afterFirstStep(user, ctx) {
   const two = await waysIn.twoStepOf(pool, user.user_id);
+  if (!two.on && (await access.requiresTwoStep(pool, user.user_id)))
+    return { body: waysIn.setupRequired(user.user_id, ctx.via) };
   if (two.on) {
     const trusted =
       two.trustDays > 0 && ctx.deviceToken
@@ -395,6 +401,57 @@ async function twoStep({ challenge_token, code, ip, userAgent, deviceToken }) {
       if (claims.via === "pin") await waysIn.pinUsed(client, user.user_id);
     },
   });
+}
+
+/** The person a set-up ticket names, refused when they can no longer sign in. */
+async function setupHolder(challenge_token) {
+  const claims = waysIn.readSetupTicket(challenge_token);
+  const user = await repo.findLoginById(pool, claims.sub);
+  if (!user || user.status !== "active")
+    throw new AppError("CHALLENGE_EXPIRED", "This request has expired. Start again.", 400);
+  return { claims, user };
+}
+
+/**
+ * POST /auth/two-step/setup: the set-up step's key, for a person whose role requires
+ * two-step and who has not set it up. The ticket is the proof of the first step.
+ */
+async function twoStepSetup({ challenge_token }) {
+  const { claims } = await setupHolder(challenge_token);
+  return waysIn.startSetup(claims);
+}
+
+/**
+ * POST /auth/two-step/enrol: the app's first code proves the new key. Two-step goes on,
+ * the session opens, and the ten recovery codes are shown this once. A wrong code
+ * counts like a wrong password: whoever types it has the password.
+ */
+async function enrolTwoStep({ challenge_token, code, ip, userAgent, deviceToken }) {
+  const { claims, user } = await setupHolder(challenge_token);
+  const wait = throttle.waitSeconds(user);
+  if (wait > 0) {
+    await failedSignIn(user, { email: user.email, ip, reason: "throttled" });
+    throw new AppError("LOGIN_THROTTLED", `Too many attempts. Try again in ${throttle.sayWait(wait)}.`, 429);
+  }
+  const proof = await waysIn.checkSetupCode(user.user_id, code);
+  if (!proof) {
+    await failedSignIn(user, { email: user.email, ip, reason: "bad_code" });
+    throw waysIn.codeRefused();
+  }
+  const { codes, hashes } = await waysIn.newRecoveryCodes();
+  const two = await waysIn.twoStepOf(pool, user.user_id);
+  const out = await startSession(user, {
+    ip,
+    userAgent,
+    deviceToken,
+    method: `${claims.via}_totp`,
+    trustDays: two.trustDays,
+    within: async (client) => {
+      await waysIn.enrolOnSignIn(client, user.user_id, proof, hashes, claims, actorOf(user, ip));
+      if (claims.via === "pin") await waysIn.pinUsed(client, user.user_id);
+    },
+  });
+  return { ...out, body: { ...out.body, recovery_codes: codes } };
 }
 
 /**
@@ -480,6 +537,7 @@ function endedError(reason) {
 async function refresh(refreshToken) {
   const claims = readRefreshToken(refreshToken);
   if (!claims) throw endedError(null);
+  await policy.load(pool);
 
   const outcome = await tx(async (client) => {
     const s = await repo.lockSession(client, claims.sid);
@@ -597,6 +655,7 @@ async function changePassword(actor, { current_password, new_password }, ip) {
       new_password: ["Same as current"],
     });
   }
+  await policy.load(pool);
   await passwordPolicy.assert(new_password, { email: user.email, field: "new_password" });
   const hash = await hashPassword(new_password);
 
@@ -720,6 +779,7 @@ async function resetPassword({ token, new_password, ip }) {
   const link = await repo.findOpenLink(pool, hashOfToken);
   if (!link)
     throw new AppError("LINK_INVALID", "This link has expired or was already used.", 404);
+  await policy.load(pool);
   await passwordPolicy.assert(new_password, { email: link.email, field: "new_password" });
   const hash = await hashPassword(new_password);
 
@@ -751,7 +811,8 @@ async function resetPassword({ token, new_password, ip }) {
  * The caller's own sessions
  * ------------------------------------------------------------------ */
 
-function listSessions(actor, query) {
+async function listSessions(actor, query) {
+  await policy.load(pool);
   return repo.listSessions(pool, actor.user_id, query, {
     currentSessionId: actor.session_id,
     idleSeconds: policy.idleSeconds(),
@@ -809,6 +870,7 @@ async function endOtherSessions(actor, ip) {
 async function security(actor) {
   const user = await repo.findLoginById(pool, actor.user_id);
   if (!user) throw new AppError("AUTH_REQUIRED", "Sign in to continue", 401);
+  await policy.load(pool);
   return {
     password_changed_at: user.password_changed_at
       ? new Date(user.password_changed_at).toISOString()
@@ -897,6 +959,8 @@ async function createUserForEmployee(client, { employee_id, email, password = nu
     throw new AppError("LOGIN_EXISTS", "This employee already has a login.", 409);
   let hash = null;
   if (password !== null && password !== undefined) {
+    // The pool, not the caller's transaction: a failed read must not abort their work.
+    await policy.load(pool);
     await passwordPolicy.assert(password, { email, field: "password" });
     hash = await hashPassword(password);
   }
@@ -980,10 +1044,46 @@ async function endAllSessions(client, userId, actor) {
 /** After the transaction that ended sessions commits. */
 const afterSessionsEnded = (userId, sessionIds) => forget(userId, sessionIds);
 
+/**
+ * Everyone's live sessions, for an administrator (Settings · Security).
+ * @param {{session_id: string}} actor  req.user, to mark their own session
+ */
+async function liveSessions(query, actor) {
+  await policy.load(pool);
+  return repo.liveSessionPage(pool, query, {
+    currentSessionId: actor && actor.session_id,
+    idleSeconds: policy.idleSeconds(),
+  });
+}
+
+/**
+ * An administrator ends one session (in the caller's transaction). The person is told.
+ * Returns the login it belonged to, or null when it had already ended; clear the fast
+ * index with afterSessionsEnded() once the transaction commits.
+ */
+async function endSessionAsAdmin(client, sessionId, actor) {
+  if (actor && sessionId === actor.session_id)
+    throw new AppError("CURRENT_SESSION", "Use Sign Out to end your own session.", 422);
+  const userId = await repo.endAnySession(client, sessionId, {
+    reason: "ended_by_admin",
+    by: actor && actor.user_id ? actor.user_id : null,
+  });
+  if (!userId) return null;
+  await emit(client, {
+    key: EVENTS.AUTH_SESSION_ENDED,
+    entity: account(userId),
+    actor,
+    payload: { session_id: sessionId, reason: "ended_by_admin", by: "admin" },
+  });
+  return userId;
+}
+
 module.exports = {
   me,
   login,
   twoStep,
+  twoStepSetup,
+  enrolTwoStep,
   pinSignIn,
   passkeyOptions,
   passkeySignIn,
@@ -1013,6 +1113,8 @@ module.exports = {
   reactivateUser,
   endAllSessions,
   afterSessionsEnded,
+  liveSessions,
+  endSessionAsAdmin,
   verifyPassword,
   RESET_LINK_MINUTES,
   INVITE_LINK_HOURS,
