@@ -64,7 +64,7 @@ erDiagram
 | Access | `role`, `permission`, `field_visibility`, `capability`, `user_role`, `user_capability` | access service | A module's permission key in `access.catalog.js`; restricted columns named in `field-mask.js` |
 | History | `event_log`, `audit_ledger` (append-only), `event_outbox`, `entity_state_history` | `emit()` in the same transaction as the write | Every write calls `emit()`; follow-on work is an outbox handler, never a second write path |
 | Approvals | `workflow_definition`, `workflow_instance`, `workflow_decision` | `shared/workflow` | `workflow_instance_id` on the record waiting for approval; definitions seeded only if they pass `validateDefinition()` |
-| Files | `document`, `document_variant`, `template`, `template_version` | `shared/documents/vault` | `document_id uuid REFERENCES document`; never a path or a URL |
+| Files | `document`, `document_variant`, `template`, `template_version`, `document_request` | `shared/documents/vault`; the documents service for `document.verified_at` and `document_request` | `document_id uuid REFERENCES document`; never a path or a URL. A document People asked for and have not been given is a `document_request`, not a `document` (`docs/guides/foundation.md` §6.9) |
 | Numbers | `numbering_scheme`, `numbering_counter` | `numbering.allocate()` | `number citext NOT NULL UNIQUE` (or the contract's name for it, `staff_number`) and a scheme in `schemes.js` |
 | Notifications | `notification`, `notification_preference`, `push_subscription`, `alert` | `shared/notifications` fan-out | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
@@ -98,7 +98,9 @@ sort, filter and search of the register reads, with a trigram index on name and 
 (`mfa_frequency`, the pending key, the last step used, a browser's trust, `mfa_recovery_code`), the
 PIN and its wrong-try counts, `passkey`, `spent_challenge`, `user_session.reauthenticated_at` and
 `pin_totp` sessions (`docs/guides/identity.md` §4) · `0290` the seven roles and their permission
-matrix (`docs/guides/identity.md` §8).
+matrix (`docs/guides/identity.md` §8) · `0350` `document_request` (what People asked an employee for)
+and `document.verified_at` and `verified_by` (People accepting a file, which the virus check does
+not say; `docs/guides/foundation.md` §6.9).
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).

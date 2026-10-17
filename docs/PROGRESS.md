@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 92 screens (86 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 93 screens (87 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | items below | | | | | |
-| M1 Core Operations & Employee Management | 31 | 27 | 0 | 4 | 0 | 0 |
+| M1 Core Operations & Employee Management | 32 | 26 | 0 | 6 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 9 | 0 | 1 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **92** | **87** | **0** | **5** | **0** | **0** |
+| **Total** | **93** | **86** | **0** | **7** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -79,7 +79,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Sign-in and sessions: `identity`, `access`, `users`; session rules, lock screen, credential links, the seven roles, the four-city sign-in screen (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | Two-step sign-in, passkeys and the PIN: the `security` module, the code step, PIN and passkey sign-in, the lock screen's PIN and passkey, the fresh-sign-in window, Reset Two-Step (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
-| Documents, media, uploads, PDF generation | GE | ☑ | 14/10/2026 |
+| Documents, media, uploads, PDF generation | GE | ☑ | 17/10/2026 |
 | Import engine + staff importer; real staff sheet imported on staging | GE · LA · TB | ☑ | 17/10/2026 |
 | AI foundation: `services/ai`, manifests, registry, gate 9 | GE | ☑ | 15/10/2026 |
 | CI wiring: `package.json`, lockfile, ESLint, Jest, `ci-local.js`, `ci.yml` | GE | ☑ | 13/10/2026 |
@@ -118,6 +118,18 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   import engine takes batch `options` and honours a service that answers "nothing to write".
   Left: tracks B, C and D; the Documents tab on the record (B); Settings · Imports, which Import
   Staff opens (B); the people tasks in the guide's §1.2.
+- 17/10/2026 · TB · Track B of `docs/guides/foundation.md` built: the `imports` module (the
+  BACKEND_STRUCTURE §9.3 API over any registered importer, plus `GET /imports/:id` so the wizard
+  survives a reload), the `documents` module (`POST /documents` for a file with no record yet,
+  `GET /documents/:id` with `/content`, `/variant/:kind` and `/versions`, `POST /documents/:id/versions`
+  and `/verify`, `GET|POST /employees/:id/documents` with `/summary` and `/document-requests`), and the
+  `ess` module's first tab. Migration `0350` adds `document_request` and `document.verified_at`;
+  reading a file stays the vault's rule, so a document the caller may not read is a 404. M0's
+  definition of done for files is proved through the gated routes in
+  `tests/integration/documents-api.test.js`: a photo, a scanned document and a voice note upload,
+  process and download; a direct `/media/vault/...` request is a JSON 404; a letter template
+  generates a numbered, hashed, locked PDF that only its readers can fetch. Left for the row above:
+  the staff importer and the real sheet on staging, which are track A's.
 - 17/10/2026 · TB · Sign-in photographs: Lagos, London, Accra and Nairobi at dusk (TB's images, WebP
   at 1280 and 640, about 250 KB for all four) behind the sign-in screen, each drifting and zooming on
   its own path, the lights glowing, a few pixels of pointer parallax, crossfades with a short focus
@@ -433,7 +445,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 11 | My Payslips | `my-payslips` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 13 | My Queries | `my-queries` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 14 | My Documents | `my-documents` | M1 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 88 | My Devices | `my-devices` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
@@ -447,6 +459,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   vacant, dotted lines tagged, no restricted field on any card. On a phone it starts on the signed-in
   person as a focus view. Built with People · Organogram (#92) from `docs/guides/organogram.md`.
 
+- 17/10/2026 · TB · My Documents (#14) built on the real API (M0, track B): the Vault list is what is
+  held and what People have asked for in one paged list, the counts come from
+  `GET /ess/documents/summary`, a row opens its details with Download, a missing row opens Upload
+  Document, and the preview is the chosen document itself. Desktop and phone. The hard-coded contract
+  and the "Your vault" subtitle are gone (`docs/guides/ess.md` §10). Left: the other ESS tabs, with
+  their milestones.
 - 16/10/2026 · TB · My Security (#90) built: Two-Step Sign-In (set up from a QR code or the key, on
   with the first code, ten recovery codes shown once, Ask for a Code every sign-in, once a day or once
   a month, New Codes, Change App, Turn Off), Passkeys (Add Passkey on this device, rename, remove;
@@ -665,9 +683,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 78 | Security | `security` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 17/10/2026 · TB · Imports (#93) built on the real API, track B of `docs/guides/foundation.md`: the
+  wizard (Upload, Map, Preview with the rows that have problems, Commit, with Blank Sheet, the new
+  values to tick and Commit Valid Rows) over ANY registered importer, opened with `?importer=<key>`;
+  and the history, every batch with its counts, Download Errors and Revert. Desktop and phone. The
+  screen knows nothing about what is being imported: the columns and choices come from
+  `GET /imports/importers`. The staff importer itself is track A's. Left: the mock cannot carry a
+  sheet, so the wizard in a mock build says so and stops at Upload.
 - 16/10/2026 · TB · Users (#70): Reset Two-Step in a login's sheet (confirm, then the fresh-sign-in
   check; the person is signed out everywhere, told, and sets two-step up again from My Security), and
   a Two-Step column on desktop.

@@ -64,7 +64,7 @@ export const MODULES: ModuleDef[] = [
     tabs: [
       t("Organisation", "organisation"), t("Users", "users"), t("Roles & Permissions", "roles-and-permissions"), t("Approvals", "approvals"),
       t("Attendance Policy", "attendance-policy"), t("Notifications", "notifications"), t("Appearance", "appearance"),
-      t("Documents & Numbering", "documents-and-numbering"), t("Integrations", "integrations"), t("Security", "security"), t("Audit Log", "audit-log"),
+      t("Documents & Numbering", "documents-and-numbering"), t("Integrations", "integrations"), t("Security", "security"), t("Audit Log", "audit-log"), t("Imports", "imports"),
     ],
   },
 ];

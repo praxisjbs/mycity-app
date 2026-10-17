@@ -114,7 +114,7 @@ mycity-app/
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
 │   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F24, the three PRs
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
-│   ├── PROGRESS.md           86 screens + M0 items, updated with every change
+│   ├── PROGRESS.md           93 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
