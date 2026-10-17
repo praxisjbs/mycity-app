@@ -480,8 +480,7 @@ const ENTRIES = [
     str(""),
     {
       group: "Mailbox",
-      doc: "IMAP host for every mailbox. Empty: mail.<the address's domain>, which is MyCity's cPanel host.",
-      example: "mycityapp.io",
+      doc: "IMAP host for every mailbox. Empty: the address's own domain, which is MyCity's cPanel host and its certificate name.",
     },
   ],
   ["MAILBOX_IMAP_PORT", int(993, { min: 1, max: 65535 }), { group: "Mailbox", doc: "IMAP port (993, TLS)." }],
@@ -490,8 +489,7 @@ const ENTRIES = [
     str(""),
     {
       group: "Mailbox",
-      doc: "SMTP host for every mailbox. Empty: mail.<the address's domain>.",
-      example: "mycityapp.io",
+      doc: "SMTP host for every mailbox. Empty: the address's own domain.",
     },
   ],
   ["MAILBOX_SMTP_PORT", int(465, { min: 1, max: 65535 }), { group: "Mailbox", doc: "SMTP port (465, TLS)." }],

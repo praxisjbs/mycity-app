@@ -82,9 +82,9 @@ describe("HTML in and out", () => {
 });
 
 describe("autodiscover", () => {
-  test("a company address goes to mail.<domain> on 993 and 465; consumer mail is refused", () => {
-    expect(settingsFor("Ada@MyCityApp.io")).toMatchObject({ incoming_host: "mail.mycityapp.io", incoming_port: 993, outgoing_port: 465, username: "ada@mycityapp.io", tls: true });
-    expect(settingsFor("ada@mycityapp.io", { MAIL_IMAP_HOST: "mycityapp.io" }).incoming_host).toBe("mycityapp.io");
+  test("a company address goes to its own domain on 993 and 465, where the certificate is; consumer mail is refused", () => {
+    expect(settingsFor("Ada@MyCityApp.io")).toMatchObject({ incoming_host: "mycityapp.io", outgoing_host: "mycityapp.io", incoming_port: 993, outgoing_port: 465, username: "ada@mycityapp.io", tls: true });
+    expect(settingsFor("ada@mycityapp.io", { MAIL_IMAP_HOST: "server123.web-hosting.com" }).incoming_host).toBe("server123.web-hosting.com");
     expect(() => settingsFor("ada@gmail.com")).toThrow("Use your company address");
   });
 });

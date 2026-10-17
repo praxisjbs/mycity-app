@@ -1,6 +1,5 @@
 "use strict";
 // ai:none mail is private correspondence; nothing in M1 asks the assistant to read it (mailbox.md §9)
-// search:none a search provider is gated by the module grant alone, and a person may find only their own mail (mailbox.md §9)
 const { ok, created, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { readUpload } = require("../../middleware/upload");

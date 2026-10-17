@@ -276,6 +276,10 @@ module.exports = recordProvider({                // shared/search/provider.js
 });
 ```
 
+Records that belong to one person whatever their grant says (their own mail) use
+`owner: { column: "a.user_id" }` instead of `scope`: every query is pinned to the caller's
+`user_id`, so a grant of `all` still finds only the caller's own rows (`mailbox.search.js`).
+
 A module with no AI surface or nothing to search says so at the top of its controller, with a
 reason: `// ai:none <reason>`, `// search:none <reason>` (gates 9 and 10). Feature AI inside a
 service is one call, `services/ai/llm.service.complete({ purpose, module, actor, input, output })`,

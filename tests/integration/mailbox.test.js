@@ -203,9 +203,9 @@ describeDb("Mailbox against the real migrations", () => {
     expect(ok.status).toBe(200);
     expect(ok.body).toMatchObject({ email: "bola@mycity.test", status: "connected" });
     const row = await one(
-      "SELECT a.incoming_host, a.outgoing_port, s.key, s.ciphertext FROM mail_account a JOIN integration_secret s ON s.integration_secret_id = a.integration_secret_id",
+      "SELECT a.incoming_host, a.outgoing_host, a.outgoing_port, s.key, s.ciphertext FROM mail_account a JOIN integration_secret s ON s.integration_secret_id = a.integration_secret_id",
     );
-    expect(row).toMatchObject({ incoming_host: "mail.mycity.test", outgoing_port: 465, key: `mail_conn:${ok.body.mail_account_id}` });
+    expect(row).toMatchObject({ incoming_host: "mycity.test", outgoing_host: "mycity.test", outgoing_port: 465, key: `mail_conn:${ok.body.mail_account_id}` });
     expect(row.ciphertext).not.toContain(server.password);
     await drain();
     expect(queues.enqueue).toHaveBeenCalledWith("mail-sync", "sync", { mail_account_id: ok.body.mail_account_id }, expect.any(Object));
@@ -254,6 +254,17 @@ describeDb("Mailbox against the real migrations", () => {
 
     // Nobody else reaches it, the CEO included.
     expect((await api(other).get(`/mailbox/threads/${venue.mail_thread_id}`)).status).toBe(409);
+  });
+
+  test("⌘K finds the owner's own mail by subject or sender, and nobody else's, the CEO included", async () => {
+    const mailGroup = (r) => r.body.groups.find((g) => g.type === "mail_thread");
+    const mine = await api().get("/search?q=venue");
+    expect(mine.status).toBe(200);
+    const hit = mailGroup(mine).items[0];
+    expect(hit).toMatchObject({ title: "Venue confirmations", sub: "bola@mycity.test, o.adesanya@mtn.ng" });
+    expect(hit.link).toBe(`/mailbox?tab=inbox&id=${hit.id}`);
+    expect(mailGroup(await api().get("/search?q=partnerships")).items.map((i) => i.title)).toContain("Venue confirmations");
+    expect(mailGroup(await api(other).get("/search?q=venue"))).toBeUndefined();
   });
 
   test("read and move: local first, then the server", async () => {

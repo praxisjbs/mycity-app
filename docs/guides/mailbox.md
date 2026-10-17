@@ -41,8 +41,8 @@ password, as with any mail app.
 
 1. **Connect** (the Connect sheet, which opens over Mailbox the first time it is opened with no
    connection; GE, 17/10/2026): address and password →
-   `autodiscover` finds the IMAP and SMTP hosts from the domain (the `MAILBOX_*` settings override
-   it) → `POST /connection` signs in to both before anything is saved → the password is stored
+   `autodiscover` uses the address's own domain as the IMAP and SMTP host (`mycityapp.io`, the name
+   on the host's certificate; the `MAILBOX_*` settings override it) → `POST /connection` signs in to both before anything is saved → the password is stored
    encrypted in `integration_secret` under `mail_conn:<id>`, never on the connection row. The first
    sync starts at once (`mail_account.connected` → `mail-sync`).
 2. **Sync**: the worker's `mail-sync` scheduler and the `mail-idle` loop (IMAP IDLE) pull new mail
@@ -163,9 +163,11 @@ Settings (`.env`, group Mailbox): `MAILBOX_IMAP_HOST`, `MAILBOX_IMAP_PORT`, `MAI
 
 - **AI reads**: `// ai:none` in M1. Mail is private correspondence; the donor's mail assist is not
   ported (REUSE_MAP §2.5) and nothing in M1 asks for it.
-- **Search**: `// search:none` in M1. A search provider is gated by the module grant alone, and a
-  person may find only their own mail; ⌘K reaches the Mailbox screen and its folders through the
-  route map. Finding a message by its words waits for an owner-scoped provider (§13).
+- **Search** (`mailbox.search.js`, ⌘K): the caller's own conversations by subject, the addresses
+  on them and the senders' names. The provider is pinned to the caller's `user_id` (`owner`), so
+  the CEO and People, whose grants reach everyone, still find only their own mail. A result opens
+  the conversation in Mailbox by its id, whichever folder it is in. Messages are found through
+  their conversation (`mail_message` is `search:none`). Words inside a body are not searched.
 
 ## 10 · On screen and mobile
 
@@ -234,7 +236,7 @@ interface copy; the copy rules apply to the chrome around them.
 - Undo send window, and how long scheduled mail may wait.
 - Leavers: which event disconnects a deactivated person's mailbox (needs a deactivation event from
   identity).
-- Search inside mail (by sender, subject and words) needs a ⌘K provider scoped to the owner.
+- Search inside message bodies: wanted, given the cost of matching every body on each keystroke?
 
 ## 14 · Change log
 
@@ -249,3 +251,4 @@ interface copy; the copy rules apply to the chrome around them.
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): the composer's body is now the shared `RichTextField` (TipTap, its own lazy chunk) instead of its own `contentEditable` on the deprecated `execCommand`. Paste from Word and Gmail is parsed into the document rather than carried in as foreign markup, which is why TipTap was chosen (FRONTEND_FOUNDATION §5, PR 3 question 3). The bar carries exactly what §6 and §10 list: Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link (`https://` or `mailto:` only, typed in a field under the bar, never a native dialog) and Clear Formatting, with Undo and Redo at its end and Attach a File beside it. The list beside the reader is `SplitPanes`, shared with Chat.
 - 17/10/2026 · GE · Built on the real API: `1120_mailbox.sql`, the `mailbox` module (IMAP and SMTP provider, threading, folders, send queue), `mail-sync`, `mail-send` and `loops/mail-idle` in the worker. §3 to §5, §7, §9 and §11 rewritten as built; the empty stubs the donor list implied (`threads.*`, `send-queue.*`, `access`, `find`, `presend`, `schedule`, `origin`, `mail-notify`, `attachments.service`, `.ai`, `.search`) were deleted: their work lives in `mailbox.service`, `mailbox.repo` and `mailbox.events`. Search is `search:none`.
 - 17/10/2026 · GE · Connecting moved into Mailbox: a Connect sheet opens over it when there is no connection, and the refused-password banner carries Reconnect, which opens the same sheet. Settings · Integrations only shows the connection.
+- 17/10/2026 · GE · ⌘K finds the owner's own mail (§9): `mailbox.search.js` with the provider's new `owner` pin, and a result opens its conversation by id in any folder. Connect now uses the address's own domain as the mail host (`mycityapp.io`, the name on the host's certificate; `mail.mycityapp.io` fails the check, runbook dns-and-mail §4).

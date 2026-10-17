@@ -15,7 +15,7 @@ import { Avatar, Banner, Button, cn, EmptyState, ErrorState, Field, formatBytes,
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
 
-export default function Mailbox({ tab }: ModuleScreenProps) {
+export default function Mailbox({ tab, id }: ModuleScreenProps) {
   const folder = (tab in NAMES ? tab : "inbox") as MailFolder;
   const mobile = useIsMobile();
   useFitPage(!mobile);
@@ -23,11 +23,18 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
   const conn = useApi("GET /api/v1/mailbox/connection");
   const list = usePaged("GET /api/v1/mailbox/threads", { filters: { folder } });
   const unread = useApi("GET /api/v1/mailbox/threads", { query: { folder, unread: true } });
-  const [sel, setSel] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const [sel, setSel] = useState<string | null>(id);
+  const [open, setOpen] = useState(Boolean(id));
   const split = useSplitPanes("mail", 330);
   const rows = list.rows;
-  const current = rows.find((r) => r.mail_thread_id === sel) ?? (mobile ? undefined : rows[0]);
+  /* A ⌘K result links a conversation by id; it opens whichever folder it is in. */
+  const linked = useLinkedThread(id);
+  useEffect(() => {
+    if (!id) return;
+    setSel(id);
+    setOpen(true);
+  }, [id]);
+  const current = rows.find((r) => r.mail_thread_id === sel) ?? (sel && sel === id ? linked : mobile ? undefined : rows[0]);
   const from = conn.data?.email ?? "";
   const status = conn.data?.status;
   const connectSheet = () =>
@@ -103,6 +110,25 @@ export default function Mailbox({ tab }: ModuleScreenProps) {
       />
     </>
   );
+}
+
+function useLinkedThread(id: string | null): ThreadRow | undefined {
+  const t = useApi("GET /api/v1/mailbox/threads/:id", { params: { id: id ?? "" }, enabled: Boolean(id) });
+  if (!id || !t.data) return undefined;
+  const last = t.data.messages[t.data.messages.length - 1];
+  return {
+    mail_thread_id: t.data.mail_thread_id,
+    folder: t.data.folder,
+    subject: t.data.subject,
+    party: last ? last.from : null,
+    snippet: "",
+    last_message_at: last ? last.sent_at : new Date().toISOString(),
+    unread: true,
+    has_attachment: t.data.messages.some((m) => m.attachments.length > 0),
+    message_count: t.data.messages.length,
+    mail_draft_id: null,
+    scheduled: null,
+  };
 }
 
 function MailFrame({ open, split, list, reader }: { open: boolean; split: SplitState; list: ReactNode; reader: ReactNode }) {
