@@ -1,4 +1,4 @@
-import type { IsoDateTime, Paged, PersonRef, Uuid } from "./common";
+import type { IsoDateTime, Paged, PersonRef } from "./common";
 import type { Status } from "./performance";
 
 /**
@@ -7,22 +7,6 @@ import type { Status } from "./performance";
  * acknowledgements (LA). Organisation, Roles & Permissions, Documents & Numbering,
  * Security and the Audit Log are on the contract (contract.gen.ts).
  */
-export interface Hierarchy {
-  hierarchy_id: Uuid;
-  name: string;
-  description: string;
-  steps: string[];
-  trigger: string;
-  deputies: string;
-  ageing: string;
-  status: Status;
-}
-export interface HierarchiesSummary {
-  hierarchies: number;
-  active: number;
-  awaiting: number;
-  longest: number;
-}
 export interface NotificationPref {
   key: string;
   label: string;
@@ -60,9 +44,6 @@ export interface PolicyAck {
 type Q<T = object> = T & { page?: number; q?: string };
 declare module "@/api/endpoints" {
   interface Endpoints {
-    "GET /api/v1/settings/approvals/summary": { query: never; body: never; params: never; response: HierarchiesSummary };
-    "GET /api/v1/settings/approvals": { query: Q; body: never; params: never; response: Paged<Hierarchy> };
-    "PUT /api/v1/settings/approvals/:id/steps": { query: never; body: { steps: string[] }; params: { id: string }; response: Hierarchy };
     "GET /api/v1/settings/notifications": { query: never; body: never; params: never; response: NotificationPref[] };
     "PATCH /api/v1/settings/notifications": { query: never; body: Record<string, { in_app: boolean; email: boolean }>; params: never; response: NotificationPref[] };
     "GET /api/v1/settings/appearance": { query: never; body: never; params: never; response: Appearance };

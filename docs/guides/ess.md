@@ -70,8 +70,9 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    deductions, each with its query. If the query is waived nothing is deducted.
 4. **Payslips** become visible when Payroll approves and locks the run (normally the 27th). Until
    then the month shows "In the run".
-5. **Leave.** A request from My Leave goes to the line manager in one step → approved leave counts
-   down the entitlement and is never counted as absence by attendance.
+5. **Leave.** A request from My Leave goes to the line manager, then to Operations & People when it
+   is over 5 days (the leave flow, `docs/guides/foundation.md` §6.5) → approved leave counts down the
+   entitlement and is never counted as absence by attendance.
 6. **Documents.** People request a document (passport photograph, a certificate) → it shows as
    Missing in My Documents → the employee uploads it → People see it on the employee record. A
    missing document blocks onboarding for a new hire, nothing for a confirmed employee.
@@ -147,8 +148,9 @@ check ownership, not the `settings` grant (README §5.2).
   to staff (TB, 12 October). The employee's response stays on the record beside the decision, and
   it is read before the decision is made, so disagreement goes in the response. Most queries close
   with no action. Who can see a query: §8.
-- Leave is approved by the line manager in one step; the screen does not say so. The leave
-  calendar shows clashes before a request is sent.
+- Leave is approved by the line manager, and by Operations & People too when it is over 5 days (a
+  number they change on Settings · Approvals); the screen does not say so. The leave calendar shows
+  clashes before a request is sent.
 - Signed documents carry two hashes (content and artifact) and a public verification link on
   `go.mycityapp.io/verify/<ref>`.
 - Changing the password ends the employee's other sessions. The password, two-step, passkey, PIN
@@ -320,3 +322,7 @@ Deductions figure and every form open the shared modal.
 - 17/10/2026 · TB · My Security follows Settings · Security, built with foundation track C: while a
   role the person holds requires two-step, Two-Step Sign-In has no Turn Off and the server refuses
   one; the person sets it up at sign-in (`docs/guides/identity.md` §3 step 15). §2 updated.
+- 17/10/2026 · TB · Leave goes to the line manager, then to Operations & People over 5 days (the leave
+  flow of `docs/guides/foundation.md` §6.5, TB 16/10/2026), where §3 and §6 said one step. My Leave's
+  Request Leave also opens from ⌘K (`?action=new`), and My Security's Change Password and Set PIN
+  (`?action=password`, `?action=pin`).

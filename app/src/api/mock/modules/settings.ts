@@ -1,5 +1,5 @@
 import type { AccessCatalogue, AuditEntry, FailedSignIn, Holiday, LiveSession, NumberingScheme, Organisation, RoleDetail, RoleGrant, RoleRow, RoleSave, UserRow, WorkingDay } from "@mycity/contract/contract.gen.ts";
-import type { Hierarchy, NotificationPref } from "@/api/types/settings";
+import type { NotificationPref } from "@/api/types/settings";
 import type { Status } from "@/api/types/performance";
 import { accepted, at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
@@ -345,28 +345,6 @@ route("DELETE /api/v1/settings/roles/:id", (req) => {
   ROLES.delete(req.params.id);
   audit(who(req.user!), "A role was deleted", `Role · ${r.name}`, describe(r), null, null, "Settings");
   return noContent();
-});
-
-const HIER: Hierarchy[] = [
-  ["Expense Request", "Every request, whatever the amount.", ["Requester", "Line manager", "Operations", "Requisition", "CEO", "Disbursed"], "Any expense request", S("ok", "Active")],
-  ["Leave request", "Requester, line manager. One step.", ["Requester", "Line manager"], "Any leave request", S("ok", "Active")],
-  ["Monthly targets", "Managers, COO, Operations, CEO. Binding on CEO approval.", ["Managers set", "COO review", "Operations review", "CEO approval"], "A departmental target is submitted", S("ok", "Active")],
-  ["Payroll run", "Operations, then the CEO. One step.", ["Operations", "CEO"], "A run is submitted", S("warn", "Approver to confirm")],
-  ["Work location request", "Line manager recommends, People decides.", ["Employee", "Line manager", "People"], "A temporary home or exception is requested", S("ok", "Active")],
-  ["Consequence chain", "Query, caution, warning, suspension, suspension without pay, dismissal.", ["Query", "Caution", "Warning", "Suspension", "Suspension without pay", "Dismissal"], "A query is decided", S("ok", "Active")],
-].map((h, i) => ({ hierarchy_id: sid(`hier:${i}`), name: h[0] as string, description: h[1] as string, steps: h[2] as string[], trigger: h[3] as string, deputies: "Each step can name a deputy for leave", ageing: "An alert at 3 days, escalation at 7", status: h[4] as Status }));
-route("GET /api/v1/settings/approvals/summary", () => ok({ hierarchies: HIER.length, active: HIER.filter((h) => h.status.tone === "ok").length, awaiting: HIER.filter((h) => h.status.tone !== "ok").length, longest: Math.max(...HIER.map((h) => h.steps.length - 1)) }));
-route("GET /api/v1/settings/approvals", (req) => paged(HIER, req, { search: (h) => [h.name, h.description] }));
-route("PUT /api/v1/settings/approvals/:id/steps", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO change hierarchies.");
-  const h = HIER.find((x) => x.hierarchy_id === req.params.id);
-  if (!h) return notFound();
-  const steps = ((req.body.steps as string[]) ?? []).map((s) => String(s).trim()).filter(Boolean);
-  if (steps.length < 2) return invalid({ steps: ["A hierarchy needs at least two steps"] });
-  if (new Set(steps).size !== steps.length) return invalid({ steps: ["Each step appears once"] });
-  audit(who(req.user!), "Hierarchy changed", `Approvals · ${h.name}`, h.steps.join(" → "), steps.join(" → "), "In-flight requests keep their chain", "Settings");
-  h.steps = steps;
-  return ok(h);
 });
 
 const PREFS = new Map<string, NotificationPref[]>();

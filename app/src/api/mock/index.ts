@@ -22,6 +22,7 @@ import "./modules/expenses";
 import "./modules/knowledge";
 import "./modules/settings";
 import "./modules/imports";
+import "./modules/workflow";
 import { dispatch } from "./core";
 
 export const mockTransport = dispatch;

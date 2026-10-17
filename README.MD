@@ -181,7 +181,8 @@ src/
 │   ├── dedup/         dedup
 │   ├── geo/           geo
 │   ├── notifications/ categories · fanout
-│   ├── search/        provider · registry · search.service
+│   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms) ·
+│   │                  actions (⌘K actions: each screen's New action, Clock In, Request Leave)
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
 │   └── observability/ scrub · metrics · error-reporter · alert (WhatsApp and webhook; also the
 │                      server's mycity-alert)
@@ -252,10 +253,10 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
 | `knowledge` | `knowledge` (announcements are read here too) |
 | `praxis_ai` | `assistant`, `ai_governance` |
-| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures` |
+| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures`, `search` |
 
-The settings modules that every user touches (`identity` login, own `notifications`, own `documents`)
-check ownership, not the `settings` grant.
+The settings modules that every user touches (`identity` login, own `notifications`, own `documents`,
+`search`, the requests waiting on them in `workflow`) check ownership, not the `settings` grant.
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -268,7 +269,8 @@ check ownership, not the `settings` grant.
 | `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
 | `notifications` | `notifications.preferences.js`, `notifications.reminders.js` (M6) | Caller's own inbox |
-| `workflow` | | Definitions, act on an instance, my approvals |
+| `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
+| `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
 

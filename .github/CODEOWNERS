@@ -104,6 +104,8 @@
 /packages/contract/schemas/query_rules.js          @swizfcodes @tomblakeasaah196
 /src/modules/sanctions/                            @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/sanctions.js            @swizfcodes @tomblakeasaah196
+/src/modules/search/                               @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/search.js               @swizfcodes @tomblakeasaah196
 /src/modules/security/                             @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/security.js             @swizfcodes @tomblakeasaah196
 /src/modules/settings/                             @swizfcodes @tomblakeasaah196

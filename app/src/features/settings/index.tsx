@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
-import type { Hierarchy } from "@/api/types/settings";
 import type { UserRow } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
@@ -15,10 +14,12 @@ import { NumberingTab } from "./Numbering";
 import { OrganisationTab } from "./Organisation";
 import { Roles } from "./Roles";
 import { SecurityTab } from "./SecurityRules";
-import { Button, Card, CardHeader, Chain, Chips, ChoiceField, cn, DataView, Field, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, InlineInput, LoadingRows, PageHeader, Pill, StatusPill, Swatch, Switch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, ChoiceField, DataView, Field, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, LoadingRows, PageHeader, Pill, StatusPill, Swatch, Switch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { RolePicker, type RoleRef } from "@/features/shared/pickers";
 import { Imports } from "./Imports";
+import { Approvals } from "./Approvals";
+import { useScreenAction } from "@/shell/screen-action";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -59,6 +60,8 @@ const USER_STATUS: Record<UserRow["status"], { tone: "ok" | "warn" | "err" | "ne
 function Users() {
   const modal = useModal();
   const { can } = useAuth();
+  const invite = () => modal.open({ title: "Invite User", body: (close) => <InviteToSignIn close={close} /> });
+  useScreenAction(can("settings", "create") ? { label: "Invite User", onSelect: invite } : null);
   const [status, setStatus] = useState<"" | UserRow["status"]>("");
   const s = useApi("GET /api/v1/users/summary");
   const list = usePaged("GET /api/v1/users", { filters: status ? { status } : {} });
@@ -67,7 +70,7 @@ function Users() {
       <PageHeader
         title="Users"
         sub={s.data ? `${s.data.users} users · ${s.data.invited} invited` : " "}
-        actions={can("settings", "create") ? <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Invite User", body: (close) => <InviteToSignIn close={close} /> })}>Invite User</Button> : undefined}
+        actions={can("settings", "create") ? <Button variant="primary" icon="plus" onClick={invite}>Invite User</Button> : undefined}
       />
       {s.data && (
         <KpiTiles
@@ -200,77 +203,6 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
             Save Roles
           </Button>
         )}
-      </FormFooter>
-    </>
-  );
-}
-
-/* ───────────── Approvals ───────────── */
-
-function Approvals() {
-  const modal = useModal();
-  const s = useApi("GET /api/v1/settings/approvals/summary");
-  const list = usePaged("GET /api/v1/settings/approvals");
-  const [sel, setSel] = useState<string | null>(null);
-  const h = list.rows.find((x) => x.hierarchy_id === sel) ?? list.rows[0];
-  return (
-    <>
-      <PageHeader title="Approvals" sub="Hierarchies as data. Changing one needs no deploy." />
-      {s.data && <KpiTiles items={[{ label: "Hierarchies", value: String(s.data.hierarchies) }, { label: "Active", value: String(s.data.active), tone: "ok" }, { label: "Awaiting a Decision", value: String(s.data.awaiting), tone: s.data.awaiting ? "warn" : undefined }, { label: "Steps, Longest", value: String(s.data.longest) }]} />}
-      <Grid cols={3}>
-        {list.rows.map((x) => (
-          <button key={x.hierarchy_id} type="button" onClick={() => setSel(x.hierarchy_id)} className={cn("rounded-box border bg-card p-3.5 text-left transition-shadow hover:shadow-2", x.hierarchy_id === h?.hierarchy_id ? "border-secondary ring-1 ring-secondary" : "border-border")}>
-            <h2 data-copy="content" className="text-sm font-semibold">{x.name}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">{x.description}</p>
-            <div className="mt-2.5"><StatusPill s={x.status} /></div>
-          </button>
-        ))}
-      </Grid>
-      {h && (
-        <Grid cols={2} className="mt-3">
-          <Card>
-            <CardHeader title={h.name} right={<StatusPill s={h.status} />} />
-            <Chain steps={h.steps.map((label) => ({ label }))} />
-            <dl className="mt-3.5 grid grid-cols-1 gap-x-4 gap-y-0.5 text-sm md:cols-term-value-tight md:gap-y-2">
-              {[["Trigger", h.trigger], ["Steps", "Roles, not people. A role can be reassigned"], ["Deputies", h.deputies], ["Ageing", h.ageing], ["In-flight", "A request keeps the chain it started on, even if the hierarchy changes"]].map(([k, v]) => (
-                <div key={k} className="contents"><dt className="text-xs text-subtle-foreground">{k}</dt><dd className="font-semibold max-md:mb-2">{v}</dd></div>
-              ))}
-            </dl>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button icon="plus" onClick={() => modal.open({ title: `Steps · ${h.name}`, body: (close) => <EditSteps h={h} close={close} /> })}>Edit Steps</Button>
-            </div>
-          </Card>
-        </Grid>
-      )}
-    </>
-  );
-}
-
-function EditSteps({ h, close }: { h: Hierarchy; close: () => void }) {
-  const [steps, setSteps] = useState(h.steps);
-  const save = useMutation("PUT /api/v1/settings/approvals/:id/steps");
-  const move = (i: number, d: number) => {
-    const n = [...steps];
-    [n[i], n[i + d]] = [n[i + d], n[i]];
-    setSteps(n);
-  };
-  return (
-    <>
-      <div className="flex flex-col gap-1.5">
-        {steps.map((s, i) => (
-          <div key={i} className="flex items-center gap-1.5">
-            <b className="w-5 text-xs text-subtle-foreground">{i + 1}</b>
-            <InlineInput aria-label={`Step ${i + 1}`} className="h-9 min-w-0 flex-1 rounded-ctl border border-input bg-background px-3 text-sm outline-none focus:border-ring" value={s} onChange={(v) => setSteps(steps.map((x, j) => (j === i ? v : x)))} />
-            <Button size="sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up"><Icon name="up" /></Button>
-            <Button size="sm" disabled={i === steps.length - 1} onClick={() => move(i, 1)} aria-label="Move down"><Icon name="up" className="rotate-180" /></Button>
-            <Button size="sm" aria-label={`Remove step ${i + 1}`} onClick={() => setSteps(steps.filter((_, j) => j !== i))}><Icon name="x" /></Button>
-          </div>
-        ))}
-      </div>
-      <Button size="sm" icon="plus" className="mt-2" onClick={() => setSteps([...steps, ""])}>Add a Step</Button>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={async () => { try { await save.run({ params: { id: h.hierarchy_id }, body: { steps } }); invalidate("/api/v1/settings/approvals"); close(); toast(`${h.name} updated`); } catch (e) { if (e instanceof ApiError && e.fields) toast(Object.values(e.fields)[0][0]); else fail(e); } }}>Save Steps</Button>
       </FormFooter>
     </>
   );

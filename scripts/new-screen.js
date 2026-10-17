@@ -11,6 +11,7 @@
  *
  *   app/src/shell/catalogue.ts           the tab in its module (the shell, the URL, screens.json)
  *   src/shared/route-map.js              the slug in SCREENS (links the backend derives land on it)
+ *   src/shared/search/screens.js         its ⌘K entry (the search coverage gate holds the two together)
  *   app/src/features/<folder>/<Name>.tsx  the screen, from @mycity/ui only, with its page header
  *   app/src/features/<folder>/index.tsx   its case in the module's switch
  *   app/src/shell/coming-soon.ts         its Coming Soon entry (fill in what it will do)
@@ -36,6 +37,7 @@ const FILES = {
   catalogue: "app/src/shell/catalogue.ts",
   screens: "app/src/shell/screens.tsx",
   routeMap: "src/shared/route-map.js",
+  search: "src/shared/search/screens.js",
   coming: "app/src/shell/coming-soon.ts",
   progress: "docs/PROGRESS.md",
   progressGate: "scripts/check/progress.js",
@@ -99,6 +101,15 @@ function addToRouteMap(text, moduleKey, slug) {
   const open = m.index + m[0].length;
   if (text.slice(open, text.indexOf("]", open)).includes(`"${slug}"`)) refuse(`${FILES.routeMap} already lists "${slug}" for ${moduleKey}`);
   return appendTo(text, open, `"${slug}"`, true);
+}
+
+/** The screen's ⌘K entry in src/shared/search/screens.js, above the marker, with no words yet. */
+function addToSearch(text, moduleKey, label, slug) {
+  const marker = "  // new:screen adds screens above this line";
+  const at = text.indexOf(marker);
+  if (at < 0) refuse(`no "${marker.trim()}" in ${FILES.search}`);
+  if (text.includes(`s("${moduleKey}", "${slug}",`)) refuse(`${FILES.search} already lists ${moduleKey} / ${slug}`);
+  return `${text.slice(0, at)}  s("${moduleKey}", "${slug}", "${label}", []),\n${text.slice(at)}`;
 }
 
 /** The module's feature folder, from its lazy import in app/src/shell/screens.tsx. */
@@ -248,6 +259,7 @@ function plan(argv, root = ROOT) {
   const writes = [
     [FILES.catalogue, addToCatalogue(read(FILES.catalogue), moduleKey, label, slug)],
     [FILES.routeMap, addToRouteMap(read(FILES.routeMap), moduleKey, slug)],
+    [FILES.search, addToSearch(read(FILES.search), moduleKey, label, slug)],
     [screenFile, screenSource({ name, label, moduleKey, slug, m })],
     [indexFile, addToIndex(read(indexFile), name, slug)],
     [FILES.coming, addToComing(read(FILES.coming), moduleKey, slug)],
@@ -279,8 +291,9 @@ function main() {
   console.log(`  1. Its rows in the feature guide's §10 (docs/guides/<feature>.md): open, behind help, phone layout.`);
   console.log(`  2. What it will do, in app/src/shell/coming-soon.ts ("${p.moduleKey}/${p.slug}"), three short lines.`);
   console.log(`  3. The screen: app/src/features/${p.folder}/${p.name}.tsx, from @mycity/ui (docs/COMPONENTS.md, npm run gallery).`);
-  console.log("  4. npm run ci: gates 8, 11 and a11y crawl it from the next build (app/dist/screens.json).");
+  console.log(`  4. The words people use for it, in src/shared/search/screens.js; its New action, if it has one, in src/shared/search/actions.js.`);
+  console.log("  5. npm run ci: gates 8, 11 and a11y crawl it from the next build (app/dist/screens.json).");
 }
 
-module.exports = { today, addToCatalogue, addToRouteMap, addToIndex, addToComing, addToProgress, bumpProgressGate, bumpRouteTest, folderOf, screenSource, slugOf, pascalOf, titleCase, plan, Refusal };
+module.exports = { today, addToCatalogue, addToRouteMap, addToSearch, addToIndex, addToComing, addToProgress, bumpProgressGate, bumpRouteTest, folderOf, screenSource, slugOf, pascalOf, titleCase, plan, Refusal };
 if (require.main === module) main();

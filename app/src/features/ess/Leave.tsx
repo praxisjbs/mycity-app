@@ -4,6 +4,7 @@ import "@/api/types/leave";
 import { Button, Card, CardHeader, DataView, DesktopOnly, formatDate, Grid, KeyValue, KpiCard, Meter, PageHeader, Pager, Pill, TapList, toast, useModal } from "@mycity/ui";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { LEAVE_TONE, LeaveForm } from "@/features/people/Leave";
+import { useScreenAction } from "@/shell/screen-action";
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--input)"];
 
@@ -15,6 +16,7 @@ export function MyLeavePage() {
   const annual = bal.data?.balances.find((b) => b.type === "Annual");
   const next = list.rows.find((r) => r.status === "Approved" && r.from >= new Date().toISOString().slice(0, 10));
   const request = () => modal.open({ title: "Request Leave", body: (close) => <LeaveForm close={close} /> });
+  useScreenAction({ label: "Request Leave", onSelect: request });
   const open = (r: LeaveRequest) =>
     modal.open({
       title: `${r.type} Leave, ${formatDate(r.from)}`,

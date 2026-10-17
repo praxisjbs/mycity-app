@@ -29,6 +29,12 @@
  * An unknown type returns null, and the caller shows no link rather than a broken
  * one. A new entity type is one line in ENTITY_ROUTES; a test fails when a route
  * names a screen that is not in docs/PROGRESS.md.
+ *
+ * Search reaches everything (docs/guides/foundation.md §6.7): a type here is declared by
+ * a search provider (`<module>.search.js`), or its line carries `// search:none <reason>`;
+ * `not built yet (src/modules/<m>)` holds only until that module is built. A screen kept
+ * out of ⌘K writes `// search:none <module>.<tab> <reason>`. The search coverage gate
+ * (scripts/check/search-coverage.js) checks both.
  */
 const catalog = require("./access/access.catalog");
 
@@ -113,23 +119,23 @@ const screen = (module, tab) => ({ module, tab });
  */
 const ENTITY_ROUTES = Object.freeze({
   // Home
-  home_alert: screen("home", "alerts"),
-  home_report: screen("home", "reports"),
-  home_report_run: screen("home", "reports"),
+  home_alert: screen("home", "alerts"), // search:none not built yet (src/modules/alerts)
+  home_report: screen("home", "reports"), // search:none not built yet (src/modules/reports)
+  home_report_run: screen("home", "reports"), // search:none not built yet (src/modules/reports)
 
   // My Workspace
-  task: screen("workspace", "tasks"),
-  calendar_event: screen("workspace", "calendar"),
+  task: screen("workspace", "tasks"), // search:none not built yet (src/modules/tasks)
+  calendar_event: screen("workspace", "calendar"), // search:none not built yet (src/modules/calendar)
 
   // Staff Community and Mailbox
-  channel: screen("community", "channels"),
-  channel_message: screen("community", "channels"),
-  direct_thread: screen("community", "direct-messages"),
-  direct_message: screen("community", "direct-messages"),
-  announcement: screen("community", "announcements"),
-  recognition: screen("community", "channels"),
-  mail_thread: screen("mailbox", "inbox"),
-  mail_message: screen("mailbox", "inbox"),
+  channel: screen("community", "channels"), // search:none not built yet (src/modules/community)
+  channel_message: screen("community", "channels"), // search:none not built yet (src/modules/community)
+  direct_thread: screen("community", "direct-messages"), // search:none not built yet (src/modules/community)
+  direct_message: screen("community", "direct-messages"), // search:none not built yet (src/modules/community)
+  announcement: screen("community", "announcements"), // search:none not built yet (src/modules/announcements)
+  recognition: screen("community", "channels"), // search:none not built yet (src/modules/community)
+  mail_thread: screen("mailbox", "inbox"), // search:none not built yet (src/modules/mailbox)
+  mail_message: screen("mailbox", "inbox"), // search:none not built yet (src/modules/mailbox)
 
   // People
   employee: {
@@ -139,115 +145,127 @@ const ENTITY_ROUTES = Object.freeze({
   import_batch: screen("settings", "imports"),
   // A file opens where its record is: on the employee's own My Documents, or on
   // the record's Documents tab for whoever may see it.
+  // search:none found from the record it belongs to; the vault decides who opens each (documents.controller.js)
   document: {
     ...screen("people", "employees"),
     self: screen("ess", "my-documents"),
   },
+  // search:none found from the record it belongs to; the vault decides who opens each (documents.controller.js)
   document_request: {
     ...screen("people", "employees"),
     self: screen("ess", "my-documents"),
   },
+  // search:none not built yet (src/modules/attendance)
   attendance_record: {
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
+  // search:none not built yet (src/modules/attendance)
   attendance_exception: {
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
+  // search:none not built yet (src/modules/leave)
   leave_request: {
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),
   },
-  device: { ...screen("people", "devices"), self: screen("ess", "my-profile") },
-  worksite: screen("people", "worksites"),
+  device: { ...screen("people", "devices"), self: screen("ess", "my-profile") }, // search:none not built yet (src/modules/devices)
+  worksite: screen("people", "worksites"), // search:none not built yet (src/modules/worksites)
 
   // Performance
+  // search:none not built yet (src/modules/goals)
   goal: {
     ...screen("performance", "goals"),
     self: screen("ess", "my-performance"),
   },
+  // search:none not built yet (src/modules/targets)
   target: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
-  kpi: screen("performance", "kpis"),
+  kpi: screen("performance", "kpis"), // search:none not built yet (src/modules/kpis)
+  // search:none not built yet (src/modules/reviews)
   review: {
     ...screen("performance", "reviews"),
     self: screen("ess", "my-performance"),
   },
 
   // Queries & Sanctions
-  query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") },
-  query_rule: screen("queries", "rules"),
+  query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") }, // search:none not built yet (src/modules/queries)
+  query_rule: screen("queries", "rules"), // search:none not built yet (src/modules/query_rules)
+  // search:none not built yet (src/modules/sanctions)
   sanction: {
     ...screen("queries", "sanctions"),
     self: screen("ess", "my-queries"),
   },
-  letter_template: screen("queries", "letter-templates"),
+  letter_template: screen("queries", "letter-templates"), // search:none not built yet (src/modules/templates)
 
   // Recruitment
-  vacancy: screen("recruitment", "vacancies"),
-  candidate: screen("recruitment", "candidates"),
-  assessment: screen("recruitment", "assessments"),
-  interview: screen("recruitment", "interviews"),
-  offer: screen("recruitment", "offers"),
+  vacancy: screen("recruitment", "vacancies"), // search:none not built yet (src/modules/vacancies)
+  candidate: screen("recruitment", "candidates"), // search:none not built yet (src/modules/candidates)
+  assessment: screen("recruitment", "assessments"), // search:none not built yet (src/modules/assessments)
+  interview: screen("recruitment", "interviews"), // search:none not built yet (src/modules/interviews)
+  offer: screen("recruitment", "offers"), // search:none not built yet (src/modules/offers)
+  // search:none not built yet (src/modules/onboarding)
   onboarding: {
     ...screen("recruitment", "onboarding"),
     self: screen("ess", "my-documents"),
   },
-  talent_pool_entry: screen("recruitment", "talent-pool"),
+  talent_pool_entry: screen("recruitment", "talent-pool"), // search:none not built yet (src/modules/talent_pool)
 
   // Payroll
-  payroll_run: screen("payroll", "payroll-runs"),
+  payroll_run: screen("payroll", "payroll-runs"), // search:none not built yet (src/modules/payroll)
+  // search:none not built yet (src/modules/payslips)
   payslip: {
     ...screen("payroll", "payslips"),
     self: screen("ess", "my-payslips"),
   },
-  salary_structure: screen("payroll", "salary-structure"),
-  deduction: screen("payroll", "deductions"),
-  statutory_return: screen("payroll", "statutory"),
+  salary_structure: screen("payroll", "salary-structure"), // search:none not built yet (src/modules/salary_structure)
+  deduction: screen("payroll", "deductions"), // search:none not built yet (src/modules/deductions)
+  statutory_return: screen("payroll", "statutory"), // search:none not built yet (src/modules/statutory)
 
   // Partnerships
-  partner: screen("partnerships", "partners"),
-  partner_deal: screen("partnerships", "pipeline"),
-  lead: screen("partnerships", "leads"),
-  proposal: screen("partnerships", "proposals"),
-  contract: screen("partnerships", "contracts-and-mous"),
-  mou: screen("partnerships", "contracts-and-mous"),
-  agreement: screen("partnerships", "contracts-and-mous"),
+  partner: screen("partnerships", "partners"), // search:none not built yet (src/modules/partners)
+  partner_deal: screen("partnerships", "pipeline"), // search:none not built yet (src/modules/partner_pipeline)
+  lead: screen("partnerships", "leads"), // search:none not built yet (src/modules/leads)
+  proposal: screen("partnerships", "proposals"), // search:none not built yet (src/modules/proposals)
+  contract: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
+  mou: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
+  agreement: screen("partnerships", "contracts-and-mous"), // search:none not built yet (src/modules/agreements)
 
   // Expenses
+  // search:none not built yet (src/modules/expenses)
   expense: {
     ...screen("expenses", "approvals"),
     self: screen("expenses", "my-requests"),
   },
-  requisition: screen("expenses", "requisitions"),
-  disbursement: screen("expenses", "disbursements"),
-  budget: screen("expenses", "budgets"),
-  expense_category: screen("expenses", "categories"),
+  requisition: screen("expenses", "requisitions"), // search:none not built yet (src/modules/requisitions)
+  disbursement: screen("expenses", "disbursements"), // search:none not built yet (src/modules/disbursements)
+  budget: screen("expenses", "budgets"), // search:none not built yet (src/modules/budgets)
+  expense_category: screen("expenses", "categories"), // search:none not built yet (src/modules/expense_categories)
 
   // Knowledge Hub
-  policy: screen("knowledge", "policies"),
-  sop: screen("knowledge", "sops"),
-  faq: screen("knowledge", "faqs"),
-  training_course: screen("knowledge", "training"),
-  knowledge_announcement: screen("knowledge", "announcements"),
+  policy: screen("knowledge", "policies"), // search:none not built yet (src/modules/knowledge)
+  sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge)
+  faq: screen("knowledge", "faqs"), // search:none not built yet (src/modules/knowledge)
+  training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/knowledge)
+  knowledge_announcement: screen("knowledge", "announcements"), // search:none not built yet (src/modules/knowledge)
 
   // Praxis AI
-  ai_conversation: screen("praxis_ai", "history"),
+  ai_conversation: screen("praxis_ai", "history"), // search:none not built yet (src/modules/assistant)
 
   // Settings
   department: screen("settings", "organisation"),
   app_user: screen("settings", "users"),
   // A person's own login, as they see it: sign-ins, sessions, their password.
-  account: screen("ess", "my-security"),
+  account: screen("ess", "my-security"), // search:none a person's own login opens from My Security; logins are found as Users (app_user)
   role: screen("settings", "roles-and-permissions"),
   workflow_definition: screen("settings", "approvals"),
   numbering_scheme: screen("settings", "documents-and-numbering"),
   public_holiday: screen("settings", "organisation"),
-  template: screen("settings", "documents-and-numbering"),
-  integration: screen("settings", "integrations"),
+  template: screen("settings", "documents-and-numbering"), // search:none not built yet (src/modules/templates)
+  integration: screen("settings", "integrations"), // search:none not built yet (src/modules/integrations)
 });
 
 /** "praxis_ai" → "praxis-ai" */

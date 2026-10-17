@@ -12,8 +12,11 @@
  *    saves the default as version 1 the first time it is needed), and
  *  - the shape of every shipped route is reviewed in code, with the gate below.
  *
- * M0 ships one, `test.threshold`, which proves the engine end to end: one stage for
- * every request, a second when the amount is ₦500,000.00 or more.
+ * M0 ships two. `test.threshold` proves the engine end to end: one stage for every
+ * request, a second when the amount is ₦500,000.00 or more. `leave.approval` is the
+ * leave flow (docs/guides/foundation.md §6.5, seeded in 0499): the line manager, then
+ * Operations & People when the request is over 5 days, a number Operations & People
+ * change on Settings, Approvals.
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -48,6 +51,28 @@ const DEFAULTS = Object.freeze({
         name: "CEO",
         approver: { type: "ceo" },
         condition: { field: "amount", op: ">=", value: "500000.00" },
+        sla_hours: 48,
+      },
+    ],
+  },
+  "leave.approval": {
+    key: "leave.approval",
+    module: "people",
+    name: "Leave Request",
+    description: "The line manager, then Operations & People when the request is over 5 days.",
+    context: { days: "number" },
+    stages: [
+      {
+        key: "line_manager",
+        name: "Line Manager",
+        approver: { type: "manager_of_subject" },
+        sla_hours: 48,
+      },
+      {
+        key: "operations_people",
+        name: "Operations & People",
+        approver: { type: "role", value: "operations_people" },
+        condition: { field: "days", op: ">", value: 5 },
         sla_hours: 48,
       },
     ],

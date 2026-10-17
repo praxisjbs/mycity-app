@@ -104,7 +104,9 @@ not say; `docs/guides/foundation.md` §6.9) · `0400` `role_capability` (a capab
 role), `role.two_step_required`, the Audit Log's indexes on `audit_ledger` and live sessions, and the
 `two_step_setup` purpose on `spent_challenge` (`docs/guides/foundation.md` §4, §6.4) · `0449` the
 field visibility of every role and the two capabilities given to Implementation, Operations & People
-and Management (`docs/guides/foundation.md` §6.3).
+and Management (`docs/guides/foundation.md` §6.3) · `0450` `reassign` as a `workflow_decision` (a stage
+given to someone else; `docs/guides/foundation.md` §11) · `0499` the leave flow, `leave.approval` (the
+line manager, then Operations & People over 5 days; §6.5).
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).

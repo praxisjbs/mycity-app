@@ -9,6 +9,7 @@ import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { PagedTable } from "@/features/shared/sections";
 import { hrefFor, useRouter } from "@/lib/router";
+import { useUrlAction } from "@/shell/screen-action";
 import {
   Button,
   Card,
@@ -92,6 +93,8 @@ export function MySecurityPage() {
   const modal = useModal();
   const confirm = useConfirm();
   const { navigate } = useRouter();
+  const changePassword = () => modal.open({ title: "Change Password", body: (close) => <PasswordForm close={close} /> });
+  useUrlAction("password", summary.data ? changePassword : null);
   const failed = summary.error ?? ways.error;
   if (failed) return <ErrorState error={failed} onRetry={() => (summary.reload(), ways.reload())} />;
   if (!summary.data || !ways.data) return <LoadingRows count={6} />;
@@ -120,7 +123,7 @@ export function MySecurityPage() {
     <Card>
       <CardHeader title="Password" />
       <p className="text-sm text-muted-foreground">{s.password_changed_at ? `Changed ${formatDate(s.password_changed_at)}` : "Not changed yet"}</p>
-      <Button className="mt-3" icon="lock" onClick={() => modal.open({ title: "Change Password", body: (close) => <PasswordForm close={close} /> })}>
+      <Button className="mt-3" icon="lock" onClick={changePassword}>
         Change Password
       </Button>
     </Card>
@@ -482,15 +485,16 @@ function PinCard() {
   const fresh = useFreshSignIn();
   const remove = useMutation("POST /api/v1/security/pin/remove");
   const p = ways.data?.pin;
-  if (!p) return <Card><LoadingRows count={2} /></Card>;
-
   const set = async () => {
     try {
-      if (await fresh.ensure()) modal.open({ title: p.on ? "Change PIN" : "Set PIN", body: (close) => <PinForm close={close} /> });
+      if (await fresh.ensure()) modal.open({ title: p?.on ? "Change PIN" : "Set PIN", body: (close) => <PinForm close={close} /> });
     } catch (e) {
       say(e);
     }
   };
+  useUrlAction("pin", p ? () => void set() : null);
+  if (!p) return <Card><LoadingRows count={2} /></Card>;
+
   const drop = async () => {
     if (!(await confirm({ title: "Remove PIN", body: "Your PIN will no longer unlock the app.", confirmLabel: "Remove PIN", destructive: true }))) return;
     try {

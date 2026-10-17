@@ -1,9 +1,13 @@
 "use strict";
 /**
- * ⌘K's record search: one term, every module that answers for it, and only what this
- * person may open (MILESTONES §15: "⌘K finds every page, tab and record the user may
- * open, and nothing they may not"). Pages and tabs are the staff app's own registry;
- * this is the records half.
+ * ⌘K: one term, every screen, action and record that answers for it, and only what
+ * this person may open (MILESTONES §15: "⌘K finds every page, tab and record the user
+ * may open, and nothing they may not"). `everything()` is GET /search; `search()` is the
+ * records half, every module's provider.
+ *
+ * Screens and actions are catalogues (shared/search/screens.js, actions.js), matched in
+ * memory against the name, the synonyms and the module, and shown when the shell would
+ * show them to this person. Records are the providers below.
  *
  *   const r = await searchService.search(pool, req.user, { q: "ada", page: 1 });
  *   // → { q: "ada", hint: null, groups: [{ type, module, label, page, items: [...] }] }
@@ -25,7 +29,13 @@
  */
 const { logger } = require("../../config/logger");
 const { atomically } = require("../db/tx");
+const { pageOf, envelope, PAGE_SIZE } = require("../http/paged");
+const catalog = require("../access/access.catalog");
+const grantsCache = require("../rbac/grants-cache");
+const routeMap = require("../route-map");
 const registry = require("./registry");
+const { SCREENS, tabVisible } = require("./screens");
+const { ACTIONS, linkOf } = require("./actions");
 
 const MIN_TERM = 2;
 const MAX_TERM = 80;
@@ -132,4 +142,183 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
   return out;
 }
 
-module.exports = { search, typeHint, trigramReady, MIN_TERM };
+/* ------------------------------------------------------------------ *
+ * Screens and actions: the staff app's own catalogues, answered in memory
+ * ------------------------------------------------------------------ */
+
+/** Lower case, accents off, "&" as "and", punctuation as spaces: "Roles & Permissions" → "roles and permissions". */
+function fold(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * How well an entry answers the term: 0 (not at all) to 5 (its name). Every word typed
+ * must appear in the name, a synonym or the module's name; the name beats a synonym,
+ * and a start beats a middle.
+ * @param {{title: string, words: readonly string[], context: string}} entry
+ * @param {string} term  folded
+ */
+function rankOf(entry, term) {
+  if (!term) return 1;
+  const title = fold(entry.title);
+  const words = entry.words.map(fold);
+  const hay = [title, ...words, fold(entry.context)];
+  if (!term.split(" ").every((part) => hay.some((h) => h.includes(part)))) return 0;
+  if (title === term) return 5;
+  if (title.startsWith(term)) return 4;
+  if (words.includes(term)) return 3;
+  if (hay.some((h) => h.startsWith(term) || h.includes(` ${term}`))) return 2;
+  return 1;
+}
+
+/** The matches of a catalogue, best first and then in catalogue order, one page of 25. */
+function pageOfMatches(entries, term, page) {
+  const ranked = entries
+    .map((e, i) => ({ e, i, rank: rankOf(e, term) }))
+    .filter((x) => x.rank > 0)
+    .sort((x, y) => y.rank - x.rank || x.i - y.i);
+  const { number, offset } = pageOf({ page });
+  return envelope(
+    ranked.slice(offset, offset + PAGE_SIZE).map((x) => x.e.hit),
+    number,
+    ranked.length,
+  );
+}
+
+/**
+ * What the shell would show this person: their actions per module (as /auth/me gives
+ * them) and whether anyone reports to them.
+ * @returns {Promise<{grants: Record<string, string[]>, is_ceo: boolean, manages_people: boolean}>}
+ */
+async function readerOf(db, user) {
+  const grants = {};
+  for (const module of catalog.MODULES) {
+    if (user.is_ceo === true) {
+      grants[module] = [...catalog.ACTIONS];
+      continue;
+    }
+    const rows = await grantsCache.getGrants(db, { role_ids: user.role_ids || [], module });
+    const actions = catalog.ACTIONS.filter((a) => rows.some((r) => r[`can_${a}`] === true));
+    if (actions.length) grants[module] = actions;
+  }
+  let managesPeople = false;
+  if (user.employee_id) {
+    const { rows } = await db.query(
+      `SELECT EXISTS (SELECT 1 FROM employee r
+                       WHERE r.line_manager_id = $1 AND r.status = 'active') AS manages`,
+      [user.employee_id],
+    );
+    managesPeople = Boolean(rows[0] && rows[0].manages);
+  }
+  return { grants, is_ceo: user.is_ceo === true, manages_people: managesPeople };
+}
+
+const tabLabel = (module, tab) => {
+  const found = SCREENS.find((x) => x.module === module && x.tab === tab);
+  return found ? found.label : null;
+};
+
+/** The screens this reader may open, as catalogue entries carrying their result. */
+function screenEntries(reader) {
+  return SCREENS.filter((x) => tabVisible(x, reader)).map((x) => {
+    const moduleLabel = catalog.MODULE_META[x.module].label;
+    return {
+      title: x.label,
+      words: x.words,
+      context: moduleLabel,
+      hit: {
+        id: `${x.module}.${x.tab}`,
+        kind: "screen",
+        type: "screen",
+        title: x.label,
+        sub: moduleLabel,
+        ref: null,
+        status: null,
+        link: routeMap.screenPath(x.module, x.tab),
+        run: null,
+      },
+    };
+  });
+}
+
+/** The actions this reader may take, as catalogue entries carrying their result. */
+function actionEntries(reader) {
+  const can = ([module, action]) => (reader.grants[module] || []).includes(action);
+  return ACTIONS.filter(
+    (x) => (!x.need || can(x.need)) && (!x.module || tabVisible({ module: x.module, tab: x.tab }, reader)),
+  ).map((x) => {
+    const where = x.module ? tabLabel(x.module, x.tab) : null;
+    return {
+      title: x.label,
+      words: x.words,
+      context: where || "",
+      hit: {
+        id: x.key,
+        kind: "action",
+        type: "action",
+        title: x.label,
+        sub: where,
+        ref: null,
+        status: null,
+        link: linkOf(x),
+        run: x.run,
+      },
+    };
+  });
+}
+
+/**
+ * ⌘K: screens, actions and every module's records, each group a page of 25, only what
+ * the reader may open. `type` keeps one group ("screen", "action" or a record type), to
+ * page through it. A type word ("staff ada") narrows the records to that type.
+ *
+ *   await searchService.everything(pool, req.user, { q: "leave", page: 1 })
+ *   // → { q: "leave", hint: null, groups: [{ kind: "screen", ... }, { kind: "action", ... }, ...] }
+ *
+ * @param {import("pg").Pool} db
+ * @param {object} user  req.user
+ * @param {{q?: string, type?: string, page?: number}} query
+ */
+async function everything(db, user, { q = "", type = null, page = 1 } = {}) {
+  const line = String(q || "").replace(/\s+/g, " ").trim().slice(0, MAX_TERM);
+  const records =
+    type === "screen" || type === "action"
+      ? { q: line, hint: null, groups: [] }
+      : await search(db, user, { q: line, types: type ? [type] : null, page });
+  const groups = [];
+  if (!type || type === "screen" || type === "action") {
+    // The whole line: a type word narrows the records, never the screens and actions
+    // ("staff sheet" is Import Staff as well as imports of a staff sheet).
+    const reader = await readerOf(db, user);
+    const term = fold(line);
+    const kinds = [
+      ["screen", "Screens", screenEntries],
+      ["action", "Actions", actionEntries],
+    ];
+    for (const [kind, label, entries] of kinds) {
+      if (type && type !== kind) continue;
+      const result = pageOfMatches(entries(reader), term, page);
+      if (result.data.length)
+        groups.push({ kind, type: kind, label, module: null, page: result.page, items: result.data });
+    }
+  }
+  for (const g of records.groups) {
+    groups.push({
+      kind: "record",
+      type: g.type,
+      label: g.label,
+      module: g.module,
+      page: g.page,
+      items: g.items.map((item) => ({ ...item, title: item.title || item.ref || item.id, kind: "record", run: null })),
+    });
+  }
+  return { q: records.q, hint: records.hint, groups };
+}
+
+module.exports = { search, everything, readerOf, rankOf, fold, typeHint, trigramReady, MIN_TERM };

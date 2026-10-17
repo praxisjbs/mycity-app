@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 10 | 4 | 0 | 6 | 0 | 0 |
+| M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **81** | **0** | **12** | **0** | **0** |
+| **Total** | **93** | **80** | **0** | **13** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -75,7 +75,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☑ | 14/10/2026 |
 | M0 migrations and reference seed 0001 to 0099 | LA | ☑ | 16/10/2026 |
 | Staging seed data | LA | ☐ | |
-| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE · TB | ☐ | 17/10/2026 |
+| Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE · TB | ☑ | 17/10/2026 |
 | Sign-in and sessions: `identity`, `access`, `users`; session rules, lock screen, credential links, the seven roles, the four-city sign-in screen (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | Two-step sign-in, passkeys and the PIN: the `security` module, the code step, PIN and passkey sign-in, the lock screen's PIN and passkey, the fresh-sign-in window, Reset Two-Step (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
@@ -97,6 +97,18 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · Track D of `docs/guides/foundation.md` built: the `workflow` module's routes (My
+  Approvals and `/workflow/mine/count` for Home's Waiting on You, one request with its route and
+  decisions, approve, reject and request changes with a reason, withdraw, and reassign from the guide's
+  §11, migration `0450`), the leave flow `leave.approval` seeded in `0499` (the line manager, then
+  Operations & People over 5 days), and ⌘K search on `GET /search` in a new `search` module: screens
+  with synonyms, actions (each screen's New action: Add Employee, Start Import, Invite User, New Role,
+  New Holiday, Add Role; and Import Staff, Clock In, Request Leave, Change Password, Set PIN, Mark All Read) and every module's records, each group 25 a
+  page by the reader's grants. The search coverage gate now fails a route-map screen, an `ENTITY_ROUTES`
+  type or a `useScreenAction` label that search cannot reach, unless it carries `search:none <reason>`;
+  65 types not built yet carry `not built yet (src/modules/<m>)`, which fails once that module is built.
+  `useScreenAction` no longer re-registers on every render (an inline `onSelect` looped). Left: the nine
+  modules row, ticked with this merge now that tracks A, B and C are in.
 - 17/10/2026 · TB · Foundation track A (`docs/guides/foundation.md` §1.1): the `organisation`
   module on the real API, the staff importer, and MyCity's real staff loaded by every deploy.
   Backend: the register at 25 with search, filters and server sort, the employee 360 masked per
@@ -693,7 +705,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 72 | Approvals | `approvals` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 74 | Notifications | `notifications` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
@@ -705,6 +717,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · Approvals (#72) built on the real API, track D of `docs/guides/foundation.md`: the
+  flows (25 a page, with search), their KPIs (Flows, Open Requests, Overdue, Needs Fixing), a flow's
+  route and stages in a side panel, and Edit Stages: change a stage's approver, when it applies and its
+  time limit, add, remove and reorder stages, Save Stages as the next version (open requests keep
+  theirs; a stale version is refused). Desktop table and side panel; phone cards and full sheets. Left:
+  `3099`'s consequence flow shows Needs Fixing until M3 seeds a valid one.
 - 17/10/2026 · TB · Organisation (#69), Roles & Permissions (#71), Documents & Numbering (#76),
   Security (#78) and Audit Log (#79) built on the real API, track C of `docs/guides/foundation.md`,
   desktop and phone; the mock follows the same paths and contract shapes. Organisation: the company

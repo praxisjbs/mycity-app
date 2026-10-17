@@ -14,6 +14,7 @@ const FILES = [
   "app/src/shell/catalogue.ts",
   "app/src/shell/screens.tsx",
   "src/shared/route-map.js",
+  "src/shared/search/screens.js",
   "app/src/shell/coming-soon.ts",
   "docs/PROGRESS.md",
   "scripts/check/progress.js",
@@ -45,6 +46,7 @@ describe("new:screen", () => {
     write(p);
     expect(read("app/src/shell/catalogue.ts")).toContain('t("Worksites", "worksites"), t("Work Patterns", "work-patterns")]');
     expect(read("src/shared/route-map.js")).toContain('"organogram", "work-patterns"]');
+    expect(read("src/shared/search/screens.js")).toContain('  s("people", "work-patterns", "Work Patterns", []),\n  // new:screen adds screens above this line');
     expect(read("app/src/features/people/WorkPatterns.tsx")).toContain('<PageHeader title="Work Patterns" />');
     expect(read("app/src/features/people/index.tsx")).toMatch(/import \{ WorkPatterns \} from "\.\/WorkPatterns";[\s\S]*case "work-patterns":\n\s+return <WorkPatterns \/>;\n\s+default:/);
     expect(read("app/src/shell/coming-soon.ts")).toContain('"people/work-patterns": [],');

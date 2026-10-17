@@ -81,8 +81,8 @@ These finish M0 and no prompt can do them:
 | Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Every numbering scheme with its next number, editable. No other document setting is specified yet |
 | Settings · Security (#78) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
 | Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export by email, values masked per reader |
-| Settings · Approvals (#72) | Settings | `settings` edit | D | Mock | Every approval flow and its stages, editable as new versions |
-| ⌘K Search | Everywhere | Everyone, by permission | D | Mock (INTERIM) | Screens, actions, employees, logins, departments; each later module adds its own |
+| Settings · Approvals (#72) | Settings | `settings` view; edit to change | D | **Built** (17/10/2026) | Every flow, its stages and version; Edit Stages saves a new version |
+| ⌘K Search | Everywhere | Everyone, by permission | D | **Built** (17/10/2026) | Screens with synonyms, actions, and every module's records (employees, logins, departments, roles, numbering, holidays, approval flows, imports), 25 a group |
 | Settings · Integrations (#77), Appearance (#75), Notifications (#74), Attendance Policy (#73) | Settings | | none | Mock | Coming Soon (#74 is M6; #73 is LA's attendance) |
 
 ## 3 · How the screens relate
@@ -197,10 +197,22 @@ employee is (`/employees/:id/documents`) while `src/modules/organisation/` is tr
 matrix, the masks and the capabilities cannot disagree half way through a save. The role picker on
 Users keeps `GET /access/roles`.
 
-**Track D · `workflow` and search**: `GET /workflow/mine` (waiting on me), `/workflow/mine/count`,
-`GET /workflow/instances/:id`, `POST /workflow/instances/:id/approve`, `/reject`,
-`/request-changes`, `/withdraw`; `GET /settings/approvals`, `/approvals/summary`,
-`PUT /settings/approvals/:id/steps` (saves a new version); `GET /search` (25 a page, grouped).
+**Track D · `workflow` and search** (built 17/10/2026)
+
+| Route | Permission |
+|---|---|
+| `GET /workflow/mine` (waiting on me; `module_key` filter), `/workflow/mine/count` (`waiting`, `overdue`) | the caller's own: the requests whose current stage names them, in modules where they hold `approve` |
+| `GET /workflow/instances/:id` (the route, the decisions, `can_decide`, `can_withdraw`, `can_reassign`) | whoever opened it, the employee it is about, the people its stage names, anyone who decided on it, or `view` on its module within scope; anyone else a 404 |
+| `POST /workflow/instances/:id/approve` (optional note), `/reject`, `/request-changes` (a reason, required) | named on the current stage, and `approve` on the request's module (§8) |
+| `POST /workflow/instances/:id/withdraw` | the requester, or the CEO |
+| `POST /workflow/instances/:id/reassign` (one login and a reason) | `approve` with scope `all` on the request's module (§11) |
+| `GET /settings/approvals` (the active version of each flow, 25 a page), `/approvals/summary` | `settings` view |
+| `PUT /settings/approvals/:id/steps` (`:id` is the version on screen; saves the next version) | `settings` edit |
+| `GET /search` (`q`, `page`, `type` to page one group) | everyone signed in; each group by the reader's own grants |
+
+The `workflow` module mounts at the API root, because its halves live under `/workflow` and
+`/settings/approvals`. `GET /search` lives in a module of its own, `search`, because routes are found
+only under `src/modules/`; the work is `shared/search`.
 
 ## 6 · Rules and calculations
 
@@ -303,6 +315,26 @@ a new version; open requests keep the version they started on. No drag-and-drop 
 flow: line manager, then Operations & People when the request is over the number of days the flow
 sets.
 
+As built (17/10/2026):
+
+- **The leave flow** is `leave.approval` (module `people`, context `days`), seeded in `0499` and in
+  `shared/workflow/definitions.js` DEFAULTS: stage `line_manager` (the subject's line manager, 48 hours),
+  then `operations_people` (the role, 48 hours) when `days > 5`. A subject with no line manager goes
+  to the CEO (the engine's rule). The leave module (M1) opens it with `{ days }`.
+- **Editing** changes a stage's name, its approver (Line Manager, a role, one login, or the CEO), when
+  it applies (Always, or one comparison on a number the flow carries: Over, At Least, Under, At Most,
+  Exactly) and its time limit in hours; stages are added, removed and moved up or down. Save Stages
+  writes the whole list as the next version. The flow's key, name, values and the timeout, approve and
+  reject behaviour of each stage are the code's and are kept as they are.
+- A save is refused when the version on screen is no longer the active one (409: someone saved first),
+  when a stage names a role or a login that does not exist, or when the engine's rules refuse the
+  route (422 naming the problem). Each save is the event `workflow.definition_saved`, so the Audit Log
+  shows the stages before and after.
+- A flow stored before the rules (`3099`'s `employee_consequence`) is listed with Needs Fixing, and
+  saving it is refused until every stage is valid.
+- **Who decides**: the people the current stage names, and only while they hold `approve` on the
+  request's module; nobody decides their own request (the CEO excepted, who may decide any stage).
+
 ### 6.6 The org tree
 
 Org Chart and Organogram read the whole tree in one `completeQuery()` with a ceiling of 2,000 people
@@ -317,6 +349,29 @@ each by the reader's permissions, 25 a page grouped by kind. **Every new screen,
 type must be searchable**: the search coverage gate (track D) fails a screen in the route map, an
 entity type in `ENTITY_ROUTES` or a screen's New action that search cannot reach, unless it carries
 a written `search:none <reason>`. CLAUDE.md says so.
+
+As built (17/10/2026):
+
+- `GET /search` answers in groups, each the first page of 25: **Screens** (every tab of the staff app by
+  its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
+  Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
+  Set PIN, Mark All Read), then one group per kind of record from each `<module>.search.js` (Employees,
+  Departments, Users, Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's). With nothing typed it offers the screens and actions; `type`
+  pages through one group.
+- A screen or an action is offered only when the shell would show its tab to the reader
+  (`shared/search/screens.js` mirrors `app/src/shell/access.ts`) and they hold the grant it needs. A
+  record group runs only for a reader with `view` on its module, within their scope.
+- A type word at either end of the line ("login halima", "staff ada") narrows the records to that
+  type; the screens and actions are still matched on the whole line.
+- An action opens its screen asked to start it: `?action=new` runs the screen's New action
+  (`useScreenAction`), another word runs what the screen names with `useUrlAction` (`password`, `pin`),
+  and `?importer=employees` opens the Import wizard. Clock In and Mark All Read run in the app itself.
+- **The gate** (`scripts/check/search-coverage.js`): every screen in the route map has a search entry
+  whose label equals the shell's; every entity type in `ENTITY_ROUTES` is declared by a provider or its
+  line carries `// search:none <reason>`; every `useScreenAction({ label })` in the app is an action in
+  `shared/search/actions.js`. A type marked `not built yet (src/modules/<m>)` fails once that module has a
+  controller and a repo, and a marker on a type a provider declares fails as stale. `npm run new:screen`
+  adds the new screen's search entry.
 
 ### 6.8 Settings screens not in this guide
 
@@ -355,6 +410,8 @@ deleted, so the ask stays on the record.
 | `settings.changed` (organisation, working week, holidays, numbering) | C | Audit only; the working week and holidays clear the calendar cache |
 | `audit.export_requested` | C | `audit.send_export` builds the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked), files it in the vault and emails it to them |
 | The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
+| `workflow.definition_saved` | D | Audit only (the stages before and after) |
+| `workflow.reassigned` | D | The new approver is told; the stage's time limit starts again |
 
 ## 8 · Permissions and visibility by role
 
@@ -364,6 +421,10 @@ deleted, so the ask stays on the record.
   (`LOCKOUT`); the CEO is exempt. A built-in role keeps its name and cannot be deleted; a role somebody
   holds cannot be deleted either.
 - `ess` own: My Documents and the Org Chart.
+- Approvals: a request is decided by the people its current stage names who also hold `approve` on its
+  module (the CEO decides anywhere); a line manager named by the leave flow therefore needs `people`
+  approve, which the Line Manager, Head of Department, Management and Operations & People roles hold.
+  My Approvals lists only what the caller can decide.
 - Field masks (`shared/rbac/field-mask.js`) apply to every response, export, import preview and AI
   read: salary, bank and personal details per §6.3.
 - The roster loader and the deploy step act as the system, never as a person.
@@ -403,8 +464,8 @@ screen.
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
 | Settings · Audit Log | Today, This Week, This Month, Sensitive; who, what, record, module, when; Module and Dates filters, search; an entry opens its fields before and after with Open Record; Entries by Module; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
-| Settings · Approvals | Flows, their stages, version; Edit Stages, Save | Help term on a stage condition | Versioning of open requests: §6.5 |
-| ⌘K Search | Results grouped Screens, Actions, People, Logins, Departments | None | The coverage gate: §6.7 |
+| Settings · Approvals | Flows, Open Requests, Overdue, Needs Fixing; the flows (Flow, Stages, Version, Open Requests, Status); a flow's route and each stage's Approver, Applies When, Time Limit; Edit Stages, then per stage Move Up, Move Down, Edit, Remove, Add Stage, Save Stages; a stage's Stage Name, Approver, Role or Person, Applies When, Comparison and value, Time Limit, Hours | Help term on Applies When | Versioning of open requests, who decides: §6.5 |
+| ⌘K Search | Results grouped Screens, Actions, then each kind of record (Employees, Departments, Users, Roles, Numbering, Holidays, Approval Flows, Imports) | None | The coverage gate: §6.7 |
 
 ### 10.2 Phone layout
 
@@ -419,6 +480,7 @@ screen.
 | Settings · Documents & Numbering (#76) | Counts as cards, then document cards: next number, when it starts again | Prefix and Issued columns | A card opens its scheme in a sheet | More, Settings |
 | Settings · Security | Counts as cards, the three rules, two-step by role as switches | Method and address of a session, the person and address of a failed sign-in | Save Rules, full width | More, Settings |
 | Settings · Audit Log | Entry cards: who, what, when | Export, Entries by Module, the Module column | Filter in a sheet | More, Settings |
+| Settings · Approvals | KPI cards two to a row, then flow cards (name, stages, version, open requests) | The Status column | Edit Stages in the flow's full sheet; Save Stages full width | More, Settings |
 | ⌘K Search | Full-screen search with grouped results | None | Tap a result | The search bar in More and the top bar |
 
 ## 11 · Edge cases
@@ -431,7 +493,10 @@ screen.
 - A role removed from a person on screen: the next deploy does not add it back (roles apply only when
   the login is created).
 - An approver who leaves: open stages keep their resolved approvers; Operations & People can
-  reassign (D).
+  reassign (D). Built 17/10/2026: `POST /workflow/instances/:id/reassign` gives the current stage to one
+  login who holds `approve` on the module (never the requester), writes a `reassign` decision with the
+  reason (`0450`), starts the time limit again and tells them.
+- Two people editing one flow: the second save is refused (409) and they open it again.
 - A security rule set looser than the floor: refused with the floor named. An idle lock longer than
   the session: refused, "Within the session length".
 - A role change that would leave the person saving it without Settings: refused (`LOCKOUT`).
@@ -464,11 +529,18 @@ screen.
   `app/src/features/people/EmployeeDetails.tsx` and nothing links to them until then.
 - The leave flow's day threshold for the second stage: Operations & People decide on screen; the
   seed sets 5 days until they do.
-- Home's Waiting on You card: D provides the count; Home wires it when its API lands (TB, M1).
+- Home's Waiting on You card: D provides the count (`GET /workflow/mine/count`, built); Home wires it
+  when its API lands (TB, M1).
 - The sign-in screen's drawings or licensed photographs: TB (`identity.md` §13).
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · Track D built: the `workflow` routes (My Approvals and its count, one request,
+  approve, reject, request changes, withdraw, and reassign from §11 with `0450`), Settings · Approvals
+  (#72) on the real API (flows edited as new versions), the leave flow in `0499` (line manager, then
+  Operations & People over 5 days), and ⌘K search on `GET /search` (screens with synonyms, actions,
+  every module's records); the search coverage gate now holds screens, entity types and New actions.
+  §2, §5, §6.5, §6.7, §7, §8, §10 and §11 say what was built.
 - 17/10/2026 · TB · Track A built: the `organisation` module on the real API (the register, the
   employee 360, departments, vacant seats, reporting lines and the bounded tree), the staff importer,
   the roster loader that every deploy runs on staging and production, the staging seed, and People ·
