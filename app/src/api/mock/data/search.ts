@@ -27,6 +27,11 @@ const ACTIONS: Array<{ hit: SearchHit; need: [string, string] | null; words: str
   { hit: hit({ id: "add_employee", kind: "action", type: "action", title: "Add Employee", sub: "Employees", link: "/people?tab=employees&action=new" }), need: ["people", "create"], words: "new staff hire" },
   { hit: hit({ id: "invite_user", kind: "action", type: "action", title: "Invite User", sub: "Users", link: "/settings?tab=users&action=new" }), need: ["settings", "create"], words: "invite login" },
   { hit: hit({ id: "start_import", kind: "action", type: "action", title: "Start Import", sub: "Imports", link: "/settings?tab=imports&action=new" }), need: ["settings", "view"], words: "import upload spreadsheet" },
+  { hit: hit({ id: "theme_dark", kind: "action", type: "action", title: "Use Dark Theme", run: "theme_dark" }), need: null, words: "dark mode night" },
+  { hit: hit({ id: "theme_light", kind: "action", type: "action", title: "Use Light Theme", run: "theme_light" }), need: null, words: "light mode day" },
+  { hit: hit({ id: "density", kind: "action", type: "action", title: "Change Density", run: "density" }), need: null, words: "compact comfortable spacing" },
+  { hit: hit({ id: "install_app", kind: "action", type: "action", title: "Install App", run: "install" }), need: null, words: "install home screen" },
+  { hit: hit({ id: "sign_out", kind: "action", type: "action", title: "Sign Out", run: "sign_out" }), need: null, words: "log out logout" },
 ];
 
 function group(kind: SearchGroup["kind"], type: string, label: string, items: SearchHit[], page: number): SearchGroup | null {

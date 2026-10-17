@@ -103,6 +103,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   starts Release from `main` with it, and an `approver` job in `release.yml` and `rollback.yml`
   refuses anyone else (SYSTEM_ARCHITECTURE §9.3, deploy runbook §2). Left: TB sets the production
   environment to Selected branches `main`; the server-side approval if the repository stays private.
+- 17/10/2026 · TB · ⌘K additions (`docs/guides/foundation.md` §6.7): Waiting on You first with nothing
+  typed (the requests waiting on the reader, opening the record each is about), open seats (opening
+  the Organogram focused on the seat), preferred and middle names, Use Dark Theme, Use Light Theme,
+  Change Density, Install App and Sign Out as actions the app runs, and one forgiven slip in screens
+  and actions. Left: nothing.
 - 17/10/2026 · TB · Track D of `docs/guides/foundation.md` built: the `workflow` module's routes (My
   Approvals and `/workflow/mine/count` for Home's Waiting on You, one request with its route and
   decisions, approve, reject and request changes with a reason, withdraw, and reassign from the guide's
@@ -160,6 +165,10 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   process and download; a direct `/media/vault/...` request is a JSON 404; a letter template
   generates a numbered, hashed, locked PDF that only its readers can fetch. Left for the row above:
   the staff importer and the real sheet on staging, which are track A's.
+- 17/10/2026 · TB · Sign-in made luxurious on both shells (TB: slight glassmorphism, motion on
+  the phone too): smoked glass for the form and the desktop's city dock, film grain, darkened
+  edges, rising points of city light, the city's name arriving out of focus and a ticking colon.
+  The phone now drifts, glows and crossfades like desktop. Left: nothing.
 - 17/10/2026 · TB · Sign-in: four more cities (Johannesburg, Rabat, Abidjan, Douala; TB's images),
   eight in turn, each photograph fetched only when its city is shown or next. The phone sign-in is
   redesigned: a still portrait crop of the photograph at the top, the brand and a glass clock on it,

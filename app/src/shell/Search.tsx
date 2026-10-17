@@ -1,32 +1,52 @@
 import { useEffect, useState } from "react";
-import { CommandPalette, toast, type IconName, type PaletteResult } from "@mycity/ui";
+import { CommandPalette, toast, useDensity, useTheme, type IconName, type PaletteResult } from "@mycity/ui";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi } from "@/api/hooks";
 import type { SearchHit } from "@mycity/contract/contract.gen.ts";
+import { useAuth } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
 import { useRouter } from "@/lib/router";
+import { useInstallApp } from "./Notices";
+import { usePwa } from "./pwa";
 
 /**
  * Search, everywhere in the staff app: ⌘K or Ctrl K, the top bar's search
  * button, the phone's search icon and More's search bar (docs/guides/foundation.md
  * §6.7). GET /api/v1/search answers in groups, Screens, Actions and each kind of
  * record, each the first page of 25 and only what this person may open; the
- * server decides that. With nothing typed it offers the screens and actions.
+ * server decides that. With nothing typed it offers what waits on the person
+ * (Waiting on You, first), then the screens and actions.
  *
  * A result opens its link. An action with no screen of its own the app runs
- * here: Clock In or Out opens the clock, Mark All Read clears the bell.
+ * here: Clock In or Out opens the clock, Mark All Read clears the bell, and the
+ * theme, density, Install App and Sign Out do what the account menu does.
+ * Install App is left out where this browser cannot install.
  */
-const ICONS: Record<string, IconName> = { app_user: "user", employee: "user", department: "users", workflow_definition: "check", import_batch: "rows" };
+const ICONS: Record<string, IconName> = {
+  app_user: "user",
+  employee: "user",
+  department: "users",
+  org_seat: "addbox",
+  approval: "check",
+  workflow_definition: "check",
+  import_batch: "rows",
+};
+const RUN_ICONS: Record<string, IconName> = { clock: "clock", read_all: "bell", theme_dark: "moon", theme_light: "sun", density: "rows", install: "download", sign_out: "logout" };
 
 function iconOf(hit: SearchHit): IconName {
   if (hit.kind === "screen") return "right";
-  if (hit.kind === "action") return hit.run === "clock" ? "clock" : hit.run === "read_all" ? "bell" : "plus";
+  if (hit.kind === "action") return (hit.run && RUN_ICONS[hit.run]) || "plus";
   return ICONS[hit.type] ?? "doc";
 }
 
 export function Search({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { navigate } = useRouter();
   const clock = useClock();
+  const { setTheme } = useTheme();
+  const density = useDensity();
+  const { canInstall } = usePwa();
+  const installApp = useInstallApp();
+  const { signOut } = useAuth();
   const [line, setLine] = useState("");
   const [q, setQ] = useState("");
   useEffect(() => {
@@ -37,7 +57,7 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
 
   const hits = new Map<string, SearchHit>();
   const results: PaletteResult[] = (res.data?.groups ?? []).flatMap((g) =>
-    g.items.map((hit) => {
+    g.items.filter((hit) => hit.run !== "install" || canInstall).map((hit) => {
       const key = `${g.type}:${hit.id}`;
       hits.set(key, hit);
       return { key, group: g.label, title: hit.title, subtitle: hit.sub ?? hit.ref ?? undefined, icon: iconOf(hit), href: hit.link ?? "" };
@@ -47,6 +67,11 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
   const choose = async (r: PaletteResult) => {
     const hit = hits.get(r.key);
     if (hit?.run === "clock") return clock.open();
+    if (hit?.run === "theme_dark") return setTheme("dark");
+    if (hit?.run === "theme_light") return setTheme("light");
+    if (hit?.run === "density") return density.toggle();
+    if (hit?.run === "install") return installApp();
+    if (hit?.run === "sign_out") return void signOut();
     if (hit?.run === "read_all") {
       try {
         await api.call("POST /api/v1/notifications/read-all", { body: {} });

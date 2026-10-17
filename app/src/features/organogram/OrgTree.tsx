@@ -39,7 +39,11 @@ import {
  * On a phone it is not the tree shrunk but a focus view (§10.2): who the focused person
  * reports to, the person, and their direct reports, each a tap away.
  */
-export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
+/**
+ * `openId`: a node to open on (a search result for an open seat, `?id=` in the address):
+ * the phone focuses it, the desktop tree marks it as the search box marks a match.
+ */
+export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; openId?: string | null }) {
   const builder = mode === "builder";
   const phone = useIsPhone();
   const me = useMe();
@@ -62,6 +66,12 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
 
   const nodes = useMemo(() => data?.nodes ?? [], [data]);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.node_id, n])), [nodes]);
+  const opened = openId ? byId.get(openId) : undefined;
+  useEffect(() => {
+    if (!opened) return;
+    setFocus(opened.node_id);
+    setQ(opened.display_name);
+  }, [opened]);
   const children = useMemo(() => {
     const m = new Map<string | null, OrgNode[]>();
     for (const n of nodes) m.set(n.manager_node_id, [...(m.get(n.manager_node_id) ?? []), n]);
@@ -117,7 +127,7 @@ export function OrgTree({ mode }: { mode: "builder" | "viewer" }) {
   const card = (n: OrgNode) => {
     if (n.vacant)
       return (
-        <div className="og-card relative w-44 rounded-card border border-dashed border-input bg-transparent px-3 py-2.5 text-center">
+        <div className={cn("og-card relative w-44 rounded-card border border-dashed border-input bg-transparent px-3 py-2.5 text-center", hit(n) && "border-ring ring-2 ring-accent")}>
           <span className="mx-auto mb-2 flex size-10.5 items-center justify-center rounded-full border border-dashed border-input bg-muted text-subtle-foreground">
             <Icon name="plus" />
           </span>

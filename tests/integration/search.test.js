@@ -17,7 +17,9 @@ const { atomically } = require("../../src/shared/db/tx");
 const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
+const crypto = require("node:crypto");
 const outbox = require("../../src/shared/events/outbox");
+const engine = require("../../src/shared/workflow/engine");
 const { SCREENS } = require("../../src/shared/search/screens");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -35,6 +37,7 @@ async function tx(fn) {
 describeDb("⌘K search against the real migrations", () => {
   let app;
   const tokens = {};
+  const people = {};
 
   /** GET /search as one person, the body checked against the contract. */
   async function search(who, query = {}) {
@@ -60,13 +63,13 @@ describeDb("⌘K search against the real migrations", () => {
       employment_type: "full_time",
       work_pattern: "hybrid",
     });
-    const people = [
+    const roster = [
       ["ops", "Halima", "Garba", "operations_people", "Operations Lead", "08031234567"],
       ["staff", "Obinna", "Eke", "employee", "Field Officer", "0809 765 4321"],
     ];
     let ip = 0;
-    for (const [key, first, last, role, job, phone] of people) {
-      await tx((client) =>
+    for (const [key, first, last, role, job, phone] of roster) {
+      people[key] = await tx((client) =>
         createAdmin(client, { employee: sample(first, last, `${key}@mycity.test`, job, phone), role_code: role, is_ceo: false }, PASSWORD, {
           allowAdditional: true,
         }),
@@ -159,6 +162,68 @@ describeDb("⌘K search against the real migrations", () => {
     expect(halima[0].link).toMatch(/^\/people\?tab=employees&id=/);
     // Staff hold no people grant: a number finds nobody for them.
     expect(group(await search("staff", { q: "0803 123 4567" }), "employee")).toBeUndefined();
+  });
+
+  test("an employee is found by the name they go by, and by a middle name", async () => {
+    await pool.query("UPDATE employee SET preferred_name = 'Lima', middle_name = 'Zainab' WHERE employee_id = $1", [
+      people.ops.employee.employee_id,
+    ]);
+    expect(titles(await search("ops", { q: "lima" }), "employee")).toEqual(["Halima Garba"]);
+    expect(titles(await search("ops", { q: "zainab" }), "employee")).toEqual(["Halima Garba"]);
+  });
+
+  test("an open seat is found by its title, and opens on the Organogram", async () => {
+    const { rows } = await pool.query(
+      `INSERT INTO org_seat (title, department_id) VALUES ('Head Sales & Revenue', $1) RETURNING org_seat_id`,
+      [people.ops.employee.department_id],
+    );
+    const seats = group(await search("ops", { q: "head sales" }), "org_seat");
+    expect(seats).toMatchObject({ kind: "record", label: "Open Seats", module: "people" });
+    expect(seats.items[0]).toMatchObject({ title: "Head Sales & Revenue", sub: "Vacant · Operations" });
+    expect(seats.items[0].link).toBe(`/people?tab=organogram&id=${rows[0].org_seat_id}`);
+    expect(group(await search("staff", { q: "head sales" }), "org_seat")).toBeUndefined();
+  });
+
+  test("the theme, density, Install App and Sign Out are actions the app runs", async () => {
+    const run = async (q, title) => group(await search("staff", { q }), "action").items.find((i) => i.title === title);
+    expect(await run("dark mode", "Use Dark Theme")).toMatchObject({ run: "theme_dark", link: null });
+    expect(await run("light mode", "Use Light Theme")).toMatchObject({ run: "theme_light" });
+    expect(await run("compact", "Change Density")).toMatchObject({ run: "density" });
+    expect(await run("install", "Install App")).toMatchObject({ run: "install" });
+    expect(await run("log out", "Sign Out")).toMatchObject({ run: "sign_out" });
+  });
+
+  test("a screen forgives one slip", async () => {
+    expect(titles(await search("staff", { q: "payslp" }), "screen")).toContain("My Payslips");
+  });
+
+  test("what waits on the reader comes first, with nothing typed", async () => {
+    await pool.query("UPDATE employee SET line_manager_id = $1 WHERE employee_id = $2", [
+      people.ops.employee.employee_id,
+      people.staff.employee.employee_id,
+    ]);
+    const leave = crypto.randomUUID();
+    await tx((client) =>
+      engine.openInstance(client, {
+        definition_key: "leave.approval",
+        entity: { type: "leave_request", id: leave },
+        subject_employee_id: people.staff.employee.employee_id,
+        context: { days: 2 },
+        actor: people.staff.user,
+      }),
+    );
+    const ops = await search("ops");
+    expect(ops.groups[0]).toMatchObject({ kind: "record", type: "approval", label: "Waiting on You" });
+    expect(ops.groups[0].items[0]).toMatchObject({
+      title: "Obinna Eke",
+      sub: "Leave Request · Line Manager",
+      status: "waiting",
+      link: `/people?tab=leave&id=${leave}`,
+    });
+    expect(ops.groups.map((g) => g.kind)).toEqual(["record", "screen", "action"]);
+    expect(group(await search("ops", { q: "obinna" }), "approval").items).toHaveLength(1);
+    expect(group(await search("ops", { q: "halima" }), "approval")).toBeUndefined();
+    expect(group(await search("staff"), "approval")).toBeUndefined();
   });
 
   test("a type word narrows to that kind of record", async () => {

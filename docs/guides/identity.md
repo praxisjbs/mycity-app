@@ -350,7 +350,7 @@ two-step by role is set on Settings · Security (`settings` edit; brought forwar
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Sign In | The city's photograph at the top, still, with the brand, a glass clock, the city's country, name and day, and a dot per city; the form in a frosted dark panel under it. Cities change by a plain crossfade; nothing moves | The headline, the eight city buttons, the photograph's drift and glow | Sign In, full width | None (signed out) |
+| Sign In | The city's photograph at the top, drifting, with the brand, a glass clock, the city's country, name and day, and a dot per city with the turn filling the shown one; the form in a smoked glass panel under it. Points of light rise behind the glass | The headline, the eight city buttons, the pointer parallax | Sign In, full width | None (signed out) |
 | Code step and PIN | The same card as sign-in: the boxes 44 px, the number keyboard; a full code or PIN goes on its own | Nothing | Sign In, full width | None (signed out) |
 | Set-up step | The same card: the QR code at 192 px, the key under it, the code boxes; a full code goes on its own | Nothing | Turn On, then Continue, full width | None (signed out) |
 | Lock screen | The same card, its buttons full width and stacked: the PIN first when set, Use Passkey (the fingerprint or face) | Nothing | Unlock, full width | None until unlocked |
@@ -429,3 +429,4 @@ two-step by role is set on Settings · Security (`settings` edit; brought forwar
   `spent_challenge`'s purposes; `PASSWORD_MIN_LENGTH` is the new floor. §2, §3, §5, §6, §8, §10, §11
   and §13 updated.
 - 17/10/2026 · TB · Four more cities on the sign-in screen: Johannesburg, Rabat, Abidjan and Douala (photographs only; their screen is the deep green until one loads). A photograph is fetched only when its city is shown or next. On a phone the photograph fills the top of the screen behind the brand, a glass clock and the city, and the form sits in a frosted panel in the dark theme's colours; nothing moves but the crossfade. The staging bar is gone from both apps (MILESTONES §6). §10 and §13 updated.
+- 17/10/2026 · TB · The sign-in screen made a place to linger, on both shells: the form sits in smoked glass (a Deep Green tint over a blur of the photograph, a brand-yellow thread along the top, a slow sheen), the cities in a glass dock on desktop, a film grain and darkened edges over the photograph, points of city light rising slowly, the city's name arriving out of focus and the clock's colon ticking. The phone moves like the desktop now (drift, glow, focus pull, the lights) but for the pointer parallax; reduced motion holds all of it still. §10 updated.

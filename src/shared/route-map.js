@@ -142,6 +142,8 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "employees"),
     self: screen("ess", "my-profile"),
   },
+  // A post nobody holds yet opens on the Organogram, focused on it.
+  org_seat: screen("people", "organogram"),
   import_batch: screen("settings", "imports"),
   // A file opens where its record is: on the employee's own My Documents, or on
   // the record's Documents tab for whoever may see it.
