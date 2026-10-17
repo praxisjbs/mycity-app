@@ -153,7 +153,8 @@ and every feature is on, so training is real. What differs is signalling, never 
 
 - `X-Mycity-Environment: staging` header on every response and every outbound mail
 - Mail `From` display name carries ` [STAGING]`; a banner row at the top of every mail template
-- A persistent top bar in both the admin and the public app
+- No bar drawn on the page: the address already says staging (TB, 17/10/2026; it replaced a
+  persistent top bar in both apps, which crowded the sign-in screen)
 - `X-Robots-Tag: noindex` on staging responses — marked, not blocked
 - Distinct favicon and theme colour
 

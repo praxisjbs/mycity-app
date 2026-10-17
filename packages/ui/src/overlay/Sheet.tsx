@@ -143,7 +143,7 @@ export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, chi
           onCloseAutoFocus={returnFocus}
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex flex-col bg-card pb-safe text-card-foreground outline-none",
-            full ? "top-[var(--env-bar,0px)] pt-safe" : "max-h-11/12 rounded-t-sheet border-t border-border shadow-3",
+            full ? "top-0 pt-safe" : "max-h-11/12 rounded-t-sheet border-t border-border shadow-3",
           )}
         >
           {!full && <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 flex-none rounded-full bg-border" />}

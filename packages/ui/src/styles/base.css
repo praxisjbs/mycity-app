@@ -30,11 +30,6 @@
   /* The Deep Green panels (the rail, the bottom bar) take a light scrollbar in both themes. */
   .on-dark { --sb: var(--sb-on-dark); }
 
-  /* The staging bar's height (StagingBar, lib/environment.ts); nothing on production. Every
-     full-screen layer starts below it: top-(--env-bar). */
-  :root { --env-bar: 0px; }
-  :root[data-env="staging"] { --env-bar: calc(28px + env(safe-area-inset-top, 0px)); }
-
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--sb); border-radius: 3px; }

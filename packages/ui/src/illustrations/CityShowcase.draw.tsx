@@ -15,11 +15,12 @@
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 
-export type CityKey = "lagos" | "london" | "accra" | "nairobi";
+/** The cities with a drawing: the stand-in while a photograph loads, and for good if it cannot. */
+export type DrawnCity = "lagos" | "london" | "accra" | "nairobi";
 export type Phase = "night" | "dawn" | "day" | "dusk";
 
 /** Latitude and longitude, for the sun. */
-const PLACE: Record<CityKey, { lat: number; lon: number }> = {
+const PLACE: Record<DrawnCity, { lat: number; lon: number }> = {
   lagos: { lat: 6.45, lon: 3.39 },
   london: { lat: 51.51, lon: -0.13 },
   accra: { lat: 5.6, lon: -0.19 },
@@ -27,7 +28,7 @@ const PLACE: Record<CityKey, { lat: number; lon: number }> = {
 };
 
 /** Sunrise and sunset in the city's local hours, from the day of the year (accurate to a few minutes). */
-export function sunTimes(city: CityKey, now: Date, offsetHours: number): { rise: number; set: number } {
+export function sunTimes(city: DrawnCity, now: Date, offsetHours: number): { rise: number; set: number } {
   const { lat, lon } = PLACE[city];
   const day = Math.floor((now.getTime() - Date.UTC(now.getUTCFullYear(), 0, 0)) / 86_400_000);
   const rad = Math.PI / 180;
@@ -480,11 +481,11 @@ function Nairobi({ lit, still }: Art) {
   );
 }
 
-const ART: Record<CityKey, (a: Art) => ReactNode> = { lagos: Lagos, london: London, accra: Accra, nairobi: Nairobi };
-const HORIZON: Record<CityKey, number> = { lagos: 700, london: 690, accra: 705, nairobi: 742 };
+const ART: Record<DrawnCity, (a: Art) => ReactNode> = { lagos: Lagos, london: London, accra: Accra, nairobi: Nairobi };
+const HORIZON: Record<DrawnCity, number> = { lagos: 700, london: 690, accra: 705, nairobi: 742 };
 
 export interface CitySceneProps {
-  city: CityKey;
+  city: DrawnCity;
   /** The city's local hour, minutes as a fraction. */
   hour: number;
   /** The city's offset from UTC in hours, for its sun. */

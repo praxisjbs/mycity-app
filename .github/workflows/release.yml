@@ -169,8 +169,8 @@ jobs:
     needs: [build, verify-staging]
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # The job waits here for a required reviewer. Before approving: open hub.staging, check the
-    # top bar shows this build, walk the demo script for what this release touches, and approve
+    # The job waits here for a required reviewer. Before approving: open hub.staging/api/health,
+    # check its build is this one, walk the demo script for what this release touches, and approve
     # with a comment naming what was checked (SYSTEM_ARCHITECTURE §9.8).
     environment:
       name: production

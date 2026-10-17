@@ -95,7 +95,7 @@ describe("SplitPanes on a phone", () => {
     render(<Screen open />);
     const record = screen.getByText("The record").parentElement!;
     expect(record.className).toContain("pt-safe");
-    expect(record.className).toContain("top-(--env-bar)");
+    expect(record.className).toContain("inset-0");
   });
 
   it("has no accessibility violations", async () => {

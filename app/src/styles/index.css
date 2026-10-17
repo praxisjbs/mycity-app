@@ -5,8 +5,8 @@
  * gate 13); the @source line lets Tailwind see the classes the package's
  * components use.
  *
- * What stays here is this app's own and nothing else: the full-height shell
- * below the staging bar (--env-bar, from @mycity/ui), the burst a tap leaves on
+ * What stays here is this app's own and nothing else: the full-height shell,
+ * the burst a tap leaves on
  * a reaction, the shimmer under provisional AI text, the search hit marks, and
  * the reporting tree's connector lines. PR 3 moved the celebration card, the
  * rich text box, the timeline rail and the disclosure marker into the package
@@ -22,7 +22,6 @@
 
 @layer base {
   html, body, #root { height: 100%; }
-  #root { height: calc(100% - var(--env-bar)); margin-top: var(--env-bar); }
   body { overflow: hidden; }
 }
 

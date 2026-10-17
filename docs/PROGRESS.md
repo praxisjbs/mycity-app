@@ -109,6 +109,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   process and download; a direct `/media/vault/...` request is a JSON 404; a letter template
   generates a numbered, hashed, locked PDF that only its readers can fetch. Left for the row above:
   the staff importer and the real sheet on staging, which are track A's.
+- 17/10/2026 · TB · Sign-in: four more cities (Johannesburg, Rabat, Abidjan, Douala; TB's images),
+  eight in turn, each photograph fetched only when its city is shown or next. The phone sign-in is
+  redesigned: a still portrait crop of the photograph at the top, the brand and a glass clock on it,
+  the form in a frosted panel in the dark theme's colours; nothing moves but the crossfade. The
+  staging bar is off both apps by TB's decision (MILESTONES §6 and SYSTEM_ARCHITECTURE §10
+  updated); the tab icon, theme colour, header and mail marks stay. Left: nothing.
 - 17/10/2026 · TB · Sign-in photographs: Lagos, London, Accra and Nairobi at dusk (TB's images, WebP
   at 1280 and 640, about 250 KB for all four) behind the sign-in screen, each drifting and zooming on
   its own path, the lights glowing, a few pixels of pointer parallax, crossfades with a short focus

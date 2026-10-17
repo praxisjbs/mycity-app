@@ -37,7 +37,7 @@ administrator can reset their two-step from Settings · Users.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Sign In (`/`) | Staff app, signed out | Anyone | The four cities (Lagos, London, Accra, Nairobi) at their local time; the sign-in card; on a browser the person has used, Use Passkey and Use PIN for the ways they have set up | Sign in with the password, a passkey or the PIN; Forgot Password |
+| Sign In (`/`) | Staff app, signed out | Anyone | Eight cities (Lagos, London, Accra, Nairobi, Johannesburg, Rabat, Abidjan, Douala) at their local time; the sign-in card; on a browser the person has used, Use Passkey and Use PIN for the ways they have set up | Sign in with the password, a passkey or the PIN; Forgot Password |
 | Code step | Staff app, the sign-in card and the lock screen | A person with two-step on, on a browser that has not given a code lately | Their email, Sign-In Code (six boxes), Use Recovery Code | Enter the authenticator app's code or a recovery code; Back |
 | Forgot Password | Staff app, the sign-in card | Anyone | Email field | Send a reset link |
 | Reset and Welcome (`/reset?token=`, `/welcome?token=`) | Staff app, from an email | The person the link was sent to | Their email or first name; New Password, Confirm Password | Choose a password; ask for a new link when it has expired |
@@ -316,7 +316,7 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Sign In | The brand, "Every city. One team." and one line on MyCity App; the shown city's country, name, local time and day; the four cities with their times; the greeting (with the first name on a known browser), Email, Password, Forgot Password, Sign In; Use Passkey and Use PIN on a known browser | None | The session rules, the throttle and why the error never says which emails exist: §6 |
+| Sign In | The brand, "Every city. One team." and one line on MyCity App; the shown city's country, name, local time and day; the eight cities with their times; the greeting (with the first name on a known browser), Email, Password, Forgot Password, Sign In; Use Passkey and Use PIN on a known browser | None | The session rules, the throttle and why the error never says which emails exist: §6 |
 | Code step and PIN | The email or the greeting; Enter Code with "From your authenticator app" or "One of your recovery codes"; Sign-In Code or Recovery Code; Enter PIN and PIN; Sign In, Back, Use Recovery Code or Use App Code, Use Password; the refusal in one line | None | Single use, the drift window, how often a browser is asked, the PIN's wait and switch-off: §6 |
 | Forgot Password | Reset Password, "We will email you a link.", Email, Send Link, Back; then Check Your Email with the address | None | How long a link lasts and that only an active login gets one: §6 |
 | Reset and Welcome | The email (reset) or "Welcome, first name" (invitation); New Password, Confirm Password, Save Password or Set Password; an expired link says so with Request New Link | None | The password rules beyond the field's own mark: §6 |
@@ -328,7 +328,7 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Sign In | A short band with the city's photograph, its country and time (still), the brand on it; the form under it | The headline, the four city buttons, the photograph's drift and glow | Sign In, full width | None (signed out) |
+| Sign In | The city's photograph at the top, still, with the brand, a glass clock, the city's country, name and day, and a dot per city; the form in a frosted dark panel under it. Cities change by a plain crossfade; nothing moves | The headline, the eight city buttons, the photograph's drift and glow | Sign In, full width | None (signed out) |
 | Code step and PIN | The same card as sign-in: the boxes 44 px, the number keyboard; a full code or PIN goes on its own | Nothing | Sign In, full width | None (signed out) |
 | Lock screen | The same card, its buttons full width and stacked: the PIN first when set, Use Passkey (the fingerprint or face) | Nothing | Unlock, full width | None until unlocked |
 | ESS · My Security | Icon cards: Password, Two-Step Sign-In, Passkeys, PIN, Signed In, Recent Sign-Ins, Clock-In Devices | The cards and tables (each opens in its sheet; tables as cards) | Change Password, Save PIN, Turn On, full width in their sheets; Add Passkey makes the phone's own passkey | Bottom bar Self-Service |
@@ -376,7 +376,8 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
 - ~~Two-step sign-in, passkeys and the PIN~~: closed 16/10/2026, built in the second sign-in PR (the
   `security` module, §3 steps 9 to 14, §6). Requiring two-step by role stays in M9.
 - ~~The sign-in drawings or licensed photographs~~: closed 17/10/2026. TB supplied photographs of the
-  four cities at dusk; `CityShowcase` shows them, the drawings standing in until they load.
+  four cities at dusk, then four more (Johannesburg, Rabat, Abidjan, Douala); `CityShowcase` shows
+  them, the drawings standing in for the first four until they load.
 
 ## 14 · Change log
 
@@ -391,3 +392,4 @@ two-step by role is M9 (Settings · Security). The exact grants are the seed mat
   on Settings · Users, the Method on Recent Sign-Ins (§2 to §11); §13's open question closed.
 - 16/10/2026 · TB · The reset and invitation emails (`templates/email/password-reset.html`, `user-invite.html`) were empty, so the worker failed every link email after the screen said it was sent; both written. The New Sign-In and other security notices now show in the bell on the real API (`notifications` module), opening My Security.
 - 17/10/2026 · TB · The sign-in screen shows photographs of Lagos, London, Accra and Nairobi at dusk (`packages/ui/src/illustrations/photos/`, WebP at 1280 and 640): each drifts and zooms slowly on its own path, the lit horizon glows softly, the picture follows the pointer by a few pixels, and cities crossfade with a short focus pull. The drawings stand in while a photograph loads or if it fails; reduced motion and the phone band hold them still. §10 and §13 updated.
+- 17/10/2026 · TB · Four more cities on the sign-in screen: Johannesburg, Rabat, Abidjan and Douala (photographs only; their screen is the deep green until one loads). A photograph is fetched only when its city is shown or next. On a phone the photograph fills the top of the screen behind the brand, a glass clock and the city, and the form sits in a frosted panel in the dark theme's colours; nothing moves but the crossfade. The staging bar is gone from both apps (MILESTONES §6). §10 and §13 updated.

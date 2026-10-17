@@ -2,8 +2,8 @@
  * The public site's stylesheet. Tokens, the Tailwind theme and the element
  * defaults come from @mycity/ui (packages/ui/src/styles), the same files as the
  * staff app (F1); the @source line lets Tailwind see the classes the package's
- * components use. What stays here is the site's own: the page as a column
- * under the staging bar, the page background and the signature pad.
+ * components use. What stays here is the site's own: the page as a column,
+ * the page background and the signature pad.
  */
 @import "tailwindcss";
 @import "@mycity/ui/styles/tokens.css";

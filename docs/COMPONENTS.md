@@ -33,7 +33,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
 | Display | [Bars](#bars) | `Bars` | Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target. | stable |
 | Display | [Chain](#chain) | `Chain` | An approval route: the steps already done, the one in hand, and what is still to come. | stable |
-| Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's moving picture: photographs of Lagos, London, Accra and Nairobi at dusk taking turns, each with its clock, drifting slowly and crossfading; the drawings stand in until a photograph has loaded. | beta |
+| Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's picture: photographs of eight cities at dusk taking turns, each with its clock; on desktop they drift slowly and crossfade, on a phone they hold still behind a frosted panel. | beta |
 | Display | [Confetti](#confetti) | `Confetti` | Pieces of paper or stars drifting down behind a celebration card. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
@@ -128,7 +128,6 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer. | stable |
 | Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
-| Shell | [StagingBar](#stagingbar) | `StagingBar` | The amber bar across the top of every staging page, sign-in included, so nobody mistakes staging for the live system. | stable |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
 
 ## Foundations
@@ -611,14 +610,14 @@ An approval route: the steps already done, the one in hand, and what is still to
 
 ### CityShowcase
 
-The sign-in screen's moving picture: photographs of Lagos, London, Accra and Nairobi at dusk taking turns, each with its clock, drifting slowly and crossfading; the drawings stand in until a photograph has loaded.
+The sign-in screen's picture: photographs of eight cities at dusk taking turns, each with its clock; on desktop they drift slowly and crossfade, on a phone they hold still behind a frosted panel.
 
 | | |
 |---|---|
-| Use | The staff sign-in screen only: `full` beside the form on desktop, `band` above it on a phone. |
+| Use | The staff sign-in screen only: `full` beside the form on desktop, `phone` behind it on a phone. |
 | Avoid | Any screen behind sign-in, and decoration anywhere else (use Illustration). |
-| Phone | variant="band": a short band with the city, its country and its time; the picture holds still and the city changes each interval, from the small photographs. |
-| Accessibility | The photographs and drawings are decorative (empty alt, aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too). |
+| Phone | variant="phone": the photograph fills the top of the screen, still, with the brand, a glass clock and the city; the form sits in a frosted dark panel below it. The city changes each interval with a plain crossfade, nothing moves. |
+| Accessibility | The photographs and drawings are decorative (empty alt, aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too). The phone's panel takes the dark theme's colours, so its text keeps AA over any photograph. |
 | Status | beta |
 | Exports | `CityShowcase` |
 | Import | `import { CityShowcase } from "@mycity/ui";` |
@@ -630,17 +629,17 @@ The sign-in screen's moving picture: photographs of Lagos, London, Accra and Nai
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `variant` | `"full" \| "band"` |  | `full` fills its parent, with the clock and the city buttons at the foot; `band` is the phone's short strip. |
-| `cities` | `CityKey[]` |  | Which cities, in order. All four by default. |
+| `variant` | `"full" \| "phone"` |  | `full` fills its parent, with the clock and the city buttons at the foot; `phone` fills a phone's screen, the picture at the top. |
+| `cities` | `CityKey[]` |  | Which cities, in order. All eight by default. |
 | `interval` | `number` |  | How long each city shows, in milliseconds. |
 | `start` | `CityKey` |  | The first city shown. |
 | `children` | `ReactNode` |  | What sits at the top over the picture: the brand, and on `full` a headline. |
-| `aside` | `ReactNode` |  | `full` only: what stands at the right over the picture, centred (the sign-in card). The clock and the cities keep clear of it. |
+| `aside` | `ReactNode` |  | The sign-in form. `full`: stands at the right over the picture, centred, as given; the clock and the cities keep clear of it. `phone`: set in the frosted panel under the city. |
 | `className` | `string` |  | Layout classes only (height, the grid cell); the look is the component's own. |
 
 ```tsx
 <CityShowcase>{brandAndHeadline}</CityShowcase>
-<CityShowcase variant="band"><Brand tone="on-dark" /></CityShowcase>
+<CityShowcase variant="phone" aside={<SignInForm />}><Brand tone="on-dark" /></CityShowcase>
 <CityShowcase aside={<SignInCard />}>{brandAndHeadline}</CityShowcase>
 ```
 
@@ -4044,36 +4043,6 @@ A small dark card floating at the foot of the shell for something about the app 
 
 ```tsx
 <ShellNotice icon="refresh" actions={<Button variant="primary" size="sm">Reload</Button>}>A new version is ready</ShellNotice>
-```
-
-### StagingBar
-
-The amber bar across the top of every staging page, sign-in included, so nobody mistakes staging for the live system.
-
-| | |
-|---|---|
-| Use | Once per app, at the top, rendered only when useEnvironment() says staging (MILESTONES §6, A4). The staff app fixes it above everything; the public site lets it stick. |
-| Avoid | Any other notice (use Banner or ShellNotice); production, where it never renders; dismissing it (it has no close). |
-| Phone | The short line only; it takes the status bar inset on a notched phone, so its text is never under the notch. |
-| Accessibility | A status region, read once when the page opens. Its height is --env-bar, which every full-screen layer starts below. |
-| Status | stable |
-| Exports | `StagingBar` |
-| Import | `import { StagingBar } from "@mycity/ui";` |
-| File | `packages/ui/src/shell/StagingBar.tsx` |
-| Test | `packages/ui/src/shell/StagingBar.test.tsx` |
-| Gallery | `packages/ui/src/shell/StagingBar.gallery.tsx` (`npm run gallery`, `#/StagingBar`) |
-
-**StagingBar** props (`StagingBarProps`)
-
-| Prop | Type | Required | Description |
-|---|---|---|---|
-| `message` | `string` | yes | The line on desktop, after the word Staging: one sentence, at most 20 words. |
-| `short` | `string` | yes | The line on a phone: at most 5 words. |
-| `placement` | `"fixed" \| "sticky" \| "inline"` |  | `fixed` above everything (the staff app, the default), `sticky` while the page scrolls (the public site), `inline` in the flow (the gallery). |
-| `className` | `string` |  | Layout classes only (spacing). |
-
-```tsx
-<StagingBar message="For training and testing. Every feature works and mail reaches real people." short="Mail here is real" />
 ```
 
 ### TopBar

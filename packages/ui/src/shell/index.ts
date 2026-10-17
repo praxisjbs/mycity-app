@@ -14,5 +14,4 @@ export * from "./PhoneShell";
 export * from "./PublicPage";
 export * from "./Rail";
 export * from "./ShellNotice";
-export * from "./StagingBar";
 export * from "./TopBar";

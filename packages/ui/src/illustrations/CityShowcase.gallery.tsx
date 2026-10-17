@@ -11,6 +11,10 @@ export default {
       </CityShowcase>
     ),
     "From London": () => <CityShowcase start="london" className="h-120 rounded-card" />,
-    "Phone Band": () => <CityShowcase variant="band" start="nairobi" className="h-52 max-w-sm rounded-card" />,
+    Phone: () => (
+      <CityShowcase variant="phone" start="johannesburg" className="h-180 max-w-sm rounded-card" aside={<p className="py-24 text-center text-muted-foreground">Sign-in form</p>}>
+        <Brand tone="on-dark" name="MyCity App" />
+      </CityShowcase>
+    ),
   },
 } satisfies GalleryEntry;

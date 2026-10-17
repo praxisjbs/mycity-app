@@ -36,9 +36,9 @@ const greeting = (d = new Date()) => (d.getHours() < 12 ? "Good morning" : d.get
 
 /**
  * Sign in (docs/guides/identity.md §10). Brand intensity is high here
- * (MILESTONES §5.3): on desktop the four cities fill the screen, each drawn at
- * its own local hour with its clock, and the card stands over them; on a phone
- * the cities are a short band and the form fills the rest. The same card
+ * (MILESTONES §5.3): on desktop the cities' photographs fill the screen, each
+ * with its clock, and the card stands over them; on a phone the photograph
+ * holds still at the top and the form sits in a frosted panel under it. The same card
  * holds Forgot Password, the page a reset or invitation link opens, the code
  * step when two-step sign-in asks for one, and the PIN. On a browser the person
  * has signed in on before, Use Passkey and Use PIN sit under Sign In for the ways
@@ -95,17 +95,16 @@ export function Login() {
 
   if (phone) {
     return (
-      <div className="fixed inset-x-0 top-(--env-bar) bottom-0 z-50 flex flex-col overflow-y-auto bg-background">
-        <CityShowcase variant="band" className="h-52 flex-none">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-deep">
+        <CityShowcase variant="phone" className="min-h-full" aside={body}>
           <Brand tone="on-dark" name="MyCity App" />
         </CityShowcase>
-        <div className="relative -mt-5 flex-1 rounded-t-sheet bg-background px-4 pt-7 pb-safe-5">{body}</div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-x-0 top-(--env-bar) bottom-0 z-50 bg-deep">
+    <div className="fixed inset-0 z-50 bg-deep">
       <CityShowcase
         className="absolute inset-0"
         aside={
