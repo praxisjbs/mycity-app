@@ -311,3 +311,9 @@ Deductions figure and every form open the shared modal.
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): every list on these screens is `DataView` (cards on a phone as before, with server sort where the contract allow-lists it), the KPI tiles are `KpiCard` (My Leave's still open only on a phone), the payslip and document previews are `Paper` and `DocumentPreview` (a PDF in the browser's own viewer, with Open in Tab and a Download card where it cannot be shown), and My Record History is the shared `Timeline`. §10 is unchanged.
 - 16/10/2026 · TB · My Security runs on the real API (`identity` module; `docs/guides/identity.md`): Password, Signed In with Sign Out per device and Sign Out Others, Recent Sign-Ins, the Clock-In Devices link. Two-step sign-in, passkeys and the PIN left the screen until the security module (the second sign-in PR); §2, §5, §6 and both §10 rows say so. New passwords follow the contract's rule (8 characters with mixed case, a number and a symbol), not 12.
 - 16/10/2026 · TB · My Security gains Two-Step Sign-In, the PIN and Passkeys (the `security` module; `docs/guides/identity.md` §3, §6), the Method on Recent Sign-Ins and Confirm It's You past the 15-minute window; the page subtitle goes. §2, §5, §6, §7 and both §10 rows updated.
+- 17/10/2026 · TB · My Documents (#14) on the real API (M0, track B): `GET /ess/documents`,
+  `/ess/documents/summary` and `POST /ess/documents`, the caller's own records only. The Vault list
+  is what is held and what People asked for in one paged list, the five counts come from the server,
+  the preview is the chosen document itself, and the hard-coded contract and the "Your vault"
+  subtitle are gone. The `ess` module carries its first read manifest; the rest of ESS arrives with
+  its milestones.
