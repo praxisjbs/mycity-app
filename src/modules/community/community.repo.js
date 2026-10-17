@@ -99,6 +99,16 @@ function removeMember(db, channelId, userId) {
   return db.query("DELETE FROM community_member WHERE community_channel_id = $1 AND user_id = $2", [channelId, userId]);
 }
 
+/** Whole years since an employee started, on a Lagos date; null with no start date or under a year. */
+async function yearsServed(db, employeeId, onDate) {
+  const row = await one(
+    db,
+    `SELECT (extract(year FROM age($2::date, start_date)))::int AS years FROM employee WHERE employee_id = $1 AND start_date IS NOT NULL`,
+    [employeeId, onDate],
+  );
+  return row && row.years >= 1 ? row.years : null;
+}
+
 /** Active logins for employees and for whole departments, deduplicated. */
 async function usersFor(db, { employeeIds = [], departmentIds = [] }) {
   if (!employeeIds.length && !departmentIds.length) return [];
@@ -637,6 +647,7 @@ function celebrationPosted(db, channelId, employeeId, occasion, date) {
 }
 
 module.exports = {
+  yearsServed,
   membershipPinned,
   pinsLocked,
   setPinned,

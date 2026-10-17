@@ -209,7 +209,22 @@ function Channels() {
 function ChannelDrawer({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   const modal = useModal();
   useEffect(() => {
-    modal.open({ title: "Channels", body: () => <div className="-mx-2">{children}</div>, onClose });
+    /* Picking a channel unmounts the drawer without touching the sheet, so the sheet is closed
+       here, unless it was the sheet that closed (the X, a drag), or another sheet could go too. */
+    let shut = false;
+    let leaving = false;
+    modal.open({
+      title: "Channels",
+      body: () => <div className="-mx-2">{children}</div>,
+      onClose: () => {
+        shut = true;
+        if (!leaving) onClose();
+      },
+    });
+    return () => {
+      leaving = true;
+      if (!shut) modal.close();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- opened once; the list inside is the live one
   }, []);
   return null;

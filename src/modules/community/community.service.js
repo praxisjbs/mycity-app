@@ -475,6 +475,8 @@ async function postMessage(channelId, body, user) {
       const persons = await repo.people(client, [body.subject_employee_id]);
       if (!persons.has(body.subject_employee_id)) throw new AppError("NOT_FOUND", "There is no such colleague", 404);
       metadata.subject_employee_id = body.subject_employee_id;
+      // A hand-posted anniversary carries its years, as the 05:00 ones do.
+      if (type === "anniversary") metadata.years = await repo.yearsServed(client, body.subject_employee_id, lagos.today());
     }
     const message = await repo.insertMessage(client, {
       community_channel_id: channelId,
