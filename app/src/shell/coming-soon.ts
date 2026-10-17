@@ -120,4 +120,5 @@ export const COMING: Record<string, string[]> = {
   "settings/integrations": ["Mail, bank and other connected services", "Health checks for each connection", "Keys stored encrypted"],
   "settings/security": ["Two-step sign-in, required by role", "Active sessions, ended remotely", "Failed sign-ins and blocked attempts"],
   "settings/audit-log": ["Who did what, when, to which record", "Search by person, record, action or date", "Cannot be edited by anyone"],
+  "settings/imports": ["Import a spreadsheet of records, column by column", "See what will be created before you commit", "Every import kept, with its error file and Revert"],
 };

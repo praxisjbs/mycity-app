@@ -101,6 +101,7 @@ const SCREENS = Object.freeze({
     "integrations",
     "security",
     "audit-log",
+    "imports",
   ],
 });
 
@@ -135,7 +136,17 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "employees"),
     self: screen("ess", "my-profile"),
   },
-  import_batch: screen("people", "employees"),
+  import_batch: screen("settings", "imports"),
+  // A file opens where its record is: on the employee's own My Documents, or on
+  // the record's Documents tab for whoever may see it.
+  document: {
+    ...screen("people", "employees"),
+    self: screen("ess", "my-documents"),
+  },
+  document_request: {
+    ...screen("people", "employees"),
+    self: screen("ess", "my-documents"),
+  },
   attendance_record: {
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),

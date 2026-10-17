@@ -33,7 +33,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Banner](#banner) | `Banner` | One line across a page or a card in a status tone, with an icon and at most one action. | stable |
 | Display | [Bars](#bars) | `Bars` | Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target. | stable |
 | Display | [Chain](#chain) | `Chain` | An approval route: the steps already done, the one in hand, and what is still to come. | stable |
-| Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's moving picture: Lagos, London, Accra and Nairobi drawn at their own local hour, taking turns, each with its clock. | beta |
+| Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's moving picture: photographs of Lagos, London, Accra and Nairobi at dusk taking turns, each with its clock, drifting slowly and crossfading; the drawings stand in until a photograph has loaded. | beta |
 | Display | [Confetti](#confetti) | `Confetti` | Pieces of paper or stars drifting down behind a celebration card. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
@@ -611,14 +611,14 @@ An approval route: the steps already done, the one in hand, and what is still to
 
 ### CityShowcase
 
-The sign-in screen's moving picture: Lagos, London, Accra and Nairobi drawn at their own local hour, taking turns, each with its clock.
+The sign-in screen's moving picture: photographs of Lagos, London, Accra and Nairobi at dusk taking turns, each with its clock, drifting slowly and crossfading; the drawings stand in until a photograph has loaded.
 
 | | |
 |---|---|
 | Use | The staff sign-in screen only: `full` beside the form on desktop, `band` above it on a phone. |
 | Avoid | Any screen behind sign-in, and decoration anywhere else (use Illustration). |
-| Phone | variant="band": a short band with the city, its country and its time; the drawing holds still and the city changes each interval. |
-| Accessibility | The drawings are decorative (aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too). |
+| Phone | variant="band": a short band with the city, its country and its time; the picture holds still and the city changes each interval, from the small photographs. |
+| Accessibility | The photographs and drawings are decorative (empty alt, aria-hidden). The cities are a group of buttons, each naming the city and its time, the shown one marked aria-current. Turning pauses while the pointer or focus is on them, and stops under reduced motion (the drawings hold still too). |
 | Status | beta |
 | Exports | `CityShowcase` |
 | Import | `import { CityShowcase } from "@mycity/ui";` |
@@ -2824,6 +2824,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 |---|---|---|---|
 | `endpoint` | `string` |  | Where the multipart goes; `/api/v1/documents` unless the route is its own. |
 | `purpose` | `string` | yes | What the file is for: the server reads it to decide which types it takes. |
+| `fields` | `Record<string, string>` |  | More text fields to send beside the file, for a route that needs to know what the file is being attached to (the import it starts, the request it answers). The server still decides everything it can decide itself. |
 | `upload` | `Uploader` |  | How the file is sent; the app's own client, which adds its session. The bare engine otherwise. |
 | `multiple` | `boolean` |  | Several files at once (the default), or exactly one. |
 | `accept` | `string` |  | What the picker offers, as extensions (".pdf,.jpg"). |

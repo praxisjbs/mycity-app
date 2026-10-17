@@ -547,6 +547,8 @@ app/
       realtime.ts             Socket.io for the bell and presence (§9.6); nothing on the mock
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
+      download.ts             the other way: a gated file fetched with the session's token, as a
+                              download (saveFile) or a blob URL a preview can draw (useFileUrl)
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
     auth/                     AuthProvider (useAuth, useMe; the session clock and the locked state; every way in),
                               Login (with the code step and the PIN), LockSheet, passkey (the browser's WebAuthn

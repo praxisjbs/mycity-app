@@ -325,3 +325,27 @@
     pointer-events: none;
   }
 }
+
+/* The sign-in photographs (CityShowcase). The parallax layer follows the pointer by a few
+   pixels, from two variables the component sets on the section (--px, --py, each -0.5 to 0.5),
+   and eases back. The glow brightens each city's lit horizon in the brand yellow, at the
+   height its photograph's lights sit (--glow-y). The reduced-motion rule in base's
+   @layer base stops all of it. */
+@layer components {
+  .city-parallax {
+    transform: translate3d(calc(var(--px, 0) * -18px), calc(var(--py, 0) * -10px), 0);
+    transition: transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .city-glow {
+    background: radial-gradient(
+      62% 26% at 46% var(--glow-y, 58%),
+      color-mix(in oklab, var(--color-scene-window) 32%, transparent),
+      transparent 72%
+    );
+    mix-blend-mode: screen;
+  }
+  [data-photo="lagos"] { --glow-y: 56%; }
+  [data-photo="london"] { --glow-y: 60%; }
+  [data-photo="accra"] { --glow-y: 64%; }
+  [data-photo="nairobi"] { --glow-y: 66%; }
+}

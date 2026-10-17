@@ -1,4 +1,4 @@
-import type { DocumentRef, IsoDate, IsoDateTime, Money, Paged, PersonRef, Tone, Uuid } from "./common";
+import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Tone, Uuid } from "./common";
 
 /** INTERIM Employee Self-Service shapes (owner AJ; docs/guides/ess.md). Scope is always own. */
 type Pill = { tone: Tone; text: string };
@@ -64,16 +64,6 @@ export interface MyQueriesSummary {
   last_sanction: IsoDate | null;
 }
 
-export interface MyDocument {
-  document_ref_id: Uuid;
-  name: string;
-  uploaded: IsoDate | null;
-  status: Pill;
-  expires: IsoDate | null;
-  document: DocumentRef | null;
-  signed_number: string | null;
-}
-
 type Q<T = object> = T & { page?: number; q?: string };
 
 declare module "@/api/endpoints" {
@@ -85,8 +75,6 @@ declare module "@/api/endpoints" {
     "GET /api/v1/ess/queries": { query: Q<{ view: "open" | "archived" }>; body: never; params: never; response: Paged<MyQuery> };
     "POST /api/v1/ess/queries/:id/response": { query: never; body: { response: string }; params: { id: string }; response: MyQuery };
     "GET /api/v1/ess/sanctions": { query: Q; body: never; params: never; response: Paged<MySanction> };
-    "GET /api/v1/ess/documents": { query: Q; body: never; params: never; response: Paged<MyDocument> };
-    "POST /api/v1/ess/documents": { query: never; body: { name: string; document_id: Uuid }; params: never; response: MyDocument };
   }
 }
 
