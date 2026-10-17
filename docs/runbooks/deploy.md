@@ -59,11 +59,17 @@ configuration, which refuses to start without SMTP.
 | Build             | `npm ci`, both frontends built, `release-manifest.js` packs the release with `RELEASE`, `BUILD.env` and `SHA256SUMS`                                                                                                                                                                                                                                               | anything fails to build                                                                                                                                                             |
 | Deploy to staging | `deploy-gate stage <sha>`, tarball over SSH: checked against `SHA256SUMS`, `npm ci --omit=dev`, every dependency confirmed installed, `pg_dump` of `mycity_stg`, migrations, `current` switched, units restarted, readiness must report this sha                                                                                                                   | the tarball is from another commit or altered; install fails; a migration fails (code not switched); the new build does not come up (staging switched back to the previous release) |
 | Verify staging    | `verify-staging.js` over HTTPS: readiness on this sha, no module skipped, migrations at head, both frontends, each host refusing the other's API, staging markers, HTTPS redirect and HSTS. Then `deploy-gate seal` writes `STAGING_VERIFIED` (the tree's hash)                                                                                                    | any check fails: no seal, so nothing can be promoted                                                                                                                                |
-| Production        | **waits for an approver** (GE or TB, not the person who merged). Then `deploy-gate promote`: seal present, under 7 days old, staging still on this sha, tree hash unchanged, not 21 December to 5 January; `pg_dump` of `mycity_prod`; the sealed tree hard-linked into production; migrations; switch; restart; readiness on this sha; tag `release-<date>-<sha>` | any of those checks; a production build that does not come up is switched back to the previous release                                                                              |
+| Production        | **started by hand by an approver** (GE or TB; see below). Then `deploy-gate promote`: seal present, under 7 days old, staging still on this sha, tree hash unchanged, not 21 December to 5 January; `pg_dump` of `mycity_prod`; the sealed tree hard-linked into production; migrations; switch; restart; readiness on this sha; tag `release-<date>-<sha>` | any of those checks; a production build that does not come up is switched back to the previous release                                                                              |
 
-Before approving: open `https://hub.staging.mycityapp.io`, check the top bar shows the release's
-short sha, walk the demo script for what this release touches, and approve with a comment naming
-what was checked (SYSTEM_ARCHITECTURE §9.8).
+Before releasing: open `https://hub.staging.mycityapp.io`, check the top bar shows the release's
+short sha, and walk the demo script for what this release touches (SYSTEM_ARCHITECTURE §9.8).
+
+**To release** (interim while the repository is private, SYSTEM_ARCHITECTURE §9.3): the automatic
+run stops after the seal, and its summary shows the sealed sha. GitHub → Actions → **Release** →
+Run workflow, branch `main`, paste that full 40-character sha. The `approver` job refuses anyone
+but GE (`@swizfcodes`) or TB (`@tomblakeasaah196`), a run from another branch, and a short sha;
+`deploy-gate promote` refuses a sha staging does not run or never sealed. Say in the team chat
+what was checked, since GitHub has no approval comment to hold it.
 
 ## 3 · On the server
 

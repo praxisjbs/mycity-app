@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | items below | | | | | |
+| M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 26 | 0 | 6 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
@@ -67,14 +67,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | Item | Owner | Done | Updated |
 |---|---|---|---|
-| Server: 4 subdomains, TLS, proxy settings per `docs/runbooks/proxy.md` | GE | ☐ | |
+| Server: 4 subdomains, TLS, proxy settings per `docs/runbooks/proxy.md` | GE | ☑ | 17/10/2026 |
 | Root config: `package.json`, `.nvmrc`, `.gitignore`, `.gitattributes`, ESLint, Jest | GE | ☑ | 14/10/2026 |
 | `src/config/*`, `app.js`, `server.js`, `worker.js`, `http/*`, `middleware/*` | GE | ☑ | 14/10/2026 |
 | Shared core: `db`, `crud`, `http`, `errors`, `events`, `workflow`, `numbering`, `money`, `time`, `access`, `rbac` | GE | ☑ | 14/10/2026 |
 | Pagination gate: `shared/http/paged.js`, `common.js` page schemas, `check/pagination.js` (§16) | GE | ☑ | 13/10/2026 |
 | Contract package + generator (`gen:contract`) + `http/route.js` | GE | ☑ | 14/10/2026 |
 | M0 migrations and reference seed 0001 to 0099 | LA | ☑ | 16/10/2026 |
-| Staging seed data | LA | ☐ | |
+| Staging seed data: MyCity's staff (`seeds/staging/10_staff.js`); each later module seeds its own records | LA · TB | ☑ | 17/10/2026 |
 | Nine M0 modules: identity, access, audit, organisation, settings, notifications, workflow, documents, imports | GE · TB | ☑ | 17/10/2026 |
 | Sign-in and sessions: `identity`, `access`, `users`; session rules, lock screen, credential links, the seven roles, the four-city sign-in screen (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | Two-step sign-in, passkeys and the PIN: the `security` module, the code step, PIN and passkey sign-in, the lock screen's PIN and passkey, the fresh-sign-in window, Reset Two-Step (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
@@ -84,11 +84,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | AI foundation: `services/ai`, manifests, registry, gate 9 | GE | ☑ | 15/10/2026 |
 | CI wiring: `package.json`, lockfile, ESLint, Jest, `ci-local.js`, `ci.yml` | GE | ☑ | 13/10/2026 |
 | Process gates: progress, guides, README map, CODEOWNERS; PR template; Claude Stop hook | GE | ☑ | 13/10/2026 |
-| GitHub settings applied by TB (`docs/runbooks/github-settings.md`) | TB | ☐ | |
+| GitHub settings applied by TB (`docs/runbooks/github-settings.md`; branch protection and required reviewers wait for a public repository or a plan that offers them) | TB | ☑ | 17/10/2026 |
 | CODEOWNERS usernames: GE `@swizfcodes`, TB `@tomblakeasaah196`, AJ `@Ghosted34`, LA `@LovedataX` | GE | ☑ | 13/10/2026 |
 | CI gates 1 to 8 and pipeline guards (gate 6: schema-drift and contract-columns) | GE · TB | ☑ | 16/10/2026 |
-| Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval | GE | ☐ | 15/10/2026 |
-| Operations: nightly backup, weekly restore drill, offsite copy, uptime probe; runbooks backup-restore, incident, monitoring, add-a-module | GE | ☐ | 16/10/2026 |
+| Release pipeline: `release.yml`, `deploy-gate`, staging seal, production approval (manual run by GE or TB while the repository is private) | GE | ☑ | 17/10/2026 |
+| Operations: nightly backup, weekly restore drill, offsite copy, uptime probe; runbooks backup-restore, incident, monitoring, add-a-module | GE | ☐ | 17/10/2026 |
 | Docs: `CLAUDE.md`, backend guide, frontend guide, this file, guide template | GE | ☑ | 13/10/2026 |
 | Screen gates 8, 11, 12, 17: `five-second`, `two-shells`, `forms`, `dashes`; screen conventions in FRONTEND_GUIDE §5, §7, §8 | TB | ☑ | 14/10/2026 |
 | Frontend foundation PR 1 · Ground: `packages/ui` (tokens, primitives, overlays, help, toast, form system, data client), catalogue and gallery, new gates, docs (FRONTEND_FOUNDATION §4) | AJ | ☑ | 15/10/2026 |
@@ -97,6 +97,29 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · GitHub settings ticked: TB restricted the production environment to `main`, and
+  the team accepted the rest as it stands for M0. Left: branch protection on `main` and required
+  reviewers on production, once the repository is public or on a plan that offers them.
+  Operations: provisioning re-run on the server, confirmed over SSH, so the backup and restore-drill
+  timers are installed. Still open: the offsite backup host and the WhatsApp alert links.
+- 17/10/2026 · TB · Release pipeline ticked: the team accepted the manual production run by GE or TB
+  (`release.yml` approver job) as M0's production approval while the repository is private. Left:
+  required reviewers on the production environment once the repository is public or on a plan
+  that offers them; the GitHub settings and operations items stay open.
+- 17/10/2026 · TB · M0 table brought up to date: 24 of 27 items done. Ticked the server (staging
+  verify passes over HTTPS with HSTS and each host refusing the other's API, production serves the
+  sealed releases, the uptime probe is green) and the staging seed (MyCity's staff through
+  `seeds/staging/10_staff.js`; later modules seed their own records). Still open, each with
+  something outside the code: GitHub settings (the repository is private, so required reviewers
+  and branch protection are not offered); the release pipeline's production approval (interim
+  manual run until then); operations (backups, restore drill and offsite copy need provisioning
+  re-run on the server, the offsite host and the WhatsApp alert links, none confirmed yet).
+- 17/10/2026 · TB · Production runs only by hand while the repository is private: GitHub offers no
+  required reviewers there, so releases 130 to 134 reached production seconds after the seal. The
+  automatic `release.yml` run now stops at the seal and names the sha; an approver (GE or TB)
+  starts Release from `main` with it, and an `approver` job in `release.yml` and `rollback.yml`
+  refuses anyone else (SYSTEM_ARCHITECTURE §9.3, deploy runbook §2). Left: TB sets the production
+  environment to Selected branches `main`; the server-side approval if the repository stays private.
 - 17/10/2026 · TB · ⌘K additions (`docs/guides/foundation.md` §6.7): Waiting on You first with nothing
   typed (the requests waiting on the reader, opening the record each is about), open seats (opening
   the Organogram focused on the seat), preferred and middle names, Use Dark Theme, Use Light Theme,

@@ -302,6 +302,18 @@ the environment's protection rules pass. No approval, no key, no shell on produc
 step Praxis's `deploy.yaml` names but never completed (its review gate is `if: false` since
 5 August).
 
+**Interim, while the repository is private on a free plan (17/10/2026).** GitHub offers no
+required reviewers there, so steps 4 and 5 of §9.2 ran on their own: releases 130 to 134 reached
+production seconds after the seal. Until the repository is public again or on a plan that keeps
+required reviewers, production is not part of the automatic run. An approver (GE or TB) starts
+**Release** by hand from `main` with the sealed sha; an `approver` job in `release.yml` and
+`rollback.yml` refuses anyone else, any other branch and a short sha before the production job
+holds the key. This is weaker than the table above: a change to the workflow file can remove the
+check, and nothing stops the approver from being the person who merged. CODEOWNERS review of
+`.github/` and the seal checks in `deploy-gate` (§9.4) still hold. The server-side approval
+(an approver's own key recording the approval, `deploy-gate promote` refusing without it) is the
+fix if the repository stays private.
+
 ### 9.4 Layer two: the staging seal
 
 `verify-staging` ends by calling `deploy-gate seal <sha>` on the server, which writes

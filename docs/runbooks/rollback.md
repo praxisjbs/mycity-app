@@ -10,8 +10,10 @@ or a revert, and it deploys.
 
 1. Find the sha to go back to: the previous `release-*` tag in GitHub, or `status` on the server
    (`docs/runbooks/deploy.md` §3).
-2. GitHub → Actions → **Rollback** → Run workflow, paste the full 40-character sha.
-3. An approver approves the `production` environment, as for a release.
+2. GE or TB: GitHub → Actions → **Rollback** → Run workflow, branch `main`, paste the full
+   40-character sha.
+3. The `approver` job refuses anyone else (`docs/runbooks/deploy.md` §2). Where the plan offers
+   required reviewers, an approver also approves the `production` environment, as for a release.
 4. `scripts/deploy/rollback.sh` asks deploy-gate to switch `prod/current` and restart; readiness
    must report the old sha, or it switches back.
 
