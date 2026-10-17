@@ -88,7 +88,7 @@ export function codeOk(key: string, code: string): boolean {
 function methodsOf(key: string): SignInMethods {
   const w = waysOf(key);
   return {
-    two_step: { on: w.twoStep.on, mfa_frequency: w.twoStep.frequency, mfa_enrolled_at: w.twoStep.since, recovery_codes_left: w.twoStep.on ? w.twoStep.codesLeft : 0 },
+    two_step: { on: w.twoStep.on, required: false, mfa_frequency: w.twoStep.frequency, mfa_enrolled_at: w.twoStep.since, recovery_codes_left: w.twoStep.on ? w.twoStep.codesLeft : 0 },
     passkeys: w.passkeys.length,
     pin: { on: !!w.pin.value, pin_changed_at: w.pin.changed },
     confirmed_for: freshFor(key),

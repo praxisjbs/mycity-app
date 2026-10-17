@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
-import { ApiError, api } from "@/api/client";
+import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
-import "@/api/types/organisation";
-import type { AuditEntry, FailedLogin, Hierarchy, Numbering, Organisation, Session } from "@/api/types/settings";
+import type { Hierarchy } from "@/api/types/settings";
 import type { UserRow } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, ExportAction, KvCard, PagedTable } from "@/features/shared/sections";
+import { BarsCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { AttendancePolicyTab } from "./Policy";
+import { AuditLog } from "./AuditLog";
+import { NumberingTab } from "./Numbering";
+import { OrganisationTab } from "./Organisation";
 import { Roles } from "./Roles";
-import { Button, Card, CardHeader, Chain, Chips, ChoiceField, cn, DataView, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, InlineInput, LoadingRows, PageHeader, Paper, PaperFoot, PaperLogo, PaperTitle, Pill, Signature, StatStrip, StatusPill, Swatch, Switch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
+import { SecurityTab } from "./SecurityRules";
+import { Button, Card, CardHeader, Chain, Chips, ChoiceField, cn, DataView, Field, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, InlineInput, LoadingRows, PageHeader, Pill, StatusPill, Swatch, Switch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { RolePicker, type RoleRef } from "@/features/shared/pickers";
 import { Imports } from "./Imports";
@@ -27,8 +30,8 @@ export default function Settings({ tab }: ModuleScreenProps) {
     case "appearance": return <AppearanceTab />;
     case "documents-and-numbering": return <NumberingTab />;
     case "integrations": return <Integrations />;
-    case "security": return <Security />;
-    case "audit-log": return <Audit />;
+    case "security": return <SecurityTab />;
+    case "audit-log": return <AuditLog />;
     case "imports":
       return <Imports />;
     default: return <OrganisationTab />;
@@ -36,60 +39,6 @@ export default function Settings({ tab }: ModuleScreenProps) {
 }
 
 const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : "Something went wrong");
-
-/* ───────────── Organisation ───────────── */
-
-function OrganisationTab() {
-  const o = useApi("GET /api/v1/settings/organisation");
-  const depts = useApi("GET /api/v1/departments", { query: {} });
-  const [week, setWeek] = useState<Organisation["week"] | null>(null);
-  const save = useMutation("PATCH /api/v1/settings/organisation");
-  const d = o.data;
-  if (!d) return (<><PageHeader title="Organisation" /><Card><LoadingRows count={8} /></Card></>);
-  const w = week ?? d.week;
-  const dirty = !!week && JSON.stringify(week) !== JSON.stringify(d.week);
-  const edit = (i: number, patch: Partial<Organisation["week"][number]>) => setWeek(w.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  return (
-    <>
-      <PageHeader
-        title="Organisation"
-        sub={d.legal_name}
-        actions={dirty && <Button variant="primary" busy={save.pending} onClick={async () => { try { await save.run({ body: { week: w } }); invalidate("/api/v1/settings"); setWeek(null); toast("Working week saved. Attendance and payroll use it"); } catch (e) { fail(e); } }}>Save</Button>}
-      />
-      <Grid cols={2}>
-        <KvCard title="Company" items={[["Legal name", d.legal_name], ["Trading name", d.trading_name], ["Country", d.country], ["Currency", d.currency], ["Time zone", d.time_zone], ["Financial year", d.financial_year]]} />
-        <KvCard title="Departments" items={(depts.data?.data ?? []).map((x) => [x.name, `${x.headcount} staff`])} />
-      </Grid>
-      <Grid cols={2}>
-        <KvCard title="Addresses" items={d.hosts.map(([k, v]) => [k, k.startsWith("Why") ? v : <code key={k} className="text-xs">{v}</code>])} />
-        <KvCard title="System" items={d.about.map(([k, v]) => [k, v === "JBS Praxis" ? <a key={k} href="https://jbspraxis.com" target="_blank" rel="noopener noreferrer" className="font-strong text-accent-foreground">{v}</a> : v])} />
-      </Grid>
-      <DataView
-        title="Working Week"
-        right={<span className="text-2xs text-subtle-foreground">Per day, not a fixed pattern</span>}
-        rows={w}
-        rowKey={(r) => r.day}
-        columns={[
-          { key: "d", label: "Day", render: (r) => <b>{r.day}</b> },
-          { key: "w", label: "Working", render: (r) => <Switch checked={r.working} label={`${r.day} is a working day`} onChange={(v) => edit(w.indexOf(r), { working: v, start: v ? r.start ?? "09:00" : null, end: v ? r.end ?? "17:00" : null, grace_min: v ? r.grace_min ?? 10 : null })} /> },
-          { key: "s", label: "Start", render: (r) => (r.working ? <TimeBox value={r.start ?? ""} label={`${r.day} start`} onChange={(v) => edit(w.indexOf(r), { start: v })} /> : "None") },
-          { key: "e", label: "End", render: (r) => (r.working ? <TimeBox value={r.end ?? ""} label={`${r.day} end`} onChange={(v) => edit(w.indexOf(r), { end: v })} /> : "None") },
-          { key: "g", label: "Grace", render: (r) => (r.grace_min != null ? `${r.grace_min} min` : "None"), desktop: true },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        <KvCard title={`Public Holidays, ${d.holidays[0]?.date.slice(0, 4) ?? ""}`} items={d.holidays.map((h) => [formatDate(h.date).slice(0, 5), h.name])} />
-      </Grid>
-    </>
-  );
-}
-
-function TimeBox({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
-  const [t, setT] = useState(value);
-  useEffect(() => setT(value), [value]);
-  const ok = /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
-  return <InlineInput aria-label={label} inputMode="numeric" className={cn("h-8 w-18 max-md:h-11 rounded-ctl border bg-background px-2 text-sm outline-none", ok ? "border-input focus:border-ring" : "border-destructive")} value={t} onChange={setT} onBlur={() => ok && t !== value && onChange(t)} />;
-}
 
 /* ───────────── Users ───────────── */
 
@@ -438,45 +387,6 @@ function AppearanceTab() {
   );
 }
 
-/* ───────────── Documents & numbering ───────────── */
-
-function NumberingTab() {
-  const s = useApi("GET /api/v1/settings/numbering/summary");
-  const list = usePaged("GET /api/v1/settings/numbering");
-  return (
-    <>
-      <PageHeader title="Documents & Numbering" sub="Reference formats and templates" />
-      {s.data && <StatStrip items={[{ label: "Document Types", value: s.data.types }, { label: "Templates", value: s.data.templates }, { label: "Issued This Year", value: s.data.issued_this_year }, { label: "Signed", value: s.data.signed }, { label: "Format", value: "PREFIX-0000", desktop: true }]} />}
-      <Grid cols="1/1.5">
-        <PagedTable<Numbering>
-          title="Numbering"
-          list={list}
-          rowKey={(n) => n.key}
-          noun="document type"
-          columns={[
-            { key: "d", label: "Document", render: (n) => n.document },
-            { key: "p", label: "Prefix", render: (n) => <b>{n.prefix}</b> },
-            { key: "f", label: "Format", render: (n) => n.format, desktop: true },
-            { key: "n", label: "Next", align: "n", render: (n) => n.next },
-          ]}
-        />
-        <Paper note="Every document type has a template like this. The engine fills it, numbers it and hashes it.">
-          <PaperLogo reference="MOU-0004" />
-          <PaperTitle sub="Between MyCity App Ltd and MTN Nigeria Communications Plc · Executed 13/03/2025">Memorandum of Understanding</PaperTitle>
-          <p><b>1. Purpose.</b> The parties record their intention to co-operate on the distribution and promotion of the MyCityApp platform across Nigerian cities.</p>
-          <p><b>2. Term.</b> This memorandum takes effect on 13 March 2025 and continues for twenty-four months, expiring on 13 March 2027 unless renewed in writing.</p>
-          <p><b>3. Consideration.</b> The commercial schedule is set out in Annexe A and carries a total value of ₦18,400,000.</p>
-          <div className="mt-4.5 flex gap-7.5">
-            <div><Signature>For MyCity</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">I. Chukwu · 13/03/2025</div></div>
-            <div><Signature>For MTN</Signature><div className="mt-0.5 border-t border-paper-dash pt-1 text-2xs text-paper-faint">O. Adesanya · 02/04/2025</div></div>
-          </div>
-          <PaperFoot><span>Content hash verified</span><span>Artifact hash verified</span><span className="ml-auto">go.mycityapp.io/verify/MOU-0004</span></PaperFoot>
-        </Paper>
-      </Grid>
-    </>
-  );
-}
-
 /* ───────────── Integrations ───────────── */
 
 function Integrations() {
@@ -511,99 +421,6 @@ function Integrations() {
             { key: "st", label: "Status", render: (h) => <StatusPill s={h.status} /> },
           ]}
         />
-      </Grid>
-    </>
-  );
-}
-
-/* ───────────── Security ───────────── */
-
-function Security() {
-  const s = useApi("GET /api/v1/settings/security");
-  const sessions = usePaged("GET /api/v1/settings/security/sessions");
-  const failed = usePaged("GET /api/v1/settings/security/failed-logins");
-  const save = useMutation("PATCH /api/v1/settings/security");
-  const d = s.data;
-  return (
-    <>
-      <PageHeader title="Security" sub="Sessions, devices and access" />
-      {d && <KpiTiles items={[{ label: "Active Sessions", value: String(d.active_sessions) }, { label: "MFA Enrolled", value: `${d.mfa_enrolled} of ${d.users}`, tone: "warn" }, { label: "Failed Logins, 7 Days", value: String(d.failed_7d) }, { label: "Devices", value: String(d.devices) }]} />}
-      <Grid cols={2}>
-        <Card>
-          <CardHeader title="Policy" />
-          {!d && <LoadingRows />}
-          {d?.rules.map((r) => (
-            <div key={r.key} className="flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-b-0">
-              <div className="text-sm font-semibold">{r.label}</div>
-              <Switch checked={r.on} label={r.label} disabled={save.pending} onChange={async (v) => { try { await save.run({ body: { [r.key]: v } }); invalidate("/api/v1/settings/security"); toast(`${r.label}: ${v ? "on" : "off"}`); } catch (e) { fail(e); } }} />
-            </div>
-          ))}
-        </Card>
-        <PagedTable<Session>
-          title="Active Sessions"
-          list={sessions}
-          rowKey={(x) => x.session_id}
-          noun="session"
-          columns={[
-            { key: "u", label: "User", render: (x) => <Who name={x.person.display_name} /> },
-            { key: "d", label: "Device", render: (x) => x.device },
-            { key: "s", label: "Started", render: (x) => formatWhen(x.started_at), desktop: true },
-            { key: "e", label: "", render: (x) => <Button size="sm" onClick={async () => { await api.call("POST /api/v1/settings/security/sessions/:id/end", { params: { id: x.session_id }, body: {} }); invalidate("/api/v1/settings/security"); toast(`${x.person.display_name}'s session ends on their next request`); }}>End</Button> },
-          ]}
-        />
-      </Grid>
-      <Grid cols={2}>
-        <PagedTable<FailedLogin>
-          title="Failed Sign-Ins"
-          right={<span className="text-2xs text-subtle-foreground">Last 7 days</span>}
-          list={failed}
-          rowKey={(x) => x.attempt_id}
-          noun="attempt"
-          columns={[
-            { key: "w", label: "When", render: (x) => formatDateTime(x.at) },
-            { key: "e", label: "Who", render: (x) => x.email },
-            { key: "p", label: "From", render: (x) => x.place, desktop: true },
-            { key: "o", label: "Outcome", render: (x) => <StatusPill s={x.outcome} /> },
-          ]}
-        />
-      </Grid>
-    </>
-  );
-}
-
-/* ───────────── Audit log ───────────── */
-
-function Audit() {
-  const s = useApi("GET /api/v1/audit/summary");
-  const [mod, setMod] = useState("");
-  const list = usePaged("GET /api/v1/audit", { filters: mod ? { module: mod } : {} });
-  const none = <span className="text-subtle-foreground">None</span>;
-  return (
-    <>
-      <PageHeader title="Audit Log" sub="Append only. Nobody can edit this." actions={<ExportAction source="audit" filters={mod ? { module: mod } : {}} />} />
-      {s.data && <KpiTiles items={[{ label: "Entries Today", value: String(s.data.today) }, { label: "This Month", value: s.data.this_month.toLocaleString("en-NG") }, { label: "Modules", value: String(s.data.modules.length) }, { label: "Retention", value: s.data.retention }]} />}
-      {s.data && <Chips value={mod} onChange={setMod} options={[["", "Everything"], ...s.data.modules.map((m) => [m, m] as [string, string])]} />}
-      <PagedTable<AuditEntry>
-        title="Recent Entries"
-        list={list}
-        search="Search actor, action or record"
-        rowKey={(a) => a.audit_id}
-        noun="entry"
-        nounPlural="entries"
-        wide
-        columns={[
-          { key: "t", label: "Date and Time", render: (a) => formatDateTime(a.at) },
-          { key: "a", label: "Actor", render: (a) => a.actor },
-          { key: "x", label: "Action", render: (a) => <b>{a.action}</b> },
-          { key: "e", label: "Entity", render: (a) => a.entity },
-          { key: "b", label: "Before", render: (a) => a.before ?? none, desktop: true },
-          { key: "f", label: "After", render: (a) => a.after ?? none, desktop: true },
-          { key: "r", label: "Reason or Reference", render: (a) => a.reason ?? none, desktop: true },
-          { key: "m", label: "Module", render: (a) => a.module },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        {s.data ? <BarsCard title="Entries by Module" rows={s.data.by_module} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );

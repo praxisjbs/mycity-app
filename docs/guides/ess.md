@@ -44,13 +44,13 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, open the leave calendar, open a request or a figure's list |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | Three cards: Open Queries, Archived, Sanctions | Open each list; respond to an open query |
 | ESS · My Documents (`my-documents`) | Staff app | Every employee | Their vault: contracts, certificates, ID; signed, verified, expiring, missing | Upload a requested document, preview, download |
-| ESS · My Security (`my-security`) | Staff app | Every employee | Password (when it was changed), two-step sign-in, the PIN, passkeys, where they are signed in, recent sign-ins with how each began; a link to My Devices | Change password; set up, change or turn off two-step and choose how often it asks; new recovery codes; set, change or remove the PIN; add, rename or remove a passkey; sign out one device or all the others; open My Devices |
+| ESS · My Security (`my-security`) | Staff app | Every employee | Password (when it was changed), two-step sign-in, the PIN, passkeys, where they are signed in, recent sign-ins with how each began; a link to My Devices | Change password; set up, change or turn off two-step (no Turn Off while a role they hold requires it) and choose how often it asks; new recovery codes; set, change or remove the PIN; add, rename or remove a passkey; sign out one device or all the others; open My Devices |
 | Shell avatar (rail, phone top bar, More) | Staff app | Every employee | The photo from My Profile, or initials | |
 | People · Employees (employee record) | Staff app | People | The same employee record | Where People edit the fields an employee cannot |
 | People · Employees · Attendance setup | Staff app | People | Owned by LA: arrangement and weekly schedule | Where the work schedule shown in My Profile is set |
 | Payroll · Payslips (M6) | Staff app | Payroll | The payslips ESS shows | Approving a run is what makes a payslip visible in ESS |
 | Queries & Sanctions (M3) | Staff app | Managers, People, CEO | The queries and sanctions ESS shows | Raising and deciding them |
-| Settings · Security (M9) | Staff app | Admins | Organisation rules for passwords, two-step sign-in, sessions | The rules My Security follows |
+| Settings · Security (#78) | Staff app | `settings` view, edit | Session length, idle lock and password minimum within the server's floor; two-step by role; everyone's sessions; failed sign-ins | The rules My Security follows; a role that requires two-step makes its people set it up at their next sign-in (`docs/guides/foundation.md` §6.4) |
 | Mobile bottom bar and More | Staff app, phone | Every employee | Self-Service is the fourth place in the bottom bar (F16) | |
 
 ## 3 · How the screens relate
@@ -317,3 +317,6 @@ Deductions figure and every form open the shared modal.
   the preview is the chosen document itself, and the hard-coded contract and the "Your vault"
   subtitle are gone. The `ess` module carries its first read manifest; the rest of ESS arrives with
   its milestones.
+- 17/10/2026 · TB · My Security follows Settings · Security, built with foundation track C: while a
+  role the person holds requires two-step, Two-Step Sign-In has no Turn Off and the server refuses
+  one; the person sets it up at sign-in (`docs/guides/identity.md` §3 step 15). §2 updated.

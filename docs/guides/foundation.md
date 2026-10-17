@@ -76,11 +76,11 @@ These finish M0 and no prompt can do them:
 | Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | Mock | As `organogram.md` describes, on the real API |
 | Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | None | Built 17/10/2026: upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | Mock | Built 17/10/2026: their documents and the ones People asked for, upload, download, preview |
-| Settings · Organisation (#69) | Settings | `settings` view, edit | C | Mock | Organisation profile, working week, holidays |
-| Settings · Roles & Permissions (#71) | Settings | `settings` edit | C | Mock | Roles, the grants matrix, field visibility, capabilities, editable |
-| Settings · Documents & Numbering (#76) | Settings | `settings` edit | C | Mock | Numbering schemes and document settings |
-| Settings · Security (#78) | Settings | `settings` edit | C | Mock | Session and password rules, required two-step by role, failed sign-ins, sessions |
-| Settings · Audit Log (#79) | Settings | `settings` view with scope all, the CEO | C | Mock | Filtered log at 25, export |
+| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | Mock | Built 17/10/2026: organisation profile, working week, public holidays entered on screen |
+| Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | Mock | Built 17/10/2026: roles created, edited and deleted; the grants matrix, field visibility and capabilities per role |
+| Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | Mock | Built 17/10/2026: every numbering scheme with its next number, editable. No other document setting is specified yet |
+| Settings · Security (#78) | Settings | `settings` view, edit | C | Mock | Built 17/10/2026: session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
+| Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | Mock | Built 17/10/2026: the log at 25 with filters, the summary, Excel export by email, values masked per reader |
 | Settings · Approvals (#72) | Settings | `settings` edit | D | Mock | Every approval flow and its stages, editable as new versions |
 | ⌘K Search | Everywhere | Everyone, by permission | D | Mock (INTERIM) | Screens, actions, employees, logins, departments; each later module adds its own |
 | Settings · Integrations (#77), Appearance (#75), Notifications (#74), Attendance Policy (#73) | Settings | | none | Mock | Coming Soon (#74 is M6; #73 is LA's attendance) |
@@ -119,9 +119,11 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 | `import_batch`, `import_row`, `import_mapping_profile` | 0085 | B | BACKEND_STRUCTURE §9.3 |
 | `document`, document versions | 0080 | B | Through the vault and upload engine only. `0350` adds `verified_at` and `verified_by`: People accepting a file is a person's judgement, not the virus scan (§6.9) |
 | `document_request` | 0350 | B | What People asked an employee for; a Missing row until it is given (§6.9) |
-| `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3) |
-| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | Security rules become settings rows with an `.env` floor (§6.4) |
-| `audit_ledger`, `event_log` | 0030 | C | Read only |
+| `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3). `0400` adds `role.two_step_required` (§6.4) |
+| `role_capability` | 0400 | C | A capability given to everyone holding a role; `user_capability` still gives one to a single person, and a person has the union |
+| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows; security rules are `security.<rule>` rows with an `.env` floor (§6.4) |
+| `audit_ledger`, `event_log` | 0030 | C | Read only. `0400` adds the indexes the Audit Log filters on (when, module, action, record) and one on live sessions |
+| `spent_challenge` | 0230 | C | `0400` widens its purpose check with `two_step_setup`, the ticket of the set-up step at sign-in (§6.4) |
 | `workflow_definition`, `workflow_instance`, `workflow_decision` | 0070 | D | The leave definition in `0499` |
 
 The staff roster is not a reference seed. A26 still holds: `seeds/reference/` carries no people.
@@ -175,12 +177,25 @@ importer arrives in the request: `engine.assertMay()` makes the real check and r
 The `documents` module mounts at the API root, because an employee's documents are read where the
 employee is (`/employees/:id/documents`) while `src/modules/organisation/` is track A's.
 
-**Track C · `access`, `settings`, `audit`**: the mock's `GET/PATCH /settings/organisation`;
-`GET /settings/roles`, `/roles/catalogue`, `/roles/matrix`, `/roles/:id`, `POST /settings/roles`,
-`PUT /settings/roles/:id`, `DELETE /settings/roles/:id`; `GET /settings/numbering`,
-`/numbering/summary` and edits; `GET/PATCH /settings/security`, `/security/failed-logins`,
-`/security/sessions`, `POST /security/sessions/:id/end`; working week and holidays; `GET /audit`,
-`/audit/summary`, export.
+**Track C · `access`, `settings`, `audit`** (built 17/10/2026)
+
+| Route | Permission |
+|---|---|
+| `GET /settings/organisation`, `PATCH /settings/organisation` | `settings` view, edit |
+| `GET /settings/working-week`, `PUT /settings/working-week` (all seven days at once) | `settings` view, edit |
+| `GET /settings/holidays` (year; sort), `POST /settings/holidays`, `PATCH /settings/holidays/:id`, `DELETE /settings/holidays/:id` | `settings` view, create, edit, delete |
+| `GET /settings/roles` (search; sort), `/roles/catalogue`, `/roles/matrix`, `/roles/:id` | `settings` view |
+| `POST /settings/roles`, `PUT /settings/roles/:id`, `DELETE /settings/roles/:id` | `settings` create, edit, delete |
+| `GET /settings/numbering` (search; sort), `/numbering/summary`, `PUT /settings/numbering/:doc_type` | `settings` view, edit |
+| `GET /settings/security`, `PATCH /settings/security` | `settings` view, edit |
+| `GET /settings/security/failed-logins` (days; sort), `/security/sessions` (search; sort), `POST /settings/security/sessions/:id/end` | `settings` view, edit |
+| `GET /audit` (module, action, actor, record, dates; search; sort), `/audit/summary` | `settings` view with scope all, or the CEO |
+| `POST /audit/exports` (the same filters; the workbook is emailed) | `settings` export with scope all, or the CEO |
+| `POST /auth/two-step/setup`, `POST /auth/two-step/enrol` (anonymous, the set-up ticket) | none; `identity.md` §5 |
+
+`PUT /settings/roles/:id` replaces a role's grants, visible fields and capabilities together, so the
+matrix, the masks and the capabilities cannot disagree half way through a save. The role picker on
+Users keeps `GET /access/roles`.
 
 **Track D · `workflow` and search**: `GET /workflow/mine` (waiting on me), `/workflow/mine/count`,
 `GET /workflow/instances/:id`, `POST /workflow/instances/:id/approve`, `/reject`,
@@ -234,12 +249,38 @@ Salary, bank and personal details are visible to Operations & People, Management
 the CEO; everyone sees their own. Announcements and alert clearing go to the same roles. All of it is
 editable on Roles & Permissions; a change is a `security` event (the watchers are told).
 
+`0449` seeds it: a `field_visibility` row for every role and each of the four field keys
+(`employee.salary`, `.bank`, `.personal`, `.statutory`), visible for the three roles and masked for
+the rest, and the capabilities `announcements.post` and `alerts.clear` given to the three roles
+through `role_capability`. Roles add up: a field is masked for a person only when every role they
+hold masks it, and a missing row reads as visible. The CEO is never masked. A new role starts with
+every field masked and no capability.
+
 ### 6.4 Security rules editable within the floor
 
 Session length, the idle lock, the password minimum and required two-step per role are settings,
 edited on Settings · Security. The `.env` values are the floor: a setting can make a rule stricter,
 never looser. Required two-step per role (brought forward from M9) makes the next sign-in of a person
 in that role set it up. Every change is audited and the watchers are told.
+
+| Rule | Setting | Floor (`.env`) | In force |
+|---|---|---|---|
+| Session length | `security.session_max_age_min` | `SESSION_MAX_AGE_MIN` | The shorter of the two |
+| Idle lock | `security.idle_lock_min` | `SESSION_INACTIVITY_MIN` | The shorter of the two, and never longer than the session |
+| Password minimum | `security.password_min_length` | `PASSWORD_MIN_LENGTH` (new, 8 by default) | The longer of the two; applies to the next password each person chooses |
+| Two-step required | `role.two_step_required` | none | Any role a person holds that requires it |
+
+A value past the floor is refused with the floor named (`RULE_BELOW_FLOOR`, 422). Each process reads
+the rules at most every 30 seconds (`settings.security-rules.js`) and falls back to the floors if the
+read fails, so a broken setting can never loosen a rule.
+
+Required two-step: when the password or the PIN is right and the person's role requires two-step
+that they have not set up, sign-in answers `{ step: "setup" }` with a 15-minute ticket instead of a
+session. The sign-in card then shows the new key as a QR code, takes the app's first code
+(`POST /auth/two-step/enrol`), shows the ten recovery codes once and opens the session. While a role
+requires it, My Security has no Turn Off and the server refuses one (`TWO_STEP_REQUIRED`). A passkey
+counts as both steps. A locked screen cannot run the set-up, so it asks the person to sign out and
+sign in again. `identity.md` §3 and §8 carry the sign-in side.
 
 ### 6.5 Approvals designer
 
@@ -297,13 +338,17 @@ deleted, so the ask stays on the record.
 | `document.requested` | B | The employee it is about is told; the notice opens My Documents |
 | `document.verified`, `document.request_cancelled` | B | Audit only |
 | `role.*`, `permission.changed`, `field_visibility.changed`, `capability.changed`, `settings.security_changed` | C | `security: true`: the watchers are told; the grants cache cleared |
-| `settings.changed` (organisation, working week, holidays, numbering) | C | Audit only |
+| `settings.changed` (organisation, working week, holidays, numbering) | C | Audit only; the working week and holidays clear the calendar cache |
+| `audit.export_requested` | C | `audit.send_export` builds the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked), files it in the vault and emails it to them |
 | The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
 
 ## 8 · Permissions and visibility by role
 
 - `people`: Employees, the 360 and the Organogram, by scope (`all`, `team`, `own`).
 - `settings`: every Settings screen; the Audit Log needs scope `all` (and the CEO passes).
+- Nobody can save a role change that takes away their own Settings edit over everything
+  (`LOCKOUT`); the CEO is exempt. A built-in role keeps its name and cannot be deleted; a role somebody
+  holds cannot be deleted either.
 - `ess` own: My Documents and the Org Chart.
 - Field masks (`shared/rbac/field-mask.js`) apply to every response, export, import preview and AI
   read: salary, bank and personal details per §6.3.
@@ -313,12 +358,17 @@ deleted, so the ask stays on the record.
 
 Each module ships a read manifest (`<module>.ai.js`) or `// ai:none <reason>`: employees and
 departments (A), import history and the caller's own documents (B, `imports.ai.js` and `ess.ai.js`),
-roles and settings (C, reads only), my approvals (D). `documents` carries `ai:none`: a document is a
+roles and settings (C, reads only: `access.ai.js` lists and opens roles; `settings.ai.js` reads
+public holidays, the working week and the organisation profile with `ess` view, and numbering with
+`settings` view), my approvals (D). `audit` carries `ai:none`: the ledger is for the people who hold
+Settings over everything, and the assistant does not answer from it. `documents` carries `ai:none`: a document is a
 file, and what it says about a person is read through that person's own module.
 
 Search providers: `organisation.search.js` (employees, departments; A), `imports.search.js` (a batch
-by its number or the file; B), `users.search.js` (exists), screens and actions (D), and the gate in
-§6.7. `documents` and `ess` carry `search:none`: a document is found from the record it belongs to,
+by its number or the file; B), `access.search.js` (roles by name or code) and `settings.search.js`
+(numbering schemes by document, public holidays by name; C), `users.search.js` (exists), screens and
+actions (D), and the gate in §6.7. `audit` carries `search:none`: entries are found on the Audit Log
+with its filters, not one by one. `documents` and `ess` carry `search:none`: a document is found from the record it belongs to,
 and who may open one is decided per document by the vault, which no single query can express.
 
 ## 10 · On screen and mobile
@@ -334,9 +384,11 @@ screen.
 | Employee record | Profile, job, reporting line, login state with Send Invite, documents, history; Edit, Archive | Masked fields show Restricted with a help term naming who may see them | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
-| Settings · Roles & Permissions | Roles, the grants matrix, field visibility, capabilities; Save | Help term on scope (all, team, own) | Grants cache and security events: §7 |
-| Settings · Security | Session length, idle lock, password minimum, two-step by role, failed sign-ins, sessions; Save, End Session | Help term naming the floor a rule cannot go below | Why `.env` is the floor: §6.4 |
-| Settings · Audit Log | Who, what, record, when, filters; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
+| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Public Holidays by year; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week | None | Who reads the working week and holidays: §3 |
+| Settings · Roles & Permissions | Roles: name, people, modules, record scope, sensitive fields; the grants matrix; a role opens its modules with actions and scope, Sensitive Fields and Capabilities; New Role, Save Role, Create Role, Delete Role | Help term on Record Scope (all, team, own); Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8 |
+| Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
+| Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
+| Settings · Audit Log | Today, This Week, This Month, Sensitive; who, what, record, module, when; Module and Dates filters, search; an entry opens its fields before and after with Open Record; Entries by Module; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
 | Settings · Approvals | Flows, their stages, version; Edit Stages, Save | Help term on a stage condition | Versioning of open requests: §6.5 |
 | ⌘K Search | Results grouped Screens, Actions, People, Logins, Departments | None | The coverage gate: §6.7 |
 
@@ -348,8 +400,11 @@ screen.
 | Employee record | Profile card, then sections as tabs that scroll sideways | History detail | Send Invite or Edit, full width in a sheet | Back to the list |
 | Settings · Imports (#93) | Import cards: reference, file, status pill | File, Who, Updated, Problems | Start Import in the floating button | More, Settings |
 | Settings · Imports, the wizard | One step per sheet, counts as cards | The rows with problems (Download Errors instead) | Commit Import, full width | From Employees or Settings |
-| Settings · Roles & Permissions | Role cards; a role opens its grants as grouped toggles | The full matrix grid | Save, full width | More, Settings |
-| Settings · Audit Log | Entry cards: who, what, when | Export | Filter in a sheet | More, Settings |
+| Settings · Organisation (#69) | Company card, then holiday cards by year, then the week | None | New Holiday in the floating button | More, Settings |
+| Settings · Roles & Permissions | Role cards; a role opens its grants as grouped toggles | The full matrix grid | New Role in the floating button; Save Role, full width | More, Settings |
+| Settings · Documents & Numbering (#76) | Counts as cards, then document cards: next number, when it starts again | Prefix and Issued columns | A card opens its scheme in a sheet | More, Settings |
+| Settings · Security | Counts as cards, the three rules, two-step by role as switches | Method and address of a session, the person and address of a failed sign-in | Save Rules, full width | More, Settings |
+| Settings · Audit Log | Entry cards: who, what, when | Export, Entries by Module, the Module column | Filter in a sheet | More, Settings |
 | ⌘K Search | Full-screen search with grouped results | None | Tap a result | The search bar in More and the top bar |
 
 ## 11 · Edge cases
@@ -363,7 +418,15 @@ screen.
   the login is created).
 - An approver who leaves: open stages keep their resolved approvers; Operations & People can
   reassign (D).
-- A security rule set looser than the floor: refused with the floor named.
+- A security rule set looser than the floor: refused with the floor named. An idle lock longer than
+  the session: refused, "Within the session length".
+- A role change that would leave the person saving it without Settings: refused (`LOCKOUT`).
+- Two public holidays on one date: refused, "Already a holiday".
+- A numbering scheme that starts again each year or month without the period in the number:
+  refused, since numbers would repeat.
+- Ending your own session from Settings · Security: refused; Sign Out does that.
+- A role made to require two-step while one of its people is signed in: their session carries on;
+  the next sign-in asks them to set it up.
 - A search provider that throws: its group is left out and logged; the rest answer.
 - A document asked for twice: two requests, two Missing rows. People cancel the one they do not want.
 - An upload answering a request somebody already answered: refused, naming the document that arrived.
@@ -389,6 +452,15 @@ screen.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · Track C built: `access` (roles created, edited and deleted, the grants matrix,
+  field visibility and capabilities per role), `settings` (organisation profile, working week, public
+  holidays, numbering schemes, the security rules within the `.env` floor) and `audit` (the log at 25
+  with filters, the summary and the emailed Excel export, masked per reader), with Organisation (#69),
+  Roles & Permissions (#71), Documents & Numbering (#76), Security (#78) and Audit Log (#79) on the
+  real API. Migration `0400` adds `role_capability`, `role.two_step_required` and the audit indexes;
+  `0449` seeds the §6.3 defaults; `PASSWORD_MIN_LENGTH` joins the `.env` floors. Required two-step by
+  role adds the set-up step to sign-in, in `identity` and `security` (§6.4, `identity.md`). §4, §5,
+  §6.3, §6.4, §7 to §11 updated.
 - 17/10/2026 · TB · Track B built: the `imports` API over any registered importer, Settings · Imports
   (#93, the wizard and the history), the `documents` module (gated upload, download, versions,
   verification and document requests) and ESS · My Documents (#14) on the real API. Migration `0350`

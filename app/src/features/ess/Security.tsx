@@ -269,9 +269,11 @@ function TwoStepCard() {
             <Button size="sm" icon="phone" busy={setup.pending} onClick={() => void start()}>
               Change App
             </Button>
-            <Button size="sm" variant="danger" busy={off.pending} onClick={() => void turnOff()}>
-              Turn Off
-            </Button>
+            {!t.required && (
+              <Button size="sm" variant="danger" busy={off.pending} onClick={() => void turnOff()}>
+                Turn Off
+              </Button>
+            )}
           </Inline>
         </>
       ) : (

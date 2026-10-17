@@ -32,6 +32,12 @@ const clearable = (max) =>
     .nullable()
     .transform((v) => (v === "" ? null : v));
 
+/** A typed value a person may clear: an empty string is "not set" (null). */
+const clearableAs = (schema) =>
+  z
+    .union([z.literal("").transform(() => null), schema])
+    .nullable();
+
 /** GET /settings/organisation. Fields nobody has entered yet are null. */
 const Organisation = z
   .object({
@@ -57,15 +63,9 @@ const OrganisationPatch = z
     registration_number: clearable(40).optional(),
     tax_id: clearable(40).optional(),
     address: clearable(500).optional(),
-    phone: phone.nullable().optional(),
-    email: email.nullable().optional(),
-    website: z
-      .string()
-      .trim()
-      .max(200)
-      .url("Not a web address")
-      .nullable()
-      .optional(),
+    phone: clearableAs(phone).optional(),
+    email: clearableAs(email).optional(),
+    website: clearableAs(z.string().trim().max(200).url("Not a web address")).optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field");

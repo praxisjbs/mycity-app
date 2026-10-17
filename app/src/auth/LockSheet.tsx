@@ -87,8 +87,13 @@ export function LockSheet() {
     try {
       if (step.kind === "code") await finishTwoStep(step.ticket, typed);
       else {
-        const ticket = using === "pin" ? await signInWithPin(me.email, typed) : await signIn(me.email, typed);
-        if (ticket) reset({ step: { kind: "code", ticket, recovery: false } });
+        const next = using === "pin" ? await signInWithPin(me.email, typed) : await signIn(me.email, typed);
+        // Setting two-step up needs the whole sign-in card, so the lock screen sends the person there.
+        if (next?.kind === "setup") {
+          setValue("");
+          setTouched(false);
+          setProblem("Your role now needs two-step sign-in. Sign out, then sign in to set it up.");
+        } else if (next) reset({ step: { kind: "code", ticket: next.ticket, recovery: false } });
       }
     } catch (e) {
       const a = e as ApiError;
