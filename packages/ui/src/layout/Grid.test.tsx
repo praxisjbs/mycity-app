@@ -33,6 +33,18 @@ describe("Grid", () => {
     expect(cls).not.toContain("mb-3");
   });
 
+  it("lets two columns side by side scroll on their own on desktop, only once they sit side by side", () => {
+    const two = render(<Grid cols={2}>{cells(2)}</Grid>).container.firstElementChild?.className ?? "";
+    expect(two).toContain("lg:*:max-h-card-pane");
+    expect(two).toContain("lg:*:overflow-y-auto");
+    const uneven = render(<Grid cols="1/1.5">{cells(2)}</Grid>).container.firstElementChild?.className ?? "";
+    expect(uneven).toContain("xl:*:max-h-card-pane");
+    const off = render(<Grid cols={2} scroll={false}>{cells(2)}</Grid>).container.firstElementChild?.className ?? "";
+    expect(off).not.toContain("max-h-card-pane");
+    const four = render(<Grid cols={4}>{cells(4)}</Grid>).container.firstElementChild?.className ?? "";
+    expect(four).not.toContain("max-h-card-pane");
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<Grid cols={2}>{cells(2)}</Grid>);
     expect(await axe(container)).toHaveNoViolations();

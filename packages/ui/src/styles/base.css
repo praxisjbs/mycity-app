@@ -229,6 +229,12 @@
   background: conic-gradient(var(--chart-2), color-mix(in oklab, var(--chart-3) 15%, transparent), var(--primary), color-mix(in oklab, var(--chart-3) 15%, transparent), var(--chart-2));
 }
 
+/* A column of a two-column Grid on desktop: at most the height under the top bar and the
+   tabs, so two cards side by side each scroll on their own, as the mailbox's panes do. */
+@utility max-h-card-pane {
+  max-height: calc(100dvh - 140px);
+}
+
 /* The split panes: the list at the width the person dragged (--pane), the
    divider, the record, and optionally a third pane at the right. */
 @utility cols-panes {
