@@ -32,13 +32,15 @@ password, as with any mail app.
 |---|---|---|---|---|
 | Mailbox · Inbox (`inbox`) | Staff app | The mailbox owner only | Threads, newest first; the open message | Read, reply, reply all, forward, archive, move to spam or trash, download attachments |
 | Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | Staff app | Owner | The canonical six folders | As above; continue a draft; empty spam and trash |
+| Mailbox · Connect (sheet) | Staff app | Owner | Opens over Mailbox when the user has no connection, or when the server refused the saved password | Connect with address and password; reconnect |
 | Composer (modal; full screen on mobile) | Staff app | Owner | From, To, Cc, Bcc, Subject, rich text body, attachments | Write, format, attach, send now or schedule, discard |
-| Settings · Integrations, mailbox connection | Staff app | Owner | Connection status, last sync | Connect with address and password, test, reconnect, disconnect |
+| Settings · Integrations, mailbox connection | Staff app | Owner | Connection status, last sync | Reads the connection; connecting happens in Mailbox |
 | Notification bell | Staff app | Owner | New mail (per Settings · Notifications) | Open the thread |
 
 ## 3 · How the screens relate
 
-1. **Connect** (Settings · Integrations, or the first time Mailbox is opened): address and password →
+1. **Connect** (the Connect sheet, which opens over Mailbox the first time it is opened with no
+   connection; GE, 17/10/2026): address and password →
    `autodiscover` finds the IMAP and SMTP hosts from the domain → `POST /connections` tests both →
    the password is stored encrypted in `integration_secret` under `mail_conn:<id>`, never on the
    connection row.
@@ -164,6 +166,7 @@ interface copy; the copy rules apply to the chrome around them.
 | Mailbox · Inbox (`inbox`) | "N messages · N unread" (desktop subtitle); Refresh, Compose; Folder, Messages, Unread, Attachments, Mailbox (desktop: the user's address); the message list (unread dot, sender, subject, time); the open message: sender avatar, subject, sender and address, time, Reply, Forward, the body, the attachments with their sizes | None | Custom domain only, no Google or Microsoft, signing in with an address and a password, sending and receiving only with no link to other modules: §1, §3 step 1 (the page's ⓘ text is removed). What Refresh does: §3 step 2 |
 | Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | As Inbox, for that folder. Drafts lists scheduled mail as "Scheduled: subject" with its release time | None | Scheduled mail waiting in Drafts until release: §3 step 5. Spam bodies not rendered: §6 |
 | Composer (modal; full screen on mobile) | New Message, Reply or Forward as the title; From (the user's address), To (address chips, each removable; Cc Bcc), Cc, Bcc, Subject; the formatting bar (Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link with its address field and Add Link, Clear Formatting, Attach a File) and a Draft Saved pill at its end; the body; attachments with their upload bar; Schedule Send (Send Date, DD/MM/YYYY; Send Time, HH:MM; Cancel, Schedule Send). Footer: Discard, Schedule (Tomorrow at 08:00, Monday at 08:00, Pick Date and Time), Send; after Discard, Keep Editing and Discard Draft. Errors of at most 4 words where they happen: "Add a recipient" and "Not an email address" on the To row, "Not a real date", "Not a valid time", "Time already passed" | Help term on Send Time: "Lagos time, on the 24 hour clock: 08:30, 17:45." | How drafts save: §3 step 4. Scheduled mail and its release: §3 step 5. Link addresses limited to `https://` and `mailto:`: §6. The discard question ("Discard this draft and its attachments?") and the "That time has already passed" sentence are removed: the Discard Draft button and the field error say it (§6) |
+| Mailbox · Connect (sheet) | Connect Mailbox as the title; Email Address, Password; Connect. On a refused password the banner over the list reads "Mail server refused the password" with Reconnect. Errors of at most 4 words on the field: "Not an email address", "Password refused", "Mail server not found" | None | Autodiscover, the test in both directions and where the password is kept: §3 step 1, §4 |
 | Settings · Integrations, mailbox connection | Owned by Settings · Integrations: that module's guide | That module's guide | How the connection is tested and where the password is kept: §3 step 1, §4 |
 | Notification bell | Owned by the frontend foundation (FRONTEND_GUIDE §9.6): the sender and subject; a tap opens the message | None | Which mail notifies: §7, Settings · Notifications |
 
@@ -174,6 +177,7 @@ interface copy; the copy rules apply to the chrome around them.
 | Mailbox · Inbox (`inbox`) | Refresh and Compose beside the title; four stat cards two to a row (Folder, Messages, Unread, Attachments); the message list, full width | The subtitle; the Mailbox address card; the reader beside the list; the resizable divider | Tap a message: the reader opens full screen with Back, Reply and Forward; Compose opens the composer full screen | Mailbox from the menu drawer (it is not on the bottom bar); the six folder tabs scroll sideways along the top |
 | Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | As Inbox | As Inbox | As Inbox | As Inbox |
 | Composer (modal; full screen on mobile) | A full screen sheet: From, To, Subject as compact 44 px rows; the formatting bar in two rows of 44 px buttons; the body | Nothing: the same fields as desktop | Send, full width at the bottom, with Discard and Schedule above it | Close at the top of the sheet; Discard asks once in the footer |
+| Mailbox · Connect (sheet) | A bottom sheet: Email Address, Password, Connect full width | Nothing | Connect | Opens by itself over Mailbox; Close returns to the menu |
 | Settings · Integrations, mailbox connection | Owned by Settings | That module's guide | That module's guide | That module's guide |
 | Notification bell | The bell in the top bar; push on the phone | None | A tap opens the message in the full screen reader | The top bar |
 
@@ -181,8 +185,8 @@ interface copy; the copy rules apply to the chrome around them.
 
 - **Wrong password / server refuses**: the connection test fails with the classified reason and
   the fix (`smtp-error.map.js`); nothing is saved.
-- **Password changed on the mail server**: sync fails → connection marked `needs_reconnect` → banner
-  in Mailbox asks for the new password.
+- **Password changed on the mail server**: sync fails → connection marked `needs_reconnect` → a
+  banner in Mailbox with **Reconnect**, which opens the Connect sheet with the address filled in.
 - **First sync of a large mailbox**: newest first, paged; older mail fills in in the background.
 - **Hard-bounced recipient**: warned on the chip before sending again.
 - **Double send** on a bad connection: refused by the Idempotency-Key.
@@ -219,3 +223,4 @@ interface copy; the copy rules apply to the chrome around them.
 - 15/10/2026 · AJ · Screens brought to §10 and the screen conventions: the ⓘ text on the folder title is gone; message rows are marked as content for gate 8; the composer's fields come from the form system.
 - 15/10/2026 · AJ · Frontend foundation PR 2 (Shell): Mailbox opens from the rail on desktop and from More on a phone (F17); the list's pane splitter now says its width to assistive technology (the a11y gate crawls the app). No Mailbox behaviour changed.
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): the composer's body is now the shared `RichTextField` (TipTap, its own lazy chunk) instead of its own `contentEditable` on the deprecated `execCommand`. Paste from Word and Gmail is parsed into the document rather than carried in as foreign markup, which is why TipTap was chosen (FRONTEND_FOUNDATION §5, PR 3 question 3). The bar carries exactly what §6 and §10 list: Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link (`https://` or `mailto:` only, typed in a field under the bar, never a native dialog) and Clear Formatting, with Undo and Redo at its end and Attach a File beside it. The list beside the reader is `SplitPanes`, shared with Chat.
+- 17/10/2026 · GE · Connecting moved into Mailbox: a Connect sheet opens over it when there is no connection, and the refused-password banner carries Reconnect, which opens the same sheet. Settings · Integrations only shows the connection.

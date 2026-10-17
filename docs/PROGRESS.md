@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 32 | 26 | 0 | 6 | 0 | 0 |
+| M1 Core Operations & Employee Management | 32 | 23 | 0 | 9 | 0 | 0 |
 | M2 Productivity & Performance | 9 | 9 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 4 | 4 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **80** | **0** | **13** | **0** | **0** |
+| **Total** | **93** | **77** | **0** | **16** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
@@ -551,12 +551,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 15 | Channels | `channels` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 16 | Direct Messages | `direct-messages` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
-| 17 | Announcements | `announcements` | M1 | GE | ☐ | ☐ | ☐ | Not started | |
+| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 17 | Announcements | `announcements` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 17/10/2026 · GE · Backend built: contract (`community.js`, `announcements.js`), migration 1110, the `community` and `announcements` modules (channels, members, messages, uploads, voice notes, polls, reactions, transcripts, direct messages with sent, delivered and read ticks, presence, profile card, recognition always to #general per A19, announcements with audience, scheduling, reads and reminders), the 05:00 celebrations job, the announcement release job and its safety net, ⌘K for announcements, the AI read manifest; unit tests and an integration suite on the real migrations. AJ's screens moved onto the contract and the mock rewritten in its shapes; voice notes record and upload in channels too; search steps between matches; Edit Members, Mute and the copy in §10 done. Walked on the live API on a laptop, desktop and phone, two people: announcement, text, a recorded voice note, a direct message with its read ticks arriving over the socket, presence; the dev server now proxies the socket too. A new `GET /community/people` lets every member of staff pick a colleague (the staff register needs People). Left: the Average Read help term needs StatStrip to take one; the Knowledge Hub (M10) needs its own read route for announcements, as `/community/announcements` is for People and the CEO.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/community/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/community.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · GE · Demo updated per the 12 October meeting (guides removed, ＋ menu, members behind ⋮, fixed
   composer, read-only pinned #announcements, birthday and recognition cards, Praxis-style DMs with

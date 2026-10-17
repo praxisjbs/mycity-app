@@ -76,6 +76,16 @@ const JOBS = Object.freeze([
     concurrency: 1,
     summary: "An import committed in the background",
   },
+  {
+    queue: "celebrations",
+    concurrency: 1,
+    summary: "A day's birthday and work anniversary cards posted again, by hand",
+  },
+  {
+    queue: "announcement-publish",
+    concurrency: 1,
+    summary: "A scheduled announcement released at its time",
+  },
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -85,6 +95,8 @@ const SCHEDULERS = Object.freeze([
   "alert-ageing",
   "media-reconcile",
   "import-cleanup",
+  "celebrations",
+  "announcement-release",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

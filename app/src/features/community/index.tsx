@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import "@/api/types/community";
+import { useRealtime } from "@/api/realtime";
 import "@/api/types/organisation";
-import type { Announcement, Channel, Conversation, MessageCreate } from "@/api/types/community";
+import type { Announcement, Channel, Conversation, Member } from "@/api/types/community";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
-import { Avatar, Button, Card, ChoiceField, cn, DateField, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
-import { EmployeePicker } from "@/features/shared/pickers";
+import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
+import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
 import { upload } from "@/api/upload";
 
 export default function Community({ tab }: ModuleScreenProps) {
@@ -20,8 +20,6 @@ export default function Community({ tab }: ModuleScreenProps) {
   return <Channels />;
 }
 
-/** Modal footer row, inside the body so it can use the form's state. */
-
 const Group = ({ children }: { children: ReactNode }) => <div className="px-2 pt-2 pb-1 text-2xs font-strong tracking-caps text-subtle-foreground uppercase">{children}</div>;
 
 function ThreadHead({ children, onBack, backLabel }: { children: ReactNode; onBack: () => void; backLabel: string }) {
@@ -29,6 +27,25 @@ function ThreadHead({ children, onBack, backLabel }: { children: ReactNode; onBa
     <div className="flex flex-none items-center gap-2.5 border-b border-border py-2.5 pr-3 pl-4 max-md:px-2 max-md:py-2">
       <IconButton icon="left" label={backLabel} className="md:hidden" onClick={onBack} />
       {children}
+    </div>
+  );
+}
+
+const WHO_POSTS: Record<Channel["post_policy"], string> = { everyone: "Every member", admins: "Admins only", people_ceo: "People and the CEO" };
+
+/** The departments, for whole-department chips. */
+function DepartmentChips({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const departments = useApi("GET /api/v1/departments", { query: {} });
+  return (
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Departments">
+      {(departments.data?.data ?? []).map((d) => {
+        const on = value.includes(d.department_id);
+        return (
+          <button key={d.department_id} type="button" aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== d.department_id) : [...value, d.department_id])} className={cn("h-7 rounded-full border px-3 text-xs font-semibold phone:min-h-tap", on ? "border-secondary bg-secondary text-secondary-foreground" : "border-input bg-background text-muted-foreground hover:bg-muted")}>
+            {d.name}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -43,92 +60,104 @@ function Channels() {
   const [sel, setSel] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [drawer, setDrawer] = useState(false);
   const split = useSplitPanes("chat", 300);
   const rows = list.rows;
-  const current = rows.find((c) => c.channel_id === sel) ?? (mobile ? undefined : rows.find((c) => !c.read_only) ?? rows[0]);
-  const t = useThread("channel", current?.channel_id ?? null);
-  /* Opening a channel marks it read, whether picked or shown first. */
-  const openId = current?.channel_id;
-  const openUnread = current?.unread ?? 0;
+  const current = rows.find((c) => c.community_channel_id === sel) ?? (mobile ? undefined : rows.find((c) => c.can_post) ?? rows[0]);
   const reloadList = list.reload;
+  const t = useThread(current?.community_channel_id ?? null, { onActivity: reloadList });
+  /* Opening a channel marks it read, whether picked or shown first. */
+  const openId = current?.community_channel_id;
+  const openUnread = current?.unread ?? 0;
   useEffect(() => {
     if (openId && openUnread) void api.call("POST /api/v1/community/channels/:id/read", { params: { id: openId }, body: {} }).then(reloadList);
   }, [openId, openUnread, reloadList]);
 
   const pick = (c: Channel) => {
-    setSel(c.channel_id);
+    setSel(c.community_channel_id);
     setOpen(true);
     setSearching(false);
+    setDrawer(false);
   };
-  const post = async (b: MessageCreate) => {
-    await t.send(b);
-    list.reload();
+  const after = async (work: Promise<void>) => {
+    await work;
+    reloadList();
   };
   const pinned = rows.filter((c) => c.pinned);
   const rest = rows.filter((c) => !c.pinned);
   const row = (c: Channel) => (
     <Row
-      key={c.channel_id}
-      on={c.channel_id === current?.channel_id && (!mobile || open)}
+      key={c.community_channel_id}
+      on={c.community_channel_id === current?.community_channel_id && (!mobile || open)}
       unread={c.unread > 0}
-      lead={<span className={cn("flex size-7.5 flex-none items-center justify-center rounded-ctl border font-bold", c.channel_id === current?.channel_id ? "border-secondary bg-secondary text-secondary-foreground" : "border-border bg-muted text-muted-foreground")}>#</span>}
-      title={<>{c.name}{c.read_only && <Icon name="lock" className="size-3.5 text-subtle-foreground" />}</>}
-      sub={c.last_text ?? `${c.members} members`}
+      lead={<span className={cn("flex size-7.5 flex-none items-center justify-center rounded-ctl border font-bold", c.community_channel_id === current?.community_channel_id ? "border-secondary bg-secondary text-secondary-foreground" : "border-border bg-muted text-muted-foreground")}>#</span>}
+      title={<>{c.name}{!c.can_post && <Icon name="lock" className="size-3.5 text-subtle-foreground" />}</>}
+      sub={c.last_text ?? `${c.members} ${c.members === 1 ? "member" : "members"}`}
       when={formatWhen(c.last_at)}
       count={c.unread}
       onClick={() => pick(c)}
     />
   );
 
+  const channelList = (
+    <>
+      {pinned.length > 0 && <><Group>Pinned</Group>{pinned.map(row)}</>}
+      <Group>Channels</Group>
+      {rest.length ? rest.map(row) : <p className="p-2 text-2xs text-subtle-foreground">No channel matches.</p>}
+    </>
+  );
   const listPane = (
     <>
       <div className="flex-none px-3 pt-3 pb-2"><SearchInput value={list.q} onChange={list.setQ} placeholder="Search channels" /></div>
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 max-md:overflow-visible">
-        {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={5} /> : (
-          <>
-            {pinned.length > 0 && <><Group>Pinned</Group>{pinned.map(row)}</>}
-            <Group>Channels</Group>
-            {rest.length ? rest.map(row) : <p className="p-2 text-2xs text-subtle-foreground">No channel matches.</p>}
-          </>
-        )}
+        {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !rows.length ? <LoadingRows count={5} /> : channelList}
       </div>
     </>
   );
 
+  const muteChannel = async (c: Channel) => {
+    await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
+    toast(c.muted ? `Notifications on for #${c.name}` : `#${c.name} muted`);
+    reloadList();
+  };
+
   const thread = current ? (
     <>
       <ThreadHead onBack={() => setOpen(false)} backLabel="Back to channels">
+        {mobile && <IconButton icon="menu" label="Switch channel" onClick={() => setDrawer(true)} />}
         <span className="min-w-0 flex-1">
-          <b className="flex items-center gap-1.5 truncate text-base font-strong"># {current.name}{current.read_only && <Pill>Read Only</Pill>}</b>
-          <span className="block text-2xs text-subtle-foreground">{current.members} members</span>
+          <b className="flex items-center gap-1.5 truncate text-base font-strong"># {current.name}{!current.can_post && <Pill>Read Only</Pill>}</b>
+          <span className="block text-2xs text-subtle-foreground">{current.members} {current.members === 1 ? "member" : "members"}</span>
         </span>
         <Menu
           trigger={(p) => <IconButton {...p} icon="dots" label="Channel menu" />}
           items={[
-            { label: "View Members", icon: "users", onSelect: () => modal.open({ title: `Members · #${current.name}`, body: (close) => <Members c={current} close={close} /> }) },
-            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: `#${current.name}`, body: (close) => <><KeyValue items={[["Members", current.members], ["Who can post", current.read_only ? "People and the CEO" : "Every member"], ["Visibility", "Internal to MyCity"]]} /><FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter></> }) },
+            { label: "View Members", icon: "users", onSelect: () => modal.open({ title: "Channel Members", body: (close) => <Members c={current} close={close} /> }) },
+            ...(current.is_admin ? [{ label: "Edit Members", icon: "user" as const, onSelect: () => modal.open({ title: "Edit Members", body: (close) => <Members c={current} close={close} edit onChanged={reloadList} /> }) }] : []),
+            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: "Channel Details", body: (close) => <><KeyValue items={[["Channel", `#${current.name}`], ["Members", current.members], ["Who Can Post", WHO_POSTS[current.post_policy]]]} /><FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter></> }) },
             { label: "Search in Channel", icon: "srch", onSelect: () => setSearching(true) },
             "sep",
-            { label: "Mute Notifications", icon: "bell", onSelect: () => void api.call("POST /api/v1/community/channels/:id/mute", { params: { id: current.channel_id }, body: {} }).then(() => toast(`#${current.name} muted`)) },
+            { label: current.muted ? "Unmute Notifications" : "Mute Notifications", icon: "bell", onSelect: () => void muteChannel(current) },
           ]}
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
       <ThreadBody t={t} />
       <Composer
-        key={current.channel_id}
+        key={current.community_channel_id}
         placeholder={`Message #${current.name}`}
         readOnly={current.can_post ? undefined : "Only People and the CEO post here"}
-        onSend={post}
+        onSend={(b) => after(t.send(b))}
+        onVoice={(file, secs) => after(t.sendFile(file, secs))}
         plus={(cls) => (
           <Menu
             align="start"
             trigger={(p) => <button {...p} type="button" className={cls} aria-label="Add to message"><Icon name="plus" /></button>}
             items={[
-              { label: "Recognise a Colleague", icon: "thumb", onSelect: () => modal.open({ title: "Recognise a Colleague", body: (close) => <Recognise channel={current} close={close} done={t.reload} /> }) },
-              { label: "Celebrate", icon: "flag", onSelect: () => modal.open({ title: "Celebrate", body: (close) => <Celebrate close={close} send={post} /> }) },
-              { label: "Start a Poll", icon: "chart", onSelect: () => modal.open({ title: "Start a Poll", body: (close) => <PollForm close={close} send={post} /> }) },
-              { label: "Attach a File", icon: "clip", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach close={close} send={post} /> }) },
+              { label: "Recognise a Colleague", icon: "thumb", onSelect: () => modal.open({ title: "Recognise a Colleague", body: (close) => <Recognise close={close} done={() => (t.reload(), reloadList())} /> }) },
+              { label: "Celebrate", icon: "flag", onSelect: () => modal.open({ title: "Celebrate", body: (close) => <Celebrate close={close} send={(b) => after(t.send(b))} /> }) },
+              { label: "Start a Poll", icon: "chart", onSelect: () => modal.open({ title: "Start a Poll", body: (close) => <PollForm close={close} send={(b) => after(t.send(b))} /> }) },
+              { label: "Attach a File", icon: "clip", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
             ]}
           />
         )}
@@ -142,23 +171,74 @@ function Channels() {
     <>
       <PageHeader
         title="Channels"
-        sub={list.page ? `${list.page.total} channels` : " "}
+        sub={list.page ? `${list.page.total} ${list.page.total === 1 ? "channel" : "channels"}` : " "}
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Channel", body: (close) => <NewChannel close={close} onMade={(c) => (list.reload(), pick(c))} /> })}>New Channel</Button>}
       />
       <SplitPanes split={split} list={listPane} detail={thread} open={open} />
+      {drawer && <ChannelDrawer onClose={() => setDrawer(false)}>{channelList}</ChannelDrawer>}
     </>
   );
 }
 
-function Members({ c, close }: { c: Channel; close: () => void }) {
-  const list = usePaged("GET /api/v1/community/channels/:id/members", { params: { id: c.channel_id } });
+/** On a phone, inside a channel: the channel list as a side drawer (community.md §10.2). */
+function ChannelDrawer({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  const modal = useModal();
+  useEffect(() => {
+    modal.open({ title: "Channels", body: () => <div className="-mx-2">{children}</div>, onClose });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- opened once; the list inside is the live one
+  }, []);
+  return null;
+}
+
+function Members({ c, close, edit = false, onChanged }: { c: Channel; close: () => void; edit?: boolean; onChanged?: () => void }) {
+  const list = usePaged("GET /api/v1/community/channels/:id/members", { params: { id: c.community_channel_id } });
+  const [adding, setAdding] = useState(false);
+  const remove = async (m: Member) => {
+    await api.call("DELETE /api/v1/community/channels/:id/members/:user_id", { params: { id: c.community_channel_id, user_id: m.user_id } });
+    toast(`Removed from #${c.name}`);
+    list.reload();
+    onChanged?.();
+  };
+  if (adding) return <AddMembers c={c} close={() => setAdding(false)} done={() => (setAdding(false), list.reload(), onChanged?.())} />;
   return (
     <>
       <SearchInput value={list.q} onChange={list.setQ} placeholder="Search members" className="mb-2" />
-      <p className="mb-2 text-2xs text-subtle-foreground">{c.members} members{list.page && list.page.total > list.rows.length ? `, showing ${list.rows.length}` : ""}</p>
-      <PeopleList people={list.rows} />
+      <p data-copy="content" className="mb-2 text-2xs text-subtle-foreground">#{c.name} · {list.page?.total ?? c.members} members</p>
+      <PeopleList
+        people={list.rows.map((m) => m.person)}
+        right={(p) => {
+          const m = list.rows.find((x) => x.person.employee_id === p.employee_id)!;
+          if (m.member_role === "admin") return <Pill tone="ok">Admin</Pill>;
+          return edit ? <Button size="sm" onClick={() => void remove(m)}>Remove</Button> : null;
+        }}
+      />
       {list.page?.has_next && <Button size="sm" className="mt-2" onClick={() => list.setPage(list.pageNumber + 1)}>Next Page</Button>}
-      <FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter>
+      <FormFooter>
+        {edit && <Button icon="plus" onClick={() => setAdding(true)}>Add People</Button>}
+        <Button variant="primary" onClick={close}>Close</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+function AddMembers({ c, close, done }: { c: Channel; close: () => void; done: () => void }) {
+  const [people, setPeople] = useState<PersonRef[]>([]);
+  const [depts, setDepts] = useState<string[]>([]);
+  const save = useMutation("POST /api/v1/community/channels/:id/members");
+  const go = async () => {
+    if (!people.length && !depts.length) return;
+    await save.run({ params: { id: c.community_channel_id }, body: { member_ids: people.map((p) => p.employee_id), department_ids: depts } });
+    toast(`Added to #${c.name}`);
+    done();
+  };
+  return (
+    <>
+      <Field label="People" optional><EmployeePicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
+      <Field label="Departments" optional><DepartmentChips value={depts} onChange={setDepts} /></Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" busy={save.pending} disabled={!people.length && !depts.length} onClick={go}>Add People</Button>
+      </FormFooter>
     </>
   );
 }
@@ -179,17 +259,16 @@ function PeopleList({ people, right }: { people: PersonRef[]; right?: (p: Person
 }
 
 function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel) => void }) {
-  const f = useContractForm({ name: "", purpose: "" }, { name: (v) => (/^[a-z0-9][a-z0-9-]{1,29}$/.test(v) ? null : "Lower case letters, numbers and hyphens, 2 to 30 characters") });
+  const f = useContractForm({ name: "", purpose: "" }, { name: (v) => (/^[a-z0-9][a-z0-9-]{1,29}$/.test(v) ? null : "Not a valid name") });
   const [people, setPeople] = useState<PersonRef[]>([]);
   const [depts, setDepts] = useState<string[]>([]);
   const [who, setWho] = useState<"everyone" | "admins">("everyone");
-  const departments = useApi("GET /api/v1/departments", { query: {} });
   const save = useMutation("POST /api/v1/community/channels");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      const c = await save.run({ body: { name: f.values.name, member_ids: people.map((p) => p.employee_id), departments: depts, post_policy: who } });
-      if (f.values.purpose.trim()) await api.call("POST /api/v1/community/channels/:id/messages", { params: { id: c.channel_id }, body: { kind: "text", text: `Created #${c.name}: ${f.values.purpose.trim()}` } });
+      const c = await save.run({ body: { name: f.values.name, description: f.values.purpose.trim() || undefined, member_ids: people.map((p) => p.employee_id), department_ids: depts, post_policy: who } });
+      if (f.values.purpose.trim()) await api.call("POST /api/v1/community/channels/:id/messages", { params: { id: c.community_channel_id }, body: { message_type: "text", body: `Created #${c.name}: ${f.values.purpose.trim()}` } });
       close();
       onMade(c);
       toast(`#${c.name} created with ${c.members} members`);
@@ -199,19 +278,12 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
   };
   return (
     <>
-      <Field label="Channel Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. abuja-hub" autoComplete="off" onChange={(v) => f.set("name", v.toLowerCase())} /></Field>
-      <Field label="What Is It For"><TextField {...f.field("purpose")} placeholder="Optional" /></Field>
-      <Field label="Add Whole Departments">
-        <div className="flex flex-wrap gap-1.5">
-          {(departments.data?.data ?? []).map((d) => {
-            const on = depts.includes(d.name);
-            return <button key={d.department_id} type="button" aria-pressed={on} onClick={() => setDepts(on ? depts.filter((x) => x !== d.name) : [...depts, d.name])} className={cn("h-7 rounded-full border px-3 text-xs font-semibold", on ? "border-secondary bg-secondary text-secondary-foreground" : "border-input bg-background text-muted-foreground hover:bg-muted")}>{d.name}</button>;
-          })}
-        </div>
-      </Field>
-      <Field label={<>Add People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>}><EmployeePicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
-      <Field label="Who Can Post" info="Set when the channel is created. Everyone can read.">
-        <ChoiceField value={who} onChange={setWho} options={[["everyone", "Every Member"], ["admins", "Only Admins"]]} />
+      <Field label={<HelpTerm help="Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name.">Channel Name</HelpTerm>} {...f.field("name")}><TextField {...f.field("name")} placeholder="abuja-hub" autoComplete="off" onChange={(v) => f.set("name", v.toLowerCase())} /></Field>
+      <Field label="Purpose" optional><TextField {...f.field("purpose")} /></Field>
+      <Field label="Departments" optional><DepartmentChips value={depts} onChange={setDepts} /></Field>
+      <Field label={<>People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>} optional><EmployeePicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
+      <Field label="Who Can Post">
+        <ChoiceField value={who} onChange={setWho} options={[["everyone", "Every Member"], ["admins", "Admins Only"]]} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -221,32 +293,33 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
   );
 }
 
-function Recognise({ channel, close, done }: { channel: Channel; close: () => void; done: () => void }) {
+/** A thumbs up for a colleague. It always lands in #general (MILESTONES A19). */
+function Recognise({ close, done }: { close: () => void; done: () => void }) {
   const [who, setWho] = useState<PersonRef[]>([]);
   const [text, setText] = useState("");
   const [tried, setTried] = useState(false);
-  const save = useMutation("POST /api/v1/community/channels/:id/recognitions");
+  const save = useMutation("POST /api/v1/community/recognitions");
   const go = async () => {
     setTried(true);
     if (!who.length) return;
-    await save.run({ params: { id: channel.channel_id }, body: { to_employee_id: who[0].employee_id, text: text.trim() || "Thank you for the great work this week." } });
+    await save.run({ body: { to_employee_id: who[0].employee_id, message: text.trim() || undefined } });
     close();
     done();
-    toast(`Posted to #${channel.name}`);
+    toast("Posted to #general");
   };
   return (
     <>
-      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are recognising" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="What Did They Do (Optional)" info="Leave it blank and a note is written for you."><TextAreaField value={text} onChange={setText} placeholder="Led the launch" /></Field>
+      <Field label="Colleague" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose a colleague" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
+      <Field label={<HelpTerm help="Leave it blank and a thank you note is written for you.">Note</HelpTerm>} optional><TextAreaField value={text} onChange={setText} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="thumb" busy={save.pending} onClick={go}>Post</Button>
+        <Button variant="primary" icon="thumb" busy={save.pending} onClick={go}>Post Recognition</Button>
       </FormFooter>
     </>
   );
 }
 
-function Celebrate({ close, send }: { close: () => void; send: (b: MessageCreate) => Promise<void> }) {
+function Celebrate({ close, send }: { close: () => void; send: (b: { message_type: "birthday" | "anniversary"; subject_employee_id: string }) => Promise<void> }) {
   const [who, setWho] = useState<PersonRef[]>([]);
   const [what, setWhat] = useState<"birthday" | "anniversary">("birthday");
   const [tried, setTried] = useState(false);
@@ -254,35 +327,33 @@ function Celebrate({ close, send }: { close: () => void; send: (b: MessageCreate
     setTried(true);
     if (!who.length) return;
     close();
-    await send({ kind: what, subject_id: who[0].employee_id });
+    await send({ message_type: what, subject_employee_id: who[0].employee_id });
   };
   return (
     <>
-      <Field label="Who" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose who you are celebrating" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="What"><ChoiceField value={what} onChange={setWhat} options={[["birthday", "Birthday"], ["anniversary", "Work Anniversary"]]} /></Field>
+      <Field label="Colleague" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose a colleague" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
+      <Field label="Occasion"><ChoiceField value={what} onChange={setWhat} options={[["birthday", "Birthday"], ["anniversary", "Work Anniversary"]]} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="flag" onClick={go}>Post</Button>
+        <Button variant="primary" icon="flag" onClick={go}>Post Celebration</Button>
       </FormFooter>
     </>
   );
 }
 
-function PollForm({ close, send }: { close: () => void; send: (b: MessageCreate) => Promise<void> }) {
-  const f = useContractForm({ q: "", o1: "", o2: "", o3: "", o4: "" }, { q: (v) => (v.trim().length > 3 ? null : "Ask a question"), o1: rules.required("At least two options"), o2: rules.required("At least two options") });
+function PollForm({ close, send }: { close: () => void; send: (b: { message_type: "poll"; body: string; options: string[] }) => Promise<void> }) {
+  const f = useContractForm({ q: "", o1: "", o2: "", o3: "", o4: "" }, { q: (v) => (v.trim().length > 3 ? null : "Add a question"), o1: rules.required("Add an option"), o2: rules.required("Add an option") });
   const go = async () => {
     if (!f.check()) return;
     close();
-    await send({ kind: "poll", poll: { question: f.values.q.trim(), options: [f.values.o1, f.values.o2, f.values.o3, f.values.o4].map((o) => o.trim()).filter(Boolean) } });
+    await send({ message_type: "poll", body: f.values.q.trim(), options: [f.values.o1, f.values.o2, f.values.o3, f.values.o4].map((o) => o.trim()).filter(Boolean) });
   };
   return (
     <>
-      <Field label="Question" {...f.field("q")}><TextField {...f.field("q")} placeholder="Ask one question" /></Field>
-      <Field label="Options" state={f.field("o1").state ?? f.field("o2").state} message={f.field("o1").message ?? f.field("o2").message}>
-        <div className="flex flex-col gap-1.5">
-          {(["o1", "o2", "o3", "o4"] as const).map((k, i) => <TextField key={k} {...f.field(k)} placeholder={`Option ${i + 1}${i > 1 ? " (optional)" : ""}`} aria-label={`Option ${i + 1}`} />)}
-        </div>
-      </Field>
+      <Field label="Question" {...f.field("q")}><TextField {...f.field("q")} /></Field>
+      {(["o1", "o2", "o3", "o4"] as const).map((k, i) => (
+        <Field key={k} label={`Option ${i + 1}`} optional={i > 1} {...f.field(k)}><TextField {...f.field(k)} /></Field>
+      ))}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="chart" onClick={go}>Post Poll</Button>
@@ -291,18 +362,18 @@ function PollForm({ close, send }: { close: () => void; send: (b: MessageCreate)
   );
 }
 
-/** Files go to the vault through the upload engine, then into the conversation. */
-function Attach({ close, send }: { close: () => void; send: (b: MessageCreate) => Promise<void> }) {
+/** A file goes to the conversation through the upload engine, then it is posted. */
+function Attach({ channelId, close, send }: { channelId: string; close: () => void; send: (b: { message_type: "file"; document_id: string }) => Promise<void> }) {
   return (
     <>
-      <p className="mb-2.5 text-2xs text-subtle-foreground">Files are stored in the vault and shared here.</p>
       <UploadField
         upload={upload}
-        purpose="community"
+        purpose="attachment"
+        endpoint={`/api/v1/community/channels/${channelId}/media`}
         multiple={false}
         onUploaded={(docs) => {
           close();
-          void Promise.all(docs.map((d) => send({ kind: "file", document_id: d.document_id })));
+          void Promise.all(docs.map((d) => send({ message_type: "file", document_id: d.document_id })));
         }}
       />
       <FormFooter><Button onClick={close}>Cancel</Button></FormFooter>
@@ -311,6 +382,8 @@ function Attach({ close, send }: { close: () => void; send: (b: MessageCreate) =
 }
 
 /* ───────────────────────── Direct messages ───────────────────────── */
+
+const seenLine = (c: { online: boolean; last_seen_at: string | null }) => (c.online ? "Online" : c.last_seen_at ? `Last seen ${formatWhen(c.last_seen_at)}` : "Offline");
 
 function Direct() {
   const mobile = useIsMobile();
@@ -324,43 +397,58 @@ function Direct() {
   const [searching, setSearching] = useState(false);
   const [info, setInfo] = useState(false);
   const split = useSplitPanes("chat", 300);
-  const current = sel ?? (mobile ? null : list.rows[0] ?? null);
-  const t = useThread("direct", current?.conversation_id ?? null);
-  /* Reading a conversation clears its count on the server; show that in the list. */
-  const openId = current?.conversation_id;
+  const current = (sel && (list.rows.find((r) => r.community_channel_id === sel.community_channel_id) ?? sel)) ?? (mobile ? null : list.rows[0] ?? null);
   const reloadList = list.reload;
+  const t = useThread(current?.community_channel_id ?? null, { direct: true, onActivity: reloadList });
+  /* Reading a conversation clears its count on the server; show that in the list. */
+  const openId = current?.community_channel_id;
   useEffect(() => {
     if (!openId) return;
-    const x = setTimeout(reloadList, 500);
-    return () => clearTimeout(x);
-  }, [openId, reloadList]);
+    void api.call("POST /api/v1/community/channels/:id/read", { params: { id: openId }, body: {} }).then(reloadList, () => undefined);
+  }, [openId, reloadList, t.msgs.length]);
+
+  /* Messages that arrive while the list is open have reached this device. */
+  const ackAll = useCallback(() => {
+    for (const r of list.rows) if (r.unread > 0) void api.call("POST /api/v1/community/channels/:id/delivered", { params: { id: r.community_channel_id }, body: { up_to: new Date().toISOString() } }).catch(() => undefined);
+  }, [list.rows]);
+  useEffect(ackAll, [ackAll]);
+  useRealtime("community.channels", reloadList);
 
   const pick = (c: Conversation) => {
     setSel(c);
     setOpen(true);
     setSearching(false);
   };
-  const start = async (p: PersonRef) => {
-    const c = await api.call("POST /api/v1/community/direct", { body: { user_id: p.employee_id } });
-    list.reload();
-    pick(c);
-  };
+  const start = useCallback(
+    async (p: PersonRef) => {
+      const c = await api.call("POST /api/v1/community/direct", { body: { employee_id: p.employee_id } });
+      reloadList();
+      setSel(c);
+      setOpen(true);
+    },
+    [reloadList],
+  );
   /* The 360's "Message" button: /community?tab=direct-messages&to=<employee_id> */
   const to = params.get("to");
   useEffect(() => {
     if (!to) return;
     setParams({ to: null }, { replace: true });
-    void api.call("POST /api/v1/community/direct", { body: { user_id: to } }).then((c) => (setSel(c), setOpen(true), invalidate("/api/v1/community/direct")));
+    void api.call("POST /api/v1/community/direct", { body: { employee_id: to } }).then((c) => (setSel(c), setOpen(true), invalidate("/api/v1/community/direct")));
   }, [to, setParams]);
 
-  const post = async (b: MessageCreate) => {
-    await t.send(b);
-    list.reload();
+  const after = async (work: Promise<void>) => {
+    await work;
+    reloadList();
+  };
+  const mute = async (c: Conversation) => {
+    await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
+    toast(c.muted ? `Notifications on for ${c.person.display_name}` : `Muted ${c.person.display_name}`);
+    reloadList();
   };
   const showProfile = () => {
     if (!current) return;
     if (!mobile) return setInfo(true);
-    modal.open({ title: "Profile", body: (close) => <ProfilePanel c={current} onMessage={close} onSearch={() => (close(), setSearching(true))} /> });
+    modal.open({ title: "Profile", body: (close) => <ProfilePanel c={current} onMessage={close} onSearch={() => (close(), setSearching(true))} onMute={() => void mute(current)} /> });
   };
   const unread = list.rows.filter((r) => r.unread > 0).length;
 
@@ -375,8 +463,8 @@ function Direct() {
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 max-md:overflow-visible">
         {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <LoadingRows count={5} /> : list.rows.map((c) => (
           <Row
-            key={c.conversation_id}
-            on={c.conversation_id === current?.conversation_id && (!mobile || open)}
+            key={c.community_channel_id}
+            on={c.community_channel_id === current?.community_channel_id && (!mobile || open)}
             unread={c.unread > 0}
             lead={<Avatar name={c.person.display_name} size={32} online={c.online} />}
             title={c.person.display_name}
@@ -395,10 +483,10 @@ function Direct() {
     <>
       <ThreadHead onBack={() => setOpen(false)} backLabel="Back to conversations">
         <button type="button" onClick={showProfile} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" aria-label="View profile">
-          <Avatar name={current.person.display_name} size={32} />
+          <Avatar name={current.person.display_name} size={32} online={current.online} />
           <span className="min-w-0 flex-1">
             <b className="block truncate text-base font-strong">{current.person.display_name}</b>
-            <span className="block truncate text-2xs text-subtle-foreground">{current.online ? "Online" : "Last seen yesterday"} · {current.person.department}</span>
+            <span className="block truncate text-2xs text-subtle-foreground">{seenLine(current)} · {current.person.department}</span>
           </span>
         </button>
         <IconButton icon="srch" label="Search in conversation" onClick={() => setSearching(true)} />
@@ -407,17 +495,28 @@ function Direct() {
           items={[
             { label: "View Profile", icon: "user", onSelect: showProfile },
             { label: "Search in Conversation", icon: "srch", onSelect: () => setSearching(true) },
+            "sep",
+            { label: current.muted ? "Unmute Notifications" : "Mute Notifications", icon: "bell", onSelect: () => void mute(current) },
           ]}
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
       <ThreadBody t={t} dm />
       <Composer
-        key={current.conversation_id}
-        voice
+        key={current.community_channel_id}
         placeholder={`Message ${current.person.display_name.split(" ")[0]}`}
-        onSend={post}
-        plus={(cls) => <button type="button" className={cls} aria-label="Attach" onClick={() => modal.open({ title: "Attach a File", body: (close) => <Attach close={close} send={post} /> })}><Icon name="clip" /></button>}
+        onSend={(b) => after(t.send(b))}
+        onVoice={(file, secs) => after(t.sendFile(file, secs))}
+        plus={(cls) => (
+          <Menu
+            align="start"
+            trigger={(p) => <button {...p} type="button" className={cls} aria-label="Attach"><Icon name="clip" /></button>}
+            items={[
+              { label: "Photo or Video", icon: "image", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
+              { label: "Document", icon: "doc", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
+            ]}
+          />
+        )}
       />
     </>
   ) : (
@@ -431,7 +530,7 @@ function Direct() {
         <IconButton icon="x" label="Close profile" onClick={() => setInfo(false)} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <ProfilePanel c={current} onMessage={() => document.querySelector<HTMLInputElement>('input[aria-label="Message"]')?.focus()} onSearch={() => setSearching(true)} />
+        <ProfilePanel c={current} onMessage={() => document.querySelector<HTMLInputElement>('input[aria-label="Message"]')?.focus()} onSearch={() => setSearching(true)} onMute={() => void mute(current)} />
       </div>
     </div>
   ) : undefined;
@@ -463,11 +562,10 @@ function NewMessage({ close, start }: { close: () => void; start: (p: PersonRef)
   );
 }
 
-function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: () => void; onSearch: () => void }) {
+function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onMessage: () => void; onSearch: () => void; onMute: () => void }) {
   const { navigate } = useRouter();
   const { can } = useAuth();
-  const card = useApi("GET /api/v1/community/people/:user_id/card", { params: { user_id: c.person.employee_id } });
-  const [mute, setMute] = useState(false);
+  const card = useApi("GET /api/v1/community/people/:id/card", { params: { id: c.person.employee_id } });
   const p = card.data;
   if (card.error) return <ErrorState error={card.error} onRetry={card.reload} />;
   if (!p) return <LoadingRows count={4} />;
@@ -480,6 +578,7 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
       {right && <span className="ml-auto flex-none text-2xs text-subtle-foreground">{right}</span>}
     </div>
   );
+  const lagosNow = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
   return (
     <div>
       <div className="border-b border-border pb-3.5 text-center">
@@ -489,7 +588,7 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
         </span>
         <h2 data-copy="content" className="text-lg font-semibold">{p.person.display_name}</h2>
         <p className="mt-0.5 text-2xs text-subtle-foreground">{p.person.job_title}</p>
-        <p className="mt-1">{p.online ? <Pill tone="ok">Online</Pill> : <Pill>Last seen yesterday</Pill>}</p>
+        <p className="mt-1">{p.online ? <Pill tone="ok">Online</Pill> : <Pill>{seenLine(p)}</Pill>}</p>
         <div className="mt-3 flex justify-center gap-2">
           <Button icon="msg" onClick={onMessage}>Message</Button>
           {can("people") && <Button icon="user" onClick={() => navigate(`/people?tab=employees&id=${p.person.employee_id}`)}>View in People</Button>}
@@ -497,21 +596,23 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
       </div>
       <div className={sec}>
         <h3 data-ui="title" className={h4}>Contact</h3>
-        {line("mail", p.email)}
+        {p.work_email && line("mail", p.work_email)}
         {p.phone && line("user", p.phone)}
-        {line("globe", p.location)}
-        {line("clock", `${p.local_time} in Lagos`)}
+        {p.worksite && line("globe", p.worksite)}
+        {line("clock", `${lagosNow} in Lagos`)}
       </div>
       <div className={sec}>
-        <h3 data-ui="title" className={h4}>Shared in this conversation</h3>
-        {p.shared_files.length ? p.shared_files.map((f) => <div key={f.document_id}>{line("doc", f.file_name, f.size_bytes != null ? `${Math.round(f.size_bytes / 1024)} KB` : undefined)}</div>) : <p className="text-2xs text-subtle-foreground">Nothing shared yet.</p>}
+        <h3 data-ui="title" className={h4}>Shared in Conversation</h3>
+        {p.shared_files.map((f) => <div key={f.document_id}>{line("doc", f.file_name, `${Math.max(1, Math.round(f.size_bytes / 1024))} KB`)}</div>)}
+        {p.voice_notes > 0 && line("mic", `${p.voice_notes} voice note${p.voice_notes > 1 ? "s" : ""}`)}
+        {!p.shared_files.length && !p.voice_notes && <p className="text-2xs text-subtle-foreground">Nothing shared yet.</p>}
       </div>
       <div className={sec}>
-        <h3 data-ui="title" className={h4}>Channels in common</h3>
+        <h3 data-ui="title" className={h4}>Channels in Common</h3>
         {p.shared_channels.map((n) => <div key={n} className="flex items-center gap-2.5 py-1 text-sm"><b className="text-subtle-foreground">#</b>{n}</div>)}
       </div>
       <div className={sec}>
-        <div className="flex items-center justify-between text-sm">Mute notifications<Switch checked={mute} onChange={(v) => (setMute(v), toast(v ? `Muted ${p.person.display_name}` : `Notifications on for ${p.person.display_name}`))} label="Mute notifications" /></div>
+        <div className="flex items-center justify-between text-sm">Mute Notifications<Switch checked={c.muted} onChange={onMute} label="Mute Notifications" /></div>
         <Button icon="srch" className="mt-3 w-full justify-center" onClick={onSearch}>Search in Conversation</Button>
       </div>
     </div>
@@ -522,33 +623,41 @@ function ProfilePanel({ c, onMessage, onSearch }: { c: Conversation; onMessage: 
 
 function Announcements() {
   const modal = useModal();
-  const { can } = useAuth();
   const list = usePaged("GET /api/v1/community/announcements");
-  const poster = can("people", "create");
   const stats = useMemo(() => {
-    const pub = list.rows.filter((a) => !a.scheduled);
-    const avg = pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience), 0) * 100) / pub.length) : 0;
+    const pub = list.rows.filter((a) => a.status === "published");
+    const avg = pub.length ? Math.round((pub.reduce((s, a) => s + a.reads / Math.max(1, a.audience_size), 0) * 100) / pub.length) : 0;
     const month = todayIso().slice(0, 7);
-    return { pub: pub.length, sch: list.rows.length - pub.length, avg, audience: list.rows[0]?.audience ?? 0, month: pub.filter((a) => a.publish_at.slice(0, 7) === month).length };
+    const audience = Math.max(0, ...pub.map((a) => a.audience_size));
+    return { pub: pub.length, sch: list.rows.length - pub.length, avg, audience, month: pub.filter((a) => (a.published_at ?? "").slice(0, 7) === month).length };
   }, [list.rows]);
+  const denied = list.error instanceof ApiError && list.error.status === 403;
+  if (denied) return <><PageHeader title="Announcements" /><EmptyState illustration="Locked" title="People and the CEO" text="Read them in #announcements." /></>;
   return (
     <>
       <PageHeader
         title="Announcements"
-        sub="Posted by People and the CEO"
-        actions={poster && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Announcement", body: (close) => <NewAnnouncement close={close} /> })}>New Announcement</Button>}
+        actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Announcement", body: (close) => <NewAnnouncement close={close} done={list.reload} /> })}>New Announcement</Button>}
       />
-      <StatStrip items={[{ label: "Published", value: stats.pub }, { label: "Scheduled", value: stats.sch }, { label: "Average Read", value: `${stats.avg}%`, tone: "ok" }, { label: "Audience", value: `${stats.audience} staff` }, { label: "This Month", value: stats.month, desktop: true }]} />
+      <StatStrip
+        items={[
+          { label: "Published", value: stats.pub },
+          { label: "Scheduled", value: stats.sch },
+          { label: "Average Read", value: `${stats.avg}%`, tone: "ok" },
+          { label: "Audience", value: `${stats.audience} staff` },
+          { label: "This Month", value: stats.month, desktop: true },
+        ]}
+      />
       {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
         <Grid cols={2} className="mt-3">
           {list.rows.map((a) => (
-            <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.title, body: (close) => <AnnouncementReads a={a} close={close} poster={poster} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
+            <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.status === "scheduled" ? "Scheduled Announcement" : "Announcement Reads", body: (close) => <AnnouncementReads a={a} close={close} done={list.reload} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
               <div className="mb-1.5 flex items-start gap-2">
                 <h2 data-copy="content" className="flex-1 text-sm font-semibold">{a.title}</h2>
-                {a.scheduled ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience ? "ok" : "neutral"}>{a.reads} of {a.audience} read</Pill>}
+                {a.status === "scheduled" ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience_size ? "ok" : "neutral"}>{a.reads} of {a.audience_size} read</Pill>}
               </div>
               <p className="text-sm text-muted-foreground">{a.body}</p>
-              <p className="mt-2 text-2xs text-subtle-foreground">{a.scheduled ? "Goes out " : "Posted "}{a.scheduled ? formatDateTime(a.publish_at) : formatDate(a.publish_at)} by {a.author.display_name}</p>
+              <p className="mt-2 text-2xs text-subtle-foreground">{a.status === "scheduled" ? `Goes out ${formatDateTime(a.publish_at!)}` : `Posted ${formatDate(a.published_at!)}`} by {a.author?.display_name}</p>
             </Card>
           ))}
         </Grid>
@@ -557,23 +666,36 @@ function Announcements() {
   );
 }
 
-function AnnouncementReads({ a, close, poster }: { a: Announcement; close: () => void; poster: boolean }) {
-  const notRead = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "not_read" }, enabled: !a.scheduled && poster });
-  const read = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "read" }, enabled: !a.scheduled && poster });
+function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => void; done: () => void }) {
+  const live = a.status === "published";
+  const notRead = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "not_read" }, enabled: live });
+  const read = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "read" }, enabled: live });
   const remind = useMutation("POST /api/v1/community/announcements/:id/remind");
-  const pct = Math.round((a.reads * 100) / Math.max(1, a.audience));
+  const pct = Math.round((a.reads * 100) / Math.max(1, a.audience_size));
   const nNot = notRead.page?.total ?? 0;
+  const nudge = async () => {
+    try {
+      const r = await remind.run({ params: { id: a.announcement_id }, body: {} });
+      toast(`Reminder sent to ${r.reminded} ${r.reminded === 1 ? "person" : "people"}`);
+      done();
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.message);
+    }
+  };
   return (
     <>
-      <p className="text-2xs text-subtle-foreground">{a.scheduled ? "Goes out " : "Posted "}{formatWhen(a.publish_at)} by {a.author.display_name}</p>
-      <p className="mt-2.5 mb-3.5 text-sm text-muted-foreground">{a.body}</p>
-      {a.scheduled ? <Pill tone="info">Scheduled. Not yet visible to staff</Pill> : poster && (
+      <div data-copy="content">
+        <h4 className="text-md font-semibold">{a.title}</h4>
+        <p className="mt-0.5 text-2xs text-subtle-foreground">{live ? `Posted ${formatDateTime(a.published_at!)}` : `Goes out ${formatDateTime(a.publish_at!)}`} by {a.author?.display_name}</p>
+        <p className="mt-2.5 mb-3.5 text-sm text-muted-foreground">{a.body}</p>
+      </div>
+      {!live ? <Pill tone="info">Scheduled</Pill> : (
         <>
-          <h3 data-ui="title" className="mb-1.5 text-sm font-semibold">Read by {a.reads} of {a.audience}</h3>
+          <h3 data-ui="title" className="mb-1.5 text-sm font-semibold">Read by {a.reads} of {a.audience_size}</h3>
           <Meter pct={pct} label={`${pct}%`} />
           <div className="mt-4 mb-1.5 flex items-center gap-2">
             <h3 data-ui="title" className="flex-1 text-sm font-semibold">Not Read · {nNot}</h3>
-            {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { const r = await remind.run({ params: { id: a.announcement_id }, body: {} }); toast(`Reminder sent to ${r.reminded} ${r.reminded === 1 ? "person" : "people"}`); }}>Remind Them</Button>}
+            {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={() => void nudge()}>Remind Them</Button>}
           </div>
           {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">Not Read</Pill>} /> : <p className="text-2xs text-subtle-foreground">Everyone has read it.</p>}
           <h3 data-ui="title" className="mt-4 mb-1.5 text-sm font-semibold">Read · {read.page?.total ?? 0}</h3>
@@ -585,35 +707,46 @@ function AnnouncementReads({ a, close, poster }: { a: Announcement; close: () =>
   );
 }
 
-function NewAnnouncement({ close }: { close: () => void }) {
-  const { me } = useAuth();
+function NewAnnouncement({ close, done }: { close: () => void; done: () => void }) {
   const [when, setWhen] = useState<"now" | "later">("now");
-  const f = useContractForm({ title: "", body: "", date: "" }, { title: (v) => (v.trim().length > 3 ? null : "Give it a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
+  const [kind, setKind] = useState<"all" | "departments">("all");
+  const [depts, setDepts] = useState<string[]>([]);
+  const [deptsBad, setDeptsBad] = useState(false);
+  const f = useContractForm({ title: "", body: "", date: "" }, { title: (v) => (v.trim().length > 3 ? null : "Add a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
   const save = useMutation("POST /api/v1/community/announcements");
   const submit = async () => {
     const noDate = when === "later" && !f.values.date;
-    if (noDate) f.setServerErrors({ date: ["Pick the day it goes out"] });
-    if (!f.check() || noDate) return;
+    if (noDate) f.setServerErrors({ date: ["Not a real date"] });
+    const noDepts = kind === "departments" && !depts.length;
+    setDeptsBad(noDepts);
+    if (!f.check() || noDate || noDepts) return;
     try {
-      await save.run({ body: { title: f.values.title.trim(), body: f.values.body.trim(), ...(when === "later" && { publish_at: `${f.values.date}T09:00:00+01:00` }) } });
+      await save.run({ body: { title: f.values.title.trim(), body: f.values.body.trim(), audience: { kind, department_ids: kind === "departments" ? depts : [] }, ...(when === "later" && { publish_at: `${f.values.date}T09:00:00+01:00` }) } });
       invalidate("/api/v1/community");
       close();
+      done();
       toast(when === "later" ? `Scheduled for ${formatDate(f.values.date)}` : "Published to #announcements");
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) toast(e.message);
-      f.setServerErrors(save.fields);
+      const fields = save.fields ?? {};
+      f.setServerErrors({ ...fields, ...(fields.publish_at ? { date: fields.publish_at } : {}) });
     }
   };
   return (
     <>
-      <Field label="Headline" {...f.field("title")}><TextField {...f.field("title")} placeholder="Office closed Friday" /></Field>
-      <Field label="Message" {...f.field("body")}><TextAreaField {...f.field("body")} placeholder="Details for staff" /></Field>
+      <Field label="Headline" {...f.field("title")}><TextField {...f.field("title")} /></Field>
+      <Field label="Message" {...f.field("body")}><TextAreaField {...f.field("body")} /></Field>
+      <Field label="Audience"><ChoiceField value={kind} onChange={setKind} options={[["all", "All Staff"], ["departments", "Departments"]]} /></Field>
+      {kind === "departments" && (
+        <Field label="Departments" state={deptsBad ? "bad" : undefined} message={deptsBad ? "Choose a department" : undefined}>
+          <DepartmentChips value={depts} onChange={(v) => (setDepts(v), setDeptsBad(false))} />
+        </Field>
+      )}
       <Field label="When"><ChoiceField value={when} onChange={setWhen} options={[["now", "Now"], ["later", "Schedule"]]} /></Field>
-      {when === "later" && <Field label="Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>}
-      <p className="flex items-center gap-1.5 text-2xs text-subtle-foreground"><Icon name="user" className="size-3.5" />Posting as {me?.display_name}</p>
+      {when === "later" && <Field label="Publish Date" {...f.field("date")}><DateField {...f.field("date")} min={todayIso()} /></Field>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>{when === "later" ? "Schedule" : "Publish"}</Button>
+        <Button variant="primary" busy={save.pending} onClick={submit}>{when === "later" ? "Schedule Announcement" : "Publish Announcement"}</Button>
       </FormFooter>
     </>
   );

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/api/client";
+import { saveFile, useFileUrl } from "@/api/download";
 import type { Message } from "@/api/types/community";
-import { Avatar, cn, Confetti, formatBytes, formatTime, Icon, initials, ShareBar, Waveform } from "@mycity/ui";
+import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, initials, ShareBar, Waveform } from "@mycity/ui";
 
 /** Highlight search hits inside a message. */
 export function Hl({ text, q }: { text: string; q: string }) {
@@ -14,7 +15,7 @@ export function Hl({ text, q }: { text: string; q: string }) {
 /** Birthday and work anniversary posts: the celebration card. */
 function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }) {
   const c = m.celebration!;
-  const bday = m.kind === "birthday";
+  const bday = m.message_type === "birthday";
   const first = c.subject.display_name.split(" ")[0];
   const names = c.fans.slice(0, 2).map((f) => f.display_name.split(" ")[0]);
   const more = c.count - names.length;
@@ -42,7 +43,7 @@ function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }
         <h2 data-copy="content" className="mt-2 text-xl leading-tight tracking-tight max-md:text-lg">
           {bday ? <>Happy birthday, <em className="text-primary not-italic">{first}</em></> : <><em className="text-primary not-italic">{c.years} years</em> at MyCity, {first}</>}
         </h2>
-        <p className="mt-1 text-sm text-on-deep-soft">{c.wish}</p>
+        <p className="mt-1 text-sm text-on-deep-soft">{m.body}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2.5">
           <button type="button" onClick={onCelebrate} className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-strong", c.mine ? "border-primary bg-primary text-primary-foreground" : "border-white/20 bg-white/10 text-on-deep")}>
             {bday ? "🎉" : "👏"} Celebrate · {c.count}
@@ -63,21 +64,43 @@ function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }
 
 function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
   const [playing, setPlaying] = useState(false);
-  const [tr, setTr] = useState<"hidden" | "loading" | "shown">(m.voice?.transcript ? "hidden" : "hidden");
-  const [text, setText] = useState(m.voice?.transcript ?? "");
+  const [tr, setTr] = useState<"hidden" | "loading" | "shown">("hidden");
+  const [text, setText] = useState(m.transcript ?? "");
+  const [wanted, setWanted] = useState(false);
+  const audio = useRef<HTMLAudioElement | null>(null);
   const t = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const secs = m.voice!.duration_s || 1;
-  useEffect(() => () => void (t.current && clearTimeout(t.current)), []);
+  const secs = m.duration_s || 1;
+  /* The note's bytes are gated: fetched with the session once Play is first pressed. */
+  const href = useFileUrl(wanted && m.document ? `/api/v1/documents/${m.document.document_id}/content` : null);
+  useEffect(
+    () => () => {
+      if (t.current) clearTimeout(t.current);
+      audio.current?.pause();
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!href || audio.current) return;
+    audio.current = new Audio(href);
+    audio.current.onended = () => setPlaying(false);
+    void audio.current.play().catch(() => setPlaying(false));
+  }, [href]);
   const play = () => {
-    if (playing) return (setPlaying(false), t.current && clearTimeout(t.current));
+    if (playing) {
+      audio.current?.pause();
+      if (t.current) clearTimeout(t.current);
+      return setPlaying(false);
+    }
     setPlaying(true);
-    t.current = setTimeout(() => setPlaying(false), secs * 1000);
+    if (audio.current) void audio.current.play().catch(() => setPlaying(false));
+    else if (m.document && import.meta.env.VITE_API_MODE !== "mock") setWanted(true);
+    else t.current = setTimeout(() => setPlaying(false), secs * 1000);
   };
   const transcribe = async () => {
     if (tr === "shown") return setTr("hidden");
     if (text) return setTr("shown");
     setTr("loading");
-    const r = await api.call("POST /api/v1/community/messages/:id/transcript", { params: { id: m.message_id }, body: {} });
+    const r = await api.call("POST /api/v1/community/messages/:id/transcript", { params: { id: m.community_message_id }, body: {} });
     setText(r.transcript);
     setTr("shown");
   };
@@ -103,27 +126,27 @@ const TICK = { sent: ["tick", "Sent"], delivered: ["ticks", "Delivered"], read: 
 
 /** One post in a channel or a conversation. */
 export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void }) {
-  if (m.kind === "birthday" || m.kind === "anniversary") return <Celebration m={m} onCelebrate={onCelebrate} />;
-  if (m.kind === "recognition") {
+  if (m.message_type === "birthday" || m.message_type === "anniversary") return m.celebration ? <Celebration m={m} onCelebrate={onCelebrate} /> : null;
+  if (m.message_type === "recognition" && m.recognition) {
     const r = m.recognition!;
     return (
       <div className="max-w-136 rounded-card border border-l-2 border-border border-l-primary bg-accent px-3.5 py-3">
         <div className="flex items-center gap-2 text-sm">
           <Avatar name={r.to.display_name} size={26} />
-          <span><b>{m.author.display_name}</b> recognised <b>{r.to.display_name}</b></span>
+          <span><b>{m.author?.display_name}</b> recognised <b>{r.to.display_name}</b></span>
         </div>
-        <q className="mt-1.5 mb-2 block text-sm text-foreground">{m.text}</q>
+        <q className="mt-1.5 mb-2 block text-sm text-foreground">{m.body}</q>
         <button type="button" onClick={onCelebrate} className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-strong", r.mine ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted")}>👍 {r.count}</button>
       </div>
     );
   }
-  if (m.kind === "poll") {
+  if (m.message_type === "poll" && m.poll) {
     const p = m.poll!;
     const votes = p.options.reduce((a, o) => a + o.votes, 0);
     const tot = votes || 1;
     return (
       <div className="max-w-136 rounded-card border border-border bg-background px-3.5 py-3">
-        <div className="mb-1 text-2xs text-subtle-foreground">Poll by {m.author.display_name} · {votes} vote{votes === 1 ? "" : "s"}</div>
+        <div className="mb-1 text-2xs text-subtle-foreground">Poll by {m.author?.display_name} · {votes} vote{votes === 1 ? "" : "s"}</div>
         <h3 data-copy="content" className="mb-2 text-sm">{p.question}</h3>
         {p.options.map((o, i) => {
           const pc = Math.round((o.votes * 100) / tot);
@@ -137,33 +160,38 @@ export function Post({ m, q, dm, onCelebrate, onVote }: { m: Message; q: string;
       </div>
     );
   }
-  if (m.kind === "announcement") {
+  if (m.message_type === "announcement") {
     return (
       <div className="max-w-152 rounded-card border border-border bg-background px-3.5 py-3">
-        <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground"><Icon name="flag" />{m.author.display_name} · {formatTime(m.created_at)}</div>
-        <h3 data-copy="content" className="text-base">{m.announcement!.title}</h3>
-        <p className="mt-1 text-sm leading-normal text-muted-foreground">{m.announcement!.body}</p>
+        <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground"><Icon name="flag" />{m.author?.display_name} · {formatDate(m.sent_at)}</div>
+        <h3 data-copy="content" className="text-base"><Hl text={m.announcement?.title ?? ""} q={q} /></h3>
+        <p className="mt-1 text-sm leading-normal text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
       </div>
     );
   }
   let inner: ReactNode;
-  if (m.kind === "voice") inner = <VoiceNote m={m} mine={m.mine} />;
-  else if (m.kind === "file")
+  if (m.deleted) inner = <span className="italic opacity-70">Message deleted</span>;
+  else if (m.message_type === "audio") inner = <VoiceNote m={m} mine={m.mine} />;
+  else if (m.document)
     inner = (
-      <div className={cn("mt-0.5 flex items-center gap-2 rounded-box border px-2.5 py-2", m.mine ? "border-white/20 bg-white/10" : "border-border bg-background")}>
-        <Icon name="doc" />
-        <span><b className="block text-xs">{m.file!.file_name}</b><span className="text-2xs opacity-70">{formatBytes(m.file!.size_bytes)}</span></span>
-      </div>
+      <button
+        type="button"
+        onClick={() => void saveFile(`/api/v1/documents/${m.document!.document_id}/content`, m.document!.file_name)}
+        className={cn("mt-0.5 flex items-center gap-2 rounded-box border px-2.5 py-2 text-left", m.mine ? "border-white/20 bg-white/10" : "border-border bg-background")}
+      >
+        <Icon name={m.message_type === "image" ? "image" : "doc"} />
+        <span><b className="block text-xs">{m.document.file_name}</b><span className="text-2xs opacity-70">{formatBytes(m.document.size_bytes)}</span></span>
+      </button>
     );
-  else inner = <Hl text={m.text ?? ""} q={q} />;
+  else inner = <Hl text={m.body ?? ""} q={q} />;
   return (
     <div className={cn("flex max-w-4/5 gap-2 max-md:max-w-11/12", m.mine && "flex-row-reverse self-end")}>
-      {!m.mine && <Avatar name={m.author.display_name} size={30} className="mt-0.5" />}
+      {!m.mine && <Avatar name={m.author?.display_name ?? "MyCity"} size={30} className="mt-0.5" />}
       <div className="min-w-0">
         <div className={cn("mb-0.5 flex items-baseline gap-1.5 text-xs font-strong", m.mine && "justify-end")}>
-          {!m.mine && m.author.display_name}
+          {!m.mine && m.author?.display_name}
           <span className="text-2xs font-normal text-subtle-foreground">
-            {formatTime(m.created_at)}
+            {formatTime(m.sent_at)}
             {m.mine && dm && m.status && (
               <span role="img" className={cn("ml-1 inline-flex align-text-bottom", m.status === "read" ? "text-info" : "text-subtle-foreground")} title={TICK[m.status][1]} aria-label={TICK[m.status][1]}>
                 <Icon name={TICK[m.status][0]} className="size-3.5" />
