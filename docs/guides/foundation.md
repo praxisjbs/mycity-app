@@ -62,8 +62,9 @@ These finish M0 and no prompt can do them:
   there.
 - TB or GE: the SMTP password and `MAIL_SEND_PER_HOUR` (staging 10, production 40) in both server
   `.env` files; DKIM, SPF and DMARC Valid in cPanel (`docs/runbooks/dns-and-mail.md`).
-- TB: `create-admin --build-account --env=staging`, then the same on production after GE approves the
-  production step (`docs/runbooks/first-accounts.md`).
+- TB: `create-admin --build-account` on production after GE approves the production step, and the
+  operations lead on both environments (`docs/runbooks/first-accounts.md`). The build account is on
+  staging (17/10/2026).
 - GE: the offsite backup host and the WhatsApp alert links (`docs/runbooks/backup-restore.md`,
   `monitoring.md`); GitHub branch protection (`github-settings.md`).
 
@@ -546,6 +547,8 @@ screen.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · `create-admin` keeps its password prompts on screen: the passwords are read without
+  readline, whose redraw erased the prompts on a narrow terminal. The build account is on staging.
 - 17/10/2026 · TB · §6.7, §10.1: ⌘K gains Waiting on You (first, with nothing typed), open seats,
   preferred and middle names, the theme, density, Install App and Sign Out as actions, and one forgiven
   slip in screens and actions.

@@ -97,6 +97,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · `create-admin`: the password and repeat prompts no longer vanish (readline's redraw
+  erased them once the echo was muted, so on a phone the script looked frozen); passwords are read
+  without readline, tested at phone width. Build account created on staging. BACKEND_STRUCTURE §13 now
+  lists the first accounts the runbook makes. Left: the operations lead on staging; both on production
+  after GE approves; the M3 consequence flow stays owed to M3 (DATABASE_SCHEMA).
 - 17/10/2026 · TB · GitHub settings ticked: TB restricted the production environment to `main`, and
   the team accepted the rest as it stands for M0. Left: branch protection on `main` and required
   reviewers on production, once the repository is public or on a plan that offers them.

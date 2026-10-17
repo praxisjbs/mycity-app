@@ -844,9 +844,10 @@ folder and adds a row here; a module never grows its own copy of a shared concer
 
 - `server.js` and `worker.js` boot on both environments; `/api/health/ready` reports build sha, nine
   modules mounted, migration head, numbering schemes present.
-- `mycity_prod` holds `system_marker('production')`, reference data and one CEO user, created by
-  `create-admin` as a complete employee with a staff number, department, login and role (§17).
-  No other row.
+- `mycity_prod` holds `system_marker('production')`, reference data and the first accounts,
+  created by `create-admin` as complete employees with a staff number, department, login and role
+  (§17): the build account (`--build-account`, the Implementation Team role, suspended at handover)
+  and the operations lead (`docs/runbooks/first-accounts.md`). No other row.
 - Every list endpoint in the M0 modules returns `{ data, page }` with at most 25 rows;
   `check/pagination.js` is green.
 - `contract.gen.ts` generated; editing it by hand fails CI; a route without a contract fails CI.

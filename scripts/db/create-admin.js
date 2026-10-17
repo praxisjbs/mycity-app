@@ -80,6 +80,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const readline = require("node:readline");
+const { StringDecoder } = require("node:string_decoder");
 const { randomUUID } = require("node:crypto");
 
 const contract = require("../../packages/contract");
@@ -123,38 +124,55 @@ function parseArgs(argv) {
  * Terminal
  * ------------------------------------------------------------------ */
 
-function makeTerminal() {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-  });
-  let muted = false;
-  // Echo nothing while a password is typed. The prompt itself is written before muting.
-  rl._writeToOutput = (s) => {
-    if (!muted) rl.output.write(s);
-  };
+/** Control and escape sequences a terminal may send with a keystroke or a paste. */
+const ESCAPE_RE = /\x1b\[[0-9;?]*[~A-Za-z]|\x1b./g; // eslint-disable-line no-control-regex
 
+/**
+ * One question at a time on the terminal. A plain question gets its own readline for that
+ * question only. A password is read with no readline at all: readline redraws its line by moving
+ * to the first column and clearing the screen below, and with the echo muted that redraw erased
+ * the prompt, so on a narrow terminal (a phone) it looked as if nothing was asked.
+ */
+function makeTerminal({ input = process.stdin, output = process.stdout } = {}) {
   const ask = (question, { fallback } = {}) =>
     new Promise((resolve) => {
+      const rl = readline.createInterface({ input, output, terminal: true });
       const hint = fallback ? ` [${fallback}]` : "";
-      rl.question(`${question}${hint}: `, (a) =>
-        resolve(a.trim() || fallback || ""),
-      );
-    });
-
-  const askHidden = (question) =>
-    new Promise((resolve) => {
-      rl.output.write(`${question}: `);
-      muted = true;
-      rl.question("", (a) => {
-        muted = false;
-        rl.output.write("\n");
-        resolve(a);
+      rl.question(`${question}${hint}: `, (a) => {
+        rl.close();
+        resolve(a.trim() || fallback || "");
       });
     });
 
-  return { ask, askHidden, close: () => rl.close() };
+  // Nothing is echoed while a password is typed. Enter ends it, Backspace removes the last
+  // character, Ctrl+C cancels the run.
+  const askHidden = (question) =>
+    new Promise((resolve, reject) => {
+      output.write(`${question}: `);
+      const decoder = new StringDecoder("utf8");
+      let typed = "";
+      const finish = (settle) => {
+        input.removeListener("data", onData);
+        input.setRawMode(false);
+        input.pause();
+        output.write("\n");
+        settle();
+      };
+      const onData = (chunk) => {
+        for (const ch of decoder.write(chunk).replace(ESCAPE_RE, "")) {
+          if (ch === "\r" || ch === "\n") return finish(() => resolve(typed));
+          if (ch === "\u0003") return finish(() => reject(new Error("Cancelled. Nothing was written.")));
+          if (ch === "\u007f" || ch === "\b") typed = typed.slice(0, -1);
+          else if (ch >= " ") typed += ch;
+        }
+        return undefined;
+      };
+      input.setRawMode(true);
+      input.on("data", onData);
+      input.resume();
+    });
+
+  return { ask, askHidden, close: () => {} };
 }
 
 /* ------------------------------------------------------------------ *
@@ -562,4 +580,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createAdmin, sampleEmployee, buildAccount, BUILD_ACCOUNT, parseArgs, MIN_PASSWORD };
+module.exports = { createAdmin, sampleEmployee, buildAccount, BUILD_ACCOUNT, parseArgs, makeTerminal, MIN_PASSWORD };
