@@ -110,10 +110,10 @@ export function SplitPanes({ split, list, detail, aside, open, minHeight = "md",
       <>
         <div className={cn(PANE, className)}>{list}</div>
         {/*
-         * Above the shell and under the staging bar, with the home indicator's
+         * Above the shell, with the status bar's and the home indicator's
          * area kept clear: an open record on a phone is the whole screen.
          */}
-        {open && <div className={cn("pt-safe fixed inset-x-0 top-(--env-bar) bottom-0 z-62 flex flex-col bg-card", scrolls && "overflow-y-auto")}>{detail}</div>}
+        {open && <div className={cn("pt-safe fixed inset-0 z-62 flex flex-col bg-card", scrolls && "overflow-y-auto")}>{detail}</div>}
       </>
     );
   }

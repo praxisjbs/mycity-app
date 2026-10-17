@@ -1,4 +1,4 @@
-import { Brand, ModalProvider, StagingBar, Toaster, useEnvironment } from "@mycity/ui";
+import { Brand, ModalProvider, Toaster } from "@mycity/ui";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { LINK_PATHS, Login } from "@/auth/Login";
 import { LockSheet } from "@/auth/LockSheet";
@@ -10,19 +10,12 @@ export function App() {
     <RouterProvider>
       <AuthProvider>
         <ModalProvider>
-          <Staging />
           <Gate />
           <Toaster />
         </ModalProvider>
       </AuthProvider>
     </RouterProvider>
   );
-}
-
-/** The staging bar (MILESTONES §6), above everything on every screen, sign-in included. Nothing on production. */
-function Staging() {
-  if (useEnvironment() !== "staging") return null;
-  return <StagingBar message="For training and testing. Every feature works and mail reaches real people." short="Mail here is real" />;
 }
 
 function Gate() {

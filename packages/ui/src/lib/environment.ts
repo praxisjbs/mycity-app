@@ -4,16 +4,17 @@
  * production, so it is decided at runtime, never at build time:
  *
  *   - the address: hub.staging.mycityapp.io and go.staging.mycityapp.io (also set
- *     before first paint by each app's index.html, so the bar never flashes in late);
+ *     before first paint by each app's index.html, so the tab icon never flashes in late);
  *   - the API's own word: `X-Mycity-Environment: staging` on any response
  *     (src/middleware/environment-marker.js), passed to noteEnvironmentHeader by
  *     each app's API client.
  *
- * Staging sets `data-env="staging"` on <html>; base.css turns that into
- * --env-bar, the height StagingBar takes. It also swaps the tab icon for
+ * Staging sets `data-env="staging"` on <html>, which opens screens by the
+ * staging rule (lib/plan.ts, F14). It also swaps the tab icon for
  * /favicon-staging.svg (the pin on amber) and gives the browser's own bar the
  * staging amber (`theme-color`, read from the --warning token), so a staging tab
- * is told apart from a live one even when the page is out of view.
+ * is told apart from a live one even when the page is out of view. No bar is
+ * drawn on the page itself: the address already says staging (TB, 17/10/2026).
  */
 import { useSyncExternalStore } from "react";
 

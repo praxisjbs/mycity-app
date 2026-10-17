@@ -125,7 +125,7 @@ app's session on the upload engine.
 - [x] Permission-aware navigation from `/me` grants; routes by the one URL shape (`/<module>?tab=<tab>&id=<id>`)
 - [x] Command palette (⌘K) and search; notification bell; realtime (Socket.io) for the bell and presence
 - [x] PWA: install, update prompt, offline shell page
-- [x] Theme, density and staging bar; what opens where (F14)
+- [x] Theme, density and the staging marks (the on-page bar taken off by TB, 17/10/2026); what opens where (F14)
 - [x] Public site shell on `packages/ui`
 - [x] Gallery served on staging only (F10): `src/http/static.js` refuses `/gallery` on production; release builds it
 - [x] The app as a gated crawl target (gates 8, 11, a11y) on mock data in CI; `npm run new:screen`

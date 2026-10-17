@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Button, PageMessage, StagingBar, useEnvironment } from "@mycity/ui";
+import { Button, PageMessage } from "@mycity/ui";
 import { useScreenState, plan } from "@/lib/plan";
 import { parse, RouterProvider, useRouter } from "@/lib/router";
 import { Apply } from "@/pages/Apply";
@@ -15,17 +15,10 @@ import { PlannedPage, ViewBar } from "@/shell/Planned";
 export function App() {
   return (
     <RouterProvider>
-      <Staging />
       <Preview />
       <Routes />
     </RouterProvider>
   );
-}
-
-/** The staging bar (MILESTONES §6), sticky while the page scrolls. Nothing on production. */
-function Staging() {
-  if (useEnvironment() !== "staging") return null;
-  return <StagingBar placement="sticky" message="A test copy of the site. Applications and signatures here are not for real roles." short="A test copy of this site" />;
 }
 
 function Routes() {

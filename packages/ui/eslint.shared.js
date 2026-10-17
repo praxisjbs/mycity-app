@@ -18,7 +18,7 @@
  *   - F4, in the apps: no `style` prop, no hex colour, no arbitrary-value class
  *     (`w-[317px]`, `bg-[#fff]`, `[stroke-width:2]`); a token class or a
  *     component instead. Variants such as `data-[state=open]:` and values that
- *     only name a variable (`w-[var(--rail)]`, `top-(--env-bar)`) are allowed.
+ *     only name a variable (`w-[var(--rail)]`, `duration-(--dur)`) are allowed.
  */
 import js from "@eslint/js";
 import globals from "globals";

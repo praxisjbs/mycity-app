@@ -518,8 +518,8 @@ packages/ui/
                               around its own *.draw.tsx chunk (F22)
     documents/                DocumentPreview, ImageViewer, Paper, Reader
     maps/                     MapView, PlaceSearch, LocationLabel on Leaflet, with Geoapify proxied (F21)
-    illustrations/            Illustration, in token colours
-    shell/                    the frame both apps' shells are built from (PR 2): Brand, StagingBar, ComingSoon,
+    illustrations/            Illustration, in token colours; CityShowcase, the sign-in screen's photographs
+    shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
                               PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
                               MoreSheet, FloatingButton, CommandPalette, NotificationRow, ShellNotice
     testing/                  test setup, render helpers, gallery types (not exported from ".")
@@ -665,12 +665,10 @@ shared pager, a dot while anything is unread, refreshed over realtime (§9.6).
 **Staging is marked, in both apps** (MILESTONES §6, A4). The same build runs on staging and
 production, so `lib/environment.ts` in `@mycity/ui` decides at runtime: a `staging.` host name (also
 set before first paint in `index.html`) or `X-Mycity-Environment: staging` on any API response sets
-`data-env="staging"` on `<html>`. `StagingBar` from `@mycity/ui` then shows a fixed, non-dismissible
-amber bar, and `--env-bar` (its height, in `base.css`) moves everything else down: `#root`, and every full-screen layer (sign-in, modal, command palette,
-the phone menu, the chat and mail readers) starts at `top-(--env-bar)`. A new full-screen layer must
-do the same. On the public site the bar is sticky. Staging also swaps the tab icon for
-`public/favicon-staging.svg` and sets `theme-color` to the `--warning` amber. `?env=staging` shows
-all of it in development.
+`data-env="staging"` on `<html>`. That opens screens by the staging rule (F14, below), swaps the tab
+icon for `public/favicon-staging.svg` and sets `theme-color` to the `--warning` amber. No bar is
+drawn on the page: the address already says staging (TB, 17/10/2026), so every full-screen layer
+starts at the top of the screen. `?env=staging` shows the marks in development.
 
 **What opens where, in both apps** (F14; `lib/plan.ts` in `@mycity/ui`, bound in each app's
 `lib/plan.ts`). At build time `deliveryPlan()` in `vite.shared.js` reads each screen's milestone and

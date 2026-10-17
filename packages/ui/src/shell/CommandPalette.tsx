@@ -98,7 +98,7 @@ export function CommandPalette({ open, onClose, query, onQueryChange, results, l
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal container={container ?? undefined}>
-        <Dialog.Overlay className={cn("fixed inset-x-0 top-(--env-bar) bottom-0 z-50 bg-scrim", !phone && "flex items-start justify-center px-4 pt-24 pb-4 backdrop-blur-xs")}>
+        <Dialog.Overlay className={cn("fixed inset-0 z-50 bg-scrim", !phone && "flex items-start justify-center px-4 pt-24 pb-4 backdrop-blur-xs")}>
           <Dialog.Content
             data-ui="modal"
             aria-describedby={undefined}

@@ -37,7 +37,7 @@ administrator can reset their two-step from Settings · Users.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Sign In (`/`) | Staff app, signed out | Anyone | The four cities (Lagos, London, Accra, Nairobi) at their local time; the sign-in card; on a browser the person has used, Use Passkey and Use PIN for the ways they have set up | Sign in with the password, a passkey or the PIN; Forgot Password |
+| Sign In (`/`) | Staff app, signed out | Anyone | Eight cities (Lagos, London, Accra, Nairobi, Johannesburg, Rabat, Abidjan, Douala) at their local time; the sign-in card; on a browser the person has used, Use Passkey and Use PIN for the ways they have set up | Sign in with the password, a passkey or the PIN; Forgot Password |
 | Code step | Staff app, the sign-in card and the lock screen | A person with two-step on, on a browser that has not given a code lately | Their email, Sign-In Code (six boxes), Use Recovery Code | Enter the authenticator app's code or a recovery code; Back |
 | Set-up step | Staff app, the sign-in card | A person whose role requires two-step and who has not set it up | Their email, the new key as a QR code and as text, Code From App; then the ten recovery codes | Turn two-step on with the app's first code; Copy Codes; Continue into the app; Back |
 | Forgot Password | Staff app, the sign-in card | Anyone | Email field | Send a reset link |
@@ -337,7 +337,7 @@ two-step by role is set on Settings · Security (`settings` edit; brought forwar
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Sign In | The brand, "Every city. One team." and one line on MyCity App; the shown city's country, name, local time and day; the four cities with their times; the greeting (with the first name on a known browser), Email, Password, Forgot Password, Sign In; Use Passkey and Use PIN on a known browser | None | The session rules, the throttle and why the error never says which emails exist: §6 |
+| Sign In | The brand, "Every city. One team." and one line on MyCity App; the shown city's country, name, local time and day; the eight cities with their times; the greeting (with the first name on a known browser), Email, Password, Forgot Password, Sign In; Use Passkey and Use PIN on a known browser | None | The session rules, the throttle and why the error never says which emails exist: §6 |
 | Code step and PIN | The email or the greeting; Enter Code with "From your authenticator app" or "One of your recovery codes"; Sign-In Code or Recovery Code; Enter PIN and PIN; Sign In, Back, Use Recovery Code or Use App Code, Use Password; the refusal in one line | None | Single use, the drift window, how often a browser is asked, the PIN's wait and switch-off: §6 |
 | Set-up step | The email; Set Up Two-Step with "Your role needs a code from an authenticator app."; the QR code and the key; Code From App; Turn On, Back; then Recovery Codes with one line to keep them, the ten codes, Copy Codes, Continue | None | Which roles require it and why: `foundation.md` §6.4 |
 | Forgot Password | Reset Password, "We will email you a link.", Email, Send Link, Back; then Check Your Email with the address | None | How long a link lasts and that only an active login gets one: §6 |
@@ -350,7 +350,7 @@ two-step by role is set on Settings · Security (`settings` edit; brought forwar
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Sign In | A short band with the city's photograph, its country and time (still), the brand on it; the form under it | The headline, the four city buttons, the photograph's drift and glow | Sign In, full width | None (signed out) |
+| Sign In | The city's photograph at the top, still, with the brand, a glass clock, the city's country, name and day, and a dot per city; the form in a frosted dark panel under it. Cities change by a plain crossfade; nothing moves | The headline, the eight city buttons, the photograph's drift and glow | Sign In, full width | None (signed out) |
 | Code step and PIN | The same card as sign-in: the boxes 44 px, the number keyboard; a full code or PIN goes on its own | Nothing | Sign In, full width | None (signed out) |
 | Set-up step | The same card: the QR code at 192 px, the key under it, the code boxes; a full code goes on its own | Nothing | Turn On, then Continue, full width | None (signed out) |
 | Lock screen | The same card, its buttons full width and stacked: the PIN first when set, Use Passkey (the fingerprint or face) | Nothing | Unlock, full width | None until unlocked |
@@ -405,7 +405,8 @@ two-step by role is set on Settings · Security (`settings` edit; brought forwar
   `security` module, §3 steps 9 to 14, §6). Requiring two-step by role: built 17/10/2026 with
   Settings · Security (§3 step 15, `foundation.md` §6.4).
 - ~~The sign-in drawings or licensed photographs~~: closed 17/10/2026. TB supplied photographs of the
-  four cities at dusk; `CityShowcase` shows them, the drawings standing in until they load.
+  four cities at dusk, then four more (Johannesburg, Rabat, Abidjan, Douala); `CityShowcase` shows
+  them, the drawings standing in for the first four until they load.
 
 ## 14 · Change log
 
@@ -427,3 +428,4 @@ two-step by role is set on Settings · Security (`settings` edit; brought forwar
   session length, idle lock and password minimum read the saved rules. Migration `0400` widens
   `spent_challenge`'s purposes; `PASSWORD_MIN_LENGTH` is the new floor. §2, §3, §5, §6, §8, §10, §11
   and §13 updated.
+- 17/10/2026 · TB · Four more cities on the sign-in screen: Johannesburg, Rabat, Abidjan and Douala (photographs only; their screen is the deep green until one loads). A photograph is fetched only when its city is shown or next. On a phone the photograph fills the top of the screen behind the brand, a glass clock and the city, and the form sits in a frosted panel in the dark theme's colours; nothing moves but the crossfade. The staging bar is gone from both apps (MILESTONES §6). §10 and §13 updated.

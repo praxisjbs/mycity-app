@@ -366,7 +366,8 @@ The approval is not a click-through. The release summary posted to the approval 
 staging verification report, the migration list for this release and the commit list since the last
 production release. The approver:
 
-1. Opens `hub.staging.mycityapp.io`, checks the top bar shows this build's short sha.
+1. Opens `hub.staging.mycityapp.io/api/health`, checks `build` names this build's sha (the Verify
+   staging job has already checked it).
 2. Walks the milestone's demo script for anything this release touches (the Friday demo script is the
    regression script).
 3. Approves with a comment naming what was checked. GitHub records who, when and the comment against
@@ -380,7 +381,7 @@ production release. The approver:
 |---|---|---|
 | `X-Mycity-Environment` header | `staging` on every response and every outbound mail | `production` |
 | Mail `From` display name | `MyCity [STAGING]`, banner row in every template | plain |
-| Top bar in both apps | persistent, shows build sha | none |
+| Bar on the page | none: the address says staging (TB, 17/10/2026) | none |
 | `X-Robots-Tag` | `noindex` | none |
 | Favicon, theme colour | distinct | brand |
 | Features, mail delivery, public URLs | all on, real | all on, real |

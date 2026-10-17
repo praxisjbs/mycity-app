@@ -21,6 +21,11 @@ describe("CityShowcase", () => {
     expect(cities).toHaveTextContent("London19:42");
     expect(cities).toHaveTextContent("Accra18:42");
     expect(cities).toHaveTextContent("Nairobi21:42");
+    expect(cities).toHaveTextContent("Johannesburg20:42");
+    expect(cities).toHaveTextContent("Rabat19:42");
+    expect(cities).toHaveTextContent("Abidjan18:42");
+    expect(cities).toHaveTextContent("Douala19:42");
+    expect(screen.getAllByRole("button")).toHaveLength(8);
     expect(screen.getByRole("button", { name: /Lagos/ })).toHaveAttribute("aria-current", "true");
   });
 
@@ -69,17 +74,36 @@ describe("CityShowcase", () => {
     expect(container.querySelector('[data-photo="london"]')).toBeNull();
   });
 
-  it("uses the small photographs and holds them still on a phone", () => {
-    const { container } = render(<CityShowcase variant="band" />);
-    const img = container.querySelector('[data-photo="lagos"] img')!;
-    expect(img.getAttribute("src")).toMatch(/lagos-640\.webp/);
-    expect(img.className).not.toMatch(/animate-ken/);
-    expect(container.querySelector(".city-parallax")).toBeNull();
+  it("fetches a photograph only when its city is shown or next, and keeps it once it has arrived", () => {
+    vi.useFakeTimers();
+    const { container } = render(<CityShowcase interval={5000} />);
+    const photos = () => [...container.querySelectorAll<HTMLElement>("[data-photo]")].map((p) => p.dataset.photo);
+    expect(photos()).toEqual(["lagos", "london"]);
+    fireEvent.load(container.querySelector('[data-photo="lagos"] img')!);
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(photos()).toEqual(["lagos", "london", "accra"]);
   });
 
-  it("is a short band on a phone", () => {
-    render(<CityShowcase variant="band" start="accra" />);
-    expect(screen.getByText("Accra")).toBeInTheDocument();
+  it("uses the portrait photographs on a phone and holds them still", () => {
+    const { container } = render(<CityShowcase variant="phone" start="rabat" />);
+    const layer = container.querySelector<HTMLElement>('[data-photo="rabat"]')!;
+    const img = layer.querySelector("img")!;
+    expect(img.getAttribute("src")).toMatch(/rabat-phone\.webp/);
+    expect(img).not.toHaveAttribute("srcset");
+    expect(img.className).not.toMatch(/animate-ken/);
+    expect(layer.className).not.toMatch(/blur/);
+    expect(container.querySelector(".city-parallax, .animate-glow, .animate-rise")).toBeNull();
+  });
+
+  it("sets the form in a dark frosted panel under the city on a phone", () => {
+    render(
+      <CityShowcase variant="phone" start="abidjan" aside={<p>The form</p>}>
+        <span>Brand</span>
+      </CityShowcase>,
+    );
+    expect(screen.getByText("Abidjan")).toBeInTheDocument();
+    expect(screen.getByText("Côte d'Ivoire")).toBeInTheDocument();
+    expect(screen.getByText("The form").closest("[data-theme]")).toHaveAttribute("data-theme", "dark");
     expect(screen.queryByRole("group", { name: "Cities" })).toBeNull();
   });
 

@@ -142,7 +142,7 @@ export function Modal({
           <Dialog.Portal container={container ?? undefined}>
             <Dialog.Overlay
               className={cn(
-                "fixed inset-x-0 top-[var(--env-bar,0px)] bottom-0 z-50 grid bg-scrim",
+                "fixed inset-0 z-50 grid bg-scrim",
                 side ? "justify-items-end" : "place-items-center overflow-y-auto p-5",
               )}
             >
