@@ -343,4 +343,83 @@
   [data-photo="london"] { --glow-y: 60%; }
   [data-photo="accra"] { --glow-y: 64%; }
   [data-photo="nairobi"] { --glow-y: 66%; }
+  [data-photo="johannesburg"] { --glow-y: 58%; }
+  [data-photo="rabat"] { --glow-y: 54%; }
+  [data-photo="abidjan"] { --glow-y: 56%; }
+  [data-photo="douala"] { --glow-y: 58%; }
+
+  /* Smoked glass: the sign-in form's panel and the cities' dock. A Deep Green tint over a
+     blur of the photograph, a hairline edge lit from above, a thread of brand yellow along
+     the top, and a slow sheen that crosses it every few seconds. What sits inside takes
+     the dark theme's tokens (data-theme="dark" on the element), so its text keeps AA. */
+  .city-glass {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: color-mix(in oklab, var(--deep) 58%, transparent);
+    border: 1px solid color-mix(in oklab, var(--on-deep) 14%, transparent);
+    box-shadow:
+      0 40px 90px -30px color-mix(in oklab, var(--deep) 90%, transparent),
+      inset 0 1px 0 color-mix(in oklab, var(--on-deep) 14%, transparent);
+    -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    backdrop-filter: blur(22px) saturate(1.5);
+  }
+  .city-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0 12% auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 70%, transparent), transparent);
+  }
+  .city-glass::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: -40% auto -40% 0;
+    width: 35%;
+    background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--on-deep) 8%, transparent), transparent);
+    transform: translateX(-160%) skewX(-18deg);
+    animation: city-sheen 11s ease-in-out 2s infinite;
+    pointer-events: none;
+  }
+  .city-glass-soft {
+    background: color-mix(in oklab, var(--deep) 32%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+  }
+
+  /* A film's grain over the photograph, and its edges falling away into the dark. */
+  .city-grain {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
+    opacity: 0.08;
+    mix-blend-mode: overlay;
+  }
+  .city-vignette {
+    background: radial-gradient(130% 95% at 50% 38%, transparent 52%, color-mix(in oklab, var(--deep) 72%, transparent) 100%);
+  }
+
+  /* Points of city light drifting slowly up through the picture. Each mote's place, size,
+     pace and head start come from its own variables, which the component sets. */
+  .city-motes > i {
+    position: absolute;
+    bottom: -16px;
+    left: var(--mote-x);
+    width: var(--mote-size);
+    height: var(--mote-size);
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in oklab, var(--color-scene-window) 90%, transparent), transparent 70%);
+    filter: blur(var(--mote-blur));
+    opacity: 0;
+    animation: city-mote var(--mote-time) linear var(--mote-delay) infinite;
+  }
+}
+
+@keyframes city-sheen {
+  0% { transform: translateX(-160%) skewX(-18deg); }
+  28%, 100% { transform: translateX(420%) skewX(-18deg); }
+}
+@keyframes city-mote {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  15%, 75% { opacity: var(--mote-glow); }
+  100% { transform: translate3d(var(--mote-sway), -72vh, 0); opacity: 0; }
 }
