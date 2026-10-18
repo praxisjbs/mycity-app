@@ -67,3 +67,8 @@ Then: fix confirmed findings, CI, open PR 3 (base m1/home-overview) and PR 4 (ba
 - PR 5 built (backend, Reports tab, staging seed), integrated (PROGRESS #3 Built), under review (wf_9ae5febb-69d).
 - 18/10 11:20: PR 3 MERGED (#61). PR 4 open as #62 (m1/home-alerts @ 68c6934, one commit on PR 3). PR 5 m1/home-reports @ 6271993
   (one commit on PR 4), full local CI 44/44 (covers 3+4+5); body in pr-bodies/pr5-body.md; open against main after #62 merges.
+
+## DONE 18/10/2026
+All five Home PRs are on main: #56 (foundation), #59 (overview), #61 (team), #62 (alerts), #63 (reports + staging seed).
+Home screens #1, #2, #3, #86 Built. Left for other milestones: HOME_STAGING_ROWS removal by each owner; Chromium for PDF runs
+on staging; source adapters updated by M2/M4/M6/M7/M8 when they build their tables.
