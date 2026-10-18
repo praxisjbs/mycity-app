@@ -27,14 +27,17 @@ interface FieldContextValue extends ControlIds {
 
 const FieldContext = createContext<FieldContextValue | null>(null);
 
-/** The ids and aria attributes a control inside a Field takes. Used by the controls in this folder. */
-export function useFieldControl(own: { id?: string; state?: FieldState }) {
+/**
+ * The ids and aria attributes a control inside a Field takes. Used by the controls in this folder.
+ * A group (a radio group) is not named by a <label for>, so with `group` it is always labelled by id.
+ */
+export function useFieldControl(own: { id?: string; state?: FieldState; group?: boolean }) {
   const ctx = useContext(FieldContext);
   const state = own.state ?? ctx?.state;
   return {
     id: own.id ?? ctx?.id,
     state,
-    "aria-labelledby": ctx?.labelledBy ? ctx.labelId : undefined,
+    "aria-labelledby": ctx && (ctx.labelledBy || own.group) ? ctx.labelId : undefined,
     "aria-describedby": ctx ? describedBy(ctx.hasHelp && ctx.helpId, ctx.hasError && ctx.errorId) : undefined,
     "aria-invalid": state === "bad" || undefined,
   };

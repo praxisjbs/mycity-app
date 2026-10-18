@@ -78,7 +78,7 @@ These finish M0 and no prompt can do them:
 | Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | **Built** (17/10/2026) | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | **Built** (17/10/2026) | Their documents and the ones People asked for, upload, download, preview |
 | Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | **Built** (17/10/2026) | Organisation profile, working week, public holidays (Nigeria's seeded, the moon-dated and weekend ones Expected until confirmed; others entered on screen) |
-| Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | **Built** (17/10/2026) | Roles created, edited and deleted; the grants matrix, field visibility and capabilities per role |
+| Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | **Built** (17/10/2026; redesigned 18/10/2026, §6.10) | Roles beside the role in view (desktop) or by level (phone), each module's access as one level with Approve and Export, review before save, who holds a role; the grants matrix as a second view; field visibility and capabilities per role |
 | Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Every numbering scheme with its next number, editable. No other document setting is specified yet |
 | Settings · Security (#78) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
 | Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export by email, values masked per reader |
@@ -451,6 +451,47 @@ file is safe to open, never that the right document arrived, so `document.verifi
 column (migration `0350`). A request (`document_request`, the same migration) is cancelled, never
 deleted, so the ask stays on the record.
 
+### 6.10 Access levels on Roles & Permissions (TB, 18/10/2026)
+
+The API keeps a grant as its six actions and a record scope (§5, `access.js`). The screen shows each
+module's actions as one **level** plus two add-ons, and turns a level back into actions when it saves.
+Nothing about levels is stored, so the matrix, the AI read and every permission check are unchanged.
+
+| Level | Actions it stands for |
+|---|---|
+| No Access | none (the grant is left out of the save) |
+| View | view |
+| Add | view, create |
+| Edit | view, create, edit |
+| Full | view, create, edit, delete |
+
+**Approve** and **Export** are separate switches beside the level, because the seeded roles hold them
+apart from delete (Management may view and export Settings, a Line Manager approves People without
+editing it). A grant whose actions fit no level (edit without create, say) reads **Custom** and keeps
+its actions until a level is picked for it. Self-Service is always Own records (`own_only`).
+
+The screen, decided with TB on 17 and 18/10/2026 from three drawn options for each shell:
+
+- **Desktop: split view.** The roles on the left (paged at 25, searched by the server), the role in
+  view on the right with Access, Details and People. A role opens read first; Edit Role turns each
+  module row into its level, records and add-ons. Roles and Matrix switch at the page head; the
+  matrix shows each cell as a level meter with its short level and letters.
+- **Phone: by level.** A role opens full screen with its modules grouped Full, Edit, Add, View and
+  No Access as chips. While editing, a chip opens a sheet to move the module to another level and set
+  its records, Approve and Export. No matrix on a phone.
+- **Letters.** Where space is short (phone chips, matrix cells) a module carries T (Team), O (Own),
+  A (Approve) and X (Export); none means All records. Each letter is a help term (hover on desktop,
+  tap on a phone), with a one-line key above the chips or the matrix.
+- **Review before save.** Save Role (Create Role for a new one) first lists what the role gains,
+  loses and changes per module, field and capability, and how many people it reaches.
+- **Unsaved edits.** Choosing another role, switching to the matrix, starting a new role or leaving
+  the screen asks once: Keep Editing or Discard Changes. Closing the tab asks through the browser.
+- **New Role.** Step 1 in a modal: Role Name and Start From (an existing role, or Blank). The role
+  then opens in place, editing, through Access, Details and Review, and ends on Create Role.
+- **People.** Who holds the role, from `GET /users?role=`, 25 a page; roles are still given on
+  Settings · Users. The role's summary (what it changes, reads and approves, and whether salary is
+  masked) sits behind an ⓘ beside its name.
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -516,7 +557,7 @@ screen.
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | None | Who reads the working week and holidays: §3; why some are Expected: §4 |
-| Settings · Roles & Permissions | Roles: name, people, modules, record scope, sensitive fields; the grants matrix; a role opens its modules with actions and scope, Sensitive Fields and Capabilities; New Role, Save Role, Create Role, Delete Role | Help term on Record Scope (all, team, own); Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8 |
+| Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
 | Settings · Audit Log | Today, This Week, This Month, Sensitive; who, what, record, module, when; Module and Dates filters, search; an entry opens its fields before and after with Open Record; Entries by Module; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
@@ -532,7 +573,7 @@ screen.
 | Settings · Imports (#93) | Import cards: reference, file, status pill | File, Who, Updated, Problems | Start Import in the floating button | More, Settings |
 | Settings · Imports, the wizard | One step per sheet, counts as cards | The rows with problems (Download Errors instead) | Commit Import, full width | From Employees or Settings |
 | Settings · Organisation (#69) | Company card, then holiday cards by year, then the week | None | New Holiday in the floating button | More, Settings |
-| Settings · Roles & Permissions | Role cards; a role opens its grants as grouped toggles | The full matrix grid | New Role in the floating button; Save Role, full width | More, Settings |
+| Settings · Roles & Permissions | Role cards; a role opens full screen with its modules as chips grouped by level, and a chip (while editing) opens a sheet with the level, records, Approve and Export | The Matrix view and its switch, the Record Scope column | New Role in the floating button; Edit Role, then Save Role, full width | More, Settings; Back closes the role |
 | Settings · Documents & Numbering (#76) | Counts as cards, then document cards: next number, when it starts again | Prefix and Issued columns | A card opens its scheme in a sheet | More, Settings |
 | Settings · Security | Counts as cards, the three rules, two-step by role as switches | Method and address of a session, the person and address of a failed sign-in | Save Rules, full width | More, Settings |
 | Settings · Audit Log | Entry cards: who, what, when | Export, Entries by Module, the Module column | Filter in a sheet | More, Settings |
@@ -556,6 +597,10 @@ screen.
 - A security rule set looser than the floor: refused with the floor named. An idle lock longer than
   the session: refused, "Within the session length".
 - A role change that would leave the person saving it without Settings: refused (`LOCKOUT`).
+- A grant whose actions fit no level (§6.10): it reads Custom and is saved as it was unless a level is
+  picked for it.
+- Another role chosen, the matrix opened, New Role pressed or the screen left while a role has unsaved
+  edits: asked once, Keep Editing or Discard Changes.
 - Two public holidays on one date: refused, "Already a holiday".
 - An expected holiday the Federal Government moves: open it, change the date, Confirm Holiday. One
   it does not declare at all: Delete Holiday. Attendance and leave count an expected holiday from
@@ -600,6 +645,12 @@ screen.
   now moves to the next free number, keeping their record, login and roles; a holder the sheet does
   name is reported instead, and importing a sheet by hand moves nobody. Why the roster has never
   run on staging at all, and how to put it there, is `docs/runbooks/staff-roster.md`.
+- 18/10/2026 · TB · §2, §6.10, §10, §11: Roles & Permissions redesigned from three drawn options per
+  shell. Desktop is a split view (roles beside the role, Access, Details and People, Roles and Matrix
+  views); the phone shows a role's modules by level, edited in a sheet. A module's access is one level
+  (No Access, View, Add, Edit, Full) with Approve and Export beside it, mapped to the six actions on
+  screen only, so the API and contract are unchanged. Review before save, a role's people, the ⓘ
+  summary, the letters with help and a key, the unsaved-edits question and New Role in steps.
 - 17/10/2026 · TB · Documents: `documents.repo.js` exports `REQUEST_STILL_OPEN`, the one rule for a request still waiting for its file, which Home's Documents Requested card reads instead of a copy. No behaviour changed.
 - 17/10/2026 · TB · §5: `organisation.service.counts(client, scope, { today })` for Home's headcount,
   attrition and confirmations cards, the register's own definition; the counts above People ·

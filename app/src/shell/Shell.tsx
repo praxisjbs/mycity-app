@@ -19,7 +19,7 @@ import {
 } from "@mycity/ui";
 import { useApi } from "@/api/hooks";
 import { useAuth, useMe } from "@/auth/AuthProvider";
-import { ClockButton, useClockPrompt } from "@/features/attendance/ClockButton";
+import { ClockButton, useClockSync } from "@/features/attendance/ClockButton";
 import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
 import { visibleModules, visibleTabs } from "./access";
@@ -93,7 +93,7 @@ export function Shell() {
   }, [allowed, tab]);
 
   useEffect(() => noteVisit(), []);
-  useClockPrompt();
+  useClockSync();
 
   const page = allowed && tab ? <ModulePage mod={allowed} tab={tab} id={location.id} /> : null;
   const strip =

@@ -18,7 +18,6 @@ describe("the session", () => {
     await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 5000 });
     await act(() => result.current.signIn("cynthia@mycityapp.io", "demo1234"));
     expect(result.current.status).toBe("signed-in");
-    act(() => result.current.clearJustSignedIn());
 
     // The refresh cookie is gone (the session was ended elsewhere): the next call is refused.
     mockSession.set(null);
@@ -31,8 +30,6 @@ describe("the session", () => {
 
     await act(() => result.current.signIn("cynthia@mycityapp.io", "demo1234"));
     expect(result.current.status).toBe("signed-in");
-    // Carrying on is not a fresh sign-in: the clock prompt does not open again.
-    expect(result.current.justSignedIn).toBe(false);
   }, 15000);
 
   it("signs out to the sign-in screen", async () => {

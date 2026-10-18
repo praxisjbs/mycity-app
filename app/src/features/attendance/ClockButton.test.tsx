@@ -78,7 +78,6 @@ async function signedInAs(email: string) {
   await act(async () => {
     await auth!.signIn(email, "demo1234");
   });
-  act(() => auth!.clearJustSignedIn());
   await waitFor(() => expect(clock?.today).toBeTruthy(), { timeout: 5000 });
 }
 

@@ -48,7 +48,7 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 mycity-app/
 ├── app/                      staff React + Vite app (frontend team), served at hub.mycityapp.io
 ├── public-app/               public React + Vite app (frontend team), served at go.mycityapp.io
-├── packages/ui/              @mycity/ui: the one design system both apps import. 157 components in
+├── packages/ui/              @mycity/ui: the one design system both apps import. 162 components in
 │                             groups: Foundations, Actions, Layout, Display, Navigation, Overlays,
 │                             Help, Feedback, Forms, Data (DataView, Kanban, Calendar), Charts,
 │                             Documents, Maps and Shell; plus the tokens, the form system, the data
@@ -312,7 +312,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 
 | Module | Owner | Files beyond the template |
 |---|---|---|
-| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js` |
+| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.prompt` (when the Overview opens Attendance's clock-in panel) |
 | `alerts` | TB | |
 | `reports` | TB | |
 | `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, worksite and shift for a date), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |

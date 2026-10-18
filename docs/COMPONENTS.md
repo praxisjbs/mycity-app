@@ -40,11 +40,13 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
 | Display | [IconCards](#iconcards) | `IconCards`, `IconCard` | A grid of phone icon cards, two to a row; each IconCard is an icon, a title and a line, and opens a sheet with that section. | stable |
 | Display | [Illustration](#illustration) | `Illustration`, `EmptyIllustration`, `SearchIllustration`, `SuccessIllustration`, `ErrorIllustration`, `LockedIllustration`, `OfflineIllustration`, `FirstRunIllustration`, `ClockInIllustration`, `ClockOutIllustration` | A small line drawing in the theme's colours, for empty states, first run, results and the clock prompts. | beta |
+| Display | [ItemChip](#itemchip) | `ItemChip` | A rounded chip naming one item (a module in a role), tapped to open it, with small marks after the name. | stable |
 | Display | [Kbd](#kbd) | `Kbd` | A keyboard key or shortcut, drawn as keycaps (⌘ K, Esc). | stable |
 | Display | [KeyValue](#keyvalue) | `KeyValue` | Label and value pairs for a record: two columns on desktop, label over value on a phone; a value that is not set shows EmptyValue. | stable |
 | Display | [KpiCard](#kpicard) | `KpiCard` | One figure a person acts on: its title, the number, and a short trend line; with `onOpen` it becomes the way into the records behind it. | stable |
 | Display | [KpiDetail](#kpidetail) | `KpiDetail` | The report model behind a KPI card: the records that make up the number, grouped, searchable and paged at 25. | stable |
 | Display | [KpiGrid](#kpigrid) | `KpiGrid` | The row of KPI cards: four across on desktop, two to a row on a phone. | stable |
+| Display | [LevelMeter](#levelmeter) | `LevelMeter` | A level drawn as a few short bars, filled up to the level: how much access a role has to a module. | stable |
 | Display | [Money](#money) | `Money` | An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word. | stable |
 | Display | [Pill](#pill) | `Pill`, `StatusPill` | A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }). | stable |
 | Display | [ProfileHeader](#profileheader) | `ProfileHeader`, `BackButton` | The head of a record page: who or what it is, in big initials, with its chips and its actions. | stable |
@@ -77,6 +79,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Feedback | [ErrorBoundary](#errorboundary) | `ErrorBoundary` | Catches a crash in one screen so the rest of the app keeps working, and shows ErrorState with Try Again in its place. | stable |
 | Feedback | [ErrorState](#errorstate) | `ErrorState` | Something did not load: one line saying so, and Try Again. | stable |
 | Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere. | stable |
+| Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot. | stable |
@@ -85,11 +88,13 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
+| Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row. | stable |
 | Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField` | Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField). | stable |
 | Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
+| Forms | [StepBar](#stepbar) | `StepBar` | Where a person is in a few steps: one bar per step, filled up to the step in hand, and Step 2 of 4. | stable |
 | Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
 | Forms | [TextField](#textfield) | `TextField`, `PasswordField`, `NumberField`, `PhoneField`, `TextAreaField` | The text input of the form system, with its typed relatives: password, whole number, phone and long text. | stable |
 | Forms | [Tick](#tick) | `Tick` | A checkbox with no label beside it, named by what it picks: the tick on a list's row. | stable |
@@ -874,6 +879,40 @@ No props of its own.
 <ClockInIllustration size="l" />
 ```
 
+### ItemChip
+
+A rounded chip naming one item (a module in a role), tapped to open it, with small marks after the name.
+
+| | |
+|---|---|
+| Use | A wrapped set of items a person opens one at a time: the modules a role reaches at one level, each opening its detail, with letters after the name for what applies to it. |
+| Avoid | Narrowing a list (use Chips); a status on a record (use Pill); records with more to say than a name (use TapList, or DataView for a server list). |
+| Phone | The name is a 44 px tap target; a row of chips wraps onto new lines and never scrolls the page sideways. Marks that are help terms open their sheet on a tap. |
+| Accessibility | With onSelect the name is a button that opens a dialog (aria-haspopup), with aria-current on the item open now; pass `label` when the name alone is not enough. The marks sit beside the button, never inside it, so each can be a control of its own. The name is marked as content (data-copy). |
+| Status | stable |
+| Exports | `ItemChip` |
+| Import | `import { ItemChip } from "@mycity/ui";` |
+| File | `packages/ui/src/display/ItemChip.tsx` |
+| Test | `packages/ui/src/display/ItemChip.test.tsx` |
+| Gallery | `packages/ui/src/display/ItemChip.gallery.tsx` (`npm run gallery`, `#/ItemChip`) |
+
+**ItemChip** props (`ItemChipProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` | yes | The item's name as the screen shows it; record content, not interface copy. |
+| `onSelect` | `() => void` |  | Opens the item. Without it the chip is a plain label, not a control. |
+| `marks` | `ReactNode` |  | Small marks after the name, such as letters behind help terms; they sit outside the chip's button so each can be a control of its own. |
+| `selected` | `boolean` |  | The item open now: drawn in the accent. |
+| `muted` | `boolean` |  | An item that is off (no access): drawn muted. |
+| `label` | `string` |  | The button's accessible name when the visible name is not enough ("Payroll, View, Team"). |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ItemChip onSelect={() => open("payroll")} label="Payroll, View, Team">Payroll</ItemChip>
+<ItemChip selected onSelect={() => open("people")} marks={<HelpTerm help={teamHelp}>T</HelpTerm>}>People</ItemChip>
+```
+
 ### Kbd
 
 A keyboard key or shortcut, drawn as keycaps (⌘ K, Esc).
@@ -994,7 +1033,7 @@ The report model behind a KPI card: the records that make up the number, grouped
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `summary` | `ReactNode` |  | One operational line above the list, at most 20 words ("22 of 25 clocked in across the organisation"). |
-| `groups` | `KpiDetailGroup[]` |  | The groups the rules read the figure in; chips show only when there is more than one. |
+| `groups` | `KpiDetailGroup[]` |  | The groups the rules read the figure in; chips show only when there is more than one. All counts the whole list, not their sum, since groups can overlap. |
 | `group` | `string` |  | The group in view; `all` for every record. |
 | `onGroup` | `(group: string) => void` |  | Called with the chosen group's value, or `all`. |
 | `list` | `DataViewList<R>` | yes | The server-paged records behind the number (a `usePaged()` result). |
@@ -1039,6 +1078,38 @@ The row of KPI cards: four across on desktop, two to a row on a phone.
 ```tsx
 <KpiGrid items={[{ key: "in", title: "Clocked In Today", value: "22 of 25", onOpen: open }]} />
 <KpiGrid>{figures.map((f) => <KpiCard key={f.key} {...f} />)}</KpiGrid>
+```
+
+### LevelMeter
+
+A level drawn as a few short bars, filled up to the level: how much access a role has to a module.
+
+| | |
+|---|---|
+| Use | A role's access to a module (No Access, View, Add, Edit, Full) in a permissions row or matrix; any short ordered scale of a few steps. |
+| Avoid | A measure against a whole, such as leave used (use Meter); a status (use Pill); a scale of more than about six steps (use Meter with its figure). |
+| Phone | The same size; it is never a tap target on its own, so a row that opens on a tap keeps its own 44 px. |
+| Accessibility | An image named by its label and count ("Edit, 3 of 4"), so the level is read, not guessed from the fill. With decorative it is hidden, for when the level's name is shown beside it. |
+| Status | stable |
+| Exports | `LevelMeter` |
+| Import | `import { LevelMeter } from "@mycity/ui";` |
+| File | `packages/ui/src/display/LevelMeter.tsx` |
+| Test | `packages/ui/src/display/LevelMeter.test.tsx` |
+| Gallery | `packages/ui/src/display/LevelMeter.gallery.tsx` (`npm run gallery`, `#/LevelMeter`) |
+
+**LevelMeter** props (`LevelMeterProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `number` | yes | How many steps are filled, from 0 to max. |
+| `max` | `number` |  | How many steps there are. Default 4. |
+| `label` | `string` | yes | The level's name ("Edit"): the meter is read as "Edit, 3 of 4". |
+| `decorative` | `boolean` |  | The name is shown beside the meter, so assistive technology skips the meter. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<LevelMeter value={3} label="Edit" />
+<LevelMeter value={level.rank} label={level.name} decorative />
 ```
 
 ### Money
@@ -2154,6 +2225,38 @@ toast.success("Alert cleared", { undo: () => restore(alert) })
 
 ## Forms
 
+### CardPicker
+
+The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first.
+
+| | |
+|---|---|
+| Use | Choose Cards on Home, and a role's cards on Settings: inside a Modal whose footer holds Cancel, any reset and the save. |
+| Avoid | A yes or no in a form (use CheckboxField); a choice of one (ChoiceField or SelectField); Save or Cancel inside it (the dialog's footer holds them); dragging to reorder. |
+| Phone | The chosen cards first with Move Up and Move Down, then the rest; each tick and button is a 44 px target, the buttons drop under the title when the row is narrow, and the count is left off. |
+| Accessibility | A named group of real checkboxes, each labelled by its card's title; a locked card's tick is checked, disabled and described as Locked. Move Up and Move Down are worded buttons named for their card, unavailable (not removed) at either end, and focus stays with a card as it moves. A polite status reads the count after a tick, a card's new place after a move, and the limit when a pick is refused; the refused tick is marked invalid and described by the error. |
+| Status | beta |
+| Exports | `CardPicker` |
+| Import | `import { CardPicker } from "@mycity/ui";` |
+| File | `packages/ui/src/form/CardPicker.tsx` |
+| Test | `packages/ui/src/form/CardPicker.test.tsx` |
+| Gallery | `packages/ui/src/form/CardPicker.gallery.tsx` (`npm run gallery`, `#/CardPicker`) |
+
+**CardPicker** props (`CardPickerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `options` | `CardPickerOption[]` | yes | Every card the person may choose, in the order the catalogue lists them. Only cards they may see: never a greyed one. |
+| `value` | `string[]` | yes | The chosen card ids, in the order the row shows them. Locked cards are chosen and lead whether or not they are listed here; an id with no option is dropped. |
+| `onChange` | `(next: string[]) => void` | yes | Called with the next chosen ids, locked first, after a tick or a move. A tick never takes it past `max`. |
+| `max` | `number` |  | How many cards may be chosen; 4, a row of KPI cards. |
+| `label` | `string` | yes | The group's accessible name, Title Case ("Overview Cards"); the dialog's title is the visible one. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<CardPicker label="Overview Cards" options={cards} value={draft} onChange={setDraft} />
+```
+
 ### DateField
 
 Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField.
@@ -2482,6 +2585,41 @@ Picks people the server searches: their name, job title and department, one page
 <PersonPicker list={employees} value={panel} onChange={setPanel} multiple />
 ```
 
+### RadioCards
+
+Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2.
+
+| | |
+|---|---|
+| Use | Two to five options a person should read together before choosing, each worth a full row or a small glyph: an access level, a leave type, a pay basis. |
+| Avoid | Short options that fit one line (use ChoiceField); more than five (use SelectField); a yes or no (use CheckboxField or Switch); a setting that applies at once (use Switch). |
+| Phone | Every row is full width and 52 px tall (44 px on desktop), so each option is its own thumb target; the rows stack and never scroll sideways. |
+| Accessibility | A radio group with arrow-key movement; each row is a radio named by its words, and the glyph is hidden so it is never read twice. Inside a Field its label names the group and the error is linked; alone, pass label. |
+| Status | stable |
+| Exports | `RadioCards` |
+| Import | `import { RadioCards } from "@mycity/ui";` |
+| File | `packages/ui/src/form/RadioCards.tsx` |
+| Test | `packages/ui/src/form/RadioCards.test.tsx` |
+| Gallery | `packages/ui/src/form/RadioCards.gallery.tsx` (`npm run gallery`, `#/RadioCards`) |
+
+**RadioCards** props (`RadioCardsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `V \| null` | yes | The chosen value; null when none is chosen yet. |
+| `onChange` | `(value: V) => void` | yes | Called with the chosen value. |
+| `onBlur` | `() => void` |  | Called when focus leaves the group. |
+| `options` | `ReadonlyArray<RadioCardOption<V>>` | yes | Two to five options. |
+| `label` | `string` |  | Names the group when no Field label sits above it. |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it). |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<Field label="Payroll Access" {...form.status("payroll_access")}><RadioCards options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]} {...form.field("payroll_access")} /></Field>
+<RadioCards label="Payroll Access" value={level} onChange={setLevel} options={levels.map((l) => ({ value: l.code, label: l.name, leading: <LevelMeter value={l.rank} label={l.name} decorative /> }))} />
+```
+
 ### RecordPicker
 
 Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything.
@@ -2670,6 +2808,37 @@ A signature drawn with a finger or a mouse, which leaves as a PNG for the docume
 
 ```tsx
 <SignatureField label="Your Signature" onChange={setInk} ref={pad} />
+```
+
+### StepBar
+
+Where a person is in a few steps: one bar per step, filled up to the step in hand, and Step 2 of 4.
+
+| | |
+|---|---|
+| Use | Above a flow of two to six steps that a screen or sheet drives itself: a role being set up, an import (Upload, Map, Preview, Commit). |
+| Avoid | A form that owns its steps, with Back and Next (use Wizard, which draws this bar); progress through a count or a total (use ProgressBar). |
+| Phone | The same bars across the full width and the same line under them; nothing in it is a tap target. |
+| Accessibility | An ordered list named Steps; each bar carries a hidden label naming its step (Step 2 of 4: Access) and the step in hand has aria-current="step". Nothing in it takes focus. |
+| Status | stable |
+| Exports | `StepBar` |
+| Import | `import { StepBar } from "@mycity/ui";` |
+| File | `packages/ui/src/form/StepBar.tsx` |
+| Test | `packages/ui/src/form/StepBar.test.tsx` |
+| Gallery | `packages/ui/src/form/StepBar.gallery.tsx` (`npm run gallery`, `#/StepBar`) |
+
+**StepBar** props (`StepBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `steps` | `readonly string[]` | yes | The steps' titles in order, Title Case, at most 4 words each. |
+| `at` | `number` | yes | The step in hand, counted from 0. |
+| `titled` | `boolean` |  | Also name the step in hand after its number ("Step 2 of 4 · Access"). Off inside Wizard, which shows the title as its heading. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<StepBar steps={["Name", "Access", "Details", "Review"]} at={1} />
+<StepBar steps={["Name", "Access", "Details", "Review"]} at={1} titled />
 ```
 
 ### Switch

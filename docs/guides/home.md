@@ -49,14 +49,14 @@ control for data-driven oversight" (02/09/2026).
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Home · Overview (`overview`) | staff app | every employee, resolved for their role | four KPI cards, the role's main chart and donut, Need You, Partnership Pipeline, Goals This Quarter, Activity Today, Your Week; Staff also the day strip, My Goals This Quarter and Upcoming Leave | open a card's records; choose their own cards; Export the Overview; New (a menu of what they may create) |
+| Home · Overview (`overview`) | staff app | every employee, resolved for their role | four KPI cards, Need You, Activity Today and Your Week; Operations, CEO and Partnerships also the role's main chart (and donut), the Partnership Pipeline and Goals This Quarter (on the CEO's the goals are the chart); Staff instead the day strip, My Goals This Quarter and Upcoming Leave | open a card's records; choose their own cards; Export the Overview; New (a menu of what they may create) |
 | Choose Cards (picker) | Overview, from the KPI row (a page menu item on a phone) | every employee | the cards they may see, the ones on their Overview in order, the ones their roles lock | add, remove and reorder up to four cards; go back to their roles' cards |
 | Home · Team (`team`) | staff app | holders of `home.team`; everyone else sees the gated state | today's roster for the people in their `home` scope (status, Clock-In, KPI, open tasks), four team cards, Attendance This Month | filter by department and status; open a card's records; open a person |
 | Home · Alerts (`alerts`) | staff app | holders of `alerts.clear` or `alerts.manage`; everyone else sees the gated state | open alerts of the rules they may clear, about people in their scope, with severity, age and Over By; the counts; View Dismissed | clear or dismiss an alert (`alerts.clear`); see, create, change and switch off rules (`alerts.manage`) |
 | Home · Reports (`reports`) | staff app | holders of `home.reports`; everyone else sees the gated state | their own reports and the shared ones whose source they may open, with schedule, status and audience; Recent Runs | build a report, schedule it, pause or resume it, run it now, download a finished run, archive it |
 | KPI detail (the report model) | any KPI card, Overview and Team | the scope the card was computed in | the paged records behind the number, with its groups | page at 25; filter by group; open a record |
 | Gated tab | Team, Alerts or Reports without the capability | every `home` viewer who lacks it | the page title, the Locked illustration, "For Managers" and one line | nothing; the tab is listed so the four tabs stay in place |
-| Clock-in prompt | opened by Home, owned by Attendance | the signed-in employee, in the first session of a working day | Attendance's clock-in panel | clock in, or close it |
+| Clock-in prompt | opened by Home, owned by Attendance | the signed-in employee, when the first session of a working day opens Home · Overview | Attendance's clock-in panel | clock in, or close it |
 | Settings · Roles (role cards) | Settings, M9 | `settings` view and edit | a role's default cards and locks | set or clear them (routes in M1, the screen in M9) |
 
 Home renders but does not own the attendance, partnership, approval, recruitment and task figures
@@ -66,18 +66,23 @@ the saved reports, their schedules and runs, the per-role cards and each person'
 ## 3 · How the screens relate
 
 1. **Sign-in → Home, and the clock-in prompt.** An employee signs in and lands on Home · Overview,
-   resolved for their role. The Overview answer carries `prompt_clock_in`; when it is true the
-   screen opens Attendance's clock-in panel once. The server decides it (§6 Clock-in prompt), so
-   the shell no longer opens the panel after every sign-in. The punch itself is Attendance's write
-   (`POST /api/v1/attendance/punches`, LA).
+   resolved for their role (a sign-in through a link to another screen lands on that screen). The
+   Overview answer carries `prompt_clock_in`; when it is true the screen opens Attendance's
+   clock-in panel once. So the prompt opens when the first session of a working day opens Home ·
+   Overview: a first session that never opens it is not prompted that day, and the top bar's
+   Clock In and the phone's floating button still open the panel. The server decides it (§6
+   Clock-in prompt), so the shell no longer opens the panel after every sign-in. The punch itself
+   is Attendance's write (`POST /api/v1/attendance/punches`, LA).
 2. **A clock-in reflects on Home.** A punch commits through Attendance, which records it and
    recalculates the person's day (`attendance_day`). Clocked In Today, the Operations chart, the
    Team roster and the Staff day strip all read the shared attendance roster
    (`src/modules/attendance/attendance.roster.js`), which reads that day's record the way People ·
    Attendance and My Attendance read it, so they move with it, no copy and no second source, and
-   always equal those screens. When Attendance emits `attendance.punched`, Home's
-   handler re-reads the late-arrival rules for that person at once instead of waiting for the
-   morning sweep.
+   always equal those screens. An Overview on screen reads itself again when the reader's own
+   state today changes (after a punch from the panel, at once) and on `attendance.updated` (a
+   punch in their People scope, a burst of them read once). When Attendance emits
+   `attendance.punched`, Home's handler re-reads the late-arrival rules for that person at once
+   instead of waiting for the morning sweep.
 3. **A KPI card → its records.** Clicking a card opens the records behind the number
    (`GET /api/v1/home/kpi/:key/meta` for its title, summary line, columns and groups, then
    `GET /api/v1/home/kpi/:key`, paged at 25). Clocked In Today breaks down into On Site, Remote,
@@ -160,7 +165,7 @@ column to the migrated schema, and the schema gate holds every query to them.
 | Adapter | Owning module · milestone · owner | Reads |
 |---|---|---|
 | `tasks.source.js` | tasks · M2 · AJ | `task`: overdue tasks and what is due this week (a person's Open Tasks on Team stays empty until M2) |
-| `goals.source.js` | goals and targets · M2 · AJ | `organisational_goal`, `employee_target`: Goals This Quarter and My Goals, without progress until M2 defines it (Goals On Track and the org KPI donut stay hidden, §13) |
+| `goals.source.js` | goals and targets · M2 · AJ | `organisational_goal`, `employee_target`: Goals This Quarter and My Goals, without progress until M2 defines it (Goals On Track stays hidden, §13; the CEO's Org KPI is drawn from the organisation's departments, each with no score until M2 defines KPI scores, §6, §13) |
 | `reviews.source.js` | reviews · M2 · AJ | `performance_review`, `performance_cycle`: reviews due |
 | `calendar.source.js` | calendar · M2 · AJ | `calendar_event`: Your Week |
 | `vacancies.source.js` | vacancies · M4 · TB | `vacancy`: open vacancies |
@@ -197,7 +202,7 @@ All three routers mount at `/api/v1/home` (`basePath: "/home"`); a literal path 
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /api/v1/home/overview` | → `HomeOverview` | `home` view · each section in the reader's scope for its module | n/a | Typed sections, null when the reader has none (§6). Embedded lists hold at most 25 and link to their own paged homes |
+| `GET /api/v1/home/overview` | → `HomeOverview` | `home` view · each section in the reader's scope for its module | n/a | Typed sections, null when the reader has none (§6). Each embedded list holds at most 25. Need You is its own paged list (`GET /workflow/mine`); Upcoming Leave links to ESS · My Leave; Your Week is at most 25 a day; Goals This Quarter, My Goals and Activity Today are their first 25, each row with its link, and have no paged home in M1 |
 | `POST /api/v1/home/overview/export` | `HomeReportRunNow` → `HomeReportRun` | `home` view | n/a | The Overview Export: a pending run of the reader's own Overview, through the reports service |
 | `GET /api/v1/home/kpi-picker` | → `HomeKpiPicker` | `home` view · own | n/a | Only cards the reader may see; their pick, their roles' defaults and locks, what shows now |
 | `PUT /api/v1/home/kpi-picks` | `HomeKpiPicks` → `HomeKpiPicker` | `home` view · own | n/a | Up to four, each once, each one the reader may see; an empty list is a choice |
@@ -205,7 +210,7 @@ All three routers mount at `/api/v1/home` (`basePath: "/home"`); a literal path 
 | `GET /api/v1/home/kpi/:key/meta` | `HomeKpiParams` → `HomeKpiDetailMeta` | `home` view, and the card's own eligibility · the card's scope | n/a | 404 for a card the reader may not see |
 | `GET /api/v1/home/kpi/:key` | `HomeKpiParams`, `HomeKpiDetailQuery` → `HomeKpiDetailPage` | as above | yes, 25 | Filter `group`; rows masked for the reader |
 | `GET /api/v1/home/roles/:role_id/kpis` | → `HomeRoleKpis` | `settings` view | n/a | Offers the cards the ROLE may see |
-| `PUT /api/v1/home/roles/:role_id/kpis` | `HomeRoleKpisSave` → `HomeRoleKpis` | `settings` edit | n/a | Up to four defaults; locks among them |
+| `PUT /api/v1/home/roles/:role_id/kpis` | `HomeRoleKpisSave` → `HomeRoleKpis` | `settings` edit | n/a | Up to four defaults; locks among them. None takes the role back to its Home view's cards, as DELETE does |
 | `DELETE /api/v1/home/roles/:role_id/kpis` | no content | `settings` edit | n/a | Back to the Home view's defaults |
 | `GET /api/v1/home/team/summary` | → `HomeTeamSummary` | `home` view · team/all, `home.team` | n/a | Today's four team cards |
 | `GET /api/v1/home/team` | `HomeTeamQuery` → `HomeTeamPage` | `home` view · team/all, `home.team` | yes, 25 | Filters: department, status, no clock-out yesterday; sort by name, department, Clock-In |
@@ -275,43 +280,84 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   string; a ratio keeps what it is out of ("0 of 30" is not "0 of nothing", and a denominator of 0
   shows no figure). A card whose query fails is logged and left out of the row, never shown as 0.
 - **Choosing cards.** Up to four, each once, only cards the reader may see; locked cards cannot be
-  taken off. Restating the roles' cards in their order saves as "follow my roles". A role's
-  defaults are at most four and its locks are among them; they are offered from the cards the role
-  may see, not the editor's.
+  taken off. Choose Cards starts from the cards showing, locks first, never the stored pick, so a
+  card a role locked after the pick was saved is already in it and saving unchanged is accepted.
+  Restating the roles' cards in their order saves as "follow my roles". A role's defaults are at
+  most four and its locks are among them; they are offered from the cards the role may see, not
+  the editor's. Saving a role with no default removes its row, as DELETE does: a role row always
+  holds a default, so `configured` is true only when its members get the role's cards.
 - **The prune.** When a role loses a grant, a capability or sight of a field, the cards it can no
   longer see leave its `role_kpi` row (the row goes when no default is left). Personal picks are
   filtered at read time.
 
 **Overview**
 
-- **Sections by Home view** (`src/modules/dashboard/dashboard.layout.js`): Operations gets the
-  attendance chart (present out of expected on each of the last 14 working days) and the on-time
-  donut (this month so far: on time, late, absent); CEO the goals chart and the org KPI donut
-  (departmental KPI scores weighted together, each department beside it); Partnerships the signed
-  value by month and the pipeline; Staff the day strip (Shift Today, Clock-In, Where, Status, Hours
-  Today), My Goals This Quarter and Upcoming Leave. A section whose module the reader cannot open
-  is null and is not drawn. The server sends figures; every title and caption is written on the
-  screen.
+- **Sections by Home view** (`src/modules/dashboard/dashboard.layout.js`, code like the cards'
+  defaults):
+  - Operations: Clocked In under the greeting; the attendance chart, present out of expected on
+    each of the last 14 working days (today the last when it is one); the On Time donut, this
+    month's working days so far counted on time, late and absent; the Partnership Pipeline; Goals
+    This Quarter. Every attendance figure is the shared roster's day (`summary`) in the reader's
+    People scope, so it equals Clocked In Today and People · Attendance; absent is a day the
+    day-close closed, so today never adds to it.
+  - CEO: the organisation's goals this quarter as the main chart, and the Org KPI donut, the
+    organisation's score and each active department beside it; the Partnership Pipeline. Goals
+    This Quarter is the chart, so it is not drawn twice.
+  - Partnerships: the Naira value signed in each month of this year (the agreements the Signed
+    Value card counts, each in the month it starts until M7 records the signing date). The year is
+    read whole, as the card reads it, so the months add up to the card: they run to this month, or
+    to a later one an agreement already starts in. Beside it the Partnership Pipeline (open
+    opportunities by stage, and active partners with no contact in 30 days) and Goals This
+    Quarter.
+  - Staff: the day strip (today's hours, and the reader's own row of today's roster: status,
+    Clock-In, Clock-Out, the worksite of the clock-in, and Hours Today, first clock-in to last
+    clock-out, none until they clock out), My Goals This Quarter (their targets due this quarter)
+    and Upcoming Leave. A member of staff's Overview is their own day, so it draws no chart,
+    pipeline or organisation goals.
+  - Every view: Need You, Activity Today, Your Week.
+
+  A section whose module the reader cannot open (the `view` grant the cards check) is null and is
+  not drawn, and every section is read in the reader's scope on its module. A goal's progress and
+  every KPI score are M2's to define and are null until then (§13). A section, the activity or the
+  alert count whose read fails is logged and left null, never drawn as a zero or an empty list,
+  as a card is. The server sends figures; every title and caption is written on the screen.
 - **Need You** is on every Overview: the requests waiting on the reader (`GET /workflow/mine`, its
-  own paged list) and the number of open alerts they may clear. Staff hold `approve` nowhere, so
-  theirs is empty in M1 and shows its empty state.
-- **Activity Today** is today's `event_log` (Lagos day), keys on an allow-list only, from modules
-  the reader may open, never a mail or private event and never audit before-and-after values; at
-  most 25, newest first.
-- **Your Week** is this week's working days: hours from the working week (Saturday 09:00 to 15:00),
-  public holidays, the reader's own leave, and their calendar events and tasks due (through the M2
-  sources).
-- **Upcoming Leave** is the reader's own submitted and approved leave not yet over, as the leave
-  module shapes a request, and what is left this year of the type My Leave leads with (Annual,
-  else the first type with an allowance): the same figure My Leave shows.
+  own paged list) and `alerts_to_clear`, the open alerts of any severity they may clear (a holder
+  of `alerts.clear` whose grant on the rule's `permission_key` reaches the alert's subject; null
+  for anyone without `alerts.clear`). Staff hold `approve` nowhere, so theirs is empty in M1 and
+  shows its empty state.
+- **Activity Today** is today's `event_log` (Lagos day) through an allow-list in
+  `dashboard.activity.js`; a key not on it never reaches Home, so a new event is private until
+  someone adds it. On it: `employee.created`, `leave_request.approved`, `leave_request.recorded`
+  and `attendance.review_required` (People, each about one person, so they follow the reader's
+  People scope; one about nobody in particular reaches `all` only), and `recognition.posted` and
+  `celebration.posted` (Community, posted in #general, so every Community viewer sees them). A
+  row is only ever an allowed key under the module that declares it. Never a mail, a message, a
+  sign-in or an audit before-and-after value: each row is the key, the module, when, who did it,
+  who it is about and where it opens (the reader's own view when it is about them). At most 25,
+  newest first.
+- **Your Week** is this week's working days, Monday first (the days the working week works, a
+  public holiday among them named and given no hours): each day's hours (Saturday 09:00 to 15:00),
+  whether the reader's granted leave covers it, and their own calendar events and tasks due on it
+  (through the M2 sources, for a reader who may open My Workspace). Each day reads its own page of
+  events and of tasks, so a busy Monday never takes Friday's place, and shows at most 25 of them.
+  An event shows on the day it starts, never on each day it spans; one that began before Monday
+  shows on Monday.
+- **Upcoming Leave** is the reader's own submitted and approved leave not yet over, soonest first,
+  as the leave module shapes a request, and what is left this year of the type My Leave leads with
+  (Annual, else the first type with an allowance): the same figure My Leave shows. It is the first
+  25; View All opens ESS · My Leave, its paged home.
 - **New** lists only the create actions the reader holds: New Task, Request Leave, New Rule, New
   Report.
-- **Clock-in prompt.** `prompt_clock_in` is true when all hold: the employee is active, today is a
-  working day in Lagos, no granted leave covers today and they have no clock-in that counts today
-  (leave and clock-in both as Attendance's own `GET /attendance/me/today` reads them: leave approved,
-  or granted by its approval; a clock-in accepted or in review), and
-  the session reading the Overview is the first one they signed in with today. It is stateless:
-  closing the panel is enough for the day, and a second session that day does not prompt.
+- **Clock-in prompt** (`dashboard.prompt.js`). `prompt_clock_in` is true when all hold: the
+  session reading the Overview is the first one they signed in with today (the earliest
+  `user_session` issued that Lagos day is the caller's), and Attendance's own word on where they
+  stand (`GET /attendance/me/today`, read only for that first session) is Not Clocked In on a
+  working day: the employee is active, no granted leave covers today (approved, or granted by its
+  approval), no clock-in counts today (accepted or in review, not excluded by People's decision)
+  and no shift is still open from yesterday. It is stateless: closing the panel is enough for the
+  day, a session kept from yesterday or a second session that day does not prompt, and a prompt
+  that cannot be decided is not shown.
 
 **Team**
 
@@ -465,13 +511,17 @@ never reaches Home.
   Nothing write-like: the assistant never clears an alert, edits a rule, runs a report or saves
   cards (A23). Manifests declare reads and screen routes only.
 - **AI routes**: "see open alerts" → `home.alerts` with a category; "open a report" →
-  `home.reports`; "see who is in" → `people.attendance`.
+  `home.reports`; "see who is in" → `people.attendance`; "choose the cards on my Home" →
+  `home.overview`; "see who has clocked in today, by status" and "see the requests waiting on my
+  approval" → `home.overview` with `kpi` (`attendance_today`, `approvals_awaiting_you`), which opens
+  that card's records as ⌘K's `?id=` does.
 - **Search**: route-map types `home_alert` and `home_alert_rule` (Alerts), `home_report` and
   `home_report_run` (Reports), `home_kpi` (Overview, opening the card's records). Providers:
   `alerts.search.js` (alerts the reader may clear, subject in scope; rules for `alerts.manage`
   holders), `reports.search.js` (reports the reader may see; runs they received),
-  `dashboard.search.js` (the cards the reader may see, by title). Each filters per person, since
-  every login holds `home` view. Words people use: "alert", "warning", "red flag"; "report",
+  `dashboard.search.js` (the cards the reader may see and the Overview offers, by their title or
+  their records' title; a Team card belongs to its tab and is not found). Each filters per person,
+  since every login holds `home` view. Words people use: "alert", "warning", "red flag"; "report",
   "attendance report"; "dashboard", "KPI", "card". New Rule and New Report are ⌘K actions
   (`src/shared/search/actions.js`). A tab the reader cannot open is not offered.
 
@@ -487,7 +537,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Home · Overview (`overview`) | Greeting with the first name, and the date (Operations adds the clocked-in count); the four KPI cards with Choose Cards; the main chart (Operations: Attendance, 14 Working Days, with "Dips are Saturdays, a half day" on desktop, and the On Time donut "37 on time, 4 late, 7 absent this month"; CEO: Organisational Goals and the Org KPI donut with its per-department figures; Partnerships: Monthly Signed Value; Staff: the day strip Shift Today, Clock-In, Where, Status, Hours Today); Need You (empty: "Nothing Needs You"); Partnership Pipeline with "4 with no contact in 30 days" on desktop; Goals This Quarter; Activity Today; Your Week; Staff: My Goals This Quarter and Upcoming Leave with the year's balance ("12 days left this year"); Export (toast "Export queued. It arrives by email."); New, a menu of New Task, Request Leave, New Rule, New Report as the reader holds them | None | How cards are chosen, inherited and pruned: §6 Cards. Why each role's Overview leans on its own work: §6 Overview. How the CEO rollup is built, where staff goals and leave are set: §6. That figures equal My Attendance: §3 step 2. Saturday hours: §11 |
+| Home · Overview (`overview`) | Greeting with the first name, and the date (Operations adds the clocked-in count); the four KPI cards with Choose Cards; the main chart (Operations: Attendance, 14 Working Days, with "Dips are Saturdays, a half day" on desktop, and the On Time donut "37 on time, 4 late, 7 absent this month"; CEO: Organisational Goals and the Org KPI donut with its per-department figures; Partnerships: Monthly Signed Value; Staff: the day strip Shift Today, Clock-In, Worksite, Status, Hours Today); Need You (empty: "Nothing Needs You"); Partnership Pipeline with "4 with no contact in 30 days" on desktop; Goals This Quarter; Activity Today; Your Week; Staff: My Goals This Quarter and Upcoming Leave with the year's balance ("12 days left this year") and View All to My Leave; Export (toast "Export queued. It arrives by email."); New, a menu of New Task, Request Leave, New Rule, New Report as the reader holds them | None | How cards are chosen, inherited and pruned: §6 Cards. Why each role's Overview leans on its own work: §6 Overview. How the CEO rollup is built, where staff goals and leave are set: §6. That figures equal My Attendance: §3 step 2. Saturday hours: §11 |
 | Choose Cards (picker) | Title "Choose Cards"; each card the reader may see with its title, a Locked pill on locked ones, a tick on the chosen; Move Up and Move Down on each chosen card; the count "3 of 4"; Cancel, Use Role Default, Save Cards; field error "Pick up to 4 cards" | None | Resolution order, eligibility, why a card is missing: §6 Cards |
 | Home · Team (`team`) | The scope (The Whole Organisation, or Your Team); Present Today, On Site, Remote, Flags; the status chips (Everyone, On Site, Remote, Late, Not In, On Leave, No Clock-Out Yesterday); the Team Roster: employee, department, today's status pill, Clock-In, KPI, Open Tasks; Attendance This Month by person. A card or a row opens its list or the person | None | Where the roster's figures come from and that they match My Attendance: §3 step 2, §6. Who the viewer may see: §6 Scope, §8 |
 | Home · Alerts (`alerts`) | Open Alerts, Needs You, Overdue 7 Days +, Cleared This Week; the category chips; the Open Alerts list: alert, trigger, Who Can Clear, age, Over By ("+1" or "12 days left"), severity; Alert Sources, 30 Days (desktop). View Dismissed (the dismissed list, with View Open to go back). A row opens the alert: Trigger, Who Can Clear, Age, Over By, Severity; Close, Edit Rule (`alerts.manage`), Dismiss Alert, Clear Alert (when the reader may clear it); toasts "Alert cleared", "Alert dismissed". Alert Rules (each rule with its switch; switching off asks "Switch Off Rule" with "Its open alerts are dismissed."; Cancel, Switch Off). New Rule (Rule Name, Metric, Threshold, Window Days for a metric counted over days, Severity, Who Can Clear; Cancel, Create Rule; toast "Rule created"); Edit Rule (the same fields but Metric; Save Rule) | Help term on the Over By column header, and on each phone card's Over By label: "How far the alert is past its rule: +1 over 3 is one more than the 3 allowed. A deadline alert shows the days left instead." | That alerts are not notifications, escalation to the CEO, the two checks on clearing, the audit entry: §3 steps 5 and 6, §6 Alerts. Rules being numbers, not code: §4, §6. A new rule's first run: §6, §7 |
@@ -504,7 +554,7 @@ role from the signed-in employee (§6).
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Home · Overview (`overview`) | The greeting and New, the four KPI cards two to a row, then the role's main chart. Staff: the day strip (Shift Today, Clock-In, Status) before the KPI cards | Export; the date line and the chart captions; Staff: Where and Hours Today in the day strip | New, in the floating button's fan; Choose Cards in the page menu; a KPI card opens its records as a bottom sheet | Bottom bar Home; the four tabs along the top |
+| Home · Overview (`overview`) | The greeting and New, the four KPI cards two to a row, then the role's main chart. Staff: the day strip (Shift Today, Clock-In, Status) before the KPI cards | Export; the date line and the chart captions; Staff: Worksite and Hours Today in the day strip | New, in the floating button's fan; Choose Cards in the page menu; a KPI card opens its records as a bottom sheet | Bottom bar Home; the four tabs along the top |
 | Choose Cards (picker) | A bottom sheet: the chosen cards in order with Move Up and Move Down, then the other cards | The count | Save Cards, full width at the foot of the sheet | The sheet closes back to the Overview |
 | Home · Team (`team`) | The four KPI cards two to a row, then the roster as person cards: avatar, name and department, a status pill, Clock-In and KPI | The scope line; the Department and Open Tasks columns (department shows under the name; open tasks in the person's sheet) | Tap a person card or a KPI card: a bottom sheet | Bottom bar Home; the four tabs along the top |
 | Home · Alerts (`alerts`) | View Dismissed, Alert Rules, New Rule; the four KPI cards two to a row; the category chips; alert cards with a severity pill, Who Can Clear and Over By (a help term: a tap opens it as a sheet) | Alert Sources, 30 Days; the Trigger and Age columns (both in the alert's sheet) | Clear Alert, full width at the foot of the alert's sheet; New Rule opens the rule form as a sheet | Bottom bar Home; the four tabs along the top |
@@ -533,11 +583,15 @@ and Move Down rather than bare arrows.
 - **A hidden M2 card** (Goals On Track, My Targets, Payroll In Progress) is never offered or
   computed; the Home view's fifth or sixth default takes its place, and with nothing else eligible
   the row shrinks.
-- **A role with no function data** (a Head of Department outside Partnerships) gets a null
-  pipeline and no pipeline card, rather than an empty one.
-- **The first session of the day.** The clock-in prompt opens once, in the first session the
-  person signs in with on a working day; closing it ends it for the day, a second device that day
-  does not prompt, and nobody on approved leave is prompted.
+- **A reader who may not open Partnerships** gets a null pipeline and no pipeline card, rather
+  than an empty one. A Head of Department whose team owns no partner (one outside Partnerships)
+  sees the pipeline's empty state; their role's own cards (`role_kpi`, §6) can lead with their
+  own work instead of the partnership cards.
+- **The first session of the day.** The clock-in prompt opens once, when the first session the
+  person signs in with on a working day opens Home · Overview; closing it ends it for the day, a
+  second device that day does not prompt, and nobody on approved leave is prompted. A first
+  session that signs in through a link to another screen and never opens the Overview is not
+  prompted that day; the top bar's Clock In and the floating button still open the panel.
 - **A report skipped.** A recipient who has left, been suspended, or lost the source's grant or
   `home.reports` since the schedule was saved gets a `skipped` run, no file and no email; the other
   recipients get theirs. A report whose owner has left keeps running for its recipients until an
@@ -581,6 +635,8 @@ rows, and nothing in the code says where anything came from.
   then a role's cards are its Home view's defaults.
 - **Goals On Track.** What makes a goal on track (progress against the share of its period gone) is
   M2's to define (AJ); the card and My Targets stay hidden until then.
+- **KPI scores.** A goal's progress and every departmental KPI score are M2's to define (AJ). Until
+  then the CEO's Org KPI lists each active department with no score, and goal progress is empty.
 - **Field status.** The roster has no field status until LA's field assignments land; Clocked In
   Today and Team show On Site and Remote only.
 - **Reporting line as recipients.** Sending a report to "each person's line manager" was dropped in
@@ -610,3 +666,6 @@ rows, and nothing in the code says where anything came from.
 - 17/10/2026 · TB · KPI catalogue and source adapters built (`src/modules/dashboard/kpi-catalog`, `src/modules/dashboard/sources`): 29 cards, 26 live; the Team cards take the `home` scope; each card's word limits, module and capability checked at require time; the records behind every card paged at 25.
 - 17/10/2026 · TB · Review fixes before PR 1: `alerts.raise` stores `subject_employee_id`; Documents Requested reads the documents module's own open-request rule; the roster's lateness counts punches in review and No Clock-Out Yesterday reads the last working day (§6, as attendance.md §6); index requests on later milestones' tables are in each owner's Owes; the New Report steps are Report, Schedule and Delivery (§10.1); §12 names the finance tiles file.
 - 18/10/2026 · TB · Merged with Attendance's clock-in and clock-out (LA): the shared roster now reads each day's record as Attendance writes it and the register's rules for a day with no record, instead of re-deciding the day from the punches. Remote is the work pattern (a hybrid or unassigned person who clocks in is on site), lateness is Attendance's (whole minutes past the start plus grace, the organisation's policy when a person has none), a punch People rejected no longer counts, `absent` joins the statuses, and My Attendance on Home counts the days Attendance has recorded. `1150` no longer adds `attendance_event (occurred_at)`. The clock-in prompt counts a clock-in in review, as Attendance does, and the panel punches through Attendance's route. §3, §4, §4.1 and §6 follow.
+- 18/10/2026 · TB · Overview backend built (`src/modules/dashboard`): `GET /home/overview` with each Home view's sections (`dashboard.layout.js`), Activity Today's allow-list (`dashboard.activity.js`), the alerts beside Need You and the clock-in prompt (`dashboard.prompt.js`); the card picker, a role's cards and the records behind a card; the prune after an access change; `cards.mine` and ⌘K's `home_kpi`. §2, §6, §9 and §11 now say which view draws which section, what Activity Today allows, how the prompt reads Attendance, and what a Head of Department outside Partnerships sees.
+- 18/10/2026 · TB · Overview screen on the real API (`app/src/features/home`): drawn from the contract's typed `HomeOverview`, with the greeting and date line, the role's cards two to a row on a phone, each view's chart, donut and sections, Need You from `GET /workflow/mine` with the alerts the reader may clear, Activity Today worded on the screen from its event keys, Your Week, and the Staff day strip first. Every card opens its records through `KpiDetail`, whose All chip now counts the server's total (the groups can overlap); `?kpi=` and `?id=` open a card's records. Choose Cards sits on the card row (the page menu on a phone) with Use Role Default; New is a menu of the create actions the reader holds on screens that are open; the Overview opens Attendance's clock-in panel once when `prompt_clock_in` says so, and the shell's after-sign-in opener is gone. The server-written notes and captions are off the screen, and the day strip's Where is Worksite, since a title may not start with Where (§10.1, §10.2). Export arrives with Reports.
+- 18/10/2026 · TB · Review fixes to the Overview: Your Week reads each working day's own page of events and tasks, so a busy week keeps its later days (§6); a role saved with no default has no row and follows its Home view, as DELETE does (§5, §6); Choose Cards starts from the cards showing, so a card locked after the pick is in the draft and saves (§6); the Overview reads itself again after the reader's punch and on `attendance.updated` (§3 step 2); Monthly Signed Value reads the whole year, as the Signed Value card does, so its months add up to the card (§6); Upcoming Leave has View All to My Leave, and §5 says which embedded lists have a paged home and which are their first 25 in M1 (§10.1); the clock-in prompt opens when the first session of a working day opens the Overview (§3 step 1, §11, attendance.md); §4.1 and §13 say the CEO's Org KPI is drawn with no score until M2.

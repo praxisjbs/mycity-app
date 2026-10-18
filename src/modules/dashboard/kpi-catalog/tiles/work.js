@@ -6,7 +6,8 @@
  *   tasks                     the tasks source adapter (M2)
  *   approvals waiting on you  the workflow module's own reads (workflow.service mine, mineCount),
  *                             the same as Need You and My Approvals
- *   open high alerts          Home's own home_alert, as the reader may clear them
+ *   open high alerts          Home's own home_alert, as the reader may clear them; the same rule
+ *                             counts the open alerts beside Need You (openToClear)
  *   goals                     hidden: declared with no query until M2 says what on track means
  */
 const workflow = require("../../../workflow/workflow.service");
@@ -33,27 +34,29 @@ const taskRecord = ({ assignee = true } = {}) => (r) =>
   );
 
 /* ------------------------------------------------------------------ *
- * Open high alerts the reader may see
+ * Open alerts the reader may see
  * ------------------------------------------------------------------ */
 
 /** Days an open alert has been open before the card's caption counts it as aged. */
 const AGED_DAYS = 7;
 const DAY_MS = 86_400_000;
 
-const OPEN_HIGH = "a.cleared_at IS NULL AND a.severity = 'high'";
+const OPEN = "a.cleared_at IS NULL";
+const OPEN_HIGH = `${OPEN} AND a.severity = 'high'`;
 
 const ALERTS_FROM = `FROM home_alert a
   JOIN home_alert_rule r ON r.home_alert_rule_id = a.home_alert_rule_id`;
 
 /**
- * Which open high alerts the reader may see, as a condition on `a` and `r` that appends its
- * values to `params`, or null when they may see none. An alert is seen by whoever may clear
- * its rule's alerts (the rule's permission_key, as alerts.mayClear() reads it), about a
- * person within their scope on that grant; an alert about no one in particular only with
- * `all` scope. The CEO sees every one.
+ * Which of the alerts `open` keeps the reader may see, as a condition on `a` and `r` that
+ * appends its values to `params`, or null when they may see none. An alert is seen by
+ * whoever may clear its rule's alerts (the rule's permission_key, as alerts.mayClear() reads
+ * it), about a person within their scope on that grant; an alert about no one in particular
+ * only with `all` scope. The CEO sees every one.
+ * @param {string} [open]  the alerts asked about, a condition on `a`: the open high ones unless told
  */
-async function seenWhere(client, user, params) {
-  const { rows } = await client.query(`SELECT DISTINCT r.permission_key ${ALERTS_FROM} WHERE ${OPEN_HIGH}`);
+async function seenWhere(client, user, params, open = OPEN_HIGH) {
+  const { rows } = await client.query(`SELECT DISTINCT r.permission_key ${ALERTS_FROM} WHERE ${open}`);
   const parts = [];
   for (const { permission_key: key } of rows) {
     const [module, action] = alerts.parsePermission(key);
@@ -79,6 +82,22 @@ async function highAlerts(client, ctx) {
     params,
   );
   return rows[0];
+}
+
+/**
+ * How many open alerts, of any severity, the reader may clear: the alerts beside Need You's
+ * requests (HomeOverview `alerts_to_clear`). The caller has checked the reader holds
+ * `alerts.clear`; this counts the alerts whose rule's grant reaches them.
+ * @param {{query: Function}} client
+ * @param {{user_id: string, employee_id: string|null, role_ids: string[], is_ceo?: boolean}} user
+ * @returns {Promise<number>}
+ */
+async function openToClear(client, user) {
+  const params = [];
+  const seen = await seenWhere(client, user, params, OPEN);
+  if (!seen) return 0;
+  const { rows } = await client.query(`SELECT count(*)::int AS n ${ALERTS_FROM} WHERE ${OPEN} AND ${seen}`, params);
+  return rows[0].n;
 }
 
 async function highAlertsPage(client, query, ctx) {
@@ -261,4 +280,4 @@ const ENTRIES = [
   },
 ];
 
-module.exports = { ENTRIES, AGED_DAYS };
+module.exports = { ENTRIES, AGED_DAYS, openToClear };

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from "react";
 
 /**
  * The one URL shape the backend produces for a screen or a record
@@ -31,7 +31,12 @@ function read(): Location {
 interface RouterValue {
   location: Location;
   navigate: (to: string, opts?: { replace?: boolean }) => void;
+  /** Sets or clears the question asked before leaving this screen (useLeaveGuard). */
+  setGuard: (ask: LeaveGuard | null) => void;
 }
+
+/** Asks whether to leave the screen; resolves true to go. */
+export type LeaveGuard = () => Promise<boolean>;
 
 const RouterContext = createContext<RouterValue | null>(null);
 
@@ -44,16 +49,35 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  const guard = useRef<LeaveGuard | null>(null);
+  const setGuard = useCallback((ask: LeaveGuard | null) => {
+    guard.current = ask;
+  }, []);
+
   const navigate = useCallback((to: string, opts: { replace?: boolean } = {}) => {
     const url = new URL(to, window.location.origin);
     const next = url.pathname + url.search;
     if (next === window.location.pathname + window.location.search) return;
-    if (opts.replace) window.history.replaceState(null, "", next);
-    else window.history.pushState(null, "", next);
-    setLocation(read());
+    const go = () => {
+      if (opts.replace) window.history.replaceState(null, "", next);
+      else window.history.pushState(null, "", next);
+      setLocation(read());
+    };
+    // Another screen (path or tab) while one holds unsaved work: it asks first.
+    const leaves = url.pathname !== window.location.pathname || url.searchParams.get("tab") !== new URLSearchParams(window.location.search).get("tab");
+    const ask = guard.current;
+    if (ask && leaves) {
+      void ask().then((ok) => {
+        if (!ok) return;
+        guard.current = null;
+        go();
+      });
+      return;
+    }
+    go();
   }, []);
 
-  const value = useMemo(() => ({ location, navigate }), [location, navigate]);
+  const value = useMemo(() => ({ location, navigate, setGuard }), [location, navigate, setGuard]);
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
 
@@ -64,6 +88,27 @@ export function useRouter(): RouterValue {
 }
 
 export { hrefFor, moduleKeyOf, segmentOf } from "./routes";
+
+/**
+ * While `active`, leaving this screen inside the app asks `ask` first, and
+ * closing or reloading the tab asks through the browser. A screen with unsaved
+ * work that is not inside a modal (a modal asks for itself) uses it.
+ */
+export function useLeaveGuard(active: boolean, ask: LeaveGuard): void {
+  const { setGuard } = useRouter();
+  const latest = useRef(ask);
+  latest.current = ask;
+  useEffect(() => {
+    if (!active) return;
+    setGuard(() => latest.current());
+    const onUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onUnload);
+    return () => {
+      setGuard(null);
+      window.removeEventListener("beforeunload", onUnload);
+    };
+  }, [active, setGuard]);
+}
 
 /** Change some query keys on the current screen, keeping the rest. `null` removes a key. */
 export function useSearchParams() {
