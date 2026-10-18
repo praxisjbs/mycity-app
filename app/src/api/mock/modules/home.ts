@@ -1,296 +1,929 @@
-import type { HomeAlert, HomeBlock, HomeKpi, HomeReport, KpiCell, KpiDetailMeta, KpiRow } from "@/api/types/home";
-import { at, created, isoDaysAgo, notFound, ok, paged, route, sid, type Req } from "../core";
-import { byKey, PEOPLE, ref, refKey, teamOf, SIGN_INS, type MockPerson } from "../data/people";
-import { STATUS_PILL, summaryOf, TODAY, HISTORY, type TodayRow } from "../data/attendance";
-import { PARTNERS, stageTone } from "../data/partners";
-import { REQUESTS, STAGE_PILL } from "../data/expenses";
+import type {
+  HomeActivityItem,
+  HomeChart,
+  HomeDayStrip,
+  HomeDonut,
+  HomeGoal,
+  HomeKpiCard,
+  HomeKpiCell,
+  HomeKpiDetailMeta,
+  HomeKpiDetailRow,
+  HomeKpiDomain,
+  HomeKpiPicker,
+  HomeKpiSource,
+  HomeKpiUnit,
+  HomeOverview,
+  HomePipeline,
+  HomeRoleKpis,
+  HomeRosterStatus,
+  HomeUpcomingLeave,
+  HomeWeekDay,
+  Me,
+} from "@mycity/contract/contract.gen.ts";
+import type { HomeAlert, HomeKpi, HomeReport } from "@/api/types/home";
+import { formatTime, todayIso } from "@mycity/ui";
+import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { byKey, DEPARTMENTS, PEOPLE, ref, SIGN_INS, teamOf, type MockPerson } from "../data/people";
+import { HISTORY, STATUS_PILL, summaryOf, TODAY, type TodayStatus } from "../data/attendance";
+import { PARTNERS, STAGES } from "../data/partners";
+import { REQUESTS } from "../data/expenses";
+import { shiftOf, todayOf } from "./attendance";
+import { me } from "./identity";
+import { leaveRequests, leaveYear, waitingOn } from "./organisation";
 
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const fmtDay = (d: Date) => `${DAY_NAMES[d.getDay()]}, ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-const naira = (amount: string) => {
-  const n = Math.round(Number(amount) / 10000) / 100;
-  return n >= 1 ? `₦${n.toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M` : `₦${Math.round(Number(amount) / 1000)}K`;
-};
-const greet = () => {
-  const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
-  return h < 12 ? "Good Morning" : h < 17 ? "Good Afternoon" : "Good Evening";
-};
+/**
+ * Home on the in-browser mock (laptops and CI only, F12 to F14). The real API is built for the
+ * Overview, the records behind a card and the card picker (src/modules/dashboard): this mock
+ * answers those in the contract's shapes (packages/contract/schemas/dashboard.js), so the screen
+ * gates and a laptop without a server see a full Overview for each Home view. It follows the
+ * server's rules where they decide what is shown: which cards a person may see (their /me
+ * grants and capabilities), which cards show (their pick, else their roles', else their Home
+ * view's), which sections each view draws, and that the server sends figures and the screen the
+ * words. Team, Alerts and Reports still answer their INTERIM shapes (@/api/types/home) until
+ * their own PRs move them.
+ *
+ * Demonstration data only (A5): production starts empty.
+ */
 
-/** Who a viewer's Home and Team cover. */
-function scopeFor(user: string): TodayRow[] {
-  const view = SIGN_INS[user]?.view;
-  if (view === "operations" || view === "ceo") return TODAY;
-  const team = new Set(teamOf(user).map((p) => p.user_key));
-  return TODAY.filter((t) => team.has(t.person.user_key));
+type Tone = "ok" | "warn" | "err" | "info" | "neutral";
+
+/** Everyone for Operations and the CEO; else the reader and everyone below them. */
+const full = (user: string) => ["operations", "ceo"].includes(SIGN_INS[user]?.view ?? "");
+const peopleOf = (user: string): MockPerson[] => (full(user) ? PEOPLE : [byKey(user)!, ...teamOf(user)]);
+const keysOf = (user: string) => new Set(peopleOf(user).map((p) => p.user_key));
+const grants = (m: Me, module: string) => (m.grants as Record<string, string[] | undefined>)[module] ?? [];
+const mayView = (m: Me, module: string) => m.is_ceo || grants(m, module).includes("view");
+const holds = (m: Me, code: string) => m.is_ceo || m.capabilities.includes(code);
+
+/** Sums wire amounts as whole kobo, never through a float. */
+function sumMoney(amounts: string[]): string {
+  const kobo = amounts.reduce((sum, a) => sum + BigInt(a.replace(".", "")), 0n);
+  const digits = kobo.toString().padStart(3, "0");
+  return `${digits.slice(0, -2)}.${digits.slice(-2)}`;
 }
 
-function weekDays(kind: "ops" | "ceo" | "partner" | "staff") {
-  const monday = new Date();
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  const items: Record<string, Array<[string, "diary" | "task" | "note"]>> = {
-    ops: [["Close out Q4 departmental targets", "task"], ["Panel interview, Adaeze Nnamdi, 11:00", "diary"], ["Ember to Remember Lagos leg, all hands", "diary"], ["Onboarding pack for the Enugu hires", "task"], ["Weekly productivity report goes out", "note"], ["Half day, 09:00 to 15:00", "note"]],
-    ceo: [["Board pack review", "task"], ["Payroll sign off", "diary"], ["Ember to Remember Lagos leg", "diary"], ["Investor update draft", "task"], ["Weekly productivity report", "note"], ["Rest day", "note"]],
-    partner: [["Eko Hotels re-engagement call", "task"], ["ProvidusBank proposal due", "diary"], ["MTN quarterly review", "diary"], ["Pipeline review with Operations", "task"], ["Lead owner one to ones", "note"], ["Rest day", "note"]],
-    staff: [["Shift 09:00 to 17:00, on site", "diary"], ["Shift 09:00 to 17:00, on site", "diary"], ["Ember to Remember Lagos leg", "diary"], ["Shift 09:00 to 17:00, on site", "diary"], ["Reviews due to your manager", "task"], ["Half day, 09:00 to 15:00", "note"]],
-  };
-  const short = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const days = items[kind].map(([text, k], i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return { day: `${short[i]} ${d.getDate()}`, text, kind: k };
-  });
-  const sat = new Date(monday);
-  sat.setDate(monday.getDate() + 5);
-  const month = (d: Date) => d.toLocaleDateString("en-GB", { month: "long" });
-  return { range: `Mon ${monday.getDate()} to Sat ${sat.getDate()} ${month(sat)}`, days };
-}
-
-const PIPE = () => {
-  const counts = [["Contacted", 31], ["In discussion", 22], ["Proposal sent", 14], ["MOU drafted", 8], ["Signed", 5]] as const;
-  return counts.map(([label, n], i) => ({ label, pct: Math.round((n / 31) * 100), value: String(n), ...(i === 4 ? { emphasis: "brand" as const } : {}) }));
-};
-const GOALS = [
-  { label: "Revenue, FY Target ₦180M", pct: 62, value: "₦112M" },
-  { label: "Ember to Remember Delivered", pct: 78, value: "On track" },
-  { label: "Headcount, 30 by Q1", pct: 83, value: "25 of 30" },
-  { label: "Partner Network, 10 Signed", pct: 50, value: "5 of 10", emphasis: "warn" as const },
-  { label: "On Time Attendance 90%", pct: 87, value: "87%", emphasis: "brand" as const },
-  { label: "Engagement Actions", pct: 40, value: "2 of 5" },
-];
-
-function needYouRequests(stages: string[]) {
-  return REQUESTS.filter((r) => stages.includes(r.stage)).map((r) => ({
-    id: r.request_id, title: r.title, from: refKey(r.requester), amount: r.amount, stage: r.stage === "ceo" && stages.length === 1 ? { tone: "info" as const, text: "With you" } : STAGE_PILL[r.stage], link: `/expenses?tab=approvals&id=${r.request_id}`,
-  }));
-}
-
-function attendanceSeries() {
-  const values: number[] = [];
-  const labels: string[] = [];
-  for (let d = 19; d >= 1 && values.length < 14; d -= 1) {
-    const date = isoDaysAgo(d);
-    const rows = HISTORY.filter((h) => h.date === date);
-    if (!rows.length) continue;
-    values.push(rows.filter((r) => r.clock_in_at).length);
-    labels.push(`${date.slice(8, 10)}/${date.slice(5, 7)}`);
-  }
-  return { values, labels };
-}
-
-function overview(user: string): { greeting: string; subtitle: string; blocks: HomeBlock[] } {
-  const p = byKey(user)!;
-  const view = SIGN_INS[user]?.view ?? "staff";
-  const greeting = `${greet()}, ${p.first_name}`;
-  const today = fmtDay(new Date());
-  const s = summaryOf(TODAY);
-
-  if (view === "operations") {
-    const waiting = REQUESTS.filter((r) => ["operations", "ceo", "line_manager", "requisition"].includes(r.stage));
-    const series = attendanceSeries();
-    return {
-      greeting,
-      subtitle: `${today} · ${s.present} of ${TODAY.length} clocked in`,
-      blocks: [
-        { type: "kpis", items: [
-          { key: "clockedin", label: "Clocked In Today", value: `${s.present} / ${TODAY.length}`, trend: { text: `${Math.round((s.present / TODAY.length) * 100)}% · ${s.late} late`, dir: "up" } },
-          { key: "overdue", label: "Overdue Tasks", value: "7", trend: { text: "3 more than last week", dir: "dn" } },
-          { key: "approval", label: "Awaiting Approval", value: naira(String(waiting.reduce((a, r) => a + Number(r.amount), 0))), trend: { text: `${waiting.length} requests · ${waiting.filter((r) => r.stage === "ceo").length} with CEO`, dir: "fl" } },
-          { key: "partnerships", label: "Active Partnerships", value: String(PARTNERS.filter((x) => x.stage === "Active partnership").length), trend: { text: "3 closed this month", dir: "up" } },
-        ] },
-        { type: "split", cols: "1.4/1", blocks: [
-          { type: "area", title: "Attendance, Last 14 Working Days", values: series.values, labels: series.labels, note: "Saturdays run 09:00 to 15:00." },
-          { type: "donut", pct: 87, label: "On Time", text: "37 on time, 4 late, 7 absent this month. Three late arrivals by Bashir Lawal in 30 days, which is the threshold the rule watches." },
-        ] },
-        { type: "split", cols: "2", blocks: [
-          { type: "need_you", title: "Need You", badge: { tone: "warn", text: `${waiting.length} pending` }, variant: "requests", rows: needYouRequests(["operations", "ceo", "line_manager", "requisition"]) },
-          { type: "bars", title: "Partnership Pipeline", rows: PIPE(), note: "4 partnerships quiet for 30 days." },
-        ] },
-        { type: "bars", title: "Goals This Quarter", rows: GOALS },
-        { type: "split", cols: "2", blocks: [
-          { type: "activity", title: "Across the Organisation Today", items: [
-            { title: "Adedotun Oyinloye raised EXP-0122", when: "08:14", text: "Stage hire, ₦820,000.00. Routed to Operations, then the CEO.", tone: "hi" },
-            { title: "Query raised against Bashir Lawal", when: "09:41", text: "Third late arrival in 30 days. Raised by the rule, not a manager.", tone: "hi" },
-            { title: "Seyi Balogun punched from a new device", when: "08:58", text: "Pixel 7, Chrome. Warned, not blocked." },
-            { title: "Hauwa Yusuf birthday posted", when: "00:01", text: "Posted automatically from her employee record.", tone: "ok" },
-            { title: "Amara Okafor submitted October payroll", when: "Yesterday 17:22", text: "25 staff, ₦11.36M net.", tone: "ok" },
-          ] },
-          { type: "week", title: "Your Week", ...weekDays("ops") },
-        ] },
-      ],
-    };
-  }
-
-  if (view === "ceo") {
-    return {
-      greeting,
-      subtitle: `${today} · The organisation at a glance`,
-      blocks: [
-        { type: "kpis", items: [
-          { key: "goals", label: "Goals on Track", value: "4 of 6", trend: { text: "2 need attention", dir: "dn" } },
-          { key: "approval_ceo", label: "Awaiting Your Approval", value: naira(String(REQUESTS.filter((r) => r.stage === "ceo").reduce((a, r) => a + Number(r.amount), 0))), trend: { text: `${REQUESTS.filter((r) => r.stage === "ceo").length} requests with you`, dir: "fl" } },
-          { key: "signed", label: "Signed Value, FY", value: "₦9.2M", trend: { text: "of ₦18M target", dir: "up" } },
-          { key: "alerts_high", label: "Open High Alerts", value: String(ALERTS.filter((a) => a.severity === "high" && !a.cleared).length), tone: "err", trend: { text: "2 over 7 days", dir: "dn" } },
-        ] },
-        { type: "split", cols: "1.4/1", blocks: [
-          { type: "bars", title: "Organisational Goals", rows: GOALS },
-          { type: "donut", pct: 76, label: "Org KPI", text: "Weighted across departments. People 81, Finance 82, Content 76, Partnerships 61, Support 76." },
-        ] },
-        { type: "split", cols: "2", blocks: [
-          { type: "need_you", title: "Need You", badge: { tone: "info", text: "With the CEO" }, variant: "requests", rows: needYouRequests(["ceo"]) },
-          { type: "bars", title: "Partnership Pipeline", rows: PIPE(), note: "Signed ₦9.2M of the ₦18M target." },
-        ] },
-        { type: "split", cols: "2", blocks: [
-          { type: "activity", title: "Across the Organisation Today", items: [
-            { title: "October payroll submitted for approval", when: "Yesterday 17:22", text: "25 staff, ₦11.36M net. Awaiting your sign off.", tone: "hi" },
-            { title: "REQ-0042 ageing with you, 6 days", when: "09:00", text: "Over the 2 day approval rule. Alert raised.", tone: "hi" },
-            { title: "Kano Trade Council, 52 days quiet", when: "05:00", text: "Oldest open alert on the board." },
-            { title: "Q4 departmental targets closing Monday", when: "08:00", text: "Four of six departments confirmed." },
-          ] },
-          { type: "week", title: "Your Week", ...weekDays("ceo") },
-        ] },
-      ],
-    };
-  }
-
-  if (view === "partnerships") {
-    const quiet = PARTNERS.filter((x) => x.quiet_days > 30);
-    return {
-      greeting,
-      subtitle: `${today} · Your pipeline and partners`,
-      blocks: [
-        { type: "kpis", items: [
-          { key: "partnerships", label: "Active Partnerships", value: String(PARTNERS.filter((x) => x.stage === "Active partnership").length), trend: { text: "3 closed this month", dir: "up" } },
-          { key: "signed", label: "Signed Value", value: "₦9.2M", trend: { text: "of ₦18M target", dir: "fl" } },
-          { key: "stale", label: "No Contact 30 Days +", value: String(quiet.length), tone: "warn", trend: { text: `${quiet.filter((x) => x.quiet_days > 50).length} over 50 days`, dir: "dn" } },
-          { key: "proposals", label: "Proposals Out", value: String(PARTNERS.filter((x) => x.stage === "Proposal sent").length), trend: { text: "1 awaiting reply", dir: "fl" } },
-        ] },
-        { type: "split", cols: "1.4/1", blocks: [
-          { type: "bars", title: "Partnership Pipeline", rows: PIPE() },
-          { type: "area", title: "Signed Value by Month, ₦M", values: [2.1, 3.4, 3.4, 5.0, 6.2, 7.1, 7.1, 9.2], labels: ["Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"] },
-        ] },
-        { type: "split", cols: "2", blocks: [
-          { type: "need_you", title: "Need You", badge: { tone: "warn", text: `${quiet.length} going quiet` }, variant: "partnerships", rows: quiet.map((x) => ({ id: x.partner_id, title: x.name, from: refKey(x.owner), amount: null, quiet_days: x.quiet_days, stage: { tone: stageTone(x.stage, x.quiet_days), text: x.stage }, link: `/partnerships?tab=partners&id=${x.partner_id}` })) },
-          { type: "week", title: "Your Week", ...weekDays("partner") },
-        ] },
-        { type: "note", text: "Your own attendance is in My Attendance." },
-      ],
-    };
-  }
-
-  const mine = TODAY.find((t) => t.person.user_key === user);
-  return {
-    greeting,
-    subtitle: `${today} · Your day`,
-    blocks: [
-      { type: "statstrip", items: [
-        { label: "Today's Shift", value: new Date().getDay() === 6 ? "09:00 to 15:00" : "09:00 to 17:00" },
-        { label: "Clock-in", value: mine?.clock_in ?? "Not yet", tone: mine?.clock_in ? "ok" : "warn" },
-        { label: "Where", value: mine?.mode === "Remote" ? "Remote, approved home" : `${p.worksite}, on site` },
-        { label: "Status", value: STATUS_PILL[mine?.status ?? "not_yet"].text, tone: mine?.status === "late" ? "err" : "ok" },
-      ] },
-      { type: "kpis", items: [
-        { key: "sk_pieces", label: "Pieces Published", value: "18 of 24", trend: { text: "75%", dir: "up" } },
-        { key: "sk_growth", label: "Channel Growth", value: "+6.2%", trend: { text: "up on last month", dir: "up" } },
-        { key: "sk_reviews", label: "Reviews Filed", value: "2 of 4", tone: "warn", trend: { text: "Due Friday", dir: "fl" } },
-        { key: "sk_attendance", label: "My Attendance, 30d", value: "20 / 20", tone: "ok", trend: { text: "100% on time", dir: "up" } },
-      ] },
-      { type: "split", cols: "2", blocks: [
-        { type: "bars", title: "My Goals This Quarter", rows: [
-          { label: "24 Pieces Published", pct: 75, value: "18 of 24" }, { label: "Enugu Shot List", pct: 100, value: "Done", emphasis: "brand" },
-          { label: "Channel Growth", pct: 62, value: "+6.2%" }, { label: "Team Reviews Filed", pct: 50, value: "2 of 4" },
-        ] },
-        { type: "list", title: "Upcoming Leave", rows: [
-          { label: "22 to 24 Dec", text: "Annual leave, 3 days", pill: { tone: "ok", text: "Approved" } },
-          { label: "Balance", text: "12 days left this year", pill: { tone: "neutral", text: "Annual" } },
-        ] },
-      ] },
-      { type: "week", title: "This Week", ...weekDays("staff") },
-      { type: "note", text: "Your tasks and diary live in My Workspace." },
-    ],
-  };
-}
+const thisYear = () => todayIso().slice(0, 4);
 
 /* ------------------------------------------------------------------ *
- * KPI catalogue: each card's report model
+ * The shared attendance roster, as Home reads it today
  * ------------------------------------------------------------------ */
-const txt = (text: string): KpiCell => ({ kind: "text", text });
-const person = (p: MockPerson): KpiCell => ({ kind: "person", person: ref(p)! });
-type Detail = { meta: Omit<KpiDetailMeta, "key" | "groups">; groups?: Array<{ value: string; label: string; test: (r: KpiRow & { _g?: string }) => boolean }>; rows: (user: string) => Array<KpiRow & { _g?: string }> };
+interface RosterRow {
+  person: MockPerson;
+  status: HomeRosterStatus;
+  clock_in_at: string | null;
+  worksite: string | null;
+  no_clock_out_yesterday: boolean;
+}
 
-const attendanceRows = (user: string) =>
-  scopeFor(user).map((t) => ({
-    id: t.person.employee_id,
-    _g: t.status === "leave" ? "leave" : t.status === "no_clockout" ? "noout" : t.status === "late" ? "late" : !t.clock_in ? "absent" : t.mode === "Remote" ? "remote" : "onsite",
-    cells: { employee: person(t.person), mode: txt(t.mode === "None" ? "None" : t.mode), clock_in: txt(t.clock_in ?? "None"), status: { kind: "pill", ...STATUS_PILL[t.status] } as KpiCell },
-    link: `/people?tab=employees&id=${t.person.employee_id}`,
-  }));
-const ATT_COLS = [{ key: "employee", label: "Employee" }, { key: "mode", label: "Mode" }, { key: "clock_in", label: "Clock-in" }, { key: "status", label: "Status" }];
-const ATT_GROUPS = [
-  { value: "onsite", label: "On Site", test: (r: { _g?: string }) => r._g === "onsite" },
-  { value: "remote", label: "Remote", test: (r: { _g?: string }) => r._g === "remote" },
-  { value: "late", label: "Late", test: (r: { _g?: string }) => r._g === "late" },
-  { value: "noout", label: "No Clock-Out", test: (r: { _g?: string }) => r._g === "noout" },
-  { value: "leave", label: "On Leave", test: (r: { _g?: string }) => r._g === "leave" },
-  { value: "absent", label: "Not in", test: (r: { _g?: string }) => r._g === "absent" },
-];
-
-const DETAILS: Record<string, Detail> = {
-  clockedin: { meta: { title: "Clocked In Today", sub: "Grouped the way the attendance rules read them.", columns: ATT_COLS }, groups: ATT_GROUPS, rows: attendanceRows },
-  tm_present: { meta: { title: "Present Today", sub: null, columns: ATT_COLS }, groups: ATT_GROUPS, rows: attendanceRows },
-  tm_onsite: { meta: { title: "On site today", sub: null, columns: ATT_COLS }, rows: (u) => attendanceRows(u).filter((r) => r._g === "onsite" || r._g === "late") },
-  tm_remote: { meta: { title: "Working remotely", sub: null, columns: ATT_COLS }, rows: (u) => attendanceRows(u).filter((r) => r._g === "remote") },
-  tm_flags: { meta: { title: "Flags today", sub: null, columns: ATT_COLS }, rows: (u) => attendanceRows(u).filter((r) => r._g === "late" || r._g === "noout") },
-  overdue: {
-    meta: { title: "Overdue Tasks", sub: null, columns: [{ key: "task", label: "Task" }, { key: "owner", label: "Owner" }, { key: "due", label: "Due" }, { key: "over", label: "Overdue" }] },
-    rows: () => [["Confirm Ember to Remember venue list", "tolu", 2], ["Eko Hotels re-engagement decision", "bashir", 22], ["NDPA certificate upload", "bashir", 12], ["October budget variance note", "amara", 7], ["Panel feedback, Adaeze Nnamdi", "ngozi", 5], ["Studio utilisation report", "emeka", 4], ["Knowledge article backlog", "hauwa", 7]].map(([t, o, d], i) => ({
-      id: sid(`ov:${i}`), cells: { task: txt(t as string), owner: person(byKey(o as string)!), due: { kind: "date", date: isoDaysAgo(d as number) }, over: { kind: "pill", tone: "err", text: `+${d} days` } }, link: "/workspace?tab=tasks",
-    })),
-  },
-  approval: {
-    meta: { title: "Awaiting Approval", sub: null, columns: [{ key: "request", label: "Request" }, { key: "from", label: "From" }, { key: "amount", label: "Amount", align: "n" }, { key: "stage", label: "Stage" }] },
-    rows: () => REQUESTS.filter((r) => ["operations", "ceo", "line_manager", "requisition"].includes(r.stage)).map((r) => ({ id: r.request_id, cells: { request: txt(r.title), from: person(byKey(r.requester)!), amount: { kind: "money", amount: r.amount }, stage: { kind: "pill", ...STAGE_PILL[r.stage] } }, link: `/expenses?tab=approvals&id=${r.request_id}` })),
-  },
-  approval_ceo: {
-    meta: { title: "Awaiting your approval", sub: null, columns: [{ key: "request", label: "Request" }, { key: "from", label: "From" }, { key: "amount", label: "Amount", align: "n" }] },
-    rows: () => REQUESTS.filter((r) => r.stage === "ceo").map((r) => ({ id: r.request_id, cells: { request: txt(r.title), from: person(byKey(r.requester)!), amount: { kind: "money", amount: r.amount } }, link: `/expenses?tab=approvals&id=${r.request_id}` })),
-  },
-  partnerships: {
-    meta: { title: "Active Partnerships", sub: null, columns: [{ key: "partner", label: "Partnership" }, { key: "stage", label: "Stage" }, { key: "last", label: "Last Contact" }, { key: "value", label: "Value", align: "n" }] },
-    rows: () => PARTNERS.filter((x) => x.stage === "Active partnership").map((x) => ({ id: x.partner_id, cells: { partner: txt(x.name), stage: { kind: "pill", tone: "ok", text: "Active" }, last: txt(`${x.quiet_days} days ago`), value: { kind: "money", amount: x.value } }, link: `/partnerships?tab=partners&id=${x.partner_id}` })),
-  },
-  signed: {
-    meta: { title: "Signed value, this year", sub: "Against an ₦18M target.", columns: [{ key: "partner", label: "Partnership" }, { key: "since", label: "Signed" }, { key: "value", label: "Value", align: "n" }] },
-    rows: () => PARTNERS.filter((x) => x.since).map((x) => ({ id: x.partner_id, cells: { partner: txt(x.name), since: { kind: "date", date: x.since! }, value: { kind: "money", amount: x.value } }, link: `/partnerships?tab=partners&id=${x.partner_id}` })),
-  },
-  stale: {
-    meta: { title: "No contact in 30 days or more", sub: null, columns: [{ key: "partner", label: "Partnership" }, { key: "owner", label: "Owner" }, { key: "quiet", label: "Quiet" }, { key: "sev", label: "Severity" }] },
-    rows: () => PARTNERS.filter((x) => x.quiet_days >= 30).map((x) => ({ id: x.partner_id, cells: { partner: txt(x.name), owner: person(byKey(x.owner)!), quiet: txt(`${x.quiet_days} days`), sev: { kind: "pill", tone: x.quiet_days > 50 ? "err" : x.quiet_days > 30 ? "warn" : "info", text: x.quiet_days > 50 ? "High" : x.quiet_days > 30 ? "Medium" : "Low" } }, link: `/partnerships?tab=partners&id=${x.partner_id}` })),
-  },
-  proposals: {
-    meta: { title: "Proposals out", sub: null, columns: [{ key: "partner", label: "Partnership" }, { key: "days", label: "Days at Stage", align: "n" }, { key: "status", label: "Status" }] },
-    rows: () => PARTNERS.filter((x) => x.stage === "Proposal sent").map((x) => ({ id: x.partner_id, cells: { partner: txt(x.name), days: txt(String(x.days_at_stage)), status: { kind: "pill", tone: x.days_at_stage > 30 ? "err" : "warn", text: x.days_at_stage > 30 ? "Chase" : "Awaiting reply" } }, link: `/partnerships?tab=proposals` })),
-  },
-  goals: {
-    meta: { title: "Organisational goals", sub: null, columns: [{ key: "goal", label: "Goal" }, { key: "progress", label: "Progress" }] },
-    rows: () => GOALS.map((g, i) => ({ id: `g${i}`, cells: { goal: txt(g.label), progress: { kind: "bar", pct: g.pct, text: g.value } }, link: "/performance?tab=goals" })),
-  },
-  alerts_high: {
-    meta: { title: "High severity alerts", sub: null, columns: [{ key: "alert", label: "Alert" }, { key: "trigger", label: "Trigger" }, { key: "who", label: "Who Can Clear" }, { key: "over", label: "Over by" }] },
-    rows: () => ALERTS.filter((a) => a.severity === "high" && !a.cleared).map((a) => ({ id: a.home_alert_id, cells: { alert: txt(a.title), trigger: txt(a.trigger), who: txt(a.who_clears), over: { kind: "over", text: a.over_by } }, link: `/home?tab=alerts&id=${a.home_alert_id}` })),
-  },
-  sk_attendance: {
-    meta: { title: "My attendance, last 30 days", sub: null, columns: [{ key: "date", label: "Date" }, { key: "in", label: "In" }, { key: "out", label: "Out" }, { key: "status", label: "Status" }] },
-    rows: (u) => HISTORY.filter((h) => h.person.user_key === u).slice(0, 26).map((h) => ({
-      id: h.event_id, cells: { date: { kind: "date", date: h.date }, in: txt(h.clock_in_at ? new Date(h.clock_in_at).toLocaleTimeString("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" }) : "None"), out: txt(h.clock_out_at ? new Date(h.clock_out_at).toLocaleTimeString("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" }) : "None"), status: { kind: "pill", tone: h.status === "late" ? "err" : h.status === "leave" ? "info" : h.status === "absent" ? "err" : "ok", text: h.status === "on_time" ? "On Time" : h.status[0].toUpperCase() + h.status.slice(1) } }, link: "/ess?tab=my-attendance",
-    })),
-  },
-  sk_pieces: { meta: { title: "Pieces published", sub: "Linked to tasks in My Workspace.", columns: [{ key: "work", label: "Contributing Work" }, { key: "p", label: "Progress" }] }, rows: () => [["Blog, 12 published", 75, "9 of 12"], ["Social copy", 70, "14 of 20"], ["Enugu brief", 100, "Done"]].map(([w, p, t], i) => ({ id: `p${i}`, cells: { work: txt(w as string), p: { kind: "bar", pct: p as number, text: t as string } }, link: "/workspace?tab=tasks" })) },
-  sk_growth: { meta: { title: "Channel growth", sub: "Overall +6.2% on last month.", columns: [{ key: "ch", label: "Channel" }, { key: "p", label: "This Month" }] }, rows: () => [["Instagram", 72, "+7.1%"], ["LinkedIn", 55, "+5.4%"], ["X", 40, "+3.9%"]].map(([w, p, t], i) => ({ id: `c${i}`, cells: { ch: txt(w as string), p: { kind: "bar", pct: p as number, text: t as string } }, link: null })) },
-  sk_reviews: { meta: { title: "Reviews filed", sub: null, columns: [{ key: "r", label: "Review" }, { key: "s", label: "Status" }] }, rows: () => [["Self rating, Q3", "ok", "Filed"], ["Peer review, Chidera", "ok", "Filed"], ["Peer review, Adedotun", "warn", "Due Friday"], ["Peer review, Emeka", "warn", "Due Friday"]].map(([r, t, s], i) => ({ id: `r${i}`, cells: { r: txt(r), s: { kind: "pill", tone: t as "ok" | "warn", text: s } }, link: "/performance?tab=reviews" })) },
+/** The register's status for each of the demonstration day's states; a suspended person is not on the roster. */
+const ROSTER: Record<TodayStatus, HomeRosterStatus | null> = {
+  on_time: "on_site",
+  remote: "remote",
+  late: "late",
+  leave: "on_leave",
+  no_clockout: "on_site",
+  new_device: "on_site",
+  absent: "not_in",
+  not_yet: "not_in",
+  suspended: null,
 };
 
+function rosterOf(user: string): RosterRow[] {
+  const keys = keysOf(user);
+  return TODAY.flatMap((t) => {
+    const status = ROSTER[t.status];
+    if (!status || !keys.has(t.person.user_key)) return [];
+    const remote = t.mode === "Remote";
+    return [
+      {
+        person: t.person,
+        status: status === "on_site" && remote ? "remote" : status,
+        clock_in_at: t.clock_in ? at(0, t.clock_in) : null,
+        worksite: t.clock_in && !remote ? t.person.worksite : null,
+        no_clock_out_yesterday: t.status === "no_clockout",
+      },
+    ];
+  });
+}
+
+const present = (r: RosterRow) => r.status === "on_site" || r.status === "remote" || r.status === "late";
+
 /* ------------------------------------------------------------------ *
- * Alerts and rules
+ * The KPI catalogue's live cards
+ * ------------------------------------------------------------------ */
+const text = (t: string): HomeKpiCell => ({ kind: "text", text: t });
+const person = (p: MockPerson | undefined): HomeKpiCell | null =>
+  p ? { kind: "person", person: { employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department } } : null;
+const pill = (tone: Tone, t: string): HomeKpiCell => ({ kind: "pill", tone, text: t });
+const money = (amount: string): HomeKpiCell => ({ kind: "money", amount });
+const date = (d: string): HomeKpiCell => ({ kind: "date", date: d });
+const time = (iso: string | null): HomeKpiCell | null => (iso ? { kind: "time", at: iso } : null);
+const number = (value: number): HomeKpiCell => ({ kind: "number", value });
+
+/** A record behind a card, and the chips it falls under. */
+type Rec = HomeKpiDetailRow & { groups?: string[] };
+const rec = (id: string, cells: Record<string, HomeKpiCell | null>, link: string | null, groups?: string[]): Rec => ({ id, cells, link, groups });
+
+/** What a card counts: its figure, and how many of its records fall under each chip. */
+interface Figure {
+  value: number | null;
+  amount: string | null;
+  denominator: number | null;
+  groups: Record<string, number>;
+  /** Anything a caption or summary line reads besides the figure. */
+  extra: Record<string, number | string>;
+}
+const counted = (value: number, more: Partial<Figure> = {}): Figure => ({ value, amount: null, denominator: null, groups: {}, extra: {}, ...more });
+
+interface MockCard {
+  key: string;
+  title: string;
+  domain: HomeKpiDomain;
+  unit: HomeKpiUnit;
+  module: string;
+  capability?: string;
+  /** False for a tab's own card, never offered in the picker (Team's). */
+  pickable?: boolean;
+  tone?: Tone;
+  records: {
+    title: string;
+    columns: Array<[key: string, label: string, opts?: { phone?: boolean; numeric?: boolean }]>;
+    groups?: Array<[value: string, label: string]>;
+    rows: (user: string) => Rec[];
+  };
+  /** The figure from its records; their count unless set. */
+  figure?: (rows: Rec[], user: string) => Figure;
+  caption?: (f: Figure) => string | null;
+  summary?: (f: Figure) => string;
+}
+
+const tally = (rows: Rec[]) => {
+  const out: Record<string, number> = {};
+  for (const r of rows) for (const g of r.groups ?? []) out[g] = (out[g] ?? 0) + 1;
+  return out;
+};
+
+const ROSTER_GROUPS: Array<[string, string]> = [
+  ["on_site", "On Site"],
+  ["remote", "Remote"],
+  ["late", "Late"],
+  ["not_in", "Not In"],
+  ["on_leave", "On Leave"],
+  ["no_clock_out_yesterday", "No Clock-Out Yesterday"],
+];
+const ROSTER_PILL: Record<HomeRosterStatus, [Tone, string]> = {
+  on_site: ["ok", "On Site"],
+  remote: ["ok", "Remote"],
+  late: ["warn", "Late"],
+  not_in: ["neutral", "Not In"],
+  on_leave: ["info", "On Leave"],
+  absent: ["err", "Absent"],
+};
+const ROSTER_COLUMNS: MockCard["records"]["columns"] = [
+  ["employee", "Employee"],
+  ["status", "Status", { phone: true }],
+  ["clock_in", "Clock-In", { phone: true }],
+  ["clock_out", "Clock-Out"],
+  ["worksite", "Worksite"],
+];
+const rosterRecords = (rows: RosterRow[]): Rec[] =>
+  rows.map((r) =>
+    rec(
+      r.person.employee_id,
+      { employee: person(r.person), status: pill(...ROSTER_PILL[r.status]), clock_in: time(r.clock_in_at), clock_out: null, worksite: r.worksite ? text(r.worksite) : null },
+      `/people?tab=attendance&id=${r.person.employee_id}`,
+      [r.status, ...(r.no_clock_out_yesterday ? ["no_clock_out_yesterday"] : [])],
+    ),
+  );
+/** Present out of expected, as the register counts them: nobody on leave is expected. */
+const rosterFigure = (rows: Rec[]): Figure => {
+  const g = tally(rows);
+  const presentCount = (g.on_site ?? 0) + (g.remote ?? 0) + (g.late ?? 0);
+  return counted(presentCount, { denominator: rows.length - (g.on_leave ?? 0), groups: g, extra: { late: g.late ?? 0, on_leave: g.on_leave ?? 0 } });
+};
+
+/* Records of the modules Home reads ahead of them being built, as their staging rows will be. */
+const TASKS: Array<[string, string, number, "high" | "medium" | "low"]> = [
+  ["Confirm Ember to Remember venue list", "tolu", 2, "high"],
+  ["Eko Hotels re-engagement decision", "bashir", 22, "high"],
+  ["NDPA certificate upload", "bashir", 12, "medium"],
+  ["October budget variance note", "amara", 7, "medium"],
+  ["Panel feedback, Adaeze Nnamdi", "ngozi", 5, "high"],
+  ["Studio utilisation report", "emeka", 4, "low"],
+  ["Knowledge article backlog", "hauwa", 7, "low"],
+  ["Enugu shoot shot list", "chidera", 1, "medium"],
+];
+const PRIORITY: Record<string, [Tone, string]> = { high: ["err", "High"], medium: ["warn", "Medium"], low: ["neutral", "Low"] };
+const REVIEWS: Array<[string, string, string]> = [
+  ["chidera", "cynthia", "Probation"],
+  ["samuel", "hauwa", "Probation"],
+  ["precious", "tolu", "Quarterly"],
+  ["grace", "bashir", "Quarterly"],
+  ["adedotun", "chidera", "Peer"],
+];
+const VACANCIES: Array<[string, string, string, number, number]> = [
+  ["Video Editor", "Studio", "emeka", 2, 21],
+  ["Partnerships Associate", "Marketing & Sales", "ngozi", 1, 14],
+  ["Support Lead", "Support", "hauwa", 1, 30],
+];
+const DOCUMENTS: Array<[string, string, number]> = [
+  ["seyi", "NDPA Certificate", 3],
+  ["precious", "Guarantor Form", 5],
+  ["samuel", "Medical Report", 9],
+];
+const BUDGETS: Array<[string, string, string, string, string]> = [
+  ["Marketing, Q4", "Marketing & Sales", "ngozi", "4000000.00", "3680000.00"],
+  ["Studio Equipment", "Studio", "emeka", "2500000.00", "1210000.00"],
+  ["Enugu Launch", "Operations & People", "cynthia", "6000000.00", "2950000.00"],
+];
+/** Whole percent of money spent, from the kobo digits. */
+const usedPercent = (spent: string, of: string) => Number((BigInt(spent.replace(".", "")) * 100n) / BigInt(of.replace(".", "")));
+const IN_APPROVAL = ["line_manager", "operations", "requisition", "ceo"];
+const leaveCovers = (key: string, day: string) => leaveRequests().some((l) => l.key === key && l.status === "approved" && l.starts_on <= day && l.ends_on >= day);
+const own = (user: string) => (key: string) => key === user;
+const expenseScope = (user: string) => (full(user) ? () => true : own(user));
+/** Partners still being worked towards a signature, in the tracker's stage order. */
+const OPEN_STAGES = STAGES.filter((s) => s !== "Partnership signed" && s !== "Active partnership" && s !== "On hold");
+const QUIET_DAYS = 30;
+
+const CARDS: MockCard[] = [
+  /* People */
+  {
+    key: "headcount",
+    title: "Headcount",
+    domain: "people",
+    unit: "count",
+    module: "people",
+    records: {
+      title: "Headcount",
+      columns: [["employee", "Employee"], ["department", "Department", { phone: true }], ["start_date", "Start Date"]],
+      rows: (u) => peopleOf(u).filter((p) => p.status !== "suspended").map((p) => rec(p.employee_id, { employee: person(p), department: text(p.department), start_date: date(p.start_date) }, `/people?tab=employees&id=${p.employee_id}`)),
+    },
+  },
+  {
+    key: "attendance_today",
+    title: "Clocked In Today",
+    domain: "people",
+    unit: "pair",
+    module: "people",
+    records: { title: "Clocked In Today", columns: ROSTER_COLUMNS, groups: ROSTER_GROUPS, rows: (u) => rosterRecords(rosterOf(u)) },
+    figure: rosterFigure,
+    caption: (f) => (Number(f.extra.late) > 0 ? `${f.extra.late} late` : null),
+    summary: (f) => `${f.value} of ${f.denominator} clocked in`,
+  },
+  {
+    key: "leave_pending",
+    title: "Leave Awaiting Approval",
+    domain: "people",
+    unit: "count",
+    module: "people",
+    records: {
+      title: "Leave Awaiting Approval",
+      columns: [["employee", "Employee"], ["leave_type", "Leave Type", { phone: true }], ["starts_on", "From", { phone: true }], ["ends_on", "To"], ["days", "Days", { numeric: true }]],
+      rows: (u) => {
+        const keys = keysOf(u);
+        return leaveRequests()
+          .filter((l) => l.status === "submitted" && keys.has(l.key))
+          .map((l) => rec(l.leave_request_id, { employee: person(byKey(l.key)), leave_type: text(l.leave_type_name), starts_on: date(l.starts_on), ends_on: date(l.ends_on), days: number(l.days) }, `/people?tab=leave&id=${l.leave_request_id}`));
+      },
+    },
+  },
+  {
+    key: "vacancies_open",
+    title: "Open Vacancies",
+    domain: "people",
+    unit: "count",
+    module: "recruitment",
+    records: {
+      title: "Open Vacancies",
+      columns: [["vacancy", "Vacancy"], ["department", "Department", { phone: true }], ["hiring_manager", "Hiring Manager"], ["positions", "Positions", { numeric: true }], ["closes", "Closes", { phone: true }]],
+      rows: () => VACANCIES.map(([title, dept, manager, positions, closes]) => rec(sid(`vacancy:${title}`), { vacancy: text(title), department: text(dept), hiring_manager: person(byKey(manager)), positions: number(positions), closes: date(isoDaysAhead(closes)) }, "/recruitment?tab=vacancies")),
+    },
+  },
+  {
+    key: "attrition_90d",
+    title: "Attrition, 90 Days",
+    domain: "people",
+    unit: "count",
+    module: "people",
+    records: { title: "Left in 90 Days", columns: [["employee", "Employee"], ["department", "Department", { phone: true }], ["left_on", "Left On", { phone: true }]], rows: () => [] },
+  },
+  {
+    key: "confirmations_due",
+    title: "Confirmations Due",
+    domain: "people",
+    unit: "count",
+    module: "people",
+    records: {
+      title: "Confirmations Due",
+      columns: [["employee", "Employee"], ["department", "Department", { phone: true }], ["confirmation_due_on", "Due On", { phone: true }]],
+      rows: (u) =>
+        peopleOf(u)
+          .filter((p) => p.status === "probation")
+          .map((p) => {
+            const due = new Date(`${p.start_date}T12:00:00Z`);
+            due.setUTCMonth(due.getUTCMonth() + 6);
+            return rec(p.employee_id, { employee: person(p), department: text(p.department), confirmation_due_on: date(due.toISOString().slice(0, 10)) }, `/people?tab=employees&id=${p.employee_id}`);
+          }),
+    },
+  },
+  {
+    key: "documentation_pending",
+    title: "Documents Requested",
+    domain: "people",
+    unit: "count",
+    module: "people",
+    records: {
+      title: "Documents Requested",
+      columns: [["employee", "Employee"], ["document", "Document", { phone: true }], ["requested", "Requested", { phone: true }]],
+      rows: (u) => {
+        const keys = keysOf(u);
+        return DOCUMENTS.filter(([key]) => keys.has(key)).map(([key, doc, ago]) => rec(sid(`document-request:${key}:${doc}`), { employee: person(byKey(key)), document: text(doc), requested: time(at(ago, "10:00")) }, `/people?tab=employees&id=${byKey(key)!.employee_id}`));
+      },
+    },
+  },
+  {
+    key: "reviews_due",
+    title: "Reviews Due",
+    domain: "people",
+    unit: "count",
+    module: "performance",
+    records: {
+      title: "Reviews Due",
+      columns: [["employee", "Employee"], ["reviewer", "Reviewer", { phone: true }], ["type", "Type"], ["cycle", "Cycle"], ["closes", "Closes", { phone: true }]],
+      rows: () => REVIEWS.map(([key, reviewer, type], i) => rec(sid(`review:${key}`), { employee: person(byKey(key)), reviewer: person(byKey(reviewer)), type: text(type), cycle: text("Q4"), closes: date(isoDaysAhead(3 + i * 2)) }, "/performance?tab=reviews")),
+    },
+  },
+  {
+    key: "my_attendance_30d",
+    title: "My Attendance",
+    domain: "people",
+    unit: "pair",
+    module: "ess",
+    records: {
+      title: "My Attendance",
+      columns: [["date", "Date"], ["status", "Status", { phone: true }], ["clock_in", "Clock-In", { phone: true }], ["clock_out", "Clock-Out"]],
+      groups: [["on_time", "On Time"], ["late", "Late"], ["absent", "Absent"], ["on_leave", "On Leave"]],
+      rows: (u) =>
+        HISTORY.filter((h) => h.person.user_key === u && h.date >= isoDaysAgo(30)).map((h) => {
+          const g = h.status === "leave" ? "on_leave" : h.status === "absent" ? "absent" : h.status === "late" ? "late" : "on_time";
+          const shown: Record<string, [Tone, string]> = { on_time: ["ok", "On Time"], late: ["warn", "Late"], absent: ["err", "Absent"], on_leave: ["info", "On Leave"] };
+          return rec(h.event_id, { date: date(h.date), status: pill(...shown[g]), clock_in: time(h.clock_in_at), clock_out: time(h.clock_out_at) }, `/ess?tab=my-attendance`, [g]);
+        }),
+    },
+    figure: (rows) => {
+      const g = tally(rows);
+      return counted(g.on_time ?? 0, { denominator: (g.on_time ?? 0) + (g.late ?? 0) + (g.absent ?? 0), groups: g, extra: { late: g.late ?? 0 } });
+    },
+    caption: (f) => (Number(f.extra.late) > 0 ? `${f.extra.late} late` : null),
+    summary: (f) => `${f.value} of ${f.denominator} days on time`,
+  },
+  {
+    key: "my_reviews_due",
+    title: "My Reviews Due",
+    domain: "people",
+    unit: "count",
+    module: "ess",
+    records: {
+      title: "My Reviews Due",
+      columns: [["employee", "Review Of"], ["type", "Type", { phone: true }], ["cycle", "Cycle"], ["closes", "Closes", { phone: true }]],
+      rows: (u) => REVIEWS.filter(([, reviewer]) => reviewer === u).map(([key, , type], i) => rec(sid(`review:${key}`), { employee: person(byKey(key)), type: text(type), cycle: text("Q4"), closes: date(isoDaysAhead(3 + i * 2)) }, "/ess?tab=my-performance")),
+    },
+  },
+  {
+    key: "my_leave_left",
+    title: "My Leave Left",
+    domain: "people",
+    unit: "days",
+    module: "ess",
+    records: {
+      title: "My Leave Left",
+      columns: [["leave_type", "Leave Type"], ["allowance", "Allowance", { numeric: true }], ["taken", "Taken", { numeric: true }], ["booked", "Booked", { numeric: true }], ["waiting", "Waiting", { numeric: true }], ["left", "Left", { numeric: true, phone: true }]],
+      rows: (u) =>
+        leaveYear(u, Number(thisYear()))
+          .balances.filter((b) => b.entitled !== null)
+          .map((b) => rec(b.leave_type_id, { leave_type: text(b.name), allowance: number(b.entitled!), taken: number(b.taken), booked: number(b.booked), waiting: number(b.pending), left: number(b.remaining!) }, "/ess?tab=my-leave")),
+    },
+    figure: (_rows, u) => {
+      const lead = leadBalance(u);
+      return counted(lead ? lead.remaining : 0, { extra: { leave_type: lead ? lead.name : "Annual" } });
+    },
+    caption: (f) => `${f.extra.leave_type}, this year`,
+    summary: (f) => `${f.value} days of ${f.extra.leave_type} left this year`,
+  },
+  ...(["team_present", "team_on_site", "team_remote", "team_flags"] as const).map(
+    (key): MockCard => ({
+      key,
+      title: { team_present: "Present Today", team_on_site: "On Site", team_remote: "Remote", team_flags: "Flags" }[key],
+      domain: "people",
+      unit: key === "team_present" ? "pair" : "count",
+      module: "home",
+      capability: "home.team",
+      pickable: false,
+      tone: key === "team_flags" ? "warn" : undefined,
+      records: {
+        title: { team_present: "Present Today", team_on_site: "On Site Today", team_remote: "Remote Today", team_flags: "Flags Today" }[key],
+        columns: ROSTER_COLUMNS,
+        groups: key === "team_present" ? ROSTER_GROUPS : key === "team_flags" ? [["late", "Late"], ["no_clock_out_yesterday", "No Clock-Out Yesterday"]] : undefined,
+        rows: (u) => {
+          const all = rosterRecords(rosterOf(u));
+          if (key === "team_on_site") return all.filter((r) => r.groups?.includes("on_site"));
+          if (key === "team_remote") return all.filter((r) => r.groups?.includes("remote"));
+          if (key === "team_flags") return all.filter((r) => r.groups?.includes("late") || r.groups?.includes("no_clock_out_yesterday"));
+          return all;
+        },
+      },
+      figure:
+        key === "team_present"
+          ? rosterFigure
+          : (rows) => {
+              const g = tally(rows);
+              return counted(rows.length, { groups: g, extra: { late: g.late ?? 0, no_clock_out_yesterday: g.no_clock_out_yesterday ?? 0 } });
+            },
+      caption:
+        key === "team_present"
+          ? (f) => (Number(f.extra.on_leave) > 0 ? `${f.extra.on_leave} on leave` : null)
+          : key === "team_flags"
+            ? (f) => (Number(f.value) > 0 ? `${f.extra.late} late, ${f.extra.no_clock_out_yesterday} no clock-out` : null)
+            : undefined,
+      summary: key === "team_present" ? (f) => `${f.value} of ${f.denominator} in today` : undefined,
+    }),
+  ),
+  /* Work */
+  {
+    key: "tasks_overdue",
+    title: "Overdue Tasks",
+    domain: "work",
+    unit: "count",
+    module: "workspace",
+    tone: "warn",
+    records: {
+      title: "Overdue Tasks",
+      columns: [["task", "Task"], ["assignee", "Assignee", { phone: true }], ["due", "Due", { phone: true }], ["priority", "Priority"]],
+      rows: (u) => {
+        const keys = keysOf(u);
+        return TASKS.filter(([, who]) => keys.has(who)).map(([title, who, days, p]) => rec(sid(`task:${title}`), { task: text(title), assignee: person(byKey(who)), due: time(at(days, "17:00")), priority: pill(...PRIORITY[p]) }, "/workspace?tab=tasks"));
+      },
+    },
+  },
+  {
+    key: "my_tasks_overdue",
+    title: "My Overdue Tasks",
+    domain: "work",
+    unit: "count",
+    module: "ess",
+    tone: "warn",
+    records: {
+      title: "My Overdue Tasks",
+      columns: [["task", "Task"], ["due", "Due", { phone: true }], ["priority", "Priority", { phone: true }]],
+      rows: (u) => TASKS.filter(([, who]) => who === u).map(([title, , days, p]) => rec(sid(`task:${title}`), { task: text(title), due: time(at(days, "17:00")), priority: pill(...PRIORITY[p]) }, "/workspace?tab=tasks")),
+    },
+  },
+  {
+    key: "approvals_awaiting_you",
+    title: "Awaiting Your Approval",
+    domain: "work",
+    unit: "count",
+    module: "home",
+    records: {
+      title: "Awaiting Your Approval",
+      columns: [["request", "Request"], ["person", "Person", { phone: true }], ["stage", "Stage"], ["waiting_since", "Waiting Since", { phone: true }], ["due", "Due"]],
+      rows: (u) =>
+        waitingOn(u).map((w) =>
+          rec(w.workflow_instance_id, { request: text(w.definition_name), person: w.subject_name ? text(w.subject_name) : null, stage: pill(w.overdue ? "err" : "info", w.stage_name), waiting_since: time(w.stage_entered_at), due: time(w.stage_due_at) }, w.link, w.overdue ? ["overdue"] : []),
+        ),
+    },
+    figure: (rows) => counted(rows.length, { extra: { overdue: tally(rows).overdue ?? 0 } }),
+    caption: (f) => (Number(f.extra.overdue) > 0 ? `${f.extra.overdue} overdue` : null),
+  },
+  {
+    key: "alerts_high_open",
+    title: "Open High Alerts",
+    domain: "work",
+    unit: "count",
+    module: "home",
+    capability: "alerts.clear",
+    tone: "err",
+    records: {
+      title: "Open High Alerts",
+      columns: [["alert", "Alert"], ["raised", "Raised", { phone: true }], ["over_by", "Over By", { numeric: true, phone: true }]],
+      rows: (u) => alertScope(u).filter((a) => a.severity === "high").map((a) => rec(a.home_alert_id, { alert: text(a.title), raised: time(a.raised_at), over_by: number(a.over) }, `/home?tab=alerts&id=${a.home_alert_id}`, a.age_days >= AGED_DAYS ? ["aged"] : [])),
+    },
+    figure: (rows) => counted(rows.length, { extra: { aged: tally(rows).aged ?? 0 } }),
+    caption: (f) => (Number(f.extra.aged) > 0 ? `${f.extra.aged} over ${AGED_DAYS} days` : null),
+  },
+  /* Business */
+  {
+    key: "partnership_pipeline",
+    title: "Open Opportunities",
+    domain: "business",
+    unit: "count",
+    module: "partnerships",
+    records: {
+      title: "Open Opportunities",
+      columns: [["opportunity", "Opportunity"], ["partner", "Partner", { phone: true }], ["stage", "Stage", { phone: true }], ["owner", "Owner"], ["value", "Value", { numeric: true }], ["expected_close", "Expected Close"]],
+      rows: () =>
+        PARTNERS.filter((p) => (OPEN_STAGES as readonly string[]).includes(p.stage)).map((p, i) =>
+          rec(sid(`opportunity:${p.name}`), { opportunity: text(`${p.name}, ${p.type}`), partner: text(p.name), stage: text(p.stage), owner: person(byKey(p.owner)), value: money(p.value), expected_close: date(isoDaysAhead(20 + i * 5)) }, `/partnerships?tab=partners&id=${p.partner_id}`),
+        ),
+    },
+  },
+  {
+    key: "partnerships_active",
+    title: "Active Partnerships",
+    domain: "business",
+    unit: "count",
+    module: "partnerships",
+    records: {
+      title: "Active Partnerships",
+      columns: [["partner", "Partner"], ["type", "Type"], ["owner", "Owner", { phone: true }], ["last_contact", "Last Contact", { phone: true }]],
+      rows: () => PARTNERS.filter((p) => p.stage === "Active partnership").map((p) => rec(p.partner_id, { partner: text(p.name), type: text(p.type), owner: person(byKey(p.owner)), last_contact: time(at(p.quiet_days, "11:00")) }, `/partnerships?tab=partners&id=${p.partner_id}`)),
+    },
+  },
+  {
+    key: "partnerships_signed_value",
+    title: "Signed Value",
+    domain: "business",
+    unit: "money",
+    module: "partnerships",
+    records: {
+      title: "Signed This Year",
+      columns: [["agreement", "Agreement"], ["partner", "Partner", { phone: true }], ["starts_on", "Starts"], ["value", "Value", { numeric: true, phone: true }], ["owner", "Owner"]],
+      rows: () => signedThisYear().map((p) => rec(sid(`agreement:${p.name}`), { agreement: text(`${p.name} Agreement`), partner: text(p.name), starts_on: date(p.since!), value: money(p.value), owner: person(byKey(p.owner)) }, `/partnerships?tab=partners&id=${p.partner_id}`)),
+    },
+    figure: (rows) => ({ value: null, amount: sumMoney(signedThisYear().map((p) => p.value)), denominator: null, groups: {}, extra: { agreements: rows.length } }),
+    caption: (f) => `${f.extra.agreements} ${f.extra.agreements === 1 ? "agreement" : "agreements"}`,
+  },
+  {
+    key: "partnerships_quiet_30d",
+    title: "No Contact 30 Days",
+    domain: "business",
+    unit: "count",
+    module: "partnerships",
+    tone: "warn",
+    records: {
+      title: "No Contact 30 Days",
+      columns: [["partner", "Partner"], ["owner", "Owner", { phone: true }], ["last_contact", "Last Contact", { phone: true }]],
+      rows: () => quietPartners().map((p) => rec(p.partner_id, { partner: text(p.name), owner: person(byKey(p.owner)), last_contact: time(at(p.quiet_days, "11:00")) }, `/partnerships?tab=partners&id=${p.partner_id}`)),
+    },
+  },
+  {
+    key: "proposals_out",
+    title: "Proposals Out",
+    domain: "business",
+    unit: "count",
+    module: "partnerships",
+    records: {
+      title: "Proposals Out",
+      columns: [["proposal", "Proposal"], ["opportunity", "Opportunity"], ["partner", "Partner", { phone: true }], ["sent", "Sent", { phone: true }], ["value", "Value", { numeric: true }]],
+      rows: () => PARTNERS.filter((p) => p.stage === "Proposal sent").map((p) => rec(sid(`proposal:${p.name}`), { proposal: text(`${p.name} Proposal`), opportunity: text(`${p.name}, ${p.type}`), partner: text(p.name), sent: time(at(p.days_at_stage, "10:00")), value: money(p.value) }, "/partnerships?tab=proposals")),
+    },
+  },
+  /* Finance */
+  {
+    key: "expenses_pending",
+    title: "Expenses Awaiting Approval",
+    domain: "finance",
+    unit: "money",
+    module: "expenses",
+    records: {
+      title: "Expenses Awaiting Approval",
+      columns: [["request", "Request"], ["employee", "Employee", { phone: true }], ["purpose", "Purpose"], ["category", "Category"], ["amount", "Amount", { numeric: true, phone: true }], ["submitted", "Submitted"]],
+      rows: (u) => {
+        const mine = expenseScope(u);
+        return REQUESTS.filter((r) => IN_APPROVAL.includes(r.stage) && mine(r.requester)).map((r) => rec(r.request_id, { request: text(r.number), employee: person(byKey(r.requester)), purpose: text(r.title), category: text(r.category), amount: money(r.amount), submitted: time(r.submitted_at) }, `/expenses?tab=approvals&id=${r.request_id}`));
+      },
+    },
+    figure: (rows, u) => {
+      const mine = expenseScope(u);
+      return { value: null, amount: sumMoney(REQUESTS.filter((r) => IN_APPROVAL.includes(r.stage) && mine(r.requester)).map((r) => r.amount)), denominator: null, groups: {}, extra: { requests: rows.length } };
+    },
+    caption: (f) => `${f.extra.requests} ${f.extra.requests === 1 ? "request" : "requests"}`,
+  },
+  {
+    key: "budget_vs_actual",
+    title: "Budget Used",
+    domain: "finance",
+    unit: "pct",
+    module: "expenses",
+    records: {
+      title: "Budgets Running Now",
+      columns: [["budget", "Budget"], ["department", "Department"], ["owner", "Owner"], ["allocated", "Allocated", { numeric: true }], ["spent", "Spent", { numeric: true, phone: true }], ["used", "Used", { numeric: true, phone: true }]],
+      rows: () => BUDGETS.map(([name, dept, owner, allocated, spent]) => rec(sid(`budget:${name}`), { budget: text(name), department: text(dept), owner: person(byKey(owner)), allocated: money(allocated), spent: money(spent), used: number(usedPercent(spent, allocated)) }, "/expenses?tab=budgets")),
+    },
+    figure: () => counted(usedPercent(sumMoney(BUDGETS.map((b) => b[4])), sumMoney(BUDGETS.map((b) => b[3]))), { denominator: BUDGETS.length }),
+    caption: (f) => (Number(f.denominator) > 0 ? `across ${f.denominator} ${f.denominator === 1 ? "budget" : "budgets"}` : null),
+  },
+];
+const BY_KEY = new Map(CARDS.map((c) => [c.key, c]));
+
+function signedThisYear() {
+  return PARTNERS.filter((p) => p.since && p.since.slice(0, 4) === thisYear());
+}
+function quietPartners() {
+  return PARTNERS.filter((p) => p.stage !== "On hold" && p.quiet_days >= QUIET_DAYS).sort((a, b) => b.quiet_days - a.quiet_days);
+}
+/** The leave type My Leave leads with: Annual, else the first with an allowance. */
+function leadBalance(user: string) {
+  const balances = leaveYear(user, Number(thisYear())).balances.filter((b) => b.remaining !== null);
+  const lead = balances.find((b) => b.code === "annual") ?? balances[0];
+  return lead ? { leave_type_id: lead.leave_type_id, name: lead.name, remaining: lead.remaining! } : null;
+}
+
+/** The cards a person may see: their module's view grant and the card's capability; the CEO, every one. */
+function eligibleFor(user: string): Set<string> {
+  const m = me(user);
+  return new Set(CARDS.filter((c) => (m.is_ceo || mayView(m, c.module)) && (!c.capability || holds(m, c.capability))).map((c) => c.key));
+}
+
+function figureOf(card: MockCard, user: string): Figure {
+  const rows = card.records.rows(user);
+  return card.figure ? card.figure(rows, user) : counted(rows.length, { groups: tally(rows) });
+}
+
+const isZero = (unit: HomeKpiUnit, f: Figure) => (unit === "money" ? /^0+(\.0+)?$/.test(f.amount ?? "0") : f.value === 0);
+
+function cardOf(card: MockCard, f: Figure): HomeKpiCard {
+  const ratio = card.unit === "pct" || card.unit === "pair";
+  return {
+    key: card.key,
+    title: card.title,
+    unit: card.unit,
+    value: card.unit === "money" ? null : f.value,
+    amount: card.unit === "money" ? f.amount : null,
+    denominator: ratio ? f.denominator : null,
+    measurable: ratio ? (f.denominator ?? 0) > 0 : true,
+    caption: card.caption ? card.caption(f) : null,
+    tone: card.tone && !isZero(card.unit, f) ? card.tone : null,
+    trend: null,
+    opens: true,
+  };
+}
+
+function metaOf(card: MockCard, f: Figure): HomeKpiDetailMeta {
+  return {
+    key: card.key,
+    title: card.records.title,
+    summary: card.summary ? card.summary(f) : null,
+    columns: card.records.columns.map(([key, label, opts]) => ({ key, label, numeric: opts?.numeric === true, phone: opts?.phone === true })),
+    groups: (card.records.groups ?? []).map(([value, label]) => ({ value, label, count: f.groups[value] ?? 0 })),
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Which cards show, and the picker (the server's kpi-catalog/resolve.js)
+ * ------------------------------------------------------------------ */
+const MAX_CARDS = 4;
+const VIEW_DEFAULTS: Record<string, string[]> = {
+  operations: ["attendance_today", "tasks_overdue", "expenses_pending", "partnerships_active", "headcount"],
+  ceo: ["goals_on_track", "approvals_awaiting_you", "partnerships_signed_value", "alerts_high_open", "attendance_today"],
+  partnerships: ["partnerships_active", "partnerships_signed_value", "partnerships_quiet_30d", "proposals_out"],
+  staff: ["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"],
+};
+/**
+ * A role's cards, as Settings · Roles will set them (M9) through the routes below. Operations &
+ * People locks Clocked In Today, so the demonstration shows a locked card in the picker.
+ */
+const ROLE_CARDS: Record<string, { default_ids: string[]; locked_ids: string[] }> = {
+  operations_people: { default_ids: ["attendance_today", "tasks_overdue", "expenses_pending", "partnerships_active"], locked_ids: ["attendance_today"] },
+};
+/** Each person's own pick; none until they choose. */
+const PICKS = new Map<string, string[]>();
+
+const pickable = (id: string, eligible: Set<string>) => BY_KEY.get(id)?.pickable !== false && BY_KEY.has(id) && eligible.has(id);
+const keepEligible = (ids: string[], eligible: Set<string>) => [...new Set(ids)].filter((id) => pickable(id, eligible));
+
+function choiceOf(user: string) {
+  const m = me(user);
+  const eligible = eligibleFor(user);
+  const roleCards = m.roles.flatMap((r) => (ROLE_CARDS[r.code] ? [ROLE_CARDS[r.code]] : []));
+  const locked = keepEligible(roleCards.flatMap((r) => r.locked_ids), eligible);
+  const lead = (ids: string[]) => [...locked, ...ids.filter((id) => !locked.includes(id))].slice(0, MAX_CARDS);
+  const fallback = (): { source: HomeKpiSource; ids: string[] } => {
+    const fromRoles = keepEligible(roleCards.flatMap((r) => r.default_ids), eligible);
+    if (fromRoles.length) return { source: "role", ids: lead(fromRoles) };
+    return { source: "view", ids: lead(keepEligible(VIEW_DEFAULTS[m.home_view] ?? [], eligible).slice(0, MAX_CARDS)) };
+  };
+  const picks = PICKS.get(user);
+  const showing = picks ? { source: "user" as const, ids: lead(keepEligible(picks, eligible)) } : fallback();
+  return { m, eligible, locked, picks, showing, fallback: fallback() };
+}
+
+function pickerOf(user: string): HomeKpiPicker {
+  const c = choiceOf(user);
+  return {
+    max: MAX_CARDS,
+    cards: CARDS.filter((card) => pickable(card.key, c.eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit })),
+    kpi_ids: c.picks ? keepEligible(c.picks, c.eligible).slice(0, MAX_CARDS) : null,
+    default_ids: c.fallback.ids,
+    locked_ids: c.locked.slice(0, MAX_CARDS),
+    showing_ids: c.showing.ids,
+    source: c.showing.source,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * The Overview's sections (the server's dashboard.layout.js)
+ * ------------------------------------------------------------------ */
+const VIEWS: Record<string, { chart?: HomeChart["kind"]; donut?: HomeDonut["kind"]; clocked_in?: boolean; pipeline?: boolean; goals?: boolean; staff?: boolean }> = {
+  operations: { chart: "attendance_days", donut: "on_time", clocked_in: true, pipeline: true, goals: true },
+  ceo: { chart: "goals", donut: "org_kpi", pipeline: true },
+  partnerships: { chart: "signed_value", pipeline: true, goals: true },
+  staff: { staff: true },
+};
+
+/** The organisation's goals this quarter. Progress is null until Performance measures it (M2). */
+const GOALS: HomeGoal[] = [
+  ["Revenue, FY Target ₦180M", 75],
+  ["Ember to Remember Delivered", 40],
+  ["Headcount, 30 by Q1", 60],
+  ["Partner Network, 10 Signed", 70],
+  ["On Time Attendance 90%", 74],
+].map(([title, days]) => ({ title: title as string, progress: null, due_on: isoDaysAhead(days as number), link: "/performance?tab=goals" }));
+const MY_GOALS: HomeGoal[] = [
+  ["24 Pieces Published", 70],
+  ["Enugu Shot List", 12],
+  ["Channel Growth", 74],
+  ["Team Reviews Filed", 9],
+].map(([title, days]) => ({ title: title as string, progress: null, due_on: isoDaysAhead(days as number), link: "/ess?tab=my-performance" }));
+
+/** Who was in on each of the last 14 working days, today the last when it is one. */
+function attendanceDays(user: string) {
+  const keys = keysOf(user);
+  const days: Array<{ date: string; present: number; expected: number }> = [];
+  if (shiftOf(todayIso()).working_day) {
+    const r = rosterOf(user);
+    days.push({ date: todayIso(), present: r.filter(present).length, expected: r.filter((x) => x.status !== "on_leave").length });
+  }
+  for (let back = 1; days.length < 14 && back <= 45; back += 1) {
+    const day = isoDaysAgo(back);
+    if (!shiftOf(day).working_day) continue;
+    const rows = HISTORY.filter((h) => h.date === day && keys.has(h.person.user_key));
+    days.push({ date: day, present: rows.filter((h) => h.clock_in_at).length, expected: rows.filter((h) => h.status !== "leave").length });
+  }
+  return days.reverse();
+}
+
+/** This month so far: the days people were in on time, late, or absent. */
+function onTimeDonut(user: string): HomeDonut {
+  const keys = keysOf(user);
+  const first = `${todayIso().slice(0, 7)}-01`;
+  const month = HISTORY.filter((h) => h.date >= first && keys.has(h.person.user_key));
+  const today = shiftOf(todayIso()).working_day ? rosterOf(user) : [];
+  return {
+    kind: "on_time",
+    on_time: month.filter((h) => h.clock_in_at && h.status !== "late").length + today.filter((r) => r.status === "on_site" || r.status === "remote").length,
+    late: month.filter((h) => h.status === "late").length + today.filter((r) => r.status === "late").length,
+    absent: month.filter((h) => h.status === "absent").length,
+  };
+}
+
+/** The year read whole, as Signed Value reads it: to this month, or to a later one an agreement starts in. */
+function signedByMonth(): HomeChart {
+  const year = thisYear();
+  const last = Math.max(Number(todayIso().slice(5, 7)), ...signedThisYear().map((p) => Number(p.since!.slice(5, 7))));
+  const months = Array.from({ length: last }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  return { kind: "signed_value", months: months.map((month) => ({ month, amount: sumMoney(["0.00", ...signedThisYear().filter((p) => p.since!.startsWith(month)).map((p) => p.value)]) })) };
+}
+
+function pipelineOf(): HomePipeline {
+  return {
+    stages: OPEN_STAGES.map((stage) => ({ stage: stage.toLowerCase().replace(/[^a-z]+/g, "_"), label: stage, open: PARTNERS.filter((p) => p.stage === stage).length })).filter((s) => s.open > 0),
+    quiet_30d: quietPartners().length,
+  };
+}
+
+function dayStripOf(user: string): HomeDayStrip {
+  const t = todayOf(user);
+  const p = byKey(user)!;
+  const startMin = t.shift.starts_at ? Number(t.shift.starts_at.slice(0, 2)) * 60 + Number(t.shift.starts_at.slice(3, 5)) + t.shift.grace_minutes : null;
+  const inMin = t.clock_in_at ? Number(formatTime(t.clock_in_at).slice(0, 2)) * 60 + Number(formatTime(t.clock_in_at).slice(3, 5)) : null;
+  const remote = p.work_pattern === "remote";
+  const status: HomeRosterStatus | null =
+    t.state === "unavailable" ? "on_leave" : t.clock_in_at ? (startMin !== null && inMin !== null && inMin > startMin ? "late" : remote ? "remote" : "on_site") : t.shift.working_day ? "not_in" : null;
+  const worked = t.clock_in_at && t.clock_out_at ? Math.floor((Date.parse(t.clock_out_at) - Date.parse(t.clock_in_at)) / 60000) : 0;
+  return {
+    starts_at: t.shift.starts_at,
+    ends_at: t.shift.ends_at,
+    clock_in_at: t.clock_in_at,
+    clock_out_at: t.clock_out_at,
+    status,
+    worksite: t.clock_in_at && !remote && t.location.kind === "worksite" ? t.location.name : null,
+    worked_minutes: Math.max(0, worked),
+  };
+}
+
+function upcomingLeaveOf(user: string): HomeUpcomingLeave {
+  const today = todayIso();
+  const requests = leaveRequests()
+    .filter((l) => l.key === user && (l.status === "submitted" || l.status === "approved") && l.ends_on >= today)
+    .sort((a, b) => a.starts_on.localeCompare(b.starts_on))
+    .map(({ key: _key, ...r }) => r);
+  return { balance: leadBalance(user), requests };
+}
+
+/** Today's events, as the allow-list lets them through: people's in the reader's scope, the community's to every holder. */
+function activityOf(user: string, m: Me): HomeActivityItem[] | null {
+  const people = mayView(m, "people");
+  const community = mayView(m, "community");
+  if (!people && !community) return null;
+  const keys = keysOf(user);
+  const events: Array<[string, string, string, string | null, string, string]> = [
+    ["celebration.posted", "community", "00:01", null, "hauwa", "/community?tab=channels"],
+    ["attendance.review_required", "people", "08:58", null, "seyi", "/people?tab=attendance"],
+    ["leave_request.approved", "people", "09:12", "cynthia", "tobi", "/people?tab=leave"],
+    ["employee.created", "people", "10:05", "cynthia", "samuel", "/people?tab=employees"],
+    ["recognition.posted", "community", "11:20", "ngozi", "adedotun", "/community?tab=channels"],
+  ];
+  const now = Date.now();
+  return events
+    .filter(([, module, , , subject]) => (module === "community" ? community : people && keys.has(subject)))
+    .map(([event_key, module_key, hm, actor, subject, link]) => ({
+      event_id: sid(`event:${event_key}:${subject}`),
+      event_key,
+      module_key,
+      occurred_at: at(0, hm),
+      actor_name: actor ? byKey(actor)!.display_name : null,
+      subject: byKey(subject)!.display_name,
+      link,
+    }))
+    .filter((e) => Date.parse(e.occurred_at) <= now)
+    .reverse();
+}
+
+/** What each Home view's week holds: [weekday, 1 is Monday; event or task; title; time]. */
+const WEEK_ITEMS: Record<string, Array<[number, "event" | "task", string, string | null]>> = {
+  operations: [[1, "task", "Close out Q4 departmental targets", "17:00"], [2, "event", "Panel interview, Adaeze Nnamdi", "11:00"], [3, "event", "Ember to Remember, all hands", "10:00"], [4, "task", "Onboarding pack for the Enugu hires", "16:00"], [5, "event", "Weekly productivity review", "09:30"]],
+  ceo: [[1, "task", "Board pack review", "17:00"], [2, "event", "Payroll sign off", "14:00"], [3, "event", "Ember to Remember, Lagos leg", "10:00"], [4, "task", "Investor update draft", "16:00"]],
+  partnerships: [[1, "task", "Eko Hotels re-engagement call", "11:00"], [2, "event", "ProvidusBank proposal review", "14:00"], [3, "event", "MTN quarterly review", "10:00"], [4, "task", "Pipeline review with Operations", "15:00"]],
+  staff: [[3, "event", "Ember to Remember, Lagos leg", "10:00"], [5, "task", "Reviews due to your manager", "17:00"]],
+};
+
+function weekOf(user: string, m: Me): HomeWeekDay[] {
+  const today = todayIso();
+  const dow = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const monday = new Date(`${today}T12:00:00Z`);
+  monday.setUTCDate(monday.getUTCDate() - ((dow + 6) % 7));
+  const items = mayView(m, "workspace") ? (WEEK_ITEMS[m.home_view] ?? []) : [];
+  const days: HomeWeekDay[] = [];
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(monday);
+    d.setUTCDate(monday.getUTCDate() + i);
+    const day = d.toISOString().slice(0, 10);
+    const shift = shiftOf(day);
+    if (!shift.working_day) continue;
+    days.push({
+      date: day,
+      starts_at: shift.starts_at,
+      ends_at: shift.ends_at,
+      holiday: null,
+      on_leave: leaveCovers(user, day),
+      items: items.filter(([w]) => w === i + 1).map(([, kind, title, hm]) => ({ kind, title, at: hm ? new Date(`${day}T${hm}:00+01:00`).toISOString() : null, link: kind === "task" ? "/workspace?tab=tasks" : "/workspace?tab=calendar" })),
+    });
+  }
+  return days;
+}
+
+function overviewOf(user: string): HomeOverview {
+  const c = choiceOf(user);
+  const m = c.m;
+  const v = VIEWS[m.home_view] ?? VIEWS.staff;
+  const may = (module: string) => mayView(m, module);
+  const cards = c.showing.ids.map((id) => cardOf(BY_KEY.get(id)!, figureOf(BY_KEY.get(id)!, user)));
+  const roster = v.clocked_in && may("people") ? rosterOf(user) : null;
+  const charts: Record<HomeChart["kind"], () => HomeChart | null> = {
+    attendance_days: () => (may("people") ? { kind: "attendance_days", days: attendanceDays(user) } : null),
+    goals: () => (may("performance") ? { kind: "goals", goals: GOALS.map(({ title, progress, link }) => ({ title, progress, link })) } : null),
+    signed_value: () => (may("partnerships") ? signedByMonth() : null),
+  };
+  const donuts: Record<HomeDonut["kind"], () => HomeDonut | null> = {
+    on_time: () => (may("people") ? onTimeDonut(user) : null),
+    org_kpi: () => (may("performance") ? { kind: "org_kpi", percent: null, departments: DEPARTMENTS.map((name) => ({ department_id: sid(`department:${name}`), department: name, percent: null })) } : null),
+  };
+  const t = todayOf(user);
+  return {
+    greeting_name: m.first_name,
+    date: todayIso(),
+    clocked_in: roster ? { present: roster.filter(present).length, expected: roster.filter((r) => r.status !== "on_leave").length } : null,
+    cards,
+    picker_source: c.showing.source,
+    chart: v.chart ? charts[v.chart]() : null,
+    donut: v.donut ? donuts[v.donut]() : null,
+    day_strip: v.staff && may("ess") ? dayStripOf(user) : null,
+    pipeline: v.pipeline && may("partnerships") ? pipelineOf() : null,
+    goals: v.goals && may("performance") ? GOALS : null,
+    my_goals: v.staff && may("ess") ? MY_GOALS : null,
+    upcoming_leave: v.staff && may("ess") ? upcomingLeaveOf(user) : null,
+    activity: activityOf(user, m),
+    week: weekOf(user, m),
+    alerts_to_clear: holds(m, "alerts.clear") ? alertScope(user).length : null,
+    // The mock keeps one session per tab, so every Overview it answers is the day's first session's.
+    prompt_clock_in: t.state === "not_clocked_in" && t.shift.working_day,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Alerts and rules (INTERIM until Home · Alerts is on the real API)
  * ------------------------------------------------------------------ */
 type A = [string, string, string, string, string, "low" | "medium" | "high", string, number, string | null];
 const A_ROWS: A[] = [
@@ -307,18 +940,42 @@ const A_ROWS: A[] = [
   ["October payroll not submitted", "Payroll cycle", "Operations", "payroll", "due today", "medium", "payroll", 0, "/payroll?tab=payroll-runs"],
   ["Adaeze Nnamdi awaiting panel feedback", "Recruitment SLA", "Hiring manager", "recruitment", "+2 over 3", "high", "recruitment_sla", 5, "/recruitment?tab=interviews"],
 ];
+/** A High alert open this many days goes to the CEO (home.md §6). */
+const AGED_DAYS = 14;
 const ALERTS = A_ROWS.map((a, i) => ({
-  home_alert_id: sid(`alert:${i}`), title: a[0], trigger: a[1], who_clears: a[2], category: a[3] as HomeAlert["category"], over_by: a[4], severity: a[5], metric: a[6],
-  age: a[7] === 0 ? "today" : `${a[7]} day${a[7] === 1 ? "" : "s"}`, raised_at: at(a[7], "09:00"), link: a[8], cleared: false as boolean,
+  home_alert_id: sid(`alert:${i}`),
+  title: a[0],
+  trigger: a[1],
+  who_clears: a[2],
+  category: a[3] as HomeAlert["category"],
+  over_by: a[4],
+  /** How far past its rule, as a number, for the records behind Open High Alerts. */
+  over: Number(/^\+?(\d+)/.exec(a[4])?.[1] ?? 0),
+  severity: a[5],
+  metric: a[6],
+  age: a[7] === 0 ? "today" : `${a[7]} day${a[7] === 1 ? "" : "s"}`,
+  age_days: a[7],
+  raised_at: at(a[7], "09:00"),
+  link: a[8],
+  cleared: false as boolean,
 }));
 const RULES = [...new Map(ALERTS.map((a) => [a.metric, a])).values()].map((a, i) => ({
-  home_alert_rule_id: sid(`rule:${a.metric}`), name: a.trigger, metric: a.metric, example: a.title, threshold: [3, 1, 1, 30, 2, 60, 14, 90, 3, 1, 3][i] ?? 3, window_days: 30, severity: a.severity, enabled: true,
+  home_alert_rule_id: sid(`rule:${a.metric}`),
+  name: a.trigger,
+  metric: a.metric,
+  example: a.title,
+  threshold: [3, 1, 1, 30, 2, 60, 14, 90, 3, 1, 3][i] ?? 3,
+  window_days: 30,
+  severity: a.severity,
+  enabled: true,
 }));
 const CATEGORY_LABEL: Record<string, string> = { attendance: "Attendance", partnership: "Partnerships", approval: "Approvals", document: "Documents", people: "People", budget: "Budget", payroll: "Payroll", recruitment: "Recruitment" };
-const alertScope = (user: string) => (SIGN_INS[user]?.view === "partnerships" ? ALERTS.filter((a) => a.category === "partnership") : ALERTS).filter((a) => !a.cleared);
+function alertScope(user: string) {
+  return (SIGN_INS[user]?.view === "partnerships" ? ALERTS.filter((a) => a.category === "partnership") : ALERTS).filter((a) => !a.cleared);
+}
 
 /* ------------------------------------------------------------------ *
- * Reports
+ * Reports (INTERIM until Home · Reports is on the real API)
  * ------------------------------------------------------------------ */
 const REPORTS = [
   ["Daily Attendance", "Every weekday at 18:00 to Operations and the CEO.", "scheduled", "Operations, CEO", ["operations", "ceo"]],
@@ -329,55 +986,141 @@ const REPORTS = [
   ["Pending Approvals", "Daily at 09:00 to whoever is holding one.", "scheduled", "Approvers", ["operations", "ceo"]],
 ].map((r, i) => ({ home_report_id: sid(`report:${i}`), name: r[0] as string, cadence: r[1] as string, status: r[2] as HomeReport["status"], audience: r[3] as string, roles: r[4] as string[] }));
 const RUNS = [
-  ["Daily Attendance", 1, "18:00", "Operations, CEO", "PDF"], ["Pending Approvals", 0, "09:00", "4 approvers", "PDF"], ["Weekly Productivity", 3, "08:00", "All managers", "PDF, XLSX"],
-  ["Recruitment Pipeline", 6, "17:00", "Hiring managers", "PDF"], ["Monthly Expenses", 13, "09:12", "Operations, CEO", "XLSX"],
+  ["Daily Attendance", 1, "18:00", "Operations, CEO", "PDF"],
+  ["Pending Approvals", 0, "09:00", "4 approvers", "PDF"],
+  ["Weekly Productivity", 3, "08:00", "All managers", "PDF, XLSX"],
+  ["Recruitment Pipeline", 6, "17:00", "Hiring managers", "PDF"],
+  ["Monthly Expenses", 13, "09:12", "Operations, CEO", "XLSX"],
 ].map((r, i) => ({ run_id: sid(`run:${i}`), number: `RPT-${String(214 - i).padStart(4, "0")}`, report: r[0] as string, run_at: at(r[1] as number, r[2] as string), recipients: r[3] as string, formats: r[4] as string }));
 const reportScope = (user: string) => REPORTS.filter((r) => r.roles.includes(SIGN_INS[user]?.view ?? "staff") || (SIGN_INS[user] == null && teamOf(user).length > 0 && r.roles.includes("operations")));
 
 /* ------------------------------------------------------------------ *
  * Routes
  * ------------------------------------------------------------------ */
-route("GET /api/v1/home/overview", (req) => ok(overview(req.user!)));
+route("GET /api/v1/home/overview", (req) => ok(overviewOf(req.user!)));
+
+route("GET /api/v1/home/kpi-picker", (req) => ok(pickerOf(req.user!)));
+route("PUT /api/v1/home/kpi-picks", (req) => {
+  const ids = (req.body as { kpi_ids?: unknown }).kpi_ids;
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string")) return invalid({ kpi_ids: ["Required"] });
+  if (ids.length > MAX_CARDS) return invalid({ kpi_ids: [`Up to ${MAX_CARDS} cards`] });
+  if (new Set(ids).size !== ids.length) return invalid({ kpi_ids: ["Each card once"] });
+  const c = choiceOf(req.user!);
+  if (ids.some((id) => !pickable(id, c.eligible))) return fail(422, "KPI_NOT_AVAILABLE", "Pick cards you can see", { kpi_ids: ["Card not available"] });
+  if (c.locked.some((id) => !ids.includes(id))) return fail(422, "KPI_LOCKED", "Locked cards stay on your Home", { kpi_ids: ["Locked cards stay"] });
+  // The roles' own cards restated in their order follow the roles, so a later change to the role reaches them.
+  const followRoles = ids.length === c.fallback.ids.length && ids.every((id, i) => id === c.fallback.ids[i]);
+  if (followRoles) PICKS.delete(req.user!);
+  else PICKS.set(req.user!, [...ids]);
+  return ok(pickerOf(req.user!));
+});
+route("DELETE /api/v1/home/kpi-picks", (req) => {
+  PICKS.delete(req.user!);
+  return noContent();
+});
+
+/*
+ * A role's cards (GET, PUT and DELETE /home/roles/:role_id/kpis). A role held by a demonstration
+ * account is offered the cards its holder may see; any other role (Implementation, System
+ * Administrator, Line Manager, one made on Settings) answers as a role with no card it can see,
+ * never a 404, as the server answers 200 for every role.
+ */
+/** The demonstration account holding each role. */
+const ROLE_HOLDER: Record<string, string> = { operations_people: "cynthia", management: "ifeoma", head_of_department: "ngozi", employee: "chidera" };
+const roleCodeOf = (id: string) => Object.keys(ROLE_HOLDER).find((code) => sid(`role:${code}`) === id) ?? null;
+const maySettings = (user: string, action: string) => {
+  const m = me(user);
+  return m.is_ceo || !!m.grants.settings?.includes(action);
+};
+const settingsDenied = () => fail(403, "PERMISSION_DENIED", "You do not have access to this");
+
+function roleCardsOf(roleId: string, code: string): HomeRoleKpis {
+  const eligible = eligibleFor(ROLE_HOLDER[code]);
+  const row = ROLE_CARDS[code];
+  const defaults = row ? keepEligible(row.default_ids, eligible).slice(0, MAX_CARDS) : [];
+  return {
+    role_id: roleId,
+    default_ids: defaults,
+    locked_ids: row ? keepEligible(row.locked_ids, eligible).filter((id) => defaults.includes(id)) : [],
+    configured: !!row,
+    view_default_ids: keepEligible(VIEW_DEFAULTS[me(ROLE_HOLDER[code]).home_view] ?? [], eligible).slice(0, MAX_CARDS),
+    cards: CARDS.filter((card) => pickable(card.key, eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit })),
+  };
+}
+
+/** A role no demonstration account holds: nothing configured and no card to offer. */
+const noCardsFor = (roleId: string): HomeRoleKpis => ({ role_id: roleId, default_ids: [], locked_ids: [], configured: false, view_default_ids: [], cards: [] });
+
+route("GET /api/v1/home/roles/:role_id/kpis", (req) => {
+  if (!maySettings(req.user!, "view")) return settingsDenied();
+  const code = roleCodeOf(req.params.role_id);
+  return ok(code ? roleCardsOf(req.params.role_id, code) : noCardsFor(req.params.role_id));
+});
+route("PUT /api/v1/home/roles/:role_id/kpis", (req) => {
+  if (!maySettings(req.user!, "edit")) return settingsDenied();
+  const code = roleCodeOf(req.params.role_id);
+  const listOf = (v: unknown) => (Array.isArray(v) && v.every((id) => typeof id === "string") && v.length <= MAX_CARDS && new Set(v).size === v.length ? (v as string[]) : null);
+  const defaults = listOf((req.body as { default_ids?: unknown }).default_ids);
+  const locked = listOf((req.body as { locked_ids?: unknown }).locked_ids);
+  if (!defaults) return invalid({ default_ids: [`Up to ${MAX_CARDS} cards`] });
+  if (!locked || locked.some((id) => !defaults.includes(id))) return invalid({ locked_ids: ["Lock a chosen card"] });
+  if (!code) return defaults.length ? fail(422, "KPI_NOT_FOR_ROLE", "Pick cards this role can see", { default_ids: ["Role cannot see it"] }) : ok(noCardsFor(req.params.role_id));
+  if (defaults.some((id) => !pickable(id, eligibleFor(ROLE_HOLDER[code])))) return fail(422, "KPI_NOT_FOR_ROLE", "Pick cards this role can see", { default_ids: ["Role cannot see it"] });
+  // A role with no default follows its Home view's cards again, as after DELETE.
+  if (defaults.length) ROLE_CARDS[code] = { default_ids: [...defaults], locked_ids: [...locked] };
+  else delete ROLE_CARDS[code];
+  return ok(roleCardsOf(req.params.role_id, code));
+});
+route("DELETE /api/v1/home/roles/:role_id/kpis", (req) => {
+  if (!maySettings(req.user!, "edit")) return settingsDenied();
+  const code = roleCodeOf(req.params.role_id);
+  if (code) delete ROLE_CARDS[code];
+  return noContent();
+});
+
+/** A live card the reader may see, or null: an unknown, hidden or unavailable card is the same 404. */
+const cardFor = (user: string, key: string) => (eligibleFor(user).has(key) ? (BY_KEY.get(key) ?? null) : null);
 
 route("GET /api/v1/home/kpi/:key/meta", (req) => {
-  const d = DETAILS[req.params.key];
-  if (!d) return notFound();
-  const rows = d.rows(req.user!);
-  return ok({ key: req.params.key, ...d.meta, groups: (d.groups ?? []).map((g) => ({ value: g.value, label: g.label, count: rows.filter(g.test).length })).filter((g) => g.count > 0) });
+  const card = cardFor(req.user!, req.params.key);
+  return card ? ok(metaOf(card, figureOf(card, req.user!))) : notFound();
 });
 route("GET /api/v1/home/kpi/:key", (req: Req) => {
-  const d = DETAILS[req.params.key];
-  if (!d) return notFound();
-  const groups = Object.fromEntries((d.groups ?? []).map((g) => [g.value, g.test]));
-  const rows = d.rows(req.user!);
-  return paged(rows.map((r) => ({ ...r })), req, {
-    search: (r) => Object.values(r.cells).map((c) => (c.kind === "text" ? c.text : c.kind === "person" ? c.person.display_name : "")),
-    filters: { group: (r, v) => !!groups[v]?.(r) },
+  const card = cardFor(req.user!, req.params.key);
+  if (!card) return notFound();
+  if (req.query.group && !(card.records.groups ?? []).some(([value]) => value === req.query.group)) return invalid({ group: ["Not a group of this card"] });
+  const res = paged(card.records.rows(req.user!), req, {
+    search: (r) => Object.values(r.cells).map((c) => (c?.kind === "text" ? c.text : c?.kind === "person" ? c.person.display_name : "")),
+    filters: { group: (r, v) => !!r.groups?.includes(v) },
   });
+  const body = res.body as { data?: Rec[] } | undefined;
+  if (body?.data) body.data = body.data.map(({ groups: _groups, ...row }) => row);
+  return res;
 });
 
 route("GET /api/v1/home/team/summary", (req) => {
-  const l = scopeFor(req.user!);
+  const keys = keysOf(req.user!);
+  const l = TODAY.filter((t) => keys.has(t.person.user_key));
   const s = summaryOf(l);
-  const view = SIGN_INS[req.user!]?.view;
   return ok({
-    scope_label: view === "operations" || view === "ceo" ? "The whole organisation" : "The people you manage",
+    scope_label: full(req.user!) ? "The whole organisation" : "The people you manage",
     kpis: [
-      { key: "tm_present", label: "Present Today", value: `${s.present} / ${l.length}`, trend: { text: `${s.leave} on leave`, dir: "fl" } },
-      { key: "tm_onsite", label: "On Site", value: String(s.onsite) },
-      { key: "tm_remote", label: "Remote", value: String(s.remote) },
-      { key: "tm_flags", label: "Flags", value: String(s.late + s.noout), tone: "warn", trend: { text: `${s.late} late, ${s.noout} no clock-out`, dir: "dn" } },
+      { key: "team_present", label: "Present Today", value: `${s.present} / ${l.length}`, trend: { text: `${s.leave} on leave`, dir: "fl" } },
+      { key: "team_on_site", label: "On Site", value: String(s.onsite) },
+      { key: "team_remote", label: "Remote", value: String(s.remote) },
+      { key: "team_flags", label: "Flags", value: String(s.late + s.noout), tone: "warn", trend: { text: `${s.late} late, ${s.noout} no clock-out`, dir: "dn" } },
     ] satisfies HomeKpi[],
     attendance_bars: l.slice(0, 6).map((t) => ({ label: t.person.display_name, pct: t.kpi_pct, value: `${t.kpi_pct}%`, ...(t.kpi_pct < 70 ? { emphasis: "warn" as const } : {}) })),
   });
 });
-route("GET /api/v1/home/team", (req) =>
-  paged(
-    scopeFor(req.user!).map((t) => ({ employee: ref(t.person)!, today: STATUS_PILL[t.status], mode: t.mode === "None" ? "None" : t.mode, clock_in: t.clock_in, kpi_pct: t.kpi_pct, open_tasks: t.open_tasks, _s: t.status })),
+route("GET /api/v1/home/team", (req) => {
+  const keys = keysOf(req.user!);
+  return paged(
+    TODAY.filter((t) => keys.has(t.person.user_key)).map((t) => ({ employee: ref(t.person)!, today: STATUS_PILL[t.status], mode: t.mode === "None" ? "None" : t.mode, clock_in: t.clock_in, kpi_pct: t.kpi_pct, open_tasks: t.open_tasks, _s: t.status })),
     req,
     { search: (r) => [r.employee.display_name, r.employee.department], filters: { status: (r, v) => r._s === v } },
-  ),
-);
+  );
+});
 
 route("GET /api/v1/home/alerts/summary", (req) => {
   const l = alertScope(req.user!);
@@ -386,7 +1129,7 @@ route("GET /api/v1/home/alerts/summary", (req) => {
     kpis: [
       { key: "alerts_open", label: "Open Alerts", value: String(l.length) },
       { key: "alerts_needs", label: "Needs You", value: String(l.filter((a) => a.who_clears === "Operations" || a.who_clears === "People").length), tone: "warn" },
-      { key: "alerts_high", label: "Overdue 7 Days +", value: String(l.filter((a) => a.severity === "high").length), tone: "err" },
+      { key: "alerts_overdue", label: "Overdue 7 Days +", value: String(l.filter((a) => a.age_days > 7).length), tone: "err" },
       { key: "alerts_cleared", label: "Cleared This Week", value: String(9 + ALERTS.filter((a) => a.cleared).length), tone: "ok" },
     ],
     sources: [["Attendance rules", 100, "18"], ["Partnership inactivity", 55, "10"], ["Approval ageing", 39, "7"], ["Document expiry", 33, "6"], ["Recruitment SLA", 22, "4"], ["Budget threshold", 11, "2"]].map(([label, pct, value]) => ({ label: label as string, pct: pct as number, value: value as string })),
@@ -394,10 +1137,11 @@ route("GET /api/v1/home/alerts/summary", (req) => {
   });
 });
 route("GET /api/v1/home/alerts", (req) =>
-  paged(alertScope(req.user!).map((a) => ({ home_alert_id: a.home_alert_id, title: a.title, trigger: a.trigger, category: a.category, who_clears: a.who_clears, age: a.age, over_by: a.over_by, severity: a.severity, raised_at: a.raised_at, link: a.link })), req, {
-    search: (r) => [r.title, r.trigger],
-    filters: { category: (r, v) => r.category === v },
-  }),
+  paged(
+    alertScope(req.user!).map((a) => ({ home_alert_id: a.home_alert_id, title: a.title, trigger: a.trigger, category: a.category, who_clears: a.who_clears, age: a.age, over_by: a.over_by, severity: a.severity, raised_at: a.raised_at, link: a.link })),
+    req,
+    { search: (r) => [r.title, r.trigger], filters: { category: (r, v) => r.category === v } },
+  ),
 );
 route("POST /api/v1/home/alerts/:id/clear", (req) => {
   const a = ALERTS.find((x) => x.home_alert_id === req.params.id);
@@ -421,12 +1165,14 @@ route("PATCH /api/v1/home/alert-rules/:id", (req) => {
 
 route("GET /api/v1/home/reports/summary", (req) => {
   const l = reportScope(req.user!);
-  return ok({ kpis: [
-    { key: "rp_sched", label: "Scheduled", value: String(l.filter((r) => r.status === "scheduled").length) },
-    { key: "rp_paused", label: "Paused", value: String(l.filter((r) => r.status === "paused").length), tone: "warn" },
-    { key: "rp_runs", label: "Run This Month", value: "38" },
-    { key: "rp_recip", label: "Recipients", value: "11" },
-  ] });
+  return ok({
+    kpis: [
+      { key: "rp_sched", label: "Scheduled", value: String(l.filter((r) => r.status === "scheduled").length) },
+      { key: "rp_paused", label: "Paused", value: String(l.filter((r) => r.status === "paused").length), tone: "warn" },
+      { key: "rp_runs", label: "Runs This Month", value: "38" },
+      { key: "rp_recip", label: "Recipients", value: "11" },
+    ],
+  });
 });
 route("GET /api/v1/home/reports", (req) => paged(reportScope(req.user!).map((r) => ({ home_report_id: r.home_report_id, name: r.name, cadence: r.cadence, status: r.status, audience: r.audience })), req, { search: (r) => [r.name] }));
 route("POST /api/v1/home/reports", (req) => {
@@ -443,5 +1189,3 @@ route("POST /api/v1/home/reports/:id/run", (req) => {
   return ok(run);
 });
 route("GET /api/v1/home/report-runs", (req) => paged(RUNS, req, { search: (r) => [r.report, r.number] }));
-
-export const _people = PEOPLE;

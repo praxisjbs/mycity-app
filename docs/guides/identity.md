@@ -435,3 +435,4 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   the CEO), read from the grants cache like `requireCapability`, so the shell and ⌘K gate Home's
   Team, Alerts and Reports tabs on what the API allows (README §5.2). `CapabilityCode` moves from
   `access.js` to `identity.js`, which `access.js` imports. Header gains the Capabilities row.
+- 18/10/2026 · TB · `AuthProvider` no longer carries `justSignedIn` and `clearJustSignedIn`: their one reader was the shell's after-sign-in clock-in prompt, which moved to Home · Overview on the server's `prompt_clock_in` (home.md §6, attendance.md change log). Sign-in, the lock and Welcome back are unchanged.

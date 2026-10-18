@@ -122,6 +122,8 @@ const ENTITY_ROUTES = Object.freeze({
   home_alert: screen("home", "alerts"), // search:none not built yet (src/modules/alerts)
   home_report: screen("home", "reports"), // search:none not built yet (src/modules/reports)
   home_report_run: screen("home", "reports"), // search:none not built yet (src/modules/reports)
+  // A KPI card, by its catalogue key: the Overview opens the records behind it.
+  home_kpi: screen("home", "overview"),
 
   // My Workspace
   task: screen("workspace", "tasks"), // search:none not built yet (src/modules/tasks)

@@ -79,6 +79,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Feedback | [ErrorBoundary](#errorboundary) | `ErrorBoundary` | Catches a crash in one screen so the rest of the app keeps working, and shows ErrorState with Try Again in its place. | stable |
 | Feedback | [ErrorState](#errorstate) | `ErrorState` | Something did not load: one line saying so, and Try Again. | stable |
 | Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere. | stable |
+| Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot. | stable |
@@ -1032,7 +1033,7 @@ The report model behind a KPI card: the records that make up the number, grouped
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `summary` | `ReactNode` |  | One operational line above the list, at most 20 words ("22 of 25 clocked in across the organisation"). |
-| `groups` | `KpiDetailGroup[]` |  | The groups the rules read the figure in; chips show only when there is more than one. |
+| `groups` | `KpiDetailGroup[]` |  | The groups the rules read the figure in; chips show only when there is more than one. All counts the whole list, not their sum, since groups can overlap. |
 | `group` | `string` |  | The group in view; `all` for every record. |
 | `onGroup` | `(group: string) => void` |  | Called with the chosen group's value, or `all`. |
 | `list` | `DataViewList<R>` | yes | The server-paged records behind the number (a `usePaged()` result). |
@@ -2223,6 +2224,38 @@ toast.success("Alert cleared", { undo: () => restore(alert) })
 ```
 
 ## Forms
+
+### CardPicker
+
+The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first.
+
+| | |
+|---|---|
+| Use | Choose Cards on Home, and a role's cards on Settings: inside a Modal whose footer holds Cancel, any reset and the save. |
+| Avoid | A yes or no in a form (use CheckboxField); a choice of one (ChoiceField or SelectField); Save or Cancel inside it (the dialog's footer holds them); dragging to reorder. |
+| Phone | The chosen cards first with Move Up and Move Down, then the rest; each tick and button is a 44 px target, the buttons drop under the title when the row is narrow, and the count is left off. |
+| Accessibility | A named group of real checkboxes, each labelled by its card's title; a locked card's tick is checked, disabled and described as Locked. Move Up and Move Down are worded buttons named for their card, unavailable (not removed) at either end, and focus stays with a card as it moves. A polite status reads the count after a tick, a card's new place after a move, and the limit when a pick is refused; the refused tick is marked invalid and described by the error. |
+| Status | beta |
+| Exports | `CardPicker` |
+| Import | `import { CardPicker } from "@mycity/ui";` |
+| File | `packages/ui/src/form/CardPicker.tsx` |
+| Test | `packages/ui/src/form/CardPicker.test.tsx` |
+| Gallery | `packages/ui/src/form/CardPicker.gallery.tsx` (`npm run gallery`, `#/CardPicker`) |
+
+**CardPicker** props (`CardPickerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `options` | `CardPickerOption[]` | yes | Every card the person may choose, in the order the catalogue lists them. Only cards they may see: never a greyed one. |
+| `value` | `string[]` | yes | The chosen card ids, in the order the row shows them. Locked cards are chosen and lead whether or not they are listed here; an id with no option is dropped. |
+| `onChange` | `(next: string[]) => void` | yes | Called with the next chosen ids, locked first, after a tick or a move. A tick never takes it past `max`. |
+| `max` | `number` |  | How many cards may be chosen; 4, a row of KPI cards. |
+| `label` | `string` | yes | The group's accessible name, Title Case ("Overview Cards"); the dialog's title is the visible one. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<CardPicker label="Overview Cards" options={cards} value={draft} onChange={setDraft} />
+```
 
 ### DateField
 

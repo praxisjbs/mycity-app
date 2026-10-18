@@ -9,7 +9,7 @@
  * @status stable
  * @example <KpiDetail summary="22 of 25 clocked in" groups={groups} group={group} onGroup={setGroup} list={list} columns={columns} rowKey={(r) => r.id} />
  */
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Chips } from "../navigation/Chips";
 import { SearchInput } from "../form/SearchInput";
 import { DataView, type DataViewColumn, type DataViewList } from "../data/DataView";
@@ -27,7 +27,7 @@ export interface KpiDetailGroup {
 export interface KpiDetailProps<R> {
   /** One operational line above the list, at most 20 words ("22 of 25 clocked in across the organisation"). */
   summary?: ReactNode;
-  /** The groups the rules read the figure in; chips show only when there is more than one. */
+  /** The groups the rules read the figure in; chips show only when there is more than one. All counts the whole list, not their sum, since groups can overlap. */
   groups?: KpiDetailGroup[];
   /** The group in view; `all` for every record. */
   group?: string;
@@ -55,7 +55,18 @@ export interface KpiDetailProps<R> {
 const SEARCH_FROM = 8;
 
 export function KpiDetail<R>({ summary, groups, group = "all", onGroup, list, columns, rowKey, onRowClick, noun, nounPlural, caption, empty }: KpiDetailProps<R>) {
-  const total = (groups ?? []).reduce((sum, g) => sum + g.count, 0);
+  /*
+   * All counts every record behind the number: the server's total for the whole list, read
+   * once its first answer with no group and no search has come back. The groups are not
+   * added up for it, because they can overlap (someone late today can also have no
+   * clock-out from yesterday); until that answer, their sum stands in.
+   */
+  const whole = group === "all" && !list.q && !list.loading ? list.page?.total : undefined;
+  const [wholeTotal, setWholeTotal] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (whole !== undefined) setWholeTotal((known) => known ?? whole);
+  }, [whole]);
+  const total = wholeTotal ?? (groups ?? []).reduce((sum, g) => sum + g.count, 0);
   const setQ = list.setQ;
   // Searching three rows is noise; the box appears once the list is longer than a screenful.
   const searchable = (list.page?.total ?? 0) > SEARCH_FROM && setQ !== undefined;

@@ -3,46 +3,19 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
+import { hasCapability } from "@/shell/access";
+import { useUrlAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Block, InfoCard, KpiRow } from "./blocks";
+import { InfoCard, KpiRow } from "./blocks";
+import { Overview } from "./Overview";
 import { toBars } from "@/features/shared/wire";
-import { Bars, Button, Card, Chips, DataView, ErrorState, Field, formatDateTime, FormFooter, Grid, Grow, KeyValue, LoadingRows, PageHeader, Pager, Pill, rules, SelectField, TextField, Tile, toast, ToggleRow, useContractForm, useModal, Who } from "@mycity/ui";
+import { Bars, Button, Card, Chips, DataView, ErrorState, Field, formatDateTime, FormFooter, Grid, Grow, KeyValue, PageHeader, Pager, Pill, rules, SelectField, TextField, Tile, toast, ToggleRow, useContractForm, useModal, Who } from "@mycity/ui";
 
 export default function Home({ tab, id }: ModuleScreenProps) {
   if (tab === "team") return <Team />;
   if (tab === "alerts") return <Alerts openId={id} />;
   if (tab === "reports") return <Reports />;
-  return <Overview />;
-}
-
-function Overview() {
-  const { data, error, reload } = useApi("GET /api/v1/home/overview");
-  const { navigate } = useRouter();
-  const me = useMe();
-  if (error) return <ErrorState error={error} onRetry={reload} />;
-  if (!data) return <LoadingRows count={8} />;
-  const canNew = me.grants.workspace?.includes("create");
-  return (
-    <>
-      <PageHeader
-        title={data.greeting}
-        sub={data.subtitle}
-        actions={
-          <>
-            <Button icon="doc" onClick={() => toast("Export queued. The file arrives in your Mailbox.")}>Export</Button>
-            {canNew && (
-              <Button variant="primary" icon="plus" onClick={() => navigate(hrefFor("workspace", "tasks", { new: "1" }))}>
-                New
-              </Button>
-            )}
-          </>
-        }
-      />
-      {data.blocks.map((b, i) => (
-        <Block key={i} block={b} />
-      ))}
-    </>
-  );
+  return <Overview linked={id} />;
 }
 
 function Team() {
@@ -98,7 +71,10 @@ function Alerts({ openId }: { openId: string | null }) {
   const summary = useApi("GET /api/v1/home/alerts/summary");
   const [cat, setCat] = useState("all");
   const list = usePaged("GET /api/v1/home/alerts", { filters: cat === "all" ? {} : { category: cat } });
-  const manage = me.grants.home?.includes("edit") ?? false;
+  const manage = hasCapability(me, "alerts.manage");
+  const openNewRule = () => modal.open({ title: "New Alert Rule", body: (close) => <RuleForm close={close} /> });
+  /* Home's New opens this tab asking for a new rule. */
+  useUrlAction("new", manage ? openNewRule : null);
 
   const openAlert = (a: HomeAlert) => modal.open({ title: "Alert", body: (close) => <AlertDetail alert={a} close={close} />, onClose: () => setParams({ id: null }, { replace: true }) });
   useEffect(() => {
@@ -117,7 +93,7 @@ function Alerts({ openId }: { openId: string | null }) {
           manage && (
             <>
               <Button onClick={() => modal.open({ title: "Alert Rules", wide: true, body: <RuleList /> })}>Alert Rules</Button>
-              <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Alert Rule", body: (close) => <RuleForm close={close} /> })}>
+              <Button variant="primary" icon="plus" onClick={openNewRule}>
                 New Rule
               </Button>
             </>
@@ -265,6 +241,9 @@ function Reports() {
   const reports = usePaged("GET /api/v1/home/reports");
   const runs = usePaged("GET /api/v1/home/report-runs");
   const run = useMutation("POST /api/v1/home/reports/:id/run");
+  const openNewReport = () => modal.open({ title: "New Report", body: (close) => <ReportForm close={close} /> });
+  /* Home's New opens this tab asking for a new report. */
+  useUrlAction("new", openNewReport);
   const runNow = async (r: HomeReport) => {
     const res = await run.run({ params: { id: r.home_report_id }, body: { format: "pdf" } });
     invalidate("/api/v1/home/report-runs");
@@ -272,7 +251,7 @@ function Reports() {
   };
   return (
     <>
-      <PageHeader title="Reports" sub="Scheduled and on demand · Managers and the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Report", body: (close) => <ReportForm close={close} /> })}>New Report</Button>} />
+      <PageHeader title="Reports" sub="Scheduled and on demand · Managers and the CEO" actions={<Button variant="primary" icon="plus" onClick={openNewReport}>New Report</Button>} />
       {summary.data && <KpiRow items={summary.data.kpis} />}
       {reports.error && <ErrorState error={reports.error} onRetry={reports.reload} />}
       <Grid cols={3}>

@@ -30,7 +30,7 @@ recorded, as evidence, and opens an exception People review; nothing is overwrit
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Clock In / Clock Out panel (`clock`) | Desktop top bar, the phone's floating button, and on its own after sign-in | Every employee, own record | Today's date and time at the workplace, the shift, the clock location and radius, the state (Clocked Out, Clocked In since, Review Required), this device's state, the result of a punch | Clock in or out, allow location, retry location, register this device, add a note to a punch under review |
+| Clock In / Clock Out panel (`clock`) | Desktop top bar, the phone's floating button, and opened by Home · Overview when the first session of a working day opens it | Every employee, own record | Today's date and time at the workplace, the shift, the clock location and radius, the state (Clocked Out, Clocked In since, Review Required), this device's state, the result of a punch | Clock in or out, allow location, retry location, register this device, add a note to a punch under review |
 | ESS · My Attendance (`my-attendance`) | Employee Self-Service | Every employee, own record | Today, the month's figures, the days of the month, each day's punches, open exceptions | Pick a month, open a day, explain an exception, export the month |
 | ESS · My Devices (`my-devices`) | Employee Self-Service | Every employee, own devices | The devices they clock in from, each with its status, up to three registered | Register this device, remove one of theirs |
 | People · Attendance (`attendance`) | People | `people` view: Operations & People and Management everyone, line managers and heads their team | The day's figures, the register, a day's evidence, exceptions | Pick a day, filter, open a person's day, decide an exception (scope all, `people` approve), export the register |
@@ -338,7 +338,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Clock In / Clock Out panel | A bottom sheet: the state, the time, the shift and location, then the result (no toast over it) | Nothing | Clock In or Clock Out, full width at the foot | The floating button's Clock In or Out (F18); the top bar's clock on desktop; it opens by itself after sign-in for anyone not yet clocked in on a working day |
+| Clock In / Clock Out panel | A bottom sheet: the state, the time, the shift and location, then the result (no toast over it) | Nothing | Clock In or Clock Out, full width at the foot | The floating button's Clock In or Out (F18); the top bar's clock on desktop; Home · Overview opens it once, when the first session of a working day opens the Overview, for anyone not yet clocked in (home.md §6 Clock-in prompt) |
 | ESS · My Attendance | Today's card, the four figures two to a row, then days as cards | Subtitle | Export Month in the header | Bottom bar Self-Service; ESS tabs scroll sideways |
 | ESS · My Devices | Device cards with their status | Subtitle | Register This Device, full width | ESS tabs |
 | People · Attendance | The figures two to a row (a figure filters the register), the view switch, the status chips scrolling sideways, then register cards with status, clock in and clock out | Subtitle; the arrangement, location, device and review columns (in the day's sheet) | A card opens the day's evidence in a sheet | More, then People |
@@ -424,3 +424,5 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   with no worksite); `absent` joins the roster's statuses; a person's totals are My Attendance's
   (`repo.daysSummary`). §3 step 8, §4, §5 and §13 follow; the "one vocabulary" question is closed
   by `1300`. `1150` no longer adds `attendance_event (occurred_at)`.
+- 18/10/2026 · TB · The panel's after-sign-in opener moved to Home (owner decision O12, home.md §6): Home · Overview opens it with `useClock().open` once when the server's `prompt_clock_in` says it is due, and `ClockButton.tsx` exports `useClockSync` in place of `useClockPrompt`, which the shell still calls so a punch made elsewhere refreshes the state. The panel, its punch and §10.2's floating button are unchanged; §2 and §10.2 say who opens it.
+- 18/10/2026 · TB · Home's review fixes: §2 and §10.2 now say the panel opens when the first session of a working day opens Home · Overview, so a first session that signs in through a link to another screen and never opens the Overview is not prompted that day (the top bar and the floating button still open it). Home · Overview now reads itself again after a punch, from its own files. Nothing in Attendance's code changed.
