@@ -54,9 +54,9 @@ async function forUser(client, user) {
   const found = await Promise.all(MODULES.map((module) => rbac.scopeFor(user, module, "view")));
   const scopes = new Map(MODULES.map((module, i) => [module, found[i]]).filter(([, scope]) => scope));
   const ceo = user.is_ceo === true;
-  const [capabilities, masked] = ceo
-    ? [[], []]
-    : await Promise.all([grantsCache.getCapabilities(client, user.user_id), fieldMask.maskedKeysFor(client, user)]);
+  // One after the other: `client` may be a transaction's, which runs one query at a time.
+  const capabilities = ceo ? [] : await grantsCache.getCapabilities(client, user.user_id);
+  const masked = ceo ? [] : await fieldMask.maskedKeysFor(client, user);
   const eligible = eligibleIds({
     viewable: new Set(scopes.keys()),
     capabilities: new Set(capabilities),
@@ -74,20 +74,21 @@ async function forUser(client, user) {
  * @returns {Promise<Set<string>>}
  */
 async function forRole(client, roleId) {
-  const [views, caps, masks] = await Promise.all([
-    client.query("SELECT p.module_key FROM permission p WHERE p.role_id = $1 AND p.can_view", [roleId]),
-    client.query(
-      `SELECT c.code::text AS code
-         FROM role_capability rc
-         JOIN capability c ON c.capability_id = rc.capability_id
-        WHERE rc.role_id = $1`,
-      [roleId],
-    ),
-    client.query(
-      "SELECT fv.field_key FROM field_visibility fv WHERE fv.role_id = $1 AND fv.visibility = 'masked'",
-      [roleId],
-    ),
+  // One after the other: the prune reads these inside its transaction, one query at a time.
+  const views = await client.query("SELECT p.module_key FROM permission p WHERE p.role_id = $1 AND p.can_view", [
+    roleId,
   ]);
+  const caps = await client.query(
+    `SELECT c.code::text AS code
+       FROM role_capability rc
+       JOIN capability c ON c.capability_id = rc.capability_id
+      WHERE rc.role_id = $1`,
+    [roleId],
+  );
+  const masks = await client.query(
+    "SELECT fv.field_key FROM field_visibility fv WHERE fv.role_id = $1 AND fv.visibility = 'masked'",
+    [roleId],
+  );
   return eligibleIds({
     viewable: new Set(views.rows.map((r) => r.module_key)),
     capabilities: new Set(caps.rows.map((r) => r.code)),

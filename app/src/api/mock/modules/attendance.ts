@@ -34,7 +34,8 @@ type Ex = AttendanceException & { key: string };
 
 const person = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department });
 
-function shiftOf(date: string) {
+/** A day's shift on the working week: Monday to Friday 09:00 to 17:00, Saturday to 15:00, Sunday off. */
+export function shiftOf(date: string) {
   const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
   if (dow === 0) return { working_day: false, starts_at: null, ends_at: null, grace_minutes: GRACE, off_reason: "Sunday" };
   return { working_day: true, starts_at: "09:00", ends_at: dow === 6 ? "15:00" : "17:00", grace_minutes: GRACE, off_reason: null };
@@ -228,7 +229,8 @@ function addException(key: string, date: string, type: ExceptionType, ev: Ev | n
  * ------------------------------------------------------------------ */
 const ON_LEAVE = new Set(TODAY.filter((t) => t.status === "leave").map((t) => t.person.user_key));
 
-function todayOf(key: string): AttendanceToday {
+/** GET /attendance/me/today for a demonstration account; Home's mock reads it for the clock-in prompt. */
+export function todayOf(key: string): AttendanceToday {
   const p = byKey(key)!;
   const date = todayIso();
   const site = p.work_pattern === "remote" ? null : siteOf(key);

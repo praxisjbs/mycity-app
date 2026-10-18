@@ -1,4 +1,4 @@
-import type { LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
 import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
 import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
@@ -646,6 +646,47 @@ const decide = (req: { params: Record<string, string>; user: string | null }, ap
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));
 route("POST /api/v1/workflow/instances/:id/reject", (req) => decide(req, false));
 
+/*
+ * The requests waiting on the caller (GET /workflow/mine), Home's Need You. A leave request
+ * waits on the requester's line manager, and one of more than 5 days on Operations & People,
+ * as the leave flow's stages read; each stage has 48 hours before it is overdue. Oldest first.
+ */
+const STAGE_HOURS = 48;
+export function waitingOn(user: string): ApprovalWaiting[] {
+  return LEAVE.filter((l) => l.status === "submitted" && l.workflow_instance_id && (l.days > 5 ? full(user) : byKey(l.key)?.manager === user))
+    .map((l) => {
+      const operations = l.days > 5;
+      const entered = l.submitted_at ?? l.created_at;
+      const due = new Date(Date.parse(entered) + STAGE_HOURS * 3600000).toISOString();
+      return {
+        workflow_instance_id: l.workflow_instance_id!,
+        definition_key: "leave.approval",
+        definition_name: "Leave Request",
+        module_key: "people",
+        entity_type: "leave_request",
+        entity_id: l.leave_request_id,
+        subject_employee_id: l.employee.employee_id,
+        subject_name: l.employee.display_name,
+        current_stage: operations ? "operations_people" : "line_manager",
+        stage_name: operations ? "Operations & People" : "Line Manager",
+        context: { days: l.days },
+        stage_entered_at: entered,
+        stage_due_at: due,
+        overdue: Date.parse(due) < Date.now(),
+        opened_by: null,
+        opened_by_name: l.employee.display_name,
+        opened_at: entered,
+        link: `/people?tab=leave&id=${l.leave_request_id}`,
+      };
+    })
+    .sort((a, b) => a.stage_entered_at.localeCompare(b.stage_entered_at));
+}
+route("GET /api/v1/workflow/mine", (req) => paged(waitingOn(req.user!), req, { filters: { module_key: (r, v) => r.module_key === v } }));
+route("GET /api/v1/workflow/mine/count", (req) => {
+  const waiting = waitingOn(req.user!);
+  return ok({ waiting: waiting.length, overdue: waiting.filter((r) => r.overdue).length });
+});
+
 /* My Leave: the caller's own. */
 const myLeave = (user: string) => LEAVE.filter((l) => l.key === user);
 route("GET /api/v1/ess/leave", (req) =>
@@ -684,5 +725,10 @@ route("POST /api/v1/ess/leave/:id/cancel", (req) => {
   l.waiting_on = null;
   return ok(out(l));
 });
+
+/** For Home's mock: every leave request, with the key of the person it is for. */
+export const leaveRequests = (): ReadonlyArray<LeaveRequest & { key: string }> => LEAVE;
+/** For Home's mock: a person's leave year, as My Leave reads it. */
+export const leaveYear = yearOf;
 
 export const _reports = reportsOf;
