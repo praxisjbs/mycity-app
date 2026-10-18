@@ -795,7 +795,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
-| 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 74 | Notifications | `notifications` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
@@ -808,6 +808,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 18/10/2026 · TB · Roles & Permissions (#71) redesigned from three drawn options per shell (`docs/guides/foundation.md` §6.10): desktop is a split view, the roles beside the role in view with Access, Details and People, and Roles or Matrix at the page head; the phone opens a role full screen with its modules grouped by level as chips, a chip opening a sheet while editing. Each module's access is one level (No Access, View, Add, Edit, Full) with Approve and Export, mapped to the six actions on screen only (the API and contract are unchanged; a grant that fits no level reads Custom). Edit Role, then Save Role reviews what the role gains, loses and changes and how many people it reaches. The letters T, O, A, X carry help and a key; the role's summary sits behind an ⓘ; People lists who holds it and opens their login on Users (Users now opens a login linked by `?id=`). Unsaved edits ask before another role, the matrix, New Role or another screen; New Role is a name and Start From, then the role opens in place through Access, Details and Review. New shared components: `LevelMeter`, `ItemChip`, `StepBar` (Wizard uses it) and `RadioCards`; the app router gains `useLeaveGuard`. Left: nothing.
 - 17/10/2026 · TB · Approvals (#72) built on the real API, track D of `docs/guides/foundation.md`: the
   flows (25 a page, with search), their KPIs (Flows, Open Requests, Overdue, Needs Fixing), a flow's
   route and stages in a side panel, and Edit Stages: change a stage's approver, when it applies and its

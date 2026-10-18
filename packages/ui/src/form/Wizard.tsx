@@ -10,9 +10,9 @@
  * @example <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { cn } from "../lib/cn";
 import { Button } from "../actions/Button";
 import { FormFooter } from "./Form";
+import { StepBar } from "./StepBar";
 
 /** One step: a topic and its fields. */
 export interface WizardStep {
@@ -67,18 +67,7 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
 
   return (
     <div>
-      <ol className="mb-4 flex gap-1.5" aria-label="Steps">
-        {steps.map((s, i) => (
-          <li key={s.title} aria-current={i === at ? "step" : undefined} className={cn("h-1 flex-1 rounded-full", i <= at ? "bg-secondary" : "bg-border")}>
-            <span className="sr-only">
-              Step {i + 1} of {steps.length}: {s.title}
-            </span>
-          </li>
-        ))}
-      </ol>
-      <p className="mb-1 text-2xs font-semibold text-subtle-foreground uppercase">
-        Step {at + 1} of {steps.length}
-      </p>
+      <StepBar steps={steps.map((s) => s.title)} at={at} />
       <h3 ref={heading} tabIndex={-1} data-ui="title" className="mb-3 text-lg font-semibold outline-none">
         {step.title}
       </h3>

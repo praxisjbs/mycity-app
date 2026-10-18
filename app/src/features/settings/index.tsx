@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
 import type { UserRow } from "@mycity/contract/contract.gen.ts";
@@ -20,6 +20,7 @@ import { RolePicker, type RoleRef } from "@/features/shared/pickers";
 import { Imports } from "./Imports";
 import { Approvals } from "./Approvals";
 import { useScreenAction } from "@/shell/screen-action";
+import { useSearchParams } from "@/lib/router";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
@@ -62,6 +63,23 @@ function Users() {
   const { can } = useAuth();
   const invite = () => modal.open({ title: "Invite User", body: (close) => <InviteToSignIn close={close} /> });
   useScreenAction(can("settings", "create") ? { label: "Invite User", onSelect: invite } : null);
+  // A login linked by id (a role's People on Roles & Permissions, a search result) opens its sheet.
+  const [params, setParams] = useSearchParams();
+  const linked = params.get("id");
+  useEffect(() => {
+    if (!linked) return;
+    let gone = false;
+    api
+      .call("GET /api/v1/users/:id", { params: { id: linked } })
+      .then((u) => {
+        if (!gone) modal.open({ title: u.display_name, body: (close) => <UserDetail u={u} close={close} />, onClose: () => setParams({ id: null }, { replace: true }) });
+      })
+      .catch(fail);
+    return () => {
+      gone = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per linked login
+  }, [linked]);
   const [status, setStatus] = useState<"" | UserRow["status"]>("");
   const s = useApi("GET /api/v1/users/summary");
   const list = usePaged("GET /api/v1/users", { filters: status ? { status } : {} });
