@@ -3034,6 +3034,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 | `kinds` | `string` |  | What kinds of file are wanted, lower case, for the line under the words ("PDF or Word"). |
 | `compact` | `boolean` |  | A tighter drop zone, inside a sheet or beside a form's footer. |
 | `trigger` | `(open: () => void) => ReactNode` |  | A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. |
+| `handOff` | `boolean` |  | The caller lists what arrived itself (a composer's attachment chips), so a finished file leaves the tray once it is handed over and is never shown twice. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx

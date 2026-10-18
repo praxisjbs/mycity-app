@@ -316,6 +316,16 @@ describeDb("Mailbox against the real migrations", () => {
     expect((await api().post("/mailbox/messages").send({ mail_draft_id: bounceId, to_addresses: ["not-an-address"] })).status).toBe(422);
   });
 
+  test("attach: the composer's request, a phone photograph with its purpose, is taken; an unknown purpose is refused", async () => {
+    const jpeg = await require("sharp")({ create: { width: 40, height: 80, channels: 3, background: { r: 32, g: 64, b: 48 } } }).jpeg().toBuffer();
+    const photo = await api().post("/mailbox/attachments").field("purpose", "attachment").attach("file", jpeg, "Screenshot_20261018_170215_Edge.jpg");
+    expect(photo.status).toBe(201);
+    expect(photo.body).toMatchObject({ file_name: "Screenshot_20261018_170215_Edge.jpg", mime_type: "image/jpeg" });
+    const wrong = await api().post("/mailbox/attachments").field("purpose", "mail").attach("file", jpeg, "photo.jpg");
+    expect(wrong.status).toBe(422);
+    expect(wrong.body.error.fields).toHaveProperty("purpose");
+  });
+
   test("schedule: waits on the queue, shows in Drafts, can be cancelled, refused in the past", async () => {
     const draftId = "6f0e8f7b-6c3c-4a35-9f2a-0d4b1b8a7c13";
     const at = new Date(Date.now() + 86400000).toISOString();
