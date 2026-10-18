@@ -24,6 +24,7 @@ route(router, "get", "/threads", { query: mb.ThreadListQuery, response: mb.Threa
 route(router, "get", "/threads/:id", { response: mb.Thread, summary: "One conversation" }, view(), controller.thread);
 route(router, "post", "/threads/:id/read", { body: c.common.EmptyBody, no_content: true, summary: "Mark a conversation read" }, view(), controller.read);
 route(router, "post", "/threads/:id/move", { body: mb.ThreadMove, no_content: true, summary: "Move a conversation to another folder" }, view(), controller.move);
+route(router, "post", "/image-trust", { body: mb.MailImageTrust, no_content: true, summary: "Always show, or stop showing, a sender's images" }, view(), controller.imageTrust);
 route(router, "post", "/folders/:kind/empty", { params: mb.FolderParams, body: c.common.EmptyBody, response: mb.EmptyResult, summary: "Empty Spam or Trash" }, requirePermission("mailbox", "delete"), controller.empty);
 route(router, "get", "/drafts/:id", { response: mb.MailDraft, summary: "One of my drafts" }, view(), controller.draft);
 route(router, "put", "/drafts/:id", { body: mb.MailDraftSave, response: mb.MailDraft, summary: "Save a draft as it is typed" }, create(), controller.saveDraft);

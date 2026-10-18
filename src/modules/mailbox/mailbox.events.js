@@ -24,6 +24,7 @@ const EVENTS = defineEvents("mailbox", {
   "mail_message.sent": { summary: "A message was delivered to the mail server" },
   "mail_thread.moved": { summary: "A conversation was moved to another folder" },
   "mail_folder.emptied": { summary: "Spam or Trash was emptied" },
+  "mail_account.images_trusted": { summary: "A mailbox owner chose to always show, or stop showing, a sender's images" },
   "mail_send.failed": { summary: "A message could not be sent" },
 });
 

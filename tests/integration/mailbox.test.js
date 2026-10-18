@@ -326,6 +326,37 @@ describeDb("Mailbox against the real migrations", () => {
     expect(wrong.body.error.fields).toHaveProperty("purpose");
   });
 
+  test("inline parts and trusted senders: a signature logo is drawn by its cid, not listed as a file; Always Show Images is the owner's", async () => {
+    const png = await require("sharp")({ create: { width: 4, height: 4, channels: 3, background: { r: 10, g: 90, b: 60 } } }).png().toBuffer();
+    server.deliver("INBOX", mail({
+      from: "news@partner.test",
+      subject: "Partner newsletter",
+      html: '<p>Hello</p><img src="cid:logo1" alt="Partner"><img src="https://tracker.example/p.gif">',
+      attachments: [{ filename: "logo.png", contentType: "image/png", size: png.length, content: png, contentId: "logo1", inline: true }],
+    }));
+    const { mail_account_id: id } = (await api().get("/mailbox/connection")).body;
+    await mailbox.sync(id);
+    const row = (await api().get("/mailbox/threads?folder=inbox")).body.data.find((t) => t.subject === "Partner newsletter");
+    const read = async () => (await api().get(`/mailbox/threads/${row.mail_thread_id}`)).body.messages[0];
+    const m = await read();
+    expect(m.body_html).toContain("cid:logo1");
+    expect(m.attachments).toEqual([]);
+    expect(m.inline_parts).toEqual([expect.objectContaining({ content_id: "logo1", mime_type: "image/png" })]);
+    expect(m.images_trusted).toBe(false);
+
+    expect((await api().post("/mailbox/image-trust").send({ sender_address: "News@Partner.test", trusted: true })).status).toBe(204);
+    expect((await read()).images_trusted).toBe(true);
+    expect((await one("SELECT count(*)::int AS n FROM mail_image_trust")).n).toBe(1);
+    await api().post("/mailbox/image-trust").send({ sender_address: "news@partner.test", trusted: true });
+    expect((await one("SELECT count(*)::int AS n FROM mail_image_trust")).n).toBe(1);
+    await drain();
+    expect((await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'mail_account.images_trusted'")).n).toBe(2);
+
+    expect((await api().post("/mailbox/image-trust").send({ sender_address: "news@partner.test", trusted: false })).status).toBe(204);
+    expect((await read()).images_trusted).toBe(false);
+    expect((await api().post("/mailbox/image-trust").send({ sender_address: "not an address", trusted: true })).status).toBe(422);
+  });
+
   test("schedule: waits on the queue, shows in Drafts, can be cancelled, refused in the past", async () => {
     const draftId = "6f0e8f7b-6c3c-4a35-9f2a-0d4b1b8a7c13";
     const at = new Date(Date.now() + 86400000).toISOString();

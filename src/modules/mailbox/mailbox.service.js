@@ -362,7 +362,7 @@ async function getThread(threadId, user) {
   const a = await account(user);
   const t = await repo.thread(pool, a.mail_account_id, threadId);
   if (!t) throw new AppError("NOT_FOUND", "There is no such message", 404);
-  const rows = await repo.messages(pool, threadId);
+  const rows = await repo.messages(pool, threadId, a.mail_account_id);
   return {
     mail_thread_id: t.mail_thread_id,
     folder: t.folder || "inbox",
@@ -375,8 +375,24 @@ async function getThread(threadId, user) {
       sent_at: iso(m.sent_at),
       body_html: m.folder === "spam" ? null : m.body_html || textToHtml(m.body_text) || "",
       attachments: (m.attachments || []).map((x) => ({ ...x, size_bytes: Number(x.size_bytes) })),
+      inline_parts: m.folder === "spam" ? [] : m.inline_parts || [],
+      images_trusted: m.folder !== "spam" && Boolean(m.images_trusted),
     })),
   };
+}
+
+/** Always show a sender's web images in this mailbox, or stop (mailbox.md §6). Spam is never shown, whoever sent it. */
+async function setImageTrust(body, user) {
+  const a = await account(user);
+  await tx(async (client) => {
+    await repo.setImageTrust(client, a.mail_account_id, body.sender_address, body.trusted);
+    await emit(client, {
+      key: EVENTS.MAIL_ACCOUNT_IMAGES_TRUSTED,
+      entity: { type: "mail_account", id: a.mail_account_id },
+      actor: user,
+      payload: { mail_account_id: a.mail_account_id, sender_address: body.sender_address, trusted: body.trusted },
+    });
+  });
 }
 
 /** Local first, then the server, best effort and after the answer (the local change wins). */
@@ -654,6 +670,7 @@ module.exports = {
   listThreads,
   getThread,
   markRead,
+  setImageTrust,
   move,
   emptyFolder,
   getDraft,

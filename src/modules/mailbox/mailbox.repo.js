@@ -244,8 +244,8 @@ function thread(db, accountId, threadId) {
   );
 }
 
-/** A thread's messages, oldest first, with their files and folders. */
-async function messages(db, threadId) {
+/** A thread's messages, oldest first, with their files, the parts drawn inline, their folders and whether the sender's images are trusted. */
+async function messages(db, threadId, accountId) {
   const { rows } = await db.query(
     `SELECT m.mail_message_id, m.from_address::text AS from_address, m.from_name, m.to_addresses::text[] AS to_addresses,
             m.cc_addresses::text[] AS cc_addresses, COALESCE(m.received_at, m.sent_at, m.created_at) AS sent_at, m.body_html,
@@ -254,14 +254,32 @@ async function messages(db, threadId) {
                        'file_name', COALESCE(d.original_name, d.title, 'attachment'), 'size_bytes', d.bytes, 'mime_type', d.mime)
                        ORDER BY a.created_at)
                         FROM mail_attachment a JOIN document d ON d.document_id = a.document_id
-                       WHERE a.mail_message_id = m.mail_message_id AND NOT a.inline), '[]') AS attachments
+                       WHERE a.mail_message_id = m.mail_message_id AND NOT a.inline), '[]') AS attachments,
+            COALESCE((SELECT json_agg(json_build_object('content_id', a.content_id, 'document_id', d.document_id, 'mime_type', d.mime)
+                       ORDER BY a.created_at)
+                        FROM mail_attachment a JOIN document d ON d.document_id = a.document_id
+                       WHERE a.mail_message_id = m.mail_message_id AND a.content_id IS NOT NULL), '[]') AS inline_parts,
+            EXISTS (SELECT 1 FROM mail_image_trust it WHERE it.mail_account_id = $2 AND it.sender_address = m.from_address) AS images_trusted
        FROM mail_message m LEFT JOIN mail_folder f ON f.mail_folder_id = m.mail_folder_id
       WHERE m.mail_thread_id = $1
       ORDER BY COALESCE(m.received_at, m.sent_at, m.created_at), m.mail_message_id
       LIMIT 200 -- pagination:batch one conversation is read whole, capped well above any real thread`,
-    [threadId],
+    [threadId, accountId],
   );
   return rows;
+}
+
+/** Always show a sender's web images, or stop. */
+async function setImageTrust(db, accountId, senderAddress, trusted) {
+  if (trusted) {
+    await db.query(
+      `INSERT INTO mail_image_trust (mail_account_id, sender_address) VALUES ($1, $2)
+       ON CONFLICT (mail_account_id, sender_address) DO NOTHING`,
+      [accountId, senderAddress],
+    );
+  } else {
+    await db.query("DELETE FROM mail_image_trust WHERE mail_account_id = $1 AND sender_address = $2", [accountId, senderAddress]);
+  }
 }
 
 /** Mark a thread read; returns the messages that were unread, for the server. */
@@ -468,6 +486,7 @@ module.exports = {
   listThreads,
   thread,
   messages,
+  setImageTrust,
   markThreadRead,
   moveThread,
   emptyFolder,

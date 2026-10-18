@@ -9,7 +9,14 @@
  * @status beta
  * @example <EmailFrame title="Client configuration settings" html={message.body_html} onMailto={(m) => compose(m)} />
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { cn } from "../lib/cn";
 import { recolourHtml, type DarkTheme, type Rgb } from "../lib/email-dark";
 import { useTheme } from "../lib/preferences";
@@ -58,8 +65,17 @@ export function parseMailto(href: string): Mailto {
       return v;
     }
   };
-  const list = (v: string | null) => (v ? decode(v) : "").split(/[,;]/).map((s) => s.trim()).filter(Boolean);
-  return { to: list(q === -1 ? raw : raw.slice(0, q)), cc: list(params.get("cc")), subject: params.get("subject"), body: params.get("body") };
+  const list = (v: string | null) =>
+    (v ? decode(v) : "")
+      .split(/[,;]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  return {
+    to: list(q === -1 ? raw : raw.slice(0, q)),
+    cc: list(params.get("cc")),
+    subject: params.get("subject"),
+    body: params.get("body"),
+  };
 }
 
 /**
@@ -68,9 +84,24 @@ export function parseMailto(href: string): Mailto {
  * images only once allowed. The page is transparent, so a message without a
  * background of its own reads on our surface; one that paints its own keeps it.
  */
-export function buildEmailDoc(html: string, { remoteImages, ink, scheme }: { remoteImages: boolean; ink: EmailInk; scheme: "light" | "dark" }): string {
+export function buildEmailDoc(
+  html: string,
+  {
+    remoteImages,
+    ink,
+    scheme,
+  }: { remoteImages: boolean; ink: EmailInk; scheme: "light" | "dark" },
+): string {
   const web = remoteImages ? " https:" : "";
-  const csp = ["default-src 'none'", `img-src data: blob:${web}`, "style-src 'unsafe-inline'", `font-src data:${web}`, "media-src 'none'", "frame-src 'none'", "form-action 'none'"].join("; ");
+  const csp = [
+    "default-src 'none'",
+    `img-src data: blob:${web}`,
+    "style-src 'unsafe-inline'",
+    `font-src data:${web}`,
+    "media-src 'none'",
+    "frame-src 'none'",
+    "form-action 'none'",
+  ].join("; ");
   const base = [
     `html{color-scheme:${scheme}}`,
     "html,body{margin:0;padding:0;background:transparent;overflow:hidden}",
@@ -80,6 +111,8 @@ export function buildEmailDoc(html: string, { remoteImages, ink, scheme }: { rem
     `blockquote{margin:0 0 0 .8ex;padding-left:1ex;border-left:2px solid ${ink.rule}}`,
     "pre{white-space:pre-wrap}",
     "img{border:0;max-width:100%;height:auto}",
+    /* An image held back until Load Images draws nothing, not a broken-image box. */
+    "img:not([src]):not([srcset]){display:none}",
     "p{margin:0 0 .6em}",
   ].join("");
   return (
@@ -95,8 +128,15 @@ export function buildEmailDoc(html: string, { remoteImages, ink, scheme }: { rem
 /** A computed `rgb()` or `rgba()` as channels, or null. */
 function rgbOf(computed: string): Rgb | null {
   const m = /^rgba?\(([^)]*)\)$/.exec(computed.trim());
-  const parts = m ? m[1]!.split(/[\s,/]+/).filter(Boolean).map(Number) : [];
-  return parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite) ? [parts[0]!, parts[1]!, parts[2]!] : null;
+  const parts = m
+    ? m[1]!
+        .split(/[\s,/]+/)
+        .filter(Boolean)
+        .map(Number)
+    : [];
+  return parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)
+    ? [parts[0]!, parts[1]!, parts[2]!]
+    : null;
 }
 
 interface Palette {
@@ -121,12 +161,25 @@ function readInk(host: HTMLElement, fallback: "light" | "dark"): Palette {
     const s = getComputedStyle(probe);
     /* Our web font cannot load inside the frame, so the system stack follows it. */
     const font = getComputedStyle(document.body).fontFamily;
-    const ink = { fg: s.color, link: getComputedStyle(link).color, rule: s.borderTopColor || s.color, font: font ? `${font}, system-ui, sans-serif` : "system-ui, sans-serif" };
+    const ink = {
+      fg: s.color,
+      link: getComputedStyle(link).color,
+      rule: s.borderTopColor || s.color,
+      font: font ? `${font}, system-ui, sans-serif` : "system-ui, sans-serif",
+    };
     const bg = rgbOf(s.backgroundColor);
     const fg = rgbOf(s.color);
     /* Dark when our card is dark: the colour decides, not a class or an attribute somewhere up the tree. */
-    const scheme = bg ? (bg[0] * 0.2126 + bg[1] * 0.7152 + bg[2] * 0.0722 < 128 ? "dark" : "light") : fallback;
-    return { scheme, ink, dark: scheme === "dark" && bg && fg ? { bg, fg } : null };
+    const scheme = bg
+      ? bg[0] * 0.2126 + bg[1] * 0.7152 + bg[2] * 0.0722 < 128
+        ? "dark"
+        : "light"
+      : fallback;
+    return {
+      scheme,
+      ink,
+      dark: scheme === "dark" && bg && fg ? { bg, fg } : null,
+    };
   } finally {
     probe.remove();
     link.remove();
@@ -135,11 +188,21 @@ function readInk(host: HTMLElement, fallback: "light" | "dark"): Palette {
 
 /** The link the press landed on, inside the frame's own document. */
 function anchorOf(target: EventTarget | null): HTMLAnchorElement | null {
-  const el = target as (Element & { closest?: (s: string) => Element | null }) | null;
-  return el && typeof el.closest === "function" ? (el.closest("a[href]") as HTMLAnchorElement | null) : null;
+  const el = target as
+    | (Element & { closest?: (s: string) => Element | null })
+    | null;
+  return el && typeof el.closest === "function"
+    ? (el.closest("a[href]") as HTMLAnchorElement | null)
+    : null;
 }
 
-export function EmailFrame({ html, title, remoteImages = false, onMailto, className }: EmailFrameProps) {
+export function EmailFrame({
+  html,
+  title,
+  remoteImages = false,
+  onMailto,
+  className,
+}: EmailFrameProps) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState<number | null>(null);
   const { theme } = useTheme();
@@ -151,8 +214,17 @@ export function EmailFrame({ html, title, remoteImages = false, onMailto, classN
   }, [theme]);
   const scheme = palette?.scheme ?? (theme === "dark" ? "dark" : "light");
   /* On a dark surface a message is recoloured as Outlook does; on a light one it is drawn as sent. */
-  const body = useMemo(() => (palette?.dark ? recolourHtml(html, palette.dark) : html), [html, palette]);
-  const doc = useMemo(() => (palette ? buildEmailDoc(body, { remoteImages, ink: palette.ink, scheme }) : ""), [body, remoteImages, palette, scheme]);
+  const body = useMemo(
+    () => (palette?.dark ? recolourHtml(html, palette.dark) : html),
+    [html, palette],
+  );
+  const doc = useMemo(
+    () =>
+      palette
+        ? buildEmailDoc(body, { remoteImages, ink: palette.ink, scheme })
+        : "",
+    [body, remoteImages, palette, scheme],
+  );
   /* Read through a ref, so a new handler from the parent does not reload the frame. */
   const mailto = useRef(onMailto);
   mailto.current = onMailto;
@@ -194,7 +266,9 @@ export function EmailFrame({ html, title, remoteImages = false, onMailto, classN
         } else if (href.startsWith("#")) {
           e.preventDefault();
           const id = href.slice(1);
-          (inner.getElementById(id) ?? inner.getElementsByName(id)[0])?.scrollIntoView({ block: "start" });
+          (
+            inner.getElementById(id) ?? inner.getElementsByName(id)[0]
+          )?.scrollIntoView({ block: "start" });
         }
       };
       /* Images and fonts change the height once they arrive; their loads do not bubble, so they are caught on the way down. */
@@ -225,20 +299,26 @@ export function EmailFrame({ html, title, remoteImages = false, onMailto, classN
     };
   }, [doc]);
 
+  /* Spacing goes on a wrapper: on the frame itself, padding would come out of the measured height and clip the last lines. */
   return (
-    <iframe
-      ref={ref}
-      /* Named by aria-label, not title: a title is also a tooltip the browser draws (gate 21). */
-      aria-label={title}
-      srcDoc={doc}
-      /* Same origin so the frame can be measured; popups so a link opens in a new tab; never scripts. */
-      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      referrerPolicy="no-referrer"
-      scrolling="no"
-      data-scheme={scheme}
-      className={cn("block h-(--email-h) w-full border-0", scheme === "dark" ? "scheme-dark" : "scheme-light", className)}
-      /* Until it has measured itself: tall enough to show it is there, short enough that a two-line reply does not jump the page. */
-      style={{ "--email-h": `${height ?? 48}px` } as CSSProperties}
-    />
+    <div className={cn("w-full", className)}>
+      <iframe
+        ref={ref}
+        /* Named by aria-label, not title: a title is also a tooltip the browser draws (gate 21). */
+        aria-label={title}
+        srcDoc={doc}
+        /* Same origin so the frame can be measured; popups so a link opens in a new tab; never scripts. */
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        referrerPolicy="no-referrer"
+        scrolling="no"
+        data-scheme={scheme}
+        className={cn(
+          "block h-(--email-h) w-full border-0",
+          scheme === "dark" ? "scheme-dark" : "scheme-light",
+        )}
+        /* Until it has measured itself: tall enough to show it is there, short enough that a two-line reply does not jump the page. */
+        style={{ "--email-h": `${height ?? 48}px` } as CSSProperties}
+      />
+    </div>
   );
 }

@@ -4324,6 +4324,11 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | Export | File | What it does |
 |---|---|---|
 | `cn` | `lib/cn.ts` | Join class names, skipping the falsy ones; of two that conflict, the later wins (`cn("h-control", "h-9")` is `h-9`). |
+| `referencedCids` | `lib/email-body.ts` | The content ids a body draws, so only those parts are fetched. |
+| `PreparedEmail` (type) | `lib/email-body.ts` |  |
+| `prepareEmail` | `lib/email-body.ts` | A body ready for EmailFrame: unsafe parts stripped, remote fetches held back unless `showRemote`, and each `cid:` drawn from `inline` (content id to a local URL, keys compared case-insensitively). |
+| `SplitEmail` (type) | `lib/email-body.ts` |  |
+| `splitQuoted` | `lib/email-body.ts` | Split a body into what is new and the history it quotes. |
 | `Rgb` (type) | `lib/email-dark.ts` | An email recoloured for the dark theme, by partial inversion: only the colours that would be wrong on a dark page move. |
 | `DarkTheme` (type) | `lib/email-dark.ts` | Where white lands (our card) and where black lands (our foreground). |
 | `toOklab` | `lib/email-dark.ts` | sRGB to OKLab. |

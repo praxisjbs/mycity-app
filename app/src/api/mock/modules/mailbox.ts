@@ -13,7 +13,7 @@ import { UPLOADS } from "../uploads";
 type MailAddress = MailMessage["from"];
 interface MThread { mail_thread_id: string; folder: MailFolder; subject: string; unread: boolean; messages: MailMessage[] }
 interface MDraft { mail_draft_id: string; save: MailDraftSave; attachments: DocumentRef[]; updated_at: string; scheduled: { mail_send_queue_id: string; release_at: string } | null }
-interface MBox { address: string; name: string; threads: MThread[]; drafts: Map<string, MDraft>; status: "connected" | "needs_reconnect" | "disconnected"; last_synced_at: string }
+interface MBox { address: string; name: string; threads: MThread[]; trusted: Set<string>; drafts: Map<string, MDraft>; status: "connected" | "needs_reconnect" | "disconnected"; last_synced_at: string }
 const BOXES = new Map<string, MBox>();
 
 const A = (name: string | null, address: string): MailAddress => ({ name, address });
@@ -26,11 +26,11 @@ type Seed = [folder: MailFolder, from: MailAddress, subject: string, days: numbe
 function seed(first: string, me: MailAddress): Seed[] {
   return [
     ["inbox", A("MTN Partnerships", "o.adesanya@mtn.ng"), "Ember to Remember, venue confirmations", 0, "09:14", true, html(`${first},`, "Following our call, brand have signed off on the placement for the Lagos leg. The eight venues below are confirmed for the 14th onwards. Two are still awaiting a site visit from your studio team.", "Could you send the final venue list by Monday so we can brief the activation agency?", "Olumide Adesanya<br>Head of Brand Partnerships, MTN Nigeria"), [att("ember-venues-lagos.xlsx", 84, XLSX), att("placement-signoff.pdf", 1126)]],
-    ["inbox", A("Providus Bank", "i.okeke@providusbank.com"), "Re: Sponsorship logo placement", 0, "08:47", true, html(`Dear ${first},`, "Thank you for the draft. We would like the Providus mark to appear on the ticket confirmation email as well as the campaign assets, as headline sponsor.", "Is that within scope of the agreement signed on 22 September?", "Ifeanyi Okeke<br>Head of Brand, Providus Bank"), []],
+    ["inbox", A("Providus Bank", "i.okeke@providusbank.com"), "Re: Sponsorship logo placement", 0, "08:47", true, html(`Dear ${first},`, "Thank you for the draft. We would like the Providus mark to appear on the ticket confirmation email as well as the campaign assets, as headline sponsor.", "Is that within scope of the agreement signed on 22 September?", "Ifeanyi Okeke<br>Head of Brand, Providus Bank") + `<p>On 14/10/2026, ${first} wrote:</p><blockquote>${html("Ifeanyi,", "The draft campaign assets are attached for your review. Headline billing is on every asset.")}</blockquote>`, []],
     ["inbox", A("Adaeze Nnamdi", "adaeze.n@example.com"), "Re: Interview on Monday", 0, "08:02", true, html("Good morning,", "Thank you for the invitation. Monday at 11:00 works for me. I will join from Lagos.", "I have attached the case study response as requested.", "Adaeze"), [att("partnership-brief-response.pdf", 620)]],
     ["inbox", A("Lagos State Tourism", "tourism@lagosstate.gov.ng"), "Request for event listing", 1, "15:20", false, html("Madam,", "Kindly find attached the schedule of state tourism events for the fourth quarter, for listing on the application.", "Our legal team has also returned the draft MOU with comments on the data sharing clauses. We will revert formally next week.", "For the Director of Tourism"), [att("q4-tourism-events.pdf", 2458)]],
     ["inbox", A("JBS Praxis", "asah.tomf@gmail.com"), "Milestone 1 documents required", 1, "11:05", false, html(`Dear ${first},`, "Thank you for Thursday’s session. To start Milestone 1 we need the staff list with departments and line managers, the organogram, a sample query letter, and your real salary structure.", "The two that block us are the staff list and the letter samples. Everything else we can seed and replace.", "Tom-Blake Asaah<br>Managing Partner, JBS Praxis"), [att("requirements-m1.pdf", 310)]],
-    ["inbox", A("Filmhouse Cinemas", "k.oyelaran@filmhouseng.com"), "Partnership proposal follow up", 6, "10:40", false, html(`Hi ${first},`, "We have reviewed the listings proposal. Rather than a flat listing fee, we would prefer a revenue share on tickets driven through the app. Happy to model it together.", "Kemi Oyelaran<br>Head of Partnerships"), []],
+    ["inbox", A("Filmhouse Cinemas", "k.oyelaran@filmhouseng.com"), "Partnership proposal follow up", 6, "10:40", false, html(`Hi ${first},`, "We have reviewed the listings proposal. Rather than a flat listing fee, we would prefer a revenue share on tickets driven through the app. Happy to model it together.", "Kemi Oyelaran<br>Head of Partnerships") + '<p><img src="https://filmhouseng.com/signature.png" alt="Filmhouse Cinemas" width="120"></p>', []],
     ["inbox", A("Eko Hotels", "t.akinwale@ekohotels.com"), "Out of office", 8, "07:12", false, html("I am away from the office until the 20th with limited access to email. For commercial matters please contact our reservations desk.", "Tunde Akinwale"), []],
     ["sent", me, "Staff list and organogram", 1, "16:02", false, html("Tom-Blake,", "Attached is the staff list with departments and line managers as at today, and the organogram. Twenty-five people across six departments.", "The salary structure is with the CEO. Sample letters I should have to you by Tuesday.", first), [att("staff-list.xlsx", 46, XLSX), att("organogram.pdf", 880)], [A("Tom-Blake Asaah", "asah.tomf@gmail.com")]],
     ["sent", me, "Re: Sponsorship logo placement", 1, "12:30", false, html("Ifeanyi,", "Yes, headline billing covers the ticket confirmation email. I have raised it as a task against the agreement so it is not lost between us.", first), [], [A("Ifeanyi Okeke", "i.okeke@providusbank.com")]],
@@ -57,9 +57,9 @@ function boxOf(user: string): MBox {
     folder,
     subject,
     unread,
-    messages: [{ mail_message_id: sid(`mailmsg:${user}:${i}`), from, to: (to ?? [me]).map((x) => x.address), cc: [], sent_at: at(days, hm), body_html: folder === "spam" ? null : body, attachments }],
+    messages: [{ mail_message_id: sid(`mailmsg:${user}:${i}`), from, to: (to ?? [me]).map((x) => x.address), cc: [], sent_at: at(days, hm), body_html: folder === "spam" ? null : body, attachments, inline_parts: [], images_trusted: false }],
   }));
-  b = { address: me.address, name: me.name!, threads, drafts: new Map(), status: "connected", last_synced_at: new Date().toISOString() };
+  b = { address: me.address, name: me.name!, threads, trusted: new Set(), drafts: new Map(), status: "connected", last_synced_at: new Date().toISOString() };
   const blank: MailDraftSave = { to_addresses: [], cc_addresses: [], bcc_addresses: [], subject: "", body_html: "", document_ids: [], in_reply_to: null };
   const d1 = { ...blank, subject: "Enugu launch brief", body_html: html("The Enugu leg runs from the 22nd. Two content roles start on the 20th, so the brief needs to be ready before they arrive. Three locations, two shoot days, Emeka producing.") };
   const d2 = { ...blank, to_addresses: ["bashir@mycityapp.io"], subject: "Re: Eko Hotels, 34 days quiet", body_html: html("Bashir, the inactivity alert on Eko has been open for four days and the one on Kano for twenty-two. Can we agree today whether to re-engage or close them?") };
@@ -135,7 +135,17 @@ route("GET /api/v1/mailbox/threads", (req) => {
 });
 route("GET /api/v1/mailbox/threads/:id", (req) => {
   const t = findThread(req.user!, req.params.id);
-  return t ? ok({ mail_thread_id: t.mail_thread_id, folder: t.folder, subject: t.subject || "(no subject)", messages: t.messages }) : notFound();
+  const trusted = boxOf(req.user!).trusted;
+  const messages = t?.messages.map((m) => ({ ...m, images_trusted: t.folder !== "spam" && trusted.has(m.from.address.toLowerCase()) }));
+  return t ? ok({ mail_thread_id: t.mail_thread_id, folder: t.folder, subject: t.subject || "(no subject)", messages }) : notFound();
+});
+route("POST /api/v1/mailbox/image-trust", (req) => {
+  const address = String(req.body.sender_address ?? "").toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(address)) return invalid({ sender_address: ["Not an email address"] });
+  const trusted = boxOf(req.user!).trusted;
+  if (req.body.trusted) trusted.add(address);
+  else trusted.delete(address);
+  return noContent();
 });
 route("POST /api/v1/mailbox/threads/:id/read", (req) => {
   const t = findThread(req.user!, req.params.id);
@@ -198,7 +208,7 @@ route("POST /api/v1/mailbox/messages", (req) => {
   const now = new Date().toISOString();
   b.threads.push({
     mail_thread_id: uuid(), folder: "sent", subject: s.subject || "(no subject)", unread: false,
-    messages: [{ mail_message_id: uuid(), from: A(b.name, b.address), to: s.to_addresses, cc: s.cc_addresses ?? [], sent_at: now, body_html: s.body_html || "<p></p>", attachments: attachments.map((d) => ({ ...d, mail_attachment_id: d.document_id })) }],
+    messages: [{ mail_message_id: uuid(), from: A(b.name, b.address), to: s.to_addresses, cc: s.cc_addresses ?? [], sent_at: now, body_html: s.body_html || "<p></p>", attachments: attachments.map((d) => ({ ...d, mail_attachment_id: d.document_id })), inline_parts: [], images_trusted: false }],
   });
   return created({ mail_send_queue_id: queue, status: "sent", release_at: now });
 });
