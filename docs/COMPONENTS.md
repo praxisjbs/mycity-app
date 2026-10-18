@@ -70,7 +70,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Overlays | [Menu](#menu) | `Menu` | A short list of actions behind one button (the ⋮ on a record, the + in a composer, the account menu). | stable |
 | Overlays | [Modal](#modal) | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` | THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened with useModal or controlled with open. | stable |
 | Overlays | [Popover](#popover) | `Popover` | A small panel anchored to the button that opens it: filters, a quick pick, a short preview. | stable |
-| Overlays | [Sheet](#sheet) | `Sheet` | The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc. | stable |
+| Overlays | [Sheet](#sheet) | `Sheet` | The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc; one with a text field closes only on purpose. | stable |
 | Overlays | [SidePanel](#sidepanel) | `SidePanel` | A panel that slides over the right of the screen to edit or inspect the record behind it. | stable |
 | Overlays | [Tooltip](#tooltip) | `Tooltip` | A small label that appears beside a control on hover or keyboard focus, desktop only. | stable |
 | Help | [Details](#details) | `Details` | One row at the foot of a card, a chevron and the word Details, that opens a short section of support facts. | stable |
@@ -1834,7 +1834,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 |---|---|
 | Use | Create or edit with up to 6 fields, a record's detail, a short reader. useModal().open({ title, body }) from anywhere under ModalProvider; <Modal open> when the screen owns the state. |
 | Avoid | A destructive yes or no (use useConfirm); editing the record behind it on desktop (use SidePanel); more than 6 fields (a wizard); a stack of dialogs (opening one replaces the last). |
-| Phone | A bottom sheet that drags down to close, with the main action full width at the bottom; `full` makes it a full-screen sheet (a composer, a long form). |
+| Phone | A bottom sheet that drags down to close, with the main action full width at the bottom; `full` makes it a full-screen sheet (a composer, a long form). It stays above the keyboard, header in view; once it holds a text field only the close button, Cancel or Esc close it. |
 | Accessibility | Radix Dialog underneath: aria-modal, focus moves in and is trapped, Esc closes, focus returns to the opener. The title (at most 4 words) names it. With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard. |
 | Status | stable |
 | Exports | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` |
@@ -1925,13 +1925,13 @@ A small panel anchored to the button that opens it: filters, a quick pick, a sho
 
 ### Sheet
 
-The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc.
+The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc; one with a text field closes only on purpose.
 
 | | |
 |---|---|
 | Use | Underneath Modal, SidePanel, Popover and Menu on a phone; directly for a phone-only sheet (the More launcher, a KPI detail). |
 | Avoid | A dialog on desktop (use Modal, which is this sheet on a phone and a centred dialog on desktop); a toast or banner for news. |
-| Phone | This is the phone form. `full` fills the screen for a long form or a reader; otherwise it is as tall as its content, up to most of the screen, with a grab handle. |
+| Phone | This is the phone form. `full` fills the screen for a long form or a reader; otherwise it is as tall as its content, up to most of the screen, with a grab handle. With the keyboard up it stays above it, header in view. Once it holds a text field it has no handle and a drag or a scrim tap never closes it (a scrim tap puts the keyboard away); the close button, Cancel and Esc do. |
 | Accessibility | A modal dialog (Radix underneath): focus moves in and is trapped, Esc closes, focus returns to the opener. The title names it; `hideHeader` keeps the title for screen readers only. |
 | Status | stable |
 | Exports | `Sheet` |
@@ -1952,7 +1952,7 @@ The phone's bottom sheet: slides up with a spring, closes by dragging down, a ta
 | `full` | `boolean` |  | Fill the screen (a long form, a composer, a reader) instead of fitting the content. |
 | `footer` | `ReactNode` |  | Buttons for the footer; the main action is last and full width at the bottom. |
 | `children` | `ReactNode` |  | The body. |
-| `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. |
+| `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. A sheet holding a text field ignores the drag and the scrim anyway. |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |

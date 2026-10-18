@@ -98,6 +98,15 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 18/10/2026 · TB · Phone sheets fixed for typing (F6 amended): with the keyboard up, a sheet was
+  pinned behind it and the browser panned the page to reach the field, pushing the header off the
+  top with no way back, and a swipe down or a tap on the scrim closed it and lost what was typed.
+  `Sheet` now follows the visible area itself (Vaul's input repositioning is off): its bottom sits
+  on the keyboard, its height never passes what is left, and the focused field scrolls back into
+  view. Once a sheet with a close button holds a text field it has no grab handle and closes only
+  from that button, Cancel or Esc; a scrim tap puts the keyboard away. `dismissible={false}` no
+  longer blocks the close button on a phone. Every Modal, SidePanel and Popover on a phone gets it.
+  Left: check on a real Android and iPhone on staging (the tests stub the keyboard).
 - 18/10/2026 · TB · The staff roster has never run on staging, which still shows only the build
   account. `/srv/mycity/bin/deploy-gate` is root-owned and installed by `ops/provision/provision.sh`
   alone, and a release carries `scripts/db` but not `scripts/deploy`, so the roster step added with
