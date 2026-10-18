@@ -64,6 +64,7 @@ mycity-app/
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
+├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
 │                             16/10/2026; docs/guides/foundation.md §6.1). The repository is private
 ├── templates/documents/      PDF templates (HTML)

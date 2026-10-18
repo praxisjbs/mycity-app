@@ -286,6 +286,10 @@ only under `src/modules/`; the work is `shared/search`.
 has a backend, so numbers, audit and events are right. The people are the real staff, never the
 mock's. Each later module adds its own staging seed when its routes land. Production never runs it.
 
+- `10_staff.js`: the staff roster (§6.1).
+- `30_leave.js`: the mock's twelve sample leave requests on the real staff, through the leave
+  service (`seeds/lib/leave-sample.js`, shared with the laptop seed `seeds/build/20_mock_data.js`).
+
 ### 6.3 Field visibility and capabilities (defaults, editable)
 
 Salary, bank and personal details are visible to Operations & People, Management, Implementation and
@@ -639,6 +643,9 @@ screen.
 
 ## 14 · Change log
 
+- 18/10/2026 · AJ · §6.2: the leave staging seed `30_leave.js` (the mock's twelve sample requests on the
+  real staff, through the leave service; LA to review) and `seeds/lib/` for code the build and staging
+  seeds share.
 - 18/10/2026 · TB · §6.1: a staff number the roster's sheet gives one of its people is theirs. The
   first administrator is created before any roster and is given 00001, which the sheet says is the
   CEO's, and the loader read that as a match and skipped the CEO. A holder the sheet does not name

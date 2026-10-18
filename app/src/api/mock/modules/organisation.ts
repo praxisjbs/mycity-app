@@ -692,6 +692,16 @@ const myLeave = (user: string) => LEAVE.filter((l) => l.key === user);
 route("GET /api/v1/ess/leave", (req) =>
   asPage(paged(myLeave(req.user!), req, { filters: { status: LIST_FILTERS.status, year: (r, v) => r.starts_on.slice(0, 4) === v }, sort: { starts_on: LIST_SORT.starts_on, submitted_at: LIST_SORT.submitted_at } })),
 );
+/** My Leave's calendar: everyone for Operations & People and the CEO, else mine and everyone under me. */
+route("GET /api/v1/ess/leave/calendar", (req) => {
+  const month = String(req.query.month || isoDaysAgo(0).slice(0, 7));
+  const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
+  const user = req.user!;
+  const mine = new Set([user, ...teamOf(user).map((p) => p.user_key)]);
+  const rows = LEAVE.filter((l) => (full(user) || mine.has(l.key)) && (l.status === "approved" || l.status === "submitted") && l.ends_on >= `${month}-01` && l.starts_on <= last);
+  const { month: _m, ...query } = req.query;
+  return asPage(paged(rows, { ...req, query }, { sort: { starts_on: LIST_SORT.starts_on } }));
+});
 route("GET /api/v1/ess/leave/balances", (req) => ok(yearOf(req.user!, Number(req.query.year || isoDaysAgo(0).slice(0, 4)))));
 route("GET /api/v1/ess/leave/:id", (req) => {
   const l = myLeave(req.user!).find((x) => x.leave_request_id === req.params.id);

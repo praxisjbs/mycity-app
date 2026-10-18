@@ -261,15 +261,20 @@ const DAY_ROW = `ad.attendance_day_id, ad.attendance_date, ad.status, ad.first_c
   (SELECT count(*)::int FROM attendance_exception x
     WHERE x.attendance_day_id = ad.attendance_day_id AND x.status = 'open') AS open_exceptions`;
 
-/** A page of one person's days between two dates, newest first unless sorted. */
+/**
+ * A page of one person's days between two dates, newest first unless sorted. `query.status`
+ * keeps one figure's days; `present` takes late days too, as the Days Present figure does.
+ */
 function listDays(db, employeeId, from, to, query) {
+  const statuses = !query.status ? null : query.status === "present" ? ["present", "late"] : [query.status];
   return pageQuery(
     db,
     `SELECT ${DAY_ROW}, ${TOTAL_COL}
        FROM attendance_day ad
       WHERE ad.employee_id = $1 AND ad.attendance_date BETWEEN $2::date AND $3::date
+        AND ($4::text[] IS NULL OR ad.status = ANY($4::text[]))
       ORDER BY ${orderBy(query, { newest: "ad.attendance_date DESC", attendance_date: "ad.attendance_date" }, "ad.attendance_day_id")}`,
-    [employeeId, from, to],
+    [employeeId, from, to, statuses],
     query,
   );
 }

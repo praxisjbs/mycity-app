@@ -5,7 +5,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { employmentType, workPattern } from "@/features/people/status";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Button, Card, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, useContractForm, useModal, Wizard } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, useContractForm, useModal, Wizard } from "@mycity/ui";
 
 /**
  * ESS · My Profile (#8, `my-profile`): the caller's own record (docs/guides/ess.md §10).
@@ -121,7 +121,7 @@ export function MyProfilePage() {
 
 /** The fields an employee changes themselves (EssProfileUpdate). Only what changed is sent. */
 function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
-  const start = {
+  const start: EditValues = {
     phone: p.phone ?? "",
     home_address: p.home_address ?? "",
     next_of_kin_name: p.next_of_kin_name ?? "",
@@ -148,10 +148,17 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
       else toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
     }
   };
-  const last4 = p.account_last4 ? `Leave blank to keep the account ending ${p.account_last4}. A bank change is logged and People are notified.` : "A bank change is logged and People are notified.";
+  const changes = CHANGEABLE.flatMap(([key, label]) => {
+    const v = f.values[key].trim();
+    if (!v || v === start[key]) return [];
+    const before = key === "account_number" ? (p.account_last4 ? `•••• ${p.account_last4}` : "Not given") : start[key] || "Not given";
+    const after = key === "account_number" ? `•••• ${v.slice(-4)}` : v;
+    return [[label, `${before} → ${after}`] as [string, string]];
+  });
+  const bankChanged = changes.some(([label]) => label === "Bank" || label === "Account Number");
   return (
     <Wizard
-      finish="Save Profile"
+      finish={changes.length ? "Save Changes" : "Close"}
       busy={save.pending}
       onFinish={() => void submit()}
       onCancel={close}
@@ -161,8 +168,8 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
           check: () => f.check(["phone", "home_address"]),
           body: (
             <>
-              <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" {...f.field("phone")} placeholder="0803 123 4567" /></Field>
-              <Field label="Address" {...f.field("home_address")}><TextField {...f.field("home_address")} /></Field>
+              <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" autoComplete="tel" {...f.field("phone")} placeholder="0803 123 4567" /></Field>
+              <Field label="Home Address" {...f.field("home_address")}><TextField autoComplete="street-address" {...f.field("home_address")} /></Field>
             </>
           ),
         },
@@ -171,9 +178,9 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
           check: () => f.check(["next_of_kin_name", "next_of_kin_relationship", "next_of_kin_phone"]),
           body: (
             <>
-              <Field label="Next of Kin" {...f.field("next_of_kin_name")}><TextField {...f.field("next_of_kin_name")} /></Field>
+              <Field label="Full Name" {...f.field("next_of_kin_name")}><TextField {...f.field("next_of_kin_name")} /></Field>
               <Field label="Relationship" optional {...f.field("next_of_kin_relationship")}><TextField {...f.field("next_of_kin_relationship")} placeholder="Sister" /></Field>
-              <Field label="Next of Kin Phone" {...f.field("next_of_kin_phone")}><TextField inputMode="tel" {...f.field("next_of_kin_phone")} /></Field>
+              <Field label="Phone" {...f.field("next_of_kin_phone")}><TextField inputMode="tel" {...f.field("next_of_kin_phone")} placeholder="0803 123 4567" /></Field>
             </>
           ),
         },
@@ -182,12 +189,44 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
           check: () => f.check(["bank_name", "account_number"]),
           body: (
             <>
+              <KeyValue
+                className="mb-3"
+                items={[
+                  ["Bank on Record", p.bank_name || "Not given"],
+                  ["Account", p.account_last4 ? `•••• ${p.account_last4}` : "Not given"],
+                ]}
+              />
               <Field label="Bank" {...f.field("bank_name")}><TextField {...f.field("bank_name")} /></Field>
-              <Field label="New Account Number" optional info={last4} {...f.field("account_number")}><TextField inputMode="numeric" maxLength={10} {...f.field("account_number")} placeholder="0123456789" /></Field>
+              <Field label="New Account Number" optional info="Ten digits. Leave it empty to keep the account on record." {...f.field("account_number")}>
+                <TextField inputMode="numeric" autoComplete="off" maxLength={10} {...f.field("account_number")} />
+              </Field>
             </>
+          ),
+        },
+        {
+          title: "Review",
+          body: changes.length ? (
+            <>
+              <KeyValue items={changes} />
+              {bankChanged && <Banner tone="info" className="mt-3">A bank change is logged and People are told.</Banner>}
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Nothing has changed yet. Go back to change a detail, or close.</p>
           ),
         },
       ]}
     />
   );
 }
+
+/** What the employee may change, in the order the review lists it (docs/guides/ess.md §6). */
+const CHANGEABLE: Array<[keyof EditValues, string]> = [
+  ["phone", "Phone"],
+  ["home_address", "Home Address"],
+  ["next_of_kin_name", "Next of Kin"],
+  ["next_of_kin_relationship", "Relationship"],
+  ["next_of_kin_phone", "Next of Kin Phone"],
+  ["bank_name", "Bank"],
+  ["account_number", "Account Number"],
+];
+type EditValues = { phone: string; home_address: string; next_of_kin_name: string; next_of_kin_relationship: string; next_of_kin_phone: string; bank_name: string; account_number: string };
