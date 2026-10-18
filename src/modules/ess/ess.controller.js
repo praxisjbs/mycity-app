@@ -40,6 +40,8 @@ module.exports = {
   listLeave: async (req, res) =>
     sendPaged(res, await service.leave.list(req.user, req.validated.query)),
 
+  leaveCalendar: async (req, res) =>
+    sendPaged(res, await service.leave.calendar(req.user, req.validated.query)),
   leaveBalances: async (req, res) =>
     ok(res, await service.leave.balances(req.user, req.validated.query || {})),
 

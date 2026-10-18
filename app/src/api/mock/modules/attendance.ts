@@ -431,8 +431,10 @@ const exOrder = (a: Ex, b: Ex) => Number(a.status !== "open") - Number(b.status 
 
 route("GET /api/v1/attendance/me", (req) => {
   const month = monthOf(req.query);
-  const rows = [...DAYS.values()].filter((d) => d.key === req.user && d.attendance_date.startsWith(month) && (d.status || d.first_clock_in_at)).sort(byNewest).map(dayOut);
-  const { month: _m, ...query } = req.query;
+  const status = req.query.status;
+  const wanted = (s: string | null | undefined) => !status || (status === "present" ? s === "present" || s === "late" : s === status);
+  const rows = [...DAYS.values()].filter((d) => d.key === req.user && d.attendance_date.startsWith(month) && (d.status || d.first_clock_in_at) && wanted(d.status)).sort(byNewest).map(dayOut);
+  const { month: _m, status: _s, ...query } = req.query;
   return paged(rows, { ...req, query }, req.query.sort ? { sort: { attendance_date: (a, b) => a.attendance_date.localeCompare(b.attendance_date) } } : {});
 });
 

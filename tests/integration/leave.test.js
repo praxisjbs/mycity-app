@@ -412,4 +412,19 @@ describeDb("leave against the real migrations", () => {
     const leave = groups.find((g) => g.type === "leave_request");
     expect(leave && leave.items.length).toBeGreaterThan(0);
   });
+
+  test("the leave calendar: your own, everyone under you, or everyone for Operations & People", async () => {
+    for (const who of ["staff", "other", "manager", "outsider"])
+      expect((await ask(who, "unpaid", d("09-07"), d("09-08"))).status).toBe(201);
+    const id = (k) => people[k].employee.employee_id;
+    const whose = async (who) => {
+      const res = await as(who).get(`/ess/leave/calendar?month=${Y}-09&sort=starts_on`);
+      expect(res.status).toBe(200);
+      return res.body.data.map((r) => r.employee.employee_id).sort();
+    };
+    expect(await whose("staff")).toEqual([id("staff")]);
+    expect(await whose("manager")).toEqual([id("manager"), id("staff")].sort());
+    expect(await whose("ops")).toEqual(["staff", "other", "manager", "outsider"].map(id).sort());
+    expect((await as("staff").get("/ess/leave/calendar?month=2026-13")).status).toBe(422);
+  });
 });

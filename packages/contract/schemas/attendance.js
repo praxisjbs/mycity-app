@@ -163,8 +163,12 @@ const AttendanceDay = z
   .strict();
 const AttendanceDayPage = Paged(AttendanceDay);
 
-/** GET /attendance/me: the days of a month (this month when absent), newest first. */
-const MyDayListQuery = listQuery({ month: month.optional() }, ["attendance_date"]);
+/**
+ * GET /attendance/me: the days of a month (this month when absent), newest first. `status`
+ * keeps the days behind one of My Attendance's figures; `present` is a day present or late,
+ * as Days Present counts it.
+ */
+const MyDayListQuery = listQuery({ month: month.optional(), status: DayStatus.optional() }, ["attendance_date"]);
 
 /** GET /attendance/me/summary */
 const MySummaryQuery = z.object({ month: month.optional() }).strict();

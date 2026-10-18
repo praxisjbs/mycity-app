@@ -118,6 +118,17 @@ const EssLeaveListQuery = listQuery(
   ["starts_on", "submitted_at"],
 );
 
+/**
+ * GET /ess/leave/calendar: the leave calendar on My Leave, one month (this month when left
+ * out). Its rows are LeavePage's: approved and waiting leave that touches the month, for the
+ * caller and everyone under them in the reporting tree; for the CEO and for People with scope
+ * all (Operations & People), everyone (the team lead, 18/10/2026).
+ */
+const EssLeaveCalendarQuery = listQuery(
+  { month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use YYYY-MM").optional() },
+  ["starts_on"],
+);
+
 /** GET /ess/leave/balances: one year; this year when it is left out. */
 const EssLeaveBalanceQuery = z
   .object({ year: z.coerce.number().int().min(2000).max(2100).optional() })
@@ -148,6 +159,7 @@ const TABLES = {
     reason: "list controls for the caller's own leave requests",
   },
   EssLeaveBalanceQuery: { table: null, reason: "which year of the caller's leave to read" },
+  EssLeaveCalendarQuery: { table: null, reason: "the month the leave calendar shows" },
 };
 
 module.exports = {
@@ -158,4 +170,5 @@ module.exports = {
   EssProfileUpdate,
   EssLeaveListQuery,
   EssLeaveBalanceQuery,
+  EssLeaveCalendarQuery,
 };

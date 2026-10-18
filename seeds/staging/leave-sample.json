@@ -1,0 +1,110 @@
+[
+  {
+    "key": "hauwa",
+    "type": "annual",
+    "from": -2,
+    "to": 1,
+    "days": 3,
+    "status": "approved",
+    "reason": "Family visit"
+  },
+  {
+    "key": "amara",
+    "type": "annual",
+    "from": 6,
+    "to": 10,
+    "days": 5,
+    "status": "submitted",
+    "reason": "Trip to Enugu"
+  },
+  {
+    "key": "chidera",
+    "type": "compassionate",
+    "from": 0,
+    "to": 0,
+    "days": 1,
+    "status": "submitted",
+    "reason": "Family emergency"
+  },
+  {
+    "key": "tolu",
+    "type": "annual",
+    "from": 69,
+    "to": 78,
+    "days": 7,
+    "status": "approved",
+    "reason": "End of year break"
+  },
+  {
+    "key": "tobi",
+    "type": "annual",
+    "from": -3,
+    "to": 2,
+    "days": 5,
+    "status": "approved",
+    "reason": null
+  },
+  {
+    "key": "kemi",
+    "type": "sick",
+    "from": -12,
+    "to": -11,
+    "days": 2,
+    "status": "approved",
+    "reason": "Flu"
+  },
+  {
+    "key": "seyi",
+    "type": "unpaid",
+    "from": 20,
+    "to": 21,
+    "days": 2,
+    "status": "approved",
+    "reason": "AWS exam"
+  },
+  {
+    "key": "grace",
+    "type": "annual",
+    "from": 30,
+    "to": 34,
+    "days": 5,
+    "status": "rejected",
+    "reason": "Clashes with Ember to Remember"
+  },
+  {
+    "key": "bashir",
+    "type": "annual",
+    "from": 45,
+    "to": 49,
+    "days": 5,
+    "status": "submitted",
+    "reason": "Wedding"
+  },
+  {
+    "key": "cynthia",
+    "type": "annual",
+    "from": 72,
+    "to": 80,
+    "days": 6,
+    "status": "approved",
+    "reason": "Christmas"
+  },
+  {
+    "key": "obinna",
+    "type": "unpaid",
+    "from": -40,
+    "to": -27,
+    "days": 10,
+    "status": "approved",
+    "reason": null
+  },
+  {
+    "key": "blessing",
+    "type": "annual",
+    "from": 14,
+    "to": 15,
+    "days": 2,
+    "status": "cancelled",
+    "reason": null
+  }
+]

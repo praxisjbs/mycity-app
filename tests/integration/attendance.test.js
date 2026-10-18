@@ -673,6 +673,13 @@ describeDb("attendance against the real migrations", () => {
     expect(days.body.data.map((d) => d.attendance_date)).toEqual([...managerToday(), "2026-10-08", "2026-10-04", "2026-10-03", "2026-10-01"]);
     const sum = await as("manager").get("/attendance/me/summary?month=2026-10");
     expect(sum.body).toMatchObject({ month: "2026-10", days_present: 4 + managerToday().length });
+    // A figure's days (My Attendance's cards): present counts late days too, as the figure does.
+    const present = await as("manager").get("/attendance/me?month=2026-10&status=present");
+    expect(present.body.page.total).toBe(sum.body.days_present);
+    const late = await as("manager").get("/attendance/me?month=2026-10&status=late");
+    expect(late.body.page.total).toBe(sum.body.late_days);
+    for (const d of late.body.data) expect(d.status).toBe("late");
+    expect((await as("manager").get("/attendance/me?status=sick")).status).toBe(422);
     const events = await as("manager").get("/attendance/me/events?date=2026-10-03");
     expect(events.body.data).toHaveLength(2);
     for (const e of events.body.data) expect(e.latitude).toBeNull();

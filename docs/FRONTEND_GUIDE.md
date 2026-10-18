@@ -273,7 +273,7 @@ and the rest; the Helpers table in `docs/COMPONENTS.md`). Never write your own.
 | Colour | Only the brand tokens (MILESTONES §5.1, §5.2, and the derived tokens, §9.3). No raw hex (gate 13). AA contrast in both themes (gate 14) |
 | Styling | Tokens only (F4). A feature composes `@mycity/ui` components and may use Tailwind layout and spacing utilities from the token scale. No colour outside a token class, no arbitrary value (`w-[317px]`, `bg-[#…]`), no inline `style`, no raw hex. Anything visual beyond that is a shared component |
 | Density | Compact by default on desktop: 14 px body, 40 px table rows, 36 px controls. A person may switch to Comfortable (15 px, 48 px rows, 40 px controls), remembered per person. A phone always uses 16 px in fields and 44 px targets. Components size themselves from the density tokens; a feature never sets a control or row height (F5) |
-| Motion | Native and brief (F6). Bottom sheets slide with a spring and close by dragging down; toasts and popovers fade in 120 to 200 ms. Everything is instant under reduced motion. Motion comes with the components; a feature adds none |
+| Motion | Native and brief (F6). Bottom sheets slide with a spring and close by dragging down (a sheet holding a text field closes only from its close button, Cancel or Esc); toasts and popovers fade in 120 to 200 ms. Everything is instant under reduced motion. Motion comes with the components; a feature adds none |
 | Empty value | The shared marker (`EmptyValue`), muted, also drawn by the table and detail components (§5.4). Never "N/A", never "null", never a typed dash |
 
 ---
@@ -321,7 +321,8 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   on a phone.
 - **Sheets, not centred modals.** The shared `Modal` becomes a bottom sheet that slides with a
   spring and closes by dragging down (F6); a long form becomes a full screen sheet. `Menu` becomes
-  an action sheet.
+  an action sheet. A sheet stays above the keyboard; once it holds a text field, a drag or a scrim
+  tap never closes it, so typing is never lost to a stray swipe.
 - **The main action within thumb reach**: at the bottom of the screen or the sheet, full width.
 - **Tap targets at least 44 × 44 px.** Inline help terms inside a sentence or heading are the only
   exception.
