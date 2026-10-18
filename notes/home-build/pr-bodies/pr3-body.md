@@ -1,6 +1,6 @@
 ## What this changes
 
-Home PR 3 of 5, stacked on tomblakeasaah196/mycity-app#57 (base `m1/home-overview`): **Home · Team (#86) on the real API, desktop and phone**, plus the gated state for Home's three manager tabs. Built to `docs/guides/home.md` §2, §5, §6 Team, §9 and §10.
+Home PR 3 of 5, to `main` (after tomblakeasaah196/mycity-app#56 and tomblakeasaah196/mycity-app#59): **Home · Team (#86) on the real API, desktop and phone**, plus the gated state for Home's three manager tabs. Built to `docs/guides/home.md` §2, §5, §6 Team, §9 and §10.
 
 **Backend** (`src/modules/dashboard/dashboard.team.js`, under `/home`)
 - `GET /home/team/summary`: the reader's scope (The Whole Organisation, Your Team or Just You) and today's four Team cards: Present Today, On Site, Remote and Flags. Each card equals the records it opens (`GET /home/kpi/:key`). Flags counts each person once, whether late, without a clock-out yesterday, or both.
@@ -32,7 +32,7 @@ Home PR 3 of 5, stacked on tomblakeasaah196/mycity-app#57 (base `m1/home-overvie
 
 ## Checklist
 
-- [x] `npm run ci` is green locally, the whole run (Node 20, `CI_STRICT=1`, `RUN_DB_TESTS=1` on Postgres 16 with pgvector and Redis 7)
+- [x] `npm run ci` is green locally: the whole run, 44 of 44 (Node 20, `CI_STRICT=1`, `RUN_DB_TESTS=1` on Postgres 16 with pgvector and Redis 7), on this code with PR 4 on top before the rebase onto today's `main`. After the rebase, the 20 gates it could touch pass, and GitHub CI runs the whole suite here.
 - [x] `docs/PROGRESS.md`: rows ticked, Status and Updated set, a dated note added under the module
 - [x] Feature guide in `docs/guides/` matches what was built, with a Change log line
 - [x] New files are on the README map (README §11)
@@ -63,7 +63,10 @@ Home PR 3 of 5, stacked on tomblakeasaah196/mycity-app#57 (base `m1/home-overvie
 
 - **LA:** `attendance.roster.js` gains `month()` and `flagged` (attendance.md §5, §6.9, change log). People · Attendance taking an employee would let View Attendance open that person's day; today it opens the screen.
 - **AJ:** Home's tabs show locked rather than hidden, which is the one exception in FRONTEND_GUIDE's tab rule (`Gated.tsx`, `features/home/access.ts`).
-- **Reviewed before opening:** REVIEW_LINE
+- **Reviewed before opening:**
+  - Six review lenses over PRs 3 and 4 together, each finding put to three independent skeptics.
+  - For the Team tab, one held: a roster filter test that could time out under load. Its waits now follow the mock's requests rather than a time budget, checked 10 of 10 runs and under CPU load by an independent verifier.
+  - No security or data-exposure defect was found in Team.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

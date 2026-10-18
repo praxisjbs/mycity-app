@@ -65,3 +65,5 @@ Then: fix confirmed findings, CI, open PR 3 (base m1/home-overview) and PR 4 (ba
 - PR 3/4 review: 19 confirmed (notes/home-build/pr34-review-confirmed.json); fixes running (workflow wf_179d92fb-06f):
   self-clearing excluded (CEO excepted), deadline today vs expired, evidence keys, ?rule= deep link, Team test flake, docs.
 - PR 5 built (backend, Reports tab, staging seed), integrated (PROGRESS #3 Built), under review (wf_9ae5febb-69d).
+- 18/10 11:20: PR 3 MERGED (#61). PR 4 open as #62 (m1/home-alerts @ 68c6934, one commit on PR 3). PR 5 m1/home-reports @ 6271993
+  (one commit on PR 4), full local CI 44/44 (covers 3+4+5); body in pr-bodies/pr5-body.md; open against main after #62 merges.
