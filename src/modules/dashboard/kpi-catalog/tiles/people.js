@@ -90,8 +90,24 @@ const rosterFigure = (s) => ({
   },
 });
 
-/** Today's roster summary in the reader's scope on `module`. */
-const summaryIn = (module) => (client, ctx) => roster.summary(client, { date: ctx.today }, ctx.scope(module));
+/**
+ * Each reader's roster summaries, by module, kept for as long as their context lives: the
+ * four Team cards count from one summary, so a row of them reads it once, not four times.
+ * A context is made for one read of one person's cards (index.context), so nothing here
+ * outlives the request or crosses to another reader.
+ */
+const SUMMARIES = new WeakMap();
+
+/** Today's roster summary in the reader's scope on `module`, read once per context. */
+const summaryIn = (module) => (client, ctx) => {
+  let byModule = SUMMARIES.get(ctx);
+  if (!byModule) {
+    byModule = new Map();
+    SUMMARIES.set(ctx, byModule);
+  }
+  if (!byModule.has(module)) byModule.set(module, roster.summary(client, { date: ctx.today }, ctx.scope(module)));
+  return byModule.get(module);
+};
 
 function rosterRecord(r) {
   const pill = STATUS_PILL[r.status];
@@ -115,15 +131,17 @@ function rosterRecord(r) {
 
 /**
  * Today's roster, one page, in the reader's scope on `module`. A chip is a status or the
- * flag. `fixed` keeps a card to one status whatever the chip; `fallback` is the chip a
- * card's records open on when none is chosen.
+ * flag. `fixed` keeps a card to one status whatever the chip; `flagged` keeps it to the
+ * people flagged today (late, or no clock-out yesterday), each once, and a chip narrows
+ * within them.
  */
-function rosterList(module, { fixed = null, fallback = null } = {}) {
+function rosterList(module, { fixed = null, flagged = false } = {}) {
   return async (client, query, ctx) => {
-    const group = fixed || query.group || fallback;
+    const group = fixed || query.group;
     const filters = { date: ctx.today, q: query.q };
     if (group === "no_clock_out_yesterday") filters.no_clock_out_yesterday = true;
     else if (group) filters.status = group;
+    if (flagged) filters.flagged = true;
     return records(await roster.page(client, filters, ctx.scope(module), query), rosterRecord);
   };
 }
@@ -748,12 +766,13 @@ const ENTRIES = [
     pickable: false,
     tone: "warn",
     source: "attendance",
-    // A flag each: late today, and no clock-out on the last working day. One person can carry both.
+    // The people late today or with no clock-out on the last working day, each once, so the
+    // figure is the number of records behind it. Someone who carries both is in both chips.
     value: (client, g, ctx) =>
       g.figure(async () => {
         const s = await summaryIn("home")(client, ctx);
         return {
-          value: s.late + s.no_clock_out_yesterday,
+          value: s.flagged,
           late: s.late,
           no_clock_out_yesterday: s.no_clock_out_yesterday,
           groups: { late: s.late, no_clock_out_yesterday: s.no_clock_out_yesterday },
@@ -767,9 +786,7 @@ const ENTRIES = [
         { value: "late", label: "Late" },
         { value: "no_clock_out_yesterday", label: "No Clock-Out Yesterday" },
       ],
-      // The roster filters by one status or by the flag, never by either, so the records
-      // open on Late with No Clock-Out Yesterday one chip away.
-      list: rosterList("home", { fallback: "late" }),
+      list: rosterList("home", { flagged: true }),
     },
   },
 ];

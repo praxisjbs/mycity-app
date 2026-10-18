@@ -382,7 +382,8 @@ of every capability). To add one:
    every code in `capability`). Where a capability decides whether a tab shows, change both mirrors in
    the same PR: `app/src/shell/access.ts` (`visibleTabs`, through `hasCapability(me, code)`) and
    `src/shared/search/screens.js` (`tabVisible`, through `hasCapability(reader, code)`), each with its
-   test. A screen hides a button with `hasCapability(useMe(), code)`; the route still decides.
+   test. A tab may instead show its locked state to those without the code (Home's tabs); ⌘K still
+   hides it. A screen hides a button with `hasCapability(useMe(), code)`; the route still decides.
 6. **Write it down**: the module guide's **Capabilities** header row, §8 (who holds it by default),
    and a row in README §5.2.
 7. **Tests**: a route test that the capability is required (`routesOf(router)` records it as

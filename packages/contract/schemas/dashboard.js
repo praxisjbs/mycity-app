@@ -454,17 +454,21 @@ const HomeKpiDetailPage = Paged(HomeKpiDetailRow);
  * Team: GET /home/team, /team/summary, /team/attendance
  * ------------------------------------------------------------------ */
 
-/** GET /home/team/summary: whose team this is, and its four cards. */
+/**
+ * GET /home/team/summary: whose people the tab shows, and its four cards today: Present Today,
+ * On Site, Remote and Flags, each the number of records behind it (GET /home/kpi/:key).
+ */
 const HomeTeamSummary = z
   .object({
+    /** Today in Lagos. */
     date: isoDate,
-    /** `all`: the whole organisation; `team`: the reader and everyone below them. */
+    /** `all`: the whole organisation; `team`: the reader and everyone below them; `own`: the reader alone. */
     scope: RecordScope,
     cards: z.array(HomeKpiCard).max(HOME_KPI_MAX),
   })
   .strict();
 
-/** GET /home/team: today's roster for the people the reader may see. */
+/** GET /home/team: today's roster for the people the reader may see. `q` searches name and job title. */
 const HomeTeamQuery = listQuery(
   {
     department_id: uuid.optional(),
@@ -494,17 +498,23 @@ const HomeTeamRow = z
 
 const HomeTeamPage = Paged(HomeTeamRow);
 
-/** GET /home/team/attendance: Attendance This Month, one row a person. */
+/**
+ * GET /home/team/attendance: Attendance This Month, one row a person on the register on any
+ * day from the 1st to today. `q` searches name and job title.
+ */
 const HomeTeamAttendanceQuery = listQuery(
   { department_id: uuid.optional() },
   ["display_name", "on_time"],
 );
 
-/** A person's working days this month so far, by how each went. */
+/**
+ * A person's days this month so far, as My Attendance counts them: a day counts once the
+ * attendance module has recorded it (a clock-in, or the day-close's absence or leave).
+ */
 const HomeTeamAttendanceRow = z
   .object({
     employee: PersonRef,
-    /** Working days so far this month they were expected in (leave and holidays are not expected). */
+    /** The days they were expected in: on time plus late plus absent. Leave is counted apart. */
     expected: count,
     on_time: count,
     late: count,

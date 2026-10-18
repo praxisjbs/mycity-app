@@ -278,7 +278,8 @@ who manage others. Every module owner applies the same rule to their own (TB, 17
    The CEO holds every capability.
 5. **Exposed** on `/me` as `capabilities`, and **mirrored** wherever a screen is shown or offered:
    `app/src/shell/access.ts` (`hasCapability`) for the menu and the screens, and
-   `src/shared/search/screens.js` (`tabVisible`) for ⌘K.
+   `src/shared/search/screens.js` (`tabVisible`) for ⌘K. A tab may show its locked state instead of
+   hiding (Home's Team, Alerts and Reports, home.md §10.1); ⌘K still offers only what the reader may use.
 6. **Listed** in the module guide's **Capabilities** header row, with who holds it.
 
 `check/capabilities.js` fails a code the code checks that the catalogue lacks, a catalogued code no
@@ -312,7 +313,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 
 | Module | Owner | Files beyond the template |
 |---|---|---|
-| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.prompt` (when the Overview opens Attendance's clock-in panel) |
+| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.prompt` (when the Overview opens Attendance's clock-in panel), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
 | `alerts` | TB | |
 | `reports` | TB | |
 | `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, worksite and shift for a date), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |

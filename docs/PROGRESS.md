@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 2 | 3 | 24 | 0 | 0 |
+| M1 Core Operations & Employee Management | 29 | 2 | 2 | 25 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **59** | **3** | **31** | **0** | **0** |
+| **Total** | **93** | **59** | **2** | **32** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
@@ -495,10 +495,18 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
-| 86 | Team | `team` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
+| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 
 **Notes**
 
+- 18/10/2026 · TB · Home PR 3 (`m1/home-team`): Team #86 built on the real API, desktop and phone.
+  `GET /home/team/summary`, `/home/team` and `/home/team/attendance` behind `home` view and
+  `home.team`, in the grant's scope; the four Team cards each equal the records they open (Flags counts
+  each person once, late or no clock-out yesterday); Attendance This Month is My Attendance's figures
+  per person from the roster's new `month()`, one paged query; `team.today` for the assistant. Home's
+  Team, Alerts and Reports tabs now show to every Home viewer, locked ("For Managers") without their
+  capability, and ⌘K still hides them. Left: Alerts (PR 4), Reports (PR 5); People · Attendance taking
+  an employee so View Attendance opens that person's day (LA).
 - 18/10/2026 · TB · Home PR 2 review fixes: Your Week reads each working day on its own page, so a
   busy week keeps Friday and Saturday; a role saved with no card follows its Home view; Choose Cards
   starts from the cards showing, so a lock added after a pick saves; the Overview reads itself again

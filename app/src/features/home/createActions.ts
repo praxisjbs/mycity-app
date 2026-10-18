@@ -2,8 +2,8 @@ import type { IconName } from "@mycity/ui";
 import type { Me } from "@/api/types/identity";
 import { useScreenState } from "@/lib/plan";
 import { hrefFor } from "@/lib/router";
-import { hasCapability, visibleModules, visibleTabs } from "@/shell/access";
-import { moduleByKey } from "@/shell/catalogue";
+import { hasCapability } from "@/shell/access";
+import { reachable } from "./access";
 
 /**
  * Home's New (docs/guides/home.md §6 Overview, §10.1): a menu of the create actions the
@@ -68,12 +68,6 @@ const OFFERS: Offer[] = [
     holds: (me) => hasCapability(me, "home.reports"),
   },
 ];
-
-/** May the person open this tab, as the navigation decides it? */
-function reachable(me: Me, moduleKey: string, tab: string): boolean {
-  const mod = moduleByKey(moduleKey);
-  return !!mod && visibleModules(me).includes(mod) && visibleTabs(me, mod).some((t) => t.slug === tab);
-}
 
 /**
  * The create actions a person holds, in the menu's order.

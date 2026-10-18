@@ -2,64 +2,29 @@ import { useEffect, useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
-import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
+import { useRouter, useSearchParams } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
 import { useUrlAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { mayUseTab } from "./access";
 import { InfoCard, KpiRow } from "./blocks";
+import { Gated } from "./Gated";
 import { Overview } from "./Overview";
+import { Team } from "./Team";
 import { toBars } from "@/features/shared/wire";
-import { Bars, Button, Card, Chips, DataView, ErrorState, Field, formatDateTime, FormFooter, Grid, Grow, KeyValue, PageHeader, Pager, Pill, rules, SelectField, TextField, Tile, toast, ToggleRow, useContractForm, useModal, Who } from "@mycity/ui";
+import { Bars, Button, Card, Chips, DataView, ErrorState, Field, formatDateTime, FormFooter, Grid, Grow, KeyValue, PageHeader, Pager, Pill, rules, SelectField, TextField, Tile, toast, ToggleRow, useContractForm, useModal } from "@mycity/ui";
 
+/**
+ * Home (docs/guides/home.md §2): Overview for every employee, and Team, Alerts and Reports for
+ * the holders of their capabilities (./access). Anyone else finds those tabs in their place,
+ * locked (./Gated), and the tab reads nothing.
+ */
 export default function Home({ tab, id }: ModuleScreenProps) {
-  if (tab === "team") return <Team />;
-  if (tab === "alerts") return <Alerts openId={id} />;
-  if (tab === "reports") return <Reports />;
+  const me = useMe();
+  if (tab === "team") return mayUseTab(me, "team") ? <Team /> : <Gated title="Team" />;
+  if (tab === "alerts") return mayUseTab(me, "alerts") ? <Alerts openId={id} /> : <Gated title="Alerts" />;
+  if (tab === "reports") return mayUseTab(me, "reports") ? <Reports /> : <Gated title="Reports" />;
   return <Overview linked={id} />;
-}
-
-function Team() {
-  const summary = useApi("GET /api/v1/home/team/summary");
-  const [status, setStatus] = useState("all");
-  const list = usePaged("GET /api/v1/home/team", { filters: status === "all" ? {} : { status } });
-  const { navigate } = useRouter();
-  if (summary.error) return <ErrorState error={summary.error} onRetry={summary.reload} />;
-  return (
-    <>
-      <PageHeader title="Team" sub={`Who is in and where${summary.data ? ` · ${summary.data.scope_label}` : ""}`} />
-      {summary.data && <KpiRow items={summary.data.kpis} />}
-      <Chips
-        value={status}
-        onChange={setStatus}
-        options={[["all", "Everyone"], ["late", "Late"], ["remote", "Remote"], ["leave", "On Leave"], ["no_clockout", "No Clock-Out"]]}
-      />
-      <DataView
-        title="Team Roster"
-        right={list.page && <Pill>{`${list.page.total} people`}</Pill>}
-        rows={list.rows}
-        rowKey={(r) => r.employee.employee_id}
-        loading={list.loading}
-        error={list.error}
-        onRowClick={(r) => navigate(hrefFor("people", "employees", { id: r.employee.employee_id }))}
-        columns={[
-          { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.job_title} /> },
-          { key: "d", label: "Department", desktop: true, render: (r) => r.employee.department },
-          { key: "t", label: "Today", render: (r) => <Pill tone={r.today.tone}>{r.today.text}</Pill> },
-          { key: "c", label: "Clock-in", render: (r) => r.clock_in ?? "None" },
-          { key: "k", label: "KPI", desktop: true, render: (r) => `${r.kpi_pct}%` },
-          { key: "o", label: "Open Tasks", align: "n", desktop: true, render: (r) => r.open_tasks },
-        ]}
-        footer={<Pager page={list.page} onPage={list.setPage} noun="person" nounPlural="people" />}
-      />
-      <Grid cols={2} className="mt-3">
-        {summary.data && (
-          <InfoCard title="Attendance by Person">
-            <Bars rows={toBars(summary.data.attendance_bars)} />
-          </InfoCard>
-        )}
-      </Grid>
-    </>
-  );
 }
 
 const SEV = { high: ["err", "High"], medium: ["warn", "Medium"], low: ["info", "Low"] } as const;

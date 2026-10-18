@@ -629,7 +629,9 @@ builds the rail, the bottom bar and More from what is left. A tab that belongs t
 its module's grant reaches follows a **capability** (README §5.2): `/me.capabilities` lists the codes
 the person holds, `hasCapability(me, code)` in `shell/access.ts` answers for them (the CEO holds
 every one), and Home's Team, Alerts and Reports are gated that way. `src/shared/search/screens.js`
-mirrors the tab rules for ⌘K; change both together. A screen hides a button the same way
+mirrors the tab rules for ⌘K; change both together. Home's three are the one exception that shows:
+every Home viewer sees the tab and, without the capability, its locked state (`features/home/Gated`),
+while ⌘K still hides it (home.md §10.1). A screen hides a button the same way
 (`hasCapability(useMe(), code)`), never by a role's code or `manages_people`. Hiding is a courtesy:
 the API refuses what a grant or a capability does not allow. An unknown module or tab lands on the
 first allowed screen.

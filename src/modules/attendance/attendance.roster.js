@@ -4,13 +4,14 @@
  * who came in, how, and who did not.
  *
  * Home reads attendance only through this file (the Clocked In Today card and the list
- * behind it, the Team tab, a person's own month). It writes nothing, emits nothing and
- * decides nothing: every fact is the attendance module's own (docs/guides/attendance.md §6),
- * read the way People · Attendance and My Attendance read it, so a figure on Home is the
- * figure on those screens.
+ * behind it, the Team tab and its month, a person's own month). It writes nothing, emits
+ * nothing and decides nothing: every fact is the attendance module's own
+ * (docs/guides/attendance.md §6), read the way People · Attendance and My Attendance read
+ * it, so a figure on Home is the figure on those screens.
  *
  *   summary(client, { date }, scope)                     the counts for one day
  *   page(client, { date, status, ... }, scope, query)    one page of 25 people for one day
+ *   month(client, { from, to, ... }, scope, query)       one page of 25 people, each with their totals
  *   personal(client, { employee_id, from, to })          one person's days and their totals
  *
  * Where each fact comes from:
@@ -27,7 +28,8 @@
  *   leave              granted as attendance.repo.js and the leave module read it
  *   working days       shared/time/working-week through rules.shiftFor, as the day-close reads them
  *   the clock-in       the day's one active clock-in, for the worksite it was judged against
- *   a person's totals  repo.daysSummary(), the figures My Attendance shows
+ *   a person's totals  repo.daysSummary(), the figures My Attendance shows; month() counts
+ *                      every person's days the same way, in one query
  *
  * The register's statuses become Home's (packages/contract HomeRosterStatus), one each:
  *
@@ -41,7 +43,8 @@
  *
  * Beside the status, `no_clock_out_yesterday` flags a person whose last working day has a
  * clock-in and no clock-out on its record: the open shift the day-close turns into a missing
- * clock-out (clock-guard isOpen over the day's counted punches).
+ * clock-out (clock-guard isOpen over the day's counted punches). A person is `flagged` on a
+ * day when they are late or carry that flag, once however many of the two they carry.
  *
  * The mapping is written twice: statusOf() for one person's days in JavaScript (personal()),
  * and STATUS in SQL so a list can filter, count and page by it (summary(), page()).
@@ -59,7 +62,7 @@ const repo = require("./attendance.repo");
 /** Home's statuses (packages/contract HomeRosterStatus), in display order. */
 const STATUSES = Object.freeze(["on_leave", "late", "on_site", "remote", "absent", "not_in"]);
 
-/** The longest stretch personal() reads: a calendar month, or the last 30 days. */
+/** The longest stretch personal() and month() read: a calendar month, or the last 30 days. */
 const MAX_DAYS = 31;
 
 /** What a day the attendance module recorded counts as on My Attendance (repo.daysSummary). */
@@ -162,6 +165,16 @@ const onRegister = (day) => `(ad.attendance_day_id IS NOT NULL
   OR (e.status = 'active' AND (e.start_date IS NULL OR e.start_date <= ${day})
       AND (e.left_on IS NULL OR e.left_on > ${day})))`;
 
+/**
+ * Whether employee `e` is on the register on at least one day from `from` to `to`: a record
+ * on one of them, or active, started by the last and not yet left on the first day they are
+ * on it (onRegister() over each day of the range, in one expression).
+ */
+const onRegisterBetween = (from, to) => `(EXISTS (SELECT 1 FROM attendance_day x
+                WHERE x.employee_id = e.employee_id AND x.attendance_date BETWEEN ${from} AND ${to})
+  OR (e.status = 'active' AND GREATEST(e.start_date, ${from}) <= ${to}
+      AND (e.left_on IS NULL OR e.left_on > GREATEST(e.start_date, ${from}))))`;
+
 /** statusOf(), over the columns of the facts `f`. */
 const STATUS = `CASE f.day_status
   WHEN 'leave' THEN 'on_leave'
@@ -170,6 +183,22 @@ const STATUS = `CASE f.day_status
   WHEN 'absent' THEN 'absent'
   ELSE CASE WHEN f.on_leave THEN 'on_leave' WHEN f.working_day THEN 'not_in' END
 END`;
+
+/** A roster row `r` is flagged: late, or no clock-out on the last working day. Never null. */
+const FLAGGED = "(r.status IS NOT DISTINCT FROM 'late' OR r.no_clock_out_yesterday)";
+
+/**
+ * The department and name filters every roster list shares, over the employee `e`, as one
+ * SQL condition; `bind` appends each value to the query's parameters.
+ */
+function personFilters(bind, { department_id: departmentId, q }) {
+  const department = bind(departmentId || null);
+  const term = bind(q || null);
+  return `(${department}::uuid IS NULL OR e.department_id = ${department}::uuid)
+           AND (${term}::text IS NULL
+                OR search_fold(e.first_name || ' ' || e.last_name || ' ' || e.job_title)
+                   LIKE '%' || search_fold(${term}::text) || '%')`;
+}
 
 /** Appends a value to the query's parameters and returns its placeholder. */
 const binder = (params) => (value) => {
@@ -197,8 +226,7 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
   // Worked out in SQL, as the register does: a holiday entered a moment ago already counts.
   const working = repo.WORKING_DAY(date);
   const yDate = `${bind(yesterday.date)}::date`;
-  const department = bind(filters.department_id || null);
-  const q = bind(filters.q || null);
+  const narrowed = personFilters(bind, filters);
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
   return `
     SELECT f.*, ${STATUS} AS status,
@@ -218,12 +246,27 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
                 AND ci.event_type = 'clock_in' AND ci.validation_state IN ('accepted', 'review')
           LEFT JOIN worksite w ON w.worksite_id = ci.worksite_id
          WHERE ${onRegister(date)}
-           AND (${department}::uuid IS NULL OR e.department_id = ${department}::uuid)
-           AND (${q}::text IS NULL
-                OR search_fold(e.first_name || ' ' || e.last_name || ' ' || e.job_title)
-                   LIKE '%' || search_fold(${q}::text) || '%')
+           AND ${narrowed}
            ${s.and}
       ) f`;
+}
+
+/**
+ * Refuse a range that is not one: a date that is not a real day, a last day before the
+ * first, or more than MAX_DAYS days.
+ */
+function assertRange(from, to) {
+  lagos.assertDate(from, "from");
+  lagos.assertDate(to, "to");
+  const span = lagos.daysBetween(from, to);
+  if (span < 0)
+    throw new AppError("ATTENDANCE_RANGE", "The last day is before the first", 422, {
+      to: ["Before the first day"],
+    });
+  if (span >= MAX_DAYS)
+    throw new AppError("ATTENDANCE_RANGE", `Pick at most ${MAX_DAYS} days`, 422, {
+      to: [`More than ${MAX_DAYS} days`],
+    });
 }
 
 /** The day asked for (today in Lagos when none is) and the day before it, as the roster reads them. */
@@ -244,6 +287,8 @@ async function dayAndYesterday(client, date) {
  *   expected  on a working day, everyone on the register but those on leave
  *             (present + absent + not_in); 0 on a day that is not worked
  *   present   late + on_site + remote: a clock-in that counts, on any day
+ *   flagged   the people late or with no clock-out yesterday, each once: at most
+ *             late + no_clock_out_yesterday, less when someone carries both
  *
  * @param {{query: Function}} client
  * @param {{date?: string}} opts  YYYY-MM-DD; today in Lagos when left out
@@ -263,6 +308,7 @@ async function summary(client, { date }, scope) {
             count(*) FILTER (WHERE r.status = 'on_leave')::int AS on_leave,
             count(*) FILTER (WHERE r.status = 'not_in')::int AS not_in,
             count(*) FILTER (WHERE r.no_clock_out_yesterday)::int AS no_clock_out_yesterday,
+            count(*) FILTER (WHERE ${FLAGGED})::int AS flagged,
             ${repo.WORKING_DAY(`$${params.push(day.date)}::date`)} AS working_day
        FROM (${roster}) r`,
     params,
@@ -277,41 +323,114 @@ const SORTS = {
   clock_in_at: "r.clock_in_at",
 };
 
+/** A yes-or-no filter: true or false keeps the rows that match it, anything else keeps every row. */
+const yesNo = (value) => (typeof value === "boolean" ? value : null);
+
 /**
  * One page of the people on the register on a day, within the reader's scope, each with
  * their status, clock-in and clock-out, late minutes, the worksite of their clock-in (null
- * when they work remotely or are not in) and the yesterday flag. Filtered, searched and
- * sorted in SQL.
+ * when they work remotely or are not in), the yesterday flag and whether they are flagged.
+ * Filtered, searched and sorted in SQL. The filters combine: `flagged` with `status` "late"
+ * keeps the late, with `no_clock_out_yesterday` the open shifts.
  *
  * @param {{query: Function}} client
  * @param {{date?: string, status?: string, department_id?: string, q?: string,
- *          no_clock_out_yesterday?: boolean}} filters
+ *          no_clock_out_yesterday?: boolean, flagged?: boolean}} filters
  * @param {{scope: string, scope_ids: string[]|null}} scope
  * @param {{page?: number, sort?: {field: string, dir: string}}} query  the validated list query
  */
 async function page(client, filters, scope, query = {}) {
-  const { date, status, department_id: departmentId, q } = filters || {};
-  if (status !== undefined && status !== null && !STATUSES.includes(status))
-    throw new TypeError(`roster: "${status}" is not a roster status`);
-  const flag = typeof filters.no_clock_out_yesterday === "boolean" ? filters.no_clock_out_yesterday : null;
-  const { day, yesterday } = await dayAndYesterday(client, date);
+  const f = filters || {};
+  if (f.status !== undefined && f.status !== null && !STATUSES.includes(f.status))
+    throw new TypeError(`roster: "${f.status}" is not a roster status`);
+  const { day, yesterday } = await dayAndYesterday(client, f.date);
   const params = [];
-  const roster = rosterSql(day, yesterday, scope, params, { department_id: departmentId, q });
+  const roster = rosterSql(day, yesterday, scope, params, f);
   const bind = binder(params);
-  const wanted = bind(status || null);
-  const flagged = bind(flag);
+  const wanted = bind(f.status || null);
+  const noClockOut = bind(yesNo(f.no_clock_out_yesterday));
+  const flagged = bind(yesNo(f.flagged));
   return pageQuery(
     client,
     `SELECT r.employee_id, r.first_name, r.last_name, r.job_title, r.department_id, r.department,
             r.work_pattern, r.status, r.clock_in_at, r.clock_out_at, r.late_minutes,
-            r.worksite, r.no_clock_out_yesterday, ${TOTAL_COL}
+            r.worksite, r.no_clock_out_yesterday, ${FLAGGED} AS flagged, ${TOTAL_COL}
        FROM (${roster}) r
       WHERE (${wanted}::text IS NULL OR r.status = ${wanted}::text)
-        AND (${flagged}::boolean IS NULL OR r.no_clock_out_yesterday = ${flagged}::boolean)
+        AND (${noClockOut}::boolean IS NULL OR r.no_clock_out_yesterday = ${noClockOut}::boolean)
+        AND (${flagged}::boolean IS NULL OR ${FLAGGED} = ${flagged}::boolean)
       ORDER BY ${orderBy(query, SORTS, "r.employee_id")}`,
     params,
     query,
   );
+}
+
+/** The SQL for each sort Attendance This Month's contract allow-lists. The first is the default order. */
+const MONTH_SORTS = {
+  display_name: "m.last_name, m.first_name",
+  on_time: "m.days_present - m.late_days",
+};
+
+/**
+ * One page of the people on the register on any day from `from` to `to` (both included, at
+ * most 31), within the reader's scope, each with the totals My Attendance shows for those
+ * days (repo.daysSummary, through totalsOf): one paged query, never one per person.
+ *
+ * The range is taken as the caller gives it; for a month so far it ends today, as personal()
+ * ends its totals there. Someone who left during it, or has a record in it, is listed with
+ * what they had; someone who starts after it is not.
+ *
+ * @param {{query: Function}} client
+ * @param {{from: string, to: string, department_id?: string, q?: string}} filters  YYYY-MM-DD
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {{page?: number, sort?: {field: string, dir: string}}} query  the validated list query
+ * @returns {Promise<{data: Array<{employee_id: string, first_name: string, last_name: string,
+ *   job_title: string|null, department_id: string, department: string|null, expected: number,
+ *   on_time: number, late: number, absent: number, on_leave: number}>, page: object}>}
+ */
+async function month(client, filters, scope, query = {}) {
+  const { from, to } = filters;
+  assertRange(from, to);
+  const params = [];
+  const bind = binder(params);
+  const first = `${bind(from)}::date`;
+  const last = `${bind(to)}::date`;
+  const narrowed = personFilters(bind, filters);
+  const s = scopeClause(scope, { column: "e.employee_id" }, params);
+  const result = await pageQuery(
+    client,
+    `SELECT m.*, ${TOTAL_COL}
+       FROM (
+         SELECT e.employee_id, e.first_name, e.last_name, e.job_title, e.department_id, d.name AS department,
+                count(*) FILTER (WHERE ad.status IN ('present', 'late'))::int AS days_present,
+                count(*) FILTER (WHERE ad.status = 'late')::int AS late_days,
+                count(*) FILTER (WHERE ad.status = 'absent')::int AS absent_days,
+                count(*) FILTER (WHERE ad.status = 'leave')::int AS leave_days
+           FROM employee e
+           LEFT JOIN department d ON d.department_id = e.department_id
+           LEFT JOIN attendance_day ad ON ad.employee_id = e.employee_id
+                 AND ad.attendance_date BETWEEN ${first} AND ${last}
+          WHERE ${onRegisterBetween(first, last)}
+            AND ${narrowed}
+            ${s.and}
+          GROUP BY e.employee_id, d.name
+       ) m
+      ORDER BY ${orderBy(query, MONTH_SORTS, "m.employee_id")}`,
+    params,
+    query,
+  );
+  return {
+    data: result.data.map((r) => ({
+      employee_id: r.employee_id,
+      first_name: r.first_name,
+      last_name: r.last_name,
+      job_title: r.job_title,
+      department_id: r.department_id,
+      department: r.department,
+      ...totalsOf(r),
+    })),
+    page: result.page,
+  };
 }
 
 /**
@@ -332,18 +451,8 @@ async function page(client, filters, scope, query = {}) {
  *   totals: {expected: number, on_time: number, late: number, absent: number, on_leave: number}}>}
  */
 async function personal(client, { employee_id: employeeId, from, to, today = lagos.today() }) {
-  lagos.assertDate(from, "from");
-  lagos.assertDate(to, "to");
+  assertRange(from, to);
   lagos.assertDate(today, "today");
-  const span = lagos.daysBetween(from, to);
-  if (span < 0)
-    throw new AppError("ATTENDANCE_RANGE", "The last day is before the first", 422, {
-      to: ["Before the first day"],
-    });
-  if (span >= MAX_DAYS)
-    throw new AppError("ATTENDANCE_RANGE", `Pick at most ${MAX_DAYS} days`, 422, {
-      to: [`More than ${MAX_DAYS} days`],
-    });
 
   const dates = [];
   for (let d = from; d <= to; d = lagos.addDays(d, 1)) dates.push(d);
@@ -387,5 +496,6 @@ module.exports = {
   totalsOf,
   summary,
   page,
+  month,
   personal,
 };

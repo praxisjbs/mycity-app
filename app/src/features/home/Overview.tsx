@@ -7,7 +7,7 @@ import { useClock } from "@/features/attendance/ClockButton";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { Button, DesktopOnly, ErrorState, formatCount, formatDate, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, zoneClock } from "@mycity/ui";
-import { OverviewCards } from "./cards";
+import { CardRow } from "./cards";
 import { claimClockPrompt } from "./clockPrompt";
 import { reloadsFor } from "./refresh";
 import { useCreateActions } from "./createActions";
@@ -192,7 +192,7 @@ export function Overview({ linked }: { linked: string | null }) {
           Choose Cards
         </Button>
       </DesktopOnly>
-      {data.cards.length > 0 && <OverviewCards cards={data.cards} onOpen={open} />}
+      {data.cards.length > 0 && <CardRow cards={data.cards} onOpen={open} />}
       <SectionRows sections={sectionsOf(data)} />
     </>
   );
