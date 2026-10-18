@@ -157,6 +157,12 @@ async function me(db, userId) {
   const view = row.is_ceo
     ? "ceo"
     : (roles.find((r) => r.home_view) || { home_view: "staff" }).home_view;
+  // The same codes requireCapability reads, so the shell shows what the API allows;
+  // the CEO passes every capability check and so holds every code there is.
+  const capabilities =
+    row.is_ceo === true
+      ? await repo.allCapabilityCodes(db)
+      : await grantsCache.getCapabilities(db, userId);
   return {
     user_id: row.user_id,
     employee_id: row.employee_id,
@@ -168,6 +174,7 @@ async function me(db, userId) {
     photo_url: null,
     is_ceo: row.is_ceo === true,
     grants,
+    capabilities,
     roles: roles.map((r) => ({ code: r.code, name: r.name })),
     home_view: view,
     manages_people: row.manages_people === true,

@@ -30,6 +30,8 @@ const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const organisation = require("../../src/modules/organisation/organisation.service");
+const catalog = require("../../src/shared/access/access.catalog");
+const grantsCache = require("../../src/shared/rbac/grants-cache");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -172,13 +174,66 @@ describeDb("identity against the real migrations", () => {
       expect(cookieOf(res, "mycity_device")).not.toBeNull();
     });
 
-    test("/me answers for the bearer, and the CEO holds every action", async () => {
+    test("/me answers for the bearer, and the CEO holds every action and every capability", async () => {
       const { token } = await signIn("ceo@mycity.test", CEO_PASSWORD);
       const me = await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${token}`);
       expect(me.status).toBe(200);
       expect(me.body.is_ceo).toBe(true);
       expect(me.body.home_view).toBe("ceo");
       expect(me.body.grants.payroll).toEqual(["view", "create", "edit", "delete", "approve", "export"]);
+      const every = (await q("SELECT code::text AS code FROM capability ORDER BY code")).rows.map((r) => r.code);
+      expect(every).toEqual(expect.arrayContaining(catalog.CAPABILITIES));
+      expect(me.body.capabilities).toEqual(every);
+    });
+
+    test("/me lists the capabilities the person's roles hold, A to Z, the same codes the routes check", async () => {
+      const { res, token } = await signIn("ops@mycity.test", OPS_PASSWORD);
+      const held = (
+        await q(
+          `SELECT c.code::text AS code
+             FROM role_capability rc
+             JOIN role r ON r.role_id = rc.role_id
+             JOIN capability c ON c.capability_id = rc.capability_id
+            WHERE r.code = 'operations_people'
+            ORDER BY c.code`,
+        )
+      ).rows.map((r) => r.code);
+      expect(held).toEqual(expect.arrayContaining(["alerts.clear", "announcements.post"]));
+      expect(res.body.user.capabilities).toEqual(held);
+      expect(await grantsCache.getCapabilities(pool, people.ops.user.user_id)).toEqual(held);
+      const me = await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${token}`);
+      expect(me.body.capabilities).toEqual(held);
+    });
+
+    test("a capability given to the person directly shows on /me beside their roles'", async () => {
+      const { token } = await signIn("ops@mycity.test", OPS_PASSWORD);
+      const userId = people.ops.user.user_id;
+      const capabilities = async () => (await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${token}`)).body.capabilities;
+      const refresh = async () => {
+        await grantsCache.invalidateGrants();
+        await grantsCache.invalidateUser(userId);
+      };
+      // The role's home.team is set aside for the test, so only the direct grant can show it.
+      const taken = await q(
+        `DELETE FROM role_capability rc USING role r, capability c
+          WHERE r.role_id = rc.role_id AND c.capability_id = rc.capability_id
+            AND r.code = 'operations_people' AND c.code = 'home.team'
+         RETURNING rc.role_id, rc.capability_id`,
+      );
+      try {
+        await refresh();
+        expect(await capabilities()).not.toContain("home.team");
+        await q("INSERT INTO user_capability (user_id, capability_id) SELECT $1, capability_id FROM capability WHERE code = 'home.team'", [userId]);
+        await refresh();
+        const held = await capabilities();
+        expect(held).toContain("home.team");
+        expect(held).toEqual([...held].sort());
+      } finally {
+        await q("DELETE FROM user_capability WHERE user_id = $1", [userId]);
+        for (const row of taken.rows)
+          await q("INSERT INTO role_capability (role_id, capability_id) VALUES ($1, $2)", [row.role_id, row.capability_id]);
+        await refresh();
+      }
     });
 
     test("the browser greets the last person who signed in on it", async () => {
@@ -422,6 +477,7 @@ describeDb("identity against the real migrations", () => {
       expect(res.body.user.home_view).toBe("staff");
       expect(res.body.user.grants.settings).toBeUndefined();
       expect(res.body.user.grants.ess).toEqual(["view", "create", "edit"]);
+      expect(res.body.user.capabilities).toEqual([]);
 
       const row = await asOps(request(app).get(`/api/v1/users/${people.staffUserId}`));
       expect(row.body.status).toBe("active");

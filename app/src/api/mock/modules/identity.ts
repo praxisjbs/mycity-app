@@ -1,5 +1,6 @@
 import type { Me, SignIn } from "@mycity/contract/contract.gen.ts";
 import { at, fail, invalid, mockSession, ok, noContent, paged, route } from "../core";
+import { capabilitiesOf } from "../data/access";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
 import { searchResult } from "../data/search";
 import { codeGiven, codeOk, markFresh, needsCode, passkeyOwner, waysOf } from "./security";
@@ -21,6 +22,8 @@ const ROLE: Record<string, { code: string; name: string }> = {
 
 function me(key: string): Me {
   const p = byKey(key)!;
+  const role = ROLE[SIGN_INS[key]?.role ?? "Staff"] ?? ROLE.Staff;
+  const isCeo = key === "ifeoma";
   return {
     user_id: p.employee_id.replace(/^.{4}/, "u5e7"),
     employee_id: p.employee_id,
@@ -30,9 +33,10 @@ function me(key: string): Me {
     job_title: p.job_title,
     department: p.department,
     photo_url: null,
-    is_ceo: key === "ifeoma",
+    is_ceo: isCeo,
     grants: grantsFor(key) as Me["grants"],
-    roles: [ROLE[SIGN_INS[key]?.role ?? "Staff"] ?? ROLE.Staff],
+    capabilities: capabilitiesOf([role.code], isCeo),
+    roles: [role],
     home_view: SIGN_INS[key]?.view ?? "staff",
     manages_people: teamOf(key).length > 0,
   };

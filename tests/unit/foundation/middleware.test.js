@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Middleware in isolation: rbac scope rules, record scope SQL, idempotency,
+ * Middleware in isolation: rbac scope rules and capabilities, record scope SQL, idempotency,
  * the error envelope for database errors, and upload limits.
  */
 const express = require("express");
@@ -18,7 +18,7 @@ jest.mock("../../../src/shared/rbac/grants-cache", () => ({
 const { pool } = require("../../../src/config/db");
 const grants = require("../../../src/shared/rbac/grants-cache");
 const { config } = require("../../../src/config/env");
-const { requirePermission, requireAnyPermission, requireCapability, readPermissions } = require("../../../src/middleware/rbac");
+const { requirePermission, requireAnyPermission, requireCapability, requireAnyCapability, readPermissions } = require("../../../src/middleware/rbac");
 const { scopeClause, assertInScope } = require("../../../src/shared/rbac/scope");
 const { idempotency } = require("../../../src/middleware/idempotency");
 const { errorHandler } = require("../../../src/middleware/error-handler");
@@ -88,10 +88,47 @@ describe("rbac", () => {
   });
 
   test("capabilities are checked on the user, CEO excepted", async () => {
-    grants.getCapabilities.mockResolvedValue(["approver"]);
-    expect((await runMw(requireCapability("disburser"), staff)).error).toMatchObject({ code: "CAPABILITY_REQUIRED" });
-    expect((await runMw(requireCapability("approver"), staff)).error).toBeNull();
-    expect((await runMw(requireCapability("disburser"), { ...staff, is_ceo: true })).error).toBeNull();
+    grants.getCapabilities.mockResolvedValue(["alerts.clear"]);
+    expect((await runMw(requireCapability("home.team"), staff)).error).toMatchObject({ code: "CAPABILITY_REQUIRED", status: 403 });
+    expect((await runMw(requireCapability("alerts.clear"), staff)).error).toBeNull();
+    expect((await runMw(requireCapability("home.team"), { ...staff, is_ceo: true })).error).toBeNull();
+    expect(grants.getCapabilities).toHaveBeenCalledTimes(2);
+  });
+
+  test("any-of passes on one capability held, and refuses none", async () => {
+    const either = requireAnyCapability(["alerts.clear", "alerts.manage"]);
+    grants.getCapabilities.mockResolvedValue(["alerts.manage"]);
+    expect((await runMw(either, staff)).error).toBeNull();
+    grants.getCapabilities.mockResolvedValue(["home.team"]);
+    expect((await runMw(either, staff)).error).toMatchObject({ code: "CAPABILITY_REQUIRED", status: 403 });
+    grants.getCapabilities.mockClear();
+    expect((await runMw(either, { ...staff, is_ceo: true })).error).toBeNull();
+    expect(grants.getCapabilities).not.toHaveBeenCalled();
+  });
+
+  test("a capability check sets no scope: the permission check before it does", async () => {
+    grants.getCapabilities.mockResolvedValue(["home.team"]);
+    const { req } = await runMw(requireCapability("home.team"), staff);
+    expect(req.scope).toBeUndefined();
+    expect(req.permission).toBeUndefined();
+  });
+
+  test("a code outside the catalogue is refused when the route is defined, not at the first request", () => {
+    expect(() => requireCapability("home.teams")).toThrow(/"home\.teams" is not a capability/);
+    expect(() => requireCapability()).toThrow(/is not a capability/);
+    expect(() => requireAnyCapability(["alerts.clear", "alerts.delete"])).toThrow(/"alerts\.delete" is not a capability/);
+    expect(() => requireAnyCapability([])).toThrow(/give capability codes/);
+    expect(() => requireAnyCapability("alerts.clear")).toThrow(/give capability codes/);
+  });
+
+  test("each check carries its code, for route() and the gates to read", () => {
+    expect(requireCapability("home.reports").capability).toBe("home.reports");
+    const codes = ["alerts.clear", "alerts.manage"];
+    const mw = requireAnyCapability(codes);
+    expect(mw.capabilities).toEqual(codes);
+    codes.push("home.team");
+    expect(mw.capabilities).toEqual(["alerts.clear", "alerts.manage"]);
+    expect(requireCapability("home.reports").permission).toBeUndefined();
   });
 
   test("readPermissions answers without throwing", async () => {

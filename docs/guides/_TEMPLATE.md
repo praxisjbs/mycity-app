@@ -7,6 +7,7 @@
 | Backend modules | `<module>`, `<module>` |
 | Frontend paths | `app/src/features/<module>/` (the feature's own folders; never `packages/ui`) |
 | Permission key(s) | `<key>` |
+| Capabilities | `<area>.<authority>` (<what it allows>), or none |
 | Screens (PROGRESS.md rows) | #<n>, #<n> |
 | Status | Draft · Agreed · Built · Accepted |
 | Last changed | <dd/mm/yyyy> |
@@ -26,6 +27,14 @@ added there with `npm run new:component` (FRONTEND_GUIDE §1). A change to the c
 change this guide (and add a Change log line), or say `Guide-unchanged: <reason>` in the PR
 description. Keep all fourteen section headings and both §10 tables, each with at least one real
 row; the check requires them.
+
+**Capabilities** names every authority the feature needs that its permission key's six actions
+cannot express (only managers see a tab, only some people write the rules), each with what it
+allows, or says `none`. The rule is README §5.2 and the steps are BACKEND_GUIDE §5: a two-segment
+code, declared once in `CAPABILITY_CATALOG`, seeded with its default holders, checked on the route
+after the permission, mirrored in the shell and ⌘K. Who holds each by default goes in §8, the routes
+it guards in §5. Every guide keeps this row, `none` included, so no module is built without the
+question being asked.
 
 ---
 
@@ -66,7 +75,8 @@ Schema migration file(s): `migrations/<NNNN_name.sql>`. Reference-data file(s):
 |---|---|---|---|---|
 | <`GET /api/v1/attendance`> | <`AttendanceListQuery` → `AttendancePage`> | <`people` view · all/team/own> | <yes, 25> | |
 
-Every list is paged at 25 (BACKEND_STRUCTURE §16). Name the filters each list accepts.
+Every list is paged at 25 (BACKEND_STRUCTURE §16). Name the filters each list accepts. A route
+behind a capability names it after the grant: <`home` view · team, `home.team`>.
 
 ## 6 · Rules and calculations
 
@@ -87,7 +97,8 @@ them.>
 | <Employee> | <own record only> | <clock in and out> |
 | <HR / Operations> | <everyone> | <reconcile, waive, uphold> |
 
-Restricted fields and who may see them.
+Restricted fields and who may see them. Each capability in the header and the roles that hold it
+by default (the CEO holds every one).
 
 ## 9 · AI and search
 

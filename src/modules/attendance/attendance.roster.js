@@ -1,0 +1,391 @@
+"use strict";
+/**
+ * The attendance roster: a day's register in the shape Home reads it. Who is on the day,
+ * who came in, how, and who did not.
+ *
+ * Home reads attendance only through this file (the Clocked In Today card and the list
+ * behind it, the Team tab, a person's own month). It writes nothing, emits nothing and
+ * decides nothing: every fact is the attendance module's own (docs/guides/attendance.md §6),
+ * read the way People · Attendance and My Attendance read it, so a figure on Home is the
+ * figure on those screens.
+ *
+ *   summary(client, { date }, scope)                     the counts for one day
+ *   page(client, { date, status, ... }, scope, query)    one page of 25 people for one day
+ *   personal(client, { employee_id, from, to })          one person's days and their totals
+ *
+ * Where each fact comes from:
+ *
+ *   the day's record   attendance_day, as reconcile.recomputeDay() writes it on every punch,
+ *                      decision and day-close (rules.projectDay with lateness.minutesLate):
+ *                      its status, first clock-in, last clock-out and late minutes. Which
+ *                      punches count, the work date, the shift, the grace and lateness are
+ *                      decided there, once, and never again here
+ *   a day with none    granted leave, else nothing on a day that is not worked, else not in:
+ *                      the register's own order (attendance.repo.js REGISTER)
+ *   who is on the day  anyone with a record that day, and everyone active, started and not
+ *                      yet left: the register's people
+ *   leave              granted as attendance.repo.js and the leave module read it
+ *   working days       shared/time/working-week through rules.shiftFor, as the day-close reads them
+ *   the clock-in       the day's one active clock-in, for the worksite it was judged against
+ *   a person's totals  repo.daysSummary(), the figures My Attendance shows
+ *
+ * The register's statuses become Home's (packages/contract HomeRosterStatus), one each:
+ *
+ *   leave     on_leave
+ *   late      late
+ *   present   remote for someone who works remotely (work_pattern remote, as the geofence,
+ *             the clock panel and the register read it), else on_site
+ *   absent    absent: a working day the day-close closed with no clock-in
+ *   not_in    not_in: a working day not closed, no clock-in yet
+ *   off       none: a day that is not worked, with nothing recorded
+ *
+ * Beside the status, `no_clock_out_yesterday` flags a person whose last working day has a
+ * clock-in and no clock-out on its record: the open shift the day-close turns into a missing
+ * clock-out (clock-guard isOpen over the day's counted punches).
+ *
+ * The mapping is written twice: statusOf() for one person's days in JavaScript (personal()),
+ * and STATUS in SQL so a list can filter, count and page by it (summary(), page()).
+ * tests/integration/attendance-roster.test.js holds the two to the same answer, and both to
+ * the register's own (repo.register, repo.registerSummary, repo.daysSummary).
+ */
+const { AppError } = require("../../shared/errors");
+const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { scopeClause } = require("../../shared/rbac/scope");
+const lagos = require("../../shared/time/lagos");
+const workingWeek = require("../../shared/time/working-week");
+const rules = require("./attendance.rules");
+const repo = require("./attendance.repo");
+
+/** Home's statuses (packages/contract HomeRosterStatus), in display order. */
+const STATUSES = Object.freeze(["on_leave", "late", "on_site", "remote", "absent", "not_in"]);
+
+/** The longest stretch personal() reads: a calendar month, or the last 30 days. */
+const MAX_DAYS = 31;
+
+/** What a day the attendance module recorded counts as on My Attendance (repo.daysSummary). */
+const OUTCOME = Object.freeze({ present: "on_time", late: "late", absent: "absent", leave: "on_leave" });
+
+/* ------------------------------------------------------------------ *
+ * The rule, for one person on one day
+ * ------------------------------------------------------------------ */
+
+/**
+ * A day as the attendance module reads it: whether it is worked and its hours
+ * (rules.shiftFor over the working week; the grace is each person's, so none here).
+ *
+ * @param {string} date  YYYY-MM-DD
+ * @param {import("../../shared/time/working-week").Calendar} cal
+ */
+function dayOf(date, cal) {
+  lagos.assertDate(date);
+  const shift = rules.shiftFor(date, cal, rules.DEFAULT_POLICY);
+  return { date, working_day: shift.working_day, starts_at: shift.starts_at, ends_at: shift.ends_at };
+}
+
+/**
+ * The day "yesterday" means on the roster: the last working day before `date`, so on a
+ * Monday it is Saturday, and after a public holiday it is the day before the holiday.
+ */
+function yesterdayOf(date, cal) {
+  return dayOf(workingWeek.addWorkingDays(date, -1, cal), cal);
+}
+
+/**
+ * One person's status on one day, as the register gives it, in Home's words; null on a
+ * day that is not worked with nothing recorded.
+ *
+ * @param {{day_status: string|null, on_leave: boolean, working_day: boolean, work_pattern: string}} f
+ *   day_status  attendance_day.status for the day, null when there is no record or it has none
+ *   on_leave    granted leave covers the day
+ */
+function statusOf(f) {
+  switch (f.day_status) {
+    case "leave":
+      return "on_leave";
+    case "late":
+      return "late";
+    case "present":
+      return f.work_pattern === "remote" ? "remote" : "on_site";
+    case "absent":
+      return "absent";
+    default:
+      break;
+  }
+  if (f.on_leave) return "on_leave";
+  return f.working_day ? "not_in" : null;
+}
+
+/** What a recorded day counts as on My Attendance (on_time, late, absent, on_leave), or null. */
+const outcomeOf = (dayStatus) => OUTCOME[dayStatus] || null;
+
+/**
+ * My Attendance's figures (repo.daysSummary) as the roster's totals. A day counts once the
+ * attendance module has recorded it: a clock-in on the day, or the day-close's absence or
+ * leave. Leave is counted apart, so `expected` is always on_time + late + absent.
+ *
+ * @param {{days_present: number, late_days: number, absent_days: number, leave_days: number}} s
+ */
+function totalsOf(s) {
+  return {
+    expected: s.days_present + s.absent_days,
+    on_time: s.days_present - s.late_days,
+    late: s.late_days,
+    absent: s.absent_days,
+    on_leave: s.leave_days,
+  };
+}
+
+const NO_TOTALS = Object.freeze({ expected: 0, on_time: 0, late: 0, absent: 0, on_leave: 0 });
+
+/* ------------------------------------------------------------------ *
+ * The same rule in SQL, and the facts it reads
+ * ------------------------------------------------------------------ */
+
+/**
+ * Whether granted leave covers `day` for `employee` (SQL expressions): approved on the
+ * request, or still `submitted` there while its approval has already granted it, as
+ * attendance.repo.js GRANTED_LEAVE and leave.repo.js read it.
+ */
+const grantedLeave = (employee, day) => `EXISTS (
+  SELECT 1
+    FROM leave_request lr
+    LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = lr.workflow_instance_id
+   WHERE lr.employee_id = ${employee} AND lr.starts_on <= ${day} AND lr.ends_on >= ${day}
+     AND (lr.status = 'approved'
+          OR (lr.status = 'submitted' AND wi.state IN ('approved', 'timeout_approved'))))`;
+
+/**
+ * Whether employee `e` is on the register on `day`, `ad` being their day's record: anyone
+ * with a record, and everyone active, started and not yet left (attendance.repo.js REGISTER).
+ */
+const onRegister = (day) => `(ad.attendance_day_id IS NOT NULL
+  OR (e.status = 'active' AND (e.start_date IS NULL OR e.start_date <= ${day})
+      AND (e.left_on IS NULL OR e.left_on > ${day})))`;
+
+/** statusOf(), over the columns of the facts `f`. */
+const STATUS = `CASE f.day_status
+  WHEN 'leave' THEN 'on_leave'
+  WHEN 'late' THEN 'late'
+  WHEN 'present' THEN CASE WHEN f.work_pattern = 'remote' THEN 'remote' ELSE 'on_site' END
+  WHEN 'absent' THEN 'absent'
+  ELSE CASE WHEN f.on_leave THEN 'on_leave' WHEN f.working_day THEN 'not_in' END
+END`;
+
+/** Appends a value to the query's parameters and returns its placeholder. */
+const binder = (params) => (value) => {
+  params.push(value);
+  return `$${params.length}`;
+};
+
+/**
+ * Everyone on the register on a day within `scope`, one row each with what their day
+ * holds and their status. `filters` narrows the people before anything is worked out.
+ *
+ * The clock-in's worksite is the one its punch was judged against, read from the day's
+ * active clock-in (one a day, attendance_event_one_active_uq); it shows only while the
+ * day's record has a clock-in, so a punch a decision excluded names none.
+ *
+ * @param {ReturnType<typeof dayOf>} day
+ * @param {ReturnType<typeof dayOf>} yesterday
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {Array} params  the query's parameters; this appends its own
+ * @param {{department_id?: string, q?: string}} [filters]
+ */
+function rosterSql(day, yesterday, scope, params, filters = {}) {
+  const bind = binder(params);
+  const date = `${bind(day.date)}::date`;
+  // Worked out in SQL, as the register does: a holiday entered a moment ago already counts.
+  const working = repo.WORKING_DAY(date);
+  const yDate = `${bind(yesterday.date)}::date`;
+  const department = bind(filters.department_id || null);
+  const q = bind(filters.q || null);
+  const s = scopeClause(scope, { column: "e.employee_id" }, params);
+  return `
+    SELECT f.*, ${STATUS} AS status,
+           CASE WHEN f.clock_in_at IS NOT NULL AND f.work_pattern <> 'remote' THEN f.clock_in_worksite END AS worksite
+      FROM (
+        SELECT e.employee_id, e.first_name, e.last_name, e.job_title, e.department_id,
+               d.name AS department, e.work_pattern, ${working} AS working_day,
+               ad.status AS day_status, ${grantedLeave("e.employee_id", date)} AS on_leave,
+               ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
+               COALESCE(ad.late_minutes, 0) AS late_minutes, w.name AS clock_in_worksite,
+               (yd.first_clock_in_at IS NOT NULL AND yd.last_clock_out_at IS NULL) AS no_clock_out_yesterday
+          FROM employee e
+          LEFT JOIN department d ON d.department_id = e.department_id
+          LEFT JOIN attendance_day ad ON ad.employee_id = e.employee_id AND ad.attendance_date = ${date}
+          LEFT JOIN attendance_day yd ON yd.employee_id = e.employee_id AND yd.attendance_date = ${yDate}
+          LEFT JOIN attendance_event ci ON ci.employee_id = e.employee_id AND ci.work_date = ${date}
+                AND ci.event_type = 'clock_in' AND ci.validation_state IN ('accepted', 'review')
+          LEFT JOIN worksite w ON w.worksite_id = ci.worksite_id
+         WHERE ${onRegister(date)}
+           AND (${department}::uuid IS NULL OR e.department_id = ${department}::uuid)
+           AND (${q}::text IS NULL
+                OR search_fold(e.first_name || ' ' || e.last_name || ' ' || e.job_title)
+                   LIKE '%' || search_fold(${q}::text) || '%')
+           ${s.and}
+      ) f`;
+}
+
+/** The day asked for (today in Lagos when none is) and the day before it, as the roster reads them. */
+async function dayAndYesterday(client, date) {
+  const cal = await workingWeek.loadCalendar(client);
+  const on = date || lagos.today();
+  return { day: dayOf(on, cal), yesterday: yesterdayOf(on, cal) };
+}
+
+/* ------------------------------------------------------------------ *
+ * Reads
+ * ------------------------------------------------------------------ */
+
+/**
+ * The counts for one day, within the reader's scope, as the register counts them
+ * (repo.registerSummary), with `present` split by where people work.
+ *
+ *   expected  on a working day, everyone on the register but those on leave
+ *             (present + absent + not_in); 0 on a day that is not worked
+ *   present   late + on_site + remote: a clock-in that counts, on any day
+ *
+ * @param {{query: Function}} client
+ * @param {{date?: string}} opts  YYYY-MM-DD; today in Lagos when left out
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ */
+async function summary(client, { date }, scope) {
+  const { day, yesterday } = await dayAndYesterday(client, date);
+  const params = [];
+  const roster = rosterSql(day, yesterday, scope, params);
+  const { rows } = await client.query(
+    `SELECT count(*) FILTER (WHERE r.working_day AND r.status <> 'on_leave')::int AS expected,
+            count(*) FILTER (WHERE r.status IN ('late', 'on_site', 'remote'))::int AS present,
+            count(*) FILTER (WHERE r.status = 'on_site')::int AS on_site,
+            count(*) FILTER (WHERE r.status = 'remote')::int AS remote,
+            count(*) FILTER (WHERE r.status = 'late')::int AS late,
+            count(*) FILTER (WHERE r.status = 'absent')::int AS absent,
+            count(*) FILTER (WHERE r.status = 'on_leave')::int AS on_leave,
+            count(*) FILTER (WHERE r.status = 'not_in')::int AS not_in,
+            count(*) FILTER (WHERE r.no_clock_out_yesterday)::int AS no_clock_out_yesterday,
+            ${repo.WORKING_DAY(`$${params.push(day.date)}::date`)} AS working_day
+       FROM (${roster}) r`,
+    params,
+  );
+  return { date: day.date, ...rows[0] };
+}
+
+/** The SQL for each sort the Team roster's contract allow-lists. The first is the default order. */
+const SORTS = {
+  display_name: "r.last_name, r.first_name",
+  department: "r.department",
+  clock_in_at: "r.clock_in_at",
+};
+
+/**
+ * One page of the people on the register on a day, within the reader's scope, each with
+ * their status, clock-in and clock-out, late minutes, the worksite of their clock-in (null
+ * when they work remotely or are not in) and the yesterday flag. Filtered, searched and
+ * sorted in SQL.
+ *
+ * @param {{query: Function}} client
+ * @param {{date?: string, status?: string, department_id?: string, q?: string,
+ *          no_clock_out_yesterday?: boolean}} filters
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {{page?: number, sort?: {field: string, dir: string}}} query  the validated list query
+ */
+async function page(client, filters, scope, query = {}) {
+  const { date, status, department_id: departmentId, q } = filters || {};
+  if (status !== undefined && status !== null && !STATUSES.includes(status))
+    throw new TypeError(`roster: "${status}" is not a roster status`);
+  const flag = typeof filters.no_clock_out_yesterday === "boolean" ? filters.no_clock_out_yesterday : null;
+  const { day, yesterday } = await dayAndYesterday(client, date);
+  const params = [];
+  const roster = rosterSql(day, yesterday, scope, params, { department_id: departmentId, q });
+  const bind = binder(params);
+  const wanted = bind(status || null);
+  const flagged = bind(flag);
+  return pageQuery(
+    client,
+    `SELECT r.employee_id, r.first_name, r.last_name, r.job_title, r.department_id, r.department,
+            r.work_pattern, r.status, r.clock_in_at, r.clock_out_at, r.late_minutes,
+            r.worksite, r.no_clock_out_yesterday, ${TOTAL_COL}
+       FROM (${roster}) r
+      WHERE (${wanted}::text IS NULL OR r.status = ${wanted}::text)
+        AND (${flagged}::boolean IS NULL OR r.no_clock_out_yesterday = ${flagged}::boolean)
+      ORDER BY ${orderBy(query, SORTS, "r.employee_id")}`,
+    params,
+    query,
+  );
+}
+
+/**
+ * One person's days from `from` to `to` (both included, at most 31), each with its status
+ * as summary() and page() would give it and the attendance module's own record of it
+ * (`day_status`), and the totals My Attendance shows for the days up to `today`
+ * (repo.daysSummary). The caller has already decided the reader may see this person (their
+ * own record, or assertInScope). The person is read whatever their status today, so the
+ * record of someone who has left still reads; a day they were not on the register has no
+ * status.
+ *
+ * @param {{query: Function}} client
+ * @param {{employee_id: string, from: string, to: string, today?: string}} opts
+ *   today  YYYY-MM-DD in Lagos, for the totals; today when left out
+ * @returns {Promise<{employee_id: string, from: string, to: string,
+ *   days: Array<{date: string, working_day: boolean, status: string|null, day_status: string|null,
+ *                clock_in_at: Date|null, clock_out_at: Date|null, late_minutes: number}>,
+ *   totals: {expected: number, on_time: number, late: number, absent: number, on_leave: number}}>}
+ */
+async function personal(client, { employee_id: employeeId, from, to, today = lagos.today() }) {
+  lagos.assertDate(from, "from");
+  lagos.assertDate(to, "to");
+  lagos.assertDate(today, "today");
+  const span = lagos.daysBetween(from, to);
+  if (span < 0)
+    throw new AppError("ATTENDANCE_RANGE", "The last day is before the first", 422, {
+      to: ["Before the first day"],
+    });
+  if (span >= MAX_DAYS)
+    throw new AppError("ATTENDANCE_RANGE", `Pick at most ${MAX_DAYS} days`, 422, {
+      to: [`More than ${MAX_DAYS} days`],
+    });
+
+  const dates = [];
+  for (let d = from; d <= to; d = lagos.addDays(d, 1)) dates.push(d);
+
+  const { rows } = await client.query(
+    `SELECT dy.on_date, ${repo.WORKING_DAY("dy.on_date")} AS working_day, e.work_pattern,
+            ${onRegister("dy.on_date")} AS on_register,
+            ad.status AS day_status, ${grantedLeave("e.employee_id", "dy.on_date")} AS on_leave,
+            ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
+            COALESCE(ad.late_minutes, 0) AS late_minutes
+       FROM employee e
+      CROSS JOIN unnest($2::date[]) AS dy(on_date)
+       LEFT JOIN attendance_day ad ON ad.employee_id = e.employee_id AND ad.attendance_date = dy.on_date
+      WHERE e.employee_id = $1
+      ORDER BY dy.on_date`,
+    [employeeId, dates],
+  );
+  if (rows.length === 0) throw new AppError("NOT_FOUND", "That employee does not exist", 404);
+
+  const days = rows.map((r) => ({
+    date: r.on_date,
+    working_day: r.working_day,
+    status: r.on_register ? statusOf(r) : null,
+    day_status: r.day_status,
+    clock_in_at: r.clock_in_at,
+    clock_out_at: r.clock_out_at,
+    late_minutes: r.late_minutes,
+  }));
+  const last = to < today ? to : today;
+  const totals = last < from ? { ...NO_TOTALS } : totalsOf(await repo.daysSummary(client, employeeId, from, last));
+  return { employee_id: employeeId, from, to, days, totals };
+}
+
+module.exports = {
+  STATUSES,
+  MAX_DAYS,
+  dayOf,
+  yesterdayOf,
+  statusOf,
+  outcomeOf,
+  totalsOf,
+  summary,
+  page,
+  personal,
+};

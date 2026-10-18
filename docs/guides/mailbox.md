@@ -7,6 +7,7 @@
 | Backend modules | `mailbox` |
 | Frontend paths | `app/src/features/mailbox/` |
 | Permission key(s) | `mailbox` |
+| Capabilities | none |
 | Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash; connection under Settings · Integrations |
 | Status | Built |
 | Last changed | 17/10/2026 |
@@ -252,3 +253,4 @@ interface copy; the copy rules apply to the chrome around them.
 - 17/10/2026 · GE · Built on the real API: `1120_mailbox.sql`, the `mailbox` module (IMAP and SMTP provider, threading, folders, send queue), `mail-sync`, `mail-send` and `loops/mail-idle` in the worker. §3 to §5, §7, §9 and §11 rewritten as built; the empty stubs the donor list implied (`threads.*`, `send-queue.*`, `access`, `find`, `presend`, `schedule`, `origin`, `mail-notify`, `attachments.service`, `.ai`, `.search`) were deleted: their work lives in `mailbox.service`, `mailbox.repo` and `mailbox.events`. Search is `search:none`.
 - 17/10/2026 · GE · Connecting moved into Mailbox: a Connect sheet opens over it when there is no connection, and the refused-password banner carries Reconnect, which opens the same sheet. Settings · Integrations only shows the connection.
 - 17/10/2026 · GE · ⌘K finds the owner's own mail (§9): `mailbox.search.js` with the provider's new `owner` pin, and a result opens its conversation by id in any folder. Connect now uses the address's own domain as the mail host (`mycityapp.io`, the name on the host's certificate; `mail.mycityapp.io` fails the check, runbook dns-and-mail §4).
+- 17/10/2026 · TB · Header gains the Capabilities row every guide now carries (README §5.2): none, each mailbox is its owner's.

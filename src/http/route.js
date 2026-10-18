@@ -30,7 +30,11 @@
  *  - a POST, PUT or PATCH with no `body` (use common.EmptyBody when the URL says it all);
  *  - a staff route with neither a requirePermission() handler, nor `self: true`
  *    (authenticated, ownership checked in the service: my notifications, my
- *    profile), nor `anonymous: true` (sign-in only).
+ *    profile), nor `anonymous: true` (sign-in only);
+ *  - a requireCapability() or requireAnyCapability() that does not come after a
+ *    requirePermission(): a capability is an authority inside a module, so the
+ *    module grant (and the scope it sets) is checked first (README §5.2); and
+ *    more than one of them on a route.
  *
  * Path parameters named `id` or `*_id` must be UUIDs unless the contract gives
  * `params`; a malformed id is a 404.
@@ -177,6 +181,22 @@ function define(kind, router, method, path, contract, handlers) {
   const permission = handlers.map((h) => h.permission).find(Boolean) || null;
   if (kind === "public" && permission)
     fail(where, "a public route cannot carry requirePermission()");
+  const gates = handlers.filter((h) => h.capability || h.capabilities);
+  if (gates.length > 1)
+    fail(
+      where,
+      "one capability check per route; requireAnyCapability([...]) takes several codes",
+    );
+  const gate = gates[0] || null;
+  if (
+    gate &&
+    !handlers.slice(0, handlers.indexOf(gate)).some((h) => h.permission)
+  ) {
+    fail(
+      where,
+      "check a capability after requirePermission(key, action): the module grant first, then the authority inside it",
+    );
+  }
   if (
     kind === "staff" &&
     !contract.anonymous &&
@@ -217,6 +237,8 @@ function define(kind, router, method, path, contract, handlers) {
     path,
     contract,
     permission,
+    capability: (gate && gate.capability) || null,
+    capabilities: (gate && gate.capabilities) || null,
   });
 }
 

@@ -13,7 +13,7 @@
  */
 const { z } = require("zod");
 const { uuid, text, listQuery, Paged } = require("./common");
-const { ModuleKey, Action, HomeView } = require("./identity");
+const { ModuleKey, Action, HomeView, CapabilityCode } = require("./identity");
 
 const RecordScope = z.enum(["all", "team", "own"]);
 
@@ -23,13 +23,6 @@ const RecordScope = z.enum(["all", "team", "own"]);
  */
 const FIELD_KEYS = ["employee.salary", "employee.bank", "employee.personal", "employee.statutory"];
 const FieldKey = z.enum(FIELD_KEYS);
-
-/** A capability's code, as stored on `capability.code` ("announcements.post"). */
-const CapabilityCode = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .regex(/^[a-z][a-z_]*\.[a-z][a-z_]*$/, "Not a capability");
 
 /** The Home a role opens. The CEO's Home is the flag's, never a role's. */
 const RoleHomeView = HomeView.exclude(["ceo"]);
@@ -212,7 +205,6 @@ module.exports = {
   RecordScope,
   FIELD_KEYS,
   FieldKey,
-  CapabilityCode,
   RoleHomeView,
   RoleOption,
   RoleListQuery,

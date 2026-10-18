@@ -4,7 +4,9 @@
  * (BACKEND_STRUCTURE §7).
  *
  * This list is the contract between the code and the `numbering_scheme` table:
- *  - migration 0099 seeds one row per entry, from these defaults;
+ *  - a reference seed writes one row per entry, from these defaults (0099 the
+ *    first sixteen; a type added later comes with its milestone's seed, as
+ *    report_run with 1199);
  *  - the readiness probe reports any entry with no row (a type the code would
  *    fail to number);
  *  - scripts/check/numbering-schemes.js fails the build when the code calls
@@ -49,6 +51,13 @@ const SCHEMES = Object.freeze({
     reset: "never",
     include_period: false,
   }, // M0
+  report_run: {
+    prefix: "RPT",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M1 Home: one generated report file, "RPT-0001"
   query: {
     prefix: "QRY",
     padding: 4,

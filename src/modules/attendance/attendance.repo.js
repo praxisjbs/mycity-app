@@ -568,6 +568,7 @@ async function withoutDay(db, date) {
 }
 
 module.exports = {
+  WORKING_DAY,
   lockEmployee,
   person,
   assignedPolicy,

@@ -1,0 +1,55 @@
+"use strict";
+/**
+ * Calendar events, as Home reads them: a person's own events in a span, for Your Week.
+ *
+ * OWNED BY the `calendar` module, M2 Productivity & Performance, AJ (migration 2000).
+ *
+ * Home reads this table before the module that owns it is built, so this file is the one
+ * place Home names it. The M2 pull request that builds `calendar` MUST, in the same PR, move
+ * or replace this query with its own read, keep `tables` true to every column it names, and
+ * clear `owes` as it pays each item (docs/guides/home.md §4.1, docs/DATABASE_SCHEMA.md M2
+ * Owes). A unit test holds `tables` to the migrated schema and the query to `tables`.
+ *
+ * An event is on a person's week when they own it. An event they are only invited to is
+ * not, until calendar has attendees.
+ */
+const { pageQuery, TOTAL_COL } = require("../../../shared/http/paged");
+
+/** The forward tables and the columns this query reads. */
+const TABLES = Object.freeze({
+  calendar_event: ["calendar_event_id", "title", "event_type", "owner_employee_id", "starts_at", "ends_at", "all_day"],
+});
+
+/** What M2 still owes this query. */
+const OWES = Object.freeze([
+  "Attendees and visibility (DATABASE_SCHEMA M2): until then an invitation is not on the invitee's week.",
+  "Index calendar_event (owner_employee_id, starts_at), for a person's week (asked by Home).",
+]);
+
+/**
+ * One page of the events a person owns that overlap `from` up to `to` (exclusive), in
+ * the order they start.
+ * @param {{query: Function}} client
+ * @param {{employee_id: string, from: Date, to: Date}} span
+ * @param {{page?: number}} query
+ */
+function eventsBetween(client, { employee_id: employeeId, from, to }, query) {
+  return pageQuery(
+    client,
+    `SELECT ce.calendar_event_id, ce.title, ce.event_type, ce.starts_at, ce.ends_at, ce.all_day, ${TOTAL_COL}
+       FROM calendar_event ce
+      WHERE ce.owner_employee_id = $1 AND ce.starts_at < $3::timestamptz AND ce.ends_at > $2::timestamptz
+      ORDER BY ce.starts_at, ce.calendar_event_id`,
+    [employeeId, from, to],
+    query,
+  );
+}
+
+module.exports = {
+  module: "calendar",
+  milestone: "M2",
+  owner: "AJ",
+  tables: TABLES,
+  owes: OWES,
+  eventsBetween,
+};

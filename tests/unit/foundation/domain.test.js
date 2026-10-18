@@ -37,6 +37,7 @@ describe("numbering", () => {
   test("formats every default scheme as BACKEND_STRUCTURE §7 says", () => {
     expect(numbering.format(SCHEMES.employee, "all", 1)).toBe("00001");
     expect(numbering.format(SCHEMES.query, "all", 28)).toBe("QRY-0028");
+    expect(numbering.format(SCHEMES.report_run, "all", 214)).toBe("RPT-0214");
     expect(numbering.format(SCHEMES.payroll_run, "2026-10", 1)).toBe("PAY-2026-10");
     expect(numbering.format(SCHEMES.payslip, "2026-10", 1)).toBe("PAY-2026-10-0001");
   });

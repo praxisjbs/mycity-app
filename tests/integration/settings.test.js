@@ -168,7 +168,13 @@ describeDb("access, settings and audit against the real migrations", () => {
         "employee.personal",
         "employee.statutory",
       ]);
-      expect(cat.body.capabilities.map((c) => c.code)).toEqual(["alerts.clear", "announcements.post"]);
+      expect(cat.body.capabilities.map((c) => c.code)).toEqual([
+        "alerts.clear",
+        "alerts.manage",
+        "announcements.post",
+        "home.reports",
+        "home.team",
+      ]);
 
       const m = await as("ops").get("/settings/roles/matrix");
       expect(m.status).toBe(200);
@@ -185,7 +191,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         (await as("ops").get(`/settings/roles/${roles.find((r) => r.code === code).role_id}`)).body;
       const ops = await detail("operations_people");
       expect(ops.visible_fields).toHaveLength(4);
-      expect(ops.capabilities).toEqual(["alerts.clear", "announcements.post"]);
+      expect(ops.capabilities).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team"]);
       const staff = await detail("employee");
       expect(staff.visible_fields).toEqual([]);
       expect(staff.capabilities).toEqual([]);
@@ -199,7 +205,10 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(await grantsCache.getMaskedFieldKeys(pool, people.ops.user.user_id)).toEqual([]);
       expect(await grantsCache.getCapabilities(pool, people.ops.user.user_id)).toEqual([
         "alerts.clear",
+        "alerts.manage",
         "announcements.post",
+        "home.reports",
+        "home.team",
       ]);
       expect(await grantsCache.getCapabilities(pool, people.staff.user.user_id)).toEqual([]);
     });
@@ -501,7 +510,7 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("every numbered document type, with the next number it would give", async () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
-      expect(res.body.page.total).toBe(16);
+      expect(res.body.page.total).toBe(17);
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");
@@ -510,7 +519,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       const found = await as("ops").get("/settings/numbering?q=payslip");
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
-      expect(summary.body).toEqual(expect.objectContaining({ types: 16, resetting: 2 }));
+      expect(summary.body).toEqual(expect.objectContaining({ types: 17, resetting: 2 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {

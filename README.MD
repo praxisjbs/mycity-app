@@ -258,6 +258,39 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 The settings modules that every user touches (`identity` login, own `notifications`, own `documents`,
 `search`, the requests waiting on them in `workflow`) check ownership, not the `settings` grant.
 
+**Capabilities.** A capability is a named authority inside a module that its six actions cannot
+express: Home's `view` opens Home to every employee, `home.team` opens its Team tab to the people
+who manage others. Every module owner applies the same rule to their own (TB, 17/10/2026):
+
+1. **Code** `<area>.<authority>`: two lower_snake segments, where `<area>` is the module key or a
+   named part of the module (`alerts`, `announcements`). Settings · Roles & Permissions saves no
+   other shape.
+2. **Declared once**, in `src/shared/access/access.catalog.js` `CAPABILITY_CATALOG`: the code, its
+   module (a key from the table above), a Title Case label and a one-sentence description.
+3. **Seeded** by the milestone's reference seed, inserted only when absent, with the catalogue's
+   label as its `name` and the roles that hold it by default (the `0449` pattern, MIGRATIONS §9).
+   A person changes who holds it on Settings · Roles & Permissions; a re-run never overwrites that.
+4. **Checked on the route after the module grant**: `requirePermission("home", "view"),
+   requireCapability("home.team"), controller.team`, or `requireAnyCapability([...])` when any of
+   several will do. The grant sets the record scope; the capability sets none. `route()` refuses a
+   capability checked before the grant, and `middleware/rbac.js` an uncatalogued code, at boot.
+   The CEO holds every capability.
+5. **Exposed** on `/me` as `capabilities`, and **mirrored** wherever a screen is shown or offered:
+   `app/src/shell/access.ts` (`hasCapability`) for the menu and the screens, and
+   `src/shared/search/screens.js` (`tabVisible`) for ⌘K.
+6. **Listed** in the module guide's **Capabilities** header row, with who holds it.
+
+`check/capabilities.js` fails a code the code checks that the catalogue lacks, a catalogued code no
+reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5 has the steps.
+
+| Capability | Module | Allows | Held by default (and the CEO) | Seed |
+|---|---|---|---|---|
+| `home.team` | `home` | Home's Team tab: who is in today and the team's figures | Implementation, Operations & People, Management, Head of Department, Line Manager | `1199` |
+| `home.reports` | `home` | Build, schedule, run and receive reports | Implementation, Operations & People, Management, Head of Department, Line Manager | `1199` |
+| `alerts.clear` | `home` | Clear or dismiss an alert, of a rule whose `permission_key` the person also holds | Implementation, Operations & People, Management (`0449`); Head of Department, Line Manager (`1199`) | `0449` |
+| `alerts.manage` | `home` | Create, change and switch off alert rules | Implementation, Operations & People, Management | `1199` |
+| `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
+
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
 | Module | Files beyond the template | Does |
@@ -278,10 +311,10 @@ The settings modules that every user touches (`identity` login, own `notificatio
 
 | Module | Owner | Files beyond the template |
 |---|---|---|
-| `dashboard` | TB | `kpi-catalog/{index, eligibility, guards}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js` |
+| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js` |
 | `alerts` | TB | |
 | `reports` | TB | |
-| `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, worksite and shift for a date), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
+| `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, worksite and shift for a date), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
 | `devices` | LA | `.guard` |
 | `worksites` | LA | |
 | `leave` | AJ | `.balance` (the dates and allowance rules), `.clash` (who else in the department is away); requests open the `leave.approval` flow, decided in `workflow` |
@@ -592,7 +625,7 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 | 20 Money | M6 | `check/money.js` |
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
-`check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
+`check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
 `check/ai-vendor-imports.js`, `check/shell.js`, `check/pagination.js`, `check/provenance.js`
 (code and comments never name the project code came from; that lives in REUSE_MAP.md only).
 

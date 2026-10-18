@@ -54,6 +54,19 @@ const ModuleKey = z.string().regex(/^[a-z][a-z_]*$/);
 const ACTIONS = ["view", "create", "edit", "delete", "approve", "export"];
 const Action = z.enum(ACTIONS);
 
+/**
+ * A capability's code, as stored on `capability.code`: `<area>.<authority>`, two
+ * lower_snake segments ("alerts.clear"). The codes are the access catalogue's
+ * CAPABILITY_CATALOG; a test holds this rule equal to its own. Declared here, not in
+ * access.js, because Me carries the codes and access.js imports this file.
+ */
+const CAPABILITY_CODE = /^[a-z][a-z_]*\.[a-z][a-z_]*$/;
+const CapabilityCode = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(CAPABILITY_CODE, "Not a capability");
+
 /** Which Home layout the person's role opens (docs/guides/home.md). */
 const HomeView = z.enum(["operations", "ceo", "partnerships", "staff"]);
 
@@ -73,9 +86,14 @@ const Me = z
     is_ceo: z.boolean(),
     /** Module key → the actions the person may take there. Hiding is a courtesy; the API enforces. */
     grants: z.record(ModuleKey, z.array(Action)),
+    /**
+     * The capabilities the person holds, through a role or given to them, A to Z; the
+     * CEO holds every one there is. Opens Home's Team, Alerts and Reports tabs.
+     */
+    capabilities: z.array(CapabilityCode),
     roles: z.array(RoleRef),
     home_view: HomeView,
-    /** Does anyone report to this person? Opens Home · Team and the manager views. */
+    /** Does anyone report to this person? Opens the manager views (My Team, approvals). */
     manages_people: z.boolean(),
   })
   .strict();
@@ -256,7 +274,7 @@ const UserInviteEmailVars = z
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   RoleRef: { table: "role" },
-  Me: { table: null, reason: "the signed-in person, assembled from app_user, employee, their roles and the grants cache" },
+  Me: { table: null, reason: "the signed-in person, assembled from app_user, employee, their roles, their capabilities and the grants cache" },
   LoginBody: { table: null, reason: "sign-in credentials, checked and never stored as sent" },
   Session: { table: null, reason: "a new session's tokens and clock, with the signed-in person" },
   SessionTokens: { table: null, reason: "a refreshed access token and the session's clock" },
@@ -301,6 +319,8 @@ module.exports = {
   ModuleKey,
   ACTIONS,
   Action,
+  CAPABILITY_CODE,
+  CapabilityCode,
   HomeView,
   RoleRef,
   Me,
