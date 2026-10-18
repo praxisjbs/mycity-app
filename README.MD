@@ -22,7 +22,7 @@ map, read §11 first.
 | `docs/DATABASE_SCHEMA.md` | **The database design**: the core every milestone attaches to, each milestone's tables as built and what it still owes, and what is not built and why. Read before any milestone's schema work |
 | `docs/MIGRATIONS.md` | **The migration and reference-seed conventions**: numbering, idempotency, DOWN, table shape, matching the code, what a seed may hold (A26), checks before the PR. Read before any migration |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
-| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F24 (binding) and the three PRs that build `packages/ui` |
+| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F26 (binding) and the three PRs that build `packages/ui` |
 | `docs/COMPONENTS.md` | Every shared component in `packages/ui`, generated from the code. Check it before building anything; a missing one is added with `npm run new:component` |
 | `docs/guides/<module>.md` | One full-stack engineering guide per feature: backend, API, events and every screen it touches, and how they relate. A change passes through its guide first |
 | `docs/PROGRESS.md` | The 86 screens and the M0 items, ticked as they are built, with a note per change |
@@ -48,7 +48,7 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 mycity-app/
 ├── app/                      staff React + Vite app (frontend team), served at hub.mycityapp.io
 ├── public-app/               public React + Vite app (frontend team), served at go.mycityapp.io
-├── packages/ui/              @mycity/ui: the one design system both apps import. 162 components in
+├── packages/ui/              @mycity/ui: the one design system both apps import. 166 components in
 │                             groups: Foundations, Actions, Layout, Display, Navigation, Overlays,
 │                             Help, Feedback, Forms, Data (DataView, Kanban, Calendar), Charts,
 │                             Documents, Maps and Shell; plus the tokens, the form system, the data
@@ -115,7 +115,7 @@ mycity-app/
 │   ├── BACKEND_GUIDE.md      how to write backend code (read first)
 │   ├── MIGRATIONS.md         migration and reference-seed conventions (read before any migration)
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
-│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F24, the three PRs
+│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F26, the three PRs
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
 │   ├── PROGRESS.md           93 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
@@ -613,6 +613,10 @@ data, not code. Services call `openInstance()` inside their transaction and reac
     message is a `packages/ui` component in the brand's tokens, on both shells; `base.css` resets
     what the browser would still draw (autofill tint, spinners, clear buttons, tap flash, selection)
     (FRONTEND_FOUNDATION F25, FRONTEND_GUIDE §8.8, gate 21, no exemptions).
+19. **One press, one request.** A button's handler hands back its work (`onClick={save}`), so the
+    button is busy from the press until the work settles and refuses a second press, and the
+    buttons beside it wait; never `() => void save()`, never `disabled={busy}`
+    (FRONTEND_FOUNDATION F26, FRONTEND_GUIDE §8.4, lint `mycity/no-void-press`).
 
 ---
 
@@ -651,8 +655,9 @@ Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check
 
 Frontend guards, from M0 (FRONTEND_GUIDE §10): `gen:components --check` and `check/components.js`
 (the catalogue is current; every shared component has its header, test and gallery page; nothing new
-in an app's `components/`), and `fe:typecheck`, `fe:lint`, `fe:test`, `fe:build` over `packages/ui`,
-`app` and `public-app`; `check/mock-free.js` (no release build carries the mock, F12) and
+in an app's `components/`), and `fe:typecheck`, `fe:lint` (with `mycity/no-void-press`: a press
+handler hands back its work, F26), `fe:test`, `fe:build` over `packages/ui`, `app` and
+`public-app`; `check/mock-free.js` (no release build carries the mock, F12) and
 `check/a11y.js` (axe on every gallery page at 390 and 1440 px, both densities, and on every app
 screen, shell included, at both sizes).
 

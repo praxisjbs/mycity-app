@@ -400,7 +400,7 @@ function ReportForm({ report, close }: { report?: HomeReport; close: () => void 
       steps={steps}
       finish={report ? "Save Report" : "Create Report"}
       busy={create.pending || update.pending}
-      onFinish={() => void save()}
+      onFinish={() => save()}
       onCancel={dismiss}
     />
   );

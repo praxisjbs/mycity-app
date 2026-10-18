@@ -125,7 +125,7 @@ function WorksiteView({ id, close }: { id: string; close: () => void }) {
       <FormFooter>
         {can("people", "edit") && (
           <>
-            <Button busy={save.pending} onClick={() => void setActive(!w.active)}>{w.active ? "Retire Worksite" : "Restore Worksite"}</Button>
+            <Button busy={save.pending} onClick={() => setActive(!w.active)}>{w.active ? "Retire Worksite" : "Restore Worksite"}</Button>
             <Button icon="edit" onClick={edit}>Edit Worksite</Button>
           </>
         )}
@@ -189,7 +189,7 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={busy} onClick={() => void submit()}>{site ? "Save Worksite" : "Add Worksite"}</Button>
+        <Button variant="primary" busy={busy} onClick={() => submit()}>{site ? "Save Worksite" : "Add Worksite"}</Button>
       </FormFooter>
     </>
   );
@@ -219,7 +219,7 @@ function AssignForm({ close, site }: { close: () => void; site: Worksite }) {
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Assign Employee</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>Assign Employee</Button>
       </FormFooter>
     </>
   );

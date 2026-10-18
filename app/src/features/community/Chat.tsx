@@ -135,7 +135,7 @@ function EditMessage({ m, close, done }: { m: Message; close: () => void; done: 
       <Field label="Message" {...f.field("body")}><TextAreaField {...f.field("body")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={() => void save()}>Save Changes</Button>
+        <Button variant="primary" onClick={() => save()}>Save Changes</Button>
       </FormFooter>
     </>
   );
@@ -195,7 +195,7 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
   return (
     <div ref={box} data-thread data-copy="content" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 [&>*]:flex-shrink-0">
       {t.page?.has_next && (
-        <Button className="self-center" size="sm" onClick={() => void t.older()}>
+        <Button className="self-center" size="sm" onClick={() => t.older()}>
           Load Older
         </Button>
       )}

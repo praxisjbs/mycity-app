@@ -15,30 +15,66 @@ module.exports = defineManifest({
   reads: [
     {
       key: "announcements.list",
-      description: "Published company announcements, newest first, with how many have read each",
+      description:
+        "Published company announcements, newest first, with how many have read each",
       params: c.announcements.AnnouncementListQuery,
       permission: ["community", "view"],
       run: async (client, params) => {
         const page = await announcements.list(client, params);
-        return { ...page, data: page.data.filter((a) => a.status === "published").map((a) => ({ announcement_id: a.announcement_id, title: a.title, body: a.body, published_at: a.published_at })) };
+        return {
+          ...page,
+          data: page.data
+            .filter((a) => a.status === "published")
+            .map((a) => ({
+              announcement_id: a.announcement_id,
+              title: a.title,
+              body: a.body,
+              published_at: a.published_at,
+            })),
+        };
       },
-      cite: (row) => ({ type: "announcement", id: row.announcement_id, label: row.title }),
+      cite: (row) => ({
+        type: "announcement",
+        id: row.announcement_id,
+        label: row.title,
+      }),
     },
     {
       key: "channels.list",
-      description: "The channels the person is a member of, by name, with unread counts",
+      description:
+        "The channels the person is a member of, by name, with unread counts",
       params: c.community.ChannelListQuery,
       permission: ["community", "view"],
       run: async (client, params, actor) => {
         const page = await repo.listChannels(client, actor.user_id, params);
-        return { ...page, data: page.data.map((r) => ({ community_channel_id: r.community_channel_id, name: r.name, members: r.members, unread: r.unread })) };
+        return {
+          ...page,
+          data: page.data.map((r) => ({
+            community_channel_id: r.community_channel_id,
+            name: r.name,
+            members: r.members,
+            unread: r.unread,
+          })),
+        };
       },
-      cite: (row) => ({ type: "channel", id: row.community_channel_id, label: `#${row.name}` }),
+      cite: (row) => ({
+        type: "channel",
+        id: row.community_channel_id,
+        label: `#${row.name}`,
+      }),
     },
   ],
   routes: [
-    { intent: "post an announcement", screen: "community.announcements", params: { new: "1" } },
-    { intent: "message someone", screen: "community.direct-messages", params: { new: "1" } },
+    {
+      intent: "post an announcement",
+      screen: "community.announcements",
+      params: { new: "1" },
+    },
+    {
+      intent: "message someone",
+      screen: "community.direct-messages",
+      params: { new: "1" },
+    },
     { intent: "recognise a colleague", screen: "community.channels" },
   ],
 });

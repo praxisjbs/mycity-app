@@ -5,12 +5,13 @@
  * @use Once, at the top of every screen.
  * @avoid A second title further down (use CardHeader); a subtitle that explains how the page works (tier 3); more than one primary action.
  * @phone The subtitle is not shown (FRONTEND_GUIDE §7: less text); the actions wrap under the title with 44 px targets.
- * @a11y The title is the page's only h1 (data-ui="page-title"); the subtitle is a paragraph (data-ui="page-subtitle"). Title at most 3 words, subtitle at most 8.
+ * @a11y The title is the page's only h1 (data-ui="page-title"); the subtitle is a paragraph (data-ui="page-subtitle"). Title at most 3 words, subtitle at most 8. The actions wait for each other while one is working (F26).
  * @status stable
  * @example <PageHeader title="My Leave" subtitle="2026 entitlement" actions={<Button variant="primary" icon="plus">Request Leave</Button>} />
  */
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { ActionGroup } from "../actions/ActionGroup";
 import { HelpTerm } from "../help/HelpTerm";
 
 export interface PageHeaderProps {
@@ -45,7 +46,11 @@ export function PageHeader({ title, help, subtitle, sub, actions, children, clas
         )}
       </div>
       {children}
-      {actions != null && <div className="flex flex-wrap gap-2 desk:ml-auto phone:w-full">{actions}</div>}
+      {actions != null && (
+        <div className="flex flex-wrap gap-2 desk:ml-auto phone:w-full">
+          <ActionGroup>{actions}</ActionGroup>
+        </div>
+      )}
     </div>
   );
 }

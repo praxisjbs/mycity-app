@@ -96,7 +96,7 @@ export function ArrangementForm({ id, name, current, schedule, office, close }: 
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Save Change</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>Save Change</Button>
       </FormFooter>
     </>
   );

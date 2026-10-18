@@ -252,7 +252,7 @@ export function Roles() {
         actions={
           canCreate ? (
             <DesktopOnly>
-              <Button variant="primary" icon="plus" onClick={() => void newRole()}>
+              <Button variant="primary" icon="plus" onClick={() => newRole()}>
                 New Role
               </Button>
             </DesktopOnly>
@@ -437,7 +437,7 @@ function RoleView({ cat, d, base, fresh, editing, tab, setTab, onBack, onEdit, o
         <div className="flex-none border-t border-border px-4 pb-3">
           <FormFooter>
             {!fresh && !d.is_system && canDelete && (
-              <Button className="desk:mr-auto" variant="danger" busy={remove.pending} onClick={() => void del()}>
+              <Button className="desk:mr-auto" variant="danger" busy={remove.pending} onClick={() => del()}>
                 Delete Role
               </Button>
             )}
@@ -481,7 +481,7 @@ function RoleView({ cat, d, base, fresh, editing, tab, setTab, onBack, onEdit, o
         footer={
           <>
             <Button onClick={() => setReviewing(false)}>Back</Button>
-            <Button variant="primary" busy={create.pending || update.pending} onClick={() => void save()}>
+            <Button variant="primary" busy={create.pending || update.pending} onClick={() => save()}>
               {fresh ? "Create Role" : "Save Role"}
             </Button>
           </>
@@ -819,7 +819,7 @@ function NewRoleStep({ close, onNext }: { close: () => void; onNext: (name: stri
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={busy} onClick={() => void next()}>
+        <Button variant="primary" busy={busy} onClick={() => next()}>
           Next
         </Button>
       </FormFooter>

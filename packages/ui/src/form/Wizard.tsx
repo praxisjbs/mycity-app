@@ -31,8 +31,8 @@ export interface WizardProps {
   finish: string;
   /** Saving: the last button ignores presses but stays reachable. */
   busy?: boolean;
-  /** Called after the last step checks clean. */
-  onFinish: () => void;
+  /** Called after the last step checks clean. Return the save's promise and the last button spins until it settles. */
+  onFinish: () => unknown;
   /** Cancel, shown on the first step instead of Back. */
   onCancel?: () => void;
   /** The step to start on (a draft resumed); 0. */
@@ -61,8 +61,8 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
 
   const next = async () => {
     if (step.check && !(await step.check())) return;
-    if (last) onFinish();
-    else setAt(at + 1);
+    if (last) return onFinish();
+    setAt(at + 1);
   };
 
   return (
@@ -78,7 +78,7 @@ export function Wizard({ steps, finish, busy, onFinish, onCancel, initialStep = 
         ) : (
           onCancel && <Button onClick={onCancel}>Cancel</Button>
         )}
-        <Button variant="primary" busy={last && busy} onClick={() => void next()}>
+        <Button variant="primary" busy={last && busy} onClick={next}>
           {last ? finish : "Next"}
         </Button>
       </FormFooter>

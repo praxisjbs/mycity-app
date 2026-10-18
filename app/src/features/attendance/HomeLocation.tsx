@@ -128,7 +128,7 @@ export function SetHomeForm({ max, close }: { max: number; close: () => void }) 
         {located ? (
           <>
             <Button icon="refresh" onClick={locate}>Retry Location</Button>
-            <Button variant="primary" icon="send" busy={send.pending} onClick={() => void submit()}>Send for Approval</Button>
+            <Button variant="primary" icon="send" busy={send.pending} onClick={() => submit()}>Send for Approval</Button>
           </>
         ) : (
           <>

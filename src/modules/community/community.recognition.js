@@ -20,6 +20,7 @@ function pick(key, list) {
   return list[h % list.length];
 }
 
-const noteFor = (employeeId) => pick(`${employeeId}:${new Date().toISOString().slice(0, 10)}`, NOTES);
+const noteFor = (employeeId) =>
+  pick(`${employeeId}:${new Date().toISOString().slice(0, 10)}`, NOTES);
 
 module.exports = { NOTES, pick, noteFor };

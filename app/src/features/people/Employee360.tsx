@@ -134,7 +134,7 @@ export function Employee360({ id }: { id: string }) {
               </Button>
             )}
             {canArchive && e.status === "archived" && (
-              <Button busy={restore.pending} onClick={() => void bringBack()}>
+              <Button busy={restore.pending} onClick={() => bringBack()}>
                 Restore Record
               </Button>
             )}
@@ -187,7 +187,7 @@ function ArchiveForm({ id, name, close, onDone }: { id: string; name: string; cl
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={archive.pending} onClick={() => void submit()}>
+        <Button variant="primary" busy={archive.pending} onClick={() => submit()}>
           Archive Record
         </Button>
       </FormFooter>
@@ -390,7 +390,7 @@ function ReportingForm({ employee: e, close, onSaved }: { employee: Record360; c
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>
           Save Line
         </Button>
       </FormFooter>

@@ -64,6 +64,42 @@ describe("Modal on desktop", () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
+  it("cannot be dismissed while a button in it is working, and closes when the save does", async () => {
+    const user = userEvent.setup();
+    let finish: () => void = () => undefined;
+    const onClose = vi.fn();
+    function Saving() {
+      const [open, setOpen] = useState(true);
+      return (
+        <Modal
+          open={open}
+          onClose={() => (onClose(), setOpen(false))}
+          title="Edit Worksite"
+          footer={(close) => (
+            <>
+              <Button onClick={close}>Cancel</Button>
+              <Button variant="primary" onClick={() => new Promise<void>((r) => (finish = r)).then(close)}>
+                Save Worksite
+              </Button>
+            </>
+          )}
+        >
+          <p>Worksite body</p>
+        </Modal>
+      );
+    }
+    render(<Saving />);
+    await user.click(screen.getByRole("button", { name: "Save Worksite" }));
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Close" })).toHaveAttribute("data-press", "waiting");
+    await act(async () => finish());
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("keeps Tab inside the dialog", async () => {
     const user = userEvent.setup();
     render(<Controlled />);

@@ -37,7 +37,7 @@ export function InviteToSignIn({ close, person }: { close: () => void; person?: 
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" busy={inv.pending} onClick={() => void send()}>
+        <Button variant="primary" icon="send" busy={inv.pending} onClick={() => send()}>
           Send Invitation
         </Button>
       </FormFooter>

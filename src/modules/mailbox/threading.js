@@ -46,7 +46,16 @@ function baseSubject(subject) {
 
 /** The first characters of a message's text, on one line, for a list row. */
 function snippetOf(text, max = 160) {
-  return String(text || "").replace(/\s+/g, " ").trim().slice(0, max);
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
 }
 
-module.exports = { normaliseId, normaliseReferences, threadKeyFor, baseSubject, snippetOf };
+module.exports = {
+  normaliseId,
+  normaliseReferences,
+  threadKeyFor,
+  baseSubject,
+  snippetOf,
+};

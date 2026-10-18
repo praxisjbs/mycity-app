@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
+| M0 Foundation | 28 items below: 27 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 29 | 2 | 0 | 27 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -96,8 +96,24 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Frontend foundation PR 2 · Shell: both apps' shells on `packages/ui`, bottom bar, More, floating button, session, PWA, what opens where | AJ | ☑ | 15/10/2026 |
 | Frontend foundation PR 3 · Build kit: DataView, KPI, charts, kanban, calendar, pickers, upload, editor, PDF preview, voice, maps; app component folders emptied; every screen on the token scale | AJ | ☑ | 16/10/2026 |
 | Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
+| One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
 
 **Notes**
+
+- 18/10/2026 · TB · One press, one request (F26, FRONTEND_GUIDE §8.4). Reload on "A new version is
+  ready" looked dead, and after a hard refresh did nothing; any button could send its request twice.
+  Now `Button`, `IconButton` and `BigButton` are busy from the press until the work their handler
+  hands back settles: brand colour kept and softened, a spinner where the icon was (centred over the
+  label when there is none), a second press refused at once, `aria-busy` but never `disabled`. The
+  new `ActionGroup` makes the buttons beside a busy one wait; modals, forms, form footers, card and
+  page header actions, shell notices and DataView's bulk bar are groups already, and a modal cannot
+  be dismissed mid-save. `Form` sends one save however often Enter is pressed. Reload now always
+  reloads: when the new version takes over, when it activates on a page loaded with a hard refresh,
+  or after 4 s. Lint `mycity/no-void-press` refuses a handler that throws its work away; 91 handlers
+  in both apps converted, and six buttons that disabled themselves and swapped their label (the
+  public site's Apply, Start, Sign and Decline, Payroll's Email All) use the shared busy. No screen's
+  ticks change. Left: a mail attachment chip, a hand-drawn
+  button, can still start its download twice.
 
 - 18/10/2026 · TB · Gate 21 and F25, nothing the browser styles itself (FRONTEND_GUIDE §8.8). A
   phone showed its own grey picker over the branded Create Rule sheet (Home · Alert Rules), because

@@ -179,8 +179,8 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
         </Field>
       )}
       <FormFooter>
-        {!self && u.status === "invited" && <Button busy={resend.pending} onClick={() => void run(() => resend.run({ params, body: {} }), "Invitation sent again")}>Resend Invitation</Button>}
-        {!self && u.status === "active" && <Button busy={reset.pending} onClick={() => void run(() => reset.run({ params, body: {} }), "Reset link sent")}>Send Reset Link</Button>}
+        {!self && u.status === "invited" && <Button busy={resend.pending} onClick={() => run(() => resend.run({ params, body: {} }), "Invitation sent again")}>Resend Invitation</Button>}
+        {!self && u.status === "active" && <Button busy={reset.pending} onClick={() => run(() => reset.run({ params, body: {} }), "Reset link sent")}>Send Reset Link</Button>}
         {!self && u.status === "active" && (
           <Button
             busy={end.pending}
@@ -209,14 +209,14 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
             Reset Two-Step
           </Button>
         )}
-        {!self && u.status !== "suspended" && !u.is_ceo && (reason == null ? <Button onClick={() => setReason("")}>Suspend</Button> : <Button variant="danger" busy={suspend.pending} onClick={() => (reasonBad ? setTried(true) : void run(() => suspend.run({ params, body: { reason: reason.trim() } }), "Login suspended"))}>Confirm Suspend</Button>)}
-        {!self && u.status === "suspended" && <Button busy={reactivate.pending} onClick={() => void run(() => reactivate.run({ params, body: {} }), "Login reactivated")}>Reactivate</Button>}
+        {!self && u.status !== "suspended" && !u.is_ceo && (reason == null ? <Button onClick={() => setReason("")}>Suspend</Button> : <Button variant="danger" busy={suspend.pending} onClick={() => (reasonBad ? setTried(true) : run(() => suspend.run({ params, body: { reason: reason.trim() } }), "Login suspended"))}>Confirm Suspend</Button>)}
+        {!self && u.status === "suspended" && <Button busy={reactivate.pending} onClick={() => run(() => reactivate.run({ params, body: {} }), "Login reactivated")}>Reactivate</Button>}
         <Button onClick={close}>Close</Button>
         {!self && (
           <Button
             variant="primary"
             busy={setR.pending}
-            onClick={() => (!roles.length ? setTried(true) : void run(() => setR.run({ params, body: { role_codes: roles.map((r) => r.code) } }), "Roles saved"))}
+            onClick={() => (!roles.length ? setTried(true) : run(() => setR.run({ params, body: { role_codes: roles.map((r) => r.code) } }), "Roles saved"))}
           >
             Save Roles
           </Button>

@@ -52,7 +52,12 @@ const COLUMNS = [
   { key: "actor_ip", header: "Address", width: 16 },
 ];
 
-const asText = (v) => (v === null || v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v));
+const asText = (v) =>
+  v === null || v === undefined
+    ? ""
+    : typeof v === "string"
+      ? v
+      : JSON.stringify(v);
 
 /** The outbox handler: build, keep and send the export. */
 async function sendExport(event) {
@@ -65,7 +70,10 @@ async function sendExport(event) {
   const grantsCache = require("../../shared/rbac/grants-cache");
   const service = require("./audit.service");
 
-  const reader = await grantsCache.getAuthUser(pool, event.payload.requested_by || event.actor_user_id);
+  const reader = await grantsCache.getAuthUser(
+    pool,
+    event.payload.requested_by || event.actor_user_id,
+  );
   if (!reader || reader.status !== "active") return;
   const filters = event.payload.filters || {};
   const { rows, total, capped } = await service.gather(pool, filters, reader);
@@ -85,7 +93,11 @@ async function sendExport(event) {
         freeze: { y: 1 },
       },
     ],
-    context: workbookContext({ actor: { name: reader.display_name }, title: "Audit Log", filters }),
+    context: workbookContext({
+      actor: { name: reader.display_name },
+      title: "Audit Log",
+      filters,
+    }),
     cover: true,
   });
   const filename = `${exportFilename({ base: "audit-log", env: config.APP_ENV, extension: "xlsx" })}`;
@@ -115,13 +127,19 @@ async function sendExport(event) {
     {
       to: { name: reader.display_name, email: reader.email },
       template: "audit-export",
-      data: { entries: Math.min(total, rows.length), filters: filtersText(filters), capped },
+      data: {
+        entries: Math.min(total, rows.length),
+        filters: filtersText(filters),
+        capped,
+      },
       attachments: [{ document_id: doc.document_id }],
     },
     { jobId: `audit-export-${event.event_id}` },
   );
 }
 
-outbox.register(EVENTS.AUDIT_EXPORT_REQUESTED, "audit.send_export", (event) => sendExport(event));
+outbox.register(EVENTS.AUDIT_EXPORT_REQUESTED, "audit.send_export", (event) =>
+  sendExport(event),
+);
 
 module.exports = { EVENTS, sendExport, filtersText };

@@ -13,16 +13,31 @@ const service = require("./devices.service");
 const id = (req) => req.validated.params.id;
 
 module.exports = {
-  listMine: async (req, res) => sendPaged(res, await service.listMine(req.user, req.validated.query)),
+  listMine: async (req, res) =>
+    sendPaged(res, await service.listMine(req.user, req.validated.query)),
 
-  registerMine: async (req, res) => created(res, await service.registerMine(withActor(req), req.validated.body)),
+  registerMine: async (req, res) =>
+    created(
+      res,
+      await service.registerMine(withActor(req), req.validated.body),
+    ),
 
-  removeMine: async (req, res) => ok(res, await service.removeMine(withActor(req), id(req))),
+  removeMine: async (req, res) =>
+    ok(res, await service.removeMine(withActor(req), id(req))),
 
-  list: async (req, res) => sendPaged(res, await service.list(req.validated.query, scopeOf(req))),
+  list: async (req, res) =>
+    sendPaged(res, await service.list(req.validated.query, scopeOf(req))),
 
   get: async (req, res) => ok(res, await service.getFor(id(req), scopeOf(req))),
 
   remove: async (req, res) =>
-    ok(res, await service.removeFor(withActor(req), scopeOf(req), id(req), req.validated.body)),
+    ok(
+      res,
+      await service.removeFor(
+        withActor(req),
+        scopeOf(req),
+        id(req),
+        req.validated.body,
+      ),
+    ),
 };

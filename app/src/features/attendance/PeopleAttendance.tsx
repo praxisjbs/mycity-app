@@ -306,7 +306,7 @@ function DecisionForm({ x, close }: { x: AttendanceException; close: () => void 
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Record Decision</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>Record Decision</Button>
       </FormFooter>
     </Card>
   );
@@ -439,7 +439,7 @@ function HomeDecisionForm({ h, close }: { h: HomeRequest; close: () => void }) {
       )}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Record Decision</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>Record Decision</Button>
       </FormFooter>
     </Card>
   );
@@ -474,7 +474,7 @@ function ExportForm({ close, date, status }: { close: () => void; date: string; 
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="download" busy={busy} onClick={() => void submit()}>Export Register</Button>
+        <Button variant="primary" icon="download" busy={busy} onClick={() => submit()}>Export Register</Button>
       </FormFooter>
     </>
   );
