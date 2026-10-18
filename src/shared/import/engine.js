@@ -662,6 +662,14 @@ async function processRows(client, imp, rows, ctx) {
       row.status = row.problems.length ? "warning" : "unchanged";
       continue;
     }
+    // The match said this row was an edit and the service made a new record instead: the
+    // match key belonged to somebody else, who gave it up (a staff number the roster
+    // takes back). What was written is what the batch reports.
+    if (res.out.action === "create" && row.action === "update") {
+      row.action = "create";
+      row.before = null;
+      row.diff = null;
+    }
     if (row.problems.length) row.status = "warning";
   }
 

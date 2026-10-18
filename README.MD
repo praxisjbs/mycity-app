@@ -118,7 +118,8 @@ mycity-app/
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
-│   │                         first-accounts (the first two logins on a server)
+│   │                         first-accounts (the first two logins on a server),
+│   │                         staff-roster (MyCity's staff onto a server that has none)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
 ├── .github/
 │   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml, uptime.yml

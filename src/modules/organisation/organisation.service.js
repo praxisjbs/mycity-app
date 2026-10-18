@@ -170,6 +170,39 @@ async function updateEmployee(client, employeeId, patch, actor) {
   return after;
 }
 
+/**
+ * Give a person the next free staff number, so the roster can take back a number its
+ * sheet says belongs to somebody else. The counter is moved past every number already
+ * in use first, so the new one is above them all; a number taken in the meantime is
+ * stepped over rather than failing the row.
+ *
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @returns {Promise<object>} the person, on their new number
+ */
+async function renumberEmployee(client, employeeId, actor) {
+  const before = await repo.findEmployeeById(client, employeeId);
+  if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
+  await advanceStaffNumbers(client);
+  let number = null;
+  for (let tries = 0; tries < 50 && number === null; tries += 1) {
+    const next = (await numbering.allocate(client, "employee", { date: before.start_date })).number;
+    if (!(await repo.findEmployeeByStaffNumber(client, next))) number = next;
+  }
+  if (number === null)
+    throw new AppError("STAFF_NUMBER_TAKEN", "No free staff number to move this person to.", 409, {
+      staff_number: ["Already in use"],
+    });
+  const after = await repo.setStaffNumber(client, employeeId, number);
+  await emit(client, {
+    key: EVENTS.EMPLOYEE_UPDATED,
+    entity: { type: "employee", id: employeeId },
+    actor,
+    before,
+    after,
+  });
+  return after;
+}
+
 /** Archive a record: off every list and out of the tree, its history kept. */
 async function archiveEmployee(client, employeeId, reason, actor) {
   const before = await repo.findEmployeeById(client, employeeId);
@@ -570,10 +603,36 @@ async function importRow(client, values, ctx = {}) {
     values.work_email ||
     (options.work_email_by_job_title || {})[String(values.job_title || "").trim()] ||
     null;
-  const existing =
-    (values.staff_number && (await repo.findEmployeeByStaffNumber(client, values.staff_number))) ||
-    (workEmail && (await repo.findEmployeeByWorkEmail(client, workEmail))) ||
-    null;
+  let byNumber = values.staff_number
+    ? await repo.findEmployeeByStaffNumber(client, values.staff_number)
+    : null;
+  const byEmail = workEmail ? await repo.findEmployeeByWorkEmail(client, workEmail) : null;
+
+  /*
+   * The staff number this row claims is held by a different work email, so the holder is
+   * a different person and this row is not an edit of their record. The sheet is the
+   * organisation's own record of who holds which number, so the holder gives it up and
+   * takes the next free one. Two guards: a holder the same sheet names keeps their
+   * number, because a sheet that gives one number to two people is wrong rather than
+   * authoritative; and a person already here under another number is left where they
+   * are, so no number is freed for nothing. Only the roster loader reclaims a number
+   * (`reclaim_staff_numbers`); for anyone importing a sheet by hand the row is a problem
+   * to look at.
+   */
+  if (byNumber && workEmail && !sameEmail(byNumber.work_email, workEmail)) {
+    const onSheet = (options.roster_work_emails || []).some((e) => sameEmail(e, byNumber.work_email));
+    if (!byEmail && (!options.reclaim_staff_numbers || onSheet))
+      throw new AppError(
+        "STAFF_NUMBER_TAKEN",
+        `Staff number ${values.staff_number} belongs to ${byNumber.work_email}.`,
+        409,
+        { staff_number: ["Already in use"] },
+      );
+    if (!byEmail) await renumberEmployee(client, byNumber.employee_id, actor);
+    byNumber = null;
+  }
+
+  const existing = byNumber || byEmail || null;
 
   if (existing) {
     if (options.keep_existing)
@@ -614,6 +673,12 @@ async function importRow(client, values, ctx = {}) {
   return { action: "create", target_id: employee.employee_id, before: null };
 }
 
+/** Whether two work emails name the same person. Stored as citext, compared as written. */
+function sameEmail(a, b) {
+  const fold = (v) => String(v ?? "").trim().toLowerCase();
+  return fold(a) !== "" && fold(a) === fold(b);
+}
+
 /** The keys that carry a value, so an empty cell never writes over something. */
 function optional(values, keys) {
   const out = {};
@@ -649,6 +714,7 @@ module.exports = {
   findEmployeeById,
   createEmployee,
   updateEmployee,
+  renumberEmployee,
   archiveEmployee,
   restoreEmployee,
   setReportingLine,

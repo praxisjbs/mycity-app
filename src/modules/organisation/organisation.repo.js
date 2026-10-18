@@ -543,6 +543,21 @@ function updateEmployee(db, employeeId, patch) {
   );
 }
 
+/**
+ * Move a person to another staff number. A staff number is not a field of the form, so
+ * it is not in UPDATE_COLUMNS: only the roster reaches this, when the sheet takes back a
+ * number it says belongs to someone else.
+ */
+function setStaffNumber(db, employeeId, staffNumber) {
+  return one(
+    db,
+    `UPDATE employee SET staff_number = $2, updated_at = now()
+      WHERE employee_id = $1
+      RETURNING ${EMPLOYEE_COLUMNS.replace(/\be\./g, "")}`,
+    [employeeId, staffNumber],
+  );
+}
+
 function archiveEmployee(db, employeeId, reason) {
   return one(
     db,
@@ -797,6 +812,7 @@ module.exports = {
   findCeoEmployee,
   insertEmployee,
   updateEmployee,
+  setStaffNumber,
   archiveEmployee,
   restoreEmployee,
   setReporting,

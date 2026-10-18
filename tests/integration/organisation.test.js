@@ -842,6 +842,108 @@ describeDb("the organisation module against the real migrations", () => {
       expect(log.join("\n")).toMatch(/Line Manager "Nobody At All" is not in the file or the system; saved without Line Manager/);
     });
 
+    test("the roster takes back a staff number held by somebody it does not name", async () => {
+      // The bootstrap administrator is created before any roster and is given the first
+      // number, which the sheet says belongs to someone else.
+      const res = await asOps()(request(app).post("/api/v1/employees")).send({
+        first_name: "Ifeanyi",
+        last_name: "Squatter",
+        work_email: "squatter@mycity.test",
+        phone: "08031234574",
+        job_title: "Delivery Analyst",
+        start_date: "2026-05-05",
+        employment_type: "full_time",
+        work_pattern: "remote",
+        department_id: people.delivery.department_id,
+      });
+      expect(res.status).toBe(201);
+      const number = res.body.staff_number;
+
+      const file = path.join(temp, "reclaim.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([
+          [number, "Ngozi Umeh", "Trading Officer", "Trading Desk", "Female", new Date(Date.UTC(2026, 4, 6)), "", "", "ngozi.reclaim@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+        ]),
+      );
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(result.stats.create).toBe(1);
+      expect(result.stats.error).toBe(0);
+
+      const owner = await one("SELECT work_email::text AS work_email FROM employee WHERE staff_number = $1", [number]);
+      expect(owner.work_email).toBe("ngozi.reclaim@mycity.test");
+
+      const moved = await one(
+        "SELECT staff_number::text AS staff_number, job_title FROM employee WHERE work_email = 'squatter@mycity.test'",
+      );
+      expect(moved.staff_number).not.toBe(number);
+      expect(moved.job_title).toBe("Delivery Analyst");
+    });
+
+    test("a staff number the same sheet gives somebody else is a problem, not a move", async () => {
+      const file = path.join(temp, "contradicts.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([
+          ["T0301", "Chidi Nwosu", "Trading Officer", "Trading Desk", "Male", new Date(Date.UTC(2026, 4, 7)), "", "", "chidi.one@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+          ["T0301", "Amaka Eze", "Trading Officer", "Trading Desk", "Female", new Date(Date.UTC(2026, 4, 8)), "", "", "amaka.two@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+        ]),
+      );
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(result.stats.create).toBe(1);
+      expect(result.stats.duplicate).toBe(1);
+      const held = await one("SELECT work_email::text AS work_email FROM employee WHERE staff_number = 'T0301'");
+      expect(held.work_email).toBe("chidi.one@mycity.test");
+      expect(await one("SELECT 1 AS x FROM employee WHERE work_email = 'amaka.two@mycity.test'")).toBeUndefined();
+    });
+
+    test("a holder the roster names keeps their number, and the row says so", async () => {
+      await expect(
+        tx((client) =>
+          organisation.importRow(
+            client,
+            {
+              staff_number: "T0301",
+              full_name: "Amaka Eze",
+              job_title: "Trading Officer",
+              work_email: "amaka.two@mycity.test",
+              department: people.delivery.department_id,
+            },
+            {
+              actor: null,
+              options: {
+                reclaim_staff_numbers: true,
+                roster_work_emails: ["chidi.one@mycity.test", "amaka.two@mycity.test"],
+              },
+            },
+          ),
+        ),
+      ).rejects.toMatchObject({ code: "STAFF_NUMBER_TAKEN" });
+      const kept = await one("SELECT work_email::text AS work_email FROM employee WHERE staff_number = 'T0301'");
+      expect(kept.work_email).toBe("chidi.one@mycity.test");
+    });
+
+    test("importing a sheet by hand reports a taken staff number instead of moving anyone", async () => {
+      const held = await one("SELECT staff_number::text AS staff_number FROM employee WHERE staff_number = 'T0001'");
+      await expect(
+        tx((client) =>
+          organisation.importRow(
+            client,
+            {
+              staff_number: held.staff_number,
+              full_name: "Wale Adeyemi",
+              job_title: "Trading Officer",
+              work_email: "wale.byhand@mycity.test",
+              department: people.delivery.department_id,
+            },
+            { actor: null, options: {} },
+          ),
+        ),
+      ).rejects.toMatchObject({ code: "STAFF_NUMBER_TAKEN" });
+      const kept = await one("SELECT work_email::text AS work_email FROM employee WHERE staff_number = 'T0001'");
+      expect(kept.work_email).toBe("zuri@mycity.test");
+    });
+
     test("no sheet in the build means nothing happens at all", async () => {
       const result = await loader.loadStaff({ db: pool, sheet: path.join(temp, "missing.xlsx") });
       expect(result.status).toBe("no_sheet");

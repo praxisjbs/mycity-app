@@ -16,9 +16,12 @@
  *   2. Nothing again if a committed batch already carries this sheet's checksum: the
  *      roster is loaded, and a deploy that changes no file changes no record.
  *   3. Uploads the sheet to the import engine as the employees importer
- *      (src/modules/organisation/employee.import.js), with two options: keep what the
- *      app already has, and the work email `roles.json` gives a post the sheet leaves
- *      empty.
+ *      (src/modules/organisation/employee.import.js), with three options: keep what the
+ *      app already has, the work email `roles.json` gives a post the sheet leaves
+ *      empty, and the sheet's claim on its own staff numbers. A number the sheet gives
+ *      one of its people, held here by somebody the sheet does not name, is taken back:
+ *      the holder moves to the next free number (the bootstrap administrator is created
+ *      before any of this and is given 00001, which the sheet says is the CEO's).
  *   4. Maps the columns the importer recognises, and drops a column the whole sheet gets
  *      wrong (MyCity's own sheet holds a day and month with no year under DOB, and the
  *      same placeholder under Phone), with the reason in the log.
@@ -97,6 +100,27 @@ function emailsByJobTitle(roles) {
   for (const [title, entry] of Object.entries(roles.by_job_title))
     if (entry.work_email) out[title] = String(entry.work_email).trim().toLowerCase();
   return out;
+}
+
+/**
+ * Every work email this roster names: the sheet's own cells, and the ones `roles.json`
+ * gives a post the sheet leaves blank. The importer uses them to tell a person the
+ * roster brought from somebody else who happens to hold one of its staff numbers, so a
+ * loose read is the safe one: anything that looks like an address counts, and a holder
+ * wrongly counted as ours keeps their number instead of being moved.
+ *
+ * @param {{sheets: Array<{rows: Array<Array<*>>}>}} book
+ * @returns {string[]}
+ */
+function sheetWorkEmails(book, roles) {
+  const out = new Set(Object.values(emailsByJobTitle(roles)));
+  for (const sheet of book.sheets || [])
+    for (const row of sheet.rows || [])
+      for (const cell of row || []) {
+        const text = String(cell ?? "").trim();
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) out.add(text.toLowerCase());
+      }
+  return [...out];
 }
 
 /**
@@ -231,6 +255,9 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
     return { status: "already_loaded", batch: loaded.import_batch_id, logins };
   }
 
+  /* The sheet is read here as well as by the engine, for the emails it names. */
+  const book = await readSheets({ buffer, filename: path.basename(sheet) });
+
   /* 1. The file goes to the engine, with the roster's own options. */
   const batch = await withTx(db, atomically, (client) =>
     engine.createBatch(client, {
@@ -240,6 +267,8 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
       options: {
         keep_existing: true,
         work_email_by_job_title: emailsByJobTitle(roles),
+        reclaim_staff_numbers: true,
+        roster_work_emails: sheetWorkEmails(book, roles),
         source: "staff roster, loaded by the deploy",
         source_sha256: checksum,
       },
@@ -248,7 +277,6 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
   log(`batch ${batch.number} from ${path.basename(sheet)}, sheet "${batch.sheet}"`);
 
   /* 2. The columns to read, and the ones the sheet gets wrong. */
-  const book = await readSheets({ buffer, filename: path.basename(sheet) });
   const grid = (book.sheets.find((s) => s.name === batch.sheet) || book.sheets[0]).rows;
   const headerRow = batch.header_row === null ? mapping.detectHeaderRow(grid, importer.fields) : batch.header_row;
   if (headerRow === null) throw new Error("the sheet has no row of column names this importer knows");
@@ -366,6 +394,7 @@ module.exports = {
   readRoles,
   rolesForTitle,
   emailsByJobTitle,
+  sheetWorkEmails,
   mappingFor,
   alreadyLoaded,
   applyRoles,
