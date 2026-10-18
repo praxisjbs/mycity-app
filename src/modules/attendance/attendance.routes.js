@@ -12,6 +12,7 @@
  *   POST  /me/exceptions/:id/explanation say why
  *   POST  /me/export                     my month, emailed as a workbook
  *   GET   /me/records/:id                the day a link to my day or exception opens
+ *   GET   /me/home, POST /me/home        my home location, and a new one for People (remote)
  *
  * People, within the `people` grant's scope (all, team, own):
  *   GET   /register, /summary            the day's register and its figures (view)
@@ -20,6 +21,9 @@
  *   GET   /exceptions                    the exceptions (view)
  *   POST  /exceptions/:id/decision       decide one (approve, scope all; never your own)
  *   GET   /records/:id                   the person and day a link opens (view)
+ *   GET   /homes, /homes/:id             remote staff's home locations (view; the address
+ *                                        and the point for scope all only)
+ *   POST  /homes/:id/decision            approve or reject one (approve, scope all; never your own)
  *   POST  /export                        the register over up to 31 days, emailed (export)
  */
 const express = require("express");
@@ -70,6 +74,14 @@ route(router, "get", "/me/records/:id",
     summary: "The day a link to my record opens" },
   controller.myRecord);
 
+route(router, "get", "/me/home",
+  { response: a.MyHome, self: true, summary: "My home location" },
+  controller.myHome);
+
+route(router, "post", "/me/home",
+  { body: a.HomeRequestCreate, response: a.MyHome, self: true, summary: "Send my home location for approval" },
+  controller.requestHome);
+
 route(router, "get", "/register",
   { query: a.RegisterQuery, response: a.RegisterPage, summary: "The attendance register for a day" },
   requirePermission("people", "view"), controller.register);
@@ -98,6 +110,19 @@ route(router, "post", "/exceptions/:id/decision",
 route(router, "get", "/records/:id",
   { params: c.common.IdParams, response: a.AttendanceRecordRef, summary: "The day a link to a record opens" },
   requirePermission("people", "view"), controller.record);
+
+route(router, "get", "/homes",
+  { query: a.HomeListQuery, response: a.HomeRequestPage, summary: "Remote staff's home locations" },
+  requirePermission("people", "view"), controller.homes);
+
+route(router, "get", "/homes/:id",
+  { params: c.common.IdParams, response: a.HomeRequest, summary: "One home location" },
+  requirePermission("people", "view"), controller.home);
+
+route(router, "post", "/homes/:id/decision",
+  { params: c.common.IdParams, body: a.HomeDecision, response: a.HomeRequest,
+    summary: "Approve or reject a home location" },
+  requirePermission("people", "approve"), controller.decideHome);
 
 route(router, "post", "/export",
   { body: a.RegisterExportRequest, response: a.AttendanceExportQueued, summary: "Email the register" },

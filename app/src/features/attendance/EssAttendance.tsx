@@ -11,6 +11,7 @@ import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useClock } from "./ClockButton";
+import { HomeLocationCard } from "./HomeLocation";
 import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
 import { Banner, BarChart, Button, Card, CardHeader, DataView, DateField, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, rules, SegmentedControl, SelectField, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 
@@ -67,7 +68,7 @@ export function MyAttendancePage() {
         items={[
           ["Clock In", t.clock_in_at ? formatTime(t.clock_in_at) : null],
           ["Clock Out", t.clock_out_at ? formatTime(t.clock_out_at) : null],
-          ["Location", t.location.kind === "worksite" ? t.location.name : t.location.kind === "remote" ? "Remote" : "No Worksite"],
+          ["Location", t.location.kind === "worksite" ? t.location.name : t.location.kind === "home" ? "Approved Home" : t.location.kind === "remote" ? "Remote" : "No Worksite"],
         ]}
       />
       {clock.ready && !clock.unavailable && (
@@ -92,6 +93,7 @@ export function MyAttendancePage() {
           </>
         }
       />
+      {t?.work_pattern === "remote" && <HomeLocationCard openOnLoad={params.get("home") === "set"} />}
       {todayCard}
       <Grid cols="4m2" className="mt-3">
         <KpiCard title="Days Present" value={s ? String(s.days_present) : ""} onOpen={() => openFigure("present")} />

@@ -1,4 +1,4 @@
-import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, PunchResult, PunchState, RegisterRow } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, MyHome, PunchResult, PunchState, RegisterRow } from "@mycity/contract/contract.gen.ts";
 import { formatDate, formatTime, todayIso } from "@mycity/ui";
 import { audit } from "../data/audit";
 import type { AttendancePolicy, LocationRequest, PolicySetting } from "@/api/types/attendance";
@@ -12,8 +12,9 @@ import { peopleGrant, siteOf, WORKSITES } from "./worksites";
  * Attendance on the mock, in the contract's shapes (packages/contract/schemas/attendance.js): the
  * clock, the person's days, punches and exceptions, People's register, a day's evidence and the
  * decisions. The punch is judged here the way the API judges it (docs/guides/attendance.md §6):
- * the server's time, the distance to the worksite from the reading sent, the accuracy, the device
- * of the session, the policy's modes, one shift a day, and the Idempotency-Key.
+ * the server's time, the distance to the worksite (for remote staff, the approved home) from the
+ * reading sent, the accuracy, the device of the session, the policy's modes, one shift a day, and
+ * the Idempotency-Key.
  *
  * The policy is a business choice; the mock runs the geofence on warn and the device on warn,
  * so a laptop sees both warnings.
@@ -61,6 +62,7 @@ function distanceM(a: { latitude: number; longitude: number }, b: { latitude: nu
 
 const SEVERITY: Record<ExceptionType, "low" | "medium" | "high"> = {
   outside_worksite: "medium",
+  outside_home: "medium",
   location_unverified: "low",
   unknown_device: "high",
   suspicious_timestamp: "medium",
@@ -225,6 +227,118 @@ function addException(key: string, date: string, type: ExceptionType, ev: Ev | n
 })();
 
 /* ------------------------------------------------------------------ *
+ * Remote staff's homes (docs/guides/attendance.md §6.10)
+ * ------------------------------------------------------------------ */
+const forbidden = () => fail(403, "FORBIDDEN", "You do not have access to this.");
+const HOME_RADIUS_M = 100;
+type Home = { id: string; key: string; status: HomeStatus; address: string; latitude: number; longitude: number; accuracy_m: number | null; requested_at: string; decided_at: string | null; decided_by: string | null; reason: string | null };
+const HOMES: Home[] = [];
+
+/** Invented homes for the demonstration's remote staff: two approved, one waiting, one moving, one rejected. */
+(() => {
+  const add = (key: string, status: HomeStatus, address: string, latitude: number, longitude: number, daysBack: number, decided: { by: string; reason?: string } | null) =>
+    HOMES.push({ id: sid(`home:${key}:${status}:${daysBack}`), key, status, address, latitude, longitude, accuracy_m: 16, requested_at: at(daysBack, "19:10"), decided_at: decided ? at(daysBack - 1, "10:05") : null, decided_by: decided?.by ?? null, reason: decided?.reason ?? null });
+  add("amara", "approved", "7 Sample Crescent, Surulere", 6.4969, 3.3553, 40, { by: "cynthia" });
+  add("obinna", "approved", "22 Example Avenue, Gbagada", 6.5543, 3.3891, 32, { by: "cynthia" });
+  add("ibrahim", "approved", "5 Placeholder Street, Yaba", 6.5095, 3.3711, 28, { by: "cynthia" });
+  add("ibrahim", "pending", "18 Demo Close, Ikeja", 6.6018, 3.3515, 1, null);
+  add("seyi", "pending", "3 Fixture Road, Ikoyi", 6.4549, 3.4246, 2, null);
+  add("kemi", "rejected", "Somewhere in Lekki", 6.4474, 3.4723, 5, { by: "cynthia", reason: "Send the full street address please" });
+})();
+
+const homeOf = (key: string, status: HomeStatus) => HOMES.find((h) => h.key === key && h.status === status) ?? null;
+const newestHome = (key: string) => HOMES.filter((h) => h.key === key).sort((a, b) => b.requested_at.localeCompare(a.requested_at))[0] ?? null;
+const isRemote = (key: string) => byKey(key)?.work_pattern === "remote";
+
+/** Where a person's punch is judged: their approved home when they work remotely, else their worksite. */
+function fenceOf(key: string): { kind: "worksite" | "home"; name: string; latitude: number; longitude: number; radius_m: number } | null {
+  if (isRemote(key)) {
+    const h = homeOf(key, "approved");
+    return h ? { kind: "home", name: "Home", latitude: h.latitude, longitude: h.longitude, radius_m: HOME_RADIUS_M } : null;
+  }
+  const site = siteOf(key);
+  return site ? { kind: "worksite", name: site.name, latitude: site.latitude, longitude: site.longitude, radius_m: site.radius_m } : null;
+}
+
+const asLocation = (h: Home | null): HomeLocation | null =>
+  h && { attendance_home_id: h.id, status: h.status, home_address: h.address, home_latitude: h.latitude, home_longitude: h.longitude, accuracy_m: h.accuracy_m, radius_m: HOME_RADIUS_M, requested_at: h.requested_at, decided_at: h.decided_at, decision_reason: h.reason };
+
+function myHome(key: string): MyHome {
+  const newest = newestHome(key);
+  return { needed: isRemote(key), approved: asLocation(homeOf(key, "approved")), pending: asLocation(homeOf(key, "pending")), rejected: asLocation(newest?.status === "rejected" ? newest : null), max_accuracy_m: POLICY_MODES.max_accuracy_m };
+}
+
+/** A home as People read it: the address and the point only for scope all. */
+function homeOut(h: Home, all: boolean): HomeRequest {
+  const approved = homeOf(h.key, "approved");
+  return {
+    attendance_home_id: h.id,
+    employee: person(byKey(h.key)!),
+    status: h.status,
+    home_address: all ? h.address : null,
+    home_latitude: all ? h.latitude : null,
+    home_longitude: all ? h.longitude : null,
+    accuracy_m: h.accuracy_m,
+    radius_m: HOME_RADIUS_M,
+    distance_from_approved_m: approved && approved.id !== h.id ? distanceM(h, approved) : null,
+    requested_at: h.requested_at,
+    decided_at: h.decided_at,
+    decided_by_name: h.decided_by ? (byKey(h.decided_by)?.display_name ?? null) : null,
+    decision_reason: h.reason,
+  };
+}
+
+route("GET /api/v1/attendance/me/home", (req) => ok(myHome(req.user!)));
+
+route("POST /api/v1/attendance/me/home", (req) => {
+  const key = req.user!;
+  const b = req.body as { home_address: string; home_latitude: number; home_longitude: number; accuracy_m: number };
+  if (!isRemote(key)) return fail(422, "HOME_NOT_NEEDED", "Only remote staff set a home location.");
+  if (!b.home_address?.trim()) return invalid({ home_address: ["Required"] });
+  if (b.accuracy_m > POLICY_MODES.max_accuracy_m) return fail(422, "HOME_READING_WEAK", "The location reading was not accurate enough.", { accuracy_m: ["Reading too weak"] });
+  const waiting = homeOf(key, "pending");
+  if (waiting) waiting.status = "superseded";
+  HOMES.push({ id: sid(`home:${key}:${Date.now()}`), key, status: "pending", address: b.home_address.trim(), latitude: b.home_latitude, longitude: b.home_longitude, accuracy_m: b.accuracy_m, requested_at: new Date().toISOString(), decided_at: null, decided_by: null, reason: null });
+  return created(myHome(key));
+});
+
+route("GET /api/v1/attendance/homes", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  const waitingFirst = (a: HomeRequest, b: HomeRequest) => Number(b.status === "pending") - Number(a.status === "pending") || b.requested_at.localeCompare(a.requested_at);
+  const rows = HOMES.filter((h) => g.sees(h.key)).map((h) => homeOut(h, g.all));
+  return paged(rows, req, {
+    search: (h) => [h.employee.display_name],
+    filters: { status: (h, v) => h.status === v, employee_id: (h, v) => h.employee.employee_id === v },
+    sort: { waiting: waitingFirst, requested_at: (a, b) => a.requested_at.localeCompare(b.requested_at) },
+  });
+});
+
+route("GET /api/v1/attendance/homes/:id", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  const h = HOMES.find((x) => x.id === req.params.id);
+  return h && g.sees(h.key) ? ok(homeOut(h, g.all)) : notFound();
+});
+
+route("POST /api/v1/attendance/homes/:id/decision", (req) => {
+  const g = peopleGrant(req.user!, "approve");
+  if (!g.may || !g.all) return forbidden();
+  const h = HOMES.find((x) => x.id === req.params.id);
+  if (!h) return notFound();
+  if (h.key === req.user) return fail(403, "OWN_RECORD", "Someone else decides your own home location");
+  if (h.status !== "pending") return fail(409, "HOME_DECIDED", "This home location was already decided");
+  const b = req.body as { decision: "approve" | "reject"; reason?: string | null };
+  if (b.decision === "reject" && (b.reason ?? "").trim().length < 10) return invalid({ reason: ["At least 10 characters"] });
+  if (b.decision === "approve") {
+    const old = homeOf(h.key, "approved");
+    if (old) old.status = "superseded";
+  }
+  Object.assign(h, { status: b.decision === "approve" ? "approved" : "rejected", decided_at: new Date().toISOString(), decided_by: req.user!, reason: b.decision === "reject" ? b.reason!.trim() : null });
+  return ok(homeOut(h, true));
+});
+
+/* ------------------------------------------------------------------ *
  * The person's own clock
  * ------------------------------------------------------------------ */
 const ON_LEAVE = new Set(TODAY.filter((t) => t.status === "leave").map((t) => t.person.user_key));
@@ -233,7 +347,7 @@ const ON_LEAVE = new Set(TODAY.filter((t) => t.status === "leave").map((t) => t.
 export function todayOf(key: string): AttendanceToday {
   const p = byKey(key)!;
   const date = todayIso();
-  const site = p.work_pattern === "remote" ? null : siteOf(key);
+  const fence = fenceOf(key);
   const evs = activeOn(key, date);
   const inEv = evs.find((e) => e.event_type === "clock_in");
   const outEv = evs.find((e) => e.event_type === "clock_out");
@@ -252,7 +366,9 @@ export function todayOf(key: string): AttendanceToday {
     review: evs.some((e) => e.validation_state === "review"),
     shift: shiftOf(date),
     work_pattern: p.work_pattern,
-    location: p.work_pattern === "remote" ? { kind: "remote", name: null, radius_m: null } : site ? { kind: "worksite", name: site.name, radius_m: site.radius_m } : { kind: "none", name: null, radius_m: null },
+    location: fence
+      ? { kind: fence.kind, name: fence.name, radius_m: fence.radius_m, home_state: fence.kind === "home" ? "approved" : null }
+      : { kind: p.work_pattern === "remote" ? "remote" : "none", name: null, radius_m: null, home_state: p.work_pattern === "remote" ? (homeOf(key, "pending") ? "pending" : "none") : null },
     policy: POLICY_MODES,
     device: { state: dev.status, label: dev.label, registered_count: count, can_register: dev.status !== "registered" && count < MAX_REGISTERED },
   };
@@ -271,7 +387,10 @@ function reasonText(code: ExceptionType, ev: Ev, accuracy: number | null) {
   switch (code) {
     case "outside_worksite":
       return `you were ${ev.distance_m} m from ${ev.worksite_name}`;
+    case "outside_home":
+      return `you were ${ev.distance_m} m from your approved home`;
     case "location_unverified":
+      if (ev.location_reason === "no_home") return "you have no approved home location yet";
       return ev.location_reason === "poor_accuracy" && accuracy ? "your location reading was not accurate enough" : "your location could not be checked";
     case "unknown_device":
       return "this device is not registered";
@@ -319,13 +438,13 @@ route("POST /api/v1/attendance/punches", (req) => {
   if (b.event_type === "clock_out" && hasOut) return fail(409, "ALREADY_CLOCKED_OUT", GUARD_MESSAGES.ALREADY_CLOCKED_OUT);
 
   const now = new Date().toISOString();
-  const site = p.work_pattern === "remote" ? null : siteOf(key);
+  const site = fenceOf(key);
   const point = b.latitude !== null && b.longitude !== null ? { latitude: b.latitude, longitude: b.longitude } : null;
   const accuracy = point && b.accuracy_m !== null ? (b.accuracy_m <= GOOD_ACCURACY_M ? "good" : b.accuracy_m <= POLICY_MODES.max_accuracy_m ? "fair" : "poor") : null;
   let geofence: GeofenceVerdict;
   let locationReason: string | null = null;
   let distance: number | null = null;
-  if (p.work_pattern === "remote") [geofence, locationReason] = ["not_applied", "remote"];
+  if (!site && p.work_pattern === "remote") [geofence, locationReason] = ["unverified", "no_home"];
   else if (!site) [geofence, locationReason] = ["not_applied", "no_worksite"];
   else if (!point) [geofence, locationReason] = ["unverified", b.location_error || "no_location"];
   else {
@@ -338,7 +457,7 @@ route("POST /api/v1/attendance/punches", (req) => {
   let fenceResult: PunchState = "accepted";
   if (mode !== "off" && geofence === "outside") {
     fenceResult = mode === "block" ? "rejected" : "review";
-    reasons.push("outside_worksite");
+    reasons.push(site?.kind === "home" ? "outside_home" : "outside_worksite");
   } else if (mode !== "off" && geofence === "unverified") {
     fenceResult = "review";
     reasons.push("location_unverified");
@@ -390,8 +509,12 @@ route("POST /api/v1/attendance/punches", (req) => {
       const detail =
         r === "outside_worksite"
           ? `${distance} m from ${site!.name}, radius ${site!.radius_m} m`
+          : r === "outside_home"
+            ? `${distance} m from the approved home, radius ${site!.radius_m} m`
           : r === "location_unverified"
-            ? locationReason === "poor_accuracy" && b.accuracy_m
+            ? locationReason === "no_home"
+              ? "No approved home"
+              : locationReason === "poor_accuracy" && b.accuracy_m
               ? `Reading accurate to ${Math.round(b.accuracy_m)} m`
               : `No location: ${LOCATION_REASON[locationReason ?? ""] ?? "no location reading"}`
             : r === "unknown_device"
@@ -486,7 +609,6 @@ route("GET /api/v1/attendance/me/records/:id", (req) => {
 /* ------------------------------------------------------------------ *
  * People · Attendance: the register, a day, the exceptions
  * ------------------------------------------------------------------ */
-const forbidden = () => fail(403, "FORBIDDEN", "You do not have access to this.");
 
 function registerRows(date: string, viewer: string): Array<RegisterRow & { key: string; working: boolean }> {
   const g = peopleGrant(viewer, "view");
@@ -508,7 +630,7 @@ function registerRows(date: string, viewer: string): Array<RegisterRow & { key: 
       clock_out_at: day?.last_clock_out_at ?? null,
       worked_minutes: day?.worked_minutes ?? 0,
       late_minutes: day?.late_minutes ?? 0,
-      expected_location: p.work_pattern === "remote" ? "Remote" : (site?.name ?? null),
+      expected_location: p.work_pattern === "remote" ? (homeOf(p.user_key, "approved") ? "Home" : "Remote") : (site?.name ?? null),
       location_verdict: last?.geofence ?? null,
       device_label: last?.device_label ?? null,
       device_state: last?.device_state ?? null,
@@ -560,7 +682,7 @@ route("GET /api/v1/attendance/register/:employee_id", (req) => {
   const row = registerRows(date, req.user!).find((r) => r.key === p.user_key);
   if (!row) return notFound();
   const day = DAYS.get(dk(p.user_key, date));
-  const site = siteOf(p.user_key);
+  const fence = fenceOf(p.user_key);
   const { grace_minutes, working_day, starts_at, ends_at } = shiftOf(date);
   const out: DayDetail = {
     employee: row.employee,
@@ -575,7 +697,7 @@ route("GET /api/v1/attendance/register/:employee_id", (req) => {
     late_minutes: row.late_minutes,
     overtime_minutes: day?.overtime_minutes ?? 0,
     closed: !!day?.closed_at,
-    expected_location: p.work_pattern === "remote" || !site ? null : { name: site.name, radius_m: site.radius_m },
+    expected_location: fence ? { name: fence.name, radius_m: fence.radius_m } : null,
     policy: { geofence_mode: POLICY_MODES.geofence_mode, device_mode: POLICY_MODES.device_mode },
     open_exceptions: row.open_exceptions,
   };

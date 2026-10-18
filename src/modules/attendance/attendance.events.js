@@ -13,9 +13,13 @@
  *   attendance.day_closed           the day-close closed a person's day
  *   attendance.export_requested     a month or the register asked for as a workbook,
  *                                   built here after commit and emailed (attendance.export.js)
+ *   attendance.home_requested       a remote employee sent a home location: People
+ *                                   (approve, within scope) are told
+ *   attendance.home_decided         People approved or rejected it: the person is told, and
+ *                                   their clock reloads
  *
- * Payloads carry ids, dates, results and exception types: never coordinates, a device
- * identifier or the evidence itself.
+ * Payloads carry ids, dates, results and exception types: never coordinates, an address,
+ * a device identifier or the evidence itself.
  */
 const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
@@ -33,6 +37,8 @@ const EVENTS = defineEvents("people", {
   "attendance.exception_decided": { summary: "People decided an attendance exception" },
   "attendance.day_closed": { summary: "An attendance day was closed" },
   "attendance.export_requested": { summary: "An attendance export was requested" },
+  "attendance.home_requested": { summary: "A remote employee asked for a home location" },
+  "attendance.home_decided": { summary: "People decided a home location" },
 });
 
 defineDocumentType("attendance_export", {
@@ -46,6 +52,7 @@ defineVariables("email", "attendance-export", c.attendance.AttendanceExportEmail
 /** "Outside the worksite" for the notification line, by exception type. */
 const WHAT = Object.freeze({
   outside_worksite: "outside the worksite",
+  outside_home: "outside the approved home",
   location_unverified: "location not verified",
   unknown_device: "an unregistered device",
   suspicious_timestamp: "the device clock ahead",
@@ -72,6 +79,21 @@ defineNotification(EVENTS.ATTENDANCE_EXCEPTION_DECIDED, {
   body: (e) => `${formatDate(e.payload.work_date)}: ${e.payload.outcome_text}.`,
 });
 
+defineNotification(EVENTS.ATTENDANCE_HOME_REQUESTED, {
+  to: [{ permission: ["people", "approve"] }],
+  title: "Home location to approve",
+  body: (e) => `${e.payload.employee_name} sent a home location.`,
+});
+
+defineNotification(EVENTS.ATTENDANCE_HOME_DECIDED, {
+  to: [{ subject: true }],
+  title: (e) => (e.payload.status === "approved" ? "Home location approved" : "Home location rejected"),
+  body: (e) =>
+    e.payload.status === "approved"
+      ? "Your clock-ins are now checked against it."
+      : "Send it again from My Attendance.",
+});
+
 /*
  * After commit: tell the screens that show this person's attendance to reload. The
  * person's own sockets, and the sockets of everyone whose `people` view reaches them
@@ -96,6 +118,8 @@ for (const key of [
   EVENTS.ATTENDANCE_EXCEPTION_DECIDED,
   EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED,
   EVENTS.ATTENDANCE_DAY_CLOSED,
+  EVENTS.ATTENDANCE_HOME_REQUESTED,
+  EVENTS.ATTENDANCE_HOME_DECIDED,
 ])
   outbox.register(key, "attendance.push_updated", pushUpdated);
 

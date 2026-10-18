@@ -19,7 +19,8 @@ const { messageOf } = require("./attendance.service");
 const { routesOf } = require("../../http/route");
 
 const TZ = "Africa/Lagos";
-const OFFICE = { worksite_id: "w-1", name: "Testbed Office", latitude: 6.5, longitude: 3.4, radius_m: 100 };
+const OFFICE = { kind: "worksite", worksite_id: "w-1", name: "Testbed Office", latitude: 6.5, longitude: 3.4, radius_m: 100 };
+const HOME = { kind: "home", attendance_home_id: "h-1", worksite_id: null, name: "Home", latitude: 6.5, longitude: 3.4, radius_m: 100 };
 
 /** A point `metres` north of the office (one degree of latitude is about 111,195 m). */
 const north = (metres) => ({ latitude: 6.5 + metres / 111_195, longitude: 3.4 });
@@ -119,13 +120,37 @@ describe("the geofence", () => {
     expect(judge({ accuracy_m: 75 })).toMatchObject({ verdict: "inside", accuracy: "fair", result: "accepted" });
   });
 
-  test("no worksite, or remote work, is not judged on location", () => {
+  test("someone not remote with no worksite is not judged on location", () => {
     expect(judge({ expected: null, mode: "block" })).toMatchObject({ verdict: "not_applied", reason: "no_worksite", result: "accepted" });
-    expect(judge({ work_pattern: "remote", point: north(5000), mode: "block" })).toMatchObject({ verdict: "not_applied", reason: "remote", result: "accepted" });
+    expect(judge({ expected: null, work_pattern: "hybrid", mode: "block" })).toMatchObject({ verdict: "not_applied" });
+  });
+
+  test("a remote employee is judged against their approved home: inside, the boundary, outside", () => {
+    const remote = (over) => judge({ work_pattern: "remote", expected: HOME, ...over });
+    expect(remote({ point: north(60) })).toMatchObject({
+      verdict: "inside", result: "accepted", place: "home", home_id: "h-1", worksite_id: null, worksite_name: "Home", distance_m: 60,
+    });
+    expect(remote({ point: north(100) })).toMatchObject({ verdict: "inside", result: "accepted" });
+    expect(remote({ point: north(101), mode: "warn" })).toMatchObject({ verdict: "outside", result: "review", exception: "outside_home", worksite_id: null });
+    expect(remote({ point: north(2500), mode: "block" })).toMatchObject({ verdict: "outside", result: "rejected", exception: null });
+    expect(remote({ point: null, location_error: "denied", mode: "block" })).toMatchObject({
+      verdict: "unverified", result: "review", exception: "location_unverified", retry_location: true,
+    });
+  });
+
+  test("a remote employee with no approved home is reviewed under warn and block, never rejected", () => {
+    for (const mode of ["warn", "block"]) {
+      const r = judge({ work_pattern: "remote", expected: null, point: north(5000), mode });
+      expect(r).toMatchObject({ verdict: "unverified", reason: "no_home", result: "review", exception: "location_unverified", retry_location: false, place: null });
+    }
+    expect(judge({ work_pattern: "remote", expected: null, point: null, mode: "block" })).toMatchObject({ reason: "no_home", result: "review" });
+    expect(judge({ work_pattern: "remote", expected: null, mode: "off" })).toMatchObject({ result: "accepted", exception: null });
   });
 
   test("a hybrid employee is judged against their worksite", () => {
-    expect(judge({ work_pattern: "hybrid", point: north(340) })).toMatchObject({ verdict: "outside", result: "review" });
+    expect(judge({ work_pattern: "hybrid", point: north(340) })).toMatchObject({
+      verdict: "outside", result: "review", exception: "outside_worksite", place: "worksite", worksite_id: "w-1", home_id: null,
+    });
   });
 });
 
@@ -293,12 +318,22 @@ describe("what a person reads", () => {
       "Clocked in at 08:58. People will review it: you were 340 m from Testbed Office.",
     );
     expect(messageOf(row("rejected", ["unknown_device"]))).toBe("Not counted: this device is not registered.");
+    expect(messageOf(row("review", ["outside_home"]))).toBe(
+      "Clocked in at 08:58. People will review it: you were 340 m from your approved home.",
+    );
+    expect(
+      messageOf(row("review", ["location_unverified"], { geofence: { reason: "no_home", distance_m: null, worksite_name: null } })),
+    ).toBe("Clocked in at 08:58. People will review it: you have no approved home location yet.");
   });
 
   test("an exception's detail comes from its evidence", () => {
     expect(detailOf("outside_worksite", { distance_m: 340, worksite_name: "Testbed Office", radius_m: 100 })).toBe(
       "340 m from Testbed Office, radius 100 m",
     );
+    expect(detailOf("outside_home", { distance_m: 2400, worksite_name: "Home", radius_m: 100 })).toBe(
+      "2400 m from the approved home, radius 100 m",
+    );
+    expect(detailOf("location_unverified", { reason: "no_home" })).toBe("No approved home");
     expect(detailOf("location_unverified", { reason: "denied" })).toBe("No location: location was not shared");
     expect(detailOf("location_unverified", { reason: "poor_accuracy", accuracy_m: 180.4 })).toBe("Reading accurate to 180 m");
     expect(detailOf("unknown_device", { device_label: "Chrome on Android" })).toBe("Unregistered device: Chrome on Android");
@@ -321,6 +356,13 @@ describe("the routes", () => {
         expect(r.permission && r.permission.key).toBe("people");
       }
     }
+  });
+
+  test("a home request carries no employee or status, and only People decide one", () => {
+    const send = routes.find((r) => r.method === "POST" && r.path === "/me/home");
+    expect(Object.keys(send.contract.body.shape).sort()).toEqual(["accuracy_m", "home_address", "home_latitude", "home_longitude"]);
+    const decide = routes.find((r) => r.method === "POST" && r.path === "/homes/:id/decision");
+    expect(decide.permission).toMatchObject({ key: "people", action: "approve" });
   });
 
   test("a punch carries no distance, inside flag, device or employee: the server works those out", () => {

@@ -174,6 +174,13 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
+  // A remote employee's home location: People · Attendance opens it in Homes (`?home=`,
+  // its `?id=` is a day); the person's own opens their Home Location on My Attendance.
+  attendance_home: {
+    ...screen("people", "attendance"),
+    param: "home",
+    self: screen("ess", "my-attendance"),
+  },
   leave_request: {
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),

@@ -37,6 +37,7 @@ const DayStatus = z.enum(["present", "late", "absent", "leave"]);
 const RegisterStatus = z.enum(["present", "late", "absent", "leave", "not_in", "off"]);
 const ExceptionType = z.enum([
   "outside_worksite",
+  "outside_home",
   "location_unverified",
   "unknown_device",
   "suspicious_timestamp",
@@ -86,11 +87,17 @@ const AttendanceToday = z
       })
       .strict(),
     work_pattern: WorkPattern,
+    /**
+     * Where the punch is matched: a worksite, a remote employee's approved home, a remote employee
+     * with no approved home yet (`remote`, judged unverified), or nowhere (`none`). `home_state` is
+     * the remote employee's home: approved, waiting on People, or none; null for anyone else.
+     */
     location: z
       .object({
-        kind: z.enum(["worksite", "none", "remote"]),
+        kind: z.enum(["worksite", "home", "none", "remote"]),
         name: z.string().nullable(),
         radius_m: z.number().int().nullable(),
+        home_state: z.enum(["approved", "pending", "none"]).nullable(),
       })
       .strict(),
     policy: z
@@ -367,6 +374,87 @@ const AttendanceRecordRef = z
   .strict();
 
 /* ------------------------------------------------------------------ *
+ * Home locations: a remote employee's approved home is their fence
+ * ------------------------------------------------------------------ */
+
+const HomeStatus = z.enum(["pending", "approved", "rejected", "superseded"]);
+
+/**
+ * One of my home locations. The address and the point are personal data: the person's own here,
+ * and only People with scope all see them elsewhere (masked under `employee.personal`).
+ */
+const HomeLocation = z
+  .object({
+    attendance_home_id: uuid,
+    status: HomeStatus,
+    home_address: z.string(),
+    home_latitude: z.number(),
+    home_longitude: z.number(),
+    accuracy_m: z.number().nullable(),
+    radius_m: z.number().int(),
+    requested_at: isoDateTime,
+    decided_at: isoDateTime.nullable(),
+    decision_reason: z.string().nullable(),
+  })
+  .strict();
+
+/** GET /attendance/me/home: the home in force, the one waiting, and the last one rejected since. */
+const MyHome = z
+  .object({
+    needed: z.boolean(),
+    approved: HomeLocation.nullable(),
+    pending: HomeLocation.nullable(),
+    rejected: HomeLocation.nullable(),
+    max_accuracy_m: z.number().int().min(1),
+  })
+  .strict();
+
+/** POST /attendance/me/home: one reading taken at home, and the address in the person's words. */
+const HomeRequestCreate = z
+  .object({
+    home_address: text(300),
+    home_latitude: z.number().min(-90).max(90),
+    home_longitude: z.number().min(-180).max(180),
+    accuracy_m: z.number().min(0).max(100000),
+  })
+  .strict();
+
+/** A home location as People see it; the address and point are null below scope all. */
+const HomeRequest = z
+  .object({
+    attendance_home_id: uuid,
+    employee: PersonRef,
+    status: HomeStatus,
+    home_address: z.string().nullable(),
+    home_latitude: z.number().nullable(),
+    home_longitude: z.number().nullable(),
+    accuracy_m: z.number().nullable(),
+    radius_m: z.number().int(),
+    distance_from_approved_m: z.number().nullable(),
+    requested_at: isoDateTime,
+    decided_at: isoDateTime.nullable(),
+    decided_by_name: z.string().nullable(),
+    decision_reason: z.string().nullable(),
+  })
+  .strict();
+const HomeRequestPage = Paged(HomeRequest);
+
+/** GET /attendance/homes: waiting first, newest first. */
+const HomeListQuery = listQuery({ status: HomeStatus.optional(), employee_id: uuid.optional() }, ["requested_at"]);
+
+/** POST /attendance/homes/:id/decision. A rejection says why, for the person to read. */
+const HomeDecision = z
+  .object({
+    decision: z.enum(["approve", "reject"]),
+    reason: optionalText(500),
+  })
+  .strict()
+  .refine((v) => v.decision !== "reject" || (v.reason || "").length >= 10, {
+    message: "At least 10 characters",
+    path: ["reason"],
+  });
+
+/* ------------------------------------------------------------------ *
  * Exports
  * ------------------------------------------------------------------ */
 
@@ -403,6 +491,42 @@ const AttendanceExportEmailVars = z
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  HomeLocation: {
+    table: "attendance_home",
+    virtual: {
+      home_address: "attendance_home.address, named for the personal-details mask",
+      home_latitude: "attendance_home.latitude, named for the personal-details mask",
+      home_longitude: "attendance_home.longitude, named for the personal-details mask",
+      radius_m: "the policy's home_radius_m",
+    },
+  },
+  MyHome: { table: null, reason: "the person's home locations: in force, waiting and last rejected" },
+  HomeRequestCreate: {
+    table: "attendance_home",
+    virtual: {
+      home_address: "written to attendance_home.address",
+      home_latitude: "written to attendance_home.latitude",
+      home_longitude: "written to attendance_home.longitude",
+    },
+  },
+  HomeRequest: {
+    table: "attendance_home",
+    virtual: {
+      employee: "the person, from employee and department",
+      home_address: "attendance_home.address, null below scope all",
+      home_latitude: "attendance_home.latitude, null below scope all",
+      home_longitude: "attendance_home.longitude, null below scope all",
+      radius_m: "the policy's home_radius_m",
+      distance_from_approved_m: "metres between this point and the person's approved home",
+      decided_by_name: "who decided it, from employee",
+    },
+  },
+  HomeRequestPage: { table: null, reason: "a page of home locations" },
+  HomeListQuery: { table: null, reason: "list controls for the home locations" },
+  HomeDecision: {
+    table: "attendance_home",
+    virtual: { decision: "written as attendance_home.status approved or rejected", reason: "attendance_home.decision_reason" },
+  },
   AttendanceToday: {
     table: null,
     reason: "the person's state now, from their day, the working week, their policy, worksite and device",
@@ -532,4 +656,12 @@ module.exports = {
   RegisterExportRequest,
   AttendanceExportQueued,
   AttendanceExportEmailVars,
+  HomeStatus,
+  HomeLocation,
+  MyHome,
+  HomeRequestCreate,
+  HomeRequest,
+  HomeRequestPage,
+  HomeListQuery,
+  HomeDecision,
 };

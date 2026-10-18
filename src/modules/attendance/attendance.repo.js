@@ -1,8 +1,8 @@
 "use strict";
 /**
  * Attendance: the SQL. Writes only the attendance tables (attendance_event,
- * attendance_day, attendance_exception); reads employee, worksite, leave and the
- * working week for what a day means. Never emits (BACKEND_GUIDE §2).
+ * attendance_day, attendance_exception, attendance_home); reads employee, worksite, leave
+ * and the working week for what a day means. Never emits (BACKEND_GUIDE §2).
  *
  * attendance_event is append-only (a trigger refuses UPDATE and DELETE): a decision on
  * an exception is written on the exception, and a correction is a new event.
@@ -64,7 +64,7 @@ function person(db, employeeId) {
 }
 
 const POLICY = `p.attendance_policy_id, p.name, p.grace_minutes, p.latest_clock_out_minutes,
-  p.geofence_mode, p.device_mode, p.max_accuracy_m`;
+  p.geofence_mode, p.device_mode, p.max_accuracy_m, p.home_radius_m`;
 
 /** The person's own policy and worksite for a date, when People set one (effective-dated). */
 function assignedPolicy(db, employeeId, date) {
@@ -132,7 +132,8 @@ async function eventsOn(db, employeeId, date) {
 }
 
 const EVENT_RESULT = `ev.attendance_event_id, ev.employee_id, ev.event_type, ev.validation_state, ev.occurred_at,
-  ev.device_at, ev.work_date, ev.distance_m::float8 AS distance_m, ev.validation, w.name AS worksite_name`;
+  ev.device_at, ev.work_date, ev.distance_m::float8 AS distance_m, ev.validation,
+  COALESCE(w.name, CASE WHEN ev.validation #>> '{geofence,place}' = 'home' THEN 'Home' END) AS worksite_name`;
 
 /** The punch an idempotency key already made, or null. */
 function eventByKey(db, employeeId, key) {
@@ -313,7 +314,7 @@ function listEvents(db, employeeId, date, query, { coordinates }) {
             CASE WHEN $3::boolean THEN ev.latitude::float8 END AS latitude,
             CASE WHEN $3::boolean THEN ev.longitude::float8 END AS longitude,
             ev.accuracy_m::float8 AS accuracy_m, ev.distance_m::float8 AS distance_m,
-            w.name AS worksite_name,
+            COALESCE(w.name, CASE WHEN ev.validation #>> '{geofence,place}' = 'home' THEN 'Home' END) AS worksite_name,
             COALESCE(ev.validation #>> '{geofence,verdict}', 'not_applied') AS geofence,
             ev.validation #>> '{geofence,reason}' AS location_reason,
             adv.label AS device_label,
@@ -436,7 +437,11 @@ const REGISTER = `
          ad.attendance_day_id, ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
          COALESCE(ad.worked_minutes, 0) AS worked_minutes, COALESCE(ad.late_minutes, 0) AS late_minutes,
          COALESCE(ad.overtime_minutes, 0) AS overtime_minutes, ad.closed_at,
-         CASE WHEN e.work_pattern = 'remote' THEN 'Remote' WHEN w.active THEN w.name END AS expected_location,
+         CASE WHEN e.work_pattern = 'remote'
+              THEN CASE WHEN EXISTS (SELECT 1 FROM attendance_home ah
+                                      WHERE ah.employee_id = e.employee_id AND ah.status = 'approved')
+                        THEN 'Home' ELSE 'Remote' END
+              WHEN w.active THEN w.name END AS expected_location,
          CASE WHEN w.active THEN w.radius_m END AS expected_radius_m,
          last.validation #>> '{geofence,verdict}' AS location_verdict,
          last.device_label,
@@ -572,6 +577,140 @@ async function withoutDay(db, date) {
   return rows;
 }
 
+
+/* ------------------------------------------------------------------ *
+ * Home locations (attendance.home.js)
+ * ------------------------------------------------------------------ */
+
+const HOME = `h.attendance_home_id, h.employee_id, h.status, h.address, h.latitude::float8 AS latitude,
+  h.longitude::float8 AS longitude, h.accuracy_m::float8 AS accuracy_m, h.requested_at, h.decided_at,
+  h.decision_reason`;
+
+/** The person's approved home, the fence a remote punch is judged against, or null. */
+function approvedHome(db, employeeId) {
+  return one(db, `SELECT ${HOME} FROM attendance_home h WHERE h.employee_id = $1 AND h.status = 'approved'`, [
+    employeeId,
+  ]);
+}
+
+/**
+ * The person's homes as My Attendance shows them: the approved one, the one waiting, and the
+ * newest request when People rejected it (until the person sends another).
+ */
+async function homesOf(db, employeeId) {
+  // One after the other: `db` may be a transaction's client, which runs one query at a time.
+  const approved = await approvedHome(db, employeeId);
+  const pending = await one(db, `SELECT ${HOME} FROM attendance_home h WHERE h.employee_id = $1 AND h.status = 'pending'`, [
+    employeeId,
+  ]);
+  const newest = await one(
+    db,
+    `SELECT ${HOME} FROM attendance_home h WHERE h.employee_id = $1
+      ORDER BY h.requested_at DESC, h.attendance_home_id DESC LIMIT 1`,
+    [employeeId],
+  );
+  return { approved, pending, rejected: newest && newest.status === "rejected" ? newest : null };
+}
+
+/** A request still waiting stops waiting: the newer one replaces it. */
+function supersedePending(client, employeeId) {
+  return client.query(
+    "UPDATE attendance_home SET status = 'superseded' WHERE employee_id = $1 AND status = 'pending'",
+    [employeeId],
+  );
+}
+
+function insertHome(client, h) {
+  return one(
+    client,
+    `INSERT INTO attendance_home (employee_id, address, latitude, longitude, accuracy_m, requested_by)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING ${HOME.replace(/h\./g, "")}`,
+    [h.employee_id, h.address, h.latitude, h.longitude, h.accuracy_m, h.requested_by],
+  );
+}
+
+/** One home location with its owner, locked for a decision when `forUpdate`. */
+function getHome(db, id, { forUpdate = false } = {}) {
+  return one(
+    db,
+    `SELECT ${HOME} FROM attendance_home h WHERE h.attendance_home_id = $1${forUpdate ? " FOR UPDATE" : ""}`,
+    [id],
+  );
+}
+
+/** Approve: the home in force before it is superseded, then this one is approved. */
+async function approveHome(client, id, employeeId, by) {
+  await client.query(
+    "UPDATE attendance_home SET status = 'superseded' WHERE employee_id = $1 AND status = 'approved'",
+    [employeeId],
+  );
+  return one(
+    client,
+    `UPDATE attendance_home SET status = 'approved', decided_by = $2, decided_at = now()
+      WHERE attendance_home_id = $1 AND status = 'pending' RETURNING attendance_home_id`,
+    [id, by],
+  );
+}
+
+function rejectHome(client, id, by, reason) {
+  return one(
+    client,
+    `UPDATE attendance_home SET status = 'rejected', decided_by = $2, decided_at = now(), decision_reason = $3
+      WHERE attendance_home_id = $1 AND status = 'pending' RETURNING attendance_home_id`,
+    [id, by, reason],
+  );
+}
+
+const HOME_SORTS = {
+  waiting: "(h.status = 'pending') DESC, h.requested_at DESC",
+  requested_at: "h.requested_at",
+};
+
+/**
+ * Home locations as People read them. `$1` says whether the address and the point travel
+ * (scope all); the request's point and the approved home's come along for the distance and
+ * are dropped by the service.
+ */
+const HOME_ROWS = (extra = "") => `SELECT h.attendance_home_id, ${PERSON()} AS employee, h.status,
+            CASE WHEN $1::boolean THEN h.address END AS home_address,
+            CASE WHEN $1::boolean THEN h.latitude::float8 END AS home_latitude,
+            CASE WHEN $1::boolean THEN h.longitude::float8 END AS home_longitude,
+            h.accuracy_m::float8 AS accuracy_m, h.requested_at, h.decided_at,
+            ${nameOf("de")} AS decided_by_name, h.decision_reason,
+            h.latitude::float8 AS point_latitude, h.longitude::float8 AS point_longitude,
+            ap.latitude::float8 AS approved_latitude, ap.longitude::float8 AS approved_longitude${extra}
+       FROM attendance_home h
+       JOIN employee e ON e.employee_id = h.employee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+       LEFT JOIN app_user du ON du.user_id = h.decided_by
+       LEFT JOIN employee de ON de.employee_id = du.employee_id
+       LEFT JOIN attendance_home ap
+         ON ap.employee_id = h.employee_id AND ap.status = 'approved' AND ap.attendance_home_id <> h.attendance_home_id`;
+
+/** A page of home locations within the reader's scope, waiting first. */
+function listHomes(db, query, scope, { place }) {
+  const params = [Boolean(place), query.status || null, query.employee_id || null, query.q || null];
+  const s = scopeClause(scope, { column: "h.employee_id" }, params);
+  return pageQuery(
+    db,
+    `${HOME_ROWS(`, ${TOTAL_COL}`)}
+      WHERE ($2::text IS NULL OR h.status = $2)
+        AND ($3::uuid IS NULL OR h.employee_id = $3)
+        AND ($4::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name || ' ' || COALESCE(e.preferred_name, ''))
+                                  LIKE '%' || search_fold($4) || '%')
+        ${s.and}
+      ORDER BY ${orderBy(query, HOME_SORTS, "h.attendance_home_id")}`,
+    params,
+    query,
+  );
+}
+
+/** One home location as People read it (the caller checked the scope). */
+function homeRow(db, id, { place }) {
+  return one(db, `${HOME_ROWS()} WHERE h.attendance_home_id = $2`, [Boolean(place), id]);
+}
+
 module.exports = {
   WORKING_DAY,
   lockEmployee,
@@ -600,4 +739,13 @@ module.exports = {
   attendanceStart,
   unclosedDays,
   withoutDay,
+  approvedHome,
+  homesOf,
+  supersedePending,
+  insertHome,
+  getHome,
+  approveHome,
+  rejectHome,
+  listHomes,
+  homeRow,
 };

@@ -1,4 +1,4 @@
-import type { AttendanceDay, DeviceStatus, ExceptionType, GeofenceVerdict, PunchState, RegisterStatus } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, DeviceStatus, ExceptionType, GeofenceVerdict, HomeStatus, PunchState, RegisterStatus } from "@mycity/contract/contract.gen.ts";
 
 /**
  * The words and tones the attendance screens show for the API's values (docs/guides/attendance.md
@@ -28,6 +28,7 @@ export const dayStatus = (d: Pick<AttendanceDay, "status" | "late_minutes">): Sh
 
 export const EXCEPTION_TYPE: Record<ExceptionType, string> = {
   outside_worksite: "Outside Worksite",
+  outside_home: "Outside Home",
   location_unverified: "Location Unverified",
   unknown_device: "Unknown Device",
   suspicious_timestamp: "Device Time Ahead",
@@ -52,6 +53,14 @@ export const DEVICE_STATUS: Record<DeviceStatus, Shown> = {
   registered: { tone: "ok", text: "Registered" },
   observed: { tone: "warn", text: "New" },
   removed: { tone: "neutral", text: "Removed" },
+};
+
+/** A remote employee's home location, as My Attendance and People's Homes show it. */
+export const HOME_STATUS: Record<HomeStatus, Shown> = {
+  pending: { tone: "warn", text: "Waiting" },
+  approved: { tone: "ok", text: "Approved" },
+  rejected: { tone: "err", text: "Rejected" },
+  superseded: { tone: "neutral", text: "Replaced" },
 };
 
 export const DEVICE_STATUS_HELP = "New: seen on a punch, not registered. Registered: one of your three. Removed: taken off, and it can be registered again.";

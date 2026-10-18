@@ -12,6 +12,7 @@ const { maskForUser } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
 const { pool } = require("../../config/db");
 const service = require("./attendance.service");
+const homes = require("./attendance.home");
 
 const q = (req) => req.validated.query || {};
 const id = (req) => req.validated.params.id;
@@ -42,6 +43,10 @@ module.exports = {
 
   myExport: async (req, res) => ok(res, await service.requestMyExport(withActor(req), req.validated.body)),
 
+  myHome: async (req, res) => ok(res, await homes.mine(req.user)),
+
+  requestHome: async (req, res) => created(res, await homes.request(withActor(req), req.validated.body)),
+
   register: async (req, res) => sendPaged(res, await masked(req, await service.register(q(req), scopeOf(req)))),
 
   summary: async (req, res) => ok(res, await service.summary(q(req), scopeOf(req))),
@@ -57,6 +62,13 @@ module.exports = {
 
   decide: async (req, res) =>
     ok(res, await service.decide(withActor(req), scopeOf(req), id(req), req.validated.body)),
+
+  homes: async (req, res) => sendPaged(res, await masked(req, await homes.list(q(req), scopeOf(req)))),
+
+  home: async (req, res) => ok(res, await masked(req, await homes.get(id(req), scopeOf(req)))),
+
+  decideHome: async (req, res) =>
+    ok(res, await masked(req, await homes.decide(withActor(req), scopeOf(req), id(req), req.validated.body))),
 
   export: async (req, res) => ok(res, await service.requestRegisterExport(withActor(req), req.validated.body)),
 };

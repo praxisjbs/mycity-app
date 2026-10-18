@@ -13,8 +13,9 @@
  *      refusal writes nothing and is a 409
  *   5. the device: the session's known device, recorded by the devices service the first
  *      time it punches, judged by the device mode (devices.guard.js)
- *   6. the geofence: the reading against the expected worksite, judged by the geofence
- *      mode (attendance.geofence.js); the time: the device's clock against the server's
+ *   6. the geofence: the reading against the expected worksite (for remote staff, the
+ *      approved home), judged by the geofence mode (attendance.geofence.js); the time: the
+ *      device's clock against the server's
  *   7. the strictest result is recorded with its evidence (attendance_event, append-only),
  *      the day recalculated, an exception opened for each check that wants review, and
  *      attendance.punched (and attendance.review_required) emitted, all committed together
@@ -54,6 +55,7 @@ async function tx(fn) {
 
 const SEVERITY = Object.freeze({
   outside_worksite: "medium",
+  outside_home: "medium",
   location_unverified: "low",
   unknown_device: "high",
   suspicious_timestamp: "medium",
@@ -65,7 +67,10 @@ function reasonText(code, ev) {
   switch (code) {
     case "outside_worksite":
       return `you were ${ev.geofence.distance_m} m from ${ev.geofence.worksite_name}`;
+    case "outside_home":
+      return `you were ${ev.geofence.distance_m} m from your approved home`;
     case "location_unverified":
+      if (ev.geofence.reason === "no_home") return "you have no approved home location yet";
       return ev.geofence.reason === "poor_accuracy"
         ? "your location reading was not accurate enough"
         : "your location could not be checked";
@@ -128,6 +133,14 @@ async function today(user, { now = new Date() } = {}) {
   const clockIn = active.find((e) => e.event_type === "clock_in") || null;
   const clockOut = active.find((e) => e.event_type === "clock_out") || null;
   const device = await devices.statusForSession(pool, user);
+  const remote = person.work_pattern === "remote";
+  const homeState = !remote
+    ? null
+    : ctx.fence
+      ? "approved"
+      : (await repo.homesOf(pool, user.employee_id)).pending
+        ? "pending"
+        : "none";
 
   let state = "not_clocked_in";
   if (person.status !== "active") state = "unavailable";
@@ -147,12 +160,9 @@ async function today(user, { now = new Date() } = {}) {
     review: (await repo.openExceptionCount(pool, day ? day.attendance_day_id : null)) > 0,
     shift: ctx.shift,
     work_pattern: person.work_pattern,
-    location:
-      person.work_pattern === "remote"
-        ? { kind: "remote", name: null, radius_m: null }
-        : ctx.fence
-          ? { kind: "worksite", name: ctx.fence.name, radius_m: ctx.fence.radius_m }
-          : { kind: "none", name: null, radius_m: null },
+    location: ctx.fence
+      ? { kind: ctx.fence.kind, name: ctx.fence.name, radius_m: ctx.fence.radius_m, home_state: homeState }
+      : { kind: remote ? "remote" : "none", name: null, radius_m: null, home_state: homeState },
     policy: {
       geofence_mode: ctx.policy.geofence_mode,
       device_mode: ctx.policy.device_mode,
@@ -251,7 +261,9 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
     const result = rules.strictest(geofence.result, deviceDecision.result, timeResult);
 
     const checks = [
-      geofence.result !== "accepted" ? (geofence.exception || "outside_worksite") : null,
+      geofence.result !== "accepted"
+        ? geofence.exception || (geofence.place === "home" ? "outside_home" : "outside_worksite")
+        : null,
       deviceDecision.result !== "accepted" ? "unknown_device" : null,
       time.future ? "suspicious_timestamp" : null,
     ].filter(Boolean);
@@ -272,8 +284,10 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         distance_m: geofence.distance_m,
         radius_m: geofence.radius_m,
         accuracy: geofence.accuracy,
+        place: geofence.place,
         worksite_id: geofence.worksite_id,
         worksite_name: geofence.worksite_name,
+        home_id: geofence.home_id,
         result: geofence.result,
       },
       device: {
@@ -339,6 +353,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
                 ? { skew_seconds: time.skew_seconds, event_type: body.event_type }
                 : {
                     reason: geofence.reason,
+                    place: geofence.place,
                     distance_m: geofence.distance_m,
                     radius_m: geofence.radius_m,
                     worksite_name: geofence.worksite_name,

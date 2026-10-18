@@ -410,15 +410,16 @@ describeDb("attendance against the real migrations", () => {
       expect(outside.message).toBe("Clocked in at 08:00. People will review it: you were 340 m from Testbed Office.");
     });
 
-    test("an employee with no worksite, and a remote one, punch unjudged on location", async () => {
+    test("someone not remote with no worksite punches unjudged; a remote one with no approved home is reviewed", async () => {
       await setPolicy("block", "off");
       await q("UPDATE employee SET worksite_id = NULL WHERE employee_id = $1", [people.outsider.employee.employee_id]);
       const r = await punchAt("outsider", nextMorning(), { ...north(5000) });
       expect(r).toMatchObject({ validation_state: "accepted", reasons: [], worksite_name: null });
-      expect(r.today.location).toEqual({ kind: "none", name: null, radius_m: null });
+      expect(r.today.location).toEqual({ kind: "none", name: null, radius_m: null, home_state: null });
       const remote = await punchAt("remote", nextMorning(), { ...north(9000) });
-      expect(remote).toMatchObject({ validation_state: "accepted", reasons: [] });
-      expect(remote.today.location.kind).toBe("remote");
+      expect(remote).toMatchObject({ validation_state: "review", reasons: ["location_unverified"], worksite_name: null });
+      expect(remote.message).toBe("Clocked in at 08:00. People will review it: you have no approved home location yet.");
+      expect(remote.today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "none" });
     });
 
     test("block: outside is rejected, counts for nothing and opens nothing; inside and the boundary are accepted", async () => {
@@ -860,5 +861,211 @@ describeDb("attendance against the real migrations", () => {
     expect(types.has("worksite")).toBe(true);
     const days = await as("manager").get("/search?q=bisi");
     for (const g of days.body.groups || []) expect(["attendance_record", "attendance_exception", "device"]).not.toContain(g.type);
+  });
+  /* ---------------------------------------------------------------- *
+   * Remote staff's homes
+   * ---------------------------------------------------------------- */
+
+  describe("remote staff's approved homes", () => {
+    /** A point `metres` north of Femi's invented home at 6.600000, 3.500000. */
+    const home = (metres) => ({ latitude: 6.6 + metres / 111_195, longitude: 3.5 });
+    const ADDRESS = "14 Invented Close, Testbed Estate";
+    const MOVED = "3 Imaginary Road, Testbed Estate";
+    const send = (who, at, address = ADDRESS, accuracy = 18) =>
+      as(who).post("/attendance/me/home", { home_address: address, home_latitude: at.latitude, home_longitude: at.longitude, accuracy_m: accuracy });
+    const decide = (who, id, body) => as(who).post(`/attendance/homes/${id}/decision`, body);
+    const homeRows = async () =>
+      (await q("SELECT status, address FROM attendance_home WHERE employee_id = $1 ORDER BY requested_at, status", [people.remote.employee.employee_id])).rows;
+    const D = (n) => `2026-08-${String(n).padStart(2, "0")}T07:00:00Z`; // August 2026 weekdays, in the past
+    let first;
+
+    test("only a remote employee sends one, from a reading good enough; a second one waiting replaces the first", async () => {
+      const notRemote = await send("staff", home(0));
+      expect(notRemote.status).toBe(422);
+      expect(notRemote.body.error.code).toBe("HOME_NOT_NEEDED");
+
+      const empty = await as("remote").get("/attendance/me/home");
+      expect(empty.body).toEqual({ needed: true, approved: null, pending: null, rejected: null, max_accuracy_m: 100 });
+      expect((await as("staff").get("/attendance/me/home")).body).toMatchObject({ needed: false });
+
+      const weak = await send("remote", home(0), ADDRESS, 250);
+      expect(weak.status).toBe(422);
+      expect(weak.body.error.code).toBe("HOME_READING_WEAK");
+      expect((await as("remote").post("/attendance/me/home", { home_address: ADDRESS, home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 10, employee_id: people.staff.employee.employee_id })).status).toBe(422);
+
+      const wrong = await send("remote", home(900), "Old address typed by mistake");
+      expect(wrong.status).toBe(201);
+      const sent2 = await send("remote", home(0));
+      expect(sent2.status).toBe(201);
+      expect(sent2.body.approved).toBeNull();
+      expect(sent2.body.pending).toMatchObject({ status: "pending", home_address: ADDRESS, radius_m: 100, accuracy_m: 18 });
+      expect(sent2.body.pending.home_latitude).toBeCloseTo(6.6, 5);
+      first = sent2.body.pending.attendance_home_id;
+      expect(await homeRows()).toEqual([
+        { status: "superseded", address: "Old address typed by mistake" },
+        { status: "pending", address: ADDRESS },
+      ]);
+      const now = await as("remote").get("/attendance/me/today");
+      expect(now.body.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "pending" });
+
+      // Waiting is not approved: the punch is still reviewed for want of a home, never rejected.
+      await setPolicy("block", "off");
+      const waiting = await punchAt("remote", D(3), home(0));
+      expect(waiting).toMatchObject({ validation_state: "review", reasons: ["location_unverified"] });
+    });
+
+    test("People list homes waiting first; the address and point only for scope all, never for a manager", async () => {
+      const ops = await as("ops").get("/attendance/homes");
+      expect(ops.status).toBe(200);
+      expect(ops.body.page.size).toBe(25);
+      expect(ops.body.data[0]).toMatchObject({
+        attendance_home_id: first,
+        status: "pending",
+        home_address: ADDRESS,
+        radius_m: 100,
+        distance_from_approved_m: null,
+        employee: { display_name: "Femi Oke" },
+      });
+      expect(ops.body.data[0].home_longitude).toBeCloseTo(3.5, 5);
+      expect((await as("ops").get(`/attendance/homes?status=superseded`)).body.data.map((h) => h.status)).toEqual(["superseded"]);
+      expect((await as("ops").get(`/attendance/homes/${first}`)).body).toMatchObject({ home_address: ADDRESS });
+      expect((await as("ops").get("/attendance/homes?limit=100")).status).toBe(422);
+
+      expect((await as("staff").get("/attendance/homes")).status).toBe(403);
+      expect((await as("manager").get("/attendance/homes")).body.data).toEqual([]);
+      expect((await as("manager").get(`/attendance/homes/${first}`)).status).toBe(404);
+
+      // On the manager's team: the status and the distance, never the address or the point.
+      await q("UPDATE employee SET line_manager_id = $1 WHERE employee_id = $2", [people.manager.employee.employee_id, people.remote.employee.employee_id]);
+      await grantsCache.bumpTeamVersion();
+      try {
+        const team = await as("manager").get("/attendance/homes");
+        expect(team.body.data.length).toBeGreaterThan(0);
+        for (const h of team.body.data) expect([h.home_address, h.home_latitude, h.home_longitude]).toEqual([null, null, null]);
+        expect(team.body.data[0]).toMatchObject({ status: "pending", employee: { display_name: "Femi Oke" } });
+        const one = await as("manager").get(`/attendance/homes/${first}`);
+        expect(one.body).toMatchObject({ home_address: null, home_latitude: null });
+        expect((await decide("manager", first, { decision: "approve" })).status).toBe(403);
+      } finally {
+        await q("UPDATE employee SET line_manager_id = NULL WHERE employee_id = $1", [people.remote.employee.employee_id]);
+        await grantsCache.bumpTeamVersion();
+      }
+    });
+
+    test("People with scope all approve; a rejection needs a reason; a decided home is a 409", async () => {
+      expect((await decide("ops", first, { decision: "reject", reason: "short" })).status).toBe(422);
+      expect((await decide("ops", first, { decision: "maybe" })).status).toBe(422);
+      const ok = await decide("ops", first, { decision: "approve" });
+      expect(ok.status).toBe(200);
+      expect(ok.body).toMatchObject({ status: "approved", decided_by_name: "Tunde Bakare", decision_reason: null, home_address: ADDRESS });
+      const again = await decide("ops", first, { decision: "reject", reason: "Changed my mind about it" });
+      expect(again.status).toBe(409);
+      expect(again.body.error.code).toBe("HOME_DECIDED");
+
+      const mine = await as("remote").get("/attendance/me/home");
+      expect(mine.body).toMatchObject({ approved: { attendance_home_id: first, status: "approved" }, pending: null, rejected: null });
+      const now = await as("remote").get("/attendance/me/today");
+      expect(now.body.location).toEqual({ kind: "home", name: "Home", radius_m: 100, home_state: "approved" });
+    });
+
+    test("a remote punch is judged against the approved home: inside, the boundary, outside under warn and block", async () => {
+      await setPolicy("block", "off");
+      const inside = await punchAt("remote", D(4), home(60));
+      expect(inside).toMatchObject({ validation_state: "accepted", reasons: [], distance_m: 60, worksite_name: "Home" });
+      const stored = await q(
+        "SELECT worksite_id, validation->'geofence' AS g FROM attendance_event WHERE attendance_event_id = $1",
+        [inside.attendance_event_id],
+      );
+      expect(stored.rows[0].worksite_id).toBeNull();
+      expect(stored.rows[0].g).toMatchObject({ verdict: "inside", place: "home", home_id: first, radius_m: 100 });
+
+      expect(await punchAt("remote", D(5), home(100))).toMatchObject({ validation_state: "accepted", distance_m: 100 });
+
+      const blocked = await punchAt("remote", D(6), home(2400));
+      expect(blocked).toMatchObject({ validation_state: "rejected", reasons: ["outside_home"] });
+      expect(blocked.message).toBe("Not counted: you were 2400 m from your approved home.");
+
+      await setPolicy("warn", "off");
+      const warned = await punchAt("remote", D(7), home(400));
+      expect(warned).toMatchObject({ validation_state: "review", reasons: ["outside_home"], distance_m: 400 });
+      expect(warned.message).toBe("Clocked in at 08:00. People will review it: you were 400 m from your approved home.");
+      const x = await as("ops").get(`/attendance/exceptions?employee_id=${people.remote.employee.employee_id}&exception_type=outside_home`);
+      expect(x.body.data.map((e) => e.detail)).toEqual(["400 m from the approved home, radius 100 m"]);
+
+      // The register and the day name the home; the roster still reads the punch as remote.
+      const reg = await as("ops").get("/attendance/register?date=2026-08-07&q=femi");
+      expect(reg.body.data[0]).toMatchObject({ expected_location: "Home", work_pattern: "remote" });
+      const day = await as("ops").get(`/attendance/register/${people.remote.employee.employee_id}?date=2026-08-07`);
+      expect(day.body.expected_location).toEqual({ name: "Home", radius_m: 100 });
+    });
+
+    test("moving house: the new home waits while the old one stays the fence; a rejection is read by the person", async () => {
+      await setPolicy("block", "off");
+      const moved = await send("remote", home(3000), MOVED);
+      expect(moved.status).toBe(201);
+      expect(moved.body).toMatchObject({ approved: { attendance_home_id: first }, pending: { home_address: MOVED } });
+      expect(await punchAt("remote", D(10), home(10))).toMatchObject({ validation_state: "accepted" });
+
+      const waiting = await as("ops").get("/attendance/homes?status=pending");
+      const next = waiting.body.data.find((h) => h.home_address === MOVED);
+      expect(next.distance_from_approved_m).toBe(3000);
+      const no = await decide("ops", next.attendance_home_id, { decision: "reject", reason: "Send it from the new house please" });
+      expect(no.body).toMatchObject({ status: "rejected", decision_reason: "Send it from the new house please" });
+      const after = await as("remote").get("/attendance/me/home");
+      expect(after.body).toMatchObject({
+        approved: { attendance_home_id: first },
+        pending: null,
+        rejected: { home_address: MOVED, decision_reason: "Send it from the new house please" },
+      });
+
+      const again = await send("remote", home(3000), MOVED);
+      const yes = await decide("ops", again.body.pending.attendance_home_id, { decision: "approve" });
+      expect(yes.body.status).toBe("approved");
+      const statuses = (await homeRows()).map((r) => r.status);
+      expect(statuses.filter((st) => st === "approved")).toHaveLength(1);
+      expect(statuses.filter((st) => st === "superseded")).toHaveLength(2);
+      expect(await punchAt("remote", D(11), home(3010))).toMatchObject({ validation_state: "accepted", distance_m: 10 });
+      expect(await punchAt("remote", D(12), home(10))).toMatchObject({ validation_state: "rejected", reasons: ["outside_home"] });
+      await setPolicy("warn", "off");
+    });
+
+    test("nobody decides their own home", async () => {
+      await q("UPDATE employee SET work_pattern = 'remote' WHERE employee_id = $1", [people.ops.employee.employee_id]);
+      try {
+        const own = await send("ops", { latitude: 6.7, longitude: 3.6 }, "1 Made Up Lane, Testbed Estate");
+        expect(own.status).toBe(201);
+        const res = await decide("ops", own.body.pending.attendance_home_id, { decision: "approve" });
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe("OWN_RECORD");
+      } finally {
+        await q("UPDATE employee SET work_pattern = 'on_site' WHERE employee_id = $1", [people.ops.employee.employee_id]);
+      }
+    });
+
+    test("events, the audit, notifications and search carry no address or coordinates", async () => {
+      await drain();
+      const logged = await q(
+        `SELECT l.event_key, l.payload, a.before, a.after FROM event_log l LEFT JOIN audit_ledger a ON a.event_id = l.event_id
+          WHERE l.event_key LIKE 'attendance.home_%'`,
+        [],
+      );
+      expect(new Set(logged.rows.map((r) => r.event_key))).toEqual(new Set(["attendance.home_requested", "attendance.home_decided"]));
+      const text = JSON.stringify(logged.rows);
+      for (const secret of ["Invented Close", "Imaginary Road", "Made Up Lane", "6.6", "3.5"]) expect(text).not.toContain(secret);
+
+      const toOps = await q("SELECT title, body FROM notification WHERE user_id = $1 AND event_key = 'attendance.home_requested'", [people.ops.user.user_id]);
+      expect(toOps.rows[0]).toEqual({ title: "Home location to approve", body: "Femi Oke sent a home location." });
+      const toFemi = await q("SELECT title FROM notification WHERE user_id = $1 AND event_key = 'attendance.home_decided' ORDER BY created_at", [people.remote.user.user_id]);
+      expect(toFemi.rows.map((r) => r.title)).toEqual(["Home location approved", "Home location rejected", "Home location approved"]);
+      const pushed = realtime.toUser.mock.calls.filter((c) => c[1] === "attendance.updated" && c[0] === people.remote.user.user_id);
+      expect(pushed.length).toBeGreaterThan(0);
+
+      const byName = await as("ops").get("/search?q=femi");
+      expect((byName.body.groups || []).map((g) => g.type)).toContain("attendance_home");
+      const byAddress = await as("ops").get("/search?q=imaginary");
+      expect((byAddress.body.groups || []).map((g) => g.type)).not.toContain("attendance_home");
+      const team = await as("manager").get("/search?q=femi");
+      expect((team.body.groups || []).map((g) => g.type)).not.toContain("attendance_home");
+    });
   });
 });
