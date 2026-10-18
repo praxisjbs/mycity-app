@@ -1,7 +1,10 @@
 import type { LeaveBalance, LeaveRequest } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { Button, Card, CardHeader, DataView, DesktopOnly, formatDate, Grid, KeyValue, KpiCard, Meter, PageHeader, Pager, TapList, toast, todayIso, useModal } from "@mycity/ui";
+import { useMe } from "@/auth/AuthProvider";
+import { useState } from "react";
+import { Button, Calendar, Card, CardHeader, DataView, DesktopOnly, formatDate, Grid, KeyValue, KpiCard, Meter, PageHeader, Pager, TapList, toast, todayIso, useModal } from "@mycity/ui";
+import { MonthPicker } from "@/features/shared/MonthPicker";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { dayCount, LeaveForm, statusPill } from "@/features/people/Leave";
 import { useScreenAction } from "@/shell/screen-action";
@@ -125,7 +128,13 @@ export function MyLeavePage() {
 
   return (
     <>
-      <PageHeader title="My Leave" sub={year ? `${year} entitlement` : undefined} actions={<Button variant="primary" icon="plus" onClick={request}>Request Leave</Button>} />
+      <PageHeader title="My Leave" sub={year ? `${year} entitlement` : undefined} actions={
+          <>
+            <Button icon="calendar" onClick={() => modal.open({ title: "Leave Calendar", wide: true, body: <MyLeaveCalendar /> })}>Leave Calendar</Button>
+            <Button variant="primary" icon="plus" onClick={request}>Request Leave</Button>
+          </>
+        }
+      />
       {main && main.entitled !== null && (
         <Grid cols="4m2">
           <KpiCard opensOn="phone" title="Entitlement" value={dayCount(main.entitled)} caption={`${main.name}, ${year}`} onOpen={() => modal.open({ title: "Entitlement", body: ent })} />
@@ -167,6 +176,38 @@ export function MyLeavePage() {
           {ent}
         </Grid>
       </DesktopOnly>
+    </>
+  );
+}
+
+
+/**
+ * The leave calendar (the team lead, 18/10/2026): approved and waiting leave for the reader and
+ * everyone under them; everyone for Operations & People and the CEO. The server decides whose
+ * (GET /ess/leave/calendar). This year and next, a month at a time.
+ */
+function MyLeaveCalendar() {
+  const me = useMe();
+  const now = todayIso().slice(0, 7);
+  const first = `${now.slice(0, 4)}-01`;
+  const last = `${Number(now.slice(0, 4)) + 1}-12`;
+  const [ym, setYm] = useState(now);
+  const list = usePaged("GET /api/v1/ess/leave/calendar", { filters: { month: ym }, sort: "starts_on" });
+  const events = list.rows.flatMap((r) => {
+    const own = r.employee.employee_id === me.employee_id;
+    const label = `${own ? "You" : r.employee.display_name.split(" ")[0]}${r.status === "submitted" ? " (Waiting)" : ""}`;
+    const out = [];
+    for (let d = new Date(`${r.starts_on}T12:00:00Z`); d <= new Date(`${r.ends_on}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+      const date = d.toISOString().slice(0, 10);
+      if (date.startsWith(ym)) out.push({ date, label, highlight: own });
+    }
+    return out;
+  });
+  return (
+    <>
+      <MonthPicker value={ym} onChange={setYm} min={first} max={last} className="mb-3" />
+      <Calendar year={Number(ym.slice(0, 4))} month={Number(ym.slice(5, 7)) - 1} events={events} />
+      <Pager page={list.page} onPage={list.setPage} noun="request" />
     </>
   );
 }
