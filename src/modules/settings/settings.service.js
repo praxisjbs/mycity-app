@@ -218,6 +218,7 @@ const DOC_LABELS = Object.freeze({
   employee: "Staff Number",
   document: "Document",
   import_batch: "Import",
+  report_run: "Report Run",
   query: "Query",
   sanction: "Sanction",
   letter: "Letter",

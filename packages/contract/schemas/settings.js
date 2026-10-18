@@ -147,6 +147,7 @@ const DOC_TYPES = [
   "employee",
   "document",
   "import_batch",
+  "report_run",
   "query",
   "sanction",
   "letter",

@@ -309,7 +309,7 @@ not a schema change.
 | Donor | loc | Note |
 |---|---|---|
 | `praxis-ls/src/modules/hr/appraisal/` | 1,208 / 10 | `appraisal.review.js`, `appraisal.rules.js`, `appraisal.evidence.js` |
-| `praxis-ls/src/modules/security/role_kpi/` | 398 | Per-role KPI config: scope, default, lock. The tenant-facing dial over the catalogue |
+| `praxis-ls/src/modules/security/role_kpi/` | 398 | Per-role KPI config: scope, default, lock. The tenant-facing dial over the catalogue. **Moved to M1 Home** by owner decision (TB, 17/10/2026; `docs/guides/home.md` §4): defaults and locks only (`role_kpi`, no scope), plus each person's own pick (`home_kpi_pick`). The editor screen stays in M9 Settings · Roles |
 | `pixie-girl-hub/src/shared/hr_payroll/appraisal.autoscore.js` | 280 | Auto-scoring from counted activity |
 | `pixie-girl-hub/src/shared/hr_payroll/appraisal.service.js` + `.repo.js` + `.metrics.js` + `.review-pdf.js` | 890 | Review cycle and the PDF |
 | `pixie-girl-hub/src/shared/goals/` | 1,318 / 12 | Targets with `notes`, and `target.progress.subscribers.js` auto-counting progress from domain events |

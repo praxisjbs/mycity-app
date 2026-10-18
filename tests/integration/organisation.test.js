@@ -36,6 +36,7 @@ const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const organisation = require("../../src/modules/organisation/organisation.service");
 const loader = require("../../scripts/db/load-staff");
+const lagos = require("../../src/shared/time/lagos");
 const c = require("@mycity/contract");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -248,6 +249,57 @@ describeDb("the organisation module against the real migrations", () => {
       const invites = res.body.decisions.find((d) => d.title === "Not Yet Invited");
       expect(invites.text).toBe("1 person with no login");
       expect(invites.link).toBe("/settings?tab=users");
+    });
+
+    test("Home reads the same counts through the service, counted from the Lagos date it is given", async () => {
+      const all = { scope: "all", scope_ids: null };
+      const today = lagos.today();
+      const tomorrow = lagos.addDays(today, 1);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const before = {
+          today: await organisation.counts(client, all, { today }),
+          tomorrow: await organisation.counts(client, all, { today: tomorrow }),
+        };
+        const add = async (first, set, values) => {
+          const { employee_id: id } = (await client.query(schema.sql.employee, [first, "Counted", null])).rows[0];
+          await client.query(`UPDATE employee SET ${set} WHERE employee_id = $1`, [id, ...values]);
+        };
+        await add("Dueinthirty", "confirmation_due_on = $2", [lagos.addDays(today, 30)]);
+        await add("Dueinthirtyone", "confirmation_due_on = $2", [lagos.addDays(today, 31)]);
+        await add("Leftninety", "start_date = $2, status = 'left', left_on = $3", [
+          lagos.addDays(today, -400),
+          lagos.addDays(today, -90),
+        ]);
+        await add("Leftninetyone", "start_date = $2, status = 'left', left_on = $3", [
+          lagos.addDays(today, -400),
+          lagos.addDays(today, -91),
+        ]);
+        const change = async (on) => {
+          const now = await organisation.counts(client, all, { today: on });
+          const was = before[on === today ? "today" : "tomorrow"];
+          return Object.fromEntries(Object.keys(now).map((k) => [k, now[k] - was[k]]));
+        };
+        // Today the windows hold the 30th day ahead and the 90th day back, and nothing beyond.
+        expect(await change(today)).toEqual({ headcount: 2, attrition_90d: 1, confirmations_due: 1 });
+        // A day later both windows have moved with the date: nothing reads the database's clock.
+        expect(await change(tomorrow)).toEqual({ headcount: 2, attrition_90d: 0, confirmations_due: 2 });
+        // And the register's own count is the same figure.
+        const counted = await organisation.counts(client, all);
+        const summary = await organisation.summary(client, all);
+        expect(summary.kpis.find((k) => k.key === "headcount").value).toBe(String(counted.headcount));
+        expect(summary.kpis.find((k) => k.key === "attrition").value).toBe(String(counted.attrition_90d));
+      } finally {
+        await client.query("ROLLBACK");
+        client.release();
+      }
+    });
+
+    test("the counts refuse a date that is not one", async () => {
+      await expect(organisation.counts(pool, { scope: "all", scope_ids: null }, { today: "2026-02-30" })).rejects.toThrow(
+        TypeError,
+      );
     });
   });
 

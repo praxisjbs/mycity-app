@@ -214,9 +214,17 @@ async function list(db, query, scope) {
   return { ...page, data: page.data.map(toRow) };
 }
 
-/** The counts above the register, for the caller's own scope. */
-async function counts(db, scope) {
-  const params = [];
+/**
+ * The counts above the register, for the caller's own scope. `today` is the Lagos date
+ * (shared/time/lagos.js) the 90 and 30 day windows count from, never the database's
+ * CURRENT_DATE, whose zone is the session's.
+ *
+ * @param {{query: Function}} db
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {string} today  YYYY-MM-DD
+ */
+async function counts(db, scope, today) {
+  const params = [today];
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
   return one(
     db,
@@ -225,12 +233,12 @@ async function counts(db, scope) {
             count(*) FILTER (WHERE e.status = 'active' AND e.confirmed_on IS NULL
                              AND e.confirmation_due_on IS NOT NULL)::int AS probation,
             count(*) FILTER (WHERE e.left_on IS NOT NULL
-                             AND e.left_on >= current_date - 90)::int AS attrition,
+                             AND e.left_on >= $1::date - 90)::int AS attrition,
             count(*) FILTER (WHERE e.status = 'active' AND e.confirmed_on IS NULL
                              AND e.confirmation_due_on IS NOT NULL
-                             AND e.confirmation_due_on <= current_date + 30)::int AS probation_due,
+                             AND e.confirmation_due_on <= $1::date + 30)::int AS probation_due,
             count(*) FILTER (WHERE e.status = 'active' AND e.contract_ends_on IS NOT NULL
-                             AND e.contract_ends_on <= current_date + 30)::int AS contracts_ending,
+                             AND e.contract_ends_on <= $1::date + 30)::int AS contracts_ending,
             count(*) FILTER (WHERE e.status = 'active' AND e.line_manager_id IS NULL
                              AND e.line_manager_seat_id IS NULL
                              AND COALESCE(u.is_ceo, false) = false)::int AS no_manager,

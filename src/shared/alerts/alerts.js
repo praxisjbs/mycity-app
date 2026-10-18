@@ -23,7 +23,7 @@
  *       value: 4,                                  // 4 late arrivals in the rule's window
  *       title: "Ada Obi: 4 late arrivals in 30 days",
  *       trigger: "Late on 2, 6, 9 and 13 October",
- *       subject_employee_id: employeeId,           // so `team` holders above Ada are told
+ *       subject_employee_id: employeeId,           // stored, and `team` holders above Ada are told
  *     });
  *   });
  *
@@ -49,7 +49,9 @@
  *                    severity ('low' | 'medium' | 'high'), permission_key, enabled
  *   home_alert       home_alert_id, home_alert_rule_id, subject_type, subject_id, title, trigger,
  *                    severity, over_by numeric, raised_at, last_seen_at, escalated_at, cleared_at,
- *                    cleared_by, outcome ('cleared' | 'dismissed'), note;
+ *                    cleared_by, outcome ('cleared' | 'dismissed'), note, subject_employee_id (1150: the
+ *                    employee the alert is about, which scopes Home's Alerts list; NULL when it is about
+ *                    no one person);
  *                    UNIQUE (home_alert_rule_id, subject_type, subject_id) WHERE cleared_at IS NULL
  */
 const { AppError } = require("../errors");
@@ -166,10 +168,12 @@ async function raise(
 
   const { rows } = await client.query(
     `INSERT INTO home_alert
-       (home_alert_rule_id, subject_type, subject_id, title, trigger, severity, over_by, raised_at, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())
+       (home_alert_rule_id, subject_type, subject_id, title, trigger, severity, over_by, subject_employee_id,
+        raised_at, last_seen_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())
      ON CONFLICT (home_alert_rule_id, subject_type, subject_id) WHERE cleared_at IS NULL
      DO UPDATE SET over_by = EXCLUDED.over_by, title = EXCLUDED.title, trigger = EXCLUDED.trigger,
+                   subject_employee_id = COALESCE(EXCLUDED.subject_employee_id, home_alert.subject_employee_id),
                    last_seen_at = now()
      RETURNING ${ALERT_COLUMNS}, (xmax = 0) AS created`,
     [
@@ -180,6 +184,7 @@ async function raise(
       trigger,
       rule.severity,
       overBy,
+      subjectEmployeeId,
     ],
   );
   const { created, ...alert } = rows[0];

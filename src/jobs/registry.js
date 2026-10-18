@@ -96,6 +96,11 @@ const JOBS = Object.freeze([
     concurrency: 1,
     summary: "A queued message delivered through SMTP at its time",
   },
+  {
+    queue: "attendance-day-close",
+    concurrency: 1,
+    summary: "Attendance days before a date closed again, by hand",
+  },
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -108,6 +113,7 @@ const SCHEDULERS = Object.freeze([
   "celebrations",
   "announcement-release",
   "mail-sync",
+  "attendance-day-close",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

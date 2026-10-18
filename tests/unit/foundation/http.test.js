@@ -225,4 +225,37 @@ describe("route() refuses at definition", () => {
     expect(() => publicRoute(express.Router(), "get", "/", { response: c.common.EmptyBody }, requirePermission("people", "view"), h))
       .toThrow(/public route cannot carry/);
   });
+  test("a capability checked before the module grant, or with none, or twice", () => {
+    const { requireCapability, requireAnyCapability } = require("../../../src/middleware/rbac");
+    const contract = { response: c.common.EmptyBody };
+    expect(() => route(express.Router(), "get", "/", contract, requireCapability("home.team"), requirePermission("home", "view"), h))
+      .toThrow(/after requirePermission/);
+    expect(() => route(express.Router(), "get", "/", { ...contract, self: true }, requireCapability("home.team"), h))
+      .toThrow(/after requirePermission/);
+    expect(() => publicRoute(express.Router(), "get", "/", contract, requireAnyCapability(["alerts.clear"]), h))
+      .toThrow(/after requirePermission/);
+    expect(() =>
+      route(express.Router(), "get", "/", contract, requirePermission("home", "view"), requireCapability("home.team"), requireCapability("home.reports"), h),
+    ).toThrow(/one capability check per route/);
+  });
+});
+
+describe("route() records the capability a route needs", () => {
+  const express = require("express");
+  const c = require("@mycity/contract");
+  const { route, routesOf } = require("../../../src/http/route");
+  const { requirePermission, requireCapability, requireAnyCapability } = require("../../../src/middleware/rbac");
+  const h = (_req, res) => res.json({});
+
+  test("beside the permission, one code or the codes any of which will do", () => {
+    const router = express.Router();
+    const contract = { response: c.common.EmptyBody };
+    route(router, "get", "/team", contract, requirePermission("home", "view"), requireCapability("home.team"), h);
+    route(router, "get", "/alerts", contract, requirePermission("home", "view"), requireAnyCapability(["alerts.clear", "alerts.manage"]), h);
+    route(router, "get", "/", contract, requirePermission("home", "view"), h);
+    const find = (p) => routesOf(router).find((r) => r.path === p);
+    expect(find("/team")).toMatchObject({ permission: { key: "home", action: "view" }, capability: "home.team", capabilities: null });
+    expect(find("/alerts")).toMatchObject({ capability: null, capabilities: ["alerts.clear", "alerts.manage"] });
+    expect(find("/")).toMatchObject({ capability: null, capabilities: null });
+  });
 });

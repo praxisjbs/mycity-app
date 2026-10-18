@@ -4,6 +4,8 @@
  */
 import "./modules/identity";
 import "./modules/security";
+import "./modules/worksites";
+import "./modules/devices";
 import "./modules/attendance";
 import "./modules/home";
 import "./modules/organisation";

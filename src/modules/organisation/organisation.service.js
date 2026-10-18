@@ -349,10 +349,29 @@ const historyOf = (client, employeeId, query) => repo.historyOf(client, employee
 /** A screen's own URL, derived and never stored (shared/route-map.js). */
 const screen = (module, tab) => routeMap.screenPath(module, tab);
 
+/**
+ * Headcount, attrition over 90 days and confirmations due in the next 30, as the
+ * register's counts define them, for whoever else shows them (Home's cards). One
+ * definition: People · Employees and Home read the same SQL.
+ *
+ * @param {{query: Function}} client
+ * @param {{scope: string, scope_ids: string[]|null}} scope
+ * @param {{today?: string}} [opts]  the Lagos date the windows count from; today when left out
+ * @returns {Promise<{headcount: number, attrition_90d: number, confirmations_due: number}>}
+ */
+async function counts(client, scope, { today = lagos.today() } = {}) {
+  const row = await repo.counts(client, scope, lagos.assertDate(today, "today"));
+  return {
+    headcount: row.headcount,
+    attrition_90d: row.attrition,
+    confirmations_due: row.probation_due,
+  };
+}
+
 /** The counts above the register, the work-pattern strip, and what needs a decision. */
 async function summary(client, scope) {
-  const [counts, patterns, byDepartment, openSeats] = await Promise.all([
-    repo.counts(client, scope),
+  const [tally, patterns, byDepartment, openSeats] = await Promise.all([
+    repo.counts(client, scope, lagos.today()),
     repo.byWorkPattern(client, scope),
     repo.byDepartment(client, scope),
     repo.vacantSeatCount(client),
@@ -361,21 +380,21 @@ async function summary(client, scope) {
   const PATTERN_LABELS = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
   const people = (n) => `${n} ${n === 1 ? "person" : "people"}`;
   const decisions = [
-    counts.probation_due > 0 && {
+    tally.probation_due > 0 && {
       title: "Probation Ending",
-      text: `${people(counts.probation_due)} in the next 30 days`,
+      text: `${people(tally.probation_due)} in the next 30 days`,
       action: { tone: "warn", text: "Confirm or extend" },
       link: screen("people", "employees"),
     },
-    counts.contracts_ending > 0 && {
+    tally.contracts_ending > 0 && {
       title: "Contracts Ending",
-      text: `${people(counts.contracts_ending)} in the next 30 days`,
+      text: `${people(tally.contracts_ending)} in the next 30 days`,
       action: { tone: "warn", text: "Renew or close" },
       link: screen("people", "employees"),
     },
-    counts.no_manager > 0 && {
+    tally.no_manager > 0 && {
       title: "No Line Manager",
-      text: people(counts.no_manager),
+      text: people(tally.no_manager),
       action: { tone: "warn", text: "Set a manager" },
       link: screen("people", "organogram"),
     },
@@ -385,19 +404,19 @@ async function summary(client, scope) {
       action: { tone: "info", text: "Create vacancy" },
       link: screen("people", "organogram"),
     },
-    counts.no_login > 0 && {
+    tally.no_login > 0 && {
       title: "Not Yet Invited",
-      text: `${people(counts.no_login)} with no login`,
+      text: `${people(tally.no_login)} with no login`,
       action: { tone: "info", text: "Send invites" },
       link: screen("settings", "users"),
     },
   ].filter(Boolean);
   return {
     kpis: [
-      { key: "headcount", label: "Headcount", value: String(counts.headcount) },
-      { key: "confirmed", label: "Confirmed", value: String(counts.confirmed), tone: "ok" },
-      { key: "probation", label: "On Probation", value: String(counts.probation), tone: "warn" },
-      { key: "attrition", label: "Attrition, 90 Days", value: String(counts.attrition) },
+      { key: "headcount", label: "Headcount", value: String(tally.headcount) },
+      { key: "confirmed", label: "Confirmed", value: String(tally.confirmed), tone: "ok" },
+      { key: "probation", label: "On Probation", value: String(tally.probation), tone: "warn" },
+      { key: "attrition", label: "Attrition, 90 Days", value: String(tally.attrition) },
     ],
     arrangements: Object.keys(PATTERN_LABELS).map((key) => {
       const hit = patterns.find((p) => p.work_pattern === key);
@@ -635,6 +654,7 @@ module.exports = {
   setReportingLine,
   advanceStaffNumbers,
   list,
+  counts,
   summary,
   historyOf,
   seats,

@@ -157,12 +157,12 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "employees"),
     self: screen("ess", "my-documents"),
   },
-  // search:none not built yet (src/modules/attendance)
+  // A day, or an exception on one: People · Attendance opens the person's day; the
+  // person's own opens on My Attendance (both read /attendance/records/:id).
   attendance_record: {
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
-  // search:none not built yet (src/modules/attendance)
   attendance_exception: {
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
@@ -171,8 +171,8 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),
   },
-  device: { ...screen("people", "devices"), self: screen("ess", "my-profile") }, // search:none not built yet (src/modules/devices)
-  worksite: screen("people", "worksites"), // search:none not built yet (src/modules/worksites)
+  device: { ...screen("people", "devices"), self: screen("ess", "my-devices") },
+  worksite: screen("people", "worksites"),
 
   // Performance
   // search:none not built yet (src/modules/goals)

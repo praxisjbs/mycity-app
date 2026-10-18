@@ -21,6 +21,7 @@ const crypto = require("node:crypto");
 const outbox = require("../../src/shared/events/outbox");
 const engine = require("../../src/shared/workflow/engine");
 const { SCREENS } = require("../../src/shared/search/screens");
+const grantsCache = require("../../src/shared/rbac/grants-cache");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 const PASSWORD = "Find-It-Fast9";
@@ -120,6 +121,31 @@ describeDb("⌘K search against the real migrations", () => {
     expect(titles(await search("staff", { q: "roles and permissions" }), "screen")).toEqual([]);
     expect(titles(await search("ops", { q: "roles & permissions" }), "screen")).toEqual(["Roles & Permissions"]);
     expect(titles(await search("staff", { q: "audit" }), "screen")).toEqual([]);
+  });
+
+  test("Home's Team, Alerts and Reports are offered to whoever holds their capability", async () => {
+    const offered = async (who) => {
+      const out = [];
+      for (const [q, title] of [["my team", "Team"], ["red flags", "Alerts"], ["insights", "Reports"]])
+        if (titles(await search(who, { q }), "screen").includes(title)) out.push(title);
+      return out;
+    };
+    expect(await offered("staff")).toEqual([]);
+    expect(await offered("ops")).toEqual(["Team", "Alerts", "Reports"]);
+
+    const staffId = people.staff.user.user_id;
+    await pool.query(
+      "INSERT INTO user_capability (user_id, capability_id) SELECT $1, capability_id FROM capability WHERE code = 'home.team'",
+      [staffId],
+    );
+    await grantsCache.invalidateUser(staffId);
+    try {
+      expect(await offered("staff")).toEqual(["Team"]);
+    } finally {
+      await pool.query("DELETE FROM user_capability WHERE user_id = $1", [staffId]);
+      await grantsCache.invalidateUser(staffId);
+    }
+    expect(await offered("staff")).toEqual([]);
   });
 
   test("actions open the screen that does them, or run in the app", async () => {

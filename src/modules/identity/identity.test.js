@@ -156,4 +156,17 @@ describe("the contract and the access catalogue", () => {
     expect(c.identity.NewPassword.safeParse("Good-pass9").success).toBe(true);
     expect(c.identity.PASSWORD_MIN).toBe(8);
   });
+
+  test("the wire's capability code rule is the catalogue's, and every catalogued code passes it", () => {
+    expect(c.identity.CAPABILITY_CODE.source).toBe(catalog.CAPABILITY_CODE.source);
+    for (const code of catalog.CAPABILITIES) expect(c.identity.CapabilityCode.parse(code)).toBe(code);
+    expect(c.identity.CapabilityCode.safeParse("home.alerts.manage").success).toBe(false);
+    expect(c.access.RoleSave.shape.capabilities.element).toBe(c.identity.CapabilityCode);
+  });
+
+  test("/me carries the capabilities, and Settings · Roles can save every catalogued one", () => {
+    expect(c.identity.Me.shape.capabilities.element).toBe(c.identity.CapabilityCode);
+    const role = { name: "Leads", grants: [], visible_fields: [], capabilities: catalog.CAPABILITIES };
+    expect(c.access.RoleSave.parse(role).capabilities).toEqual(catalog.CAPABILITIES);
+  });
 });

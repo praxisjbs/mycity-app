@@ -13,7 +13,7 @@ files.
 | `docs/MIGRATIONS.md` | How a migration or reference seed is written and checked |
 | `migrations/`, `seeds/reference/` | The schema itself. Where this file and the SQL disagree, the SQL is the fact and this file is fixed |
 
-Status as of 16/10/2026 (`main` with the second sign-in PR, `0220`): 45 files, 144 tables and 5 views. Gate 6
+Status as of 18/10/2026 (`main` with attendance's clock, `1300` and `1390`, and Home's foundation, `1150` and `1199`): 64 files, 155 tables and 5 views. Gate 6
 (`check/schema-drift.js`, `check/contract-columns.js`) checks the code and the contract against
 the same reading of the migrations on every PR.
 
@@ -120,20 +120,51 @@ line manager, then Operations & People over 5 days; §6.5).
 exceptions), leave (types, balances, requests), community (channels, members, messages, reactions,
 recognition), announcements, mailbox (accounts, folders, threads, messages, attachments) · `1099`
 seed · `1100` `home_alert` columns the alerts code writes · `1110` community: post policy, pinned
-and system channels, delivered pointer, the wider message kinds, transcripts, poll votes,
-presence, `announcement_read` and the announcement's message, audience size and reminder · `1120`
-mailbox: connection status and errors, folder kinds and sync cursor, thread keys, the reader's
-message fields, `mail_draft` and `mail_send_queue` · `1130` an announcement can be `cancelled` ·
-`1140` each member's own pin (`community_member.pinned_at`) · `1200` leave requests as the leave
-module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list indexes) ·
-`1290` the leave status code list (Cancelled added, Draft switched off) and the four leave types.
+and system channels, delivered pointer, the wider message kinds, transcripts, poll votes, presence,
+`announcement_read` and the announcement's message, audience size and reminder · `1120` mailbox:
+connection status and errors, folder kinds and sync cursor, thread keys, the reader's message
+fields, `mail_draft` and `mail_send_queue` · `1130` an announcement can be `cancelled` · `1140` each
+member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
+changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
+Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and
+recipients as users, one schedule per report; `home_report_run` (one numbered file per recipient and
+format, a scheduled slot generated once); `role_kpi` (a role's default and locked KPI cards, at most
+four) and `home_kpi_pick` (the cards a person chose); the indexes the Alerts list, the report
+scheduler and run history read; and, for Activity Today, `event_log (occurred_at)` · `1199` Home
+reference data: the
+capabilities `home.team`, `home.reports` and `alerts.manage` with their role grants (and
+`alerts.clear` for Heads of Department and Managers), the `report_run` numbering scheme
+(`RPT-0001`), and `1099`'s three alert thresholds removed (A26, §5) · `1200` leave requests as the
+leave module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list
+indexes) · `1290` the leave status code list (Cancelled added, Draft switched off) and the four
+leave types · `1300` attendance as the clock writes it: the policy's `geofence_mode`,
+`device_mode` and `max_accuracy_m`; `attendance_device` (a person's clock-in devices on
+`known_device`, observed, registered or removed); the event's `work_date`, `device_at`, device,
+policy, `idempotency_key` and correction fields, one active clock-in and one active clock-out a day
+(a partial unique index), the ledger made append-only; the day's status nullable; the exception's
+event, outcome, the person's note and the five types, deduplicated by partial unique indexes ·
+`1390` the two new exception types' names in the code list.
+
+Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
+other M1 modules take numbers outside them.
 
 **Owes:**
-- Attendance (attendance.md §4): employee home location, field assignment, location requests
+- Attendance (attendance.md §4, §13): employee home location, field assignment, location requests
   (screen #87), policy versions and acknowledgements (#89), a unique key for the auto-query
-  upsert, the lateness deduction amount.
-- Devices (ess.md §6): enrolment requests, status and the three-device rule on `known_device`.
-- Home (home.md §4): `home_report_run`, `role_kpi` (per-role tile defaults and locks), alert scope.
+  upsert, the lateness deduction amount; dropping the superseded booleans `require_geofence` and
+  `require_known_device` (MIGRATIONS §8).
+- Attendance, for Home (LA): the shared roster (`src/modules/attendance/attendance.roster.js`)
+  reads `attendance_day` as `1300`'s code writes it (the punch, People's decisions, the day-close)
+  and a day with no record by the register's rules, through `1300`'s and `1200`'s indexes; it needs
+  no index of its own, so `1150` no longer adds `attendance_event (occurred_at)`. Its statuses are
+  the register's (`present`, `late`, `absent`, `leave`, checked by `1300`) in Home's words, with
+  `present` split into on site and remote by `employee.work_pattern`. When the register's statuses
+  change, or field assignments land (a `field` status), the roster's mapping changes in the same PR
+  (`tests/integration/attendance-roster.test.js` holds the two together).
+- ~~Home (home.md §4): `home_report_run`, `role_kpi` (per-role tile defaults and locks), alert
+  scope.~~ Built 17/10/2026 in `1150`: `home_report_run`, `role_kpi` and the personal
+  `home_kpi_pick`. "Alert scope" became `home_alert.subject_employee_id`: the Alerts list is scoped by
+  the employee an alert is about, and a rule has no scope of its own.
 
 ### M2 Productivity & Performance · 2000 to 2999 · AJ
 
@@ -149,6 +180,19 @@ performance cycles, reviews and review items · `2099` seed.
 - Reviews: the second-level and HR stages and their workflow; dictation transcript, cleaned text
   and `ai_run_id` (A18).
 - Numbering: `project` has `number NOT NULL` and no scheme in `schemes.js`.
+- **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
+  `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;
+  `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,
+  `ends_at`, `all_day`) through `calendar.source.js`; `organisational_goal` (`organisational_goal_id`,
+  `level`, `title`, `status`, `starts_on`, `ends_on`) and `employee_target` (`employee_target_id`,
+  `employee_id`, `title`, `due_on`) through `goals.source.js`; `performance_review`
+  (`performance_review_id`, `performance_cycle_id`, `employee_id`, `reviewer_employee_id`,
+  `review_type`, `submitted_at`) with `performance_cycle` (`performance_cycle_id`, `name`,
+  `closes_at`) through `reviews.source.js`. The PR that changes any of these updates the adapter in
+  the same PR, and the one that defines a goal's progress makes Goals On Track and My Targets live.
+  Indexes asked by Home: `task (due_at) WHERE archived_at IS NULL AND completed_at IS NULL`,
+  `calendar_event (owner_employee_id, starts_at)`, `organisational_goal (level, starts_on, ends_on)`,
+  `employee_target (employee_id, due_on)`.
 
 ### M3 Queries & Consequence Management · 3000 to 3999 · GE
 
@@ -166,7 +210,12 @@ performance cycles, reviews and review items · `2099` seed.
 **Built:** `4000` vacancies and questions, candidates, applications and stage history, scorecard
 criteria (A10), assessments, interviews, rounds, panelists and blind feedback · `4099` seed.
 
-**Owes:** the final score beside the provisional one, and the AI-provisional flag.
+**Owes:**
+- The final score beside the provisional one, and the AI-provisional flag.
+- **Read by Home** (home.md §4.1): `vacancy` (`vacancy_id`, `number`, `title`, `status`,
+  `department_id`, `hiring_manager_id`, `positions`, `closes_at`) through
+  `src/modules/dashboard/sources/vacancies.source.js`: update it in the same PR. Index asked by Home:
+  `vacancy (status)`.
 
 ### M5 Offers, Documentation & Onboarding · 5000 to 5999 · LA
 
@@ -188,6 +237,11 @@ statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, the payroll ap
 and reminder settings. The `payroll_run` and `payslip` numbering schemes are already seeded.
 The earlier note that payroll was "deliberately not modelled" was not a decision and is withdrawn.
 
+**Read by Home** (home.md §4.1): nothing yet. Payroll In Progress is a hidden card with no query and
+`src/modules/dashboard/sources/payroll.source.js` declares no table. The PR that creates
+`payroll_run` adds the query there (runs not finished, in the reader's scope), declares its columns
+and makes the card live in the same PR.
+
 ### M7 Partnerships, CRM & Trackers · 7000 to 7999 · GE
 
 **Built:** `7000` partners, contacts, opportunities and stage history, interactions, proposals,
@@ -202,6 +256,17 @@ agreements and obligations · `7099` seed.
   date, viewed and expiring states, the agreement workflow.
 - Numbering: `partner`, `partnership_opportunity`, `partnership_agreement` have no scheme in
   `schemes.js`.
+- **Read by Home** (home.md §4.1): `partner` (`partner_id`, `name`, `partner_type`, `status`,
+  `owner_id`, `created_at`), `partner_interaction` (`partner_id`, `occurred_at`),
+  `partnership_opportunity` (`partnership_opportunity_id`, `partner_id`, `title`, `stage`, `status`,
+  `owner_id`, `estimated_value`, `currency`, `expected_close_on`), `partnership_proposal`
+  (`partnership_proposal_id`, `partnership_opportunity_id`, `number`, `value`, `currency`, `sent_at`,
+  `accepted_at`) and `partnership_agreement` (`partnership_agreement_id`, `partner_id`, `number`,
+  `title`, `status`, `starts_on`, `value`, `currency`, `owner_id`) through
+  `src/modules/dashboard/sources/partners.source.js`: update it in the same PR. Replacing the seeded
+  stages changes what the pipeline chart counts. Indexes asked by Home: `partner_interaction
+  (partner_id, occurred_at DESC)`, `partner (owner_id)`, `partnership_opportunity (owner_id, status)`,
+  `partnership_agreement (status, starts_on)`.
 
 ### M8 Expenses & Budget Control · 8000 to 8999 · AJ
 
@@ -216,6 +281,13 @@ and lines, disbursements · `8099` seed.
 - The trigger that refuses a disbursement without a payment reference.
 - Statuses as the M8 chain has them; one numbering type for expenses (`expense` and
   `expense_request` are both seeded); `budget` has no scheme in `schemes.js`.
+- **Read by Home** (home.md §4.1): `expense_request` (`expense_request_id`, `number`, `employee_id`,
+  `expense_category_id`, `purpose`, `amount`, `currency`, `status`, `needed_on`, `submitted_at`) and
+  `expense_category` (`expense_category_id`, `name`) through
+  `src/modules/dashboard/sources/expenses.source.js`, and `budget` (`budget_id`, `number`, `name`,
+  `department_id`, `owner_id`, `currency`, `starts_on`, `ends_on`, `approved_at`) with `budget_line`
+  (`budget_id`, `amount`, `spent_amount`) through `budgets.source.js`: update them in the same PR.
+  Indexes asked by Home: `expense_request (status)` and `(employee_id)`, `budget (owner_id)`.
 
 ### M9 Settings & Governance · 9000 to 9999 · GE
 
@@ -268,7 +340,9 @@ Security's two-step and PIN, which M1 owed until then.
    a seed.
 3. **The business choices PR 25 seeded** (expense categories, partner types and stages, the
    Standard attendance policy, alert thresholds, knowledge categories) move out of the seeds under
-   A26, each when its milestone builds the screen that manages it.
+   A26, each when its milestone builds the screen that manages it. The alert thresholds moved out on
+   17/10/2026: `1199` removes each of `1099`'s three rules while it is as seeded and no alert points
+   at it, and MyCity enters its own on Home, Alerts.
 
 ## 6 · Changing this document
 

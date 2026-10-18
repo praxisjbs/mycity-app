@@ -1,36 +1,46 @@
-import { useCallback, useEffect, useState } from "react";
+import attendance from "@mycity/contract/schemas/attendance.js";
+import type { AttendanceToday, LocationError, PunchCreate, PunchResult } from "@mycity/contract/contract.gen.ts";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
-import { invalidate, useApi } from "@/api/hooks";
-import type { AttendanceToday, ClockResponse } from "@/api/types/attendance";
+import { invalidate, useApi, useMutation } from "@/api/hooks";
+import { useRealtime } from "@/api/realtime";
 import { useAuth } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Avatar, Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, Icon, KeyValue, Result, rules, TextAreaField, toast, useContractForm, useModal } from "@mycity/ui";
+import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Pill, Result, TextAreaField, toast, useContractForm, useModal, zoneClock } from "@mycity/ui";
 
 /**
- * Clocking in and out, for the shell: the desktop top bar's ClockButton and the
- * phone's floating button (F18) both use useClock. The button only asks; the
- * API decides (location, device, shift, policy acknowledgment) and answers with
- * an outcome the panel shows.
+ * Clocking in and out, for the shell: the desktop top bar's ClockButton and the phone's floating
+ * button (F18) both use useClock (docs/guides/attendance.md §10). The panel asks; the API decides.
+ * It reads the location only after the person presses Clock In, and only when there is a worksite
+ * to match it to; every punch carries one Idempotency-Key, kept for a retry of the same press, so
+ * a lost answer never makes a second punch. What the panel shows after a punch is the server's.
  */
+
+const PATTERN: Record<AttendanceToday["work_pattern"], string> = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
+
 export function useClock() {
   const { data: today } = useApi("GET /api/v1/attendance/me/today");
   const openPanel = useClockPanel();
   const out = today?.state === "clocked_in";
-  const done = today?.state === "complete";
+  const done = today?.state === "clocked_out";
   const unavailable = today?.state === "unavailable";
   const label = out ? "Clock Out" : "Clock In";
   const open = useCallback(() => openPanel(out ? "Clock Out" : "Clock In"), [openPanel, out]);
   return { today, out, done, unavailable, label, open, ready: !!today && !done };
 }
 
-/** After sign-in, the clock panel opens by itself for anyone who has not clocked in today. The shell calls it once. */
+/**
+ * Called once by the shell: the panel opens by itself after sign-in for anyone not yet clocked in
+ * on a working day, and a punch made on another device or decided by People refreshes the state.
+ */
 export function useClockPrompt() {
   const { today, open } = useClock();
   const { justSignedIn, clearJustSignedIn } = useAuth();
+  useRealtime("attendance.updated", () => invalidate("/api/v1/attendance"));
   useEffect(() => {
     if (justSignedIn && today) {
       clearJustSignedIn();
-      if (today.state === "not_clocked") setTimeout(() => open(), 700);
+      if (today.state === "not_clocked_in" && today.shift.working_day) setTimeout(() => open(), 700);
     }
   }, [justSignedIn, today, clearJustSignedIn, open]);
 }
@@ -38,7 +48,7 @@ export function useClockPrompt() {
 /** The desktop top bar's Clock In / Clock Out button. */
 export function ClockButton({ compact }: { compact?: boolean }) {
   const { today, out, done, unavailable, label, open } = useClock();
-  const title = unavailable ? (today?.unavailable_message ?? "Attendance unavailable") : done ? "Attendance is complete for today" : label;
+  const title = unavailable ? (today?.unavailable_reason === "leave" ? "On Leave Today" : "Clock Not Available") : done ? "Done For Today" : label;
 
   return (
     <button
@@ -64,162 +74,309 @@ function useClockPanel() {
   return useCallback((title: string) => modal.open({ title, body: (close) => <ClockPanel close={close} /> }), [modal]);
 }
 
-type Stage = { kind: "review" } | { kind: "explain"; res: ClockResponse } | { kind: "done"; res: ClockResponse };
+type Fix = { latitude: number; longitude: number; accuracy_m: number };
+type Stage =
+  | { kind: "ready" }
+  | { kind: "ask" }
+  | { kind: "locating" }
+  | { kind: "weak"; fix: Fix }
+  | { kind: "no_location"; error: LocationError }
+  | { kind: "sending"; body: PunchCreate; key: string }
+  | { kind: "lost"; body: PunchCreate; key: string; message: string }
+  | { kind: "refused"; message: string }
+  | { kind: "done"; res: PunchResult };
 
-function ClockPanel({ close }: { close: () => void }) {
-  const { me } = useAuth();
-  const { navigate } = useRouter();
-  const { data: t, loading } = useApi("GET /api/v1/attendance/me/today");
-  const [stage, setStage] = useState<Stage>({ kind: "review" });
-  const [busy, setBusy] = useState(false);
-  const f = useContractForm({ why: "" }, { why: rules.min(10, "At least 10 characters") });
-  const [fix, setFix] = useState<{ lat: number | null; lng: number | null; acc: number | null; note: string } | null>(null);
+const LOCATION_ERROR: Record<number, LocationError> = { 1: "denied", 2: "unavailable", 3: "timeout" };
+
+/** Has the person already let this site read their location? Then the browser will not ask again. */
+async function locationGranted(): Promise<boolean> {
+  try {
+    const p = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
+    return p?.state === "granted";
+  } catch {
+    return false;
+  }
+}
+
+/** The workplace's wall clock, kept to the server's time rather than this device's. */
+function useServerClock(t: AttendanceToday | undefined) {
+  const offset = useRef(0);
   const [now, setNow] = useState(() => new Date());
-
   useEffect(() => {
-    const i = setInterval(() => setNow(new Date()), 15000);
+    if (t) offset.current = Date.parse(t.server_time) - Date.now();
+    setNow(new Date(Date.now() + offset.current));
+  }, [t]);
+  useEffect(() => {
+    const i = setInterval(() => setNow(new Date(Date.now() + offset.current)), 15000);
     return () => clearInterval(i);
   }, []);
+  return t ? zoneClock(now, t.timezone) : null;
+}
 
-  useEffect(() => {
-    if (!navigator.geolocation) return setFix({ lat: null, lng: null, acc: null, note: "This device cannot share its location." });
-    navigator.geolocation.getCurrentPosition(
-      (p) => setFix({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy), note: "" }),
-      () => setFix({ lat: null, lng: null, acc: null, note: "Location was not shared." }),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+function ClockPanel({ close }: { close: () => void }) {
+  const { navigate } = useRouter();
+  const { data: t, error, reload } = useApi("GET /api/v1/attendance/me/today");
+  const [stage, setStage] = useState<Stage>({ kind: "ready" });
+  const inFlight = useRef(false);
+  const clock = useServerClock(t);
+  const toDevices = () => (close(), navigate(hrefFor("ess", "my-devices")));
+
+  if (error && !t) {
+    return (
+      <>
+        <Result tone="err" label="Clock" title="Not Loaded" text={error.message} />
+        <FormFooter>
+          <Button onClick={close}>Not Now</Button>
+          <Button variant="primary" onClick={reload}>Try Again</Button>
+        </FormFooter>
+      </>
     );
-  }, []);
-
-  if (loading || !t || !me) return <p className="text-xs text-subtle-foreground">Checking today’s attendance…</p>;
+  }
+  // Only the first read shows this: a refresh after a punch keeps the answer on screen.
+  if (!t || !clock) return <Result tone="info" label="Clock" title="Checking Today" icon="clock" />;
 
   if (t.state === "unavailable") {
     return (
       <>
-        <Banner tone={t.unavailable_reason === "leave" ? "info" : "err"} icon={t.unavailable_reason === "leave" ? "info" : "alert"}>
-          <b>{me.display_name}</b>
-          <br />
-          {t.unavailable_message}
-        </Banner>
+        {t.leave ? (
+          <Result tone="info" label="On Leave" title={`${t.leave.leave_type_name} Leave`} text={`From ${formatDate(t.leave.starts_on)} to ${formatDate(t.leave.ends_on)}.`} />
+        ) : (
+          <Result tone="err" label="Clock" title="Not Available" text="Only people who work here now can clock in." />
+        )}
         <FormFooter>
-          <Button variant="primary" onClick={close}>
-            Close
-          </Button>
+          <Button variant="primary" onClick={close}>Close</Button>
         </FormFooter>
       </>
     );
   }
 
-  const kind = t.state === "clocked_in" ? "out" : "in";
-  const blocked = kind === "in" && t.policy_ack_pending?.blocks_clock_in;
+  const eventType: PunchCreate["event_type"] = t.state === "clocked_in" ? "clock_out" : "clock_in";
+  const verb = eventType === "clock_out" ? "Clock Out" : "Clock In";
 
-  const submit = async (explanation?: string) => {
-    setBusy(true);
+  /** Sends one punch. A retry passes the same body and key, so the server answers with the first punch, never a second. */
+  const send = async (body: PunchCreate, key: string) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setStage({ kind: "sending", body, key });
     try {
-      const res = await api.call("POST /api/v1/attendance/punches", {
-        body: { kind, latitude: fix?.lat ?? null, longitude: fix?.lng ?? null, accuracy_m: fix?.acc ?? null, device_label: navigator.platform || "This device", ...(explanation ? { explanation } : {}) },
-      });
+      const res = await api.call("POST /api/v1/attendance/punches", { body, idempotencyKey: key });
       invalidate("/api/v1/attendance");
-      if (res.result === "review" && !explanation) setStage({ kind: "explain", res });
-      else {
-        setStage({ kind: "done", res });
-        if (res.result === "accepted") toast(kind === "in" ? "Clocked in" : "Clocked out");
-      }
+      invalidate("/api/v1/devices");
+      // The result card is the confirmation; a toast would cover it on a phone.
+      setStage({ kind: "done", res });
     } catch (e) {
-      setStage({ kind: "done", res: { result: "rejected", title: "Not Recorded", message: (e as ApiError).message, event_id: null, case_number: null } });
+      const err = e instanceof ApiError ? e : new ApiError(0, null);
+      // Nothing came back, the server was not reached, or the first press is still running:
+      // the punch may or may not be recorded, so the retry reuses the key.
+      if (err.status === 0 || err.status >= 500 || err.code === "IDEMPOTENCY_IN_PROGRESS") setStage({ kind: "lost", body, key, message: err.message });
+      else {
+        invalidate("/api/v1/attendance");
+        setStage({ kind: "refused", message: err.message });
+      }
     } finally {
-      setBusy(false);
+      inFlight.current = false;
     }
   };
 
-  if (stage.kind === "done") {
-    const r = stage.res;
+  const punch = (where: Partial<Pick<PunchCreate, "latitude" | "longitude" | "accuracy_m" | "location_error">> = {}) =>
+    void send({ event_type: eventType, device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, ...where }, crypto.randomUUID());
+
+  const locate = () => {
+    if (!navigator.geolocation) return setStage({ kind: "no_location", error: "unsupported" });
+    setStage({ kind: "locating" });
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const fix = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy_m: Math.round(p.coords.accuracy) };
+        if (fix.accuracy_m > t.policy.max_accuracy_m) setStage({ kind: "weak", fix });
+        else punch(fix);
+      },
+      (e) => setStage({ kind: "no_location", error: LOCATION_ERROR[e.code] ?? "unavailable" }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  };
+
+  /** The press: a worksite to match means the location is read now, after saying why; otherwise the punch goes as it is. */
+  const start = async () => {
+    if (t.location.kind !== "worksite") return punch();
+    if (await locationGranted()) return locate();
+    setStage({ kind: "ask" });
+  };
+
+  if (stage.kind === "done") return <PunchDone res={stage.res} close={close} again={() => setStage({ kind: "ready" })} toDevices={toDevices} />;
+
+  if (stage.kind === "refused") {
     return (
       <>
-        <Result tone={r.result === "accepted" ? "ok" : r.result === "review" ? "warn" : "err"} label="Attendance status" title={r.title} text={r.message} />
+        <Result tone="err" label={verb} title="Not Recorded" text={stage.message} />
         <FormFooter>
-          <Button variant="primary" onClick={close}>
-            Done
-          </Button>
+          <Button variant="primary" onClick={close}>Close</Button>
         </FormFooter>
       </>
     );
   }
 
-  if (stage.kind === "explain") {
+  if (stage.kind === "lost") {
     return (
       <>
-        <Result tone="warn" label="Location check" title={stage.res.title} text={stage.res.message} />
-        <Card className="mt-3">
-          <h3 data-ui="title" className="mb-1 text-sm">Add Exception Details</h3>
-          <Field label="Explanation" {...f.field("why")}>
-            <TextAreaField {...f.field("why")} placeholder="Phone battery died" />
-          </Field>
-        </Card>
+        <Result tone="err" label={verb} title="No Connection" text="Not recorded yet. Try again once you are online." icon="offline" />
         <FormFooter>
-          <Button onClick={() => setStage({ kind: "done", res: stage.res })}>Skip</Button>
-          <Button variant="primary" icon="send" busy={busy} onClick={() => f.check() && void submit(f.values.why.trim())}>
-            Send
-          </Button>
+          <Button onClick={close}>Not Now</Button>
+          <Button variant="primary" icon="refresh" onClick={() => void send(stage.body, stage.key)}>Try Again</Button>
         </FormFooter>
       </>
     );
   }
+
+  const fence = t.location.kind === "worksite" ? `${t.location.name} · ${t.location.radius_m} m` : t.location.kind === "remote" ? "Remote, Not Checked" : "No Worksite Assigned";
+  const unregistered = t.device.state !== "registered";
+  const deviceHelp =
+    t.policy.device_mode === "block"
+      ? "Punches from a device you have not registered are not counted. Register up to three in My Devices."
+      : t.policy.device_mode === "warn"
+        ? "Punches from a device you have not registered go to People for review. Register up to three in My Devices."
+        : "Register up to three devices you clock in from in My Devices.";
+
+  let step;
+  if (stage.kind === "ask") step = <Result tone="info" label="Location Check" title="Share Your Location" text={`Your ${eventType === "clock_out" ? "clock-out" : "clock-in"} is matched to ${t.location.name}.`} icon="target" />;
+  else if (stage.kind === "locating") step = <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />;
+  else if (stage.kind === "weak") step = <Result tone="warn" label="Location Check" title="Weak Location Signal" text={`Accurate to about ${stage.fix.accuracy_m} m. Move near a window, then retry.`} icon="target" />;
+  else if (stage.kind === "no_location")
+    step =
+      stage.error === "denied" ? (
+        <Result tone="warn" label="Location Check" title="Location Is Off" text="Allow location for this site in your browser settings, then retry." icon="target" />
+      ) : stage.error === "unsupported" ? (
+        <Result tone="warn" label="Location Check" title="No Location Support" text="This browser cannot share a location." icon="target" />
+      ) : (
+        <Result tone="warn" label="Location Check" title="Location Not Found" text="Move near a window or outside, then retry." icon="target" />
+      );
+  else if (stage.kind === "sending") step = <Result tone="info" label={verb} title="Processing" icon="clock" />;
+
+  const statePill =
+    t.state === "clocked_in" ? (
+      <Pill tone={t.review ? "warn" : "ok"}>{t.review ? "Review Required" : `Clocked In ${formatTime(t.clock_in_at)}`}</Pill>
+    ) : t.state === "clocked_out" ? (
+      <Pill tone={t.review ? "warn" : "neutral"}>{t.review ? "Review Required" : "Clocked Out"}</Pill>
+    ) : (
+      <Pill>Not Clocked In</Pill>
+    );
+
+  if (t.state === "clocked_out") {
+    return (
+      <>
+        <Result tone={t.review ? "warn" : "ok"} label={t.review ? "Review Required" : "Day Complete"} title={`${formatTime(t.clock_in_at)} to ${formatTime(t.clock_out_at)}`} text={formatDate(t.date)} />
+        <FormFooter>
+          <Button onClick={() => (close(), navigate(hrefFor("ess", "my-attendance")))}>My Attendance</Button>
+          <Button variant="primary" onClick={close}>Close</Button>
+        </FormFooter>
+      </>
+    );
+  }
+
+  const primary =
+    stage.kind === "ask" ? (
+      <Button variant="primary" icon="target" onClick={locate}>Allow Location</Button>
+    ) : stage.kind === "weak" || stage.kind === "no_location" ? (
+      <Button variant="primary" icon="refresh" onClick={locate}>Retry Location</Button>
+    ) : (
+      <Button variant="primary" icon="clock" busy={stage.kind === "sending" || stage.kind === "locating"} onClick={() => void start()}>
+        {verb}
+      </Button>
+    );
 
   return (
     <>
-      <div className="pt-0.5 pb-3.5 text-center">
-        <span className="mx-auto mb-2.5 flex w-fit">
-          <Avatar name={me.display_name} size={42} tone="brand" />
-        </span>
-        <h2 data-ui="title" className="mb-1 text-2xl">{kind === "out" ? "Finish Your Day" : "Start Your Day"}</h2>
-        <p className="text-2xs text-subtle-foreground">
-          {me.display_name} · {formatDate(t.date)}
+      <div className="flex flex-col items-center pb-3 text-center">
+        <Illustration name={eventType === "clock_out" ? "ClockOut" : "ClockIn"} size="s" />
+        <h2 data-ui="title" className="mt-2 text-2xl">{eventType === "clock_out" ? "Finish Your Day" : "Start Your Day"}</h2>
+        <p className="mt-1 text-2xs text-subtle-foreground" data-copy="content">
+          <b className="text-base tabular-nums">{clock.time}</b> · {clock.day}
         </p>
+        <div className="mt-2">{statePill}</div>
       </div>
-      {blocked ? (
-        <Result tone="err" label="Action required" title="Attendance Policy Acknowledgment Needed" text={`Read policy v${t.policy_ack_pending!.version} before clocking in.`} />
-      ) : !fix ? (
-        <Result tone="info" label="Location check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />
-      ) : fix.lat == null ? (
-        <Result tone="warn" label="Location check" title="Attendance Will Be Reviewed" text={`${fix.note} People will review this attendance.`} />
-      ) : (
-        <Result tone="ok" label="Location check" title="Location Found" text={`Accurate to about ${fix.acc} m. The server checks it against ${t.location_label}.`} />
+      {step && <div className="mb-3">{step}</div>}
+      {unregistered && t.policy.device_mode !== "off" && stage.kind === "ready" && (
+        <Banner tone={t.policy.device_mode === "block" ? "err" : "warn"} icon="lock" action={t.device.can_register ? <Button size="sm" onClick={toDevices}>Register Device</Button> : undefined}>
+          {t.policy.device_mode === "block" ? "Register this device to clock in." : "This device is not registered."}
+        </Banner>
       )}
-      <Card className="mt-3">
+      <Card>
         <KeyValue
           items={[
-            ["Work arrangement", t.work_pattern],
-            ["Shift", `${t.shift_start} to ${t.shift_end}${t.grace_minutes ? ` · ${t.grace_minutes} min grace` : ""}`],
-            ["Clock location", `${t.location_label}${t.location_radius_m ? ` · ${t.location_radius_m} m` : ""}`],
-            ...(kind === "out" && t.clock_in_at ? ([["Clocked in", formatTime(t.clock_in_at)]] as Array<[string, string]>) : []),
+            ["Shift", t.shift.working_day && t.shift.starts_at ? `${t.shift.starts_at} to ${t.shift.ends_at}${t.shift.grace_minutes ? `, ${t.shift.grace_minutes} min grace` : ""}` : (t.shift.off_reason ?? "Day Off")],
+            ["Work Arrangement", PATTERN[t.work_pattern]],
+            [<HelpTerm key="l" help="Your punch is matched to this place. Inside the circle counts as on site.">Clock Location</HelpTerm>, fence],
             [
-              "Current time",
-              <>
-                <b>{formatTime(now.toISOString())}</b> <span className="text-2xs text-subtle-foreground">Africa/Lagos</span>
-              </>,
+              <HelpTerm key="d" help={deviceHelp}>This Device</HelpTerm>,
+              <Pill key="dv" tone={unregistered ? (t.policy.device_mode === "off" ? "neutral" : "warn") : "ok"}>{unregistered ? "Not Registered" : "Registered"}</Pill>,
             ],
           ]}
         />
       </Card>
-      {t.policy_ack_pending && !blocked && (
-        <p className="mx-0.5 mt-2 text-2xs text-subtle-foreground">Policy v{t.policy_ack_pending.version} still needs acknowledgment. Read it from Policy Updates afterwards.</p>
-      )}
       <FormFooter>
-        <Button onClick={close}>Not Now</Button>
-        {blocked ? (
-          <Button variant="primary" onClick={() => (close(), navigate(hrefFor("ess", "policy-updates")))}>
-            View Policy
-          </Button>
+        {stage.kind === "weak" ? (
+          <Button onClick={() => punch(stage.fix)}>{`${verb} Anyway`}</Button>
+        ) : stage.kind === "no_location" ? (
+          <Button onClick={() => punch({ location_error: stage.error })}>{`${verb} Anyway`}</Button>
         ) : (
-          <Button variant="primary" icon="clock" busy={busy || !fix} onClick={() => void submit()}>
-            {kind === "out" ? "Clock Out" : "Clock In"}
-          </Button>
+          <Button onClick={close}>Not Now</Button>
         )}
+        {primary}
       </FormFooter>
     </>
   );
 }
 
-/** Actions at the foot of the panel, matching the modal footer. */
+/** After a punch: what the server decided, and a note for People when it is under review. */
+function PunchDone({ res, close, again, toDevices }: { res: PunchResult; close: () => void; again: () => void; toDevices: () => void }) {
+  const label = res.event_type === "clock_out" ? "Clocked Out" : "Clocked In";
+  const open = useApi("GET /api/v1/attendance/me/exceptions", { query: { status: "open" }, enabled: res.validation_state === "review" });
+  const mine = (open.data?.data ?? []).filter((x) => x.attendance_event_id === res.attendance_event_id);
+  const f = useContractForm({ employee_note: "" }, attendance.ExceptionExplanation);
+  const explain = useMutation("POST /api/v1/attendance/me/exceptions/:id/explanation");
+  const [sent, setSent] = useState(false);
 
-export type { AttendanceToday };
+  const sendNote = async () => {
+    if (!f.check()) return;
+    try {
+      for (const x of mine) await explain.run({ params: { id: x.attendance_exception_id }, body: { employee_note: f.values.employee_note.trim() } });
+      invalidate("/api/v1/attendance");
+      setSent(true);
+      close();
+      toast("Note sent to People");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else toast(e instanceof ApiError ? e.message : "Note not sent");
+    }
+  };
+
+  const where = res.worksite_name ? (res.distance_m !== null ? `${res.worksite_name}, ${res.distance_m} m away` : res.worksite_name) : undefined;
+  return (
+    <>
+      {res.validation_state === "accepted" && <Result tone="ok" label={label} title={formatTime(res.occurred_at)} text={where} />}
+      {res.validation_state === "review" && <Result tone="warn" label="Review Required" title={`${label} ${formatTime(res.occurred_at)}`} text={res.message} />}
+      {res.validation_state === "rejected" && <Result tone="err" label={res.event_type === "clock_out" ? "Clock Out" : "Clock In"} title="Not Counted" text={res.message} />}
+      {res.validation_state === "review" && mine.length > 0 && !sent && (
+        <Card className="mt-3">
+          <Field label="Note for People" {...f.status("employee_note")}>
+            <TextAreaField {...f.field("employee_note")} placeholder="Client visit" rows={3} />
+          </Field>
+        </Card>
+      )}
+      <FormFooter>
+        {res.validation_state === "review" && mine.length > 0 && !sent ? (
+          <>
+            <Button onClick={close}>Skip</Button>
+            <Button variant="primary" icon="send" busy={explain.pending} onClick={() => void sendNote()}>Send Note</Button>
+          </>
+        ) : res.validation_state === "rejected" ? (
+          <>
+            {res.reasons.includes("unknown_device") ? <Button onClick={toDevices}>Register Device</Button> : <Button onClick={close}>Close</Button>}
+            <Button variant="primary" icon="refresh" onClick={again}>Try Again</Button>
+          </>
+        ) : (
+          <Button variant="primary" onClick={close}>Done</Button>
+        )}
+      </FormFooter>
+    </>
+  );
+}

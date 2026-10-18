@@ -57,6 +57,12 @@ const ACTIONS = Object.freeze([
     need: ["people", "edit"],
     words: ["open role", "vacant seat", "new seat", "vacancy on the organogram"],
   }),
+  a("add_worksite", "Add Worksite", {
+    screen: "people.worksites",
+    params: { action: "new" },
+    need: ["people", "create"],
+    words: ["worksite", "office", "geofence", "new office", "clock-in location"],
+  }),
   a("import_staff", "Import Staff", {
     screen: "settings.imports",
     params: { importer: "employees" },
@@ -91,6 +97,11 @@ const ACTIONS = Object.freeze([
     screen: "ess.my-attendance",
     run: "clock",
     words: ["clock out", "punch in", "check in", "check out", "start work", "attendance"],
+  }),
+  a("register_device", "Register This Device", {
+    screen: "ess.my-devices",
+    params: { action: "new" },
+    words: ["device", "my phone", "clock-in device", "new phone", "trusted device"],
   }),
   a("request_leave", "Request Leave", {
     screen: "ess.my-leave",
