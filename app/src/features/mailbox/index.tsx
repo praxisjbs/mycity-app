@@ -231,13 +231,13 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
         </span>
       </div>
       {thread.messages.map((m, i) => (
-        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={(a, on) => void trust(a, on)} onMailto={mailto} />
+        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} />
       ))}
     </div>
   );
 }
 
-function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m: MailMessage; subject: string; head: boolean; images: boolean; onImages: () => void; onTrust: (address: string, trusted: boolean) => void; onMailto: (m: Mailto) => void }) {
+function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m: MailMessage; subject: string; head: boolean; images: boolean; onImages: () => void; onTrust: (address: string, trusted: boolean) => Promise<void>; onMailto: (m: Mailto) => void }) {
   const showRemote = images || m.images_trusted;
   /* Only the parts the body draws are fetched, each into a local URL the sealed frame may show. */
   const parts = useMemo(() => {
