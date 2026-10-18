@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
-import type { HomeBlock, KpiCell } from "@/api/types/home";
-import { toBars, toTrail, toTrend } from "@/features/shared/wire";
-import { useRouter } from "@/lib/router";
+import type { HomeKpi } from "@/api/types/home";
+import { toTrend } from "@/features/shared/wire";
 import { useKpiDetail } from "./KpiDetail";
-import { AreaChart, Bars, Card, CardHeader, DataView, DonutChart, formatDate, Grid, KpiCard, Meter, Money, Pill, StatStrip, Timeline, Who } from "@mycity/ui";
+import { Card, CardHeader, Grid, KpiCard } from "@mycity/ui";
 
+/**
+ * The frames Team, Alerts and Reports still draw on their INTERIM shapes
+ * (@/api/types/home); each tab's own PR moves it onto the contract as the Overview did.
+ */
 
 /** A card with a title, the common frame of Home's blocks. `info` makes the title a help term (§5.2). */
 export function InfoCard({ title, info, right, children }: { title: string; info?: string; right?: ReactNode; children: ReactNode }) {
@@ -17,7 +20,7 @@ export function InfoCard({ title, info, right, children }: { title: string; info
 }
 
 /** KPI tiles; each opens the records behind its number. */
-export function KpiRow({ items, mobileCols = 1 }: { mobileCols?: 1 | 2; items: Array<{ key: string; label: string; value: string; tone?: "ok" | "warn" | "err" | "info" | "neutral"; trend?: { text: string; dir: "up" | "dn" | "fl" } }> }) {
+export function KpiRow({ items, mobileCols = 1 }: { mobileCols?: 1 | 2; items: HomeKpi[] }) {
   const open = useKpiDetail();
   return (
     <Grid cols={mobileCols === 2 ? "4m2" : 4}>
@@ -26,116 +29,4 @@ export function KpiRow({ items, mobileCols = 1 }: { mobileCols?: 1 | 2; items: A
       ))}
     </Grid>
   );
-}
-
-const KIND = { diary: ["info", "Diary"], task: ["warn", "Task"], note: ["neutral", "Note"] } as const;
-
-export function Block({ block }: { block: HomeBlock }) {
-  const { navigate } = useRouter();
-  switch (block.type) {
-    case "kpis":
-      return <KpiRow items={block.items} />;
-    case "statstrip":
-      return <StatStrip items={block.items} />;
-    case "split":
-      return (
-        <Grid cols={block.cols === "2" ? 2 : "1.4/1"}>
-          {block.blocks.map((b, i) => (
-            <Block key={i} block={b} />
-          ))}
-        </Grid>
-      );
-    case "area":
-      return <AreaChart title={block.title} values={block.values} labels={block.labels ?? []} caption={block.note} />;
-    case "donut":
-      return <DonutChart percent={block.pct} middle={`${block.pct}%`} under={block.label} lines={[block.text]} />;
-    case "bars":
-      return (
-        <div className="mb-3 last:mb-0 [.grid_&]:mb-0">
-          <InfoCard title={block.title} info={block.info}>
-            <Bars rows={toBars(block.rows)} note={block.note} />
-          </InfoCard>
-        </div>
-      );
-    case "need_you":
-      return (
-        <DataView
-          title={block.title}
-          right={<Pill tone={block.badge.tone}>{block.badge.text}</Pill>}
-          rows={block.rows}
-          rowKey={(r) => r.id}
-          onRowClick={(r) => navigate(r.link)}
-          empty={{ title: "Nothing Needs You", text: "Requests waiting on you appear here." }}
-          columns={
-            block.variant === "requests"
-              ? [
-                  { key: "t", label: "Request", render: (r) => r.title },
-                  { key: "f", label: "From", render: (r) => r.from && <Who name={r.from.display_name} sub={r.from.department} /> },
-                  { key: "a", label: "Amount", align: "n", render: (r) => <Money value={r.amount} /> },
-                  { key: "s", label: "Stage", render: (r) => <Pill tone={r.stage.tone}>{r.stage.text}</Pill> },
-                ]
-              : [
-                  { key: "t", label: "Partnership", render: (r) => r.title },
-                  { key: "s", label: "Stage", render: (r) => <Pill tone={r.stage.tone}>{r.stage.text}</Pill> },
-                  { key: "q", label: "Quiet", render: (r) => `${r.quiet_days} days` },
-                  { key: "o", label: "Owner", desktop: true, render: (r) => r.from && <Who name={r.from.display_name} sub={r.from.department} /> },
-                ]
-          }
-        />
-      );
-    case "activity":
-      return (
-        <Card>
-          <CardHeader title={block.title} />
-          <Timeline items={toTrail(block.items)} />
-        </Card>
-      );
-    case "week":
-      return (
-        <Card>
-          <CardHeader title={block.title} right={<span className="text-2xs text-subtle-foreground">{block.range}</span>} />
-          {block.days.map((d, i) => (
-            <div key={i} className="flex items-center gap-2.5 border-b border-border py-2 last:border-b-0">
-              <b className="w-14 flex-none text-xs text-subtle-foreground">{d.day}</b>
-              <span className="min-w-0 flex-1 text-xs">{d.text}</span>
-              <Pill tone={KIND[d.kind][0]}>{KIND[d.kind][1]}</Pill>
-            </div>
-          ))}
-        </Card>
-      );
-    case "list":
-      return (
-        <InfoCard title={block.title} info={block.info}>
-          {block.rows.map((r, i) => (
-            <div key={i} className="flex items-center gap-2.5 border-b border-border py-2.5 last:border-b-0">
-              <b className="w-22 flex-none text-xs text-subtle-foreground">{r.label}</b>
-              <span className="flex-1 text-xs">{r.text}</span>
-              <Pill tone={r.pill.tone}>{r.pill.text}</Pill>
-            </div>
-          ))}
-        </InfoCard>
-      );
-    case "note":
-      return <p className="mt-1 text-2xs text-subtle-foreground">{block.text}</p>;
-  }
-}
-
-/** One cell of a report model row. */
-export function Cell({ cell }: { cell: KpiCell }) {
-  switch (cell.kind) {
-    case "text":
-      return <>{cell.text}</>;
-    case "person":
-      return <Who name={cell.person.display_name} sub={cell.person.department} />;
-    case "pill":
-      return <Pill tone={cell.tone}>{cell.text}</Pill>;
-    case "money":
-      return <Money value={cell.amount} />;
-    case "date":
-      return <>{formatDate(cell.date)}</>;
-    case "over":
-      return <span className="inline-block rounded-full bg-warning-soft px-2 py-0.5 text-2xs font-semibold whitespace-nowrap text-warning">{cell.text}</span>;
-    case "bar":
-      return <Meter pct={cell.pct} label={cell.text} />;
-  }
 }

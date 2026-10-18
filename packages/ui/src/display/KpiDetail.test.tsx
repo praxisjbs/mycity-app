@@ -63,6 +63,20 @@ describe("KpiDetail", () => {
     expect(onGroup).toHaveBeenLastCalledWith("remote");
   });
 
+  it("counts All from the whole list, not the groups, which can overlap, and keeps it while a group is chosen", async () => {
+    const overlapping: KpiDetailGroup[] = [
+      { value: "on_site", label: "On Site", count: 14 },
+      { value: "late", label: "Late", count: 3 },
+      { value: "no_clock_out_yesterday", label: "No Clock-Out Yesterday", count: 2 },
+    ];
+    const whole = list({ page: { number: 1, size: 25, total: 17, pages: 1, has_next: false } });
+    const { rerender } = detail({ groups: overlapping, group: "all", onGroup: vi.fn(), list: whole });
+    expect(await screen.findByRole("button", { name: /All 17/ })).toBeInTheDocument();
+    const late = list({ rows: PEOPLE.slice(0, 1), page: { number: 1, size: 25, total: 3, pages: 1, has_next: false } });
+    rerender(<KpiDetail list={late} columns={COLUMNS} rowKey={(r) => r.id} caption="Clocked In Today" groups={overlapping} group="late" onGroup={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /All 17/ })).toBeInTheDocument();
+  });
+
   it("shows no chips for a figure with one group or none", () => {
     const { rerender } = detail({ groups: [{ value: "on_site", label: "On Site", count: 14 }], group: "all", onGroup: vi.fn() });
     expect(screen.queryByRole("group", { name: "Clocked In Today" })).toBeNull();

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
-import { useAuth } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
 import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Pill, Result, TextAreaField, toast, useContractForm, useModal, zoneClock } from "@mycity/ui";
 
@@ -30,19 +29,12 @@ export function useClock() {
 }
 
 /**
- * Called once by the shell: the panel opens by itself after sign-in for anyone not yet clocked in
- * on a working day, and a punch made on another device or decided by People refreshes the state.
+ * Called once by the shell: a punch made on another device or decided by People refreshes the
+ * state. When the panel opens by itself is Home's to decide (docs/guides/home.md §6 Clock-in
+ * prompt): the Overview opens it with useClock().open.
  */
-export function useClockPrompt() {
-  const { today, open } = useClock();
-  const { justSignedIn, clearJustSignedIn } = useAuth();
+export function useClockSync() {
   useRealtime("attendance.updated", () => invalidate("/api/v1/attendance"));
-  useEffect(() => {
-    if (justSignedIn && today) {
-      clearJustSignedIn();
-      if (today.state === "not_clocked_in" && today.shift.working_day) setTimeout(() => open(), 700);
-    }
-  }, [justSignedIn, today, clearJustSignedIn, open]);
 }
 
 /** The desktop top bar's Clock In / Clock Out button. */

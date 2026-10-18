@@ -1,54 +1,110 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
+import type { HomeKpiCell, HomeKpiDetailRow } from "@mycity/contract/contract.gen.ts";
 import { useApi, usePaged } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
-import { Cell } from "./blocks";
-import type { KpiRow } from "@/api/types/home";
-import { ErrorState, KpiDetail, LoadingRows, useModal } from "@mycity/ui";
+import { ErrorState, formatDate, formatDateTime, formatTime, KpiDetail, LoadingRows, Money, Pill, todayIso, useModal, Who } from "@mycity/ui";
 
 /**
- * Every KPI card opens the records behind its number (docs/guides/home.md §3
- * step 3): GET /home/kpi/:key, paged at 25 by the server, searchable, with the
- * card's own groups as chips. The report model itself is `KpiDetail` in
- * @mycity/ui; this binds it to the two endpoints and to the router.
+ * Every KPI card opens the records behind its number (docs/guides/home.md §3 step 3):
+ * GET /home/kpi/:key/meta for the line above them, their columns and their groups, then
+ * GET /home/kpi/:key, paged at 25 by the server, with the card's groups as chips. The report
+ * model itself is `KpiDetail` in @mycity/ui; this binds it to the two endpoints and the
+ * router. On a phone the modal is a bottom sheet and the records are cards: the first
+ * column is the card's title and only the columns the card marks `phone` follow it.
+ *
+ * A card the reader may not see answers 404, and the sheet says so with ErrorState.
  */
-export function useKpiDetail() {
+export function useKpiDetail(): OpenKpiDetail {
   const modal = useModal();
   return useCallback(
-    (key: string, label: string) => modal.open({ title: label, wide: true, body: (close) => <Report kpiKey={key} label={label} close={close} /> }),
+    (key, title, onClose) =>
+      modal.open({
+        title: title ?? <RecordsTitle kpiKey={key} />,
+        wide: true,
+        onClose,
+        body: (close) => <Records kpiKey={key} close={close} />,
+      }),
     [modal],
   );
 }
 
-function Report({ kpiKey, label, close }: { kpiKey: string; label: string; close: () => void }) {
+/**
+ * Opens a card's records by its catalogue key. `title` is the card's, as the row shows it;
+ * without it (a link straight to a card not on the reader's row) the records' own title names
+ * the sheet. `onClose` runs once the sheet closes, however it closed.
+ */
+export type OpenKpiDetail = (key: string, title?: string, onClose?: () => void) => void;
+
+/** The title of a card's records, for a sheet opened without its card in hand. */
+function RecordsTitle({ kpiKey }: { kpiKey: string }) {
+  const meta = useApi("GET /api/v1/home/kpi/:key/meta", { params: { key: kpiKey } });
+  return <>{meta.data?.title ?? "Records"}</>;
+}
+
+function Records({ kpiKey, close }: { kpiKey: string; close: () => void }) {
   const { navigate } = useRouter();
   const meta = useApi("GET /api/v1/home/kpi/:key/meta", { params: { key: kpiKey } });
   const [group, setGroup] = useState("all");
   const list = usePaged("GET /api/v1/home/kpi/:key", { params: { key: kpiKey }, filters: group === "all" ? {} : { group } });
 
-  if (meta.error) return <ErrorState error={meta.error} />;
+  if (meta.error) return <ErrorState error={meta.error} onRetry={meta.reload} />;
   if (!meta.data) return <LoadingRows />;
   const m = meta.data;
 
   return (
     <KpiDetail
-      caption={label}
-      summary={m.sub}
+      caption={m.title}
+      summary={m.summary ?? undefined}
       groups={m.groups}
       group={group}
       onGroup={setGroup}
       list={list}
       rowKey={(r) => r.id}
+      noun="record"
       onRowClick={(r) => {
         if (!r.link) return;
         close();
         navigate(r.link);
       }}
-      columns={m.columns.map((c) => ({
+      columns={m.columns.map((c, i) => ({
         key: c.key,
         label: c.label,
-        align: c.align,
-        render: (r: KpiRow) => (r.cells[c.key] ? <Cell cell={r.cells[c.key]} /> : null),
+        align: c.numeric ? ("n" as const) : undefined,
+        // A phone card is the first column as its title and the columns the card marks for a phone.
+        desktop: i > 0 && !c.phone,
+        render: (r: HomeKpiDetailRow) => <Cell cell={r.cells[c.key] ?? null} />,
       }))}
     />
   );
+}
+
+/**
+ * A moment as a list reads it: the time alone for today ("09:14", a clock-in), the day and
+ * the time for any other day ("13/10/2026 09:14", a last contact).
+ */
+export function momentOf(at: string, today = todayIso()): string {
+  return formatDate(at) === formatDate(today) ? formatTime(at) : formatDateTime(at);
+}
+
+const NUMBER = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
+
+/** One cell of a card's records, formatted at render time: dates day-first, money as Naira. */
+export function Cell({ cell }: { cell: HomeKpiCell | null }): ReactNode {
+  if (!cell) return null;
+  switch (cell.kind) {
+    case "text":
+      return cell.text;
+    case "person":
+      return <Who name={cell.person.display_name} sub={cell.person.department ?? undefined} />;
+    case "pill":
+      return <Pill tone={cell.tone}>{cell.text}</Pill>;
+    case "money":
+      return <Money value={cell.amount} />;
+    case "date":
+      return formatDate(cell.date);
+    case "time":
+      return momentOf(cell.at);
+    case "number":
+      return NUMBER.format(cell.value);
+  }
 }

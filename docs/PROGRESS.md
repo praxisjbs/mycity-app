@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 2 | 4 | 23 | 0 | 0 |
+| M1 Core Operations & Employee Management | 29 | 2 | 3 | 24 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **59** | **4** | **30** | **0** | **0** |
+| **Total** | **93** | **59** | **3** | **31** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
@@ -475,13 +475,29 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Overview | `overview` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
+| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
 
 **Notes**
 
+- 18/10/2026 · TB · Home PR 2 review fixes: Your Week reads each working day on its own page, so a
+  busy week keeps Friday and Saturday; a role saved with no card follows its Home view; Choose Cards
+  starts from the cards showing, so a lock added after a pick saves; the Overview reads itself again
+  after a punch; Monthly Signed Value adds up to the Signed Value card; Upcoming Leave has View All
+  to My Leave; the guide says when the clock-in prompt opens and which lists have a paged home.
+  Nothing ticked. Left: as below.
+- 18/10/2026 · TB · Home PR 2 (`m1/home-overview`): Overview #1 built on the real API, desktop and
+  phone. `GET /home/overview` resolves each Home view's sections (Operations: attendance over 14
+  working days and the On Time donut from the shared roster; CEO: goals and Org KPI; Partnerships:
+  signed value by month and the pipeline; Staff: the day strip, My Goals and Upcoming Leave; Your Week,
+  Activity Today and Need You for everyone) and decides the clock-in prompt (the first session of a
+  working day with no clock-in and no leave), which replaces the old after-sign-in trigger. The
+  records behind every card (paged at 25, masked, 404 when not the reader's), Choose Cards with the new
+  `CardPicker` (locks, Move Up, Move Down, Use Role Default), a role's cards over the API (the editor is
+  M9), the prune after an access change, `cards.mine` for the assistant and `home_kpi` in ⌘K. Left:
+  Team (PR 3), Alerts (PR 4), Reports and the Overview's Export (PR 5).
 - 18/10/2026 · TB · Home PR 1 merged with Attendance's clock-in and clock-out (LA, #55). The shared
   roster now reads each day as Attendance records it (`attendance_day`) and a day with no record by
   the register's rules, so Clocked In Today, the Team cards and My Attendance on Home equal People ·

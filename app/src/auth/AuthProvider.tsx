@@ -74,8 +74,6 @@ interface AuthValue {
   signOut: () => Promise<void>;
   /** Can the user perform `action` on `module`? Hiding is a courtesy; the API enforces. */
   can: (module: string, action?: string) => boolean;
-  justSignedIn: boolean;
-  clearJustSignedIn: () => void;
 }
 
 /** What follows a first step that did not sign in: the code, or setting two-step up. */
@@ -119,7 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [me, setMe] = useState<Me | null>(null);
   const [lockReason, setLockReason] = useState<LockReason | null>(null);
-  const [justSignedIn, setJust] = useState(false);
   const current = useRef<{ status: Status; me: Me | null }>({ status, me });
   useEffect(() => {
     current.current = { status, me };
@@ -302,7 +299,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         toast("Welcome back");
         return;
       }
-      setJust(true);
       setTimeout(() => toast(`Signed in as ${s.user.display_name}`), 260);
     },
     [applyClock, tell],
@@ -382,10 +378,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithPasskey,
       signOut,
       can,
-      justSignedIn,
-      clearJustSignedIn: () => setJust(false),
     }),
-    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, finishSetup, signInWithPasskey, signOut, can, justSignedIn],
+    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, finishSetup, signInWithPasskey, signOut, can],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

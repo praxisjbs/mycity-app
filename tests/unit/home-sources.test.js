@@ -38,7 +38,7 @@ const CALLS = {
     overduePage: [{ now: NOW }, TEAM, QUERY],
     dueBetween: [{ employee_id: ID, from: NOW, to: NOW }, QUERY],
   },
-  calendar: { eventsBetween: [{ employee_id: ID, from: NOW, to: NOW }, QUERY] },
+  calendar: { eventsStarting: [{ employee_id: ID, from: NOW, to: NOW, running: true }, QUERY] },
   goals: {
     organisationGoals: [{ from: "2026-10-01", to: "2026-12-31" }, QUERY],
     targetsOf: [{ employee_id: ID, from: "2026-10-01", to: "2026-12-31" }, QUERY],

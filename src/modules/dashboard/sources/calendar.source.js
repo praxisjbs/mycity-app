@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Calendar events, as Home reads them: a person's own events in a span, for Your Week.
+ * Calendar events, as Home reads them: a person's own events starting on a day, for Your Week.
  *
  * OWNED BY the `calendar` module, M2 Productivity & Performance, AJ (migration 2000).
  *
@@ -27,20 +27,24 @@ const OWES = Object.freeze([
 ]);
 
 /**
- * One page of the events a person owns that overlap `from` up to `to` (exclusive), in
- * the order they start.
+ * One page of the events a person owns that start from `from` up to `to` (exclusive), in
+ * the order they start: one day of Your Week. With `running`, also the ones that began
+ * before `from` and are still running at it, so the week's first day carries an event
+ * that began the week before. An event is on the day it starts only, never repeated on
+ * each day it spans.
  * @param {{query: Function}} client
- * @param {{employee_id: string, from: Date, to: Date}} span
+ * @param {{employee_id: string, from: Date, to: Date, running?: boolean}} span
  * @param {{page?: number}} query
  */
-function eventsBetween(client, { employee_id: employeeId, from, to }, query) {
+function eventsStarting(client, { employee_id: employeeId, from, to, running = false }, query) {
   return pageQuery(
     client,
     `SELECT ce.calendar_event_id, ce.title, ce.event_type, ce.starts_at, ce.ends_at, ce.all_day, ${TOTAL_COL}
        FROM calendar_event ce
-      WHERE ce.owner_employee_id = $1 AND ce.starts_at < $3::timestamptz AND ce.ends_at > $2::timestamptz
+      WHERE ce.owner_employee_id = $1 AND ce.starts_at < $3::timestamptz
+        AND (ce.starts_at >= $2::timestamptz OR ($4::boolean AND ce.ends_at > $2::timestamptz))
       ORDER BY ce.starts_at, ce.calendar_event_id`,
-    [employeeId, from, to],
+    [employeeId, from, to, running],
     query,
   );
 }
@@ -51,5 +55,5 @@ module.exports = {
   owner: "AJ",
   tables: TABLES,
   owes: OWES,
-  eventsBetween,
+  eventsStarting,
 };

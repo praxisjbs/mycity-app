@@ -20,7 +20,8 @@ const ROLE: Record<string, { code: string; name: string }> = {
   Staff: { code: "employee", name: "Staff" },
 };
 
-function me(key: string): Me {
+/** The /me answer for a demonstration account; Home's mock reads it to decide which cards each may see. */
+export function me(key: string): Me {
   const p = byKey(key)!;
   const role = ROLE[SIGN_INS[key]?.role ?? "Staff"] ?? ROLE.Staff;
   const isCeo = key === "ifeoma";
