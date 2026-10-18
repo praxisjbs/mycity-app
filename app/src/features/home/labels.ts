@@ -1,12 +1,22 @@
 import alerts from "@mycity/contract/schemas/alerts.js";
-import type { HomeActivityItem, HomeAlert, HomeAlertRule, HomeRosterStatus } from "@mycity/contract/contract.gen.ts";
+import type reports from "@mycity/contract/schemas/reports.js";
+import type {
+  HomeActivityItem,
+  HomeAlert,
+  HomeAlertRule,
+  HomeReportRecipient,
+  HomeReportRunStatus,
+  HomeReportSchedule,
+  HomeReportStatus,
+  HomeRosterStatus,
+} from "@mycity/contract/contract.gen.ts";
 import { formatCount, plural, todayIso } from "@mycity/ui";
 import { moduleByKey } from "@/shell/catalogue";
 
 /**
  * The words Home shows for the API's values (docs/guides/home.md §10.1). The server sends
- * keys and figures; the screen words them here, once, so the Overview, Team and Alerts say
- * the same thing and the screen gates read every word.
+ * keys and figures; the screen words them here, once, so the Overview, Team, Alerts and
+ * Reports say the same thing and the screen gates read every word.
  */
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
@@ -175,4 +185,122 @@ export function overByDetail(a: Pick<HomeAlert, "over_by" | "over_by_kind" | "th
 export function ageOf(raisedAt: string, now = new Date()): string {
   const open = Math.round((Date.parse(todayIso(now)) - Date.parse(todayIso(new Date(raisedAt)))) / 86_400_000);
   return open <= 0 ? "Today" : plural(open, "day");
+}
+
+/* ------------------------------------------------------------------ *
+ * Reports (home.md §6 Reports, §10.1)
+ * ------------------------------------------------------------------ */
+
+/** A source a report runs, as the contract lists them (HOME_REPORT_SOURCES). */
+export type ReportSourceKey = keyof typeof reports.HOME_REPORT_SOURCES;
+
+/** What each source reports on, by the contract's sources (HOME_REPORT_SOURCES, in the form's order). */
+export const REPORT_SOURCE: Record<ReportSourceKey, string> = {
+  daily_attendance: "Daily Attendance",
+  leave: "Leave",
+  open_alerts: "Open Alerts",
+  headcount: "Headcount",
+  tasks: "Tasks",
+  partnerships: "Partnerships",
+  expenses: "Expenses",
+  recruitment: "Recruitment",
+  overview: "Overview",
+};
+
+/** A source's name; one the contract no longer lists reads as Other, never as its key. */
+export const sourceName = (key: string): string => (Object.hasOwn(REPORT_SOURCE, key) ? REPORT_SOURCE[key as ReportSourceKey] : "Other");
+
+/** A report's pill: running on its schedule, paused, or run only when someone asks. */
+export const REPORT_STATUS: Record<HomeReportStatus, { tone: Tone; text: string }> = {
+  scheduled: { tone: "ok", text: "Scheduled" },
+  paused: { tone: "warn", text: "Paused" },
+  on_demand: { tone: "info", text: "On Demand" },
+};
+
+/** An archived report's pill, where a link opens one: it neither changes nor runs. */
+export const REPORT_ARCHIVED = { tone: "neutral", text: "Archived" } as const satisfies { tone: Tone; text: string };
+
+/** A run whose file is there, in a run's sheet, where Download is its own button. */
+export const RUN_DONE = { tone: "ok", text: "Done" } as const satisfies { tone: Tone; text: string };
+
+/** A run whose file is not there to download: still being made, failed, or not made for its recipient. */
+export const RUN_STATUS: Record<Exclude<HomeReportRunStatus, "done">, { tone: Tone; text: string }> = {
+  pending: { tone: "info", text: "Pending" },
+  failed: { tone: "err", text: "Failed" },
+  skipped: { tone: "neutral", text: "Skipped" },
+};
+
+/** A leave request's status, for the Leave source's filter (the contract's LeaveStatus). */
+export const LEAVE_STATUS: Record<"submitted" | "approved" | "rejected" | "cancelled", string> = {
+  submitted: "Submitted",
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+/** A file's format, as people name it (HOME_REPORT_FORMATS). */
+const REPORT_FORMAT: Record<string, string> = { pdf: "PDF", xlsx: "XLSX" };
+export const formatName = (format: string): string => REPORT_FORMAT[format] ?? format.toUpperCase();
+
+/** Weekdays as the recurrence rule numbers them: 1 is Monday, 7 is Sunday. */
+const WEEKDAY = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** The short names the form's Days offer, Monday first. */
+export const WEEKDAY_SHORT = WEEKDAY.map((d) => d.slice(0, 3));
+
+/** The ISO weekday of a date: 1 Monday to 7 Sunday. */
+export const isoWeekday = (date: string) => ((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+
+/** "Mondays", "Mondays and Fridays", "Mondays, Wednesdays and Fridays". */
+function joined(words: string[]): string {
+  return words.length < 2 ? (words[0] ?? "") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+/** The days a weekly rule runs on: a run of days reads as one span ("Monday to Friday"). */
+function weekdays(days: number[]): string {
+  const sorted = [...new Set(days)].sort((a, b) => a - b);
+  if (sorted.length === 7) return "Every day";
+  const span = sorted.length > 2 && sorted.every((d, i) => i === 0 || d === sorted[i - 1] + 1);
+  if (span) return `${WEEKDAY[sorted[0] - 1]} to ${WEEKDAY[sorted[sorted.length - 1] - 1]}`;
+  return joined(sorted.map((d) => `${WEEKDAY[d - 1]}s`));
+}
+
+/** 1st, 2nd, 3rd, 4th, 11th, 21st. */
+function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const suffix = teen ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
+/**
+ * A schedule as the report card reads it: "Every working day at 18:00", "Mondays and Fridays
+ * at 08:00", "Monthly on the last day at 17:00", "Every 2 weeks on Mondays at 08:00". A weekly
+ * rule with no days runs on its start date's weekday, a monthly one on its start date's day,
+ * as the recurrence rule reads them (src/shared/time/recurrence.js).
+ */
+export function scheduleLine(s: Pick<HomeReportSchedule, "recurrence" | "starts_on" | "run_time">): string {
+  const r = s.recurrence;
+  const every = r.interval && r.interval > 1 ? r.interval : 1;
+  let when: string;
+  if (r.freq === "daily") {
+    const unit = r.working_days_only ? "working day" : "day";
+    when = every === 1 ? `Every ${unit}` : `Every ${every} days${r.working_days_only ? ", working days only" : ""}`;
+  } else if (r.freq === "weekly") {
+    const days = weekdays(r.by_weekday ?? [isoWeekday(s.starts_on)]);
+    if (every === 1) when = days;
+    else when = days === "Every day" ? `Every day, every ${every} weeks` : `Every ${every} weeks on ${days}`;
+  } else {
+    const day = r.by_month_day ?? Number(s.starts_on.slice(8, 10));
+    const on = day === -1 ? "the last day" : `the ${ordinal(day)}`;
+    when = every === 1 ? `Monthly on ${on}` : `Every ${every} months on ${on}`;
+  }
+  return `${when} at ${s.run_time}`;
+}
+
+/** Who a schedule goes to: two names, then how many more ("Ada Obi, Tolu Ade and 3 more"). */
+export function audienceLine(audience: Array<Pick<HomeReportRecipient, "display_name">>): string | null {
+  const names = audience.map((a) => a.display_name);
+  if (names.length === 0) return null;
+  if (names.length <= 3) return joined(names);
+  return `${names.slice(0, 2).join(", ")} and ${formatCount(names.length - 2)} more`;
 }

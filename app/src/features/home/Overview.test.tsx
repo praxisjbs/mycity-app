@@ -2,8 +2,9 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import dashboard from "@mycity/contract/schemas/dashboard.js";
+import reports from "@mycity/contract/schemas/reports.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import { formatTime, ModalProvider, todayIso } from "@mycity/ui";
+import { formatTime, ModalProvider, Toaster, todayIso } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
@@ -16,7 +17,7 @@ import Home from "./index";
 /**
  * Home · Overview on the in-browser mock (docs/guides/home.md §10): each Home view draws its
  * own sections and nothing a guide keeps off a screen; Choose Cards; the records behind a card;
- * the clock-in prompt; the phone's layout. The screen gates crawl Operations only (FRONTEND_GUIDE
+ * the clock-in prompt; Export; the phone's layout. The screen gates crawl Operations only (FRONTEND_GUIDE
  * §9.4), so the CEO, Partnerships and Staff Overviews are held to the copy rules here.
  *
  * The clock is a Monday morning in Lagos, a working day, whatever day the suite runs.
@@ -424,6 +425,40 @@ describe("the records behind a card", () => {
     expect(await within(sheet).findByText(`26 to ${page.page.total} of ${page.page.total} records`)).toBeTruthy();
     expect(within(sheet).getAllByRole("row")).toHaveLength(1 + page.page.total - 25);
   }, 60000);
+});
+
+describe("Export", () => {
+  // The toasts, on their own: the Overview's other cases read the page without them.
+  const toasts = () => render(<Toaster />);
+
+  it("makes a file of the reader's own Overview in the format they choose, toasted with its run's number", async () => {
+    toasts();
+    await overviewAs("cynthia@mycityapp.io");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Export" }), { key: "Enter" });
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Export PDF", "Export XLSX"]);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Export XLSX" }));
+    const toast = await screen.findByText(/^RPT-\d{4} queued\. It arrives by email\.$/, {}, { timeout: 5000 });
+    const number = toast.textContent!.split(" ")[0];
+    // A run of the reader's own Overview, for them alone, Pending until its file is there.
+    const runs = reports.HomeReportRunPage.parse(await api.call("GET /api/v1/home/report-runs")).data;
+    expect(runs.find((r) => r.number === number)).toMatchObject({ report_key: "overview", format: "xlsx", recipient_name: "Cynthia Osakunih", report_schedule_id: null });
+    // The Overview's own report is not one of the reports Reports lists.
+    const listed = reports.HomeReportPage.parse(await api.call("GET /api/v1/home/reports")).data;
+    expect(listed.some((r) => r.report_key === "overview")).toBe(false);
+  }, 30000);
+
+  it("is any Home reader's, Staff included, and is left off a phone", async () => {
+    toasts();
+    await overviewAs("chidera@mycityapp.io");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Export" }), { key: "Enter" });
+    fireEvent.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Export PDF" }));
+    expect(await screen.findByText(/^RPT-\d{4} queued\. It arrives by email\.$/, {}, { timeout: 5000 })).toBeTruthy();
+    cleanup();
+    setViewport(390);
+    await overviewAs("chidera@mycityapp.io");
+    expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
+  }, 30000);
 });
 
 describe("on a phone", () => {

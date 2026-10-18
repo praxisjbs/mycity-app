@@ -63,6 +63,7 @@ mycity-app/
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
+│                             (60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
 │                             16/10/2026; docs/guides/foundation.md §6.1). The repository is private
@@ -315,7 +316,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 |---|---|---|
 | `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.prompt` (when the Overview opens Attendance's clock-in panel), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
 | `alerts` | TB | `.metrics` (the metric registry: what each of the nine metrics reads, from which module, about whom, a batch at a time), `.sweeps` (the 06:00 sweep, and one person's re-read on an attendance signal) |
-| `reports` | TB | |
+| `reports` | TB | `.sources` (the source registry: each source's module, grant, filters and columns over its own screen's query, gathered page by page as the reader, at most 2,000 rows a table; and the reader's own Overview for the Export), `.schedule` (a schedule's next slot in Lagos from its recurrence rule, start day and time), `.generate` (each run's file built as its recipient, PDF or XLSX, emailed once it exists; skipped or failed with why), `.files` (a report's tables as the PDF's variables and the XLSX workbook, day-first and in Naira) |
 | `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, worksite and shift for a date), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
 | `devices` | LA | `.guard` |
 | `worksites` | LA | |
@@ -328,6 +329,9 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
 `services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `shared/geo`,
 `shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence).
+
+Templates first filled in M1: `templates/documents/report.html` (a report run, landscape, its RPT
+number on it) and `templates/email/scheduled-report.html` (the report's file attached).
 
 **M1 mailbox rule:** cut the five `require` lines into triage, binding and assist before anything else
 (MILESTONES §6.5). `mailbox/binding/` stays empty until M7.
