@@ -30,15 +30,17 @@ const HomeAlertCategory = z.enum(HOME_ALERT_CATEGORIES);
  * How a metric is read against its threshold:
  *   count     the value reaching the threshold breaches it (3 late arrivals, 14 days waiting)
  *   deadline  a date coming within the threshold's days breaches it (a document expiring in
- *             30 days or less); `over_by` then holds the days left, and the screen says so.
- *             The threshold is whole days.
+ *             30 days or less); `over_by` then holds the days left, 0 on the day itself and
+ *             below 0 once the date has passed, and the screen says so. The threshold is
+ *             whole days.
  */
 const HomeAlertKind = z.enum(["count", "deadline"]);
 
 /**
  * What an alert's `over_by` holds, from its metric's kind: how far past the threshold
  * (`over`, a count metric) or the days left before the date (`days_left`, a deadline
- * metric). The Over By cell reads "+1" or "12 days left" from it.
+ * metric: "12.00" twelve days ahead, "0.00" on the day itself, "-2.00" two days after it has
+ * passed). The Over By cell reads "+1", "12 days left", the day itself or Expired from it.
  */
 const HomeAlertOverBy = z.enum(["over", "days_left"]);
 
@@ -106,7 +108,7 @@ const HomeAlert = z
     title: z.string(),
     trigger: z.string().nullable(),
     severity: HomeAlertSeverity,
-    /** How far past the threshold, or for a deadline metric the days left ("12.00"). */
+    /** How far past the threshold, or for a deadline metric the days left ("12.00"; "0.00" on the day, below 0 once passed). */
     over_by: z.string().nullable(),
     /** Which of the two `over_by` is; null for a metric no longer in the list. */
     over_by_kind: HomeAlertOverBy.nullable(),
@@ -114,6 +116,8 @@ const HomeAlert = z
     threshold: z.string(),
     /** Who may clear it: the rule's grant. */
     permission_key: z.string(),
+    /** The rule's grant as a person reads it ("People Approvers"): the Who Can Clear column. */
+    who_can_clear: z.string(),
     raised_at: isoDateTime,
     last_seen_at: isoDateTime,
     escalated_at: isoDateTime.nullable(),
@@ -193,6 +197,8 @@ const HomeAlertRule = z
     window_days: z.number().int().nullable(),
     severity: HomeAlertSeverity,
     permission_key: z.string(),
+    /** The grant as a person reads it ("People Approvers"). */
+    who_can_clear: z.string(),
     enabled: z.boolean(),
     open_alerts: count,
     created_by: uuid.nullable(),
@@ -267,9 +273,10 @@ const TABLES = {
       rule_name: "the rule's name, from home_alert_rule",
       metric: "the rule's metric, from home_alert_rule",
       category: "the metric's category in HOME_ALERT_METRICS",
-      over_by_kind: "from the metric's kind in HOME_ALERT_METRICS: a deadline metric's over_by is the days left",
+      over_by_kind: "from the metric's kind in HOME_ALERT_METRICS: a deadline metric's over_by is the days left, below 0 once passed",
       threshold: "the rule's threshold, from home_alert_rule",
       permission_key: "the rule's grant, from home_alert_rule",
+      who_can_clear: "the rule's grant worded from the access catalogue's module label and its action",
       cleared_by_name: "the name of the login in cleared_by",
       link: "derived from subject_type and subject_id through shared/route-map.js",
       can_clear: "open, the reader holds alerts.clear, and the rule's grant reaches the subject",
@@ -284,6 +291,7 @@ const TABLES = {
     virtual: {
       category: "the metric's category in HOME_ALERT_METRICS",
       kind: "the metric's kind in HOME_ALERT_METRICS",
+      who_can_clear: "permission_key worded from the access catalogue's module label and its action",
       open_alerts: "counted from the rule's home_alert rows not yet cleared",
     },
   },

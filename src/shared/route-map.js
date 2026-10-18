@@ -114,12 +114,16 @@ const SCREENS = Object.freeze({
 const screen = (module, tab) => ({ module, tab });
 
 /**
- * entity_type → { module, tab, self? }. Types are the snake_case names modules pass
- * to emit() and store beside a notification, task or alert.
+ * entity_type → { module, tab, self?, param? }. Types are the snake_case names modules pass
+ * to emit() and store beside a notification, task or alert. `param` names the query value
+ * that carries the record's id when its tab opens two kinds of record (an alert rule beside
+ * the alerts it raises: `?rule=`); `id` otherwise.
  */
 const ENTITY_ROUTES = Object.freeze({
   // Home
-  home_alert: screen("home", "alerts"), // search:none not built yet (src/modules/alerts)
+  home_alert: screen("home", "alerts"),
+  // A rule opens Edit Rule on the Alerts tab, whose `?id=` is an alert.
+  home_alert_rule: { ...screen("home", "alerts"), param: "rule" },
   home_report: screen("home", "reports"), // search:none not built yet (src/modules/reports)
   home_report_run: screen("home", "reports"), // search:none not built yet (src/modules/reports)
   // A KPI card, by its catalogue key: the Overview opens the records behind it.
@@ -285,6 +289,10 @@ function check() {
       throw new Error(`route-map: ${module} lists a tab twice`);
   }
   for (const [type, r] of Object.entries(ENTITY_ROUTES)) {
+    if (r.param !== undefined && (!/^[a-z][a-z_]*$/.test(r.param) || ["tab", "id"].includes(r.param)))
+      throw new Error(
+        `route-map: ${type} carries its id as "${r.param}"; name a snake_case value other than tab and id`,
+      );
     for (const s of [r, r.self].filter(Boolean)) {
       if (!SCREENS[s.module] || !SCREENS[s.module].includes(s.tab)) {
         throw new Error(
@@ -334,7 +342,9 @@ function linkFor(entityType, entityId, { self = false } = {}) {
     module: target.module,
     tab: target.tab,
     id,
-    path: screenPath(target.module, target.tab, { id }),
+    path: r.param
+      ? screenPath(target.module, target.tab, { params: { [r.param]: id } })
+      : screenPath(target.module, target.tab, { id }),
   };
 }
 

@@ -3,11 +3,14 @@
  * The attendance roster: a day's register in the shape Home reads it. Who is on the day,
  * who came in, how, and who did not.
  *
- * Home reads attendance only through this file (the Clocked In Today card and the list
- * behind it, the Team tab and its month, a person's own month). It writes nothing, emits
- * nothing and decides nothing: every fact is the attendance module's own
- * (docs/guides/attendance.md §6), read the way People · Attendance and My Attendance read
- * it, so a figure on Home is the figure on those screens.
+ * Home's screens read attendance only through this file (the Clocked In Today card and the
+ * list behind it, the Team tab and its month, a person's own month). The one other reader in
+ * Home is its alert metrics (src/modules/alerts/alerts.metrics.js: the days recorded late, and
+ * the day-close's missing clock-out exception or a day still open), which a change to those
+ * updates in the same PR (attendance.md §6.9). This file writes nothing, emits nothing and
+ * decides nothing: every fact is the attendance module's own (docs/guides/attendance.md §6),
+ * read the way People · Attendance and My Attendance read it, so a figure on Home is the
+ * figure on those screens.
  *
  *   summary(client, { date }, scope)                     the counts for one day
  *   page(client, { date, status, ... }, scope, query)    one page of 25 people for one day

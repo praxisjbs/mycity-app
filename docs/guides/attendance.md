@@ -70,7 +70,10 @@ recorded, as evidence, and opens an exception People review; nothing is overwrit
    (`src/modules/attendance/attendance.roster.js`, §6.9): the Clocked In Today card and the list
    behind it, the Team tab and a person's own month. The roster reads each day as steps 4, 6 and 7
    left it (`attendance_day`) and a day with no record by the register's rules, so a figure on Home
-   is the figure on People · Attendance and My Attendance.
+   is the figure on People · Attendance and My Attendance. Home's alert metrics
+   (`src/modules/alerts/alerts.metrics.js`, home.md §6 Alerts) are the one other reader: Late
+   Arrivals counts the days recorded `late`, and Missing Clock-Out the day-close's
+   `missing_clock_out` exception and a day still open before today with a clock-in and no clock-out.
 
 ## 4 · Data
 
@@ -278,16 +281,21 @@ Home and those screens never disagree.
   and pages by it); `tests/integration/attendance-roster.test.js` holds them to each other and both
   to `repo.register`, `repo.registerSummary`, `repo.listDays` and `repo.daysSummary` on every kind of
   day. A change to the register's statuses changes the roster's mapping in the same PR.
+- **The one other reader.** Home's alert metrics (`src/modules/alerts/alerts.metrics.js`, home.md
+  §4.1) read `attendance_day.status = 'late'` (Late Arrivals) and the day-close's
+  `missing_clock_out` exception with no event, or a day still open before today with a clock-in and
+  no clock-out (Missing Clock-Out), in their own SQL. A change to the register's statuses or to
+  that exception changes those two entries in the same PR, as it does the roster's mapping.
 
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
 |---|---|---|
-| `attendance.punched` | A punch commits (any result) | Audit; outbox `attendance.push_updated`: `attendance.updated` to the person and to `people` view holders above them |
+| `attendance.punched` | A punch commits (any result) | Audit; outbox `attendance.push_updated`: `attendance.updated` to the person and to `people` view holders above them; outbox `alerts.person-signal` (Home): a clock-in (`event_type`) re-reads that person's (`employee_id`) Late Arrivals rules |
 | `attendance.review_required` | A punch or the day-close opens an exception | Notifies the person and `people` approve holders within scope |
 | `attendance.exception_explained` | The person explains an exception | Notifies `people` approve holders within scope |
 | `attendance.exception_decided` | People decide an exception | Notifies the person; realtime refresh |
-| `attendance.day_closed` | The day-close job closes a person's day | Audit; realtime refresh |
+| `attendance.day_closed` | The day-close job closes a person's day | Audit; realtime refresh; outbox `alerts.person-signal` (Home): re-reads that person's (`employee_id`) Late Arrivals and Missing Clock-Out rules |
 | `attendance.export_requested` | My Attendance or the register asks for a workbook | Outbox `attendance.send_export`: gathered 25 at a time, kept in the vault, emailed |
 | `device.registered`, `device.removed` | My Devices, People · Devices | Notifies the person when People removed it |
 | `worksite.created`, `worksite.updated` | People · Worksites | Audit |
@@ -434,3 +442,4 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - 18/10/2026 · TB · The panel's after-sign-in opener moved to Home (owner decision O12, home.md §6): Home · Overview opens it with `useClock().open` once when the server's `prompt_clock_in` says it is due, and `ClockButton.tsx` exports `useClockSync` in place of `useClockPrompt`, which the shell still calls so a punch made elsewhere refreshes the state. The panel, its punch and §10.2's floating button are unchanged; §2 and §10.2 say who opens it.
 - 18/10/2026 · TB · Home's review fixes: §2 and §10.2 now say the panel opens when the first session of a working day opens Home · Overview, so a first session that signs in through a link to another screen and never opens the Overview is not prompted that day (the top bar and the floating button still open it). Home · Overview now reads itself again after a punch, from its own files. Nothing in Attendance's code changed.
 - 18/10/2026 · TB · The shared roster gains what Home's Team tab reads (§5, §6.9), for LA's review: `month()`, one page of 25 people with My Attendance's totals over a range of up to 31 days in one query (Attendance This Month); `flagged` (late, or no clock-out yesterday, each person once) as a count on `summary()` and a filter on `page()`, so the Flags card equals the records it opens. Nothing this module records or decides changed.
+- 18/10/2026 · TB · Home's alert metrics named as the one other reader of `attendance_day` and `attendance_exception` (step 8, §6.9) and Home's `alerts.person-signal` handler on `attendance.punched` and `attendance.day_closed` (§7), with the payload fields it reads; the roster's header says the same. Nothing this module records or decides changed.

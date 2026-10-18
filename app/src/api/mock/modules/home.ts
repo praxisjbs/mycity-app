@@ -1,5 +1,9 @@
+import alertsContract from "@mycity/contract/schemas/alerts.js";
 import type {
   HomeActivityItem,
+  HomeAlert,
+  HomeAlertRule,
+  HomeAlertSummary,
   HomeChart,
   HomeDayStrip,
   HomeDonut,
@@ -23,8 +27,9 @@ import type {
   HomeWeekDay,
   Me,
 } from "@mycity/contract/contract.gen.ts";
-import type { HomeAlert, HomeReport } from "@/api/types/home";
-import { formatTime, todayIso } from "@mycity/ui";
+import type { HomeReport } from "@/api/types/home";
+import { MODULES } from "@/shell/catalogue";
+import { formatDate, formatTime, todayIso } from "@mycity/ui";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS, teamOf, type MockPerson } from "../data/people";
 import { HISTORY, TODAY, type TodayStatus } from "../data/attendance";
@@ -44,8 +49,11 @@ import { leaveRequests, leaveYear, waitingOn } from "./organisation";
  * view's), which sections each view draws, and that the server sends figures and the screen the
  * words. Team is on the contract too, over the same roster as the Clocked In Today card, in the
  * reader's `home` scope (everyone for Operations and the CEO, else the reader and everyone below
- * them). Alerts and Reports still answer their INTERIM shapes (@/api/types/home) until their own
- * PRs move them.
+ * them). Alerts and their rules are on the contract (packages/contract/schemas/alerts.js): who
+ * sees an alert, who may clear it, the counts, and a rule switched off dismissing its open
+ * alerts follow home.md §6 Alerts, and a body the contract refuses is answered 422 as the API
+ * answers it. Reports still answers its INTERIM shapes (@/api/types/home) until its own PR
+ * moves it.
  *
  * Demonstration data only (A5): production starts empty.
  */
@@ -527,8 +535,14 @@ const CARDS: MockCard[] = [
     tone: "err",
     records: {
       title: "Open High Alerts",
-      columns: [["alert", "Alert"], ["raised", "Raised", { phone: true }], ["over_by", "Over By", { numeric: true, phone: true }]],
-      rows: (u) => alertScope(u).filter((a) => a.severity === "high").map((a) => rec(a.home_alert_id, { alert: text(a.title), raised: time(a.raised_at), over_by: number(a.over) }, `/home?tab=alerts&id=${a.home_alert_id}`, a.age_days >= AGED_DAYS ? ["aged"] : [])),
+      columns: [["alert", "Alert"], ["raised", "Raised", { phone: true }], ["over_by", "Over By", { phone: true }]],
+      rows: (u) =>
+        visibleAlerts(u)
+          .filter((a) => a.cleared_at === null && a.severity === "high")
+          .map((a) => {
+            const overBy = overByWords(a.over_by, overByKindOf(ruleOf(a).metric));
+            return rec(a.home_alert_id, { alert: text(a.title), raised: time(a.raised_at), over_by: overBy === null ? null : text(overBy) }, `/home?tab=alerts&id=${a.home_alert_id}`, openDays(a) >= AGED_DAYS ? ["aged"] : []);
+          }),
     },
     figure: (rows) => counted(rows.length, { extra: { aged: tally(rows).aged ?? 0 } }),
     caption: (f) => (Number(f.extra.aged) > 0 ? `${f.extra.aged} over ${AGED_DAYS} days` : null),
@@ -937,62 +951,310 @@ function overviewOf(user: string): HomeOverview {
     upcoming_leave: v.staff && may("ess") ? upcomingLeaveOf(user) : null,
     activity: activityOf(user, m),
     week: weekOf(user, m),
-    alerts_to_clear: holds(m, "alerts.clear") ? alertScope(user).length : null,
+    alerts_to_clear: holds(m, "alerts.clear") ? alertsToClear(user).length : null,
     // The mock keeps one session per tab, so every Overview it answers is the day's first session's.
     prompt_clock_in: t.state === "not_clocked_in" && t.shift.working_day,
   };
 }
 
 /* ------------------------------------------------------------------ *
- * Alerts and rules (INTERIM until Home · Alerts is on the real API)
+ * Alerts and their rules, in the contract's shapes (packages/contract/schemas/alerts.js)
  * ------------------------------------------------------------------ */
-type A = [string, string, string, string, string, "low" | "medium" | "high", string, number, string | null];
-const A_ROWS: A[] = [
-  ["Bashir Lawal, 3 late arrivals in 30 days", "Attendance rule", "Operations", "attendance", "+1 over 3", "high", "late_arrivals", 2, "/people?tab=attendance"],
-  ["Emeka Obi, no clock-out yesterday", "Missing Punch", "Operations", "attendance", "1 day open", "medium", "missing_punch", 1, "/people?tab=attendance"],
-  ["Seyi Balogun punched from a new device", "Device policy", "Operations", "attendance", "None", "medium", "device", 1, "/people?tab=devices"],
-  ["Eko Hotels, no contact in 34 days", "Partnership inactivity", "Ngozi Eze", "partnership", "+4 over 30", "medium", "inactivity", 4, "/partnerships?tab=partners"],
-  ["Kano Trade Council, no contact in 52 days", "Partnership inactivity", "Ngozi Eze", "partnership", "+22 over 30", "high", "inactivity", 22, "/partnerships?tab=partners"],
-  ["Requisition REQ-0042 with CEO for 6 days", "Approval ageing", "CEO", "approval", "+4 over 2", "high", "approval_ageing", 6, "/expenses?tab=requisitions"],
-  ["NDPA certificate expires soon", "Document expiry", "People", "document", "44 days left", "low", "document_expiry", 0, "/people?tab=employees"],
-  ["MTN MOU renewal due", "Contract renewal", "Ngozi Eze", "partnership", "90 days notice", "low", "renewal", 0, "/partnerships?tab=contracts-and-mous"],
-  ["Chidera Nwosu probation ends soon", "Confirmation due", "People", "people", "11 days left", "medium", "probation", 3, "/people?tab=employees"],
-  ["Marketing spend at 92% of budget", "Budget threshold", "Finance", "budget", "+2 over 90", "medium", "budget", 1, "/expenses?tab=budgets"],
-  ["October payroll not submitted", "Payroll cycle", "Operations", "payroll", "due today", "medium", "payroll", 0, "/payroll?tab=payroll-runs"],
-  ["Adaeze Nnamdi awaiting panel feedback", "Recruitment SLA", "Hiring manager", "recruitment", "+2 over 3", "high", "recruitment_sla", 5, "/recruitment?tab=interviews"],
-];
+
 /** A High alert open this many days goes to the CEO (home.md §6). */
 const AGED_DAYS = 14;
-const ALERTS = A_ROWS.map((a, i) => ({
-  home_alert_id: sid(`alert:${i}`),
-  title: a[0],
-  trigger: a[1],
-  who_clears: a[2],
-  category: a[3] as HomeAlert["category"],
-  over_by: a[4],
-  /** How far past its rule, as a number, for the records behind Open High Alerts. */
-  over: Number(/^\+?(\d+)/.exec(a[4])?.[1] ?? 0),
-  severity: a[5],
-  metric: a[6],
-  age: a[7] === 0 ? "today" : `${a[7]} day${a[7] === 1 ? "" : "s"}`,
-  age_days: a[7],
-  raised_at: at(a[7], "09:00"),
-  link: a[8],
-  cleared: false as boolean,
-}));
-const RULES = [...new Map(ALERTS.map((a) => [a.metric, a])).values()].map((a, i) => ({
-  home_alert_rule_id: sid(`rule:${a.metric}`),
-  name: a.trigger,
-  metric: a.metric,
-  example: a.title,
-  threshold: [3, 1, 1, 30, 2, 60, 14, 90, 3, 1, 3][i] ?? 3,
-  window_days: 30,
-  severity: a.severity,
-  enabled: true,
-}));
-const CATEGORY_LABEL: Record<string, string> = { attendance: "Attendance", partnership: "Partnerships", approval: "Approvals", document: "Documents", people: "People", budget: "Budget", payroll: "Payroll", recruitment: "Recruitment" };
-function alertScope(user: string) {
-  return (SIGN_INS[user]?.view === "partnerships" ? ALERTS.filter((a) => a.category === "partnership") : ALERTS).filter((a) => !a.cleared);
+/** Overdue 7 Days +: open more than this many days. */
+const OVERDUE_DAYS = 7;
+const DAY_MS = 86_400_000;
+/** A person's login as the alert tables keep it (`created_by`, `cleared_by`). */
+const loginOf = (key: string) => sid(`login:${key}`);
+/** The note a switched-off rule leaves on the alerts it dismisses. */
+const RULE_OFF_NOTE = "Rule switched off";
+
+type Severity = HomeAlertRule["severity"];
+type RuleSeed = [name: string, metric: keyof typeof alertsContract.HOME_ALERT_METRICS, threshold: string, window: number | null, severity: Severity, permission: string, enabled: boolean];
+
+/**
+ * A rule's key, as the server makes it: `<metric>.<slug of the name>`, the slug lower case with
+ * accents dropped, runs of anything else as one `_`, at most 40 characters ("rule" when nothing
+ * is left), and `_2`, `_3` on the end when taken (keys compare without case).
+ */
+function ruleKey(metric: string, name: string, taken: (key: string) => boolean): string {
+  const slug = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .slice(0, 40)
+    .replace(/^_+|_+$/g, "");
+  const base = `${metric}.${slug || "rule"}`;
+  let key = base;
+  for (let n = 2; taken(key.toLowerCase()); n += 1) key = `${base}_${n}`;
+  return key;
+}
+
+/** A rule on every metric, two on late arrivals and one switched off, so a laptop shows every state. */
+const RULE_SEEDS: RuleSeed[] = [
+  ["Late Arrivals", "late_arrivals", "3", 30, "medium", "people.view", true],
+  ["Repeated Lateness", "late_arrivals", "5", 30, "high", "people.view", true],
+  ["Missing Clock-Outs", "missing_clock_out", "2", 14, "medium", "people.view", true],
+  ["Approvals Waiting", "approval_ageing", "3", null, "high", "people.approve", true],
+  ["Documents Expiring", "document_expiry", "30", null, "low", "people.edit", true],
+  ["Probation Ending", "confirmation_due", "14", null, "medium", "people.edit", true],
+  ["Contracts Ending", "contract_ending", "30", null, "medium", "people.edit", true],
+  ["Quiet Partners", "partner_inactivity", "30", null, "medium", "partnerships.edit", true],
+  ["Budget Nearly Spent", "budget_threshold", "90", null, "medium", "expenses.approve", true],
+  ["Slow Hiring Stages", "recruitment_sla", "5", null, "high", "recruitment.edit", false],
+];
+
+type MockRule = Omit<HomeAlertRule, "category" | "kind" | "who_can_clear" | "open_alerts">;
+const RULES: MockRule[] = [];
+for (const [name, metric, threshold, window_days, severity, permission_key, enabled] of RULE_SEEDS) {
+  const key = ruleKey(metric, name, (k) => RULES.some((r) => r.key.toLowerCase() === k));
+  RULES.push({
+    home_alert_rule_id: sid(`alert-rule:${key}`),
+    key,
+    name,
+    metric,
+    threshold,
+    window_days,
+    severity,
+    permission_key,
+    enabled,
+    created_by: loginOf("cynthia"),
+    updated_by: loginOf("cynthia"),
+    created_at: at(60, "10:00"),
+    updated_at: at(enabled ? 60 : 6, "10:00"),
+  });
+}
+const ruleNamed = (name: string) => RULES.find((r) => r.name === name)!;
+
+/** An alert as the mock keeps it: the row the shared engine writes. */
+interface MockAlert {
+  home_alert_id: string;
+  home_alert_rule_id: string;
+  subject_type: string;
+  subject_id: string;
+  subject_employee_id: string | null;
+  title: string;
+  trigger: string | null;
+  severity: Severity;
+  over_by: string | null;
+  raised_at: string;
+  last_seen_at: string;
+  escalated_at: string | null;
+  cleared_at: string | null;
+  cleared_by: string | null;
+  outcome: "cleared" | "dismissed" | null;
+  note: string | null;
+  link: string | null;
+}
+
+/** "Late on 09/10/2026, 12/10/2026 and 14/10/2026", or for many days "Late on 6 days, last on 14/10/2026", as the server words a trigger. */
+function onDays(lead: string, back: number[]): string {
+  const shown = [...back].sort((a, b) => b - a).map((n) => formatDate(isoDaysAgo(n)));
+  if (shown.length > 3) return `${lead} ${shown.length} days, last on ${shown[shown.length - 1]}`;
+  return shown.length === 1 ? `${lead} ${shown[0]}` : `${lead} ${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
+}
+
+type AlertSeed = {
+  rule: string;
+  subject: [type: string, id: string];
+  /** The person it is about, by their key; none for a partner or a budget. */
+  who: string | null;
+  title: string;
+  trigger: string;
+  over_by: string;
+  /** Raised this many days ago. */
+  raised: number;
+  /** Closed this many days ago, and how; open when absent. A rule switched off closes its alerts as no one (`by` null). */
+  closed?: { days: number; at: string; outcome: "cleared" | "dismissed"; by: string | null; note?: string };
+  link: string | null;
+};
+
+const staff = (key: string) => byKey(key)!;
+const employeeLink = (key: string) => `/people?tab=employees&id=${staff(key).employee_id}`;
+const partnerNamed = (name: string) => PARTNERS.find((p) => p.name === name)!;
+
+/**
+ * Open alerts on every category, of both kinds (a count at or past its threshold, a date coming
+ * up, falling today or gone), about people across the tree (one about Ngozi, whom only
+ * Operations and the CEO see) and about no one in particular; two dismissed (one by a person,
+ * one by its rule being switched off) and some cleared this week.
+ */
+const ALERT_SEEDS: AlertSeed[] = [
+  { rule: "Late Arrivals", subject: ["employee", "bashir"], who: "bashir", title: "Bashir Lawal: 4 late arrivals in 30 days", trigger: onDays("Late on", [1, 6, 9, 13]), over_by: "1", raised: 2, link: "/people?tab=attendance" },
+  { rule: "Late Arrivals", subject: ["employee", "rotimi"], who: "rotimi", title: "Rotimi Alade: 6 late arrivals in 30 days", trigger: onDays("Late on", [0, 3, 8, 15, 17, 22]), over_by: "3", raised: 17, link: "/people?tab=attendance" },
+  { rule: "Repeated Lateness", subject: ["employee", "rotimi"], who: "rotimi", title: "Rotimi Alade: 6 late arrivals in 30 days", trigger: onDays("Late on", [0, 3, 8, 15, 17, 22]), over_by: "1", raised: 16, link: "/people?tab=attendance" },
+  { rule: "Late Arrivals", subject: ["employee", "ngozi"], who: "ngozi", title: "Ngozi Eze: 3 late arrivals in 30 days", trigger: onDays("Late on", [2, 7, 19]), over_by: "0", raised: 2, link: "/people?tab=attendance" },
+  { rule: "Missing Clock-Outs", subject: ["employee", "emeka"], who: "emeka", title: "Emeka Obi: 3 missing clock-outs in 14 days", trigger: onDays("No clock-out on", [1, 5, 12]), over_by: "1", raised: 1, link: "/people?tab=attendance" },
+  { rule: "Approvals Waiting", subject: ["workflow_instance", "leave:funke"], who: "funke", title: "Annual Leave for Funke Bello: waiting 5 days", trigger: `At Line Manager since ${formatDate(isoDaysAgo(5))}`, over_by: "2", raised: 2, link: "/people?tab=leave" },
+  { rule: "Documents Expiring", subject: ["document", "permit:grace"], who: "grace", title: "Grace Okon: Work Permit", trigger: `Expires on ${formatDate(isoDaysAhead(12))}`, over_by: "12", raised: 18, link: employeeLink("grace") },
+  { rule: "Documents Expiring", subject: ["document", "first-aid:hauwa"], who: "hauwa", title: "Hauwa Yusuf: First Aid Certificate", trigger: `Expired on ${formatDate(isoDaysAgo(3))}`, over_by: "-3", raised: 33, link: employeeLink("hauwa") },
+  { rule: "Documents Expiring", subject: ["document", "passport:tobi"], who: "tobi", title: "Tobi Ojo: Passport", trigger: `Expires on ${formatDate(isoDaysAhead(0))}`, over_by: "0", raised: 30, link: employeeLink("tobi") },
+  { rule: "Probation Ending", subject: ["employee", "chidera"], who: "chidera", title: "Chidera Nwosu: confirmation due", trigger: `Due on ${formatDate(isoDaysAhead(6))}`, over_by: "6", raised: 8, link: employeeLink("chidera") },
+  { rule: "Contracts Ending", subject: ["employee", "amara"], who: "amara", title: "Amara Okafor: contract ending", trigger: `Ends on ${formatDate(isoDaysAhead(21))}`, over_by: "21", raised: 9, link: employeeLink("amara") },
+  { rule: "Quiet Partners", subject: ["partner", "Eko Hotels"], who: null, title: "Eko Hotels: no contact in 34 days", trigger: `Last contact on ${formatDate(isoDaysAgo(34))}`, over_by: "4", raised: 4, link: `/partnerships?tab=partners&id=${partnerNamed("Eko Hotels").partner_id}` },
+  { rule: "Quiet Partners", subject: ["partner", "Kano Trade Council"], who: null, title: "Kano Trade Council: no contact in 52 days", trigger: `Last contact on ${formatDate(isoDaysAgo(52))}`, over_by: "22", raised: 22, link: `/partnerships?tab=partners&id=${partnerNamed("Kano Trade Council").partner_id}` },
+  { rule: "Budget Nearly Spent", subject: ["budget", "marketing-sales"], who: null, title: "Marketing & Sales: 94% spent", trigger: "₦4,700,000.00 of ₦5,000,000.00", over_by: "4", raised: 3, link: "/expenses?tab=budgets" },
+  { rule: "Late Arrivals", subject: ["employee", "seyi"], who: "seyi", title: "Seyi Balogun: 3 late arrivals in 30 days", trigger: onDays("Late on", [11, 14, 20]), over_by: "0", raised: 10, closed: { days: 5, at: "11:20", outcome: "dismissed", by: "cynthia", note: "Client site visits, agreed in advance" }, link: "/people?tab=attendance" },
+  { rule: "Slow Hiring Stages", subject: ["application", "senior-designer"], who: null, title: "Senior Designer: 7 days at Interview", trigger: `At Interview since ${formatDate(isoDaysAgo(15))}`, over_by: "2", raised: 8, closed: { days: 6, at: "10:00", outcome: "dismissed", by: null, note: RULE_OFF_NOTE }, link: "/recruitment?tab=interviews" },
+  { rule: "Missing Clock-Outs", subject: ["employee", "yusuf"], who: "yusuf", title: "Yusuf Musa: 2 missing clock-outs in 14 days", trigger: onDays("No clock-out on", [4, 9]), over_by: "0", raised: 3, closed: { days: 0, at: "08:05", outcome: "cleared", by: "cynthia" }, link: "/people?tab=attendance" },
+  { rule: "Documents Expiring", subject: ["document", "ndpa:damilola"], who: "damilola", title: "Damilola Eke: NDPA Certificate", trigger: `Expired on ${formatDate(isoDaysAgo(20))}`, over_by: "-20", raised: 40, closed: { days: 0, at: "08:10", outcome: "cleared", by: "cynthia" }, link: employeeLink("damilola") },
+];
+
+const ALERTS: MockAlert[] = ALERT_SEEDS.map((s) => {
+  const rule = ruleNamed(s.rule);
+  const raised = at(s.raised, "06:00");
+  return {
+    home_alert_id: sid(`alert:${rule.key}:${s.subject.join(":")}`),
+    home_alert_rule_id: rule.home_alert_rule_id,
+    subject_type: s.subject[0],
+    subject_id: s.who ? staff(s.who).employee_id : sid(`${s.subject[0]}:${s.subject[1]}`),
+    subject_employee_id: s.who ? staff(s.who).employee_id : null,
+    title: s.title,
+    trigger: s.trigger,
+    severity: rule.severity,
+    over_by: `${s.over_by}.00`,
+    raised_at: raised,
+    last_seen_at: s.closed ? at(s.closed.days, "06:00") : at(0, "06:00"),
+    escalated_at: rule.severity === "high" && !s.closed && s.raised >= AGED_DAYS ? at(s.raised - AGED_DAYS, "06:10") : null,
+    cleared_at: s.closed ? at(s.closed.days, s.closed.at) : null,
+    cleared_by: s.closed?.by ? loginOf(s.closed.by) : null,
+    outcome: s.closed?.outcome ?? null,
+    note: s.closed?.note ?? null,
+    link: s.link,
+  };
+});
+
+/** Who Can Clear as the server words a rule's grant: the module's label and who holds the action ("People Approvers"). */
+const HOLDERS: Record<string, string> = { view: "Viewers", create: "Creators", edit: "Editors", delete: "Deleters", approve: "Approvers", export: "Exporters" };
+const grantWords = (permissionKey: string) => {
+  const [module, action] = permissionKey.split(".");
+  return `${MODULES.find((m) => m.key === module)?.label ?? module} ${HOLDERS[action] ?? action}`;
+};
+
+const ruleOf = (a: MockAlert) => RULES.find((r) => r.home_alert_rule_id === a.home_alert_rule_id)!;
+const metricOf = (metric: string) => (Object.hasOwn(alertsContract.HOME_ALERT_METRICS, metric) ? alertsContract.HOME_ALERT_METRICS[metric as keyof typeof alertsContract.HOME_ALERT_METRICS] : null);
+const nameOfLogin = (userId: string | null) => (userId ? (PEOPLE.find((p) => loginOf(p.user_key) === userId)?.display_name ?? null) : null);
+const openDays = (a: MockAlert) => Math.floor((Date.now() - Date.parse(a.raised_at)) / DAY_MS);
+const stateOf = (a: MockAlert): HomeAlert["outcome"] | "open" => a.outcome ?? "open";
+
+/** Alerts and rules are read by holders of either capability; the routes check it before reading anything. */
+const withoutAlerts = (user: string) => {
+  const m = me(user);
+  return holds(m, "alerts.clear") || holds(m, "alerts.manage") ? null : fail(403, "CAPABILITY_REQUIRED", "This needs an authority you do not hold");
+};
+const withoutCapability = (user: string, code: string) => (holds(me(user), code) ? null : fail(403, "CAPABILITY_REQUIRED", "This needs an authority you do not hold"));
+
+/**
+ * Does the reader's grant on the rule's `permission_key` reach the alert's subject (home.md §6
+ * Alerts)? The grant's module and action, then its scope over the person it is about: the
+ * reader's scope as Team reads it (everyone for Operations and the CEO, else the reader and
+ * everyone below them). An alert about no one in particular reaches only an organisation-wide
+ * scope, and one about the reader never does. The CEO reaches every alert.
+ */
+function grantReaches(user: string, a: MockAlert): boolean {
+  const m = me(user);
+  if (m.is_ceo) return true;
+  if (a.subject_employee_id !== null && a.subject_employee_id === byKey(user)?.employee_id) return false;
+  const [module, action] = ruleOf(a).permission_key.split(".");
+  if (!grants(m, module).includes(action)) return false;
+  if (a.subject_employee_id === null) return full(user);
+  const p = byId(a.subject_employee_id);
+  return !!p && keysOf(user).has(p.user_key);
+}
+const visibleAlerts = (user: string) => ALERTS.filter((a) => grantReaches(user, a));
+/** Clear Alert works: the alert is open, the reader holds alerts.clear, and their grant reaches its subject. */
+const mayClearAlert = (user: string, a: MockAlert) => a.cleared_at === null && holds(me(user), "alerts.clear") && grantReaches(user, a);
+/** The open alerts the reader may clear: Needs You, and the Overview's alerts beside Need You. */
+const alertsToClear = (user: string) => ALERTS.filter((a) => mayClearAlert(user, a));
+
+/** "4.00" as a person reads it: 4, "2.50" is 2.5, thousands grouped; read from the digits, as the server does. */
+function figureOfWire(value: string): string {
+  const [whole, fraction = ""] = value.replace(/^[-+]/, "").split(".");
+  const kept = fraction.replace(/0+$/, "");
+  return `${value.startsWith("-") ? "-" : ""}${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${kept ? `.${kept}` : ""}`;
+}
+
+/** What an alert's over_by holds, from its rule's metric: past a count's threshold, or a deadline's days left. */
+const overByKindOf = (metric: string): HomeAlert["over_by_kind"] => {
+  const m = metricOf(metric);
+  return m ? (m.kind === "deadline" ? "days_left" : "over") : null;
+};
+
+/**
+ * Over By as the server words it for the Open High Alerts card (alerts.service overByText), in
+ * the Alerts tab's list words: "+1" past a count, "12 days left", Due Today, Expired.
+ */
+export function overByWords(overBy: string | null, kind: HomeAlert["over_by_kind"]): string | null {
+  if (overBy === null) return null;
+  if (kind === "days_left") {
+    const left = Number(overBy);
+    return left < 0 ? "Expired" : left === 0 ? "Due Today" : `${figureOfWire(overBy)} ${left === 1 ? "day" : "days"} left`;
+  }
+  return kind === "over" ? `+${figureOfWire(overBy)}` : figureOfWire(overBy);
+}
+
+function alertOf(a: MockAlert, user: string): HomeAlert {
+  const rule = ruleOf(a);
+  const metric = metricOf(rule.metric);
+  return {
+    home_alert_id: a.home_alert_id,
+    home_alert_rule_id: a.home_alert_rule_id,
+    rule_name: rule.name,
+    metric: rule.metric,
+    category: metric?.category ?? null,
+    subject_type: a.subject_type,
+    subject_id: a.subject_id,
+    subject_employee_id: a.subject_employee_id,
+    title: a.title,
+    trigger: a.trigger,
+    severity: a.severity,
+    over_by: a.over_by,
+    over_by_kind: overByKindOf(rule.metric),
+    threshold: rule.threshold,
+    permission_key: rule.permission_key,
+    who_can_clear: grantWords(rule.permission_key),
+    raised_at: a.raised_at,
+    last_seen_at: a.last_seen_at,
+    escalated_at: a.escalated_at,
+    cleared_at: a.cleared_at,
+    cleared_by: a.cleared_by,
+    cleared_by_name: nameOfLogin(a.cleared_by),
+    outcome: a.outcome,
+    note: a.note,
+    link: a.link,
+    can_clear: mayClearAlert(user, a),
+  };
+}
+
+function ruleRowOf(r: MockRule): HomeAlertRule {
+  const metric = metricOf(r.metric);
+  return {
+    ...r,
+    category: metric?.category ?? null,
+    kind: (metric?.kind ?? null) as HomeAlertRule["kind"],
+    who_can_clear: grantWords(r.permission_key),
+    open_alerts: ALERTS.filter((a) => a.home_alert_rule_id === r.home_alert_rule_id && a.cleared_at === null).length,
+  };
+}
+
+/** A body the contract refuses, as the API answers it: 422 with each field's first message. */
+function refused422(issues: Array<{ path: PropertyKey[]; message: string }>) {
+  const fields: Record<string, string[]> = {};
+  for (const issue of issues) {
+    const key = String(issue.path[0] ?? "body");
+    fields[key] ??= [issue.message];
+  }
+  return invalid(fields);
+}
+
+/** The start of this week, Monday, Lagos. */
+function mondayOf(now = new Date()): number {
+  const today = Date.parse(todayIso(now));
+  const weekday = (new Date(today).getUTCDay() + 6) % 7;
+  return today - weekday * DAY_MS;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1213,45 +1475,171 @@ route("GET /api/v1/home/team/attendance", (req) => {
   });
 });
 
+/* ------------------------------------------------------------------ *
+ * Alerts: the counts, the list, one alert, clearing; and the rules
+ * ------------------------------------------------------------------ */
+const SEVERITY_RANK: Record<Severity, number> = { low: 0, medium: 1, high: 2 };
+const STATES: readonly string[] = ["open", "cleared", "dismissed"];
+const ALERT_SORT: Record<string, (a: MockAlert, b: MockAlert) => number> = {
+  raised_at: (a, b) => a.raised_at.localeCompare(b.raised_at),
+  severity: (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity],
+};
+
 route("GET /api/v1/home/alerts/summary", (req) => {
-  const l = alertScope(req.user!);
-  const cats = [...new Set(l.map((a) => a.category))];
-  return ok({
-    kpis: [
-      { key: "alerts_open", label: "Open Alerts", value: String(l.length) },
-      { key: "alerts_needs", label: "Needs You", value: String(l.filter((a) => a.who_clears === "Operations" || a.who_clears === "People").length), tone: "warn" },
-      { key: "alerts_overdue", label: "Overdue 7 Days +", value: String(l.filter((a) => a.age_days > 7).length), tone: "err" },
-      { key: "alerts_cleared", label: "Cleared This Week", value: String(9 + ALERTS.filter((a) => a.cleared).length), tone: "ok" },
-    ],
-    sources: [["Attendance rules", 100, "18"], ["Partnership inactivity", 55, "10"], ["Approval ageing", 39, "7"], ["Document expiry", 33, "6"], ["Recruitment SLA", 22, "4"], ["Budget threshold", 11, "2"]].map(([label, pct, value]) => ({ label: label as string, pct: pct as number, value: value as string })),
-    categories: cats.map((c) => ({ value: c, label: CATEGORY_LABEL[c], count: l.filter((a) => a.category === c).length })),
+  const refused = withoutAlerts(req.user!);
+  if (refused) return refused;
+  const seen = visibleAlerts(req.user!);
+  const open = seen.filter((a) => a.cleared_at === null);
+  const monday = mondayOf();
+  const raisedSince = Date.now() - 30 * DAY_MS;
+  const count = <K extends string>(keys: Array<K | null>) => {
+    const out = new Map<K, number>();
+    for (const k of keys) if (k !== null) out.set(k, (out.get(k) ?? 0) + 1);
+    return out;
+  };
+  const categories = count<string>(open.map((a) => metricOf(ruleOf(a).metric)?.category ?? null));
+  const sources = count(seen.filter((a) => Date.parse(a.raised_at) >= raisedSince).map((a) => ruleOf(a).metric));
+  const summary: HomeAlertSummary = {
+    open: open.length,
+    needs_you: open.filter((a) => mayClearAlert(req.user!, a)).length,
+    overdue: open.filter((a) => openDays(a) > OVERDUE_DAYS).length,
+    cleared_this_week: seen.filter((a) => a.outcome === "cleared" && Date.parse(todayIso(new Date(a.cleared_at!))) >= monday).length,
+    categories: alertsContract.HOME_ALERT_CATEGORIES.filter((c) => categories.has(c)).map((category) => ({ category, count: categories.get(category)! })),
+    sources: [...sources].map(([metric, n]) => ({ metric, count: n })).sort((a, b) => b.count - a.count || a.metric.localeCompare(b.metric)),
+  };
+  return ok(summary);
+});
+
+route("GET /api/v1/home/alerts", (req) => {
+  const refused = withoutAlerts(req.user!);
+  if (refused) return refused;
+  const user = req.user!;
+  if (req.query.state && !STATES.includes(req.query.state)) return invalid({ state: ["Choose one"] });
+  // Open alerts unless the state asks for the cleared or the dismissed: open newest first, a closed list most recently closed first.
+  const closed = req.query.state === "cleared" || req.query.state === "dismissed";
+  const rows = visibleAlerts(user)
+    .filter((a) => (req.query.state ? true : a.cleared_at === null))
+    .sort((a, b) => (closed ? (b.cleared_at ?? "").localeCompare(a.cleared_at ?? "") : b.raised_at.localeCompare(a.raised_at)));
+  const res = paged(rows, req, {
+    search: (a) => [a.title, a.trigger],
+    filters: {
+      category: (a, v) => metricOf(ruleOf(a).metric)?.category === v,
+      severity: (a, v) => a.severity === v,
+      state: (a, v) => stateOf(a) === v,
+      mine: (a, v) => mayClearAlert(user, a) === (v === "true"),
+      overdue: (a, v) => (a.cleared_at === null && openDays(a) > OVERDUE_DAYS) === (v === "true"),
+      home_alert_rule_id: (a, v) => a.home_alert_rule_id === v,
+    },
+    // The server's own order is newest first; a sort the person picks replaces it.
+    ...(req.query.sort ? { sort: ALERT_SORT } : {}),
+  });
+  const body = res.body as { data?: MockAlert[] } | undefined;
+  if (body?.data) (body as { data: HomeAlert[] }).data = body.data.map((a) => alertOf(a, user));
+  return res;
+});
+
+route("GET /api/v1/home/alerts/:id", (req) => {
+  const refused = withoutAlerts(req.user!);
+  if (refused) return refused;
+  const a = visibleAlerts(req.user!).find((x) => x.home_alert_id === req.params.id);
+  return a ? ok(alertOf(a, req.user!)) : notFound();
+});
+
+route("POST /api/v1/home/alerts/:id/clear", (req) => {
+  const user = req.user!;
+  const refused = withoutCapability(user, "alerts.clear");
+  if (refused) return refused;
+  const a = visibleAlerts(user).find((x) => x.home_alert_id === req.params.id);
+  if (!a) return notFound();
+  const body = alertsContract.HomeAlertClear.safeParse(req.body);
+  if (!body.success) return refused422(body.error.issues);
+  if (!grantReaches(user, a)) return fail(403, "PERMISSION_DENIED", "You cannot clear this alert");
+  // Clearing a closed alert answers it as it stands.
+  if (a.cleared_at === null) {
+    a.cleared_at = new Date().toISOString();
+    a.cleared_by = loginOf(user);
+    a.outcome = body.data.outcome;
+    a.note = body.data.note ?? null;
+  }
+  return ok(alertOf(a, user));
+});
+
+route("GET /api/v1/home/alert-rules", (req) => {
+  const refused = withoutCapability(req.user!, "alerts.manage");
+  if (refused) return refused;
+  return paged(RULES.map(ruleRowOf), req, {
+    search: (r) => [r.name, r.key],
+    filters: {
+      metric: (r, v) => r.metric === v,
+      category: (r, v) => r.category === v,
+      enabled: (r, v) => String(r.enabled) === v,
+    },
+    sort: {
+      name: (a, b) => a.name.localeCompare(b.name),
+      created_at: (a, b) => a.created_at.localeCompare(b.created_at),
+    },
   });
 });
-route("GET /api/v1/home/alerts", (req) =>
-  paged(
-    alertScope(req.user!).map((a) => ({ home_alert_id: a.home_alert_id, title: a.title, trigger: a.trigger, category: a.category, who_clears: a.who_clears, age: a.age, over_by: a.over_by, severity: a.severity, raised_at: a.raised_at, link: a.link })),
-    req,
-    { search: (r) => [r.title, r.trigger], filters: { category: (r, v) => r.category === v } },
-  ),
-);
-route("POST /api/v1/home/alerts/:id/clear", (req) => {
-  const a = ALERTS.find((x) => x.home_alert_id === req.params.id);
-  if (!a) return notFound();
-  a.cleared = true;
-  return ok(a);
+
+route("GET /api/v1/home/alert-rules/:id", (req) => {
+  const refused = withoutCapability(req.user!, "alerts.manage");
+  if (refused) return refused;
+  const r = RULES.find((x) => x.home_alert_rule_id === req.params.id);
+  return r ? ok(ruleRowOf(r)) : notFound();
 });
-route("GET /api/v1/home/alert-rules", (req) => paged(RULES, req, { search: (r) => [r.name, r.example] }));
+
 route("POST /api/v1/home/alert-rules", (req) => {
-  const b = req.body as { name: string; metric: string; threshold: number; window_days: number; severity: "low" };
-  const rule = { home_alert_rule_id: sid(`rule:${b.name}:${Date.now()}`), name: b.name, metric: b.metric, example: `For example: ${b.name}`, threshold: b.threshold, window_days: b.window_days, severity: b.severity, enabled: true };
+  const user = req.user!;
+  const refused = withoutCapability(user, "alerts.manage");
+  if (refused) return refused;
+  const body = alertsContract.HomeAlertRuleCreate.safeParse(req.body);
+  if (!body.success) return refused422(body.error.issues);
+  const b = body.data;
+  const now = new Date().toISOString();
+  const key = ruleKey(b.metric, b.name, (k) => RULES.some((r) => r.key.toLowerCase() === k));
+  const rule: MockRule = {
+    home_alert_rule_id: sid(`alert-rule:${key}:${now}`),
+    key,
+    name: b.name,
+    metric: b.metric,
+    threshold: b.threshold,
+    window_days: b.window_days ?? null,
+    severity: b.severity,
+    permission_key: b.permission_key,
+    enabled: true,
+    created_by: loginOf(user),
+    updated_by: loginOf(user),
+    created_at: now,
+    updated_at: now,
+  };
   RULES.push(rule);
-  return created(rule);
+  return created(ruleRowOf(rule));
 });
+
 route("PATCH /api/v1/home/alert-rules/:id", (req) => {
+  const user = req.user!;
+  const refused = withoutCapability(user, "alerts.manage");
+  if (refused) return refused;
   const r = RULES.find((x) => x.home_alert_rule_id === req.params.id);
   if (!r) return notFound();
-  Object.assign(r, req.body);
-  return ok(r);
+  const body = alertsContract.HomeAlertRuleUpdate.safeParse(req.body);
+  if (!body.success) return refused422(body.error.issues);
+  const { enabled, ...change } = body.data;
+  const next = { ...r, ...change, window_days: "window_days" in change ? (change.window_days ?? null) : r.window_days };
+  // The metric stays, so the change is held to it as a new rule is (a window only where the metric counts over days).
+  if (Object.keys(change).length > 0) {
+    const fits = alertsContract.HomeAlertRuleCreate.safeParse({ name: next.name, metric: next.metric, threshold: next.threshold, window_days: next.window_days ?? undefined, severity: next.severity, permission_key: next.permission_key });
+    if (!fits.success) return refused422(fits.error.issues);
+  }
+  const now = new Date().toISOString();
+  // Switching a rule off dismisses its open alerts as the rule change itself: no person is recorded as closing them.
+  if (enabled === false && r.enabled) {
+    for (const a of ALERTS.filter((x) => x.home_alert_rule_id === r.home_alert_rule_id && x.cleared_at === null)) {
+      Object.assign(a, { cleared_at: now, cleared_by: null, outcome: "dismissed", note: RULE_OFF_NOTE });
+    }
+  }
+  Object.assign(r, next, enabled === undefined ? {} : { enabled }, { updated_by: loginOf(user), updated_at: now });
+  return ok(ruleRowOf(r));
 });
 
 route("GET /api/v1/home/reports/summary", (req) => {

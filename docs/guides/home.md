@@ -81,8 +81,9 @@ the saved reports, their schedules and runs, the per-role cards and each person'
    always equal those screens. An Overview on screen reads itself again when the reader's own
    state today changes (after a punch from the panel, at once) and on `attendance.updated` (a
    punch in their People scope, a burst of them read once). When Attendance emits
-   `attendance.punched`, Home's handler re-reads the late-arrival rules for that person at once
-   instead of waiting for the morning sweep.
+   `attendance.punched` for a clock-in, Home's handler re-reads the late-arrival rules for that
+   person at once instead of waiting for the morning sweep; when the day-close closes a person's day
+   (`attendance.day_closed`), it re-reads their late arrivals and missing clock-outs.
 3. **A KPI card → its records.** Clicking a card opens the records behind the number
    (`GET /api/v1/home/kpi/:key/meta` for its title, summary line, columns and groups, then
    `GET /api/v1/home/kpi/:key`, paged at 25). Clocked In Today breaks down into On Site, Remote,
@@ -96,17 +97,19 @@ the saved reports, their schedules and runs, the per-role cards and each person'
    `field_visibility.changed`), an outbox handler takes the cards it can no longer see out of
    `role_kpi`; a person's own pick is filtered the same way each time it is read.
 5. **A threshold breach → an alert.** Time-based metrics are swept once a day at 06:00 Lagos
-   (`home-alert-sweeps`): for each switched-on rule the sweep computes its metric per subject and
-   raises, refreshes or leaves an alert through the shared alert engine
-   (`src/shared/alerts/alerts.js`). Late arrivals are also re-read on `attendance.punched`. An alert
-   appears on Home · Alerts, and the holders of the rule's grant are notified
-   (`home.alert_raised`). A High alert left open 14 days is escalated to the CEO
+   (`home-alert-sweeps`): for each switched-on rule the sweep reads its metric's breaches
+   (`src/modules/alerts/alerts.metrics.js`) and raises, refreshes or leaves an alert for each
+   subject through the shared alert engine (`src/shared/alerts/alerts.js`). Late arrivals are also
+   re-read on `attendance.punched`, and late arrivals and missing clock-outs on
+   `attendance.day_closed`. An alert appears on Home · Alerts, and the holders of the rule's grant
+   over the person it is about, never that person, are notified (`home.alert_raised`). A High alert left open 14 days is escalated to the CEO
    (`home.alert_escalated`, the hourly `alert-ageing` job). An alert is not a notification
    (MILESTONES §18.1): a notification is read once, an alert ages until someone clears it.
 6. **Clearing.** A person who holds `alerts.clear` and whose grant on the rule's `permission_key`
    reaches the alert's subject clears or dismisses it (`POST /api/v1/home/alerts/:id/clear`),
-   which writes the audit entry (`home.alert_cleared`). Switching a rule off dismisses its open
-   alerts as the rule change itself.
+   which writes the audit entry (`home.alert_cleared`). Nobody but the CEO sees or clears an alert
+   about themselves. Switching a rule off dismisses its open alerts as the rule change itself
+   (`PATCH /api/v1/home/alert-rules/:id`, in the same transaction).
 7. **A report → the recipient's inbox.** A manager builds a report on Home · Reports and schedules
    it (Daily Attendance, every working day at 18:00). Every five minutes `scheduled-reports` finds
    the schedules that are due and creates one numbered run per recipient and format for the slot
@@ -129,7 +132,7 @@ the owning modules, scoped by the reader's grants.
 | Table | Key columns | Notes |
 |---|---|---|
 | `home_alert_rule` | `home_alert_rule_id`, `key`, `name`, `metric`, `threshold`, `window_days`, `severity`, `permission_key`, `enabled`, `created_by`, `updated_by` | A rule is data, not code: a number changes with no deploy. `key` is made by the server, `<metric>.<slug of the name>`, with a number on the end when taken. `metric` is a key of the metric registry (§6). `permission_key` is who may clear its alerts, `<module>.<action>` from the access catalogue. Rules are switched off, never deleted. `name`, `created_by`, `updated_by` came with `1150`; rules written before it took their key as their name |
-| `home_alert` | `home_alert_id`, `home_alert_rule_id`, `subject_type`, `subject_id`, `subject_employee_id`, `title`, `trigger`, `severity`, `over_by`, `raised_at`, `last_seen_at`, `escalated_at`, `cleared_at`, `cleared_by`, `outcome`, `note` | One open alert per rule and subject. `subject_employee_id` (`1150`) is the person it is about, null when it is about no one in particular (a budget, a partner). `over_by` (`numeric(18,2)`, `1100`) is how far past the threshold, or the days left for a deadline metric. `outcome` is `cleared` or `dismissed`. Written only by the shared alert engine (BACKEND_STRUCTURE §11.1) |
+| `home_alert` | `home_alert_id`, `home_alert_rule_id`, `subject_type`, `subject_id`, `subject_employee_id`, `title`, `trigger`, `severity`, `over_by`, `due_on`, `raised_at`, `last_seen_at`, `escalated_at`, `cleared_at`, `cleared_by`, `outcome`, `note` | One open alert per rule and subject. `subject_employee_id` (`1150`) is the person it is about, null when it is about no one in particular (a budget, a partner). `over_by` (`numeric(18,2)`, `1100`) is how far past the threshold, or the days left for a deadline metric (0 on the day, below 0 once the date has passed). `due_on` (`1151`) is the date a deadline alert is about, null for a count metric: a person who cleared it dealt with that date. `outcome` is `cleared` or `dismissed`; a rule switched off dismisses its open alerts with `cleared_by` empty and the note "Rule switched off" (the audit entry names who switched it off). Written only by the shared alert engine (BACKEND_STRUCTURE §11.1) |
 | `saved_report` | `saved_report_id`, `owner_user_id`, `name`, `report_key`, `definition`, `shared`, `archived_at` | A report. `report_key` is its source (§6); `definition` holds its filters (`{ filters }`); `name` is unique per owner. A report with runs is archived (`archived_at`, `1150`), never deleted |
 | `report_schedule` | `report_schedule_id`, `saved_report_id`, `recurrence`, `starts_on`, `run_time`, `timezone`, `formats`, `recipient_user_ids`, `recipients`, `active`, `last_run_at`, `next_run_at` | One per report (unique index, `1150`). `recurrence` is a rule of `src/shared/time/recurrence.js` counted from `starts_on`, fired at `run_time` in `timezone` (always Africa/Lagos); never cron. `formats` is `pdf`, `xlsx` or both. Recipients are logins (`recipient_user_ids`); `recipients` keeps their addresses as written, for display. `active` false is Paused |
 | `home_report_run` | `home_report_run_id`, `number`, `saved_report_id`, `report_schedule_id`, `scheduled_for`, `recipient_user_id`, `requested_by`, `format`, `status`, `document_id`, `emailed_at`, `error`, `run_at`, `finished_at` | One generated file: one report, one recipient, one format. `number` from `numbering.allocate(client, "report_run")` (RPT-0001, never reset). `status` is `pending`, `done`, `failed` or `skipped`. A scheduled run names its schedule and slot, and a slot is generated once per recipient and format (unique index); a run on demand has neither. `document_id` is the vaulted file once it exists |
@@ -140,13 +143,13 @@ A card id in `role_kpi` and `home_kpi_pick` is a key of the KPI catalogue
 (`src/modules/dashboard/kpi-catalog`), which is code, so there is no foreign key: the service
 checks every id, and an id the catalogue no longer has is ignored when read.
 
-Schema migration files: `migrations/1000_core_operations.sql` (the tables), `1100_home_alert_columns.sql`
-and `1150_home_foundation.sql` (everything above that is not in 1000, plus the index Activity
+Schema migration files: `migrations/1000_core_operations.sql` (the tables), `1100_home_alert_columns.sql`,
+`1150_home_foundation.sql` (everything above that is not in 1000 or 1151, plus the index Activity
 Today needs on an M1 table, `event_log (occurred_at)`; the roster reads through the attendance
-module's own indexes).
+module's own indexes) and `1151_home_alert_due_on.sql` (`home_alert.due_on`).
 Reference data: `seeds/reference/1199_seed_home.sql` (the capabilities and their default roles,
 the `report_run` numbering scheme, and the removal of 1099's three alert thresholds, A26). Home
-claims 1150 and 1199 in the M1 block. No `role_kpi` row is seeded: a role's cards are a business
+claims 1150 to 1159 and 1199 in the M1 block. No `role_kpi` row is seeded: a role's cards are a business
 choice, and the defaults by Home view are code (§6). Indexes Home's reads want on tables of later
 milestones are requests in each owning milestone's Owes in DATABASE_SCHEMA ("Indexes asked by
 Home"), never added here (A1).
@@ -168,11 +171,11 @@ column to the migrated schema, and the schema gate holds every query to them.
 | `goals.source.js` | goals and targets · M2 · AJ | `organisational_goal`, `employee_target`: Goals This Quarter and My Goals, without progress until M2 defines it (Goals On Track stays hidden, §13; the CEO's Org KPI is drawn from the organisation's departments, each with no score until M2 defines KPI scores, §6, §13) |
 | `reviews.source.js` | reviews · M2 · AJ | `performance_review`, `performance_cycle`: reviews due |
 | `calendar.source.js` | calendar · M2 · AJ | `calendar_event`: Your Week |
-| `vacancies.source.js` | vacancies · M4 · TB | `vacancy`: open vacancies |
+| `vacancies.source.js` | vacancies and candidates · M4 · TB | `vacancy`: open vacancies; `application`, `candidate`: applications left at one stage too long (Recruitment SLA alerts) |
 | `payroll.source.js` | payroll · M6 · LA | nothing yet: Payroll In Progress is hidden and has no query until M6 creates its tables |
-| `partners.source.js` | partners and pipeline · M7 · GE | `partner`, `partner_interaction`, `partnership_opportunity`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners, proposals out |
+| `partners.source.js` | partners and pipeline · M7 · GE | `partner`, `partner_interaction`, `partnership_opportunity`, `partnership_agreement`, `partnership_proposal`: pipeline, signed value, quiet partners (and Partner Inactivity alerts), proposals out |
 | `expenses.source.js` | expenses · M8 · AJ | `expense_request` and `expense_category`: awaiting approval, with each request's category |
-| `budgets.source.js` | budgets · M8 · AJ | `budget`, `budget_line`: budget used |
+| `budgets.source.js` | budgets · M8 · AJ | `budget`, `budget_line`: budget used, and the budgets past a share spent (Budget Threshold alerts) |
 
 **The milestone that builds a table updates its adapter in the same PR**: it moves or replaces the
 query, keeps the declared columns true, and clears its `owes`. Each adapter's header says so, and
@@ -196,6 +199,16 @@ Attendance's own totals (`attendance.repo.js` `daysSummary`). Overview, Team and
 read it; People · Attendance and My Attendance read the same records through their own routes
 (attendance.md §6.9).
 
+The one exception is the alert metrics (§6 Alerts). `src/modules/alerts/alerts.metrics.js` reads
+`attendance_day` and `attendance_exception` (Late Arrivals, Missing Clock-Out), `workflow_instance`
+and `workflow_definition` (Approval Ageing), `document` (Document Expiry) and `employee`
+(Confirmation Due, Contract Ending) in its own SQL, under each owning module's own conditions and
+a batch at a time, so a sweep loads breaches rather than every record. It is the one other reader
+of those tables, coupled to them the way an adapter is to its milestone's tables: each entry names
+its owning module, and **the module that changes what an entry reads updates that entry in the
+same PR** (the file's header and attendance.md §6.9 say so; `tests/integration/home-alerts.test.js`
+raises each from real rows). DATABASE_SCHEMA's notes on those tables name the metric that reads them.
+
 ## 5 · API
 
 All three routers mount at `/api/v1/home` (`basePath: "/home"`); a literal path (`/summary`,
@@ -217,14 +230,14 @@ All three routers mount at `/api/v1/home` (`basePath: "/home"`); a literal path 
 | `GET /api/v1/home/team/summary` | → `HomeTeamSummary` | `home` view · its scope (all, team or own), `home.team` | n/a | `scope`, and today's four Team cards, each the number of records it opens (`GET /home/kpi/:key`) |
 | `GET /api/v1/home/team` | `HomeTeamQuery` → `HomeTeamPage` | as above | yes, 25 | Today's roster. Filters: department, status, no clock-out yesterday, `q` (name or job title); sort by name (the default), department, Clock-In. KPI and Open Tasks are null until M2 |
 | `GET /api/v1/home/team/attendance` | `HomeTeamAttendanceQuery` → `HomeTeamAttendancePage` | as above | yes, 25 | Attendance This Month, one row a person. Filters: department, `q`; sort by name (the default) or days on time |
-| `GET /api/v1/home/alerts` | `HomeAlertQuery` → `HomeAlertPage` | `home` view, `alerts.clear` or `alerts.manage` · each rule's module scope over `subject_employee_id` | yes, 25 | Filters: category, severity, state (open, cleared, dismissed: View Dismissed), mine, overdue, rule. Each row says `can_clear` |
+| `GET /api/v1/home/alerts` | `HomeAlertQuery` → `HomeAlertPage` | `home` view, `alerts.clear` or `alerts.manage` · each rule's module scope over `subject_employee_id`, never the reader's own | yes, 25 | Filters: category, severity, state (open, cleared, dismissed: View Dismissed), mine, overdue, rule, `q` (title or trigger). Open newest first, a closed list most recently closed first; sort by raised or severity. Each row says `can_clear` and Who Can Clear (`who_can_clear`) |
 | `GET /api/v1/home/alerts/summary` | → `HomeAlertSummary` | as above | n/a | Open, Needs You, Overdue 7 Days +, Cleared This Week, the category chips, Alert Sources |
-| `GET /api/v1/home/alerts/:id` | → `HomeAlert` | as above | n/a | For `?tab=alerts&id=`; 404 when the reader may not see it |
-| `POST /api/v1/home/alerts/:id/clear` | `HomeAlertClear` → `HomeAlert` | `home` view, `alerts.clear`, and the rule's `permission_key` reaching the subject | n/a | `outcome` cleared (default) or dismissed. Clearing a closed alert answers it as it is, with no second audit entry |
-| `GET /api/v1/home/alert-rules` | `HomeAlertRuleQuery` → `HomeAlertRulePage` | `home` view, `alerts.manage` | yes, 25 | Filters: metric, category, enabled |
-| `GET /api/v1/home/alert-rules/:id` | → `HomeAlertRule` | `home` view, `alerts.manage` | n/a | Edit Rule from an alert |
-| `POST /api/v1/home/alert-rules` | `HomeAlertRuleCreate` → `HomeAlertRule` | `home` view, `alerts.manage` | n/a | Rule Name, Metric, Threshold, Window Days, Severity, Who Can Clear; the key is made by the server |
-| `PATCH /api/v1/home/alert-rules/:id` | `HomeAlertRuleUpdate` → `HomeAlertRule` | `home` view, `alerts.manage` | n/a | Any field but the metric; `enabled: false` dismisses its open alerts |
+| `GET /api/v1/home/alerts/:id` | → `HomeAlert` | as above | n/a | For `?tab=alerts&id=`, in any state; 404 when the reader may not see it |
+| `POST /api/v1/home/alerts/:id/clear` | `HomeAlertClear` → `HomeAlert` | `home` view, `alerts.clear`, and the rule's `permission_key` reaching the subject | n/a | `outcome` cleared (default) or dismissed, with a note. An alert the reader may not see is a 404. Clearing a closed alert answers it as it is, with no second audit entry |
+| `GET /api/v1/home/alert-rules` | `HomeAlertRuleQuery` → `HomeAlertRulePage` | `home` view, `alerts.manage` | yes, 25 | Filters: metric, category, enabled, `q` (name or key); sort by name (the default) or created. Each rule with its open alerts and Who Can Clear |
+| `GET /api/v1/home/alert-rules/:id` | → `HomeAlertRule` | `home` view, `alerts.manage` | n/a | Edit Rule from an alert, or from `?tab=alerts&rule=` |
+| `POST /api/v1/home/alert-rules` | `HomeAlertRuleCreate` → `HomeAlertRule` | `home` view, `alerts.manage` | n/a | Rule Name, Metric, Threshold, Window Days, Severity, Who Can Clear; the key is made by the server. A window only for a metric counted over days, whole days for a deadline, Who Can Clear a grant of the access catalogue (422 on the field otherwise) |
+| `PATCH /api/v1/home/alert-rules/:id` | `HomeAlertRuleUpdate` → `HomeAlertRule` | `home` view, `alerts.manage` | n/a | Any field but the metric, held to its metric as on create; `enabled: false` dismisses its open alerts. Saving it unchanged records nothing |
 | `GET /api/v1/home/reports` | `HomeReportQuery` → `HomeReportPage` | `home` view, `home.reports` · own, and shared ones whose source the reader may open | yes, 25 | Filters: source, status, archived, mine; sort by name or created |
 | `GET /api/v1/home/reports/summary` | → `HomeReportSummary` | as above | n/a | Scheduled, Paused, Runs This Month, Recipients |
 | `GET /api/v1/home/reports/:id` | → `HomeReport` | as above | n/a | 404 when the reader may not see it |
@@ -394,33 +407,61 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
 **Alerts**
 
 - **The metric registry** (`src/modules/alerts/alerts.metrics.js`, keys equal to the contract's
-  `HomeAlertMetric`, in this order): `late_arrivals` and `missing_clock_out` (attendance, counted
-  over a window of days), `approval_ageing` (approval, days waiting), `document_expiry` (document,
-  deadline), `confirmation_due` and `contract_ending` (people, deadline), `partner_inactivity`
-  (partnership, days since contact), `budget_threshold` (budget, percent spent),
-  `recruitment_sla` (recruitment, days at a stage). Each also names its subject, its source, the
-  milestone that owns its tables and its default Who Can Clear. Only the four over M0 tables
-  (approval ageing, document expiry, confirmation due, contract ending) raise real alerts on
-  production in M1; the attendance pair follows LA's punch API, the rest their milestones.
+  `HomeAlertMetric`, in this order): `late_arrivals` (attendance, the days the attendance module
+  recorded late in the window), `missing_clock_out` (attendance, the days in the window with a
+  missing clock-out exception, or still open before today with a clock-in and no clock-out),
+  `approval_ageing` (approval, whole days a pending request has waited at its stage; the alert is
+  about the record waiting and the person it is for), `document_expiry` (document, deadline: a
+  current document's expiry), `confirmation_due` and `contract_ending` (people, deadline: an active
+  employee's dates, as the staff register counts them), `partner_inactivity` (partnership, whole
+  days since an active partner's last contact), `budget_threshold` (budget, percent of a running
+  Naira budget spent), `recruitment_sla` (recruitment, whole days an application has been at its
+  stage). Each also names its subject, the module, milestone and owner of its tables and its
+  default Who Can Clear. The six over M0 and M1 tables raise real alerts on production in M1; the
+  last three read their milestones' tables through the source adapters (§4.1) and find nothing
+  until those are used; the six read their owning modules' tables in their own SQL, the one other
+  reader of those tables (§4.1), and the owning module updates the entry when it changes them. A
+  breach is read in SQL, a batch at a time, so a sweep loads breaches, never the organisation; an
+  alert on a partner, a budget or an application is about no one in particular.
 - **A count metric** breaches when its value reaches the threshold; `over_by` is the value less the
   threshold ("+1 over 3"). A window counts the last W days ("3 late arrivals in 30 days").
 - **A deadline metric** breaches when the days left reach the threshold or fewer; its threshold is
-  whole days, `over_by` holds the days left, and the screen reads "12 days left". A date already
-  passed holds 0 and reads Expired.
+  whole days, `over_by` holds the days left, and the screen reads "12 days left". The day itself
+  holds 0 and is not yet Expired; a date already passed holds the days since as a negative ("-2.00")
+  and reads Expired. The contract's `over_by_kind` says which of the two a row holds.
+- **The same breach is raised once.** The sweep sees a breach every morning; while its alert is
+  open it is refreshed (Over By, title, trigger, last seen). Once a person clears or dismisses it,
+  it is not raised again for the same evidence (the latest late clock-in, the end of the latest
+  day with no clock-out whether or not the day-close has reached it, the request's time at its
+  stage, the last contact, a deadline's date itself, stored as `due_on`); newer evidence raises a
+  new alert, and a deadline whose date changes is new evidence. A rule's alerts dismissed by
+  switching it off do not count, so a rule switched back on raises what still breaches.
 - **Who sees an alert.** A holder of `alerts.clear` or `alerts.manage` sees the alerts of the rules
   whose `permission_key` they hold, about people within their scope for that module. An alert about
-  no one in particular is seen only by holders with `all` scope. The CEO sees every alert.
+  no one in particular is seen only by holders with `all` scope. Nobody sees an alert about
+  themselves, as nobody decides their own request or attendance exception: a manager late three
+  times is seen by their own line manager and HR, not by themselves. The CEO sees every alert.
 - **Clearing needs both checks**: `alerts.clear` (may clear alerts at all, on the route) and the
-  rule's `permission_key` reaching the alert's subject (may clear this one). The CEO passes both.
-  `can_clear` on each row says the same, so the screen offers Clear Alert only where it will work.
+  rule's `permission_key` reaching the alert's subject (may clear this one; the shared engine's
+  `mayClear` checks the scope too, and refuses an alert about the clearer). The CEO passes both.
+  An alert the reader may not see is a 404, whatever they hold. `can_clear` on each row says the
+  same, so the screen offers Clear Alert only where it will work.
+- **One definition.** Who sees an alert is one condition in `alerts.repo.js`, read by the list, one
+  alert, the counts, the Overview's alerts beside Need You, the Open High Alerts card and its
+  records, ⌘K and the assistant, so none of them can disagree.
 - **Rules.** Created and changed by `alerts.manage` holders. Who Can Clear defaults to the metric's
-  own and can be changed. A new rule is first evaluated at the next sweep or signal. Switching a
-  rule off dismisses its open alerts as the rule change (no clearing right needed) and raises no
-  more.
-- **The counts.** Open; Needs You (open alerts the reader may clear); Overdue 7 Days + (open more
-  than seven days, any severity); Cleared This Week (outcome `cleared` since Monday, Lagos; a
-  dismissed alert is not counted); Alert Sources, 30 Days (raised in the last 30 days by metric,
-  cleared ones included). View Dismissed lists outcome `dismissed`.
+  own and can be changed; it reads as the grant's holders ("People Approvers"). A rule's key is
+  `<metric>.<slug of the name>`, `_2`, `_3` on the end when taken. A new rule is first evaluated at
+  the next sweep or signal. Switching a rule off dismisses its open alerts as the rule change (no
+  clearing right needed) and raises no more: each raise reads the rule again in its own
+  transaction, so a sweep part way through a rule when it is switched off stops raising on it. A
+  rule whose metric the registry no longer has is skipped by the sweep.
+- **The counts.** Open; Needs You (open alerts the reader may clear: all of Open for a holder of
+  `alerts.clear`, none for one who only manages rules); Overdue 7 Days + (open more than seven
+  days, any severity); Cleared This Week (outcome `cleared` since Monday, Lagos; a dismissed alert
+  is not counted); the category chips (open alerts by category, most first); Alert Sources, 30
+  Days (raised in the last 30 days by metric, cleared ones included, most first). View Dismissed
+  lists outcome `dismissed`.
 - A High alert open 14 days is escalated to the CEO once.
 
 **Reports**
@@ -471,9 +512,10 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
 | `home.role_kpis_changed` | a role's cards are saved or cleared | audit; nothing follows |
 | `permission.changed`, `field_visibility.changed`, `capability.changed` (access) | a role's grants, masks or capabilities change | outbox `dashboard.prune-role-kpis`: takes the cards the role can no longer see out of `role_kpi`; idempotent |
 | `home.alert_rule_created`, `home.alert_rule_updated` | a rule is created or changed | audit; switching off also dismisses its open alerts in the same transaction (`home.alert_cleared` per alert) |
-| `home-alert-sweeps` (scheduler, daily 06:00 Lagos) | every morning | runs each time-based metric's sweep for its switched-on rules: raises, refreshes or leaves alerts |
-| `attendance.punched` (Attendance, when LA emits it) | a punch commits | outbox handler in `alerts.events.js`: re-reads the late-arrival rules for that person |
-| `home.alert_raised` | an alert is raised | notifies the holders of the rule's `permission_key` (a notification, separate from the alert) |
+| `home-alert-sweeps` (scheduler, daily 06:00 Lagos; and its queue, to re-run a morning by hand) | every morning | `alerts.sweeps.js`: reads each switched-on rule's metric, a batch at a time, and raises, refreshes or leaves an alert per subject, each in its own transaction; a rule it cannot read is logged and the others still run |
+| `attendance.punched` (Attendance) | a clock-in commits | outbox handler `alerts.person-signal` in `alerts.events.js`: re-reads the late-arrival rules for that person |
+| `attendance.day_closed` (Attendance) | the day-close closes a person's day | the same handler: re-reads that person's late arrivals and missing clock-outs |
+| `home.alert_raised` | an alert is raised | notifies the holders of the rule's `permission_key` whose scope reaches the person it is about, never that person (a notification, separate from the alert) |
 | `home.alert_cleared` | an alert is cleared or dismissed | the audit entry (who, when, outcome) |
 | `alert-ageing` (scheduler, hourly at ten past, M0) | a High alert has been open 14 days | `home.alert_escalated`: notifies the CEO, once per alert |
 | `home.report_created`, `home.report_updated`, `home.report_archived` | a report or its schedule is saved, paused, resumed or archived | audit |
@@ -491,7 +533,7 @@ figure it only reads.
 | Role | Sees | Can do |
 |---|---|---|
 | Employee (Staff) | the Staff Overview: day strip, their own cards, Upcoming Leave, Your Week, an empty Need You; Team, Alerts and Reports show the gated state | choose their cards; open a card's records; Export their Overview; clock in from the prompt |
-| Line Manager | the Staff Overview; Team for everyone below them on the reporting line; alerts of rules whose grant reaches their team; their own and shared reports | clear their team's alerts; build, run and receive reports |
+| Line Manager | the Staff Overview; Team for everyone below them on the reporting line; alerts of rules whose grant reaches their team; their own and shared reports | clear their team's alerts, never one about themselves; build, run and receive reports |
 | Head of Department | the Partnerships Overview; Team for everyone below them; alerts their grants reach; their own and shared reports | as a Line Manager |
 | Operations & People, Implementation, Management | the Operations Overview; Team across the organisation; every alert their grants reach; their own and shared reports | clear alerts; create and change rules; build, run and receive reports |
 | System Administrator | the Staff Overview; Settings | set a role's cards (`settings` edit) |
@@ -523,7 +565,8 @@ never reaches Home.
     empty without `home.reports`.
   Nothing write-like: the assistant never clears an alert, edits a rule, runs a report or saves
   cards (A23). Manifests declare reads and screen routes only.
-- **AI routes**: "see open alerts" → `home.alerts` with a category; "open a report" →
+- **AI routes**: "see open alerts" → `home.alerts`, and "see attendance alerts" (one per category)
+  → `home.alerts` with that category; "change the rules that raise alerts" → `home.alerts`; "open a report" →
   `home.reports`; "see who is in" → `people.attendance`; "see my team's attendance" →
   `home.team`; "choose the cards on my Home" →
   `home.overview`; "see who has clocked in today, by status" and "see the requests waiting on my
@@ -531,13 +574,15 @@ never reaches Home.
   that card's records as ⌘K's `?id=` does.
 - **Search**: route-map types `home_alert` and `home_alert_rule` (Alerts), `home_report` and
   `home_report_run` (Reports), `home_kpi` (Overview, opening the card's records). Providers:
-  `alerts.search.js` (alerts the reader may clear, subject in scope; rules for `alerts.manage`
-  holders), `reports.search.js` (reports the reader may see; runs they received),
+  `alerts.search.js` (open alerts the reader may see, by title or trigger; rules by name or key
+  for `alerts.manage` holders, opening Edit Rule at `?tab=alerts&rule=`, since the tab's `?id=` is
+  an alert), `reports.search.js` (reports the reader may see; runs they received),
   `dashboard.search.js` (the cards the reader may see and the Overview offers, by their title or
   their records' title; a Team card belongs to its tab and is not found). Each filters per person,
   since every login holds `home` view. Words people use: "alert", "warning", "red flag"; "report",
   "attendance report"; "dashboard", "KPI", "card". New Rule and New Report are ⌘K actions
-  (`src/shared/search/actions.js`). A tab the reader cannot open is not offered.
+  (`src/shared/search/actions.js`; New Rule only for holders of `alerts.manage`, through the
+  action's `capability`). A tab the reader cannot open is not offered.
 
 ## 10 · On screen and mobile
 
@@ -554,7 +599,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Home · Overview (`overview`) | Greeting with the first name, and the date (Operations adds the clocked-in count); the four KPI cards with Choose Cards; the main chart (Operations: Attendance, 14 Working Days, with "Dips are Saturdays, a half day" on desktop, and the On Time donut "37 on time, 4 late, 7 absent this month"; CEO: Organisational Goals and the Org KPI donut with its per-department figures; Partnerships: Monthly Signed Value; Staff: the day strip Shift Today, Clock-In, Worksite, Status, Hours Today); Need You (empty: "Nothing Needs You"); Partnership Pipeline with "4 with no contact in 30 days" on desktop; Goals This Quarter; Activity Today; Your Week; Staff: My Goals This Quarter and Upcoming Leave with the year's balance ("12 days left this year") and View All to My Leave; Export (toast "Export queued. It arrives by email."); New, a menu of New Task, Request Leave, New Rule, New Report as the reader holds them | None | How cards are chosen, inherited and pruned: §6 Cards. Why each role's Overview leans on its own work: §6 Overview. How the CEO rollup is built, where staff goals and leave are set: §6. That figures equal My Attendance: §3 step 2. Saturday hours: §11 |
 | Choose Cards (picker) | Title "Choose Cards"; each card the reader may see with its title, a Locked pill on locked ones, a tick on the chosen; Move Up and Move Down on each chosen card; the count "3 of 4"; Cancel, Use Role Default, Save Cards; field error "Pick up to 4 cards" | None | Resolution order, eligibility, why a card is missing: §6 Cards |
 | Home · Team (`team`) | The scope (The Whole Organisation, Your Team, or Just You); Present Today, On Site, Remote, Flags; Department (all departments, or one) and the status chips (Everyone, On Site, Remote, Late, Not In, On Leave, No Clock-Out Yesterday); the Team Roster with Search People: employee, department, today's status pill (Day Off on a day not worked) with No Clock-Out Yesterday beside it, Clock-In, KPI, Open Tasks; empty: "Nobody Matches", "Try another status, department or search."; Attendance This Month by person: On Time (out of the days expected), Late, Absent, On Leave. A card opens its records; a row opens the person: Job Title, Department, Today, Clock-In, Clock-Out, Worksite, KPI, Open Tasks, with View Attendance and Open Profile for a reader who may open those screens | None | Where the roster's figures come from and that they match My Attendance: §3 step 2, §6. Who the viewer may see: §6 Scope, §8 |
-| Home · Alerts (`alerts`) | Open Alerts, Needs You, Overdue 7 Days +, Cleared This Week; the category chips; the Open Alerts list: alert, trigger, Who Can Clear, age, Over By ("+1" or "12 days left"), severity; Alert Sources, 30 Days (desktop). View Dismissed (the dismissed list, with View Open to go back). A row opens the alert: Trigger, Who Can Clear, Age, Over By, Severity; Close, Edit Rule (`alerts.manage`), Dismiss Alert, Clear Alert (when the reader may clear it); toasts "Alert cleared", "Alert dismissed". Alert Rules (each rule with its switch; switching off asks "Switch Off Rule" with "Its open alerts are dismissed."; Cancel, Switch Off). New Rule (Rule Name, Metric, Threshold, Window Days for a metric counted over days, Severity, Who Can Clear; Cancel, Create Rule; toast "Rule created"); Edit Rule (the same fields but Metric; Save Rule) | Help term on the Over By column header, and on each phone card's Over By label: "How far the alert is past its rule: +1 over 3 is one more than the 3 allowed. A deadline alert shows the days left instead." | That alerts are not notifications, escalation to the CEO, the two checks on clearing, the audit entry: §3 steps 5 and 6, §6 Alerts. Rules being numbers, not code: §4, §6. A new rule's first run: §6, §7 |
+| Home · Alerts (`alerts`) | Open Alerts, Needs You, Overdue 7 Days +, Cleared This Week; the category chips (All, then each category with open alerts, with counts); the Open Alerts list: alert, trigger, Who Can Clear ("People Approvers"), age ("Today", "3 days"), Over By ("+1", "12 days left", "Due Today" on the day itself, or Expired once it has passed), severity; empty: "No Open Alerts", or for a category "No Alerts Here", "Try another category."; Alert Sources, 30 Days (desktop; empty: "Nothing Raised"). View Dismissed (the dismissed list: alert, trigger, Dismissed, Dismissed By, severity; empty: "Nothing Dismissed"; View Open goes back). A row opens the alert: Trigger, Who Can Clear, Age, Over By ("+1 over 3"), Severity, and for a closed alert when, by whom and its note; Close, Edit Rule (`alerts.manage`), Dismiss Alert, Clear Alert (when the reader may clear it); toasts "Alert cleared", "Alert dismissed", and "Alert not found" for a link to one the reader may not see. Alert Rules (each rule with its threshold in words ("3 late in 30 days"), severity, Who Can Clear, open alerts, its switch and Edit Rule; Close, New Rule; switching off asks "Switch Off Rule" with "Its open alerts are dismissed."; Cancel, Switch Off; toasts "Rule switched off", "Rule switched on"). New Rule (Rule Name, Metric, Threshold, Window Days for a metric counted over days, Severity, Who Can Clear offering each metric's own grant; Cancel, Create Rule; toast "Rule created"); Edit Rule (from an alert, from Alert Rules, or from a link to the rule as ⌘K's rule results open it; the same fields but Metric; Save Rule; toast "Rule saved"), not offered for a rule on a metric no longer listed, which can still be switched off | Help term on the Over By column header, and on each phone card's Over By label: "How far the count is past its rule's threshold: +0 over 3 means it reached 3, +1 means 4. A deadline alert shows the days left instead." | That alerts are not notifications, escalation to the CEO, the two checks on clearing, the audit entry: §3 steps 5 and 6, §6 Alerts. Rules being numbers, not code: §4, §6. A new rule's first run: §6, §7 |
 | Home · Reports (`reports`) | Scheduled, Paused, Runs This Month, Recipients; a card per report the reader may see (name, source, schedule, status pill Scheduled, Paused or On Demand, audience) with Run Now, and for its owner Pause Report or Resume Report, Edit Report, Archive Report; Recent Runs: number, report, run, recipient, format, status (Pending, Failed, Skipped, or Download once done); New Report, a form in three steps: Report (Report Name, Source, its filters, Share With Managers), Schedule (Repeats, Days, Start Date, Time; or On Demand), Delivery (Recipients, Formats); Create Report. Run Now asks the format when the report has both; toast "RPT-0215 queued" | None | Generation as the recipient, skipped runs, sources being the screens' own queries, email delivery, who may open a file, what Paused means: §3 step 7, §4, §6 Reports |
 | KPI detail (the report model) | The card's title, the summary line ("22 of 25 clocked in across the organisation"), the group chips with their counts (Clocked In Today: On Site, Remote, Late, Not In, On Leave, No Clock-Out Yesterday), the paged list, the page count; empty: "Nothing Behind This" | None | Paging at 25: §5. Scope: §6 |
 | Gated tab (Team, Alerts, Reports) | The page title, the Locked illustration, "For Managers" and one line, "This tab is for managers and the CEO." | None | Which capability opens which tab: §8 |
@@ -571,7 +616,7 @@ role from the signed-in employee (§6).
 | Home · Overview (`overview`) | The greeting and New, the four KPI cards two to a row, then the role's main chart. Staff: the day strip (Shift Today, Clock-In, Status) before the KPI cards | Export; the date line and the chart captions; Staff: Worksite and Hours Today in the day strip | New, in the floating button's fan; Choose Cards in the page menu; a KPI card opens its records as a bottom sheet | Bottom bar Home; the four tabs along the top |
 | Choose Cards (picker) | A bottom sheet: the chosen cards in order with Move Up and Move Down, then the other cards | The count | Save Cards, full width at the foot of the sheet | The sheet closes back to the Overview |
 | Home · Team (`team`) | The four KPI cards two to a row, the status chips, then the roster as person cards: avatar, name and department, a status pill, Clock-In and KPI; then Attendance This Month as person cards (On Time, Late, Absent) | The scope line; the Department filter; the Department and Open Tasks columns (department shows under the name; open tasks in the person's sheet); On Leave in Attendance This Month | Tap a person card or a KPI card: a bottom sheet; View Attendance and Open Profile full width at the foot of the person's sheet | Bottom bar Home; the four tabs along the top |
-| Home · Alerts (`alerts`) | View Dismissed, Alert Rules, New Rule; the four KPI cards two to a row; the category chips; alert cards with a severity pill, Who Can Clear and Over By (a help term: a tap opens it as a sheet) | Alert Sources, 30 Days; the Trigger and Age columns (both in the alert's sheet) | Clear Alert, full width at the foot of the alert's sheet; New Rule opens the rule form as a sheet | Bottom bar Home; the four tabs along the top |
+| Home · Alerts (`alerts`) | View Dismissed, Alert Rules, New Rule; the four KPI cards two to a row; the category chips; alert cards with a severity pill, Who Can Clear and Over By (a help term: a tap opens it as a sheet) | Alert Sources, 30 Days; the Trigger and Age columns (both in the alert's sheet); in Alert Rules, each rule's Severity, Who Can Clear and open alerts (a rule card is its name, threshold, switch and Edit Rule) | Clear Alert, full width at the foot of the alert's sheet; New Rule, also in the floating button's fan, opens the rule form as a sheet | Bottom bar Home; the four tabs along the top |
 | Home · Reports (`reports`) | New Report, the four KPI cards two to a row, then the report cards one to a row, then Recent Runs as run cards (report, run, recipient, status) | The Format column of Recent Runs | New Report; Run Now on a report card; a Done run card downloads its file | Bottom bar Home; the four tabs along the top |
 | KPI detail (the report model) | A bottom sheet: the title, then the list as cards (the first column as the card title, a status pill, two label and value pairs) | Columns beyond two per card | Close, at the top of the sheet | The sheet closes back to the tab |
 | Gated tab (Team, Alerts, Reports) | The Locked illustration, "For Managers" and its line | Nothing else is on it | None | Bottom bar Home; the four tabs along the top |
@@ -613,7 +658,12 @@ and Move Down rather than bare arrows.
 - **A failed file.** A PDF that cannot be rendered is retried by the render job and then marked
   `failed`; its run shows Failed and offers no download.
 - **Deadline alerts.** A document, confirmation or contract date inside the rule's days raises an
-  alert reading "N days left"; a date already passed reads Expired until someone clears it.
+  alert reading "N days left"; on the day itself it is not yet Expired; a date already passed reads
+  Expired until someone clears it, and once cleared it is not raised again unless the date
+  changes (earlier or later), when a new alert is raised for the new date.
+- **A rule switched off and on.** Its open alerts are dismissed as the rule change and count as
+  neither cleared nor dealt with; at the next sweep after it is switched back on, what still
+  breaches is raised again.
 - **A gated tab**: opening Team, Alerts or Reports without its capability shows the gated state
   (§10.1), not an empty screen or an error; ⌘K does not offer it.
 - **A KPI with nothing behind it**: the records open to their empty state, not a blank modal.
@@ -685,3 +735,7 @@ rows, and nothing in the code says where anything came from.
 - 18/10/2026 · TB · Review fixes to the Overview: Your Week reads each working day's own page of events and tasks, so a busy week keeps its later days (§6); a role saved with no default has no row and follows its Home view, as DELETE does (§5, §6); Choose Cards starts from the cards showing, so a card locked after the pick is in the draft and saves (§6); the Overview reads itself again after the reader's punch and on `attendance.updated` (§3 step 2); Monthly Signed Value reads the whole year, as the Signed Value card does, so its months add up to the card (§6); Upcoming Leave has View All to My Leave, and §5 says which embedded lists have a paged home and which are their first 25 in M1 (§10.1); the clock-in prompt opens when the first session of a working day opens the Overview (§3 step 1, §11, attendance.md); §4.1 and §13 say the CEO's Org KPI is drawn with no score until M2.
 - 18/10/2026 · TB · Team backend built (`src/modules/dashboard/dashboard.team.js`): `GET /home/team/summary`, `/home/team` and `/home/team/attendance` behind `home` view and `home.team`, in the grant's scope (`own` included, for someone given the capability alone); the four cards read the roster once per request; Flags now counts the people late or with no clock-out yesterday once each, so it equals the records it opens, which list both; Attendance This Month is My Attendance's figures per person from the 1st to today, from the roster's new `month()` in one paged query; `team.today` for the assistant, empty without the capability, and a route to the tab. §4.1, §5, §6 Team and §9 follow.
 - 18/10/2026 · TB · Team screen on the real API (`app/src/features/home/Team.tsx`): the scope line, the four Team cards (two to a row on a phone) opening their records through `KpiDetail`, Department (desktop) and the status chips, the Team Roster searched, filtered and sorted by the server, a person's sheet with View Attendance and Open Profile for a reader who may open them, and Attendance This Month paged at 25. The gated state is live: Home's four tabs stay in place for every Home viewer (`app/src/shell/access.ts`), and Team, Alerts or Reports opened without its capability shows the lock and reads nothing (`app/src/features/home/access.ts`, `Gated.tsx`); ⌘K still offers only the tabs a reader may use. §2, §10.1 and §10.2 say what Team shows on each shell.
+- 18/10/2026 · TB · Alerts backend built (`src/modules/alerts`): the metric registry over the attendance, approval, document and staff-register records and the partners, budgets and vacancies adapters; the alert list, one alert, the counts and clearing or dismissing behind `alerts.clear` or `alerts.manage` with the rule's grant over the subject; the rules (`alerts.manage`) with server-made keys, switching off dismissing their open alerts as the rule change; the 06:00 `home-alert-sweeps` scheduler and its queue, and the `attendance.punched` and `attendance.day_closed` signals; a breach a person closed is not raised again for the same evidence; the Overview's alerts beside Need You and the Open High Alerts card read the one rule of who sees an alert; `alerts.mine` for the assistant, ⌘K's alerts and rules, and New Rule for `alerts.manage` holders. §3, §4, §4.1, §5, §6 Alerts, §7, §9 and §11 follow.
+- 18/10/2026 · TB · Alerts screen on the real API (`app/src/features/home/Alerts.tsx`, `AlertRules.tsx`): drawn from the contract's `HomeAlert`, `HomeAlertSummary` and `HomeAlertRule`, with the four counts (two to a row on a phone), the category chips, the Open Alerts list sorted by the server (Age, Severity) with Over By's help term on its header and on each phone card, View Dismissed, and Alert Sources, 30 Days on desktop. An alert opens as a sheet offering Clear Alert and Dismiss Alert only where `can_clear` says clearing will work, and Edit Rule to `alerts.manage`. Alert Rules lists each rule with its switch (switching off asks first) and Edit Rule; New Rule and Edit Rule are one form checked by the contract's `HomeAlertRuleCreate`, with Window Days only for a metric counted over days and Who Can Clear following the metric. `?id=`, `?category=` and `?action=new` open an alert, a chip and New Rule. The old subtitle and the explainer copy left the screen; the INTERIM Alerts types are gone. §10.1 and §10.2 say what each shell shows.
+- 18/10/2026 · TB · Alerts review fixes (backend): nobody but the CEO sees, counts or clears an alert about themselves (`mayClear` and the one `seenWhere` condition, so the list, one alert, the counts, Needs You, the Overview, the Open High Alerts card, ⌘K and the assistant agree), nor is told it was raised; a raise reads its rule again in its own transaction, so a sweep or signal that loaded a rule before it was switched off raises nothing on it; a deadline's date is part of its evidence (`home_alert.due_on`, `1151`), so a cleared deadline alert is raised again when the date changes; `over_by` keeps a deadline's days left below 0 once passed, so the day itself and a passed date read apart; a missed clock-out's evidence is the day's end, so a late day-close does not raise a cleared one again; §4.1 and §6 say the alert metrics are the one other reader of the attendance, workflow, document and employee tables they watch. §3, §4, §4.1, §6 Alerts, §7, §8 and §11 follow.
+- 18/10/2026 · TB · Alerts review fixes (screen): `?tab=alerts&rule=<id>`, the link ⌘K's Alert Rules results open, opens Edit Rule for a holder of `alerts.manage` and leaves the address when it closes, as `?id=` does; anyone else just loses the link. Over By reads Due Today for a deadline on the day itself and Expired only once the server's days left are below 0. The Over By help says what a count at its threshold reads (+0 over 3 means it reached 3), since reaching the threshold raises it. Age going up lists the youngest alert first. The mock follows the server: nobody but the CEO sees an alert about themselves, a rule switched off dismisses its alerts as no one, rule keys are `<metric>.<slug>` with `_2` when taken, and a closed list is most recently closed first. A link to a rule on a metric no longer listed opens Alert Rules and leaves the address, since Edit Rule is not offered for such a rule. §10.1 follows.
