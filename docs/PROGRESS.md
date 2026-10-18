@@ -98,6 +98,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 18/10/2026 · TB · An out-of-date gate can no longer go unnoticed. `deploy-gate status` now prints
+  the gate's own `sha256` first, and `release.yml` asks for it before `stage` and before `promote`:
+  `scripts/deploy/check-gate.js` compares it with the copy in the commit being deployed and, on a
+  mismatch (or a gate too old to report one), fails before the server is touched. The job summary
+  gives the fix with that commit's download link, the hash to check, the install line and the
+  re-run; `docs/runbooks/deploy.md` §5 has the same. CI still never installs the gate. Left: the
+  first deploy after this merges stops on staging until the new gate is installed by hand, once.
 - 18/10/2026 · TB · The staff roster has never run on staging, which still shows only the build
   account. `/srv/mycity/bin/deploy-gate` is root-owned and installed by `ops/provision/provision.sh`
   alone, and a release carries `scripts/db` but not `scripts/deploy`, so the roster step added with

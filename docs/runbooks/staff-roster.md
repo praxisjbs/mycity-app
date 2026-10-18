@@ -116,6 +116,9 @@ grep -c load-staff /srv/mycity/bin/deploy-gate
 
 `1` is right. `0` means the old script is still there.
 
+This cannot go unnoticed again: every deploy now checks the server's gate against the commit it
+deploys and stops, with these steps, when they differ (`docs/runbooks/deploy.md` §5).
+
 ## 5 · Check
 
 ```sh
