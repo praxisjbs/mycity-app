@@ -22,7 +22,10 @@ const ANNIVERSARY = [
 ];
 
 function wishFor(employeeId, occasion, year = new Date().getUTCFullYear()) {
-  return pick(`${employeeId}:${year}`, occasion === "anniversary" ? ANNIVERSARY : BIRTHDAY);
+  return pick(
+    `${employeeId}:${year}`,
+    occasion === "anniversary" ? ANNIVERSARY : BIRTHDAY,
+  );
 }
 
 module.exports = { BIRTHDAY, ANNIVERSARY, wishFor };

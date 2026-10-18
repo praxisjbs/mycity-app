@@ -18,29 +18,84 @@ const controller = require("./devices.controller");
 const router = express.Router();
 const d = c.devices;
 
-route(router, "get", "/mine",
-  { query: c.common.PageQuery, response: d.MyDevicePage, self: true, summary: "My clock-in devices" },
-  controller.listMine);
+route(
+  router,
+  "get",
+  "/mine",
+  {
+    query: c.common.PageQuery,
+    response: d.MyDevicePage,
+    self: true,
+    summary: "My clock-in devices",
+  },
+  controller.listMine,
+);
 
-route(router, "post", "/mine",
-  { body: d.DeviceRegister, response: d.MyDevice, self: true, summary: "Register the device I am on" },
-  controller.registerMine);
+route(
+  router,
+  "post",
+  "/mine",
+  {
+    body: d.DeviceRegister,
+    response: d.MyDevice,
+    self: true,
+    summary: "Register the device I am on",
+  },
+  controller.registerMine,
+);
 
-route(router, "post", "/mine/:id/remove",
-  { params: c.common.IdParams, body: c.common.EmptyBody, response: d.MyDevice, self: true,
-    summary: "Remove one of my devices" },
-  controller.removeMine);
+route(
+  router,
+  "post",
+  "/mine/:id/remove",
+  {
+    params: c.common.IdParams,
+    body: c.common.EmptyBody,
+    response: d.MyDevice,
+    self: true,
+    summary: "Remove one of my devices",
+  },
+  controller.removeMine,
+);
 
-route(router, "get", "/",
-  { query: d.DeviceListQuery, response: d.DevicePage, summary: "Clock-in devices" },
-  requirePermission("people", "view"), controller.list);
+route(
+  router,
+  "get",
+  "/",
+  {
+    query: d.DeviceListQuery,
+    response: d.DevicePage,
+    summary: "Clock-in devices",
+  },
+  requirePermission("people", "view"),
+  controller.list,
+);
 
-route(router, "get", "/:id",
-  { params: c.common.IdParams, response: d.Device, summary: "One clock-in device" },
-  requirePermission("people", "view"), controller.get);
+route(
+  router,
+  "get",
+  "/:id",
+  {
+    params: c.common.IdParams,
+    response: d.Device,
+    summary: "One clock-in device",
+  },
+  requirePermission("people", "view"),
+  controller.get,
+);
 
-route(router, "post", "/:id/remove",
-  { params: c.common.IdParams, body: d.DeviceRemove, response: d.Device, summary: "Remove a device" },
-  requirePermission("people", "edit"), controller.remove);
+route(
+  router,
+  "post",
+  "/:id/remove",
+  {
+    params: c.common.IdParams,
+    body: d.DeviceRemove,
+    response: d.Device,
+    summary: "Remove a device",
+  },
+  requirePermission("people", "edit"),
+  controller.remove,
+);
 
 module.exports = { basePath: "/devices", surface: "staff", router };

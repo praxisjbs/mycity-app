@@ -6,7 +6,8 @@
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 
-const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
+const one = async (db, sql, params) =>
+  (await db.query(sql, params)).rows[0] || null;
 
 const TZ = "Africa/Lagos";
 

@@ -10,10 +10,15 @@
  */
 const { AppError } = require("../../shared/errors");
 
-const CONSUMER = /^(gmail\.com|googlemail\.com|outlook\.com|hotmail\.com|live\.com|msn\.com|yahoo\.com|icloud\.com)$/i;
+const CONSUMER =
+  /^(gmail\.com|googlemail\.com|outlook\.com|hotmail\.com|live\.com|msn\.com|yahoo\.com|icloud\.com)$/i;
 
 function domainOf(address) {
-  return String(address || "").split("@").pop().trim().toLowerCase();
+  return String(address || "")
+    .split("@")
+    .pop()
+    .trim()
+    .toLowerCase();
 }
 
 /**
@@ -23,10 +28,17 @@ function domainOf(address) {
 function settingsFor(address, env = {}) {
   const domain = domainOf(address);
   if (!domain || !domain.includes(".")) {
-    throw new AppError("NOT_AN_EMAIL", "That is not an email address", 422, { email: ["Not an email address"] });
+    throw new AppError("NOT_AN_EMAIL", "That is not an email address", 422, {
+      email: ["Not an email address"],
+    });
   }
   if (CONSUMER.test(domain)) {
-    throw new AppError("PROVIDER_NOT_SUPPORTED", "Use your company address", 422, { email: ["Use your company address"] });
+    throw new AppError(
+      "PROVIDER_NOT_SUPPORTED",
+      "Use your company address",
+      422,
+      { email: ["Use your company address"] },
+    );
   }
   return {
     incoming_protocol: "imap",
