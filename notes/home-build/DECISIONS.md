@@ -192,8 +192,12 @@ Today 17/10/2026. Author initials on every PROGRESS/guide note: `TB`.
   `dashboard.layout.js`, eligibility applied (null when the viewer cannot read its module).
 - Need You = client `usePaged("GET /api/v1/workflow/mine")` (built) + alerts the reader can clear (count);
   rendered for every role with its empty state.
-- Activity Today = `event_log` today, allow-listed keys, module-view filtered, never mail/private events;
-  each embedded list ≤ 25 and links to its paged home.
+- Activity Today = `event_log` today, allow-listed keys, module-view filtered, never mail/private events.
+- Each embedded list ≤ 25. Need You is its own paged list; Upcoming Leave links to ESS · My Leave, its
+  paged home; Your Week is ≤ 25 a day, each working day its own page of events and tasks; Goals This
+  Quarter, My Goals and Activity Today show their first 25, each row with its link, and have no paged
+  home in M1 (the goal screens are M2, and Activity has no paged endpoint). Amended 18/10/2026 after
+  the PR 2 review, to what is built: it said every embedded list links to its paged home (home.md §5).
 - Your Week = working days of this week: leave (own), public holidays, Saturday short day, calendar
   events and task due dates through sources (M2 forward).
 - "New" = a menu of the create actions the reader holds (task, leave request, alert rule, report).

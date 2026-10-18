@@ -39,3 +39,21 @@ Local test infra used: Postgres 16 + pgvector, Redis, DBs `mycity_test` and `myc
   Full CI running (DB mycity_d_test, Redis 14). Under adversarial review (workflow wf_e1b9c371-2d7). Not yet opened.
 - Next: fix the review findings in PR 3 / PR 4 (fix in the branch that owns the code, then rebase PR 4), CI each, open PR 3
   (base m1/home-overview) and PR 4 (base m1/home-team); then PR 5 Reports on `m1/home-reports` from m1/home-alerts.
+
+## PAUSED 18/10/2026 (owner out of credit)
+State on GitHub:
+- PR 1 #56 and PR 2 #57 OPEN (CI 44/44 each).
+- PR 3 `m1/home-team` @ 5f10bc4 and PR 4 `m1/home-alerts` @ a75973c: built, restacked on PR 2, full CI on PR 4
+  (which contains PR 3) 44/44. NOT opened yet. Bodies drafted: notes/home-build/pr-bodies/pr3-body.md, pr4-body.md
+  (replace REVIEW_LINE after the review).
+- PR 5 `m1/home-reports`: build had just started (backend R1 + screen R2 reading the code); any partial files are
+  in the "wip(home): PR 5 partial build (paused)" commit, if one exists.
+Review of PRs 3+4 was stopped mid-way: lenses team-logic (no findings) done; security found one candidate:
+  "A line manager or Head of Department can see, clear and dismiss alerts about themselves, and that closure stops
+  the evidence from ever raising again" (src/shared/alerts) — needs verifying and probably a fix (exclude the
+  reader's own employee id from what they may clear, or from visibility, except the CEO).
+To resume (same session): Workflow resumeFromRunId wf_e1b9c371-2d7 (review, script notes/home-build/workflows/
+  pr34-review.js) and wf_ce59fb57-df5 (PR 5 build, notes/home-build/workflows/home-pr5-reports.js). New session:
+  re-run those scripts (args are in the files' callers: repo /home/user/mycity-pr4, base 92f815f; PR 5 worktree
+  from m1/home-alerts).
+Then: fix confirmed findings, CI, open PR 3 (base m1/home-overview) and PR 4 (base m1/home-team), finish PR 5.
