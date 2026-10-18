@@ -29,3 +29,13 @@ Local test infra used: Postgres 16 + pgvector, Redis, DBs `mycity_test` and `myc
 - PR 1 OPEN: https://github.com/tomblakeasaah196/mycity-app/pull/56 (`m1/home-foundation`, one squashed commit 6f210d0,
   full CI green 44/44 with DB tests). LA's #55 merged in; the roster now reads attendance_day and LA's rules.
 - PR 2 (Overview) started on `m1/home-overview`, stacked on `m1/home-foundation` (PR base = m1/home-foundation).
+
+## 18/10/2026, later
+- PR 2 OPEN: https://github.com/tomblakeasaah196/mycity-app/pull/57 (`m1/home-overview` @ 92f815f, one squashed commit,
+  base `m1/home-foundation`, full CI 44/44). Pre-squash history kept as local tag `home-pr2-prequash` (b03c829).
+- PR 3 `m1/home-team` @ 5f10bc4: squashed and rebased onto 92f815f (only PR 2's review fixes came in; doc notes kept both
+  sides). Full CI was 44/44 before the restack. Under adversarial review now (with PR 4). Not yet opened.
+- PR 4 `m1/home-alerts` @ a75973c: built, integrated (README, PROGRESS #2 Built, counts, note), rebased onto 5f10bc4.
+  Full CI running (DB mycity_d_test, Redis 14). Under adversarial review (workflow wf_e1b9c371-2d7). Not yet opened.
+- Next: fix the review findings in PR 3 / PR 4 (fix in the branch that owns the code, then rebase PR 4), CI each, open PR 3
+  (base m1/home-overview) and PR 4 (base m1/home-team); then PR 5 Reports on `m1/home-reports` from m1/home-alerts.
