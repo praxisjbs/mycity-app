@@ -24,3 +24,8 @@ Local test infra used: Postgres 16 + pgvector, Redis, DBs `mycity_test` and `myc
 - Home's schema file renumbered `1140` → `migrations/1150_home_foundation.sql` (main took `1140` for community pins).
   Home now claims `1150`-`1159` and `1199`. The redundant `leave_request` index was dropped (1200 indexes it).
 - Slices C (finish contract + guide), D (roster) and E (catalogue + sources) relaunched; autosave pushes every 5 minutes.
+
+## 18/10/2026
+- PR 1 OPEN: https://github.com/tomblakeasaah196/mycity-app/pull/56 (`m1/home-foundation`, one squashed commit 6f210d0,
+  full CI green 44/44 with DB tests). LA's #55 merged in; the roster now reads attendance_day and LA's rules.
+- PR 2 (Overview) started on `m1/home-overview`, stacked on `m1/home-foundation` (PR base = m1/home-foundation).
