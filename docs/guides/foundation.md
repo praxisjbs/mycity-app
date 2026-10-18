@@ -270,9 +270,14 @@ only under `src/modules/`; the work is `shared/search`.
   created before any roster and is given 00001, which the sheet says is the CEO's. A number held by
   somebody the sheet does not name is taken back: that person moves to the next free number from
   `numbering.allocate()`, keeping their record, their login and their roles, and the person the
-  sheet names is created on the number it gives them. Two things are never moved: a holder the same
-  sheet also names (a sheet that gives one number to two people is wrong, not authoritative, and the
-  row is reported), and a person already here under another number. Importing a sheet by hand moves
+  sheet names is created on the number it gives them. **Who the holder is is read from the work
+  email and the name together, never the email alone**: a sheet is corrected by loading it again,
+  and a mistyped address is the thing most often corrected, so matching on the address by itself
+  would read the person as a stranger on the reload, move them off their own number and build a
+  second record and a second login for one human. Three things are never moved: a holder whose name
+  or address the sheet still gives that number, a holder the same sheet names elsewhere (a sheet
+  that gives one number to two people is wrong, not authoritative, and the row is reported), and a
+  person already here under another number. Importing a sheet by hand moves
   nobody: a taken staff number is a problem on the row, as it is on the Add Employee form. Reverting
   such a batch archives the people it created but leaves the holder on the number they moved to; a
   number is given back on screen, not by a revert.
@@ -644,6 +649,12 @@ screen.
 
 ## 14 · Change log
 
+- 18/10/2026 · TB · §6.1: who holds a staff number is read from the work email and the name
+  together. The email alone read a corrected address as a different human: on the reload that
+  corrects it (the one documented reason to load a sheet again) the real person was moved off their
+  own number and a second record and second login were built for them. Reproduced on the shipped
+  sheet, whose rows 00027 and 00028 carry mistyped addresses, and covered by a test that fails
+  without the fix.
 - 18/10/2026 · AJ · §6.2: the leave staging seed `30_leave.js` (the mock's twelve sample requests on the
   real staff, through the leave service; LA to review) and `seeds/lib/` for code the build and staging
   seeds share.

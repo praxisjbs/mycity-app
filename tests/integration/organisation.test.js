@@ -842,6 +842,34 @@ describeDb("the organisation module against the real migrations", () => {
       expect(log.join("\n")).toMatch(/Line Manager "Nobody At All" is not in the file or the system; saved without Line Manager/);
     });
 
+    test("a corrected work email on a number already loaded moves nobody and makes nobody", async () => {
+      // Correcting a mistyped address is the usual reason to load a sheet again. The
+      // stored address no longer matches the sheet's, and the person must still be read
+      // as themselves rather than as a stranger holding their number.
+      const before = await one("SELECT count(*)::int AS n FROM employee");
+      const was = await one(
+        "SELECT employee_id, work_email::text AS work_email FROM employee WHERE staff_number = 'T0003'",
+      );
+      const file = path.join(temp, "corrected.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([
+          ["T0003", "Emeka Obiora", "Trading Officer", "Trading Desk", "Male", new Date(Date.UTC(2026, 2, 2)), "", "", "emeka.corrected@mycity.test", "", "FTE", "Remote", "Mon - Fri", "Test Bank"],
+        ]),
+      );
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(result.stats.create).toBe(0);
+      expect(result.stats.error).toBe(0);
+
+      expect(await one("SELECT count(*)::int AS n FROM employee")).toEqual(before);
+      const now = await one(
+        "SELECT employee_id, work_email::text AS work_email FROM employee WHERE staff_number = 'T0003'",
+      );
+      expect(now.employee_id).toBe(was.employee_id);
+      expect(now.work_email).toBe(was.work_email);
+      expect(await one("SELECT 1 AS x FROM employee WHERE work_email = 'emeka.corrected@mycity.test'")).toBeUndefined();
+    });
+
     test("the roster takes back a staff number held by somebody it does not name", async () => {
       // The bootstrap administrator is created before any roster and is given the first
       // number, which the sheet says belongs to someone else.

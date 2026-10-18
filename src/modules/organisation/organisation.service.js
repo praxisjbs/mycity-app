@@ -609,17 +609,26 @@ async function importRow(client, values, ctx = {}) {
   const byEmail = workEmail ? await repo.findEmployeeByWorkEmail(client, workEmail) : null;
 
   /*
-   * The staff number this row claims is held by a different work email, so the holder is
-   * a different person and this row is not an edit of their record. The sheet is the
-   * organisation's own record of who holds which number, so the holder gives it up and
-   * takes the next free one. Two guards: a holder the same sheet names keeps their
-   * number, because a sheet that gives one number to two people is wrong rather than
-   * authoritative; and a person already here under another number is left where they
-   * are, so no number is freed for nothing. Only the roster loader reclaims a number
-   * (`reclaim_staff_numbers`); for anyone importing a sheet by hand the row is a problem
-   * to look at.
+   * The staff number this row claims is held by somebody who is not the person the row
+   * is about, so this row is not an edit of their record. The sheet is the organisation's
+   * own record of who holds which number, so the holder gives it up and takes the next
+   * free one.
+   *
+   * Who the holder is cannot be read from the work email alone. A sheet is corrected by
+   * loading it again, and the one thing most often corrected is a mistyped address: on
+   * that reload the stored address no longer matches the sheet's, and matching on the
+   * address by itself would read the person as a stranger, move them off their own
+   * number and build a second record and a second login for one human. So the name
+   * counts too, and only a holder whose address and name both fail to match is a
+   * different person.
+   *
+   * Three guards: a holder the same sheet names keeps their number, because a sheet that
+   * gives one number to two people is wrong rather than authoritative; a person already
+   * here under another number is left where they are, so no number is freed for nothing;
+   * and only the roster loader reclaims at all (`reclaim_staff_numbers`), so for anyone
+   * importing a sheet by hand the row is a problem to look at.
    */
-  if (byNumber && workEmail && !sameEmail(byNumber.work_email, workEmail)) {
+  if (byNumber && workEmail && !samePerson(byNumber, values, workEmail)) {
     const onSheet = (options.roster_work_emails || []).some((e) => sameEmail(e, byNumber.work_email));
     if (!byEmail && (!options.reclaim_staff_numbers || onSheet))
       throw new AppError(
@@ -671,6 +680,27 @@ async function importRow(client, values, ctx = {}) {
     actor,
   );
   return { action: "create", target_id: employee.employee_id, before: null };
+}
+
+/**
+ * Whether the person holding a staff number is the person a roster row is about. The
+ * work email settles it when it matches; when it does not, the name still can, which is
+ * what keeps a corrected address from reading as a different human.
+ *
+ * @param {object} holder     the employee already on that staff number
+ * @param {object} values     the row, with one Name cell
+ * @param {string} workEmail  the row's work email, the sheet's or `roles.json`'s
+ */
+function samePerson(holder, values, workEmail) {
+  if (sameEmail(holder.work_email, workEmail)) return true;
+  const fold = (v) =>
+    String(v ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  const name = splitName(values.full_name);
+  const theirs = fold(`${holder.first_name} ${holder.last_name}`);
+  return theirs !== "" && theirs === fold(`${name.first_name} ${name.last_name}`);
 }
 
 /** Whether two work emails name the same person. Stored as citext, compared as written. */

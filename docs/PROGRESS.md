@@ -98,6 +98,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 18/10/2026 · TB · Roster follow-up to the staff number work merged earlier today (#60): that change
+  read who holds a staff number from the work email alone, so the reload that corrects a mistyped
+  address, which `docs/guides/foundation.md` §6.1 names as the reason to load a sheet again, read the
+  real person as a stranger on their own number, moved them off it and built a second record and a
+  second login for one human. The shipped sheet carries two such typos (rows 00027 and 00028), so
+  correcting them would have duplicated both people. Reproduced end to end, then fixed: the holder's
+  name counts as well as their address (`samePerson`), and only a holder whose address and name both
+  fail to match is a different person. The CEO reclaim the earlier change was for still works. A test
+  covers the corrected address and fails without the fix. Nothing ticked; the roster is still not on
+  staging until `docs/runbooks/staff-roster.md` is run.
 - 18/10/2026 · TB · Phone sheets fixed for typing (F6 amended): with the keyboard up, a sheet was
   pinned behind it and the browser panned the page to reach the field, pushing the header off the
   top with no way back, and a swipe down or a tap on the scrim closed it and lost what was typed.
