@@ -134,7 +134,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
     setSched((s) => ({ ...s, tried: true, past: false }));
     if (!sched.date || !okT) return;
     if (new Date(at(sched.date, sched.time)).getTime() <= Date.now()) return setSched((s) => ({ ...s, past: true }));
-    void send(at(sched.date, sched.time));
+    return send(at(sched.date, sched.time));
   };
   const discard = async () => {
     if (stored) await api.call("DELETE /api/v1/mailbox/drafts/:id", { params: { id: draftId } }).catch(() => null);

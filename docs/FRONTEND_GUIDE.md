@@ -6,13 +6,14 @@ React apps: the staff app (`app/`, `hub.mycityapp.io`) and the public site (`pub
 
 Status: **the rules here are settled. The foundation (§9) is one design system for both apps,
 `packages/ui` (`@mycity/ui`), owned by AJ (Adole Jerome), backup TB.** It is built in three PRs
-planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F25 are binding: where this guide
+planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F26 are binding: where this guide
 and that file differ, that file wins and this one is fixed. Started 13 October 2026 from
 MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and §8 rewritten 14 October
 2026 into the screen content, two shells and form conventions; §1 to §3, §6, §9, §10 and §11
 rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8 brought into line;
 §1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell); §8.8 and gate 21
-(nothing the browser styles itself, F25) added 18 October 2026.
+(nothing the browser styles itself, F25) added 18 October 2026, and one press, one request (F26:
+§8.4, §9.4, the `no-void-press` lint) the same day.
 If something here is wrong or missing, fix the guide in the same PR as the code.
 
 **Feature guides are full-stack guides.** A guide in `docs/guides/` covers the backend modules,
@@ -34,7 +35,7 @@ the client has already accepted.
 Guides lead, gates confirm (F9). Every builder, person or AI, starts here, so the gates in §10
 confirm work that was built right instead of rejecting it at the end.
 
-1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F25 and where each foundation PR
+1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F26 and where each foundation PR
    stands. Then **read `docs/COMPONENTS.md`**, the catalogue of every shared component: what it is
    for, when not to use it, its props and how it behaves on a phone. It is generated from the code
    (`npm run gen:components`), so it is never out of date.
@@ -396,7 +397,8 @@ element outside the form components (§8.6).
 - **The signal is on the field**: a red ring and a ! mark, with an error of at most 4 words beside
   it ("Not a real date"). Never a sentence under the form, never a dialog, never a toast.
 - **Submit is never disabled.** Pressing it checks everything, marks every problem and moves focus
-  to the first one. A wizard step does not advance until its fields are right.
+  to the first one. A wizard step does not advance until its fields are right. While the save runs
+  the button is busy, not disabled (§8.4).
 - **Server errors land on fields.** An `AppError` with `fields` marks those fields the same way; a
   general error is one line above the footer.
 
@@ -407,6 +409,15 @@ element outside the form components (§8.6).
 - **The primary is Verb Noun** (§5.4) and is the only filled button in the footer.
 - **Destructive actions** are red and confirm in the shared modal, naming the thing ("Delete
   Rule"), never `confirm()`.
+- **One press, one request** (F26). A button answers the moment it is pressed. Its handler hands
+  back the work (`onClick={save}`, `onClick={() => save()}`, or an async handler), and the button is
+  busy until that settles: its own colour and label, softened, a spinner where its icon was (centred
+  over the label when it has none, so its size never changes), and a second press refused at once.
+  The buttons beside it wait with it (a modal, a form, a form footer, a card or page header, a shell
+  notice, or an `ActionGroup` around a row's Approve and Reject), and a modal cannot be dismissed
+  mid-save. A `Form` whose `onSubmit` returns its save refuses Enter twice and spins the button that
+  submitted it. Never `onClick={() => void save()}`: the button cannot see the work, and the lint
+  refuses it (`mycity/no-void-press`). Never `disabled={busy}` either: busy stays focusable.
 - Enter submits a single-line form. Esc closes a form with no changes; with changes it asks once
   whether to discard.
 
@@ -536,7 +547,8 @@ packages/ui/
     lib/                      cn, format, media (useIsPhone), preferences (theme, density), slots, ids,
                               environment (the staging marks), plan (what opens where, F14)
     icons/                    Icon (Lucide underneath)
-    actions/                  Button, IconButton, BigButton
+    actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
+                              Form and Modal share (F26)
     layout/                   Card, PageHeader, Grid, Stack, Inline, PhoneOnly, DesktopOnly
     display/                  Pill, StatusPill, Avatar, Who, CountBadge, KeyValue, Banner, EmptyState,
                               EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money
@@ -555,7 +567,8 @@ packages/ui/
     shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
                               PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
                               MoreSheet, FloatingButton, CommandPalette, NotificationRow, ShellNotice
-    testing/                  test setup, render helpers, gallery types (not exported from ".")
+    testing/                  test setup, render helpers, gallery types (not exported from "."), and
+                              eslint-rules.test.ts, the shared lint rules' own test
 ```
 
 Beside every component file `X.tsx` sit `X.test.tsx` and `X.gallery.tsx`. One component, or a
@@ -804,10 +817,13 @@ What a feature may still keep beside its screens is **wiring**, not components:
 endpoint (`EmployeePicker`), `features/shared/wire.ts` maps what the API sends to what the
 components take, and `api/upload.ts` gives the upload engine this app's session.
 
-**Submit is never disabled** (§8.3). `Button`'s `busy` ignores presses while a request is in flight
-but keeps the button enabled and reachable; a form shows what is wrong on its fields when Submit is
-pressed, never by disabling it. A choice that is not a field (pick at least one row) says so in one
-line above the footer.
+**Submit is never disabled** (§8.3). `Button`, `IconButton` and `BigButton` are busy while the work
+their handler returns runs (F26, §8.4), or while `busy` says so (a mutation's pending that the press
+does not hand back); either way they ignore presses but stay enabled and reachable (`aria-busy`,
+`aria-disabled`), and the buttons in their `ActionGroup` wait. `actions/press.ts` holds the one copy
+of that state, which `Form` and `Modal` share. A form shows what is wrong on its fields when Submit
+is pressed, never by disabling it. A choice that is not a field (pick at least one row) says so in
+one line above the footer.
 
 **What the screen gates read** (gates 8 and 11, §9.2). The shared components carry the copy slots
 as `data-ui` attributes: `page-title`, `page-subtitle`, `title` (card, section, modal and KPI
@@ -934,6 +950,7 @@ when a change touches it (F23). Several gates are lint rules in
 | 17 No dashes | `scripts/check/dashes.js` | An em dash, an en dash or a double hyphen in copy a person reads (§5.4) |
 | 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
 | 21 Nothing the browser styles itself | `scripts/check/native-ui.js` (source, and every gallery page and app screen in Chromium) | A native select, option, datalist, progress, meter or dialog; a browser-drawn input type; a `title` tooltip; a form without `noValidate`; a control the `base.css` reset missed; sonner outside the `Toaster`. No exemptions, `packages/ui` included (§8.8, F25) |
+| F26 One press, one request | lint `no-void-press` (`packages/ui/eslint.shared.js`, tested in `packages/ui/src/testing/eslint-rules.test.ts`) | A press handler on `Button`, `IconButton`, `BigButton`, `Form`, `Wizard`, `ConfirmDialog` or `ExportButton` that throws its work away (`() => void save()`, or a local function it names that does), so the button cannot stay busy (§8.4) |
 | Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; ANY file in an app's `components/` (both folders are gone); a feature shadowing a shared component (§9.4) |
 | Mock-free (F12) | `scripts/check/mock-free.js` | A release build that contains the in-browser mock (§9.5) |
 | Accessibility | `scripts/check/a11y.js` | An axe violation on any gallery state, in either theme, or on any app screen (shell and page together) at phone and desktop size |
@@ -963,6 +980,8 @@ The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-ap
   by `useContractForm` from the contract schema, or INTERIM rules until it exists (gate 12)
 - [ ] Day-first dates, formatted money, through the `@mycity/ui` helpers
 - [ ] No native dialogs; upload engine
+- [ ] Every press hands back its work: the button busy until it settles, its group waiting, no
+  `() => void save()` and no `disabled={busy}` (F26, §8.4)
 - [ ] Nothing the browser draws in its own style: no native select or picker, no browser input
   type, no `title` tooltip, no validation bubble, no unbranded toast, on phone or desktop (gate 21, §8.8)
 - [ ] `npm run ci` green, the whole suite, before pushing

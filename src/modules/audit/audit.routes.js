@@ -12,16 +12,39 @@ const controller = require("./audit.controller");
 
 const router = express.Router();
 
-route(router, "get", "/",
-  { query: c.audit.AuditListQuery, response: c.audit.AuditPage, summary: "The audit log, filtered" },
-  requirePermission("settings", "view"), controller.list);
+route(
+  router,
+  "get",
+  "/",
+  {
+    query: c.audit.AuditListQuery,
+    response: c.audit.AuditPage,
+    summary: "The audit log, filtered",
+  },
+  requirePermission("settings", "view"),
+  controller.list,
+);
 
-route(router, "get", "/summary",
+route(
+  router,
+  "get",
+  "/summary",
   { response: c.audit.AuditSummary, summary: "Counts above the audit log" },
-  requirePermission("settings", "view"), controller.summary);
+  requirePermission("settings", "view"),
+  controller.summary,
+);
 
-route(router, "post", "/exports",
-  { body: c.audit.AuditExportRequest, response: c.audit.AuditExportQueued, summary: "Email the filtered log as a workbook" },
-  requirePermission("settings", "export"), controller.requestExport);
+route(
+  router,
+  "post",
+  "/exports",
+  {
+    body: c.audit.AuditExportRequest,
+    response: c.audit.AuditExportQueued,
+    summary: "Email the filtered log as a workbook",
+  },
+  requirePermission("settings", "export"),
+  controller.requestExport,
+);
 
 module.exports = { basePath: "/audit", surface: "staff", router };

@@ -7,14 +7,39 @@
  */
 const sanitize = require("sanitize-html");
 
-const TAGS = ["p", "br", "strong", "b", "em", "i", "u", "s", "strike", "h1", "h2", "h3", "ul", "ol", "li", "blockquote", "a", "span", "div"];
+const TAGS = [
+  "p",
+  "br",
+  "strong",
+  "b",
+  "em",
+  "i",
+  "u",
+  "s",
+  "strike",
+  "h1",
+  "h2",
+  "h3",
+  "ul",
+  "ol",
+  "li",
+  "blockquote",
+  "a",
+  "span",
+  "div",
+];
 
 function outgoingHtml(html) {
   return sanitize(String(html || ""), {
     allowedTags: TAGS,
     allowedAttributes: { a: ["href", "target", "rel"] },
     allowedSchemes: ["https", "mailto"],
-    transformTags: { a: (tag, attribs) => ({ tagName: "a", attribs: { ...attribs, target: "_blank", rel: "noopener noreferrer" } }) },
+    transformTags: {
+      a: (tag, attribs) => ({
+        tagName: "a",
+        attribs: { ...attribs, target: "_blank", rel: "noopener noreferrer" },
+      }),
+    },
   });
 }
 

@@ -34,13 +34,16 @@ function bareAddress(value) {
 function addressesOf(field) {
   if (!field) return [];
   const list = Array.isArray(field) ? field : [field];
-  return list.flatMap((x) => (x.value || []).map((v) => v.address)).filter(Boolean);
+  return list
+    .flatMap((x) => (x.value || []).map((v) => v.address))
+    .filter(Boolean);
 }
 
 /** One parsed message, in the shape mailbox.service ingests. */
 function normalise(parsed, item = {}) {
   const references = parsed.references ? [].concat(parsed.references) : [];
-  const fromValue = (parsed.from && parsed.from.value && parsed.from.value[0]) || {};
+  const fromValue =
+    (parsed.from && parsed.from.value && parsed.from.value[0]) || {};
   return {
     uid: item.uid ?? null,
     messageId: parsed.messageId || null,
@@ -54,7 +57,12 @@ function normalise(parsed, item = {}) {
     html: parsed.html || null,
     text: parsed.text || null,
     date: parsed.date || item.internalDate || new Date(),
-    seen: Boolean(item.flags && (item.flags.has ? item.flags.has("\\Seen") : item.flags.includes("\\Seen"))),
+    seen: Boolean(
+      item.flags &&
+      (item.flags.has
+        ? item.flags.has("\\Seen")
+        : item.flags.includes("\\Seen")),
+    ),
     attachments: (parsed.attachments || [])
       .filter((a) => a.content && a.content.length)
       .map((a) => ({
@@ -158,13 +166,19 @@ class ImapSmtpProvider {
         const messages = [];
         let maxUid = lastUid;
         let more = false;
-        for await (const item of imap.fetch(`${lastUid + 1}:*`, { uid: true, source: true, flags: true, internalDate: true }, { uid: true })) {
+        for await (const item of imap.fetch(
+          `${lastUid + 1}:*`,
+          { uid: true, source: true, flags: true, internalDate: true },
+          { uid: true },
+        )) {
           if (item.uid <= lastUid) continue; // "n:*" answers with the last message when none is newer
           if (messages.length >= MAX_FETCH) {
             more = true;
             break;
           }
-          messages.push(normalise(await simpleParser(item.source, PARSE), item));
+          messages.push(
+            normalise(await simpleParser(item.source, PARSE), item),
+          );
           if (item.uid > maxUid) maxUid = item.uid;
         }
         return { uidValidity, lastUid: maxUid, messages, more };
@@ -180,8 +194,12 @@ class ImapSmtpProvider {
     return this.withImap(async (imap) => {
       const lock = await imap.getMailboxLock(path);
       try {
-        const uids = await imap.search({ header: { "message-id": messageId } }, { uid: true });
-        if (uids && uids.length) await imap.messageFlagsAdd(uids, ["\\Seen"], { uid: true });
+        const uids = await imap.search(
+          { header: { "message-id": messageId } },
+          { uid: true },
+        );
+        if (uids && uids.length)
+          await imap.messageFlagsAdd(uids, ["\\Seen"], { uid: true });
         return Boolean(uids && uids.length);
       } finally {
         lock.release();
@@ -195,7 +213,10 @@ class ImapSmtpProvider {
     return this.withImap(async (imap) => {
       const lock = await imap.getMailboxLock(fromPath);
       try {
-        const uids = await imap.search({ header: { "message-id": messageId } }, { uid: true });
+        const uids = await imap.search(
+          { header: { "message-id": messageId } },
+          { uid: true },
+        );
         if (!uids || !uids.length) return false;
         await imap.messageMove(uids, toPath, { uid: true });
         return true;
@@ -214,7 +235,10 @@ class ImapSmtpProvider {
       try {
         let n = 0;
         for (const id of ids) {
-          const uids = await imap.search({ header: { "message-id": id } }, { uid: true });
+          const uids = await imap.search(
+            { header: { "message-id": id } },
+            { uid: true },
+          );
           if (uids && uids.length) {
             await imap.messageDelete(uids, { uid: true });
             n += uids.length;
@@ -246,13 +270,31 @@ class ImapSmtpProvider {
       text: msg.text || undefined,
       messageId,
       inReplyTo: msg.inReplyTo || undefined,
-      references: msg.references && msg.references.length ? msg.references.join(" ") : undefined,
-      attachments: (msg.attachments || []).map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
+      references:
+        msg.references && msg.references.length
+          ? msg.references.join(" ")
+          : undefined,
+      attachments: (msg.attachments || []).map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     };
     const raw = await new Promise((resolve, reject) => {
-      nodemailer.createTransport({ streamTransport: true, buffer: true, newline: "\r\n" }).sendMail(mail, (err, info) => (err ? reject(err) : resolve(info.message)));
+      nodemailer
+        .createTransport({
+          streamTransport: true,
+          buffer: true,
+          newline: "\r\n",
+        })
+        .sendMail(mail, (err, info) =>
+          err ? reject(err) : resolve(info.message),
+        );
     });
-    const envelope = { from: bareAddress(c.email), to: [...msg.to, ...(msg.cc || []), ...(msg.bcc || [])].map(bareAddress) };
+    const envelope = {
+      from: bareAddress(c.email),
+      to: [...msg.to, ...(msg.cc || []), ...(msg.bcc || [])].map(bareAddress),
+    };
     await this.smtp().sendMail({ envelope, raw });
     let sentPath = null;
     try {
@@ -270,11 +312,20 @@ class ImapSmtpProvider {
 
   async sentFolder(imap) {
     const list = await imap.list();
-    const flagged = (list || []).find((f) => String(f.specialUse || "").toLowerCase() === "\\sent");
+    const flagged = (list || []).find(
+      (f) => String(f.specialUse || "").toLowerCase() === "\\sent",
+    );
     if (flagged) return flagged.path;
-    for (const name of SENT_FALLBACKS) if ((list || []).some((f) => f.path === name)) return name;
+    for (const name of SENT_FALLBACKS)
+      if ((list || []).some((f) => f.path === name)) return name;
     return null;
   }
 }
 
-module.exports = { ImapSmtpProvider, normalise, bareAddress, addressesOf, MAX_FETCH };
+module.exports = {
+  ImapSmtpProvider,
+  normalise,
+  bareAddress,
+  addressesOf,
+  MAX_FETCH,
+};

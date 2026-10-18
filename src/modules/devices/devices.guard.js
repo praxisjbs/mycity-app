@@ -28,7 +28,12 @@
  *          has_session_device: boolean}} input
  * @returns {{state: string, known: boolean, reason: string|null, result: string, exception: string|null}}
  */
-function evaluateDevice({ mode, status, first_seen: firstSeen, has_session_device: hasDevice }) {
+function evaluateDevice({
+  mode,
+  status,
+  first_seen: firstSeen,
+  has_session_device: hasDevice,
+}) {
   const state = !hasDevice ? "none" : status || "none";
   const known = hasDevice && status === "registered";
   const reason = known
@@ -40,12 +45,21 @@ function evaluateDevice({ mode, status, first_seen: firstSeen, has_session_devic
         : status === "removed"
           ? "removed"
           : "not_registered";
-  if (known || mode === "off") return { state, known, reason, result: "accepted", exception: null };
-  if (mode === "block") return { state, known, reason, result: "rejected", exception: null };
-  return { state, known, reason, result: "review", exception: "unknown_device" };
+  if (known || mode === "off")
+    return { state, known, reason, result: "accepted", exception: null };
+  if (mode === "block")
+    return { state, known, reason, result: "rejected", exception: null };
+  return {
+    state,
+    known,
+    reason,
+    result: "review",
+    exception: "unknown_device",
+  };
 }
 
 /** May one more device be registered, given how many are now? */
-const canRegister = (registeredCount, max) => Number(registeredCount) < Number(max);
+const canRegister = (registeredCount, max) =>
+  Number(registeredCount) < Number(max);
 
 module.exports = { evaluateDevice, canRegister };

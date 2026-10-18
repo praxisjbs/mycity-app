@@ -76,7 +76,7 @@ export default function Mailbox({ tab, id }: ModuleScreenProps) {
         actions={
           <>
             {emptiable && total > 0 && <Button onClick={() => modal.open({ title: `Empty ${NAMES[folder]}`, body: (close) => <EmptyFolder kind={folder as "spam" | "trash"} count={total} close={close} /> })}>Empty {NAMES[folder]}</Button>}
-            <Button onClick={() => void refresh()}>Refresh</Button>
+            <Button onClick={() => refresh()}>Refresh</Button>
             <Button variant="primary" icon="plus" onClick={() => compose()}>Compose</Button>
           </>
         }
@@ -310,7 +310,7 @@ function DraftReader({ row, onBack, compose }: { row: ThreadRow; onBack: () => v
           <p className="mt-1 text-2xs text-subtle-foreground">To {draft.to_addresses.join(", ") || "(no recipient)"} · {formatWhen(draft.updated_at)}</p>
         </span>
         <span className="flex flex-wrap gap-1.5 max-md:w-full">
-          {row.scheduled && <Button onClick={() => void cancelSchedule()}>Cancel Schedule</Button>}
+          {row.scheduled && <Button onClick={() => cancelSchedule()}>Cancel Schedule</Button>}
           <Button variant="primary" icon="send" onClick={() => compose({ draft_id: draft.mail_draft_id, to: draft.to_addresses, cc: draft.cc_addresses, bcc: draft.bcc_addresses, subject: draft.subject, body_html: draft.body_html, attachments: draft.attachments, in_reply_to: draft.in_reply_to }, "Continue Draft")}>Continue Editing</Button>
         </span>
       </div>

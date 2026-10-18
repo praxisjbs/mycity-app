@@ -160,7 +160,7 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
     <Wizard
       finish={changes.length ? "Save Changes" : "Close"}
       busy={save.pending}
-      onFinish={() => void submit()}
+      onFinish={() => submit()}
       onCancel={close}
       steps={[
         {

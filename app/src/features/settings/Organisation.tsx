@@ -248,7 +248,7 @@ function WeekForm({ days: initial, close }: { days: WorkingDay[]; close: () => v
     }
   };
   return (
-    <Form onSubmit={() => void submit()}>
+    <Form onSubmit={() => submit()}>
       {days.map((d) => (
         <div key={d.weekday} className="border-b border-border py-2 last:border-b-0">
           <div className="flex items-center justify-between gap-3">
@@ -343,7 +343,7 @@ function HolidayForm({ holiday, close }: { holiday: Holiday | null; close: () =>
       </Field>
       <FormFooter>
         {holiday && (
-          <Button variant="danger" className="mr-auto" busy={remove.pending} onClick={() => void del()}>
+          <Button variant="danger" className="mr-auto" busy={remove.pending} onClick={() => del()}>
             Delete Holiday
           </Button>
         )}

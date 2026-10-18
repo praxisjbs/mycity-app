@@ -20,8 +20,16 @@ const row = (over = {}) => ({
   module_key: "settings",
   entity_type: "employee",
   entity_id: "00000000-0000-4000-8000-0000000000aa",
-  before: { gross_monthly: "450000.00", job_title: "Analyst", next_of_kin_name: null },
-  after: { gross_monthly: "500000.00", job_title: "Analyst", bank: { account_number: "0123456789" } },
+  before: {
+    gross_monthly: "450000.00",
+    job_title: "Analyst",
+    next_of_kin_name: null,
+  },
+  after: {
+    gross_monthly: "500000.00",
+    job_title: "Analyst",
+    bank: { account_number: "0123456789" },
+  },
   changed_fields: ["gross_monthly"],
   is_sensitive: true,
   ...over,
@@ -44,7 +52,11 @@ describe("an entry as a reader sees it", () => {
   });
 
   test("an entry about the reader's own employee record is not masked from them", () => {
-    const [e] = present([row()], ["employee.salary"], "00000000-0000-4000-8000-0000000000aa");
+    const [e] = present(
+      [row()],
+      ["employee.salary"],
+      "00000000-0000-4000-8000-0000000000aa",
+    );
     expect(e.after.gross_monthly).toBe("500000.00");
     expect(e.masked).toEqual([]);
   });
@@ -57,8 +69,14 @@ describe("an entry as a reader sees it", () => {
   test("what it means comes from the event catalogue, and where it opens from the route map", () => {
     const [e] = present([row({ entity_type: "role" })], [], null);
     expect(e.summary).toBe("A role was created");
-    expect(e.link).toBe(`/settings?tab=roles-and-permissions&id=${e.entity_id}`);
-    const [acct] = present([row({ entity_type: "account", action: "auth.signed_in" })], [], null);
+    expect(e.link).toBe(
+      `/settings?tab=roles-and-permissions&id=${e.entity_id}`,
+    );
+    const [acct] = present(
+      [row({ entity_type: "account", action: "auth.signed_in" })],
+      [],
+      null,
+    );
     expect(acct.link).toBe(`/settings?tab=users&id=${acct.entity_id}`);
     const [none] = present([row({ entity_type: "audit_export" })], [], null);
     expect(none.link).toBeNull();
@@ -67,7 +85,9 @@ describe("an entry as a reader sees it", () => {
 
 describe("the export's filters, as the email says them", () => {
   test("each filter set, or the whole log", () => {
-    expect(filtersText({ module: "settings", from: "2026-10-01", q: "" })).toBe("module = settings, from = 2026-10-01");
+    expect(filtersText({ module: "settings", from: "2026-10-01", q: "" })).toBe(
+      "module = settings, from = 2026-10-01",
+    );
     expect(filtersText({})).toBe("none, the whole log");
   });
 });
