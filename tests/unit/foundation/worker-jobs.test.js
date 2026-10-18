@@ -37,6 +37,7 @@ describe("job registry", () => {
       "av-transcode",
       "celebrations",
       "email-send",
+      "home-alert-sweeps",
       "import-commit",
       "import-validate",
       "mail-send",
@@ -45,16 +46,19 @@ describe("job registry", () => {
       "media-scan",
       "notification-deliver",
       "pdf-render",
+      "scheduled-report",
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
       "alert-ageing",
       "announcement-release",
       "attendance-day-close",
       "celebrations",
+      "home-alert-sweeps",
       "import-cleanup",
       "mail-sync",
       "media-reconcile",
       "outbox-dispatch",
+      "scheduled-reports",
       "workflow-timeout",
     ]);
   });

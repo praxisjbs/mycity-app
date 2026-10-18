@@ -252,9 +252,10 @@ const HomeReportScheduleState = z.object({ active: z.boolean() }).strict();
 /** GET /home/reports/summary: the four cards over the reports the reader may see. */
 const HomeReportSummary = z
   .object({
+    /** Reports the reader may see that run on a schedule, and those whose schedule is paused. */
     scheduled: count,
     paused: count,
-    /** Files generated for those reports since the 1st of this month (Lagos). */
+    /** Files generated since the 1st of this month (Lagos), of the runs on the reader's Recent Runs. */
     runs_this_month: count,
     /** People who receive at least one of the scheduled ones. */
     recipients: count,
@@ -313,6 +314,58 @@ const HomeReportRunPage = Paged(HomeReportRun);
  * caller, in one format. The answer is the pending run.
  */
 const HomeReportRunNow = z.object({ format: HomeReportFormat }).strict();
+
+/* ------------------------------------------------------------------ *
+ * The file and its email
+ * ------------------------------------------------------------------ */
+
+/** A cell as the PDF prints it: dates day-first and amounts in Naira, already written out. */
+const HomeReportCell = z.object({ text: z.string(), numeric: z.boolean() }).strict();
+
+/** One table of a report file: a source's rows, or one part of an Overview. */
+const HomeReportTable = z
+  .object({
+    title: z.string(),
+    columns: z.array(z.object({ header: z.string(), numeric: z.boolean() }).strict()).min(1),
+    rows: z.array(z.object({ cells: z.array(HomeReportCell) }).strict()),
+    /** Why the table is shorter than its source: more rows than one file holds. Null when whole. */
+    note: z.string().nullable(),
+  })
+  .strict();
+
+/**
+ * templates/documents/report.html: a report as its recipient may read it. Generated as
+ * that person, so every row is one they could open on screen.
+ */
+const HomeReportDocumentVars = z
+  .object({
+    report_name: z.string(),
+    /** The run's number (RPT-0001); the document itself takes none. */
+    run_number: z.string(),
+    /** The source's name ("Daily Attendance"). */
+    source: z.string(),
+    recipient_name: z.string(),
+    /** The moment the report describes: the slot a schedule fired for, or when it was asked for. */
+    as_at: isoDateTime,
+    /** The report's filters as a person reads them ("Status: Late"). */
+    filters: z.array(z.object({ label: z.string(), value: z.string() }).strict()),
+    /** Lines above the tables: an Overview's greeting and its headline figures. */
+    lines: z.array(z.string()),
+    tables: z.array(HomeReportTable).min(1),
+  })
+  .strict();
+
+/** templates/email/scheduled-report.html: the file is attached. */
+const HomeReportEmailVars = z
+  .object({
+    report_name: z.string(),
+    run_number: z.string(),
+    /** How the attachment opens: "PDF" or "Excel". */
+    format: z.enum(["PDF", "Excel"]),
+    /** Sent by a schedule; otherwise someone pressed Run Now or Export. */
+    scheduled: z.boolean(),
+  })
+  .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
@@ -377,6 +430,14 @@ const TABLES = {
   HomeReportRunQuery: { table: null, reason: "list controls and the Recent Runs filters" },
   HomeReportRunPage: { table: null, reason: "a page of report runs" },
   HomeReportRunNow: { table: "home_report_run" },
+  HomeReportDocumentVars: {
+    table: null,
+    reason: "the variables of templates/documents/report.html, not a row",
+  },
+  HomeReportEmailVars: {
+    table: null,
+    reason: "the variables of templates/email/scheduled-report.html, not a row",
+  },
 };
 
 module.exports = {
@@ -404,4 +465,6 @@ module.exports = {
   HomeReportRunQuery,
   HomeReportRunPage,
   HomeReportRunNow,
+  HomeReportDocumentVars,
+  HomeReportEmailVars,
 };

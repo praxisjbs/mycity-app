@@ -623,7 +623,9 @@ DROP TABLE IF EXISTS old_thing;`,
         "const A = `SELECT p.staff_number, p.name FROM person p WHERE p.person_id = $1`;\n" +
           "const B = `INSERT INTO person (person_id, staff_number, name) VALUES ($1, $2, $3)`;\n" +
           "const C = `UPDATE person SET name = $2, staff_number = upper($3) WHERE person_id = $1`;\n" +
-          "const D = `SELECT 1 FROM person FOR UPDATE SKIP LOCKED`;",
+          "const D = `SELECT 1 FROM person FOR UPDATE SKIP LOCKED`;\n" +
+          "const E = `SELECT 1 FROM person p FOR NO KEY UPDATE OF p`;\n" +
+          "const F = `SELECT 1 FROM person p FOR KEY SHARE OF p`;",
       ),
     ).toEqual([]);
   });

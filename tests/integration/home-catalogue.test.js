@@ -561,7 +561,7 @@ describeDb("the KPI catalogue against the real migrations", () => {
           const columns = meta.columns.map((col) => col.key).sort();
           for (const row of rows) expect([id, Object.keys(row.cells).sort()]).toEqual([id, columns]);
           const counted = {
-            count: () => (id === "team_flags" ? f.late : f.value),
+            count: () => f.value,
             money: () => (id === "expenses_pending" ? f.requests : f.agreements),
             pct: () => f.denominator,
             pair: () => Object.entries(f.groups).reduce((n, [g, v]) => (g === "no_clock_out_yesterday" ? n : n + v), 0),

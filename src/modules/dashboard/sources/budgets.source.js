@@ -1,7 +1,8 @@
 "use strict";
 /**
  * Budgets, as Home reads them: how much of the budgets running today has been spent,
- * behind the Budget Used card.
+ * behind the Budget Used card, and the budgets past a share spent, for Home's Budget
+ * Threshold alert rules.
  *
  * OWNED BY the `budgets` module, M8 Expenses & Budget Control, AJ (migration 8000).
  *
@@ -100,6 +101,34 @@ function usedPage(client, { today }, scope, query) {
   );
 }
 
+/**
+ * The budgets running on a Lagos date with at least `percent` of their allocation spent, a
+ * batch of at most `size` after the budget `after` (by id): Home's Budget Threshold alert
+ * rules read them in their daily sweep. Spent over allocated is a percentage to two places,
+ * worked out in SQL, so no amount passes through JavaScript arithmetic. Naira budgets only.
+ * @param {{query: Function}} client
+ * @param {{today: string, percent: string, after?: string|null, size: number}} batch
+ * @returns {Promise<Array<{budget_id: string, name: string, starts_on: string, allocated: string, spent: string, used: string}>>}
+ */
+async function spentBatch(client, { today, percent, after = null, size }) {
+  const { rows } = await client.query(
+    `SELECT u.budget_id, u.name, u.starts_on, u.allocated, u.spent, u.used
+       FROM (SELECT b.budget_id, b.name, b.starts_on,
+                    COALESCE(sum(bl.amount), 0)::numeric(18,2) AS allocated,
+                    COALESCE(sum(bl.spent_amount), 0)::numeric(18,2) AS spent,
+                    COALESCE(round(100 * sum(bl.spent_amount) / NULLIF(sum(bl.amount), 0), 2), 0)::numeric(18,2) AS used
+               FROM budget b
+               LEFT JOIN budget_line bl ON bl.budget_id = b.budget_id
+              WHERE ${RUNNING} AND ($3::uuid IS NULL OR b.budget_id > $3::uuid)
+              GROUP BY b.budget_id) u
+      WHERE u.used >= $2::numeric
+      ORDER BY u.budget_id
+      LIMIT $4 -- pagination:batch the budgets one step of Home's alert sweep reads`,
+    [today, percent, after, size],
+  );
+  return rows;
+}
+
 module.exports = {
   module: "budgets",
   milestone: "M8",
@@ -108,4 +137,5 @@ module.exports = {
   owes: OWES,
   used,
   usedPage,
+  spentBatch,
 };

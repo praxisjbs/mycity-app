@@ -333,6 +333,7 @@ describeDb("the attendance roster against the real migrations", () => {
         on_leave: 2,
         not_in: 19,
         no_clock_out_yesterday: 2,
+        flagged: 6,
       });
       expect(s.expected).toBe(s.present + s.absent + s.not_in);
       for (const status of roster.STATUSES) {
@@ -400,6 +401,52 @@ describeDb("the attendance roster against the real migrations", () => {
       const rows = byName(await everyone(MONDAY));
       expect(rows["Kemi Adeyemi"].no_clock_out_yesterday).toBe(true);
       expect(rows["Ngozi Eke"].no_clock_out_yesterday).toBe(false);
+    });
+  });
+
+  describe("who is flagged", () => {
+    test("late or no clock-out yesterday, each once: the count is the list, and each filter narrows within it", async () => {
+      const s = await roster.summary(pool, { date: FRIDAY }, ALL);
+      const flagged = await everyone(FRIDAY, ALL, { flagged: true });
+      expect(flagged.map((r) => r.first_name).sort()).toEqual(["Bisi", "Ifeanyi", "Ijeoma", "Ngozi", "Pat", "Tunde"]);
+      expect(flagged).toHaveLength(s.flagged);
+      expect(flagged.every((r) => r.flagged && (r.status === "late" || r.no_clock_out_yesterday))).toBe(true);
+      const calm = await everyone(FRIDAY, ALL, { flagged: false });
+      expect(calm).toHaveLength(32 - s.flagged);
+      expect(calm.some((r) => r.flagged || r.status === "late" || r.no_clock_out_yesterday)).toBe(false);
+      expect((await roster.page(pool, { date: FRIDAY, flagged: true, status: "late" }, ALL, {})).page.total).toBe(s.late);
+      expect(
+        (await roster.page(pool, { date: FRIDAY, flagged: true, no_clock_out_yesterday: true }, ALL, {})).page.total,
+      ).toBe(s.no_clock_out_yesterday);
+    });
+
+    test("someone late today with no clock-out yesterday is flagged once, and counted under both", async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          `INSERT INTO attendance_event (employee_id, event_type, occurred_at, work_date, worksite_id, source, validation_state)
+           VALUES ($1, 'clock_in', $2, $3, $4, 'pwa', 'accepted')`,
+          [people.kemi, at(MONDAY, "09:30"), MONDAY, headOffice],
+        );
+        await recompute("kemi", MONDAY, client);
+        // Kemi and Emeka left Saturday open; Kemi is also late on Monday.
+        const s = await roster.summary(client, { date: MONDAY }, ALL);
+        expect(s).toMatchObject({ late: 1, no_clock_out_yesterday: 2, flagged: 2 });
+        const rows = await roster.page(client, { date: MONDAY, flagged: true }, ALL, {});
+        expect(rows.data.map((r) => [r.first_name, r.status, r.no_clock_out_yesterday])).toEqual([
+          ["Kemi", "late", true],
+          ["Emeka", "not_in", true],
+        ]);
+        expect(rows.page.total).toBe(s.flagged);
+      } finally {
+        await client.query("ROLLBACK");
+        client.release();
+      }
+    });
+
+    test("a flag that is not yes or no is no filter", async () => {
+      expect((await roster.page(pool, { date: FRIDAY, flagged: "yes" }, ALL, {})).page.total).toBe(32);
     });
   });
 
@@ -562,6 +609,81 @@ describeDb("the attendance roster against the real migrations", () => {
 
     test("a status that is not the roster's is refused", async () => {
       await expect(roster.page(pool, { date: FRIDAY, status: "present" }, ALL, {})).rejects.toThrow(TypeError);
+    });
+  });
+
+  describe("everyone's days over a range", () => {
+    /** Every row of a range, page by page. */
+    async function allMonth(from, to, scope = ALL, filters = {}, query = {}) {
+      const rows = [];
+      for (let n = 1; ; n += 1) {
+        const result = await roster.month(pool, { from, to, ...filters }, scope, { ...query, page: n });
+        rows.push(...result.data);
+        if (!result.page.has_next) return rows;
+      }
+    }
+
+    test("each person's totals are My Attendance's for the same days, from one paged read", async () => {
+      const rows = await allMonth(MONDAY_BEFORE, SATURDAY);
+      expect(rows).toHaveLength(32);
+      for (const r of rows) {
+        const mine = roster.totalsOf(await repo.daysSummary(pool, r.employee_id, MONDAY_BEFORE, SATURDAY));
+        const { expected, on_time: onTime, late, absent, on_leave: onLeave } = r;
+        expect({ who: r.first_name, expected, on_time: onTime, late, absent, on_leave: onLeave }).toEqual({ who: r.first_name, ...mine });
+      }
+      const tunde = rows.find((r) => r.employee_id === people.tunde);
+      expect(tunde).toMatchObject({ expected: 4, on_time: 1, late: 2, absent: 1, on_leave: 0, department: "Test" });
+      // Only the leave the attendance module recorded counts: Friday, not the holiday or Saturday.
+      const jide = rows.find((r) => r.employee_id === people.jide);
+      expect(jide).toMatchObject({ expected: 3, on_leave: 1 });
+      expect(jide.expected).toBe(jide.on_time + jide.late + jide.absent);
+    });
+
+    test("the people are those on the register on any day of the range", async () => {
+      const through = async (to) => (await allMonth(MONDAY_BEFORE, to)).map((r) => r.first_name);
+      expect(await through(SATURDAY)).not.toContain("Sola"); // starts on Monday
+      expect(await through(MONDAY)).toContain("Sola");
+      expect(await through(MONDAY)).not.toContain("Tobi"); // suspended, and nothing recorded
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Hassan left on Wednesday: the days recorded for him still count; after them he is gone.
+        await client.query("UPDATE employee SET status = 'left', left_on = $2 WHERE employee_id = $1", [people.hassan, WEDNESDAY]);
+        const before = await roster.month(client, { from: MONDAY_BEFORE, to: FRIDAY, q: "hassan" }, ALL, {});
+        expect(before.data).toEqual([expect.objectContaining({ first_name: "Hassan", expected: 3, absent: 3 })]);
+        const after = await roster.month(client, { from: FRIDAY, to: MONDAY, q: "hassan" }, ALL, {});
+        expect(after.data).toEqual([]);
+      } finally {
+        await client.query("ROLLBACK");
+        client.release();
+      }
+    });
+
+    test("pages at 25, with nobody twice and nobody missed", async () => {
+      const first = await roster.month(pool, { from: MONDAY_BEFORE, to: MONDAY }, ALL, { page: 1 });
+      const second = await roster.month(pool, { from: MONDAY_BEFORE, to: MONDAY }, ALL, { page: 2 });
+      expect(first.data).toHaveLength(25);
+      expect(first.page).toEqual({ number: 1, size: 25, total: 33, pages: 2, has_next: true });
+      expect(second.data).toHaveLength(8);
+      expect(new Set([...first.data, ...second.data].map((r) => r.employee_id)).size).toBe(33);
+    });
+
+    test("within the scope, by department and by name", async () => {
+      const names = (rows) => rows.map((r) => r.first_name).sort();
+      expect(names(await allMonth(MONDAY_BEFORE, SATURDAY, await team("kemi")))).toEqual(["Ifeanyi", "Kemi", "Tunde", "Zainab"]);
+      expect(names(await allMonth(MONDAY_BEFORE, SATURDAY, own("zainab")))).toEqual(["Zainab"]);
+      expect(names(await allMonth(MONDAY_BEFORE, SATURDAY, ALL, { department_id: ops }))).toEqual(["Emeka", "Zainab"]);
+      expect(names(await allMonth(MONDAY_BEFORE, SATURDAY, ALL, { q: "bakare" }))).toEqual(["Tunde"]);
+    });
+
+    test("sorts by name unless told otherwise, or by the days on time", async () => {
+      const byDefault = await roster.month(pool, { from: MONDAY_BEFORE, to: SATURDAY }, ALL, {});
+      expect(byDefault.data.slice(0, 3).map((r) => r.last_name)).toEqual(["Ade", "Adebayo", "Adeyemi"]);
+      const most = await allMonth(MONDAY_BEFORE, SATURDAY, ALL, {}, { sort: { field: "on_time", dir: "desc" } });
+      const onTime = most.map((r) => r.on_time);
+      expect(onTime).toEqual([...onTime].sort((a, b) => b - a));
+      expect(onTime[0]).toBeGreaterThan(0);
     });
   });
 

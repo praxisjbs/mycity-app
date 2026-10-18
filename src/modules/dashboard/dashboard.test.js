@@ -778,16 +778,31 @@ describe("the routes", () => {
     expect(require("./dashboard.routes").basePath).toBe("/home");
     expect(routes.map((r) => `${r.method} ${r.path}`)).toEqual([
       "GET /overview",
+      "POST /overview/export",
       "GET /kpi-picker",
       "PUT /kpi-picks",
       "DELETE /kpi-picks",
       "GET /kpi/:key/meta",
       "GET /kpi/:key",
+      "GET /team/summary",
+      "GET /team/attendance",
+      "GET /team",
       "GET /roles/:role_id/kpis",
       "PUT /roles/:role_id/kpis",
       "DELETE /roles/:role_id/kpis",
     ]);
     expect(find("GET", "/overview").contract.response).toBe(dashboard.HomeOverview);
+    // The Overview Export is a run of the reports engine, in the reports contract.
+    expect(find("POST", "/overview/export").contract).toMatchObject({
+      body: c.reports.HomeReportRunNow,
+      response: c.reports.HomeReportRun,
+    });
+    expect(find("GET", "/team/summary").contract.response).toBe(dashboard.HomeTeamSummary);
+    expect(find("GET", "/team").contract).toMatchObject({ query: dashboard.HomeTeamQuery, response: dashboard.HomeTeamPage });
+    expect(find("GET", "/team/attendance").contract).toMatchObject({
+      query: dashboard.HomeTeamAttendanceQuery,
+      response: dashboard.HomeTeamAttendancePage,
+    });
     expect(find("PUT", "/kpi-picks").contract.body).toBe(dashboard.HomeKpiPicks);
     expect(find("PUT", "/roles/:role_id/kpis").contract.body).toBe(dashboard.HomeRoleKpisSave);
     for (const r of routes.filter((x) => x.method === "DELETE")) expect(r.contract.no_content).toBe(true);
@@ -800,6 +815,28 @@ describe("the routes", () => {
         : { key: "home", action: "view" };
       expect([r.method, r.path, r.permission]).toEqual([r.method, r.path, expected]);
     }
+  });
+
+  test("the Team tab, and only it, also needs `home.team`, checked after the grant that sets its scope", () => {
+    for (const r of routes) {
+      const expected = r.path === "/team" || r.path.startsWith("/team/") ? "home.team" : null;
+      expect([r.method, r.path, r.capability]).toEqual([r.method, r.path, expected]);
+    }
+  });
+
+  test("the Team tab's lists page at 25 through the contract's controls, and sort only as it allows", () => {
+    for (const path of ["/team", "/team/attendance"]) {
+      const { query } = find("GET", path).contract;
+      expect([path, Object.keys(query.shape)]).toEqual([path, expect.arrayContaining(["page", "q", "sort", "department_id"])]);
+      expect(query.safeParse({ limit: "100" }).success).toBe(false);
+    }
+    expect(Object.keys(find("GET", "/team").contract.query.shape)).toEqual(
+      expect.arrayContaining(["status", "no_clock_out_yesterday"]),
+    );
+    expect(dashboard.HomeTeamQuery.safeParse({ sort: "-clock_in_at" }).success).toBe(true);
+    expect(dashboard.HomeTeamQuery.safeParse({ sort: "status" }).success).toBe(false);
+    expect(dashboard.HomeTeamAttendanceQuery.safeParse({ sort: "-on_time" }).success).toBe(true);
+    expect(dashboard.HomeTeamAttendanceQuery.safeParse({ status: "late" }).success).toBe(false);
   });
 
   test("a card's records are paged at 25 through the contract's controls, and /meta is defined first", () => {
@@ -1069,6 +1106,207 @@ describe("the clock-in prompt", () => {
   });
 });
 
+describe("the Team tab", () => {
+  const team = require("./dashboard.team");
+  const roster = require("../attendance/attendance.roster");
+  const TEAM = Object.freeze({ scope: "team", scope_ids: [ID], employee_id: ID });
+  const NOW = new Date("2026-10-14T11:00:00Z");
+  const db = { query: jest.fn() };
+  const emptyPage = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
+  const wire = (value) => JSON.parse(JSON.stringify(value));
+
+  /** A roster row as attendance.roster.page() answers one. */
+  const rosterRow = (patch = {}) => ({
+    employee_id: ID,
+    first_name: "Ada",
+    last_name: "Obi",
+    job_title: "Field Officer",
+    department_id: "5f0e9c1c-7d4e-4d0a-9c8e-2b0a7e3f1a10",
+    department: "Programmes",
+    work_pattern: "on_site",
+    status: "late",
+    clock_in_at: new Date("2026-10-14T08:12:00Z"),
+    clock_out_at: null,
+    late_minutes: 12,
+    worksite: "Head Office",
+    no_clock_out_yesterday: true,
+    flagged: true,
+    ...patch,
+  });
+
+  /** A day's roster summary as attendance.roster.summary() answers one. */
+  const daySummary = {
+    date: "2026-10-14",
+    working_day: true,
+    expected: 5,
+    present: 3,
+    on_site: 1,
+    remote: 1,
+    late: 1,
+    absent: 0,
+    on_leave: 1,
+    not_in: 1,
+    no_clock_out_yesterday: 2,
+    flagged: 2,
+  };
+
+  test("its cards are the catalogue's four Team cards, each a live `home` card behind `home.team`, never on the picker", () => {
+    expect(team.CARDS).toEqual(["team_present", "team_on_site", "team_remote", "team_flags"]);
+    expect(team.CAPABILITY).toBe("home.team");
+    for (const id of team.CARDS)
+      expect(kpi.BY_ID.get(id)).toMatchObject({ status: "live", module: "home", capability: "home.team", pickable: false });
+    expect(catalog.isCapability(team.CAPABILITY)).toBe(true);
+  });
+
+  test("a Team card that leaves the tab's scope or its capability stops the require", () => {
+    const drift = (change, message) => {
+      try {
+        jest.isolateModules(() => {
+          jest.doMock("./kpi-catalog/tiles/people", () => {
+            const real = jest.requireActual("./kpi-catalog/tiles/people");
+            return { ...real, ENTRIES: change(real.ENTRIES) };
+          });
+          expect(() => require("./dashboard.team")).toThrow(message);
+        });
+      } finally {
+        jest.dontMock("./kpi-catalog/tiles/people");
+      }
+    };
+    const patch = (id, p) => (entries) => entries.map((e) => (e.id === id ? { ...e, ...p } : e));
+    drift(patch("team_flags", { module: "people" }), /team_flags/);
+    drift(patch("team_remote", { pickable: true }), /team_remote/);
+    drift((entries) => entries.filter((e) => e.id !== "team_on_site"), /"team_on_site" is not in the KPI catalogue/);
+  });
+
+  test("the query's filters reach the roster on the day asked, the yes-or-no as a boolean", () => {
+    expect(team.filtersOf({ status: "late", department_id: ID, q: "ada", no_clock_out_yesterday: "true" }, "2026-10-14")).toEqual({
+      date: "2026-10-14",
+      status: "late",
+      department_id: ID,
+      q: "ada",
+      no_clock_out_yesterday: true,
+    });
+    expect(team.filtersOf({ no_clock_out_yesterday: "false" }, "2026-10-14").no_clock_out_yesterday).toBe(false);
+    expect(team.filtersOf({}, "2026-10-14").no_clock_out_yesterday).toBeUndefined();
+  });
+
+  test("a roster row is a Team Roster row; KPI and Open Tasks stay null until M2", () => {
+    const row = team.rowOf(rosterRow());
+    expect(row).toMatchObject({
+      employee: { employee_id: ID, display_name: "Ada Obi", job_title: "Field Officer", department: "Programmes" },
+      status: "late",
+      worksite: "Head Office",
+      no_clock_out_yesterday: true,
+      kpi_percent: null,
+      open_tasks: null,
+    });
+    expect(dashboard.HomeTeamRow.parse(wire(row))).toEqual(wire(row));
+    const month = team.monthRowOf({ ...rosterRow(), expected: 9, on_time: 6, late: 2, absent: 1, on_leave: 2 });
+    expect(dashboard.HomeTeamAttendanceRow.parse(month)).toEqual(month);
+    expect(month).toMatchObject({ expected: 9, on_time: 6, late: 2, absent: 1, on_leave: 2 });
+  });
+
+  test("the summary: the grant's scope and the four cards from one read of the roster, in that scope", async () => {
+    const read = jest.spyOn(roster, "summary").mockResolvedValue(daySummary);
+    const answer = await team.summary({ user_id: ID, employee_id: ID }, TEAM, { now: NOW, db });
+    expect(dashboard.HomeTeamSummary.parse(answer)).toEqual(answer);
+    expect(answer).toMatchObject({ date: "2026-10-14", scope: "team" });
+    expect(answer.cards.map((card) => [card.key, card.value, card.denominator, card.caption])).toEqual([
+      ["team_present", 3, 5, "1 on leave"],
+      ["team_on_site", 1, null, null],
+      ["team_remote", 1, null, null],
+      ["team_flags", 2, null, "1 late, 2 no clock-out"],
+    ]);
+    expect(answer.cards[3].tone).toBe("warn");
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith(db, { date: "2026-10-14" }, TEAM);
+  });
+
+  test("Flags counts each person once, so someone late with no clock-out yesterday is one flag", async () => {
+    jest.spyOn(roster, "summary").mockResolvedValue({ ...daySummary, late: 2, no_clock_out_yesterday: 2, flagged: 3 });
+    const { cards } = await team.summary({ user_id: ID }, TEAM, { now: NOW, db });
+    expect(cards.find((card) => card.key === "team_flags")).toMatchObject({ value: 3, caption: "2 late, 2 no clock-out" });
+  });
+
+  test("a roster that cannot be read leaves the cards out rather than showing zeros", async () => {
+    const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    jest.spyOn(roster, "summary").mockRejectedValue(new Error("relation gone"));
+    const answer = await team.summary({ user_id: ID }, TEAM, { now: NOW, db });
+    expect(answer).toEqual({ date: "2026-10-14", scope: "team", cards: [] });
+    expect(warn).toHaveBeenCalledTimes(4);
+  });
+
+  test("the roster: today's page in the grant's scope, as the contract shapes it", async () => {
+    const page = jest
+      .spyOn(roster, "page")
+      .mockResolvedValue({ data: [rosterRow()], page: { number: 2, size: 25, total: 26, pages: 2, has_next: false } });
+    const query = { page: 2, status: "late", no_clock_out_yesterday: "true", sort: { field: "clock_in_at", dir: "desc" } };
+    const answer = await team.roster(TEAM, query, { now: NOW, db });
+    expect(dashboard.HomeTeamPage.parse(wire(answer))).toEqual(wire(answer));
+    expect(answer.page.total).toBe(26);
+    expect(page).toHaveBeenCalledWith(
+      db,
+      { date: "2026-10-14", status: "late", department_id: undefined, q: undefined, no_clock_out_yesterday: true },
+      TEAM,
+      query,
+    );
+  });
+
+  test("Attendance This Month: from the 1st of this month in Lagos to today", async () => {
+    const month = jest.spyOn(roster, "month").mockResolvedValue({
+      data: [{ ...rosterRow(), expected: 9, on_time: 6, late: 2, absent: 1, on_leave: 2 }],
+      page: { number: 1, size: 25, total: 1, pages: 1, has_next: false },
+    });
+    // 23:30 on the 31st, UTC, is already the 1st of November in Lagos.
+    const answer = await team.month(TEAM, { department_id: ID }, { now: new Date("2026-10-31T23:30:00Z"), db });
+    expect(dashboard.HomeTeamAttendancePage.parse(answer)).toEqual(answer);
+    expect(month).toHaveBeenCalledWith(
+      db,
+      { from: "2026-11-01", to: "2026-11-01", department_id: ID, q: undefined },
+      TEAM,
+      { department_id: ID },
+    );
+  });
+
+  test("the assistant: an empty page without `home.team`, the roster in the asker's scope with it, and the CEO always", async () => {
+    const caps = jest.spyOn(grantsCache, "getCapabilities");
+    const page = jest.spyOn(roster, "page").mockResolvedValue({ data: [rosterRow()], page: { ...emptyPage.page, total: 1, pages: 1 } });
+    const actor = { user_id: ID, employee_id: ID, scope: TEAM };
+
+    caps.mockResolvedValue(["alerts.clear"]);
+    expect(await team.forAssistant(db, actor, { page: 1 }, { now: NOW })).toEqual(emptyPage);
+    expect(page).not.toHaveBeenCalled();
+
+    caps.mockResolvedValue(["home.team"]);
+    const mine = await team.forAssistant(db, actor, { page: 1 }, { now: NOW });
+    expect(mine.data.map((r) => r.employee.display_name)).toEqual(["Ada Obi"]);
+    expect(page).toHaveBeenLastCalledWith(db, expect.objectContaining({ date: "2026-10-14" }), TEAM, { page: 1 });
+
+    caps.mockClear();
+    await team.forAssistant(db, { ...actor, is_ceo: true }, { page: 1 }, { now: NOW });
+    expect(caps).not.toHaveBeenCalled();
+  });
+
+  test("over HTTP, each list reads in the route's scope and leaves through the field mask", async () => {
+    const controller = require("./dashboard.controller");
+    jest.spyOn(grantsCache, "getMaskedFieldKeys").mockResolvedValue([]);
+    const list = jest.spyOn(team, "roster").mockResolvedValue({ data: [team.rowOf(rosterRow())], page: emptyPage.page });
+    const month = jest.spyOn(team, "month").mockResolvedValue(emptyPage);
+    const summary = jest.spyOn(team, "summary").mockResolvedValue({ date: "2026-10-14", scope: "team", cards: [] });
+    const res = () => ({ json: jest.fn(), status: jest.fn().mockReturnThis() });
+    const req = { user: { user_id: ID, employee_id: ID }, scope: "team", scope_ids: [ID], validated: { query: { page: 1 } } };
+
+    const sent = res();
+    await controller.team(req, sent);
+    expect(list).toHaveBeenCalledWith(TEAM, { page: 1 });
+    expect(sent.json.mock.calls[0][0].data[0].employee.display_name).toBe("Ada Obi");
+    await controller.teamAttendance(req, res());
+    expect(month).toHaveBeenCalledWith(TEAM, { page: 1 });
+    await controller.teamSummary(req, res());
+    expect(summary).toHaveBeenCalledWith(req.user, TEAM);
+  });
+});
+
 describe("the prune, the assistant and ⌘K", () => {
   const outbox = require("../../shared/events/outbox");
   const events = require("./dashboard.events");
@@ -1090,15 +1328,23 @@ describe("the prune, the assistant and ⌘K", () => {
     expect(prune.mock.calls).toEqual([[ID], [ID], [ID]]);
   });
 
-  test("the assistant reads the asker's own cards and routes to the Overview; it writes nothing", () => {
+  test("the assistant reads the asker's own cards and their Team, and routes to Home's tabs; it writes nothing", () => {
     const manifest = require("./dashboard.ai");
     expect(manifest.module).toBe("home");
-    expect(manifest.reads.map((r) => [r.key, r.permission, r.list])).toEqual([["cards.mine", ["home", "view"], false]]);
+    expect(manifest.reads.map((r) => [r.key, r.permission, r.list])).toEqual([
+      ["cards.mine", ["home", "view"], false],
+      ["team.today", ["home", "view"], true],
+    ]);
     expect(manifest.reads[0].params).toBe(c.common.EmptyBody);
-    for (const route of manifest.routes) {
-      expect(route.screen).toBe("home.overview");
+    expect(manifest.reads[1].params).toBe(c.dashboard.HomeTeamQuery);
+    expect(manifest.routes.map((route) => route.screen)).toEqual([
+      "home.overview",
+      "home.overview",
+      "home.overview",
+      "home.team",
+    ]);
+    for (const route of manifest.routes)
       if (route.params) expect([route.params.kpi, kpi.isPickable(route.params.kpi)]).toEqual([route.params.kpi, true]);
-    }
   });
 
   test("⌘K: the cards the reader may see, by title, paged at 25, opening the Overview on the card", async () => {

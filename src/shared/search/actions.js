@@ -18,7 +18,10 @@
  *
  * `need` is the grant the action needs, [module, action]; the reader must also be shown
  * the screen it opens (shared/search/screens.js tabVisible). Mark All Read needs nothing:
- * the bell is everyone's own.
+ * the bell is everyone's own. `capability` is the authority it needs on top (README §5.2),
+ * where its screen opens to more people than may take it: the Alerts tab opens to whoever
+ * may clear alerts, New Rule only to those who may manage the rules; New Report needs
+ * `home.reports`, as its tab does.
  */
 const routeMap = require("../route-map");
 const catalog = require("../access/access.catalog");
@@ -28,9 +31,10 @@ const RUNS = new Set(["clock", "read_all", "theme_dark", "theme_light", "density
 /**
  * @param {string} key  snake_case, unique
  * @param {string} label  Verb Noun, at most 3 words, as the screen's button reads
- * @param {{screen?: string, params?: Record<string, string>, run?: string, need?: [string, string]|null, words?: string[]}} opts
+ * @param {{screen?: string, params?: Record<string, string>, run?: string, need?: [string, string]|null,
+ *          capability?: string|null, words?: string[]}} opts
  */
-function a(key, label, { screen = null, params = {}, run = null, need, words = [] }) {
+function a(key, label, { screen = null, params = {}, run = null, need, capability = null, words = [] }) {
   const [module, tab] = screen ? screen.split(".") : [null, null];
   return Object.freeze({
     key,
@@ -40,6 +44,7 @@ function a(key, label, { screen = null, params = {}, run = null, need, words = [
     params: Object.freeze({ ...params }),
     run,
     need: need === undefined ? (module ? [module, "view"] : null) : need,
+    capability,
     words: Object.freeze(words),
   });
 }
@@ -92,6 +97,20 @@ const ACTIONS = Object.freeze([
     params: { action: "new" },
     need: ["settings", "create"],
     words: ["public holiday", "add holiday", "holiday", "day off for everyone"],
+  }),
+  a("new_rule", "New Rule", {
+    screen: "home.alerts",
+    params: { action: "new" },
+    need: ["home", "view"],
+    capability: "alerts.manage",
+    words: ["alert rule", "new alert", "create rule", "threshold", "warn me when"],
+  }),
+  a("new_report", "New Report", {
+    screen: "home.reports",
+    params: { action: "new" },
+    need: ["home", "view"],
+    capability: "home.reports",
+    words: ["report", "build report", "schedule report", "attendance report", "send me a report"],
   }),
   a("clock_in", "Clock In", {
     screen: "ess.my-attendance",
@@ -172,6 +191,8 @@ function check() {
     if (!x.module && !x.run) throw new Error(`search actions: ${x.key} opens a screen or runs something`);
     if (x.need && (!catalog.isModule(x.need[0]) || !catalog.isAction(x.need[1])))
       throw new Error(`search actions: ${x.key} needs [module, action], got ${JSON.stringify(x.need)}`);
+    if (x.capability !== null && !catalog.isCapability(x.capability))
+      throw new Error(`search actions: ${x.key} needs "${x.capability}", which is not a catalogued capability`);
   }
 }
 check();

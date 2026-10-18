@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 2 | 3 | 24 | 0 | 0 |
+| M1 Core Operations & Employee Management | 29 | 2 | 0 | 27 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **59** | **3** | **31** | **0** | **0** |
+| **Total** | **93** | **59** | **0** | **34** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
@@ -493,12 +493,52 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
-| 2 | Alerts | `alerts` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
-| 3 | Reports | `reports` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
-| 86 | Team | `team` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
+| 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 
 **Notes**
 
+- 18/10/2026 · TB · Home PR 5 (`m1/home-reports`): Reports #3 built on the real API, desktop and
+  phone, which completes Home. `src/modules/reports`: the source registry (Daily Attendance, Leave,
+  Open Alerts, Headcount, the four forward sources and the reader's own Overview, each over its
+  screen's own query, gathered page by page as the reader); reports with sharing, filters and a
+  recurrence schedule (start day, time in Lagos, working days only, PDF or XLSX, recipients who hold
+  `home.reports` and the source's grant); pause, resume and archive for the owner or the CEO; Run Now
+  and the Overview Export as pending runs, the same run on a second press; `scheduled-reports` and
+  `scheduled-report` (one run per recipient and format per slot); `reports.generate` building each
+  numbered file (RPT-0001) as its recipient, skipped when they may no longer have it, emailed once it
+  exists and opened only by its recipient, its owner and the CEO. The tab: the four counts, a card
+  per report with Run Now, Edit, Pause or Resume and Archive, Recent Runs paged at 25 with Download,
+  and New Report and Edit Report as one three-step form. The staging seed (`seeds/staging/60_home.js`)
+  gives every Home card, chart, list and tab figures on staging: attendance for the real staff through
+  the attendance module, forward rows by fixed ids in its `HOME_STAGING_ROWS` manifest, the morning
+  sweep's alerts and four reports through the reports service; it refuses production. Left: each
+  owning milestone deletes its `HOME_STAGING_ROWS` entries when its own staging seed lands
+  (DATABASE_SCHEMA, Read by Home); PDF rendering on staging needs Chromium wired.
+- 18/10/2026 · TB · Home PR 4 (`m1/home-alerts`): Alerts #2 built on the real API, desktop and
+  phone. The metric registry (`alerts.metrics.js`, nine metrics, each breach read in SQL a batch at
+  a time) and the 06:00 Lagos sweep (`home-alert-sweeps`, each subject in its own transaction, a rule
+  it cannot read logged and skipped); late arrivals re-read on `attendance.punched` and late arrivals
+  and missing clock-outs on `attendance.day_closed`; a breach a person cleared is not raised again
+  for the same evidence. Who sees an alert is one condition in `alerts.repo.js`, read by the list,
+  the counts, the Overview, the Open High Alerts card, ⌘K and the assistant; clearing needs
+  `alerts.clear` and the rule's grant reaching the subject; rules are created, edited and switched
+  off by `alerts.manage` holders (switching off dismisses their open alerts in the same
+  transaction). The tab: the four counts, category chips, Alert Sources, the paged list with View
+  Dismissed, Clear Alert and Dismiss Alert (the sheet sends the outcome; the API's optional note is
+  not asked for, as home.md §10.1 lists no note field), and Alert Rules (New Rule also in ⌘K, and
+  ⌘K's rule results open Edit Rule at `?rule=`). The M7 and M8 stub jobs (partner inactivity,
+  budget threshold, approval ageing) are superseded by the sweep. Left: Reports (PR 5); partner,
+  budget and recruitment alerts find nothing until M4, M7 and M8 use their tables.
+- 18/10/2026 · TB · Home PR 3 (`m1/home-team`): Team #86 built on the real API, desktop and phone.
+  `GET /home/team/summary`, `/home/team` and `/home/team/attendance` behind `home` view and
+  `home.team`, in the grant's scope; the four Team cards each equal the records they open (Flags counts
+  each person once, late or no clock-out yesterday); Attendance This Month is My Attendance's figures
+  per person from the roster's new `month()`, one paged query; `team.today` for the assistant. Home's
+  Team, Alerts and Reports tabs now show to every Home viewer, locked ("For Managers") without their
+  capability, and ⌘K still hides them. Left: Alerts (PR 4), Reports (PR 5); People · Attendance taking
+  an employee so View Attendance opens that person's day (LA).
 - 18/10/2026 · TB · Home PR 2 review fixes: Your Week reads each working day on its own page, so a
   busy week keeps Friday and Saturday; a role saved with no card follows its Home view; Choose Cards
   starts from the cards showing, so a lock added after a pick saves; the Overview reads itself again

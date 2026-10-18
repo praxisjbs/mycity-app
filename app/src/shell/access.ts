@@ -23,14 +23,11 @@ const FULL = (me: Me) => me.grants.settings?.includes("view") || me.is_ceo;
 export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
   return mod.tabs.filter((t) => {
     /*
-     * Home's Team, Alerts and Reports follow capabilities. A tab whose capability the
-     * person lacks is hidden until that tab is built on the real API; from then it stays
-     * in the menu and draws its locked state (docs/guides/home.md §10.1), and only ⌘K
-     * hides it.
+     * Home keeps its four tabs for everyone who may open it. Team, Alerts and Reports
+     * follow capabilities: a tab whose capability the person lacks draws its locked state
+     * (features/home/access.ts, docs/guides/home.md §10.1), so the tabs never move, and
+     * only ⌘K hides it (src/shared/search/screens.js tabVisible).
      */
-    if (mod.key === "home" && t.slug === "team") return hasCapability(me, "home.team");
-    if (mod.key === "home" && t.slug === "alerts") return hasCapability(me, "alerts.clear") || hasCapability(me, "alerts.manage");
-    if (mod.key === "home" && t.slug === "reports") return hasCapability(me, "home.reports");
     if (mod.key === "people" && !FULL(me)) return t.slug === "attendance" || t.slug === "organogram";
     /* Announcements is the posting and read-tracking side; staff read them in #announcements. */
     if (mod.key === "community" && t.slug === "announcements") return !!me.grants.people?.includes("create");

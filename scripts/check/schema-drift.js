@@ -154,8 +154,8 @@ function checkStatement(raw, cat) {
   let m;
 
   // 4. Tables that do not exist.
-  // `FOR UPDATE OF t` and `FOR UPDATE SKIP LOCKED` are row locks, not an UPDATE.
-  const target = /\b(?:FROM|JOIN|(?<!FOR\s)UPDATE(?:\s+ONLY)?|INSERT\s+INTO|DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?)\s+(?:ONLY\s+)?((?:public\.)?[a-z_][a-z0-9_]*)\b(?!\s*\()/gi;
+  // `FOR UPDATE OF t`, `FOR NO KEY UPDATE OF t` and `FOR UPDATE SKIP LOCKED` are row locks, not an UPDATE.
+  const target = /\b(?:FROM|JOIN|(?<!FOR\s)(?<!KEY\s)UPDATE(?:\s+ONLY)?|INSERT\s+INTO|DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?)\s+(?:ONLY\s+)?((?:public\.)?[a-z_][a-z0-9_]*)\b(?!\s*\()/gi;
   while ((m = target.exec(sql))) {
     const table = m[1].toLowerCase().replace(/^public\./, "");
     if (SQL_WORDS.has(table) || opaque.has(table) || table === "interp") continue;
@@ -192,7 +192,7 @@ function checkStatement(raw, cat) {
   }
 
   // 3. UPDATE t SET a = ..., b = ...
-  const update = /\b(?<!FOR\s)UPDATE\s+(?:ONLY\s+)?((?:public\.)?[a-z_][a-z0-9_]*)(?:\s+(?:AS\s+)?[a-z_][a-z0-9_]*)?\s+SET\b/gi;
+  const update = /\b(?<!FOR\s)(?<!KEY\s)UPDATE\s+(?:ONLY\s+)?((?:public\.)?[a-z_][a-z0-9_]*)(?:\s+(?:AS\s+)?[a-z_][a-z0-9_]*)?\s+SET\b/gi;
   while ((m = update.exec(sql))) {
     const table = m[1].toLowerCase().replace(/^public\./, "");
     if (!judged(cat, table)) continue;
