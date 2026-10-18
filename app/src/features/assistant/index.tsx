@@ -90,7 +90,7 @@ function Ask() {
           ))}
           <div ref={end} />
         </div>
-        <Form className="mt-4 flex gap-2" onSubmit={() => void ask(text)}>
+        <Form className="mt-4 flex gap-2" onSubmit={() => ask(text)}>
           <InlineInput className="h-10.5 max-md:h-11 min-w-0 flex-1 rounded-full border border-input bg-background px-4 text-sm outline-none focus:border-ring" placeholder="Ask a question" aria-label="Ask Praxis AI" value={text} onChange={setText} />
           <button type="submit" disabled={busy || text.trim().length < 4} aria-label="Ask" className="on-primary flex size-10.5 max-md:size-11 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-50"><Icon name="send" /></button>
         </Form>

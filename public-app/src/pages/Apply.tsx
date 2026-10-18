@@ -36,7 +36,6 @@ export function Apply({ token }: { token: string }) {
   const [cv, setCv] = useState<DocumentRef | null>(null);
   const [touched, setTouched] = useState<Partial<Record<Key, boolean>>>({});
   const [server, setServer] = useState<Partial<Record<Key, string>>>({});
-  const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ApplicationReceipt | null>(null);
 
@@ -71,7 +70,6 @@ export function Apply({ token }: { token: string }) {
     const all = Object.fromEntries((Object.keys(RULES) as Key[]).map((k) => [k, true]));
     setTouched(all);
     if ((Object.keys(RULES) as Key[]).some((k) => RULES[k](v, cv))) return;
-    setBusy(true);
     setProblem(null);
     try {
       setReceipt(
@@ -84,8 +82,6 @@ export function Apply({ token }: { token: string }) {
       if (e instanceof ApiError && Object.keys(e.fields).length) {
         setServer(Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [SERVER_KEY[k] ?? k, m[0]])));
       } else setProblem(e instanceof ApiError ? e.message : "The application did not send. Try again.");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -95,7 +91,7 @@ export function Apply({ token }: { token: string }) {
       <Sub className="mt-1">
         This link is yours and works until {formatDate(link.data.expires_at)} at {formatTime(link.data.expires_at)}.
       </Sub>
-      <Form className="mt-4.5 flex flex-col gap-3" onSubmit={() => void submit()}>
+      <Form className="mt-4.5 flex flex-col gap-3" onSubmit={() => submit()}>
         <Field label="Full Name" htmlFor="full_name" state={state("full_name")} message={err("full_name")}>
           <TextField id="full_name" autoComplete="name" value={v.full_name} onChange={set("full_name")} onBlur={blur("full_name")} state={state("full_name")} />
         </Field>
@@ -130,8 +126,8 @@ export function Apply({ token }: { token: string }) {
           <TextAreaField id="why" rows={3} value={v.why} onChange={set("why")} onBlur={blur("why")} state={state("why")} />
         </Field>
         {problem && <Banner tone="err">{problem}</Banner>}
-        <Button type="submit" variant="primary" block disabled={busy}>
-          {busy ? "Sending" : "Submit Application"}
+        <Button type="submit" variant="primary" block>
+          Submit Application
         </Button>
         <Sub className="text-center">We will email you within five working days.</Sub>
       </Form>

@@ -150,7 +150,7 @@ export function prepareEmail(html: string, { showRemote, inline = {} }: { showRe
  * trimmed line, anchored, with bounded repeats, so no body can make it slow.
  */
 const ATTRIBUTION =
-  /^(?:>+ ?)?(?:On\s.{0,200}?\swrote:|Le\s.{0,200}?\sa\s[ée]crit[  ]?:|-{2,}\s?(?:Original Message|Message d'origine|Forwarded message|Message transf[ée]r[ée])\s?-{2,})$/i;
+  /^(?:>+ ?)?(?:On\s.{0,200}?\swrote:|Le\s.{0,200}?\sa\s[ée]crit[\u00a0 ]?:|-{2,}\s?(?:Original Message|Message d'origine|Forwarded message|Message transf[ée]r[ée])\s?-{2,})$/i;
 const isAttribution = (text: string) => ATTRIBUTION.test(text.trim());
 
 export interface SplitEmail {

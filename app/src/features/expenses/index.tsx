@@ -107,7 +107,7 @@ function RequestForm({ close }: { close: () => void }) {
     <Wizard
       finish="Send Request"
       busy={save.pending}
-      onFinish={() => void submit()}
+      onFinish={() => submit()}
       onCancel={close}
       steps={[
         {

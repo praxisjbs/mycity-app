@@ -10,7 +10,8 @@
  */
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
 
-const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
+const one = async (db, sql, params) =>
+  (await db.query(sql, params)).rows[0] || null;
 
 /** A person as the contract's PersonRef, from employee `e` and department `d`. */
 const PERSON = (e = "e", d = "d") =>
@@ -21,7 +22,8 @@ const PERSON = (e = "e", d = "d") =>
      'department', ${d}.name) END`;
 
 /** Online is a socket touch inside the last 90 seconds (community.presence.js). */
-const ONLINE = (p = "p") => `COALESCE(${p}.last_seen_at > now() - interval '90 seconds', false)`;
+const ONLINE = (p = "p") =>
+  `COALESCE(${p}.last_seen_at > now() - interval '90 seconds', false)`;
 
 /* ------------------------------------------------------------------ *
  * Channels and members
@@ -29,7 +31,11 @@ const ONLINE = (p = "p") => `COALESCE(${p}.last_seen_at > now() - interval '90 s
 
 /** #general or #announcements, made the first time it is needed. */
 async function systemChannel(db, key) {
-  const found = await one(db, "SELECT * FROM community_channel WHERE system_key = $1", [key]);
+  const found = await one(
+    db,
+    "SELECT * FROM community_channel WHERE system_key = $1",
+    [key],
+  );
   if (found) return found;
   await db.query(
     `INSERT INTO community_channel (channel_type, name, description, post_policy, pinned, system_key)
@@ -37,11 +43,17 @@ async function systemChannel(db, key) {
      ON CONFLICT (system_key) WHERE system_key IS NOT NULL DO NOTHING`,
     [key, key === "announcements" ? "people_ceo" : "everyone"],
   );
-  return one(db, "SELECT * FROM community_channel WHERE system_key = $1", [key]);
+  return one(db, "SELECT * FROM community_channel WHERE system_key = $1", [
+    key,
+  ]);
 }
 
 function channelById(db, channelId) {
-  return one(db, "SELECT * FROM community_channel WHERE community_channel_id = $1", [channelId]);
+  return one(
+    db,
+    "SELECT * FROM community_channel WHERE community_channel_id = $1",
+    [channelId],
+  );
 }
 
 /** The caller's membership of a channel, with the channel, or null when they are not in it. */
@@ -83,7 +95,10 @@ function memberRow(db, channelId, userId) {
 
 /** The channel's admins, its row locked so two admins stepping down at once cannot leave it with none. */
 async function adminsLocked(db, channelId) {
-  await db.query("SELECT 1 FROM community_channel WHERE community_channel_id = $1 FOR UPDATE", [channelId]);
+  await db.query(
+    "SELECT 1 FROM community_channel WHERE community_channel_id = $1 FOR UPDATE",
+    [channelId],
+  );
   const { rows } = await db.query(
     "SELECT user_id FROM community_member WHERE community_channel_id = $1 AND member_role = 'admin' ORDER BY user_id",
     [channelId],
@@ -92,11 +107,17 @@ async function adminsLocked(db, channelId) {
 }
 
 function setRole(db, channelId, userId, role) {
-  return db.query("UPDATE community_member SET member_role = $3 WHERE community_channel_id = $1 AND user_id = $2", [channelId, userId, role]);
+  return db.query(
+    "UPDATE community_member SET member_role = $3 WHERE community_channel_id = $1 AND user_id = $2",
+    [channelId, userId, role],
+  );
 }
 
 function removeMember(db, channelId, userId) {
-  return db.query("DELETE FROM community_member WHERE community_channel_id = $1 AND user_id = $2", [channelId, userId]);
+  return db.query(
+    "DELETE FROM community_member WHERE community_channel_id = $1 AND user_id = $2",
+    [channelId, userId],
+  );
 }
 
 /** Whole years since an employee started, on a Lagos date; null with no start date or under a year. */
@@ -123,7 +144,11 @@ async function usersFor(db, { employeeIds = [], departmentIds = [] }) {
 }
 
 async function userOfEmployee(db, employeeId) {
-  const row = await one(db, "SELECT user_id FROM app_user WHERE employee_id = $1 AND status = 'active'", [employeeId]);
+  const row = await one(
+    db,
+    "SELECT user_id FROM app_user WHERE employee_id = $1 AND status = 'active'",
+    [employeeId],
+  );
   return row ? row.user_id : null;
 }
 
@@ -135,7 +160,16 @@ function nameTaken(db, name) {
   );
 }
 
-function insertChannel(db, { name, description, post_policy: postPolicy, channel_type: type, created_by: by }) {
+function insertChannel(
+  db,
+  {
+    name,
+    description,
+    post_policy: postPolicy,
+    channel_type: type,
+    created_by: by,
+  },
+) {
   return one(
     db,
     `INSERT INTO community_channel (channel_type, name, description, post_policy, created_by)
@@ -228,14 +262,24 @@ function setMuted(db, channelId, userId, muted) {
 }
 
 async function membershipPinned(db, channelId, userId) {
-  const row = await one(db, "SELECT pinned_at FROM community_member WHERE community_channel_id = $1 AND user_id = $2", [channelId, userId]);
+  const row = await one(
+    db,
+    "SELECT pinned_at FROM community_member WHERE community_channel_id = $1 AND user_id = $2",
+    [channelId, userId],
+  );
   return Boolean(row && row.pinned_at);
 }
 
 /** The caller's pins, their row locked so two pins at once cannot pass the limit. */
 async function pinsLocked(db, userId) {
-  await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`community:pins:${userId}`]);
-  const row = await one(db, "SELECT count(*)::int AS n FROM community_member WHERE user_id = $1 AND pinned_at IS NOT NULL", [userId]);
+  await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+    `community:pins:${userId}`,
+  ]);
+  const row = await one(
+    db,
+    "SELECT count(*)::int AS n FROM community_member WHERE user_id = $1 AND pinned_at IS NOT NULL",
+    [userId],
+  );
   return row.n;
 }
 
@@ -285,7 +329,9 @@ async function findDirect(db, userA, userB) {
 /** Serialises the creation of one pair's conversation, so two first messages make one channel. */
 function lockPair(db, userA, userB) {
   const key = [userA, userB].sort().join(":");
-  return db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`community:direct:${key}`]);
+  return db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+    `community:direct:${key}`,
+  ]);
 }
 
 const CONVERSATION = `
@@ -320,7 +366,11 @@ function listConversations(db, userId, query) {
 }
 
 function conversationFor(db, channelId, userId) {
-  return one(db, `${CONVERSATION} ${CONVERSATION_FROM} WHERE c.community_channel_id = $2`, [userId, channelId]);
+  return one(
+    db,
+    `${CONVERSATION} ${CONVERSATION_FROM} WHERE c.community_channel_id = $2`,
+    [userId, channelId],
+  );
 }
 
 /** Every direct channel the user is in: receiving a message there marks it delivered. */
@@ -386,12 +436,20 @@ function listMessages(db, channelId, userId, query) {
 }
 
 function messageFor(db, messageId, userId) {
-  return one(db, `${MESSAGE} ${MESSAGE_FROM} WHERE x.community_message_id = $2`, [userId, messageId]);
+  return one(
+    db,
+    `${MESSAGE} ${MESSAGE_FROM} WHERE x.community_message_id = $2`,
+    [userId, messageId],
+  );
 }
 
 /** The message row itself, locked for an edit, a delete or a close. */
 function lockMessage(db, messageId) {
-  return one(db, "SELECT * FROM community_message WHERE community_message_id = $1 FOR UPDATE", [messageId]);
+  return one(
+    db,
+    "SELECT * FROM community_message WHERE community_message_id = $1 FOR UPDATE",
+    [messageId],
+  );
 }
 
 function editMessage(db, messageId, { body, metadata }) {
@@ -403,20 +461,35 @@ function editMessage(db, messageId, { body, metadata }) {
 }
 
 function setMetadata(db, messageId, metadata) {
-  return one(db, "UPDATE community_message SET metadata = $2 WHERE community_message_id = $1 RETURNING *", [messageId, metadata]);
+  return one(
+    db,
+    "UPDATE community_message SET metadata = $2 WHERE community_message_id = $1 RETURNING *",
+    [messageId, metadata],
+  );
 }
 
 function deleteMessage(db, messageId) {
-  return one(db, "UPDATE community_message SET deleted_at = now() WHERE community_message_id = $1 AND deleted_at IS NULL RETURNING *", [messageId]);
+  return one(
+    db,
+    "UPDATE community_message SET deleted_at = now() WHERE community_message_id = $1 AND deleted_at IS NULL RETURNING *",
+    [messageId],
+  );
 }
 
 /** A deleted recognition leaves the counts Home and M2 read. */
 function deleteRecognitionOf(db, messageId) {
-  return db.query("DELETE FROM peer_recognition WHERE community_message_id = $1", [messageId]);
+  return db.query(
+    "DELETE FROM peer_recognition WHERE community_message_id = $1",
+    [messageId],
+  );
 }
 
 async function voteCount(db, messageId) {
-  const row = await one(db, "SELECT count(*)::int AS n FROM community_poll_vote WHERE community_message_id = $1", [messageId]);
+  const row = await one(
+    db,
+    "SELECT count(*)::int AS n FROM community_poll_vote WHERE community_message_id = $1",
+    [messageId],
+  );
   return row.n;
 }
 
@@ -425,12 +498,22 @@ function insertMessage(db, m) {
     db,
     `INSERT INTO community_message (community_channel_id, sender_user_id, message_type, body, document_id, metadata)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [m.community_channel_id, m.sender_user_id ?? null, m.message_type, m.body ?? null, m.document_id ?? null, m.metadata ?? {}],
+    [
+      m.community_channel_id,
+      m.sender_user_id ?? null,
+      m.message_type,
+      m.body ?? null,
+      m.document_id ?? null,
+      m.metadata ?? {},
+    ],
   );
 }
 
 function setTranscript(db, messageId, transcript) {
-  return db.query("UPDATE community_message SET transcript = $2 WHERE community_message_id = $1", [messageId, transcript]);
+  return db.query(
+    "UPDATE community_message SET transcript = $2 WHERE community_message_id = $1",
+    [messageId, transcript],
+  );
 }
 
 /** People who are the subject of celebration cards and who are recognised, by employee id. */
@@ -476,7 +559,8 @@ async function votes(db, messageIds, userId) {
   );
   const out = new Map();
   for (const r of rows) {
-    if (!out.has(r.community_message_id)) out.set(r.community_message_id, { counts: {}, mine: null });
+    if (!out.has(r.community_message_id))
+      out.set(r.community_message_id, { counts: {}, mine: null });
     const v = out.get(r.community_message_id);
     v.counts[r.option_index] = r.votes;
     if (r.mine) v.mine = r.option_index;
@@ -518,7 +602,13 @@ function insertRecognition(db, r) {
     db,
     `INSERT INTO peer_recognition (from_employee_id, to_employee_id, message, community_message_id, note_written_by_system)
      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [r.from_employee_id, r.to_employee_id, r.message, r.community_message_id, r.note_written_by_system],
+    [
+      r.from_employee_id,
+      r.to_employee_id,
+      r.message,
+      r.community_message_id,
+      r.note_written_by_system,
+    ],
   );
 }
 
@@ -585,7 +675,10 @@ async function shared(db, userA, userB) {
     [direct.community_channel_id],
   );
   return {
-    files: rows.filter((r) => r.message_type !== "audio").slice(0, 25).map((r) => r.document),
+    files: rows
+      .filter((r) => r.message_type !== "audio")
+      .slice(0, 25)
+      .map((r) => r.document),
     voice_notes: rows.filter((r) => r.message_type === "audio").length,
   };
 }

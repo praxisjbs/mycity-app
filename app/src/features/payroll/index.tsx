@@ -101,7 +101,7 @@ function Payslips() {
         sub={c ? `${formatMonth(c.period)} ${locked ? "run" : "preview"}` : " "}
         actions={
           <>
-            <Button icon="mail" disabled={!c || email.pending} onClick={async () => { try { await email.run({ params: { id: c!.run_id }, body: {} }); toast(`Payslips are being emailed to ${c!.headcount} staff`); } catch (e) { fail(e); } }}>Email All</Button>
+            <Button icon="mail" disabled={!c} onClick={async () => { try { await email.run({ params: { id: c!.run_id }, body: {} }); toast(`Payslips are being emailed to ${c!.headcount} staff`); } catch (e) { fail(e); } }}>Email All</Button>
             {c && <ExportAction source="payroll.payslips" filters={{ period: c.period }} label="Download All" />}
           </>
         }

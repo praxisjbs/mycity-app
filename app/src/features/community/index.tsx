@@ -262,8 +262,8 @@ function Members({ c, close, edit = false, onChanged }: { c: Channel; close: () 
           if (!edit) return admin ? <Pill tone="ok">Admin</Pill> : null;
           return (
             <span className="flex flex-none items-center gap-1.5">
-              <Button size="sm" onClick={() => void setRole(m, admin ? "member" : "admin")}>{admin ? "Remove Admin" : "Make Admin"}</Button>
-              {!admin && <Button size="sm" onClick={() => void remove(m)}>Remove</Button>}
+              <Button size="sm" onClick={() => setRole(m, admin ? "member" : "admin")}>{admin ? "Remove Admin" : "Make Admin"}</Button>
+              {!admin && <Button size="sm" onClick={() => remove(m)}>Remove</Button>}
             </span>
           );
         }}
@@ -790,7 +790,7 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
           <Meter pct={pct} label={`${pct}%`} />
           <div className="mt-4 mb-1.5 flex items-center gap-2">
             <h3 data-ui="title" className="flex-1 text-sm font-semibold">Not Read · {nNot}</h3>
-            {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={() => void nudge()}>Remind Them</Button>}
+            {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={() => nudge()}>Remind Them</Button>}
           </div>
           {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">Not Read</Pill>} /> : <p className="text-2xs text-subtle-foreground">Everyone has read it.</p>}
           <h3 data-ui="title" className="mt-4 mb-1.5 text-sm font-semibold">Read · {read.page?.total ?? 0}</h3>
@@ -798,7 +798,7 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
         </>
       )}
       <FormFooter>
-        {!live && <Button variant="danger" busy={cancel.pending} onClick={() => void callOff()}>Cancel Announcement</Button>}
+        {!live && <Button variant="danger" busy={cancel.pending} onClick={() => callOff()}>Cancel Announcement</Button>}
         {!live && <Button icon="edit" onClick={() => setEditing(true)}>Edit</Button>}
         <Button variant="primary" onClick={close}>Close</Button>
       </FormFooter>

@@ -5,7 +5,7 @@
  * @use Create or edit with up to 6 fields, a record's detail, a short reader. useModal().open({ title, body }) from anywhere under ModalProvider; <Modal open> when the screen owns the state.
  * @avoid A destructive yes or no (use useConfirm); editing the record behind it on desktop (use SidePanel); more than 6 fields (a wizard); a stack of dialogs (opening one replaces the last).
  * @phone A bottom sheet that drags down to close, with the main action full width at the bottom; `full` makes it a full-screen sheet (a composer, a long form). It stays above the keyboard, header in view; once it holds a text field only the close button, Cancel or Esc close it.
- * @a11y Radix Dialog underneath: aria-modal, focus moves in and is trapped, Esc closes, focus returns to the opener. The title (at most 4 words) names it. With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard.
+ * @a11y Radix Dialog underneath: aria-modal, focus moves in and is trapped, Esc closes, focus returns to the opener. The title (at most 4 words) names it. With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard. Its buttons are one ActionGroup: while one is working the others wait, and Esc, the scrim, a drag and the close button do nothing until it finishes (F26).
  * @status stable
  * @exports ModalProvider, ModalFooter, Grow
  * @example modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })
@@ -28,6 +28,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "../lib/cn";
 import { useIsPhone } from "../lib/media";
 import { Button } from "../actions/Button";
+import { ActionGroup } from "../actions/ActionGroup";
+import { PressGroupContext, usePressGroup } from "../actions/press";
 import { Chrome, Sheet } from "./Sheet";
 import { FooterContext, HostContext, IN_FOOTER, OverlayContext, focusInto, useReturnFocus, type HostLayer, type OverlayState } from "./context";
 
@@ -94,6 +96,9 @@ export function Modal({
   const [formDirty, setFormDirty] = useState(false);
   const [asking, setAsking] = useState(false);
   const returnFocus = useReturnFocus(open);
+  // Its own group: the page behind may be busy (the button that opened it), and that must not hold it.
+  const group = usePressGroup(true);
+  const { isBusy } = group;
 
   // The overlay context stays stable (a form's effect depends on it), so it reads the latest values through a ref.
   const latest = useRef({ unsaved: dirty || formDirty, onClose });
@@ -101,9 +106,12 @@ export function Modal({
     latest.current = { unsaved: dirty || formDirty, onClose };
   });
   const dismiss = useCallback(() => {
+    // Mid-save, a dismissal would lose the answer: it waits like the buttons do. A save that
+    // succeeds closes the modal through `close`, which is not a dismissal.
+    if (isBusy()) return;
     if (latest.current.unsaved) setAsking(true);
     else latest.current.onClose();
-  }, []);
+  }, [isBusy]);
   const overlay = useMemo<OverlayState>(() => ({ setDirty: setFormDirty, dismiss }), [dismiss]);
 
   useEffect(() => {
@@ -122,6 +130,7 @@ export function Modal({
 
   return (
     <OverlayContext.Provider value={overlay}>
+      <PressGroupContext.Provider value={group}>
       {phone ? (
         <Sheet
           open={open}
@@ -174,6 +183,7 @@ export function Modal({
           </Dialog.Portal>
         </Dialog.Root>
       )}
+      </PressGroupContext.Provider>
       {asking && (
         <Modal
           open
@@ -216,7 +226,9 @@ export function ModalFooter({ children }: ModalFooterProps) {
   if (!slot.inOverlay) {
     return (
       <div data-ui="modal-footer" className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3 phone:flex-col phone:items-stretch">
-        <FooterContext.Provider value={IN_FOOTER}>{children}</FooterContext.Provider>
+        <FooterContext.Provider value={IN_FOOTER}>
+          <ActionGroup>{children}</ActionGroup>
+        </FooterContext.Provider>
       </div>
     );
   }

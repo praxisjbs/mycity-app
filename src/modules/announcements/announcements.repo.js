@@ -8,7 +8,8 @@
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { PERSON } = require("../community/community.repo");
 
-const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
+const one = async (db, sql, params) =>
+  (await db.query(sql, params)).rows[0] || null;
 
 const ROW = `
   SELECT a.announcement_id, a.title, a.body, a.audience, a.status, a.publish_at, a.published_at,
@@ -40,7 +41,11 @@ function get(db, id) {
 }
 
 function lockForUpdate(db, id) {
-  return one(db, "SELECT * FROM announcement WHERE announcement_id = $1 FOR UPDATE", [id]);
+  return one(
+    db,
+    "SELECT * FROM announcement WHERE announcement_id = $1 FOR UPDATE",
+    [id],
+  );
 }
 
 function insert(db, a) {
@@ -48,7 +53,14 @@ function insert(db, a) {
     db,
     `INSERT INTO announcement (title, body, audience, status, published_by, publish_at)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [a.title, a.body, a.audience, a.status, a.published_by, a.publish_at ?? null],
+    [
+      a.title,
+      a.body,
+      a.audience,
+      a.status,
+      a.published_by,
+      a.publish_at ?? null,
+    ],
   );
 }
 
@@ -62,7 +74,11 @@ function updateScheduled(db, id, a) {
 }
 
 function cancelScheduled(db, id) {
-  return one(db, "UPDATE announcement SET status = 'cancelled' WHERE announcement_id = $1 AND status = 'scheduled' RETURNING *", [id]);
+  return one(
+    db,
+    "UPDATE announcement SET status = 'cancelled' WHERE announcement_id = $1 AND status = 'scheduled' RETURNING *",
+    [id],
+  );
 }
 
 function markPublished(db, id, { messageId, audienceSize }) {
@@ -140,7 +156,10 @@ async function unreadUsers(db, id) {
 }
 
 function setReminded(db, id) {
-  return db.query("UPDATE announcement SET last_reminded_at = now() WHERE announcement_id = $1", [id]);
+  return db.query(
+    "UPDATE announcement SET last_reminded_at = now() WHERE announcement_id = $1",
+    [id],
+  );
 }
 
 /** The caller opened #announcements: the announcements behind these messages are read. */

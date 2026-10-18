@@ -10,7 +10,8 @@
  */
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
 
-const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
+const one = async (db, sql, params) =>
+  (await db.query(sql, params)).rows[0] || null;
 
 /* ------------------------------------------------------------------ *
  * Account and secret
@@ -46,11 +47,18 @@ async function saveSecret(db, { key, ciphertext, by }) {
 }
 
 function secretOf(db, secretId) {
-  return one(db, "SELECT ciphertext FROM integration_secret WHERE integration_secret_id = $1 AND active", [secretId]);
+  return one(
+    db,
+    "SELECT ciphertext FROM integration_secret WHERE integration_secret_id = $1 AND active",
+    [secretId],
+  );
 }
 
 function retireSecret(db, secretId) {
-  return db.query("UPDATE integration_secret SET active = false, ciphertext = '', rotated_at = now() WHERE integration_secret_id = $1", [secretId]);
+  return db.query(
+    "UPDATE integration_secret SET active = false, ciphertext = '', rotated_at = now() WHERE integration_secret_id = $1",
+    [secretId],
+  );
 }
 
 function upsertAccount(db, a) {
@@ -65,7 +73,18 @@ function upsertAccount(db, a) {
             integration_secret_id = EXCLUDED.integration_secret_id, tls = EXCLUDED.tls,
             status = 'connected', last_error_code = NULL, consecutive_failures = 0
      RETURNING *`,
-    [a.mail_account_id, a.user_id, a.email, a.incoming_host, a.incoming_port, a.outgoing_host, a.outgoing_port, a.username, a.integration_secret_id, a.tls],
+    [
+      a.mail_account_id,
+      a.user_id,
+      a.email,
+      a.incoming_host,
+      a.incoming_port,
+      a.outgoing_host,
+      a.outgoing_port,
+      a.username,
+      a.integration_secret_id,
+      a.tls,
+    ],
   );
 }
 
@@ -122,7 +141,11 @@ async function folders(db, accountId) {
 }
 
 function folderOfKind(db, accountId, kind) {
-  return one(db, "SELECT * FROM mail_folder WHERE mail_account_id = $1 AND kind = $2", [accountId, kind]);
+  return one(
+    db,
+    "SELECT * FROM mail_folder WHERE mail_account_id = $1 AND kind = $2",
+    [accountId, kind],
+  );
 }
 
 function setCursor(db, folderId, { uidValidity, lastUid, error = null }) {
@@ -157,7 +180,14 @@ function upsertThread(db, t) {
            last_message_at = GREATEST(mail_thread.last_message_at, EXCLUDED.last_message_at),
            has_attachment = mail_thread.has_attachment OR EXCLUDED.has_attachment
      RETURNING mail_thread_id`,
-    [t.mail_account_id, t.thread_key, t.subject || "(no subject)", t.participants, t.last_message_at, t.has_attachment],
+    [
+      t.mail_account_id,
+      t.thread_key,
+      t.subject || "(no subject)",
+      t.participants,
+      t.last_message_at,
+      t.has_attachment,
+    ],
   );
 }
 
@@ -171,16 +201,36 @@ function insertMessage(db, m) {
      ON CONFLICT (mail_account_id, internet_message_id) WHERE internet_message_id IS NOT NULL DO NOTHING
      RETURNING mail_message_id`,
     [
-      m.mail_thread_id, m.mail_account_id, m.mail_folder_id, m.remote_id, m.internet_message_id,
-      m.from_address, m.from_name, m.to_addresses, m.cc_addresses, m.subject, m.body_text, m.body_html,
-      m.snippet, m.direction, m.sent_at, m.received_at, m.read_at, m.in_reply_to, m.references_header, m.has_attachment,
+      m.mail_thread_id,
+      m.mail_account_id,
+      m.mail_folder_id,
+      m.remote_id,
+      m.internet_message_id,
+      m.from_address,
+      m.from_name,
+      m.to_addresses,
+      m.cc_addresses,
+      m.subject,
+      m.body_text,
+      m.body_html,
+      m.snippet,
+      m.direction,
+      m.sent_at,
+      m.received_at,
+      m.read_at,
+      m.in_reply_to,
+      m.references_header,
+      m.has_attachment,
     ],
   );
 }
 
 /** A message seen again in another folder: the server moved it. */
 function moveMessageRow(db, messageId, folderId, remoteId) {
-  return db.query("UPDATE mail_message SET mail_folder_id = $2, remote_id = $3 WHERE mail_message_id = $1", [messageId, folderId, remoteId]);
+  return db.query(
+    "UPDATE mail_message SET mail_folder_id = $2, remote_id = $3 WHERE mail_message_id = $1",
+    [messageId, folderId, remoteId],
+  );
 }
 
 /** Counts a thread carries, from its messages. */
@@ -230,7 +280,12 @@ function listThreads(db, accountId, query) {
         AND ($3::text IS NULL OR search_fold(t.subject || ' ' || array_to_string(t.participant_addresses::text[], ' ')) LIKE '%' || search_fold($3) || '%')
         AND (NOT $4::boolean OR agg.unread)
       ORDER BY t.last_message_at DESC, t.mail_thread_id`,
-    [accountId, query.folder || "inbox", query.q ?? null, Boolean(query.unread)],
+    [
+      accountId,
+      query.folder || "inbox",
+      query.q ?? null,
+      Boolean(query.unread),
+    ],
     query,
   );
 }
@@ -345,7 +400,11 @@ const DRAFT = `d.mail_draft_id, d.to_addresses, d.cc_addresses, d.bcc_addresses,
                            FROM document doc WHERE doc.document_id = ANY(d.document_ids)), '[]') AS attachments`;
 
 function draft(db, userId, draftId) {
-  return one(db, `SELECT ${DRAFT} FROM mail_draft d WHERE d.mail_draft_id = $2 AND d.user_id = $1`, [userId, draftId]);
+  return one(
+    db,
+    `SELECT ${DRAFT} FROM mail_draft d WHERE d.mail_draft_id = $2 AND d.user_id = $1`,
+    [userId, draftId],
+  );
 }
 
 function saveDraft(db, { id, userId, accountId, d }) {
@@ -358,12 +417,26 @@ function saveDraft(db, { id, userId, accountId, d }) {
             document_ids = EXCLUDED.document_ids, in_reply_to = EXCLUDED.in_reply_to
       WHERE mail_draft.user_id = $2
      RETURNING mail_draft_id`,
-    [id, userId, accountId, d.to_addresses, d.cc_addresses, d.bcc_addresses, d.subject, d.body_html, d.document_ids, d.in_reply_to],
+    [
+      id,
+      userId,
+      accountId,
+      d.to_addresses,
+      d.cc_addresses,
+      d.bcc_addresses,
+      d.subject,
+      d.body_html,
+      d.document_ids,
+      d.in_reply_to,
+    ],
   );
 }
 
 function deleteDraft(db, userId, draftId) {
-  return db.query("DELETE FROM mail_draft WHERE mail_draft_id = $2 AND user_id = $1", [userId, draftId]);
+  return db.query(
+    "DELETE FROM mail_draft WHERE mail_draft_id = $2 AND user_id = $1",
+    [userId, draftId],
+  );
 }
 
 /** Drafts as rows of the Drafts folder, newest first, with a schedule when one waits on the queue. */
@@ -390,7 +463,14 @@ function enqueue(db, q) {
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO UPDATE SET updated_at = now()
      RETURNING mail_send_queue_id, status, release_at`,
-    [q.user_id, q.mail_account_id, q.mail_draft_id, q.payload, q.release_at, q.idempotency_key ?? null],
+    [
+      q.user_id,
+      q.mail_account_id,
+      q.mail_draft_id,
+      q.payload,
+      q.release_at,
+      q.idempotency_key ?? null,
+    ],
   );
 }
 

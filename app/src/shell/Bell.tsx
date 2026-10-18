@@ -62,9 +62,10 @@ function BellBody({ close }: { close: () => void }) {
   const { navigate } = useRouter();
   const markRead = (n: Notification) => read.run({ params: { id: n.notification_id }, body: {} }).then(reload);
   const open = (n: Notification) => {
-    if (!n.read_at) void markRead(n).catch(() => undefined);
+    const marked = n.read_at ? undefined : markRead(n).catch(() => undefined);
     close();
     navigate(n.link!.path);
+    return marked;
   };
   return (
     <>
@@ -89,7 +90,7 @@ function BellBody({ close }: { close: () => void }) {
                   Open
                 </Button>
               ) : !n.read_at ? (
-                <Button size="sm" busy={read.pending} onClick={() => void markRead(n)}>
+                <Button size="sm" busy={read.pending} onClick={() => markRead(n)}>
                   Mark Read
                 </Button>
               ) : undefined

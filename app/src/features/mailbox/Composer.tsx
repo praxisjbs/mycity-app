@@ -134,7 +134,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
     setSched((s) => ({ ...s, tried: true, past: false }));
     if (!sched.date || !okT) return;
     if (new Date(at(sched.date, sched.time)).getTime() <= Date.now()) return setSched((s) => ({ ...s, past: true }));
-    void send(at(sched.date, sched.time));
+    return send(at(sched.date, sched.time));
   };
   const discard = async () => {
     if (stored) await api.call("DELETE /api/v1/mailbox/drafts/:id", { params: { id: draftId } }).catch(() => null);
@@ -229,7 +229,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
                 { label: "Pick Date and Time", icon: "check", onSelect: () => setSched((s) => ({ ...s, open: true })) },
               ]}
             />
-            <Button variant="primary" icon="send" className="max-md:flex-1" busy={busy} onClick={() => void send()}>Send</Button>
+            <Button variant="primary" icon="send" className="max-md:flex-1" busy={busy} onClick={() => send()}>Send</Button>
           </>
         )}
       </div>
