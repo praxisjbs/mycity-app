@@ -46,6 +46,7 @@ describe("job registry", () => {
       "media-scan",
       "notification-deliver",
       "pdf-render",
+      "scheduled-report",
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
       "alert-ageing",
@@ -57,6 +58,7 @@ describe("job registry", () => {
       "mail-sync",
       "media-reconcile",
       "outbox-dispatch",
+      "scheduled-reports",
       "workflow-timeout",
     ]);
   });

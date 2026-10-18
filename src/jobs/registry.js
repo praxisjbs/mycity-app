@@ -106,6 +106,11 @@ const JOBS = Object.freeze([
     concurrency: 1,
     summary: "Home's alert rules read again for a day, by hand",
   },
+  {
+    queue: "scheduled-report",
+    concurrency: 2,
+    summary: "A report schedule's slot: a run for each recipient and format",
+  },
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -120,6 +125,7 @@ const SCHEDULERS = Object.freeze([
   "mail-sync",
   "attendance-day-close",
   "home-alert-sweeps",
+  "scheduled-reports",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

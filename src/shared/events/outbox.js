@@ -21,7 +21,9 @@
  *
  *   event  { event_id, key, module, entity: { type, id }, actor_user_id, payload,
  *            occurred_at, request_id }
- *   ctx    { outbox_id, attempt }
+ *   ctx    { outbox_id, attempt, max_attempts }   attempt counts from 1; on attempt ===
+ *          max_attempts a failure is final, so a handler that keeps a status of its own
+ *          (a report run) records the failure instead of throwing it again
  *
  * Guarantees, and what they ask of a handler:
  *
@@ -260,7 +262,11 @@ async function processRow(db, row) {
         try {
           await withTimeout(
             Promise.resolve().then(() =>
-              h.fn(event, { outbox_id: row.outbox_id, attempt: row.attempts }),
+              h.fn(event, {
+                outbox_id: row.outbox_id,
+                attempt: row.attempts,
+                max_attempts: row.max_attempts,
+              }),
             ),
             HANDLER_TIMEOUT_MS,
             `handler ${h.name}`,

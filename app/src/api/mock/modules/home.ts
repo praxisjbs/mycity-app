@@ -1,4 +1,5 @@
 import alertsContract from "@mycity/contract/schemas/alerts.js";
+import reportsContract from "@mycity/contract/schemas/reports.js";
 import type {
   HomeActivityItem,
   HomeAlert,
@@ -18,6 +19,13 @@ import type {
   HomeKpiUnit,
   HomeOverview,
   HomePipeline,
+  HomeReport,
+  HomeReportFilters,
+  HomeReportRecipient,
+  HomeReportRecurrence,
+  HomeReportRun,
+  HomeReportScheduleSave,
+  HomeReportSummary,
   HomeRoleKpis,
   HomeRosterStatus,
   HomeTeamAttendanceRow,
@@ -27,7 +35,6 @@ import type {
   HomeWeekDay,
   Me,
 } from "@mycity/contract/contract.gen.ts";
-import type { HomeReport } from "@/api/types/home";
 import { MODULES } from "@/shell/catalogue";
 import { formatDate, formatTime, todayIso } from "@mycity/ui";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
@@ -52,8 +59,10 @@ import { leaveRequests, leaveYear, waitingOn } from "./organisation";
  * them). Alerts and their rules are on the contract (packages/contract/schemas/alerts.js): who
  * sees an alert, who may clear it, the counts, and a rule switched off dismissing its open
  * alerts follow home.md §6 Alerts, and a body the contract refuses is answered 422 as the API
- * answers it. Reports still answers its INTERIM shapes (@/api/types/home) until its own PR
- * moves it.
+ * answers it. Reports are on the contract too (packages/contract/schemas/reports.js): who sees
+ * a report and who may change it, who may receive one, schedules kept running or paused, files
+ * that are Pending for a few seconds before they are there, and Run Now and the Overview Export
+ * answered 202 with their numbered run, the same run again while its file waits.
  *
  * Demonstration data only (A5): production starts empty.
  */
@@ -966,8 +975,12 @@ const AGED_DAYS = 14;
 /** Overdue 7 Days +: open more than this many days. */
 const OVERDUE_DAYS = 7;
 const DAY_MS = 86_400_000;
-/** A person's login as the alert tables keep it (`created_by`, `cleared_by`). */
-const loginOf = (key: string) => sid(`login:${key}`);
+/**
+ * A person's login id, as Home's tables keep it (`created_by`, `cleared_by`, a report's owner and
+ * recipients): the same id the other mocks' people lists and profile cards give, so a recipient
+ * picked on New Report is a login this mock knows.
+ */
+const loginOf = (key: string) => sid(`user:${key}`);
 /** The note a switched-off rule leaves on the alerts it dismisses. */
 const RULE_OFF_NOTE = "Rule switched off";
 
@@ -1240,12 +1253,17 @@ function ruleRowOf(r: MockRule): HomeAlertRule {
   };
 }
 
-/** A body the contract refuses, as the API answers it: 422 with each field's first message. */
-function refused422(issues: Array<{ path: PropertyKey[]; message: string }>) {
+/**
+ * A body the contract refuses, as the API answers it (src/shared/http/validate.js): 422 with
+ * each field's first message, keyed by its dotted path ("schedule.recipient_user_ids"), and a
+ * key the contract does not know named on its own.
+ */
+function refused422(issues: Array<{ path: PropertyKey[]; message: string; code?: string; keys?: string[] }>) {
   const fields: Record<string, string[]> = {};
   for (const issue of issues) {
-    const key = String(issue.path[0] ?? "body");
-    fields[key] ??= [issue.message];
+    const at = issue.path.map(String).join(".");
+    if (issue.code === "unrecognized_keys") for (const k of issue.keys ?? []) fields[at ? `${at}.${k}` : k] ??= ["is not allowed"];
+    else fields[at || "_"] ??= [issue.message];
   }
   return invalid(fields);
 }
@@ -1258,24 +1276,414 @@ function mondayOf(now = new Date()): number {
 }
 
 /* ------------------------------------------------------------------ *
- * Reports (INTERIM until Home · Reports is on the real API)
+ * Reports, in the contract's shapes (packages/contract/schemas/reports.js)
  * ------------------------------------------------------------------ */
-const REPORTS = [
-  ["Daily Attendance", "Every weekday at 18:00 to Operations and the CEO.", "scheduled", "Operations, CEO", ["operations", "ceo"]],
-  ["Weekly Productivity", "Mondays at 08:00. Completion, overdue, workload by team.", "scheduled", "All managers", ["operations", "ceo"]],
-  ["Recruitment Pipeline", "Fridays. Stage counts and time at stage per vacancy.", "scheduled", "Hiring managers", ["operations", "ceo"]],
-  ["Partnership Pipeline", "Monthly. Stage movement, signed value, lead owner.", "paused", "Partnerships, CEO", ["operations", "ceo", "partnerships"]],
-  ["Monthly Expenses", "First working day. By department, project and category.", "scheduled", "Operations, CEO", ["operations", "ceo"]],
-  ["Pending Approvals", "Daily at 09:00 to whoever is holding one.", "scheduled", "Approvers", ["operations", "ceo"]],
-].map((r, i) => ({ home_report_id: sid(`report:${i}`), name: r[0] as string, cadence: r[1] as string, status: r[2] as HomeReport["status"], audience: r[3] as string, roles: r[4] as string[] }));
-const RUNS = [
-  ["Daily Attendance", 1, "18:00", "Operations, CEO", "PDF"],
-  ["Pending Approvals", 0, "09:00", "4 approvers", "PDF"],
-  ["Weekly Productivity", 3, "08:00", "All managers", "PDF, XLSX"],
-  ["Recruitment Pipeline", 6, "17:00", "Hiring managers", "PDF"],
-  ["Monthly Expenses", 13, "09:12", "Operations, CEO", "XLSX"],
-].map((r, i) => ({ run_id: sid(`run:${i}`), number: `RPT-${String(214 - i).padStart(4, "0")}`, report: r[0] as string, run_at: at(r[1] as number, r[2] as string), recipients: r[3] as string, formats: r[4] as string }));
-const reportScope = (user: string) => REPORTS.filter((r) => r.roles.includes(SIGN_INS[user]?.view ?? "staff") || (SIGN_INS[user] == null && teamOf(user).length > 0 && r.roles.includes("operations")));
+
+type ReportSource = HomeReport["report_key"];
+type ReportFormat = HomeReportRun["format"];
+
+/** A report's schedule as the mock keeps it: its recipients by their roster keys. */
+interface MockSchedule {
+  report_schedule_id: string;
+  recurrence: HomeReportRecurrence;
+  starts_on: string;
+  run_time: string;
+  formats: ReportFormat[];
+  recipients: string[];
+  active: boolean;
+  last_run_at: string | null;
+}
+
+/** A report as the mock keeps it: its owner by their roster key, so who sees it reads from the roster. */
+interface MockReport {
+  saved_report_id: string;
+  owner: string;
+  name: string;
+  report_key: ReportSource;
+  filters: HomeReportFilters;
+  shared: boolean;
+  schedule: MockSchedule | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * One file. A run made on this laptop is generated a few seconds after it is asked for, as
+ * the outbox would make it (`settles_at`); the seeded runs keep the state they were given.
+ */
+interface MockRun extends Omit<HomeReportRun, "report_name" | "report_key" | "recipient_user_id" | "recipient_name" | "requested_by"> {
+  recipient: string;
+  requested_by: string | null;
+  settles_at: number | null;
+}
+
+/** How long a run asked for here stays Pending before its file is there. */
+const SETTLE_MS = 4_000;
+
+/** RPT-0001 onwards, never reset; the seeded history starts the laptop's numbers at RPT-0201. */
+let lastRunNumber = 200;
+const nextRunNumber = () => `RPT-${String(++lastRunNumber).padStart(4, "0")}`;
+
+/** The person a login names, whether it came from a people list (loginOf) or is the reader's own from /me. */
+const keyOfLogin = (userId: string) => PEOPLE.find((p) => loginOf(p.user_key) === userId || me(p.user_key).user_id === userId)?.user_key ?? null;
+
+/** A source as the contract declares it: the module whose grant opens it, and the filters it takes. */
+const sourceOf = (key: string) => (reportsContract.HOME_REPORT_SOURCES as Record<string, { module: string; filters: readonly string[] }>)[key];
+
+interface ReportSeed {
+  name: string;
+  owner: string;
+  source: ReportSource;
+  filters?: HomeReportFilters;
+  shared: boolean;
+  /** Days ago it was made. */
+  made: number;
+  schedule?: { recurrence: HomeReportRecurrence; time: string; formats: ReportFormat[]; to: string[]; active?: boolean };
+  /** Days ago it was archived. */
+  archived?: number;
+}
+
+/**
+ * Reports across the sources, scheduled, paused and on demand, shared and private, owned by
+ * Operations, the CEO and a Head of Department, and one archived, so a laptop shows every state.
+ */
+const REPORT_SEEDS: ReportSeed[] = [
+  { name: "Daily Attendance", owner: "cynthia", source: "daily_attendance", shared: true, made: 60, schedule: { recurrence: { freq: "daily", working_days_only: true }, time: "18:00", formats: ["pdf"], to: ["cynthia", "ifeoma", "damilola"] } },
+  { name: "Late Arrivals", owner: "cynthia", source: "daily_attendance", filters: { roster_status: "late" }, shared: false, made: 40, schedule: { recurrence: { freq: "weekly", by_weekday: [1] }, time: "09:30", formats: ["xlsx"], to: ["cynthia"] } },
+  { name: "Leave This Month", owner: "cynthia", source: "leave", filters: { leave_status: "approved" }, shared: true, made: 90, schedule: { recurrence: { freq: "monthly", by_month_day: 1 }, time: "08:00", formats: ["pdf", "xlsx"], to: ["cynthia", "ngozi", "musa"] } },
+  { name: "Open High Alerts", owner: "ifeoma", source: "open_alerts", filters: { severity: "high" }, shared: true, made: 30, schedule: { recurrence: { freq: "weekly", by_weekday: [1] }, time: "07:45", formats: ["pdf"], to: ["ifeoma", "cynthia"], active: false } },
+  { name: "Headcount by Department", owner: "cynthia", source: "headcount", shared: true, made: 20 },
+  { name: "Partnership Pipeline", owner: "ngozi", source: "partnerships", shared: true, made: 50, schedule: { recurrence: { freq: "weekly", by_weekday: [5] }, time: "16:00", formats: ["pdf", "xlsx"], to: ["ngozi", "ifeoma", "bashir"] } },
+  { name: "Monthly Expenses", owner: "ifeoma", source: "expenses", shared: false, made: 120, schedule: { recurrence: { freq: "monthly", by_month_day: -1, working_days_only: true }, time: "17:00", formats: ["xlsx"], to: ["ifeoma", "amara"] } },
+  { name: "Open Tasks", owner: "cynthia", source: "tasks", shared: false, made: 10 },
+  { name: "Recruitment Pipeline", owner: "cynthia", source: "recruitment", shared: true, made: 70, schedule: { recurrence: { freq: "weekly", by_weekday: [4] }, time: "10:00", formats: ["pdf"], to: ["cynthia"], active: false } },
+  { name: "Studio Hours", owner: "cynthia", source: "daily_attendance", filters: { department_id: departmentId("Studio") }, shared: false, made: 100, archived: 12, schedule: { recurrence: { freq: "weekly", by_weekday: [5] }, time: "17:00", formats: ["pdf"], to: ["cynthia"], active: false } },
+];
+
+const REPORTS: MockReport[] = REPORT_SEEDS.map((s) => {
+  const id = sid(`report:${s.name}`);
+  const made = at(s.made, "10:00");
+  return {
+    saved_report_id: id,
+    owner: s.owner,
+    name: s.name,
+    report_key: s.source,
+    filters: s.filters ?? {},
+    shared: s.shared,
+    schedule: s.schedule
+      ? {
+          report_schedule_id: sid(`report-schedule:${s.name}`),
+          recurrence: s.schedule.recurrence,
+          starts_on: isoDaysAgo(s.made),
+          run_time: s.schedule.time,
+          formats: s.schedule.formats,
+          recipients: s.schedule.to,
+          active: s.schedule.active ?? true,
+          last_run_at: null,
+        }
+      : null,
+    archived_at: s.archived === undefined ? null : at(s.archived, "11:20"),
+    created_at: made,
+    updated_at: s.archived === undefined ? made : at(s.archived, "11:20"),
+  };
+});
+const reportNamed = (name: string) => REPORTS.find((r) => r.name === name)!;
+
+const RUNS: MockRun[] = [];
+
+/** A seeded file of a scheduled report: its slot, one recipient, one format, in the state it ended in. */
+function seedRun(name: string, daysAgo: number, recipient: string, format: ReportFormat, status: Exclude<HomeReportRun["status"], "pending">) {
+  const report = reportNamed(name);
+  const schedule = report.schedule!;
+  const slot = at(daysAgo, schedule.run_time);
+  const finished = new Date(Date.parse(slot) + 90_000).toISOString();
+  const number = nextRunNumber();
+  RUNS.push({
+    home_report_run_id: sid(`report-run:${number}`),
+    number,
+    saved_report_id: report.saved_report_id,
+    report_schedule_id: schedule.report_schedule_id,
+    scheduled_for: slot,
+    recipient,
+    requested_by: null,
+    format,
+    status,
+    document_id: status === "done" ? sid(`report-file:${number}`) : null,
+    emailed_at: status === "done" ? finished : null,
+    run_at: slot,
+    finished_at: finished,
+    settles_at: null,
+  });
+  if (!schedule.last_run_at || slot > schedule.last_run_at) schedule.last_run_at = slot;
+}
+
+/* Oldest first, so the numbers rise with time; Recent Runs lists them newest first. */
+seedRun("Studio Hours", 19, "cynthia", "pdf", "done");
+seedRun("Monthly Expenses", 18, "ifeoma", "xlsx", "done");
+seedRun("Monthly Expenses", 18, "amara", "xlsx", "done");
+for (const [recipient, format, status] of [
+  ["cynthia", "pdf", "done"],
+  ["cynthia", "xlsx", "done"],
+  ["ngozi", "pdf", "done"],
+  ["ngozi", "xlsx", "done"],
+  // Suspended since the schedule was saved: no file and no email for her.
+  ["musa", "pdf", "skipped"],
+  ["musa", "xlsx", "skipped"],
+] as const)
+  seedRun("Leave This Month", 17, recipient, format, status);
+seedRun("Open High Alerts", 7, "ifeoma", "pdf", "done");
+seedRun("Open High Alerts", 7, "cynthia", "pdf", "failed");
+for (let day = 8; day >= 1; day -= 1) {
+  for (const recipient of ["cynthia", "ifeoma", "damilola"]) seedRun("Daily Attendance", day, recipient, "pdf", day === 1 && recipient === "damilola" ? "failed" : "done");
+  if (day === 3) for (const recipient of ["ngozi", "ifeoma", "bashir"]) for (const format of ["pdf", "xlsx"] as const) seedRun("Partnership Pipeline", day, recipient, format, "done");
+  if (day === 1) seedRun("Late Arrivals", day, "cynthia", "xlsx", "done");
+}
+
+/* Two files asked for by hand: Headcount, done three hours ago, and Open Tasks, still being made. */
+const ASKED: Array<[name: string, recipient: string, format: ReportFormat, at: string, status: HomeReportRun["status"]]> = [
+  ["Headcount by Department", "cynthia", "pdf", new Date(Date.now() - 3 * 3_600_000).toISOString(), "done"],
+  ["Open Tasks", "cynthia", "xlsx", new Date(Date.now() - 60_000).toISOString(), "pending"],
+];
+for (const [name, recipient, format, runAt, status] of ASKED) {
+  const number = nextRunNumber();
+  const done = status === "done";
+  RUNS.push({
+    home_report_run_id: sid(`report-run:${number}`),
+    number,
+    saved_report_id: reportNamed(name).saved_report_id,
+    report_schedule_id: null,
+    scheduled_for: null,
+    recipient,
+    requested_by: recipient,
+    format,
+    status,
+    document_id: done ? sid(`report-file:${number}`) : null,
+    emailed_at: done ? runAt : null,
+    run_at: runAt,
+    finished_at: done ? runAt : null,
+    settles_at: null,
+  });
+}
+
+/** A run asked for here becomes its file once the outbox would have made it. */
+function settle(run: MockRun) {
+  if (run.status !== "pending" || run.settles_at === null || Date.now() < run.settles_at) return;
+  const now = new Date().toISOString();
+  Object.assign(run, { status: "done", document_id: sid(`report-file:${run.number}`), finished_at: now, emailed_at: now, settles_at: null });
+}
+
+/**
+ * May a person open a source, as the server reads it (reports.sources.js): its module's `view`
+ * grant and, for Open Alerts, one of the capabilities that open the Alerts tab.
+ */
+const mayOpenSource = (m: Me, key: string) =>
+  m.is_ceo || (mayView(m, sourceOf(key).module) && (key !== "open_alerts" || holds(m, "alerts.clear") || holds(m, "alerts.manage")));
+
+/**
+ * Who sees a report (home.md §6 Reports): its owner; its recipients and, when it is shared,
+ * every holder of `home.reports`, while they may open its source; the CEO sees every one.
+ * Archived ones only when asked for.
+ */
+function mayReadReport(user: string, r: MockReport): boolean {
+  const m = me(user);
+  return m.is_ceo || r.owner === user || ((r.shared || !!r.schedule?.recipients.includes(user)) && mayOpenSource(m, r.report_key));
+}
+const mayEditReport = (user: string, r: MockReport) => r.owner === user || me(user).is_ceo;
+/** The reports Reports lists: never the Overview Export's own report. */
+const listedReports = (user: string) => REPORTS.filter((r) => r.report_key !== "overview" && mayReadReport(user, r));
+const statusOfReport = (r: MockReport): HomeReport["status"] => (!r.schedule ? "on_demand" : r.schedule.active ? "scheduled" : "paused");
+
+/** Recent Runs: the files the reader received, and every file of the reports they own; the CEO sees every one. */
+function visibleRuns(user: string): MockRun[] {
+  const ceo = me(user).is_ceo;
+  RUNS.forEach(settle);
+  return RUNS.filter((run) => ceo || run.recipient === user || REPORTS.find((r) => r.saved_report_id === run.saved_report_id)?.owner === user);
+}
+
+const addDays = (date: string, n: number) => todayIso(new Date(Date.parse(`${date}T12:00:00Z`) + n * DAY_MS));
+const daysFrom = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / DAY_MS);
+const weekdayOfDate = (date: string) => ((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+const lastDayOf = (date: string) => new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0)).getUTCDate();
+
+/** Does the rule fall on this day? Working days here are Monday to Saturday, as the working week has them. */
+function falls(s: MockSchedule, date: string): boolean {
+  const r = s.recurrence;
+  const every = r.interval ?? 1;
+  if (r.working_days_only && weekdayOfDate(date) === 7) return false;
+  if (r.freq === "daily") return daysFrom(s.starts_on, date) % every === 0;
+  if (r.freq === "weekly") {
+    const weeks = Math.floor(daysFrom(addDays(s.starts_on, 1 - weekdayOfDate(s.starts_on)), date) / 7);
+    return weeks % every === 0 && (r.by_weekday ?? [weekdayOfDate(s.starts_on)]).includes(weekdayOfDate(date));
+  }
+  const months = (Number(date.slice(0, 4)) - Number(s.starts_on.slice(0, 4))) * 12 + Number(date.slice(5, 7)) - Number(s.starts_on.slice(5, 7));
+  const wanted = r.by_month_day ?? Number(s.starts_on.slice(8, 10));
+  const day = wanted === -1 ? lastDayOf(date) : Math.min(wanted, lastDayOf(date));
+  return months % every === 0 && Number(date.slice(8, 10)) === day;
+}
+
+/** The next slot a running schedule fires at, in Lagos; none while it is paused. */
+function nextRunOf(s: MockSchedule): string | null {
+  if (!s.active) return null;
+  const today = todayIso();
+  for (let d = s.starts_on > today ? s.starts_on : today, n = 0; n < 400; d = addDays(d, 1), n += 1) {
+    const slot = new Date(`${d}T${s.run_time}:00+01:00`).toISOString();
+    if (slot > new Date().toISOString() && falls(s, d)) return slot;
+  }
+  return null;
+}
+
+const recipientOf = (key: string): HomeReportRecipient => ({ user_id: loginOf(key), display_name: staff(key).display_name, email: staff(key).work_email });
+
+function reportOf(r: MockReport, user: string): HomeReport {
+  const s = r.schedule;
+  return {
+    saved_report_id: r.saved_report_id,
+    name: r.name,
+    report_key: r.report_key,
+    filters: r.filters,
+    shared: r.shared,
+    owner_user_id: loginOf(r.owner),
+    owner_name: staff(r.owner).display_name,
+    status: statusOfReport(r),
+    schedule: s && {
+      report_schedule_id: s.report_schedule_id,
+      recurrence: s.recurrence,
+      starts_on: s.starts_on,
+      run_time: s.run_time,
+      formats: s.formats,
+      audience: s.recipients.map(recipientOf),
+      active: s.active,
+      last_run_at: s.last_run_at,
+      next_run_at: nextRunOf(s),
+    },
+    can_edit: mayEditReport(user, r),
+    archived_at: r.archived_at,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+}
+
+function runOf(run: MockRun): HomeReportRun {
+  const { recipient, requested_by, settles_at: _settles, ...rest } = run;
+  const report = REPORTS.find((r) => r.saved_report_id === run.saved_report_id)!;
+  return {
+    ...rest,
+    report_name: report.name,
+    report_key: report.report_key,
+    recipient_user_id: loginOf(recipient),
+    recipient_name: staff(recipient).display_name,
+    requested_by: requested_by && loginOf(requested_by),
+  };
+}
+
+/** The same Idempotency-Key from the same person is the same run, never a second file. */
+const RUN_REPLAYS = new Map<string, MockRun>();
+
+/** A run answered while its file is still being made: 202, as the API answers Run Now and Export. */
+const queued = (run: HomeReportRun) => ({ status: 202, body: run });
+
+/**
+ * Run Now and Export: one file for the caller, in the format they chose, answered while it is
+ * still being made. Pressed again while that file waits (or with the same Idempotency-Key), it
+ * answers the same run.
+ */
+function runFor(report: MockReport, user: string, format: ReportFormat, key: string | undefined): HomeReportRun {
+  RUNS.forEach(settle);
+  const replay =
+    (key ? RUN_REPLAYS.get(`${user}:${key}`) : undefined) ??
+    RUNS.find((r) => r.saved_report_id === report.saved_report_id && r.report_schedule_id === null && r.recipient === user && r.format === format && r.status === "pending");
+  if (replay) return runOf(replay);
+  const number = nextRunNumber();
+  const run: MockRun = {
+    home_report_run_id: sid(`report-run:${number}:${Date.now()}`),
+    number,
+    saved_report_id: report.saved_report_id,
+    report_schedule_id: null,
+    scheduled_for: null,
+    recipient: user,
+    requested_by: user,
+    format,
+    status: "pending",
+    document_id: null,
+    emailed_at: null,
+    run_at: new Date().toISOString(),
+    finished_at: null,
+    settles_at: Date.now() + SETTLE_MS,
+  };
+  RUNS.push(run);
+  if (key) RUN_REPLAYS.set(`${user}:${key}`, run);
+  return runOf(run);
+}
+
+/** The reader's own Overview, as a report the Export runs: made the first time they export, never listed. */
+function overviewReportOf(user: string): MockReport {
+  const found = REPORTS.find((r) => r.report_key === "overview" && r.owner === user);
+  if (found) return found;
+  const now = new Date().toISOString();
+  const made: MockReport = { saved_report_id: sid(`report:overview:${user}`), owner: user, name: "Overview", report_key: "overview", filters: {}, shared: false, schedule: null, archived_at: null, created_at: now, updated_at: now };
+  REPORTS.push(made);
+  return made;
+}
+
+/**
+ * May this login receive a report of the source: someone on the roster, not suspended, who holds
+ * `home.reports` and may open the source. The people who sign in on this laptop are held to their
+ * own grants; the rest of the roster has no account here, and stands for the managers the real
+ * roles give them to. Musa, suspended since Leave This Month was scheduled, may not.
+ */
+function mayReceive(userId: string, source: string): boolean {
+  const key = keyOfLogin(userId);
+  if (key === null || staff(key).status === "suspended") return false;
+  if (!SIGN_INS[key]) return true;
+  const m = me(key);
+  return holds(m, "home.reports") && mayOpenSource(m, source);
+}
+
+/**
+ * What the service holds a report to beyond its contract: a source the owner may open, a name
+ * they have not used, filters its source takes, and recipients who may receive it. A recipient
+ * the saved schedule already goes to (`kept`) is not asked again; each one refused is named.
+ */
+function reportProblems(
+  user: string,
+  report: Pick<MockReport, "name" | "report_key" | "filters" | "saved_report_id">,
+  recipientIds: string[] | null,
+  kept: readonly string[] = [],
+): Record<string, string[]> | null {
+  const fields: Record<string, string[]> = {};
+  if (!mayOpenSource(me(user), report.report_key)) fields.report_key = ["Not open to you"];
+  if (REPORTS.some((r) => r.owner === user && r.saved_report_id !== report.saved_report_id && r.name.toLowerCase() === report.name.toLowerCase())) fields.name = ["Name already used"];
+  const takes: readonly string[] = sourceOf(report.report_key).filters;
+  for (const [key, value] of Object.entries(report.filters)) if (value !== undefined && !takes.includes(key)) fields[`filters.${key}`] = ["Not for this source"];
+  const refused = (recipientIds ?? []).filter((id) => !kept.includes(id) && !mayReceive(id, report.report_key));
+  if (refused.length) {
+    fields["schedule.recipient_user_ids"] = refused.map((id) => {
+      const key = keyOfLogin(id);
+      return key === null ? "Cannot receive this report" : `${staff(key).display_name}: no access`;
+    });
+  }
+  return Object.keys(fields).length ? fields : null;
+}
+
+/** A schedule as the form sends it, kept running or paused as it was (a new one runs). */
+function scheduleFrom(save: HomeReportScheduleSave, was: MockSchedule | null, reportId: string): MockSchedule {
+  return {
+    report_schedule_id: was?.report_schedule_id ?? sid(`report-schedule:${reportId}`),
+    recurrence: save.recurrence,
+    starts_on: save.starts_on,
+    run_time: save.run_time,
+    formats: save.formats,
+    recipients: save.recipient_user_ids.map((id) => keyOfLogin(id)!),
+    active: was?.active ?? true,
+    last_run_at: was?.last_run_at ?? null,
+  };
+}
+
+/** A report the reader may see, by id: archived ones too, since a link may name one. */
+const readableReport = (user: string, id: string) => REPORTS.find((r) => r.saved_report_id === id && r.report_key !== "overview" && mayReadReport(user, r));
+const archivedRefusal = () => fail(409, "REPORT_ARCHIVED", "This report is archived");
+const notYours = () => fail(403, "PERMISSION_DENIED", "Only its owner or the CEO can change it");
 
 /* ------------------------------------------------------------------ *
  * Routes
@@ -1643,28 +2051,177 @@ route("PATCH /api/v1/home/alert-rules/:id", (req) => {
 });
 
 route("GET /api/v1/home/reports/summary", (req) => {
-  const l = reportScope(req.user!);
-  return ok({
-    kpis: [
-      { key: "rp_sched", label: "Scheduled", value: String(l.filter((r) => r.status === "scheduled").length) },
-      { key: "rp_paused", label: "Paused", value: String(l.filter((r) => r.status === "paused").length), tone: "warn" },
-      { key: "rp_runs", label: "Runs This Month", value: "38" },
-      { key: "rp_recip", label: "Recipients", value: "11" },
-    ],
+  const user = req.user!;
+  const refused = withoutCapability(user, "home.reports");
+  if (refused) return refused;
+  const listed = listedReports(user).filter((r) => r.archived_at === null);
+  const monthStart = Date.parse(`${todayIso().slice(0, 8)}01T00:00:00+01:00`);
+  const scheduled = listed.filter((r) => statusOfReport(r) === "scheduled");
+  const summary: HomeReportSummary = {
+    scheduled: scheduled.length,
+    paused: listed.filter((r) => statusOfReport(r) === "paused").length,
+    // The files on the reader's own Recent Runs made since the 1st, Lagos.
+    runs_this_month: visibleRuns(user).filter((run) => run.status === "done" && Date.parse(run.run_at) >= monthStart).length,
+    recipients: new Set(scheduled.flatMap((r) => r.schedule!.recipients)).size,
+  };
+  return ok(summary);
+});
+
+route("GET /api/v1/home/reports", (req) => {
+  const user = req.user!;
+  const refused = withoutCapability(user, "home.reports");
+  if (refused) return refused;
+  const archived = req.query.archived === "true";
+  const rows = listedReports(user).filter((r) => (r.archived_at !== null) === archived);
+  const res = paged(rows, req, {
+    search: (r) => [r.name],
+    filters: {
+      report_key: (r, v) => r.report_key === v,
+      status: (r, v) => statusOfReport(r) === v,
+      archived: () => true,
+      mine: (r, v) => (r.owner === user || !!r.schedule?.recipients.includes(user)) === (v === "true"),
+    },
+    sort: {
+      name: (a, b) => a.name.localeCompare(b.name),
+      created_at: (a, b) => a.created_at.localeCompare(b.created_at),
+    },
   });
+  const body = res.body as { data?: unknown[] } | undefined;
+  if (body?.data) body.data = (body.data as MockReport[]).map((r) => reportOf(r, user));
+  return res;
 });
-route("GET /api/v1/home/reports", (req) => paged(reportScope(req.user!).map((r) => ({ home_report_id: r.home_report_id, name: r.name, cadence: r.cadence, status: r.status, audience: r.audience })), req, { search: (r) => [r.name] }));
+
+route("GET /api/v1/home/reports/:id", (req) => {
+  const refused = withoutCapability(req.user!, "home.reports");
+  if (refused) return refused;
+  const r = readableReport(req.user!, req.params.id);
+  return r ? ok(reportOf(r, req.user!)) : notFound();
+});
+
 route("POST /api/v1/home/reports", (req) => {
-  const b = req.body as { name: string; schedule: string; recipients: string };
-  const r = { home_report_id: sid(`report:${b.name}`), name: b.name, cadence: b.schedule, status: "scheduled" as const, audience: b.recipients, roles: ["operations", "ceo", "partnerships"] };
-  REPORTS.unshift(r);
-  return created(r);
+  const user = req.user!;
+  const refused = withoutCapability(user, "home.reports");
+  if (refused) return refused;
+  const body = reportsContract.HomeReportCreate.safeParse(req.body);
+  if (!body.success) return refused422(body.error.issues);
+  const b = body.data;
+  const problems = reportProblems(user, { ...b, saved_report_id: "" }, b.schedule?.recipient_user_ids ?? null);
+  if (problems) return invalid(problems);
+  const now = new Date().toISOString();
+  const id = sid(`report:${user}:${b.name}:${now}`);
+  const report: MockReport = {
+    saved_report_id: id,
+    owner: user,
+    name: b.name,
+    report_key: b.report_key,
+    filters: b.filters,
+    shared: b.shared,
+    schedule: b.schedule && scheduleFrom(b.schedule, null, id),
+    archived_at: null,
+    created_at: now,
+    updated_at: now,
+  };
+  REPORTS.push(report);
+  return created(reportOf(report, user));
 });
-route("POST /api/v1/home/reports/:id/run", (req) => {
-  const r = REPORTS.find((x) => x.home_report_id === req.params.id);
+
+route("PATCH /api/v1/home/reports/:id", (req) => {
+  const user = req.user!;
+  const refused = withoutCapability(user, "home.reports");
+  if (refused) return refused;
+  const r = readableReport(user, req.params.id);
   if (!r) return notFound();
-  const run = { run_id: sid(`run:${Date.now()}`), number: `RPT-${String(215 + RUNS.length).padStart(4, "0")}`, report: r.name, run_at: new Date().toISOString(), recipients: "You", formats: String(req.body.format).toUpperCase() };
-  RUNS.unshift(run);
-  return ok(run);
+  if (!mayEditReport(user, r)) return notYours();
+  if (r.archived_at) return archivedRefusal();
+  const body = reportsContract.HomeReportUpdate.safeParse(req.body);
+  if (!body.success) return refused422(body.error.issues);
+  const b = body.data;
+  const next = { name: b.name ?? r.name, report_key: r.report_key, filters: b.filters ?? r.filters, saved_report_id: r.saved_report_id };
+  const kept = (r.schedule?.recipients ?? []).map(loginOf);
+  const problems = reportProblems(user, next, b.schedule?.recipient_user_ids ?? null, kept);
+  if (problems) return invalid(problems);
+  Object.assign(r, { name: next.name, filters: next.filters, updated_at: new Date().toISOString() });
+  if (b.shared !== undefined) r.shared = b.shared;
+  if (b.schedule !== undefined) r.schedule = b.schedule && scheduleFrom(b.schedule, r.schedule, r.saved_report_id);
+  return ok(reportOf(r, user));
 });
-route("GET /api/v1/home/report-runs", (req) => paged(RUNS, req, { search: (r) => [r.report, r.number] }));
+
+route("PATCH /api/v1/home/reports/:id/schedule", (req) => {
+  const user = req.user!;
+  const refused = withoutCapability(user, "home.reports");
+  if (refused) return refused;
+  const r = readableReport(user, req.params.id);
+  if (!r) return notFound();
+  if (!mayEditReport(user, r)) return notYours();
+  if (r.archived_at) return archivedRefusal();
+  const body = reportsContract.HomeReportScheduleState.safeParse(req.body);
+  if (!body.success) return refused422(body.error.issues);
+  if (!r.schedule) return fail(409, "REPORT_ON_DEMAND", "This report has no schedule to pause");
+  r.schedule.active = body.data.active;
+  r.updated_at = new Date().toISOString();
+  return ok(reportOf(r, user));
+});
+
+route("POST /api/v1/home/reports/:id/archive", (req) => {
+  const user = req.user!;
+  const refused = withoutCapability(user, "home.reports");
+  if (refused) return refused;
+  const r = readableReport(user, req.params.id);
+  if (!r) return notFound();
+  if (!mayEditReport(user, r)) return notYours();
+  // Archiving stops the schedule and keeps the runs; archiving it again answers it as it is.
+  if (!r.archived_at) {
+    const now = new Date().toISOString();
+    Object.assign(r, { archived_at: now, updated_at: now });
+    if (r.schedule) r.schedule.active = false;
+  }
+  return ok(reportOf(r, user));
+});
+
+route("POST /api/v1/home/reports/:id/run", (req) => {
+  const user = req.user!;
+  const refused = withoutCapability(user, "home.reports");
+  if (refused) return refused;
+  const r = readableReport(user, req.params.id);
+  if (!r) return notFound();
+  if (r.archived_at) return archivedRefusal();
+  if (!mayOpenSource(me(user), r.report_key)) return fail(403, "REPORT_SOURCE_CLOSED", "You cannot open this report's source");
+  const body = reportsContract.HomeReportRunNow.safeParse(req.body);
+  if (!body.success) return refused422(body.error.issues);
+  // A scheduled report runs in a format its schedule offers; one on demand in either.
+  if (r.schedule && !r.schedule.formats.includes(body.data.format)) return invalid({ format: ["Not offered"] });
+  return queued(runFor(r, user, body.data.format, req.idempotency_key));
+});
+
+route("GET /api/v1/home/report-runs", (req) => {
+  const refused = withoutCapability(req.user!, "home.reports");
+  if (refused) return refused;
+  const rows = visibleRuns(req.user!).sort((a, b) => b.run_at.localeCompare(a.run_at) || b.number.localeCompare(a.number));
+  const res = paged(rows, req, {
+    filters: {
+      saved_report_id: (run, v) => run.saved_report_id === v,
+      status: (run, v) => run.status === v,
+      format: (run, v) => run.format === v,
+    },
+    // The server's own order is newest first; a sort the person picks replaces it.
+    ...(req.query.sort ? { sort: { run_at: (a: MockRun, b: MockRun) => a.run_at.localeCompare(b.run_at) } } : {}),
+  });
+  const body = res.body as { data?: unknown[] } | undefined;
+  if (body?.data) body.data = (body.data as MockRun[]).map(runOf);
+  return res;
+});
+
+/* One run on the reader's Recent Runs, however far back, for a link to it (⌘K). */
+route("GET /api/v1/home/report-runs/:id", (req) => {
+  const refused = withoutCapability(req.user!, "home.reports");
+  if (refused) return refused;
+  const run = visibleRuns(req.user!).find((r) => r.home_report_run_id === req.params.id);
+  return run ? ok(runOf(run)) : notFound();
+});
+
+/* The Overview Export: any Home reader, on their own Overview. */
+route("POST /api/v1/home/overview/export", (req) => {
+  const body = reportsContract.HomeReportRunNow.safeParse(req.body);
+  if (!body.success) return refused422(body.error.issues);
+  return queued(runFor(overviewReportOf(req.user!), req.user!, body.data.format, req.idempotency_key));
+});

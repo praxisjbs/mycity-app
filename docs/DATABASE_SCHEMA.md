@@ -211,6 +211,16 @@ performance cycles, reviews and review items · `2099` seed.
   Indexes asked by Home: `task (due_at) WHERE archived_at IS NULL AND completed_at IS NULL`,
   `calendar_event (owner_employee_id, starts_at)`, `organisational_goal (level, starts_on, ends_on)`,
   `employee_target (employee_id, due_on)`.
+  **Staging holds Home's demonstration rows** in `task`, `calendar_event`, `organisational_goal`,
+  `employee_target`, `performance_cycle` and `performance_review` (`seeds/staging/60_home.js`,
+  decision O11). Their ids are written out in `HOME_STAGING_ROWS`
+  (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
+  takes them away once, in the three steps that file starts with: that seed calls
+  `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes
+  the alerts Home raised about those rows and then the rows, children first; the PR takes the rows
+  out of `seeds/staging/lib/forward-rows.js` and leaves their ids in the manifest, so the call finds
+  them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
+  (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
 
 ### M3 Queries & Consequence Management · 3000 to 3999 · GE
 
@@ -236,6 +246,15 @@ criteria (A10), assessments, interviews, rounds, panelists and blind feedback ·
   `current_stage_entered_at`, `withdrawn_at`) with `candidate` (`candidate_id`, `first_name`,
   `last_name`), through `src/modules/dashboard/sources/vacancies.source.js`: update it in the same PR.
   Indexes asked by Home: `vacancy (status)`, `application (status, current_stage_entered_at)`.
+  **Staging holds Home's demonstration rows** in `vacancy`, one for each open seat on the organogram
+  (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`
+  (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
+  takes them away once, in the three steps that file starts with: that seed calls
+  `removeHomeStagingRows(client, ["vacancy"])` in its transaction before it writes, which deletes
+  the alerts Home raised about those rows and then the rows, children first; the PR takes the rows
+  out of `seeds/staging/lib/forward-rows.js` and leaves their ids in the manifest, so the call finds
+  them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
+  (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
 
 ### M5 Offers, Documentation & Onboarding · 5000 to 5999 · LA
 
@@ -287,6 +306,16 @@ agreements and obligations · `7099` seed.
   stages changes what the pipeline chart counts. Indexes asked by Home: `partner_interaction
   (partner_id, occurred_at DESC)`, `partner (owner_id)`, `partnership_opportunity (owner_id, status)`,
   `partnership_agreement (status, starts_on)`.
+  **Staging holds Home's demonstration rows** in `partner`, `partner_interaction`,
+  `partnership_opportunity`, `partnership_proposal` and `partnership_agreement`
+  (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`
+  (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
+  takes them away once, in the three steps that file starts with: that seed calls
+  `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes
+  the alerts Home raised about those rows and then the rows, children first; the PR takes the rows
+  out of `seeds/staging/lib/forward-rows.js` and leaves their ids in the manifest, so the call finds
+  them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
+  (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
 
 ### M8 Expenses & Budget Control · 8000 to 8999 · AJ
 
@@ -308,6 +337,15 @@ and lines, disbursements · `8099` seed.
   `department_id`, `owner_id`, `currency`, `starts_on`, `ends_on`, `approved_at`) with `budget_line`
   (`budget_id`, `amount`, `spent_amount`) through `budgets.source.js`: update them in the same PR.
   Indexes asked by Home: `expense_request (status)` and `(employee_id)`, `budget (owner_id)`.
+  **Staging holds Home's demonstration rows** in `expense_request`, `budget` and `budget_line`
+  (`seeds/staging/60_home.js`, decision O11). Their ids are written out in `HOME_STAGING_ROWS`
+  (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
+  takes them away once, in the three steps that file starts with: that seed calls
+  `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes
+  the alerts Home raised about those rows and then the rows, children first; the PR takes the rows
+  out of `seeds/staging/lib/forward-rows.js` and leaves their ids in the manifest, so the call finds
+  them whichever seed runs first; and it takes the figures they gave out of Home's seed tests
+  (`home-staging-seed.test.js` in `tests/unit/` and `tests/integration/`).
 
 ### M9 Settings & Governance · 9000 to 9999 · GE
 

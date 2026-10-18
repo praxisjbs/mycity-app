@@ -117,15 +117,16 @@ const screen = (module, tab) => ({ module, tab });
  * entity_type → { module, tab, self?, param? }. Types are the snake_case names modules pass
  * to emit() and store beside a notification, task or alert. `param` names the query value
  * that carries the record's id when its tab opens two kinds of record (an alert rule beside
- * the alerts it raises: `?rule=`); `id` otherwise.
+ * the alerts it raises: `?rule=`; a report's run beside the reports: `?run=`); `id` otherwise.
  */
 const ENTITY_ROUTES = Object.freeze({
   // Home
   home_alert: screen("home", "alerts"),
   // A rule opens Edit Rule on the Alerts tab, whose `?id=` is an alert.
   home_alert_rule: { ...screen("home", "alerts"), param: "rule" },
-  home_report: screen("home", "reports"), // search:none not built yet (src/modules/reports)
-  home_report_run: screen("home", "reports"), // search:none not built yet (src/modules/reports)
+  home_report: screen("home", "reports"),
+  // A run opens on the Reports tab, whose `?id=` is a report.
+  home_report_run: { ...screen("home", "reports"), param: "run" },
   // A KPI card, by its catalogue key: the Overview opens the records behind it.
   home_kpi: screen("home", "overview"),
 

@@ -778,6 +778,7 @@ describe("the routes", () => {
     expect(require("./dashboard.routes").basePath).toBe("/home");
     expect(routes.map((r) => `${r.method} ${r.path}`)).toEqual([
       "GET /overview",
+      "POST /overview/export",
       "GET /kpi-picker",
       "PUT /kpi-picks",
       "DELETE /kpi-picks",
@@ -791,6 +792,11 @@ describe("the routes", () => {
       "DELETE /roles/:role_id/kpis",
     ]);
     expect(find("GET", "/overview").contract.response).toBe(dashboard.HomeOverview);
+    // The Overview Export is a run of the reports engine, in the reports contract.
+    expect(find("POST", "/overview/export").contract).toMatchObject({
+      body: c.reports.HomeReportRunNow,
+      response: c.reports.HomeReportRun,
+    });
     expect(find("GET", "/team/summary").contract.response).toBe(dashboard.HomeTeamSummary);
     expect(find("GET", "/team").contract).toMatchObject({ query: dashboard.HomeTeamQuery, response: dashboard.HomeTeamPage });
     expect(find("GET", "/team/attendance").contract).toMatchObject({

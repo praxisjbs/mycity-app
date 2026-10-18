@@ -1,18 +1,20 @@
 import { Fragment, useEffect, useRef, type ReactNode } from "react";
-import type { HomeKpiCard, HomeOverview } from "@mycity/contract/contract.gen.ts";
-import { useApi } from "@/api/hooks";
+import type { HomeKpiCard, HomeOverview, HomeReportFormat } from "@mycity/contract/contract.gen.ts";
+import { ApiError } from "@/api/client";
+import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import { useMe } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, DesktopOnly, ErrorState, formatCount, formatDate, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, zoneClock } from "@mycity/ui";
+import { Button, DesktopOnly, ErrorState, formatCount, formatDate, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, toast, zoneClock } from "@mycity/ui";
 import { CardRow } from "./cards";
 import { claimClockPrompt } from "./clockPrompt";
 import { reloadsFor } from "./refresh";
 import { useCreateActions } from "./createActions";
 import { useKpiDetail } from "./KpiDetail";
 import { useKpiPicker } from "./KpiPickerDialog";
+import { FormatButton } from "./Reports";
 import { ActivityToday, DayStrip, GoalBars, MainChart, NeedYou, Pipeline, SideDonut, UpcomingLeave, weekdayOf, YourWeek } from "./sections";
 
 /**
@@ -21,10 +23,13 @@ import { ActivityToday, DayStrip, GoalBars, MainChart, NeedYou, Pipeline, SideDo
  * chart and the sections beside it, Need You on every Overview, and New. The server sends
  * data; every word on the screen is written here and in ./sections.
  *
+ * Export makes a file of the reader's own Overview, PDF or XLSX, through the reports engine
+ * (POST /home/overview/export): numbered, kept in the vault and emailed to them.
+ *
  * Both shells come from one tree (§10.2): on a phone the cards are two to a row and the
  * sections stack in the same order; Choose Cards moves into the page menu, New into the
- * floating button's fan as well as the header, and the date line and chart captions are
- * left off. A card opens its records (./KpiDetail) as a dialog, a bottom sheet on a phone;
+ * floating button's fan as well as the header, and the date line, the chart captions and
+ * Export are left off. A card opens its records (./KpiDetail) as a dialog, a bottom sheet on a phone;
  * `?kpi=<key>` (the assistant's route) or `?id=<key>` (a ⌘K result) opens one straight away.
  */
 
@@ -88,6 +93,21 @@ function useAttendanceRefresh(reload: () => void, overview: HomeOverview | undef
     if (seen.current !== null && seen.current !== punch) reload();
     seen.current = punch;
   }, [punch, reload]);
+}
+
+/** Export: the reader's Overview as a file in the format they choose, toasted with its run's number. Desktop only (§10.2). */
+function ExportOverview() {
+  const exporting = useMutation("POST /api/v1/home/overview/export");
+  const run = async (format: HomeReportFormat) => {
+    try {
+      const res = await exporting.run({ body: { format }, idempotencyKey: crypto.randomUUID() });
+      invalidate("/api/v1/home/report-runs");
+      toast(`${res.number} queued. It arrives by email.`);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Export not queued. Try again.");
+    }
+  };
+  return <FormatButton label="Export" formats={["pdf", "xlsx"]} busy={exporting.pending} onRun={(format) => void run(format)} item={(format) => `Export ${format}`} size="md" />;
 }
 
 /** A section of the Overview, laid out two to a row on desktop. */
@@ -169,6 +189,9 @@ export function Overview({ linked }: { linked: string | null }) {
         subtitle={dateLineOf(data)}
         actions={
           <>
+            <DesktopOnly as="span" unmount>
+              <ExportOverview />
+            </DesktopOnly>
             {create.length > 0 && (
               <Menu
                 label="New"

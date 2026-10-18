@@ -20,7 +20,8 @@
  * the screen it opens (shared/search/screens.js tabVisible). Mark All Read needs nothing:
  * the bell is everyone's own. `capability` is the authority it needs on top (README §5.2),
  * where its screen opens to more people than may take it: the Alerts tab opens to whoever
- * may clear alerts, New Rule only to those who may manage the rules.
+ * may clear alerts, New Rule only to those who may manage the rules; New Report needs
+ * `home.reports`, as its tab does.
  */
 const routeMap = require("../route-map");
 const catalog = require("../access/access.catalog");
@@ -103,6 +104,13 @@ const ACTIONS = Object.freeze([
     need: ["home", "view"],
     capability: "alerts.manage",
     words: ["alert rule", "new alert", "create rule", "threshold", "warn me when"],
+  }),
+  a("new_report", "New Report", {
+    screen: "home.reports",
+    params: { action: "new" },
+    need: ["home", "view"],
+    capability: "home.reports",
+    words: ["report", "build report", "schedule report", "attendance report", "send me a report"],
   }),
   a("clock_in", "Clock In", {
     screen: "ess.my-attendance",

@@ -1,0 +1,29 @@
+<style>
+  @page { size: A4 landscape; margin: 14mm 14mm 18mm 14mm; }
+  .rp-meta { margin: 0 0 4px 0; font-size: 9pt; color: #71717A; }
+  .rp-meta strong { color: #014339; font-weight: 600; }
+  .rp-filter { margin-right: 16px; }
+  .rp-lines { margin: 12px 0 0 0; }
+  .rp-line { margin: 0 0 4px 0; }
+  .rp-body h2 { font-size: 12pt; margin: 18px 0 6px 0; }
+  .rp-body table { font-size: 9pt; margin: 0; }
+  .rp-body thead { display: table-header-group; }
+  .rp-body thead th { border-bottom: 2px solid #014339; }
+  .rp-body tr { page-break-inside: avoid; }
+  .rp-empty, .rp-note { margin: 6px 0 0 0; font-size: 9pt; color: #71717A; }
+</style>
+<div class="rp-body">
+  <p class="rp-meta"><strong>{{ run_number }}</strong> · {{ source }} · For {{ recipient_name }} · As at {{ datetime as_at }}</p>
+  {{#if filters}}<p class="rp-meta">{{#each filters}}<span class="rp-filter">{{ label }}: {{ value }}</span>{{/each}}</p>{{/if}}
+  {{#if lines}}<div class="rp-lines">{{#each lines}}<p class="rp-line">{{ this }}</p>{{/each}}</div>{{/if}}
+  {{#each tables}}
+  <h2>{{ title }}</h2>
+  {{#if rows}}
+  <table>
+    <thead><tr>{{#each columns}}<th{{#if numeric}} class="amount"{{/if}}>{{ header }}</th>{{/each}}</tr></thead>
+    <tbody>{{#each rows}}<tr>{{#each cells}}<td{{#if numeric}} class="amount"{{/if}}>{{ text }}</td>{{/each}}</tr>{{/each}}</tbody>
+  </table>
+  {{else}}<p class="rp-empty">Nothing to show.</p>{{/if}}
+  {{#if note}}<p class="rp-note">{{ note }}</p>{{/if}}
+  {{/each}}
+</div>

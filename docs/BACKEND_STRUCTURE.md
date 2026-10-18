@@ -763,7 +763,7 @@ fails at the first query. Everything else in each table is the migration's call.
 | any effective-dated table | `effective_from` date NOT NULL, `effective_to` date NULL (exclusive; NULL = current), no overlap per key | `shared/db/effective-dated` |
 | `event_log` (0030) | `event_id` uuid PK, `event_key`, `module_key`, `entity_type`, `entity_id` **text**, `actor_user_id` NULL, `payload` jsonb, `request_id`, `import_batch_id` NULL, `occurred_at` | `shared/events/emit` |
 | `audit_ledger` (0030) | `event_id` FK, `occurred_at`, `actor_user_id`, `actor_name`, `actor_email`, `actor_ip`, `action`, `module_key`, `entity_type`, `entity_id` text, `before` jsonb, `after` jsonb, `changed_fields` text[], `is_sensitive`, `metadata` jsonb, `request_id`, `import_batch_id`; append-only trigger | `shared/events/emit` |
-| `event_outbox` (0030) | `outbox_id` uuid PK, `event_id` FK, `event_key`, `dedup_key` (UNIQUE where not null), `status` (`pending` / `processing` / `done` / `failed`), `attempts`, `max_attempts` (default 8), `next_attempt_at`, `completed_handlers` text[], `last_error`, `created_at`, `updated_at`, `processed_at`; index on `next_attempt_at` where pending | `shared/events/outbox` |
+| `event_outbox` (0030) | `outbox_id` uuid PK, `event_id` FK, `event_key`, `dedup_key` (UNIQUE where not null), `status` (`pending` / `processing` / `done` / `failed`), `attempts`, `max_attempts` (default 8), `next_attempt_at`, `completed_handlers` text[], `last_error`, `created_at`, `updated_at`, `processed_at`; index on `next_attempt_at` where pending. A handler is given `{ outbox_id, attempt, max_attempts }`, so one that keeps a status of its own (a report run) records a final failure instead of throwing it again | `shared/events/outbox` |
 | `notification` (0060) | `notification_id` uuid PK, `user_id`, `event_id` FK, `event_key`, `category`, `priority` (`normal` / `high`), `title`, `body`, `entity_type`, `entity_id` text, `channels` text[], `created_at`, `read_at`, `delivery_queued_at`; UNIQUE (`event_id`, `user_id`). No link column: the inbox derives it (`shared/route-map`). The bell shows rows whose `channels` include `in_app` | `shared/notifications/fanout` |
 | `notification_preference` (0060) | `user_id`, `category`, `channel` (`in_app` / `email` / `push`), `enabled`; PRIMARY KEY (`user_id`, `category`, `channel`) | `shared/notifications/fanout` |
 | `workflow_definition` (0070) | `workflow_definition_id` uuid PK, `key`, `version`, `module_key`, `name`, `description`, `context_types` jsonb, `stages` jsonb, `active`, `created_by`, `created_at`; UNIQUE (`key`, `version`) | `shared/workflow/definitions` |
@@ -833,7 +833,7 @@ milestone shown, so nothing is retrofitted.
 | Assistant orchestrator (retrieve, read, answer, cite) | M10 | `services/ai/assistant/` | Seam |
 | ⌘K search providers | M1 onward | `shared/search` | Built |
 | Embeddings (pgvector) | M10 | extension in 0001 | Seam |
-| Scheduled reports, generated as recipient | M1 Home → Reports | `jobs`, `shared/spreadsheet`, `services/pdf` | Seam |
+| Scheduled reports, generated as recipient | M1 Home → Reports | `modules/reports` (sources, schedule, files, generate), `jobs` (`scheduled-reports`, `scheduled-report`), `shared/documents`, `shared/spreadsheet` | Built |
 | Backups, restore drill, monitoring | M11 | `scripts/db`, `ops` | Built |
 
 If a milestone needs something not on this list, the PR that adds it puts it in the matching shared

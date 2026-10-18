@@ -5,6 +5,8 @@
  * their own routers at the same base path.
  *
  *   GET    /overview                `home` view: the reader's Overview, resolved for them
+ *   POST   /overview/export         `home` view: a file of it for the reader, through the reports
+ *                                   engine (reports.service exportOverview), answered pending
  *   GET    /kpi-picker              `home` view: the cards they may choose, and their own
  *   PUT    /kpi-picks               `home` view: choose up to four, locks kept
  *   DELETE /kpi-picks               `home` view: back to their roles' cards
@@ -36,6 +38,10 @@ const team = requireCapability("home.team");
 route(router, "get", "/overview",
   { response: d.HomeOverview, summary: "The signed-in person's Overview" },
   view, controller.overview);
+
+route(router, "post", "/overview/export",
+  { body: c.reports.HomeReportRunNow, response: c.reports.HomeReportRun, summary: "Export my Overview" },
+  view, controller.exportOverview);
 
 route(router, "get", "/kpi-picker",
   { response: d.HomeKpiPicker, summary: "The cards a person may choose, and the ones they chose" },
