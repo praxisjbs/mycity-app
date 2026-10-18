@@ -594,6 +594,12 @@ screen.
 
 ## 14 · Change log
 
+- 18/10/2026 · TB · §6.1: a staff number the roster's sheet gives one of its people is theirs. The
+  first administrator is created before any roster and is given 00001, which the sheet says is the
+  CEO's, and the loader read that as a match and skipped the CEO. A holder the sheet does not name
+  now moves to the next free number, keeping their record, login and roles; a holder the sheet does
+  name is reported instead, and importing a sheet by hand moves nobody. Why the roster has never
+  run on staging at all, and how to put it there, is `docs/runbooks/staff-roster.md`.
 - 17/10/2026 · TB · Documents: `documents.repo.js` exports `REQUEST_STILL_OPEN`, the one rule for a request still waiting for its file, which Home's Documents Requested card reads instead of a copy. No behaviour changed.
 - 17/10/2026 · TB · §5: `organisation.service.counts(client, scope, { today })` for Home's headcount,
   attrition and confirmations cards, the register's own definition; the counts above People ·
