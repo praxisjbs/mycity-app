@@ -95,9 +95,21 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Frontend foundation PR 1 · Ground: `packages/ui` (tokens, primitives, overlays, help, toast, form system, data client), catalogue and gallery, new gates, docs (FRONTEND_FOUNDATION §4) | AJ | ☑ | 15/10/2026 |
 | Frontend foundation PR 2 · Shell: both apps' shells on `packages/ui`, bottom bar, More, floating button, session, PWA, what opens where | AJ | ☑ | 15/10/2026 |
 | Frontend foundation PR 3 · Build kit: DataView, KPI, charts, kanban, calendar, pickers, upload, editor, PDF preview, voice, maps; app component folders emptied; every screen on the token scale | AJ | ☑ | 16/10/2026 |
+| Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
 
 **Notes**
 
+- 18/10/2026 · TB · Gate 21 and F25, nothing the browser styles itself (FRONTEND_GUIDE §8.8). A
+  phone showed its own grey picker over the branded Create Rule sheet (Home · Alert Rules), because
+  `SelectField`, `FilterSelect` and `InlineSelect` were native `<select>`s. All three now draw the new
+  `SelectMenu`: a Radix listbox in our tokens on desktop, a bottom sheet of 44 px rows on a phone,
+  titled by the field's label. Every `title` tooltip is now `Tooltip` (IconButton, the collapsed
+  rail, Calendar events, file names, the clock button, message ticks, mail recipients, policy
+  summaries); map markers use Leaflet's tooltip in our tokens. `base.css` resets control appearance,
+  spinners, the search clear and autofill buttons, the autofill tint, the invalid glow, the tap
+  flash, the selection, accent and caret colours; the Toaster styles every sonner part.
+  `check/native-ui.js` runs in `npm run ci` and the Stop hook: source plus every gallery page and
+  app screen at phone and desktop size, no exemptions; green on all 402 views. Left: nothing.
 - 18/10/2026 · TB · Phone sheets fixed for typing (F6 amended): with the keyboard up, a sheet was
   pinned behind it and the browser panned the page to reach the field, pushing the header off the
   top with no way back, and a swipe down or a tap on the scrim closed it and lost what was typed.

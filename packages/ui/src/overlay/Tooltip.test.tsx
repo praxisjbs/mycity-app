@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { setViewport } from "../testing/viewport";
-import { IconButton } from "../actions/Button";
 import { Tooltip } from "./Tooltip";
 
 describe("Tooltip", () => {
@@ -11,7 +10,7 @@ describe("Tooltip", () => {
     const user = userEvent.setup();
     render(
       <Tooltip label="Notifications">
-        <IconButton icon="bell" label="Notifications" />
+        <button type="button" aria-label="Notifications">bell</button>
       </Tooltip>,
     );
     await user.tab();
@@ -25,7 +24,7 @@ describe("Tooltip", () => {
     const user = userEvent.setup();
     render(
       <Tooltip label="Search" delay={0}>
-        <IconButton icon="srch" label="Search" />
+        <button type="button" aria-label="Search">srch</button>
       </Tooltip>,
     );
     await user.hover(screen.getByRole("button", { name: "Search" }));
@@ -37,7 +36,7 @@ describe("Tooltip", () => {
     const user = userEvent.setup();
     render(
       <Tooltip label="Notifications">
-        <IconButton icon="bell" label="Notifications" />
+        <button type="button" aria-label="Notifications">bell</button>
       </Tooltip>,
     );
     await user.tab();
@@ -49,7 +48,7 @@ describe("Tooltip", () => {
     const user = userEvent.setup();
     const { container } = render(
       <Tooltip label="Notifications">
-        <IconButton icon="bell" label="Notifications" />
+        <button type="button" aria-label="Notifications">bell</button>
       </Tooltip>,
     );
     await user.tab();

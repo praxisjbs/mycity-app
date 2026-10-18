@@ -9,11 +9,13 @@
  * @status stable
  * @example <Rail items={items} current="people" onNavigate={navigate} account={{ name: "Cynthia Osakunih", subtitle: "Operations Manager", menu }} />
  */
-import type { MouseEvent, ReactNode } from "react";
+import { forwardRef, type HTMLAttributes, type MouseEvent, type ReactElement, type ReactNode } from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cn } from "../lib/cn";
 import { Icon, type IconName } from "../icons/Icon";
 import { Avatar } from "../display/Avatar";
 import { Menu, type MenuItem } from "../overlay/Menu";
+import { Tooltip } from "../overlay/Tooltip";
 import { Brand } from "./Brand";
 
 /** One module in the rail. */
@@ -65,6 +67,19 @@ export interface RailProps {
 
 const plain = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 
+
+/** A collapsed rail names its links in our tooltip, to the right; an open rail shows the words. */
+const Tip = forwardRef<HTMLElement, { label: string | null; children: ReactElement } & HTMLAttributes<HTMLElement>>(function Tip({ label, children, ...rest }, ref) {
+  return label ? (
+    <Tooltip label={label} side="right" {...rest} ref={ref}>
+      {children}
+    </Tooltip>
+  ) : (
+    <Slot {...rest} ref={ref}>
+      {children}
+    </Slot>
+  );
+});
 export function Rail({ items, current, collapsed = false, onNavigate, account, brandName = "MyCity App", foot, label = "Modules" }: RailProps) {
   let lastGroup: string | undefined;
   return (
@@ -91,31 +106,32 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
                   {head}
                 </div>
               )}
-              <a
-                href={item.href}
-                aria-current={on ? "page" : undefined}
-                title={collapsed ? item.label : undefined}
-                onClick={(e) => {
-                  if (onNavigate && plain(e)) {
-                    e.preventDefault();
-                    onNavigate(item.href);
-                  }
-                }}
-                className={cn(
-                  "flex min-h-9 items-center gap-3 rounded-ctl px-2.5 py-2 text-base font-medium whitespace-nowrap no-underline transition-colors phone:min-h-tap",
-                  on ? "bg-sidebar-primary font-strong text-sidebar-primary-foreground" : "text-sidebar-muted hover:bg-sidebar-hover hover:text-sidebar-foreground",
-                )}
-              >
-                <Icon name={item.icon} size="m" />
-                <span data-ui="nav-label" className={cn(collapsed && "sr-only")}>
-                  {item.label}
-                </span>
-                {!!item.count && (
-                  <span className={cn("ml-auto rounded-full px-1.5 text-2xs leading-5 font-strong tabular-nums", on ? "bg-on-primary-badge" : "bg-sidebar-badge", collapsed && "sr-only")}>
-                    {item.count}
+              <Tip label={collapsed ? item.label : null}>
+                <a
+                  href={item.href}
+                  aria-current={on ? "page" : undefined}
+                  onClick={(e) => {
+                    if (onNavigate && plain(e)) {
+                      e.preventDefault();
+                      onNavigate(item.href);
+                    }
+                  }}
+                  className={cn(
+                    "flex min-h-9 items-center gap-3 rounded-ctl px-2.5 py-2 text-base font-medium whitespace-nowrap no-underline transition-colors phone:min-h-tap",
+                    on ? "bg-sidebar-primary font-strong text-sidebar-primary-foreground" : "text-sidebar-muted hover:bg-sidebar-hover hover:text-sidebar-foreground",
+                  )}
+                >
+                  <Icon name={item.icon} size="m" />
+                  <span data-ui="nav-label" className={cn(collapsed && "sr-only")}>
+                    {item.label}
                   </span>
-                )}
-              </a>
+                  {!!item.count && (
+                    <span className={cn("ml-auto rounded-full px-1.5 text-2xs leading-5 font-strong tabular-nums", on ? "bg-on-primary-badge" : "bg-sidebar-badge", collapsed && "sr-only")}>
+                      {item.count}
+                    </span>
+                  )}
+                </a>
+              </Tip>
             </div>
           );
         })}
@@ -127,27 +143,27 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
               align="start"
               label="Account"
               trigger={(p) => (
-                <button
-                  {...p}
-                  type="button"
-                  aria-label={collapsed ? account.name : undefined}
-                  title={collapsed ? account.name : undefined}
-                  className="flex min-h-10 min-w-0 items-center gap-2.5 rounded-ctl px-0.5 text-left hover:bg-sidebar-hover phone:min-h-tap"
-                >
-                  <Avatar name={account.name} src={account.photo} size="md" tone="brand" />
-                  {!collapsed && (
-                    <span className="min-w-0 leading-tight">
-                      <b className="block truncate text-sm font-semibold" data-copy="content">
-                        {account.name}
-                      </b>
-                      {account.subtitle && (
-                        <span className="block truncate text-2xs text-sidebar-muted" data-copy="content">
-                          {account.subtitle}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </button>
+                <Tip label={collapsed ? account.name : null} {...p}>
+                  <button
+                    type="button"
+                    aria-label={collapsed ? account.name : undefined}
+                    className="flex min-h-10 min-w-0 items-center gap-2.5 rounded-ctl px-0.5 text-left hover:bg-sidebar-hover phone:min-h-tap"
+                  >
+                    <Avatar name={account.name} src={account.photo} size="md" tone="brand" />
+                    {!collapsed && (
+                      <span className="min-w-0 leading-tight">
+                        <b className="block truncate text-sm font-semibold" data-copy="content">
+                          {account.name}
+                        </b>
+                        {account.subtitle && (
+                          <span className="block truncate text-2xs text-sidebar-muted" data-copy="content">
+                            {account.subtitle}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </button>
+                </Tip>
               )}
               items={account.menu}
             />

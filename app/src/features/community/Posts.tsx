@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/api/client";
 import { saveFile, useFileUrl } from "@/api/download";
 import type { Message } from "@/api/types/community";
-import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, initials, Pill, ShareBar, Waveform } from "@mycity/ui";
+import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, initials, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
 
 /** Highlight search hits inside a message. */
 export function Hl({ text, q }: { text: string; q: string }) {
@@ -201,9 +201,11 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
             {formatTime(m.sent_at)}
             {m.edited_at && !m.deleted && " · Edited"}
             {m.mine && dm && m.status && (
-              <span role="img" className={cn("ml-1 inline-flex align-text-bottom", m.status === "read" ? "text-info" : "text-subtle-foreground")} title={TICK[m.status][1]} aria-label={TICK[m.status][1]}>
-                <Icon name={TICK[m.status][0]} className="size-3.5" />
-              </span>
+              <Tooltip label={TICK[m.status][1]}>
+                <span role="img" className={cn("ml-1 inline-flex align-text-bottom", m.status === "read" ? "text-info" : "text-subtle-foreground")} aria-label={TICK[m.status][1]}>
+                  <Icon name={TICK[m.status][0]} className="size-3.5" />
+                </span>
+              </Tooltip>
             )}
           </span>
           {menu}

@@ -14,6 +14,7 @@ import { cn } from "../lib/cn";
 import { formatBytes } from "../lib/format";
 import { uploadFile, type DocumentRef, type Uploader } from "../lib/upload";
 import { Icon } from "../icons/Icon";
+import { Tooltip } from "../overlay/Tooltip";
 
 /** One file on its way, or arrived, or refused. */
 interface Travelling {
@@ -183,9 +184,9 @@ export function UploadField({
                   size="s"
                   className={cn("flex-none", file.error && "text-destructive", file.doc && "text-success")}
                 />
-                <span className="min-w-0 flex-1 truncate" title={file.name}>
-                  {file.name}
-                </span>
+                <Tooltip label={file.name}>
+                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                </Tooltip>
                 <span className="flex-none text-2xs font-normal text-subtle-foreground tabular-nums">
                   {file.error ? "" : file.doc ? "Done" : `${file.percent}%`}
                 </span>

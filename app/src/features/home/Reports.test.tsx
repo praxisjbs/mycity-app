@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import reports from "@mycity/contract/schemas/reports.js";
 import type { HomeReport, HomeReportPage, HomeReportRunPage, HomeReportSummary, Me } from "@mycity/contract/contract.gen.ts";
 import { formatDate, formatDateTime, ModalProvider, toast, Toaster, todayIso } from "@mycity/ui";
-import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { axe, axeMatchers, chooseValue, installMatchMedia, optionLabels, optionValues, setViewport } from "@mycity/ui/testing";
 import { api, ApiError } from "@/api/client";
 import { saveFile } from "@/api/download";
 import { invalidate } from "@/api/hooks";
@@ -655,8 +655,8 @@ describe("New Report and Edit Report", () => {
     fireEvent.click(screen.getByRole("button", { name: "New Report" }));
     const dialog = await dialogNamed("New Report");
     expect(step(dialog)).toBe("Report");
-    const source = within(dialog).getByLabelText("Source") as HTMLSelectElement;
-    expect([...source.options].map((o) => o.value)).toEqual(ALL_SOURCES);
+    const source = within(dialog).getByLabelText("Source") as HTMLButtonElement;
+    expect(await optionValues(source)).toEqual(ALL_SOURCES);
 
     // Nothing named: the step marks it and does not move on.
     press(dialog, "Next");
@@ -664,10 +664,10 @@ describe("New Report and Edit Report", () => {
     expect(step(dialog)).toBe("Report");
 
     // A source's own filters: Leave takes a status and a type.
-    fireEvent.change(source, { target: { value: "leave" } });
+    await chooseValue(source, "leave");
     await within(dialog).findByLabelText("Leave Type");
-    expect([...(within(dialog).getByLabelText("Status") as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(["Every Status", "Submitted", "Approved", "Rejected", "Cancelled"]);
-    fireEvent.change(within(dialog).getByLabelText("Status"), { target: { value: "approved" } });
+    expect(await optionLabels(within(dialog).getByLabelText("Status"))).toEqual(["Every Status", "Submitted", "Approved", "Rejected", "Cancelled"]);
+    await chooseValue(within(dialog).getByLabelText("Status"), "approved");
     fireEvent.change(within(dialog).getByLabelText("Report Name"), { target: { value: "Approved Leave" } });
     fireEvent.click(within(dialog).getByRole("checkbox", { name: "Share With Managers" }));
     expect(copyProblems(dialog)).toEqual([]);
@@ -750,7 +750,7 @@ describe("New Report and Edit Report", () => {
     const dialog = await dialogNamed("Edit Report");
     expect((within(dialog).getByLabelText("Report Name") as HTMLInputElement).value).toBe("Leave This Month");
     expect(within(dialog).queryByLabelText("Source")).toBeNull();
-    expect((within(dialog).getByLabelText("Status") as HTMLSelectElement).value).toBe("approved");
+    expect((within(dialog).getByLabelText("Status") as HTMLButtonElement).value).toBe("approved");
     press(dialog, "Next");
     await waitFor(() => expect(step(dialog)).toBe("Schedule"));
     expect(within(dialog).getByRole("radio", { name: "Monthly" }).getAttribute("aria-checked")).toBe("true");

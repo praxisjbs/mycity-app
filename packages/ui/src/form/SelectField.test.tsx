@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
+import { setViewport } from "../testing/viewport";
 import { Field } from "./Field";
 import { ChoiceField, SelectField } from "./SelectField";
 
@@ -15,16 +16,56 @@ const departments = [
 ] as const;
 
 describe("SelectField and ChoiceField", () => {
-  it("SelectField picks a value by label", async () => {
+  it("SelectField picks a value from our own listbox on desktop, never a native select", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onBlur = vi.fn();
+    const { container } = render(
+      <Field label="Department">
+        <SelectField value="" onChange={onChange} onBlur={onBlur} options={departments} placeholder="Choose One" />
+      </Field>,
+    );
+    expect(container.querySelector("select")).toBeNull();
+    const button = screen.getByRole("combobox", { name: "Department" });
+    expect(button).toHaveTextContent("Choose One");
+    await user.click(button);
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "Finance" }));
+    expect(onChange).toHaveBeenCalledWith("fin");
+    expect(onBlur).toHaveBeenCalled();
+  });
+
+  it("SelectField shows the chosen label and moves with the keyboard", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(
       <Field label="Department">
-        <SelectField value="" onChange={onChange} options={departments} placeholder="Choose One" />
+        <SelectField value="hr" onChange={onChange} options={departments} />
       </Field>,
     );
-    await user.selectOptions(screen.getByLabelText("Department"), "Finance");
-    expect(onChange).toHaveBeenCalledWith("fin");
+    const button = screen.getByRole("combobox", { name: "Department" });
+    expect(button).toHaveTextContent("People");
+    button.focus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("option", { name: "People" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("SelectField opens a branded sheet on a phone, titled by its label", async () => {
+    setViewport(390);
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <Field label="Department">
+        <SelectField value="ops" onChange={onChange} options={departments} />
+      </Field>,
+    );
+    await user.click(screen.getByRole("button", { name: "Department" }));
+    const sheet = await screen.findByRole("dialog", { name: "Department" });
+    expect(sheet.querySelector("select")).toBeNull();
+    expect(screen.getByRole("option", { name: "Operations" })).toHaveAttribute("aria-selected", "true");
+    // A click without the pointer: jsdom has no layout for the sheet's drag to read on release.
+    fireEvent.click(screen.getByRole("option", { name: "Marketing" }));
+    expect(onChange).toHaveBeenCalledWith("mkt");
   });
 
   it("ChoiceField is a radio group that moves with the arrow keys", async () => {

@@ -3,7 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
-import { Button, cn, DateField, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, Pill, RichTextField, TextField, toast, todayIso, UploadField } from "@mycity/ui";
+import { Button, cn, DateField, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, Pill, RichTextField, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
 
 export interface ComposeInit {
@@ -32,8 +32,8 @@ function Recipients({ id, label, list, onChange, bad, error, right }: { id: stri
     <div className={cn("flex min-h-10.5 flex-wrap items-center gap-2 border-b py-1.5", bad ? "border-destructive" : "border-border")}>
       <InlineLabel htmlFor={id} className="w-14 flex-none text-xs font-semibold text-subtle-foreground">{label}</InlineLabel>
       {list.map((a, i) => (
-        <span key={a + i} className={cn("inline-flex h-6.5 items-center gap-1 rounded-full pr-1 pl-2.5 text-xs", EMAIL.test(a) ? "bg-accent" : "bg-destructive-soft text-destructive")} title={EMAIL.test(a) ? undefined : "Not an email address"}>
-          {a}
+        <span key={a + i} className={cn("inline-flex h-6.5 items-center gap-1 rounded-full pr-1 pl-2.5 text-xs", EMAIL.test(a) ? "bg-accent" : "bg-destructive-soft text-destructive")}>
+          {EMAIL.test(a) ? a : <Tooltip label="Not an Email"><span>{a}</span></Tooltip>}
           <button type="button" aria-label={`Remove ${a}`} className="flex size-5 items-center justify-center rounded-full hover:bg-card" onClick={() => onChange(list.filter((_, j) => j !== i))}><Icon name="x" className="size-3" /></button>
         </span>
       ))}
@@ -165,7 +165,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           endpoint="/api/v1/mailbox/attachments"
           onUploaded={(docs) => (setFiles((f) => [...f, ...docs]), touch())}
           trigger={(open) => (
-            <button type="button" title="Attach a File" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground"><Icon name="clip" /></button>
+            <Tooltip label="Attach File"><button type="button" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground"><Icon name="clip" /></button></Tooltip>
           )}
         />
       </div>

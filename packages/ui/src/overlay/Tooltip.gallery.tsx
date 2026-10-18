@@ -1,21 +1,20 @@
 import type { GalleryEntry } from "../testing/gallery";
-import { IconButton } from "../actions/Button";
 import { Tooltip } from "./Tooltip";
 import { useGalleryFrame } from "./gallery-frame";
+
+const NAMES = ["Offer Letter Adaeze Okafor Signed.pdf", "Lekki Phase One Worksite Survey.pdf"];
 
 function Row({ side }: { side?: "top" | "bottom" }) {
   const [ref, frame] = useGalleryFrame();
   return (
-    <div ref={ref} className="flex items-center gap-2 py-6">
-      <Tooltip label="Search" side={side} container={frame}>
-        <IconButton icon="srch" label="Search" />
-      </Tooltip>
-      <Tooltip label="Notifications" side={side} container={frame}>
-        <IconButton icon="bell" label="Notifications" dot />
-      </Tooltip>
-      <Tooltip label="More Actions" side={side} container={frame}>
-        <IconButton icon="dots" label="More Actions" />
-      </Tooltip>
+    <div ref={ref} className="flex flex-col gap-2 py-6">
+      {NAMES.map((name) => (
+        <Tooltip key={name} label={name} side={side} container={frame}>
+          <span tabIndex={0} data-copy="content" className="block w-48 truncate text-sm">
+            {name}
+          </span>
+        </Tooltip>
+      ))}
     </div>
   );
 }

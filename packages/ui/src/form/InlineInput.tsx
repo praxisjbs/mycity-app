@@ -1,16 +1,17 @@
 /**
  * @component InlineInput
  * @group Forms
- * @summary Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows.
+ * @summary Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows.
  * @use Only inside another shared component or widget that styles them itself; never as a form field.
  * @avoid A field in a form (use Field with TextField and the rest); a control with no label.
- * @phone The caller's widget decides its size; keep 16 px text so iOS never zooms.
+ * @phone The caller's widget decides its size; keep 16 px text so iOS never zooms. InlineSelect opens the branded bottom sheet, never the phone's own picker.
  * @a11y Every one needs a visible label or an aria-label; InlineLabel gives a widget a label it lays out itself.
  * @status stable
  * @exports InlineSelect, InlineLabel, InlineTextArea
  * @example <InlineInput aria-label="Message" value={text} onChange={setText} />
  */
-import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { SelectMenu, type SelectMenuProps } from "./SelectField";
 
 export interface InlineInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
   /** The text. */
@@ -38,28 +39,14 @@ export const InlineTextArea = forwardRef<HTMLTextAreaElement, InlineTextAreaProp
   return <textarea ref={ref} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />;
 });
 
-export interface InlineSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange"> {
-  /** The chosen value. */
-  value: string;
-  /** Called with the chosen value. */
-  onChange: (value: string) => void;
+export interface InlineSelectProps extends Omit<SelectMenuProps, "options"> {
   /** Options as plain strings or [value, label] pairs. */
   options: Array<string | [string, string]>;
 }
 
-export function InlineSelect({ value, onChange, options, ...rest }: InlineSelectProps) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} {...rest}>
-      {options.map((o) => {
-        const [v, l] = typeof o === "string" ? [o, o] : o;
-        return (
-          <option key={v} value={v}>
-            {l}
-          </option>
-        );
-      })}
-    </select>
-  );
+/** A select whose button the caller's widget draws (className); the list is the branded one (SelectMenu). */
+export function InlineSelect({ options, ...rest }: InlineSelectProps) {
+  return <SelectMenu {...rest} options={options.map((o) => (typeof o === "string" ? ([o, o] as const) : o))} />;
 }
 
 export type InlineLabelProps = LabelHTMLAttributes<HTMLLabelElement>;

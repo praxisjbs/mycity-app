@@ -89,8 +89,8 @@ export default function MapDraw({ centre, zoom, tileUrl, markers, radiusMetres, 
     if (!layer) return;
     layer.clearLayers();
     for (const marker of markers) {
-      L.marker([marker.lat, marker.lon], { icon: pin(marker.tone ?? "plain"), title: marker.label, alt: marker.label, keyboard: false })
-        .bindTooltip(marker.label)
+      L.marker([marker.lat, marker.lon], { icon: pin(marker.tone ?? "plain"), alt: marker.label, keyboard: false })
+        .bindTooltip(marker.label, { className: "map-tip", direction: "top" })
         .addTo(layer);
     }
     const first = markers[0];

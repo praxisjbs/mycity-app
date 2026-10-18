@@ -35,6 +35,7 @@
     "check:five-second": "node scripts/check/five-second.js",
     "check:two-shells": "node scripts/check/two-shells.js",
     "check:forms": "node scripts/check/forms.js",
+    "check:native-ui": "node scripts/check/native-ui.js",
     "check:dashes": "node scripts/check/dashes.js",
     "check:progress": "node scripts/check/progress.js",
     "check:guides": "node scripts/check/guides.js",

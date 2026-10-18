@@ -51,7 +51,7 @@ app's session on the upload engine.
 
 ---
 
-## 3 · Decisions (15/10/2026, TB)
+## 3 · Decisions (15/10/2026, TB; F25 added 18/10/2026)
 
 | # | Decision |
 |---|---|
@@ -79,6 +79,7 @@ app's session on the upload engine.
 | F22 | **Heavy parts now, loaded lazily**: rich text editor, PDF preview, charts, voice input, maps. Each is its own chunk, loaded only by a screen that uses it |
 | F23 | **demo.html is frozen** as a visual reference. The screen gates crawl it only when a change touches it; the gallery and the app are the gated targets |
 | F24 | **Work split**: Ground, Shell, Build kit (§1). Each PR session asks four clarifying questions first (§2) |
+| F25 | **Nothing the browser styles itself** (added 18/10/2026). No native select or phone picker, no browser date, number, checkbox or radio input, no `title` tooltip, no validation bubble, no toast styled by a library: every control, list, tooltip and message is a `packages/ui` component in the brand's tokens, on both shells. A select is `SelectMenu` (a Radix listbox on desktop, a bottom sheet on a phone); a hover label is `Tooltip`; `base.css` resets what the browser would still draw. Gate 21 (`check/native-ui.js`) holds it in source and on every rendered screen, `packages/ui` included, with no exemptions (FRONTEND_GUIDE §8.8) |
 
 ---
 
@@ -204,6 +205,19 @@ app's session on the upload engine.
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 18/10/2026 · TB · F25 and gate 21, nothing the browser styles itself. A phone showed its own grey
+  picker over the branded Create Rule sheet: `SelectField`, `FilterSelect` and `InlineSelect` were
+  native `<select>`s. All three now draw `SelectMenu` (new, in Forms): a Radix listbox in our tokens
+  under the button on desktop (`@radix-ui/react-select` 2.3.7, on the Radix versions already
+  installed), a bottom sheet of 44 px rows with a tick on the chosen one on a phone, titled by the
+  field's label (`useFieldLabelId`). Every `title` tooltip became `Tooltip`, which now passes a ref
+  and props through so it can sit inside a Menu or Dialog trigger; `IconButton` draws one from its
+  label; the collapsed rail names its links with it; a map marker's label is Leaflet's tooltip in our
+  tokens (`map-tip`). `base.css` resets the rest (appearance, spinners, search clear, picker and
+  autofill buttons, autofill tint, invalid glow, tap flash, selection, accent and caret colours); the
+  Toaster styles sonner's warning, loading, description, cancel and close too. `check/native-ui.js`
+  scans source and the crawl of every gallery page and app screen (402 views) with no exemptions;
+  all green. Left: nothing.
 - 16/10/2026 · TB · PR 3 (Build kit) done, and with it the frontend foundation. `packages/ui` holds
   157 components: a **Data** group (DataView, Pager, Toolbar, ExportButton, Kanban, Calendar), a
   **Charts** group (five charts, each a boundary around its own lazy chunk), a **Documents** group

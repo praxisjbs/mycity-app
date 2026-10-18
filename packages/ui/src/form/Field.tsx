@@ -43,6 +43,11 @@ export function useFieldControl(own: { id?: string; state?: FieldState; group?: 
   };
 }
 
+/** The id of the Field's label, so a control that opens a sheet can title it with the label's words. */
+export function useFieldLabelId(): string | undefined {
+  return useContext(FieldContext)?.labelId;
+}
+
 export interface FieldProps {
   /** Title Case, at most 4 words. */
   label: ReactNode;

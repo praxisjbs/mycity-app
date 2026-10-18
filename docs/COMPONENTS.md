@@ -83,7 +83,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot. | stable |
-| Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
+| Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
@@ -91,8 +91,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
-| Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row. | stable |
-| Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField` | Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField). | stable |
+| Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row. | stable |
+| Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField`, `SelectMenu` | Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField). | stable |
 | Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
 | Forms | [StepBar](#stepbar) | `StepBar` | Where a person is in a few steps: one bar per step, filled up to the step in hand, and Step 2 of 4. | stable |
 | Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
@@ -2002,10 +2002,10 @@ A small label that appears beside a control on hover or keyboard focus, desktop 
 
 | | |
 |---|---|
-| Use | The words behind an icon-only button (IconButton's label), a truncated name in full. |
+| Use | A truncated name in full, the words behind an icon-only control that is not an IconButton (IconButton draws its own from its label). Every hover label in the product: never the browser's title attribute (gate 21). |
 | Avoid | Help or explanation (use HelpTerm); anything a person must read to act; anything on a phone, where there is no hover. |
 | Phone | Nothing: the child renders alone, since a touch screen has no hover and the control already carries its name. |
-| Accessibility | Opens on hover after a short pause and at once on keyboard focus; Esc closes it; the text is announced as the control's description. The control keeps its own accessible name. |
+| Accessibility | Opens on hover after a short pause and at once on keyboard focus; Esc closes it; the text is announced as the control's description. The control keeps its own accessible name. It passes a ref and props through to its child, so it can sit inside a Menu or Dialog trigger. Never the browser's own title tooltip (gate 21). |
 | Status | stable |
 | Exports | `Tooltip` |
 | Import | `import { Tooltip } from "@mycity/ui";` |
@@ -2013,7 +2013,7 @@ A small label that appears beside a control on hover or keyboard focus, desktop 
 | Test | `packages/ui/src/overlay/Tooltip.test.tsx` |
 | Gallery | `packages/ui/src/overlay/Tooltip.gallery.tsx` (`npm run gallery`, `#/Tooltip`) |
 
-**Tooltip** props (`TooltipProps`)
+**Tooltip** props (`TooltipProps`, extends `Omit<HTMLAttributes<HTMLElement>, "children">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
@@ -2025,7 +2025,7 @@ A small label that appears beside a control on hover or keyboard focus, desktop 
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default. |
 
 ```tsx
-<Tooltip label="Notifications"><IconButton icon="bell" label="Notifications" /></Tooltip>
+<Tooltip label={file.name}><span className="truncate">{file.name}</span></Tooltip>
 ```
 
 ## Help
@@ -2402,13 +2402,13 @@ The one <form>: Enter submits, the browser's own bubbles are off; with FormFoote
 
 ### InlineInput
 
-Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows.
+Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows.
 
 | | |
 |---|---|
 | Use | Only inside another shared component or widget that styles them itself; never as a form field. |
 | Avoid | A field in a form (use Field with TextField and the rest); a control with no label. |
-| Phone | The caller's widget decides its size; keep 16 px text so iOS never zooms. |
+| Phone | The caller's widget decides its size; keep 16 px text so iOS never zooms. InlineSelect opens the branded bottom sheet, never the phone's own picker. |
 | Accessibility | Every one needs a visible label or an aria-label; InlineLabel gives a widget a label it lays out itself. |
 | Status | stable |
 | Exports | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` |
@@ -2424,12 +2424,10 @@ Unstyled controls for a field built into a larger widget: the chat message box, 
 | `value` | `string` | yes | The text. |
 | `onChange` | `(value: string) => void` | yes | Called on each key with the new text. |
 
-**InlineSelect** props (`InlineSelectProps`, extends `Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">`)
+**InlineSelect** props (`InlineSelectProps`, extends `Omit<SelectMenuProps, "options">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `value` | `string` | yes | The chosen value. |
-| `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
 | `options` | `Array<string \| [string, string]>` | yes | Options as plain strings or [value, label] pairs. |
 
 **InlineLabel** props (`InlineLabelProps`)
@@ -2694,13 +2692,13 @@ Long text with the little formatting a message needs, loaded only when a compose
 
 ### SearchInput
 
-The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row.
+The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row.
 
 | | |
 |---|---|
 | Use | Above every list that searches; FilterSelect for one of a list's server filters. |
 | Avoid | Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design. |
-| Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens the phone's own picker. |
+| Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens a branded bottom sheet, never the phone's own picker. |
 | Accessibility | The box is a searchbox named by its label (or its placeholder); FilterSelect's label is visible and linked. |
 | Status | stable |
 | Exports | `SearchInput`, `FilterSelect` |
@@ -2734,22 +2732,22 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 
 ### SelectField
 
-Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField).
+Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField).
 
 | | |
 |---|---|
-| Use | SelectField for more than five options; ChoiceField for two to five, so every option is visible at once. |
-| Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch). |
-| Phone | SelectField opens the phone's own picker; ChoiceField segments are 44 px tall and wrap rather than scroll. |
-| Accessibility | SelectField is a native select labelled by its Field; ChoiceField is a radio group with arrow-key movement. |
+| Use | SelectField for more than five options; ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
+| Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
+| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker; ChoiceField segments are 44 px tall and wrap rather than scroll. |
+| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field. Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
 | Status | stable |
-| Exports | `SelectField`, `ChoiceField` |
-| Import | `import { SelectField, ChoiceField } from "@mycity/ui";` |
+| Exports | `SelectField`, `ChoiceField`, `SelectMenu` |
+| Import | `import { SelectField, ChoiceField, SelectMenu } from "@mycity/ui";` |
 | File | `packages/ui/src/form/SelectField.tsx` |
 | Test | `packages/ui/src/form/SelectField.test.tsx` |
 | Gallery | `packages/ui/src/form/SelectField.gallery.tsx` (`npm run gallery`, `#/SelectField`) |
 
-**SelectField** props (`SelectFieldProps`, extends `Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange" | "onBlur">`)
+**SelectField** props (`SelectFieldProps`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
@@ -2757,9 +2755,15 @@ Pick one value: a select list, or for five options or fewer a segmented choice (
 | `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
 | `onBlur` | `() => void` |  | Called when the person leaves the field. |
 | `options` | `ReadonlyArray<Option>` | yes | The options. |
-| `placeholder` | `string` |  | A first, unchoosable line shown while nothing is chosen (Choose One). |
+| `placeholder` | `string` |  | Shown on the button while nothing is chosen (Choose One). |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
+| `name` | `string` |  | Its name in a submitted form. |
+| `disabled` | `boolean` |  | Shown but not usable. |
+| `"aria-label"` | `string` |  | Names it when no Field label sits above it. |
+| `className` | `string` |  | Layout classes only. |
+| `id` | `string` |  | The control's id; the Field supplies one otherwise. |
+| `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default. |
 
 **ChoiceField** props (`ChoiceFieldProps`)
 
@@ -2775,8 +2779,28 @@ Pick one value: a select list, or for five options or fewer a segmented choice (
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `className` | `string` |  | Layout classes only. |
 
+**SelectMenu** props (`SelectMenuProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The chosen value; "" for none (or for an option whose value is ""). |
+| `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
+| `onBlur` | `() => void` |  | Called when the list closes. |
+| `options` | `ReadonlyArray<Option>` | yes | The options. |
+| `placeholder` | `string` |  | Shown on the button while nothing is chosen. |
+| `label` | `string` |  | The sheet's title on a phone and the list's name; the label above the button otherwise. |
+| `className` | `string` |  | The button's classes: the caller's widget draws it (a field, a filter, a row in a composer). |
+| `id` | `string` |  | The button's id, so a <label for> names it. |
+| `"aria-label"` | `string` |  | Names the button when no label is linked to it. |
+| `"aria-labelledby"` | `string` |  | The id of the label that names it (a Field supplies it). |
+| `"aria-describedby"` | `string` |  | The ids of its help and error (a Field supplies them). |
+| `"aria-invalid"` | `boolean` |  | Marks it wrong for assistive technology (a Field supplies it). |
+| `disabled` | `boolean` |  | Shown but not usable. |
+| `name` | `string` |  | Its name in a submitted form. |
+| `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default (the gallery passes its themed frame). |
+
 ```tsx
-<ChoiceField options={[["remote", "Remote"], ["hybrid", "Hybrid"], ["on_site", "On Site"]]} {...form.field("work_pattern")} />
+<SelectField placeholder="Choose One" options={[["ops", "Operations"], ["hr", "People"]]} {...form.field("department")} />
 ```
 
 ### SignatureField

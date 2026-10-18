@@ -2,6 +2,7 @@
 /**
  * The pure logic of the frontend gates added with packages/ui
  * (FRONTEND_FOUNDATION PR 1): palette (13), native dialogs (16), upload (18),
+ * nothing the browser styles itself (21),
  * mock-free (F12), the gallery target of the screen crawl (F10, F23), the
  * a11y report and the copy props gate 8 reads from source. A scanner that
  * misses a case passes a broken screen; one that over-reaches fails good work,
@@ -15,6 +16,7 @@ const { jsxProps, frontendFiles } = require("../../scripts/check/lib/sources");
 const { findHex, findStyling, tokenValues, HEX_ALLOWED } = require("../../scripts/check/palette");
 const { findDialogs } = require("../../scripts/check/native-dialogs");
 const { findFileInputs, uploadHome, LEGACY_UPLOADS } = require("../../scripts/check/upload");
+const { findNativeUi, renderedMessages } = require("../../scripts/check/native-ui");
 const { sentinelOf, filesWith } = require("../../scripts/check/mock-free");
 const { demoWanted } = require("../../scripts/check/lib/screens");
 const { isStale } = require("../../scripts/check/lib/gallery");
@@ -122,6 +124,39 @@ describe("upload (gate 18)", () => {
     for (const f of LEGACY_UPLOADS) expect(uploadHome(f)).toBe(true);
     expect(uploadHome("app/src/features/ess/Documents.tsx")).toBe(false);
     expect(uploadHome("packages/ui/src/display/Avatar.tsx")).toBe(false);
+  });
+});
+
+describe("native ui (gate 21)", () => {
+  const what = (src, file = "app/src/features/x.tsx") => findNativeUi(src, file).map((f) => f.what);
+
+  test("refuses every element, input type and attribute the browser draws itself", () => {
+    expect(what('<select value={v} onChange={go}><option value="a">A</option></select>')).toEqual(["<select>", "<option>"]);
+    expect(what("<datalist id='d' /><progress value={1} /><meter /><dialog open />")).toEqual(["<datalist>", "<progress>", "<meter>", "<dialog>"]);
+    expect(what('<input type="number" /><input type={"date"} /><input type="checkbox" /><input list="d" />')).toEqual(['<input type="number">', '<input type="date">', '<input type="checkbox">', "<input list>"]);
+    expect(what("<button onClick={() => a > b} title={label}>x</button>")).toEqual(["<button title>"]);
+    expect(what("<form onSubmit={save}>")).toEqual(["<form> without noValidate"]);
+    expect(what('document.createElement("select"); el.setAttribute("title", "x");')).toEqual(['createElement("select")', 'setAttribute("title")']);
+    expect(what('L.marker([1, 2], { icon: pin("brand"), title: m.label })')).toEqual(["a Leaflet marker's title option"]);
+    expect(what('import { toast } from "sonner";')).toEqual(["sonner imported directly"]);
+  });
+
+  test("holds packages/ui to it too, with no exemptions", () => {
+    expect(what("<select />", "packages/ui/src/form/SelectField.tsx")).toEqual(["<select>"]);
+    expect(what('<span title="x" />', "packages/ui/src/overlay/Tooltip.tsx")).toEqual(["<span title>"]);
+  });
+
+  test("allows components, type arguments, comments and the Toaster's own sonner", () => {
+    expect(what('<SelectField value={v} /><Card title="Leave" /><Tooltip label={n}><span>{n}</span></Tooltip>')).toEqual([]);
+    expect(what('const [v, setV] = useState<string>(""); const ok = a < b && c > d;')).toEqual([]);
+    expect(what('<input type="text" /><input type="search" /><form noValidate onSubmit={s}><svg><title>Pin</title></svg>')).toEqual([]);
+    expect(what('// <select> and title="x"\nL.marker(p, { icon }).bindTooltip(m.label);')).toEqual([]);
+    expect(what('import { Toaster } from "sonner";', "packages/ui/src/feedback/Toaster.tsx")).toEqual([]);
+  });
+
+  test("reads the rendered findings a crawled screen carries", () => {
+    expect(renderedMessages({ native: [{ what: "<select>", label: "Department", state: "Select" }] })).toEqual(['<select> "Department" is drawn by the browser (gate 21) in state "Select"']);
+    expect(renderedMessages({})).toEqual([]);
   });
 });
 

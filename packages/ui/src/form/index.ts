@@ -18,7 +18,7 @@ export {
   type PhoneFieldProps,
   type TextAreaFieldProps,
 } from "./TextField";
-export { SelectField, ChoiceField, type SelectFieldProps, type ChoiceFieldProps, type Option } from "./SelectField";
+export { SelectField, ChoiceField, SelectMenu, type SelectFieldProps, type ChoiceFieldProps, type SelectMenuProps, type Option } from "./SelectField";
 export { Switch, ToggleRow, CheckboxField, type SwitchProps, type ToggleRowProps, type CheckboxFieldProps } from "./Switch";
 export { DateField, DateRangeField, TimeField, type DateFieldProps, type DateRangeFieldProps, type TimeFieldProps, type DateRange } from "./DateField";
 export { MoneyField, toMoneyString, type MoneyFieldProps } from "./MoneyField";
