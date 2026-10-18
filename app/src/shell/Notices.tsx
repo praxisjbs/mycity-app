@@ -16,7 +16,7 @@ export function ShellNotices() {
       <ShellNotice
         icon="refresh"
         actions={
-          <Button variant="primary" size="sm" onClick={() => void update()}>
+          <Button variant="primary" size="sm" onClick={update}>
             Reload
           </Button>
         }
@@ -47,11 +47,11 @@ export function ShellNotices() {
   return null;
 }
 
-/** Install App: the browser's own prompt, or on an iPhone the Add to Home Screen steps. */
+/** Install App: the browser's own prompt, or on an iPhone the Add to Home Screen steps. Its button spins while the prompt is open. */
 export function useInstallApp() {
   const modal = useModal();
   return useCallback(() => {
-    void install().then((r) => {
+    return install().then((r) => {
       if (r !== "steps") return;
       modal.open({
         title: "Install MyCity App",

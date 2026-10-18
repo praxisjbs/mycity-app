@@ -136,7 +136,7 @@ function VacancyForm({ close }: { close: () => void }) {
     <Wizard
       finish="Publish Vacancy"
       busy={save.pending}
-      onFinish={() => void submit()}
+      onFinish={() => submit()}
       onCancel={close}
       steps={[
         {

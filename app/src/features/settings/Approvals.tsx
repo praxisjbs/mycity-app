@@ -241,7 +241,7 @@ function EditStages({ flow, close }: { flow: ApprovalFlow; close: () => void }) 
       <FormError>{problem}</FormError>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>
           Save Stages
         </Button>
       </FormFooter>

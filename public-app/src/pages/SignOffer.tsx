@@ -4,7 +4,7 @@ import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { OfferToSign } from "@/api/types/public";
 import { Page } from "@/shell/Page";
-import { Banner, Brand, Button, Field, formatDate, formatTime, PageMessage, SignatureField, Skeleton, Sub, TextAreaField, type SignatureFieldHandle } from "@mycity/ui";
+import { ActionGroup, Banner, Brand, Button, Field, formatDate, formatTime, PageMessage, SignatureField, Skeleton, Sub, TextAreaField, type SignatureFieldHandle } from "@mycity/ui";
 import { useRouter } from "@/lib/router";
 import { LinkProblem } from "./LinkProblem";
 
@@ -64,9 +64,9 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
   const sign = () => {
     const png = pad.current?.toPng();
     if (!png) return setProblem("Sign in the box first.");
-    void run(() => api.call("POST /api/public/v1/sign/:token/sign", { params: { token }, body: { signature_png: png } }), "The signature did not send. Try again.");
+    return run(() => api.call("POST /api/public/v1/sign/:token/sign", { params: { token }, body: { signature_png: png } }), "The signature did not send. Try again.");
   };
-  const decline = () => void run(() => api.call("POST /api/public/v1/sign/:token/decline", { params: { token }, body: { reason: reason.trim() } }), "Could not record your answer. Try again.");
+  const decline = () => run(() => api.call("POST /api/public/v1/sign/:token/decline", { params: { token }, body: { reason: reason.trim() } }), "Could not record your answer. Try again.");
 
   return (
     <Page title="Offer of Employment" brandInCard>
@@ -97,8 +97,8 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
               <Banner tone="err">{problem}</Banner>
             </div>
           )}
-          <Button variant="primary" block className="mt-2" disabled={busy || !inked} onClick={sign}>
-            {busy ? "Signing" : "Accept and Sign"}
+          <Button variant="primary" block className="mt-2" disabled={!inked} onClick={sign}>
+            Accept and Sign
           </Button>
           <Sub className="mt-2.5 text-center">Once signed, this document is locked and verifiable at go.mycityapp.io/verify</Sub>
           <div className="mt-3 text-center">
@@ -114,12 +114,12 @@ function Sign({ d, token, onDone }: { d: OfferToSign; token: string; onDone: (d:
           </Field>
           {problem && <Banner tone="err">{problem}</Banner>}
           <div className="flex justify-end gap-2">
-            <Button disabled={busy} onClick={() => (setDeclining(false), setProblem(null))}>
-              Back to the Offer
-            </Button>
-            <Button variant="primary" disabled={busy} onClick={decline}>
-              {busy ? "Sending" : "Confirm Decline"}
-            </Button>
+            <ActionGroup>
+              <Button onClick={() => (setDeclining(false), setProblem(null))}>Back to the Offer</Button>
+              <Button variant="primary" onClick={decline}>
+                Confirm Decline
+              </Button>
+            </ActionGroup>
           </div>
         </div>
       )}

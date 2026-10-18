@@ -15,7 +15,6 @@ import { PATTERN } from "./Careers";
 export function Vacancy({ slug }: { slug: string }) {
   const { navigate } = useRouter();
   const v = useApi("GET /api/public/v1/jobs/:slug", { params: { slug } });
-  const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   if (v.error)
@@ -37,14 +36,12 @@ export function Vacancy({ slug }: { slug: string }) {
   const pay = d.salary_min && d.salary_max ? `${formatMoney(d.salary_min, { kobo: false })} to ${formatMoney(d.salary_max, { kobo: false })}` : null;
   const where = [d.department, d.location, `${PATTERN[d.work_pattern]}${d.work_pattern_note ? `, ${d.work_pattern_note}` : ""}`, pay].filter(Boolean).join(" · ");
   const apply = async () => {
-    setBusy(true);
     setProblem(null);
     try {
       const { token } = await api.call("POST /api/public/v1/jobs/:slug/apply", { params: { slug }, body: {} });
       navigate(`/apply/${token}`);
     } catch (e) {
       setProblem(e instanceof ApiError ? e.message : "Could not start an application. Try again.");
-      setBusy(false);
     }
   };
 
@@ -85,8 +82,8 @@ export function Vacancy({ slug }: { slug: string }) {
       )}
       {d.state === "open" ? (
         <>
-          <Button variant="primary" block className="mt-5" disabled={busy} onClick={apply}>
-            {busy ? "Opening the Form" : "Apply for This Role"}
+          <Button variant="primary" block className="mt-5" onClick={apply}>
+            Apply for This Role
           </Button>
           <Sub className="mt-3 text-center">
             {d.applicants === 1 ? "1 person has applied." : `${d.applicants} people have applied.`} Closes when filled.

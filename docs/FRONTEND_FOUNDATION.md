@@ -51,7 +51,7 @@ app's session on the upload engine.
 
 ---
 
-## 3 · Decisions (15/10/2026, TB; F25 added 18/10/2026)
+## 3 · Decisions (15/10/2026, TB; F25 and F26 added 18/10/2026)
 
 | # | Decision |
 |---|---|
@@ -80,6 +80,7 @@ app's session on the upload engine.
 | F23 | **demo.html is frozen** as a visual reference. The screen gates crawl it only when a change touches it; the gallery and the app are the gated targets |
 | F24 | **Work split**: Ground, Shell, Build kit (§1). Each PR session asks four clarifying questions first (§2) |
 | F25 | **Nothing the browser styles itself** (added 18/10/2026). No native select or phone picker, no browser date, number, checkbox or radio input, no `title` tooltip, no validation bubble, no toast styled by a library: every control, list, tooltip and message is a `packages/ui` component in the brand's tokens, on both shells. A select is `SelectMenu` (a Radix listbox on desktop, a bottom sheet on a phone); a hover label is `Tooltip`; `base.css` resets what the browser would still draw. Gate 21 (`check/native-ui.js`) holds it in source and on every rendered screen, `packages/ui` included, with no exemptions (FRONTEND_GUIDE §8.8) |
+| F26 | **One press, one request** (added 18/10/2026). A button answers the moment it is pressed. Its handler hands back the work (a promise), and the button is busy until that settles: its own colour and label, softened, with a spinner where its icon was (centred over the label when it has none, so its size never changes), and a second press refused at once, before the screen redraws. The buttons beside it wait with it (a modal, a form, a form footer, a card or page header, a shell notice, or an `ActionGroup`), and a modal cannot be dismissed mid-save. Busy stays focusable and named (`aria-busy`, `aria-disabled`), never `disabled`. A `Form` refuses a second submit while its save runs. The lint rule `mycity/no-void-press` refuses a handler that throws its work away (`() => void save()`) on `Button`, `IconButton`, `BigButton`, `Form`, `Wizard`, `ConfirmDialog` and `ExportButton` (FRONTEND_GUIDE §8.4, §9.4) |
 
 ---
 
@@ -193,6 +194,20 @@ app's session on the upload engine.
    sits beside it for pictures, and **both carry Open in Tab**, so a preview opens full size.
    Our own generated documents keep rendering through `Paper`.
 
+**F26 · One press, one request** (18/10/2026, TB)
+
+1. How does a working button look? **Its own colour and label, softened, with a spinner where its
+   icon was**, so the brand yellow stays yellow and the button keeps its size. Grey was turned down:
+   it drops the brand colour and looks the same as a disabled button.
+2. What else waits while it works? **Its group**: the buttons beside it in the same modal, form
+   footer, card or page header or shell notice, and the modal's own close button, Esc, scrim and
+   drag. The rest of the app stays usable. Not only the pressed button (Approve could race Reject,
+   Cancel could close a dialog mid-save), and not the whole screen (one slow request would freeze it).
+3. How does it stay true as screens are added? **Automatically, with a lint gate**: the button
+   watches the promise its handler hands back, the 91 handlers that threw it away were converted, and
+   `mycity/no-void-press` refuses the pattern from now on, inline or in the local function a button
+   names.
+
 ---
 
 ## 6 · Progress
@@ -205,6 +220,29 @@ app's session on the upload engine.
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 18/10/2026 · TB · F26, one press, one request. Reload on "A new version is ready" looked dead: no
+  sign of work while the new version took over, and after a hard refresh nothing at all, because the
+  PWA plugin reloads only a page a service worker controlled when it loaded. Now every press answers
+  at once. `Button`, `IconButton` and `BigButton` watch the promise their handler returns (new
+  `actions/press.ts`): busy from the press until it settles, a second press refused through a ref
+  before React draws, the spinner where the icon was (centred over the label when there is none, so
+  nothing moves), the colour kept and softened, `aria-busy` and `aria-disabled` but never `disabled`.
+  New `ActionGroup` holds the buttons beside a busy one; every Modal (its own group, so a
+  confirmation opened by a busy button stays answerable), Form, FormFooter, ModalFooter, CardHeader
+  and PageHeader actions, ShellNotice and DataView's bulk bar is one, and a Modal refuses Esc, the
+  scrim, a drag and its close button mid-save. `Form` refuses a second submit (Enter twice) while its
+  save runs and spins the button that submitted it, even one outside it with `form=`; `Wizard` spins
+  its last button on `onFinish`'s promise; `ConfirmDialog` uses the shared busy instead of its own.
+  Reload asks the waiting version to take over and reloads on `controllerchange`, on that worker
+  reaching activated (the hard-refresh case) or after 4 s, and comes back if the browser's unsaved
+  work prompt keeps the page. Lint `mycity/no-void-press` (with a RuleTester test) refuses a press
+  handler that throws its work away; 91 handlers in both apps were converted, and six buttons that
+  disabled themselves with a busy flag of their own and swapped their label (Accept and Sign,
+  Confirm Decline, Submit Application, Start the Assessment, Apply for This Role, Email All) use the
+  shared busy instead; Assessment's Back and Next, and Keep Going and Submit, are groups. Left: six hand-drawn
+  `<button>`s in features are not `@mycity/ui` buttons and keep their own guards (the chat composer's
+  controls and the assistant's suggested questions disable or swap themselves while they send); a
+  mail attachment chip can still start its download twice.
 - 18/10/2026 · TB · F25 and gate 21, nothing the browser styles itself. A phone showed its own grey
   picker over the branded Create Rule sheet: `SelectField`, `FilterSelect` and `InlineSelect` were
   native `<select>`s. All three now draw `SelectMenu` (new, in Forms): a Radix listbox in our tokens

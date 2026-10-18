@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { Wizard, type WizardStep } from "./Wizard";
@@ -31,6 +31,21 @@ describe("Wizard", () => {
     render(<Wizard steps={steps(() => false)} finish="Publish Vacancy" onFinish={() => undefined} />);
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByRole("heading", { name: "The Role" })).toBeInTheDocument();
+  });
+
+  it("spins its last button until the save it finishes with settles", async () => {
+    const user = userEvent.setup();
+    let finish: () => void = () => undefined;
+    const onFinish = vi.fn(() => new Promise<void>((r) => (finish = r)));
+    render(<Wizard steps={steps()} finish="Publish Vacancy" onFinish={onFinish} initialStep={2} />);
+    const publish = screen.getByRole("button", { name: "Publish Vacancy" });
+    await user.click(publish);
+    await user.click(publish);
+    expect(onFinish).toHaveBeenCalledOnce();
+    expect(publish).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Back" })).toHaveAttribute("data-press", "waiting");
+    await act(async () => finish());
+    await waitFor(() => expect(publish).not.toHaveAttribute("aria-busy"));
   });
 
   it("has no accessibility violations", async () => {

@@ -38,7 +38,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 | Type | Read |
 |---|---|
 | Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
-| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F25, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
+| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F26, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
@@ -53,7 +53,7 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 1. `MILESTONES.md` is binding for scope and decisions A1 to A26.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
 3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
-   frontend gates), decisions F1 to F25 in `docs/FRONTEND_FOUNDATION.md` §3 win over
+   frontend gates), decisions F1 to F26 in `docs/FRONTEND_FOUNDATION.md` §3 win over
    `MILESTONES.md`, `FRONTEND_GUIDE.md` and `demo.html` (decided with TB, 15/10/2026).
 4. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
 5. `README.MD` is the map of every file.
@@ -106,6 +106,10 @@ silently.
   `InlineSelect` (`SelectMenu`), hover labels are `Tooltip`. FRONTEND_GUIDE §8.8 has the full list.
 - **The mock never ships** (F12 to F14): the in-browser mock is for laptops and CI only, never in a
   release build. Staging shows its seed, production only live data.
+- **One press, one request** (F26): a button's handler hands back its work (`onClick={save}`),
+  never `() => void save()`; the button spins and refuses a second press until it settles, and the
+  buttons beside it wait (`ActionGroup`; modals, forms and footers already are one). Never
+  `disabled={busy}`. The lint rule `mycity/no-void-press` refuses it (FRONTEND_GUIDE §8.4).
 - **One form system** (gate 12): fields only from `packages/ui/src/form/` (`useContractForm` with the
   module's schema, or INTERIM rules until it exists), labels above, Optional tags, errors of at
   most 4 words on the field as it is filled, buttons only in a footer. Nobody builds their own field.

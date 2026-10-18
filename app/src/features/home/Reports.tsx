@@ -260,7 +260,7 @@ const hasFile = (run: HomeReportRun) => run.status === "done" && !!run.document_
 function DownloadRun({ run, main = false }: { run: HomeReportRun; main?: boolean }) {
   const file = `/api/v1/documents/${run.document_id}/content`;
   return (
-    <Button size={main ? "md" : "sm"} variant={main ? "primary" : "default"} icon="download" aria-label={`Download ${run.number}`} onClick={() => void saveFile(file, `${run.number}.${run.format}`)}>
+    <Button size={main ? "md" : "sm"} variant={main ? "primary" : "default"} icon="download" aria-label={`Download ${run.number}`} onClick={() => saveFile(file, `${run.number}.${run.format}`)}>
       Download
     </Button>
   );

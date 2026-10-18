@@ -5,7 +5,7 @@
  * @use A section of a page: a KPI group, a record's fields, a list, a chart. One idea per card.
  * @avoid Cards inside cards; an explainer card (a title starting How, Why or What is tier 3 and never reaches a screen); a list on a phone (a card list comes from DataView).
  * @phone Full width with the same padding; the actions in CardHeader keep their 44 px targets and wrap under the title when there is no room.
- * @a11y A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it.
+ * @a11y A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. CardHeader's actions wait for each other while one is working (F26).
  * @status stable
  * @exports CardHeader
  * @example <Card><CardHeader title="Leave Requests" actions={<Button size="sm">View All</Button>} />...</Card>
@@ -13,6 +13,7 @@
  */
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { ActionGroup } from "../actions/ActionGroup";
 import { HelpTerm } from "../help/HelpTerm";
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {
@@ -71,7 +72,11 @@ export function CardHeader({ title, help, record, actions, right, level = 2, chi
         </H>
       )}
       {children}
-      {end != null && <div className="ml-auto flex flex-wrap items-center gap-1.5">{end}</div>}
+      {end != null && (
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <ActionGroup>{end}</ActionGroup>
+        </div>
+      )}
     </div>
   );
 }
