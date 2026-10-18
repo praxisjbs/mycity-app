@@ -7,6 +7,7 @@
 | Backend modules | `organisation` |
 | Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram tab), `app/src/features/ess/` (Org Chart tab) |
 | Permission key(s) | `people` (builder, manage), `org_chart` (viewer, read for all staff) |
+| Capabilities | none; the builder is the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
 | Status | Built |
 | Last changed | 17/10/2026 |
@@ -242,6 +243,12 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · Header gains the Capabilities row every guide now carries (README §5.2): none. In the
+  `organisation` module this guide covers, the register's counts now take the Lagos date they count
+  from (`organisation.repo.counts(db, scope, today)`, from `lagos.today()`) instead of the database's
+  `current_date`, and the service exposes `counts(client, scope, { today })` (headcount, attrition
+  over 90 days, confirmations due in 30) so Home's cards read the register's definition. The
+  Organogram and Org Chart are unchanged.
 - 17/10/2026 · TB · §9: open seats are searchable and the Organogram opens focused on one (`?id=`);
   people are also found by preferred and middle name.
 - 17/10/2026 · TB · §9: a person is also found by their work phone, typed any way. The work phone is

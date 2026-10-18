@@ -226,9 +226,9 @@ function pageOfMatches(entries, term, page) {
 }
 
 /**
- * What the shell would show this person: their actions per module (as /auth/me gives
- * them) and whether anyone reports to them.
- * @returns {Promise<{grants: Record<string, string[]>, is_ceo: boolean, manages_people: boolean}>}
+ * What the shell would show this person: their actions per module and their
+ * capabilities (as /auth/me gives them), and whether anyone reports to them.
+ * @returns {Promise<import("./screens").Reader>}
  */
 async function readerOf(db, user) {
   const grants = {};
@@ -250,7 +250,12 @@ async function readerOf(db, user) {
     );
     managesPeople = Boolean(rows[0] && rows[0].manages);
   }
-  return { grants, is_ceo: user.is_ceo === true, manages_people: managesPeople };
+  return {
+    grants,
+    capabilities: await grantsCache.getCapabilities(db, user.user_id),
+    is_ceo: user.is_ceo === true,
+    manages_people: managesPeople,
+  };
 }
 
 const tabLabel = (module, tab) => {

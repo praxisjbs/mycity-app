@@ -2,7 +2,7 @@
 /**
  * AI and search, the parts that need no database: redaction, structured output, the
  * stub, the Gemini request and its errors, manifests and their registry, search
- * providers, and gates 9, 10, 19 and the vendor-import guard. The database half
+ * providers, the tabs search offers, and gates 9, 10, 19 and the vendor-import guard. The database half
  * (governance, the ledger, reads with grants and scope, search, the catalogue) runs in
  * tests/integration/ai-search.test.js.
  */
@@ -524,6 +524,44 @@ describe("search providers", () => {
     });
     expect(typeHint("staff", providers)).toBeNull();
     expect(typeHint("ada obi", providers)).toBeNull();
+  });
+});
+
+describe("search's screens follow the shell", () => {
+  const { tabVisible, hasCapability } = require("../../../src/shared/search/screens");
+  const reader = (capabilities, extra = {}) => ({
+    grants: { home: ["view"] },
+    capabilities,
+    is_ceo: false,
+    manages_people: false,
+    ...extra,
+  });
+  const home = (r) => ["overview", "team", "alerts", "reports"].filter((tab) => tabVisible({ module: "home", tab }, r));
+
+  test("Home's Team, Alerts and Reports open on their capabilities, not on managing people", () => {
+    expect(home(reader([]))).toEqual(["overview"]);
+    expect(home(reader([], { manages_people: true, grants: { home: ["view"], settings: ["view"] } }))).toEqual(["overview"]);
+    expect(home(reader(["home.team"]))).toEqual(["overview", "team"]);
+    expect(home(reader(["home.reports"]))).toEqual(["overview", "reports"]);
+    expect(home(reader(["alerts.clear"]))).toEqual(["overview", "alerts"]);
+    expect(home(reader(["alerts.manage"]))).toEqual(["overview", "alerts"]);
+    expect(home(reader([], { is_ceo: true }))).toEqual(["overview", "team", "alerts", "reports"]);
+  });
+
+  test("a capability never opens a module the reader cannot view", () => {
+    expect(home(reader(["home.team"], { grants: {} }))).toEqual([]);
+    expect(hasCapability(reader(["home.team"]), "home.team")).toBe(true);
+    expect(hasCapability(reader(["home.team"]), "home.reports")).toBe(false);
+    expect(hasCapability({ ...reader([]), capabilities: undefined }, "home.team")).toBe(false);
+    expect(hasCapability(reader([], { is_ceo: true }), "home.reports")).toBe(true);
+  });
+
+  test("every other module's tabs are gated as before", () => {
+    const manager = reader([], { grants: { people: ["view"], expenses: ["view"] }, manages_people: true });
+    expect(tabVisible({ module: "people", tab: "employees" }, manager)).toBe(false);
+    expect(tabVisible({ module: "people", tab: "attendance" }, manager)).toBe(true);
+    expect(tabVisible({ module: "expenses", tab: "approvals" }, manager)).toBe(true);
+    expect(tabVisible({ module: "expenses", tab: "approvals" }, { ...manager, manages_people: false })).toBe(false);
   });
 });
 

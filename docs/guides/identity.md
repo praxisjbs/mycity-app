@@ -7,6 +7,7 @@
 | Backend modules | `identity`, `security`, `users`, `access` |
 | Frontend paths | `app/src/auth/`, `app/src/features/ess/Security.tsx`, `app/src/features/shared/InviteToSignIn.tsx`, `app/src/api/mock/modules/security.ts` |
 | Permission key(s) | none for sign-in and the person's own security (own account); `settings` view, create, edit for Users |
+| Capabilities | none of its own; `/auth/me` lists the ones the person holds (§5) |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
 | Last changed | 17/10/2026 |
@@ -152,7 +153,7 @@ Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sig
 | `POST /api/v1/auth/forgot` | `ForgotBody` → `Accepted` | anonymous | | Same answer for every email; 5 per address in 15 minutes |
 | `POST /api/v1/auth/link` | `LinkCheckBody` → `LinkCheck` | anonymous | | 404 `LINK_INVALID` when expired or spent |
 | `POST /api/v1/auth/reset` | `ResetBody` → `ResetDone` | anonymous | | Sets the password, ends every session |
-| `GET /api/v1/auth/me` | → `Me` | own account | | |
+| `GET /api/v1/auth/me` | → `Me` | own account | | `grants` per module, and `capabilities`: the codes the person holds through a role or directly, A to Z (the CEO's are every code in `capability`), the same the routes check (README §5.2). Every session response carries the same `Me` |
 | `GET /api/v1/auth/security` | → `SecuritySummary` | own account | | |
 | `POST /api/v1/auth/password` | `PasswordChange` → `PasswordChanged` | own account | | 10 per person in 15 minutes |
 | `GET /api/v1/auth/sessions` | `SignInListQuery` → `SignInPage` | own account | yes, 25 | Filter `status` (active, ended); sort `issued_at` |
@@ -315,11 +316,11 @@ or the audit.
 | Line Manager (`manager`) | Their team | Approvals for their team |
 | Staff (`employee`) | Their own records | Self-service |
 
-The CEO is a flag on the login (`is_ceo`) and holds every action. Every person sees and manages
-only their own sessions, two-step, passkeys and PIN on My Security (`self` routes: no grant, only the
-caller's own login). Reset Two-Step needs `settings` edit and is never on your own login. Requiring
-two-step by role is set on Settings · Security (`settings` edit; brought forward from M9,
-`foundation.md` §6.4). The exact grants are the seed matrix
+The CEO is a flag on the login (`is_ceo`) and holds every action and every capability. Every person
+sees and manages only their own sessions, two-step, passkeys and PIN on My Security (`self` routes:
+no grant, only the caller's own login). Reset Two-Step needs `settings` edit and is never on your
+own login. Requiring two-step by role is set on Settings · Security (`settings` edit; brought
+forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 (`seeds/reference/0290_seed_roles_and_grants.sql`).
 
 ## 9 · AI and search
@@ -430,3 +431,7 @@ two-step by role is set on Settings · Security (`settings` edit; brought forwar
   and §13 updated.
 - 17/10/2026 · TB · Four more cities on the sign-in screen: Johannesburg, Rabat, Abidjan and Douala (photographs only; their screen is the deep green until one loads). A photograph is fetched only when its city is shown or next. On a phone the photograph fills the top of the screen behind the brand, a glass clock and the city, and the form sits in a frosted panel in the dark theme's colours; nothing moves but the crossfade. The staging bar is gone from both apps (MILESTONES §6). §10 and §13 updated.
 - 17/10/2026 · TB · The sign-in screen made a place to linger, on both shells: the form sits in smoked glass (a Deep Green tint over a blur of the photograph, a brand-yellow thread along the top, a slow sheen), the cities in a glass dock on desktop, a film grain and darkened edges over the photograph, points of city light rising slowly, the city's name arriving out of focus and the clock's colon ticking. The phone moves like the desktop now (drift, glow, focus pull, the lights) but for the pointer parallax; reduced motion holds all of it still. §10 updated.
+- 17/10/2026 · TB · §5, §8: `Me` gains `capabilities`, the codes the person holds (every code for
+  the CEO), read from the grants cache like `requireCapability`, so the shell and ⌘K gate Home's
+  Team, Alerts and Reports tabs on what the API allows (README §5.2). `CapabilityCode` moves from
+  `access.js` to `identity.js`, which `access.js` imports. Header gains the Capabilities row.

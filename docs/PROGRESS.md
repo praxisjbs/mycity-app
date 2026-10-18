@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 6 | 0 | 23 | 0 | 0 |
+| M1 Core Operations & Employee Management | 29 | 2 | 4 | 23 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **63** | **0** | **30** | **0** | **0** |
+| **Total** | **93** | **59** | **4** | **30** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
@@ -98,6 +98,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 17/10/2026 · TB · Capabilities made a convention every module follows (README §5.2, BACKEND_GUIDE §5,
+  the guide template's new Capabilities row on every guide): each one declared once in
+  `access.catalog.js`, seeded by its milestone, checked on the route after the module grant
+  (`requireCapability`, new `requireAnyCapability`), sent on `/me.capabilities` and mirrored in the
+  shell and ⌘K. New gate `check/capabilities.js`. Left: nothing.
 - 17/10/2026 · GE · Two-column Grid panes polished: a thin scrollbar kept inside the card's rounded corners (its track margin is the card radius) and a card's header that stays put while its body scrolls (`data-panes`, `data-card-header`). Left: nothing.
 - 17/10/2026 · GE · Two cards side by side now scroll on their own on desktop, as the mailbox's panes do: `Grid` (2, "1.4/1", "1/1.5") caps each column at the window's height under the top bar (`max-h-card-pane`) with its own scroll, from the width the columns sit side by side; the page still scrolls around them, and `scroll={false}` opts a grid out. Phones are unchanged (one column, the page scrolls). Checked on Settings · Security at 1440 by 520: the role card scrolls alone while the rules card and the page stay put. Left: nothing.
 - 17/10/2026 · TB · GitHub settings ticked: TB restricted the production environment to `main`, and
@@ -470,13 +475,30 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Overview | `overview` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
-| 2 | Alerts | `alerts` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
-| 3 | Reports | `reports` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
-| 86 | Team | `team` | M1 | TB | ☐ | ☐ | ☐ | Not started | |
+| 1 | Overview | `overview` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
+| 2 | Alerts | `alerts` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
+| 3 | Reports | `reports` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
+| 86 | Team | `team` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
 
 **Notes**
 
+- 18/10/2026 · TB · Home PR 1 merged with Attendance's clock-in and clock-out (LA, #55). The shared
+  roster now reads each day as Attendance records it (`attendance_day`) and a day with no record by
+  the register's rules, so Clocked In Today, the Team cards and My Attendance on Home equal People ·
+  Attendance and My Attendance; the roster gains `absent`, remote is the work pattern, and `1150`
+  drops its index on `attendance_event`. Nothing ticked. Left: as below.
+- 17/10/2026 · TB · Home PR 1 of 5 (foundation, `m1/home-foundation`), built to the owner's twelve answers in
+  `docs/guides/home.md` (rewritten first). Schema `1150` (rule names, `home_alert.subject_employee_id`,
+  report schedules with start day, run time, formats and recipients as users, `home_report_run`,
+  `role_kpi`, `home_kpi_pick`) and reference seed `1199` (capabilities `home.team`, `home.reports`,
+  `alerts.manage` and their grants, `alerts.clear` for Heads of Department and Managers, the
+  `report_run` numbers, 1099's thresholds moved out per A26). Capabilities on `/me` and in the shell and
+  ⌘K mirrors. The contract for all four tabs (`dashboard.js`, `alerts.js`, `reports.js`). The KPI
+  catalogue (29 cards, 26 live; Goals On Track and My Targets wait for M2, Payroll In Progress for M6),
+  nine source adapters for the later milestones' tables, and the shared attendance roster
+  (`attendance.roster.js`, LA to review). No route is mounted and no screen moved, so nothing is
+  ticked. Left: Overview with the card picker (PR 2), Team (PR 3), Alerts (PR 4), Reports and the
+  staging seed (PR 5).
 - 15/10/2026 · AJ · Frontend built in `app/src/features/home/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/home.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 13/10/2026 · TB · Team tab ratified into the inventory (MILESTONES §18): Home is now four tabs, with Team added as #86 (`team`, M1). Summary counts and the SCREENS constant moved to 86. Full engineering guide written at `docs/guides/home.md`; Home reads live from the owning modules and owns the alert and report engines.
 - 13/10/2026 · TB · Home demo upgraded in `docs/MyCity-ERP-Documents/demo.html` from the two 12

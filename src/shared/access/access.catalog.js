@@ -5,7 +5,8 @@
  *  - the 15 module keys a route can name in requirePermission(key, action)
  *    (README §5.2; the 15 admin modules of MILESTONES §18),
  *  - the six actions and three record scopes,
- *  - the label, area and description the Roles & Permissions screen shows.
+ *  - the label, area and description the Roles & Permissions screen shows,
+ *  - the capabilities: named authorities inside a module, beyond its six actions.
  *
  * middleware/rbac.js refuses, at boot, a requirePermission() whose key or action
  * is not here; scripts/check/module-catalogue.js fails CI when this list and the
@@ -156,6 +157,66 @@ function widerScope(a, b) {
   return RECORD_SCOPES.indexOf(a) <= RECORD_SCOPES.indexOf(b) ? a : b;
 }
 
+/**
+ * Capabilities (README §5.2): an authority inside a module that its six actions cannot
+ * express. Home's `view` opens Home for every employee; `home.team` opens its Team tab
+ * to the people who manage others.
+ *
+ * Each is declared here once, with the module it belongs to, and inserted into the
+ * `capability` table by its milestone's reference seed (insert if absent, so a role's
+ * holdings edited on Settings · Roles & Permissions are never overwritten). A route
+ * checks one after the module grant:
+ *
+ *   requirePermission("home", "view"), requireCapability("home.team"), controller.team
+ *
+ * The code is `<area>.<authority>`, two lower_snake segments, where the area is the
+ * module key or a named part of the module (`alerts`, `announcements`). The rule is
+ * the contract's too (packages/contract/schemas/identity.js; a test holds them equal).
+ *
+ * middleware/rbac.js refuses, at boot, a requireCapability() whose code is not here;
+ * scripts/check/capabilities.js fails CI on a code the code checks that is not here, and
+ * on a code here that no reference seed inserts (nobody could be given it).
+ */
+const CAPABILITY_CODE = /^[a-z][a-z_]*\.[a-z][a-z_]*$/;
+
+const CAPABILITY_CATALOG = [
+  {
+    code: "home.team",
+    module: "home",
+    label: "View Team",
+    description: "Open the Team tab on Home: who is in today and the team's figures.",
+  },
+  {
+    code: "home.reports",
+    module: "home",
+    label: "Run Reports",
+    description: "Build, schedule and run reports on Home, and receive them.",
+  },
+  {
+    code: "alerts.clear",
+    module: "home",
+    label: "Clear Alerts",
+    description: "Clear or dismiss an alert on Home.",
+  },
+  {
+    code: "alerts.manage",
+    module: "home",
+    label: "Manage Alert Rules",
+    description: "Create, change and switch off the rules that raise alerts on Home.",
+  },
+  {
+    code: "announcements.post",
+    module: "community",
+    label: "Post Announcements",
+    description: "Post to the announcements channel and track who has read a post.",
+  },
+];
+
+const CAPABILITIES = CAPABILITY_CATALOG.map((c) => c.code);
+const CAPABILITY_SET = new Set(CAPABILITIES);
+
+const isCapability = (code) => CAPABILITY_SET.has(code);
+
 module.exports = {
   AREAS,
   MODULE_CATALOG,
@@ -164,8 +225,12 @@ module.exports = {
   ACTIONS,
   RECORD_SCOPES,
   OWN_ONLY,
+  CAPABILITY_CODE,
+  CAPABILITY_CATALOG,
+  CAPABILITIES,
   isModule,
   isAction,
   isScope,
+  isCapability,
   widerScope,
 };

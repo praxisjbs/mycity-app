@@ -11,7 +11,8 @@
  * the shell's. `npm run new:screen` adds the entry with the screen; add its words.
  *
  * Who sees a screen: the reader holds `view` on its module, and the tab is one the
- * shell shows them (tabVisible mirrors app/src/shell/access.ts visibleTabs).
+ * shell shows them (tabVisible mirrors app/src/shell/access.ts visibleTabs). A tab
+ * behind a capability (README §5.2) is offered only to a reader who holds it.
  */
 const s = (module, tab, label, words = []) => Object.freeze({ module, tab, label, words: Object.freeze(words) });
 
@@ -121,18 +122,37 @@ const SCREENS = Object.freeze([
 ]);
 
 /**
+ * @typedef {{grants: Record<string, string[]>, capabilities: string[], is_ceo: boolean, manages_people: boolean}} Reader
+ */
+
+/**
+ * Does the reader hold this capability? The CEO holds every one, as requireCapability
+ * passes them. Mirrors app/src/shell/access.ts hasCapability.
+ * @param {Reader} reader
+ * @param {string} code  a code in shared/access/access.catalog.js CAPABILITY_CATALOG
+ */
+function hasCapability(reader, code) {
+  return reader.is_ceo === true || (reader.capabilities || []).includes(code);
+}
+
+/**
  * Does the shell show this tab to the reader? Mirrors app/src/shell/access.ts
  * visibleTabs, so search never offers a tab the person's menu hides.
  * @param {{module: string, tab: string}} screen
- * @param {{grants: Record<string, string[]>, is_ceo: boolean, manages_people: boolean}} reader
+ * @param {Reader} reader
  */
 function tabVisible(screen, reader) {
   const can = (module, action = "view") => (reader.grants[module] || []).includes(action);
   if (!can(screen.module)) return false;
   const full = can("settings") || reader.is_ceo;
   const { module, tab } = screen;
-  if (module === "home" && tab === "team") return reader.manages_people || reader.is_ceo;
-  if (module === "home" && (tab === "reports" || tab === "alerts")) return full || reader.manages_people;
+  // Home's Team, Alerts and Reports follow capabilities. Search offers only a tab the
+  // reader can use, so these stay hidden here even where the shell shows one locked
+  // (docs/guides/home.md §10.1).
+  if (module === "home" && tab === "team") return hasCapability(reader, "home.team");
+  if (module === "home" && tab === "alerts")
+    return hasCapability(reader, "alerts.clear") || hasCapability(reader, "alerts.manage");
+  if (module === "home" && tab === "reports") return hasCapability(reader, "home.reports");
   if (module === "people" && !full) return tab === "attendance" || tab === "organogram";
   if (module === "community" && tab === "announcements") return can("people", "create");
   if (module === "queries" && !full) return tab === "queries";
@@ -142,4 +162,4 @@ function tabVisible(screen, reader) {
   return true;
 }
 
-module.exports = { SCREENS, tabVisible };
+module.exports = { SCREENS, tabVisible, hasCapability };

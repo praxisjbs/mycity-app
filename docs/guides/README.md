@@ -9,7 +9,9 @@ changing behaviour: **a change to a feature passes through its guide first.**
 events, permissions, AI reads and screens (§4 to §10). A frontend builder reads the whole guide, not
 only §10, and a backend builder reads §10 too. The header's **Frontend paths** row names the
 feature's own folders (`app/src/features/<module>/`, `public-app/src/pages/...`); shared components
-live in `packages/ui` (`docs/COMPONENTS.md`) and are never a feature path.
+live in `packages/ui` (`docs/COMPONENTS.md`) and are never a feature path. Its **Capabilities** row
+names each authority the feature needs beyond its permission key's six actions, or `none`; README
+§5.2 is the rule every module follows.
 
 Start a new guide by copying `_TEMPLATE.md` to `<module>.md` (the backend module name, e.g.
 `attendance.md`). Keep it current: a guide that describes last month's behaviour is worse than none.

@@ -7,6 +7,7 @@
 | Backend modules | `organisation`, `access`, `audit`, `settings`, `workflow`, `documents`, `imports` |
 | Frontend paths | `app/src/features/people/`, `app/src/features/settings/`, `app/src/shell/Search.tsx` |
 | Permission key(s) | `people`, `settings`, `ess` (own records) |
+| Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
 | Last changed | 17/10/2026 |
@@ -121,7 +122,7 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 | `document_request` | 0350 | B | What People asked an employee for; a Missing row until it is given (§6.9) |
 | `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3). `0400` adds `role.two_step_required` (§6.4) |
 | `role_capability` | 0400 | C | A capability given to everyone holding a role; `user_capability` still gives one to a single person, and a person has the union |
-| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows; security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026) |
+| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows; security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026) |
 | `audit_ledger`, `event_log` | 0030 | C | Read only. `0400` adds the indexes the Audit Log filters on (when, module, action, record) and one on live sessions |
 | `spent_challenge` | 0230 | C | `0400` widens its purpose check with `two_step_setup`, the ticket of the set-up step at sign-in (§6.4) |
 | `workflow_definition`, `workflow_instance`, `workflow_decision` | 0070 | D | The leave definition in `0499` |
@@ -148,6 +149,11 @@ Every list pages at 25 through `shared/http/paged.js`. Every route has a contrac
 | `GET /departments`, `POST /departments`, `PATCH /departments/:id` | `people` view, create, edit |
 | `GET /org-chart` (the whole tree, §6.6) | `ess` view |
 | Organogram routes as `organogram.md` §5 | `people` edit |
+
+`organisation.service.counts(client, scope, { today })` gives headcount, attrition over 90 days and
+confirmations due in the next 30, counted as `GET /employees/summary` counts them and from the Lagos
+date it is given (`lagos.today()` when none is), never the database's `current_date`. Home's cards read
+them through it, so the two screens share one definition.
 
 `organisation.service.importRow(client, values, ctx)` is the one write the staff importer calls:
 create or update by `staff_number` or `work_email`, returning `{ action: "create" | "update" | "none",
@@ -272,15 +278,39 @@ mock's. Each later module adds its own staging seed when its routes land. Produc
 ### 6.3 Field visibility and capabilities (defaults, editable)
 
 Salary, bank and personal details are visible to Operations & People, Management, Implementation and
-the CEO; everyone sees their own. Announcements and alert clearing go to the same roles. All of it is
-editable on Roles & Permissions; a change is a `security` event (the watchers are told).
+the CEO; everyone sees their own. All of it, and who holds each capability, is editable on Roles &
+Permissions; a change is a `security` event (the watchers are told).
 
-`0449` seeds it: a `field_visibility` row for every role and each of the four field keys
+`0449` seeds the fields: a `field_visibility` row for every role and each of the four field keys
 (`employee.salary`, `.bank`, `.personal`, `.statutory`), visible for the three roles and masked for
-the rest, and the capabilities `announcements.post` and `alerts.clear` given to the three roles
-through `role_capability`. Roles add up: a field is masked for a person only when every role they
-hold masks it, and a missing row reads as visible. The CEO is never masked. A new role starts with
-every field masked and no capability.
+the rest. Roles add up: a field is masked for a person only when every role they hold masks it, and
+a missing row reads as visible. The CEO is never masked. A new role starts with every field masked
+and no capability.
+
+**Capabilities are a convention every module follows** (TB, 17/10/2026; README §5.2 is the rule and
+the table of every capability, BACKEND_GUIDE §5 the steps). A capability is a named authority inside
+a module that its six actions cannot express: everyone views Home, only managers see its Team tab.
+
+- **Code** `<area>.<authority>`, two lower_snake segments, the area being the module key or a named
+  part of it (`home.team`, `alerts.clear`). `RoleSave` refuses any other shape, so a three-segment
+  code could never be given on this screen.
+- **Declared once**, in `src/shared/access/access.catalog.js` `CAPABILITY_CATALOG`, with its module,
+  label and description; **seeded** by its milestone's reference seed, inserted only when absent,
+  with the roles that hold it by default (`0449`: `announcements.post` and `alerts.clear` to
+  Implementation, Operations & People and Management; `1199`: Home's `home.team`, `home.reports`,
+  `alerts.manage`, and `alerts.clear` for Heads of Department and Line Managers).
+- **Held** through `role_capability` (edited here) or `user_capability` (one person, until an
+  optional date). Roles add up: a person holds every capability any of their roles holds. The CEO
+  holds every capability without a grant.
+- **Checked** on the route after the module grant, `requirePermission(...)` then
+  `requireCapability(code)` or `requireAnyCapability([...])`: the grant gives the record scope, the
+  capability only says yes or no. `route()` refuses the other order and `middleware/rbac.js` an
+  uncatalogued code, at boot.
+- **Shown** on `/me` as `capabilities` (`identity.md` §5), which the shell's tab access
+  (`app/src/shell/access.ts`) and ⌘K (`src/shared/search/screens.js`) both read.
+- **Gated**: `scripts/check/capabilities.js` fails a code the code checks that the catalogue lacks, a
+  catalogued code no reference seed inserts (this screen lists only the rows of `capability`, so
+  nobody could be given it), and a seeded code the catalogue lacks.
 
 ### 6.4 Security rules editable within the floor
 
@@ -440,6 +470,8 @@ deleted, so the ask stays on the record.
   My Approvals lists only what the caller can decide.
 - Field masks (`shared/rbac/field-mask.js`) apply to every response, export, import preview and AI
   read: salary, bank and personal details per §6.3.
+- Capabilities (§6.3) sit on top of a module's grant, never instead of it; who holds each by default
+  is README §5.2's table, and Roles & Permissions changes it.
 - The roster loader and the deploy step act as the system, never as a person.
 
 ## 9 · AI and search
@@ -551,6 +583,19 @@ screen.
 
 ## 14 · Change log
 
+- 17/10/2026 · TB · Documents: `documents.repo.js` exports `REQUEST_STILL_OPEN`, the one rule for a request still waiting for its file, which Home's Documents Requested card reads instead of a copy. No behaviour changed.
+- 17/10/2026 · TB · §5: `organisation.service.counts(client, scope, { today })` for Home's headcount,
+  attrition and confirmations cards, the register's own definition; the counts above People ·
+  Employees now count their 90 and 30 day windows from `lagos.today()` rather than the database's
+  `current_date` (the same figures, except between midnight and 01:00 Lagos on a server in UTC).
+- 17/10/2026 · TB · §6.3, §8, header: capabilities become a convention every module applies (README
+  §5.2, BACKEND_GUIDE §5): one catalogue (`CAPABILITY_CATALOG`), seeded by the milestone's reference
+  seed, checked after the grant (`route()` enforces the order; `requireAnyCapability` added), on
+  `/me.capabilities`, mirrored in the shell and ⌘K, and held by `scripts/check/capabilities.js`.
+  Every guide gains a Capabilities header row (`_TEMPLATE.md`).
+- 17/10/2026 · TB · §4: Documents & Numbering gains Report Run (`report_run`, RPT-0001, never
+  reset), the number of each report file Home generates. Its scheme is seeded by
+  `seeds/reference/1199`; the settings contract's `DOC_TYPES` and the screen's labels list it.
 - 17/10/2026 · TB · §2, §4, §10.1, §11: Nigeria's public holidays for 2026 and 2027 are seeded
   (`seeds/reference/0448`): the days the Public Holidays Act fixes as declared, and the Eids (from the
   Umm al-Qura calendar) and the weekday given for a weekend holiday as Expected, which `0410` adds and

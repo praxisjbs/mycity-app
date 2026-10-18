@@ -2,6 +2,7 @@ import type { AccessCatalogue, AuditEntry, FailedSignIn, Holiday, LiveSession, N
 import type { NotificationPref } from "@/api/types/settings";
 import type { Status } from "@/api/types/performance";
 import { accepted, at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { CAPABILITIES, ROLE_CAPABILITIES } from "../data/access";
 import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
 import { waysOf } from "./security";
@@ -250,27 +251,24 @@ const CATALOGUE: AccessCatalogue = {
   actions: ALL,
   scopes: ["all", "team", "own"],
   fields: FIELDS.map(([key, label]) => ({ key, label })),
-  capabilities: [
-    { code: "alerts.clear", name: "Clear Alerts", description: "Clear or dismiss an alert on Home." },
-    { code: "announcements.post", name: "Post Announcements", description: "Post to the announcements channel and track who has read a post." },
-  ],
+  capabilities: CAPABILITIES,
 };
 const g = (module_key: string, actions: Action[], scope: Scope = "all"): RoleGrant => ({ module_key, actions, scope: module_key === "ess" ? "own" : scope });
 const everything = (scope: Scope = "all") => MODULE_LIST.map(([k]) => g(k, ALL, k === "mailbox" ? "own" : scope));
 const own = (mods: string[], acts: Action[] = ["view", "create", "edit"]) => mods.map((m) => g(m, acts, "own"));
 const SENSITIVE = FIELDS.map(([k]) => k);
 type MockRole = Omit<RoleDetail, "users" | "role_id">;
-const role = (code: string, name: string, description: string, rank: number, home: RoleDetail["home_view"], grants: RoleGrant[], visible: string[], caps: string[]): MockRole => ({ code, name, description, rank, home_view: home, is_system: true, two_step_required: false, grants, visible_fields: visible as RoleDetail["visible_fields"], capabilities: caps });
-const CAPS = ["alerts.clear", "announcements.post"];
+const role = (code: string, name: string, description: string, rank: number, home: RoleDetail["home_view"], grants: RoleGrant[], visible: string[]): MockRole => ({ code, name, description, rank, home_view: home, is_system: true, two_step_required: false, grants, visible_fields: visible as RoleDetail["visible_fields"], capabilities: [...(ROLE_CAPABILITIES[code] ?? [])] });
+const CAPS = CAPABILITIES.map((c) => c.code);
 const ROLES = new Map<string, MockRole>(
   [
-    role("implementation", "Implementation Team", "Full access for the build team until handover.", 100, "operations", everything(), SENSITIVE, CAPS),
-    role("operations_people", "Operations & People", "People, HR and operations across every module.", 90, "operations", everything(), SENSITIVE, CAPS),
-    role("management", "Management", "Organisation-wide oversight and approvals.", 80, "operations", everything().map((x) => (x.module_key === "settings" ? g("settings", ["view", "export"]) : x)), SENSITIVE, CAPS),
-    role("head_of_department", "Head of Department", "Runs a department and approves for it.", 60, "partnerships", [...own(["ess", "community", "mailbox"]), g("home", ["view", "approve"], "team"), g("people", ["view", "approve"], "team"), g("partnerships", ["view", "create", "edit", "approve"], "team"), g("knowledge", ["view"])], [], []),
-    role("administrator", "System Administrator", "Settings, users and roles.", 50, "staff", [...own(["home", "workspace", "ess", "community", "mailbox"]), g("knowledge", ["view"]), g("settings", ALL)], [], []),
-    role("manager", "Line Manager", "Manages the people who report to them.", 40, "staff", [...own(["ess", "community", "mailbox"]), g("home", ["view"], "team"), g("people", ["view", "approve"], "team"), g("performance", ["view", "create", "edit", "approve"], "team"), g("knowledge", ["view"])], [], []),
-    role("employee", "Staff", "Their own work and records.", 10, "staff", [...own(["home", "workspace", "ess", "community", "mailbox", "performance", "expenses"]), g("knowledge", ["view"])], [], []),
+    role("implementation", "Implementation Team", "Full access for the build team until handover.", 100, "operations", everything(), SENSITIVE),
+    role("operations_people", "Operations & People", "People, HR and operations across every module.", 90, "operations", everything(), SENSITIVE),
+    role("management", "Management", "Organisation-wide oversight and approvals.", 80, "operations", everything().map((x) => (x.module_key === "settings" ? g("settings", ["view", "export"]) : x)), SENSITIVE),
+    role("head_of_department", "Head of Department", "Runs a department and approves for it.", 60, "partnerships", [...own(["ess", "community", "mailbox"]), g("home", ["view", "approve"], "team"), g("people", ["view", "approve"], "team"), g("partnerships", ["view", "create", "edit", "approve"], "team"), g("knowledge", ["view"])], []),
+    role("administrator", "System Administrator", "Settings, users and roles.", 50, "staff", [...own(["home", "workspace", "ess", "community", "mailbox"]), g("knowledge", ["view"]), g("settings", ALL)], []),
+    role("manager", "Line Manager", "Manages the people who report to them.", 40, "staff", [...own(["ess", "community", "mailbox"]), g("home", ["view"], "team"), g("people", ["view", "approve"], "team"), g("performance", ["view", "create", "edit", "approve"], "team"), g("knowledge", ["view"])], []),
+    role("employee", "Staff", "Their own work and records.", 10, "staff", [...own(["home", "workspace", "ess", "community", "mailbox", "performance", "expenses"]), g("knowledge", ["view"])], []),
   ].map((r) => [sid(`role:${r.code}`), r]),
 );
 const holders = (code: string) => USERS.filter((u) => u.status === "active" && u.roles.some((r) => r.code === code)).length;

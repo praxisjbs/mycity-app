@@ -7,6 +7,7 @@
 | Backend modules | `ess`, `leave` |
 | Frontend paths | `app/src/features/ess/`, `app/src/features/attendance/EssAttendance.tsx`, `app/src/features/people/Leave.tsx` |
 | Permission key(s) | `ess` (always `own` scope); `people` for People · Leave |
+| Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
 | Last changed | 17/10/2026 |
@@ -361,3 +362,4 @@ Deductions figure and every form open the shared modal.
 - 17/10/2026 · AJ · Leave types: the four are seeded in `1290` (the team lead's decision, an exception to A26), and People add, change, retire and delete types on People · Leave (Leave Types); a type with leave on record is retired, never deleted. Allowances: People set one person's allowance of a type for a year (`GET`, `PUT /leave/balances`), and the person is told. The staging leave-types seed is gone.
 - 17/10/2026 · AJ · Local data: `seeds/build/20_mock_data.js` loads the mock's 25 people, their logins and its leave into a laptop's database through the services (`npm run db:seed -- --build`, with `SEED_PASSWORD` in `.env`), so the real API shows what the mock shows. The roster moved to `app/src/api/mock/data/roster.json`, which the mock and the seed both read. Local and CI only: besides `seed.js`'s three refusals it needs APP_ENV development or test and no SMTP_HOST, and a release does not carry the roster.
 - 17/10/2026 · LA · My Attendance (#9) and My Devices (#88) are built on the real API from the attendance guide, which owns them: §10.2 rows now follow its phone layout (cards from the shared list rather than icon cards). Work Location Requests and Policy Updates stay on INTERIM shapes until their API exists (attendance guide §13).
+- 17/10/2026 · TB · Header gains the Capabilities row every guide now carries (README §5.2): none, Self-Service is always the person's own.

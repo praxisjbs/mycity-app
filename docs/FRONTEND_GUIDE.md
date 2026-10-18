@@ -554,10 +554,11 @@ app/
                               Login (with the code step and the PIN), LockSheet, passkey (the browser's WebAuthn
                               calls), FreshSignIn (useFreshSignIn: Confirm It's You before a change)
     shell/                    Shell (DesktopShell or PhoneShell from @mycity/ui), catalogue (modules, tab
-                              slugs, one-word names), access (grants), nav (rail, bottom bar, More),
-                              screens (lazy per module), More, Fab, screen-action (useScreenAction),
-                              Search (⌘K), Bell, Notices, pwa (update, install), offline, Planned
-                              (Coming Soon, the Prototype View switch), coming-soon, layout-context
+                              slugs, one-word names), access (grants, capabilities), nav (rail, bottom
+                              bar, More), screens (lazy per module), More, Fab, screen-action
+                              (useScreenAction), Search (⌘K), Bell, Notices, pwa (update, install),
+                              offline, Planned (Coming Soon, the Prototype View switch), coming-soon,
+                              layout-context
     features/shared/          wiring, never components (§9.4): sections (PagedTable, ExportAction),
                               pickers (EmployeePicker), wire (the API's shapes to the components'),
                               KpiTiles, Letter
@@ -624,8 +625,14 @@ a quicker loop while fixing a screen.
 `shell/catalogue.ts` lists the fifteen modules, their one-word names (the More tiles and the bottom
 bar) and their tab slugs in the order of MILESTONES §18 and `src/shared/route-map.js`;
 `shell/access.ts` filters modules by the `view` grant from `/me` and tabs by role, and `shell/nav.ts`
-builds the rail, the bottom bar and More from what is left. Hiding is a courtesy: the API refuses
-what a grant does not allow. An unknown module or tab lands on the first allowed screen.
+builds the rail, the bottom bar and More from what is left. A tab that belongs to fewer people than
+its module's grant reaches follows a **capability** (README §5.2): `/me.capabilities` lists the codes
+the person holds, `hasCapability(me, code)` in `shell/access.ts` answers for them (the CEO holds
+every one), and Home's Team, Alerts and Reports are gated that way. `src/shared/search/screens.js`
+mirrors the tab rules for ⌘K; change both together. A screen hides a button the same way
+(`hasCapability(useMe(), code)`), never by a role's code or `manages_people`. Hiding is a courtesy:
+the API refuses what a grant or a capability does not allow. An unknown module or tab lands on the
+first allowed screen.
 `npm run new:screen` adds a tab everywhere it is listed (§1).
 
 Two shells (gate 11), chosen by `useIsPhone()` from `@mycity/ui` (760 px and below; the merged

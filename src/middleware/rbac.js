@@ -27,6 +27,10 @@
  * Grant model: one `permission` row per role and module, a boolean per action and one scope (grants-cache.js
  * documents the columns). requirePermission refuses an unknown key or action when
  * the route is DEFINED, so a typo fails at boot instead of denying everyone.
+ *
+ * Capabilities are authorities inside a module beyond its six actions (README §5.2):
+ * requireCapability and requireAnyCapability come AFTER requirePermission on a route,
+ * which keeps the scope; they refuse a code that is not in the catalogue the same way.
  */
 const { pool } = require("../config/db");
 const { logger } = require("../config/logger");
@@ -181,28 +185,72 @@ function requireAnyPermission(specs) {
   return mw;
 }
 
+function checkCapability(where, code) {
+  if (!catalog.isCapability(code)) {
+    throw new Error(
+      `${where}: "${code}" is not a capability (shared/access/access.catalog.js CAPABILITY_CATALOG)`,
+    );
+  }
+}
+
+function missingCapability(req, label) {
+  logger.warn(
+    { user_id: req.user.user_id, capability: label },
+    "capability missing",
+  );
+  return new AppError(
+    "CAPABILITY_REQUIRED",
+    "This needs an authority you do not hold",
+    403,
+  );
+}
+
 /**
- * Demand a capability held by the user directly, on top of the module grant
- * (segregation of duties: the person who approves a spend is not the one who
- * disburses it). Codes live in the `capability` table.
- * @param {string} code
+ * Demand a capability, held through one of the caller's roles or given to them
+ * directly, on top of the module grant: the grant says they may use the module and
+ * over which records, the capability that they hold this authority inside it.
+ *
+ *   requirePermission("home", "view"), requireCapability("home.team"), controller.team
+ *
+ * It sets no scope; the permission check before it did. The CEO passes.
+ * @param {string} code  a code in CAPABILITY_CATALOG
  */
 function requireCapability(code) {
-  if (!code || typeof code !== "string")
-    throw new Error("requireCapability: give a capability code");
-  return async function capabilityCheck(req, _res, next) {
+  checkCapability("requireCapability", code);
+
+  const mw = async function capabilityCheck(req, _res, next) {
     requireUser(req);
     if (req.user.is_ceo === true) return next();
     const held = await grantsCache.getCapabilities(pool, req.user.user_id);
-    if (!held.includes(code)) {
-      throw new AppError(
-        "CAPABILITY_REQUIRED",
-        "This needs an authority you do not hold",
-        403,
-      );
-    }
+    if (!held.includes(code)) throw missingCapability(req, code);
     return next();
   };
+  mw.capability = code;
+  return mw;
+}
+
+/**
+ * Pass when the caller holds ANY of several capabilities: Home's alert list opens to
+ * whoever may clear alerts or manage their rules. Like requireCapability, it follows
+ * the permission check and the CEO passes.
+ * @param {string[]} codes  codes in CAPABILITY_CATALOG
+ */
+function requireAnyCapability(codes) {
+  if (!Array.isArray(codes) || codes.length === 0)
+    throw new Error("requireAnyCapability: give capability codes");
+  for (const code of codes) checkCapability("requireAnyCapability", code);
+  const wanted = [...codes];
+
+  const mw = async function anyCapabilityCheck(req, _res, next) {
+    requireUser(req);
+    if (req.user.is_ceo === true) return next();
+    const held = await grantsCache.getCapabilities(pool, req.user.user_id);
+    if (!wanted.some((code) => held.includes(code)))
+      throw missingCapability(req, wanted.join(" or "));
+    return next();
+  };
+  mw.capabilities = wanted;
+  return mw;
 }
 
 /** Only the CEO. */
@@ -280,6 +328,7 @@ module.exports = {
   scopeFor,
   requireAnyPermission,
   requireCapability,
+  requireAnyCapability,
   requireCeo,
   readPermissions,
   scopeFromGrants,

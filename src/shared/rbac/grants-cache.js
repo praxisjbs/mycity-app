@@ -159,8 +159,8 @@ function getMaskedFieldKeys(client, userId) {
 }
 
 /**
- * Capability codes the user holds: given to them directly (segregation of duties, e.g.
- * "disburser"), or held by one of their roles ("announcements.post").
+ * Capability codes the user holds (README §5.2): given to them directly (user_capability,
+ * until an optional date), or held by one of their roles ("announcements.post").
  */
 function getCapabilities(client, userId) {
   if (!userId) return Promise.resolve([]);

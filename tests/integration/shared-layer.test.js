@@ -446,8 +446,8 @@ describeDb("shared layer against Postgres", () => {
     let rule;
     beforeAll(async () => {
       await q(
-        `INSERT INTO home_alert_rule (key, metric, threshold, window_days, severity, permission_key)
-         VALUES ('attendance.late_arrivals', 'late_arrivals', 3, 30, 'high', 'people.approve')`,
+        `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key)
+         VALUES ('attendance.late_arrivals', 'Late Arrivals', 'late_arrivals', 3, 30, 'high', 'people.approve')`,
       );
       rule = await tx((c) => alerts.ruleByKey(c, "attendance.late_arrivals"));
     });

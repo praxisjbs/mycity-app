@@ -26,8 +26,11 @@ END`;
 /** Documents that belong to a person: current versions, nothing a scan refused. */
 const MINE = `d.subject_employee_id = ANY($1::uuid[]) AND d.is_current AND d.scan_status <> 'infected'`;
 
-/** A request still waiting for its file. */
-const OPEN_REQUEST = `r.employee_id = ANY($1::uuid[]) AND r.fulfilled_at IS NULL AND r.cancelled_at IS NULL`;
+/** A request still waiting for its file (alias `r`). Home's Documents Requested card reads it too. */
+const REQUEST_STILL_OPEN = "r.fulfilled_at IS NULL AND r.cancelled_at IS NULL";
+
+/** A person's requests still waiting for their file. */
+const OPEN_REQUEST = `r.employee_id = ANY($1::uuid[]) AND ${REQUEST_STILL_OPEN}`;
 
 const VAULT_ROWS = `
   SELECT 'doc:' || d.document_id::text AS row_key, d.document_id,
@@ -193,6 +196,7 @@ async function subjectOf(db, employeeId) {
 
 module.exports = {
   COLUMNS,
+  REQUEST_STILL_OPEN,
   vault,
   summary,
   get,

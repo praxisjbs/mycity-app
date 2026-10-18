@@ -301,6 +301,7 @@ request, never inside a transaction, and what it returns is provisional until a 
 |---|---|---|
 | A transaction | `shared/db/tx.atomically(client, fn)` | `BEGIN` by hand |
 | Who is calling, and over which records | `req.user`, `scopeOf(req)`, `shared/rbac/scope.scopeClause` | Reading the token yourself; your own "my team" query |
+| An authority inside a module beyond its six actions (see the team, manage alert rules) | A capability: `CAPABILITY_CATALOG` entry, reference seed, `requireCapability(code)` after `requirePermission` (§5) | A new action, a role-code check, `manages_people`, a flag column |
 | A success response | `shared/http/respond` (`ok`, `created`, `noContent`) or `sendPaged` | Wrapping one record in `{ data }` |
 | A list | `shared/http/paged.pageQuery` + `sendPaged` | Your own `LIMIT`/`OFFSET`, a bare array |
 | Validation | Contract schema via `route()` | Hand checks in the controller |
@@ -337,10 +338,61 @@ request, never inside a transaction, and what it returns is provisional until a 
 - Every staff route: `auth` then `requirePermission(key, action)`. The permission keys are the 15
   modules in README §5.2.
 - `req.scope` is `all`, `team` or `own`. The repo filters by it; the controller never does.
+- An authority inside a module that its six actions cannot express is a capability, checked after
+  the grant (below).
 - Field masking (`shared/rbac/field-mask`) hides restricted fields (bank, salary, date of birth)
   from users without the field grant, in responses, exports, import previews and AI reads.
 - Public routes (`*.public.routes.js`) never import `auth` or `rbac`. They are reached by token or,
   for careers and vacancies only, by slug.
+
+### Capabilities: an authority the six actions cannot express
+
+Some screens and writes belong to fewer people than the module's grant reaches: everyone views
+Home, only managers see its Team tab; anyone in Home may see an alert, only some may write the rules
+that raise them. That is a **capability**, never a seventh action, a check on a role's code or on
+`manages_people`, or a flag column. Each module owns its own (README §5.2 has the rule and the table
+of every capability). To add one:
+
+1. **Name it** `<area>.<authority>`: two lower_snake segments, the area being the module key or a
+   named part of the module (`home.team`, `alerts.manage`). Three segments do not save on Settings ·
+   Roles & Permissions.
+2. **Catalogue it** in `src/shared/access/access.catalog.js` `CAPABILITY_CATALOG`: `code`, `module`
+   (the permission key it sits inside), a Title Case `label` and a one-sentence `description`. This is
+   the only place it is declared.
+3. **Seed it** in your milestone's reference seed, inserted only when absent, with the catalogue's
+   label as its `name`, and give it to the roles that hold it by default the same way (copy
+   `seeds/reference/0449_seed_field_visibility_capabilities.sql`). The DOWN takes back only what it
+   gave, and keeps a capability someone has since given to a person or another role.
+4. **Check it on the route, after the grant** (`contract` is the route's schemas, §3.2):
+
+   ```js
+   route(router, "get", "/team", contract,
+     requirePermission("home", "view"), requireCapability("home.team"), controller.team);
+
+   route(router, "get", "/alerts", contract,
+     requirePermission("home", "view"), requireAnyCapability(["alerts.clear", "alerts.manage"]), controller.list);
+   ```
+
+   The grant decides the module and the record scope (`req.scope`); the capability only says yes or
+   no and sets nothing. `route()` refuses a capability checked before the grant, and more than one
+   capability check on a route; `requireCapability` refuses a code that is not catalogued. Both happen
+   at boot. The CEO passes. A service or a worker that must ask outside a route reads
+   `grantsCache.getCapabilities(client, user_id)` and lets the CEO through, as `requireCapability` does.
+5. **It reaches the screens by itself**: `/auth/me` lists the codes a person holds (the CEO's are
+   every code in `capability`). Where a capability decides whether a tab shows, change both mirrors in
+   the same PR: `app/src/shell/access.ts` (`visibleTabs`, through `hasCapability(me, code)`) and
+   `src/shared/search/screens.js` (`tabVisible`, through `hasCapability(reader, code)`), each with its
+   test. A screen hides a button with `hasCapability(useMe(), code)`; the route still decides.
+6. **Write it down**: the module guide's **Capabilities** header row, §8 (who holds it by default),
+   and a row in README §5.2.
+7. **Tests**: a route test that the capability is required (`routesOf(router)` records it as
+   `capability`, or `capabilities` for an any-of), and an integration test that a person without it
+   gets 403 `CAPABILITY_REQUIRED` and one with it passes.
+
+`scripts/check/capabilities.js` (in `npm run ci`) fails a code passed to `requireCapability`,
+`requireAnyCapability` or `hasCapability` that the catalogue lacks or that is not a string literal, a
+catalogued code that no reference seed inserts (nobody could be given it), and a seeded code the
+catalogue lacks.
 
 ---
 
@@ -457,6 +509,7 @@ red:
 | **Lint** | ESLint error or warning; the limit is zero | Fix it. `npm run lint` lists them |
 | **Tests** | A test fails, anywhere in the suite | Fix the code or the test. Never delete a test to go green |
 | **Every list pages at 25** | A repo wrote `LIMIT`/`OFFSET`, or a page-size key appeared in the contract or frontend | Use `pageQuery()` (§3.5) |
+| **Capabilities are catalogued and seeded** | A `requireCapability`, `requireAnyCapability` or `hasCapability` names a code the catalogue lacks, or a catalogued code no reference seed inserts | Catalogue it and seed it (§5, Capabilities) |
 | **PROGRESS.md updated** | You changed product code (`src/`, `packages/contract/schemas/`, `migrations/`, `seeds/`, `templates/`, `app/`, `public-app/`) and `docs/PROGRESS.md` got no dated note, or the file is malformed | Tick the screens, set Status and Updated, add `- dd/mm/yyyy · XX · what was done, what is left` under the module |
 | **Feature guides** | You changed code a guide in `docs/guides/` covers and the guide got no Change log line | Update the guide to match what you built, add the line |
 | **README map** | You added a file outside the places the map already covers | Add it to the right section of `README.MD`, or put it where an existing file of that kind lives |

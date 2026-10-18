@@ -7,7 +7,7 @@
  * Every function takes the client it runs on, so a caller inside atomically()
  * keeps the work in its transaction. Nothing here emits or decides; the service does.
  */
-const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -162,6 +162,18 @@ async function grantsOf(db, roleIds) {
     [roleIds],
   );
   return rows;
+}
+
+/** Every capability code there is, A to Z: the CEO's (a short code list). */
+async function allCapabilityCodes(db) {
+  // pagination:complete the CEO holds every capability, and /me lists what the person holds
+  const { rows } = await completeQuery(
+    db,
+    "SELECT code::text AS code FROM capability ORDER BY code",
+    [],
+    { label: "capabilities", ceiling: 200 },
+  );
+  return rows.map((r) => r.code);
 }
 
 /* ------------------------------------------------------------------ *
@@ -525,6 +537,7 @@ module.exports = {
   meOf,
   rolesOf,
   grantsOf,
+  allCapabilityCodes,
   insertSession,
   lockSession,
   rotateSession,

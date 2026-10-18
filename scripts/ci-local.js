@@ -70,6 +70,7 @@ const GATES = [
   { id: "contract", label: "Contract is generated and current", script: "scripts/gen/contract.js", args: ["--check"] },
   { id: "env-template", label: ".env.example matches the schema", script: "scripts/check/env-template.js" },
   { id: "module-catalogue", label: "Module catalogue equals enforced keys", script: "scripts/check/module-catalogue.js" },
+  { id: "capabilities", label: "Capabilities are catalogued and seeded", script: "scripts/check/capabilities.js" },
   { id: "public-surface", label: "Public routes import no auth", script: "scripts/check/public-surface.js" },
   { id: "numbering-schemes", label: "Numbering schemes exist", script: "scripts/check/numbering-schemes.js" },
   { id: "production-environment-refs", label: "Only release/rollback reach production", script: "scripts/check/production-environment-refs.js" },

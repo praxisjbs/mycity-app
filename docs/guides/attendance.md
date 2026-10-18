@@ -7,9 +7,10 @@
 | Backend modules | `attendance`, `devices`, `worksites` |
 | Frontend paths | `app/src/features/attendance/` |
 | Permission key(s) | `people` (all, team, own) for the register, devices and worksites; none for the person's own clock, attendance and devices (`self`, own only) |
+| Capabilities | none |
 | Screens (PROGRESS.md rows) | #9 My Attendance, #88 My Devices, #25 Attendance, #27 Devices, #28 Worksites; later in this guide: #87 Work Location Requests, #89 Policy Updates; #73 Attendance Policy is M9 (MILESTONES §18) |
 | Status | Draft |
-| Last changed | 17/10/2026 |
+| Last changed | 18/10/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): MILESTONES §6.2 and A22, A26; REUSE_MAP §2.2
 (the policy model and the donor files); the 12 and 13 October meetings (three devices, enrolment
@@ -65,6 +66,11 @@ recorded, as evidence, and opens an exception People review; nothing is overwrit
 7. At 01:30 Lagos time the day-close job closes yesterday (and any day left open within 14 days):
    an open clock-in becomes a missing clock-out exception, an expected working day with no clock-in
    becomes absent, approved leave becomes leave. It never invents a clock-out time.
+8. Home reads a day's attendance through the shared roster
+   (`src/modules/attendance/attendance.roster.js`, §6.9): the Clocked In Today card and the list
+   behind it, the Team tab and a person's own month. The roster reads each day as steps 4, 6 and 7
+   left it (`attendance_day`) and a day with no record by the register's rules, so a figure on Home
+   is the figure on People · Attendance and My Attendance.
 
 ## 4 · Data
 
@@ -81,6 +87,13 @@ recorded, as evidence, and opens an exception People review; nothing is overwrit
 Schema migration: `migrations/1300_attendance_clock.sql`. Reference data:
 `seeds/reference/1390_seed_attendance.sql` (the two new exception types). Nothing about a person,
 a device, a punch, a holiday or a coordinate is seeded (A26).
+
+**The shared roster** (§6.9) reads `attendance_day` as the punch, the decision and the day-close
+write it; the day's one active clock-in on `attendance_event` (by `work_date`, for the worksite it
+was judged against); `employee`, `department` and `worksite`; and granted `leave_request` with its
+approval (`workflow_instance`). It reads through the indexes above (`attendance_day`'s
+`(employee_id, attendance_date)` key and `(attendance_date, status)`, `attendance_event`'s one active
+event a day) and needs none of its own.
 
 ## 5 · API
 
@@ -115,6 +128,12 @@ a device, a punch, a holiday or a coordinate is seeded (A26).
 | `PATCH /api/v1/worksites/:id` | `WorksiteUpdate` → `Worksite` | `people` edit | no | `active: false` retires, `true` restores |
 | `GET /api/v1/worksites/:id/employees` | `PageQuery` → `WorksiteEmployeePage` | `people` view · scope | yes, 25 | |
 | `POST /api/v1/worksites/:id/employees` | `WorksiteAssign` → `WorksiteEmployee` | `people` edit · scope | no | Through `organisation.service.updateEmployee`; assigning someone to another worksite moves them |
+
+The shared roster has no route of its own. It is a read Home's services call: `GET /home/team`,
+`/home/team/summary` and the records behind the attendance cards (`docs/guides/home.md` §5). People
+· Attendance and My Attendance read the routes above; the roster agrees with them because it reads
+the same records the same way (§6.9). `page()` answers in the list envelope at 25, filtered,
+searched and sorted in SQL.
 
 ## 6 · Rules and calculations
 
@@ -206,6 +225,53 @@ a device, a punch, a holiday or a coordinate is seeded (A26).
   excluded). `add_clock_out` (missing clock-out only): an `admin` clock-out at the time given, after
   the clock-in, on the work date. Each recalculates the day and is audited with before and after.
 
+### 6.9 The shared roster (`attendance.roster.js`, read only)
+
+`src/modules/attendance/attendance.roster.js` is how Home reads a day's attendance. It decides
+nothing: every fact is this module's own, read the way the register (`GET /attendance/register`,
+`/attendance/summary`) and My Attendance (`GET /attendance/me`, `/attendance/me/summary`) read it, so
+Home and those screens never disagree.
+
+| Function | Gives |
+|---|---|
+| `summary(client, { date }, scope)` | For one day within the reader's scope: `working_day`, `expected`, `present`, `on_site`, `remote`, `late`, `absent`, `on_leave`, `not_in`, `no_clock_out_yesterday` |
+| `page(client, { date, status, department_id, q, no_clock_out_yesterday }, scope, query)` | One page of 25 people on the register that day: name, job title, department, work pattern, status, clock-in, clock-out, late minutes, the worksite the clock-in was judged against (none when the person works remotely or is not in), the yesterday flag. Sorts: `display_name` (the default), `department`, `clock_in_at` |
+| `personal(client, { employee_id, from, to })` | One person's days (at most 31), each with its status, its record's own status (`day_status`), clock-in, clock-out and late minutes, and the totals My Attendance shows: days expected, on time, late, absent, on leave |
+
+- **A day's record is the source.** Status, first clock-in, last clock-out and late minutes are
+  `attendance_day` as §6.4 to §6.8 write it: counted punches only (accepted or in review, not
+  excluded by a decision), on the work date, late by the whole minutes past the start plus the
+  policy's grace (§6.1, §6.4). The roster never re-reads the punches to decide any of these.
+- **A day with no record** reads as the register reads it: granted leave, else nothing on a day
+  that is not worked, else not in.
+- **Who is on the day:** anyone with a record that day, and everyone active, started and not yet
+  left (the register's people).
+- **Home's words** for the register's statuses (the contract's `HomeRosterStatus`):
+
+  | Register | Roster |
+  |---|---|
+  | `leave` | `on_leave` |
+  | `late` | `late` |
+  | `present` | `remote` when the person's work pattern is `remote` (as §6.5 and the clock panel read it), else `on_site` |
+  | `absent` | `absent` (a working day the day-close closed with no clock-in) |
+  | `not_in` | `not_in` (a working day not closed, no clock-in yet) |
+  | `off` | none |
+
+- **The counts** are the register summary's: `expected` is everyone on the register but those on
+  leave, on a working day only (0 on a day that is not worked); `present` is late plus on site plus
+  remote, a clock-in that counts on any day, so a Sunday clock-in is present with nobody expected.
+- **No clock-out yesterday:** the person's last working day (Saturday, read on a Monday; the day
+  before a holiday, read after it) has a clock-in and no clock-out on its record: the open shift the
+  day-close turns into a missing clock-out.
+- **A person's totals** are `repo.daysSummary()` up to today, the figures My Attendance shows: a day
+  counts once this module has recorded it (a clock-in, or the day-close's absence or leave), so
+  today's leave and a past day not yet closed count for nothing until then. Leave is counted apart,
+  so `expected` is always on time plus late plus absent.
+- The mapping is written once in JavaScript (`statusOf`) and once in SQL (so a list filters, counts
+  and pages by it); `tests/integration/attendance-roster.test.js` holds them to each other and both
+  to `repo.register`, `repo.registerSummary`, `repo.listDays` and `repo.daysSummary` on every kind of
+  day. A change to the register's statuses changes the roster's mapping in the same PR.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -228,6 +294,11 @@ a device, a punch, a holiday or a coordinate is seeded (A26).
 | Line Manager, Head of Department (`people` team) | The register, days, devices and exceptions of their reporting tree; no coordinates | Read only; export (heads) |
 | Operations & People, Management (`people` all) | Everyone, with the punch coordinates | Decide exceptions (approve), remove devices (edit), manage worksites (create, edit), export |
 | CEO | Everything, as the access rules give the CEO | The same as `people` all, never on their own exception |
+
+The shared roster reads within the scope the caller's grant gives (`scopeClause` on the employee):
+the whole organisation, the reader and everyone below them on the solid line, or the reader alone.
+`personal()` takes no scope; its caller has already decided the reader may see that person (their
+own record, or `assertInScope`).
 
 The punch's coordinates go only to `people` scope all; the person's own screens and team scope get
 the verdict, the distance and the worksite's name. The device cookie, its hash and any raw identifier
@@ -324,6 +395,9 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   Policy (M9).
 - A late punch raising a query (MILESTONES §6 definition of done) waits for the query rules (M3).
 - Offline punching for field staff is not in scope (BACKEND_STRUCTURE §15).
+- **Field status on the roster.** Home's guide lists "field" beside on site and remote. Nothing
+  records a field assignment yet (they follow the homes decision above), so the roster gives no
+  `field` status; it joins the vocabulary when field assignments land.
 
 ## 14 · Change log
 
@@ -335,3 +409,18 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - 16/10/2026 · TB · Frontend foundation PR 3 (Build kit): these screens now draw from `@mycity/ui` rather than the app's own components. The registers are `DataView` (the same table on desktop, the same cards on a phone, and now server sort on the columns the contract allow-lists); the hours chart, the on-time donut and the trail are the shared `AreaChart`, `DonutChart` and `Timeline`; People · Attendance's list beside its day is `SplitPanes`, with the divider the keyboard can move; the worksite map and its geofence are `MapView` (F21, Leaflet with Geoapify through our API), and the clock-in address is `LocationLabel`. §10 is unchanged: every screen shows what it showed.
 - 17/10/2026 · LA · Clock-in and clock-out built on the real API with the geofence and device checks: the guide rewritten to what is built. The policy modes `off`, `warn`, `block` (geofence warn, device off by default) from MILESTONES §6.2 and REUSE_MAP §2.2 replace the booleans; the permission key is `people` (README §5.2) with own-scope `self` routes for the person's clock; `devices` and `worksites` join the backend modules; three registered devices without People's approval (12 and 13 October); §4 to §9 describe the tables, routes, rules, events and reads as built; §10 drops field assignments, location requests, the manager preview and the map from these screens until their API exists (§13); Settings · Attendance Policy is M9 (MILESTONES §18).
 - 17/10/2026 · LA · The five screens on the real API through `contract.gen.ts`: the clock panel (location asked only after the press, the reason first; Retry Location and Clock In Anyway; No Connection with the same key and body on Try Again; the server's result with Send Note for a punch under review), ESS · My Attendance and My Devices (Register This Device behind a fresh sign-in), People · Attendance (figures, register, a person's day with every punch's evidence, exceptions and the decision, Export Register for up to 31 days), People · Devices (Remove Device with a reason) and People · Worksites (add, edit, retire, restore, assign). `AttendanceToday.policy` gained `max_accuracy_m` so the panel offers Retry Location without a rule of its own. The INTERIM attendance types keep only Work Location Requests, Policy Updates, the policy settings and the employee setup tab; the mock answers the built routes in the contract's shapes. §3, §5, §10.2 and §11 updated.
+- 17/10/2026 · TB · The shared attendance roster (`attendance.roster.js`): `summary`, `page` and
+  `personal`, the one read of a day that Home uses now and My Attendance will; its status
+  vocabulary and order, the expected set, lateness against the start plus the policy's grace, the
+  remote rule and the yesterday flag are in §6, the tables it reads as built in §4, its scope in §8,
+  and field status and the day's vocabulary in §13. Read only, no route, no event. Header gains the
+  Capabilities row (none). Written for Home by owner decision; LA reviews.
+- 18/10/2026 · TB · The shared roster now follows this module (§6.9), after clock-in and clock-out
+  were merged: it reads each day's `attendance_day` record as the punch, the decision and the
+  day-close write it, so which punches count (a punch People rejected no longer counts), the work
+  date, lateness (whole minutes past the start plus grace, the organisation's policy when a person
+  has none) and leave are decided once, here. A day with no record and the people on a day follow
+  the register; `present` splits into on site and remote by the work pattern (no longer by a punch
+  with no worksite); `absent` joins the roster's statuses; a person's totals are My Attendance's
+  (`repo.daysSummary`). §3 step 8, §4, §5 and §13 follow; the "one vocabulary" question is closed
+  by `1300`. `1150` no longer adds `attendance_event (occurred_at)`.

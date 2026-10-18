@@ -7,6 +7,7 @@
 | Backend modules | `community`, `announcements` |
 | Frontend paths | `app/src/features/community/` |
 | Permission key(s) | `community` |
+| Capabilities | `announcements.post` (post to the announcements channel and track who has read a post: the Announcements tab's routes) |
 | Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements; reads shared with #66 Knowledge Hub · Announcements (M10) |
 | Status | Built |
 | Last changed | 17/10/2026 |
@@ -362,3 +363,4 @@ fields, never in a toast.
 
 - 17/10/2026 · GE · #announcements has no composer and a lock on its row; announcements come only from the tab. The tab's figures come from the server (`GET /announcements/stats`): Audience is the active staff an all-staff announcement reaches, not the largest past audience on the first page. Polls sit on the sender's side at up to 560 px; Ctrl+Enter starts a new line.
 - 17/10/2026 · GE · A hand-posted work anniversary carries its years from the start date, as the 05:00 ones do ("Another year" with no start date). The phone's Channels drawer closes when a channel is picked.
+- 17/10/2026 · TB · Header gains the Capabilities row every guide now carries (README §5.2): `announcements.post`, as built and seeded by `0449`.
