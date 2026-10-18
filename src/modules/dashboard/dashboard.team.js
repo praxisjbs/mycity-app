@@ -34,7 +34,12 @@ const resolve = require("./kpi-catalog/resolve");
 const CAPABILITY = "home.team";
 
 /** The tab's cards, in the order the tab shows them. */
-const CARDS = Object.freeze(["team_present", "team_on_site", "team_remote", "team_flags"]);
+const CARDS = Object.freeze([
+  "team_present",
+  "team_on_site",
+  "team_remote",
+  "team_flags",
+]);
 
 /**
  * The tab computes its cards with the `home` scope alone, which holds only while each is a
@@ -46,10 +51,19 @@ function assertCards() {
   for (const id of CARDS) {
     const e = kpi.BY_ID.get(id);
     if (!e) problems.push(`"${id}" is not in the KPI catalogue`);
-    else if (e.status !== "live" || e.module !== "home" || e.capability !== CAPABILITY || e.sensitive_field || e.pickable)
-      problems.push(`"${id}" must be a live home card behind ${CAPABILITY}, unmasked and not pickable`);
+    else if (
+      e.status !== "live" ||
+      e.module !== "home" ||
+      e.capability !== CAPABILITY ||
+      e.sensitive_field ||
+      e.pickable
+    )
+      problems.push(
+        `"${id}" must be a live home card behind ${CAPABILITY}, unmasked and not pickable`,
+      );
   }
-  if (problems.length) throw new Error(`dashboard.team:\n  ${problems.join("\n  ")}`);
+  if (problems.length)
+    throw new Error(`dashboard.team:\n  ${problems.join("\n  ")}`);
 }
 
 const display = (first, last) => `${first} ${last}`.trim();
@@ -111,8 +125,16 @@ const monthRowOf = (r) => ({
  */
 async function summary(user, scope, { now = new Date(), db = pool } = {}) {
   const today = lagos.today(now);
-  const ctx = kpi.context({ user, scopes: new Map([["home", scope]]), today, now });
-  const { cards } = resolve.paintCards(CARDS, await kpi.figuresFor(db, CARDS, ctx));
+  const ctx = kpi.context({
+    user,
+    scopes: new Map([["home", scope]]),
+    today,
+    now,
+  });
+  const { cards } = resolve.paintCards(
+    CARDS,
+    await kpi.figuresFor(db, CARDS, ctx),
+  );
   return { date: today, scope: scope.scope, cards };
 }
 
@@ -124,7 +146,12 @@ async function summary(user, scope, { now = new Date(), db = pool } = {}) {
  * @param {{now?: Date, db?: {query: Function}}} [at]
  */
 async function roster(scope, query, { now = new Date(), db = pool } = {}) {
-  const page = await attendance.page(db, filtersOf(query, lagos.today(now)), scope, query);
+  const page = await attendance.page(
+    db,
+    filtersOf(query, lagos.today(now)),
+    scope,
+    query,
+  );
   return { data: page.data.map(rowOf), page: page.page };
 }
 
@@ -139,7 +166,12 @@ async function month(scope, query, { now = new Date(), db = pool } = {}) {
   const today = lagos.today(now);
   const page = await attendance.month(
     db,
-    { from: lagos.monthBounds(today).first, to: today, department_id: query.department_id, q: query.q },
+    {
+      from: lagos.monthBounds(today).first,
+      to: today,
+      department_id: query.department_id,
+      q: query.q,
+    },
     scope,
     query,
   );
@@ -149,7 +181,9 @@ async function month(scope, query, { now = new Date(), db = pool } = {}) {
 /** Whether the reader holds the Team tab's capability; the CEO always does. */
 async function mayOpen(db, user) {
   if (user.is_ceo === true) return true;
-  return (await grantsCache.getCapabilities(db, user.user_id)).includes(CAPABILITY);
+  return (await grantsCache.getCapabilities(db, user.user_id)).includes(
+    CAPABILITY,
+  );
 }
 
 /**
@@ -166,4 +200,15 @@ async function forAssistant(db, actor, query, { now = new Date() } = {}) {
 
 assertCards();
 
-module.exports = { CAPABILITY, CARDS, filtersOf, rowOf, monthRowOf, summary, roster, month, mayOpen, forAssistant };
+module.exports = {
+  CAPABILITY,
+  CARDS,
+  filtersOf,
+  rowOf,
+  monthRowOf,
+  summary,
+  roster,
+  month,
+  mayOpen,
+  forAssistant,
+};

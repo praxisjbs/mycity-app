@@ -8,12 +8,31 @@ const { router } = require("./community.routes");
 
 describe("who may post", () => {
   test("everyone, admins only, or announcement posters", () => {
-    expect(service.mayPost({ post_policy: "everyone", member_role: "member" }, false)).toBe(true);
-    expect(service.mayPost({ post_policy: "admins", member_role: "member" }, true)).toBe(false);
-    expect(service.mayPost({ post_policy: "admins", member_role: "admin" }, false)).toBe(true);
-    expect(service.mayPost({ post_policy: "people_ceo", member_role: "admin" }, false)).toBe(false);
+    expect(
+      service.mayPost(
+        { post_policy: "everyone", member_role: "member" },
+        false,
+      ),
+    ).toBe(true);
+    expect(
+      service.mayPost({ post_policy: "admins", member_role: "member" }, true),
+    ).toBe(false);
+    expect(
+      service.mayPost({ post_policy: "admins", member_role: "admin" }, false),
+    ).toBe(true);
+    expect(
+      service.mayPost(
+        { post_policy: "people_ceo", member_role: "admin" },
+        false,
+      ),
+    ).toBe(false);
     // Nothing is posted straight into #announcements, People and the CEO included: they publish from the tab.
-    expect(service.mayPost({ post_policy: "people_ceo", member_role: "member" }, true)).toBe(false);
+    expect(
+      service.mayPost(
+        { post_policy: "people_ceo", member_role: "member" },
+        true,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -31,9 +50,24 @@ describe("ticks on a direct message", () => {
   const at = "2026-10-17T09:00:00.000Z";
   test("sent, delivered, read from the other person's pointers", () => {
     expect(service.statusOf({ sent_at: at }, null)).toBe("sent");
-    expect(service.statusOf({ sent_at: at }, { last_delivered_at: "2026-10-17T08:59:00Z", last_read_at: null })).toBe("sent");
-    expect(service.statusOf({ sent_at: at }, { last_delivered_at: "2026-10-17T09:00:01Z", last_read_at: null })).toBe("delivered");
-    expect(service.statusOf({ sent_at: at }, { last_delivered_at: null, last_read_at: "2026-10-17T09:05:00Z" })).toBe("read");
+    expect(
+      service.statusOf(
+        { sent_at: at },
+        { last_delivered_at: "2026-10-17T08:59:00Z", last_read_at: null },
+      ),
+    ).toBe("sent");
+    expect(
+      service.statusOf(
+        { sent_at: at },
+        { last_delivered_at: "2026-10-17T09:00:01Z", last_read_at: null },
+      ),
+    ).toBe("delivered");
+    expect(
+      service.statusOf(
+        { sent_at: at },
+        { last_delivered_at: null, last_read_at: "2026-10-17T09:05:00Z" },
+      ),
+    ).toBe("read");
   });
 });
 
@@ -52,12 +86,14 @@ describe("written lines", () => {
     expect(ANNIVERSARY).toContain(wishFor("e1", "anniversary", 2026));
   });
   test("no em dash in anything a person reads", () => {
-    for (const line of [...NOTES, ...BIRTHDAY, ...ANNIVERSARY]) expect(line).not.toMatch(/—|--/);
+    for (const line of [...NOTES, ...BIRTHDAY, ...ANNIVERSARY])
+      expect(line).not.toMatch(/—|--/);
   });
 });
 
 test("every community route carries the community grant", () => {
   const routes = routesOf(router);
   expect(routes.length).toBeGreaterThanOrEqual(19);
-  for (const r of routes) expect(r.permission && r.permission.key).toBe("community");
+  for (const r of routes)
+    expect(r.permission && r.permission.key).toBe("community");
 });

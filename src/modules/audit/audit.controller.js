@@ -12,8 +12,19 @@ const { withActor } = require("../../shared/events/emit");
 const service = require("./audit.service");
 
 module.exports = {
-  list: async (req, res) => sendPaged(res, await service.list(req.validated.query, req.user, scopeOf(req))),
+  list: async (req, res) =>
+    sendPaged(
+      res,
+      await service.list(req.validated.query, req.user, scopeOf(req)),
+    ),
   summary: async (req, res) => ok(res, await service.summary(scopeOf(req))),
   requestExport: async (req, res) =>
-    accepted(res, await service.requestExport(req.validated.body, withActor(req), scopeOf(req))),
+    accepted(
+      res,
+      await service.requestExport(
+        req.validated.body,
+        withActor(req),
+        scopeOf(req),
+      ),
+    ),
 };

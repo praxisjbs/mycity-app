@@ -13,9 +13,15 @@ const { logger } = require("../../config/logger");
 const BEAT_MS = 30_000;
 
 /** Start beating for one socket; returns the function that stops it. */
-function track(socket, userId, touch = require("./community.service").touchPresence) {
+function track(
+  socket,
+  userId,
+  touch = require("./community.service").touchPresence,
+) {
   const beat = () =>
-    Promise.resolve(touch(userId)).catch((err) => logger.warn({ err, user_id: userId }, "presence touch failed"));
+    Promise.resolve(touch(userId)).catch((err) =>
+      logger.warn({ err, user_id: userId }, "presence touch failed"),
+    );
   beat();
   const timer = setInterval(beat, BEAT_MS);
   if (timer.unref) timer.unref();
