@@ -5,12 +5,12 @@
  * @use Deleting, cancelling, revoking, emptying a folder: `if (!(await confirm({ title: "Delete Rule", destructive: true }))) return;`. The component form when a screen keeps its own state.
  * @avoid Asking before something that can be undone (do it, and offer Undo in the toast); window.confirm (gate 16); a form (use Modal).
  * @phone A short bottom sheet; the confirm button full width at the bottom, Cancel above it.
- * @a11y An alertdialog: Cancel has focus when it opens, Esc and the close button answer no. A destructive confirmation cannot be dismissed by a stray tap on the scrim.
+ * @a11y An alertdialog: Cancel has focus when it opens, Esc and the close button answer no. A destructive confirmation cannot be dismissed by a stray tap on the scrim. While an async confirm runs, Cancel, Esc and the close button wait (F26).
  * @status stable
  * @example const confirm = useConfirm(); if (await confirm({ title: "Delete Rule", destructive: true })) remove(rule);
  * @example <ConfirmDialog open={open} title="Revoke Device" destructive onConfirm={revoke} onCancel={() => setOpen(false)} />
  */
-import { useCallback, useContext, useState, type ReactNode } from "react";
+import { useCallback, useContext, type ReactNode } from "react";
 import { Button } from "../actions/Button";
 import { Modal } from "./Modal";
 import { HostContext } from "./context";
@@ -50,21 +50,10 @@ export function ConfirmDialog({
   onCancel,
   container,
 }: ConfirmDialogProps) {
-  const [busy, setBusy] = useState(false);
-  const confirm = async () => {
-    const out = onConfirm();
-    if (!(out instanceof Promise)) return;
-    setBusy(true);
-    try {
-      await out;
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <Modal
       open={open}
-      onClose={() => !busy && onCancel()}
+      onClose={onCancel}
       title={title}
       size="sm"
       role="alertdialog"
@@ -72,10 +61,10 @@ export function ConfirmDialog({
       container={container}
       footer={
         <>
-          <Button data-autofocus disabled={busy} onClick={onCancel}>
+          <Button data-autofocus onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button variant={destructive ? "danger" : "primary"} busy={busy} onClick={() => void confirm()}>
+          <Button variant={destructive ? "danger" : "primary"} onClick={() => onConfirm()}>
             {confirmLabel ?? title}
           </Button>
         </>

@@ -21,7 +21,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Group | Component | Import | Summary | Status |
 |---|---|---|---|---|
 | Foundations | [Icon](#icon) | `Icon` | One Lucide glyph by its short name, drawn in the current text colour. | stable |
-| Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side. | stable |
+| Actions | [ActionGroup](#actiongroup) | `ActionGroup` | Buttons that wait for each other: while one is working, the others in the group dim and ignore presses until it finishes. | stable |
+| Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done. | stable |
 | Layout | [Card](#card) | `Card`, `CardHeader` | The raised panel every section sits in, with an optional title row (CardHeader) and one Details row at its foot. | stable |
 | Layout | [Grid](#grid) | `Grid` | The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone. | stable |
 | Layout | [PageHeader](#pageheader) | `PageHeader` | A page's title, its one-line subtitle (desktop only) and the page's actions. | stable |
@@ -82,7 +83,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
-| Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot. | stable |
+| Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
@@ -170,16 +171,43 @@ One Lucide glyph by its short name, drawn in the current text colour.
 
 ## Actions
 
-### Button
+### ActionGroup
 
-The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side.
+Buttons that wait for each other: while one is working, the others in the group dim and ignore presses until it finishes.
 
 | | |
 |---|---|
-| Use | Every action a person takes: Create Rule, Clock In, Export. A link that looks like a button passes asChild with an <a>. |
-| Avoid | A second primary on one surface (one yellow button per surface); a bare icon (use IconButton); the sign in or clock in call to action (use BigButton). |
-| Phone | At least 44 px tall; a footer stretches the primary to full width at the bottom. |
-| Accessibility | A native button (type="button" unless set). While busy it stays focusable, says aria-busy and ignores presses. Verb Noun labels, Title Case. |
+| Use | Around buttons that act on the same thing and must not race: Approve and Reject on a request row, Retire and Edit on a record. Modals, forms, form footers, card headers, page headers and shell notices are groups already. |
+| Avoid | Around a whole page or list (one slow request would hold every row); around a single button (it already ignores a second press); for layout (it draws no element). |
+| Phone | The same: the waiting buttons dim and keep their 44 px targets. |
+| Accessibility | Draws no element of its own. A busy button says aria-busy; the waiting ones say aria-disabled, so a screen reader hears them as unavailable while they stay focusable. |
+| Status | stable |
+| Exports | `ActionGroup` |
+| Import | `import { ActionGroup } from "@mycity/ui";` |
+| File | `packages/ui/src/actions/ActionGroup.tsx` |
+| Test | `packages/ui/src/actions/ActionGroup.test.tsx` |
+| Gallery | `packages/ui/src/actions/ActionGroup.gallery.tsx` (`npm run gallery`, `#/ActionGroup`) |
+
+**ActionGroup** props (`ActionGroupProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | The buttons, laid out by the caller: the group adds behaviour, not markup. |
+
+```tsx
+<ActionGroup><Button onClick={reject}>Reject</Button><Button variant="primary" onClick={approve}>Approve</Button></ActionGroup>
+```
+
+### Button
+
+The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done.
+
+| | |
+|---|---|
+| Use | Every action a person takes: Create Rule, Clock In, Export. Hand it the work (onClick={save}, an async handler) and it spins and ignores a second press until the work settles. A link that looks like a button passes asChild with an <a>. |
+| Avoid | A second primary on one surface (one yellow button per surface); a bare icon (use IconButton); the sign in or clock in call to action (use BigButton); throwing the work away (onClick={() => void save()}: the lint refuses it, F26). |
+| Phone | At least 44 px tall; a footer stretches the primary to full width at the bottom. Busy keeps its size and colour, so nothing beside it moves. |
+| Accessibility | A native button (type="button" unless set). Busy, it keeps its colour, softens, shows a spinner and says aria-busy; it and the buttons in its ActionGroup ignore presses but stay focusable and named (aria-disabled, never disabled). Verb Noun labels, Title Case. |
 | Status | stable |
 | Exports | `Button`, `IconButton`, `BigButton` |
 | Import | `import { Button, IconButton, BigButton } from "@mycity/ui";` |
@@ -187,7 +215,7 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | Test | `packages/ui/src/actions/Button.test.tsx` |
 | Gallery | `packages/ui/src/actions/Button.gallery.tsx` (`npm run gallery`, `#/Button`) |
 
-**Button** props (`ButtonProps`, extends `ButtonHTMLAttributes<HTMLButtonElement>`)
+**Button** props (`ButtonProps`, extends `Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
@@ -196,11 +224,12 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | `iconRight` | `IconName` |  | A glyph after the label (a chevron for "View All"). |
 | `size` | `"md" \| "sm"` |  | `md` follows the density (36 or 40 px); `sm` is 28 px on desktop. Both are 44 px on a phone. |
 | `block` | `boolean` |  | Fills the width: the call to action at the foot of a form or page. |
-| `busy` | `boolean` |  | Shows a spinner in place of the icon and ignores presses until the work finishes. |
+| `onClick` | `PressHandler<MouseEvent<HTMLButtonElement>>` |  | The press. Return the work (onClick={save}, or an async handler) and the button is busy from the press until it settles: a spinner, presses ignored, and its ActionGroup waiting with it. |
+| `busy` | `boolean` |  | Busy by the caller's own measure (a mutation's pending), for work the press does not return. |
 | `asChild` | `boolean` |  | Renders the single child element (an <a>, a router Link) with the button's look instead of a <button>. |
 | `children` | `ReactNode` |  | The label: Verb Noun, Title Case, at most 3 words. |
 
-**IconButton** props (`IconButtonProps`, extends `Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "aria-label">`)
+**IconButton** props (`IconButtonProps`, extends `Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "aria-label" | "onClick">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
@@ -208,16 +237,20 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | `label` | `string` | yes | What the button does, in words: its accessible name and its tooltip. Required. |
 | `size` | `"md" \| "sm"` |  | `md` follows the density; `sm` is 32 px on desktop. Both are 44 px on a phone. |
 | `dot` | `boolean` |  | A small red dot for something new (the bell). |
+| `onClick` | `PressHandler<MouseEvent<HTMLButtonElement>>` |  | The press. Return the work and the glyph turns to a spinner until it settles, presses ignored meanwhile. |
+| `busy` | `boolean` |  | Busy by the caller's own measure, for work the press does not return. |
 
-**BigButton** props (`BigButtonProps`, extends `ButtonHTMLAttributes<HTMLButtonElement>`)
+**BigButton** props (`BigButtonProps`, extends `Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `icon` | `IconName` |  | A glyph after the label. |
-| `busy` | `boolean` |  | Shows a spinner and ignores presses until the work finishes. |
+| `onClick` | `PressHandler<MouseEvent<HTMLButtonElement>>` |  | The press. Return the work and it spins until the work settles, presses ignored meanwhile. |
+| `busy` | `boolean` |  | Busy by the caller's own measure (a sign-in form's submit). |
 
 ```tsx
 <Button variant="primary" icon="plus">New Rule</Button>
+<Button variant="primary" onClick={save}>Save Worksite</Button>
 <Button variant="ghost" iconRight="right">View All</Button>
 ```
 
@@ -232,7 +265,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | Use | A section of a page: a KPI group, a record's fields, a list, a chart. One idea per card. |
 | Avoid | Cards inside cards; an explainer card (a title starting How, Why or What is tier 3 and never reaches a screen); a list on a phone (a card list comes from DataView). |
 | Phone | Full width with the same padding; the actions in CardHeader keep their 44 px targets and wrap under the title when there is no room. |
-| Accessibility | A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. |
+| Accessibility | A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. CardHeader's actions wait for each other while one is working (F26). |
 | Status | stable |
 | Exports | `Card`, `CardHeader` |
 | Import | `import { Card, CardHeader } from "@mycity/ui";` |
@@ -308,7 +341,7 @@ A page's title, its one-line subtitle (desktop only) and the page's actions.
 | Use | Once, at the top of every screen. |
 | Avoid | A second title further down (use CardHeader); a subtitle that explains how the page works (tier 3); more than one primary action. |
 | Phone | The subtitle is not shown (FRONTEND_GUIDE §7: less text); the actions wrap under the title with 44 px targets. |
-| Accessibility | The title is the page's only h1 (data-ui="page-title"); the subtitle is a paragraph (data-ui="page-subtitle"). Title at most 3 words, subtitle at most 8. |
+| Accessibility | The title is the page's only h1 (data-ui="page-title"); the subtitle is a paragraph (data-ui="page-subtitle"). Title at most 3 words, subtitle at most 8. The actions wait for each other while one is working (F26). |
 | Status | stable |
 | Exports | `PageHeader` |
 | Import | `import { PageHeader } from "@mycity/ui";` |
@@ -1731,7 +1764,7 @@ A yes or no before an action that cannot be taken back, named for the thing it a
 | Use | Deleting, cancelling, revoking, emptying a folder: `if (!(await confirm({ title: "Delete Rule", destructive: true }))) return;`. The component form when a screen keeps its own state. |
 | Avoid | Asking before something that can be undone (do it, and offer Undo in the toast); window.confirm (gate 16); a form (use Modal). |
 | Phone | A short bottom sheet; the confirm button full width at the bottom, Cancel above it. |
-| Accessibility | An alertdialog: Cancel has focus when it opens, Esc and the close button answer no. A destructive confirmation cannot be dismissed by a stray tap on the scrim. |
+| Accessibility | An alertdialog: Cancel has focus when it opens, Esc and the close button answer no. A destructive confirmation cannot be dismissed by a stray tap on the scrim. While an async confirm runs, Cancel, Esc and the close button wait (F26). |
 | Status | stable |
 | Exports | `ConfirmDialog` |
 | Import | `import { ConfirmDialog } from "@mycity/ui";` |
@@ -1835,7 +1868,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 | Use | Create or edit with up to 6 fields, a record's detail, a short reader. useModal().open({ title, body }) from anywhere under ModalProvider; <Modal open> when the screen owns the state. |
 | Avoid | A destructive yes or no (use useConfirm); editing the record behind it on desktop (use SidePanel); more than 6 fields (a wizard); a stack of dialogs (opening one replaces the last). |
 | Phone | A bottom sheet that drags down to close, with the main action full width at the bottom; `full` makes it a full-screen sheet (a composer, a long form). It stays above the keyboard, header in view; once it holds a text field only the close button, Cancel or Esc close it. |
-| Accessibility | Radix Dialog underneath: aria-modal, focus moves in and is trapped, Esc closes, focus returns to the opener. The title (at most 4 words) names it. With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard. |
+| Accessibility | Radix Dialog underneath: aria-modal, focus moves in and is trapped, Esc closes, focus returns to the opener. The title (at most 4 words) names it. With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard. Its buttons are one ActionGroup: while one is working the others wait, and Esc, the scrim, a drag and the close button do nothing until it finishes (F26). |
 | Status | stable |
 | Exports | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` |
 | Import | `import { Modal, ModalProvider, ModalFooter, Grow } from "@mycity/ui";` |
@@ -2365,14 +2398,14 @@ A form field's frame: the label above, an Optional tag, the control, and the err
 
 ### Form
 
-The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot.
+The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot.
 
 | | |
 |---|---|
-| Use | Around every set of fields; onSubmit comes from the form hook (form.submit(save) or a handler that calls form.check()). |
+| Use | Around every set of fields; onSubmit comes from the form hook (form.submit(save) or a handler that calls form.check()). Return the save's promise and the form refuses another submit until it settles, its submit button spins and its other buttons wait (F26). |
 | Avoid | A <form> written anywhere else (gate 12); text in a footer (buttons only); a disabled submit button. |
 | Phone | FormFooter puts the primary button full width at the bottom and the others above it. |
-| Accessibility | A real form element, so Enter submits and assistive technology announces it; FormFooter keeps the primary last in the tab order. |
+| Accessibility | A real form element, so Enter submits and assistive technology announces it; FormFooter keeps the primary last in the tab order. While a save runs the submit button says aria-busy and stays focusable. |
 | Status | stable |
 | Exports | `Form`, `FormFooter` |
 | Import | `import { Form, FormFooter } from "@mycity/ui";` |
@@ -2384,7 +2417,7 @@ The one <form>: Enter submits, the browser's own bubbles are off; with FormFoote
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `onSubmit` | `() => void` | yes | Called on submit (Enter in a single-line form, or the submit button). |
+| `onSubmit` | `() => unknown` | yes | Called on submit (Enter in a single-line form, or the submit button). Return the save's promise to hold the form until it settles. |
 | `children` | `ReactNode` | yes | The fields and the footer. |
 | `className` | `string` |  | Layout classes only. |
 | `id` | `string` |  | Its id, so a button outside it (a modal footer) can submit it with form={id}. |
@@ -3096,7 +3129,7 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | `steps` | `WizardStep[]` | yes | The steps, in order. |
 | `finish` | `string` | yes | The last step's button: Verb Noun naming the result (Publish Vacancy). |
 | `busy` | `boolean` |  | Saving: the last button ignores presses but stays reachable. |
-| `onFinish` | `() => void` | yes | Called after the last step checks clean. |
+| `onFinish` | `() => unknown` | yes | Called after the last step checks clean. Return the save's promise and the last button spins until it settles. |
 | `onCancel` | `() => void` |  | Cancel, shown on the first step instead of Back. |
 | `initialStep` | `number` |  | The step to start on (a draft resumed); 0. |
 | `onStepChange` | `(index: number) => void` |  | Called with the step index each time it changes, so a draft can remember it. |
@@ -4226,7 +4259,7 @@ A small dark card floating at the foot of the shell for something about the app 
 | Use | In the shell's notice slot (DesktopShell, PhoneShell): the update prompt (Reload), the install offer (Install App, Not Now). One at a time. |
 | Avoid | A result of something the person did (a toast); news about their work (the bell); anything that must interrupt (a ConfirmDialog). |
 | Phone | Above the floating button and the bottom bar, full width less the margins; its buttons are 44 px. |
-| Accessibility | A status region, announced when it appears and never taking focus; its actions are named buttons, drawn in the dark theme so they keep their contrast on the dark card. At most 12 words. |
+| Accessibility | A status region, announced when it appears and never taking focus; its actions are named buttons, drawn in the dark theme so they keep their contrast on the dark card, and wait for each other while one is working (F26). At most 12 words. |
 | Status | stable |
 | Exports | `ShellNotice` |
 | Import | `import { ShellNotice } from "@mycity/ui";` |

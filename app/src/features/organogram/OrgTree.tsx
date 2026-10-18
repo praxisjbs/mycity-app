@@ -442,7 +442,7 @@ function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSave
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>
           {seat ? "Save Role" : "Add Role"}
         </Button>
       </FormFooter>

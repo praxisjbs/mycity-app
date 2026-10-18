@@ -103,7 +103,7 @@ function Rules({ policy, canEdit }: { policy: SecurityPolicy; canEdit: boolean }
   return (
     <Card>
       <CardHeader title="Sessions and Passwords" />
-      <Form onSubmit={() => void submit()}>
+      <Form onSubmit={() => submit()}>
         <Field label="Session Minutes" help={`No longer than ${policy.session_max_age_floor} minutes, the server's own limit. After it, the screen locks and the person signs in again.`} {...mark("session_max_age_min")}>
           <NumberField value={v.session} onChange={(x) => (setV((o) => ({ ...o, session: x })), setErrors({}))} disabled={!canEdit} />
         </Field>
@@ -191,7 +191,7 @@ function Sessions({ canEdit }: { canEdit: boolean }) {
             s.current ? (
               <Pill tone="info">This Session</Pill>
             ) : canEdit ? (
-              <Button size="sm" busy={end.pending} onClick={() => void stop(s)}>
+              <Button size="sm" busy={end.pending} onClick={() => stop(s)}>
                 End Session
               </Button>
             ) : null,

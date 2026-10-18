@@ -209,7 +209,7 @@ function SignInForm({
   };
 
   return (
-    <Form onSubmit={() => void submit()}>
+    <Form onSubmit={() => submit()}>
       <p className="text-sm text-muted-foreground">{known ? `${greeting()}, ${known.first_name}` : greeting()}</p>
       <h2 className="mt-1 text-3xl font-strong">Sign In</h2>
       {notice && (
@@ -235,7 +235,7 @@ function SignInForm({
       {(withPasskey || withPin) && (
         <Inline className="mt-3" gap={2}>
           {withPasskey && (
-            <Button icon="fingerprint" busy={keyBusy} className="flex-1" onClick={() => void passkey()}>
+            <Button icon="fingerprint" busy={keyBusy} className="flex-1" onClick={() => passkey()}>
               Use Passkey
             </Button>
           )}
@@ -298,7 +298,7 @@ function CodeForm({ ticket, email, onBack }: { ticket: string; email: string; on
   };
 
   return (
-    <Form onSubmit={() => void submit()}>
+    <Form onSubmit={() => submit()}>
       <p className="text-sm text-muted-foreground wrap-any">{email}</p>
       <h2 className="mt-1 text-3xl font-strong">Enter Code</h2>
       <p className="mt-1.5 mb-4 text-muted-foreground">{recovery ? "One of your recovery codes" : "From your authenticator app"}</p>
@@ -399,7 +399,7 @@ function SetupForm({ ticket, email, onBack }: { ticket: string; email: string; o
             </li>
           ))}
         </ul>
-        <Button icon="copy" className="w-full" onClick={() => void copy()}>
+        <Button icon="copy" className="w-full" onClick={() => copy()}>
           Copy Codes
         </Button>
         <BigButton icon="right" className="mt-3" onClick={done.start}>
@@ -410,7 +410,7 @@ function SetupForm({ ticket, email, onBack }: { ticket: string; email: string; o
   }
 
   return (
-    <Form onSubmit={() => void submit()}>
+    <Form onSubmit={() => submit()}>
       <p className="text-sm text-muted-foreground wrap-any">{email}</p>
       <h2 className="mt-1 text-3xl font-strong">Set Up Two-Step</h2>
       <p className="mt-1.5 text-muted-foreground">Your role needs a code from an authenticator app.</p>
@@ -483,7 +483,7 @@ function PinForm({ account, onStep, onPassword }: { account: NonNullable<Known>;
   };
 
   return (
-    <Form onSubmit={() => void submit()}>
+    <Form onSubmit={() => submit()}>
       <p className="text-sm text-muted-foreground">{`${greeting()}, ${account.first_name}`}</p>
       <h2 className="mt-1 mb-4 text-3xl font-strong">Enter PIN</h2>
       <Field label="PIN" htmlFor="pin" state={touched && err ? "bad" : undefined} message={err}>
@@ -531,7 +531,7 @@ function ForgotForm({ email, setEmail, onSent, onBack }: { email: string; setEma
   };
 
   return (
-    <Form onSubmit={() => void submit()}>
+    <Form onSubmit={() => submit()}>
       <h2 className="text-3xl font-strong">Reset Password</h2>
       <p className="mt-1.5 text-muted-foreground">We will email you a link.</p>
       <LoginField id="forgot-email" label="Email" type="email" autoComplete="username" value={email} onChange={(v) => (setEmail(v), setProblem(null))} onBlur={() => setTouched(true)} error={touched ? err : ""} good={!err} buzz={touched && err ? buzz : 0} />
@@ -625,7 +625,7 @@ function LinkForm({ token, onDone, onExpired }: { token: string; onDone: (email:
   };
 
   return (
-    <Form onSubmit={() => void submit()}>
+    <Form onSubmit={() => submit()}>
       <p className="text-sm text-muted-foreground wrap-any">{invite ? `Welcome, ${check.first_name}` : check.email}</p>
       <h2 className="mt-1 text-3xl font-strong">{invite ? "Set Your Password" : "New Password"}</h2>
       <LoginField id="new-pass" label="New Password" type="password" autoComplete="new-password" value={next} onChange={(v) => (setNext(v), setServerErr(""))} onBlur={() => setTouched((t) => ({ ...t, next: true }))} error={touched.next ? nErr : ""} good={!nErr} buzz={touched.next && nErr ? buzz : 0} />

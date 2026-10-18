@@ -144,7 +144,7 @@ function PartnerForm({ close }: { close: () => void }) {
     <Wizard
       finish="Add Partner"
       busy={save.pending}
-      onFinish={() => void submit()}
+      onFinish={() => submit()}
       onCancel={close}
       steps={[
         {
@@ -490,7 +490,7 @@ function ProposalForm({ close, partner }: { close: () => void; partner: string }
     <Wizard
       finish="Draft Proposal"
       busy={save.pending}
-      onFinish={() => void submit()}
+      onFinish={() => submit()}
       onCancel={close}
       steps={[
         {

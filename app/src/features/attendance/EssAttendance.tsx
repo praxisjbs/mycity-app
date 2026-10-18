@@ -225,7 +225,7 @@ function ExplainForm({ x, close }: { x: AttendanceException; close: () => void }
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" busy={save.pending} onClick={() => void submit()}>Send Note</Button>
+        <Button variant="primary" icon="send" busy={save.pending} onClick={() => submit()}>Send Note</Button>
       </FormFooter>
     </>
   );
@@ -276,7 +276,7 @@ export function MyDevicesPage() {
           />
           <FormFooter>
             {row.status !== "removed" && (
-              <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => (close(), void drop(row))}>Remove Device</Button>
+              <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => (close(), drop(row))}>Remove Device</Button>
             )}
             <Button variant="primary" onClick={close}>Close</Button>
           </FormFooter>
@@ -346,7 +346,7 @@ function RegisterForm({ close }: { close: () => void }) {
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Register Device</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>Register Device</Button>
       </FormFooter>
     </>
   );

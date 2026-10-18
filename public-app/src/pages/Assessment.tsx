@@ -3,7 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import "@/api/types/public";
 import type { AssessmentQuestion, AssessmentSession } from "@/api/types/public";
-import { Banner, Button, cn, formatDate, Icon, Meter, PageMessage, Skeleton, Sub, TextAreaField } from "@mycity/ui";
+import { ActionGroup, Banner, Button, cn, formatDate, Icon, Meter, PageMessage, Skeleton, Sub, TextAreaField } from "@mycity/ui";
 import { Page } from "@/shell/Page";
 import { LinkProblem } from "./LinkProblem";
 
@@ -52,15 +52,12 @@ export function Assessment({ token }: { token: string }) {
 }
 
 function Intro({ d, token, onStarted }: { d: AssessmentSession; token: string; onStarted: (d: AssessmentSession) => void }) {
-  const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const start = async () => {
-    setBusy(true);
     try {
       onStarted(await api.call("POST /api/public/v1/assess/:token/start", { params: { token }, body: {} }));
     } catch (e) {
       setProblem(e instanceof ApiError ? e.message : "Could not start. Try again.");
-      setBusy(false);
     }
   };
   return (
@@ -88,8 +85,8 @@ function Intro({ d, token, onStarted }: { d: AssessmentSession; token: string; o
           <Banner tone="err">{problem}</Banner>
         </div>
       )}
-      <Button variant="primary" block className="mt-5" disabled={busy} onClick={start}>
-        {busy ? "Starting" : "Start the Assessment"}
+      <Button variant="primary" block className="mt-5" onClick={start}>
+        Start the Assessment
       </Button>
     </Page>
   );
@@ -232,20 +229,22 @@ function Running({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
             "Answers save as you go"
           )}
         </span>
-        <Button disabled={i === 0} onClick={() => void go(i - 1)}>
-          Back
-        </Button>
-        {i < total - 1 ? (
-          <Button variant="primary" onClick={() => void go(i + 1)}>
-            Next Question
+        <ActionGroup>
+          <Button disabled={i === 0} onClick={() => go(i - 1)}>
+            Back
           </Button>
-        ) : (
-          !confirm && (
-            <Button variant="primary" onClick={() => setConfirm(true)}>
-              Finish
+          {i < total - 1 ? (
+            <Button variant="primary" onClick={() => go(i + 1)}>
+              Next Question
             </Button>
-          )
-        )}
+          ) : (
+            !confirm && (
+              <Button variant="primary" onClick={() => setConfirm(true)}>
+                Finish
+              </Button>
+            )
+          )}
+        </ActionGroup>
       </div>
       {confirm && (
         <div className="mt-4 rounded-box border border-border bg-muted p-3.5">
@@ -259,10 +258,12 @@ function Running({ d, token, onEnded, reload }: { d: AssessmentSession; token: s
             </div>
           )}
           <div className="mt-3 flex justify-end gap-2">
-            <Button onClick={() => setConfirm(false)}>Keep Going</Button>
-            <Button variant="primary" onClick={() => void submit()}>
-              Submit Assessment
-            </Button>
+            <ActionGroup>
+              <Button onClick={() => setConfirm(false)}>Keep Going</Button>
+              <Button variant="primary" onClick={() => submit()}>
+                Submit Assessment
+              </Button>
+            </ActionGroup>
           </div>
         </div>
       )}

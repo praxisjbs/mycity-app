@@ -118,7 +118,7 @@ export function AddEmployee({ close }: { close: () => void }) {
     <Wizard
       finish="Add Employee"
       busy={save.pending}
-      onFinish={() => void submit()}
+      onFinish={() => submit()}
       onCancel={close}
       steps={[
         step("Person", ["first_name", "last_name", "work_email", "phone"], (
@@ -256,7 +256,7 @@ export function EditEmployee({ employee, close }: { employee: Employee360; close
   };
 
   return (
-    <Form onSubmit={() => void submit()}>
+    <Form onSubmit={() => submit()}>
       <Field label="First Name" {...f.field("first_name")}>
         <TextField {...f.field("first_name")} />
       </Field>

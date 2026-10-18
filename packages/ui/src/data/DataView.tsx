@@ -15,6 +15,7 @@ import { useId, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { content, slot } from "../lib/slots";
 import { useIsPhone } from "../lib/media";
+import { ActionGroup } from "../actions/ActionGroup";
 import { Button, IconButton } from "../actions/Button";
 import { Icon, type IconName } from "../icons/Icon";
 import { CardHeader } from "../layout/Card";
@@ -382,8 +383,10 @@ export function DataView<R>({
         {keys.length} Selected
       </span>
       <span className="flex flex-wrap items-center gap-2 desk:ml-auto">
-        {selection.actions}
-        <IconButton label="Clear Selection" icon="x" onClick={() => selection.onChange([])} />
+        <ActionGroup>
+          {selection.actions}
+          <IconButton label="Clear Selection" icon="x" onClick={() => selection.onChange([])} />
+        </ActionGroup>
       </span>
     </div>
   );

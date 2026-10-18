@@ -15,6 +15,11 @@ import { useSyncExternalStore } from "react";
  *
  * The service worker registers only in a build (never under `npm run dev`); the
  * screen gates' crawl blocks it.
+ *
+ * Reload hands over to the waiting version and reloads once it has taken over
+ * (reloadOnTakeover). The plugin alone reloads only a page that a service worker
+ * was already running when it loaded, so after a hard refresh pressing Reload did
+ * nothing; and with no sign of work the press looked dead even when it worked.
  */
 
 interface InstallPrompt extends Event {
@@ -35,6 +40,10 @@ const VISITS = "mc-visits";
 const LATER = "mc-install-later";
 const COUNTED = "mc-visit-counted";
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+/** How long Reload waits for the new version to take over before it reloads anyway. */
+export const TAKEOVER_MS = 4000;
+/** How long after asking for the reload the page is taken to have stayed (a person kept unsaved work). */
+export const STAYED_MS = 3000;
 
 const read = (key: string, store: () => Storage): number => {
   try {
@@ -64,6 +73,39 @@ const set = (patch: Partial<PwaState>) => {
 };
 
 let started = false;
+let registration: ServiceWorkerRegistration | undefined;
+
+/**
+ * Asks the waiting version to take over, then reloads as soon as it has: when it
+ * controls this page, when it reports itself activated (a page loaded with a hard
+ * refresh is not controlled, so it never hears the first), or after TAKEOVER_MS
+ * at the latest. With nothing waiting, it reloads at once. The promise keeps the
+ * Reload button busy, and settles only if the page stays after all (the browser
+ * asked about unsaved work and the person stayed), so the button comes back.
+ */
+export function reloadOnTakeover(
+  waiting: ServiceWorker | null | undefined,
+  skipWaiting: () => Promise<void>,
+  reload: () => void,
+  container: ServiceWorkerContainer | undefined = typeof navigator === "undefined" ? undefined : navigator.serviceWorker,
+): Promise<void> {
+  return new Promise<void>((settle) => {
+    let asked = false;
+    const go = () => {
+      if (asked) return;
+      asked = true;
+      reload();
+      window.setTimeout(settle, STAYED_MS);
+    };
+    if (!waiting) return go();
+    container?.addEventListener("controllerchange", go, { once: true });
+    waiting.addEventListener("statechange", () => {
+      if (waiting.state === "activated") go();
+    });
+    window.setTimeout(go, TAKEOVER_MS);
+    skipWaiting().catch(go);
+  });
+}
 
 /** Called once at start: reads the device's state, listens for the browser's install events, registers the service worker. */
 export function startPwa(): void {
@@ -80,8 +122,16 @@ export function startPwa(): void {
   if (!("serviceWorker" in navigator) || import.meta.env.DEV) return;
   void import("virtual:pwa-register").then(({ registerSW }) => {
     const updateSW = registerSW({
+      onRegisteredSW(_url, r) {
+        registration = r;
+      },
       onNeedRefresh() {
-        set({ update: () => updateSW(true) });
+        set({
+          update: async () => {
+            const reg = registration ?? (await navigator.serviceWorker.getRegistration());
+            return reloadOnTakeover(reg?.waiting, () => updateSW(true), () => window.location.reload());
+          },
+        });
       },
     });
   });

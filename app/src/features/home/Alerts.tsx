@@ -335,12 +335,12 @@ function AlertSheet({ alert, manage, close, onEditRule }: { alert: HomeAlert; ma
         <Grow />
         {can.editRule && <Button onClick={onEditRule}>Edit Rule</Button>}
         {can.clear && (
-          <Button busy={acting === "dismissed"} onClick={() => void act("dismissed")}>
+          <Button busy={acting === "dismissed"} onClick={() => act("dismissed")}>
             Dismiss Alert
           </Button>
         )}
         {can.clear && (
-          <Button variant="primary" busy={acting === "cleared"} onClick={() => void act("cleared")}>
+          <Button variant="primary" busy={acting === "cleared"} onClick={() => act("cleared")}>
             Clear Alert
           </Button>
         )}
