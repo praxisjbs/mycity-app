@@ -21,9 +21,16 @@
  *  - **VACANT rows.** A row whose Name says VACANT is a seat in the structure, not a
  *    person: it carries reports and becomes a suggested vacancy in Recruitment.
  *
- * Two options only the roster loader sets (`ctx.options`):
+ * Four options only the roster loader sets (`ctx.options`):
  *   keep_existing            fill what is missing, never write over what the app holds
  *   work_email_by_job_title  the work email of a post whose Email cell is empty
+ *   reclaim_staff_numbers    a staff number the sheet gives one of its people is theirs:
+ *                            a holder the sheet does not name moves to the next free one
+ *   roster_work_emails       every address the sheet names, so a holder it does name is
+ *                            left on their number and the row is a problem instead
+ *
+ * Importing a sheet by hand sets none of them, so a staff number already in use is a
+ * problem on the row, as it is on the Add Employee form.
  */
 const c = require("@mycity/contract");
 const { defineImporter } = require("../../shared/import/registry");

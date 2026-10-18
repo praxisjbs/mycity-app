@@ -261,10 +261,21 @@ only under `src/modules/`; the work is `shared/search`.
   row: mapping either would fail every row instead of loading the person. A column with one good
   cell among bad ones is imported, and its bad cells are row problems as usual. Work Hours and S/N
   are not fields of a person at all (the working week is one organisation setting, A22).
-- The loader asks the import engine for two things no person asks for, as batch options: **keep what
+- The loader asks the import engine for things no person asks for, as batch options: **keep what
   the app already has** (an existing person is left exactly as People hold them, and the reporting
-  line is filled only where it is empty), and **the work email `roles.json` gives a post** whose
-  sheet cell is blank. The Import wizard sets neither.
+  line is filled only where it is empty), **the work email `roles.json` gives a post** whose
+  sheet cell is blank, and **the sheet's claim on its own staff numbers**. The Import wizard sets
+  none of them.
+- **A staff number the sheet gives one of its people belongs to them.** The first administrator is
+  created before any roster and is given 00001, which the sheet says is the CEO's. A number held by
+  somebody the sheet does not name is taken back: that person moves to the next free number from
+  `numbering.allocate()`, keeping their record, their login and their roles, and the person the
+  sheet names is created on the number it gives them. Two things are never moved: a holder the same
+  sheet also names (a sheet that gives one number to two people is wrong, not authoritative, and the
+  row is reported), and a person already here under another number. Importing a sheet by hand moves
+  nobody: a taken staff number is a problem on the row, as it is on the Add Employee form. Reverting
+  such a batch archives the people it created but leaves the holder on the number they moved to; a
+  number is given back on screen, not by a revert.
 - **A deploy that changes no file changes no record.** The loader keeps the sheet's checksum on its
   batch; a later deploy with the same sheet checks the logins and stops. A corrected sheet loads
   again, adding what is new and leaving the rest alone.
@@ -628,6 +639,12 @@ screen.
 
 ## 14 · Change log
 
+- 18/10/2026 · TB · §6.1: a staff number the roster's sheet gives one of its people is theirs. The
+  first administrator is created before any roster and is given 00001, which the sheet says is the
+  CEO's, and the loader read that as a match and skipped the CEO. A holder the sheet does not name
+  now moves to the next free number, keeping their record, login and roles; a holder the sheet does
+  name is reported instead, and importing a sheet by hand moves nobody. Why the roster has never
+  run on staging at all, and how to put it there, is `docs/runbooks/staff-roster.md`.
 - 18/10/2026 · TB · §2, §6.10, §10, §11: Roles & Permissions redesigned from three drawn options per
   shell. Desktop is a split view (roles beside the role, Access, Details and People, Roles and Matrix
   views); the phone shows a role's modules by level, edited in a sheet. A module's access is one level

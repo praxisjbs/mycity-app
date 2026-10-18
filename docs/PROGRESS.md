@@ -98,6 +98,23 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 18/10/2026 · TB · The staff roster has never run on staging, which still shows only the build
+  account. `/srv/mycity/bin/deploy-gate` is root-owned and installed by `ops/provision/provision.sh`
+  alone, and a release carries `scripts/db` but not `scripts/deploy`, so the roster step added with
+  track A never reached the server: every staging deploy prints `[migrate]` then `[ai-catalogue]`
+  with no `[staff]` line and no warning. Nothing in the repository can fix that, so
+  `docs/runbooks/staff-roster.md` is new: what happened, the one command that loads the roster from
+  the running release, and the one that puts the current gate back for both environments. Fixed here:
+  the first administrator is given 00001, which the sheet says is the CEO's, and the loader read that
+  as a match and skipped the CEO (17 people, no CEO, two reporting lines lost to an unresolved "CEO").
+  A staff number the sheet gives one of its people is now taken back, the holder moving to the next
+  free number with their record, login and roles intact (`reclaim_staff_numbers`,
+  `roster_work_emails`, `organisation.renumberEmployee`, `repo.setStaffNumber`); a holder the same
+  sheet names is reported instead, and importing a sheet by hand moves nobody. The import engine now
+  reports what a service wrote rather than what the match predicted, so a preview that says create
+  means create. Proved on a copy of staging's own state: 20 rows, 20 created, 18 logins invited, the
+  CEO on 00001, the build account on 00004. Nothing ticked; the roster is still not on staging until
+  the runbook is run.
 - 17/10/2026 · TB · Capabilities made a convention every module follows (README §5.2, BACKEND_GUIDE §5,
   the guide template's new Capabilities row on every guide): each one declared once in
   `access.catalog.js`, seeded by its milestone, checked on the route after the module grant
