@@ -20,7 +20,7 @@ export function MonthPicker({ value, onChange, min, max, className }: { value: s
         align="center"
         onOpenChange={(open) => open && setYear(Number(value.slice(0, 4)))}
         trigger={
-          <button type="button" className="flex min-w-36 flex-1 items-center justify-center gap-1 rounded-ctl px-2 py-1 text-sm font-semibold hover:bg-muted">
+          <button type="button" className="flex h-control min-w-36 flex-1 items-center justify-center gap-1 rounded-ctl px-2 text-sm font-semibold hover:bg-muted">
             <span aria-live="polite">{formatMonth(value)}</span>
             <Icon name="down" size="s" />
           </button>
