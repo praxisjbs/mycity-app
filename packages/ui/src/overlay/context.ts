@@ -89,7 +89,8 @@ export function useReturnFocus(open: boolean): (e: Event) => void {
   }, []);
 }
 
-const TEXT_ENTRY = "input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea, select, [contenteditable=true]";
+/** Fields that take typing, so the phone's keyboard comes up when one has focus. */
+export const TEXT_ENTRY = "input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea, select, [contenteditable=true]";
 
 /**
  * Moves focus into an overlay as it opens. Desktop: the element marked
