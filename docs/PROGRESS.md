@@ -143,16 +143,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   shell and ⌘K. New gate `check/capabilities.js`. Left: nothing.
 - 17/10/2026 · GE · Two-column Grid panes polished: a thin scrollbar kept inside the card's rounded corners (its track margin is the card radius) and a card's header that stays put while its body scrolls (`data-panes`, `data-card-header`). Left: nothing.
 - 17/10/2026 · GE · Two cards side by side now scroll on their own on desktop, as the mailbox's panes do: `Grid` (2, "1.4/1", "1/1.5") caps each column at the window's height under the top bar (`max-h-card-pane`) with its own scroll, from the width the columns sit side by side; the page still scrolls around them, and `scroll={false}` opts a grid out. Phones are unchanged (one column, the page scrolls). Checked on Settings · Security at 1440 by 520: the role card scrolls alone while the rules card and the page stay put. Left: nothing.
-- 17/10/2026 · TB · GitHub settings ticked: TB restricted the production environment to `main`, and
+- 17/10/2026 · GE · GitHub settings ticked: TB restricted the production environment to `main`, and
   the team accepted the rest as it stands for M0. Left: branch protection on `main` and required
   reviewers on production, once the repository is public or on a plan that offers them.
   Operations: provisioning re-run on the server, confirmed over SSH, so the backup and restore-drill
   timers are installed. Still open: the offsite backup host and the WhatsApp alert links.
-- 17/10/2026 · TB · Release pipeline ticked: the team accepted the manual production run by GE or TB
+- 17/10/2026 · GE · Release pipeline ticked: the team accepted the manual production run by GE or TB
   (`release.yml` approver job) as M0's production approval while the repository is private. Left:
   required reviewers on the production environment once the repository is public or on a plan
   that offers them; the GitHub settings and operations items stay open.
-- 17/10/2026 · TB · M0 table brought up to date: 24 of 27 items done. Ticked the server (staging
+- 17/10/2026 · GE · M0 table brought up to date: 24 of 27 items done. Ticked the server (staging
   verify passes over HTTPS with HSTS and each host refusing the other's API, production serves the
   sealed releases, the uptime probe is green) and the staging seed (MyCity's staff through
   `seeds/staging/10_staff.js`; later modules seed their own records). Still open, each with
@@ -160,7 +160,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   and branch protection are not offered); the release pipeline's production approval (interim
   manual run until then); operations (backups, restore drill and offsite copy need provisioning
   re-run on the server, the offsite host and the WhatsApp alert links, none confirmed yet).
-- 17/10/2026 · TB · Production runs only by hand while the repository is private: GitHub offers no
+- 17/10/2026 · GE · Production runs only by hand while the repository is private: GitHub offers no
   required reviewers there, so releases 130 to 134 reached production seconds after the seal. The
   automatic `release.yml` run now stops at the seal and names the sha; an approver (GE or TB)
   starts Release from `main` with it, and an `approver` job in `release.yml` and `rollback.yml`
@@ -314,17 +314,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   ⌘K still on INTERIM types); the organisation routes, so the employee screens still use the mock;
   `create-admin` on staging and production for the operations lead and the build account
   (`docs/runbooks/first-accounts.md`).
-- 16/10/2026 · TB · `docs/DATABASE_SCHEMA.md` rewritten as the database design: the M0 core and how a
+- 16/10/2026 · GE · `docs/DATABASE_SCHEMA.md` rewritten as the database design: the M0 core and how a
   module attaches to it, each milestone's block, owner, tables as built and what it still owes (from
   the coverage audit), what is not built and why (passkeys per REUSE_MAP; nothing for M11), and the
   open decisions (payroll design, the role permission matrix, moving business choices out of seeds).
   M6 payroll is in scope (MILESTONES §11); the earlier "not modelled" note is withdrawn.
-- 16/10/2026 · TB · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
+- 16/10/2026 · GE · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
   rebuilds the schema with `migrate.js` and `fixtures/shared-layer.sql` is gone; CI now has PostgreSQL 16
   with pgvector and Redis, so the suite and gate 4's round trip run on every PR. `1100` lets the alerts
   code raise an alert with no trigger and returns `over_by` to two places. 82 of 82 integration tests
   pass. Left: the role permission matrix (M9), the staff-number counter after an import.
-- 16/10/2026 · TB · M0 schema made to match the foundation code: `0100` lets the shared layer write
+- 16/10/2026 · GE · M0 schema made to match the foundation code: `0100` lets the shared layer write
   what it writes (emit's empty diff, bell rows without a body, untitled uploads, 0-based import
   header rows, refused AI runs, the AI settings defaults); `0110` gives `employee` the contract's
   columns (`staff_number`, gender, date of birth, next of kin, bank, gross monthly, dotted line,
@@ -336,7 +336,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   Left: `home_alert` (M1 block) and the integration suite on the real migrations (next PR); role
   permissions wait on a role matrix; the importer must advance the staff-number counter past
   imported IDs.
-- 16/10/2026 · TB · Gate 6 built: `check/schema-drift.js` (every SQL string in `src/` and `scripts/` names only
+- 16/10/2026 · GE · Gate 6 built: `check/schema-drift.js` (every SQL string in `src/` and `scripts/` names only
   tables and columns the migrations create: qualified columns, INSERT column lists, UPDATE SET lists,
   dropped or unknown tables, a table created twice with different columns) and `check/contract-columns.js`
   (each contract file's `TABLES` names the table every object schema's keys are columns of, with a
@@ -344,7 +344,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   checked column for column against a migrated database). Run against the schema PR 25 merged,
   contract-columns reports the 12 employee mismatches. `CI_STRICT` is on: no gate can sit empty again.
   Left: nothing for gate 6; every new contract file declares its `TABLES`.
-- 16/10/2026 · TB · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
+- 16/10/2026 · GE · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
   schema, and A26 added (reference seeds hold only what the code cannot run without). Left: a
   fix-forward M0 file for the six columns the shared layer cannot write (`audit_ledger.changed_fields`,
   `notification.body`, `document.title`, `import_batch.header_row`, `ai_run` vendor and prompt,
@@ -368,7 +368,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   `monitoring.md`, `add-a-module.md`. Left: re-run provisioning on the server to install them,
   the offsite host (`backup-restore.md` §2), the WhatsApp alert links in production's `.env` and as
   a repository secret; the M11 rehearsal in front of MyCity.
-- 16/10/2026 · TB · RichTextField no longer touches a destroyed editor: TipTap's `useEditor` can
+- 16/10/2026 · GE · RichTextField no longer touches a destroyed editor: TipTap's `useEditor` can
   destroy its first editor before the mount effect runs on a slow machine, and the draft sync then
   threw (gate 11 on CI). `syncDraft` skips a destroyed editor, with a test. Nothing left.
 - 16/10/2026 · LA · Moved deterministic reference SQL to `seeds/reference/` while retaining CLAUDE.md's milestone blocks (`0099`, `1099`, and so on). `db:migrate` now interleaves both folders and the migration gates enforce unique numbers and milestone ownership across both. Payroll tables remain deferred; only shared numbering configuration required by the existing numbering contract is seeded. Left: create environment-specific staging people and transaction data through services.
@@ -704,7 +704,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
-- 18/10/2026 · TB · Composer fixed from a phone test: attachments were all refused (422, "Check the highlighted fields") because the composer sent the purpose `mail`, which the upload contract does not take; it now sends `attachment`, with an integration test sending a phone photograph the way the composer does. "Draft saved" moved out of the footer to quiet text beside Attach a File (guide §10); on the phone the footer is one row (Discard and Schedule as icons, Send filling the rest). `UploadField` gains Remove on a failed file and `handOff`, so a finished attachment shows once, as its chip. Left: walk it on a phone once staging has it.
+- 18/10/2026 · GE · Reader fixed from a phone test: HTML mail was written into the page, so a sender's fixed 600 px layout (a cPanel notice) ran off the phone and their styles could reach ours. It now renders in `EmailFrame` (new in `packages/ui`): a sealed frame, as tall as its content, scaled down to the column's width when wider, with its own policy (no scripts, frames or forms; web images after Load Images); a `mailto:` link opens the composer. Checked in Chromium at 360 px: the 600 px table shows at 0.49 and the page no longer scrolls sideways. Left: dark-mode recolouring of mail designed for a white page; walk it on a phone once staging has it.
+- 18/10/2026 · GE · Composer fixed from a phone test: attachments were all refused (422, "Check the highlighted fields") because the composer sent the purpose `mail`, which the upload contract does not take; it now sends `attachment`, with an integration test sending a phone photograph the way the composer does. "Draft saved" moved out of the footer to quiet text beside Attach a File (guide §10); on the phone the footer is one row (Discard and Schedule as icons, Send filling the rest). `UploadField` gains Remove on a failed file and `handOff`, so a finished attachment shows once, as its chip. Left: walk it on a phone once staging has it.
 - 17/10/2026 · GE · ⌘K now finds a person's own mail by subject, address or sender name, pinned to the caller so the CEO and People find nobody else's; a result opens the conversation in any folder. Connecting uses `mycityapp.io` as the mail host, the certificate's name, instead of `mail.mycityapp.io`. Virus scanning checked against a real clamd with a local test signature (the signature download is blocked here): an inbound attachment carrying the EICAR string stays in quarantine marked infected, a clean one is released. Left: the real host and clamd's real signatures on staging; disconnecting a leaver needs a deactivation event.
 - 17/10/2026 · GE · Built on the real API: contract `mailbox.js`, migration 1120 (connection status, folder kinds and UID cursor, thread keys, `mail_draft`, `mail_send_queue`), the `mailbox` module (IMAP and SMTP provider, autodiscover to `mail.<domain>` on 993 and 465, threading by References, sanitised HTML in and out, send queue with Bcc in the envelope only, a copy to the server's Sent, deferrals retried three times, paced to 50 an hour), `mail-sync` and `mail-send` jobs, IMAP IDLE in the worker, `mailbox.updated` over the socket. Screens on the contract: the Connect sheet opens over Mailbox ("Password refused" on the field), Reconnect banner, scheduled mail in Drafts with Cancel Schedule, field errors in the composer, Discard with buttons only. Unit tests and an integration suite on a fake provider; checked against a real Dovecot IMAP server and an SMTP relay (15 of 15), then walked on a laptop and a phone: connect, sync with an attachment, reply, Sent, the reply arriving in the other person's inbox. Empty stubs deleted. Left: the real `mycityapp.io` host (Namecheap) is untested; disconnecting a leaver needs a deactivation event; ⌘K inside mail needs an owner-scoped provider.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/mailbox/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/mailbox.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.

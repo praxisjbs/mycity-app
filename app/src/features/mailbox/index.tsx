@@ -10,7 +10,7 @@ import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, type ComposeInit } from "./Composer";
 import { ApiError } from "@/api/client";
-import { Avatar, Banner, Button, cn, EmptyState, ErrorState, Field, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, SearchInput, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type MenuItem, type SplitState } from "@mycity/ui";
+import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, SearchInput, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
@@ -179,6 +179,10 @@ function clean(html: string, images: boolean) {
   return { html: doc.body.firstElementChild?.innerHTML ?? "", blocked };
 }
 
+function escapeHtml(text: string) {
+  return text.replace(/[&<>"']/g, (c) => `&${({ "&": "amp", "<": "lt", ">": "gt", '"': "quot", "'": "#39" } as Record<string, string>)[c]};`);
+}
+
 function quote(m: MailMessage) {
   return `<p></p><p></p><p>On ${formatDateTime(m.sent_at)}, ${who(m.from)} wrote:</p><blockquote>${m.body_html ?? ""}</blockquote>`;
 }
@@ -212,6 +216,8 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
     const others = all ? [...lastMsg.to, ...lastMsg.cc].filter((a) => a.toLowerCase() !== me.toLowerCase()) : [];
     compose({ to: [lastMsg.from.address], cc: others, subject: /^re:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`, body_html: quote(lastMsg), in_reply_to: lastMsg.mail_message_id }, all ? "Reply All" : "Reply");
   };
+  /* A mailto: link in a message writes from this mailbox, as a mail app's own composer does. */
+  const mailto = (m: Mailto) => compose({ to: m.to, cc: m.cc, subject: m.subject ?? "", body_html: m.body ? `<p>${escapeHtml(m.body)}</p>` : "" }, "New Message");
   const forward = () =>
     compose({ subject: /^fwd:/i.test(thread.subject) ? thread.subject : `Fwd: ${thread.subject}`, body_html: quote(lastMsg), attachments: lastMsg.attachments.map(({ document_id, file_name, size_bytes, mime_type }) => ({ document_id, file_name, size_bytes, mime_type })) }, "Forward");
   const moves: MenuItem[] = [
@@ -240,13 +246,13 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
         </span>
       </div>
       {thread.messages.map((m, i) => (
-        <Message key={m.mail_message_id} m={m} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} />
+        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onMailto={mailto} />
       ))}
     </div>
   );
 }
 
-function Message({ m, head, images, onImages }: { m: MailMessage; head: boolean; images: boolean; onImages: () => void }) {
+function Message({ m, subject, head, images, onImages, onMailto }: { m: MailMessage; subject: string; head: boolean; images: boolean; onImages: () => void; onMailto: (m: Mailto) => void }) {
   const body = useMemo(() => (m.body_html == null ? null : clean(m.body_html, images)), [m.body_html, images]);
   return (
     <div className={cn(head && "border-b border-dashed border-border")}>
@@ -261,7 +267,7 @@ function Message({ m, head, images, onImages }: { m: MailMessage; head: boolean;
               <button type="button" className="font-semibold text-accent-foreground underline" onClick={onImages}>Load Images</button>
             </p>
           )}
-          <div className="rte mail-body py-3.5 text-sm leading-relaxed text-muted-foreground [&_p+p]:mt-2.5" dangerouslySetInnerHTML={{ __html: body.html || "<p></p>" }} />
+          <EmailFrame className="py-3.5" title={subject} html={body.html} remoteImages={images} onMailto={onMailto} />
         </>
       )}
       {m.attachments.length > 0 && (
@@ -309,7 +315,7 @@ function DraftReader({ row, onBack, compose }: { row: ThreadRow; onBack: () => v
         </span>
       </div>
       {row.scheduled && <div className="mt-3"><Pill tone="info">Scheduled {formatDateTime(row.scheduled.release_at)}</Pill></div>}
-      <div data-copy="content" className="rte mail-body py-3.5 text-sm leading-relaxed text-muted-foreground [&_p+p]:mt-2.5" dangerouslySetInnerHTML={{ __html: body.html || "<p></p>" }} />
+      <EmailFrame className="py-3.5" title={draft.subject || "Draft"} html={body.html} />
     </div>
   );
 }

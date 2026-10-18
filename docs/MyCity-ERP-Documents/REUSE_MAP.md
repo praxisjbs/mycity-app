@@ -255,7 +255,10 @@ Those five lines are the whole job: cut them to no-ops behind a feature check, o
 
 Jobs: `src/jobs/mail-sync.js`, `src/jobs/handlers/mail-sync-scheduler.js`, `src/jobs/mail-idle.js`
 (IMAP IDLE for push).
-Frontend: `client/src/features/comms/inbox/`, `mail-setup-wizard.tsx`, `setup/`.
+Frontend: `client/src/features/comms/inbox/`, `mail-setup-wizard.tsx`, `setup/`. Taken so far (18/10/2026):
+`email-frame.tsx` and `email-doc.ts` (the sealed frame, its policy, fit to width, `mailto:` parsing) as
+`packages/ui/src/documents/EmailFrame.tsx`; the ink is read from our tokens by the component, and the
+dark-mode recolouring in `message-body.ts` is not taken yet.
 Reference: `doc/SMART_MAIL_ENGINEERING_GUIDE.md` — a binding decision log on all 35 questions, plus
 `doc/SMART_MAIL_FIELD_NOTES.md`, which is the defect log of what actually broke after each PR.
 **Read the field notes before starting, not after.**

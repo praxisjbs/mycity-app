@@ -114,6 +114,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both. | stable |
+| Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
@@ -3570,6 +3571,37 @@ A file from the vault as the browser draws it: a PDF inline, a picture in the im
 
 ```tsx
 <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
+```
+
+### EmailFrame
+
+One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app.
+
+| | |
+|---|---|
+| Use | The body of a received or drafted email, wherever HTML mail is read (the mailbox reader, a draft preview). |
+| Avoid | Writing mail HTML into the page with dangerouslySetInnerHTML: its widths overflow a phone and its styles leak; any other HTML (use Reader for our own long text). |
+| Phone | A message laid out wider than the screen (the 600 px newsletter, a cPanel notice) is scaled down to the screen's width, as mail apps do, never scrolled sideways. |
+| Accessibility | An iframe named by `title` (the subject), as its aria-label so no browser tooltip appears. Nothing in the message runs: no scripts, forms or frames, whatever the sanitiser missed. |
+| Status | beta |
+| Exports | `EmailFrame` |
+| Import | `import { EmailFrame } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/EmailFrame.tsx` |
+| Test | `packages/ui/src/documents/EmailFrame.test.tsx` |
+| Gallery | `packages/ui/src/documents/EmailFrame.gallery.tsx` (`npm run gallery`, `#/EmailFrame`) |
+
+**EmailFrame** props (`EmailFrameProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `html` | `string` | yes | The message body, already sanitised by the server. |
+| `title` | `string` | yes | What a screen reader announces for the frame: the subject. |
+| `remoteImages` | `boolean` |  | Lets images load from the web; until then only embedded ones show. |
+| `onMailto` | `(mailto: Mailto) => void` |  | A `mailto:` link was pressed; open the composer with it. Without this it opens the device's mail app. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<EmailFrame title="Client configuration settings" html={message.body_html} onMailto={(m) => compose(m)} />
 ```
 
 ### ImageViewer
