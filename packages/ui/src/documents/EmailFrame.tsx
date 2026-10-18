@@ -4,13 +4,14 @@
  * @summary One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app.
  * @use The body of a received or drafted email, wherever HTML mail is read (the mailbox reader, a draft preview).
  * @avoid Writing mail HTML into the page with dangerouslySetInnerHTML: its widths overflow a phone and its styles leak; any other HTML (use Reader for our own long text).
- * @phone A message laid out wider than the screen (the 600 px newsletter, a cPanel notice) is scaled down to the screen's width, as mail apps do, never scrolled sideways.
+ * @phone In the dark theme a message designed for a white page is recoloured (light backgrounds dark, dark text light, brand colours and images kept). A message laid out wider than the screen (the 600 px newsletter, a cPanel notice) is scaled down to the screen's width, as mail apps do, never scrolled sideways.
  * @a11y An iframe named by `title` (the subject), as its aria-label so no browser tooltip appears. Nothing in the message runs: no scripts, forms or frames, whatever the sanitiser missed.
  * @status beta
  * @example <EmailFrame title="Client configuration settings" html={message.body_html} onMailto={(m) => compose(m)} />
  */
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { cn } from "../lib/cn";
+import { recolourHtml, type DarkTheme, type Rgb } from "../lib/email-dark";
 import { useTheme } from "../lib/preferences";
 
 /** Below this the text is unreadable; a wider message is shown at this scale and wraps instead. */
@@ -91,16 +92,41 @@ export function buildEmailDoc(html: string, { remoteImages, ink, scheme }: { rem
   );
 }
 
-/** The token colours resolved to values a document outside the app can use. */
-function readInk(): EmailInk {
+/** A computed `rgb()` or `rgba()` as channels, or null. */
+function rgbOf(computed: string): Rgb | null {
+  const m = /^rgba?\(([^)]*)\)$/.exec(computed.trim());
+  const parts = m ? m[1]!.split(/[\s,/]+/).filter(Boolean).map(Number) : [];
+  return parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite) ? [parts[0]!, parts[1]!, parts[2]!] : null;
+}
+
+interface Palette {
+  scheme: "light" | "dark";
+  ink: EmailInk;
+  /** Where white and black land when the surface is dark; null on a light one. */
+  dark: DarkTheme | null;
+}
+
+/**
+ * The token colours where the frame sits, resolved to values a document outside
+ * the app can use. Read beside the frame, not on the page, so a region themed
+ * on its own (a dark panel, the gallery's dark column) is honoured.
+ */
+function readInk(host: HTMLElement, fallback: "light" | "dark"): Palette {
   const probe = document.createElement("span");
-  probe.className = "text-foreground border-border absolute invisible";
+  probe.className = "bg-card text-foreground border-border absolute invisible";
   const link = document.createElement("span");
   link.className = "text-accent-foreground absolute invisible";
-  document.body.append(probe, link);
+  host.append(probe, link);
   try {
     const s = getComputedStyle(probe);
-    return { fg: s.color, link: getComputedStyle(link).color, rule: s.borderTopColor || s.color, font: getComputedStyle(document.body).fontFamily || "sans-serif" };
+    /* Our web font cannot load inside the frame, so the system stack follows it. */
+    const font = getComputedStyle(document.body).fontFamily;
+    const ink = { fg: s.color, link: getComputedStyle(link).color, rule: s.borderTopColor || s.color, font: font ? `${font}, system-ui, sans-serif` : "system-ui, sans-serif" };
+    const bg = rgbOf(s.backgroundColor);
+    const fg = rgbOf(s.color);
+    /* Dark when our card is dark: the colour decides, not a class or an attribute somewhere up the tree. */
+    const scheme = bg ? (bg[0] * 0.2126 + bg[1] * 0.7152 + bg[2] * 0.0722 < 128 ? "dark" : "light") : fallback;
+    return { scheme, ink, dark: scheme === "dark" && bg && fg ? { bg, fg } : null };
   } finally {
     probe.remove();
     link.remove();
@@ -117,9 +143,16 @@ export function EmailFrame({ html, title, remoteImages = false, onMailto, classN
   const ref = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState<number | null>(null);
   const { theme } = useTheme();
-  const scheme = theme === "dark" ? "dark" : "light";
-  const ink = useMemo(readInk, [scheme]);
-  const doc = useMemo(() => buildEmailDoc(html, { remoteImages, ink, scheme }), [html, remoteImages, ink, scheme]);
+  const [palette, setPalette] = useState<Palette | null>(null);
+  /* Read before the first paint, and again whenever the theme changes. */
+  useLayoutEffect(() => {
+    const host = ref.current?.parentElement;
+    if (host) setPalette(readInk(host, theme === "dark" ? "dark" : "light"));
+  }, [theme]);
+  const scheme = palette?.scheme ?? (theme === "dark" ? "dark" : "light");
+  /* On a dark surface a message is recoloured as Outlook does; on a light one it is drawn as sent. */
+  const body = useMemo(() => (palette?.dark ? recolourHtml(html, palette.dark) : html), [html, palette]);
+  const doc = useMemo(() => (palette ? buildEmailDoc(body, { remoteImages, ink: palette.ink, scheme }) : ""), [body, remoteImages, palette, scheme]);
   /* Read through a ref, so a new handler from the parent does not reload the frame. */
   const mailto = useRef(onMailto);
   mailto.current = onMailto;

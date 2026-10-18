@@ -3581,7 +3581,7 @@ One email body in a sealed frame: the sender's layout kept, scaled down to fit t
 |---|---|
 | Use | The body of a received or drafted email, wherever HTML mail is read (the mailbox reader, a draft preview). |
 | Avoid | Writing mail HTML into the page with dangerouslySetInnerHTML: its widths overflow a phone and its styles leak; any other HTML (use Reader for our own long text). |
-| Phone | A message laid out wider than the screen (the 600 px newsletter, a cPanel notice) is scaled down to the screen's width, as mail apps do, never scrolled sideways. |
+| Phone | In the dark theme a message designed for a white page is recoloured (light backgrounds dark, dark text light, brand colours and images kept). A message laid out wider than the screen (the 600 px newsletter, a cPanel notice) is scaled down to the screen's width, as mail apps do, never scrolled sideways. |
 | Accessibility | An iframe named by `title` (the subject), as its aria-label so no browser tooltip appears. Nothing in the message runs: no scripts, forms or frames, whatever the sanitiser missed. |
 | Status | beta |
 | Exports | `EmailFrame` |
@@ -4324,6 +4324,20 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | Export | File | What it does |
 |---|---|---|
 | `cn` | `lib/cn.ts` | Join class names, skipping the falsy ones; of two that conflict, the later wins (`cn("h-control", "h-9")` is `h-9`). |
+| `Rgb` (type) | `lib/email-dark.ts` | An email recoloured for the dark theme, by partial inversion: only the colours that would be wrong on a dark page move. |
+| `DarkTheme` (type) | `lib/email-dark.ts` | Where white lands (our card) and where black lands (our foreground). |
+| `toOklab` | `lib/email-dark.ts` | sRGB to OKLab. |
+| `fromOklab` | `lib/email-dark.ts` | OKLab to sRGB, clamped into gamut. |
+| `Role` (type) | `lib/email-dark.ts` |  |
+| `mapColour` | `lib/email-dark.ts` | Where one colour lands on a dark page, or the colour itself when it is already right there. |
+| `parseColour` | `lib/email-dark.ts` | One colour token as channels and alpha, or null for anything that is not a colour. |
+| `mapValue` | `lib/email-dark.ts` | Every colour inside one declaration's value, moved for its role; a gradient's stops each move. |
+| `rewriteDeclarations` | `lib/email-dark.ts` | Split a declaration list on `;` outside quotes and parentheses, rewriting each value; anything unchanged comes back as it was. |
+| `recolourDeclarations` | `lib/email-dark.ts` | One declaration list: an inline `style`, or the inside of one CSS block. |
+| `recolourStylesheet` | `lib/email-dark.ts` | A whole stylesheet: each run between braces is a declaration list; a selector there has no colour property, so it passes through. |
+| `hasOwnDarkMode` | `lib/email-dark.ts` | Does this message bring its own dark design? |
+| `recolourFragment` | `lib/email-dark.ts` | Recolour a parsed body in place: inline styles, `bgcolor` and `color` attributes, and `<style>` blocks. |
+| `recolourHtml` | `lib/email-dark.ts` | A body as HTML, recoloured for a dark page. |
 | `Environment` (type) | `lib/environment.ts` | Staging, or anything else (production, a laptop, CI). |
 | `isStagingHost` | `lib/environment.ts` | A staging host name: hub.staging.mycityapp.io, go.staging.mycityapp.io. |
 | `markStaging` | `lib/environment.ts` | Marks the page as staging: the attribute, the amber tab icon and the browser bar colour. |

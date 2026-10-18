@@ -257,8 +257,9 @@ Jobs: `src/jobs/mail-sync.js`, `src/jobs/handlers/mail-sync-scheduler.js`, `src/
 (IMAP IDLE for push).
 Frontend: `client/src/features/comms/inbox/`, `mail-setup-wizard.tsx`, `setup/`. Taken so far (18/10/2026):
 `email-frame.tsx` and `email-doc.ts` (the sealed frame, its policy, fit to width, `mailto:` parsing) as
-`packages/ui/src/documents/EmailFrame.tsx`; the ink is read from our tokens by the component, and the
-dark-mode recolouring in `message-body.ts` is not taken yet.
+`packages/ui/src/documents/EmailFrame.tsx`, and `email-dark.ts` (the dark-mode partial inversion) as
+`packages/ui/src/lib/email-dark.ts`. The ink is read from our tokens beside the frame; the rest of
+`message-body.ts` (quoted-history folding, the remote-image pass) is not taken.
 Reference: `doc/SMART_MAIL_ENGINEERING_GUIDE.md` — a binding decision log on all 35 questions, plus
 `doc/SMART_MAIL_FIELD_NOTES.md`, which is the defect log of what actually broke after each PR.
 **Read the field notes before starting, not after.**
