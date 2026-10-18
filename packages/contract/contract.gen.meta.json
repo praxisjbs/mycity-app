@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "6091b31eaab0530660437ac2eb7488436713ace543d26e7492297f6b5a0c704e",
+  "source_hash": "c788dd407d625ef1bb97a04601bf740a6f27b956964ae0596b4048f6f95860c9",
   "schemas": 473,
-  "endpoints": 236,
+  "endpoints": 239,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -18,7 +18,7 @@
     "packages/contract/schemas/candidates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/common.js": "0e690f26fdd6643c9b9c7fd30c6d53702fa3875ce8a031a3e02296959cb5215e",
     "packages/contract/schemas/community.js": "388d6edb36a857bb6132e44a2025bcd2e7bfb61d412a15526169dea4a6932171",
-    "packages/contract/schemas/dashboard.js": "7073154703093adf24522f3961aa65fd7fe01665fdf87f0748e6d6c671fc2ba4",
+    "packages/contract/schemas/dashboard.js": "62cdcfd00b004299d219e1193c53cc2eef5019323f04025b74960ef913bad78c",
     "packages/contract/schemas/deductions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/devices.js": "8de4f49564eb2aee09fa0505652fe4b8c8d579e8f488eadfe72ade2be1394017",
     "packages/contract/schemas/disbursements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -74,7 +74,7 @@
     "src/modules/attendance/attendance.routes.js": "4f399a9158a4ed55bbea0dfdb8fc68e20920984737b85d0533a0599c911a60bc",
     "src/modules/audit/audit.routes.js": "22f7a660678e7dbb8d78ec5a9adc59668ce88da452c0a284c10ad4d36dbbdde8",
     "src/modules/community/community.routes.js": "13f20c9a186ea906de6ab29d34a99faa322848b48ef6c53c6ccc521fc354041e",
-    "src/modules/dashboard/dashboard.routes.js": "2e390c8195702daa430923c366a92400bc471763cc9f14d3f45a32e04e06000e",
+    "src/modules/dashboard/dashboard.routes.js": "f709e2a0658d2c1fa1bd9c541b449ce8cccf258c216101cd4b9850e40b7987f5",
     "src/modules/devices/devices.routes.js": "bbf96fe4435f210b0b6361e33ceed8358b516b030812fc5c9ca747b033f11483",
     "src/modules/documents/documents.routes.js": "73a5476bb414205b143e2318f0033683756937e359b7f1c8ebcccd41a654d9cf",
     "src/modules/ess/ess.routes.js": "35b169ebeff9251ee72d4b6cb47643b97a641e60d928bb8b51eaf4a679d646bf",

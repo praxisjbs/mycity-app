@@ -130,10 +130,10 @@ event a day) and needs none of its own.
 | `POST /api/v1/worksites/:id/employees` | `WorksiteAssign` → `WorksiteEmployee` | `people` edit · scope | no | Through `organisation.service.updateEmployee`; assigning someone to another worksite moves them |
 
 The shared roster has no route of its own. It is a read Home's services call: `GET /home/team`,
-`/home/team/summary` and the records behind the attendance cards (`docs/guides/home.md` §5). People
-· Attendance and My Attendance read the routes above; the roster agrees with them because it reads
-the same records the same way (§6.9). `page()` answers in the list envelope at 25, filtered,
-searched and sorted in SQL.
+`/home/team/summary`, `/home/team/attendance` and the records behind the attendance cards
+(`docs/guides/home.md` §5). People · Attendance and My Attendance read the routes above; the roster
+agrees with them because it reads the same records the same way (§6.9). `page()` and `month()`
+answer in the list envelope at 25, filtered, searched and sorted in SQL.
 
 ## 6 · Rules and calculations
 
@@ -234,8 +234,9 @@ Home and those screens never disagree.
 
 | Function | Gives |
 |---|---|
-| `summary(client, { date }, scope)` | For one day within the reader's scope: `working_day`, `expected`, `present`, `on_site`, `remote`, `late`, `absent`, `on_leave`, `not_in`, `no_clock_out_yesterday` |
-| `page(client, { date, status, department_id, q, no_clock_out_yesterday }, scope, query)` | One page of 25 people on the register that day: name, job title, department, work pattern, status, clock-in, clock-out, late minutes, the worksite the clock-in was judged against (none when the person works remotely or is not in), the yesterday flag. Sorts: `display_name` (the default), `department`, `clock_in_at` |
+| `summary(client, { date }, scope)` | For one day within the reader's scope: `working_day`, `expected`, `present`, `on_site`, `remote`, `late`, `absent`, `on_leave`, `not_in`, `no_clock_out_yesterday`, `flagged` |
+| `page(client, { date, status, department_id, q, no_clock_out_yesterday, flagged }, scope, query)` | One page of 25 people on the register that day: name, job title, department, work pattern, status, clock-in, clock-out, late minutes, the worksite the clock-in was judged against (none when the person works remotely or is not in), the yesterday flag and `flagged`. The filters combine. Sorts: `display_name` (the default), `department`, `clock_in_at` |
+| `month(client, { from, to, department_id, q }, scope, query)` | One page of 25 people on the register on any day from `from` to `to` (at most 31), each with the totals My Attendance shows for those days: expected, on time, late, absent, on leave. One query for the page, never one per person. Sorts: `display_name` (the default), `on_time` |
 | `personal(client, { employee_id, from, to })` | One person's days (at most 31), each with its status, its record's own status (`day_status`), clock-in, clock-out and late minutes, and the totals My Attendance shows: days expected, on time, late, absent, on leave |
 
 - **A day's record is the source.** Status, first clock-in, last clock-out and late minutes are
@@ -263,6 +264,12 @@ Home and those screens never disagree.
 - **No clock-out yesterday:** the person's last working day (Saturday, read on a Monday; the day
   before a holiday, read after it) has a clock-in and no clock-out on its record: the open shift the
   day-close turns into a missing clock-out.
+- **Flagged:** late that day, or no clock-out yesterday; a person who is both is flagged once, so
+  `flagged` counts people, not flags.
+- **Over a range** (`month()`): the people on the register on at least one of its days (anyone with
+  a record in it, and everyone active, started by its last day and not yet left on the first day
+  they are on it), each with `repo.daysSummary()`'s figures for those days, counted the same way
+  in one grouped query.
 - **A person's totals** are `repo.daysSummary()` up to today, the figures My Attendance shows: a day
   counts once this module has recorded it (a clock-in, or the day-close's absence or leave), so
   today's leave and a past day not yet closed count for nothing until then. Leave is counted apart,
@@ -426,3 +433,4 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   by `1300`. `1150` no longer adds `attendance_event (occurred_at)`.
 - 18/10/2026 · TB · The panel's after-sign-in opener moved to Home (owner decision O12, home.md §6): Home · Overview opens it with `useClock().open` once when the server's `prompt_clock_in` says it is due, and `ClockButton.tsx` exports `useClockSync` in place of `useClockPrompt`, which the shell still calls so a punch made elsewhere refreshes the state. The panel, its punch and §10.2's floating button are unchanged; §2 and §10.2 say who opens it.
 - 18/10/2026 · TB · Home's review fixes: §2 and §10.2 now say the panel opens when the first session of a working day opens Home · Overview, so a first session that signs in through a link to another screen and never opens the Overview is not prompted that day (the top bar and the floating button still open it). Home · Overview now reads itself again after a punch, from its own files. Nothing in Attendance's code changed.
+- 18/10/2026 · TB · The shared roster gains what Home's Team tab reads (§5, §6.9), for LA's review: `month()`, one page of 25 people with My Attendance's totals over a range of up to 31 days in one query (Attendance This Month); `flagged` (late, or no clock-out yesterday, each person once) as a count on `summary()` and a filter on `page()`, so the Flags card equals the records it opens. Nothing this module records or decides changed.

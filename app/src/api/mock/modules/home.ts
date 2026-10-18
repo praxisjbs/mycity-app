@@ -16,15 +16,18 @@ import type {
   HomePipeline,
   HomeRoleKpis,
   HomeRosterStatus,
+  HomeTeamAttendanceRow,
+  HomeTeamRow,
+  HomeTeamSummary,
   HomeUpcomingLeave,
   HomeWeekDay,
   Me,
 } from "@mycity/contract/contract.gen.ts";
-import type { HomeAlert, HomeKpi, HomeReport } from "@/api/types/home";
+import type { HomeAlert, HomeReport } from "@/api/types/home";
 import { formatTime, todayIso } from "@mycity/ui";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
-import { byKey, DEPARTMENTS, PEOPLE, ref, SIGN_INS, teamOf, type MockPerson } from "../data/people";
-import { HISTORY, STATUS_PILL, summaryOf, TODAY, type TodayStatus } from "../data/attendance";
+import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS, teamOf, type MockPerson } from "../data/people";
+import { HISTORY, TODAY, type TodayStatus } from "../data/attendance";
 import { PARTNERS, STAGES } from "../data/partners";
 import { REQUESTS } from "../data/expenses";
 import { shiftOf, todayOf } from "./attendance";
@@ -39,8 +42,10 @@ import { leaveRequests, leaveYear, waitingOn } from "./organisation";
  * server's rules where they decide what is shown: which cards a person may see (their /me
  * grants and capabilities), which cards show (their pick, else their roles', else their Home
  * view's), which sections each view draws, and that the server sends figures and the screen the
- * words. Team, Alerts and Reports still answer their INTERIM shapes (@/api/types/home) until
- * their own PRs move them.
+ * words. Team is on the contract too, over the same roster as the Clocked In Today card, in the
+ * reader's `home` scope (everyone for Operations and the CEO, else the reader and everyone below
+ * them). Alerts and Reports still answer their INTERIM shapes (@/api/types/home) until their own
+ * PRs move them.
  *
  * Demonstration data only (A5): production starts empty.
  */
@@ -51,6 +56,10 @@ type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 const full = (user: string) => ["operations", "ceo"].includes(SIGN_INS[user]?.view ?? "");
 const peopleOf = (user: string): MockPerson[] => (full(user) ? PEOPLE : [byKey(user)!, ...teamOf(user)]);
 const keysOf = (user: string) => new Set(peopleOf(user).map((p) => p.user_key));
+/** A department's id, as the organisation mock gives it (GET /departments). */
+const departmentId = (name: string) => sid(`dept:${name}`);
+/** A person as lists carry them (the contract's PersonRef). */
+const refOf = (p: MockPerson): HomeTeamRow["employee"] => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department });
 const grants = (m: Me, module: string) => (m.grants as Record<string, string[] | undefined>)[module] ?? [];
 const mayView = (m: Me, module: string) => m.is_ceo || grants(m, module).includes("view");
 const holds = (m: Me, code: string) => m.is_ceo || m.capabilities.includes(code);
@@ -71,6 +80,7 @@ interface RosterRow {
   person: MockPerson;
   status: HomeRosterStatus;
   clock_in_at: string | null;
+  clock_out_at: string | null;
   worksite: string | null;
   no_clock_out_yesterday: boolean;
 }
@@ -78,7 +88,7 @@ interface RosterRow {
 /** The register's status for each of the demonstration day's states; a suspended person is not on the roster. */
 const ROSTER: Record<TodayStatus, HomeRosterStatus | null> = {
   on_time: "on_site",
-  remote: "remote",
+  remote: "on_site",
   late: "late",
   leave: "on_leave",
   no_clockout: "on_site",
@@ -87,20 +97,32 @@ const ROSTER: Record<TodayStatus, HomeRosterStatus | null> = {
   not_yet: "not_in",
   suspended: null,
 };
+const TODAY_BY_KEY = new Map(TODAY.map((t) => [t.person.user_key, t]));
 
+/**
+ * Today's register in the reader's scope: everyone active and started, as the server's roster
+ * reads it. Someone in on time is remote when their work pattern is remote and on site
+ * otherwise; the worksite is their clock-in's, unless they work remotely. Nobody has clocked
+ * out yet, and someone added today has not clocked in.
+ */
 function rosterOf(user: string): RosterRow[] {
   const keys = keysOf(user);
-  return TODAY.flatMap((t) => {
-    const status = ROSTER[t.status];
-    if (!status || !keys.has(t.person.user_key)) return [];
-    const remote = t.mode === "Remote";
+  const today = todayIso();
+  return PEOPLE.flatMap((p): RosterRow[] => {
+    if (!keys.has(p.user_key) || p.start_date > today) return [];
+    const t = TODAY_BY_KEY.get(p.user_key);
+    const day = t ? ROSTER[t.status] : "not_in";
+    if (!day) return [];
+    const remote = p.work_pattern === "remote";
+    const clockIn = t?.clock_in ? at(0, t.clock_in) : null;
     return [
       {
-        person: t.person,
-        status: status === "on_site" && remote ? "remote" : status,
-        clock_in_at: t.clock_in ? at(0, t.clock_in) : null,
-        worksite: t.clock_in && !remote ? t.person.worksite : null,
-        no_clock_out_yesterday: t.status === "no_clockout",
+        person: p,
+        status: day === "on_site" && remote ? "remote" : day,
+        clock_in_at: clockIn,
+        clock_out_at: null,
+        worksite: clockIn && !remote ? p.worksite : null,
+        no_clock_out_yesterday: t?.status === "no_clockout",
       },
     ];
   });
@@ -112,8 +134,7 @@ const present = (r: RosterRow) => r.status === "on_site" || r.status === "remote
  * The KPI catalogue's live cards
  * ------------------------------------------------------------------ */
 const text = (t: string): HomeKpiCell => ({ kind: "text", text: t });
-const person = (p: MockPerson | undefined): HomeKpiCell | null =>
-  p ? { kind: "person", person: { employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department } } : null;
+const person = (p: MockPerson | undefined): HomeKpiCell | null => (p ? { kind: "person", person: refOf(p) } : null);
 const pill = (tone: Tone, t: string): HomeKpiCell => ({ kind: "pill", tone, text: t });
 const money = (amount: string): HomeKpiCell => ({ kind: "money", amount });
 const date = (d: string): HomeKpiCell => ({ kind: "date", date: d });
@@ -898,7 +919,7 @@ function overviewOf(user: string): HomeOverview {
   };
   const donuts: Record<HomeDonut["kind"], () => HomeDonut | null> = {
     on_time: () => (may("people") ? onTimeDonut(user) : null),
-    org_kpi: () => (may("performance") ? { kind: "org_kpi", percent: null, departments: DEPARTMENTS.map((name) => ({ department_id: sid(`department:${name}`), department: name, percent: null })) } : null),
+    org_kpi: () => (may("performance") ? { kind: "org_kpi", percent: null, departments: DEPARTMENTS.map((name) => ({ department_id: departmentId(name), department: name, percent: null })) } : null),
   };
   const t = todayOf(user);
   return {
@@ -1098,28 +1119,98 @@ route("GET /api/v1/home/kpi/:key", (req: Req) => {
   return res;
 });
 
-route("GET /api/v1/home/team/summary", (req) => {
-  const keys = keysOf(req.user!);
-  const l = TODAY.filter((t) => keys.has(t.person.user_key));
-  const s = summaryOf(l);
-  return ok({
-    scope_label: full(req.user!) ? "The whole organisation" : "The people you manage",
-    kpis: [
-      { key: "team_present", label: "Present Today", value: `${s.present} / ${l.length}`, trend: { text: `${s.leave} on leave`, dir: "fl" } },
-      { key: "team_on_site", label: "On Site", value: String(s.onsite) },
-      { key: "team_remote", label: "Remote", value: String(s.remote) },
-      { key: "team_flags", label: "Flags", value: String(s.late + s.noout), tone: "warn", trend: { text: `${s.late} late, ${s.noout} no clock-out`, dir: "dn" } },
-    ] satisfies HomeKpi[],
-    attendance_bars: l.slice(0, 6).map((t) => ({ label: t.person.display_name, pct: t.kpi_pct, value: `${t.kpi_pct}%`, ...(t.kpi_pct < 70 ? { emphasis: "warn" as const } : {}) })),
+/* ------------------------------------------------------------------ *
+ * Team: today's roster and each person's month, in the reader's `home` scope
+ * ------------------------------------------------------------------ */
+const TEAM_CARDS = ["team_present", "team_on_site", "team_remote", "team_flags"];
+const ROSTER_STATUSES: readonly string[] = ["on_leave", "late", "on_site", "remote", "absent", "not_in"];
+
+/** The routes check the capability before reading anything, as requireCapability does. */
+const withoutTeam = (user: string) => (holds(me(user), "home.team") ? null : fail(403, "CAPABILITY_REQUIRED", "This needs an authority you do not hold"));
+
+const teamRowOf = (r: RosterRow): HomeTeamRow => ({
+  employee: refOf(r.person),
+  department_id: departmentId(r.person.department),
+  status: r.status,
+  clock_in_at: r.clock_in_at,
+  clock_out_at: r.clock_out_at,
+  worksite: r.worksite,
+  no_clock_out_yesterday: r.no_clock_out_yesterday,
+  // Performance measures KPIs and Tasks counts open tasks from M2: the server sends neither yet.
+  kpi_percent: null,
+  open_tasks: null,
+});
+
+/**
+ * This month so far, as My Attendance counts a person's days: a day counts once it is recorded,
+ * so today counts once they are in, and today's leave and absence wait for the day-close.
+ */
+function monthOf(user: string): HomeTeamAttendanceRow[] {
+  const first = `${todayIso().slice(0, 7)}-01`;
+  return rosterOf(user).map((r) => {
+    const days = HISTORY.filter((h) => h.person.user_key === r.person.user_key && h.date >= first);
+    const onTime = days.filter((h) => h.clock_in_at && h.status !== "late").length + (r.status === "on_site" || r.status === "remote" ? 1 : 0);
+    const late = days.filter((h) => h.status === "late").length + (r.status === "late" ? 1 : 0);
+    const absent = days.filter((h) => h.status === "absent").length;
+    const onLeave = days.filter((h) => h.status === "leave").length;
+    return { employee: refOf(r.person), expected: onTime + late + absent, on_time: onTime, late, absent, on_leave: onLeave };
   });
+}
+
+/** People in the server's order: last name, then first name. */
+const surnameFirst = (r: { employee: { employee_id: string; display_name: string } }) => {
+  const p = byId(r.employee.employee_id);
+  return p ? `${p.last_name} ${p.first_name}` : r.employee.display_name;
+};
+const byName = <R extends { employee: { employee_id: string; display_name: string } }>(a: R, b: R) => surnameFirst(a).localeCompare(surnameFirst(b));
+/** Earliest first, and nobody in yet last, as Postgres orders a null going up. */
+const byClockIn = (a: HomeTeamRow, b: HomeTeamRow) => {
+  if (a.clock_in_at === b.clock_in_at) return 0;
+  if (a.clock_in_at === null) return 1;
+  if (b.clock_in_at === null) return -1;
+  return a.clock_in_at < b.clock_in_at ? -1 : 1;
+};
+
+route("GET /api/v1/home/team/summary", (req) => {
+  const refused = withoutTeam(req.user!);
+  if (refused) return refused;
+  const summary: HomeTeamSummary = {
+    date: todayIso(),
+    scope: full(req.user!) ? "all" : "team",
+    cards: TEAM_CARDS.map((key) => {
+      const card = BY_KEY.get(key)!;
+      return cardOf(card, figureOf(card, req.user!));
+    }),
+  };
+  return ok(summary);
 });
 route("GET /api/v1/home/team", (req) => {
-  const keys = keysOf(req.user!);
-  return paged(
-    TODAY.filter((t) => keys.has(t.person.user_key)).map((t) => ({ employee: ref(t.person)!, today: STATUS_PILL[t.status], mode: t.mode === "None" ? "None" : t.mode, clock_in: t.clock_in, kpi_pct: t.kpi_pct, open_tasks: t.open_tasks, _s: t.status })),
-    req,
-    { search: (r) => [r.employee.display_name, r.employee.department], filters: { status: (r, v) => r._s === v } },
-  );
+  const refused = withoutTeam(req.user!);
+  if (refused) return refused;
+  if (req.query.status && !ROSTER_STATUSES.includes(req.query.status)) return invalid({ status: ["Choose one"] });
+  if (req.query.no_clock_out_yesterday && !["true", "false"].includes(req.query.no_clock_out_yesterday)) return invalid({ no_clock_out_yesterday: ["Choose one"] });
+  return paged(rosterOf(req.user!).map(teamRowOf), req, {
+    search: (r) => [r.employee.display_name, r.employee.job_title],
+    filters: {
+      department_id: (r, v) => r.department_id === v,
+      status: (r, v) => r.status === v,
+      no_clock_out_yesterday: (r, v) => String(r.no_clock_out_yesterday) === v,
+    },
+    sort: {
+      display_name: byName,
+      department: (a, b) => (a.employee.department ?? "").localeCompare(b.employee.department ?? ""),
+      clock_in_at: byClockIn,
+    },
+  });
+});
+route("GET /api/v1/home/team/attendance", (req) => {
+  const refused = withoutTeam(req.user!);
+  if (refused) return refused;
+  return paged(monthOf(req.user!), req, {
+    search: (r) => [r.employee.display_name, r.employee.job_title],
+    filters: { department_id: (r, v) => departmentId(r.employee.department ?? "") === v },
+    sort: { display_name: byName, on_time: (a, b) => a.on_time - b.on_time },
+  });
 });
 
 route("GET /api/v1/home/alerts/summary", (req) => {

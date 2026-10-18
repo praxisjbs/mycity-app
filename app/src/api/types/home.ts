@@ -1,9 +1,9 @@
-import type { IsoDateTime, Paged, PersonRef, Tone, Uuid } from "./common";
+import type { IsoDateTime, Paged, Tone, Uuid } from "./common";
 
 /**
  * INTERIM Home shapes for the tabs not yet on the real API (owner TB; docs/guides/home.md
- * §5): Team, Alerts and Reports. The Overview, the records behind a card and the card
- * picker are on the contract (packages/contract/schemas/dashboard.js) and are typed from
+ * §5): Alerts and Reports. The Overview, the records behind a card, the card picker and
+ * Team are on the contract (packages/contract/schemas/dashboard.js) and are typed from
  * contract.gen.ts; each tab's own PR moves its keys there and deletes them here.
  */
 export interface HomeKpi {
@@ -20,20 +20,6 @@ export interface BarRow {
   value: string;
   /** "warn" draws the bar in the warning series, "brand" in yellow. */
   emphasis?: "warn" | "brand";
-}
-
-export interface TeamRow {
-  employee: PersonRef;
-  today: { tone: Tone; text: string };
-  mode: string;
-  clock_in: string | null;
-  kpi_pct: number;
-  open_tasks: number;
-}
-export interface TeamSummary {
-  scope_label: string;
-  kpis: HomeKpi[];
-  attendance_bars: BarRow[];
 }
 
 export interface HomeAlert {
@@ -101,8 +87,6 @@ type Q<T = object> = T & { page?: number; q?: string };
 
 declare module "@/api/endpoints" {
   interface Endpoints {
-    "GET /api/v1/home/team": { query: Q<{ status?: string }>; body: never; params: never; response: Paged<TeamRow> };
-    "GET /api/v1/home/team/summary": { query: never; body: never; params: never; response: TeamSummary };
     "GET /api/v1/home/alerts": { query: Q<{ category?: string }>; body: never; params: never; response: Paged<HomeAlert> };
     "GET /api/v1/home/alerts/summary": { query: never; body: never; params: never; response: AlertSummary };
     "POST /api/v1/home/alerts/:id/clear": { query: never; body: { outcome: "cleared" | "dismissed"; note?: string }; params: { id: string }; response: HomeAlert };

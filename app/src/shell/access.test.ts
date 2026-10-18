@@ -35,17 +35,15 @@ describe("shell access", () => {
     expect(hasCapability(person([], { is_ceo: true }), "alerts.manage")).toBe(true);
   });
 
-  it("Home's Team, Alerts and Reports follow capabilities, not managing people or Settings", () => {
-    expect(tabs(person([]))).toEqual(["overview"]);
-    expect(tabs(person([], { manages_people: true, grants: { home: ["view"], settings: ["view"] } }))).toEqual(["overview"]);
-    expect(tabs(person(["home.team"]))).toEqual(["overview", "team"]);
-    expect(tabs(person(["home.reports"]))).toEqual(["overview", "reports"]);
-    expect(tabs(person(["alerts.clear"]))).toEqual(["overview", "alerts"]);
-    expect(tabs(person(["alerts.manage"]))).toEqual(["overview", "alerts"]);
-    expect(tabs(person([], { is_ceo: true }))).toEqual(["overview", "team", "alerts", "reports"]);
+  it("Home keeps its four tabs for every Home viewer, whatever capabilities they hold: a tab they cannot use shows locked", () => {
+    const all = ["overview", "team", "alerts", "reports"];
+    expect(tabs(person([]))).toEqual(all);
+    expect(tabs(person(["home.team"]))).toEqual(all);
+    expect(tabs(person(["alerts.manage"]))).toEqual(all);
+    expect(tabs(person([], { is_ceo: true }))).toEqual(all);
   });
 
-  it("a capability opens a tab, never a module the person cannot view", () => {
+  it("a capability never opens a module the person cannot view", () => {
     const me = person(["home.team"], { grants: { people: ["view"] } });
     expect(visibleModules(me).map((m) => m.key)).toEqual(["people"]);
   });

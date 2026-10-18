@@ -413,7 +413,8 @@ As built (17/10/2026):
   0 dropped, so 0803 123 4567, +234 803 123 4567 and the last four digits find the same person
   (`phones` in `shared/search/provider.js`). Masked numbers (personal, next of kin) are never searched.
 - A screen or an action is offered only when the shell would show its tab to the reader
-  (`shared/search/screens.js` mirrors `app/src/shell/access.ts`) and they hold the grant it needs. A
+  (`shared/search/screens.js` mirrors `app/src/shell/access.ts`; a Home tab the shell shows locked,
+  ⌘K hides) and they hold the grant it needs. A
   record group runs only for a reader with `view` on its module, within their scope.
 - A type word at either end of the line ("login halima", "staff ada") narrows the records to that
   type; the screens and actions are still matched on the whole line.
@@ -651,6 +652,7 @@ screen.
   (No Access, View, Add, Edit, Full) with Approve and Export beside it, mapped to the six actions on
   screen only, so the API and contract are unchanged. Review before save, a role's people, the ⓘ
   summary, the letters with help and a key, the unsaved-edits question and New Role in steps.
+- 18/10/2026 · TB · §6.7: a Home tab the shell shows locked (Team, Alerts, Reports without their capability) stays hidden from ⌘K.
 - 17/10/2026 · TB · Documents: `documents.repo.js` exports `REQUEST_STILL_OPEN`, the one rule for a request still waiting for its file, which Home's Documents Requested card reads instead of a copy. No behaviour changed.
 - 17/10/2026 · TB · §5: `organisation.service.counts(client, scope, { today })` for Home's headcount,
   attrition and confirmations cards, the register's own definition; the counts above People ·

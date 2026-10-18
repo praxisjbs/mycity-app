@@ -24,15 +24,15 @@ export function figureOf(card: HomeKpiCard): ReactNode {
   }
 }
 
-export interface OverviewCardsProps {
-  /** The reader's cards, in the order the server resolved them. */
+export interface CardRowProps {
+  /** The cards, in the order the server sent them. */
   cards: HomeKpiCard[];
   /** Opens the records behind a card. */
   onOpen: (card: HomeKpiCard) => void;
 }
 
-/** The row of KPI cards: four across on desktop, two to a row on a phone (KpiGrid). */
-export function OverviewCards({ cards, onOpen }: OverviewCardsProps) {
+/** A row of KPI cards, on Overview and on Team: four across on desktop, two to a row on a phone (KpiGrid). */
+export function CardRow({ cards, onOpen }: CardRowProps) {
   return (
     <KpiGrid>
       {cards.map((card) => (

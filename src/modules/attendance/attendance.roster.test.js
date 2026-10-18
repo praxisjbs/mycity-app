@@ -3,7 +3,7 @@
  * Attendance: the roster's reading of a day, without a database. Which days are worked and
  * their hours (the module's own rules.shiftFor), the register's statuses in Home's words, a
  * day as the module records it (rules.projectDay with its lateness) read back by the
- * roster, and what a person's days add up to. The roster's SQL, its scope and its agreement
+ * roster, what a person's days add up to, and the ranges a read over several days refuses. The roster's SQL, its scope and its agreement
  * with the register run against Postgres in tests/integration/attendance-roster.test.js.
  */
 const c = require("@mycity/contract");
@@ -160,6 +160,32 @@ describe("what a person's days add up to", () => {
     const totals = roster.totalsOf({ days_present: 5, late_days: 2, absent_days: 1, leave_days: 3 });
     expect(totals).toEqual({ expected: 6, on_time: 3, late: 2, absent: 1, on_leave: 3 });
     expect(totals.expected).toBe(totals.on_time + totals.late + totals.absent);
+  });
+});
+
+describe("everyone's days over a range", () => {
+  const never = { query: jest.fn() };
+  const ALL = { scope: "all", scope_ids: null };
+
+  test("more than a month, a range that ends before it starts, or a day that is not real is refused before anything is read", async () => {
+    await expect(roster.month(never, { from: "2026-10-01", to: "2026-11-01" }, ALL, {})).rejects.toMatchObject({
+      code: "ATTENDANCE_RANGE",
+      status: 422,
+      fields: { to: ["More than 31 days"] },
+    });
+    await expect(roster.month(never, { from: "2026-10-05", to: "2026-10-04" }, ALL, {})).rejects.toMatchObject({
+      code: "ATTENDANCE_RANGE",
+      fields: { to: ["Before the first day"] },
+    });
+    await expect(roster.month(never, { from: "2026-02-30", to: "2026-03-01" }, ALL, {})).rejects.toThrow(TypeError);
+    expect(never.query).not.toHaveBeenCalled();
+  });
+
+  test("a whole month of 31 days is one range", async () => {
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+    const result = await roster.month(client, { from: "2026-10-01", to: "2026-10-31" }, ALL, {});
+    expect(result).toEqual({ data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } });
+    expect(client.query).toHaveBeenCalledTimes(1);
   });
 });
 
