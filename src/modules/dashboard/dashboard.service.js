@@ -27,14 +27,13 @@ const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
-const grantsCache = require("../../shared/rbac/grants-cache");
 const lagos = require("../../shared/time/lagos");
 const access = require("../access/access.service");
 const identity = require("../identity/identity.service");
 const kpi = require("./kpi-catalog");
 const eligibility = require("./kpi-catalog/eligibility");
 const resolve = require("./kpi-catalog/resolve");
-const { openToClear } = require("./kpi-catalog/tiles/work");
+const alerts = require("../alerts/alerts.service");
 const activity = require("./dashboard.activity");
 const layout = require("./dashboard.layout");
 const prompt = require("./dashboard.prompt");
@@ -85,13 +84,6 @@ async function cardsOf(db, user, reader, { today, now }) {
   return { source: selected.source, cards };
 }
 
-/** Open alerts the reader may clear, or null for a reader without `alerts.clear`. */
-async function alertsToClear(db, user) {
-  if (user.is_ceo !== true && !(await grantsCache.getCapabilities(db, user.user_id)).includes("alerts.clear"))
-    return null;
-  return openToClear(db, user);
-}
-
 /* ------------------------------------------------------------------ *
  * The Overview
  * ------------------------------------------------------------------ */
@@ -110,7 +102,7 @@ async function overview(user, { now = new Date() } = {}) {
     cardsOf(pool, user, reader, { today, now }),
     layout.sectionsFor(pool, { user, view: reader.me.home_view, today, scopes: reader.scopes }),
     layout.guarded("activity", () => activity.today(pool, user, { today })),
-    layout.guarded("alerts_to_clear", () => alertsToClear(pool, user)),
+    layout.guarded("alerts_to_clear", () => alerts.openToClear(pool, user)),
     layout.guarded("prompt_clock_in", () => prompt.shouldPrompt(pool, user, { now, today })),
   ]);
   return {

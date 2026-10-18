@@ -49,7 +49,7 @@ const CALLS = {
     reviewerDueCount: [{ today: TODAY, employee_id: ID }],
     reviewerDuePage: [{ today: TODAY, employee_id: ID }, QUERY],
   },
-  vacancies: { openCount: [TEAM], openPage: [TEAM, QUERY] },
+  vacancies: { openCount: [TEAM], openPage: [TEAM, QUERY], stalledBatch: [{ before: NOW, after: ID, size: 100 }] },
   payroll: {},
   partners: {
     pipelineCount: [TEAM],
@@ -64,13 +64,22 @@ const CALLS = {
     signedByMonth: [{ from: "2026-01-01", to: "2026-12-31" }, TEAM],
     proposalsOutCount: [TEAM],
     proposalsOutPage: [TEAM, QUERY],
+    quietBatch: [{ before: NOW, after: ID, size: 100 }],
   },
   expenses: { awaiting: [TEAM], awaitingPage: [TEAM, QUERY] },
-  budgets: { used: [{ today: TODAY }, TEAM], usedPage: [{ today: TODAY }, TEAM, QUERY] },
+  budgets: {
+    used: [{ today: TODAY }, TEAM],
+    usedPage: [{ today: TODAY }, TEAM, QUERY],
+    spentBatch: [{ today: TODAY, percent: "80", after: ID, size: 100 }],
+  },
 };
 
 /** The functions that sum money, each of which must count Naira only. */
-const SUMS = { partners: ["signedValue", "signedByMonth"], expenses: ["awaiting"], budgets: ["used", "usedPage"] };
+const SUMS = {
+  partners: ["signedValue", "signedByMonth"],
+  expenses: ["awaiting"],
+  budgets: ["used", "usedPage", "spentBatch"],
+};
 
 const queryFunctions = (adapter) =>
   Object.keys(adapter).filter((k) => typeof adapter[k] === "function");

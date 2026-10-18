@@ -285,7 +285,7 @@ describe("Home · Overview, by Home view", () => {
     const menu = await screen.findByRole("menu");
     expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave", "New Rule", "New Report"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "New Rule" }));
-    expect(await screen.findByRole("dialog", { name: "New Alert Rule" }, { timeout: 5000 })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "New Rule" }, { timeout: 5000 })).toBeTruthy();
     // The address asked once; it no longer does, so Back or a reload does not open the form again.
     expect(window.location.search).toBe("?tab=alerts");
   }, 30000);

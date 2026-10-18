@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 2 | 2 | 25 | 0 | 0 |
+| M1 Core Operations & Employee Management | 29 | 2 | 1 | 26 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **59** | **2** | **32** | **0** | **0** |
+| **Total** | **93** | **59** | **1** | **33** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
@@ -493,12 +493,27 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
-| 2 | Alerts | `alerts` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
+| 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☐ | ☐ | ☐ | In progress | 17/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 
 **Notes**
 
+- 18/10/2026 · TB · Home PR 4 (`m1/home-alerts`): Alerts #2 built on the real API, desktop and
+  phone. The metric registry (`alerts.metrics.js`, nine metrics, each breach read in SQL a batch at
+  a time) and the 06:00 Lagos sweep (`home-alert-sweeps`, each subject in its own transaction, a rule
+  it cannot read logged and skipped); late arrivals re-read on `attendance.punched` and late arrivals
+  and missing clock-outs on `attendance.day_closed`; a breach a person cleared is not raised again
+  for the same evidence. Who sees an alert is one condition in `alerts.repo.js`, read by the list,
+  the counts, the Overview, the Open High Alerts card, ⌘K and the assistant; clearing needs
+  `alerts.clear` and the rule's grant reaching the subject; rules are created, edited and switched
+  off by `alerts.manage` holders (switching off dismisses their open alerts in the same
+  transaction). The tab: the four counts, category chips, Alert Sources, the paged list with View
+  Dismissed, Clear Alert and Dismiss Alert (the sheet sends the outcome; the API's optional note is
+  not asked for, as home.md §10.1 lists no note field), and Alert Rules (New Rule also in ⌘K, and
+  ⌘K's rule results open Edit Rule at `?rule=`). The M7 and M8 stub jobs (partner inactivity,
+  budget threshold, approval ageing) are superseded by the sweep. Left: Reports (PR 5); partner,
+  budget and recruitment alerts find nothing until M4, M7 and M8 use their tables.
 - 18/10/2026 · TB · Home PR 3 (`m1/home-team`): Team #86 built on the real API, desktop and phone.
   `GET /home/team/summary`, `/home/team` and `/home/team/attendance` behind `home` view and
   `home.team`, in the grant's scope; the four Team cards each equal the records they open (Flags counts

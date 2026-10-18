@@ -228,6 +228,29 @@ function quietPage(client, { today }, scope, query) {
   );
 }
 
+/**
+ * The active partners last in contact before `before` (an instant), a batch of at most `size`
+ * after the partner `after` (by id), each with its name and last contact: Home's Partner
+ * Inactivity alert rules read them in their daily sweep. Every partner, whatever its owner:
+ * who sees an alert is the alert list's decision.
+ * @param {{query: Function}} client
+ * @param {{before: Date, after?: string|null, size: number}} batch
+ * @returns {Promise<Array<{partner_id: string, name: string, last_contact_at: Date}>>}
+ */
+async function quietBatch(client, { before, after = null, size }) {
+  const { rows } = await client.query(
+    `SELECT q.partner_id, q.name, q.last_contact_at
+       FROM (SELECT p.partner_id, p.name, ${LAST_CONTACT} AS last_contact_at
+               FROM partner p
+              WHERE p.status = 'active' AND ($2::uuid IS NULL OR p.partner_id > $2::uuid)) q
+      WHERE q.last_contact_at < $1::timestamptz
+      ORDER BY q.partner_id
+      LIMIT $3 -- pagination:batch the partners one step of Home's alert sweep reads`,
+    [before, after, size],
+  );
+  return rows;
+}
+
 /* ------------------------------------------------------------------ *
  * Signed value
  * ------------------------------------------------------------------ */
@@ -350,6 +373,7 @@ module.exports = {
   activePage,
   quietCount,
   quietPage,
+  quietBatch,
   signedValue,
   signedPage,
   signedByMonth,

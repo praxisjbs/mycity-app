@@ -13,7 +13,7 @@ files.
 | `docs/MIGRATIONS.md` | How a migration or reference seed is written and checked |
 | `migrations/`, `seeds/reference/` | The schema itself. Where this file and the SQL disagree, the SQL is the fact and this file is fixed |
 
-Status as of 18/10/2026 (`main` with attendance's clock, `1300` and `1390`, and Home's foundation, `1150` and `1199`): 64 files, 155 tables and 5 views. Gate 6
+Status as of 18/10/2026 (`main` with attendance's clock, `1300` and `1390`, Home's foundation, `1150` and `1199`, and Home's alerts, `1151`): 65 files, 155 tables and 5 views. Gate 6
 (`check/schema-drift.js`, `check/contract-columns.js`) checks the code and the contract against
 the same reading of the migrations on every PR.
 
@@ -113,6 +113,15 @@ line manager, then Operations & People over 5 days; §6.5).
 - ~~The staff importer must advance the `employee` counter past imported staff numbers.~~ Built
   17/10/2026: `numbering.advanceTo()`, called by the organisation service whenever a staff number
   arrives with its record, and by the roster loader at the end of a load.
+- **Read by Home** (home.md §4.1, §6 Alerts): Home reads these through their modules' own
+  functions, except its alert metrics (`src/modules/alerts/alerts.metrics.js`), which read
+  `workflow_instance` (`state = 'pending'`, `stage_entered_at`, `current_stage`, `entity_type`,
+  `entity_id`, `subject_employee_id`) with `workflow_definition` (`name`, `stages`) for the
+  `approval_ageing` metric; `document` (`is_current`, `scan_status`, `expires_on`, `title`,
+  `subject_employee_id`) for `document_expiry`; and `employee` (`status`, `first_name`,
+  `last_name`, `confirmation_due_on`, `confirmed_on`, `contract_ends_on`) for `confirmation_due` and
+  `contract_ending`, and for the names on every alert about a person. A change to those columns
+  or their meaning updates the metric in the same PR.
 
 ### M1 Core Operations · 1000 to 1999 · TB (Home), LA (attendance), GE (community, mailbox), AJ (ESS)
 
@@ -130,7 +139,9 @@ Alerts list); a report's `archived_at`; a schedule's start day, run time, format
 recipients as users, one schedule per report; `home_report_run` (one numbered file per recipient and
 format, a scheduled slot generated once); `role_kpi` (a role's default and locked KPI cards, at most
 four) and `home_kpi_pick` (the cards a person chose); the indexes the Alerts list, the report
-scheduler and run history read; and, for Activity Today, `event_log (occurred_at)` · `1199` Home
+scheduler and run history read; and, for Activity Today, `event_log (occurred_at)` · `1151`
+`home_alert.due_on`, the date a deadline alert is about, so one a person cleared is raised again
+when the date changes · `1199` Home
 reference data: the
 capabilities `home.team`, `home.reports` and `alerts.manage` with their role grants (and
 `alerts.clear` for Heads of Department and Managers), the `report_run` numbering scheme
@@ -161,6 +172,13 @@ other M1 modules take numbers outside them.
   `present` split into on site and remote by `employee.work_pattern`. When the register's statuses
   change, or field assignments land (a `field` status), the roster's mapping changes in the same PR
   (`tests/integration/attendance-roster.test.js` holds the two together).
+- **Read by Home** (home.md §4.1, §6 Alerts): besides the roster, Home's alert metrics
+  (`src/modules/alerts/alerts.metrics.js`) are the one other reader of `attendance_day`
+  (`employee_id`, `attendance_date`, `status = 'late'`, `first_clock_in_at`, `last_clock_out_at`,
+  `closed_at`: the `late_arrivals` metric, and `missing_clock_out` for a day still open) and
+  `attendance_exception` (`attendance_day_id`, `exception_type = 'missing_clock_out'`,
+  `attendance_event_id IS NULL`: the `missing_clock_out` metric). A change to those updates the two
+  entries in the same PR.
 - ~~Home (home.md §4): `home_report_run`, `role_kpi` (per-role tile defaults and locks), alert
   scope.~~ Built 17/10/2026 in `1150`: `home_report_run`, `role_kpi` and the personal
   `home_kpi_pick`. "Alert scope" became `home_alert.subject_employee_id`: the Alerts list is scoped by
@@ -213,9 +231,11 @@ criteria (A10), assessments, interviews, rounds, panelists and blind feedback ·
 **Owes:**
 - The final score beside the provisional one, and the AI-provisional flag.
 - **Read by Home** (home.md §4.1): `vacancy` (`vacancy_id`, `number`, `title`, `status`,
-  `department_id`, `hiring_manager_id`, `positions`, `closes_at`) through
-  `src/modules/dashboard/sources/vacancies.source.js`: update it in the same PR. Index asked by Home:
-  `vacancy (status)`.
+  `department_id`, `hiring_manager_id`, `positions`, `closes_at`), and for the Recruitment SLA alert
+  rules `application` (`application_id`, `vacancy_id`, `candidate_id`, `stage`, `status`,
+  `current_stage_entered_at`, `withdrawn_at`) with `candidate` (`candidate_id`, `first_name`,
+  `last_name`), through `src/modules/dashboard/sources/vacancies.source.js`: update it in the same PR.
+  Indexes asked by Home: `vacancy (status)`, `application (status, current_stage_entered_at)`.
 
 ### M5 Offers, Documentation & Onboarding · 5000 to 5999 · LA
 

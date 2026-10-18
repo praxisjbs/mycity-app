@@ -587,6 +587,7 @@ describe("schedules and heartbeat", () => {
       "announcement-release",
       "attendance-day-close",
       "celebrations",
+      "home-alert-sweeps",
       "import-cleanup",
       "mail-sync",
       "media-reconcile",
@@ -597,6 +598,7 @@ describe("schedules and heartbeat", () => {
   test("a schedule tick runs its sweep under the lock", async () => {
     const byName = new Map(registry.schedules().map((s) => [s.name, s]));
     expect(await byName.get("alert-ageing").run()).toEqual({ escalated: 0 });
+    expect(await byName.get("home-alert-sweeps").run()).toEqual({ rules: 0, raised: 0, refreshed: 0, skipped: 0, failed: 0 });
     expect(await byName.get("workflow-timeout").run()).toMatchObject({
       due: 0,
     });

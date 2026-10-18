@@ -314,7 +314,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | Module | Owner | Files beyond the template |
 |---|---|---|
 | `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.prompt` (when the Overview opens Attendance's clock-in panel), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
-| `alerts` | TB | |
+| `alerts` | TB | `.metrics` (the metric registry: what each of the nine metrics reads, from which module, about whom, a batch at a time), `.sweeps` (the 06:00 sweep, and one person's re-read on an attendance signal) |
 | `reports` | TB | |
 | `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, worksite and shift for a date), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
 | `devices` | LA | `.guard` |
@@ -462,7 +462,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
 | M0 | `email-send`, `pdf-render`, `notification-deliver`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
-| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `scheduled-reports`; loop `loops/mail-idle` |
+| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`; loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |
 | M4 | `assessment-expire`, `interview-feedback-reminder` | `assessment-expiry`, `interview-reminders` |
@@ -471,6 +471,11 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
 | M10 | `knowledge-embed` | |
+
+`partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's
+`home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity and budget threshold
+read through Home's source adapters, approval ageing reads the workflow tables in the metric's own SQL.
+Their stub files stay for their milestones to delete or fill.
 
 Every scheduler takes `cron-lock` so a restart overlap cannot double-fire. Every handler is
 idempotent: the outbox and BullMQ both deliver at least once.

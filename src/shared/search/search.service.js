@@ -289,8 +289,13 @@ function screenEntries(reader) {
 /** The actions this reader may take, as catalogue entries carrying their result. */
 function actionEntries(reader) {
   const can = ([module, action]) => (reader.grants[module] || []).includes(action);
+  // An action's capability is checked against the catalogue when actions.js loads; the CEO holds every one.
+  const holds = (code) => reader.is_ceo === true || reader.capabilities.includes(code);
   return ACTIONS.filter(
-    (x) => (!x.need || can(x.need)) && (!x.module || tabVisible({ module: x.module, tab: x.tab }, reader)),
+    (x) =>
+      (!x.need || can(x.need)) &&
+      (!x.capability || holds(x.capability)) &&
+      (!x.module || tabVisible({ module: x.module, tab: x.tab }, reader)),
   ).map((x) => {
     const where = x.module ? tabLabel(x.module, x.tab) : null;
     return {

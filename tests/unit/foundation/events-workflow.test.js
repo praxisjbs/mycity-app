@@ -333,6 +333,18 @@ describe("alerts", () => {
     expect(alerts.evaluate({ threshold: 80 }, "79.5")).toEqual({ breached: false, over_by: -0.5 });
     expect(alerts.ageDays({ raised_at: "2026-10-01T09:00:00Z" }, new Date("2026-10-15T08:59:00Z"))).toBe(13);
   });
+
+  test("a deadline breaches at its days left or fewer; over_by holds the days left, 0 on the day, below 0 once passed", () => {
+    expect(alerts.evaluate({ threshold: "30" }, 31, "deadline")).toEqual({ breached: false, over_by: 31 });
+    expect(alerts.evaluate({ threshold: "30" }, 30, "deadline")).toEqual({ breached: true, over_by: 30 });
+    expect(alerts.evaluate({ threshold: "30" }, 12, "deadline")).toEqual({ breached: true, over_by: 12 });
+    expect(alerts.evaluate({ threshold: "30" }, 0, "deadline")).toEqual({ breached: true, over_by: 0 });
+    expect(alerts.evaluate({ threshold: "30" }, -1, "deadline")).toEqual({ breached: true, over_by: -1 });
+    expect(alerts.evaluate({ threshold: "30" }, -5, "deadline")).toEqual({ breached: true, over_by: -5 });
+    expect(alerts.evaluate({ threshold: "3" }, 4, "count")).toEqual({ breached: true, over_by: 1 });
+    expect(() => alerts.evaluate({ threshold: "3" }, 4, "ratio")).toThrow(/count or deadline/);
+    expect(alerts.KINDS).toEqual(["count", "deadline"]);
+  });
 });
 
 describe("resource kit", () => {

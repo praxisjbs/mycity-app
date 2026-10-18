@@ -1,10 +1,10 @@
 import type { IsoDateTime, Paged, Tone, Uuid } from "./common";
 
 /**
- * INTERIM Home shapes for the tabs not yet on the real API (owner TB; docs/guides/home.md
- * §5): Alerts and Reports. The Overview, the records behind a card, the card picker and
- * Team are on the contract (packages/contract/schemas/dashboard.js) and are typed from
- * contract.gen.ts; each tab's own PR moves its keys there and deletes them here.
+ * INTERIM Home shapes for the tab not yet on the real API (owner TB; docs/guides/home.md
+ * §5): Reports. The Overview, the records behind a card, the card picker, Team and Alerts
+ * are on the contract (packages/contract/schemas/dashboard.js, alerts.js) and are typed from
+ * contract.gen.ts; Reports' own PR moves its keys there and deletes them here.
  */
 export interface HomeKpi {
   key: string;
@@ -20,41 +20,6 @@ export interface BarRow {
   value: string;
   /** "warn" draws the bar in the warning series, "brand" in yellow. */
   emphasis?: "warn" | "brand";
-}
-
-export interface HomeAlert {
-  home_alert_id: Uuid;
-  title: string;
-  trigger: string;
-  category: "attendance" | "partnership" | "approval" | "document" | "people" | "budget" | "payroll" | "recruitment";
-  who_clears: string;
-  age: string;
-  over_by: string;
-  severity: "low" | "medium" | "high";
-  raised_at: IsoDateTime;
-  link: string | null;
-}
-export interface AlertSummary {
-  kpis: HomeKpi[];
-  sources: BarRow[];
-  categories: Array<{ value: string; label: string; count: number }>;
-}
-export interface AlertRule {
-  home_alert_rule_id: Uuid;
-  name: string;
-  metric: string;
-  example: string;
-  threshold: number;
-  window_days: number;
-  severity: "low" | "medium" | "high";
-  enabled: boolean;
-}
-export interface AlertRuleBody {
-  name: string;
-  metric: string;
-  threshold: number;
-  window_days: number;
-  severity: "low" | "medium" | "high";
 }
 
 export interface HomeReport {
@@ -87,12 +52,6 @@ type Q<T = object> = T & { page?: number; q?: string };
 
 declare module "@/api/endpoints" {
   interface Endpoints {
-    "GET /api/v1/home/alerts": { query: Q<{ category?: string }>; body: never; params: never; response: Paged<HomeAlert> };
-    "GET /api/v1/home/alerts/summary": { query: never; body: never; params: never; response: AlertSummary };
-    "POST /api/v1/home/alerts/:id/clear": { query: never; body: { outcome: "cleared" | "dismissed"; note?: string }; params: { id: string }; response: HomeAlert };
-    "GET /api/v1/home/alert-rules": { query: Q; body: never; params: never; response: Paged<AlertRule> };
-    "POST /api/v1/home/alert-rules": { query: never; body: AlertRuleBody; params: never; response: AlertRule };
-    "PATCH /api/v1/home/alert-rules/:id": { query: never; body: Partial<AlertRuleBody> & { enabled?: boolean }; params: { id: string }; response: AlertRule };
     "GET /api/v1/home/reports": { query: Q; body: never; params: never; response: Paged<HomeReport> };
     "GET /api/v1/home/reports/summary": { query: never; body: never; params: never; response: ReportSummary };
     "POST /api/v1/home/reports": { query: never; body: ReportBody; params: never; response: HomeReport };

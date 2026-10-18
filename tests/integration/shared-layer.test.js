@@ -492,6 +492,233 @@ describeDb("shared layer against Postgres", () => {
       const n = await one("SELECT title, priority FROM notification WHERE event_key = 'home.alert_escalated' AND user_id = $1", [people.ada.user_id]);
       expect(n).toEqual({ title: "Escalated alert: Chidi Eze: late arrivals", priority: "high" });
     });
+
+    test("clearing needs the grant's scope to reach the person the alert is about", async () => {
+      const about = (who) => (who ? people[who].employee_id : null);
+      await tx((c) =>
+        alerts.raise(c, {
+          rule,
+          subject: { type: "employee", id: people.eze.employee_id },
+          value: 3,
+          title: "Eze Uche: late arrivals",
+          subject_employee_id: people.eze.employee_id,
+        }),
+      );
+      const may = (who, subject) => tx((c) => alerts.mayClear(c, people[who], rule, subject));
+      expect(await may("bola", about("chidi"))).toBe(true);
+      expect(await may("bola", about("eze"))).toBe(false);
+      expect(await may("bola", null)).toBe(false);
+      expect(await may("bola", undefined)).toBe(true);
+      expect(await may("dayo", about("eze"))).toBe(true);
+      expect(await may("dayo", null)).toBe(true);
+      expect(await may("eze", about("eze"))).toBe(false);
+      expect(await may("ada", null)).toBe(true);
+      // Nobody but the CEO clears an alert about themselves, whatever their scope reaches.
+      expect(await may("bola", about("bola"))).toBe(false);
+      expect(await may("dayo", about("dayo"))).toBe(false);
+      expect(await may("ada", about("ada"))).toBe(true);
+
+      const { home_alert_id: id } = await one(
+        "SELECT home_alert_id FROM home_alert WHERE subject_id = $1 AND cleared_at IS NULL",
+        [people.eze.employee_id],
+      );
+      await expect(tx((c) => alerts.clear(c, { alert_id: id, actor: people.bola }))).rejects.toMatchObject({ status: 403 });
+      expect((await tx((c) => alerts.clear(c, { alert_id: id, actor: people.dayo, outcome: "dismissed" }))).outcome).toBe(
+        "dismissed",
+      );
+    });
+
+    test("a breach a person already closed is not raised again for the same evidence; newer evidence raises it", async () => {
+      const subject = { type: "employee", id: people.dayo.employee_id };
+      const seen = (since) =>
+        tx((c) =>
+          alerts.raise(c, { rule, subject, value: 4, title: "Dayo Ola: late arrivals", subject_employee_id: subject.id, since }),
+        );
+      const evidence = new Date(Date.now() - 3_600_000);
+      expect((await seen(evidence)).created).toBe(true);
+      expect(await seen(evidence)).toMatchObject({ raised: true, created: false });
+      const { home_alert_id: id } = await one("SELECT home_alert_id FROM home_alert WHERE subject_id = $1 AND cleared_at IS NULL", [
+        subject.id,
+      ]);
+      await expect(tx((c) => alerts.clear(c, { alert_id: id, actor: people.dayo }))).rejects.toMatchObject({ status: 403 });
+      await tx((c) => alerts.clear(c, { alert_id: id, actor: people.ada }));
+      expect(await seen(evidence)).toEqual({ raised: false, created: false, alert: null });
+      expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE subject_id = $1", [subject.id])).n).toBe(1);
+      expect((await seen(new Date(Date.now() + 1000))).created).toBe(true);
+      expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE subject_id = $1", [subject.id])).n).toBe(2);
+    });
+
+    test("a deadline breaches at its days left or fewer and keeps the days left: 0 on the day, below 0 once passed", async () => {
+      await q(
+        `INSERT INTO home_alert_rule (key, name, metric, threshold, severity, permission_key)
+         VALUES ('document_expiry.engine', 'Documents Expiring', 'document_expiry', 30, 'medium', 'people.edit')`,
+      );
+      const deadline = await tx((c) => alerts.ruleByKey(c, "document_expiry.engine"));
+      const days = (value) =>
+        tx((c) =>
+          alerts.raise(c, {
+            rule: deadline,
+            subject: { type: "document", id: "passport-chidi" },
+            value,
+            kind: "deadline",
+            title: "Chidi Eze: Passport",
+            subject_employee_id: people.chidi.employee_id,
+          }),
+        );
+      expect((await days(31)).raised).toBe(false);
+      expect((await days(12)).alert.over_by).toBe("12.00");
+      expect((await days(0)).alert.over_by).toBe("0.00");
+      expect((await days(-4)).alert).toMatchObject({ over_by: "-4.00", subject_employee_id: people.chidi.employee_id });
+      expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE subject_id = 'passport-chidi'")).n).toBe(1);
+    });
+
+    test("switching a rule off dismisses its open alerts as the rule change, once, needing no clearing right", async () => {
+      const { home_alert_rule_id: ruleId } = await one(
+        `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key)
+         VALUES ('missing_clock_out.engine', 'Missing Clock-Outs', 'missing_clock_out', 2, 30, 'low', 'people.approve')
+         RETURNING home_alert_rule_id`,
+      );
+      const off = await tx((c) => alerts.ruleByKey(c, "missing_clock_out.engine"));
+      for (const who of ["chidi", "eze", "dayo"])
+        await tx((c) =>
+          alerts.raise(c, {
+            rule: off,
+            subject: { type: "employee", id: people[who].employee_id },
+            value: 2,
+            title: `${who}: missing clock-outs`,
+            subject_employee_id: people[who].employee_id,
+          }),
+        );
+      const { home_alert_id: done } = await one(
+        "SELECT home_alert_id FROM home_alert WHERE home_alert_rule_id = $1 AND subject_id = $2",
+        [ruleId, people.dayo.employee_id],
+      );
+      await tx((c) => alerts.clear(c, { alert_id: done, actor: people.ada }));
+
+      await expect(alerts.closeForRule(pool, { rule_id: ruleId, actor: people.eze })).rejects.toThrow(/atomically/);
+      expect(await tx((c) => alerts.closeForRule(c, { rule_id: ruleId, actor: people.eze }))).toBe(2);
+      expect(await tx((c) => alerts.closeForRule(c, { rule_id: ruleId, actor: people.eze }))).toBe(0);
+      const { rows } = await q(
+        "SELECT outcome, note, cleared_by FROM home_alert WHERE home_alert_rule_id = $1 ORDER BY outcome, note NULLS FIRST",
+        [ruleId],
+      );
+      expect(rows).toEqual([
+        { outcome: "cleared", note: null, cleared_by: people.ada.user_id },
+        { outcome: "dismissed", note: "Rule switched off", cleared_by: null },
+        { outcome: "dismissed", note: "Rule switched off", cleared_by: null },
+      ]);
+      const audited = await q(
+        `SELECT payload->>'outcome' AS outcome, payload->>'rule_off' AS rule_off, actor_user_id FROM event_log
+          WHERE event_key = 'home.alert_cleared' AND payload->>'rule_key' = 'missing_clock_out.engine'
+          ORDER BY occurred_at`,
+      );
+      expect(audited.rows).toEqual([
+        { outcome: "cleared", rule_off: null, actor_user_id: people.ada.user_id },
+        { outcome: "dismissed", rule_off: "true", actor_user_id: people.eze.user_id },
+        { outcome: "dismissed", rule_off: "true", actor_user_id: people.eze.user_id },
+      ]);
+
+      // Switched back on, what still breaches is raised again; what a person cleared is not.
+      const again = (who) =>
+        tx((c) =>
+          alerts.raise(c, {
+            rule: off,
+            subject: { type: "employee", id: people[who].employee_id },
+            value: 2,
+            title: `${who}: missing clock-outs`,
+            subject_employee_id: people[who].employee_id,
+            since: new Date(Date.now() - 86_400_000),
+          }),
+        );
+      expect((await again("chidi")).created).toBe(true);
+      expect((await again("dayo")).raised).toBe(false);
+    });
+
+    test("a raise reads its rule again: a switch-off saved first wins over the rule a sweep loaded before it", async () => {
+      const { home_alert_rule_id: ruleId } = await one(
+        `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key)
+         VALUES ('late_arrivals.stale', 'Late Arrivals', 'late_arrivals', 3, 30, 'medium', 'people.approve')
+         RETURNING home_alert_rule_id`,
+      );
+      // The rule as a sweep loaded it, switched on.
+      const stale = await tx((c) => alerts.ruleByKey(c, "late_arrivals.stale"));
+      const raiseStale = () =>
+        tx((c) =>
+          alerts.raise(c, {
+            rule: stale,
+            subject: { type: "employee", id: people.eze.employee_id },
+            value: 4,
+            title: "Eze Uche: late arrivals",
+            subject_employee_id: people.eze.employee_id,
+          }),
+        );
+      // Switching it off, held as Home's rule change holds it: the raise waits, then reads it off.
+      const off = await pool.connect();
+      try {
+        await off.query("BEGIN");
+        await off.query("SELECT 1 FROM home_alert_rule WHERE home_alert_rule_id = $1 FOR UPDATE", [ruleId]);
+        await off.query("UPDATE home_alert_rule SET enabled = false WHERE home_alert_rule_id = $1", [ruleId]);
+        const raising = raiseStale();
+        await off.query("COMMIT");
+        expect(await raising).toEqual({ raised: false, created: false, alert: null });
+      } finally {
+        off.release();
+      }
+      expect(await raiseStale()).toEqual({ raised: false, created: false, alert: null });
+      expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE home_alert_rule_id = $1", [ruleId])).n).toBe(0);
+    });
+
+    test("a deadline a person cleared is dealt with for its date only", async () => {
+      const deadline = await tx((c) => alerts.ruleByKey(c, "document_expiry.engine"));
+      const subject = { type: "document", id: "contract-dayo" };
+      const due = (dueOn) =>
+        tx((c) =>
+          alerts.raise(c, {
+            rule: deadline,
+            subject,
+            value: 10,
+            kind: "deadline",
+            title: "Dayo Ola: Contract",
+            subject_employee_id: people.dayo.employee_id,
+            since: new Date(Date.now() - 86_400_000),
+            due_on: dueOn,
+          }),
+        );
+      const first = await due("2026-12-01");
+      expect(first.alert.due_on).toBeTruthy();
+      await tx((c) => alerts.clear(c, { alert_id: first.alert.home_alert_id, actor: people.ada }));
+      expect((await due("2026-12-01")).raised).toBe(false);
+      expect((await due("2026-11-20")).created).toBe(true);
+    });
+
+    test("a date that moves away and back is new evidence, though a person cleared it before", async () => {
+      const deadline = await tx((c) => alerts.ruleByKey(c, "document_expiry.engine"));
+      const subject = { type: "document", id: "licence-dayo" };
+      const due = (dueOn) =>
+        tx((c) =>
+          alerts.raise(c, {
+            rule: deadline,
+            subject,
+            value: 10,
+            kind: "deadline",
+            title: "Dayo Ola: Licence",
+            subject_employee_id: people.dayo.employee_id,
+            since: new Date(Date.now() - 86_400_000),
+            due_on: dueOn,
+          }),
+        );
+      const clear = (raised) => tx((c) => alerts.clear(c, { alert_id: raised.alert.home_alert_id, actor: people.ada }));
+      // A, cleared; then B, cleared; then back to A: the date changed, so it is raised again.
+      await clear(await due("2026-12-01"));
+      await clear(await due("2026-11-20"));
+      const back = await due("2026-12-01");
+      expect(back).toMatchObject({ raised: true, created: true });
+      expect(back.alert.due_on).toBeTruthy();
+      // Cleared again, the same date is the same evidence.
+      await clear(back);
+      expect(await due("2026-12-01")).toEqual({ raised: false, created: false, alert: null });
+      expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE subject_id = 'licence-dayo'")).n).toBe(3);
+    });
   });
 
   describe("field masking", () => {

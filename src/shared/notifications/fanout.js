@@ -467,8 +467,24 @@ defineNotification(WORKFLOW.WORKFLOW_CANCELLED, {
   body: "The requester withdrew this before it was decided.",
 });
 
+/**
+ * The holders of an alert rule's grant over the person the alert is about, never that person:
+ * nobody but the CEO sees or clears an alert about themselves (shared/alerts mayClear).
+ */
+async function alertClearers(event, client) {
+  const subject = subjectOf(event);
+  const holders = await permissionHolders(client, event.payload.clear_permission, subject);
+  if (!subject) return holders;
+  const { rows } = await client.query(
+    "SELECT user_id FROM app_user WHERE employee_id = $1::uuid AND is_ceo IS NOT TRUE",
+    [subject],
+  );
+  const own = new Set(rows.map((r) => r.user_id));
+  return holders.filter((id) => !own.has(id));
+}
+
 defineNotification(ALERTS.HOME_ALERT_RAISED, {
-  to: [{ permission: (e) => e.payload.clear_permission }],
+  to: [{ users: alertClearers }],
   title: (e) => `Alert: ${e.payload.title}`,
   body: (e) => e.payload.trigger || "",
   priority: "normal",

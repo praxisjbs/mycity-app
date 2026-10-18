@@ -1,18 +1,15 @@
-import { useEffect, useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import type { AlertRule, HomeAlert, HomeReport } from "@/api/types/home";
+import type { HomeReport } from "@/api/types/home";
 import { useMe } from "@/auth/AuthProvider";
-import { useRouter, useSearchParams } from "@/lib/router";
-import { hasCapability } from "@/shell/access";
 import { useUrlAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { mayUseTab } from "./access";
-import { InfoCard, KpiRow } from "./blocks";
+import { Alerts } from "./Alerts";
+import { KpiRow } from "./blocks";
 import { Gated } from "./Gated";
 import { Overview } from "./Overview";
 import { Team } from "./Team";
-import { toBars } from "@/features/shared/wire";
-import { Bars, Button, Card, Chips, DataView, ErrorState, Field, formatDateTime, FormFooter, Grid, Grow, KeyValue, PageHeader, Pager, Pill, rules, SelectField, TextField, Tile, toast, ToggleRow, useContractForm, useModal } from "@mycity/ui";
+import { Button, DataView, ErrorState, Field, formatDateTime, FormFooter, Grid, PageHeader, Pager, Pill, rules, SelectField, TextField, Tile, toast, useContractForm, useModal } from "@mycity/ui";
 
 /**
  * Home (docs/guides/home.md §2): Overview for every employee, and Team, Alerts and Reports for
@@ -22,180 +19,9 @@ import { Bars, Button, Card, Chips, DataView, ErrorState, Field, formatDateTime,
 export default function Home({ tab, id }: ModuleScreenProps) {
   const me = useMe();
   if (tab === "team") return mayUseTab(me, "team") ? <Team /> : <Gated title="Team" />;
-  if (tab === "alerts") return mayUseTab(me, "alerts") ? <Alerts openId={id} /> : <Gated title="Alerts" />;
+  if (tab === "alerts") return mayUseTab(me, "alerts") ? <Alerts linked={id} /> : <Gated title="Alerts" />;
   if (tab === "reports") return mayUseTab(me, "reports") ? <Reports /> : <Gated title="Reports" />;
   return <Overview linked={id} />;
-}
-
-const SEV = { high: ["err", "High"], medium: ["warn", "Medium"], low: ["info", "Low"] } as const;
-
-function Alerts({ openId }: { openId: string | null }) {
-  const me = useMe();
-  const modal = useModal();
-  const [, setParams] = useSearchParams();
-  const summary = useApi("GET /api/v1/home/alerts/summary");
-  const [cat, setCat] = useState("all");
-  const list = usePaged("GET /api/v1/home/alerts", { filters: cat === "all" ? {} : { category: cat } });
-  const manage = hasCapability(me, "alerts.manage");
-  const openNewRule = () => modal.open({ title: "New Alert Rule", body: (close) => <RuleForm close={close} /> });
-  /* Home's New opens this tab asking for a new rule. */
-  useUrlAction("new", manage ? openNewRule : null);
-
-  const openAlert = (a: HomeAlert) => modal.open({ title: "Alert", body: (close) => <AlertDetail alert={a} close={close} />, onClose: () => setParams({ id: null }, { replace: true }) });
-  useEffect(() => {
-    if (!openId) return;
-    const a = list.rows.find((r) => r.home_alert_id === openId);
-    if (a) openAlert(a);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openId, list.rows.length]);
-
-  return (
-    <>
-      <PageHeader
-        title="Alerts"
-        sub="Thresholds crossed and not yet cleared"
-        actions={
-          manage && (
-            <>
-              <Button onClick={() => modal.open({ title: "Alert Rules", wide: true, body: <RuleList /> })}>Alert Rules</Button>
-              <Button variant="primary" icon="plus" onClick={openNewRule}>
-                New Rule
-              </Button>
-            </>
-          )
-        }
-      />
-      {summary.data && <KpiRow items={summary.data.kpis} />}
-      {summary.data && (
-        <Chips value={cat} onChange={setCat} options={[["all", `All ${summary.data.categories.reduce((a, c) => a + c.count, 0)}`], ...summary.data.categories.map((c) => [c.value, c.label] as [string, string])]} />
-      )}
-      <DataView
-        title="Open Alerts"
-        right={list.page && <Pill tone="warn">{`${list.page.total} open`}</Pill>}
-        rows={list.rows}
-        rowKey={(r) => r.home_alert_id}
-        loading={list.loading}
-        error={list.error}
-        onRowClick={(a) => (setParams({ id: a.home_alert_id }, { replace: true }), openAlert(a))}
-        empty={{ title: "No Open Alerts", text: "Everything that needed action has been dealt with." }}
-        columns={[
-          { key: "a", label: "Alert", render: (r) => r.title },
-          { key: "t", label: "Trigger", desktop: true, render: (r) => r.trigger },
-          { key: "w", label: "Who Can Clear", desktop: true, render: (r) => r.who_clears },
-          { key: "g", label: "Age", render: (r) => r.age },
-          { key: "o", label: "Over By", render: (r) => <span className="inline-block rounded-full bg-warning-soft px-2 py-0.5 text-2xs font-semibold whitespace-nowrap text-warning">{r.over_by}</span> },
-          { key: "s", label: "Severity", render: (r) => <Pill tone={SEV[r.severity][0]}>{SEV[r.severity][1]}</Pill> },
-        ]}
-        footer={<Pager page={list.page} onPage={list.setPage} noun="alert" />}
-      />
-      <Grid cols={2} className="mt-3">
-        {summary.data && (
-          <InfoCard title="Alerts by Source">
-            <Bars rows={toBars(summary.data.sources)} />
-          </InfoCard>
-        )}
-      </Grid>
-    </>
-  );
-}
-
-function AlertDetail({ alert, close }: { alert: HomeAlert; close: () => void }) {
-  const clear = useMutation("POST /api/v1/home/alerts/:id/clear");
-  const { navigate } = useRouter();
-  const act = async (outcome: "cleared" | "dismissed") => {
-    await clear.run({ params: { id: alert.home_alert_id }, body: { outcome } });
-    invalidate("/api/v1/home/alerts");
-    close();
-    toast(outcome === "cleared" ? "Alert cleared, logged against you." : "Alert dismissed, logged against you.");
-  };
-  return (
-    <>
-      <h3 data-copy="content" className="mb-2 text-md">{alert.title}</h3>
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        <Pill tone={SEV[alert.severity][0]}>{SEV[alert.severity][1]}</Pill>
-        <Pill>{alert.trigger}</Pill>
-        <Pill tone="warn">{`Over ${alert.over_by}`}</Pill>
-      </div>
-      <Card>
-        <KeyValue items={[["Trigger", alert.trigger], ["Who can clear", alert.who_clears], ["Raised", formatDateTime(alert.raised_at)], ["Over threshold", alert.over_by]]} />
-      </Card>
-      <FormFooter>
-        {alert.link && <Button onClick={() => (close(), navigate(alert.link!))}>Open Record</Button>}
-        <Grow />
-        <Button busy={clear.pending} onClick={() => act("dismissed")}>Dismiss</Button>
-        <Button variant="primary" busy={clear.pending} onClick={() => act("cleared")}>
-          Clear This Alert
-        </Button>
-      </FormFooter>
-    </>
-  );
-}
-
-function RuleList() {
-  const list = usePaged("GET /api/v1/home/alert-rules");
-  const patch = useMutation("PATCH /api/v1/home/alert-rules/:id");
-  const toggle = async (r: AlertRule, enabled: boolean) => {
-    await patch.run({ params: { id: r.home_alert_rule_id }, body: { enabled } });
-    list.reload();
-    toast(enabled ? "Rule enabled" : "Rule disabled, its alerts stop");
-  };
-  if (list.error) return <ErrorState error={list.error} />;
-  return (
-    <>
-      {list.rows.map((r) => (
-        <ToggleRow key={r.home_alert_rule_id} title={r.name} text={r.example} checked={r.enabled} onChange={(v) => toggle(r, v)} />
-      ))}
-      <Pager page={list.page} onPage={list.setPage} noun="rule" className="px-0" />
-    </>
-  );
-}
-
-const METRICS: Array<[string, string]> = [["late_arrivals", "Late arrivals"], ["inactivity", "Partnership inactivity"], ["approval_ageing", "Approval ageing"], ["document_expiry", "Document expiry"], ["budget", "Budget threshold"]];
-
-function RuleForm({ close }: { close: () => void }) {
-  const f = useContractForm(
-    { name: "", metric: "late_arrivals", threshold: "", window_days: "30", severity: "medium" },
-    { name: rules.required("Name the rule"), threshold: (v) => (/^\d+$/.test(v) ? null : "A whole number"), window_days: (v) => (/^\d+$/.test(v) && Number(v) > 0 ? null : "Days, above 0") },
-  );
-  const save = useMutation("POST /api/v1/home/alert-rules");
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      await save.run({ body: { name: f.values.name, metric: f.values.metric, threshold: Number(f.values.threshold), window_days: Number(f.values.window_days), severity: f.values.severity as "medium" } });
-      invalidate("/api/v1/home/alert-rules");
-      close();
-      toast("Alert rule created. It runs next cycle.");
-    } catch {
-      f.setServerErrors(save.fields);
-    }
-  };
-  return (
-    <>
-      <Field label="Rule Name" {...f.field("name")} htmlFor="rn">
-        <TextField id="rn" placeholder="3 lates monthly" {...f.field("name")} />
-      </Field>
-      <Field label="Metric">
-        <SelectField options={METRICS} {...f.field("metric")} />
-      </Field>
-      <>
-        <Field label="Threshold" {...f.field("threshold")}>
-          <TextField inputMode="numeric" placeholder="3" {...f.field("threshold")} />
-        </Field>
-        <Field label="Window, Days" {...f.field("window_days")}>
-          <TextField inputMode="numeric" {...f.field("window_days")} />
-        </Field>
-      </>
-      <Field label="Severity" info="High severity escalates to the CEO after 14 days.">
-        <SelectField options={[["low", "Low"], ["medium", "Medium"], ["high", "High"]]} {...f.field("severity")} />
-      </Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>
-          Create Rule
-        </Button>
-      </FormFooter>
-    </>
-  );
 }
 
 const RSTATUS = { scheduled: ["ok", "Scheduled"], paused: ["neutral", "Paused"], on_demand: ["info", "On demand"] } as const;
