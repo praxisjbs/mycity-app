@@ -2558,10 +2558,10 @@ Pick one of two to five options shown as stacked rows, each with an optional gly
 
 | | |
 |---|---|
-| Use | Two to five options a person should read side by side before choosing, each worth a full row or a small glyph: an access level, a leave type, a pay basis. |
+| Use | Two to five options a person should read together before choosing, each worth a full row or a small glyph: an access level, a leave type, a pay basis. |
 | Avoid | Short options that fit one line (use ChoiceField); more than five (use SelectField); a yes or no (use CheckboxField or Switch); a setting that applies at once (use Switch). |
 | Phone | Every row is full width and 52 px tall (44 px on desktop), so each option is its own thumb target; the rows stack and never scroll sideways. |
-| Accessibility | A radio group with arrow-key movement; each row is a radio named by its words, and the glyph is hidden so it is never read twice. Inside a Field the error is linked; alone, pass label. |
+| Accessibility | A radio group with arrow-key movement; each row is a radio named by its words, and the glyph is hidden so it is never read twice. Inside a Field its label names the group and the error is linked; alone, pass label. |
 | Status | stable |
 | Exports | `RadioCards` |
 | Import | `import { RadioCards } from "@mycity/ui";` |
@@ -2583,7 +2583,7 @@ Pick one of two to five options shown as stacked rows, each with an optional gly
 | `className` | `string` |  | Layout classes only. |
 
 ```tsx
-<RadioCards options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]} {...form.field("payroll_access")} />
+<Field label="Payroll Access" {...form.status("payroll_access")}><RadioCards options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]} {...form.field("payroll_access")} /></Field>
 <RadioCards label="Payroll Access" value={level} onChange={setLevel} options={levels.map((l) => ({ value: l.code, label: l.name, leading: <LevelMeter value={l.rank} label={l.name} decorative /> }))} />
 ```
 

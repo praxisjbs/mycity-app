@@ -48,7 +48,7 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 mycity-app/
 ├── app/                      staff React + Vite app (frontend team), served at hub.mycityapp.io
 ├── public-app/               public React + Vite app (frontend team), served at go.mycityapp.io
-├── packages/ui/              @mycity/ui: the one design system both apps import. 157 components in
+├── packages/ui/              @mycity/ui: the one design system both apps import. 161 components in
 │                             groups: Foundations, Actions, Layout, Display, Navigation, Overlays,
 │                             Help, Feedback, Forms, Data (DataView, Kanban, Calendar), Charts,
 │                             Documents, Maps and Shell; plus the tokens, the form system, the data

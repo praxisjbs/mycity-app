@@ -70,11 +70,17 @@ describe("RadioCards", () => {
     expect(onChange).toHaveBeenCalledTimes(2);
   });
 
-  it("has nothing checked while the value is null, and stays controlled once one is chosen", () => {
+  it("has nothing checked while the value is null, and stays controlled once one is chosen", async () => {
+    const user = userEvent.setup();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const { rerender } = render(<RadioCards label="Performance Access" value={null} onChange={() => undefined} options={levels} />);
+    const onChange = vi.fn();
+    const { rerender } = render(<RadioCards label="Performance Access" value={null} onChange={onChange} options={levels} />);
     for (const radio of screen.getAllByRole("radio")) expect(radio).not.toBeChecked();
-    rerender(<RadioCards label="Performance Access" value="full" onChange={() => undefined} options={levels} />);
+    /* The value is the caller's: a choice the caller does not take leaves nothing checked. */
+    await user.click(screen.getByRole("radio", { name: "View" }));
+    expect(onChange).toHaveBeenCalledWith("view");
+    for (const radio of screen.getAllByRole("radio")) expect(radio).not.toBeChecked();
+    rerender(<RadioCards label="Performance Access" value="full" onChange={onChange} options={levels} />);
     expect(screen.getByRole("radio", { name: "Full" })).toBeChecked();
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
@@ -115,13 +121,13 @@ describe("RadioCards", () => {
     expect(onBlur).toHaveBeenCalledTimes(1);
   });
 
-  it("takes the bad state and its error from the Field", () => {
+  it("is named by the Field label and takes the bad state and its error from the Field", () => {
     render(
       <Field label="Payroll Access" state="bad" message="Choose a level">
         <RadioCards value={null} onChange={() => undefined} options={levels} />
       </Field>,
     );
-    const group = screen.getByRole("radiogroup");
+    const group = screen.getByRole("radiogroup", { name: "Payroll Access" });
     expect(group).toHaveAttribute("aria-invalid", "true");
     expect(group.className).toContain("border-destructive");
     const error = screen.getByText("Choose a level").closest("p")!;
