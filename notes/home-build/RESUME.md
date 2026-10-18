@@ -57,3 +57,11 @@ To resume (same session): Workflow resumeFromRunId wf_e1b9c371-2d7 (review, scri
   re-run those scripts (args are in the files' callers: repo /home/user/mycity-pr4, base 92f815f; PR 5 worktree
   from m1/home-alerts).
 Then: fix confirmed findings, CI, open PR 3 (base m1/home-overview) and PR 4 (base m1/home-team), finish PR 5.
+
+## Resumed 18/10/2026 morning
+- PR 2 reached main through #59 (#57 had merged into m1/home-foundation, not main). main = PR 1 + PR 2 + #58 (Roles).
+- From now on each Home PR targets main (GitHub CI runs only on PRs to main) and is merged by Claude once green (owner's
+  instruction: "You are supposed to merge please. Using my admin rights.").
+- PR 3/4 review: 19 confirmed (notes/home-build/pr34-review-confirmed.json); fixes running (workflow wf_179d92fb-06f):
+  self-clearing excluded (CEO excepted), deadline today vs expired, evidence keys, ?rule= deep link, Team test flake, docs.
+- PR 5 built (backend, Reports tab, staging seed), integrated (PROGRESS #3 Built), under review (wf_9ae5febb-69d).
