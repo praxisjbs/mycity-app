@@ -16,9 +16,16 @@ describe("SearchInput and FilterSelect", () => {
   it("FilterSelect has a visible label and sends the value", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(<FilterSelect label="Status" value="" onChange={onChange} options={[["", "All"], ["late", "Late"]]} />);
-    await user.selectOptions(screen.getByLabelText("Status"), "Late");
+    const { rerender } = render(<FilterSelect label="Status" value="" onChange={onChange} options={[["", "All"], ["late", "Late"]]} />);
+    const button = screen.getByRole("combobox", { name: "Status" });
+    expect(button).toHaveTextContent("All");
+    await user.click(button);
+    await user.click(screen.getByRole("option", { name: "Late" }));
     expect(onChange).toHaveBeenCalledWith("late");
+    rerender(<FilterSelect label="Status" value="late" onChange={onChange} options={[["", "All"], ["late", "Late"]]} />);
+    await user.click(screen.getByRole("combobox", { name: "Status" }));
+    await user.click(screen.getByRole("option", { name: "All" }));
+    expect(onChange).toHaveBeenLastCalledWith("");
   });
 
   it("has no accessibility violations", async () => {

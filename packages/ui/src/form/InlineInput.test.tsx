@@ -24,7 +24,8 @@ describe("Inline controls", () => {
         <InlineSelect id="who" value="a" onChange={onChange} options={["a", ["b", "Bola"]]} />
       </div>,
     );
-    await user.selectOptions(screen.getByLabelText("To"), "Bola");
+    await user.click(screen.getByRole("combobox", { name: "To" }));
+    await user.click(screen.getByRole("option", { name: "Bola" }));
     expect(onChange).toHaveBeenCalledWith("b");
   });
 

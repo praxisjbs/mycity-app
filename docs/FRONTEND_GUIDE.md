@@ -6,12 +6,13 @@ React apps: the staff app (`app/`, `hub.mycityapp.io`) and the public site (`pub
 
 Status: **the rules here are settled. The foundation (§9) is one design system for both apps,
 `packages/ui` (`@mycity/ui`), owned by AJ (Adole Jerome), backup TB.** It is built in three PRs
-planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F24 are binding: where this guide
+planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F25 are binding: where this guide
 and that file differ, that file wins and this one is fixed. Started 13 October 2026 from
 MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and §8 rewritten 14 October
 2026 into the screen content, two shells and form conventions; §1 to §3, §6, §9, §10 and §11
 rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8 brought into line;
-§1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell).
+§1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell); §8.8 and gate 21
+(nothing the browser styles itself, F25) added 18 October 2026.
 If something here is wrong or missing, fix the guide in the same PR as the code.
 
 **Feature guides are full-stack guides.** A guide in `docs/guides/` covers the backend modules,
@@ -33,7 +34,7 @@ the client has already accepted.
 Guides lead, gates confirm (F9). Every builder, person or AI, starts here, so the gates in §10
 confirm work that was built right instead of rejecting it at the end.
 
-1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F24 and where each foundation PR
+1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F25 and where each foundation PR
    stands. Then **read `docs/COMPONENTS.md`**, the catalogue of every shared component: what it is
    for, when not to use it, its props and how it behaves on a phone. It is generated from the code
    (`npm run gen:components`), so it is never out of date.
@@ -372,8 +373,10 @@ element outside the form components (§8.6).
   needs explaining, its label is a help term (§5.2).
 - **Placeholders** are a format example of at most 3 words, never an instruction and never the
   label.
-- **Choices**: up to 5 options as a segmented control or radio cards; more than 5 as a searchable
-  select; yes or no as a checkbox inside a form, or a switch for a setting that applies at once.
+- **Choices**: up to 5 options as a segmented control or radio cards; more than 5 as `SelectField`
+  (our branded list: a listbox under the button on desktop, a bottom sheet of 44 px rows on a phone,
+  never the browser's or the phone's own picker, §8.8); yes or no as a checkbox inside a form, or a
+  switch for a setting that applies at once.
 - **Typed fields, never plain text**: dates through the date field (day-first, gate 15), money
   through the money field (`shared/money`, gate 20), files through the upload engine (gate 18),
   people and records through the server-searching picker (§4).
@@ -418,7 +421,7 @@ The form system lives in **`packages/ui/src/form/`**, for both apps. It is the *
 `<form>`, `<input>`, `<select>`, `<textarea>` or `<label>` may appear, and the only place that
 imports `react-hook-form`. Features import its parts from `@mycity/ui`: `Form`, `Field`,
 `TextField`, `PasswordField`, `NumberField`, `DateField`, `DateRangeField`, `TimeField`,
-`MoneyField`, `PhoneField`, `SelectField`, `ChoiceField`, `CheckboxField`, `Switch`, `ToggleRow`,
+`MoneyField`, `PhoneField`, `SelectField`, `ChoiceField`, `SelectMenu`, `CheckboxField`, `Switch`, `ToggleRow`,
 `TextAreaField`, `SearchInput`, `FilterSelect`, `LoginField`, `OtpField`, `FormFooter`, `FormError`,
 `Wizard`, `InlineInput`, `InlineSelect`, `InlineLabel`, and the hook `useContractForm(initial, rules)`. PR 3 added `UploadField` (the
 only file input in the product), `PersonPicker` and `RecordPicker` (both searching the server, 25 at a
@@ -460,6 +463,35 @@ in `packages/ui`, approved by AJ (backup TB). Never build it inside a feature.
   look right on both. The in-browser mock exists only on laptops and in CI (F12, §9.5).
 - **AI deep links.** The assistant answers with links to screens ("Create Task"). Every screen
   that a write can be routed to accepts its prefill from the URL.
+
+### 8.8 Nothing the browser styles itself (gate 21)
+
+The brand holds everywhere, on both shells: **no part of a screen is drawn by the browser or the
+phone in its own style** (FRONTEND_FOUNDATION F25). A grey native picker opening over a branded
+sheet, a yellow autofill box, a browser tooltip or a validation bubble is a defect, never a detail.
+There are no exemptions, `packages/ui` included.
+
+| Never | Always |
+|---|---|
+| `<select>`, `<option>`, `<datalist>`, the phone's own picker | `SelectField`, `FilterSelect`, `InlineSelect` (all `SelectMenu`: a Radix listbox on desktop, a bottom sheet on a phone); `ChoiceField` for 2 to 5 options; `PersonPicker`, `RecordPicker` for server lists |
+| `<input type>` date, time, month, week, number, range, color, checkbox, radio | `DateField`, `DateRangeField`, `TimeField`, `NumberField`, `MoneyField`, `CheckboxField`, `Switch`, `ChoiceField`, `Tick` |
+| `<progress>`, `<meter>`, `<dialog>` | `ProgressBar`, `LevelMeter`, `Modal`, `Sheet`, `ConfirmDialog` |
+| A `title` attribute (the browser's tooltip), a Leaflet marker's `title` | `Tooltip` (`IconButton` draws one from its `label`); a marker's `bindTooltip` with the `map-tip` class |
+| A `<form>` without `noValidate`, the browser's "Please fill in this field" | `Form` (`noValidate`, errors on the field, §8.3) |
+| `alert`, `confirm`, `prompt` (gate 16) | `useConfirm`, `ConfirmDialog`, `toast` |
+| `sonner` imported in a feature, a toast styled by the library | `toast` and `Toaster` from `@mycity/ui` (unstyled sonner, our classes and icons) |
+
+What the browser would still draw on our own controls is reset once, in
+`packages/ui/src/styles/base.css`: control `appearance`, number spinners, the search clear button,
+the date picker icon, the password reveal and autofill key buttons, the autofill tint, Firefox's
+invalid glow, the tap flash on a phone, the text selection colour, `accent-color` and
+`caret-color` (all from tokens). Scrollbars were already thin and tinted there.
+
+`scripts/check/native-ui.js` refuses each "Never" in the source of `packages/ui`, `app` and
+`public-app`, and crawls every gallery page and every app screen at phone and desktop size
+(`lib/screens.js`) for a visible native element, a `title`, a form without `novalidate`, a control
+whose computed `appearance` is not `none`, and a toast sonner styled. A control the set lacks is
+added in `packages/ui` with `npm run new:component`, drawn in tokens, never left to the browser.
 
 ---
 
@@ -900,12 +932,13 @@ when a change touches it (F23). Several gates are lint rules in
 | 16 No native dialogs | lint; `scripts/check/native-dialogs.js` | `alert`, `confirm`, `prompt` and `window.` forms of them (§8.7) |
 | 17 No dashes | `scripts/check/dashes.js` | An em dash, an en dash or a double hyphen in copy a person reads (§5.4) |
 | 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
+| 21 Nothing the browser styles itself | `scripts/check/native-ui.js` (source, and every gallery page and app screen in Chromium) | A native select, option, datalist, progress, meter or dialog; a browser-drawn input type; a `title` tooltip; a form without `noValidate`; a control the `base.css` reset missed; sonner outside the `Toaster`. No exemptions, `packages/ui` included (§8.8, F25) |
 | Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; ANY file in an app's `components/` (both folders are gone); a feature shadowing a shared component (§9.4) |
 | Mock-free (F12) | `scripts/check/mock-free.js` | A release build that contains the in-browser mock (§9.5) |
 | Accessibility | `scripts/check/a11y.js` | An axe violation on any gallery state, in either theme, or on any app screen (shell and page together) at phone and desktop size |
 | Frontend typecheck, lint, test, build | `npm run fe:typecheck`, `fe:lint`, `fe:test`, `fe:build` | A type error, a lint error (the rules above, F4, F7, no local Zod), a failing Vitest test (each component's render, behaviour and axe check), a build that does not complete, in `packages/ui`, `app` or `public-app` |
 
-The screen gates need Chromium. CI installs it; locally, `npx playwright install chromium` once.
+The screen gates (8, 11 and 21) need Chromium. CI installs it; locally, `npx playwright install chromium` once.
 The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`.
 
 ## 11 · Done means
@@ -929,6 +962,8 @@ The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-ap
   by `useContractForm` from the contract schema, or INTERIM rules until it exists (gate 12)
 - [ ] Day-first dates, formatted money, through the `@mycity/ui` helpers
 - [ ] No native dialogs; upload engine
+- [ ] Nothing the browser draws in its own style: no native select or picker, no browser input
+  type, no `title` tooltip, no validation bubble, no unbranded toast, on phone or desktop (gate 21, §8.8)
 - [ ] `npm run ci` green, the whole suite, before pushing
 - [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked (UI, Mobile) and a note left

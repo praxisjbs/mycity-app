@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import dashboard from "@mycity/contract/schemas/dashboard.js";
 import { ModalProvider } from "@mycity/ui";
-import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { axe, axeMatchers, chooseOption, chooseValue, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession } from "@/api/mock/core";
@@ -259,9 +259,8 @@ describe("the roster's filters", () => {
     fireEvent.click(chip("On Leave"));
     await shows(["Hauwa Yusuf", "Tobi Ojo"]);
 
-    const department = screen.getByRole("combobox", { name: "Department" }) as HTMLSelectElement;
-    const studio = within(department).getByRole("option", { name: "Studio" }) as HTMLOptionElement;
-    fireEvent.change(department, { target: { value: studio.value } });
+    const department = screen.getByRole("combobox", { name: "Department" });
+    await chooseOption(department, "Studio");
     // Nobody in Studio is on leave today.
     await settled();
     expect(screen.getByText("Nobody Matches")).toBeTruthy();
@@ -272,7 +271,7 @@ describe("the roster's filters", () => {
     // The department narrows the month too.
     expect(namesIn(monthTable(), everyone).sort()).toEqual(["Emeka Obi", "Rotimi Alade", "Yusuf Musa"]);
 
-    fireEvent.change(department, { target: { value: "" } });
+    await chooseValue(department, "");
     fireEvent.click(chip("Everyone"));
     fireEvent.change(screen.getByPlaceholderText("Search People"), { target: { value: "bashir" } });
     await shows(["Bashir Lawal"]);

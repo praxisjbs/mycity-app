@@ -27,10 +27,12 @@ describe("Rail", () => {
     expect(onNavigate).toHaveBeenCalledWith("#/Rail");
   });
 
-  it("collapsed, keeps every item's name for screen readers and as a hover title", () => {
+  it("collapsed, keeps every item's name for screen readers and in our tooltip, never a browser title", async () => {
     render(<Rail items={RAIL_ITEMS} current="home" collapsed account={account()} />);
     const link = screen.getByRole("link", { name: /Staff Community/ });
-    expect(link).toHaveAttribute("title", "Staff Community");
+    expect(link).not.toHaveAttribute("title");
+    await userEvent.hover(link);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Staff Community");
     expect(screen.getByRole("button", { name: "Cynthia Osakunih" })).toBeInTheDocument();
   });
 

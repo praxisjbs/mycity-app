@@ -29,15 +29,21 @@ const CLASSES = {
     "flex w-full items-center gap-2.5 rounded-box bg-sidebar px-3.5 py-2.5 text-sm text-sidebar-foreground shadow-3 phone:min-h-tap",
   content: "min-w-0 flex-1",
   title: "font-normal",
+  description: "text-xs text-sidebar-muted",
   icon: "flex flex-none items-center",
   actionButton:
     "ml-auto flex-none rounded-ctl px-2.5 py-1.5 text-sm font-semibold text-primary transition-colors duration-(--dur-fast) hover:bg-sidebar-hover phone:min-h-tap",
+  cancelButton: "flex-none rounded-ctl px-2.5 py-1.5 text-sm font-semibold text-sidebar-muted hover:bg-sidebar-hover phone:min-h-tap",
+  closeButton: "flex size-6 flex-none items-center justify-center rounded-full text-sidebar-muted hover:bg-sidebar-hover",
 };
 
 const ICONS = {
   success: <Icon name="ok" className="text-primary" />,
   error: <Icon name="alert" className="text-destructive" />,
   info: <Icon name="info" className="text-sidebar-muted" />,
+  warning: <Icon name="alert" className="text-warning" />,
+  loading: <Icon name="refresh" className="animate-spin text-sidebar-muted" />,
+  close: <Icon name="x" size="s" />,
 };
 
 export function Toaster({ id }: ToasterProps) {

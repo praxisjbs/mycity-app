@@ -5,7 +5,7 @@ import alerts from "@mycity/contract/schemas/alerts.js";
 import dashboard from "@mycity/contract/schemas/dashboard.js";
 import type { HomeAlert } from "@mycity/contract/contract.gen.ts";
 import { ModalProvider, Toaster } from "@mycity/ui";
-import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { axe, axeMatchers, chooseValue, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession, ok, route } from "@/api/mock/core";
@@ -654,7 +654,7 @@ describe("Alert Rules", () => {
 });
 
 describe("New Rule and Edit Rule", () => {
-  const field = (dialog: HTMLElement, label: string) => within(dialog).getByLabelText(label) as HTMLInputElement | HTMLSelectElement;
+  const field = (dialog: HTMLElement, label: string) => within(dialog).getByLabelText(label) as HTMLInputElement | HTMLButtonElement;
 
   it("checks the fields with the contract's rule, follows the metric, and creates the rule", async () => {
     await alertsAs("cynthia@mycityapp.io");
@@ -663,7 +663,7 @@ describe("New Rule and Edit Rule", () => {
     expect(field(dialog, "Metric").value).toBe("late_arrivals");
     expect(field(dialog, "Window Days").value).toBe("30");
     expect(within(dialog).getByRole("radio", { name: "Medium" }).getAttribute("aria-checked")).toBe("true");
-    expect((field(dialog, "Who Can Clear") as HTMLSelectElement).selectedOptions[0].textContent).toBe("People Viewers");
+    expect(field(dialog, "Who Can Clear").textContent).toBe("People Viewers");
 
     // Nothing typed: the form marks what is missing and sends nothing.
     fireEvent.click(within(dialog).getByRole("button", { name: "Create Rule" }));
@@ -677,9 +677,9 @@ describe("New Rule and Edit Rule", () => {
     expect(await within(dialog).findByText("Enter the days")).toBeTruthy();
 
     // A deadline metric has no window, counts whole days, and is cleared by its own grant.
-    fireEvent.change(field(dialog, "Metric"), { target: { value: "document_expiry" } });
+    await chooseValue(field(dialog, "Metric"), "document_expiry");
     await waitFor(() => expect(within(dialog).queryByLabelText("Window Days")).toBeNull());
-    expect((field(dialog, "Who Can Clear") as HTMLSelectElement).selectedOptions[0].textContent).toBe("People Editors");
+    expect(field(dialog, "Who Can Clear").textContent).toBe("People Editors");
     fireEvent.click(within(dialog).getByRole("button", { name: "Create Rule" }));
     expect(await within(dialog).findByText("Whole days only")).toBeTruthy();
     // From here the field itself takes whole days only.

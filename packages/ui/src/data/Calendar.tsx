@@ -14,6 +14,7 @@ import { cn } from "../lib/cn";
 import { content } from "../lib/slots";
 import { monthName } from "../lib/format";
 import { Card, CardHeader } from "../layout/Card";
+import { Tooltip } from "../overlay/Tooltip";
 
 /** One thing happening on a day. */
 export interface CalendarEvent {
@@ -73,10 +74,8 @@ export function Calendar({ year, month, events, actions, className }: CalendarPr
         <thead>
           <tr>
             {WEEKDAYS.map((day) => (
-              <th key={day.short} scope="col" className="overflow-hidden py-1 text-center text-2xs font-strong tracking-caps text-subtle-foreground uppercase">
-                <abbr title={day.full} className="no-underline">
-                  {day.short}
-                </abbr>
+              <th key={day.short} scope="col" aria-label={day.full} className="overflow-hidden py-1 text-center text-2xs font-strong tracking-caps text-subtle-foreground uppercase">
+                {day.short}
               </th>
             ))}
           </tr>
@@ -98,23 +97,23 @@ export function Calendar({ year, month, events, actions, className }: CalendarPr
                     </b>
                     {(byDay.get(day) ?? []).map((event, j) =>
                       event.onSelect ? (
-                        <button
-                          key={j}
-                          type="button"
-                          onClick={event.onSelect}
-                          title={event.label}
-                          className={cn("mb-0.5 block w-full truncate rounded-sm px-1 text-left text-2xs font-semibold", event.highlight ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}
-                        >
-                          {event.label}
-                        </button>
+                        <Tooltip key={j} label={event.label}>
+                          <button
+                            type="button"
+                            onClick={event.onSelect}
+                            className={cn("mb-0.5 block w-full truncate rounded-sm px-1 text-left text-2xs font-semibold", event.highlight ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}
+                          >
+                            {event.label}
+                          </button>
+                        </Tooltip>
                       ) : (
-                        <span
-                          key={j}
-                          title={event.label}
-                          className={cn("mb-0.5 block w-full truncate rounded-sm px-1 text-left text-2xs font-semibold", event.highlight ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}
-                        >
-                          {event.label}
-                        </span>
+                        <Tooltip key={j} label={event.label}>
+                          <span
+                            className={cn("mb-0.5 block w-full truncate rounded-sm px-1 text-left text-2xs font-semibold", event.highlight ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}
+                          >
+                            {event.label}
+                          </span>
+                        </Tooltip>
                       ),
                     )}
                   </td>

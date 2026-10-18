@@ -1,10 +1,10 @@
 /**
  * @component SearchInput
  * @group Forms
- * @summary The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row.
+ * @summary The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row.
  * @use Above every list that searches; FilterSelect for one of a list's server filters.
  * @avoid Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design.
- * @phone Full width, 44 px tall; the keyboard's search key; FilterSelect opens the phone's own picker.
+ * @phone Full width, 44 px tall; the keyboard's search key; FilterSelect opens a branded bottom sheet, never the phone's own picker.
  * @a11y The box is a searchbox named by its label (or its placeholder); FilterSelect's label is visible and linked.
  * @status stable
  * @exports FilterSelect
@@ -13,7 +13,7 @@
 import { useId } from "react";
 import { cn } from "../lib/cn";
 import { Icon } from "../icons/Icon";
-import type { Option } from "./SelectField";
+import { SelectMenu, type Option } from "./SelectField";
 
 export interface SearchInputProps {
   /** What is typed; the list sends it as q (the list hook debounces it). */
@@ -64,16 +64,14 @@ export function FilterSelect({ label, value, onChange, options }: FilterSelectPr
       <label htmlFor={id} className="text-2xs font-semibold text-subtle-foreground">
         {label}
       </label>
-      <select id={id} className="h-control w-full min-w-32 rounded-ctl border border-input bg-background px-3 text-field desk:w-auto desk:max-w-56" value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => {
-          const [v, l] = Array.isArray(o) ? [o[0], o[1]] : [(o as { value: string }).value, (o as { label: unknown }).label];
-          return (
-            <option key={v} value={v}>
-              {typeof l === "string" ? l : v}
-            </option>
-          );
-        })}
-      </select>
+      <SelectMenu
+        id={id}
+        label={label}
+        value={value}
+        onChange={onChange}
+        options={options}
+        className="h-control w-full min-w-32 rounded-ctl border border-input bg-background px-3 text-field focus-visible:border-ring desk:w-auto desk:max-w-56"
+      />
     </span>
   );
 }

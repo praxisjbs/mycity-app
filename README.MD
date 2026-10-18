@@ -84,7 +84,8 @@ mycity-app/
 │   │   │                     titles, refused button labels (gates 8, 11, 12, 17; FRONTEND_GUIDE §5)
 │   │   ├── lib/gallery.js    builds packages/ui's gallery when stale and serves it (gates 8, 11, a11y)
 │   │   ├── lib/screens.js    opens every gallery page and every app screen (demo.html only when touched)
-│   │   │                     in Chromium at phone and desktop size, records copy and layout (gates 8, 11)
+│   │   │                     in Chromium at phone and desktop size, records copy, layout and anything
+│   │   │                     the browser draws itself (gates 8, 11, 21)
 │   │   ├── lib/source.js     reads JavaScript for the backend code gates (date-format, money,
 │   │   │                     module-catalogue): comments, strings, template and regex literals apart
 │   │   ├── lib/styling-exemptions.json  #18 files still exempt from F4 styling; only shrinks
@@ -605,6 +606,12 @@ data, not code. Services call `openInstance()` inside their transaction and reac
     steps; no arbitrary value, no raw hex, and no `style` prop in an app at all. A runtime value
     belongs in a shared component, where a class reads it from a CSS variable
     (FRONTEND_FOUNDATION F4, gate 13).
+18. **Nothing the browser styles itself, anywhere.** No native `<select>` or phone picker, no
+    browser date, number, checkbox or radio input, no `title` tooltip, no validation bubble, no
+    toast or toast library styled outside the branded `Toaster`. Every control, list, tooltip and
+    message is a `packages/ui` component in the brand's tokens, on both shells; `base.css` resets
+    what the browser would still draw (autofill tint, spinners, clear buttons, tap flash, selection)
+    (FRONTEND_FOUNDATION F25, FRONTEND_GUIDE §8.8, gate 21, no exemptions).
 
 ---
 
@@ -634,6 +641,7 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 | 18 Upload engine | M1 | `check/upload.js` (no raw file input outside `packages/ui/src/form`) and the lint rule |
 | 19 AI read manifest only | M4 | `check/ai-no-writes.js` |
 | 20 Money | M6 | `check/money.js` |
+| 21 Nothing the browser styles itself | M0 | `check/native-ui.js`: no native select, picker, spinner, checkbox, `title` tooltip, validation bubble or unbranded toast, in source and on every gallery page and app screen in Chromium (F25), no exemptions |
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,

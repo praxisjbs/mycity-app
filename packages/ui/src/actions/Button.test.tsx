@@ -68,7 +68,7 @@ describe("IconButton", () => {
     const onClick = vi.fn();
     render(<IconButton icon="srch" label="Search" onClick={onClick} />);
     const button = screen.getByRole("button", { name: "Search" });
-    expect(button).toHaveAttribute("title", "Search");
+    expect(button).not.toHaveAttribute("title");
     await user.click(button);
     expect(onClick).toHaveBeenCalledOnce();
   });

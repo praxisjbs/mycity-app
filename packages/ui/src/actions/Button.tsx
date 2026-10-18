@@ -16,6 +16,7 @@ import { Slot, Slottable } from "@radix-ui/react-slot";
 import { LoaderCircle } from "lucide-react";
 import { cn } from "../lib/cn";
 import { Icon, type IconName } from "../icons/Icon";
+import { Tooltip } from "../overlay/Tooltip";
 
 export type ButtonVariant = "default" | "primary" | "ghost" | "danger";
 
@@ -102,22 +103,23 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   ref,
 ) {
   return (
-    <button
-      ref={ref}
-      type={type}
-      title={label}
-      aria-label={label}
-      data-ui="button"
-      className={cn(
-        "relative inline-flex flex-none items-center justify-center rounded-ctl text-muted-foreground transition-colors duration-(--dur-fast) hover:bg-muted hover:text-foreground disabled:opacity-40",
-        size === "md" ? "size-control" : "size-8 phone:size-control",
-        className,
-      )}
-      {...rest}
-    >
-      <Icon name={icon} size={size === "md" ? "m" : "s"} />
-      {dot && <span aria-hidden="true" className="absolute top-1.5 right-1.5 size-2 rounded-full border-2 border-background bg-destructive" />}
-    </button>
+    <Tooltip label={label}>
+      <button
+        ref={ref}
+        type={type}
+        aria-label={label}
+        data-ui="button"
+        className={cn(
+          "relative inline-flex flex-none items-center justify-center rounded-ctl text-muted-foreground transition-colors duration-(--dur-fast) hover:bg-muted hover:text-foreground disabled:opacity-40",
+          size === "md" ? "size-control" : "size-8 phone:size-control",
+          className,
+        )}
+        {...rest}
+      >
+        <Icon name={icon} size={size === "md" ? "m" : "s"} />
+        {dot && <span aria-hidden="true" className="absolute top-1.5 right-1.5 size-2 rounded-full border-2 border-background bg-destructive" />}
+      </button>
+    </Tooltip>
   );
 });
 

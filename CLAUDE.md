@@ -38,7 +38,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 | Type | Read |
 |---|---|
 | Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
-| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F24, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
+| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F25, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
@@ -53,7 +53,7 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 1. `MILESTONES.md` is binding for scope and decisions A1 to A26.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
 3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
-   frontend gates), decisions F1 to F24 in `docs/FRONTEND_FOUNDATION.md` §3 win over
+   frontend gates), decisions F1 to F25 in `docs/FRONTEND_FOUNDATION.md` §3 win over
    `MILESTONES.md`, `FRONTEND_GUIDE.md` and `demo.html` (decided with TB, 15/10/2026).
 4. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
 5. `README.MD` is the map of every file.
@@ -100,6 +100,10 @@ silently.
   inside a feature; nothing new goes in `app/src/components/` or `public-app/src/components/`.
 - **Styling is tokens only** (F4): token classes and the named layout and spacing scales. No hex,
   no arbitrary value, no inline `style`. Colours exist only in `packages/ui/src/styles/tokens.css`.
+- **Nothing the browser styles itself** (F25, gate 21, no exemptions): no native `<select>` or
+  phone picker, no browser date, number, checkbox or radio input, no `title` tooltip, no validation
+  bubble, no toast outside the branded `Toaster`. Selects are `SelectField`/`FilterSelect`/
+  `InlineSelect` (`SelectMenu`), hover labels are `Tooltip`. FRONTEND_GUIDE §8.8 has the full list.
 - **The mock never ships** (F12 to F14): the in-browser mock is for laptops and CI only, never in a
   release build. Staging shows its seed, production only live data.
 - **One form system** (gate 12): fields only from `packages/ui/src/form/` (`useContractForm` with the
@@ -117,7 +121,7 @@ fix them rather than arguing with them. If one genuinely does not apply (a refac
 screen, a test-only change), say so to the user and give the PR line to use:
 `Progress-unchanged: <reason>` or `Guide-unchanged: <reason>`. CI runs the same checks on every PR.
 When your change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`, the hook also runs
-the screen gates (`components`, `palette`, `forms`, `dashes`, `five-second`, `two-shells`); they have
+the screen gates (`components`, `palette`, `forms`, `dashes`, `five-second`, `two-shells`, `native-ui`); they have
 no exemption line. Fix the screen.
 
 A task is not finished until:

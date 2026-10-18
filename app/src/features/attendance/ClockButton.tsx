@@ -5,7 +5,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Pill, Result, TextAreaField, toast, useContractForm, useModal, zoneClock } from "@mycity/ui";
+import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
 
 /**
  * Clocking in and out, for the shell: the desktop top bar's ClockButton and the phone's floating
@@ -43,21 +43,22 @@ export function ClockButton({ compact }: { compact?: boolean }) {
   const title = unavailable ? (today?.unavailable_reason === "leave" ? "On Leave Today" : "Clock Not Available") : done ? "Done For Today" : label;
 
   return (
-    <button
-      type="button"
-      onClick={() => open()}
-      disabled={!today || done}
-      title={title}
-      aria-label={title}
-      className={cn(
-        "flex h-9 max-md:h-11 max-md:min-w-11 max-md:justify-center items-center gap-1.5 rounded-full text-sm font-semibold transition hover:brightness-110 disabled:opacity-50",
-        compact ? "px-2.5" : "px-3.5",
-        out ? "on-primary bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
-      )}
-    >
-      <Icon name="clock" />
-      {!compact && <span>{done ? "Done For Today" : label}</span>}
-    </button>
+    <Tooltip label={title}>
+      <button
+        type="button"
+        onClick={() => open()}
+        disabled={!today || done}
+        aria-label={title}
+        className={cn(
+          "flex h-9 max-md:h-11 max-md:min-w-11 max-md:justify-center items-center gap-1.5 rounded-full text-sm font-semibold transition hover:brightness-110 disabled:opacity-50",
+          compact ? "px-2.5" : "px-3.5",
+          out ? "on-primary bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
+        )}
+      >
+        <Icon name="clock" />
+        {!compact && <span>{done ? "Done For Today" : label}</span>}
+      </button>
+    </Tooltip>
   );
 }
 
