@@ -239,6 +239,17 @@ function listMine(db, employeeId, query) {
   );
 }
 
+/** The caller's own queries, counted for My Queries: open (not resolved) and archived. */
+async function mineSummary(db, employeeId) {
+  const { rows } = await db.query(
+    `SELECT count(*) FILTER (WHERE status <> 'resolved')::int AS open,
+            count(*) FILTER (WHERE status = 'resolved')::int AS archived
+       FROM employee_query WHERE employee_id = $1`,
+    [employeeId],
+  );
+  return rows[0];
+}
+
 /** One of the caller's own queries, in MyQuery's shape. */
 async function getMine(db, employeeId, id) {
   const { rows } = await db.query(
@@ -276,6 +287,7 @@ module.exports = {
   insertResponse,
   summary,
   listMine,
+  mineSummary,
   getMine,
   employeeOf,
 };

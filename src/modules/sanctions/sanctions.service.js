@@ -214,5 +214,6 @@ async function settle(id, outcome) {
  * ------------------------------------------------------------------ */
 
 const listMine = (employeeId, query) => repo.listMine(pool, employeeId, query);
+const mineSummary = (employeeId) => repo.mineSummary(pool, employeeId);
 
-module.exports = { list, summary, get, nextStep, standing, propose, settle, listMine };
+module.exports = { list, summary, get, nextStep, standing, propose, settle, listMine, mineSummary };

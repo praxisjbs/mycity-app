@@ -196,6 +196,16 @@ const MyQuery = z
 
 const MyQueryPage = Paged(MyQuery);
 
+/** GET /ess/queries/summary: the three cards on My Queries, the caller's own. */
+const MyQueriesSummary = z
+  .object({
+    open: z.number().int().min(0),
+    archived: z.number().int().min(0),
+    sanctions: z.number().int().min(0),
+    last_sanction: isoDate.nullable(),
+  })
+  .strict();
+
 /** POST /ess/queries/:id/response: the employee's written answer. One a query. */
 const QueryResponseCreate = z
   .object({
@@ -265,6 +275,7 @@ const TABLES = {
     },
   },
   MyQueryPage: { table: null, reason: "a page of the caller's own queries" },
+  MyQueriesSummary: { table: null, reason: "counts over the caller's own queries and issued sanctions" },
   QueryResponseCreate: { table: "query_response" },
   QueryRaisedEmailVars: { table: null, reason: "the variables of templates/email/query-raised.html, not a row" },
 };
@@ -286,6 +297,7 @@ module.exports = {
   EssQueryListQuery,
   MyQuery,
   MyQueryPage,
+  MyQueriesSummary,
   QueryResponseCreate,
   QueryRaisedEmailVars,
 };

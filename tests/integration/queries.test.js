@@ -162,8 +162,13 @@ describeDb("queries and sanctions against the real migrations", () => {
 
       const preview = await as("ops").get(`/letter-templates/${ql.letter_template_id}/preview`);
       expect(preview.status).toBe(200);
-      expect(preview.body.html).toContain("Dear Ada,");
-      expect(preview.body.html).toContain("QRY-0000");
+      expect(preview.body).toMatchObject({ reference: "LTR-0000", title: "Query QRY-0000" });
+      // What the record fills is marked; the rest is the template's own wording.
+      expect(preview.body.paragraphs).toContainEqual([
+        { text: "Dear ", filled: false },
+        { text: "Ada", filled: true },
+        { text: ",", filled: false },
+      ]);
 
       const warning = await byKey("ops", "warning-letter");
       const none = await as("ops").get(`/letter-templates/${warning.letter_template_id}/preview`);
@@ -227,7 +232,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(on.status).toBe(200);
       expect(on.body.status).toBe("active");
       const preview = await as("manager").get(`/letter-templates/${id}/preview`);
-      expect(preview.body.html).toContain("this is a written warning");
+      expect(preview.body.paragraphs.flat().map((r) => r.text).join("")).toContain("this is a written warning");
 
       const audit = await q(
         "SELECT event_key FROM event_log WHERE entity_id = $1 ORDER BY occurred_at",
@@ -396,6 +401,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(res.body).toMatchObject({ status: "resolved", outcome: "no_action", reviewed_by_name: "Tunde Bakare", can_decide: false });
       expect((await as("ops").post(`/queries/${ids.first}/decision`, { outcome: "no_action", reason: "Closing it a second time." })).status).toBe(409);
 
+      expect((await as("staff").get("/ess/queries/summary")).body).toEqual({ open: 0, archived: 1, sanctions: 0, last_sanction: null });
       const archived = await as("staff").get("/ess/queries?status=archived");
       expect(archived.body.data.map((r) => [r.number, r.outcome])).toEqual([["QRY-0001", "no_action"]]);
       await drain();

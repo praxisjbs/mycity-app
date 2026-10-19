@@ -38,7 +38,7 @@ ESS · My Queries.
 |---|---|---|---|---|
 | Queries & Sanctions · Queries (`queries`) | Staff app | `queries` view: scope `all` sees every query; anyone else only the queries they raised (§6.1) | KPI strip (open, awaiting response, closed this month, escalated), the query list, the open query's card (subject, raised by, due, the response, the letter), Queries by Reason | Raise a Query, Send Reminder, View Letter, Record Decision (close with no action, or propose a sanction) |
 | Queries & Sanctions · Rules (`rules`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip (active, draft, fired this month, queries raised), one card per rule with its threshold, Recent Firings | New Rule, Edit Rule, Activate, Pause |
-| Queries & Sanctions · Sanctions (`sanctions`) | Staff app | `queries` view, same visibility as the query a sanction follows | KPI strip (active, awaiting approval, fines this year, fines recovered), sanction history, a person's standing on the ladder | Issue Sanction (from an upheld query), Chain Settings (needs `queries.configure`): add, reorder, edit or retire a rung |
+| Queries & Sanctions · Sanctions (`sanctions`) | Staff app | `queries` view, same visibility as the query a sanction follows | KPI strip (active, awaiting approval, fines this year, fines recovered), sanction history | Issue Sanction (opens Queries: a sanction starts from a query's decision), Chain Settings: the ladder in order; Add Step, Move Up, Move Down, Retire need `queries.configure` |
 | Queries & Sanctions · Letter Templates (`letter-templates`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip, the template list with status, the selected template's preview filled with sample values | New Template, Edit Template, Preview, Activate |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee, own records (ESS guide) | Open Queries, Archived, Sanctions | Respond to an open query; open a letter |
 | Employee 360 · History | Staff app | `people` view within scope | The person's queries and sanctions, append-only, newest first | Open the query or sanction |
@@ -126,10 +126,11 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `GET /api/v1/letter-templates/summary` | → `LetterTemplatesSummary` | `queries` view | no | |
 | `GET /api/v1/letter-templates` | `LetterTemplateListQuery` (`purpose`, `status`, `q`) → `LetterTemplatePage` | `queries` view | yes, 25 | |
 | `GET /api/v1/letter-templates/:id` | → `LetterTemplateDetail` | `queries` view | no | The current wording and its version |
-| `GET /api/v1/letter-templates/:id/preview` | → `LetterPreview` | `queries` view | no | Rendered with sample values |
+| `GET /api/v1/letter-templates/:id/preview` | → `LetterPreview` | `queries` view | no | The wording filled with sample values, as paragraphs of runs; `filled` marks the record's words |
 | `POST /api/v1/letter-templates` | `LetterTemplateCreate` → `LetterTemplateDetail` | `queries` create, `queries.configure` | | Saved as a draft |
 | `PUT /api/v1/letter-templates/:id/body` | `LetterTemplateBodySave` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | A new `template_version` |
 | `POST /api/v1/letter-templates/:id/activate` | `EmptyBody` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | Refused while it has no wording |
+| `GET /api/v1/ess/queries/summary` | → `MyQueriesSummary` | `ess` · own | no | Open, archived, sanctions and the latest one's date |
 | `GET /api/v1/ess/queries` | `EssQueryListQuery` (`status`: `open`, `archived`) → `MyQueryPage` | `ess` · own | yes, 25 | ESS module, through the queries service |
 | `POST /api/v1/ess/queries/:id/response` | `QueryResponseCreate` → `MyQuery` | `ess` · own | | Through `queries.response` |
 | `GET /api/v1/ess/sanctions` | `PageQuery` → `MySanctionPage` | `ess` · own | yes, 25 | |
@@ -302,12 +303,12 @@ or tier 2.**
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Queries | KPI strip; the list (employee, number, subject, raised by, raised, response, status); the query card (subject, raised by or Rule, raised, response due, response, letter); Raise a Query, Send Reminder, View Letter, Record Decision | Help on Escalated: a sanction is waiting for approval. Help on Response Due: the 48 hour window | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
-| Record Decision | Outcome (Close No Action, or a rung with the next rung first), reason, evidence, fine, dates | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
+| Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by, raised, response due, counted days, response, sanction); Raise a Query, Send Reminder, View Letter (the PDF the employee received), Record Decision | Help on Escalated: a sanction is waiting for approval. Help on Response Due: the 48 hour window | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
+| Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, fine, reason | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
 | Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 30 days", status); Recent Firings; New Rule, Activate, Pause | Help on Measure: count or late minutes | Counting after the last query, the dedup key: §6.3 |
-| Sanctions | KPI strip; the history (employee, number, sanction, reason, decided by, date, fine, status); a person's standing on the ladder; Issue Sanction, Chain Settings | Help on Fines Recovered: accepted into payroll | The rank rule for approvals, valid_days mechanics: §6.5 |
-| Chain Settings | The rungs in order (name, letter, financial effect, in force for); Add Rung, Move, Edit, Retire | Help on In Force For: how long a rung counts for the next offence | Why a fine is not a rung: §6.6 |
-| Letter Templates | KPI strip; the list (template, used for, status); the preview; New Template, Edit, Preview, Activate | Help on the variables a letter can use | Versioning, the shipped defaults: §6.7 |
+| Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
+| Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
+| Letter Templates | Stat strip; the list (template, used by, status); the selected letter's preview on paper, the record's words underlined; New Template, Edit Template, Activate | Help on Letter: the names a letter can use | Versioning, the shipped defaults: §6.7 |
 
 ### 10.2 Phone layout
 
@@ -315,8 +316,8 @@ or tier 2.**
 |---|---|---|---|---|
 | Queries | Two KPI cards (Open, Awaiting Response), then query cards with a status pill | Queries by Reason; the Number and Raised By columns | Raise a Query, full width; a query opens in a sheet with Record Decision at its foot | Bottom bar More → Queries; the four tabs scroll sideways |
 | Rules | Rule cards, one a row, with Activate on drafts | Recent Firings | New Rule in the header | Tabs scroll sideways |
-| Sanctions | Sanction cards with the rung and status | KPI strip after the first two; Chain Settings (desktop only) | Issue Sanction | Tabs scroll sideways |
-| Letter Templates | The template list | The preview beside the list (it opens in a sheet instead); editing (desktop only) | Preview | Tabs scroll sideways |
+| Sanctions | Sanction cards with the step and status | The query and decided-by columns | Issue Sanction | Tabs scroll sideways |
+| Letter Templates | The template list, then the selected letter's preview | The Used By column | New Template | Tabs scroll sideways |
 
 ## 11 · Edge cases
 
@@ -370,6 +371,10 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 19/10/2026 · GE · The screens are on the contract (§2, §10): Issue Sanction opens Queries, since every
+  sanction starts from a query's decision; View Letter shows the PDF the employee received; a
+  letter's preview is its wording on paper with the record's words marked (`LetterPreview`
+  paragraphs, not HTML); ESS · My Queries gains `GET /ess/queries/summary` for its three cards.
 - 19/10/2026 · GE · The definition of done (MILESTONES §8) walked end to end in
   `tests/integration/queries-done.test.js`, one step a test. ESS's sanctions list orders a day's
   sanctions newest first.

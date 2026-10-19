@@ -45,7 +45,7 @@ saying who agreed and when.
 | M0 Foundation | 35 items below: 34 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 11 | 0 | 0 | 11 | 0 | 0 |
-| M3 Queries & Consequence Management | 5 | 1 | 4 | 0 | 0 | 0 |
+| M3 Queries & Consequence Management | 5 | 0 | 1 | 4 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **101** | **36** | **4** | **61** | **0** | **0** |
+| **Total** | **101** | **35** | **1** | **65** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -819,7 +819,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 13 | My Queries | `my-queries` | M3 | AJ | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1122,10 +1122,10 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 34 | Queries | `queries` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
-| 35 | Rules | `rules` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
-| 36 | Sanctions | `sanctions` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
-| 37 | Letter Templates | `letter-templates` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
+| 34 | Queries | `queries` | M3 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 35 | Rules | `rules` | M3 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 36 | Sanctions | `sanctions` | M3 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 37 | Letter Templates | `letter-templates` | M3 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
@@ -1137,6 +1137,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 - 19/10/2026 · GE · Sanctions (#36) and the rest of Queries (#34) API: Chain Settings (add a rung at a position, move, change, retire; `queries.configure`), a sanction proposed from a query's decision and approved on `queries.consequence` (Operations & People, then Management from rank 4; the proposer never approves), issued with its number and letter (emailed with the PDF), the query resolved; a refusal sends it back under review; fines pending for M6 (`sanctions.fines`); standing and next rung; ESS `GET /ess/sanctions`. 22 integration tests. Left: the screens on the real API, M6 taking fines into a run.
 - 19/10/2026 · GE · Rules (#35) API: drafts, change, activate, pause (`queries.configure`), Recent Firings within the visibility rule; the evaluator (job `query-rule-evaluate`) counts a person's late, absent, missing clock-out and unknown-device days through `attendance.auto-query.js` and raises one query per breach (three late arrivals raise exactly one query; a redelivered event raises none; late minutes summed is a setting too). Overdue tasks and missed targets wait for M2. Left: the screen on the real API; the lateness threshold is MyCity's to set (no default seeded).
 - 19/10/2026 · GE · M3's definition of done proved end to end on the real migrations (`tests/integration/queries-done.test.js`): a rule set up in two calls; three late arrivals raise exactly one query; the employee answers in ESS; HR upholds and a warning letter is generated, filed (the employee opens it, a colleague cannot) and emailed with the PDF; a second offence is offered Second Warning without code; a rung inserted on the chain is walked by the next case (rank 4, so Management approves too); a fine waits pending for payroll. The late arrivals are attendance days announced by the clock-in event; the punch route itself is attendance's suite. Left: M6 accepting the fine into a run.
+- 19/10/2026 · GE · Queries (#34), Rules (#35), Sanctions (#36) and Letter Templates (#37) on the generated contract (INTERIM `app/src/api/types/queries.ts` deleted; the mock rewritten in the contract's shapes): desktop and phone, checked in Chromium on the real API (signed in as Operations & People on the integration database: every tab loads with live records, no failed request) and by the screen gates (five-second, two shells, native UI, a11y). The letter preview is the wording on paper with the record's words underlined; View Letter opens the sent PDF; Issue Sanction opens Queries. ESS · My Queries (#13) moved onto the contract with `GET /ess/queries/summary`: API ticked; UI and Mobile are AJ's to tick once checked on staging (live builds show it Coming Soon until the API tick lands). Left: AJ's review of the screens; M6 accepting fines.
 
 ### Recruitment
 

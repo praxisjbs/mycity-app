@@ -84,11 +84,19 @@ const LetterTemplatesSummary = z
   })
   .strict();
 
-/** GET /letter-templates/:id/preview: the letter rendered inside the letterhead with sample values. */
+/**
+ * GET /letter-templates/:id/preview: the letter's wording filled with sample values, as
+ * paragraphs of runs; `filled` marks the words that came from the record, so the screen
+ * can show which parts the system writes. Nothing is stored.
+ */
 const LetterPreview = z
   .object({
+    reference: z.string(),
     title: z.string(),
-    html: z.string(),
+    date_line: z.string(),
+    paragraphs: z
+      .array(z.array(z.object({ text: z.string(), filled: z.boolean() }).strict()).max(200))
+      .max(200),
   })
   .strict();
 

@@ -70,6 +70,8 @@ module.exports = {
     created(res, await service.performance.addEvidence(withActor(req), readUpload(req), req.validated.body)),
   myReviews: async (req, res) => sendPaged(res, await service.performance.myReviews(req.user, req.validated.query)),
 
+  queriesSummary: async (req, res) => ok(res, await service.queries.summary(req.user)),
+
   listQueries: async (req, res) => sendPaged(res, await service.queries.list(req.user, req.validated.query)),
 
   listSanctions: async (req, res) => sendPaged(res, await service.queries.listSanctions(req.user, req.validated.query)),

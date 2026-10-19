@@ -302,6 +302,7 @@ async function settleEscalation(client, id, { issued, reviewedBy }) {
  * ------------------------------------------------------------------ */
 
 const listMine = (employeeId, query) => repo.listMine(pool, employeeId, query);
+const mineSummary = (employeeId) => repo.mineSummary(pool, employeeId);
 
 async function getMine(employeeId, id) {
   const row = await repo.getMine(pool, employeeId, id);
@@ -350,6 +351,7 @@ module.exports = {
   rowFor,
   settleEscalation,
   listMine,
+  mineSummary,
   getMine,
   respond,
   emailLetter,

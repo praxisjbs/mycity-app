@@ -464,3 +464,4 @@ Deductions figure and every form open the shared modal.
 - 19/10/2026 · GE · §5: the ESS queries and sanctions rows name the contract the queries guide wrote (`EssQueryListQuery`, `MyQueryPage`, `QueryResponseCreate`, `MySanctionPage`).
 - 19/10/2026 · GE · My Queries (#13) API: `GET /ess/queries` and `POST /ess/queries/:id/response` (`ess.queries.js`, through the queries service, queries guide §3 step 3). The screen stays on INTERIM shapes until the frontend swap; sanctions follow with the sanctions module.
 - 19/10/2026 · GE · My Queries · Sanctions API: `GET /ess/sanctions` (`MySanctionPage`), the caller's issued sanctions, through the sanctions service.
+- 19/10/2026 · GE · My Queries (#13) on the contract: `GET /ess/queries/summary` (`MyQueriesSummary`) for the three cards; Open shows View Letter and Respond, Archived the outcome, Sanctions opens the letter. The INTERIM MyQuery shapes are gone from `app/src/api/types/ess.ts`.
