@@ -46,6 +46,14 @@ const int = (def, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) =>
     .transform((v) => (v === undefined || v === "" ? def : Number(v)))
     .pipe(z.number().int().min(min).max(max));
 
+/** A whole number that may be left unset (null), for a default that depends on APP_ENV. */
+const intOrNull = ({ min = 0, max = Number.MAX_SAFE_INTEGER } = {}) =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v === "" ? null : Number(v)))
+    .pipe(z.number().int().min(min).max(max).nullable());
+
 const str = (def) =>
   z
     .string()
@@ -510,10 +518,37 @@ const ENTRIES = [
   ],
   [
     "MAILBOX_IDLE_MAX",
-    int(0, { min: 0, max: 30 }),
+    intOrNull({ min: 0, max: 30 }),
     {
       group: "Mailbox",
-      doc: "Mailboxes held open on IMAP IDLE by the worker, so new mail arrives without waiting for a sync. The host allows 30 connections per IP for production and staging together: 24 on production, 0 on staging and laptops.",
+      doc: "Mailboxes held open on IMAP IDLE by the worker, so new mail arrives the moment it lands instead of at the next sync. The host allows 30 connections per IP for production and staging together. Empty: 24 on production, 4 on staging, 0 on laptops and in tests.",
+    },
+  ],
+
+  // Web push (docs/guides/notifications.md §6)
+  [
+    "VAPID_SUBJECT",
+    str("mailto:jbspraxisllc@gmail.com"),
+    {
+      group: "Web push",
+      doc: "Who push services contact about this server's pushes: a mailto: or https: address.",
+    },
+  ],
+  [
+    "VAPID_PUBLIC_KEY",
+    str(""),
+    {
+      group: "Web push",
+      doc: "Optional. The VAPID public key (base64url). Empty: the app makes a pair on first start and keeps it encrypted in the database. Set both keys or neither.",
+    },
+  ],
+  [
+    "VAPID_PRIVATE_KEY",
+    str(""),
+    {
+      group: "Web push",
+      doc: "Optional. The VAPID private key (base64url), with VAPID_PUBLIC_KEY. Empty: the pair kept in the database.",
+      secret: true,
     },
   ],
 
@@ -679,6 +714,11 @@ function serverProblems(c) {
   for (const p of whatsappProblems(c.ALERT_WHATSAPP_URLS))
     out.push(`ALERT_WHATSAPP_URLS: ${p}`);
 
+  if (Boolean(c.VAPID_PUBLIC_KEY) !== Boolean(c.VAPID_PRIVATE_KEY))
+    out.push("VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are set together, or neither");
+  if (!/^(mailto:[^@\s]+@[^@\s]+|https:\/\/\S+)$/.test(c.VAPID_SUBJECT))
+    out.push("VAPID_SUBJECT must be a mailto: or https: address");
+
   // A passkey made on one host cannot be used on another, so the two must agree.
   let rpOrigin = null;
   try {
@@ -772,6 +812,11 @@ function parseEnv(source) {
       c.WEBAUTHN_RP_ID = "";
     }
   }
+
+  // Live mail on servers by default (TB, 19/10/2026): production and staging share the host's
+  // 30 IMAP connections per IP; laptops and tests hold none unless asked.
+  if (c.MAILBOX_IDLE_MAX === null)
+    c.MAILBOX_IDLE_MAX = { production: 24, staging: 4 }[c.APP_ENV] ?? 0;
 
   // Laptops and CI run without secrets; servers never do (serverProblems).
   const local = c.APP_ENV === "development" || c.APP_ENV === "test";

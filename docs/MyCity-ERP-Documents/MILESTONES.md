@@ -899,6 +899,13 @@ Transports: in-app, web push, email. Per-user and per-category preferences. Conf
 reminders for pending leave approvals, other approvals, employees due for confirmation, due
 invoices, and sensitive operational actions.
 
+**Brought forward to M0 by TB on 19/10/2026.** Web push to phones and computers (it reaches a device
+after the session has ended, and a tap opens the record through sign-in), the in-app banner, the
+bell's pane on both shells and each person's Notification Settings (In App, Email and Push per
+category) are built in M0 (`docs/guides/notifications.md`, `docs/runbooks/push-notifications.md`).
+M6 keeps the configurable reminders above (Settings · Notifications, #74) and the definition of
+done below.
+
 ### Definition of done
 
 A payroll run computes from attendance, deductions and approved consequences; payslips generate and

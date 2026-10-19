@@ -636,6 +636,7 @@ async function postMessage(channelId, body, user) {
         community_message_id: message.community_message_id,
         message_type: type,
         sender_name: user.display_name || null,
+        channel_name: m.channel_type === "direct" ? null : m.name || null,
         preview: lineOf(type, message.body),
       },
     });

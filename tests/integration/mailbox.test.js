@@ -247,10 +247,11 @@ describeDb("Mailbox against the real migrations", () => {
     const spam = (await api().get("/mailbox/threads?folder=spam")).body.data[0];
     expect((await api().get(`/mailbox/threads/${spam.mail_thread_id}`)).body.messages[0].body_html).toBeNull();
 
-    // Fresh unread inbound mail notifies; a three-day-old message does not.
+    // Fresh unread inbound mail notifies (the subject, a new line, the first line); a three-day-old
+    // message does not.
     await drain();
     const told = (await q("SELECT title, body FROM notification WHERE event_key = 'mail_message.received' ORDER BY created_at")).rows;
-    expect(told).toEqual([{ title: "MTN Partnerships", body: "Venue confirmations" }]);
+    expect(told).toEqual([{ title: "MTN Partnerships", body: "Venue confirmations\nHello" }]);
 
     // Nobody else reaches it, the CEO included.
     expect((await api(other).get(`/mailbox/threads/${venue.mail_thread_id}`)).status).toBe(409);

@@ -211,10 +211,10 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
 - **The mail host's limits** (Namecheap plan, `docs/runbooks/dns-and-mail.md` §4): IMAP and SMTP
   at `mycityapp.io` (993, 465), strict certificate check on that name. At most **30 IMAP connections
   at once from one IP address**, and production and staging share the server's address: production
-  holds at most one IDLE connection per connected mailbox and runs sync with short-lived
-  connections under a shared cap (IDLE plus sync never above 24, leaving room for staging; mailboxes beyond that
-  are polled);
-  staging never IDLEs, it polls with one connection at a time. People's own phones and webmail
+  holds at most one IDLE connection per connected mailbox, up to 24 (`MAILBOX_IDLE_MAX`, 24 on
+  production when unset), and syncs with one short-lived connection at a time; mailboxes beyond that
+  are polled. Staging holds up to 4 (its default) and syncs with one connection at a time, so the
+  two stay inside 30 (TB, 19/10/2026: new mail is noticed the moment it lands on both). People's own phones and webmail
   connect from other addresses and do not count. **30 mailboxes** on the plan. **50 recipients an
   hour** to send; whether that is per mailbox or for the whole account is still open (§13), and
   the send queue paces each user to it either way.
@@ -225,9 +225,9 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
 |---|---|---|
 | `mail-sync` (scheduler, every `MAILBOX_SYNC_EVERY_MIN` minutes) | On schedule | Syncs every connected mailbox, then flushes due mail from the send queue |
 | `mail-sync` (handler) | `mail_account.connected`, `mail_account.sync_requested`, IDLE | Syncs one mailbox |
-| `loops/mail-idle` | Continuously in the worker, up to `MAILBOX_IDLE_MAX` mailboxes (0 on staging) | IMAP IDLE on the inbox; new mail enqueues `mail-sync` |
+| `loops/mail-idle` | Continuously in the worker, up to `MAILBOX_IDLE_MAX` mailboxes (unset: 24 on production, 4 on staging, 0 on laptops) | IMAP IDLE on the inbox; new mail enqueues `mail-sync` |
 | `mail-send` | `mail_message.queued`, delayed to `release_at` | Delivers through SMTP, paced to `MAILBOX_SEND_PER_HOUR`; files it in Sent; classifies failures (`smtp-errors`) |
-| `mail_message.received` | New inbound message | Notification to the owner |
+| `mail_message.received` | New inbound message | Notification to the owner: the sender as the title, the subject and the message's first line as the text (`payload.preview`); on a phone a conversation's mail shares one notification (`docs/guides/notifications.md` §6). Reading the conversation marks its notices read |
 | `mail_account.needs_reconnect` | The server refused the saved password | Notification to the owner; banner in Mailbox |
 | `mail_message.sent` / `mail_send.failed` | After delivery or a permanent failure | Updates the queue; notifies on failure |
 | `mail_account.connected` / `disconnected`, `mail_thread.moved`, `mail_folder.emptied` | As named | Audit; `mailbox.updated` to the owner's socket |
@@ -365,4 +365,5 @@ interface copy; the copy rules apply to the chrome around them.
 - 18/10/2026 · GE · §10, the composer, from a phone test: attachments were refused because the composer sent the purpose `mail`, which the upload contract does not know (it is `attachment`). "Draft saved" back out of the footer to quiet text beside Attach a File; on the phone the footer is one row, Discard and Schedule as icons with Send taking the rest; a failed file can be removed, and a finished one shows once, as its chip.
 - 18/10/2026 · GE · §10, the reader, from a phone test and TB's review of how mail is formatted: HTML mail now renders in `EmailFrame`, a sealed frame with its own policy (no scripts, frames or forms; web images only after Load Images), as tall as its content and scaled down when wider than the column, so a 600 px cPanel notice fits a phone. The Drafts preview uses it too. In the dark theme, mail designed for a white page is recoloured by partial inversion, as Outlook does: light backgrounds onto our card, dark text onto our foreground, hue kept; colours already right for a dark page, accent borders and images untouched, and a message with its own dark design left alone. In the light theme mail is drawn as sent.
 - 18/10/2026 · GE · Everything the reader still lacked against the reference client: remote content held back by every route it can fetch (images, `srcset`, posters, `background`, style `url()`), with the count behind Load Images honest; Always Show Images per sender (`mail_image_trust`, migration 1125, `POST /image-trust`, Stop Showing Images in the thread menu); inline `cid:` parts (signature logos) drawn from the vault; quoted history folded behind Show Quoted Text in English and French. §3, §4, §5, §6, §7 and §10 updated.
+- 19/10/2026 · TB · §6 and §7 from TB's notification decisions (`docs/guides/notifications.md`): IMAP IDLE on by default, 24 inboxes on production and 4 on staging when `MAILBOX_IDLE_MAX` is unset, so mail is noticed the moment it lands; the new-mail notice carries the message's first line; reading a conversation marks its notices read (`notifications.markReadForRecord` in `markRead`'s transaction).
 - 19/10/2026 · TB · Email signatures, from TB's brief and answers: one design for everyone (Street Sign, chosen on the design canvas from three), built from the employee record, the mailbox and Settings · Organisation, never designed by hand. The Signature tab (#94) shows it as it sends (New Mail or Reply) and takes only the person's numbers (the mobile through the employee record, an office line, Show Mobile and WhatsApp Link); Configure (capability `mailbox.signature`, System Administrator and Implementation Team) sets the app and social links and the switches. The full signature goes on new mail and forwards, the slim line on replies and colleague-only mail, baked when queued, placed above the quoted mail, with its pictures inline. The composer previews it behind Show Signature. §1 to §14 updated; migration 1127, seed 1129.
