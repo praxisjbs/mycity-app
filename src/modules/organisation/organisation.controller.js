@@ -10,7 +10,7 @@
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
-const { ok, created } = require("../../shared/http/respond");
+const { ok, created, accepted } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf, assertInScope } = require("../../shared/rbac/scope");
 const { maskForUser } = require("../../shared/rbac/field-mask");
@@ -108,4 +108,7 @@ module.exports = {
     ok(res, await tx((client) => service.updateSeat(client, id(req), req.validated.body, withActor(req)))),
 
   orgChart: async (req, res) => ok(res, await service.orgChart(pool, req.validated.query)),
+
+  requestOrgChartExport: async (req, res) =>
+    accepted(res, await tx((client) => service.requestOrgChartExport(client, req.validated.body, withActor(req)))),
 };

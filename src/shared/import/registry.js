@@ -37,7 +37,10 @@
  *                                              which. It may answer { id, action: "none" } when the
  *                                              module decided the row needed no write, and the batch
  *                                              then counts the row as unchanged
- *   link(client, id, refs, ctx)                pass 2: set the pass-2 references on a row's record
+ *   link(client, id, refs, ctx)                pass 2: set the pass-2 references on a row's record;
+ *                                              ctx.values holds the row's own cells. It may answer
+ *                                              false when it wrote nothing, and a row that needed no
+ *                                              write then stays unchanged
  *   archive(client, id, ctx)                   revert a create
  *   restore(client, id, before, ctx)           revert an update to its before-snapshot
  *   isReferenced(client, id)                   optional: true refuses reverting that row

@@ -10,7 +10,7 @@
 | Capabilities | `home.team` (open the Team tab and its figures), `home.reports` (build, schedule, run and receive reports), `alerts.manage` (create, change and switch off alert rules), `alerts.clear` (clear or dismiss an alert, together with the rule's own grant) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 18/10/2026 |
+| Last changed | 19/10/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -812,3 +812,6 @@ rows, and nothing in the code says where anything came from.
 - 18/10/2026 · TB · Review fixes to the staging seed: the `HOME_STAGING_ROWS` ids are written out in `seeds/staging/lib/home-staging-rows.js` instead of worked out from the rows, so an owner taking its rows out of `forward-rows.js` keeps their ids, and its own seed calls `removeHomeStagingRows`, which deletes Home's alerts about those rows before the rows; a run deletes the listed rows it no longer writes with their alerts, a row given a unique value another of Home's rows held takes it from that row, and a vacancy's slug follows its place, so a seat filled or someone moving manager between runs no longer stops the seed. §11 and DATABASE_SCHEMA's Read by Home for M2, M4, M7 and M8 give the steps.
 - 18/10/2026 · TB · Review fixes to the reports backend: a slot firing takes the report before its schedule, and a change to a report locks it without blocking a run made against it, so a slot firing while its owner saves, pauses, archives or runs it takes turns instead of deadlocking; a running schedule saved while its slot is due keeps that slot; Run Now answers only a run the caller asked for, never a scheduled run whose schedule was removed; saving over a schedule checks only the recipients it adds, and a refusal names each person refused; `GET /home/report-runs/:id` reads one run on the reader's Recent Runs for `?run=`; the reports integration test no longer depends on the day or hour it runs. §5, §6 Reports and §11 follow.
 - 18/10/2026 · TB · Review fixes to the Reports screen: a `?run=` link (⌘K) opens that run as a sheet, read on its own from `GET /home/report-runs/:id`, however far back it is (number, Report, Run, Recipient, Format, Status, and Download once done), toasts "Run not found" for one the reader may not see, and closing it takes the link out; Edit Report sends the schedule only when the person changed it, so a new name or sharing alone never saves it again, and a recipient the server refuses is named on Recipients. The mock serves the one-run read, checks only the recipients a schedule adds and names each one refused, and holds a suspended person to not receiving. §10.1 and §10.2 follow.
+- 19/10/2026 · TB · No change to Home. The reports unit test reads Home's outbox handlers sorted,
+  because the organogram's Download PDF now registers on the same document events
+  (`docs/guides/organogram.md` §7) and the order they load in is not Home's to fix.

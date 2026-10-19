@@ -101,6 +101,21 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · The staff roster and the staff importer (`docs/guides/foundation.md` §6.1, §6.5,
+  §6.6, §11), from a review of what staging shows. A VACANT row's Line Manager is the seat's own
+  line (the importer dropped it without a word); `roles.json` gives a post outside the sheet its line
+  manager (the build account reports to the CTO), only while it has none; a row whose staff number
+  is held by someone with its own name is that person, so a corrected email no longer takes their
+  number and makes a second record; each row's dotted line comes from its own cell, so a preview no
+  longer costs its commit a dotted line; a link that writes nothing is not counted as an update;
+  the import preview lists warning rows (someone saved without a Line Manager) with the errors.
+  Approvals, team scope, the notifications that follow it and `manages_people` pass through a
+  vacant seat to the first person above it (`1160` `employee_effective_manager`); a loop through a
+  seat is refused. MyCity's sheet corrected (TB, 19/10/2026). Left: the server's `deploy-gate` is
+  still the one provisioned before the roster step (no `[staff]` line in staging's Release run 159),
+  so `docs/runbooks/staff-roster.md` §2 needs someone with root on the server; staging's on-screen
+  corrections are §6 there.
+
 - 18/10/2026 · TB · One press, one request (F26, FRONTEND_GUIDE §8.4). Reload on "A new version is
   ready" looked dead, and after a hard refresh did nothing; any button could send its request twice.
   Now `Button`, `IconButton` and `BigButton` are busy from the press until the work their handler
@@ -648,11 +663,21 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 89 | Policy Updates | `policy-updates` | M9 | LA | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 16/10/2026 |
-| 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
 - 19/10/2026 · LA · Work Location Requests (#87) built on the real API (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.11): a temporary home (remote staff, with one reading taken there and refused when too coarse), a remote day (on-site and hybrid staff) or a client visit (anyone), for at most 90, 5 or 14 days, from today and within 90 days, never overlapping another. Each is numbered `WLR-0001` and approved by the line manager, then Operations & People; the person withdraws one waiting or cancels an approved one before its first day, and each request opens with its approval route and every decision's reason. On an approved day the clock names the place (Temporary Home · 100 m, or the request), fences a temporary home like a home, and otherwise keeps the reading as evidence; a present remote day counts as remote on Home's roster. A request waiting on someone is in their Need You on Home and opens on People · Attendance. ⌘K: New Request and the requests by number. Checked by 3 screen tests and 6 integration tests, and on the mock at 390 and 1440 px (Chidera, Kemi, Cynthia). Policy Updates (#89) moves to M9 with Settings · Attendance Policy (owner decision, 19/10/2026). Left: field assignments.
+- 19/10/2026 · TB · ESS · Org Chart (#91), TB's four decisions on the phone (`docs/guides/organogram.md`
+  §8, §10.2): a Focus or Everyone switch, opening on Focus at the person looking, with the path
+  from the top, their team, Dotted Line and Same Manager; Everyone opens the way down to them and
+  marks their row You. A card opens the person's sheet on both shells: Send Message (My Profile on
+  your own), Open Record and Change Manager only by grant, so staff are no longer sent to Home.
+  Download PDF works: drawn in the worker as the person asking and emailed to them. Left: nothing.
+- 19/10/2026 · TB · ESS · Org Chart (#91): someone who is not on the chart starts at the top, the
+  CEO, instead of a card of their own with nowhere to go; on a phone a search lists the matching
+  cards to tap, and anyone else at the top is listed under Also At The Top (`docs/guides/organogram.md`
+  §10.2). The build account now sits under the CTO, so it opens with Reports To. Left: nothing.
 - 18/10/2026 · LA · My Attendance (#9): remote staff are fenced on an approved home (owner decision, 18/10/2026; `docs/guides/attendance.md` §6.5, §6.10). A remote employee sees a Home Location card first (Approved, Waiting, Not Set, or Rejected with People's reason) and sends their home from Set Home Location: one reading taken at home, refused when coarser than the policy's accuracy, and the address in their words. The clock panel asks a remote employee for their location too, matches it to the approved home (100 m), and without one shows No Approved Home with Set Home and sends the punch to People's review, never rejected. Checked on the mock at 390 and 1440 px through People's side; the card and sheet by 3 panel tests (the demonstration sign-ins work hybrid). Left: hybrid staff's home days (a per-day schedule), temporary homes (#87).
 - 18/10/2026 · AJ · My Attendance (#9): the 12 October asks (`docs/guides/ess.md` §13) on LA's screen, LA to review: the month picker beside Export Month (arrows, or a year and month picked directly), the share of days present on Late Days, Days Present, Late Days and Absent opening their days paged at 25 (`GET /attendance/me` takes `status`), and the days as a table or a chart of hours. Leave on staging: `seeds/staging/30_leave.js` puts the mock's twelve sample requests on the real staff through the leave service. My Leave (#12) gains Leave Calendar (`GET /ess/leave/calendar`): approved and waiting leave for the reader and everyone under them, everyone for the CEO and Operations & People (the team lead, 18/10/2026).
 - 17/10/2026 · LA · My Attendance (#9) and My Devices (#88) on the real API (`docs/guides/attendance.md`): the clock panel (location read only after the press, the worksite named first; Retry Location and Clock In Anyway; No Connection keeps the punch's key and body for Try Again; the server's result, with Send Note on a punch under review), the month's figures and days with each day's punches, open exceptions with Explain, Export Month by email; My Devices lists the person's devices, registers this one behind a fresh sign-in (three at most) and removes one. Checked on the real API at 390 and 1440 px. Left: Work Location Requests (#87) and Policy Updates (#89) stay on INTERIM shapes until home locations and policy versions are decided (attendance guide §13).
@@ -741,11 +766,33 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
 - 19/10/2026 · LA · People · Attendance (#25): Requests beside Homes, the work location requests in the reader's scope waiting first (Waiting, Approved, Rejected, Cancelled, All), searched by name or number, each opening with its details, its approval route and the decisions so far; Record Decision (Approve, or Reject with the reason the person reads) when its stage waits on the reader, through the approval's own routes. The temporary home's point is shown to People with scope all only. Left: nothing.
+- 19/10/2026 · TB · People · Organogram (#92), TB's four decisions on the phone
+  (`docs/guides/organogram.md` §5 to §8, §10): Focus and Everyone, opening on Everyone, the whole
+  company as one folding list; Focus has the path from the top, each card's team ("3 direct · 13 in
+  all"), Dotted Line and Same Manager, and cards carry their department again. A card opens the
+  person's sheet on both shells, with Change Manager (the record's reporting line form, now
+  `app/src/features/shared/ReportingForm.tsx`), so a phone moves a line without dragging. Download
+  PDF is real (`POST /org-chart/exports`, `org-chart.layout.js`, `templates/documents/org-chart.html`,
+  emailed; a failed render tells the person), where it was a toast that made nothing. Add Role is in
+  the floating button alone on a phone. The build account keeps every grant until handover
+  (`docs/guides/identity.md` §8), held by a test. Left: nothing.
+- 19/10/2026 · TB · People · Organogram (#92), from a review of the roster on staging, which drew
+  four tops (the CEO, both open seats and the build account) and hid the seven marketing officers
+  under a seat a phone could not reach. TB's four decisions of 19/10/2026: the sheet's VACANT rows
+  name their seat's line (Head Sales & Revenue under the Program Manager, Technical Assistant under
+  the CEO) and the importer applies it; `roles.json` puts the build account under the CTO; while a
+  seat is empty the first person above it approves for its reports and has them in team scope
+  (`employee_effective_manager`, `1160`); the sheet's errors are corrected. Screens: the CEO first,
+  the desktop tree opens and returns (Expand All) centred on the CEO, an open seat's branch folds
+  and unfolds like a person's, a phone search lists the matching cards, and Also At The Top lists
+  any other card at the top. Loops through a seat are refused. Left: staging takes the sheet's
+  corrections on screen and the roster step goes back on the server
+  (`docs/runbooks/staff-roster.md` §2, §6).
 - 18/10/2026 · LA · People · Attendance (#25): Homes beside Register and Exceptions, remote staff's home locations waiting first (Waiting, Approved, Rejected, All), each with the person, accuracy, when it was sent, how far it is from the home in force and, for scope all, the address and point (masked under personal details); People with scope all approve or reject one (a reason the person reads, never their own), and a link opens it (`?home=`). A remote punch outside the approved home is `outside_home` (warn reviews, block rejects); no approved home is Location Unverified for review. `attendance_home`, `home_radius_m` and the type in `1310`, its name in `1391`; five routes, two events; no address or point in any event, notification, audit line, AI read or search result. 41 integration tests on the real migrations, 35 unit tests. Left: hybrid staff's home days, temporary homes and field assignments (§13).
 - 17/10/2026 · LA · People · Attendance (#25), Devices (#27) and Worksites (#28) on the real API (`docs/guides/attendance.md`): modules `attendance`, `devices`, `worksites`, migration `1300`, reference seed `1390`. The punch is judged on the server (clock guard, geofence off, warn or block, device off, warn or block, device time ahead), recorded with its evidence and the day in one transaction with its event, audit and outbox rows, under an advisory lock and an Idempotency-Key; the day-close (01:30) opens missing clock-outs and absences once. People see the day's figures and register within their scope, a person's day with each punch's evidence (coordinates for scope all only), and decide exceptions (accept, reject, add the clock-out; scope all, never their own); Export Register emails up to 31 days. Devices: Remove Device with a reason. Worksites: add, edit, retire, restore, assign. 34 integration tests on the real migrations, 43 unit tests, 4 panel tests; checked on the real API at 390 and 1440 px. Left: the map and address search (F21), field assignments and approved homes (§13), the late-query rule (M3), Settings · Attendance Policy (M9).
 - 17/10/2026 · AJ · People · Leave (#26): Leave Types (add, change, retire; delete only a type nothing has used, `LEAVE_TYPE_IN_USE` otherwise) and Allowances (one person's allowance of a type for a year, or back to the type's; the person is told). The four types are seeded in `seeds/reference/1290_seed_leave.sql` with DO NOTHING, by the team lead's decision of 17/10/2026 (an exception to A26), replacing the staging seed. 15 leave integration tests.
@@ -907,10 +954,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Imports (#93): a row saved with something missing (a warning: a person left
+  without a Line Manager, say) is a problem beside the errors and duplicates. The preview lists
+  those rows (`GET /imports/:id/rows?status=problem`, contract `ImportRowListQuery`) and counts
+  them, in amber when nothing blocks, and the history's Problems column counts them too, so the
+  preview never says Every Row Is Fine over a person left at the top of the tree
+  (`docs/guides/foundation.md` §10.1, §11). Left: nothing.
 - 18/10/2026 · TB · Roles & Permissions (#71) redesigned from three drawn options per shell (`docs/guides/foundation.md` §6.10): desktop is a split view, the roles beside the role in view with Access, Details and People, and Roles or Matrix at the page head; the phone opens a role full screen with its modules grouped by level as chips, a chip opening a sheet while editing. Each module's access is one level (No Access, View, Add, Edit, Full) with Approve and Export, mapped to the six actions on screen only (the API and contract are unchanged; a grant that fits no level reads Custom). Edit Role, then Save Role reviews what the role gains, loses and changes and how many people it reaches. The letters T, O, A, X carry help and a key; the role's summary sits behind an ⓘ; People lists who holds it and opens their login on Users (Users now opens a login linked by `?id=`). Unsaved edits ask before another role, the matrix, New Role or another screen; New Role is a name and Start From, then the role opens in place through Access, Details and Review. New shared components: `LevelMeter`, `ItemChip`, `StepBar` (Wizard uses it) and `RadioCards`; the app router gains `useLeaveGuard`. Left: nothing.
 - 17/10/2026 · TB · Approvals (#72) built on the real API, track D of `docs/guides/foundation.md`: the
   flows (25 a page, with search), their KPIs (Flows, Open Requests, Overdue, Needs Fixing), a flow's

@@ -1,6 +1,6 @@
 import type { ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
 import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
-import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
+import { accepted, at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
 import roster from "../data/roster.json";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
@@ -452,6 +452,9 @@ route("GET /api/v1/org-chart", (req) => {
     roots: nodes.filter((n) => !n.manager_node_id).length,
   });
 });
+
+/* Download PDF: the real API queues the chart for the worker, which emails it; the mock only says where it would go. */
+route("POST /api/v1/org-chart/exports", (req) => ({ ...accepted(), body: { queued: true, email: byKey(req.user!)!.work_email } }));
 
 /* ------------------------------------------------------------------ *
  * Leave, in the contract's shapes (packages/contract/schemas/leave.js)

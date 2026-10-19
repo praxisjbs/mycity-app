@@ -1,30 +1,41 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { api } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import type { OrgNode } from "@/api/types/organisation";
+import type { ManagerRef, OrgNode } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { ReportingForm, type ReportingSubject } from "@/features/shared/ReportingForm";
 import { useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
+import { visibleTabs } from "@/shell/access";
+import { moduleByKey } from "@/shell/catalogue";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Banner,
   Button,
   Card,
   cn,
+  EmptyState,
   ErrorState,
+  ExportButton,
   Field,
   FormFooter,
   HelpTerm,
   Icon,
   initials,
+  KeyValue,
   LoadingRows,
+  ModalFooter,
   PageHeader,
+  Pill,
   SearchInput,
+  SegmentedControl,
   SelectField,
   TextField,
   toast,
   useIsPhone,
   useModal,
+  Who,
 } from "@mycity/ui";
 
 /**
@@ -36,9 +47,29 @@ import {
  * `manager_node_id`; the dotted line is drawn beside it and changes nothing about who
  * approves what (§6). Salary, bank details and phone numbers are never on a card.
  *
- * On a phone it is not the tree shrunk but a focus view (§10.2): who the focused person
- * reports to, the person, and their direct reports, each a tap away.
+ * A person's card opens their sheet on both shells: what the chart holds about them, with
+ * Send Message, and Open Record and Change Manager for whoever may (§8).
+ *
+ * On a phone it is not the tree shrunk (§10.2) but two views of it. Everyone is the whole
+ * company as one indented list that folds; Focus is one card and what is around it: the
+ * path from the top, the manager, the reports, the dotted-line reports and the colleagues.
  */
+const DOTTED_HELP = "A second manager for matrix work. It does not change who approves leave, expenses or tasks.";
+
+/** Everyone's indent per level, held at the fifth so a deep branch never runs off a phone. */
+const INDENT = ["pl-0", "pl-4", "pl-8", "pl-12", "pl-16"];
+
+/** The line from the top down to a card, the card last. */
+function pathTo(n: OrgNode, byId: Map<string, OrgNode>): OrgNode[] {
+  const out = [n];
+  const seen = new Set([n.node_id]);
+  for (let up = n.manager_node_id ? byId.get(n.manager_node_id) : undefined; up && !seen.has(up.node_id); up = up.manager_node_id ? byId.get(up.manager_node_id) : undefined) {
+    seen.add(up.node_id);
+    out.unshift(up);
+  }
+  return out;
+}
+
 /**
  * `openId`: a node to open on (a search result for an open seat, `?id=` in the address):
  * the phone focuses it, the desktop tree marks it as the search box marks a match.
@@ -55,7 +86,10 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   const [dragging, setDragging] = useState<OrgNode | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string> | null>(null);
+  const [expandedAll, setExpandedAll] = useState(0);
   const [focus, setFocus] = useState<string | null>(null);
+  /* People opens on the whole company, Org Chart on the person looking (§10.2). */
+  const [view, setView] = useState<"focus" | "everyone">(builder ? "everyone" : "focus");
   const addRole = () => modal.open({ title: "Add Open Role", body: (close) => <SeatForm close={close} onSaved={reload} /> });
   const editRole = (n: OrgNode) =>
     modal.open({
@@ -70,23 +104,61 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   useEffect(() => {
     if (!opened) return;
     setFocus(opened.node_id);
-    setQ(opened.display_name);
-  }, [opened]);
+    setView("focus");
+    /* The desktop tree marks it as a search would; a phone opens straight on it. */
+    if (!phone) setQ(opened.display_name);
+  }, [opened, phone]);
   const children = useMemo(() => {
     const m = new Map<string | null, OrgNode[]>();
     for (const n of nodes) m.set(n.manager_node_id, [...(m.get(n.manager_node_id) ?? []), n]);
     return m;
   }, [nodes]);
-  const roots = useMemo(() => children.get(null) ?? [], [children]);
+  const dottedReports = useMemo(() => {
+    const m = new Map<string, OrgNode[]>();
+    for (const n of nodes) if (n.dotted_manager_node_id) m.set(n.dotted_manager_node_id, [...(m.get(n.dotted_manager_node_id) ?? []), n]);
+    return m;
+  }, [nodes]);
+  /* The CEO is the top whatever else sits there; the rest keep the server's order. */
+  const roots = useMemo(
+    () => [...(children.get(null) ?? [])].sort((a, b) => Number(b.is_ceo) - Number(a.is_ceo)),
+    [children],
+  );
+  const top = roots[0]?.node_id ?? null;
+  /* Every place below each card, people and open roles alike, as the tree draws them (§6). */
+  const below = useMemo(() => {
+    const out = new Map<string, number>();
+    const count = (n: OrgNode): number => {
+      const total = (children.get(n.node_id) ?? []).reduce((s, k) => s + 1 + count(k), 0);
+      out.set(n.node_id, total);
+      return total;
+    };
+    roots.forEach(count);
+    return out;
+  }, [children, roots]);
+  const teamOf = (n: OrgNode) => {
+    const direct = children.get(n.node_id)?.length ?? 0;
+    const all = below.get(n.node_id) ?? direct;
+    if (!direct) return null;
+    return all > direct ? `${direct} direct · ${all} in all` : `${direct} direct`;
+  };
+  /* The person looking, on Org Chart: where its phone starts, and the branch it opens. */
+  const mine = !builder && me.employee_id && byId.has(me.employee_id) ? me.employee_id : null;
   const scroller = useRef<HTMLDivElement>(null);
 
-  /* A wide tree opens centred on its top. */
+  /*
+   * A wide tree opens centred on its top, the CEO's card, wherever the other roots fall,
+   * and comes back to it after Expand All, which widens every branch at once.
+   */
   useEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
-  }, [data]);
+    const card = el?.querySelector<HTMLElement>("[data-top]");
+    if (!el || !card) return;
+    const box = el.getBoundingClientRect();
+    const at = card.getBoundingClientRect();
+    el.scrollLeft += at.left + at.width / 2 - (box.left + box.width / 2);
+  }, [data, expandedAll]);
 
-  /* Start with the top three levels open; deeper branches open on a tap. */
+  /* Start with the top three levels open, and on Org Chart the way down to the person looking. */
   const folded = useMemo(() => {
     if (collapsed) return collapsed;
     const out = new Set<string>();
@@ -96,10 +168,20 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       kids.forEach((k) => walk(k, depth + 1));
     };
     roots.forEach((r) => walk(r, 0));
+    const self = mine ? byId.get(mine) : undefined;
+    if (self) for (const up of pathTo(self, byId)) out.delete(up.node_id);
     return out;
-  }, [collapsed, children, roots]);
+  }, [collapsed, children, roots, mine, byId]);
+  const fold = (id: string) =>
+    setCollapsed(() => {
+      const x = new Set(folded);
+      if (x.has(id)) x.delete(id);
+      else x.add(id);
+      return x;
+    });
 
-  const hit = (n: OrgNode) => !!q.trim() && `${n.display_name} ${n.job_title} ${n.department}`.toLowerCase().includes(q.trim().toLowerCase());
+  const term = q.trim().toLowerCase();
+  const hit = (n: OrgNode) => !!term && `${n.display_name} ${n.job_title} ${n.department}`.toLowerCase().includes(term);
 
   const drop = async (target: OrgNode, e: DragEvent) => {
     e.preventDefault();
@@ -120,14 +202,65 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
     }
   };
 
-  const openNode = (n: OrgNode) => {
-    if (n.employee_id) navigate(hrefFor("people", "employees", { id: n.employee_id }));
+  /* What a person's sheet offers follows the grants, never a role's name (§8). */
+  const people = moduleByKey("people");
+  const canOpenRecords = Boolean(people && me.grants.people?.includes("view") && visibleTabs(me, people).some((t) => t.slug === "employees"));
+  const canMove = Boolean(me.grants.people?.includes("edit"));
+  const ref = (m: OrgNode | undefined): ManagerRef | null =>
+    m ? { employee_id: m.employee_id, org_seat_id: m.org_seat_id, display_name: m.display_name, job_title: m.job_title, vacant: m.vacant } : null;
+
+  const openPerson = (n: OrgNode) => {
+    const employeeId = n.employee_id;
+    if (!employeeId) return;
+    const manager = n.manager_node_id ? byId.get(n.manager_node_id) : undefined;
+    const subject: ReportingSubject = {
+      employee_id: employeeId,
+      display_name: n.display_name,
+      line_manager: ref(manager),
+      dotted_manager: ref(n.dotted_manager_node_id ? byId.get(n.dotted_manager_node_id) : undefined),
+    };
+    const go = (close: () => void, href: string) => (close(), navigate(href));
+    modal.open({
+      title: "Profile",
+      body: (close) => (
+        <PersonSheet
+          n={n}
+          manager={manager}
+          team={teamOf(n)}
+          self={employeeId === me.employee_id}
+          canOpenRecord={canOpenRecords}
+          canChangeManager={canMove && !n.is_ceo}
+          onMessage={() => go(close, hrefFor("community", "direct-messages", { to: employeeId }))}
+          onOpenRecord={() => go(close, hrefFor("people", "employees", { id: employeeId }))}
+          onMyProfile={() => go(close, hrefFor("ess", "my-profile"))}
+          onChangeManager={() =>
+            modal.open({ title: "Change Reporting Line", body: (done) => <ReportingForm employee={subject} close={done} onSaved={reload} /> })
+          }
+        />
+      ),
+    });
   };
+
+  /* A card with reports, a person's or an open seat's, folds and unfolds its branch. */
+  const toggle = (n: OrgNode) =>
+    (children.get(n.node_id)?.length ?? 0) > 0 && (
+      <button
+        type="button"
+        aria-label={folded.has(n.node_id) ? "Expand" : "Collapse"}
+        onClick={(e) => (e.stopPropagation(), fold(n.node_id))}
+        className="absolute -bottom-2.5 left-1/2 z-1 flex h-5.5 min-w-5.5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card px-1.5 text-2xs font-bold text-muted-foreground"
+      >
+        {folded.has(n.node_id) ? `+${children.get(n.node_id)!.length}` : "−"}
+      </button>
+    );
 
   const card = (n: OrgNode) => {
     if (n.vacant)
       return (
-        <div className={cn("og-card relative w-44 rounded-card border border-dashed border-input bg-transparent px-3 py-2.5 text-center", hit(n) && "border-ring ring-2 ring-accent")}>
+        <div
+          data-top={n.node_id === top ? "" : undefined}
+          className={cn("og-card relative w-44 rounded-card border border-dashed border-input bg-transparent px-3 py-2.5 text-center", hit(n) && "border-ring ring-2 ring-accent")}
+        >
           <span className="mx-auto mb-2 flex size-10.5 items-center justify-center rounded-full border border-dashed border-input bg-muted text-subtle-foreground">
             <Icon name="plus" />
           </span>
@@ -155,15 +288,18 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           ) : (
             <span className="mt-2 inline-block rounded-full border border-dashed border-input px-2 py-0.5 text-2xs font-strong text-subtle-foreground">Open role</span>
           )}
+          {toggle(n)}
         </div>
       );
     return (
       <div
         tabIndex={0}
+        data-top={n.node_id === top ? "" : undefined}
         draggable={builder && !n.is_ceo}
         onDragStart={() => setDragging(n)}
         onDragEnd={() => (setDragging(null), setOver(null))}
-        onClick={() => openNode(n)}
+        onClick={() => openPerson(n)}
+        onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && openPerson(n)}
         className={cn(
           "og-card relative w-44 cursor-pointer rounded-card border bg-card px-3 py-2.5 text-center shadow-1 transition hover:border-input hover:shadow-2",
           n.is_ceo ? "border-primary shadow-1 ring-2 ring-primary-tint" : "border-border",
@@ -179,24 +315,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         <span className="mt-2 inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{n.department}</span>
         {n.meta && <span className="mt-1.5 block text-2xs text-subtle-foreground">{n.meta}</span>}
         {n.dotted_line_to && <span className="mt-1.5 inline-block rounded-full border border-dashed border-input px-2 py-px text-2xs text-subtle-foreground">{`Dotted line · ${n.dotted_line_to}`}</span>}
-        {(children.get(n.node_id)?.length ?? 0) > 0 && (
-          <button
-            type="button"
-            aria-label={folded.has(n.node_id) ? "Expand" : "Collapse"}
-            onClick={(e) => (
-              e.stopPropagation(),
-              setCollapsed(() => {
-                const x = new Set(folded);
-                if (x.has(n.node_id)) x.delete(n.node_id);
-                else x.add(n.node_id);
-                return x;
-              })
-            )}
-            className="absolute -bottom-2.5 left-1/2 z-1 flex h-5.5 min-w-5.5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card px-1.5 text-2xs font-bold text-muted-foreground"
-          >
-            {folded.has(n.node_id) ? `+${children.get(n.node_id)!.length}` : "−"}
-          </button>
-        )}
+        {toggle(n)}
       </div>
     );
   };
@@ -217,9 +336,18 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
     );
   };
 
-  /* The phone's focus: the signed-in person on the viewer, the top of the tree on the builder. */
-  const start = builder ? (roots[0]?.node_id ?? null) : (me.employee_id ?? roots[0]?.node_id ?? null);
-  const focused = (focus && byId.get(focus)) || (start ? byId.get(start) : undefined) || roots[0];
+  /*
+   * The phone's focus: the signed-in person on the viewer, or the top when they are not
+   * on the chart; the top on the builder. Anyone else at the top is listed beside a root,
+   * so every card can be reached, and a search lists the cards that match instead.
+   */
+  const start = mine ?? top;
+  const focused = (focus && byId.get(focus)) || (start ? byId.get(start) : undefined);
+  const others = focused && !focused.manager_node_id ? roots.filter((r) => r.node_id !== focused.node_id) : [];
+  const colleagues = focused?.manager_node_id ? (children.get(focused.manager_node_id) ?? []).filter((n) => n.node_id !== focused.node_id) : [];
+  const matches = term ? nodes.filter(hit) : [];
+  const focusOn = (id: string) => (setFocus(id), setQ(""), setView("focus"));
+  const exportPdf = () => api.call("POST /api/v1/org-chart/exports", { body: { view: mode } });
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
@@ -231,13 +359,11 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         actions={
           <>
             <SearchInput value={q} onChange={setQ} placeholder="Name or role" className="w-48 max-md:w-full" />
-            {builder && !phone && <Button onClick={() => setCollapsed(new Set())}>Expand All</Button>}
-            {builder && <Button icon="plus" onClick={addRole}>Add Role</Button>}
-            {!phone && (
-              <Button icon="doc" onClick={() => toast("PDF queued, check your Mailbox")}>
-                Download PDF
-              </Button>
-            )}
+            {builder && !phone && <Button onClick={() => (setCollapsed(new Set()), setExpandedAll((n) => n + 1))}>Expand All</Button>}
+            {builder && !phone && <Button icon="plus" onClick={addRole}>Add Role</Button>}
+            <ExportButton onExport={exportPdf} message="PDF on its way to your email">
+              Download PDF
+            </ExportButton>
           </>
         }
       />
@@ -250,11 +376,11 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         <div className="mt-0.5 mb-1 flex flex-wrap gap-4 text-2xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <i className="inline-block w-5.5 border-t-2 border-input" />
-            <HelpTerm help="Drag a card onto a new manager to change its reporting line.">Reporting Line</HelpTerm>
+            {builder ? <HelpTerm help="Drag a card onto a new manager to change its reporting line.">Reporting Line</HelpTerm> : "Reporting Line"}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <i className="inline-block w-5.5 border-t-2 border-dashed border-input" />
-            <HelpTerm help="A second manager for matrix work. It does not change who approves leave, expenses or tasks.">Dotted Line</HelpTerm>
+            <HelpTerm help={DOTTED_HELP}>Dotted Line</HelpTerm>
           </span>
           <span className="inline-flex items-center gap-1.5">
             <i className="inline-block size-3 rounded bg-primary" />
@@ -270,19 +396,42 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         <Card className="p-1.5">
           <LoadingRows count={5} />
         </Card>
+      ) : phone && term ? (
+        <Matches nodes={matches} teamOf={teamOf} onPick={(n) => focusOn(n.node_id)} />
       ) : phone ? (
-        <Focus
-          focused={focused}
-          manager={focused?.manager_node_id ? byId.get(focused.manager_node_id) : undefined}
-          reports={children.get(focused?.node_id ?? "") ?? []}
-          childrenOf={(id) => (children.get(id) ?? []).length}
-          onFocus={setFocus}
-          onOpen={openNode}
-          onEditRole={editRole}
-          builder={builder}
-          atStart={!focus || focus === start}
-          onStart={() => setFocus(null)}
-        />
+        <>
+          <SegmentedControl
+            label="View"
+            value={view}
+            onChange={setView}
+            options={[
+              ["focus", "Focus"],
+              ["everyone", "Everyone"],
+            ]}
+            className="mb-3"
+          />
+          {view === "everyone" ? (
+            <Everyone roots={roots} childrenOf={(id) => children.get(id) ?? []} folded={folded} onFold={fold} teamOf={teamOf} mine={mine} onPick={(n) => focusOn(n.node_id)} />
+          ) : (
+            <Focus
+              focused={focused}
+              path={focused ? pathTo(focused, byId) : []}
+              manager={focused?.manager_node_id ? byId.get(focused.manager_node_id) : undefined}
+              reports={children.get(focused?.node_id ?? "") ?? []}
+              dotted={dottedReports.get(focused?.node_id ?? "") ?? []}
+              colleagues={colleagues}
+              others={others}
+              teamOf={teamOf}
+              onFocus={setFocus}
+              onOpen={openPerson}
+              onEditRole={editRole}
+              builder={builder}
+              atStart={!focus || focus === start}
+              startLabel={mine ? "Show Me" : "Show Top"}
+              onStart={() => setFocus(null)}
+            />
+          )}
+        </>
       ) : (
         <Card className="p-1.5">
           <div ref={scroller} className="ogt" data-copy="content">
@@ -294,67 +443,219 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   );
 }
 
-/** The phone's focus view: the manager above, the person, and the reports below. */
+/** One card of the phone's views: a tap moves the focus to it, or on the focused person opens their sheet. */
+function NodeTile({
+  n,
+  large = false,
+  team,
+  you = false,
+  dotted = true,
+  onPick,
+}: {
+  n: OrgNode;
+  large?: boolean;
+  team: string | null;
+  you?: boolean;
+  /** The dotted-line tag; off where the section already says whose dotted line it is. */
+  dotted?: boolean;
+  onPick?: (n: OrgNode) => void;
+}) {
+  const body = (
+    <>
+      <span
+        aria-hidden
+        className={cn(
+          "flex flex-none items-center justify-center rounded-full font-bold",
+          large ? "size-13 text-base" : "size-10.5 text-sm",
+          n.vacant ? "border border-dashed border-input bg-muted text-subtle-foreground" : n.is_ceo ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground",
+        )}
+      >
+        {n.vacant ? <Icon name="plus" /> : initials(n.display_name)}
+      </span>
+      <span className="min-w-0 flex-1" data-copy="content">
+        <b className={cn("block truncate font-strong", large ? "text-base" : "text-sm")}>{n.display_name}</b>
+        <span className="block truncate text-2xs text-muted-foreground">{n.vacant ? `Vacant · ${n.department}` : `${n.job_title} · ${n.department}`}</span>
+        {large && n.meta && <span className="block truncate text-2xs text-subtle-foreground">{n.meta}</span>}
+        {team && <span className="block truncate text-2xs text-subtle-foreground">{team}</span>}
+        {dotted && n.dotted_line_to && <span className="block truncate text-2xs text-subtle-foreground">{`Dotted line · ${n.dotted_line_to}`}</span>}
+      </span>
+      {you && <Pill tone="neutral">You</Pill>}
+      {onPick && <Icon name="right" className="flex-none text-subtle-foreground" />}
+    </>
+  );
+  /* min-w-0: beside Everyone's fold arrow a tile is a flex item, and must shrink to truncate its text. */
+  const box = cn(
+    "flex min-h-tap w-full min-w-0 items-center gap-3 rounded-card border bg-card px-3 py-2.5 text-left",
+    n.vacant ? "border-dashed border-input" : "border-border",
+    large && "border-2 border-secondary py-3.5",
+  );
+  return onPick ? (
+    <button type="button" onClick={() => onPick(n)} className={box}>
+      {body}
+    </button>
+  ) : (
+    <div className={box}>{body}</div>
+  );
+}
+
+/** A titled list of cards on a phone, "Direct Reports · 3"; nothing when it is empty. */
+function Section({
+  title,
+  nodes,
+  teamOf,
+  onPick,
+  dotted = true,
+}: {
+  title: string;
+  nodes: OrgNode[];
+  teamOf: (n: OrgNode) => string | null;
+  onPick: (n: OrgNode) => void;
+  dotted?: boolean;
+}) {
+  if (!nodes.length) return null;
+  return (
+    <section>
+      <h2 className="mb-1.5 text-2xs font-strong text-subtle-foreground uppercase" data-ui="title">
+        {`${title} · ${nodes.length}`}
+      </h2>
+      <div className="flex flex-col gap-2">
+        {nodes.map((n) => (
+          <NodeTile key={n.node_id} n={n} team={teamOf(n)} dotted={dotted} onPick={onPick} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** The phone's search: the people and open roles that match, each a tap from the focus. */
+function Matches({ nodes, teamOf, onPick }: { nodes: OrgNode[]; teamOf: (n: OrgNode) => string | null; onPick: (n: OrgNode) => void }) {
+  if (!nodes.length) return <EmptyState illustration="Search" title="No Match" text="Try another name or role." />;
+  return <Section title="Matches" nodes={nodes} teamOf={teamOf} onPick={onPick} />;
+}
+
+/** The phone's whole company: one indented list, folding as the desktop tree does; a tap focuses a row. */
+function Everyone({
+  roots,
+  childrenOf,
+  folded,
+  onFold,
+  teamOf,
+  mine,
+  onPick,
+}: {
+  roots: OrgNode[];
+  childrenOf: (id: string) => OrgNode[];
+  folded: Set<string>;
+  onFold: (id: string) => void;
+  teamOf: (n: OrgNode) => string | null;
+  mine: string | null;
+  onPick: (n: OrgNode) => void;
+}) {
+  const rows: Array<{ n: OrgNode; depth: number }> = [];
+  const walk = (n: OrgNode, depth: number) => {
+    rows.push({ n, depth });
+    if (!folded.has(n.node_id)) childrenOf(n.node_id).forEach((k) => walk(k, depth + 1));
+  };
+  roots.forEach((r) => walk(r, 0));
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {rows.map(({ n, depth }) => {
+        const kids = childrenOf(n.node_id).length;
+        const shut = folded.has(n.node_id);
+        return (
+          <li key={n.node_id} className={cn("flex items-center gap-1", INDENT[Math.min(depth, INDENT.length - 1)])}>
+            {kids > 0 ? (
+              <button
+                type="button"
+                aria-expanded={!shut}
+                aria-label={`${shut ? "Expand" : "Collapse"} ${n.display_name}`}
+                onClick={() => onFold(n.node_id)}
+                className="flex size-tap flex-none items-center justify-center rounded-full text-muted-foreground"
+              >
+                <Icon name={shut ? "right" : "down"} />
+              </button>
+            ) : (
+              <span className="size-tap flex-none" aria-hidden />
+            )}
+            <NodeTile n={n} team={teamOf(n)} you={n.node_id === mine} onPick={onPick} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** The phone's focus view: the path from the top, the manager, the person, and the people around them. */
 function Focus({
   focused,
+  path,
   manager,
   reports,
-  childrenOf,
+  dotted,
+  colleagues,
+  others,
+  teamOf,
   onFocus,
   onOpen,
   onEditRole,
   builder,
   atStart,
+  startLabel,
   onStart,
 }: {
   focused: OrgNode | undefined;
+  path: OrgNode[];
   manager: OrgNode | undefined;
   reports: OrgNode[];
-  childrenOf: (id: string) => number;
+  dotted: OrgNode[];
+  colleagues: OrgNode[];
+  others: OrgNode[];
+  teamOf: (n: OrgNode) => string | null;
   onFocus: (id: string) => void;
   onOpen: (n: OrgNode) => void;
   onEditRole: (n: OrgNode) => void;
   builder: boolean;
   atStart: boolean;
+  startLabel: string;
   onStart: () => void;
 }) {
   const { navigate } = useRouter();
   if (!focused) return null;
-  const tile = (n: OrgNode, size: "sm" | "lg") => (
-    <button
-      key={n.node_id}
-      type="button"
-      onClick={() => onFocus(n.node_id)}
-      data-copy="content"
-      className={cn(
-        "flex min-h-tap w-full items-center gap-3 rounded-card border bg-card px-3 py-2.5 text-left",
-        n.vacant ? "border-dashed border-input" : "border-border",
-        size === "lg" && "border-2 border-secondary",
-      )}
-    >
-      <span className={cn("flex size-10.5 flex-none items-center justify-center rounded-full text-sm font-bold", n.vacant ? "border border-dashed border-input bg-muted text-subtle-foreground" : "bg-accent text-accent-foreground")}>
-        {n.vacant ? <Icon name="plus" /> : initials(n.display_name)}
-      </span>
-      <span className="min-w-0 flex-1">
-        <b className="block truncate text-sm font-strong">{n.display_name}</b>
-        <span className="block truncate text-2xs text-muted-foreground">{n.vacant ? `Vacant · ${n.department}` : n.job_title}</span>
-        {n.dotted_line_to && <span className="block truncate text-2xs text-subtle-foreground">{`Dotted line · ${n.dotted_line_to}`}</span>}
-      </span>
-      {childrenOf(n.node_id) > 0 && <span className="flex-none rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{childrenOf(n.node_id)}</span>}
-    </button>
-  );
+  const pick = (n: OrgNode) => onFocus(n.node_id);
 
   return (
     <div className="flex flex-col gap-3">
+      {path.length > 1 && (
+        <nav aria-label="Reporting line" data-copy="content">
+          <ol className="flex flex-wrap items-center gap-1">
+            {path.map((p, i) => (
+              <li key={p.node_id} className="flex items-center gap-1">
+                {i > 0 && <Icon name="right" className="text-subtle-foreground" />}
+                {i < path.length - 1 ? (
+                  <button type="button" onClick={() => pick(p)} className="inline-flex min-h-tap items-center rounded-full border border-border bg-card px-3 text-xs font-strong">
+                    {p.display_name}
+                  </button>
+                ) : (
+                  <span aria-current="true" className="inline-flex min-h-tap items-center rounded-full border border-secondary bg-accent px-3 text-xs font-strong text-accent-foreground">
+                    {p.display_name}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
       {manager && (
         <section>
           <h2 className="mb-1.5 text-2xs font-strong text-subtle-foreground uppercase" data-ui="title">
             Reports To
           </h2>
-          {tile(manager, "sm")}
+          <NodeTile n={manager} team={teamOf(manager)} onPick={pick} />
         </section>
       )}
-      <section>{tile(focused, "lg")}</section>
+      <section>
+        <NodeTile n={focused} large team={teamOf(focused)} onPick={focused.vacant ? undefined : onOpen} />
+      </section>
       {focused.vacant && builder && (
         <>
           <Button variant="primary" className="w-full" icon="plus" onClick={() => navigate(hrefFor("recruitment", "vacancies", { new: "1", title: focused.display_name }))}>
@@ -365,23 +666,79 @@ function Focus({
           </Button>
         </>
       )}
-      {!focused.vacant && (
-        <Button className="w-full" onClick={() => onOpen(focused)}>
-          Open Record
-        </Button>
-      )}
-      <section>
-        <h2 className="mb-1.5 text-2xs font-strong text-subtle-foreground uppercase" data-ui="title">
-          {`Direct Reports · ${reports.length}`}
-        </h2>
-        <div className="flex flex-col gap-2">{reports.map((r) => tile(r, "sm"))}</div>
-      </section>
+      <Section title="Direct Reports" nodes={reports} teamOf={teamOf} onPick={pick} />
+      <Section title="Dotted Line" nodes={dotted} teamOf={teamOf} onPick={pick} dotted={false} />
+      <Section title="Same Manager" nodes={colleagues} teamOf={teamOf} onPick={pick} />
+      <Section title="Also At The Top" nodes={others} teamOf={teamOf} onPick={pick} />
       {!atStart && (
         <Button className="w-full" onClick={onStart}>
-          {builder ? "Show Top" : "Show Me"}
+          {startLabel}
         </Button>
       )}
     </div>
+  );
+}
+
+/**
+ * A person's sheet: what the chart holds about them, and what the person looking may do with
+ * it (organogram.md §8). Send Message for everyone, My Profile on your own card, Open Record
+ * and Change Manager by grant.
+ */
+function PersonSheet({
+  n,
+  manager,
+  team,
+  self,
+  canOpenRecord,
+  canChangeManager,
+  onMessage,
+  onOpenRecord,
+  onMyProfile,
+  onChangeManager,
+}: {
+  n: OrgNode;
+  manager: OrgNode | undefined;
+  team: string | null;
+  self: boolean;
+  canOpenRecord: boolean;
+  canChangeManager: boolean;
+  onMessage: () => void;
+  onOpenRecord: () => void;
+  onMyProfile: () => void;
+  onChangeManager: () => void;
+}) {
+  const items: Array<[ReactNode, ReactNode]> = [["Department", n.department]];
+  if (manager) items.push(["Reports To", manager.vacant ? `${manager.display_name} (open role)` : manager.display_name]);
+  if (n.dotted_line_to)
+    items.push([
+      <HelpTerm key="dotted" help={DOTTED_HELP}>
+        Dotted Line
+      </HelpTerm>,
+      n.dotted_line_to,
+    ]);
+  if (team) items.push(["Team", team]);
+  return (
+    <>
+      <div className="mb-3" data-copy="content">
+        <Who name={n.display_name} role={n.job_title} size="lg" />
+      </div>
+      <KeyValue items={items} />
+      <ModalFooter>
+        {self ? (
+          <Button variant="primary" onClick={onMyProfile}>
+            My Profile
+          </Button>
+        ) : (
+          <>
+            {canChangeManager && <Button onClick={onChangeManager}>Change Manager</Button>}
+            {canOpenRecord && <Button onClick={onOpenRecord}>Open Record</Button>}
+            <Button variant="primary" icon="msg" onClick={onMessage}>
+              Send Message
+            </Button>
+          </>
+        )}
+      </ModalFooter>
+    </>
   );
 }
 

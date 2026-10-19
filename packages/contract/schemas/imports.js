@@ -220,9 +220,15 @@ const ImportRowRecord = z
   })
   .strict();
 
-const ImportRowListQuery = listQuery({ status: ImportRowStatus.optional() }, [
-  "row_number",
-]);
+/**
+ * A batch's rows by status, or "problem" for every row the preview lists: an error, a
+ * duplicate, or a warning (a row that saves with something missing, such as a Line
+ * Manager nobody holds).
+ */
+const ImportRowListQuery = listQuery(
+  { status: z.enum([...ImportRowStatus.options, "problem"]).optional() },
+  ["row_number"],
+);
 const ImportRowPage = Paged(ImportRowRecord);
 
 /** GET /imports: the history. */

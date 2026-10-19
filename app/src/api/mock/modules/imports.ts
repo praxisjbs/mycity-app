@@ -86,7 +86,12 @@ route("GET /api/v1/imports/:id/rows", (req) =>
       },
     ],
     req,
-    { filters: { status: (r, v) => r.status === v } },
+    {
+      filters: {
+        /* "problem" is the preview's list, as on the API: errors, duplicates and warnings. */
+        status: (r, v) => r.status === v || (v === "problem" && ["error", "duplicate", "warning"].includes(r.status)),
+      },
+    },
   ),
 );
 

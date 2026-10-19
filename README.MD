@@ -304,7 +304,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `security` | `.mfa` (TOTP codes, recovery codes), `.passkeys` (WebAuthn), `.pin`, `.challenge` (single-use tickets), `.signin` (what `identity`'s sign-in calls) | Each person's two-step sign-in, passkeys and PIN, the fresh-sign-in check, Reset Two-Step (`docs/guides/identity.md`); came forward from M9 (TB, 16/10/2026) |
 | `access` | | Roles created, edited and deleted with their grants, record scope, field visibility and capabilities; the matrix; two-step required by role (`docs/guides/foundation.md` §6.3) |
 | `audit` | `audit.events.js` (the emailed Excel export) | Audit ledger read at 25 with filters, the summary, masked per reader |
-| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram |
+| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template), `org-chart.export.js` (Download PDF in the worker: drawn as the person asking, rendered, emailed) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
 | `notifications` | `notifications.preferences.js`, `notifications.reminders.js` (M6) | Caller's own inbox |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
@@ -333,7 +333,9 @@ Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/d
 `shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence).
 
 Templates first filled in M1: `templates/documents/report.html` (a report run, landscape, its RPT
-number on it) and `templates/email/scheduled-report.html` (the report's file attached).
+number on it) and `templates/email/scheduled-report.html` (the report's file attached);
+`templates/documents/org-chart.html` (Download PDF: the whole organogram on one page sized to it)
+and `templates/email/org-chart-export.html` (the PDF attached).
 
 **M1 mailbox rule:** cut the five `require` lines into triage, binding and assist before anything else
 (MILESTONES §6.5). `mailbox/binding/` stays empty until M7.
