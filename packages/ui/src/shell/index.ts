@@ -8,6 +8,7 @@ export * from "./CommandPalette";
 export * from "./DesktopShell";
 export * from "./FloatingButton";
 export * from "./MoreSheet";
+export * from "./NotificationCenter";
 export * from "./NotificationRow";
 export * from "./PhoneHeader";
 export * from "./PhoneShell";

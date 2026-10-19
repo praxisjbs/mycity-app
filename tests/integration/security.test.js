@@ -617,10 +617,13 @@ describeDb("two-step sign-in, passkeys and the PIN against the real migrations",
     });
 
     test("no PIN reaches an event or the audit", async () => {
+      // A PIN on its own: a value, a number or a word. Not four digits inside a UUID (the
+      // session and employee ids these rows carry), which made this fail now and then.
+      const pin = "(^|[^0-9a-f-])(4826|5821|9157)([^0-9a-f-]|$)";
       const leaks = await one(
         `SELECT count(*)::int AS n FROM event_log e LEFT JOIN audit_ledger a USING (event_id)
-          WHERE e.entity_id = $1 AND (e.payload::text ~ '4826|5821|9157' OR coalesce(a.after::text, '') ~ '4826|5821|9157')`,
-        [ceoId],
+          WHERE e.entity_id = $1 AND (e.payload::text ~ $2 OR coalesce(a.after::text, '') ~ $2)`,
+        [ceoId, pin],
       );
       expect(leaks.n).toBe(0);
     });

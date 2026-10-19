@@ -283,11 +283,11 @@ two-step up again.
 | `auth.signed_in` | A sign-in | Audit; New Sign-In notice (bell and email) when the browser is new and others are known |
 | `auth.sign_in_failed` | A wrong password | Audit |
 | `auth.sign_in_throttled` | The sixth wrong password in a row | Notice to the person |
-| `auth.signed_out`, `auth.session_ended` | Sign-out; a session ended by policy, the person or an administrator | Audit; notice when an administrator ended it |
+| `auth.signed_out`, `auth.session_ended` | Sign-out; a session ended by policy, the person or an administrator | Audit; notice when an administrator ended it. Sign Out Everywhere turns push off on every device of the person; Sign Out Others (`kept_session_id` in its payload) on every device but the one it was pressed on. A plain Sign Out or a session that ends leaves push on (`docs/guides/notifications.md` §6) |
 | `auth.password_changed` | Change Password | Notice to the person |
 | `auth.link_requested` | Forgot, invite, resend, reset link | Outbox `identity.send_link`: mint the token, store its hash, queue the email (no token in the event, the ledger or a notification) |
 | `auth.password_set` | A password chosen from a link | Notice after a reset |
-| `app_user.created`, `app_user.suspended`, `app_user.reactivated` | Users actions | Audit (sensitive) |
+| `app_user.created`, `app_user.suspended`, `app_user.reactivated` | Users actions | Audit (sensitive); suspension turns push off on every device of the person |
 | `access.roles_set` | Roles changed | Audit (sensitive); the grants cache is dropped |
 | `auth.two_step_started` | A set-up began | Audit |
 | `auth.two_step_on`, `auth.two_step_changed`, `auth.two_step_off` | Two-step turned on, moved to a new app, turned off | Notice to the person |
@@ -449,3 +449,4 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   module, action, capability and field), until handover, because training runs from it; what is
   the CEO's own stays the CEO's. A test in `tests/integration/settings.test.js` holds the role to
   the catalogues, so a seed that adds a module, capability or field without it fails.
+- 19/10/2026 · TB · §7: Sign Out Others names the session it kept (`kept_session_id`), so push stays on that device and goes off on the others; Sign Out Everywhere and suspension turn push off everywhere (`docs/guides/notifications.md`).
