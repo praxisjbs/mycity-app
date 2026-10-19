@@ -19,7 +19,7 @@
  * `queries.configure` capability.
  */
 const { z } = require("zod");
-const { uuid, text, isoDateTime, money, listQuery, Paged } = require("./common");
+const { uuid, text, isoDate, isoDateTime, money, listQuery, Paged } = require("./common");
 
 const LetterPurpose = z.enum(["query", "sanction"]);
 const LetterTemplateStatus = z.enum(["awaiting_sample", "draft", "active", "retired"]);
@@ -94,7 +94,8 @@ const LetterPreview = z
 
 /**
  * What every query and sanction letter may say (shared/templates/variables.js).
- * Dates arrive day-first for the reader; money as a Naira string.
+ * Dates are ISO and money a Naira string; the template formats them for the reader
+ * (`{{ longdate raised_on }}`, `{{ money fine_amount }}`, shared/documents/render.js).
  */
 const ConsequenceLetterVars = z
   .object({
@@ -111,10 +112,10 @@ const ConsequenceLetterVars = z
     details: z.string(),
     reason: z.string().nullable().default(null),
     step_name: z.string().nullable().default(null),
-    raised_on: z.string(),
-    response_due: z.string().nullable().default(null),
-    effective_on: z.string().nullable().default(null),
-    ends_on: z.string().nullable().default(null),
+    raised_on: isoDate,
+    response_due: isoDateTime.nullable().default(null),
+    effective_on: isoDate.nullable().default(null),
+    ends_on: isoDate.nullable().default(null),
     days: z.number().int().nullable().default(null),
     fine_amount: money.nullable().default(null),
     signer: z.object({ name: z.string(), role: z.string() }).strict(),

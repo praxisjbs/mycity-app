@@ -331,7 +331,7 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("queries", "sanctions"),
     self: screen("ess", "my-queries"),
   },
-  letter_template: screen("queries", "letter-templates"), // search:none not built yet (src/modules/templates)
+  letter_template: screen("queries", "letter-templates"), // search:none a handful of letters, listed whole on Letter Templates, which ⌘K finds by name
 
   // Recruitment
   vacancy: screen("recruitment", "vacancies"), // search:none not built yet (src/modules/vacancies)
@@ -398,7 +398,7 @@ const ENTITY_ROUTES = Object.freeze({
   workflow_definition: screen("settings", "approvals"),
   numbering_scheme: screen("settings", "documents-and-numbering"),
   public_holiday: screen("settings", "organisation"),
-  template: screen("settings", "documents-and-numbering"), // search:none not built yet (src/modules/templates)
+  template: screen("settings", "documents-and-numbering"), // search:none a template is opened from Settings, Documents and Numbering, which ⌘K finds by name; letters are letter_template
   // Status, Performance, Faults and Integrations sit in Settings but are held by keys of their
   // own (docs/guides/system-health.md §8, integrations.md §8): `permission` is what a viewer must
   // hold to open them. A fault opens its sheet on Faults; a check going down or coming back, and

@@ -227,8 +227,10 @@ here.
   number, subject or rung, reason, dates, fine, response due, signer), so a template added on the
   screen fills from the same record.
 - An edit saves a new `template_version`; a letter records the version it used. A template is
-  `awaiting_sample` while it has no wording (the shipped files stay empty until MyCity sends the
-  sample), `draft` until activated, `active`, or `retired`. Only an active template can be chosen.
+  `awaiting_sample` while it has no wording (the sanction letters' files stay empty until MyCity
+  sends the samples; `query-letter` ships with wording and is seeded active, so a rule can raise a
+  query on a fresh database), `draft` until activated, `active`, or `retired`. Only an active
+  template can be chosen.
 - Letter templates added on the screen take a key `<slug>-letter`; generate() is given the template
   key with the shared doc types `query_letter` and `sanction_letter` (a small extension to
   `shared/documents/generate.js`: an explicit `template` for a doc type that allows it).
@@ -362,5 +364,8 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 19/10/2026 · GE · Letter Templates built (§5, §6.7): `query-letter` ships with wording and is
+  seeded active so a rule can raise a query on a fresh database; the sanction letters stay
+  `awaiting_sample`. Letter variables carry ISO dates and the template formats them.
 - 19/10/2026 · GE · Guide written before the build: screens, data (3010, 3190 on top of the merged
   3000 and 3099), API, rules, chain, letters, and the four decisions in §13.
