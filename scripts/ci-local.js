@@ -19,6 +19,9 @@
  *   node scripts/ci-local.js --strict   NOT BUILT counts as a failure
  *   node scripts/ci-local.js --list     print the gates and exit
  *   node scripts/ci-local.js --only=progress,guides   run just these (by id)
+ *   node scripts/ci-local.js --group=backend          run one CI job's gates (backend, frontend,
+ *                                                     screens or checks; GROUPS below)
+ *   node scripts/ci-local.js --groups                 print each group's gates as JSON
  *   node scripts/ci-local.js --decide-scope   GitHub Actions: how much this run needs
  *
  * SCOPE. In GitHub Actions, ci.yml first asks how much of this a run needs
@@ -36,6 +39,8 @@ const argv = process.argv.slice(2);
 const has = (flag) => argv.includes(`--${flag}`);
 const onlyArg = argv.find((a) => a.startsWith("--only="));
 const ONLY = onlyArg ? new Set(onlyArg.slice(7).split(",")) : null;
+const groupArg = argv.find((a) => a.startsWith("--group="));
+const GROUP = groupArg ? groupArg.slice(8) : null;
 const FAST = has("fast");
 const STRICT = has("strict") || process.env.CI_STRICT === "1";
 const SCOPE = process.env.CI_SCOPE || "full";
@@ -59,22 +64,27 @@ const bin = (pkg, rel) => path.join(ROOT, "node_modules", pkg, rel);
  * args    extra arguments
  * tool    [package, bin path] for a dependency's CLI (eslint, jest)
  * npm     an npm script to run (the frontend workspaces' typecheck, lint, test, build)
+ * group   the CI job that runs it (ci.yml runs the four in parallel); `checks` unless named:
+ *           backend   needs PostgreSQL, Redis and ffmpeg: the whole jest suite and the schema gates
+ *           frontend  the workspaces' typecheck, lint, tests and builds
+ *           screens   needs Chromium: the gates that open every screen
+ *           checks    the fast static and process gates, including every gate that reads documents
  */
 const GATES = [
   // Gates 1 to 8 (M0)
   { id: "lint", label: "1  Lint", tool: ["eslint", "bin/eslint.js"], args: ["--max-warnings", "0", "."] },
-  { id: "test", label: "2  Tests, whole suite", tool: ["jest", "bin/jest.js"], args: ["--ci"] },
-  { id: "migration-numbers", label: "3  Migration numbering", script: "scripts/check/migration-numbers.js" },
-  { id: "migration-reversibility", label: "4  Migration reversibility", script: "scripts/check/migration-reversibility.js" },
-  { id: "migration-idempotency", label: "5  Migration idempotency", script: "scripts/check/migration-idempotency.js" },
-  { id: "schema-drift", label: "6  Schema drift", script: "scripts/check/schema-drift.js" },
-  { id: "contract-columns", label: "6  Contract keys are columns", script: "scripts/check/contract-columns.js" },
-  { id: "route-contracts", label: "7  Write routes validated", script: "scripts/check/route-contracts.js" },
-  { id: "five-second", label: "8  Five-second rule (screen copy)", script: "scripts/check/five-second.js" },
+  { id: "test", label: "2  Tests, whole suite", tool: ["jest", "bin/jest.js"], args: ["--ci"], group: "backend" },
+  { id: "migration-numbers", label: "3  Migration numbering", script: "scripts/check/migration-numbers.js", group: "backend" },
+  { id: "migration-reversibility", label: "4  Migration reversibility", script: "scripts/check/migration-reversibility.js", group: "backend" },
+  { id: "migration-idempotency", label: "5  Migration idempotency", script: "scripts/check/migration-idempotency.js", group: "backend" },
+  { id: "schema-drift", label: "6  Schema drift", script: "scripts/check/schema-drift.js", group: "backend" },
+  { id: "contract-columns", label: "6  Contract keys are columns", script: "scripts/check/contract-columns.js", group: "backend" },
+  { id: "route-contracts", label: "7  Write routes validated", script: "scripts/check/route-contracts.js", group: "backend" },
+  { id: "five-second", label: "8  Five-second rule (screen copy)", script: "scripts/check/five-second.js", group: "screens" },
   // Gates from M1 onward
   { id: "ai-manifest-coverage", label: "9  AI manifest coverage", script: "scripts/check/ai-manifest-coverage.js" },
   { id: "search-coverage", label: "10 Search coverage", script: "scripts/check/search-coverage.js" },
-  { id: "two-shells", label: "11 Two shells (phone and desktop)", script: "scripts/check/two-shells.js" },
+  { id: "two-shells", label: "11 Two shells (phone and desktop)", script: "scripts/check/two-shells.js", group: "screens" },
   { id: "forms", label: "12 Inline validation, one form system", script: "scripts/check/forms.js" },
   { id: "palette", label: "13 Palette (colours only in tokens.css)", script: "scripts/check/palette.js" },
   { id: "contrast", label: "14 Contrast, every token pair, both themes", script: "scripts/check/contrast.js" },
@@ -84,7 +94,7 @@ const GATES = [
   { id: "upload", label: "18 Files only through the upload field", script: "scripts/check/upload.js" },
   { id: "ai-no-writes", label: "19 AI read manifest only", script: "scripts/check/ai-no-writes.js" },
   { id: "money", label: "20 Money", script: "scripts/check/money.js" },
-  { id: "native-ui", label: "21 Nothing the browser styles itself", script: "scripts/check/native-ui.js" },
+  { id: "native-ui", label: "21 Nothing the browser styles itself", script: "scripts/check/native-ui.js", group: "screens" },
   // Pipeline guards
   { id: "contract", label: "Contract is generated and current", script: "scripts/gen/contract.js", args: ["--check"] },
   { id: "env-template", label: ".env.example matches the schema", script: "scripts/check/env-template.js" },
@@ -100,18 +110,25 @@ const GATES = [
   // Frontend: the design system and both apps (packages/ui, app, public-app)
   { id: "components-catalogue", label: "Component catalogue is generated and current", script: "scripts/gen/components.js", args: ["--check"] },
   { id: "components", label: "Every component documented, tested, in the gallery", script: "scripts/check/components.js" },
-  { id: "fe-typecheck", label: "Frontend typecheck", npm: "fe:typecheck" },
-  { id: "fe-lint", label: "Frontend lint", npm: "fe:lint" },
-  { id: "fe-test", label: "Frontend tests", npm: "fe:test" },
-  { id: "fe-build", label: "Frontend build (gallery, app, public site)", npm: "fe:build" },
-  { id: "mock-free", label: "Release builds carry no mock", script: "scripts/check/mock-free.js" },
-  { id: "a11y", label: "Accessibility (axe on the gallery and the app)", script: "scripts/check/a11y.js" },
+  { id: "fe-typecheck", label: "Frontend typecheck", npm: "fe:typecheck", group: "frontend" },
+  { id: "fe-lint", label: "Frontend lint", npm: "fe:lint", group: "frontend" },
+  { id: "fe-test", label: "Frontend tests", npm: "fe:test", group: "frontend" },
+  { id: "fe-build", label: "Frontend build (gallery, app, public site)", npm: "fe:build", group: "frontend" },
+  { id: "mock-free", label: "Release builds carry no mock", script: "scripts/check/mock-free.js", group: "frontend" },
+  { id: "a11y", label: "Accessibility (axe on the gallery and the app)", script: "scripts/check/a11y.js", group: "screens" },
   // Process: the work is recorded where the team reads it
   { id: "progress", label: "PROGRESS.md updated and well formed", script: "scripts/check/progress.js" },
   { id: "guides", label: "Feature guides followed and complete", script: "scripts/check/guides.js" },
   { id: "readme-map", label: "New files are on the README map", script: "scripts/check/readme-map.js" },
   { id: "codeowners", label: "CODEOWNERS complete and valid", script: "scripts/check/codeowners.js" },
 ];
+
+const GROUPS = ["backend", "frontend", "screens", "checks"];
+const groupOf = (gate) => gate.group || "checks";
+if (GROUP && !GROUPS.includes(GROUP)) {
+  console.error(`--group=${GROUP}: it must be one of ${GROUPS.join(", ")}`);
+  process.exit(2);
+}
 
 function isEmpty(rel) {
   const file = path.join(ROOT, rel);
@@ -145,6 +162,12 @@ function command(gate) {
   return { argv: [path.join(ROOT, gate.script), ...(gate.args || [])] };
 }
 
+if (has("groups")) {
+  const out = Object.fromEntries(GROUPS.map((g) => [g, GATES.filter((x) => groupOf(x) === g).map((x) => x.id)]));
+  console.log(JSON.stringify({ groups: out, doc_gates: scope.DOC_GATES }, null, 2));
+  process.exit(0);
+}
+
 if (has("list")) {
   for (const g of GATES) {
     const c = command(g);
@@ -157,6 +180,7 @@ if (has("list")) {
 const results = [];
 for (const gate of GATES) {
   if (ONLY && !ONLY.has(gate.id)) continue;
+  if (GROUP && groupOf(gate) !== GROUP) continue;
   if (SCOPE !== "full" && !scope.DOC_GATES.includes(gate.id)) {
     results.push({ gate, status: "SKIPPED" });
     continue;

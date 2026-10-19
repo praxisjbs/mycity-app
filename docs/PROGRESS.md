@@ -102,6 +102,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · AJ · CI runs as four jobs side by side (`.github/workflows/ci.yml`: backend, frontend, screens, checks, and the `ci` check over them; `npm run ci -- --group=<name>`), the three frontend workspaces' tests at once (`scripts/fe-test.js`: 430 s to 254 s here), Chromium and ffmpeg's packages cached. Left: compare a week of run times and Actions minutes; four jobs bill more minutes than one.
+- 19/10/2026 · AJ · Frontend foundation: a module's tab strip on a narrow desktop window keeps the tabs that fit (the active one always) and folds the rest into More Tabs, a ⋯ menu, instead of scrolling sideways (`packages/ui` `Tabs`; every module). Phones unchanged.
 - 19/10/2026 · TB · CI does only what a change needs (`.github/workflows/ci.yml`,
   `scripts/check/lib/scope.js`, BACKEND_GUIDE §8.4), after a week of CI used 2,275 Actions minutes
   (902 of them re-testing merges on `main`) and GitHub stopped starting jobs. A draft PR runs no CI
@@ -709,6 +711,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · AJ · My Profile (#8): the photo now also shows on the employee record's header (People · Employees) and on Settings · Users and a role's people. Left: the organogram PDF still draws initials.
 - 19/10/2026 · AJ · My Profile (#8): photos everywhere a person appears and Download My Data. `photo_url` on `PersonRef` and the register, org chart and worksite rows (one SQL helper, `shared/db/person.js`, 192 px for lists), shown through `Avatar`/`Who` on People · Employees, Leave and Attendance, Devices, Worksites, the Organogram and Org Chart, Community, Home Team and a card's records and the pickers (`usePhotos`, fetched once). Download My Data on My Profile (`POST /ess/profile/export`) and the CEO's Download Their Data on the employee record (`POST /employees/:id/data-export`): one workbook (cover and ten sheets) built in the worker, restricted in the vault, emailed, removed after 7 days, once a day. Left: payslips join it in M6; the employee record header and the org chart PDF still show initials.
 - 19/10/2026 · AJ · My Profile (#8): the photo. Profile Photo uploads through the upload engine as an `avatar` (`POST /ess/profile/photo`, Remove Photo `DELETE`), `employee.photo_document_id` (1170) points at it, every colleague may read it, and My Profile and the shell avatar show it. Community and People lists still show initials until their rows carry `photo_url`. Left: Download My Data (needs the lead's decisions on what it holds, its format and delivery).
 - 19/10/2026 · LA · My Attendance (#9): Field Assignments, the person's in progress and to come (number and name, dates, the site), each opening with the client, its sites with their address and radius, and who else is on it; on an assignment's day the clock names its site (both, "A or B", when there are two) and matches the punch to the nearer, as a worksite. Opened from a notice by `?assignment=`. Checked by a screen test and on the mock at 390 and 1440 px (Adedotun). Left: nothing.

@@ -251,6 +251,11 @@ describeDb("My Profile against the real migrations", () => {
     // Lists read the 192 px size; My Profile keeps the 384 px one.
     const small = `/api/v1/documents/${set.body.document_id}/variant/webp-192`;
     expect(await seen()).toEqual([small, small, small, small]);
+    // The record's header reads the 384 px size; Settings · Users the list size.
+    const record = await as("ops").get(`/employees/${staff}`);
+    expect(record.body.photo_url).toBe(`/api/v1/documents/${set.body.document_id}/variant/webp-384`);
+    const users = (await as("ops").get("/users")).body;
+    expect(users.data.find((u) => u.employee_id === staff).photo_url).toBe(small);
     expect((await request(app).get(small).set("Authorization", `Bearer ${tokens.manager}`)).status).toBe(200);
     // Someone without a photo still reads null beside mine.
     const manager = (await as("ops").get("/employees")).body.data.find((r) => r.employee_id === people.manager.employee.employee_id);

@@ -134,7 +134,7 @@ const roleRef = (code: string) => {
   const r = ACCESS_ROLES.find((x) => x.code === code)!;
   return { code: r.code, name: r.name };
 };
-type MockUser = Omit<UserRow, "two_step"> & { role: string; mfa: boolean };
+type MockUser = Omit<UserRow, "two_step" | "photo_url"> & { role: string; mfa: boolean };
 const USERS: MockUser[] = PEOPLE.slice(0, 22).map((p, i) => ({
   user_id: sid(`user:${p.user_key}`),
   employee_id: p.employee_id,
@@ -155,7 +155,7 @@ const out = (u: MockUser): UserRow => {
   void _role;
   // The demonstration accounts' two-step is the security mock's, which My Security changes.
   const key = u.email.split("@")[0];
-  return { ...row, two_step: SIGN_INS[key] ? waysOf(key).twoStep.on : mfa };
+  return { ...row, two_step: SIGN_INS[key] ? waysOf(key).twoStep.on : mfa, photo_url: null };
 };
 const userOf = (id: string) => USERS.find((x) => x.user_id === id);
 const settingsEditor = (u: string) => admin(u);

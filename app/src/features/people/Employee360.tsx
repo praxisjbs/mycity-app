@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ApiError } from "@/api/client";
+import { usePhoto } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { Employee360 as Record360, ManagerRef } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
@@ -70,6 +71,7 @@ export function Employee360({ id }: { id: string }) {
   const { data: e, error, reload } = useApi("GET /api/v1/employees/:id", { params: { id } });
   const restore = useMutation("POST /api/v1/employees/:id/restore");
   const exportData = useMutation("POST /api/v1/employees/:id/data-export");
+  const photo = usePhoto(e?.photo_url);
   const back = () => navigate(hrefFor("people", "employees"));
 
   if (error)
@@ -116,6 +118,7 @@ export function Employee360({ id }: { id: string }) {
       <BackButton label="Back to Employees" onBack={back} />
       <ProfileHeader
         name={e.display_name}
+        photo={photo}
         role={`${e.job_title} · ${e.department}`}
         chips={
           <>

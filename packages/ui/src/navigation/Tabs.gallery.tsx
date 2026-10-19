@@ -16,6 +16,22 @@ function Strip() {
   return <Tabs label="Attendance" value={tab} onValueChange={setTab} items={MODULE.map((t) => ({ ...t, href: `#/Tabs?tab=${t.value}` }))} />;
 }
 
+const ESS: TabItem[] = ["My Profile", "My Attendance", "Work Location Requests", "My Devices", "My Performance", "My Payslips", "My Leave", "My Queries", "My Documents", "My Security", "Org Chart"].map((label, i) => ({
+  value: label.toLowerCase().replace(/ /g, "-"),
+  label,
+  count: i === 8 ? 1 : undefined,
+}));
+
+/** A desktop window too narrow for the module's tabs: what fits, the rest behind More Tabs. */
+function Narrow() {
+  const [tab, setTab] = useState("my-profile");
+  return (
+    <div className="max-w-md">
+      <Tabs label="Employee Self-Service" value={tab} onValueChange={setTab} items={ESS} />
+    </div>
+  );
+}
+
 function WithPanels() {
   const [tab, setTab] = useState("profile");
   return (
@@ -47,5 +63,6 @@ export default {
   states: {
     "Module Strip": () => <Strip />,
     "With Panels": () => <WithPanels />,
+    "Many Tabs, Narrow": () => <Narrow />,
   },
 } satisfies GalleryEntry;

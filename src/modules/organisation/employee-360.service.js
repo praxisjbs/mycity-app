@@ -17,6 +17,7 @@
  */
 const { AppError } = require("../../shared/errors");
 const repo = require("./organisation.repo");
+const { PHOTO_VARIANTS, photoPath } = require("../../shared/db/person");
 
 const day = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : (v ?? null));
 const at = (v) => (v instanceof Date ? v.toISOString() : (v ?? null));
@@ -76,6 +77,7 @@ async function get(client, employeeId) {
     account_number: row.account_number ?? null,
     gross_monthly: money(row.gross_monthly),
     created_at: at(row.created_at),
+    photo_url: photoPath(row.photo_document_id, PHOTO_VARIANTS.profile),
   };
 }
 

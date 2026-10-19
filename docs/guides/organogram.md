@@ -310,6 +310,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 19/10/2026 · AJ · The employee record (`Employee360`) carries `photo_url` at 384 px, and its header shows the face (`ProfileHeader` `photo`), initials when there is none. TB to review.
 - 19/10/2026 · AJ · Every node carries `photo_url` (`OrgNode`, from `shared/db/person.js` at 192 px; null for a vacant seat): the desktop chart, the phone's tiles and a person's sheet show the face through `Avatar`, initials when there is none. The Download PDF keeps initials. TB to review.
 - 19/10/2026 · AJ · `employee` gained `photo_document_id` (1170): the person's photo, a vault document of type
   `employee_photo` that every signed-in colleague may read. `organisation.photo.js` sets and clears it

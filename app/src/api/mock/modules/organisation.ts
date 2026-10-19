@@ -195,6 +195,7 @@ function record(p: MockPerson, viewer: string): Employee360 {
     account_number: canSee ? `00000${p.account_last4}` : null,
     gross_monthly: canSee ? p.gross_monthly : null,
     created_at: at(200, "09:00"),
+    photo_url: null,
   };
 }
 

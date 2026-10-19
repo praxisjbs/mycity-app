@@ -64,7 +64,8 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    `employee.photo_updated`. My Profile and the shell avatar (rail, phone top bar, More, the lock
    screen) show it at 384 px; every list and card that names a person shows it at 192 px, because
    every person in a list is read through `shared/db/person.js` (`PersonRef.photo_url`): People ·
-   Employees, Leave and Attendance, Devices, Worksites, the Organogram and Org Chart, Staff
+   Employees (the list, and the record's header at 384 px), Leave and Attendance, Devices,
+   Worksites, Settings · Users and Roles, the Organogram and Org Chart, Staff
    Community (channels, direct messages, members, the profile panel, posts, celebrations,
    recognitions, the people pickers) and Home (Team, a card's records). Remove Photo clears the
    pointer and the initials return. `photo_url` is an API path fetched with the session, never a
@@ -405,3 +406,4 @@ Deductions figure and every form open the shared modal.
 - 19/10/2026 · AJ · Photos everywhere a person appears (§3 step 1, §6, §10): `photo_url` on `PersonRef` and on the register row, the org chart node and the worksite list, read through one SQL helper (`shared/db/person.js`, 192 px for lists); the app's `usePhotos` fetches each face once. Download My Data (§3 step 8, §5, §6, §7, §8, §10): `POST /ess/profile/export` and the CEO's `POST /employees/:id/data-export`, one workbook emailed and kept 7 days, once a day; replaces "not built". TB to review the organisation, identity, documents/vault and Home parts, GE the Community parts, LA the attendance, devices and worksites parts.
 - 19/10/2026 · LA · Work Location Requests (#87) is built on the real API from the attendance guide, which owns it (§6.11, §10): §10.2 row follows its phone layout. Policy Updates (#89) stays on INTERIM shapes until M9 (attendance guide §13).
 - 19/10/2026 · LA · My Attendance (#9) shows the person's field assignments in progress and to come, under Today (attendance guide §6.12, §10); §10.2 row updated.
+- 19/10/2026 · AJ · The photo also reaches the employee record's header in People · Employees and Settings · Users and Roles (`Employee360.photo_url`, `UserRow.photo_url`); the organogram PDF is the one place left with initials.

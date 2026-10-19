@@ -276,6 +276,8 @@ const Employee360 = z
     account_number: z.string().nullable(),
     gross_monthly: money.nullable(),
     created_at: isoDateTime,
+    /** Their photo at a profile's size (384 px, shared/db/person.js); null shows their initials. */
+    photo_url: z.string().nullable(),
   })
   .strict();
 
@@ -642,6 +644,7 @@ const TABLES = {
       dotted_manager: "the second manager for matrix work: a person or a vacant seat",
       direct_reports: "how many people report to them, counted",
       login: "their login and roles, from app_user and user_role",
+      photo_url: "the profile size of photo_document_id, as an API path (shared/db/person.js)",
     },
   },
   EmployeeHistoryEntry: {
