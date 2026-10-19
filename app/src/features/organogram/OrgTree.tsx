@@ -483,8 +483,9 @@ function NodeTile({
       {onPick && <Icon name="right" className="flex-none text-subtle-foreground" />}
     </>
   );
+  /* min-w-0: beside Everyone's fold arrow a tile is a flex item, and must shrink to truncate its text. */
   const box = cn(
-    "flex min-h-tap w-full items-center gap-3 rounded-card border bg-card px-3 py-2.5 text-left",
+    "flex min-h-tap w-full min-w-0 items-center gap-3 rounded-card border bg-card px-3 py-2.5 text-left",
     n.vacant ? "border-dashed border-input" : "border-border",
     large && "border-2 border-secondary py-3.5",
   );
