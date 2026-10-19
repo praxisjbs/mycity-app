@@ -85,4 +85,12 @@ route(router, "get", "/org-chart",
   { query: c.organisation.OrgChartQuery, response: c.organisation.OrgChartTree, summary: "The whole reporting tree" },
   requirePermission("ess", "view"), controller.orgChart);
 
+/*
+ * Download PDF: the same chart as a file, drawn in the worker and emailed to the person asking.
+ * It holds nothing the read does not, so it takes the read's grant (docs/guides/organogram.md §8).
+ */
+route(router, "post", "/org-chart/exports",
+  { body: c.organisation.OrgChartExportRequest, response: c.organisation.OrgChartExportQueued, summary: "Email the whole chart as a PDF" },
+  requirePermission("ess", "view"), controller.requestOrgChartExport);
+
 module.exports = { basePath: "/", surface: "staff", router };

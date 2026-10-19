@@ -4,8 +4,9 @@
  * Opens every screen in Chromium at phone and desktop size and records what a
  * person sees: the copy in each slot (page title, card titles, buttons,
  * captions, help), the layout (sideways scroll, which navigation shows,
- * tables, tap targets) and any script error. The screen gates read it:
- * five-second.js (gate 8) and two-shells.js (gate 11), FRONTEND_GUIDE §5, §7.
+ * tables, tap targets), anything the browser draws for itself, and any
+ * script error. The screen gates read it: five-second.js (gate 8),
+ * two-shells.js (gate 11) and native-ui.js (gate 21), FRONTEND_GUIDE §5, §7, §8.8.
  *
  * TARGETS (FRONTEND_FOUNDATION F10, F23)
  *   gallery  packages/ui's component gallery: built when missing or stale
@@ -52,6 +53,17 @@ const APP_DIST = "app/dist";
 const WIDTHS = {
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
   desktop: { viewport: { width: 1440, height: 900 } },
+};
+
+/**
+ * What gate 21 (native-ui.js) looks for on a rendered page: elements the
+ * browser draws itself, inputs whose type it draws, and the controls whose
+ * computed appearance must be none (base.css resets them).
+ */
+const NATIVE = {
+  tags: "select, datalist, progress, meter, dialog[open]",
+  types: ["date", "time", "datetime-local", "month", "week", "number", "range", "color", "checkbox", "radio"],
+  controls: "input:not([type=hidden]):not([type=file]), textarea, select, button",
 };
 
 /**
@@ -160,6 +172,7 @@ const GALLERY_TARGET = {
   state: "section[aria-labelledby]",
   /** Not an app: no navigation and no first phone screen to judge. */
   checks: { navigation: false, firstScreen: false },
+  native: NATIVE,
 };
 
 /**
@@ -199,6 +212,7 @@ const APP_TARGET = {
   /* A help term is a word in a sentence: its tap target is the sentence's line (FRONTEND_GUIDE §5.2). */
   tapExempt: "[data-help-term]",
   checks: { navigation: true, firstScreen: true },
+  native: NATIVE,
 };
 
 function hashOf(files) {
@@ -313,6 +327,40 @@ function collect(cfg) {
     });
   }
 
+  /* Gate 21: anything the browser draws for itself (native-ui.js). Only where
+     the target asks (the gallery and the app; demo.html is frozen, F23). */
+  const native = [];
+  if (cfg.native) {
+    const shown = (el) => {
+      if (!visible(el) || el.closest("[aria-hidden=true]")) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 1 && r.height > 1;
+    };
+    const push = (el, what) => {
+      const label = (text(el) || el.getAttribute("aria-label") || el.getAttribute("name") || "").slice(0, 40);
+      native.push({ what, label, state: stateOf(el) });
+    };
+    document.querySelectorAll(cfg.native.tags).forEach((el) => shown(el) && push(el, `<${el.tagName.toLowerCase()}>`));
+    document.querySelectorAll("input").forEach((el) => {
+      const type = (el.getAttribute("type") || "text").toLowerCase();
+      if (cfg.native.types.includes(type) && shown(el)) push(el, `<input type="${type}">`);
+      else if (el.hasAttribute("list") && shown(el)) push(el, "<input list>");
+    });
+    document.querySelectorAll("[title]").forEach((el) => {
+      if (el.namespaceURI !== "http://www.w3.org/1999/xhtml" || !String(el.getAttribute("title")).trim() || !visible(el)) return;
+      push(el, `a title tooltip on <${el.tagName.toLowerCase()}>`);
+    });
+    document.querySelectorAll("form:not([novalidate])").forEach((el) => push(el, "a <form> without novalidate"));
+    document.querySelectorAll(cfg.native.controls).forEach((el) => {
+      if (!shown(el)) return;
+      const look = getComputedStyle(el).appearance;
+      if (look && look !== "none") push(el, `a <${el.tagName.toLowerCase()}> with appearance ${look}`);
+    });
+    document.querySelectorAll("[data-sonner-toast]").forEach((el) => {
+      if (el.getAttribute("data-styled") !== "false") push(el, "a toast styled by sonner");
+    });
+  }
+
   const tables = page ? [...page.querySelectorAll("table")].filter((t) => visible(t) && !t.closest("[data-copy=content]")).length : 0;
   const scroller = cfg.scroller && document.querySelector(cfg.scroller);
   const desktopNav = cfg.desktopNav && document.querySelector(cfg.desktopNav);
@@ -334,6 +382,7 @@ function collect(cfg) {
       taps,
       frameOverflow,
     },
+    native,
   };
 }
 
@@ -544,7 +593,8 @@ function ensureAppBuild() {
   const app = path.join(ROOT, "app");
   if (!fs.existsSync(app)) return false;
   const built = path.join(ROOT, APP_DIST, "screens.json");
-  const source = Math.max(newest(path.join(app, "src")), newest(path.join(app, "index.html")), newest(path.join(app, "vite.config.ts")), newest(path.join(app, "package.json")), newest(path.join(ROOT, "docs", "PROGRESS.md")));
+  // packages/ui is built into the app, so a change to a shared component makes the build stale too.
+  const source = Math.max(newest(path.join(app, "src")), newest(path.join(ROOT, "packages", "ui", "src")), newest(path.join(app, "index.html")), newest(path.join(app, "vite.config.ts")), newest(path.join(app, "package.json")), newest(path.join(ROOT, "docs", "PROGRESS.md")));
   const mock = () => {
     try {
       return JSON.parse(fs.readFileSync(built, "utf8")).api_mode === "mock";

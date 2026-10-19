@@ -92,7 +92,7 @@ What the M0 port actually changed, so this map stays true. Each was a decision, 
 | praxis `services/encryption.service.js` | As is |
 | praxis `mail/deliverability/` + `mail/mail/dns-check.js` | DMARC, PTR, RBL, evaluate and route check as is, comments made MyCity's. No `deliverability` table or routes yet (`check.js` composes the checks). System mail refuses a send the route check calls trapped (`MAIL_ROUTE_TRAPPED`) |
 | praxis `services/spreadsheet/` | Ported with the tenant workbook context replaced by `context.js` (organisation profile, actor, title); NGN money; Lagos dates |
-| praxis `image-pipeline.service.js` + `media-compression.service.js` | Profiles and enhancement ported (photo and avatar enhanced; document and signature untouched). Not ported: the lenient decode that stores an unreadable image as it came (ours refuses it, because a pass-through keeps GPS metadata); the brand profile (brand images come from `assets/brand/`); stem-suffix derivative keys (ours are rows in `document_variant`, named by `variant-key.js`). The "never bigger than what arrived" rule applies only to a file already free of metadata |
+| praxis `image-pipeline.service.js` + `media-compression.service.js` | Profiles and enhancement ported (photo and avatar enhanced; document and signature untouched). Not ported: the lenient decode that stores an unreadable image as it came (ours refuses it, because a pass-through keeps GPS metadata); the brand profile as the donor wrote it (ours, added 19/10/2026 by TB's decision, keeps an uploaded brand file a PNG and never corrects its colours: the Logo, White Logo and Icon of Settings · Organisation, `docs/guides/foundation.md` §6.11, with `assets/brand/` as the fallback); stem-suffix derivative keys (ours are rows in `document_variant`, named by `variant-key.js`). The "never bigger than what arrived" rule applies only to a file already free of metadata |
 | praxis `vault/document_vault/` | Doc-type registry ported as `shared/documents/types.js`: `moduleKey` became `module`, the signing ceiling keeps `signable` and `wet` and drops `allowsQes`. The mime fallback now applies at serve time. `attachment_variants.variantKey` became `shared/files/variant-key.js`. Attachment outbox not ported (our outbox covers it) |
 | praxis `services/signatures/canonical.js` | Mechanism ported as is (Map lookup, versioned builders, `hash`, `build`, `diff`). Only `EMPLOYMENT_CONTRACT` carried over; the logistics builders were left. Money is a two-place string, never a float |
 | pixie `recruitment.render.js` | The escape-first Markdown renderer and `stripTrailingAcceptanceBlock` ported to `shared/documents/markdown.js`; safe links added. The offer shell and execution block wait for M5. The `marked` dependency was removed |
@@ -212,7 +212,7 @@ Frontend: `praxis-ls/client/src/features/comms/team-chat.tsx` + `chat/`.
 | Sub-area | loc | files | Verdict |
 |---|---|---|---|
 | `mail/mail/` — the client | **12,250** | 39 | **Take** |
-| `mail/signature/` — signature builder | 3,414 | 17 | Leave for now (palette, PNG render, gap analysis) |
+| `mail/signature/` — signature builder | 3,414 | 17 | **Taken in part, 19/10/2026 (TB)**: the pure model then email-safe HTML, and the bake at send; one design for everyone, pictures inline. Still left: templates, palette, PNG card, gap analysis, languages, render cache (`docs/guides/mailbox.md` §12) |
 | `mail/triage/` — ticket triage + SLA clock | 2,368 | 13 | Leave. Praxis-LS logistics desk |
 | `mail/assist/` — AI on mail, OCR | 2,261 | 10 | Leave until M10 |
 | `mail/binding/` — bind a thread to an ERP record | 2,126 | 19 | **Take in M7** — this is how a thread attaches to a partner record |
@@ -255,7 +255,13 @@ Those five lines are the whole job: cut them to no-ops behind a feature check, o
 
 Jobs: `src/jobs/mail-sync.js`, `src/jobs/handlers/mail-sync-scheduler.js`, `src/jobs/mail-idle.js`
 (IMAP IDLE for push).
-Frontend: `client/src/features/comms/inbox/`, `mail-setup-wizard.tsx`, `setup/`.
+Frontend: `client/src/features/comms/inbox/`, `mail-setup-wizard.tsx`, `setup/`. Taken so far (18/10/2026):
+`email-frame.tsx` and `email-doc.ts` (the sealed frame, its policy, fit to width, `mailto:` parsing) as
+`packages/ui/src/documents/EmailFrame.tsx`, and `email-dark.ts` (the dark-mode partial inversion) as
+`packages/ui/src/lib/email-dark.ts`; `message-body.ts` (the remote-content pass, `cid:` resolution and
+quoted-history folding) as `packages/ui/src/lib/email-body.ts`, which re-parses the stored body for each
+render instead of keeping held-back URLs on the markup, and splits plain-text replies line by line
+because our server joins their lines with `<br>`. The sender trust is ours: `mail_image_trust` (1125).
 Reference: `doc/SMART_MAIL_ENGINEERING_GUIDE.md` — a binding decision log on all 35 questions, plus
 `doc/SMART_MAIL_FIELD_NOTES.md`, which is the defect log of what actually broke after each PR.
 **Read the field notes before starting, not after.**

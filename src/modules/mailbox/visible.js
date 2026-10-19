@@ -10,9 +10,41 @@
  */
 const sanitize = require("sanitize-html");
 
-const EXTRA_TAGS = ["img", "font", "center", "big", "tt", "strike", "del", "ins", "span", "div", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "col", "colgroup"];
+const EXTRA_TAGS = [
+  "img",
+  "font",
+  "center",
+  "big",
+  "tt",
+  "strike",
+  "del",
+  "ins",
+  "span",
+  "div",
+  "table",
+  "thead",
+  "tbody",
+  "tfoot",
+  "tr",
+  "td",
+  "th",
+  "caption",
+  "col",
+  "colgroup",
+];
 const ATTRS = {
-  "*": ["style", "dir", "lang", "title", "align", "valign", "width", "height", "bgcolor", "border"],
+  "*": [
+    "style",
+    "dir",
+    "lang",
+    "title",
+    "align",
+    "valign",
+    "width",
+    "height",
+    "bgcolor",
+    "border",
+  ],
   a: ["href", "name", "target", "rel"],
   img: ["src", "alt", "width", "height", "border"],
   table: ["cellpadding", "cellspacing", "border", "role"],
@@ -23,7 +55,8 @@ const ATTRS = {
   li: ["value"],
   blockquote: ["cite"],
 };
-const UNSAFE_CSS = /expression\s*\(|javascript:|vbscript:|behavior\s*:|-moz-binding|@import|url\(\s*["']?\s*(javascript|vbscript|data:text\/html)/i;
+const UNSAFE_CSS =
+  /expression\s*\(|javascript:|vbscript:|behavior\s*:|-moz-binding|@import|url\(\s*["']?\s*(javascript|vbscript|data:text\/html)/i;
 
 function cleanStyle(style) {
   return String(style || "")
@@ -41,19 +74,44 @@ function cleanHtml(html) {
     allowedSchemes: ["http", "https", "mailto", "tel", "cid"],
     allowedSchemesByTag: { img: ["http", "https", "cid", "data"] },
     allowedSchemesAppliedToAttributes: ["href", "src", "cite"],
-    nonTextTags: ["style", "script", "textarea", "option", "noscript", "title", "xml", "object", "embed", "iframe", "template", "button"],
+    nonTextTags: [
+      "style",
+      "script",
+      "textarea",
+      "option",
+      "noscript",
+      "title",
+      "xml",
+      "object",
+      "embed",
+      "iframe",
+      "template",
+      "button",
+    ],
     transformTags: {
-      a: (tag, attribs) => ({ tagName: "a", attribs: { ...attribs, target: "_blank", rel: "noopener noreferrer" } }),
-      "*": (tag, attribs) => (attribs.style ? { tagName: tag, attribs: { ...attribs, style: cleanStyle(attribs.style) } } : { tagName: tag, attribs }),
+      a: (tag, attribs) => ({
+        tagName: "a",
+        attribs: { ...attribs, target: "_blank", rel: "noopener noreferrer" },
+      }),
+      "*": (tag, attribs) =>
+        attribs.style
+          ? {
+              tagName: tag,
+              attribs: { ...attribs, style: cleanStyle(attribs.style) },
+            }
+          : { tagName: tag, attribs },
     },
   });
-  return out.replace(/<[^>]*>|&nbsp;|\s/g, "").length || /<img\b/i.test(out) ? out : null;
+  return out.replace(/<[^>]*>|&nbsp;|\s/g, "").length || /<img\b/i.test(out)
+    ? out
+    : null;
 }
 
 /** A plain text body as HTML paragraphs, for mail that has no HTML part. */
 function textToHtml(text) {
   if (!text) return null;
-  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (s) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return String(text)
     .split(/\r?\n\r?\n/)
     .map((p) => `<p>${esc(p).replace(/\r?\n/g, "<br>")}</p>`)

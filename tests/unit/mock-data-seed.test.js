@@ -4,6 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { EmployeeCreate } = require("../../packages/contract/schemas/organisation");
 const seed = require("../../seeds/build/20_mock_data");
+const { datesOf } = require("../../seeds/lib/leave-sample");
+const workingWeek = require("../../src/shared/time/working-week");
 
 const ROSTER = path.join(__dirname, "..", "..", "app", "src", "api", "mock", "data", "roster.json");
 const roster = JSON.parse(fs.readFileSync(ROSTER, "utf8"));
@@ -38,5 +40,19 @@ describe("seeds/build/20_mock_data", () => {
   test("every leave row names someone on the roster", () => {
     const keys = new Set(roster.people.map((p) => p.key));
     for (const l of roster.leave) expect(keys.has(l.key)).toBe(true);
+  });
+
+  test("staging's leave sample is the mock's, row for row", () => {
+    const staging = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "seeds", "staging", "leave-sample.json"), "utf8"));
+    expect(staging).toEqual(roster.leave);
+  });
+
+  test("a sample row's dates move off days not worked and stay inside one year", () => {
+    const cal = workingWeek.makeCalendar({ holidays: [{ holiday_date: "2026-12-28", name: "Holiday" }] });
+    // Saturday 26 December: Sunday is not worked and Monday is a holiday, so it starts on Tuesday;
+    // the end, in January, comes back to 31 December.
+    const dates = datesOf({ from: 1, to: 9 }, "2026-12-26", cal, workingWeek);
+    expect(dates.starts_on).toBe("2026-12-29");
+    expect(dates.ends_on).toBe("2026-12-31");
   });
 });

@@ -137,7 +137,7 @@ function ConfirmForm({ close, onConfirmed }: { close: () => void; onConfirmed: (
       {problem && <FormError>{problem}</FormError>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon={way === "passkey" ? "fingerprint" : "lock"} busy={busy} onClick={() => void go()}>
+        <Button variant="primary" icon={way === "passkey" ? "fingerprint" : "lock"} busy={busy} onClick={() => go()}>
           {way === "passkey" ? "Use Passkey" : "Confirm"}
         </Button>
       </FormFooter>

@@ -1,20 +1,20 @@
 /**
  * @component Sheet
  * @group Overlays
- * @summary The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc.
+ * @summary The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc; one with a text field closes only on purpose.
  * @use Underneath Modal, SidePanel, Popover and Menu on a phone; directly for a phone-only sheet (the More launcher, a KPI detail).
  * @avoid A dialog on desktop (use Modal, which is this sheet on a phone and a centred dialog on desktop); a toast or banner for news.
- * @phone This is the phone form. `full` fills the screen for a long form or a reader; otherwise it is as tall as its content, up to most of the screen, with a grab handle.
+ * @phone This is the phone form. `full` fills the screen for a long form or a reader; otherwise it is as tall as its content, up to most of the screen, with a grab handle. With the keyboard up it stays above it, header in view. Once it holds a text field it has no handle and a drag or a scrim tap never closes it (a scrim tap puts the keyboard away); the close button, Cancel and Esc do.
  * @a11y A modal dialog (Radix underneath): focus moves in and is trapped, Esc closes, focus returns to the opener. The title names it; `hideHeader` keeps the title for screen readers only.
  * @status stable
  * @example <Sheet open={open} onClose={() => setOpen(false)} title="Leave Balance">{balance}</Sheet>
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Drawer } from "vaul";
 import { cn } from "../lib/cn";
 import { IconButton } from "../actions/Button";
-import { FooterContext, IN_FOOTER, focusInto, useReturnFocus } from "./context";
+import { FooterContext, IN_FOOTER, TEXT_ENTRY, focusInto, useReturnFocus } from "./context";
 
 export interface ChromeProps {
   /** The heading. */
@@ -90,7 +90,7 @@ export interface SheetProps {
   footer?: ReactNode;
   /** The body. */
   children?: ReactNode;
-  /** false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. */
+  /** false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. A sheet holding a text field ignores the drag and the scrim anyway. */
   dismissible?: boolean;
   /** `alertdialog` for a confirmation. Default `dialog`. */
   role?: "dialog" | "alertdialog";
@@ -100,14 +100,83 @@ export interface SheetProps {
   bodyClassName?: string;
 }
 
+/**
+ * Whether a text field sits in the sheet, watched as its body renders (a form
+ * can arrive after the sheet opens).
+ */
+function useHoldsFields(el: HTMLElement | null): boolean {
+  const [holds, setHolds] = useState(false);
+  useLayoutEffect(() => {
+    if (!el) return;
+    const check = () => setHolds(!!el.querySelector(TEXT_ENTRY));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(el, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [el]);
+  return !!el && holds;
+}
+
+/**
+ * Keeps the sheet inside what the phone's keyboard leaves visible. The keyboard
+ * shrinks only the visual viewport (iOS, and Android by default), so a sheet
+ * pinned to the bottom of the page would sit behind it and the browser would
+ * pan the page to reach the field, taking the header off the top. Here the
+ * sheet's bottom follows the visible area and its height never passes it.
+ */
+function useKeyboardInset(el: HTMLElement | null, full: boolean): void {
+  useEffect(() => {
+    const view = window.visualViewport;
+    if (!el || !view) return;
+    let lastInset = 0;
+    const place = () => {
+      // A pinch zoom also shrinks the visual viewport; only the keyboard moves the sheet.
+      const zoomed = view.scale > 1.01;
+      const top = zoomed ? 0 : Math.max(0, Math.round(view.offsetTop));
+      const inset = zoomed ? 0 : Math.max(0, Math.round(document.documentElement.clientHeight - view.height - view.offsetTop));
+      el.style.bottom = inset ? `${inset}px` : "";
+      if (full) el.style.top = top ? `${top}px` : "";
+      else el.style.maxHeight = inset || top ? `${Math.floor((view.height * 11) / 12)}px` : "";
+      if (inset === lastInset) return;
+      lastInset = inset;
+      // The keyboard came up or changed size: bring the field being typed in back into view.
+      const field = document.activeElement;
+      if (inset && field instanceof HTMLElement && el.contains(field)) {
+        requestAnimationFrame(() => field.scrollIntoView({ block: "nearest" }));
+      }
+    };
+    place();
+    view.addEventListener("resize", place);
+    view.addEventListener("scroll", place);
+    return () => {
+      view.removeEventListener("resize", place);
+      view.removeEventListener("scroll", place);
+      el.style.bottom = "";
+      el.style.top = "";
+      el.style.maxHeight = "";
+    };
+  }, [el, full]);
+}
+
 export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, children, dismissible = true, role, container, bodyClassName }: SheetProps) {
-  const content = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement | null>(null);
+  // The sheet's element as state too: it mounts after the first render, and the hooks below start then.
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const contentRef = useCallback((el: HTMLDivElement | null) => {
+    content.current = el;
+    setNode(el);
+  }, []);
   const overlay = useRef<HTMLDivElement>(null);
   const isOpen = useRef(open);
   useEffect(() => {
     isOpen.current = open;
   }, [open]);
   const returnFocus = useReturnFocus(open);
+  useKeyboardInset(node, !!full);
+  const holdsFields = useHoldsFields(node);
+  // Typing is never lost to a stray swipe or tap: a sheet with a text field and a close button
+  // closes only through that button, Cancel or Esc.
+  const locked = !dismissible || (holdsFields && !hideHeader);
 
   const change = (next: boolean) => {
     if (next) return;
@@ -127,11 +196,12 @@ export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, chi
   return (
     // `container` goes to the portal only: on the root it would drop the sheet's own overscroll
     // fill, which is also what lets a drag start on a scrolled page.
-    <Drawer.Root open={open} onOpenChange={change} dismissible={dismissible}>
+    // The sheet places itself around the keyboard (useKeyboardInset), so Vaul's own repositioning is off.
+    <Drawer.Root open={open} onOpenChange={change} handleOnly={locked} repositionInputs={false}>
       <Drawer.Portal container={container ?? undefined}>
         <Drawer.Overlay ref={overlay} className="fixed inset-0 z-50 bg-scrim" />
         <Drawer.Content
-          ref={content}
+          ref={contentRef}
           role={role ?? "dialog"}
           data-ui="modal"
           aria-modal="true"
@@ -141,12 +211,19 @@ export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, chi
             focusInto(content.current, true);
           }}
           onCloseAutoFocus={returnFocus}
+          onEscapeKeyDown={(e) => !dismissible && e.preventDefault()}
+          onPointerDownOutside={(e) => {
+            if (!locked) return;
+            e.preventDefault();
+            // A tap beside a locked sheet puts the keyboard away instead.
+            content.current?.focus();
+          }}
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex flex-col bg-card pb-safe text-card-foreground outline-none",
             full ? "top-0 pt-safe" : "max-h-11/12 rounded-t-sheet border-t border-border shadow-3",
           )}
         >
-          {!full && <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 flex-none rounded-full bg-border" />}
+          {!full && !locked && <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 flex-none rounded-full bg-border" />}
           <Chrome title={title} sub={sub} hideHeader={hideHeader} footer={footer} bodyClassName={bodyClassName}>
             {children}
           </Chrome>

@@ -16,6 +16,7 @@ import { Button } from "../actions/Button";
 import { Icon, type IconName } from "../icons/Icon";
 import { EmptyState } from "../display/EmptyState";
 import { ImageViewer } from "./ImageViewer";
+import { Tooltip } from "../overlay/Tooltip";
 
 /** What a glyph should be for a file we cannot draw. */
 function glyphFor(mime: string): IconName {
@@ -50,9 +51,11 @@ export function DocumentPreview({ name, mime, href, sizeBytes, height = "md", ac
     <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted px-3 py-2">
       <Icon name={glyphFor(mime)} size="s" className="flex-none text-subtle-foreground" />
       <span className="min-w-0 flex-1">
-        <b data-copy="content" className="block truncate text-xs font-semibold" title={name}>
-          {name}
-        </b>
+        <Tooltip label={name}>
+          <b data-copy="content" className="block truncate text-xs font-semibold">
+            {name}
+          </b>
+        </Tooltip>
         {sizeBytes != null && <span className="text-2xs text-subtle-foreground">{formatBytes(sizeBytes)}</span>}
       </span>
       {actions}

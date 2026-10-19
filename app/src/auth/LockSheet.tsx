@@ -150,7 +150,7 @@ export function LockSheet() {
       reason={step.kind === "code" ? "From your authenticator app" : WHY[reason]}
       footer={
         <>
-          <Button variant="ghost" icon="logout" onClick={() => void signOut()}>
+          <Button variant="ghost" icon="logout" onClick={() => signOut()}>
             Sign Out
           </Button>
           {step.kind === "code" ? (
@@ -160,7 +160,7 @@ export function LockSheet() {
           ) : (
             <>
               {withPasskey && (
-                <Button icon="fingerprint" busy={keyBusy} onClick={() => void passkey()}>
+                <Button icon="fingerprint" busy={keyBusy} onClick={() => passkey()}>
                   Use Passkey
                 </Button>
               )}
@@ -177,7 +177,7 @@ export function LockSheet() {
         </>
       }
     >
-      <Form id="unlock" onSubmit={() => void submit()}>
+      <Form id="unlock" onSubmit={() => submit()}>
         {field}
         {problem && (
           <Banner tone="err" icon="lock" className="mt-3 mb-0">

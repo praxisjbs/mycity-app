@@ -1,27 +1,79 @@
-import { useCallback } from "react";
-import { Button, Icon, ShellNotice, useModal } from "@mycity/ui";
+import { useCallback, useState } from "react";
+import { Button, Icon, ShellNotice, toast, useModal } from "@mycity/ui";
+import { enablePush, usePushState } from "@/features/notifications/push";
 import { install, installLater, usePwa } from "./pwa";
 
 /**
  * The shell's notices, one at a time, floating at the foot of the page
- * (ShellNotice): a new version is ready (Reload), or the one-time offer to
- * install the app (PR 2 question 4: from the second visit, phone and desktop,
- * Not Now holds 30 days, never once installed).
+ * (ShellNotice): a new version is ready (Reload); turning notifications on for
+ * this device, never asked yet (docs/guides/notifications.md §2: never the
+ * browser's prompt unasked; Not Now holds 14 days on this device); or the
+ * one-time offer to install the app (PR 2 question 4: from the second visit,
+ * phone and desktop, Not Now holds 30 days, never once installed).
  */
+const PUSH_LATER = "mc-push-later";
+const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+const pushLaterUntil = () => {
+  try {
+    return Number(localStorage.getItem(PUSH_LATER)) || 0;
+  } catch {
+    return 0;
+  }
+};
+
 export function ShellNotices() {
   const { update, banner } = usePwa();
   const installApp = useInstallApp();
+  const push = usePushState();
+  const [laterUntil, setLaterUntil] = useState(pushLaterUntil);
+  const pushLater = () => {
+    const until = Date.now() + FOURTEEN_DAYS;
+    try {
+      localStorage.setItem(PUSH_LATER, String(until));
+    } catch {
+      /* the offer then shows again next time */
+    }
+    setLaterUntil(until);
+  };
   if (update) {
     return (
       <ShellNotice
         icon="refresh"
         actions={
-          <Button variant="primary" size="sm" onClick={() => void update()}>
+          <Button variant="primary" size="sm" onClick={update}>
             Reload
           </Button>
         }
       >
         A new version is ready
+      </ShellNotice>
+    );
+  }
+  if (push === "ask" && laterUntil < Date.now()) {
+    return (
+      <ShellNotice
+        icon="bell"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" onClick={pushLater}>
+              Not Now
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() =>
+                enablePush().then((s) => {
+                  if (s === "on") toast("Notifications are on");
+                  else if (s === "blocked") toast.error("Notifications are blocked here");
+                })
+              }
+            >
+              Turn On
+            </Button>
+          </>
+        }
+      >
+        Get notified of new mail and approvals
       </ShellNotice>
     );
   }
@@ -47,11 +99,11 @@ export function ShellNotices() {
   return null;
 }
 
-/** Install App: the browser's own prompt, or on an iPhone the Add to Home Screen steps. */
+/** Install App: the browser's own prompt, or on an iPhone the Add to Home Screen steps. Its button spins while the prompt is open. */
 export function useInstallApp() {
   const modal = useModal();
   return useCallback(() => {
-    void install().then((r) => {
+    return install().then((r) => {
       if (r !== "steps") return;
       modal.open({
         title: "Install MyCity App",

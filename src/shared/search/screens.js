@@ -50,6 +50,7 @@ const SCREENS = Object.freeze([
   s("mailbox", "archive", "Archive", ["archived mail"]),
   s("mailbox", "spam", "Spam", ["junk"]),
   s("mailbox", "trash", "Trash", ["deleted", "bin"]),
+  s("mailbox", "signature", "Signature", ["signature", "email signature", "sign-off", "whatsapp", "social links"]),
 
   s("people", "employees", "Employees", ["staff", "staff list", "register", "directory", "hr", "people"]),
   s("people", "attendance", "Attendance", ["team attendance", "clock ins", "lateness", "absence"]),

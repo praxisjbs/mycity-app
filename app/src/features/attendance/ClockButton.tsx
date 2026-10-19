@@ -5,7 +5,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Pill, Result, TextAreaField, toast, useContractForm, useModal, zoneClock } from "@mycity/ui";
+import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
 
 /**
  * Clocking in and out, for the shell: the desktop top bar's ClockButton and the phone's floating
@@ -43,21 +43,22 @@ export function ClockButton({ compact }: { compact?: boolean }) {
   const title = unavailable ? (today?.unavailable_reason === "leave" ? "On Leave Today" : "Clock Not Available") : done ? "Done For Today" : label;
 
   return (
-    <button
-      type="button"
-      onClick={() => open()}
-      disabled={!today || done}
-      title={title}
-      aria-label={title}
-      className={cn(
-        "flex h-9 max-md:h-11 max-md:min-w-11 max-md:justify-center items-center gap-1.5 rounded-full text-sm font-semibold transition hover:brightness-110 disabled:opacity-50",
-        compact ? "px-2.5" : "px-3.5",
-        out ? "on-primary bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
-      )}
-    >
-      <Icon name="clock" />
-      {!compact && <span>{done ? "Done For Today" : label}</span>}
-    </button>
+    <Tooltip label={title}>
+      <button
+        type="button"
+        onClick={() => open()}
+        disabled={!today || done}
+        aria-label={title}
+        className={cn(
+          "flex h-9 max-md:h-11 max-md:min-w-11 max-md:justify-center items-center gap-1.5 rounded-full text-sm font-semibold transition hover:brightness-110 disabled:opacity-50",
+          compact ? "px-2.5" : "px-3.5",
+          out ? "on-primary bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
+        )}
+      >
+        <Icon name="clock" />
+        {!compact && <span>{done ? "Done For Today" : label}</span>}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -171,7 +172,7 @@ function ClockPanel({ close }: { close: () => void }) {
   };
 
   const punch = (where: Partial<Pick<PunchCreate, "latitude" | "longitude" | "accuracy_m" | "location_error">> = {}) =>
-    void send({ event_type: eventType, device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, ...where }, crypto.randomUUID());
+    send({ event_type: eventType, device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, ...where }, crypto.randomUUID());
 
   const locate = () => {
     if (!navigator.geolocation) return setStage({ kind: "no_location", error: "unsupported" });
@@ -213,7 +214,7 @@ function ClockPanel({ close }: { close: () => void }) {
         <Result tone="err" label={verb} title="No Connection" text="Not recorded yet. Try again once you are online." icon="offline" />
         <FormFooter>
           <Button onClick={close}>Not Now</Button>
-          <Button variant="primary" icon="refresh" onClick={() => void send(stage.body, stage.key)}>Try Again</Button>
+          <Button variant="primary" icon="refresh" onClick={() => send(stage.body, stage.key)}>Try Again</Button>
         </FormFooter>
       </>
     );
@@ -270,7 +271,7 @@ function ClockPanel({ close }: { close: () => void }) {
     ) : stage.kind === "weak" || stage.kind === "no_location" ? (
       <Button variant="primary" icon="refresh" onClick={locate}>Retry Location</Button>
     ) : (
-      <Button variant="primary" icon="clock" busy={stage.kind === "sending" || stage.kind === "locating"} onClick={() => void start()}>
+      <Button variant="primary" icon="clock" busy={stage.kind === "sending" || stage.kind === "locating"} onClick={() => start()}>
         {verb}
       </Button>
     );
@@ -358,7 +359,7 @@ function PunchDone({ res, close, again, toDevices }: { res: PunchResult; close: 
         {res.validation_state === "review" && mine.length > 0 && !sent ? (
           <>
             <Button onClick={close}>Skip</Button>
-            <Button variant="primary" icon="send" busy={explain.pending} onClick={() => void sendNote()}>Send Note</Button>
+            <Button variant="primary" icon="send" busy={explain.pending} onClick={() => sendNote()}>Send Note</Button>
           </>
         ) : res.validation_state === "rejected" ? (
           <>

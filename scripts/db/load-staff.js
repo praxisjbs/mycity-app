@@ -31,7 +31,9 @@
  *   6. Gives each person a login in the invited state with the roles `roles.json` holds
  *      for their post, and the CEO flag where it says so. **No email is sent**: Send
  *      Invite does that, when People are ready.
- *   7. Moves the staff-number counter past every number the sheet brought, so the next
+ *   7. Gives a post the sheet does not hold the line manager `roles.json` names for it
+ *      (the build account reports to the CTO), only while that person has none.
+ *   8. Moves the staff-number counter past every number the sheet brought, so the next
  *      person added on screen is not given one that is taken.
  *
  * It is safe to run again: every step looks before it writes, and an edit made on screen
@@ -197,6 +199,7 @@ async function applyRoles({ pool, atomically, log, roles }) {
       continue;
     }
     const entry = rolesForTitle(roles, person.job_title);
+    const granted = entry.roles || roles.default.roles || ["employee"];
     const client = await pool.connect();
     try {
       await atomically(client, async () => {
@@ -209,16 +212,69 @@ async function applyRoles({ pool, atomically, log, roles }) {
           },
           SYSTEM,
         );
-        await access.setRoles(client, user.user_id, entry.roles || ["employee"], SYSTEM);
+        await access.setRoles(client, user.user_id, granted, SYSTEM);
       });
       out.created += 1;
-      log(`login invited for ${person.display_name}: ${(entry.roles || []).join(", ")}${entry.is_ceo ? ", CEO" : ""}`);
+      log(`login invited for ${person.display_name}: ${granted.join(", ")}${entry.is_ceo ? ", CEO" : ""}`);
     } catch (err) {
       out.failed += 1;
       log(`WARNING: no login for ${person.display_name} (${person.job_title}): ${err.message}`);
     } finally {
       client.release();
     }
+  }
+  return out;
+}
+
+/**
+ * Give a post the sheet does not hold the line manager `roles.json` names for it (the
+ * build account, made before any roster, reports to the CTO). The words are read as the
+ * sheet's Line Manager column is (manager-text.js). Only an active person with no line at
+ * all is given one, and never the CEO, so a manager set on screen stays.
+ *
+ * @returns {Promise<{set: number, unresolved: number}>}
+ */
+async function applyLines({ pool, atomically, log, roles }) {
+  const managerText = require(path.join(ROOT, "src/modules/organisation/manager-text.js"));
+  const organisation = require(path.join(ROOT, "src/modules/organisation/organisation.service.js"));
+  const out = { set: 0, unresolved: 0 };
+  if (!Object.values(roles.by_job_title).some((entry) => entry.line_manager)) return out;
+  const { rows } = await pool.query(
+    `SELECT e.employee_id, e.job_title, btrim(e.first_name || ' ' || e.last_name) AS display_name
+       FROM employee e
+       LEFT JOIN app_user u ON u.employee_id = e.employee_id
+      WHERE e.status = 'active' AND e.line_manager_id IS NULL AND e.line_manager_seat_id IS NULL
+        AND COALESCE(u.is_ceo, false) = false
+      ORDER BY e.created_at, e.employee_id`,
+  );
+  for (const person of rows) {
+    const entry = rolesForTitle(roles, person.job_title);
+    if (!entry.line_manager) continue;
+    await withTx(pool, atomically, async (client) => {
+      const target = await organisation.resolveManager(
+        client,
+        managerText.parse(entry.line_manager).primary,
+        { exclude: person.employee_id },
+      );
+      if (!target) {
+        out.unresolved += 1;
+        log(`WARNING: no line manager for ${person.display_name} (${person.job_title}): "${entry.line_manager}" matches nobody`);
+        return;
+      }
+      await organisation.setReportingLine(
+        client,
+        person.employee_id,
+        {
+          ...(target.employee_id
+            ? { line_manager_id: target.employee_id }
+            : { line_manager_seat_id: target.org_seat_id }),
+          reason: `Staff roster: ${person.job_title} reports to ${entry.line_manager}`,
+        },
+        SYSTEM,
+      );
+      out.set += 1;
+      log(`${person.display_name} (${person.job_title}) now reports to the ${entry.line_manager}`);
+    });
   }
   return out;
 }
@@ -249,10 +305,11 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
 
   const loaded = await alreadyLoaded(db, checksum);
   if (loaded && !dryRun) {
-    log(`this sheet is already loaded (batch ${loaded.number}); checking logins only`);
+    log(`this sheet is already loaded (batch ${loaded.number}); checking logins and lines only`);
     const logins = await applyRoles({ pool: db, atomically, log, roles });
+    const lines = await applyLines({ pool: db, atomically, log, roles });
     await withTx(db, atomically, (client) => organisation.advanceStaffNumbers(client));
-    return { status: "already_loaded", batch: loaded.import_batch_id, logins };
+    return { status: "already_loaded", batch: loaded.import_batch_id, logins, lines };
   }
 
   /* The sheet is read here as well as by the engine, for the emails it names. */
@@ -314,12 +371,14 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
   );
   await logProblems(db, batch.import_batch_id, log);
 
-  /* 4. Logins and roles, then the counter past the numbers the sheet brought. */
+  /* 4. Logins and roles, the lines of posts outside the sheet, then the counter past the
+        numbers the sheet brought. */
   const logins = await applyRoles({ pool: db, atomically, log, roles });
+  const lines = await applyLines({ pool: db, atomically, log, roles });
   const highest = await withTx(db, atomically, (client) => organisation.advanceStaffNumbers(client));
   log(`staff numbers continue after ${highest}`);
   log(`logins: ${logins.created} invited, ${logins.kept} already had one, ${logins.failed} failed`);
-  return { status: "loaded", batch: batch.import_batch_id, stats: committed.stats, logins, dropped };
+  return { status: "loaded", batch: batch.import_batch_id, stats: committed.stats, logins, lines, dropped };
 }
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -398,6 +457,7 @@ module.exports = {
   mappingFor,
   alreadyLoaded,
   applyRoles,
+  applyLines,
   loadStaff,
   logProblems,
   main,

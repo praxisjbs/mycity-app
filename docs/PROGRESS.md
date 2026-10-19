@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 93 screens (87 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 94 screens (88 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -42,8 +42,8 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 27 items below: 26 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 2 | 0 | 27 | 0 | 0 |
+| M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
+| M1 Core Operations & Employee Management | 30 | 2 | 0 | 28 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **59** | **0** | **34** | **0** | **0** |
+| **Total** | **94** | **59** | **0** | **35** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
@@ -95,16 +95,94 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Frontend foundation PR 1 · Ground: `packages/ui` (tokens, primitives, overlays, help, toast, form system, data client), catalogue and gallery, new gates, docs (FRONTEND_FOUNDATION §4) | AJ | ☑ | 15/10/2026 |
 | Frontend foundation PR 2 · Shell: both apps' shells on `packages/ui`, bottom bar, More, floating button, session, PWA, what opens where | AJ | ☑ | 15/10/2026 |
 | Frontend foundation PR 3 · Build kit: DataView, KPI, charts, kanban, calendar, pickers, upload, editor, PDF preview, voice, maps; app component folders emptied; every screen on the token scale | AJ | ☑ | 16/10/2026 |
+| Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
+| One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
+| Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☑ | 19/10/2026 |
 
 **Notes**
 
-- 18/10/2026 · TB · An out-of-date gate can no longer go unnoticed. `deploy-gate status` now prints
+- 19/10/2026 · TB · An out-of-date gate can no longer go unnoticed. `deploy-gate status` now prints
   the gate's own `sha256` first, and `release.yml` asks for it before `stage` and before `promote`:
   `scripts/deploy/check-gate.js` compares it with the copy in the commit being deployed and, on a
   mismatch (or a gate too old to report one), fails before the server is touched. The job summary
   gives the fix with that commit's download link, the hash to check, the install line and the
   re-run; `docs/runbooks/deploy.md` §5 has the same. CI still never installs the gate. Left: the
   first deploy after this merges stops on staging until the new gate is installed by hand, once.
+- 19/10/2026 · TB · Notifications built (`docs/guides/notifications.md` is Built; PR #72). Web push to
+  phones and computers through the app's own service worker (`app/src/sw.ts`: one notification per
+  conversation, Mark Read, the pin in the status bar and the count on the app icon, a tap through
+  sign-in to the record), the in-app banner (3 s, the chime or a buzz, once per notice, none in a
+  window in the background), the pane on both shells (`NotificationCenter`: a page from the right on
+  a phone, a panel under the bell on desktop), Notification Settings (this device, other devices, In
+  App, Email and Push per category), the one-time Turn On offer, three ⌘K actions, and live mail on
+  staging and production. The integration suite passes locally, 26 suites and 635 tests, with
+  `notifications-push.test.js`. GE's runbook: `docs/runbooks/push-notifications.md` (nothing to set
+  in `.env`; check `MAILBOX_IDLE_MAX` is not 0). The whole `npm run ci` passes locally (45 gates),
+  and pushes delivered to the built service worker in Chromium show as designed (handoff §8). Left:
+  TB's phone check after the staging deploy (handoff §7).
+- 19/10/2026 · TB · Notifications, in progress (TB's eight decisions in `docs/handoff/push-notifications.md`
+  §2; design `docs/guides/notifications.md`). The backend of web push: migration `0460`
+  (`push_subscription` as a device with its token, key id and health; `push_delivery`, one row per
+  notice and device), the environment's VAPID pair made on first start and kept encrypted
+  (`services/push/vapid.js`, `.env` may override, subject `mailto:jbspraxisllc@gmail.com`), the sender
+  with error mapping (`web-push.js`), the payload (`payload.js`), the `notification-push` job (a
+  minute's hold while the person is in front of the app, Security never held; one send per device;
+  dead subscriptions revoked; retries with backoff), the routes for preferences, devices, Send Test,
+  read state and the service worker's two device-token calls, push off on suspension, leaving, Sign
+  Out Everywhere and Sign Out Others. Mail: IMAP IDLE on by default (24 production, 4 staging), the
+  first line in the notice, reading a conversation reads its notices. Channel posts alert once per
+  channel. Left: the service worker, the banner, the pane and Notification Settings on both shells,
+  tests, the runbook for GE.
+- 19/10/2026 · TB · The staff roster and the staff importer (`docs/guides/foundation.md` §6.1, §6.5,
+  §6.6, §11), from a review of what staging shows. A VACANT row's Line Manager is the seat's own
+  line (the importer dropped it without a word); `roles.json` gives a post outside the sheet its line
+  manager (the build account reports to the CTO), only while it has none; a row whose staff number
+  is held by someone with its own name is that person, so a corrected email no longer takes their
+  number and makes a second record; each row's dotted line comes from its own cell, so a preview no
+  longer costs its commit a dotted line; a link that writes nothing is not counted as an update;
+  the import preview lists warning rows (someone saved without a Line Manager) with the errors.
+  Approvals, team scope, the notifications that follow it and `manages_people` pass through a
+  vacant seat to the first person above it (`1160` `employee_effective_manager`); a loop through a
+  seat is refused. MyCity's sheet corrected (TB, 19/10/2026). Left: the server's `deploy-gate` is
+  still the one provisioned before the roster step (no `[staff]` line in staging's Release run 159),
+  so `docs/runbooks/staff-roster.md` §2 needs someone with root on the server; staging's on-screen
+  corrections are §6 there.
+
+- 18/10/2026 · TB · One press, one request (F26, FRONTEND_GUIDE §8.4). Reload on "A new version is
+  ready" looked dead, and after a hard refresh did nothing; any button could send its request twice.
+  Now `Button`, `IconButton` and `BigButton` are busy from the press until the work their handler
+  hands back settles: brand colour kept and softened, a spinner where the icon was (centred over the
+  label when there is none), a second press refused at once, `aria-busy` but never `disabled`. The
+  new `ActionGroup` makes the buttons beside a busy one wait; modals, forms, form footers, card and
+  page header actions, shell notices and DataView's bulk bar are groups already, and a modal cannot
+  be dismissed mid-save. `Form` sends one save however often Enter is pressed. Reload now always
+  reloads: when the new version takes over, when it activates on a page loaded with a hard refresh,
+  or after 4 s. Lint `mycity/no-void-press` refuses a handler that throws its work away; 91 handlers
+  in both apps converted, and six buttons that disabled themselves and swapped their label (the
+  public site's Apply, Start, Sign and Decline, Payroll's Email All) use the shared busy. No screen's
+  ticks change. Left: a mail attachment chip, a hand-drawn
+  button, can still start its download twice.
+
+- 18/10/2026 · TB · Gate 21 and F25, nothing the browser styles itself (FRONTEND_GUIDE §8.8). A
+  phone showed its own grey picker over the branded Create Rule sheet (Home · Alert Rules), because
+  `SelectField`, `FilterSelect` and `InlineSelect` were native `<select>`s. All three now draw the new
+  `SelectMenu`: a Radix listbox in our tokens on desktop, a bottom sheet of 44 px rows on a phone,
+  titled by the field's label. Every `title` tooltip is now `Tooltip` (IconButton, the collapsed
+  rail, Calendar events, file names, the clock button, message ticks, mail recipients, policy
+  summaries); map markers use Leaflet's tooltip in our tokens. `base.css` resets control appearance,
+  spinners, the search clear and autofill buttons, the autofill tint, the invalid glow, the tap
+  flash, the selection, accent and caret colours; the Toaster styles every sonner part.
+  `check/native-ui.js` runs in `npm run ci` and the Stop hook: source plus every gallery page and
+  app screen at phone and desktop size, no exemptions; green on all 402 views. Left: nothing.
+- 18/10/2026 · TB · Phone sheets fixed for typing (F6 amended): with the keyboard up, a sheet was
+  pinned behind it and the browser panned the page to reach the field, pushing the header off the
+  top with no way back, and a swipe down or a tap on the scrim closed it and lost what was typed.
+  `Sheet` now follows the visible area itself (Vaul's input repositioning is off): its bottom sits
+  on the keyboard, its height never passes what is left, and the focused field scrolls back into
+  view. Once a sheet with a close button holds a text field it has no grab handle and closes only
+  from that button, Cancel or Esc; a scrim tap puts the keyboard away. `dismissible={false}` no
+  longer blocks the close button on a phone. Every Modal, SidePanel and Popover on a phone gets it.
+  Left: check on a real Android and iPhone on staging (the tests stub the keyboard).
 - 18/10/2026 · TB · The staff roster has never run on staging, which still shows only the build
   account. `/srv/mycity/bin/deploy-gate` is root-owned and installed by `ops/provision/provision.sh`
   alone, and a release carries `scripts/db` but not `scripts/deploy`, so the roster step added with
@@ -129,16 +207,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   shell and ⌘K. New gate `check/capabilities.js`. Left: nothing.
 - 17/10/2026 · GE · Two-column Grid panes polished: a thin scrollbar kept inside the card's rounded corners (its track margin is the card radius) and a card's header that stays put while its body scrolls (`data-panes`, `data-card-header`). Left: nothing.
 - 17/10/2026 · GE · Two cards side by side now scroll on their own on desktop, as the mailbox's panes do: `Grid` (2, "1.4/1", "1/1.5") caps each column at the window's height under the top bar (`max-h-card-pane`) with its own scroll, from the width the columns sit side by side; the page still scrolls around them, and `scroll={false}` opts a grid out. Phones are unchanged (one column, the page scrolls). Checked on Settings · Security at 1440 by 520: the role card scrolls alone while the rules card and the page stay put. Left: nothing.
-- 17/10/2026 · TB · GitHub settings ticked: TB restricted the production environment to `main`, and
+- 17/10/2026 · GE · GitHub settings ticked: TB restricted the production environment to `main`, and
   the team accepted the rest as it stands for M0. Left: branch protection on `main` and required
   reviewers on production, once the repository is public or on a plan that offers them.
   Operations: provisioning re-run on the server, confirmed over SSH, so the backup and restore-drill
   timers are installed. Still open: the offsite backup host and the WhatsApp alert links.
-- 17/10/2026 · TB · Release pipeline ticked: the team accepted the manual production run by GE or TB
+- 17/10/2026 · GE · Release pipeline ticked: the team accepted the manual production run by GE or TB
   (`release.yml` approver job) as M0's production approval while the repository is private. Left:
   required reviewers on the production environment once the repository is public or on a plan
   that offers them; the GitHub settings and operations items stay open.
-- 17/10/2026 · TB · M0 table brought up to date: 24 of 27 items done. Ticked the server (staging
+- 17/10/2026 · GE · M0 table brought up to date: 24 of 27 items done. Ticked the server (staging
   verify passes over HTTPS with HSTS and each host refusing the other's API, production serves the
   sealed releases, the uptime probe is green) and the staging seed (MyCity's staff through
   `seeds/staging/10_staff.js`; later modules seed their own records). Still open, each with
@@ -146,7 +224,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   and branch protection are not offered); the release pipeline's production approval (interim
   manual run until then); operations (backups, restore drill and offsite copy need provisioning
   re-run on the server, the offsite host and the WhatsApp alert links, none confirmed yet).
-- 17/10/2026 · TB · Production runs only by hand while the repository is private: GitHub offers no
+- 17/10/2026 · GE · Production runs only by hand while the repository is private: GitHub offers no
   required reviewers there, so releases 130 to 134 reached production seconds after the seal. The
   automatic `release.yml` run now stops at the seal and names the sha; an approver (GE or TB)
   starts Release from `main` with it, and an `approver` job in `release.yml` and `rollback.yml`
@@ -300,17 +378,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   ⌘K still on INTERIM types); the organisation routes, so the employee screens still use the mock;
   `create-admin` on staging and production for the operations lead and the build account
   (`docs/runbooks/first-accounts.md`).
-- 16/10/2026 · TB · `docs/DATABASE_SCHEMA.md` rewritten as the database design: the M0 core and how a
+- 16/10/2026 · GE · `docs/DATABASE_SCHEMA.md` rewritten as the database design: the M0 core and how a
   module attaches to it, each milestone's block, owner, tables as built and what it still owes (from
   the coverage audit), what is not built and why (passkeys per REUSE_MAP; nothing for M11), and the
   open decisions (payroll design, the role permission matrix, moving business choices out of seeds).
   M6 payroll is in scope (MILESTONES §11); the earlier "not modelled" note is withdrawn.
-- 16/10/2026 · TB · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
+- 16/10/2026 · GE · The integration suite runs on the real migrations: `tests/integration/helpers/schema.js`
   rebuilds the schema with `migrate.js` and `fixtures/shared-layer.sql` is gone; CI now has PostgreSQL 16
   with pgvector and Redis, so the suite and gate 4's round trip run on every PR. `1100` lets the alerts
   code raise an alert with no trigger and returns `over_by` to two places. 82 of 82 integration tests
   pass. Left: the role permission matrix (M9), the staff-number counter after an import.
-- 16/10/2026 · TB · M0 schema made to match the foundation code: `0100` lets the shared layer write
+- 16/10/2026 · GE · M0 schema made to match the foundation code: `0100` lets the shared layer write
   what it writes (emit's empty diff, bell rows without a body, untitled uploads, 0-based import
   header rows, refused AI runs, the AI settings defaults); `0110` gives `employee` the contract's
   columns (`staff_number`, gender, date of birth, next of kin, bank, gross monthly, dotted line,
@@ -322,7 +400,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   Left: `home_alert` (M1 block) and the integration suite on the real migrations (next PR); role
   permissions wait on a role matrix; the importer must advance the staff-number counter past
   imported IDs.
-- 16/10/2026 · TB · Gate 6 built: `check/schema-drift.js` (every SQL string in `src/` and `scripts/` names only
+- 16/10/2026 · GE · Gate 6 built: `check/schema-drift.js` (every SQL string in `src/` and `scripts/` names only
   tables and columns the migrations create: qualified columns, INSERT column lists, UPDATE SET lists,
   dropped or unknown tables, a table created twice with different columns) and `check/contract-columns.js`
   (each contract file's `TABLES` names the table every object schema's keys are columns of, with a
@@ -330,7 +408,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   checked column for column against a migrated database). Run against the schema PR 25 merged,
   contract-columns reports the 12 employee mismatches. `CI_STRICT` is on: no gate can sit empty again.
   Left: nothing for gate 6; every new contract file declares its `TABLES`.
-- 16/10/2026 · TB · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
+- 16/10/2026 · GE · Migration conventions written (`docs/MIGRATIONS.md`) after the audit of the PR 25
   schema, and A26 added (reference seeds hold only what the code cannot run without). Left: a
   fix-forward M0 file for the six columns the shared layer cannot write (`audit_ledger.changed_fields`,
   `notification.body`, `document.title`, `import_batch.header_row`, `ai_run` vendor and prompt,
@@ -354,7 +432,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   `monitoring.md`, `add-a-module.md`. Left: re-run provisioning on the server to install them,
   the offsite host (`backup-restore.md` §2), the WhatsApp alert links in production's `.env` and as
   a repository secret; the M11 rehearsal in front of MyCity.
-- 16/10/2026 · TB · RichTextField no longer touches a destroyed editor: TipTap's `useEditor` can
+- 16/10/2026 · GE · RichTextField no longer touches a destroyed editor: TipTap's `useEditor` can
   destroy its first editor before the mount effect runs on a slow machine, and the draft sync then
   threw (gate 11 on CI). `syncDraft` skips a destroyed editor, with a test. Nothing left.
 - 16/10/2026 · LA · Moved deterministic reference SQL to `seeds/reference/` while retaining CLAUDE.md's milestone blocks (`0099`, `1099`, and so on). `db:migrate` now interleaves both folders and the migration gates enforce unique numbers and milestone ownership across both. Payroll tables remain deferred; only shared numbering configuration required by the existing numbering contract is seeded. Left: create environment-specific staging people and transaction data through services.
@@ -607,20 +685,32 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 16/10/2026 |
-| 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · ESS · Org Chart (#91), TB's four decisions on the phone (`docs/guides/organogram.md`
+  §8, §10.2): a Focus or Everyone switch, opening on Focus at the person looking, with the path
+  from the top, their team, Dotted Line and Same Manager; Everyone opens the way down to them and
+  marks their row You. A card opens the person's sheet on both shells: Send Message (My Profile on
+  your own), Open Record and Change Manager only by grant, so staff are no longer sent to Home.
+  Download PDF works: drawn in the worker as the person asking and emailed to them. Left: nothing.
+- 19/10/2026 · TB · ESS · Org Chart (#91): someone who is not on the chart starts at the top, the
+  CEO, instead of a card of their own with nowhere to go; on a phone a search lists the matching
+  cards to tap, and anyone else at the top is listed under Also At The Top (`docs/guides/organogram.md`
+  §10.2). The build account now sits under the CTO, so it opens with Reports To. Left: nothing.
+
+- 18/10/2026 · AJ · My Attendance (#9): the 12 October asks (`docs/guides/ess.md` §13) on LA's screen, LA to review: the month picker beside Export Month (arrows, or a year and month picked directly), the share of days present on Late Days, Days Present, Late Days and Absent opening their days paged at 25 (`GET /attendance/me` takes `status`), and the days as a table or a chart of hours. Leave on staging: `seeds/staging/30_leave.js` puts the mock's twelve sample requests on the real staff through the leave service. My Leave (#12) gains Leave Calendar (`GET /ess/leave/calendar`): approved and waiting leave for the reader and everyone under them, everyone for the CEO and Operations & People (the team lead, 18/10/2026).
 - 17/10/2026 · LA · My Attendance (#9) and My Devices (#88) on the real API (`docs/guides/attendance.md`): the clock panel (location read only after the press, the worksite named first; Retry Location and Clock In Anyway; No Connection keeps the punch's key and body for Try Again; the server's result, with Send Note on a punch under review), the month's figures and days with each day's punches, open exceptions with Explain, Export Month by email; My Devices lists the person's devices, registers this one behind a fresh sign-in (three at most) and removes one. Checked on the real API at 390 and 1440 px. Left: Work Location Requests (#87) and Policy Updates (#89) stay on INTERIM shapes until home locations and policy versions are decided (attendance guide §13).
 - 17/10/2026 · AJ · My Profile (#8) on the real API: the caller's record from the employee 360 (account by its last four digits), Edit Profile for phone, home address, next of kin and bank through the organisation service (a bank change tells `people` edit holders), Record History, the organisation's working week (Saturday 09:00 to 15:00). Screen on `contract.gen.ts`, INTERIM `MyProfile` gone, mock in the contract's shapes; 5 integration tests. Left, each needing a module AJ does not own: the photo (`employee.photo_document_id`, written by the organisation module, read by the shell and Community; GE, TB), each person's own schedule (LA, attendance), Download My Data.
 - 17/10/2026 · AJ · My Performance (#10), My Queries (#13) and My Payslips (#11) now carry the milestone of the module they show (M2, M3, M6), as `docs/guides/ess.md` §6 already said, so the shell's Coming Soon names that milestone and its date instead of M1 (AJ, 17/10/2026). Summary counts moved with them. MILESTONES §18 still lists all twelve ESS tabs under M1: TB to note.
@@ -686,9 +776,15 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 21 | Archive | `archive` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 22 | Spam | `spam` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 23 | Trash | `trash` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 94 | Signature | `signature` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Signature (#94) built, from TB's brief and answers (design B, Street Sign, chosen on the design canvas from three): one signature for everyone, drawn from the employee record, the mailbox and Settings · Organisation, never designed by hand. Backend: contract (`MySignature`, `MySignatureSave`, `SignaturePreview*`, `SignatureConfig*`), migration 1127 (`mail_signature`, `mail_signature_config`), seed 1129 (`mailbox.signature` for System Administrator and Implementation), `mailbox/signature/` (the model, the email-safe full signature and slim line in HTML and text, the pictures drawn at 2x and stored once by hash, placement above the quoted mail), five routes, and `send()` baking the signature into the queued message with its pictures sent inline (`cid:`) and kept on the Sent copy. The slim line goes on replies and on mail only for colleagues. Screens: the tab shows it as it sends (New Mail or Reply) with Copy Signature, the person's numbers (the mobile through the organisation service, as Edit Profile) and two switches; Configure for holders (app links, six social links as icons, what shows); the composer previews it behind Show Signature. 21 unit tests (the model, the drawings, placement, the full-or-slim rule, the pictures) and 7 integration tests on the real migrations (the tab, numbers through the employee record, the preview rule, Configure's capability, sending with inline pictures and the Sent copy, a reply's placement, a queued message keeping its signature, a failed bake leaving without it); the brand files' test in `tests/integration/settings.test.js`. Left: walk it on a phone once staging has it; the brand files are uploaded by MyCity in Settings · Organisation.
+- 19/10/2026 · GE · Signature added with npm run new:screen (catalogue, route map, screen file, Coming Soon); not started.
+- 18/10/2026 · GE · Reader brought level with the reference client: remote content held back by every route it can fetch (images, `srcset`, posters, `background`, style `url()`), so Load Images is offered whenever anything was held; Always Show Images per sender (`mail_image_trust`, migration 1125, `POST /mailbox/image-trust`, Stop Showing Images in the thread menu); signature logos (`cid:` inline parts) drawn from the vault; quoted history folded behind Show Quoted Text, in English and French, from a blockquote, an "On … wrote:" line or trailing `>` lines. Also fixed: the frame's spacing came out of its measured height and clipped the last lines of every message. Checked in the mock app at 390 px and with the integration suite (12 of 12). Left: walk it on a phone once staging has it.
+- 18/10/2026 · GE · Reader fixed from a phone test: HTML mail was written into the page, so a sender's fixed 600 px layout (a cPanel notice) ran off the phone and their styles could reach ours. It now renders in `EmailFrame` (new in `packages/ui`): a sealed frame, as tall as its content, scaled down to the column's width when wider, with its own policy (no scripts, frames or forms; web images after Load Images); a `mailto:` link opens the composer. On a dark surface a message designed for a white page is recoloured as Outlook does (light backgrounds onto our card, dark text onto our foreground, hue kept in OKLab; brand colours already right for dark, accent borders and images untouched; a message with its own `prefers-color-scheme` left alone). Checked in Chromium at 360 px: the 600 px table shows at 0.49 and the page no longer scrolls sideways; the cPanel-style notice draws as sent in light and on our dark card in dark. Left: walk it on a phone once staging has it.
+- 18/10/2026 · GE · Composer fixed from a phone test: attachments were all refused (422, "Check the highlighted fields") because the composer sent the purpose `mail`, which the upload contract does not take; it now sends `attachment`, with an integration test sending a phone photograph the way the composer does. "Draft saved" moved out of the footer to quiet text beside Attach a File (guide §10); on the phone the footer is one row (Discard and Schedule as icons, Send filling the rest). `UploadField` gains Remove on a failed file and `handOff`, so a finished attachment shows once, as its chip. Left: walk it on a phone once staging has it.
 - 17/10/2026 · GE · ⌘K now finds a person's own mail by subject, address or sender name, pinned to the caller so the CEO and People find nobody else's; a result opens the conversation in any folder. Connecting uses `mycityapp.io` as the mail host, the certificate's name, instead of `mail.mycityapp.io`. Virus scanning checked against a real clamd with a local test signature (the signature download is blocked here): an inbound attachment carrying the EICAR string stays in quarantine marked infected, a clean one is released. Left: the real host and clamd's real signatures on staging; disconnecting a leaver needs a deactivation event.
 - 17/10/2026 · GE · Built on the real API: contract `mailbox.js`, migration 1120 (connection status, folder kinds and UID cursor, thread keys, `mail_draft`, `mail_send_queue`), the `mailbox` module (IMAP and SMTP provider, autodiscover to `mail.<domain>` on 993 and 465, threading by References, sanitised HTML in and out, send queue with Bcc in the envelope only, a copy to the server's Sent, deferrals retried three times, paced to 50 an hour), `mail-sync` and `mail-send` jobs, IMAP IDLE in the worker, `mailbox.updated` over the socket. Screens on the contract: the Connect sheet opens over Mailbox ("Password refused" on the field), Reconnect banner, scheduled mail in Drafts with Cancel Schedule, field errors in the composer, Discard with buttons only. Unit tests and an integration suite on a fake provider; checked against a real Dovecot IMAP server and an SMTP relay (15 of 15), then walked on a laptop and a phone: connect, sync with an attachment, reply, Sent, the reply arriving in the other person's inbox. Empty stubs deleted. Left: the real `mycityapp.io` host (Namecheap) is untested; disconnecting a leaver needs a deactivation event; ⌘K inside mail needs an owner-scoped provider.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/mailbox/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/mailbox.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
@@ -704,9 +800,32 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
+
+- 19/10/2026 · TB · People · Organogram (#92), TB's four decisions on the phone
+  (`docs/guides/organogram.md` §5 to §8, §10): Focus and Everyone, opening on Everyone, the whole
+  company as one folding list; Focus has the path from the top, each card's team ("3 direct · 13 in
+  all"), Dotted Line and Same Manager, and cards carry their department again. A card opens the
+  person's sheet on both shells, with Change Manager (the record's reporting line form, now
+  `app/src/features/shared/ReportingForm.tsx`), so a phone moves a line without dragging. Download
+  PDF is real (`POST /org-chart/exports`, `org-chart.layout.js`, `templates/documents/org-chart.html`,
+  emailed; a failed render tells the person), where it was a toast that made nothing. Add Role is in
+  the floating button alone on a phone. The build account keeps every grant until handover
+  (`docs/guides/identity.md` §8), held by a test. Left: nothing.
+- 19/10/2026 · TB · People · Organogram (#92), from a review of the roster on staging, which drew
+  four tops (the CEO, both open seats and the build account) and hid the seven marketing officers
+  under a seat a phone could not reach. TB's four decisions of 19/10/2026: the sheet's VACANT rows
+  name their seat's line (Head Sales & Revenue under the Program Manager, Technical Assistant under
+  the CEO) and the importer applies it; `roles.json` puts the build account under the CTO; while a
+  seat is empty the first person above it approves for its reports and has them in team scope
+  (`employee_effective_manager`, `1160`); the sheet's errors are corrected. Screens: the CEO first,
+  the desktop tree opens and returns (Expand All) centred on the CEO, an open seat's branch folds
+  and unfolds like a person's, a phone search lists the matching cards, and Also At The Top lists
+  any other card at the top. Loops through a seat are refused. Left: staging takes the sheet's
+  corrections on screen and the roster step goes back on the server
+  (`docs/runbooks/staff-roster.md` §2, §6).
 
 - 17/10/2026 · LA · People · Attendance (#25), Devices (#27) and Worksites (#28) on the real API (`docs/guides/attendance.md`): modules `attendance`, `devices`, `worksites`, migration `1300`, reference seed `1390`. The punch is judged on the server (clock guard, geofence off, warn or block, device off, warn or block, device time ahead), recorded with its evidence and the day in one transaction with its event, audit and outbox rows, under an advisory lock and an Idempotency-Key; the day-close (01:30) opens missing clock-outs and absences once. People see the day's figures and register within their scope, a person's day with each punch's evidence (coordinates for scope all only), and decide exceptions (accept, reject, add the clock-out; scope all, never their own); Export Register emails up to 31 days. Devices: Remove Device with a reason. Worksites: add, edit, retire, restore, assign. 34 integration tests on the real migrations, 43 unit tests, 4 panel tests; checked on the real API at 390 and 1440 px. Left: the map and address search (F21), field assignments and approved homes (§13), the late-query rule (M3), Settings · Attendance Policy (M9).
 - 17/10/2026 · AJ · People · Leave (#26): Leave Types (add, change, retire; delete only a type nothing has used, `LEAVE_TYPE_IN_USE` otherwise) and Allowances (one person's allowance of a type for a year, or back to the type's; the person is told). The four types are seeded in `seeds/reference/1290_seed_leave.sql` with DO NOTHING, by the team lead's decision of 17/10/2026 (an exception to A26), replacing the staging seed. 15 leave integration tests.
@@ -857,7 +976,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -868,10 +987,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Organisation (#69): the brand files (`docs/guides/foundation.md` §6.11). A Brand card takes the Logo, the White Logo (shown on Deep Green) and the Icon, each one upload that applies at once (`POST`, `DELETE /settings/organisation/brand/:slot`, purpose `brand`: PNG or WebP, kept a PNG, colours untouched), and Remove. Letterheads and PDFs draw the Logo, system mail's header the White Logo inside the message, email signatures the White Logo or the Icon. One reader of the profile for all of them (`shared/organisation/profile.js`) also fixes letterheads and system mail, which read an `organisation.profile` row nothing wrote and so always printed the defaults; the letterhead's footer now carries the RC number. Left: MyCity uploads its files.
+- 19/10/2026 · TB · Imports (#93): a row saved with something missing (a warning: a person left
+  without a Line Manager, say) is a problem beside the errors and duplicates. The preview lists
+  those rows (`GET /imports/:id/rows?status=problem`, contract `ImportRowListQuery`) and counts
+  them, in amber when nothing blocks, and the history's Problems column counts them too, so the
+  preview never says Every Row Is Fine over a person left at the top of the tree
+  (`docs/guides/foundation.md` §10.1, §11). Left: nothing.
 - 18/10/2026 · TB · Roles & Permissions (#71) redesigned from three drawn options per shell (`docs/guides/foundation.md` §6.10): desktop is a split view, the roles beside the role in view with Access, Details and People, and Roles or Matrix at the page head; the phone opens a role full screen with its modules grouped by level as chips, a chip opening a sheet while editing. Each module's access is one level (No Access, View, Add, Edit, Full) with Approve and Export, mapped to the six actions on screen only (the API and contract are unchanged; a grant that fits no level reads Custom). Edit Role, then Save Role reviews what the role gains, loses and changes and how many people it reaches. The letters T, O, A, X carry help and a key; the role's summary sits behind an ⓘ; People lists who holds it and opens their login on Users (Users now opens a login linked by `?id=`). Unsaved edits ask before another role, the matrix, New Role or another screen; New Role is a name and Start From, then the role opens in place through Access, Details and Review. New shared components: `LevelMeter`, `ItemChip`, `StepBar` (Wizard uses it) and `RadioCards`; the app router gains `useLeaveGuard`. Left: nothing.
 - 17/10/2026 · TB · Approvals (#72) built on the real API, track D of `docs/guides/foundation.md`: the
   flows (25 a page, with search), their KPIs (Flows, Open Requests, Overdue, Needs Fixing), a flow's

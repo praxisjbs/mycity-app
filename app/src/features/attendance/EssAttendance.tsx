@@ -1,7 +1,7 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import devices from "@mycity/contract/schemas/devices.js";
 import type { AttendanceDay, AttendanceEvent, AttendanceException, MyDevice } from "@mycity/contract/contract.gen.ts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { LocationRequest, LocationRequestBody } from "@/api/types/attendance";
@@ -9,9 +9,10 @@ import { useMe } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
+import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useClock } from "./ClockButton";
 import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
-import { Banner, Button, Card, CardHeader, DataView, DateField, ErrorState, ExportButton, Field, FilterSelect, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, rules, SelectField, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { Banner, BarChart, Button, Card, CardHeader, DataView, DateField, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, rules, SegmentedControl, SelectField, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 
 /**
  * ESS · My Attendance (#9), My Devices (#88), and the two attendance screens still on INTERIM
@@ -34,6 +35,7 @@ export function MyAttendancePage() {
   const [month, setMonth] = useState(months[0]);
   const summary = useApi("GET /api/v1/attendance/me/summary", { query: { month } });
   const days = usePaged("GET /api/v1/attendance/me", { filters: { month } });
+  const [view, setView] = useState<"table" | "chart">("table");
   const open = usePaged("GET /api/v1/attendance/me/exceptions", { filters: { status: "open" } });
   const t = clock.today;
   const s = summary.data;
@@ -47,6 +49,8 @@ export function MyAttendancePage() {
       openDay(link.data.date, days.rows.find((d) => d.attendance_day_id === link.data?.attendance_day_id));
     }
   });
+  const openFigure = (status: FigureStatus) =>
+    modal.open({ title: `${FIGURE[status]}, ${formatMonth(month)}`, wide: true, body: <FigureDays month={month} status={status} /> });
   const explain = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], body: (close) => <ExplainForm x={x} close={close} /> });
 
   const todayCard = t && (
@@ -74,21 +78,31 @@ export function MyAttendancePage() {
     </Card>
   );
 
+  const viewSwitch = <SegmentedControl label="Show" value={view} onChange={(v) => setView(v as "table" | "chart")} options={[["table", "Table"], ["chart", "Chart"]]} />;
+
   if (summary.error && !s) return <ErrorState error={summary.error} onRetry={summary.reload} />;
   return (
     <>
       <PageHeader
         title="My Attendance"
-        sub={formatMonth(month)}
-        actions={<ExportButton message="Export queued for your email" onExport={() => api.call("POST /api/v1/attendance/me/export", { body: { month } })}>Export Month</ExportButton>}
-      >
-        <FilterSelect label="Month" value={month} onChange={(m) => m && setMonth(m)} options={months.map((m) => [m, formatMonth(m)] as [string, string])} />
-      </PageHeader>
+        actions={
+          <>
+            <MonthPicker value={month} onChange={setMonth} min={`${Number(months[0].slice(0, 4)) - 2}-01`} max={months[0]} className="phone:flex-1" />
+            <ExportButton message="Export queued for your email" onExport={() => api.call("POST /api/v1/attendance/me/export", { body: { month } })}>Export Month</ExportButton>
+          </>
+        }
+      />
       {todayCard}
       <Grid cols="4m2" className="mt-3">
-        <KpiCard title="Days Present" value={s ? String(s.days_present) : ""} />
-        <KpiCard title="Late Days" value={s ? String(s.late_days) : ""} tone={s && s.late_days > 0 ? "warn" : undefined} />
-        <KpiCard title="Absent" value={s ? String(s.absent_days) : ""} tone={s && s.absent_days > 0 ? "err" : undefined} />
+        <KpiCard title="Days Present" value={s ? String(s.days_present) : ""} onOpen={() => openFigure("present")} />
+        <KpiCard
+          title="Late Days"
+          value={s ? String(s.late_days) : ""}
+          tone={s && s.late_days > 0 ? "warn" : undefined}
+          caption={s && s.days_present > 0 ? `${Math.round((s.late_days / s.days_present) * 100)}% of days present` : undefined}
+          onOpen={() => openFigure("late")}
+        />
+        <KpiCard title="Absent" value={s ? String(s.absent_days) : ""} tone={s && s.absent_days > 0 ? "err" : undefined} onOpen={() => openFigure("absent")} />
         <KpiCard title="Hours Worked" value={s ? hours(s.worked_minutes) : ""} help="From the first clock-in to the last clock-out of each day." />
       </Grid>
       {open.rows.length > 0 && (
@@ -106,24 +120,52 @@ export function MyAttendancePage() {
           ]}
         />
       )}
-      <DataView
-        title="My Days"
-        list={days}
-        rowKey={(d) => d.attendance_day_id}
-        onRowClick={(d) => openDay(d.attendance_date, d)}
-        noun="day"
-        empty={{ icon: "clock", title: "No Days Yet", text: "Your clock-ins this month appear here." }}
-        columns={[
-          { key: "attendance_date", label: "Date", sortable: true, render: (d) => formatDate(d.attendance_date) },
-          { key: "i", label: "Clock In", render: (d) => (d.first_clock_in_at ? formatTime(d.first_clock_in_at) : null) },
-          { key: "o", label: "Clock Out", render: (d) => (d.last_clock_out_at ? formatTime(d.last_clock_out_at) : null) },
-          { key: "h", label: "Hours", align: "n", render: (d) => (d.worked_minutes ? hours(d.worked_minutes) : null) },
-          { key: "s", label: "Status", render: (d) => <Pill tone={dayStatus(d).tone}>{dayStatus(d).text}</Pill> },
-          { key: "r", label: "Review", desktop: true, render: (d) => (d.open_exceptions ? <Pill tone="warn">{`${d.open_exceptions} Open`}</Pill> : null) },
-        ]}
-      />
+      {view === "table" ? (
+        <DataView
+          title="My Days"
+          actions={viewSwitch}
+          list={days}
+          rowKey={(d) => d.attendance_day_id}
+          onRowClick={(d) => openDay(d.attendance_date, d)}
+          noun="day"
+          empty={{ icon: "clock", title: "No Days Yet", text: "Your clock-ins this month appear here." }}
+          columns={[...DAY_COLUMNS, { key: "r", label: "Review", desktop: true, render: (d) => (d.open_exceptions ? <Pill tone="warn">{`${d.open_exceptions} Open`}</Pill> : null) }]}
+        />
+      ) : (
+        <>
+          <BarChart
+            className="mt-3"
+            title="My Days"
+            actions={viewSwitch}
+            caption="Hours worked; late days stand out"
+            format={(v) => `${v} hours`}
+            bars={[...days.rows]
+              .sort((a, b) => a.attendance_date.localeCompare(b.attendance_date))
+              .map((d) => ({ label: formatDate(d.attendance_date).slice(0, 6), value: Math.round(d.worked_minutes / 6) / 10, series: d.status === "late" ? 3 : 1 }))}
+          />
+          <Pager page={days.page} onPage={days.setPage} noun="day" />
+        </>
+      )}
     </>
   );
+}
+
+/** A day's columns, as My Days and a figure's days show them. */
+const DAY_COLUMNS: Array<{ key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode }> = [
+  { key: "attendance_date", label: "Date", sortable: true, render: (d) => formatDate(d.attendance_date) },
+  { key: "i", label: "Clock In", render: (d) => (d.first_clock_in_at ? formatTime(d.first_clock_in_at) : null) },
+  { key: "o", label: "Clock Out", render: (d) => (d.last_clock_out_at ? formatTime(d.last_clock_out_at) : null) },
+  { key: "h", label: "Hours", align: "n", render: (d) => (d.worked_minutes ? hours(d.worked_minutes) : null) },
+  { key: "s", label: "Status", render: (d) => <Pill tone={dayStatus(d).tone}>{dayStatus(d).text}</Pill> },
+];
+
+type FigureStatus = "present" | "late" | "absent";
+const FIGURE: Record<FigureStatus, string> = { present: "Days Present", late: "Late Days", absent: "Absent Days" };
+
+/** The days behind one of My Attendance's figures, paged at 25. */
+function FigureDays({ month, status }: { month: string; status: FigureStatus }) {
+  const list = usePaged("GET /api/v1/attendance/me", { filters: { month, status } });
+  return <DataView bare caption={FIGURE[status]} list={list} rowKey={(d) => d.attendance_day_id} noun="day" empty={{ icon: "clock", title: "No Days", text: "None this month." }} columns={DAY_COLUMNS} />;
 }
 
 /** One of my days: its punches with what the server decided about each. */
@@ -183,7 +225,7 @@ function ExplainForm({ x, close }: { x: AttendanceException; close: () => void }
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" busy={save.pending} onClick={() => void submit()}>Send Note</Button>
+        <Button variant="primary" icon="send" busy={save.pending} onClick={() => submit()}>Send Note</Button>
       </FormFooter>
     </>
   );
@@ -234,7 +276,7 @@ export function MyDevicesPage() {
           />
           <FormFooter>
             {row.status !== "removed" && (
-              <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => (close(), void drop(row))}>Remove Device</Button>
+              <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => (close(), drop(row))}>Remove Device</Button>
             )}
             <Button variant="primary" onClick={close}>Close</Button>
           </FormFooter>
@@ -304,7 +346,7 @@ function RegisterForm({ close }: { close: () => void }) {
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>Register Device</Button>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>Register Device</Button>
       </FormFooter>
     </>
   );

@@ -473,11 +473,13 @@ describe("the routes", () => {
 describe("events and jobs", () => {
   test("Home declares its report events, and builds each run's file after commit", () => {
     for (const key of Object.values(EVENTS)) expect(catalogue.get(key)).toMatchObject({ module: "home" });
+    /* Sorted: other modules register on the document events too, in whatever order they load. */
+    const byName = (a, b) => a.name.localeCompare(b.name);
     const handlers = outbox.registrations().filter((h) => h.name.startsWith("reports."));
-    expect(handlers).toEqual([
-      { key: "home.report_run", name: "reports.generate" },
-      { key: "document.generated", name: "reports.file-ready" },
+    expect(handlers.sort(byName)).toEqual([
       { key: "document.render_failed", name: "reports.file-failed" },
+      { key: "document.generated", name: "reports.file-ready" },
+      { key: "home.report_run", name: "reports.generate" },
     ]);
   });
 

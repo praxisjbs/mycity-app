@@ -17,6 +17,10 @@ import { refreshSession, session } from "./client";
  *               refresh leaves it closed (the session sheet takes over)
  *   events      `notification` (a new notification for this person) and
  *               `presence` ({ user_id, online }, sent with M1 chat)
+ *   in front    while this tab is on screen and was touched in the last 5 minutes, the
+ *               socket says `presence:active` every 30 seconds, and `presence:idle` when that
+ *               stops: the server holds a push to the person's devices for a minute while
+ *               they are looking at the app (docs/guides/notifications.md §6)
  *
  * The in-browser mock has no server: in mock mode nothing connects and the
  * hooks never fire. socket.io-client is loaded only when a live build connects.
@@ -46,6 +50,45 @@ function notePresence(payload: unknown) {
   presenceListeners.forEach((l) => l());
 }
 
+/* ───── in front of the app ───── */
+
+const BEAT_MS = 30_000;
+const IDLE_AFTER_MS = 5 * 60_000;
+const TOUCHES = ["pointerdown", "keydown", "touchstart", "wheel"] as const;
+let touchedAt = Date.now();
+let saidActive = false;
+let beat: ReturnType<typeof setInterval> | null = null;
+
+const inFront = () => document.visibilityState === "visible" && Date.now() - touchedAt < IDLE_AFTER_MS;
+
+function sayPresence() {
+  if (!socket?.connected) return;
+  const now = inFront();
+  if (now) socket.emit("presence:active");
+  else if (saidActive) socket.emit("presence:idle");
+  saidActive = now;
+}
+const touched = () => {
+  const was = inFront();
+  touchedAt = Date.now();
+  if (!was) sayPresence();
+};
+
+function startPresence() {
+  if (beat) return;
+  TOUCHES.forEach((t) => window.addEventListener(t, touched, { passive: true }));
+  document.addEventListener("visibilitychange", sayPresence);
+  beat = setInterval(sayPresence, BEAT_MS);
+}
+
+function stopPresence() {
+  TOUCHES.forEach((t) => window.removeEventListener(t, touched));
+  document.removeEventListener("visibilitychange", sayPresence);
+  if (beat) clearInterval(beat);
+  beat = null;
+  saidActive = false;
+}
+
 /** Opens the connection (a live build only); the shell calls it once signed in. */
 export async function connectRealtime(): Promise<void> {
   wanted = true;
@@ -59,6 +102,8 @@ export async function connectRealtime(): Promise<void> {
     auth: (cb) => cb({ token: session.token ?? "" }),
   });
   socket = s;
+  s.on("connect", sayPresence);
+  startPresence();
   s.onAny((event: string, payload: unknown) => {
     if (event === "presence") notePresence(payload);
     dispatch(event, payload);
@@ -79,6 +124,7 @@ export async function connectRealtime(): Promise<void> {
 /** Closes the connection: sign-out, or the session ended. */
 export function disconnectRealtime(): void {
   wanted = false;
+  stopPresence();
   socket?.disconnect();
   socket = null;
   online.clear();

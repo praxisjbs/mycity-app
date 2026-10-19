@@ -13,7 +13,9 @@ import { useRef, useState, type CSSProperties, type DragEvent, type ReactNode } 
 import { cn } from "../lib/cn";
 import { formatBytes } from "../lib/format";
 import { uploadFile, type DocumentRef, type Uploader } from "../lib/upload";
+import { IconButton } from "../actions/Button";
 import { Icon } from "../icons/Icon";
+import { Tooltip } from "../overlay/Tooltip";
 
 /** One file on its way, or arrived, or refused. */
 interface Travelling {
@@ -60,6 +62,11 @@ export interface UploadFieldProps {
   compact?: boolean;
   /** A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. */
   trigger?: (open: () => void) => ReactNode;
+  /**
+   * The caller lists what arrived itself (a composer's attachment chips), so a
+   * finished file leaves the tray once it is handed over and is never shown twice.
+   */
+  handOff?: boolean;
   /** Layout classes only (spacing). */
   className?: string;
 }
@@ -77,6 +84,7 @@ export function UploadField({
   kinds,
   compact,
   trigger,
+  handOff,
   className,
 }: UploadFieldProps) {
   const input = useRef<HTMLInputElement>(null);
@@ -111,7 +119,12 @@ export function UploadField({
         .catch((e: Error) => patch(item.key, { error: e.message }))
         .finally(() => {
           waiting -= 1;
-          if (waiting === 0 && arrived.length > 0) onUploaded?.(arrived);
+          if (waiting > 0 || arrived.length === 0) return;
+          onUploaded?.(arrived);
+          if (handOff) {
+            const handed = new Set(arrived);
+            setFiles((list) => list.filter((f) => !f.doc || !handed.has(f.doc)));
+          }
         });
     });
   };
@@ -183,12 +196,22 @@ export function UploadField({
                   size="s"
                   className={cn("flex-none", file.error && "text-destructive", file.doc && "text-success")}
                 />
-                <span className="min-w-0 flex-1 truncate" title={file.name}>
-                  {file.name}
-                </span>
-                <span className="flex-none text-2xs font-normal text-subtle-foreground tabular-nums">
-                  {file.error ? "" : file.doc ? "Done" : `${file.percent}%`}
-                </span>
+                <Tooltip label={file.name}>
+                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                </Tooltip>
+                {file.error ? (
+                  <IconButton
+                    icon="x"
+                    size="sm"
+                    label={`Remove ${file.name}`}
+                    className="-my-1 -mr-2"
+                    onClick={() => setFiles((list) => list.filter((f) => f.key !== file.key))}
+                  />
+                ) : (
+                  <span className="flex-none text-2xs font-normal text-subtle-foreground tabular-nums">
+                    {file.doc ? "Done" : `${file.percent}%`}
+                  </span>
+                )}
               </span>
               {file.error ? (
                 <span className="text-2xs font-normal text-destructive">{file.error}</span>

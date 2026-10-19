@@ -6,7 +6,7 @@ import "@/api/types/settings";
 import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
 import type { PolicyAck } from "@/api/types/settings";
 import { PagedTable } from "@/features/shared/sections";
-import { Banner, Button, Card, CardHeader, cn, DataView, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, InlineInput, LoadingRows, PageHeader, Pill, rules, Switch, TextAreaField, toast, useContractForm, useModal, Who } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, cn, DataView, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, InlineInput, LoadingRows, PageHeader, Pill, rules, Switch, TextAreaField, toast, Tooltip, useContractForm, useModal, Who } from "@mycity/ui";
 
 const fmt = (s: PolicySetting) => (s.kind === "bool" ? (s.value ? "On" : "Off") : s.kind === "mode" ? String(s.value)[0].toUpperCase() + String(s.value).slice(1) : String(s.value));
 
@@ -81,7 +81,7 @@ export function AttendancePolicyTab() {
             { key: "s", label: "Status", render: (v) => (v.version === p.version ? <Pill tone="ok">In force</Pill> : <Pill>Archived</Pill>) },
             { key: "p", label: "Published", render: (v) => formatDate(v.published_at) },
             { key: "b", label: "By", render: (v) => v.published_by, desktop: true },
-            { key: "m", label: "Summary", render: (v) => <span className="line-clamp-1" title={v.summary}>{v.summary}</span> },
+            { key: "m", label: "Summary", render: (v) => <Tooltip label={v.summary}><span className="line-clamp-1">{v.summary}</span></Tooltip> },
           ]}
         />
       </Grid>

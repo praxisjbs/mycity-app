@@ -12,7 +12,9 @@
  *    (handshake `auth.token`, or an Authorization header), an active user who is an
  *    employee, and a live session (Redis index, then user_session).
  *  - On connect the socket joins `user:<user_id>` and `session:<session_id>`, from the
- *    verified token. The client cannot join or leave rooms; it only listens.
+ *    verified token. The client cannot join or leave rooms. It listens, and says only
+ *    whether it is in front of its person (`presence:active`, `presence:idle`;
+ *    services/realtime/active.js).
  *  - When the access token expires the socket is closed, so the client reconnects with
  *    a fresh token and the session is checked again. Ending a session closes its
  *    sockets at once (services/realtime/emitter.endSession).
@@ -122,6 +124,8 @@ function onConnection(socket) {
 
   // Staff Community: online while connected, last seen when the socket closes.
   require("../modules/community/community.presence").track(socket, userId);
+  // Notifications: whether this app is in front of its person, so pushes can wait a minute.
+  require("../services/realtime/active").track(socket, userId);
 }
 
 /**

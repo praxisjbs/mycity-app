@@ -33,12 +33,18 @@ async function tx(fn) {
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
 function view(row) {
-  const audience = row.audience && row.audience.kind ? row.audience : { kind: "all", department_ids: [] };
+  const audience =
+    row.audience && row.audience.kind
+      ? row.audience
+      : { kind: "all", department_ids: [] };
   return {
     announcement_id: row.announcement_id,
     title: row.title,
     body: row.body,
-    audience: { kind: audience.kind, department_ids: audience.department_ids || [] },
+    audience: {
+      kind: audience.kind,
+      department_ids: audience.department_ids || [],
+    },
     departments: row.departments || [],
     status: row.status,
     author: row.author,
@@ -56,7 +62,8 @@ async function list(query) {
 
 async function get(id) {
   const row = await repo.get(pool, id);
-  if (!row) throw new AppError("NOT_FOUND", "There is no such announcement", 404);
+  if (!row)
+    throw new AppError("NOT_FOUND", "There is no such announcement", 404);
   return view(row);
 }
 
@@ -97,7 +104,12 @@ async function publish(client, id) {
 function future(at) {
   const when = new Date(at);
   if (when.getTime() <= Date.now()) {
-    throw new AppError("PUBLISH_AT_PASSED", "That time has already passed", 422, { publish_at: ["Time already passed"] });
+    throw new AppError(
+      "PUBLISH_AT_PASSED",
+      "That time has already passed",
+      422,
+      { publish_at: ["Time already passed"] },
+    );
   }
   return when;
 }
@@ -105,8 +117,10 @@ function future(at) {
 /** A scheduled announcement, locked, or the reason it cannot be changed. */
 async function scheduled(client, id) {
   const a = await repo.lockForUpdate(client, id);
-  if (!a || a.status === "cancelled") throw new AppError("NOT_FOUND", "There is no such announcement", 404);
-  if (a.status !== "scheduled") throw new AppError("ALREADY_POSTED", "It has already gone out", 409);
+  if (!a || a.status === "cancelled")
+    throw new AppError("NOT_FOUND", "There is no such announcement", 404);
+  if (a.status !== "scheduled")
+    throw new AppError("ALREADY_POSTED", "It has already gone out", 409);
   return a;
 }
 
@@ -126,7 +140,10 @@ async function create(body, user) {
       entity: { type: "announcement", id: made.announcement_id },
       actor: user,
       after: made,
-      payload: { announcement_id: made.announcement_id, publish_at: made.publish_at ? iso(made.publish_at) : null },
+      payload: {
+        announcement_id: made.announcement_id,
+        publish_at: made.publish_at ? iso(made.publish_at) : null,
+      },
     });
     if (!when) await publish(client, made.announcement_id);
     return made.announcement_id;
@@ -181,7 +198,12 @@ async function cancel(id, user) {
 async function release(id) {
   return tx(async (client) => {
     const a = await repo.lockForUpdate(client, id);
-    if (!a || a.status !== "scheduled" || new Date(a.publish_at).getTime() > Date.now()) return a;
+    if (
+      !a ||
+      a.status !== "scheduled" ||
+      new Date(a.publish_at).getTime() > Date.now()
+    )
+      return a;
     return publish(client, id);
   });
 }
@@ -205,9 +227,14 @@ async function readers(id, query) {
 async function remind(id, user) {
   return tx(async (client) => {
     const a = await repo.lockForUpdate(client, id);
-    if (!a) throw new AppError("NOT_FOUND", "There is no such announcement", 404);
-    if (a.status !== "published") throw new AppError("NOT_PUBLISHED", "It has not gone out yet", 422);
-    if (a.last_reminded_at && lagos.dateOf(a.last_reminded_at) === lagos.today()) {
+    if (!a)
+      throw new AppError("NOT_FOUND", "There is no such announcement", 404);
+    if (a.status !== "published")
+      throw new AppError("NOT_PUBLISHED", "It has not gone out yet", 422);
+    if (
+      a.last_reminded_at &&
+      lagos.dateOf(a.last_reminded_at) === lagos.today()
+    ) {
       throw new AppError("ALREADY_REMINDED", "Already reminded today", 429);
     }
     const users = await repo.unreadUsers(client, id);
@@ -227,4 +254,18 @@ function markReadByMessages(userId, messageIds) {
   return repo.markReadByMessages(pool, userId, messageIds);
 }
 
-module.exports = { view, list, stats, get, create, update, cancel, publish, release, releaseDue, readers, remind, markReadByMessages };
+module.exports = {
+  view,
+  list,
+  stats,
+  get,
+  create,
+  update,
+  cancel,
+  publish,
+  release,
+  releaseDue,
+  readers,
+  remind,
+  markReadByMessages,
+};

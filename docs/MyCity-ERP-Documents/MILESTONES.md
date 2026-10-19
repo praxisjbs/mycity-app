@@ -194,6 +194,7 @@ that gives them something to guard.
 | 18 | Upload engine | A raw `<input type="file">`, or a drop zone with no percentage | M1 |
 | 19 | AI read manifest | A module with records and no read manifest. The write contract is dropped: under A23 the assistant has no writes to contract | M4 |
 | 20 | Money | Float arithmetic on a money value; a money column that is not `numeric(18,2)` | M6 |
+| 21 | Nothing the browser styles itself | A native select or phone picker, a browser-drawn input, a `title` tooltip, a validation bubble or an unbranded toast, in source or on any rendered screen (FRONTEND_FOUNDATION F25, added 18/10/2026) | M0 |
 
 **Gates 8, 11 and 12 are the ones agreed on 8 October** and they are the reason this product is not
 Praxis LS. Stated as rules a script can check:
@@ -897,6 +898,13 @@ the shared route map so the bell and the task panel open the same screen.
 Transports: in-app, web push, email. Per-user and per-category preferences. Configurable
 reminders for pending leave approvals, other approvals, employees due for confirmation, due
 invoices, and sensitive operational actions.
+
+**Brought forward to M0 by TB on 19/10/2026.** Web push to phones and computers (it reaches a device
+after the session has ended, and a tap opens the record through sign-in), the in-app banner, the
+bell's pane on both shells and each person's Notification Settings (In App, Email and Push per
+category) are built in M0 (`docs/guides/notifications.md`, `docs/runbooks/push-notifications.md`).
+M6 keeps the configurable reminders above (Settings · Notifications, #74) and the definition of
+done below.
 
 ### Definition of done
 

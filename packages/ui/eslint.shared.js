@@ -19,6 +19,11 @@
  *     (`w-[317px]`, `bg-[#fff]`, `[stroke-width:2]`); a token class or a
  *     component instead. Variants such as `data-[state=open]:` and values that
  *     only name a variable (`w-[var(--rail)]`, `duration-(--dur)`) are allowed.
+ *   - F26, one press, one request: a button's handler hands back its work
+ *     (onClick={save}, onClick={() => save()}) rather than throwing it away with
+ *     `void`, because the button watches that promise to stay busy and refuse a
+ *     second press. The same for Form onSubmit, Wizard onFinish, ConfirmDialog
+ *     onConfirm and ExportButton onExport.
  */
 import js from "@eslint/js";
 import globals from "globals";
@@ -50,6 +55,85 @@ const stringsOf = (check) => ({
 
 function rule(description, create) {
   return { meta: { type: "problem", docs: { description }, schema: [] }, create };
+}
+
+/** F26: the components that watch the work a handler returns, and the prop each watches it on. */
+export const PRESS_PROPS = {
+  Button: "onClick",
+  BigButton: "onClick",
+  IconButton: "onClick",
+  Form: "onSubmit",
+  Wizard: "onFinish",
+  ConfirmDialog: "onConfirm",
+  ExportButton: "onExport",
+};
+
+const isFunction = (node) => !!node && /^(ArrowFunctionExpression|FunctionExpression|FunctionDeclaration)$/.test(node.type);
+const isChain = (node) =>
+  node.type === "CallExpression" && node.callee.type === "MemberExpression" && node.callee.property.type === "Identifier" && ["then", "catch", "finally"].includes(node.callee.property.name);
+
+/**
+ * Where a function that is not async throws its work away: a `void`, or a
+ * promise chain left as a statement (`save().then(close);`). An async function
+ * hands back a promise of its own, so a `void` inside it is a side job, not the
+ * work. A function nested inside is its own business.
+ */
+function droppedIn(fn, keys) {
+  if (fn.async) return null;
+  const stack = [fn.body];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node.type !== "string") continue;
+    if (node.type === "UnaryExpression" && node.operator === "void") return node;
+    if (node.type === "ExpressionStatement" && isChain(node.expression)) return node;
+    if (node !== fn.body && isFunction(node)) continue;
+    for (const key of keys[node.type] ?? []) {
+      const child = node[key];
+      if (Array.isArray(child)) stack.push(...child);
+      else if (child) stack.push(child);
+    }
+  }
+  return null;
+}
+
+/** The function a name stands for in this file: `function save() {}`, `const save = () => {}` or `const save = useCallback(() => {}, [])`. */
+function localFunction(context, node, name) {
+  for (let scope = context.sourceCode.getScope(node); scope; scope = scope.upper) {
+    const variable = scope.set.get(name);
+    if (!variable) continue;
+    const def = variable.defs[0];
+    if (!def) return null;
+    if (def.type === "FunctionName") return def.node;
+    const init = def.type === "Variable" ? def.node.init : null;
+    if (isFunction(init)) return init;
+    if (init && init.type === "CallExpression" && init.callee.type === "Identifier" && init.callee.name === "useCallback" && isFunction(init.arguments[0])) {
+      return init.arguments[0];
+    }
+    return null;
+  }
+  return null;
+}
+
+/**
+ * The handler a press prop runs and where it drops its work, if it does: the
+ * inline function itself, or the local function it names (onClick={save}) or
+ * calls and hands back (onClick={() => save()}).
+ */
+function droppedWork(context, value) {
+  const keys = context.sourceCode.visitorKeys;
+  if (isFunction(value)) {
+    const own = droppedIn(value, keys);
+    if (own) return { node: own };
+    const call = value.body.type === "CallExpression" && value.body.callee.type === "Identifier" ? value.body : null;
+    const named = call && localFunction(context, value, call.callee.name);
+    const inner = named && named !== value ? droppedIn(named, keys) : null;
+    return inner ? { node: value, name: call.callee.name } : null;
+  }
+  if (value.type === "Identifier") {
+    const named = localFunction(context, value, value.name);
+    return named && droppedIn(named, keys) ? { node: value, name: value.name } : null;
+  }
+  return null;
 }
 
 /** The rules behind the gates, as a local plugin so each can be scoped to its own files. */
@@ -99,6 +183,22 @@ export const plugin = {
         if (m) context.report({ node, message: `Raw colour "${m[0]}" (gate 13). Colours live in tokens.css; use a token class.` });
       }),
     ),
+    "no-void-press": rule("F26: a press handler hands back its work", (context) => ({
+      JSXAttribute(node) {
+        const element = node.parent;
+        const name = element.name && element.name.type === "JSXIdentifier" ? element.name.name : null;
+        if (!name || !attr(node, PRESS_PROPS[name])) return;
+        const value = node.value && node.value.type === "JSXExpressionContainer" ? node.value.expression : null;
+        const found = value && droppedWork(context, value);
+        if (!found) return;
+        const prop = PRESS_PROPS[name];
+        const where = found.name ? `${found.name}() throws its work away (a \`void\` or a loose .then chain)` : "the handler throws its work away";
+        context.report({
+          node: found.node,
+          message: `${name} watches the work ${prop} hands back, to stay busy and refuse a second press (F26), but ${where}. Return the promise (${prop}={save}, ${prop}={() => save()}, or make the function async and await it).`,
+        });
+      },
+    })),
     "no-arbitrary-class": rule("F4: no arbitrary Tailwind values", (context) =>
       stringsOf((node, text) => {
         const m = ARBITRARY.exec(text);
@@ -153,6 +253,7 @@ export function frontendConfig({ kind, fileInputAllowed = [], ignores = [] }) {
         "mycity/no-date-input": "error",
         "mycity/no-bare-date-locale": "error",
         "mycity/no-z-object": "error",
+        "mycity/no-void-press": "error",
         "no-restricted-syntax": [
           "error",
           {

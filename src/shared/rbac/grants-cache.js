@@ -16,9 +16,11 @@
  *    line change calls bumpTeamVersion(), which orphans every cached team at once
  *    (one INCR instead of a SCAN over every manager).
  *
- * Tables and columns read (migrations 0010, 0020, 0040; this is their contract):
+ * Tables and columns read (migrations 0010, 0020, 0040, 1160; this is their contract):
  *   app_user        user_id, employee_id, email, status ('active' | 'suspended' | 'left'), is_ceo
  *   employee        employee_id, first_name, last_name, line_manager_id
+ *   employee_effective_manager  employee_id, manager_id (the line manager, or the first
+ *                   person above the vacant seat someone reports to)
  *   user_role       user_id, role_id
  *   role            role_id, code
  *   permission      role_id, module_key, can_view, can_create, can_edit, can_delete,
@@ -111,8 +113,9 @@ async function teamVersion() {
 }
 
 /**
- * The employee and everyone who reports to them, at any depth, through
- * employee.line_manager_id. Depth-capped so a cycle in bad data cannot spin.
+ * The employee and everyone who reports to them, at any depth, through the solid line
+ * (employee_effective_manager): a person under a vacant seat is in the team of the first
+ * person above the seat. Depth-capped so a cycle in bad data cannot spin.
  * @returns {Promise<string[]>} employee ids, the employee's own first
  */
 async function getTeamEmployeeIds(client, employeeId) {
@@ -120,12 +123,14 @@ async function getTeamEmployeeIds(client, employeeId) {
   const version = await teamVersion();
   return cached(keys.team(version, employeeId), TEAM_TTL_S, async () => {
     const { rows } = await client.query(
-      `WITH RECURSIVE team AS (
+      `WITH RECURSIVE line AS MATERIALIZED (
+         SELECT employee_id, manager_id FROM employee_effective_manager WHERE manager_id IS NOT NULL
+       ), team AS (
          SELECT employee_id, 0 AS depth FROM employee WHERE employee_id = $1
          UNION
-         SELECT e.employee_id, team.depth + 1
-           FROM employee e
-           JOIN team ON e.line_manager_id = team.employee_id
+         SELECT line.employee_id, team.depth + 1
+           FROM line
+           JOIN team ON line.manager_id = team.employee_id
           WHERE team.depth < 20
        )
        SELECT employee_id FROM team ORDER BY depth, employee_id`,
@@ -216,7 +221,7 @@ async function invalidateGrants() {
   await scanDelete(redis, rkey("idc", "caps", "*"));
 }
 
-/** After any reporting line change (event employee.reporting_line_changed). */
+/** After any reporting line change (employee.reporting_line_changed, or a seat's line: org_seat.updated). */
 async function bumpTeamVersion() {
   const redis = tryClient();
   if (redis) await redis.incr(keys.teamVersion()).catch(() => {});

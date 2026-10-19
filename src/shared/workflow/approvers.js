@@ -6,7 +6,9 @@
  *
  *   { type: "role", value: "hr_manager" }      anyone holding that role (role.code)
  *   { type: "user", value: "<user id>" }       one named person
- *   { type: "manager_of_subject" }             the line manager of the person the request is about
+ *   { type: "manager_of_subject" }             the line manager of the person the request is about;
+ *                                              for someone who reports to a vacant seat, the first
+ *                                              person above the seat (employee_effective_manager)
  *   { type: "ceo" }                            the CEO (app_user.is_ceo)
  *
  * When a stage starts, resolve() turns that into a snapshot stored on the instance
@@ -18,7 +20,8 @@
  *   { type: "user", value: "<user id>" }
  *   { type: "employee", value: "<employee id>", via: "manager_of_subject" }
  *   { type: "ceo" }      also what manager_of_subject becomes when the subject has no
- *                        line manager (the top of the tree goes to the CEO)
+ *                        line manager, nor anybody above their empty seat (the top of
+ *                        the tree goes to the CEO)
  *
  * Rules canAct() applies:
  *  - The CEO may act on any stage of any approval (by design; A11).
@@ -41,13 +44,14 @@ async function roleCodesOf(client, roleIds) {
   return rows.map((r) => r.code);
 }
 
+/** The person the subject answers to: their line manager, or whoever is above their empty seat. */
 async function lineManagerOf(client, employeeId) {
   if (!employeeId) return null;
   const { rows } = await client.query(
-    "SELECT line_manager_id FROM employee WHERE employee_id = $1",
+    "SELECT manager_id FROM employee_effective_manager WHERE employee_id = $1",
     [employeeId],
   );
-  return rows[0] ? rows[0].line_manager_id : null;
+  return rows[0] ? rows[0].manager_id : null;
 }
 
 /**

@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 17/10/2026 |
+| Last changed | 19/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -77,7 +77,7 @@ These finish M0 and no prompt can do them:
 | Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | **Built** (17/10/2026) | As `organogram.md` describes, on the real API, with the phone focus view |
 | Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | **Built** (17/10/2026) | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | **Built** (17/10/2026) | Their documents and the ones People asked for, upload, download, preview |
-| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | **Built** (17/10/2026) | Organisation profile, working week, public holidays (Nigeria's seeded, the moon-dated and weekend ones Expected until confirmed; others entered on screen) |
+| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | **Built** (17/10/2026; brand files 19/10/2026, §6.11) | Organisation profile, the brand files (Logo, White Logo, Icon), working week, public holidays (Nigeria's seeded, the moon-dated and weekend ones Expected until confirmed; others entered on screen) |
 | Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | **Built** (17/10/2026; redesigned 18/10/2026, §6.10) | Roles beside the role in view (desktop) or by level (phone), each module's access as one level with Approve and Export, review before save, who holds a role; the grants matrix as a second view; field visibility and capabilities per role |
 | Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Every numbering scheme with its next number, editable. No other document setting is specified yet |
 | Settings · Security (#78) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
@@ -122,7 +122,7 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 | `document_request` | 0350 | B | What People asked an employee for; a Missing row until it is given (§6.9) |
 | `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3). `0400` adds `role.two_step_required` (§6.4) |
 | `role_capability` | 0400 | C | A capability given to everyone holding a role; `user_capability` still gives one to a single person, and a person has the union |
-| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows; security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026) |
+| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows, the three brand files among them as `organisation.logo_document_id`, `organisation.logo_white_document_id` and `organisation.icon_document_id` (§6.11), read by everything that prints the company through one reader, `shared/organisation/profile.js` (until 19/10/2026 documents and system mail read a single `organisation.profile` row that nothing wrote, so they always printed the defaults); security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026) |
 | `audit_ledger`, `event_log` | 0030 | C | Read only. `0400` adds the indexes the Audit Log filters on (when, module, action, record) and one on live sessions |
 | `spent_challenge` | 0230 | C | `0400` widens its purpose check with `two_step_setup`, the ticket of the set-up step at sign-in (§6.4) |
 | `workflow_definition`, `workflow_instance`, `workflow_decision` | 0070 | D | The leave definition in `0499` |
@@ -188,6 +188,7 @@ employee is (`/employees/:id/documents`) while `src/modules/organisation/` is tr
 | Route | Permission |
 |---|---|
 | `GET /settings/organisation`, `PATCH /settings/organisation` | `settings` view, edit |
+| `POST /settings/organisation/brand/:slot` (multipart `file`, purpose `brand`; `slot` is `logo`, `logo_white` or `icon`) → `DocumentRef`; `DELETE /settings/organisation/brand/:slot` → `Organisation` | `settings` edit |
 | `GET /settings/working-week`, `PUT /settings/working-week` (all seven days at once) | `settings` view, edit |
 | `GET /settings/holidays` (year; sort), `POST /settings/holidays`, `PATCH /settings/holidays/:id`, `DELETE /settings/holidays/:id` | `settings` view, create, edit, delete |
 | `GET /settings/roles` (search; sort), `/roles/catalogue`, `/roles/matrix`, `/roles/:id` | `settings` view |
@@ -245,11 +246,23 @@ only under `src/modules/`; the work is `shared/search`.
   and the CTO, who is also System Administrator; Operations & People for the Operations & People
   Lead; Head of Department for the Head of PR, Marketing and Brand Strategy; Line Manager for the
   Back-end Manager; Staff for everyone else.
+- **A post the sheet does not hold** can be given its line manager in `roles.json`, in the same
+  words as the sheet's Line Manager column: the Implementation Partner (the build account, which
+  `create-admin` makes before any roster) reports to the CTO (TB, 19/10/2026). The loader gives that
+  line on every run, only while the person has none, so a manager set on screen stays.
 - Line managers come from the sheet's Line Manager column: a name, a title ("<first name> - Head PR &
   Marketing", "Program Manager", "CEO"), or a vacant post with a dotted line ("Head Sales & Revenue,
   with dotted line to Head PR & Marketing": the vacant seat as line manager, the Head of PR as the
   dotted manager). The mapping from those texts to people and seats is written once, tested, and
-  shown in the import preview.
+  shown in the import preview. A VACANT row's Line Manager is the seat's own line: the importer
+  gives it to the seat (the roster only while the seat has none), so the sheet places an open post
+  as it places a person. MyCity's sheet names both (TB, 19/10/2026): Head Sales & Revenue under the
+  Program Manager, Technical Assistant under the CEO.
+- **The sheet was corrected on 19/10/2026 (TB).** Aaron Agama's team is Sales & Marketing (the
+  sheet said Marketing, a department of one); Markerting is Marketing in three titles; Operations&
+  People Lead is Operations & People Lead, and its `roles.json` key with it; two work emails had a
+  mistyped domain (gheil.com and gpril.com, for gmail.com). A person already loaded is never written
+  over, so staging takes these on screen (`docs/runbooks/staff-roster.md` §6).
 - FTE is `full_time`; Remote and Hybrid are `remote` and `hybrid`. The working hours column (Monday
   to Friday 09:00 to 17:00, Saturday 09:00 to 15:00) is the organisation's working week (A22), set by
   track C, not per person.
@@ -272,7 +285,10 @@ only under `src/modules/`; the work is `shared/search`.
   `numbering.allocate()`, keeping their record, their login and their roles, and the person the
   sheet names is created on the number it gives them. Two things are never moved: a holder the same
   sheet also names (a sheet that gives one number to two people is wrong, not authoritative, and the
-  row is reported), and a person already here under another number. Importing a sheet by hand moves
+  row is reported), and a person already here under another number. A holder with the row's own
+  first and last name is not somebody else: it is the same person, whose work email the sheet now
+  spells differently (a corrected domain), and the row is theirs, so nobody moves and no second
+  record is made (TB, 19/10/2026). Importing a sheet by hand moves
   nobody: a taken staff number is a problem on the row, as it is on the Add Employee form. Reverting
   such a batch archives the people it created but leaves the holder on the number they moved to; a
   number is given back on screen, not by a revert.
@@ -285,6 +301,10 @@ only under `src/modules/`; the work is `shared/search`.
 `seeds/staging/` loads the mock's records (F13) through each module's service, for every module that
 has a backend, so numbers, audit and events are right. The people are the real staff, never the
 mock's. Each later module adds its own staging seed when its routes land. Production never runs it.
+
+- `10_staff.js`: the staff roster (§6.1).
+- `30_leave.js`: the mock's twelve sample leave requests on the real staff, through the leave
+  service (`seeds/lib/leave-sample.js`, shared with the laptop seed `seeds/build/20_mock_data.js`).
 
 ### 6.3 Field visibility and capabilities (defaults, editable)
 
@@ -309,7 +329,8 @@ a module that its six actions cannot express: everyone views Home, only managers
   label and description; **seeded** by its milestone's reference seed, inserted only when absent,
   with the roles that hold it by default (`0449`: `announcements.post` and `alerts.clear` to
   Implementation, Operations & People and Management; `1199`: Home's `home.team`, `home.reports`,
-  `alerts.manage`, and `alerts.clear` for Heads of Department and Line Managers).
+  `alerts.manage`, and `alerts.clear` for Heads of Department and Line Managers; `1129`: Mailbox's
+  `mailbox.signature` to System Administrator and Implementation, `docs/guides/mailbox.md` §8).
 - **Held** through `role_capability` (edited here) or `user_capability` (one person, until an
   optional date). Roles add up: a person holds every capability any of their roles holds. The CEO
   holds every capability without a grant.
@@ -360,8 +381,9 @@ As built (17/10/2026):
 
 - **The leave flow** is `leave.approval` (module `people`, context `days`), seeded in `0499` and in
   `shared/workflow/definitions.js` DEFAULTS: stage `line_manager` (the subject's line manager, 48 hours),
-  then `operations_people` (the role, 48 hours) when `days > 5`. A subject with no line manager goes
-  to the CEO (the engine's rule). The leave module (M1, `src/modules/leave`) opens it with `{ days }`
+  then `operations_people` (the role, 48 hours) when `days > 5`. A subject who reports to a vacant
+  seat goes to the first person above the seat (`employee_effective_manager`, organogram guide §6;
+  TB, 19/10/2026); one with nobody above them goes to the CEO (the engine's rule). The leave module (M1, `src/modules/leave`) opens it with `{ days }`
   in the transaction that saves the request, and copies its outcome onto the request after commit
   (`docs/guides/ess.md` §6). People · Leave decides with the same approve and reject routes.
 - **Editing** changes a stage's name, its approver (Line Manager, a role, one login, or the CEO), when
@@ -383,6 +405,12 @@ As built (17/10/2026):
 Org Chart and Organogram read the whole tree in one `completeQuery()` with a ceiling of 2,000 people
 and the `// pagination:complete` marker (BACKEND_STRUCTURE §16.3). Vacant seats are part of it.
 
+Team scope (`shared/rbac/grants-cache.js`), the line-manager approver (`shared/workflow/approvers.js`),
+the notifications that reach a person's managers (`shared/notifications/fanout.js`) and search's
+"manages people" read the same tree through `employee_effective_manager`: someone under an empty
+seat answers to the first person above it (TB, 19/10/2026). A seat's line or status changing bumps
+the team cache as a person's line does. A loop is refused whether it runs through people or seats.
+
 ### 6.7 Search reaches everything
 
 ⌘K finds screens (with synonyms), actions (Add Employee, Import Staff, Invite, Clock In, Request
@@ -398,7 +426,8 @@ As built (17/10/2026):
 - `GET /search` answers in groups, each the first page of 25: **Screens** (every tab of the staff app by
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
   Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
-  Set PIN, Mark All Read, Use Dark Theme, Use Light Theme, Change Density, Install App, Sign Out), then
+  Set PIN, Mark All Read, Notification Settings, Turn On Notifications, Send Test Notification, Use
+  Dark Theme, Use Light Theme, Change Density, Install App, Sign Out), then
   one group per kind of record from each `<module>.search.js` (Employees, Departments, Open Seats, Users,
   Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's).
 - **Waiting on You** comes first: the requests waiting on the reader's decision (the My Approvals list),
@@ -420,7 +449,8 @@ As built (17/10/2026):
   type; the screens and actions are still matched on the whole line.
 - An action opens its screen asked to start it: `?action=new` runs the screen's New action
   (`useScreenAction`), another word runs what the screen names with `useUrlAction` (`password`, `pin`),
-  and `?importer=employees` opens the Import wizard. Clock In and Mark All Read run in the app itself.
+  and `?importer=employees` opens the Import wizard. Clock In, Mark All Read and the three
+  notification actions run in the app itself (`docs/guides/notifications.md` §9).
 - **The gate** (`scripts/check/search-coverage.js`): every screen in the route map has a search entry
   whose label equals the shell's; every entity type in `ENTITY_ROUTES` is declared by a provider or its
   line carries `// search:none <reason>`; every `useScreenAction({ label })` in the app is an action in
@@ -493,6 +523,24 @@ The screen, decided with TB on 17 and 18/10/2026 from three drawn options for ea
   Settings · Users. The role's summary (what it changes, reads and approves, and whether salary is
   masked) sits behind an ⓘ beside its name.
 
+### 6.11 Brand files (TB, 19/10/2026)
+
+Settings · Organisation holds the company's three brand files, each optional, each one upload
+(purpose `brand`: PNG or WebP with a transparent background, at most 5 MB; the `brand` image profile
+keeps it a PNG, never corrects its colours and fits it within 2000 px). Uploading one replaces it at
+once (no Save) and Remove clears it; the old document stays in the vault, as every replaced file
+does. What changes with each, from the next thing made:
+
+| File | Where it goes | Until it is uploaded |
+|---|---|---|
+| Logo (City Green, for white paper) | Letterheads and every PDF `documents.generate` renders | `assets/brand/logo.png`, else the company's name set in the letterhead's own type |
+| White Logo (for Deep Green) | The email signature's band (`docs/guides/mailbox.md` §3) and the header of system mail, both as an inline picture | The drawn pin with the company's name on the signature; the name in text on system mail |
+| Icon (the pin) | The signature's band beside the company's name when there is no White Logo | The app's drawn pin |
+
+The Icon is drawn on Deep Green, so it must read on a dark ground (the yellow pin does). The app's
+own icons (the favicon, the home-screen icon) are files in the release, which phones keep, so they
+change with a release, not with this screen.
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -556,8 +604,8 @@ screen.
 | People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
 | Employee record | Profile, Job, Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
-| Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
-| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | None | Who reads the working week and holidays: §3; why some are Expected: §4 |
+| Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
+| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
 | Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
@@ -573,7 +621,7 @@ screen.
 | Employee record | Profile card, then sections as tabs that scroll sideways | History detail | Send Invite or Edit, full width in a sheet | Back to the list |
 | Settings · Imports (#93) | Import cards: reference, file, status pill | File, Who, Updated, Problems | Start Import in the floating button | More, Settings |
 | Settings · Imports, the wizard | One step per sheet, counts as cards | The rows with problems (Download Errors instead) | Commit Import, full width | From Employees or Settings |
-| Settings · Organisation (#69) | Company card, then holiday cards by year, then the week | None | New Holiday in the floating button | More, Settings |
+| Settings · Organisation (#69) | Company card, the Brand card (the three pictures in a row, each with its upload as a 44 px icon button and Remove under it), then holiday cards by year, then the week | None | New Holiday in the floating button | More, Settings |
 | Settings · Roles & Permissions | Role cards; a role opens full screen with its modules as chips grouped by level, and a chip (while editing) opens a sheet with the level, records, Approve and Export | The Matrix view and its switch, the Record Scope column | New Role in the floating button; Edit Role, then Save Role, full width | More, Settings; Back closes the role |
 | Settings · Documents & Numbering (#76) | Counts as cards, then document cards: next number, when it starts again | Prefix and Issued columns | A card opens its scheme in a sheet | More, Settings |
 | Settings · Security | Counts as cards, the three rules, two-step by role as switches | Method and address of a session, the person and address of a failed sign-in | Save Rules, full width | More, Settings |
@@ -585,6 +633,14 @@ screen.
 
 - A sheet row whose line manager is a title held by nobody: the vacant seat with that title, or an
   error on the row, never a guess.
+- A row whose Line Manager matches nobody: the person is saved without one and the row is a
+  warning. The wizard's preview lists warnings with the errors, so it never says Every Row Is Fine
+  over a person left at the top of the tree.
+- A VACANT row with a Line Manager: the seat is given that line; the roster gives it only while the
+  seat has none.
+- A dotted line to someone the same sheet creates: set once every row is written, in the preview
+  and the commit alike. Each run reads the dotted manager from the row's own Line Manager cell,
+  never from an earlier run, whose ids a preview rolls back.
 - A person removed from the sheet: nothing happens; archiving is a person's decision on screen.
 - A person edited on screen, then the deploy runs: the screen's version stays.
 - Two people with the same name: matched by staff number or email, never by name alone.
@@ -617,6 +673,8 @@ screen.
 - A locked document (signed, sent, filed): it can never be replaced; a new version is refused.
 - A file whose scan has not finished: reading it waits rather than serving an unchecked file.
 - A sheet whose first row is the header: the header row is 0, which `0100` already allows.
+- A brand file that is not PNG or WebP (a JPEG has no clear background, an SVG may carry script): refused
+  with the types it takes. A very large one is fitted within 2000 px.
 
 ## 12 · Donor code
 
@@ -640,6 +698,26 @@ screen.
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · §6.7: ⌘K's actions gain Notification Settings, Turn On Notifications and Send
+  Test Notification, run in the app like Mark All Read (`docs/guides/notifications.md`, web push
+  brought forward from M6).
+- 19/10/2026 · TB · §2, §4, §5, §6.3, §6.11, §10, §11: the brand files on Settings · Organisation
+  (Logo, White Logo, Icon) and where each goes; one reader of the organisation profile
+  (`shared/organisation/profile.js`) for settings, documents, system mail and signatures; the
+  `mailbox.signature` capability seeded by `1129`.
+- 19/10/2026 · TB · §6.1, §6.5, §6.6, §10.1, §11, from a review of the roster as staging shows it.
+  A VACANT row's Line Manager becomes the seat's line (the importer dropped it). `roles.json` can
+  give a post outside the sheet its line manager (the Implementation Partner reports to the CTO).
+  The sheet's corrections of 19/10/2026 are listed, and a row whose staff number is held by someone
+  with its own name is that person (a corrected email no longer takes their number and makes a
+  second record). Approvals, team scope and the notifications that
+  follow it pass through a vacant seat to the first person above it, and loops through seats are
+  refused. The import preview lists warning rows with the errors and counts them as problems. A
+  preview's dotted lines no longer leak into its commit, and a link that writes nothing is no longer
+  counted as an update.
+- 18/10/2026 · AJ · §6.2: the leave staging seed `30_leave.js` (the mock's twelve sample requests on the
+  real staff, through the leave service; LA to review) and `seeds/lib/` for code the build and staging
+  seeds share.
 - 18/10/2026 · TB · §6.1: a staff number the roster's sheet gives one of its people is theirs. The
   first administrator is created before any roster and is given 00001, which the sheet says is the
   CEO's, and the loader read that as a match and skipped the CEO. A holder the sheet does not name

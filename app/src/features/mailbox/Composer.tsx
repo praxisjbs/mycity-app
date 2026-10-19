@@ -3,7 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
-import { Button, cn, DateField, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, Pill, RichTextField, TextField, toast, todayIso, UploadField } from "@mycity/ui";
+import { Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
 
 export interface ComposeInit {
@@ -32,8 +32,8 @@ function Recipients({ id, label, list, onChange, bad, error, right }: { id: stri
     <div className={cn("flex min-h-10.5 flex-wrap items-center gap-2 border-b py-1.5", bad ? "border-destructive" : "border-border")}>
       <InlineLabel htmlFor={id} className="w-14 flex-none text-xs font-semibold text-subtle-foreground">{label}</InlineLabel>
       {list.map((a, i) => (
-        <span key={a + i} className={cn("inline-flex h-6.5 items-center gap-1 rounded-full pr-1 pl-2.5 text-xs", EMAIL.test(a) ? "bg-accent" : "bg-destructive-soft text-destructive")} title={EMAIL.test(a) ? undefined : "Not an email address"}>
-          {a}
+        <span key={a + i} className={cn("inline-flex h-6.5 items-center gap-1 rounded-full pr-1 pl-2.5 text-xs", EMAIL.test(a) ? "bg-accent" : "bg-destructive-soft text-destructive")}>
+          {EMAIL.test(a) ? a : <Tooltip label="Not an Email"><span>{a}</span></Tooltip>}
           <button type="button" aria-label={`Remove ${a}`} className="flex size-5 items-center justify-center rounded-full hover:bg-card" onClick={() => onChange(list.filter((_, j) => j !== i))}><Icon name="x" className="size-3" /></button>
         </span>
       ))}
@@ -56,6 +56,41 @@ function Recipients({ id, label, list, onChange, bad, error, right }: { id: stri
       {right}
     </div>
   );
+}
+
+/**
+ * The signature this message will carry, as the server will add it (mailbox.md §3 step 8): the
+ * slim line on a reply or mail only for colleagues, the full signature otherwise. Asked again
+ * when the recipients change; addresses not yet valid are left out.
+ */
+function SignaturePreview({ inReplyTo, to, cc, bcc }: { inReplyTo: string | null; to: string[]; cc: string[]; bcc: string[] }) {
+  const valid = (list: string[]) => list.filter((a) => EMAIL.test(a));
+  const key = JSON.stringify([inReplyTo, valid(to), valid(cc), valid(bcc)]);
+  const [html, setHtml] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const [in_reply_to, to_addresses, cc_addresses, bcc_addresses] = JSON.parse(key) as [string | null, string[], string[], string[]];
+    const wait = setTimeout(() => {
+      api
+        .call("POST /api/v1/mailbox/signature/preview", { body: { in_reply_to, to_addresses, cc_addresses, bcc_addresses } })
+        .then((r) => {
+          if (!live) return;
+          setHtml(r.html);
+          setFailed(false);
+        })
+        .catch(() => {
+          if (live) setFailed(true);
+        });
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(wait);
+    };
+  }, [key]);
+  if (failed) return <p className="py-2 text-xs text-subtle-foreground">Signature not available</p>;
+  if (html === null) return <Skeleton lines={3} />;
+  return <EmailFrame title="Signature" html={html} />;
 }
 
 /** Next 08:00 tomorrow and next Monday, Lagos time. */
@@ -86,6 +121,8 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   const [toBad, setToBad] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [body, setBody] = useState(init.body_html ?? "");
+  /* Hidden each time the composer opens, to keep the room for writing (TB, 19/10/2026). */
+  const [showSignature, setShowSignature] = useState(false);
   const dirty = useRef(0);
 
   const payload = (): MailDraftSave => ({ to_addresses: to, cc_addresses: cc, bcc_addresses: bcc, subject, body_html: body, document_ids: files.map((f) => f.document_id), in_reply_to: init.in_reply_to ?? null });
@@ -134,7 +171,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
     setSched((s) => ({ ...s, tried: true, past: false }));
     if (!sched.date || !okT) return;
     if (new Date(at(sched.date, sched.time)).getTime() <= Date.now()) return setSched((s) => ({ ...s, past: true }));
-    void send(at(sched.date, sched.time));
+    return send(at(sched.date, sched.time));
   };
   const discard = async () => {
     if (stored) await api.call("DELETE /api/v1/mailbox/drafts/:id", { params: { id: draftId } }).catch(() => null);
@@ -161,13 +198,18 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
       <div className="flex flex-wrap items-center gap-0.5 border-b border-border py-1.5">
         <UploadField
           upload={upload}
-          purpose="mail"
+          purpose="attachment"
           endpoint="/api/v1/mailbox/attachments"
+          handOff
+          className="min-w-0 flex-1"
           onUploaded={(docs) => (setFiles((f) => [...f, ...docs]), touch())}
           trigger={(open) => (
-            <button type="button" title="Attach a File" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground"><Icon name="clip" /></button>
+            <Tooltip label="Attach File"><button type="button" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground phone:size-tap"><Icon name="clip" /></button></Tooltip>
           )}
         />
+        <span role="status" className="flex flex-none items-center gap-1 self-start pt-2 text-2xs text-subtle-foreground">
+          {saved === "saved" ? <><Icon name="ok" className="size-3.5" />Draft saved</> : saved === "saving" ? "Saving…" : null}
+        </span>
       </div>
       <RichTextField
         label="Message Body"
@@ -178,6 +220,16 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           touch();
         }}
       />
+      <div className="pt-2">
+        <Button size="sm" variant="ghost" icon={showSignature ? "hide" : "eye"} onClick={() => setShowSignature((v) => !v)}>
+          {showSignature ? "Hide Signature" : "Show Signature"}
+        </Button>
+        {showSignature && (
+          <div className="mt-2 rounded-box border border-border p-3">
+            <SignaturePreview inReplyTo={init.in_reply_to ?? null} to={to} cc={cc} bcc={bcc} />
+          </div>
+        )}
+      </div>
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-2">
           {files.map((f) => (
@@ -205,18 +257,18 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           </div>
         </div>
       )}
-      <div className="sticky -bottom-4 z-1 -mx-4.5 mt-3 -mb-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card px-4.5 py-3 max-md:pb-safe-3">
+      {/* One row on a phone: Discard and Schedule as icons, Send taking the rest of the width. */}
+      <div className="sticky -bottom-4 z-1 -mx-4.5 mt-3 -mb-4 flex items-center justify-end gap-2 border-t border-border bg-card px-4.5 py-3 max-md:pb-safe-3">
         {confirmDiscard ? (
           <>
-            <Button onClick={() => setConfirmDiscard(false)}>Keep Editing</Button>
-            <Button variant="danger" icon="x" onClick={discard}>Discard Draft</Button>
+            <Button className="max-md:flex-1" onClick={() => setConfirmDiscard(false)}>Keep Editing</Button>
+            <Button className="max-md:flex-1" variant="danger" icon="x" onClick={discard}>Discard Draft</Button>
           </>
         ) : (
           <>
-            <span className="mr-auto">{saved === "saved" ? <Pill>Draft saved</Pill> : saved === "saving" ? <span className="text-2xs text-subtle-foreground">Saving…</span> : null}</span>
-            <Button onClick={() => setConfirmDiscard(true)}>Discard</Button>
+            <Button icon="trash" className="max-md:px-3" onClick={() => setConfirmDiscard(true)}><span className="max-md:sr-only">Discard</span></Button>
             <Menu
-              trigger={(p) => <Button {...p} icon="clock">Schedule</Button>}
+              trigger={(p) => <Button {...p} icon="clock" className="max-md:px-3"><span className="max-md:sr-only">Schedule</span></Button>}
               items={[
                 { label: `Tomorrow, ${formatDate(q.tomorrow).slice(0, 5)} at 08:00`, icon: "clock", onSelect: () => void send(at(q.tomorrow, "08:00")) },
                 { label: `Monday, ${formatDate(q.monday).slice(0, 5)} at 08:00`, icon: "clock", onSelect: () => void send(at(q.monday, "08:00")) },
@@ -224,7 +276,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
                 { label: "Pick Date and Time", icon: "check", onSelect: () => setSched((s) => ({ ...s, open: true })) },
               ]}
             />
-            <Button variant="primary" icon="send" busy={busy} onClick={() => void send()}>Send</Button>
+            <Button variant="primary" icon="send" className="max-md:flex-1" busy={busy} onClick={() => send()}>Send</Button>
           </>
         )}
       </div>

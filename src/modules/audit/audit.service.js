@@ -48,7 +48,10 @@ function loadCatalogue() {
     try {
       if (fs.existsSync(file) && fs.statSync(file).size > 0) require(file);
     } catch (err) {
-      logger.warn({ err, file: `${name}.events.js` }, "audit: an events file did not load; its entries show their keys");
+      logger.warn(
+        { err, file: `${name}.events.js` },
+        "audit: an events file did not load; its entries show their keys",
+      );
     }
   }
 }
@@ -62,7 +65,10 @@ function summaryOf(action) {
 
 /** Where an entry's record opens. A person's own account opens on Settings · Users. */
 function linkOf(entityType, entityId) {
-  const link = routeMap.linkFor(entityType === "account" ? "app_user" : entityType, entityId);
+  const link = routeMap.linkFor(
+    entityType === "account" ? "app_user" : entityType,
+    entityId,
+  );
   return link ? link.path : null;
 }
 
@@ -85,9 +91,14 @@ function maskedIn(value, props, out = new Set(), depth = 0) {
 function present(rows, maskedKeys, ownEmployeeId) {
   const props = fieldMask.maskedPropsFor(maskedKeys);
   return rows.map((r) => {
-    const own = r.entity_type === "employee" && ownEmployeeId && r.entity_id === ownEmployeeId;
+    const own =
+      r.entity_type === "employee" &&
+      ownEmployeeId &&
+      r.entity_id === ownEmployeeId;
     const hide = own ? new Set() : props;
-    const masked = hide.size ? [...maskedIn(r.before, hide, maskedIn(r.after, hide))].sort() : [];
+    const masked = hide.size
+      ? [...maskedIn(r.before, hide, maskedIn(r.after, hide))].sort()
+      : [];
     return {
       audit_ledger_id: r.audit_ledger_id,
       occurred_at: r.occurred_at,
@@ -113,7 +124,11 @@ function present(rows, maskedKeys, ownEmployeeId) {
 /** Refuse a reader without Settings view over everything; the CEO's scope is always all. */
 function assertWholeLog(scope) {
   if (!scope || scope.scope !== "all")
-    throw new AppError("PERMISSION_DENIED", "You do not have access to this", 403);
+    throw new AppError(
+      "PERMISSION_DENIED",
+      "You do not have access to this",
+      403,
+    );
 }
 
 /**
@@ -126,18 +141,29 @@ async function list(query, reader, scope) {
   assertWholeLog(scope);
   const page = await repo.page(pool, query);
   const keys = await fieldMask.maskedKeysFor(pool, reader);
-  return { ...page, data: present(page.data, keys, reader.employee_id || null) };
+  return {
+    ...page,
+    data: present(page.data, keys, reader.employee_id || null),
+  };
 }
 
 /** GET /audit/summary */
 async function summary(scope) {
   assertWholeLog(scope);
   const counts = await repo.summary(pool);
-  const label = (key) => (catalog.MODULE_META[key] ? catalog.MODULE_META[key].label : key);
+  const label = (key) =>
+    catalog.MODULE_META[key] ? catalog.MODULE_META[key].label : key;
   return {
     ...counts,
-    by_module: counts.by_module.map((m) => ({ module_key: m.module_key, label: label(m.module_key), entries: m.entries })),
-    modules: catalog.MODULE_CATALOG.map((m) => ({ key: m.key, label: m.label })),
+    by_module: counts.by_module.map((m) => ({
+      module_key: m.module_key,
+      label: label(m.module_key),
+      entries: m.entries,
+    })),
+    modules: catalog.MODULE_CATALOG.map((m) => ({
+      key: m.key,
+      label: m.label,
+    })),
   };
 }
 
@@ -147,7 +173,12 @@ async function summary(scope) {
  */
 async function requestExport(filters, actor, scope) {
   assertWholeLog(scope);
-  if (!actor.email) throw new AppError("NO_EMAIL", "Your login has no email to send the export to.", 422);
+  if (!actor.email)
+    throw new AppError(
+      "NO_EMAIL",
+      "Your login has no email to send the export to.",
+      422,
+    );
   const client = await pool.connect();
   try {
     await atomically(client, () =>
@@ -179,7 +210,18 @@ async function gather(db, filters, reader) {
     rows.push(...present(page.data, keys, reader.employee_id || null));
   }
   const total = page.page.total;
-  return { rows: rows.slice(0, EXPORT_CEILING), total, capped: total > EXPORT_CEILING };
+  return {
+    rows: rows.slice(0, EXPORT_CEILING),
+    total,
+    capped: total > EXPORT_CEILING,
+  };
 }
 
-module.exports = { list, summary, requestExport, gather, present, EXPORT_CEILING };
+module.exports = {
+  list,
+  summary,
+  requestExport,
+  gather,
+  present,
+  EXPORT_CEILING,
+};

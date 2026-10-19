@@ -200,3 +200,125 @@ describe("the History tab's line", () => {
     ).toBe("Reporting line changed");
   });
 });
+
+describe("Download PDF's drawing", () => {
+  const { layout, initialsOf } = require("./org-chart.layout");
+  const { render } = require("../../shared/documents/render");
+  const variables = require("../../shared/templates/variables");
+  const store = require("../../shared/templates/template-store");
+  require("./organisation.events");
+
+  /** A node as the org chart read gives it. */
+  const node = (id, manager, extra = {}) => ({
+    node_id: id,
+    node_kind: "employee",
+    employee_id: id,
+    org_seat_id: null,
+    display_name: `Ada ${id}`,
+    job_title: `Post ${id}`,
+    department: "Delivery",
+    manager_node_id: manager,
+    dotted_manager_node_id: null,
+    dotted_line_to: null,
+    is_ceo: false,
+    vacant: false,
+    meta: null,
+    ...extra,
+  });
+  const at = (drawing, name) => {
+    const c = drawing.cards.find((k) => k.name === name);
+    return c && [c.x, c.y];
+  };
+
+  test("draws the desktop's tree: each card over its branch, the CEO's tree first", () => {
+    const drawing = layout([
+      node("R", null),
+      node("A", null, { is_ceo: true }),
+      node("B", "A"),
+      node("C", "A"),
+      node("D", "B"),
+      node("E", "B"),
+    ]);
+    expect(drawing.cards.map((c) => c.name)).toEqual(["Ada A", "Ada B", "Ada D", "Ada E", "Ada C", "Ada R"]);
+    expect(at(drawing, "Ada A")).toEqual([53, 0]);
+    expect(at(drawing, "Ada B")).toEqual([28, 50]);
+    expect(at(drawing, "Ada D")).toEqual([3, 100]);
+    expect(at(drawing, "Ada E")).toEqual([53, 100]);
+    expect(at(drawing, "Ada C")).toEqual([103, 50]);
+    expect(at(drawing, "Ada R")).toEqual([153, 0]);
+    /* A line down from the CEO, one across to its two reports, and one down to each. */
+    expect(drawing.lines).toEqual(
+      expect.arrayContaining([
+        { x: 75, y: 38, w: 0, h: 6, across: false },
+        { x: 50, y: 44, w: 75, h: 0, across: true },
+        { x: 50, y: 44, w: 0, h: 6, across: false },
+        { x: 125, y: 44, w: 0, h: 6, across: false },
+      ]),
+    );
+    expect(drawing.chart).toEqual({ width: 200, height: 138, scale: 1 });
+    expect(drawing.page).toEqual({ width: 297, height: 238 });
+  });
+
+  test("five or more reports with nobody under them hang in two columns down a line", () => {
+    const leaves = ["L1", "L2", "L3", "L4", "L5"].map((id) => node(id, "M"));
+    const drawing = layout([node("M", null, { is_ceo: true }), ...leaves]);
+    expect(at(drawing, "Ada M")).toEqual([28, 0]);
+    expect(["L1", "L2", "L3", "L4", "L5"].map((id) => at(drawing, `Ada ${id}`))).toEqual([
+      [3, 50],
+      [53, 50],
+      [3, 92],
+      [53, 92],
+      [3, 134],
+    ]);
+    expect(drawing.lines).toEqual(
+      expect.arrayContaining([
+        { x: 50, y: 38, w: 0, h: 115, across: false },
+        { x: 47, y: 69, w: 3, h: 0, across: true },
+        { x: 50, y: 69, w: 3, h: 0, across: true },
+        { x: 47, y: 153, w: 3, h: 0, across: true },
+      ]),
+    );
+    expect(drawing.chart).toEqual({ width: 100, height: 172, scale: 1 });
+
+    /* Four stay in a row, and so do five when one of them has a report of their own. */
+    expect(layout([node("M", null), ...leaves.slice(0, 4)]).chart.width).toBe(200);
+    expect(layout([node("M", null), ...leaves, node("X", "L5")]).chart.width).toBe(250);
+  });
+
+  test("a card says what the screen's does: initials, title, department, dotted line, an open role", () => {
+    const drawing = layout([
+      node("A", null, { display_name: "Ifeoma Mbonu", is_ceo: true, meta: "Since 2023 · Remote" }),
+      node("S", "A", { node_kind: "seat", employee_id: null, display_name: "Head of Finance", department: "Finance", vacant: true }),
+      node("B", "A", { display_name: "Rabi'a Zawiya", dotted_line_to: "Ifeoma Mbonu" }),
+    ]);
+    expect(drawing.cards).toEqual([
+      expect.objectContaining({ initials: "IM", title: "Post A", ceo: true, meta: "Since 2023 · Remote", vacant: false }),
+      expect.objectContaining({ initials: "", name: "Head of Finance", title: "Vacant · Finance", vacant: true, ceo: false }),
+      expect.objectContaining({ initials: "RZ", dotted: "Ifeoma Mbonu", meta: null }),
+    ]);
+    expect(initialsOf("Sade")).toBe("S");
+    expect(initialsOf("  Tobiloba Iyanuoluwa Dada ")).toBe("TD");
+  });
+
+  test("a chart wider or taller than a PDF page allows is drawn smaller", () => {
+    const wide = layout(["A", "B", "C", "D"].map((id) => node(id, null)), { maxSide: 100 });
+    expect(wide.chart).toEqual({ width: 200, height: 38, scale: 0.5 });
+    expect(wide.page.width).toBe(297);
+    /* Five hung under one card make it 172 mm tall: 100 / 172, to three places, rounded down. */
+    const tall = layout([node("M", null), ...["L1", "L2", "L3", "L4", "L5"].map((id) => node(id, "M"))], { maxSide: 100 });
+    expect(tall.chart).toEqual({ width: 100, height: 172, scale: 0.581 });
+  });
+
+  test("the template names only its declared variables and places every card and line", () => {
+    const t = store.shipped("document", "org-chart");
+    expect(() => variables.assertTemplate("document", "org-chart", t.body)).not.toThrow();
+    const drawing = layout([node("A", null, { is_ceo: true }), node("B", "A", { dotted_line_to: "Ada A" })]);
+    const data = variables.parseData("document", "org-chart", { ...drawing, seats: 2, filled: 2, open: 0 });
+    const html = render(t.body, data);
+    expect(html).toContain("size: 297mm 210mm");
+    expect(html).toContain("left: 3mm; top: 0mm;");
+    expect(html).toContain("left: 3mm; top: 50mm;");
+    expect(html).toContain("Dotted line · Ada A");
+    expect(html).toMatch(/<strong>2 seats<\/strong> · 2 filled · 0 open/);
+  });
+});

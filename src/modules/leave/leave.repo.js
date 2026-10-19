@@ -73,7 +73,8 @@ const LIVE = `v.status IN ('submitted', 'approved')`;
  * One page of requests.
  * @param {{query: Function}} db
  * @param {{status?: string, leave_type_id?: string, employee_id?: string, from?: string,
- *          to?: string, year?: number, q?: string, page?: number, sort?: object}} query
+ *          to?: string, year?: number, q?: string, page?: number, sort?: object,
+ *          statuses?: string[]}} query   statuses: the leave calendar's several, never from a request
  * @param {{scope: string, scope_ids: string[]|null}} scope
  */
 function list(db, query, scope) {
@@ -85,6 +86,7 @@ function list(db, query, scope) {
     query.to || null,
     query.year || null,
     query.q || null,
+    query.statuses || null,
   ];
   const s = scopeClause(scope, { column: "v.employee_id" }, params);
   return pageQuery(
@@ -98,6 +100,7 @@ function list(db, query, scope) {
         AND ($5::date IS NULL OR v.starts_on <= $5)
         AND ($6::int IS NULL OR date_part('year', v.starts_on)::int = $6)
         AND ($7::text IS NULL OR v.haystack LIKE '%' || search_fold($7) || '%')
+        AND ($8::text[] IS NULL OR v.status = ANY($8::text[]))
         ${s.and}
       ORDER BY ${orderBy(query, SORTS, "v.leave_request_id")}`,
     params,

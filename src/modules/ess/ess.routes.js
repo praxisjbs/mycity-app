@@ -56,6 +56,11 @@ route(router, "get", "/leave",
     summary: "My leave requests" },
   controller.listLeave);
 
+route(router, "get", "/leave/calendar",
+  { query: c.ess.EssLeaveCalendarQuery, response: c.leave.LeavePage, self: true,
+    summary: "The leave calendar: mine, those under me, or everyone" },
+  controller.leaveCalendar);
+
 route(router, "get", "/leave/balances",
   { query: c.ess.EssLeaveBalanceQuery, response: c.leave.LeaveBalances, self: true,
     summary: "What is left of my year, per leave type" },

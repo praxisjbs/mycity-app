@@ -714,13 +714,16 @@ async function processRows(client, imp, rows, ctx) {
           client,
           row.target_id,
           { [f.key]: id },
-          { ...ctx, row_number: row.row_number },
+          { ...ctx, row_number: row.row_number, values: row.values },
         ),
       );
       if (!res.ok) {
         row.status = "error";
         row.problems.push(...problemOf(res.err));
       } else if (
+        // An importer's link answers false when it wrote nothing (it keeps what a person
+        // set on screen), and the row then stays unchanged rather than counting as an update.
+        res.out !== false &&
         row.action === "none" &&
         row.status === "unchanged" &&
         (!row.before || !same(row.before[f.key], id))
@@ -926,7 +929,8 @@ const preview = (batchId, opts) => run(batchId, { ...opts, commit: false });
 const commit = (batchId, opts) => run(batchId, { ...opts, commit: true });
 
 /**
- * A page of a batch's rows, optionally by status ("error" for the problems list).
+ * A page of a batch's rows, optionally by status; "problem" is the preview's list: every
+ * error, duplicate and warning, so a row that saves with something missing is seen too.
  * @param {{query: Function}} client
  */
 function rowsOf(client, batchId, query = {}) {
@@ -934,7 +938,9 @@ function rowsOf(client, batchId, query = {}) {
     client,
     `SELECT import_row_id, row_number, raw, "values", status, problems, action, target_id, diff, ${TOTAL_COL}
        FROM import_row
-      WHERE import_batch_id = $1 AND ($2::text IS NULL OR status = $2)
+      WHERE import_batch_id = $1
+        AND ($2::text IS NULL OR status = $2
+             OR ($2::text = 'problem' AND status IN ('error', 'duplicate', 'warning')))
       ORDER BY row_number, import_row_id`,
     [batchId, query.status || null],
     query,

@@ -59,14 +59,14 @@ erDiagram
 
 | Concern | Tables | Written by (the only writer) | How a module attaches |
 |---|---|---|---|
-| People and structure | `employee`, `department`, `worksite`, `org_seat`, `reporting_line` | organisation service, staff importer | `employee_id uuid REFERENCES employee`. Team scope follows `employee.line_manager_id` (the dotted line never grants scope) |
+| People and structure | `employee`, `department`, `worksite`, `org_seat`, `reporting_line` | organisation service, staff importer | `employee_id uuid REFERENCES employee`. Team scope follows the solid line: `employee.line_manager_id`, or, for someone who reports to a vacant seat, the first person above it (`employee_effective_manager`, `1160`). The dotted line never grants scope |
 | Sign-in | `app_user`, `user_session`, `password_reset`, `known_device`, `mfa_recovery_code`, `passkey`, `spent_challenge` | identity service; the security service for two-step, the PIN and passkeys (the `mfa_*` and `pin_*` columns of `app_user`, `mfa_recovery_code`, `passkey`, `spent_challenge`) | `user_id` for who acted; never an email or a name. A key, a code, a PIN or a credential is never copied out |
 | Access | `role`, `permission`, `field_visibility`, `capability`, `user_role`, `user_capability` | access service | A module's permission key in `access.catalog.js`; restricted columns named in `field-mask.js` |
 | History | `event_log`, `audit_ledger` (append-only), `event_outbox`, `entity_state_history` | `emit()` in the same transaction as the write | Every write calls `emit()`; follow-on work is an outbox handler, never a second write path |
 | Approvals | `workflow_definition`, `workflow_instance`, `workflow_decision` | `shared/workflow` | `workflow_instance_id` on the record waiting for approval; definitions seeded only if they pass `validateDefinition()` |
 | Files | `document`, `document_variant`, `template`, `template_version`, `document_request` | `shared/documents/vault`; the documents service for `document.verified_at` and `document_request` | `document_id uuid REFERENCES document`; never a path or a URL. A document People asked for and have not been given is a `document_request`, not a `document` (`docs/guides/foundation.md` §6.9) |
 | Numbers | `numbering_scheme`, `numbering_counter` | `numbering.allocate()` | `number citext NOT NULL UNIQUE` (or the contract's name for it, `staff_number`) and a scheme in `schemes.js` |
-| Notifications | `notification`, `notification_preference`, `push_subscription`, `alert` | `shared/notifications` fan-out | An outbox handler that calls the fan-out; never an insert into `notification` |
+| Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
 | Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
@@ -105,11 +105,18 @@ role), `role.two_step_required`, the Audit Log's indexes on `audit_ledger` and l
 `two_step_setup` purpose on `spent_challenge` (`docs/guides/foundation.md` §4, §6.4) · `0449` the
 field visibility of every role and the two capabilities given to Implementation, Operations & People
 and Management (`docs/guides/foundation.md` §6.3) · `0450` `reassign` as a `workflow_decision` (a stage
-given to someone else; `docs/guides/foundation.md` §11) · `0499` the leave flow, `leave.approval` (the
-line manager, then Operations & People over 5 days; §6.5).
+given to someone else; `docs/guides/foundation.md` §11) · `0460` web push (brought forward from M6 by
+TB, 19/10/2026; `docs/guides/notifications.md` §4): `push_subscription` as a device (its
+`known_device`, label and platform, the hash of its device token, the key id it was made under, its
+health and why it stopped) and `push_delivery`, one row per notice and device, so a retried push is
+never sent twice · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
+People over 5 days; §6.5).
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
+- `employee_team_closure` (`0040`) is read by no code since 19/10/2026: team scope walks
+  `employee_effective_manager` (`1160`) and the reporting-loop check walks people and seats in
+  `organisation.repo.wouldLoop`. Drop it in a later file once GE agrees (MIGRATIONS §8).
 - ~~The staff importer must advance the `employee` counter past imported staff numbers.~~ Built
   17/10/2026: `numbering.advanceTo()`, called by the organisation service whenever a staff number
   arrives with its record, and by the roster loader at the end of a load.
@@ -132,7 +139,13 @@ seed · `1100` `home_alert` columns the alerts code writes · `1110` community: 
 and system channels, delivered pointer, the wider message kinds, transcripts, poll votes, presence,
 `announcement_read` and the announcement's message, audience size and reminder · `1120` mailbox:
 connection status and errors, folder kinds and sync cursor, thread keys, the reader's message
-fields, `mail_draft` and `mail_send_queue` · `1130` an announcement can be `cancelled` · `1140` each
+fields, `mail_draft` and `mail_send_queue` · `1125` `mail_image_trust` (the senders whose web images a
+mailbox owner always shows) · `1127` email signatures: `mail_signature` (a person's office line and
+their Show Mobile and WhatsApp switches; the mobile stays `employee.phone`) and
+`mail_signature_config` (the company's app and social links, the confidentiality note and what
+shows, one row at most); the baked signature rides in `mail_send_queue.payload` and its pictures
+are vault documents (`mail_signature_image`) · `1129` reference data: the `mailbox.signature`
+capability for System Administrator and Implementation · `1130` an announcement can be `cancelled` · `1140` each
 member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and
@@ -141,7 +154,10 @@ format, a scheduled slot generated once); `role_kpi` (a role's default and locke
 four) and `home_kpi_pick` (the cards a person chose); the indexes the Alerts list, the report
 scheduler and run history read; and, for Activity Today, `event_log (occurred_at)` · `1151`
 `home_alert.due_on`, the date a deadline alert is about, so one a person cleared is raised again
-when the date changes · `1199` Home
+when the date changes · `1160` `employee_effective_manager`, a view: the person each employee
+answers to, their line manager or, under a vacant seat, the first person above the seat, read by
+approvals, team scope and the notifications that follow it (`docs/guides/organogram.md` §4, §6) ·
+`1199` Home
 reference data: the
 capabilities `home.team`, `home.reports` and `alerts.manage` with their role grants (and
 `alerts.clear` for Heads of Department and Managers), the `report_run` numbering scheme
@@ -157,7 +173,7 @@ event, outcome, the person's note and the five types, deduplicated by partial un
 `1390` the two new exception types' names in the code list.
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
-other M1 modules take numbers outside them.
+other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026).
 
 **Owes:**
 - Attendance (attendance.md §4, §13): employee home location, field assignment, location requests
@@ -268,7 +284,8 @@ cases and checklist items, employment contracts, talent pool · `5099` seed.
 
 ### M6 Payroll & Notifications · 6000 to 6999 · LA
 
-**Built:** nothing in the block. Notifications are M0 (`0060`).
+**Built:** nothing in the block. Notifications are M0 (`0060`), web push and each person's
+preferences too (`0460`, brought forward by TB on 19/10/2026).
 
 **Owes, all of payroll** (MILESTONES §11, in scope): payroll runs, payslips, salary structures
 and pay components, deductions (pending, accepted, in a run, including M3 fines and lateness),

@@ -5,6 +5,8 @@ import { invalidate, useApi } from "@/api/hooks";
 import type { SearchHit } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
+import { enablePush, sendTestPush } from "@/features/notifications/push";
+import { openNotificationSettings } from "@/features/notifications/state";
 import { useRouter } from "@/lib/router";
 import { useInstallApp } from "./Notices";
 import { usePwa } from "./pwa";
@@ -31,7 +33,18 @@ const ICONS: Record<string, IconName> = {
   workflow_definition: "check",
   import_batch: "rows",
 };
-const RUN_ICONS: Record<string, IconName> = { clock: "clock", read_all: "bell", theme_dark: "moon", theme_light: "sun", density: "rows", install: "download", sign_out: "logout" };
+const RUN_ICONS: Record<string, IconName> = {
+  clock: "clock",
+  read_all: "bell",
+  notify_settings: "cog",
+  notify_on: "bell",
+  notify_test: "send",
+  theme_dark: "moon",
+  theme_light: "sun",
+  density: "rows",
+  install: "download",
+  sign_out: "logout",
+};
 
 function iconOf(hit: SearchHit): IconName {
   if (hit.kind === "screen") return "right";
@@ -72,6 +85,24 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
     if (hit?.run === "density") return density.toggle();
     if (hit?.run === "install") return installApp();
     if (hit?.run === "sign_out") return void signOut();
+    if (hit?.run === "notify_settings") return openNotificationSettings();
+    if (hit?.run === "notify_on") {
+      const s = await enablePush();
+      if (s === "on") toast("Notifications are on");
+      else if (s === "blocked") toast.error("Notifications are blocked here");
+      else if (s === "needs-install") toast.info("Install the app first");
+      else if (s !== "ask") toast.error("Not available on this device");
+      return;
+    }
+    if (hit?.run === "notify_test") {
+      try {
+        await sendTestPush();
+        toast("Test sent");
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Could not send the test");
+      }
+      return;
+    }
     if (hit?.run === "read_all") {
       try {
         await api.call("POST /api/v1/notifications/read-all", { body: {} });

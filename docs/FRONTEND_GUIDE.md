@@ -6,12 +6,14 @@ React apps: the staff app (`app/`, `hub.mycityapp.io`) and the public site (`pub
 
 Status: **the rules here are settled. The foundation (§9) is one design system for both apps,
 `packages/ui` (`@mycity/ui`), owned by AJ (Adole Jerome), backup TB.** It is built in three PRs
-planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F24 are binding: where this guide
+planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F26 are binding: where this guide
 and that file differ, that file wins and this one is fixed. Started 13 October 2026 from
 MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and §8 rewritten 14 October
 2026 into the screen content, two shells and form conventions; §1 to §3, §6, §9, §10 and §11
 rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8 brought into line;
-§1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell).
+§1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell); §8.8 and gate 21
+(nothing the browser styles itself, F25) added 18 October 2026, and one press, one request (F26:
+§8.4, §9.4, the `no-void-press` lint) the same day.
 If something here is wrong or missing, fix the guide in the same PR as the code.
 
 **Feature guides are full-stack guides.** A guide in `docs/guides/` covers the backend modules,
@@ -33,7 +35,7 @@ the client has already accepted.
 Guides lead, gates confirm (F9). Every builder, person or AI, starts here, so the gates in §10
 confirm work that was built right instead of rejecting it at the end.
 
-1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F24 and where each foundation PR
+1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F26 and where each foundation PR
    stands. Then **read `docs/COMPONENTS.md`**, the catalogue of every shared component: what it is
    for, when not to use it, its props and how it behaves on a phone. It is generated from the code
    (`npm run gen:components`), so it is never out of date.
@@ -272,7 +274,7 @@ and the rest; the Helpers table in `docs/COMPONENTS.md`). Never write your own.
 | Colour | Only the brand tokens (MILESTONES §5.1, §5.2, and the derived tokens, §9.3). No raw hex (gate 13). AA contrast in both themes (gate 14) |
 | Styling | Tokens only (F4). A feature composes `@mycity/ui` components and may use Tailwind layout and spacing utilities from the token scale. No colour outside a token class, no arbitrary value (`w-[317px]`, `bg-[#…]`), no inline `style`, no raw hex. Anything visual beyond that is a shared component |
 | Density | Compact by default on desktop: 14 px body, 40 px table rows, 36 px controls. A person may switch to Comfortable (15 px, 48 px rows, 40 px controls), remembered per person. A phone always uses 16 px in fields and 44 px targets. Components size themselves from the density tokens; a feature never sets a control or row height (F5) |
-| Motion | Native and brief (F6). Bottom sheets slide with a spring and close by dragging down; toasts and popovers fade in 120 to 200 ms. Everything is instant under reduced motion. Motion comes with the components; a feature adds none |
+| Motion | Native and brief (F6). Bottom sheets slide with a spring and close by dragging down (a sheet holding a text field closes only from its close button, Cancel or Esc); toasts and popovers fade in 120 to 200 ms. Everything is instant under reduced motion. Motion comes with the components; a feature adds none |
 | Empty value | The shared marker (`EmptyValue`), muted, also drawn by the table and detail components (§5.4). Never "N/A", never "null", never a typed dash |
 
 ---
@@ -320,7 +322,8 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   on a phone.
 - **Sheets, not centred modals.** The shared `Modal` becomes a bottom sheet that slides with a
   spring and closes by dragging down (F6); a long form becomes a full screen sheet. `Menu` becomes
-  an action sheet.
+  an action sheet. A sheet stays above the keyboard; once it holds a text field, a drag or a scrim
+  tap never closes it, so typing is never lost to a stray swipe.
 - **The main action within thumb reach**: at the bottom of the screen or the sheet, full width.
 - **Tap targets at least 44 × 44 px.** Inline help terms inside a sentence or heading are the only
   exception.
@@ -372,8 +375,10 @@ element outside the form components (§8.6).
   needs explaining, its label is a help term (§5.2).
 - **Placeholders** are a format example of at most 3 words, never an instruction and never the
   label.
-- **Choices**: up to 5 options as a segmented control or radio cards; more than 5 as a searchable
-  select; yes or no as a checkbox inside a form, or a switch for a setting that applies at once.
+- **Choices**: up to 5 options as a segmented control or radio cards; more than 5 as `SelectField`
+  (our branded list: a listbox under the button on desktop, a bottom sheet of 44 px rows on a phone,
+  never the browser's or the phone's own picker, §8.8); yes or no as a checkbox inside a form, or a
+  switch for a setting that applies at once.
 - **Typed fields, never plain text**: dates through the date field (day-first, gate 15), money
   through the money field (`shared/money`, gate 20), files through the upload engine (gate 18),
   people and records through the server-searching picker (§4).
@@ -392,7 +397,8 @@ element outside the form components (§8.6).
 - **The signal is on the field**: a red ring and a ! mark, with an error of at most 4 words beside
   it ("Not a real date"). Never a sentence under the form, never a dialog, never a toast.
 - **Submit is never disabled.** Pressing it checks everything, marks every problem and moves focus
-  to the first one. A wizard step does not advance until its fields are right.
+  to the first one. A wizard step does not advance until its fields are right. While the save runs
+  the button is busy, not disabled (§8.4).
 - **Server errors land on fields.** An `AppError` with `fields` marks those fields the same way; a
   general error is one line above the footer.
 
@@ -403,6 +409,15 @@ element outside the form components (§8.6).
 - **The primary is Verb Noun** (§5.4) and is the only filled button in the footer.
 - **Destructive actions** are red and confirm in the shared modal, naming the thing ("Delete
   Rule"), never `confirm()`.
+- **One press, one request** (F26). A button answers the moment it is pressed. Its handler hands
+  back the work (`onClick={save}`, `onClick={() => save()}`, or an async handler), and the button is
+  busy until that settles: its own colour and label, softened, a spinner where its icon was (centred
+  over the label when it has none, so its size never changes), and a second press refused at once.
+  The buttons beside it wait with it (a modal, a form, a form footer, a card or page header, a shell
+  notice, or an `ActionGroup` around a row's Approve and Reject), and a modal cannot be dismissed
+  mid-save. A `Form` whose `onSubmit` returns its save refuses Enter twice and spins the button that
+  submitted it. Never `onClick={() => void save()}`: the button cannot see the work, and the lint
+  refuses it (`mycity/no-void-press`). Never `disabled={busy}` either: busy stays focusable.
 - Enter submits a single-line form. Esc closes a form with no changes; with changes it asks once
   whether to discard.
 
@@ -418,7 +433,7 @@ The form system lives in **`packages/ui/src/form/`**, for both apps. It is the *
 `<form>`, `<input>`, `<select>`, `<textarea>` or `<label>` may appear, and the only place that
 imports `react-hook-form`. Features import its parts from `@mycity/ui`: `Form`, `Field`,
 `TextField`, `PasswordField`, `NumberField`, `DateField`, `DateRangeField`, `TimeField`,
-`MoneyField`, `PhoneField`, `SelectField`, `ChoiceField`, `CheckboxField`, `Switch`, `ToggleRow`,
+`MoneyField`, `PhoneField`, `SelectField`, `ChoiceField`, `SelectMenu`, `CheckboxField`, `Switch`, `ToggleRow`,
 `TextAreaField`, `SearchInput`, `FilterSelect`, `LoginField`, `OtpField`, `FormFooter`, `FormError`,
 `Wizard`, `InlineInput`, `InlineSelect`, `InlineLabel`, and the hook `useContractForm(initial, rules)`. PR 3 added `UploadField` (the
 only file input in the product), `PersonPicker` and `RecordPicker` (both searching the server, 25 at a
@@ -460,6 +475,35 @@ in `packages/ui`, approved by AJ (backup TB). Never build it inside a feature.
   look right on both. The in-browser mock exists only on laptops and in CI (F12, §9.5).
 - **AI deep links.** The assistant answers with links to screens ("Create Task"). Every screen
   that a write can be routed to accepts its prefill from the URL.
+
+### 8.8 Nothing the browser styles itself (gate 21)
+
+The brand holds everywhere, on both shells: **no part of a screen is drawn by the browser or the
+phone in its own style** (FRONTEND_FOUNDATION F25). A grey native picker opening over a branded
+sheet, a yellow autofill box, a browser tooltip or a validation bubble is a defect, never a detail.
+There are no exemptions, `packages/ui` included.
+
+| Never | Always |
+|---|---|
+| `<select>`, `<option>`, `<datalist>`, the phone's own picker | `SelectField`, `FilterSelect`, `InlineSelect` (all `SelectMenu`: a Radix listbox on desktop, a bottom sheet on a phone); `ChoiceField` for 2 to 5 options; `PersonPicker`, `RecordPicker` for server lists |
+| `<input type>` date, time, month, week, number, range, color, checkbox, radio | `DateField`, `DateRangeField`, `TimeField`, `NumberField`, `MoneyField`, `CheckboxField`, `Switch`, `ChoiceField`, `Tick` |
+| `<progress>`, `<meter>`, `<dialog>` | `ProgressBar`, `LevelMeter`, `Modal`, `Sheet`, `ConfirmDialog` |
+| A `title` attribute (the browser's tooltip), a Leaflet marker's `title` | `Tooltip` (`IconButton` draws one from its `label`); a marker's `bindTooltip` with the `map-tip` class |
+| A `<form>` without `noValidate`, the browser's "Please fill in this field" | `Form` (`noValidate`, errors on the field, §8.3) |
+| `alert`, `confirm`, `prompt` (gate 16) | `useConfirm`, `ConfirmDialog`, `toast` |
+| `sonner` imported in a feature, a toast styled by the library | `toast` and `Toaster` from `@mycity/ui` (unstyled sonner, our classes and icons) |
+
+What the browser would still draw on our own controls is reset once, in
+`packages/ui/src/styles/base.css`: control `appearance`, number spinners, the search clear button,
+the date picker icon, the password reveal and autofill key buttons, the autofill tint, Firefox's
+invalid glow, the tap flash on a phone, the text selection colour, `accent-color` and
+`caret-color` (all from tokens). Scrollbars were already thin and tinted there.
+
+`scripts/check/native-ui.js` refuses each "Never" in the source of `packages/ui`, `app` and
+`public-app`, and crawls every gallery page and every app screen at phone and desktop size
+(`lib/screens.js`) for a visible native element, a `title`, a form without `novalidate`, a control
+whose computed `appearance` is not `none`, and a toast sonner styled. A control the set lacks is
+added in `packages/ui` with `npm run new:component`, drawn in tokens, never left to the browser.
 
 ---
 
@@ -503,14 +547,17 @@ packages/ui/
     lib/                      cn, format, media (useIsPhone), preferences (theme, density), slots, ids,
                               environment (the staging marks), plan (what opens where, F14)
     icons/                    Icon (Lucide underneath)
-    actions/                  Button, IconButton, BigButton
+    actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
+                              Form and Modal share (F26)
     layout/                   Card, PageHeader, Grid, Stack, Inline, PhoneOnly, DesktopOnly
     display/                  Pill, StatusPill, Avatar, Who, CountBadge, KeyValue, Banner, EmptyState,
                               EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money
     navigation/               Tabs, SegmentedControl, Chips
-    overlay/                  Modal, SidePanel, ConfirmDialog (useConfirm), Popover, Menu, Tooltip
+    overlay/                  Modal, SidePanel, ConfirmDialog (useConfirm), Popover, Menu, Tooltip,
+                              PhonePage (a full-screen page from the right on a phone)
     help/                     HelpTerm, InfoButton, Details (§5.2)
-    feedback/                 toast and Toaster, ErrorBoundary, ErrorState
+    feedback/                 toast and Toaster, NotificationBanner (notify(), the banner at the top),
+                              ErrorBoundary, ErrorState
     form/                     the form system: the only home of raw form elements (§8.6)
     data/                     ApiError, createApiClient, useApi, usePaged, useInfinite, useMutation, invalidate,
                               DataView (F20), Pager, Toolbar, ExportButton, Kanban (F19), Calendar
@@ -521,8 +568,10 @@ packages/ui/
     illustrations/            Illustration, in token colours; CityShowcase, the sign-in screen's photographs
     shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
                               PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
-                              MoreSheet, FloatingButton, CommandPalette, NotificationRow, ShellNotice
-    testing/                  test setup, render helpers, gallery types (not exported from ".")
+                              MoreSheet, FloatingButton, CommandPalette, NotificationCenter (the bell's
+                              pane), NotificationRow, ShellNotice
+    testing/                  test setup, render helpers, gallery types (not exported from "."), and
+                              eslint-rules.test.ts, the shared lint rules' own test
 ```
 
 Beside every component file `X.tsx` sit `X.test.tsx` and `X.gallery.tsx`. One component, or a
@@ -535,16 +584,19 @@ app/
   index.html                  theme and density set before first paint (localStorage mc-theme, mc-density)
   vite.config.ts              the shared Vite settings, page size from the contract, API mode, PWA manifest, /api proxy
   eslint.config.js            extends @mycity/ui/eslint
-  public/                     favicon, PWA icons
+  public/                     favicon, PWA icons, badge-96.png (the pin in a phone's status bar)
+  tsconfig.sw.json            types src/sw.ts against the WebWorker library (§9.7)
   scripts/contract-status.mjs which modules still run on INTERIM types, and which are ready for the contract
   src/
     main.tsx  App.tsx         entry; providers (auth, router, modal, toasts)
+    sw.ts                     the service worker: precache, offline, update, web push (§9.7)
     styles/index.css          Tailwind and the @mycity/ui styles; the staging offset; no colour of its own
     lib/                      plan (the delivery plan bound to this app), router, routes (screen URLs)
     api/
       client.ts               the staff app's client, made with createApiClient (session, refresh)
       endpoints.ts  hooks.ts  the typed endpoint map; the shared hooks bound to this client
-      realtime.ts             Socket.io for the bell and presence (§9.6); nothing on the mock
+      realtime.ts             Socket.io for the bell, presence and the in-front heartbeat (§9.6); nothing
+                              on the mock
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       download.ts             the other way: a gated file fetched with the session's token, as a
@@ -565,7 +617,9 @@ app/
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
-                              shared by People, ESS and Settings, and shared/ (sections, KPI tiles, letters)
+                              shared by People, ESS and Settings; notifications (the bell's pane, the banner,
+                              push on the device, Notification Settings, §9.6); and shared/ (sections, KPI
+                              tiles, letters)
 ```
 
 A module's screens are `features/<module>/index.tsx`, whose default export renders the tab it is
@@ -771,10 +825,13 @@ What a feature may still keep beside its screens is **wiring**, not components:
 endpoint (`EmployeePicker`), `features/shared/wire.ts` maps what the API sends to what the
 components take, and `api/upload.ts` gives the upload engine this app's session.
 
-**Submit is never disabled** (§8.3). `Button`'s `busy` ignores presses while a request is in flight
-but keeps the button enabled and reachable; a form shows what is wrong on its fields when Submit is
-pressed, never by disabling it. A choice that is not a field (pick at least one row) says so in one
-line above the footer.
+**Submit is never disabled** (§8.3). `Button`, `IconButton` and `BigButton` are busy while the work
+their handler returns runs (F26, §8.4), or while `busy` says so (a mutation's pending that the press
+does not hand back); either way they ignore presses but stay enabled and reachable (`aria-busy`,
+`aria-disabled`), and the buttons in their `ActionGroup` wait. `actions/press.ts` holds the one copy
+of that state, which `Form` and `Modal` share. A form shows what is wrong on its fields when Submit
+is pressed, never by disabling it. A choice that is not a field (pick at least one row) says so in
+one line above the footer.
 
 **What the screen gates read** (gates 8 and 11, §9.2). The shared components carry the copy slots
 as `data-ui` attributes: `page-title`, `page-subtitle`, `title` (card, section, modal and KPI
@@ -847,21 +904,53 @@ signed in, with the access token from memory in the handshake. The server joins 
 person's own rooms and closes it when the token expires; the client then refreshes the session once
 and reconnects. A refused refresh leaves it closed and the session sheet takes over (§9.2).
 `useRealtime(event, handler)` hands an event to the components listening while they are mounted;
-`usePresence(userId)` keeps who is online from `presence` events. The bell listens for
-`notification` (a new one) and `notification_read` (a read mark made in another tab or on another
-device) and reloads its dot, its list and the badge counts (`GET /api/v1/notifications/unread-count`,
-`GET /api/v1/notifications`, `GET /api/v1/notifications/badges`, on the contract). Open marks a
-notice read before it navigates; a notice with no screen has Mark Read. Realtime is best effort:
-everything also arrives over HTTP, so a dropped socket only means the bell refreshes when it is
-opened. The in-browser mock has no server, so nothing connects in mock mode. The server sends
-`presence` from M1 chat; notification preferences and web push land in M6.
+`usePresence(userId)` keeps who is online from `presence` events. While the tab is on screen and was
+touched in the last 5 minutes the socket says `presence:active` every 30 seconds, and
+`presence:idle` when that stops: the server holds a push to the person's devices for a minute while
+they are looking at the app. Realtime is best effort: everything also arrives over HTTP, so a
+dropped socket only means the bell refreshes when it is opened. The in-browser mock has no server, so
+nothing connects in mock mode; it answers every notification route in the contract's shapes.
+
+Notifications are designed in `docs/guides/notifications.md` (web push and personal preferences
+brought forward from M6 by TB, 19/10/2026). In the staff app:
+
+- **The bell** (`shell/Bell.tsx`) is the pane, `NotificationCenter`: a `PhonePage` from the right on
+  a phone and a 420 px panel under the bell on desktop, All and Unread, Today, Yesterday and
+  Earlier, pages of 25 through `useInfinite` as the list nears its end, pull to refresh, swipe left
+  (phone) or the hover tick (desktop) to mark read, Mark All Read, and the gear for Notification
+  Settings (`features/notifications/Settings.tsx`: a `PhonePage` over the pane on a phone, a
+  `Modal` on desktop). It reloads its dot, its list and the badge counts
+  (`GET /api/v1/notifications/unread-count`, `GET /api/v1/notifications`,
+  `GET /api/v1/notifications/badges`) on `notification` (a new one) and `notification_read` (a read
+  mark made in another tab or on another device). Open marks a notice read before it navigates.
+  Whether the pane and Notification Settings are open is one store (`features/notifications/state.ts`),
+  so the bell, ⌘K and a `pane=notifications` link open the same ones.
+- **Arrivals** (`features/notifications/arrivals.ts`, `useArrivals`): a notice reaching a window on
+  screen, over the socket or from the service worker, shows the banner (`notify()` from
+  `@mycity/ui`, on the second, top `Toaster`, for 3 seconds) and chimes or vibrates (`sound.ts`):
+  once per notice whichever way it came, never for the record already on screen. A window in the
+  background only reloads its bell; the device's own notification sounds. A link from a notification
+  carries `n=<ids>` (marked read, then dropped from the address) or `pane=notifications`. When the
+  app comes to the front it closes the notifications in the shade whose notices are read, and the
+  app icon's count follows the unread count (`setAppBadge`, where the platform has one).
+- **Push** (`features/notifications/push.ts`): the device's state (unsupported, needs-install, ask,
+  blocked, off, on, unavailable); `syncPush()` on every signed-in start, which never asks;
+  `enablePush()`, only from a press; `disablePush()`, remembered on that device; `sendTestPush()`.
+  The device's id, token and key id live in IndexedDB (`device-store.ts`, database `mycity-push`),
+  where the service worker reads them. The one-time Turn On offer is a `ShellNotice`
+  (`shell/Notices.tsx`); the browser's own prompt never shows unasked.
+- **⌘K** runs Notification Settings, Turn On Notifications, Send Test Notification and Mark All Read
+  in the app itself (`shell/Search.tsx`, `src/shared/search/actions.js`).
 
 ### 9.7 PWA (staff app only)
 
-`vite-plugin-pwa` in `generateSW` mode with `registerType: "prompt"`; `shell/pwa.ts` holds what the
-shell shows (`startPwa()` at start, `usePwa()` in the shell):
+`vite-plugin-pwa` in `injectManifest` mode with `registerType: "prompt"`: the service worker is the
+app's own, `src/sw.ts` (typed by `tsconfig.sw.json`, the WebWorker library, and built as
+`dist/sw.js`); the plugin injects the precache list. `shell/pwa.ts` holds what the shell shows
+(`startPwa()` at start, `usePwa()` in the shell):
 
-- **Update**: a new version shows a `ShellNotice` with Reload rather than reloading under someone.
+- **Update**: a new version shows a `ShellNotice` with Reload rather than reloading under someone;
+  Reload sends the waiting worker `SKIP_WAITING`.
 - **Install** (PR 2 question 4): an Install App action in More and in the desktop account menu, and
   a one-time banner (`ShellNotice`: Install App, Not Now) from a person's second signed-in visit on
   that device, on a phone and on desktop; Not Now holds it for 30 days. Neither shows once the app
@@ -869,12 +958,24 @@ shell shows (`startPwa()` at start, `usePwa()` in the shell):
   its own prompt (`beforeinstallprompt`) Install App uses it; on an iPhone or iPad it shows the Add
   to Home Screen steps.
 - **Offline**: the shell and assets are precached, so the installed app opens without a connection;
-  `/api/` is `NetworkOnly`, so every number on screen is live and nothing personal is cached. With
-  no connection the page area shows the offline page (`shell/offline.tsx`: No Connection, Try
-  Again) and the shell stays; when the connection returns every mounted read reloads.
+  the worker answers no `/api/` request, so every number on screen is live and nothing personal is
+  cached. With no connection the page area shows the offline page (`shell/offline.tsx`: No
+  Connection, Try Again) and the shell stays; when the connection returns every mounted read
+  reloads.
+- **Push** (`src/sw.ts`, `docs/guides/notifications.md` §3, §6): `push` asks each visible window of
+  the app on a `MessageChannel` (`mycity:push`, 1.5 seconds) and shows a notification unless one
+  answers `{ ok: true }`; Safari, iPhones and iPads, and a test always show one, because WebKit stops
+  a subscription whose pushes show nothing. One notification per conversation (its tag): mail and
+  direct messages alert again, channel posts update quietly. Each carries the sender's initials
+  (drawn on an `OffscreenCanvas` in the brand colours read from `tokens.css`), the monochrome pin
+  `public/badge-96.png`, Mark Read and the unread count on the app icon. `notificationclick` focuses
+  a window and sends it to the record (`mycity:open`) or opens one on the record's address with
+  `n=<ids>`; sign-in keeps the address, so the record opens once signed in. Mark Read and
+  `pushsubscriptionchange` call the API with the device token, without a session.
 
 The manifest is in `vite.config.ts` (standalone, brand colours, 192, 512 and maskable icons). The
-service worker never answers `/api/` or `/gallery/` with the app shell.
+service worker never answers `/api/` or `/gallery/` with the app shell, and the API serves `sw.js`
+with `Cache-Control: no-cache`, so a new worker is found at the next start.
 
 ---
 
@@ -900,12 +1001,14 @@ when a change touches it (F23). Several gates are lint rules in
 | 16 No native dialogs | lint; `scripts/check/native-dialogs.js` | `alert`, `confirm`, `prompt` and `window.` forms of them (§8.7) |
 | 17 No dashes | `scripts/check/dashes.js` | An em dash, an en dash or a double hyphen in copy a person reads (§5.4) |
 | 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
+| 21 Nothing the browser styles itself | `scripts/check/native-ui.js` (source, and every gallery page and app screen in Chromium) | A native select, option, datalist, progress, meter or dialog; a browser-drawn input type; a `title` tooltip; a form without `noValidate`; a control the `base.css` reset missed; sonner outside the `Toaster`. No exemptions, `packages/ui` included (§8.8, F25) |
+| F26 One press, one request | lint `no-void-press` (`packages/ui/eslint.shared.js`, tested in `packages/ui/src/testing/eslint-rules.test.ts`) | A press handler on `Button`, `IconButton`, `BigButton`, `Form`, `Wizard`, `ConfirmDialog` or `ExportButton` that throws its work away (`() => void save()`, or a local function it names that does), so the button cannot stay busy (§8.4) |
 | Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; ANY file in an app's `components/` (both folders are gone); a feature shadowing a shared component (§9.4) |
 | Mock-free (F12) | `scripts/check/mock-free.js` | A release build that contains the in-browser mock (§9.5) |
 | Accessibility | `scripts/check/a11y.js` | An axe violation on any gallery state, in either theme, or on any app screen (shell and page together) at phone and desktop size |
 | Frontend typecheck, lint, test, build | `npm run fe:typecheck`, `fe:lint`, `fe:test`, `fe:build` | A type error, a lint error (the rules above, F4, F7, no local Zod), a failing Vitest test (each component's render, behaviour and axe check), a build that does not complete, in `packages/ui`, `app` or `public-app` |
 
-The screen gates need Chromium. CI installs it; locally, `npx playwright install chromium` once.
+The screen gates (8, 11 and 21) need Chromium. CI installs it; locally, `npx playwright install chromium` once.
 The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`.
 
 ## 11 · Done means
@@ -929,6 +1032,10 @@ The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-ap
   by `useContractForm` from the contract schema, or INTERIM rules until it exists (gate 12)
 - [ ] Day-first dates, formatted money, through the `@mycity/ui` helpers
 - [ ] No native dialogs; upload engine
+- [ ] Every press hands back its work: the button busy until it settles, its group waiting, no
+  `() => void save()` and no `disabled={busy}` (F26, §8.4)
+- [ ] Nothing the browser draws in its own style: no native select or picker, no browser input
+  type, no `title` tooltip, no validation bubble, no unbranded toast, on phone or desktop (gate 21, §8.8)
 - [ ] `npm run ci` green, the whole suite, before pushing
 - [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked (UI, Mobile) and a note left

@@ -15,10 +15,13 @@ const list = (user, query) => leave.listFor(meOf(user), query);
 
 const get = (user, id) => leave.getOwn(meOf(user), id);
 
+/** The leave calendar: the caller's own, everyone under them, or everyone (leave.calendarScope). */
+const calendar = (user, query) => leave.calendarFor(user, meOf(user), query);
+
 const balances = (user, query) => leave.balancesFor(meOf(user), query.year);
 
 const request = (user, body) => leave.request(user, meOf(user), body);
 
 const cancel = (user, id, body) => leave.cancelOwn(user, meOf(user), id, body);
 
-module.exports = { list, get, balances, request, cancel };
+module.exports = { list, get, calendar, balances, request, cancel };

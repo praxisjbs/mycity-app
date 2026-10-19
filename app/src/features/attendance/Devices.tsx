@@ -108,7 +108,7 @@ function DeviceView({ d, close, canRemove }: { d: Device; close: () => void; can
         {asking ? (
           <>
             <Button onClick={() => setAsking(false)}>Cancel</Button>
-            <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => void submit()}>Remove Device</Button>
+            <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => submit()}>Remove Device</Button>
           </>
         ) : (
           <>

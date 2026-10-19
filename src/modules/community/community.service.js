@@ -35,7 +35,8 @@ async function tx(fn) {
   }
 }
 
-const notFound = () => new AppError("NOT_FOUND", "There is no such conversation", 404);
+const notFound = () =>
+  new AppError("NOT_FOUND", "There is no such conversation", 404);
 
 /** Whether the caller holds announcements.post (People and the CEO). */
 async function canAnnounce(db, user) {
@@ -76,7 +77,9 @@ function lineOf(type, body) {
 }
 
 /** Muted until a time still ahead; pg reads 'infinity' (muted for good) as Infinity, which new Date() cannot hold. */
-const muted = (until) => until === Infinity || Boolean(until && new Date(until).getTime() > Date.now());
+const muted = (until) =>
+  until === Infinity ||
+  Boolean(until && new Date(until).getTime() > Date.now());
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
 /** Who moderates a channel: its admins; People and the CEO in #general and #announcements; nobody in a direct conversation. */
@@ -169,18 +172,35 @@ async function getChannel(channelId, user) {
 async function createChannel(body, user) {
   const channel = await tx(async (client) => {
     if (await repo.nameTaken(client, body.name)) {
-      throw new AppError("NAME_TAKEN", "A channel already has that name", 409, { name: ["Name already taken"] });
+      throw new AppError("NAME_TAKEN", "A channel already has that name", 409, {
+        name: ["Name already taken"],
+      });
     }
     const made = await repo.insertChannel(client, {
       name: body.name,
       description: body.description,
       post_policy: body.post_policy,
-      channel_type: body.department_ids.length && !body.member_ids.length ? "department" : "group",
+      channel_type:
+        body.department_ids.length && !body.member_ids.length
+          ? "department"
+          : "group",
       created_by: user.user_id,
     });
-    await repo.addMembers(client, made.community_channel_id, [user.user_id], "admin");
-    const others = await repo.usersFor(client, { employeeIds: body.member_ids, departmentIds: body.department_ids });
-    await repo.addMembers(client, made.community_channel_id, others.filter((u) => u !== user.user_id));
+    await repo.addMembers(
+      client,
+      made.community_channel_id,
+      [user.user_id],
+      "admin",
+    );
+    const others = await repo.usersFor(client, {
+      employeeIds: body.member_ids,
+      departmentIds: body.department_ids,
+    });
+    await repo.addMembers(
+      client,
+      made.community_channel_id,
+      others.filter((u) => u !== user.user_id),
+    );
     await emit(client, {
       key: EVENTS.CHANNEL_CREATED,
       entity: { type: "channel", id: made.community_channel_id },
@@ -200,15 +220,28 @@ async function listMembers(channelId, user, query) {
 
 async function assertAdmin(db, channelId, user) {
   const m = await member(db, channelId, user);
-  if (m.system_key) throw new AppError("SYSTEM_CHANNEL", "Everyone is a member of this channel", 422);
-  if (m.member_role !== "admin") throw new AppError("NOT_CHANNEL_ADMIN", "Only the channel's admins can do this", 403);
+  if (m.system_key)
+    throw new AppError(
+      "SYSTEM_CHANNEL",
+      "Everyone is a member of this channel",
+      422,
+    );
+  if (m.member_role !== "admin")
+    throw new AppError(
+      "NOT_CHANNEL_ADMIN",
+      "Only the channel's admins can do this",
+      403,
+    );
   return m;
 }
 
 async function addMembers(channelId, body, user) {
   await tx(async (client) => {
     await assertAdmin(client, channelId, user);
-    const users = await repo.usersFor(client, { employeeIds: body.member_ids, departmentIds: body.department_ids });
+    const users = await repo.usersFor(client, {
+      employeeIds: body.member_ids,
+      departmentIds: body.department_ids,
+    });
     const added = await repo.addMembers(client, channelId, users);
     await emit(client, {
       key: EVENTS.CHANNEL_MEMBERS_CHANGED,
@@ -223,7 +256,12 @@ async function addMembers(channelId, body, user) {
 async function removeMember(channelId, userId, user) {
   await tx(async (client) => {
     await assertAdmin(client, channelId, user);
-    if (userId === user.user_id) throw new AppError("LEAVE_NOT_REMOVE", "An admin cannot remove themselves", 422);
+    if (userId === user.user_id)
+      throw new AppError(
+        "LEAVE_NOT_REMOVE",
+        "An admin cannot remove themselves",
+        422,
+      );
     await repo.removeMember(client, channelId, userId);
     await emit(client, {
       key: EVENTS.CHANNEL_MEMBERS_CHANGED,
@@ -243,18 +281,31 @@ async function setRole(channelId, userId, role, user) {
     if (target.member_role === role) return;
     const admins = await repo.adminsLocked(client, channelId);
     if (role === "member" && admins.length === 1 && admins[0] === userId) {
-      throw new AppError("LAST_ADMIN", "A channel needs at least one admin", 422);
+      throw new AppError(
+        "LAST_ADMIN",
+        "A channel needs at least one admin",
+        422,
+      );
     }
     await repo.setRole(client, channelId, userId, role);
     await emit(client, {
       key: EVENTS.CHANNEL_MEMBERS_CHANGED,
       entity: { type: "channel", id: channelId },
       actor: user,
-      payload: { community_channel_id: channelId, member_role: role, user_id: userId },
+      payload: {
+        community_channel_id: channelId,
+        member_role: role,
+        user_id: userId,
+      },
     });
   });
   const row = await repo.memberRow(pool, channelId, userId);
-  return { person: row.person, user_id: row.user_id, member_role: row.member_role, joined_at: new Date(row.joined_at).toISOString() };
+  return {
+    person: row.person,
+    user_id: row.user_id,
+    member_role: row.member_role,
+    joined_at: new Date(row.joined_at).toISOString(),
+  };
 }
 
 async function setMuted(channelId, muteOn, user) {
@@ -269,7 +320,12 @@ const PIN_LIMIT = 3;
 async function setPinned(channelId, on, user) {
   await tx(async (client) => {
     const m = await member(client, channelId, user);
-    if (m.system_key) throw new AppError("ALWAYS_PINNED", "This channel is pinned for everyone", 422);
+    if (m.system_key)
+      throw new AppError(
+        "ALWAYS_PINNED",
+        "This channel is pinned for everyone",
+        422,
+      );
     if (on && !(await repo.membershipPinned(client, channelId, user.user_id))) {
       if ((await repo.pinsLocked(client, user.user_id)) >= PIN_LIMIT) {
         throw new AppError("PIN_LIMIT", "Unpin one first", 409);
@@ -315,13 +371,23 @@ async function markDelivered(channelId, upTo, user) {
 function statusOf(row, other) {
   if (!other) return "sent";
   const at = new Date(row.sent_at).getTime();
-  if (other.last_read_at && new Date(other.last_read_at).getTime() >= at) return "read";
-  if (other.last_delivered_at && new Date(other.last_delivered_at).getTime() >= at) return "delivered";
+  if (other.last_read_at && new Date(other.last_read_at).getTime() >= at)
+    return "read";
+  if (
+    other.last_delivered_at &&
+    new Date(other.last_delivered_at).getTime() >= at
+  )
+    return "delivered";
   return "sent";
 }
 
 /** Rows from the repo, completed with people, fans and votes, in the contract's shape. */
-async function present(db, rows, user, { direct = false, other = null, moderator = false } = {}) {
+async function present(
+  db,
+  rows,
+  user,
+  { direct = false, other = null, moderator = false } = {},
+) {
   const meta = (r) => r.metadata || {};
   const subjects = rows
     .filter((r) => ["birthday", "anniversary"].includes(r.message_type))
@@ -331,7 +397,9 @@ async function present(db, rows, user, { direct = false, other = null, moderator
   const celebrationIds = rows
     .filter((r) => ["birthday", "anniversary"].includes(r.message_type))
     .map((r) => r.community_message_id);
-  const pollIds = rows.filter((r) => r.message_type === "poll").map((r) => r.community_message_id);
+  const pollIds = rows
+    .filter((r) => r.message_type === "poll")
+    .map((r) => r.community_message_id);
   const [persons, fanMap, voteMap] = await Promise.all([
     repo.people(db, [...new Set(subjects)]),
     repo.fans(db, celebrationIds),
@@ -342,7 +410,8 @@ async function present(db, rows, user, { direct = false, other = null, moderator
     const deleted = Boolean(r.deleted_at);
     const m = meta(r);
     const celebration =
-      ["birthday", "anniversary"].includes(r.message_type) && persons.get(m.subject_employee_id)
+      ["birthday", "anniversary"].includes(r.message_type) &&
+      persons.get(m.subject_employee_id)
         ? {
             subject: persons.get(m.subject_employee_id),
             years: m.years ?? null,
@@ -353,7 +422,11 @@ async function present(db, rows, user, { direct = false, other = null, moderator
         : null;
     const recognition =
       r.message_type === "recognition" && persons.get(r.recognised_employee_id)
-        ? { to: persons.get(r.recognised_employee_id), count: r.reactions, mine: r.reacted }
+        ? {
+            to: persons.get(r.recognised_employee_id),
+            count: r.reactions,
+            mine: r.reacted,
+          }
         : null;
     const votesOf = voteMap.get(r.community_message_id)?.counts || {};
     const voted = Object.values(votesOf).reduce((n, v) => n + v, 0) > 0;
@@ -365,7 +438,8 @@ async function present(db, rows, user, { direct = false, other = null, moderator
             question: r.body || "",
             options: (m.options || []).map((text, i) => ({
               text,
-              votes: (voteMap.get(r.community_message_id)?.counts || {})[i] || 0,
+              votes:
+                (voteMap.get(r.community_message_id)?.counts || {})[i] || 0,
             })),
             my_vote: voteMap.get(r.community_message_id)?.mine ?? null,
             closed,
@@ -385,13 +459,21 @@ async function present(db, rows, user, { direct = false, other = null, moderator
       celebration,
       recognition,
       poll,
-      announcement: r.announcement_id ? { announcement_id: r.announcement_id, title: r.announcement_title } : null,
+      announcement: r.announcement_id
+        ? { announcement_id: r.announcement_id, title: r.announcement_title }
+        : null,
       status: direct && mine && other ? statusOf(r, other) : null,
       deleted,
       edited_at: iso(r.edited_at),
-      can_edit: !deleted && mine && ((r.message_type === "text" && fresh) || (r.message_type === "poll" && !closed && !voted)),
-      can_delete: !deleted && r.message_type !== "announcement" && (mine || moderator),
-      can_close: !deleted && r.message_type === "poll" && !closed && (mine || moderator),
+      can_edit:
+        !deleted &&
+        mine &&
+        ((r.message_type === "text" && fresh) ||
+          (r.message_type === "poll" && !closed && !voted)),
+      can_delete:
+        !deleted && r.message_type !== "announcement" && (mine || moderator),
+      can_close:
+        !deleted && r.message_type === "poll" && !closed && (mine || moderator),
     };
   });
 }
@@ -400,12 +482,23 @@ async function listMessages(channelId, user, query) {
   const m = await member(pool, channelId, user);
   const page = await repo.listMessages(pool, channelId, user.user_id, query);
   const direct = m.channel_type === "direct";
-  const other = direct ? await repo.otherPointers(pool, channelId, user.user_id) : null;
+  const other = direct
+    ? await repo.otherPointers(pool, channelId, user.user_id)
+    : null;
   const moderator = isModerator(m, await canAnnounce(pool, user));
-  const data = await present(pool, page.data, user, { direct, other, moderator });
+  const data = await present(pool, page.data, user, {
+    direct,
+    other,
+    moderator,
+  });
   if (m.system_key === "announcements") {
-    const seen = data.filter((x) => x.message_type === "announcement").map((x) => x.community_message_id);
-    await require("../announcements/announcements.service").markReadByMessages(user.user_id, seen);
+    const seen = data
+      .filter((x) => x.message_type === "announcement")
+      .map((x) => x.community_message_id);
+    await require("../announcements/announcements.service").markReadByMessages(
+      user.user_id,
+      seen,
+    );
   }
   // Newest page first, each page read top to bottom.
   return { ...page, data: data.reverse() };
@@ -417,7 +510,9 @@ async function messageView(db, messageId, user) {
   const ch = await repo.membership(db, row.community_channel_id, user.user_id);
   if (!ch) throw notFound();
   const direct = ch.channel_type === "direct";
-  const other = direct ? await repo.otherPointers(db, row.community_channel_id, user.user_id) : null;
+  const other = direct
+    ? await repo.otherPointers(db, row.community_channel_id, user.user_id)
+    : null;
   const moderator = isModerator(ch, await canAnnounce(db, user));
   return (await present(db, [row], user, { direct, other, moderator }))[0];
 }
@@ -444,7 +539,12 @@ async function storeMedia(channelId, upload, user) {
       entity: { type: "community_channel", id: channelId },
       actor: user,
     });
-    return { document_id: doc.document_id, file_name: doc.original_name || "file", size_bytes: Number(doc.bytes), mime_type: doc.mime };
+    return {
+      document_id: doc.document_id,
+      file_name: doc.original_name || "file",
+      size_bytes: Number(doc.bytes),
+      mime_type: doc.mime,
+    };
   });
 }
 
@@ -452,20 +552,43 @@ async function postMessage(channelId, body, user) {
   const posted = await tx(async (client) => {
     const m = await member(client, channelId, user);
     const announcer = await canAnnounce(client, user);
-    if (!mayPost(m)) throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
+    if (!mayPost(m))
+      throw new AppError("CANNOT_POST", "You cannot post in this channel", 403);
     if (body.message_type === "poll" && !mayPoll(m, announcer)) {
-      throw new AppError("CANNOT_POLL", "Only moderators start a poll here", 403);
+      throw new AppError(
+        "CANNOT_POLL",
+        "Only moderators start a poll here",
+        403,
+      );
     }
-    if ((body.message_type === "birthday" || body.message_type === "anniversary") && !isModerator(m, announcer)) {
-      throw new AppError("CANNOT_CELEBRATE", "Only moderators post a celebration here", 403);
+    if (
+      (body.message_type === "birthday" ||
+        body.message_type === "anniversary") &&
+      !isModerator(m, announcer)
+    ) {
+      throw new AppError(
+        "CANNOT_CELEBRATE",
+        "Only moderators post a celebration here",
+        403,
+      );
     }
 
     let type = body.message_type;
     const metadata = {};
     if (body.document_id) {
       const doc = await vault.get(client, body.document_id);
-      if (!doc || doc.entity_type !== "community_channel" || doc.entity_id !== channelId || doc.uploaded_by !== user.user_id) {
-        throw new AppError("NOT_YOUR_FILE", "Attach a file to this conversation first", 422, { document_id: ["Attach the file again"] });
+      if (
+        !doc ||
+        doc.entity_type !== "community_channel" ||
+        doc.entity_id !== channelId ||
+        doc.uploaded_by !== user.user_id
+      ) {
+        throw new AppError(
+          "NOT_YOUR_FILE",
+          "Attach a file to this conversation first",
+          422,
+          { document_id: ["Attach the file again"] },
+        );
       }
       if (type !== "audio") type = kindOfFile(doc.mime);
       if (type === "audio") metadata.duration_s = body.duration_s ?? 1;
@@ -473,30 +596,47 @@ async function postMessage(channelId, body, user) {
     if (type === "poll") metadata.options = body.options;
     if (type === "birthday" || type === "anniversary") {
       const persons = await repo.people(client, [body.subject_employee_id]);
-      if (!persons.has(body.subject_employee_id)) throw new AppError("NOT_FOUND", "There is no such colleague", 404);
+      if (!persons.has(body.subject_employee_id))
+        throw new AppError("NOT_FOUND", "There is no such colleague", 404);
       metadata.subject_employee_id = body.subject_employee_id;
       // A hand-posted anniversary carries its years, as the 05:00 ones do.
-      if (type === "anniversary") metadata.years = await repo.yearsServed(client, body.subject_employee_id, lagos.today());
+      if (type === "anniversary")
+        metadata.years = await repo.yearsServed(
+          client,
+          body.subject_employee_id,
+          lagos.today(),
+        );
     }
     const message = await repo.insertMessage(client, {
       community_channel_id: channelId,
       sender_user_id: user.user_id,
       message_type: type,
-      body: type === "birthday" || type === "anniversary" ? wishFor(body.subject_employee_id, type) : body.body,
+      body:
+        type === "birthday" || type === "anniversary"
+          ? wishFor(body.subject_employee_id, type)
+          : body.body,
       document_id: body.document_id,
       metadata,
     });
     // Sending is reading: the sender's own pointer moves past what they sent.
     await repo.markRead(client, channelId, user.user_id);
     await emit(client, {
-      key: m.channel_type === "direct" ? EVENTS.DIRECT_MESSAGE_SENT : EVENTS.CHANNEL_MESSAGE_POSTED,
-      entity: { type: m.channel_type === "direct" ? "direct_message" : "channel_message", id: message.community_message_id },
+      key:
+        m.channel_type === "direct"
+          ? EVENTS.DIRECT_MESSAGE_SENT
+          : EVENTS.CHANNEL_MESSAGE_POSTED,
+      entity: {
+        type:
+          m.channel_type === "direct" ? "direct_message" : "channel_message",
+        id: message.community_message_id,
+      },
       actor: user,
       payload: {
         community_channel_id: channelId,
         community_message_id: message.community_message_id,
         message_type: type,
         sender_name: user.display_name || null,
+        channel_name: m.channel_type === "direct" ? null : m.name || null,
         preview: lineOf(type, message.body),
       },
     });
@@ -508,12 +648,23 @@ async function postMessage(channelId, body, user) {
 /** A thumbs up for a colleague, posted to #general whatever channel it came from (A19). */
 async function recognise(body, user) {
   const posted = await tx(async (client) => {
-    if (!user.employee_id) throw new AppError("NO_EMPLOYEE", "Your login has no employee record", 422);
+    if (!user.employee_id)
+      throw new AppError(
+        "NO_EMPLOYEE",
+        "Your login has no employee record",
+        422,
+      );
     if (body.to_employee_id === user.employee_id) {
-      throw new AppError("SELF_RECOGNITION", "Recognise a colleague, not yourself", 422, { to_employee_id: ["Choose a colleague"] });
+      throw new AppError(
+        "SELF_RECOGNITION",
+        "Recognise a colleague, not yourself",
+        422,
+        { to_employee_id: ["Choose a colleague"] },
+      );
     }
     const persons = await repo.people(client, [body.to_employee_id]);
-    if (!persons.has(body.to_employee_id)) throw new AppError("NOT_FOUND", "There is no such colleague", 404);
+    if (!persons.has(body.to_employee_id))
+      throw new AppError("NOT_FOUND", "There is no such colleague", 404);
     const { general } = await joinCompany(client, user);
     const note = body.message || noteFor(body.to_employee_id);
     const message = await repo.insertMessage(client, {
@@ -552,14 +703,32 @@ async function recognise(body, user) {
 async function react(messageId, user) {
   await tx(async (client) => {
     const row = await repo.messageFor(client, messageId, user.user_id);
-    if (!row || !(await repo.membership(client, row.community_channel_id, user.user_id))) throw notFound();
-    const reaction = row.message_type === "birthday" ? "🎉" : row.message_type === "anniversary" ? "👏" : "👍";
-    const on = await repo.toggleReaction(client, messageId, user.user_id, reaction);
+    if (
+      !row ||
+      !(await repo.membership(client, row.community_channel_id, user.user_id))
+    )
+      throw notFound();
+    const reaction =
+      row.message_type === "birthday"
+        ? "🎉"
+        : row.message_type === "anniversary"
+          ? "👏"
+          : "👍";
+    const on = await repo.toggleReaction(
+      client,
+      messageId,
+      user.user_id,
+      reaction,
+    );
     await emit(client, {
       key: EVENTS.CHANNEL_MESSAGE_REACTED,
       entity: { type: "channel_message", id: messageId },
       actor: user,
-      payload: { community_channel_id: row.community_channel_id, community_message_id: messageId, on },
+      payload: {
+        community_channel_id: row.community_channel_id,
+        community_message_id: messageId,
+        on,
+      },
     });
   });
   return messageView(pool, messageId, user);
@@ -568,20 +737,35 @@ async function react(messageId, user) {
 async function vote(messageId, optionIndex, user) {
   await tx(async (client) => {
     const row = await repo.messageFor(client, messageId, user.user_id);
-    if (!row || !(await repo.membership(client, row.community_channel_id, user.user_id))) throw notFound();
-    if (row.message_type !== "poll") throw new AppError("NOT_A_POLL", "This message is not a poll", 422);
+    if (
+      !row ||
+      !(await repo.membership(client, row.community_channel_id, user.user_id))
+    )
+      throw notFound();
+    if (row.message_type !== "poll")
+      throw new AppError("NOT_A_POLL", "This message is not a poll", 422);
     if (row.deleted_at) throw notFound();
-    if (row.metadata && row.metadata.closed) throw new AppError("POLL_CLOSED", "This poll is closed", 409);
+    if (row.metadata && row.metadata.closed)
+      throw new AppError("POLL_CLOSED", "This poll is closed", 409);
     const options = (row.metadata && row.metadata.options) || [];
     if (optionIndex >= options.length) {
-      throw new AppError("NO_SUCH_OPTION", "That option is not on the poll", 422, { option_index: ["Not an option"] });
+      throw new AppError(
+        "NO_SUCH_OPTION",
+        "That option is not on the poll",
+        422,
+        { option_index: ["Not an option"] },
+      );
     }
     await repo.vote(client, messageId, user.user_id, optionIndex);
     await emit(client, {
       key: EVENTS.CHANNEL_MESSAGE_REACTED,
       entity: { type: "channel_message", id: messageId },
       actor: user,
-      payload: { community_channel_id: row.community_channel_id, community_message_id: messageId, vote: optionIndex },
+      payload: {
+        community_channel_id: row.community_channel_id,
+        community_message_id: messageId,
+        vote: optionIndex,
+      },
     });
   });
   return messageView(pool, messageId, user);
@@ -591,7 +775,11 @@ async function vote(messageId, optionIndex, user) {
 async function lockedForChange(client, messageId, user) {
   const row = await repo.lockMessage(client, messageId);
   if (!row || row.deleted_at) throw notFound();
-  const ch = await repo.membership(client, row.community_channel_id, user.user_id);
+  const ch = await repo.membership(
+    client,
+    row.community_channel_id,
+    user.user_id,
+  );
   if (!ch) throw notFound();
   const moderator = isModerator(ch, await canAnnounce(client, user));
   return { row, ch, mine: row.sender_user_id === user.user_id, moderator };
@@ -602,7 +790,11 @@ async function changed(client, key, row, user, extra = {}) {
     key,
     entity: { type: "channel_message", id: row.community_message_id },
     actor: user,
-    payload: { community_channel_id: row.community_channel_id, community_message_id: row.community_message_id, ...extra },
+    payload: {
+      community_channel_id: row.community_channel_id,
+      community_message_id: row.community_message_id,
+      ...extra,
+    },
   });
 }
 
@@ -610,22 +802,41 @@ async function changed(client, key, row, user, extra = {}) {
 async function editMessage(messageId, body, user) {
   await tx(async (client) => {
     const { row, mine } = await lockedForChange(client, messageId, user);
-    if (!mine) throw new AppError("NOT_YOURS", "Only its author edits a message", 403);
+    if (!mine)
+      throw new AppError("NOT_YOURS", "Only its author edits a message", 403);
     const metadata = { ...(row.metadata || {}) };
     if (row.message_type === "text") {
       if (Date.now() - new Date(row.sent_at).getTime() >= EDIT_WINDOW_MS) {
-        throw new AppError("EDIT_WINDOW_PASSED", "Too late to edit this message", 409, { body: ["Too late to edit"] });
+        throw new AppError(
+          "EDIT_WINDOW_PASSED",
+          "Too late to edit this message",
+          409,
+          { body: ["Too late to edit"] },
+        );
       }
     } else if (row.message_type === "poll") {
-      if (metadata.closed) throw new AppError("POLL_CLOSED", "This poll is closed", 409);
+      if (metadata.closed)
+        throw new AppError("POLL_CLOSED", "This poll is closed", 409);
       if ((await repo.voteCount(client, messageId)) > 0) {
-        throw new AppError("POLL_HAS_VOTES", "People have voted on this poll", 409, { body: ["Already has votes"] });
+        throw new AppError(
+          "POLL_HAS_VOTES",
+          "People have voted on this poll",
+          409,
+          { body: ["Already has votes"] },
+        );
       }
       if (body.options) metadata.options = body.options;
     } else {
-      throw new AppError("NOT_EDITABLE", "This kind of message is not edited", 422);
+      throw new AppError(
+        "NOT_EDITABLE",
+        "This kind of message is not edited",
+        422,
+      );
     }
-    const after = await repo.editMessage(client, messageId, { body: body.body, metadata });
+    const after = await repo.editMessage(client, messageId, {
+      body: body.body,
+      metadata,
+    });
     await changed(client, EVENTS.CHANNEL_MESSAGE_EDITED, after, user);
   });
   return messageView(pool, messageId, user);
@@ -634,26 +845,57 @@ async function editMessage(messageId, body, user) {
 /** By its author, or a moderator; an announcement's post is managed from Announcements. */
 async function deleteMessage(messageId, user) {
   await tx(async (client) => {
-    const { row, mine, moderator } = await lockedForChange(client, messageId, user);
+    const { row, mine, moderator } = await lockedForChange(
+      client,
+      messageId,
+      user,
+    );
     if (row.message_type === "announcement") {
-      throw new AppError("ANNOUNCEMENT_POST", "Announcements are managed from the Announcements tab", 422);
+      throw new AppError(
+        "ANNOUNCEMENT_POST",
+        "Announcements are managed from the Announcements tab",
+        422,
+      );
     }
-    if (!mine && !moderator) throw new AppError("NOT_YOURS", "Only its author or a moderator deletes a message", 403);
+    if (!mine && !moderator)
+      throw new AppError(
+        "NOT_YOURS",
+        "Only its author or a moderator deletes a message",
+        403,
+      );
     const after = await repo.deleteMessage(client, messageId);
-    if (row.message_type === "recognition") await repo.deleteRecognitionOf(client, messageId);
-    await changed(client, EVENTS.CHANNEL_MESSAGE_DELETED, after, user, { message_type: row.message_type });
+    if (row.message_type === "recognition")
+      await repo.deleteRecognitionOf(client, messageId);
+    await changed(client, EVENTS.CHANNEL_MESSAGE_DELETED, after, user, {
+      message_type: row.message_type,
+    });
   });
 }
 
 /** Stop a poll taking votes; its result stays. */
 async function closePoll(messageId, user) {
   await tx(async (client) => {
-    const { row, mine, moderator } = await lockedForChange(client, messageId, user);
-    if (row.message_type !== "poll") throw new AppError("NOT_A_POLL", "This message is not a poll", 422);
-    if (!mine && !moderator) throw new AppError("NOT_YOURS", "Only its author or a moderator closes a poll", 403);
+    const { row, mine, moderator } = await lockedForChange(
+      client,
+      messageId,
+      user,
+    );
+    if (row.message_type !== "poll")
+      throw new AppError("NOT_A_POLL", "This message is not a poll", 422);
+    if (!mine && !moderator)
+      throw new AppError(
+        "NOT_YOURS",
+        "Only its author or a moderator closes a poll",
+        403,
+      );
     if (row.metadata && row.metadata.closed) return;
-    const after = await repo.setMetadata(client, messageId, { ...(row.metadata || {}), closed: true });
-    await changed(client, EVENTS.CHANNEL_MESSAGE_EDITED, after, user, { closed: true });
+    const after = await repo.setMetadata(client, messageId, {
+      ...(row.metadata || {}),
+      closed: true,
+    });
+    await changed(client, EVENTS.CHANNEL_MESSAGE_EDITED, after, user, {
+      closed: true,
+    });
   });
   return messageView(pool, messageId, user);
 }
@@ -661,12 +903,24 @@ async function closePoll(messageId, user) {
 /** A voice note's transcript, asked for once and stored for everyone after (§3 step 11). */
 async function transcript(messageId, user) {
   const row = await repo.messageFor(pool, messageId, user.user_id);
-  if (!row || !(await repo.membership(pool, row.community_channel_id, user.user_id))) throw notFound();
+  if (
+    !row ||
+    !(await repo.membership(pool, row.community_channel_id, user.user_id))
+  )
+    throw notFound();
   if (row.message_type !== "audio" || !row.document_id) {
-    throw new AppError("NOT_A_VOICE_NOTE", "Only a voice note has a transcript", 422);
+    throw new AppError(
+      "NOT_A_VOICE_NOTE",
+      "Only a voice note has a transcript",
+      422,
+    );
   }
   if (row.transcript) return { transcript: row.transcript };
-  const t = await transcription.transcribe({ document_id: row.document_id, module: "community", actor: user });
+  const t = await transcription.transcribe({
+    document_id: row.document_id,
+    module: "community",
+    actor: user,
+  });
   await repo.setTranscript(pool, messageId, t.text);
   return { transcript: t.text };
 }
@@ -684,7 +938,10 @@ async function listConversations(user, query) {
 async function openDirect(employeeId, user) {
   const channelId = await tx(async (client) => {
     const other = await repo.userOfEmployee(client, employeeId);
-    if (!other) throw new AppError("NO_LOGIN", "That colleague has no login yet", 422, { employee_id: ["No login yet"] });
+    if (!other)
+      throw new AppError("NO_LOGIN", "That colleague has no login yet", 422, {
+        employee_id: ["No login yet"],
+      });
     // A conversation with oneself is allowed: notes, drafts, files to keep (one member).
     await repo.lockPair(client, user.user_id, other);
     const found = await repo.findDirect(client, user.user_id, other);
@@ -696,7 +953,9 @@ async function openDirect(employeeId, user) {
       channel_type: "direct",
       created_by: user.user_id,
     });
-    await repo.addMembers(client, made.community_channel_id, [...new Set([user.user_id, other])]);
+    await repo.addMembers(client, made.community_channel_id, [
+      ...new Set([user.user_id, other]),
+    ]);
     await emit(client, {
       key: EVENTS.DIRECT_THREAD_OPENED,
       entity: { type: "direct_thread", id: made.community_channel_id },
@@ -718,9 +977,13 @@ async function profileCard(employeeId, user) {
   const p = await repo.profile(pool, employeeId);
   if (!p) throw new AppError("NOT_FOUND", "There is no such colleague", 404);
   const other = p.user_id;
-  const [sharedItems, common] = other && other !== user.user_id
-    ? await Promise.all([repo.shared(pool, user.user_id, other), repo.channelsInCommon(pool, user.user_id, other)])
-    : [{ files: [], voice_notes: 0 }, []];
+  const [sharedItems, common] =
+    other && other !== user.user_id
+      ? await Promise.all([
+          repo.shared(pool, user.user_id, other),
+          repo.channelsInCommon(pool, user.user_id, other),
+        ])
+      : [{ files: [], voice_notes: 0 }, []];
   return {
     person: p.person,
     user_id: other ?? null,
@@ -749,7 +1012,16 @@ async function postCelebrations(date = lagos.today()) {
   for (const c of due) {
     posted += await tx(async (client) => {
       const general = await repo.systemChannel(client, "general");
-      if (await repo.celebrationPosted(client, general.community_channel_id, c.employee_id, c.occasion, date)) return 0;
+      if (
+        await repo.celebrationPosted(
+          client,
+          general.community_channel_id,
+          c.employee_id,
+          c.occasion,
+          date,
+        )
+      )
+        return 0;
       const message = await repo.insertMessage(client, {
         community_channel_id: general.community_channel_id,
         sender_user_id: null,

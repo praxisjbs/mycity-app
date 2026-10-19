@@ -84,9 +84,10 @@ function sameWord(a, b) {
  *
  * Every word the cell uses must appear in the title, forgiving one wrong letter in a
  * word of five letters or more, so the sheet's "Head PR & Marketing" reaches the post
- * written "Head PR, Markerting & Brand Strategy" and its own typo costs nothing. A
- * one-word cell must match the title exactly, word for word: "Head" alone names
- * nothing. The title may say more than the cell does; the cell may never say more.
+ * "Head PR, Marketing & Brand Strategy", and a slip like "Markerting" on either side
+ * costs nothing. A one-word cell must match the title exactly, word for word: "Head"
+ * alone names nothing. The title may say more than the cell does; the cell may never
+ * say more.
  */
 function matchesTitle(cell, title) {
   const asked = words(cell);

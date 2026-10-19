@@ -14,8 +14,8 @@
  * Screen gates. When the change touches the design system, either app or the
  * demo (packages/ui/, app/, public-app/, docs/MyCity-ERP-Documents/demo.html),
  * the hook also runs the fast frontend gates: components (F8), palette (13),
- * forms (12), dashes (17), five-second (8) and two-shells (11) (FRONTEND_GUIDE
- * §5, §7, §8; FRONTEND_FOUNDATION F4, F8). They are the conventions agreed on
+ * forms (12), dashes (17), five-second (8), two-shells (11) and native-ui (21)
+ * (FRONTEND_GUIDE §5, §7, §8; FRONTEND_FOUNDATION F4, F8, F25). They are the conventions agreed on
  * 8 and 15 October; a session that broke one does not get to stop. The slow
  * ones (a11y, mock-free, the builds) are left to npm run ci.
  *
@@ -34,7 +34,7 @@ const path = require("node:path");
 const ROOT = path.resolve(__dirname, "..", "..");
 const MAX_BLOCKS = 2;
 const CHECKS = ["progress", "guides", "readme-map"];
-const SCREEN_CHECKS = ["components", "palette", "forms", "dashes", "five-second", "two-shells"];
+const SCREEN_CHECKS = ["components", "palette", "forms", "dashes", "five-second", "two-shells", "native-ui"];
 const TOUCHES_SCREENS = /^(packages\/ui|app|public-app)\/|^docs\/MyCity-ERP-Documents\/demo\.html$/;
 
 function screensChanged() {

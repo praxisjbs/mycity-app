@@ -3,19 +3,30 @@ import { api } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/mailbox";
 import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/types/mailbox";
-import { saveFile } from "@/api/download";
+import { saveFile, useFileUrls } from "@/api/download";
 import { useRealtime } from "@/api/realtime";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, type ComposeInit } from "./Composer";
 import { ApiError } from "@/api/client";
-import { Avatar, Banner, Button, cn, EmptyState, ErrorState, Field, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, SearchInput, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type MenuItem, type SplitState } from "@mycity/ui";
+import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, prepareEmail, referencedCids, SearchInput, splitQuoted, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
+import { MailSignature } from "./MailSignature";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
 
-export default function Mailbox({ tab, id }: ModuleScreenProps) {
+export default function Mailbox(props: ModuleScreenProps) {
+  switch (props.tab) {
+    case "signature":
+      return <MailSignature />;
+    default:
+      return <Folders {...props} />;
+  }
+}
+
+/** The six folders: the list beside the reader, the composer and the Connect sheet. */
+function Folders({ tab, id }: ModuleScreenProps) {
   const folder = (tab in NAMES ? tab : "inbox") as MailFolder;
   const mobile = useIsMobile();
   useFitPage(!mobile);
@@ -76,7 +87,7 @@ export default function Mailbox({ tab, id }: ModuleScreenProps) {
         actions={
           <>
             {emptiable && total > 0 && <Button onClick={() => modal.open({ title: `Empty ${NAMES[folder]}`, body: (close) => <EmptyFolder kind={folder as "spam" | "trash"} count={total} close={close} /> })}>Empty {NAMES[folder]}</Button>}
-            <Button onClick={() => void refresh()}>Refresh</Button>
+            <Button onClick={() => refresh()}>Refresh</Button>
             <Button variant="primary" icon="plus" onClick={() => compose()}>Compose</Button>
           </>
         }
@@ -157,26 +168,8 @@ function MailRow({ r, on, onClick }: { r: ThreadRow; on: boolean; onClick: () =>
   );
 }
 
-/**
- * HTML mail arrives sanitised from the server. This is a second line: no
- * scripts, no handlers, links open outside, and remote images wait until asked.
- */
-function clean(html: string, images: boolean) {
-  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
-  doc.querySelectorAll("script,style,iframe,object,embed,form,link,meta").forEach((n) => n.remove());
-  let blocked = 0;
-  doc.querySelectorAll("*").forEach((el) => {
-    for (const a of [...el.attributes]) if (a.name.startsWith("on") || /^\s*javascript:/i.test(a.value)) el.removeAttribute(a.name);
-    if (el.tagName === "A") {
-      el.setAttribute("target", "_blank");
-      el.setAttribute("rel", "noopener noreferrer");
-    }
-    if (el.tagName === "IMG" && !images && /^https?:/i.test(el.getAttribute("src") ?? "")) {
-      el.removeAttribute("src");
-      blocked++;
-    }
-  });
-  return { html: doc.body.firstElementChild?.innerHTML ?? "", blocked };
+function escapeHtml(text: string) {
+  return text.replace(/[&<>"']/g, (c) => `&${({ "&": "amp", "<": "lt", ">": "gt", '"': "quot", "'": "#39" } as Record<string, string>)[c]};`);
 }
 
 function quote(m: MailMessage) {
@@ -212,6 +205,14 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
     const others = all ? [...lastMsg.to, ...lastMsg.cc].filter((a) => a.toLowerCase() !== me.toLowerCase()) : [];
     compose({ to: [lastMsg.from.address], cc: others, subject: /^re:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`, body_html: quote(lastMsg), in_reply_to: lastMsg.mail_message_id }, all ? "Reply All" : "Reply");
   };
+  /* Always Show Images is the owner's, per sender, kept on the server (mailbox.md §6). */
+  const trust = async (address: string, trusted: boolean) => {
+    await api.call("POST /api/v1/mailbox/image-trust", { body: { sender_address: address, trusted } });
+    t.reload();
+    toast(trusted ? `Images shown from ${address}` : `Images hidden from ${address}`);
+  };
+  /* A mailto: link in a message writes from this mailbox, as a mail app's own composer does. */
+  const mailto = (m: Mailto) => compose({ to: m.to, cc: m.cc, subject: m.subject ?? "", body_html: m.body ? `<p>${escapeHtml(m.body)}</p>` : "" }, "New Message");
   const forward = () =>
     compose({ subject: /^fwd:/i.test(thread.subject) ? thread.subject : `Fwd: ${thread.subject}`, body_html: quote(lastMsg), attachments: lastMsg.attachments.map(({ document_id, file_name, size_bytes, mime_type }) => ({ document_id, file_name, size_bytes, mime_type })) }, "Forward");
   const moves: MenuItem[] = [
@@ -219,6 +220,7 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
     ...(row.folder !== "inbox" && row.folder !== "sent" ? [{ label: "Move to Inbox", icon: "mail" as const, onSelect: () => void move("inbox") }] : []),
     ...(row.folder !== "spam" ? [{ label: "Move to Spam", icon: "alert" as const, onSelect: () => void move("spam") }] : []),
     ...(row.folder !== "trash" ? [{ label: "Move to Trash", icon: "x" as const, danger: true, onSelect: () => void move("trash") }] : []),
+    ...(lastMsg.images_trusted ? [{ label: "Stop Showing Images", icon: "image" as const, onSelect: () => void trust(lastMsg.from.address, false) }] : []),
   ];
 
   return (
@@ -240,28 +242,48 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
         </span>
       </div>
       {thread.messages.map((m, i) => (
-        <Message key={m.mail_message_id} m={m} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} />
+        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} />
       ))}
     </div>
   );
 }
 
-function Message({ m, head, images, onImages }: { m: MailMessage; head: boolean; images: boolean; onImages: () => void }) {
-  const body = useMemo(() => (m.body_html == null ? null : clean(m.body_html, images)), [m.body_html, images]);
+function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m: MailMessage; subject: string; head: boolean; images: boolean; onImages: () => void; onTrust: (address: string, trusted: boolean) => Promise<void>; onMailto: (m: Mailto) => void }) {
+  const showRemote = images || m.images_trusted;
+  /* Only the parts the body draws are fetched, each into a local URL the sealed frame may show. */
+  const parts = useMemo(() => {
+    const wanted = new Set(m.body_html ? referencedCids(m.body_html) : []);
+    return Object.fromEntries(m.inline_parts.filter((p) => wanted.has(p.content_id.toLowerCase())).map((p) => [p.content_id, `/api/v1/documents/${p.document_id}/content`]));
+  }, [m.body_html, m.inline_parts]);
+  const inline = useFileUrls(parts);
+  const body = useMemo(() => (m.body_html == null ? null : prepareEmail(m.body_html, { showRemote, inline })), [m.body_html, showRemote, inline]);
+  const split = useMemo(() => (body ? splitQuoted(body.html) : null), [body]);
+  const [history, setHistory] = useState(false);
   return (
     <div className={cn(head && "border-b border-dashed border-border")}>
       {head && <p className="pt-3 text-2xs font-semibold text-subtle-foreground">{who(m.from)} · {formatWhen(m.sent_at)}</p>}
-      {body == null ? (
+      {body == null || split == null ? (
         <p className="py-3.5 text-sm text-subtle-foreground">Spam is not shown.</p>
       ) : (
         <>
           {body.blocked > 0 && (
-            <p className="mt-3 flex items-center gap-2 rounded-ctl bg-muted px-3 py-2 text-xs text-muted-foreground">
-              <Icon name="image" />Remote images are hidden.
-              <button type="button" className="font-semibold text-accent-foreground underline" onClick={onImages}>Load Images</button>
-            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 rounded-ctl bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+              <span className="flex items-center gap-2 py-1 max-md:w-full"><Icon name="image" />Remote images are hidden.</span>
+              <span className="flex items-center gap-4">
+                <button type="button" className="font-semibold text-accent-foreground underline phone:min-h-tap" onClick={onImages}>Load Images</button>
+                <button type="button" className="font-semibold text-accent-foreground underline phone:min-h-tap" onClick={() => onTrust(m.from.address, true)}>Always Show Images</button>
+              </span>
+            </div>
           )}
-          <div className="rte mail-body py-3.5 text-sm leading-relaxed text-muted-foreground [&_p+p]:mt-2.5" dangerouslySetInnerHTML={{ __html: body.html || "<p></p>" }} />
+          <EmailFrame className="py-3.5" title={subject} html={split.visible} remoteImages={showRemote} onMailto={onMailto} />
+          {split.quoted != null && (
+            <>
+              <Button size="sm" variant="ghost" icon={history ? "up" : "dots"} aria-expanded={history} onClick={() => setHistory((h) => !h)}>
+                {history ? "Hide Quoted Text" : "Show Quoted Text"}
+              </Button>
+              {history && <EmailFrame className="pb-3.5" title={`${subject}, quoted`} html={split.quoted} remoteImages={showRemote} onMailto={onMailto} />}
+            </>
+          )}
         </>
       )}
       {m.attachments.length > 0 && (
@@ -294,7 +316,7 @@ function DraftReader({ row, onBack, compose }: { row: ThreadRow; onBack: () => v
     invalidate("/api/v1/mailbox");
     toast("Schedule cancelled");
   };
-  const body = clean(draft.body_html, false);
+  const body = prepareEmail(draft.body_html, { showRemote: false });
   return (
     <div className="p-4.5 max-md:px-3.5 max-md:pt-3 max-md:pb-safe-5">
       {back}
@@ -304,12 +326,12 @@ function DraftReader({ row, onBack, compose }: { row: ThreadRow; onBack: () => v
           <p className="mt-1 text-2xs text-subtle-foreground">To {draft.to_addresses.join(", ") || "(no recipient)"} · {formatWhen(draft.updated_at)}</p>
         </span>
         <span className="flex flex-wrap gap-1.5 max-md:w-full">
-          {row.scheduled && <Button onClick={() => void cancelSchedule()}>Cancel Schedule</Button>}
+          {row.scheduled && <Button onClick={() => cancelSchedule()}>Cancel Schedule</Button>}
           <Button variant="primary" icon="send" onClick={() => compose({ draft_id: draft.mail_draft_id, to: draft.to_addresses, cc: draft.cc_addresses, bcc: draft.bcc_addresses, subject: draft.subject, body_html: draft.body_html, attachments: draft.attachments, in_reply_to: draft.in_reply_to }, "Continue Draft")}>Continue Editing</Button>
         </span>
       </div>
       {row.scheduled && <div className="mt-3"><Pill tone="info">Scheduled {formatDateTime(row.scheduled.release_at)}</Pill></div>}
-      <div data-copy="content" className="rte mail-body py-3.5 text-sm leading-relaxed text-muted-foreground [&_p+p]:mt-2.5" dangerouslySetInnerHTML={{ __html: body.html || "<p></p>" }} />
+      <EmailFrame className="py-3.5" title={draft.subject || "Draft"} html={body.html} />
     </div>
   );
 }

@@ -49,10 +49,24 @@ const { leadBalance } = require("./kpi-catalog/tiles/people");
 
 /** What each Home view draws beside its cards. */
 const VIEWS = Object.freeze({
-  operations: Object.freeze({ chart: "attendance_days", donut: "on_time", clocked_in: true, pipeline: true, goals: true }),
+  operations: Object.freeze({
+    chart: "attendance_days",
+    donut: "on_time",
+    clocked_in: true,
+    pipeline: true,
+    goals: true,
+  }),
   ceo: Object.freeze({ chart: "goals", donut: "org_kpi", pipeline: true }),
-  partnerships: Object.freeze({ chart: "signed_value", pipeline: true, goals: true }),
-  staff: Object.freeze({ day_strip: true, my_goals: true, upcoming_leave: true }),
+  partnerships: Object.freeze({
+    chart: "signed_value",
+    pipeline: true,
+    goals: true,
+  }),
+  staff: Object.freeze({
+    day_strip: true,
+    my_goals: true,
+    upcoming_leave: true,
+  }),
 });
 
 /** Working days the attendance chart covers. */
@@ -97,11 +111,18 @@ async function guarded(part, read) {
  * @param {import("../../shared/time/working-week").Calendar} cal
  */
 function attendanceDays(today, cal) {
-  const last = workingWeek.isWorkingDay(today, cal) ? today : workingWeek.addWorkingDays(today, -1, cal);
+  const last = workingWeek.isWorkingDay(today, cal)
+    ? today
+    : workingWeek.addWorkingDays(today, -1, cal);
   const history = [last];
-  while (history.length < HISTORY_DAYS) history.unshift(workingWeek.addWorkingDays(history[0], -1, cal));
+  while (history.length < HISTORY_DAYS)
+    history.unshift(workingWeek.addWorkingDays(history[0], -1, cal));
   const month = [];
-  for (let d = lagos.monthBounds(today).first; d <= today; d = lagos.addDays(d, 1))
+  for (
+    let d = lagos.monthBounds(today).first;
+    d <= today;
+    d = lagos.addDays(d, 1)
+  )
     if (workingWeek.isWorkingDay(d, cal)) month.push(d);
   return { history, month };
 }
@@ -127,9 +148,18 @@ async function attendance(client, { today, scopes }) {
     clocked_in: { present: sofar.present, expected: sofar.expected },
     chart: {
       kind: "attendance_days",
-      days: history.map((date) => ({ date, present: counts.get(date).present, expected: counts.get(date).expected })),
+      days: history.map((date) => ({
+        date,
+        present: counts.get(date).present,
+        expected: counts.get(date).expected,
+      })),
     },
-    donut: { kind: "on_time", on_time: sum("on_site") + sum("remote"), late: sum("late"), absent: sum("absent") },
+    donut: {
+      kind: "on_time",
+      on_time: sum("on_site") + sum("remote"),
+      late: sum("late"),
+      absent: sum("absent"),
+    },
   };
 }
 
@@ -139,7 +169,9 @@ async function attendance(client, { today, scopes }) {
 
 /** The organisation's goals live this quarter, soonest ending first, at most a page. Progress waits for M2. */
 async function quarterGoals(client, { today }) {
-  const page = await goals.organisationGoals(client, quarterOf(today), { page: 1 });
+  const page = await goals.organisationGoals(client, quarterOf(today), {
+    page: 1,
+  });
   return page.data.map((g) => ({
     title: g.title,
     progress: null,
@@ -154,11 +186,18 @@ async function quarterGoals(client, { today }) {
  * departments are the organisation's own, the first page of them by name.
  */
 async function orgKpi(client) {
-  const page = await organisation.departments(client, { page: 1, active: "true" });
+  const page = await organisation.departments(client, {
+    page: 1,
+    active: "true",
+  });
   return {
     kind: "org_kpi",
     percent: null,
-    departments: page.data.map((d) => ({ department_id: d.department_id, department: d.name, percent: null })),
+    departments: page.data.map((d) => ({
+      department_id: d.department_id,
+      department: d.name,
+      percent: null,
+    })),
   };
 }
 
@@ -177,11 +216,17 @@ async function signedValue(client, { today, scopes }) {
     scopes.get("partnerships"),
   );
   const signed = new Map(rows.map((r) => [r.month, r.amount]));
-  const last = Math.max(Number(today.slice(5, 7)), ...rows.map((r) => Number(r.month.slice(5, 7))));
+  const last = Math.max(
+    Number(today.slice(5, 7)),
+    ...rows.map((r) => Number(r.month.slice(5, 7))),
+  );
   const months = [];
   for (let n = 1; n <= last; n += 1) {
     const month = `${year}-${String(n).padStart(2, "0")}`;
-    months.push({ month, amount: m.toWire(signed.has(month) ? signed.get(month) : "0") });
+    months.push({
+      month,
+      amount: m.toWire(signed.has(month) ? signed.get(month) : "0"),
+    });
   }
   return { kind: "signed_value", months };
 }
@@ -194,7 +239,9 @@ async function pipeline(client, { today, scopes }) {
     partners.quietCount(client, { today }, scope),
   ]);
   return {
-    stages: stages.slice(0, PAGE_SIZE).map((s) => ({ stage: s.stage, label: s.label, open: s.open })),
+    stages: stages
+      .slice(0, PAGE_SIZE)
+      .map((s) => ({ stage: s.stage, label: s.label, open: s.open })),
     quiet_30d: quiet,
   };
 }
@@ -213,7 +260,9 @@ async function dayStrip(client, { user, today }) {
   const cal = await workingWeek.loadCalendar(client);
   const day = roster.dayOf(today, cal);
   const own = { scope: "own", scope_ids: [user.employee_id] };
-  const row = (await roster.page(client, { date: today }, own, { page: 1 })).data[0] || null;
+  const row =
+    (await roster.page(client, { date: today }, own, { page: 1 })).data[0] ||
+    null;
   const inAt = row && row.clock_in_at ? new Date(row.clock_in_at) : null;
   const outAt = row && row.clock_out_at ? new Date(row.clock_out_at) : null;
   return {
@@ -223,13 +272,18 @@ async function dayStrip(client, { user, today }) {
     clock_out_at: iso(outAt),
     status: row ? row.status : null,
     worksite: row ? row.worksite : null,
-    worked_minutes: inAt && outAt && outAt > inAt ? Math.floor((outAt - inAt) / 60_000) : 0,
+    worked_minutes:
+      inAt && outAt && outAt > inAt ? Math.floor((outAt - inAt) / 60_000) : 0,
   };
 }
 
 /** The reader's own targets due this quarter, soonest first, at most a page. Progress waits for M2. */
 async function myGoals(client, { user, today }) {
-  const page = await goals.targetsOf(client, { employee_id: user.employee_id, ...quarterOf(today) }, { page: 1 });
+  const page = await goals.targetsOf(
+    client,
+    { employee_id: user.employee_id, ...quarterOf(today) },
+    { page: 1 },
+  );
   return page.data.map((t) => ({
     title: t.title,
     progress: null,
@@ -244,20 +298,29 @@ async function myGoals(client, { user, today }) {
  * (Annual, else the first type with an allowance), the figure My Leave shows.
  */
 async function upcomingLeave({ user, today }) {
-  const ahead = (status) => leave.listFor(user.employee_id, { status, from: today, page: 1 });
+  const ahead = (status) =>
+    leave.listFor(user.employee_id, { status, from: today, page: 1 });
   const [waiting, granted, year] = await Promise.all([
     ahead("submitted"),
     ahead("approved"),
     leave.balancesFor(user.employee_id, Number(today.slice(0, 4))),
   ]);
   const requests = [...waiting.data, ...granted.data]
-    .sort((a, b) => a.starts_on.localeCompare(b.starts_on) || a.leave_request_id.localeCompare(b.leave_request_id))
+    .sort(
+      (a, b) =>
+        a.starts_on.localeCompare(b.starts_on) ||
+        a.leave_request_id.localeCompare(b.leave_request_id),
+    )
     .slice(0, PAGE_SIZE);
   const lead = leadBalance(year.balances);
   return {
     balance:
       lead && lead.remaining !== null
-        ? { leave_type_id: lead.leave_type_id, name: lead.name, remaining: lead.remaining }
+        ? {
+            leave_type_id: lead.leave_type_id,
+            name: lead.name,
+            remaining: lead.remaining,
+          }
         : null,
     requests,
   };
@@ -268,7 +331,8 @@ async function upcomingLeave({ user, today }) {
  * ------------------------------------------------------------------ */
 
 /** Items of a day in their order: all-day first, then by time, then by title. */
-const byTime = (a, b) => (a.at || "").localeCompare(b.at || "") || a.title.localeCompare(b.title);
+const byTime = (a, b) =>
+  (a.at || "").localeCompare(b.at || "") || a.title.localeCompare(b.title);
 
 /**
  * This week's working days, Monday first (the days the working week works, a public holiday
@@ -284,14 +348,23 @@ async function week(client, { user, today, scopes }) {
   const sunday = lagos.addDays(monday, 6);
   const workspace = scopes.has("workspace");
   const dates = [];
-  for (let d = monday; d <= sunday; d = lagos.addDays(d, 1)) if (cal.days.has(lagos.weekday(d))) dates.push(d);
+  for (let d = monday; d <= sunday; d = lagos.addDays(d, 1))
+    if (cal.days.has(lagos.weekday(d))) dates.push(d);
 
   /** One working day's events and tasks, at most a page of each. */
   async function itemsOn(d) {
     if (!workspace) return [];
-    const span = { employee_id: user.employee_id, from: lagos.startOfDay(d), to: lagos.endOfDayExclusive(d) };
+    const span = {
+      employee_id: user.employee_id,
+      from: lagos.startOfDay(d),
+      to: lagos.endOfDayExclusive(d),
+    };
     const [events, due] = await Promise.all([
-      calendar.eventsStarting(client, { ...span, running: d === monday }, { page: 1 }),
+      calendar.eventsStarting(
+        client,
+        { ...span, running: d === monday },
+        { page: 1 },
+      ),
       tasks.dueBetween(client, span, { page: 1 }),
     ]);
     return [
@@ -301,7 +374,12 @@ async function week(client, { user, today, scopes }) {
         at: e.all_day ? null : iso(e.starts_at),
         link: pathOf("calendar_event", e.calendar_event_id),
       })),
-      ...due.data.map((t) => ({ kind: "task", title: t.title, at: iso(t.due_at), link: pathOf("task", t.task_id) })),
+      ...due.data.map((t) => ({
+        kind: "task",
+        title: t.title,
+        at: iso(t.due_at),
+        link: pathOf("task", t.task_id),
+      })),
     ]
       .sort(byTime)
       .slice(0, PAGE_SIZE);
@@ -316,7 +394,12 @@ async function week(client, { user, today, scopes }) {
   }
 
   const [granted, items] = await Promise.all([
-    leave.listFor(user.employee_id, { status: "approved", from: monday, to: sunday, page: 1 }),
+    leave.listFor(user.employee_id, {
+      status: "approved",
+      from: monday,
+      to: sunday,
+      page: 1,
+    }),
     everyDay(),
   ]);
   return dates.map((d, i) => {
@@ -348,23 +431,54 @@ async function sectionsFor(client, reader) {
   const v = VIEWS[reader.view] || VIEWS.staff;
   const may = (module) => reader.scopes.has(module);
   const when = (drawn, part, read) => (drawn ? guarded(part, read) : null);
-  const fromRoster = v.chart === "attendance_days" || v.donut === "on_time" || v.clocked_in === true;
+  const fromRoster =
+    v.chart === "attendance_days" ||
+    v.donut === "on_time" ||
+    v.clocked_in === true;
 
-  const [roll, goalList, kpis, signed, pipe, strip, mine, ahead, days] = await Promise.all([
-    when(fromRoster && may("people"), "attendance", () => attendance(client, reader)),
-    when((v.chart === "goals" || v.goals === true) && may("performance"), "goals", () => quarterGoals(client, reader)),
-    when(v.donut === "org_kpi" && may("performance"), "org_kpi", () => orgKpi(client)),
-    when(v.chart === "signed_value" && may("partnerships"), "signed_value", () => signedValue(client, reader)),
-    when(v.pipeline === true && may("partnerships"), "pipeline", () => pipeline(client, reader)),
-    when(v.day_strip === true && may("ess"), "day_strip", () => dayStrip(client, reader)),
-    when(v.my_goals === true && may("ess"), "my_goals", () => myGoals(client, reader)),
-    when(v.upcoming_leave === true && may("ess"), "upcoming_leave", () => upcomingLeave(reader)),
-    guarded("week", () => week(client, reader)),
-  ]);
+  const [roll, goalList, kpis, signed, pipe, strip, mine, ahead, days] =
+    await Promise.all([
+      when(fromRoster && may("people"), "attendance", () =>
+        attendance(client, reader),
+      ),
+      when(
+        (v.chart === "goals" || v.goals === true) && may("performance"),
+        "goals",
+        () => quarterGoals(client, reader),
+      ),
+      when(v.donut === "org_kpi" && may("performance"), "org_kpi", () =>
+        orgKpi(client),
+      ),
+      when(
+        v.chart === "signed_value" && may("partnerships"),
+        "signed_value",
+        () => signedValue(client, reader),
+      ),
+      when(v.pipeline === true && may("partnerships"), "pipeline", () =>
+        pipeline(client, reader),
+      ),
+      when(v.day_strip === true && may("ess"), "day_strip", () =>
+        dayStrip(client, reader),
+      ),
+      when(v.my_goals === true && may("ess"), "my_goals", () =>
+        myGoals(client, reader),
+      ),
+      when(v.upcoming_leave === true && may("ess"), "upcoming_leave", () =>
+        upcomingLeave(reader),
+      ),
+      guarded("week", () => week(client, reader)),
+    ]);
 
   const charts = {
     attendance_days: roll && roll.chart,
-    goals: goalList && { kind: "goals", goals: goalList.map(({ title, progress, link }) => ({ title, progress, link })) },
+    goals: goalList && {
+      kind: "goals",
+      goals: goalList.map(({ title, progress, link }) => ({
+        title,
+        progress,
+        link,
+      })),
+    },
     signed_value: signed,
   };
   const donuts = { on_time: roll && roll.donut, org_kpi: kpis };
@@ -381,4 +495,11 @@ async function sectionsFor(client, reader) {
   };
 }
 
-module.exports = { VIEWS, HISTORY_DAYS, quarterOf, attendanceDays, guarded, sectionsFor };
+module.exports = {
+  VIEWS,
+  HISTORY_DAYS,
+  quarterOf,
+  attendanceDays,
+  guarded,
+  sectionsFor,
+};

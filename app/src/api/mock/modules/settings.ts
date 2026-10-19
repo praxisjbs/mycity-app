@@ -6,6 +6,7 @@ import { CAPABILITIES, ROLE_CAPABILITIES } from "../data/access";
 import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
 import { waysOf } from "./security";
+import { ON_UPLOAD } from "../uploads";
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const admin = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
@@ -13,8 +14,22 @@ const who = (u: string) => byKey(u)!.display_name;
 
 /* ── Organisation: the profile, the working week (A22), holidays (entered on screen, A26) ── */
 const PROFILE_KEYS = ["legal_name", "trading_name", "registration_number", "tax_id", "address", "phone", "email", "website"] as const;
-const ORG: Organisation = { legal_name: "MyCity App Ltd", trading_name: "MyCityApp", registration_number: null, tax_id: null, address: null, phone: null, email: "hello@mycityapp.io", website: "https://mycityapp.io", currency: "NGN", time_zone: "Africa/Lagos" };
+const ORG: Organisation = { legal_name: "MyCity App Ltd", trading_name: "MyCityApp", registration_number: null, tax_id: null, address: null, phone: null, email: "hello@mycityapp.io", website: "https://mycityapp.io", logo: null, logo_white: null, icon: null, currency: "NGN", time_zone: "Africa/Lagos" };
 route("GET /api/v1/settings/organisation", () => ok(ORG));
+
+/* The brand files (foundation.md §6.11): an upload lands through the mock upload engine, which tells us here. */
+const BRAND_SLOTS = ["logo", "logo_white", "icon"] as const;
+ON_UPLOAD.push((endpoint, doc) => {
+  const slot = /\/settings\/organisation\/brand\/(logo_white|logo|icon)$/.exec(endpoint)?.[1] as (typeof BRAND_SLOTS)[number] | undefined;
+  if (slot) ORG[slot] = doc;
+});
+route("DELETE /api/v1/settings/organisation/brand/:slot", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const slot = req.params.slot as (typeof BRAND_SLOTS)[number];
+  if (!BRAND_SLOTS.includes(slot)) return invalid({ slot: ["Choose one"] });
+  ORG[slot] = null;
+  return ok(ORG);
+});
 route("PATCH /api/v1/settings/organisation", (req) => {
   if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
   const b = req.body as Partial<Record<(typeof PROFILE_KEYS)[number], string | null>>;

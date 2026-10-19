@@ -21,7 +21,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Group | Component | Import | Summary | Status |
 |---|---|---|---|---|
 | Foundations | [Icon](#icon) | `Icon` | One Lucide glyph by its short name, drawn in the current text colour. | stable |
-| Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side. | stable |
+| Actions | [ActionGroup](#actiongroup) | `ActionGroup` | Buttons that wait for each other: while one is working, the others in the group dim and ignore presses until it finishes. | stable |
+| Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done. | stable |
 | Layout | [Card](#card) | `Card`, `CardHeader` | The raised panel every section sits in, with an optional title row (CardHeader) and one Details row at its foot. | stable |
 | Layout | [Grid](#grid) | `Grid` | The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone. | stable |
 | Layout | [PageHeader](#pageheader) | `PageHeader` | A page's title, its one-line subtitle (desktop only) and the page's actions. | stable |
@@ -69,8 +70,9 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Overlays | [LockScreen](#lockscreen) | `LockScreen` | The full-screen lock over the staff app when a session ends: who is signed in, why it locked, and their password to carry on. | beta |
 | Overlays | [Menu](#menu) | `Menu` | A short list of actions behind one button (the ⋮ on a record, the + in a composer, the account menu). | stable |
 | Overlays | [Modal](#modal) | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` | THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened with useModal or controlled with open. | stable |
+| Overlays | [PhonePage](#phonepage) | `PhonePage` | A full-screen page that slides in from the right over the screen on a phone, like a native app's next screen: Back, a title, its own actions, a body that scrolls. | beta |
 | Overlays | [Popover](#popover) | `Popover` | A small panel anchored to the button that opens it: filters, a quick pick, a short preview. | stable |
-| Overlays | [Sheet](#sheet) | `Sheet` | The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc. | stable |
+| Overlays | [Sheet](#sheet) | `Sheet` | The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc; one with a text field closes only on purpose. | stable |
 | Overlays | [SidePanel](#sidepanel) | `SidePanel` | A panel that slides over the right of the screen to edit or inspect the record behind it. | stable |
 | Overlays | [Tooltip](#tooltip) | `Tooltip` | A small label that appears beside a control on hover or keyboard focus, desktop only. | stable |
 | Help | [Details](#details) | `Details` | One row at the foot of a card, a chevron and the word Details, that opens a short section of support facts. | stable |
@@ -78,12 +80,14 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Help | [InfoButton](#infobutton) | `InfoButton` | The ⓘ, for help that has no word to attach to: a chart, an icon-only control, a figure with no title. | stable |
 | Feedback | [ErrorBoundary](#errorboundary) | `ErrorBoundary` | Catches a crash in one screen so the rest of the app keeps working, and shows ErrorState with Try Again in its place. | stable |
 | Feedback | [ErrorState](#errorstate) | `ErrorState` | Something did not load: one line saying so, and Try Again. | stable |
-| Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere. | stable |
+| Feedback | [NotificationBanner](#notificationbanner) | `NotificationBanner` | The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere. | beta |
+| Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top. | stable |
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
+| Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
-| Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot. | stable |
-| Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
+| Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
+| Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
@@ -91,8 +95,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
-| Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row. | stable |
-| Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField` | Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField). | stable |
+| Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row. | stable |
+| Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField`, `SelectMenu` | Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField). | stable |
 | Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
 | Forms | [StepBar](#stepbar) | `StepBar` | Where a person is in a few steps: one bar per step, filled up to the step in hand, and Step 2 of 4. | stable |
 | Forms | [Switch](#switch) | `Switch`, `ToggleRow`, `CheckboxField` | On or off: a Switch for a setting that applies at once, a CheckboxField for a yes or no inside a form, and the ToggleRow that lays a setting out. | stable |
@@ -114,6 +118,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both. | stable |
+| Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
@@ -127,7 +132,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [DesktopShell](#desktopshell) | `DesktopShell` | The staff app's desktop frame: the rail at the left, the top bar, the module's tab strip and the page, which alone scrolls. | stable |
 | Shell | [FloatingButton](#floatingbutton) | `FloatingButton` | The phone's floating button, bottom right above the bottom bar: a tap fans out the screen's New action, Clock In or Out, Praxis AI and Help, with Hide Here last (F18). | stable |
 | Shell | [MoreSheet](#moresheet) | `MoreSheet` | The phone's More: a launcher in a bottom sheet with the person's row, a search bar, the modules they may open as tiles four to a row, and Sign Out (F17). | stable |
-| Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the bell's list: its glyph in a tone, its title and line, when it came, a dot while unread, and Open. | stable |
+| Shell | [NotificationCenter](#notificationcenter) | `NotificationCenter` | The bell's pane: All and Unread, the notifications grouped Today, Yesterday and Earlier, Mark All Read and the settings gear; a page from the right on a phone, a panel under the bell on desktop. | beta |
+| Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
 | Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls, the floating button, and the bottom bar. | stable |
 | Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer. | stable |
@@ -170,16 +176,43 @@ One Lucide glyph by its short name, drawn in the current text colour.
 
 ## Actions
 
-### Button
+### ActionGroup
 
-The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side.
+Buttons that wait for each other: while one is working, the others in the group dim and ignore presses until it finishes.
 
 | | |
 |---|---|
-| Use | Every action a person takes: Create Rule, Clock In, Export. A link that looks like a button passes asChild with an <a>. |
-| Avoid | A second primary on one surface (one yellow button per surface); a bare icon (use IconButton); the sign in or clock in call to action (use BigButton). |
-| Phone | At least 44 px tall; a footer stretches the primary to full width at the bottom. |
-| Accessibility | A native button (type="button" unless set). While busy it stays focusable, says aria-busy and ignores presses. Verb Noun labels, Title Case. |
+| Use | Around buttons that act on the same thing and must not race: Approve and Reject on a request row, Retire and Edit on a record. Modals, forms, form footers, card headers, page headers and shell notices are groups already. |
+| Avoid | Around a whole page or list (one slow request would hold every row); around a single button (it already ignores a second press); for layout (it draws no element). |
+| Phone | The same: the waiting buttons dim and keep their 44 px targets. |
+| Accessibility | Draws no element of its own. A busy button says aria-busy; the waiting ones say aria-disabled, so a screen reader hears them as unavailable while they stay focusable. |
+| Status | stable |
+| Exports | `ActionGroup` |
+| Import | `import { ActionGroup } from "@mycity/ui";` |
+| File | `packages/ui/src/actions/ActionGroup.tsx` |
+| Test | `packages/ui/src/actions/ActionGroup.test.tsx` |
+| Gallery | `packages/ui/src/actions/ActionGroup.gallery.tsx` (`npm run gallery`, `#/ActionGroup`) |
+
+**ActionGroup** props (`ActionGroupProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | The buttons, laid out by the caller: the group adds behaviour, not markup. |
+
+```tsx
+<ActionGroup><Button onClick={reject}>Reject</Button><Button variant="primary" onClick={approve}>Approve</Button></ActionGroup>
+```
+
+### Button
+
+The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done.
+
+| | |
+|---|---|
+| Use | Every action a person takes: Create Rule, Clock In, Export. Hand it the work (onClick={save}, an async handler) and it spins and ignores a second press until the work settles. A link that looks like a button passes asChild with an <a>. |
+| Avoid | A second primary on one surface (one yellow button per surface); a bare icon (use IconButton); the sign in or clock in call to action (use BigButton); throwing the work away (onClick={() => void save()}: the lint refuses it, F26). |
+| Phone | At least 44 px tall; a footer stretches the primary to full width at the bottom. Busy keeps its size and colour, so nothing beside it moves. |
+| Accessibility | A native button (type="button" unless set). Busy, it keeps its colour, softens, shows a spinner and says aria-busy; it and the buttons in its ActionGroup ignore presses but stay focusable and named (aria-disabled, never disabled). Verb Noun labels, Title Case. |
 | Status | stable |
 | Exports | `Button`, `IconButton`, `BigButton` |
 | Import | `import { Button, IconButton, BigButton } from "@mycity/ui";` |
@@ -187,7 +220,7 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | Test | `packages/ui/src/actions/Button.test.tsx` |
 | Gallery | `packages/ui/src/actions/Button.gallery.tsx` (`npm run gallery`, `#/Button`) |
 
-**Button** props (`ButtonProps`, extends `ButtonHTMLAttributes<HTMLButtonElement>`)
+**Button** props (`ButtonProps`, extends `Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
@@ -196,11 +229,12 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | `iconRight` | `IconName` |  | A glyph after the label (a chevron for "View All"). |
 | `size` | `"md" \| "sm"` |  | `md` follows the density (36 or 40 px); `sm` is 28 px on desktop. Both are 44 px on a phone. |
 | `block` | `boolean` |  | Fills the width: the call to action at the foot of a form or page. |
-| `busy` | `boolean` |  | Shows a spinner in place of the icon and ignores presses until the work finishes. |
+| `onClick` | `PressHandler<MouseEvent<HTMLButtonElement>>` |  | The press. Return the work (onClick={save}, or an async handler) and the button is busy from the press until it settles: a spinner, presses ignored, and its ActionGroup waiting with it. |
+| `busy` | `boolean` |  | Busy by the caller's own measure (a mutation's pending), for work the press does not return. |
 | `asChild` | `boolean` |  | Renders the single child element (an <a>, a router Link) with the button's look instead of a <button>. |
 | `children` | `ReactNode` |  | The label: Verb Noun, Title Case, at most 3 words. |
 
-**IconButton** props (`IconButtonProps`, extends `Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "aria-label">`)
+**IconButton** props (`IconButtonProps`, extends `Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "aria-label" | "onClick">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
@@ -208,16 +242,20 @@ The pill button: default, primary (the yellow one), ghost and danger, with an op
 | `label` | `string` | yes | What the button does, in words: its accessible name and its tooltip. Required. |
 | `size` | `"md" \| "sm"` |  | `md` follows the density; `sm` is 32 px on desktop. Both are 44 px on a phone. |
 | `dot` | `boolean` |  | A small red dot for something new (the bell). |
+| `onClick` | `PressHandler<MouseEvent<HTMLButtonElement>>` |  | The press. Return the work and the glyph turns to a spinner until it settles, presses ignored meanwhile. |
+| `busy` | `boolean` |  | Busy by the caller's own measure, for work the press does not return. |
 
-**BigButton** props (`BigButtonProps`, extends `ButtonHTMLAttributes<HTMLButtonElement>`)
+**BigButton** props (`BigButtonProps`, extends `Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `icon` | `IconName` |  | A glyph after the label. |
-| `busy` | `boolean` |  | Shows a spinner and ignores presses until the work finishes. |
+| `onClick` | `PressHandler<MouseEvent<HTMLButtonElement>>` |  | The press. Return the work and it spins until the work settles, presses ignored meanwhile. |
+| `busy` | `boolean` |  | Busy by the caller's own measure (a sign-in form's submit). |
 
 ```tsx
 <Button variant="primary" icon="plus">New Rule</Button>
+<Button variant="primary" onClick={save}>Save Worksite</Button>
 <Button variant="ghost" iconRight="right">View All</Button>
 ```
 
@@ -232,7 +270,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | Use | A section of a page: a KPI group, a record's fields, a list, a chart. One idea per card. |
 | Avoid | Cards inside cards; an explainer card (a title starting How, Why or What is tier 3 and never reaches a screen); a list on a phone (a card list comes from DataView). |
 | Phone | Full width with the same padding; the actions in CardHeader keep their 44 px targets and wrap under the title when there is no room. |
-| Accessibility | A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. |
+| Accessibility | A plain container. CardHeader's title is a heading (h2 unless set: a card is a section of the page under its h1) marked data-ui="title"; give a card that is itself clickable a role and a name, or better, put a Button inside it. CardHeader's actions wait for each other while one is working (F26). |
 | Status | stable |
 | Exports | `Card`, `CardHeader` |
 | Import | `import { Card, CardHeader } from "@mycity/ui";` |
@@ -308,7 +346,7 @@ A page's title, its one-line subtitle (desktop only) and the page's actions.
 | Use | Once, at the top of every screen. |
 | Avoid | A second title further down (use CardHeader); a subtitle that explains how the page works (tier 3); more than one primary action. |
 | Phone | The subtitle is not shown (FRONTEND_GUIDE §7: less text); the actions wrap under the title with 44 px targets. |
-| Accessibility | The title is the page's only h1 (data-ui="page-title"); the subtitle is a paragraph (data-ui="page-subtitle"). Title at most 3 words, subtitle at most 8. |
+| Accessibility | The title is the page's only h1 (data-ui="page-title"); the subtitle is a paragraph (data-ui="page-subtitle"). Title at most 3 words, subtitle at most 8. The actions wait for each other while one is working (F26). |
 | Status | stable |
 | Exports | `PageHeader` |
 | Import | `import { PageHeader } from "@mycity/ui";` |
@@ -1731,7 +1769,7 @@ A yes or no before an action that cannot be taken back, named for the thing it a
 | Use | Deleting, cancelling, revoking, emptying a folder: `if (!(await confirm({ title: "Delete Rule", destructive: true }))) return;`. The component form when a screen keeps its own state. |
 | Avoid | Asking before something that can be undone (do it, and offer Undo in the toast); window.confirm (gate 16); a form (use Modal). |
 | Phone | A short bottom sheet; the confirm button full width at the bottom, Cancel above it. |
-| Accessibility | An alertdialog: Cancel has focus when it opens, Esc and the close button answer no. A destructive confirmation cannot be dismissed by a stray tap on the scrim. |
+| Accessibility | An alertdialog: Cancel has focus when it opens, Esc and the close button answer no. A destructive confirmation cannot be dismissed by a stray tap on the scrim. While an async confirm runs, Cancel, Esc and the close button wait (F26). |
 | Status | stable |
 | Exports | `ConfirmDialog` |
 | Import | `import { ConfirmDialog } from "@mycity/ui";` |
@@ -1834,8 +1872,8 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 |---|---|
 | Use | Create or edit with up to 6 fields, a record's detail, a short reader. useModal().open({ title, body }) from anywhere under ModalProvider; <Modal open> when the screen owns the state. |
 | Avoid | A destructive yes or no (use useConfirm); editing the record behind it on desktop (use SidePanel); more than 6 fields (a wizard); a stack of dialogs (opening one replaces the last). |
-| Phone | A bottom sheet that drags down to close, with the main action full width at the bottom; `full` makes it a full-screen sheet (a composer, a long form). |
-| Accessibility | Radix Dialog underneath: aria-modal, focus moves in and is trapped, Esc closes, focus returns to the opener. The title (at most 4 words) names it. With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard. |
+| Phone | A bottom sheet that drags down to close, with the main action full width at the bottom; `full` makes it a full-screen sheet (a composer, a long form). It stays above the keyboard, header in view; once it holds a text field only the close button, Cancel or Esc close it. |
+| Accessibility | Radix Dialog underneath: aria-modal, focus moves in and is trapped, Esc closes, focus returns to the opener. The title (at most 4 words) names it. With unsaved changes, Esc, the scrim, the close button or a drag ask once to discard. Its buttons are one ActionGroup: while one is working the others wait, and Esc, the scrim, a drag and the close button do nothing until it finishes (F26). |
 | Status | stable |
 | Exports | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` |
 | Import | `import { Modal, ModalProvider, ModalFooter, Grow } from "@mycity/ui";` |
@@ -1888,6 +1926,41 @@ modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })
 <Modal open={open} onClose={() => setOpen(false)} title="Edit Worksite" footer={<Button variant="primary">Save Worksite</Button>}>{fields}</Modal>
 ```
 
+### PhonePage
+
+A full-screen page that slides in from the right over the screen on a phone, like a native app's next screen: Back, a title, its own actions, a body that scrolls.
+
+| | |
+|---|---|
+| Use | A place a person goes into and comes back from without leaving the screen they were on: the notification pane, Notification Settings over it. |
+| Avoid | A form or a record on desktop (use Modal or SidePanel); a short choice (use Sheet); a real screen with its own address (a route). |
+| Phone | This is its phone form: the whole screen, under the status bar and above the home bar, swiped right or Back to close. On desktop it draws the same page as a panel on the right. |
+| Accessibility | A modal dialog named by `title` (Radix underneath, through Vaul): focus moves in and is trapped, Esc and Back close it, focus returns to the opener. Back is a named button; `actions` are IconButtons with labels. |
+| Status | beta |
+| Exports | `PhonePage` |
+| Import | `import { PhonePage } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/PhonePage.tsx` |
+| Test | `packages/ui/src/overlay/PhonePage.test.tsx` |
+| Gallery | `packages/ui/src/overlay/PhonePage.gallery.tsx` (`npm run gallery`, `#/PhonePage`) |
+
+**PhonePage** props (`PhonePageProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the page is showing. |
+| `onClose` | `() => void` | yes | Called when the person goes back: Back, a swipe to the right, Esc. |
+| `title` | `ReactNode` | yes | The page's title, at most 3 words, Title Case. |
+| `actions` | `ReactNode` |  | IconButtons at the right of the header (Mark All Read, a gear). |
+| `bar` | `ReactNode` |  | Something fixed under the header that does not scroll away (a segmented control). |
+| `children` | `ReactNode` |  | The body; it scrolls. |
+| `bodyRef` | `(el: HTMLDivElement \| null) => void` |  | Called with the scrolling body, for a list that loads more near its end or pulls to refresh. |
+| `container` | `HTMLElement \| null` |  | Where the page mounts; document.body by default (the gallery passes its themed frame). |
+| `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
+
+```tsx
+<PhonePage open={open} onClose={close} title="Notifications" actions={<IconButton icon="cog" label="Notification Settings" />}>{rows}</PhonePage>
+```
+
 ### Popover
 
 A small panel anchored to the button that opens it: filters, a quick pick, a short preview.
@@ -1925,13 +1998,13 @@ A small panel anchored to the button that opens it: filters, a quick pick, a sho
 
 ### Sheet
 
-The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc.
+The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc; one with a text field closes only on purpose.
 
 | | |
 |---|---|
 | Use | Underneath Modal, SidePanel, Popover and Menu on a phone; directly for a phone-only sheet (the More launcher, a KPI detail). |
 | Avoid | A dialog on desktop (use Modal, which is this sheet on a phone and a centred dialog on desktop); a toast or banner for news. |
-| Phone | This is the phone form. `full` fills the screen for a long form or a reader; otherwise it is as tall as its content, up to most of the screen, with a grab handle. |
+| Phone | This is the phone form. `full` fills the screen for a long form or a reader; otherwise it is as tall as its content, up to most of the screen, with a grab handle. With the keyboard up it stays above it, header in view. Once it holds a text field it has no handle and a drag or a scrim tap never closes it (a scrim tap puts the keyboard away); the close button, Cancel and Esc do. |
 | Accessibility | A modal dialog (Radix underneath): focus moves in and is trapped, Esc closes, focus returns to the opener. The title names it; `hideHeader` keeps the title for screen readers only. |
 | Status | stable |
 | Exports | `Sheet` |
@@ -1952,7 +2025,7 @@ The phone's bottom sheet: slides up with a spring, closes by dragging down, a ta
 | `full` | `boolean` |  | Fill the screen (a long form, a composer, a reader) instead of fitting the content. |
 | `footer` | `ReactNode` |  | Buttons for the footer; the main action is last and full width at the bottom. |
 | `children` | `ReactNode` |  | The body. |
-| `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. |
+| `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. A sheet holding a text field ignores the drag and the scrim anyway. |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
@@ -2002,10 +2075,10 @@ A small label that appears beside a control on hover or keyboard focus, desktop 
 
 | | |
 |---|---|
-| Use | The words behind an icon-only button (IconButton's label), a truncated name in full. |
+| Use | A truncated name in full, the words behind an icon-only control that is not an IconButton (IconButton draws its own from its label). Every hover label in the product: never the browser's title attribute (gate 21). |
 | Avoid | Help or explanation (use HelpTerm); anything a person must read to act; anything on a phone, where there is no hover. |
 | Phone | Nothing: the child renders alone, since a touch screen has no hover and the control already carries its name. |
-| Accessibility | Opens on hover after a short pause and at once on keyboard focus; Esc closes it; the text is announced as the control's description. The control keeps its own accessible name. |
+| Accessibility | Opens on hover after a short pause and at once on keyboard focus; Esc closes it; the text is announced as the control's description. The control keeps its own accessible name. It passes a ref and props through to its child, so it can sit inside a Menu or Dialog trigger. Never the browser's own title tooltip (gate 21). |
 | Status | stable |
 | Exports | `Tooltip` |
 | Import | `import { Tooltip } from "@mycity/ui";` |
@@ -2013,7 +2086,7 @@ A small label that appears beside a control on hover or keyboard focus, desktop 
 | Test | `packages/ui/src/overlay/Tooltip.test.tsx` |
 | Gallery | `packages/ui/src/overlay/Tooltip.gallery.tsx` (`npm run gallery`, `#/Tooltip`) |
 
-**Tooltip** props (`TooltipProps`)
+**Tooltip** props (`TooltipProps`, extends `Omit<HTMLAttributes<HTMLElement>, "children">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
@@ -2025,7 +2098,7 @@ A small label that appears beside a control on hover or keyboard focus, desktop 
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default. |
 
 ```tsx
-<Tooltip label="Notifications"><IconButton icon="bell" label="Notifications" /></Tooltip>
+<Tooltip label={file.name}><span className="truncate">{file.name}</span></Tooltip>
 ```
 
 ## Help
@@ -2194,9 +2267,42 @@ Something did not load: one line saying so, and Try Again.
 <ErrorState page message="This screen hit a problem" onRetry={reset} />
 ```
 
+### NotificationBanner
+
+The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere.
+
+| | |
+|---|---|
+| Use | A new notification over realtime or from the service worker while the app is on screen (the app's Bell calls notify), never for the record already on screen. |
+| Avoid | The confirmation after an action (toast, at the bottom); something a person must act on before going on (a Banner or a dialog); the list of notifications (NotificationCenter). |
+| Phone | Full width at the top, under the status bar, as a phone's own notifications arrive; swipe it up to dismiss, tap it to open; 44 px targets. |
+| Accessibility | Shown in a polite live region named New Notifications, so it is read without moving focus; the banner is one button named by its title and text, with a named Dismiss button. It stays while hovered or touched, and fades only when motion is allowed. |
+| Status | beta |
+| Exports | `NotificationBanner` |
+| Import | `import { NotificationBanner } from "@mycity/ui";` |
+| File | `packages/ui/src/feedback/NotificationBanner.tsx` |
+| Test | `packages/ui/src/feedback/NotificationBanner.test.tsx` |
+| Gallery | `packages/ui/src/feedback/NotificationBanner.gallery.tsx` (`npm run gallery`, `#/NotificationBanner`) |
+
+**NotificationBanner** props (`NotificationBannerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | yes | Who it is from, or what happened. |
+| `body` | `string \| null` |  | Its text; two lines show. |
+| `avatar` | `string \| null` |  | A person's name: their initials stand for it. |
+| `icon` | `IconName` |  | The category's glyph when there is no person. |
+| `tone` | `"ok" \| "warn" \| "err" \| "info"` |  | The glyph's tone; info unless set. |
+| `onOpen` | `() => unknown` |  | Opens what it is about. |
+| `onDismiss` | `() => unknown` |  | Dismisses it (the × button). |
+
+```tsx
+notify({ id, title: "Tom-Blake Asaah", body: "Re: Test mail", avatar: "Tom-Blake Asaah", onOpen: () => navigate(path) })
+```
+
 ### Toaster
 
-Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere.
+Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top.
 
 | | |
 |---|---|
@@ -2255,6 +2361,38 @@ The cards a person puts on a KPI row: tick up to four, keep them in order with M
 
 ```tsx
 <CardPicker label="Overview Cards" options={cards} value={draft} onChange={setDraft} />
+```
+
+### ChannelGrid
+
+Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own.
+
+| | |
+|---|---|
+| Use | Notification Settings: where each category reaches the person. Any per-row, per-channel on and off choice that saves at once. |
+| Avoid | A form with a Save button (CheckboxField in a Form); one setting (Switch or ToggleRow); more than four columns. |
+| Phone | One row per category with what is on ("In App, Push", or Off); a tap opens a sheet titled by the category with a ToggleRow per channel. |
+| Accessibility | Desktop is a table: the columns are headers and each switch is named "<row>, <column>". A locked switch is disabled and says why with the lock's label. On a phone each row is a button that opens the sheet. |
+| Status | beta |
+| Exports | `ChannelGrid` |
+| Import | `import { ChannelGrid } from "@mycity/ui";` |
+| File | `packages/ui/src/form/ChannelGrid.tsx` |
+| Test | `packages/ui/src/form/ChannelGrid.test.tsx` |
+| Gallery | `packages/ui/src/form/ChannelGrid.gallery.tsx` (`npm run gallery`, `#/ChannelGrid`) |
+
+**ChannelGrid** props (`ChannelGridProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `columns` | `ChannelGridColumn[]` | yes | The ways a row can reach a person, left to right (In App, Email, Push). |
+| `rows` | `ChannelGridRow[]` | yes | One per category, in the order shown. |
+| `onChange` | `(row: string, column: string, on: boolean) => unknown` | yes | Called with the new state of one switch. Hands back its work; the grid shows the new state at once. |
+| `lockedLabel` | `string` |  | What locked means, as the lock's label ("Always on"). |
+| `label` | `string` |  | Names the grid for assistive technology. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ChannelGrid columns={[{ key: "in_app", label: "In App" }, { key: "push", label: "Push" }]} rows={rows} onChange={(row, column, on) => save(row, column, on)} />
 ```
 
 ### DateField
@@ -2365,14 +2503,14 @@ A form field's frame: the label above, an Optional tag, the control, and the err
 
 ### Form
 
-The one <form>: Enter submits, the browser's own bubbles are off; with FormFooter, the buttons at its foot.
+The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot.
 
 | | |
 |---|---|
-| Use | Around every set of fields; onSubmit comes from the form hook (form.submit(save) or a handler that calls form.check()). |
+| Use | Around every set of fields; onSubmit comes from the form hook (form.submit(save) or a handler that calls form.check()). Return the save's promise and the form refuses another submit until it settles, its submit button spins and its other buttons wait (F26). |
 | Avoid | A <form> written anywhere else (gate 12); text in a footer (buttons only); a disabled submit button. |
 | Phone | FormFooter puts the primary button full width at the bottom and the others above it. |
-| Accessibility | A real form element, so Enter submits and assistive technology announces it; FormFooter keeps the primary last in the tab order. |
+| Accessibility | A real form element, so Enter submits and assistive technology announces it; FormFooter keeps the primary last in the tab order. While a save runs the submit button says aria-busy and stays focusable. |
 | Status | stable |
 | Exports | `Form`, `FormFooter` |
 | Import | `import { Form, FormFooter } from "@mycity/ui";` |
@@ -2384,7 +2522,7 @@ The one <form>: Enter submits, the browser's own bubbles are off; with FormFoote
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `onSubmit` | `() => void` | yes | Called on submit (Enter in a single-line form, or the submit button). |
+| `onSubmit` | `() => unknown` | yes | Called on submit (Enter in a single-line form, or the submit button). Return the save's promise to hold the form until it settles. |
 | `children` | `ReactNode` | yes | The fields and the footer. |
 | `className` | `string` |  | Layout classes only. |
 | `id` | `string` |  | Its id, so a button outside it (a modal footer) can submit it with form={id}. |
@@ -2402,13 +2540,13 @@ The one <form>: Enter submits, the browser's own bubbles are off; with FormFoote
 
 ### InlineInput
 
-Unstyled controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows.
+Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows.
 
 | | |
 |---|---|
 | Use | Only inside another shared component or widget that styles them itself; never as a form field. |
 | Avoid | A field in a form (use Field with TextField and the rest); a control with no label. |
-| Phone | The caller's widget decides its size; keep 16 px text so iOS never zooms. |
+| Phone | The caller's widget decides its size; keep 16 px text so iOS never zooms. InlineSelect opens the branded bottom sheet, never the phone's own picker. |
 | Accessibility | Every one needs a visible label or an aria-label; InlineLabel gives a widget a label it lays out itself. |
 | Status | stable |
 | Exports | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` |
@@ -2424,12 +2562,10 @@ Unstyled controls for a field built into a larger widget: the chat message box, 
 | `value` | `string` | yes | The text. |
 | `onChange` | `(value: string) => void` | yes | Called on each key with the new text. |
 
-**InlineSelect** props (`InlineSelectProps`, extends `Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange">`)
+**InlineSelect** props (`InlineSelectProps`, extends `Omit<SelectMenuProps, "options">`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `value` | `string` | yes | The chosen value. |
-| `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
 | `options` | `Array<string \| [string, string]>` | yes | Options as plain strings or [value, label] pairs. |
 
 **InlineLabel** props (`InlineLabelProps`)
@@ -2694,13 +2830,13 @@ Long text with the little formatting a message needs, loaded only when a compose
 
 ### SearchInput
 
-The one search box for a list, sent to the server as q; with FilterSelect, a labelled select in a filter row.
+The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row.
 
 | | |
 |---|---|
 | Use | Above every list that searches; FilterSelect for one of a list's server filters. |
 | Avoid | Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design. |
-| Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens the phone's own picker. |
+| Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens a branded bottom sheet, never the phone's own picker. |
 | Accessibility | The box is a searchbox named by its label (or its placeholder); FilterSelect's label is visible and linked. |
 | Status | stable |
 | Exports | `SearchInput`, `FilterSelect` |
@@ -2734,22 +2870,22 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 
 ### SelectField
 
-Pick one value: a select list, or for five options or fewer a segmented choice (ChoiceField).
+Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField).
 
 | | |
 |---|---|
-| Use | SelectField for more than five options; ChoiceField for two to five, so every option is visible at once. |
-| Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch). |
-| Phone | SelectField opens the phone's own picker; ChoiceField segments are 44 px tall and wrap rather than scroll. |
-| Accessibility | SelectField is a native select labelled by its Field; ChoiceField is a radio group with arrow-key movement. |
+| Use | SelectField for more than five options; ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
+| Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
+| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker; ChoiceField segments are 44 px tall and wrap rather than scroll. |
+| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field. Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
 | Status | stable |
-| Exports | `SelectField`, `ChoiceField` |
-| Import | `import { SelectField, ChoiceField } from "@mycity/ui";` |
+| Exports | `SelectField`, `ChoiceField`, `SelectMenu` |
+| Import | `import { SelectField, ChoiceField, SelectMenu } from "@mycity/ui";` |
 | File | `packages/ui/src/form/SelectField.tsx` |
 | Test | `packages/ui/src/form/SelectField.test.tsx` |
 | Gallery | `packages/ui/src/form/SelectField.gallery.tsx` (`npm run gallery`, `#/SelectField`) |
 
-**SelectField** props (`SelectFieldProps`, extends `Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange" | "onBlur">`)
+**SelectField** props (`SelectFieldProps`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
@@ -2757,9 +2893,15 @@ Pick one value: a select list, or for five options or fewer a segmented choice (
 | `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
 | `onBlur` | `() => void` |  | Called when the person leaves the field. |
 | `options` | `ReadonlyArray<Option>` | yes | The options. |
-| `placeholder` | `string` |  | A first, unchoosable line shown while nothing is chosen (Choose One). |
+| `placeholder` | `string` |  | Shown on the button while nothing is chosen (Choose One). |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
+| `name` | `string` |  | Its name in a submitted form. |
+| `disabled` | `boolean` |  | Shown but not usable. |
+| `"aria-label"` | `string` |  | Names it when no Field label sits above it. |
+| `className` | `string` |  | Layout classes only. |
+| `id` | `string` |  | The control's id; the Field supplies one otherwise. |
+| `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default. |
 
 **ChoiceField** props (`ChoiceFieldProps`)
 
@@ -2775,8 +2917,28 @@ Pick one value: a select list, or for five options or fewer a segmented choice (
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `className` | `string` |  | Layout classes only. |
 
+**SelectMenu** props (`SelectMenuProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The chosen value; "" for none (or for an option whose value is ""). |
+| `onChange` | `(value: string) => void` | yes | Called with the chosen value. |
+| `onBlur` | `() => void` |  | Called when the list closes. |
+| `options` | `ReadonlyArray<Option>` | yes | The options. |
+| `placeholder` | `string` |  | Shown on the button while nothing is chosen. |
+| `label` | `string` |  | The sheet's title on a phone and the list's name; the label above the button otherwise. |
+| `className` | `string` |  | The button's classes: the caller's widget draws it (a field, a filter, a row in a composer). |
+| `id` | `string` |  | The button's id, so a <label for> names it. |
+| `"aria-label"` | `string` |  | Names the button when no label is linked to it. |
+| `"aria-labelledby"` | `string` |  | The id of the label that names it (a Field supplies it). |
+| `"aria-describedby"` | `string` |  | The ids of its help and error (a Field supplies them). |
+| `"aria-invalid"` | `boolean` |  | Marks it wrong for assistive technology (a Field supplies it). |
+| `disabled` | `boolean` |  | Shown but not usable. |
+| `name` | `string` |  | Its name in a submitted form. |
+| `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default (the gallery passes its themed frame). |
+
 ```tsx
-<ChoiceField options={[["remote", "Remote"], ["hybrid", "Hybrid"], ["on_site", "On Site"]]} {...form.field("work_pattern")} />
+<SelectField placeholder="Choose One" options={[["ops", "Operations"], ["hr", "People"]]} {...form.field("department")} />
 ```
 
 ### SignatureField
@@ -3010,6 +3172,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 | `kinds` | `string` |  | What kinds of file are wanted, lower case, for the line under the words ("PDF or Word"). |
 | `compact` | `boolean` |  | A tighter drop zone, inside a sheet or beside a form's footer. |
 | `trigger` | `(open: () => void) => ReactNode` |  | A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. |
+| `handOff` | `boolean` |  | The caller lists what arrived itself (a composer's attachment chips), so a finished file leaves the tray once it is handed over and is never shown twice. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3072,7 +3235,7 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | `steps` | `WizardStep[]` | yes | The steps, in order. |
 | `finish` | `string` | yes | The last step's button: Verb Noun naming the result (Publish Vacancy). |
 | `busy` | `boolean` |  | Saving: the last button ignores presses but stays reachable. |
-| `onFinish` | `() => void` | yes | Called after the last step checks clean. |
+| `onFinish` | `() => unknown` | yes | Called after the last step checks clean. Return the save's promise and the last button spins until it settles. |
 | `onCancel` | `() => void` |  | Cancel, shown on the first step instead of Back. |
 | `initialStep` | `number` |  | The step to start on (a draft resumed); 0. |
 | `onStepChange` | `(index: number) => void` |  | Called with the step index each time it changes, so a draft can remember it. |
@@ -3547,6 +3710,37 @@ A file from the vault as the browser draws it: a PDF inline, a picture in the im
 <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
 ```
 
+### EmailFrame
+
+One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app.
+
+| | |
+|---|---|
+| Use | The body of a received or drafted email, wherever HTML mail is read (the mailbox reader, a draft preview). |
+| Avoid | Writing mail HTML into the page with dangerouslySetInnerHTML: its widths overflow a phone and its styles leak; any other HTML (use Reader for our own long text). |
+| Phone | In the dark theme a message designed for a white page is recoloured (light backgrounds dark, dark text light, brand colours and images kept). A message laid out wider than the screen (the 600 px newsletter, a cPanel notice) is scaled down to the screen's width, as mail apps do, never scrolled sideways. |
+| Accessibility | An iframe named by `title` (the subject), as its aria-label so no browser tooltip appears. Nothing in the message runs: no scripts, forms or frames, whatever the sanitiser missed. |
+| Status | beta |
+| Exports | `EmailFrame` |
+| Import | `import { EmailFrame } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/EmailFrame.tsx` |
+| Test | `packages/ui/src/documents/EmailFrame.test.tsx` |
+| Gallery | `packages/ui/src/documents/EmailFrame.gallery.tsx` (`npm run gallery`, `#/EmailFrame`) |
+
+**EmailFrame** props (`EmailFrameProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `html` | `string` | yes | The message body, already sanitised by the server. |
+| `title` | `string` | yes | What a screen reader announces for the frame: the subject. |
+| `remoteImages` | `boolean` |  | Lets images load from the web; until then only embedded ones show. |
+| `onMailto` | `(mailto: Mailto) => void` |  | A `mailto:` link was pressed; open the composer with it. Without this it opens the device's mail app. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<EmailFrame title="Client configuration settings" html={message.body_html} onMailto={(m) => compose(m)} />
+```
+
 ### ImageViewer
 
 A picture at a readable size, with zoom and a way to open it full size in a new tab.
@@ -4017,16 +4211,60 @@ The phone's More: a launcher in a bottom sheet with the person's row, a search b
 <MoreSheet open={open} onClose={close} person={{ name: "Cynthia Osakunih", subtitle: "Operations Manager" }} groups={groups} onSearch={openSearch} onSignOut={signOut} />
 ```
 
-### NotificationRow
+### NotificationCenter
 
-One notification in the bell's list: its glyph in a tone, its title and line, when it came, a dot while unread, and Open.
+The bell's pane: All and Unread, the notifications grouped Today, Yesterday and Earlier, Mark All Read and the settings gear; a page from the right on a phone, a panel under the bell on desktop.
 
 | | |
 |---|---|
-| Use | The bell's list (the app's Bell): each notification from GET /api/v1/notifications, newest first, under the shared pager. |
-| Avoid | Alerts, which are conditions to act on (Home · Alerts); a toast (something that just happened in front of the person); a list of records (DataView). |
-| Phone | The same row; Open drops under the text when there is no room, a 44 px target. |
-| Accessibility | An article; unread is said in words as well as by the dot; the title, line and time are content, read as written. |
+| Use | Once, in each shell's top bar, around the bell (the app's Bell wires it to GET /api/v1/notifications and the read marks). |
+| Avoid | Alerts that need clearing (Home · Alerts); a record's own activity (Timeline); confirming an action (a toast). |
+| Phone | A full-screen PhonePage that slides in from the right: Back, Mark All Read and the gear in its header, All and Unread under it, rows with swipe to mark read, pull down to refresh, more rows as you near the end. |
+| Accessibility | On desktop a non-modal panel named Notifications under the bell (Radix popover: Esc or a click outside closes it, focus returns to the bell); on a phone a modal page. All and Unread is a radio group; the groups are headed lists; each row is one button. |
+| Status | beta |
+| Exports | `NotificationCenter` |
+| Import | `import { NotificationCenter } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/NotificationCenter.tsx` |
+| Test | `packages/ui/src/shell/NotificationCenter.test.tsx` |
+| Gallery | `packages/ui/src/shell/NotificationCenter.gallery.tsx` (`npm run gallery`, `#/NotificationCenter`) |
+
+**NotificationCenter** props (`NotificationCenterProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the pane is open. |
+| `onOpenChange` | `(open: boolean) => void` | yes | Called to open or close it: the bell, Back, Esc, a click outside. |
+| `trigger` | `ReactElement` | yes | The bell button: the desktop panel hangs under it; on a phone it opens the page. |
+| `view` | `"all" \| "unread"` | yes | All, or only the unread. |
+| `onView` | `(view: NotificationView) => void` | yes | Called with the view chosen. |
+| `unread` | `number` | yes | How many are unread, for the Unread choice. |
+| `items` | `NotificationItem[]` | yes | The rows loaded so far, newest first. |
+| `loading` | `boolean` |  | The first page is loading. |
+| `more` | `boolean` |  | There are more rows to load (pages of 25). |
+| `onMore` | `() => unknown` |  | Loads the next page; called as the list nears its end. |
+| `onRefresh` | `() => Promise<unknown>` |  | Reloads the list: pull down on a phone. |
+| `onOpenItem` | `(item: NotificationItem) => unknown` | yes | Opens one: its record (the pane closes), or marks it read when it has none. |
+| `onMarkRead` | `(item: NotificationItem) => unknown` | yes | Marks one read without opening it (hover on desktop, a swipe on a phone). |
+| `onMarkAllRead` | `() => unknown` | yes | Marks every one read. Hands back its work. |
+| `onSettings` | `() => unknown` | yes | The gear: Notification Settings. |
+| `notice` | `ReactNode` |  | Something above the list, such as turning notifications on for this device. |
+| `now` | `Date` |  | Today, for the day groups (tests). |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<NotificationCenter open={open} onOpenChange={setOpen} trigger={bell} view="all" onView={setView} unread={3} items={rows} onOpenItem={open} onMarkRead={read} onMarkAllRead={readAll} onSettings={settings} />
+```
+
+### NotificationRow
+
+One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it.
+
+| | |
+|---|---|
+| Use | The notification pane (NotificationCenter): each notification from GET /api/v1/notifications, newest first, grouped by day. |
+| Avoid | Alerts, which are conditions to act on (Home · Alerts); a toast or the banner (something that just happened in front of the person); a list of records (DataView). |
+| Phone | The same row, 44 px and up; swiping it to the left marks it read (the row slides back and the dot goes); a tap opens it. |
+| Accessibility | The row is one button named by its title, its text and its time; unread is said in words as well as by the dot. Mark Read is a named button on desktop (shown on hover or focus) and the swipe has that button's job on a phone. |
 | Status | stable |
 | Exports | `NotificationRow` |
 | Import | `import { NotificationRow } from "@mycity/ui";` |
@@ -4038,16 +4276,18 @@ One notification in the bell's list: its glyph in a tone, its title and line, wh
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `title` | `ReactNode` | yes | What happened, as the notification says it. |
-| `body` | `ReactNode` |  | Its line, as the notification says it. |
+| `title` | `ReactNode` | yes | What happened, or who it is from, as the notification says it. |
+| `body` | `ReactNode` |  | Its text, as the notification says it; two lines show. |
 | `when` | `string` | yes | When it came, formatted (formatWhen). |
-| `icon` | `IconName` |  | Its glyph, from its category; the bell unless set. |
-| `tone` | `"ok" \| "warn" \| "err" \| "info"` |  | Its tone; info unless set. |
-| `unread` | `boolean` |  | Not read yet: a dot before the title, and the word Unread for screen readers. |
-| `action` | `ReactNode` |  | Open, when it links to a record. |
+| `avatar` | `string \| null` |  | A person's name: their initials stand for the notification instead of a glyph (mail, a message). |
+| `icon` | `IconName` |  | Its glyph, from its category, when there is no person; the bell unless set. |
+| `tone` | `"ok" \| "warn" \| "err" \| "info"` |  | The glyph's tone; info unless set. |
+| `unread` | `boolean` |  | Not read yet: a dot, the title in strong type, and the word Unread for screen readers. |
+| `onOpen` | `() => unknown` |  | Opens it: the record it is about, or marks it read when it has none. Hands back its work. |
+| `onMarkRead` | `() => unknown` |  | Marks it read without opening it: hover on desktop, a swipe to the left on a phone. |
 
 ```tsx
-<NotificationRow title="Expense request waiting on you" body="Bashir Lawal · ₦185,000.00" when="08:41" tone="warn" icon="check" unread action={<Button size="sm">Open</Button>} />
+<NotificationRow title="Tom-Blake Asaah" body="Re: Test mail" when="05:33" avatar="Tom-Blake Asaah" unread onOpen={open} onMarkRead={markRead} />
 ```
 
 ### PhoneHeader
@@ -4202,7 +4442,7 @@ A small dark card floating at the foot of the shell for something about the app 
 | Use | In the shell's notice slot (DesktopShell, PhoneShell): the update prompt (Reload), the install offer (Install App, Not Now). One at a time. |
 | Avoid | A result of something the person did (a toast); news about their work (the bell); anything that must interrupt (a ConfirmDialog). |
 | Phone | Above the floating button and the bottom bar, full width less the margins; its buttons are 44 px. |
-| Accessibility | A status region, announced when it appears and never taking focus; its actions are named buttons, drawn in the dark theme so they keep their contrast on the dark card. At most 12 words. |
+| Accessibility | A status region, announced when it appears and never taking focus; its actions are named buttons, drawn in the dark theme so they keep their contrast on the dark card, and wait for each other while one is working (F26). At most 12 words. |
 | Status | stable |
 | Exports | `ShellNotice` |
 | Import | `import { ShellNotice } from "@mycity/ui";` |
@@ -4267,6 +4507,25 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | Export | File | What it does |
 |---|---|---|
 | `cn` | `lib/cn.ts` | Join class names, skipping the falsy ones; of two that conflict, the later wins (`cn("h-control", "h-9")` is `h-9`). |
+| `referencedCids` | `lib/email-body.ts` | The content ids a body draws, so only those parts are fetched. |
+| `PreparedEmail` (type) | `lib/email-body.ts` |  |
+| `prepareEmail` | `lib/email-body.ts` | A body ready for EmailFrame: unsafe parts stripped, remote fetches held back unless `showRemote`, and each `cid:` drawn from `inline` (content id to a local URL, keys compared case-insensitively). |
+| `SplitEmail` (type) | `lib/email-body.ts` |  |
+| `splitQuoted` | `lib/email-body.ts` | Split a body into what is new and the history it quotes. |
+| `Rgb` (type) | `lib/email-dark.ts` | An email recoloured for the dark theme, by partial inversion: only the colours that would be wrong on a dark page move. |
+| `DarkTheme` (type) | `lib/email-dark.ts` | Where white lands (our card) and where black lands (our foreground). |
+| `toOklab` | `lib/email-dark.ts` | sRGB to OKLab. |
+| `fromOklab` | `lib/email-dark.ts` | OKLab to sRGB, clamped into gamut. |
+| `Role` (type) | `lib/email-dark.ts` |  |
+| `mapColour` | `lib/email-dark.ts` | Where one colour lands on a dark page, or the colour itself when it is already right there. |
+| `parseColour` | `lib/email-dark.ts` | One colour token as channels and alpha, or null for anything that is not a colour. |
+| `mapValue` | `lib/email-dark.ts` | Every colour inside one declaration's value, moved for its role; a gradient's stops each move. |
+| `rewriteDeclarations` | `lib/email-dark.ts` | Split a declaration list on `;` outside quotes and parentheses, rewriting each value; anything unchanged comes back as it was. |
+| `recolourDeclarations` | `lib/email-dark.ts` | One declaration list: an inline `style`, or the inside of one CSS block. |
+| `recolourStylesheet` | `lib/email-dark.ts` | A whole stylesheet: each run between braces is a declaration list; a selector there has no colour property, so it passes through. |
+| `hasOwnDarkMode` | `lib/email-dark.ts` | Does this message bring its own dark design? |
+| `recolourFragment` | `lib/email-dark.ts` | Recolour a parsed body in place: inline styles, `bgcolor` and `color` attributes, and `<style>` blocks. |
+| `recolourHtml` | `lib/email-dark.ts` | A body as HTML, recoloured for a dark page. |
 | `Environment` (type) | `lib/environment.ts` | Staging, or anything else (production, a laptop, CI). |
 | `isStagingHost` | `lib/environment.ts` | A staging host name: hub.staging.mycityapp.io, go.staging.mycityapp.io. |
 | `markStaging` | `lib/environment.ts` | Marks the page as staging: the attribute, the amber tab icon and the browser bar colour. |
@@ -4289,6 +4548,8 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `initials` | `lib/format.ts` | Initials for an avatar: "Cynthia Osakunih" → "CO". |
 | `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB" from a byte count. |
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |
+| `formatPhone` | `lib/format.ts` | A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. |
+| `formatPhoneLocal` | `lib/format.ts` | A stored number as a person types it at home, for a field to start from: "0803 123 4567". |
 | `ControlIds` (type) | `lib/ids.ts` | The ids of one control and the parts that describe it. |
 | `useControlIds` | `lib/ids.ts` | The ids for one control, from a readable stem (the field name) and a page-unique suffix. |
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |

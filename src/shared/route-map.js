@@ -57,7 +57,7 @@ const SCREENS = Object.freeze({
     "org-chart",
   ],
   community: ["channels", "direct-messages", "announcements"],
-  mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash"],
+  mailbox: ["inbox", "sent", "drafts", "archive", "spam", "trash", "signature"],
   people: ["employees", "attendance", "leave", "devices", "worksites", "organogram"],
   performance: ["goals", "targets", "kpis", "reviews", "analytics"],
   queries: ["queries", "rules", "sanctions", "letter-templates"],
@@ -143,6 +143,9 @@ const ENTITY_ROUTES = Object.freeze({
   recognition: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
   mail_thread: screen("mailbox", "inbox"), // opens the conversation by id, whichever folder it is in
   mail_message: screen("mailbox", "inbox"), // search:none a message is found through its conversation (mailbox.search.js)
+  mail_signature: screen("mailbox", "signature"), // search:none one per person, their own; ⌘K finds the Signature tab (shared/search/screens.js)
+  mail_signature_config: screen("mailbox", "signature"), // search:none one for the company, opened by Configure on the Signature tab
+  mail_signature_image: screen("mailbox", "signature"), // search:none a picture inside every signature, never a record anyone looks up
 
   // People
   employee: {
@@ -151,6 +154,8 @@ const ENTITY_ROUTES = Object.freeze({
   },
   // A post nobody holds yet opens on the Organogram, focused on it.
   org_seat: screen("people", "organogram"),
+  // A Download PDF request: its notice opens the Org Chart, where it can be asked for again.
+  org_chart_export: screen("ess", "org-chart"), // search:none a request for a file that is emailed to the person who asked; nothing to look up
   import_batch: screen("settings", "imports"),
   // A file opens where its record is: on the employee's own My Documents, or on
   // the record's Documents tab for whoever may see it.

@@ -22,7 +22,7 @@ map, read §11 first.
 | `docs/DATABASE_SCHEMA.md` | **The database design**: the core every milestone attaches to, each milestone's tables as built and what it still owes, and what is not built and why. Read before any milestone's schema work |
 | `docs/MIGRATIONS.md` | **The migration and reference-seed conventions**: numbering, idempotency, DOWN, table shape, matching the code, what a seed may hold (A26), checks before the PR. Read before any migration |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
-| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F24 (binding) and the three PRs that build `packages/ui` |
+| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F26 (binding) and the three PRs that build `packages/ui` |
 | `docs/COMPONENTS.md` | Every shared component in `packages/ui`, generated from the code. Check it before building anything; a missing one is added with `npm run new:component` |
 | `docs/guides/<module>.md` | One full-stack engineering guide per feature: backend, API, events and every screen it touches, and how they relate. A change passes through its guide first |
 | `docs/PROGRESS.md` | The 86 screens and the M0 items, ticked as they are built, with a note per change |
@@ -48,7 +48,7 @@ Gemini (through `services/ai` only). Timezone Africa/Lagos. Currency NGN. Englis
 mycity-app/
 ├── app/                      staff React + Vite app (frontend team), served at hub.mycityapp.io
 ├── public-app/               public React + Vite app (frontend team), served at go.mycityapp.io
-├── packages/ui/              @mycity/ui: the one design system both apps import. 162 components in
+├── packages/ui/              @mycity/ui: the one design system both apps import. 166 components in
 │                             groups: Foundations, Actions, Layout, Display, Navigation, Overlays,
 │                             Help, Feedback, Forms, Data (DataView, Kanban, Calendar), Charts,
 │                             Documents, Maps and Shell; plus the tokens, the form system, the data
@@ -65,6 +65,7 @@ mycity-app/
 ├── seeds/staging/            demonstration data, staging only. Never production
 │                             (60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
+├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
 │                             16/10/2026; docs/guides/foundation.md §6.1). The repository is private
 ├── templates/documents/      PDF templates (HTML)
@@ -84,7 +85,8 @@ mycity-app/
 │   │   │                     titles, refused button labels (gates 8, 11, 12, 17; FRONTEND_GUIDE §5)
 │   │   ├── lib/gallery.js    builds packages/ui's gallery when stale and serves it (gates 8, 11, a11y)
 │   │   ├── lib/screens.js    opens every gallery page and every app screen (demo.html only when touched)
-│   │   │                     in Chromium at phone and desktop size, records copy and layout (gates 8, 11)
+│   │   │                     in Chromium at phone and desktop size, records copy, layout and anything
+│   │   │                     the browser draws itself (gates 8, 11, 21)
 │   │   ├── lib/source.js     reads JavaScript for the backend code gates (date-format, money,
 │   │   │                     module-catalogue): comments, strings, template and regex literals apart
 │   │   ├── lib/styling-exemptions.json  #18 files still exempt from F4 styling; only shrinks
@@ -113,14 +115,17 @@ mycity-app/
 │   ├── BACKEND_GUIDE.md      how to write backend code (read first)
 │   ├── MIGRATIONS.md         migration and reference-seed conventions (read before any migration)
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
-│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F24, the three PRs
+│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F26, the three PRs
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
 │   ├── PROGRESS.md           93 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
 │   │                         first-accounts (the first two logins on a server),
-│   │                         staff-roster (MyCity's staff onto a server that has none)
+│   │                         staff-roster (MyCity's staff onto a server that has none),
+│   │                         push-notifications (web push keys, live mail, a device's health)
+│   ├── handoff/              a build carried across sessions: its decisions, plan and log
+│   │                         (push-notifications)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
 ├── .github/
 │   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml, uptime.yml
@@ -167,6 +172,8 @@ src/
 │   ├── events/        emit · outbox · catalogue
 │   ├── workflow/      engine · conditions · definitions · approvers
 │   ├── access/        access.catalog (the permission module list)
+│   ├── organisation/  profile (Settings · Organisation's profile and brand files, the one reader for
+│   │                  letterheads, system mail and email signatures)
 │   ├── rbac/          grants-cache · field-mask · scope · sessions
 │   ├── money/         money
 │   ├── time/          lagos · working-week · day-first · recurrence
@@ -197,10 +204,10 @@ src/
 │   ├── secrets/       encryption.service
 │   ├── ai/            llm.service · governance · ledger · redact · structured · transcription ·
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
-│   ├── push/          web-push (M6)
+│   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── qr/            qr
-│   └── realtime/      emitter
+│   └── realtime/      emitter · active (who is in front of the app, for the push hold)
 ├── realtime/      socket
 └── jobs/
     ├── queues.js · registry.js · cron-lock.js
@@ -293,6 +300,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `alerts.clear` | `home` | Clear or dismiss an alert, of a rule whose `permission_key` the person also holds | Implementation, Operations & People, Management (`0449`); Head of Department, Line Manager (`1199`) | `0449` |
 | `alerts.manage` | `home` | Create, change and switch off alert rules | Implementation, Operations & People, Management | `1199` |
 | `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
+| `mailbox.signature` | `mailbox` | Configure Signature: the company's signature links and what shows on everyone's email signature | Implementation, System Administrator | `1129` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -302,9 +310,9 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `security` | `.mfa` (TOTP codes, recovery codes), `.passkeys` (WebAuthn), `.pin`, `.challenge` (single-use tickets), `.signin` (what `identity`'s sign-in calls) | Each person's two-step sign-in, passkeys and PIN, the fresh-sign-in check, Reset Two-Step (`docs/guides/identity.md`); came forward from M9 (TB, 16/10/2026) |
 | `access` | | Roles created, edited and deleted with their grants, record scope, field visibility and capabilities; the matrix; two-step required by role (`docs/guides/foundation.md` §6.3) |
 | `audit` | `audit.events.js` (the emailed Excel export) | Audit ledger read at 25 with filters, the summary, masked per reader |
-| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram |
+| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template), `org-chart.export.js` (Download PDF in the worker: drawn as the person asking, rendered, emailed) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
-| `notifications` | `notifications.preferences.js`, `notifications.reminders.js` (M6) | Caller's own inbox |
+| `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (M6) | Caller's own inbox, preferences and devices |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
 | `documents` | | Upload, download, versions, generated documents |
@@ -324,14 +332,16 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service) |
 | `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
 | `announcements` | GE | |
-| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7) |
+| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test` |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
 `services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `shared/geo`,
 `shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence).
 
 Templates first filled in M1: `templates/documents/report.html` (a report run, landscape, its RPT
-number on it) and `templates/email/scheduled-report.html` (the report's file attached).
+number on it) and `templates/email/scheduled-report.html` (the report's file attached);
+`templates/documents/org-chart.html` (Download PDF: the whole organogram on one page sized to it)
+and `templates/email/org-chart-export.html` (the PDF attached).
 
 **M1 mailbox rule:** cut the five `require` lines into triage, binding and assist before anything else
 (MILESTONES §6.5). `mailbox/binding/` stays empty until M7.
@@ -400,8 +410,9 @@ Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Template
 | `deductions` | `.acceptance` (nothing deducts itself) |
 | `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
 
-Also: `notifications.preferences`, `notifications.reminders`, `services/push/web-push`,
-`settings` Notifications screen. The daily rate divides by the working days from
+Also: `notifications.reminders` and the `settings` Notifications screen (company reminder rules).
+Web push and each person's preferences were brought forward to M0 by TB on 19/10/2026
+(`docs/guides/notifications.md`). The daily rate divides by the working days from
 `shared/time/working-week` (A22), never by a constant.
 
 ### 5.10 M7 · Partnerships, CRM & Trackers · GE, LA · 30 Nov to 4 Dec
@@ -465,7 +476,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
-| M0 | `email-send`, `pdf-render`, `notification-deliver`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
+| M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
 | M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`; loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |
@@ -605,6 +616,16 @@ data, not code. Services call `openInstance()` inside their transaction and reac
     steps; no arbitrary value, no raw hex, and no `style` prop in an app at all. A runtime value
     belongs in a shared component, where a class reads it from a CSS variable
     (FRONTEND_FOUNDATION F4, gate 13).
+18. **Nothing the browser styles itself, anywhere.** No native `<select>` or phone picker, no
+    browser date, number, checkbox or radio input, no `title` tooltip, no validation bubble, no
+    toast or toast library styled outside the branded `Toaster`. Every control, list, tooltip and
+    message is a `packages/ui` component in the brand's tokens, on both shells; `base.css` resets
+    what the browser would still draw (autofill tint, spinners, clear buttons, tap flash, selection)
+    (FRONTEND_FOUNDATION F25, FRONTEND_GUIDE §8.8, gate 21, no exemptions).
+19. **One press, one request.** A button's handler hands back its work (`onClick={save}`), so the
+    button is busy from the press until the work settles and refuses a second press, and the
+    buttons beside it wait; never `() => void save()`, never `disabled={busy}`
+    (FRONTEND_FOUNDATION F26, FRONTEND_GUIDE §8.4, lint `mycity/no-void-press`).
 
 ---
 
@@ -634,6 +655,7 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 | 18 Upload engine | M1 | `check/upload.js` (no raw file input outside `packages/ui/src/form`) and the lint rule |
 | 19 AI read manifest only | M4 | `check/ai-no-writes.js` |
 | 20 Money | M6 | `check/money.js` |
+| 21 Nothing the browser styles itself | M0 | `check/native-ui.js`: no native select, picker, spinner, checkbox, `title` tooltip, validation bubble or unbranded toast, in source and on every gallery page and app screen in Chromium (F25), no exemptions |
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
@@ -642,8 +664,9 @@ Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check
 
 Frontend guards, from M0 (FRONTEND_GUIDE §10): `gen:components --check` and `check/components.js`
 (the catalogue is current; every shared component has its header, test and gallery page; nothing new
-in an app's `components/`), and `fe:typecheck`, `fe:lint`, `fe:test`, `fe:build` over `packages/ui`,
-`app` and `public-app`; `check/mock-free.js` (no release build carries the mock, F12) and
+in an app's `components/`), and `fe:typecheck`, `fe:lint` (with `mycity/no-void-press`: a press
+handler hands back its work, F26), `fe:test`, `fe:build` over `packages/ui`, `app` and
+`public-app`; `check/mock-free.js` (no release build carries the mock, F12) and
 `check/a11y.js` (axe on every gallery page at 390 and 1440 px, both densities, and on every app
 screen, shell included, at both sizes).
 

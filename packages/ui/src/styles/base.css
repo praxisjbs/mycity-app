@@ -2,6 +2,11 @@
  * Element defaults for both apps: the typeface, body text at the density's
  * size, the focus ring from --ring, slim scrollbars tinted for the theme, and
  * no motion for a person who asked for none (F6).
+ *
+ * Nothing the browser draws for itself reaches a person (gate 21): no native
+ * control chrome, spinners, clear buttons, autofill tint, validation glow,
+ * tap flash or selection colour. Each is either turned off here or drawn in
+ * our tokens. The controls themselves are packages/ui components.
  */
 @import "@fontsource-variable/geist";
 
@@ -27,6 +32,27 @@
   summary { list-style: none; }
   summary::-webkit-details-marker { display: none; }
   input::placeholder, textarea::placeholder { color: var(--subtle-foreground); }
+
+  /* Gate 21: the browser's own chrome, off or in our tokens. */
+  html { -webkit-tap-highlight-color: transparent; accent-color: var(--secondary); caret-color: var(--ring); }
+  ::selection { background: var(--accent); color: var(--accent-foreground); }
+  input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea, select, button { -webkit-appearance: none; appearance: none; }
+  input[type=number] { -moz-appearance: textfield; }
+  input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=search]::-webkit-search-cancel-button, input[type=search]::-webkit-search-decoration,
+  input[type=search]::-webkit-search-results-button, input[type=search]::-webkit-search-results-decoration { -webkit-appearance: none; display: none; }
+  input::-webkit-calendar-picker-indicator, input::-webkit-list-button { display: none; }
+  input::-webkit-contacts-auto-fill-button, input::-webkit-credentials-auto-fill-button, input::-webkit-strong-password-auto-fill-button { visibility: hidden; display: none !important; pointer-events: none; }
+  input::-ms-reveal, input::-ms-clear { display: none; }
+  input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, textarea:-webkit-autofill, select:-webkit-autofill {
+    -webkit-text-fill-color: var(--foreground);
+    caret-color: var(--ring);
+    box-shadow: 0 0 0 1000px var(--background) inset;
+    transition: background-color 600000s 0s;
+  }
+  input:autofill { background-color: var(--background); color: var(--foreground); }
+  :-moz-ui-invalid, :user-invalid { box-shadow: none; outline: none; }
+  :focus-visible:user-invalid { outline: 2px solid var(--ring); }
   /* The Deep Green panels (the rail, the bottom bar) take a light scrollbar in both themes. */
   .on-dark { --sb: var(--sb-on-dark); }
 
@@ -489,3 +515,15 @@
   15%, 75% { opacity: var(--mote-glow); }
   100% { transform: translate3d(var(--mote-sway), -72vh, 0); opacity: 0; }
 }
+
+/* A map marker's label: Leaflet's tooltip drawn as our Tooltip (gate 21), never its white default. */
+.leaflet-container .leaflet-tooltip.map-tip {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-ctl);
+  background: var(--foreground);
+  color: var(--background);
+  box-shadow: var(--shadow-2);
+  font: 600 var(--text-xs) / 1.5 var(--font-sans);
+}
+.leaflet-container .leaflet-tooltip.map-tip::before { display: none; }

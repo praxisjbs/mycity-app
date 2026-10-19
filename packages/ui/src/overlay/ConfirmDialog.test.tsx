@@ -35,16 +35,25 @@ describe("ConfirmDialog", () => {
     expect(onCancel).toHaveBeenCalledTimes(2);
   });
 
-  it("stays busy while an async confirm runs", async () => {
+  it("stays busy while an async confirm runs, and nothing else answers meanwhile", async () => {
     const user = userEvent.setup();
     let finish: () => void = () => undefined;
-    const onConfirm = () => new Promise<void>((r) => (finish = r));
-    render(<ConfirmDialog open title="Revoke Device" confirmLabel="Revoke Device" onConfirm={onConfirm} onCancel={() => undefined} />);
+    const onConfirm = vi.fn(() => new Promise<void>((r) => (finish = r)));
+    const onCancel = vi.fn();
+    render(<ConfirmDialog open title="Revoke Device" confirmLabel="Revoke Device" onConfirm={onConfirm} onCancel={onCancel} />);
     await user.click(screen.getByRole("button", { name: "Revoke Device" }));
+    await user.click(screen.getByRole("button", { name: "Revoke Device" }));
+    expect(onConfirm).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Revoke Device" })).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    expect(cancel).toHaveAttribute("aria-disabled", "true");
+    expect(cancel).not.toBeDisabled();
+    await user.click(cancel);
+    await user.keyboard("{Escape}");
+    expect(onCancel).not.toHaveBeenCalled();
     finish();
     await waitFor(() => expect(screen.getByRole("button", { name: "Revoke Device" })).not.toHaveAttribute("aria-busy"));
+    expect(cancel).not.toHaveAttribute("aria-disabled");
   });
 
   it("is a short sheet on a phone", () => {

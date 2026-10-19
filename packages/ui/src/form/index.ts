@@ -18,7 +18,7 @@ export {
   type PhoneFieldProps,
   type TextAreaFieldProps,
 } from "./TextField";
-export { SelectField, ChoiceField, type SelectFieldProps, type ChoiceFieldProps, type Option } from "./SelectField";
+export { SelectField, ChoiceField, SelectMenu, type SelectFieldProps, type ChoiceFieldProps, type SelectMenuProps, type Option } from "./SelectField";
 export { Switch, ToggleRow, CheckboxField, type SwitchProps, type ToggleRowProps, type CheckboxFieldProps } from "./Switch";
 export { DateField, DateRangeField, TimeField, type DateFieldProps, type DateRangeFieldProps, type TimeFieldProps, type DateRange } from "./DateField";
 export { MoneyField, toMoneyString, type MoneyFieldProps } from "./MoneyField";
@@ -36,5 +36,6 @@ export { RecordPicker, type RecordPickerProps } from "./RecordPicker";
 export { PersonPicker, type PersonPickerProps, type PickedPerson } from "./PersonPicker";
 export { SignatureField, type SignatureFieldProps, type SignatureFieldHandle } from "./SignatureField";
 export { CardPicker, type CardPickerProps, type CardPickerOption } from "./CardPicker";
+export * from "./ChannelGrid";
 export * from "./RadioCards";
 export * from "./StepBar";

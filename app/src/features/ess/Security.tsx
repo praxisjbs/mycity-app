@@ -134,11 +134,11 @@ export function MySecurityPage() {
       list={live}
       rowKey={(r) => r.session_id}
       noun="device"
-      right={s.active_sessions > 1 ? <Button size="sm" busy={endOthers.pending} onClick={() => void others()}>Sign Out Others</Button> : undefined}
+      right={s.active_sessions > 1 ? <Button size="sm" busy={endOthers.pending} onClick={() => others()}>Sign Out Others</Button> : undefined}
       columns={[
         { key: "d", label: "Device", render: (r) => <Who name={r.device_label} sub={r.ip_address ?? ""} /> },
         { key: "w", label: "Signed In", render: (r) => formatWhen(r.issued_at) },
-        { key: "s", label: "Status", render: (r) => (r.current ? statusOf(r) : <Button size="sm" onClick={() => void end(r)}>Sign Out</Button>) },
+        { key: "s", label: "Status", render: (r) => (r.current ? statusOf(r) : <Button size="sm" onClick={() => end(r)}>Sign Out</Button>) },
       ]}
     />
   );
@@ -266,14 +266,14 @@ function TwoStepCard() {
           </Field>
           <p className="text-sm text-muted-foreground">{t.recovery_codes_left === 1 ? "1 recovery code left" : `${t.recovery_codes_left} recovery codes left`}</p>
           <Inline className="mt-3" gap={2}>
-            <Button size="sm" icon="refresh" busy={codes.pending} onClick={() => void renew()}>
+            <Button size="sm" icon="refresh" busy={codes.pending} onClick={() => renew()}>
               New Codes
             </Button>
-            <Button size="sm" icon="phone" busy={setup.pending} onClick={() => void start()}>
+            <Button size="sm" icon="phone" busy={setup.pending} onClick={() => start()}>
               Change App
             </Button>
             {!t.required && (
-              <Button size="sm" variant="danger" busy={off.pending} onClick={() => void turnOff()}>
+              <Button size="sm" variant="danger" busy={off.pending} onClick={() => turnOff()}>
                 Turn Off
               </Button>
             )}
@@ -282,7 +282,7 @@ function TwoStepCard() {
       ) : (
         <>
           <p className="text-sm text-muted-foreground">Not set up</p>
-          <Button className="mt-3" icon="shield" busy={setup.pending} onClick={() => void start()}>
+          <Button className="mt-3" icon="shield" busy={setup.pending} onClick={() => start()}>
             Set Up Two-Step
           </Button>
         </>
@@ -324,7 +324,7 @@ function SetUpForm({ setup, close }: { setup: TwoStepSetup; close: () => void })
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="shield" busy={turnOn.pending} onClick={() => void submit()}>
+        <Button variant="primary" icon="shield" busy={turnOn.pending} onClick={() => submit()}>
           Turn On
         </Button>
       </FormFooter>
@@ -353,7 +353,7 @@ function RecoveryCodes({ codes, close }: { codes: string[]; close: () => void })
         ))}
       </ul>
       <FormFooter>
-        <Button icon="copy" onClick={() => void copy()}>
+        <Button icon="copy" onClick={() => copy()}>
           Copy Codes
         </Button>
         <Button variant="primary" onClick={close}>
@@ -398,7 +398,7 @@ function PasskeysCard() {
       noun="passkey"
       right={
         passkeysWork() ? (
-          <Button size="sm" icon="fingerprint" busy={adding} onClick={() => void add()}>
+          <Button size="sm" icon="fingerprint" busy={adding} onClick={() => add()}>
             Add Passkey
           </Button>
         ) : undefined
@@ -463,11 +463,11 @@ function PasskeyForm({ passkey, close }: { passkey: Passkey; close: () => void }
         <TextField {...f.field("label")} placeholder="Work Laptop" />
       </Field>
       <FormFooter>
-        <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => void drop()}>
+        <Button variant="danger" icon="trash" busy={remove.pending} onClick={() => drop()}>
           Remove Passkey
         </Button>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={rename.pending} onClick={() => void save()}>
+        <Button variant="primary" busy={rename.pending} onClick={() => save()}>
           Save Name
         </Button>
       </FormFooter>
@@ -516,11 +516,11 @@ function PinCard() {
       />
       <p className="text-sm text-muted-foreground">{p.on && p.pin_changed_at ? `Changed ${formatDate(p.pin_changed_at)}` : "Not set"}</p>
       <Inline className="mt-3" gap={2}>
-        <Button icon="key" onClick={() => void set()}>
+        <Button icon="key" onClick={() => set()}>
           {p.on ? "Change PIN" : "Set PIN"}
         </Button>
         {p.on && (
-          <Button variant="danger" busy={remove.pending} onClick={() => void drop()}>
+          <Button variant="danger" busy={remove.pending} onClick={() => drop()}>
             Remove PIN
           </Button>
         )}
@@ -559,7 +559,7 @@ function PinForm({ close }: { close: () => void }) {
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="key" busy={save.pending} onClick={() => void submit()}>
+        <Button variant="primary" icon="key" busy={save.pending} onClick={() => submit()}>
           Save PIN
         </Button>
       </FormFooter>
@@ -607,7 +607,7 @@ function PasswordForm({ close }: { close: () => void }) {
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={() => void submit()}>
+        <Button variant="primary" busy={save.pending} onClick={() => submit()}>
           Change Password
         </Button>
       </FormFooter>

@@ -24,5 +24,6 @@ test("an announcement with no audience stored reads as all staff", () => {
 });
 
 test("every announcements route carries the community grant", () => {
-  for (const r of routesOf(router)) expect(r.permission && r.permission.key).toBe("community");
+  for (const r of routesOf(router))
+    expect(r.permission && r.permission.key).toBe("community");
 });

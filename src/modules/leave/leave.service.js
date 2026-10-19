@@ -26,6 +26,8 @@ const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const { scopeFor } = require("../../middleware/rbac");
+const grantsCache = require("../../shared/rbac/grants-cache");
 const { assertInScope } = require("../../shared/rbac/scope");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
@@ -84,6 +86,33 @@ const clashes = (id, query, scope) => clashesOf(id, query, scope);
 /** One person's requests (My Leave). The person is the caller; nothing names another. */
 const listFor = (employeeId, query) =>
   repo.list(pool, { ...query, employee_id: employeeId }, ALL);
+
+/**
+ * Whose leave the calendar on My Leave shows (the team lead, 18/10/2026): the CEO and People
+ * with scope all (Operations & People) see everyone; anyone else sees their own and everyone
+ * under them in the reporting tree, which for most staff is their own alone.
+ */
+async function calendarScope(user, employeeId) {
+  const people = await scopeFor(user, "people", "view");
+  if (people && people.scope === "all") return { scope: "all", scope_ids: null, employee_id: employeeId };
+  return {
+    scope: "team",
+    scope_ids: await grantsCache.getTeamEmployeeIds(pool, employeeId),
+    employee_id: employeeId,
+  };
+}
+
+/** The leave calendar: approved and waiting leave touching one month, within calendarScope. */
+async function calendarFor(user, employeeId, query) {
+  const month = query.month || lagos.today().slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  return repo.list(
+    pool,
+    { ...query, from: `${month}-01`, to: last, statuses: ["approved", "submitted"] },
+    await calendarScope(user, employeeId),
+  );
+}
 
 /** One of the caller's own requests, or a 404 when it is someone else's. */
 async function getOwn(employeeId, id) {
@@ -408,6 +437,8 @@ module.exports = {
   summary,
   clashes,
   listFor,
+  calendarFor,
+  calendarScope,
   getOwn,
   balancesFor,
   balancesOf,

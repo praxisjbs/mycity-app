@@ -16,6 +16,12 @@ if (!("ResizeObserver" in window)) {
   };
 }
 
+/* Radix Select (SelectMenu) captures the pointer and scrolls the chosen option into view. */
+Element.prototype.hasPointerCapture ??= () => false;
+Element.prototype.setPointerCapture ??= () => undefined;
+Element.prototype.releasePointerCapture ??= () => undefined;
+Element.prototype.scrollIntoView ??= () => undefined;
+
 beforeEach(() => setViewport(1440));
 afterEach(() => {
   cleanup();
