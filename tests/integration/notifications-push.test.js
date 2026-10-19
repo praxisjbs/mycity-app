@@ -170,7 +170,7 @@ describeDb("Web push against the real migrations", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  const userOf = (who) => people[who].user_id;
+  const userOf = (who) => people[who].user.user_id;
 
   test("signed out: the config needs a session, and a device call with a wrong token is refused", async () => {
     expect((await request(app).get("/api/v1/notifications/push/config")).status).toBe(401);
@@ -258,12 +258,17 @@ describeDb("Web push against the real migrations", () => {
     expect(toLive[0].options).toMatchObject({ urgency: "normal", TTL: 86400 });
     expect(await one("SELECT revoked_reason FROM push_subscription WHERE endpoint = $1", [dead.endpoint])).toEqual({ revoked_reason: "refused" });
 
-    // Again: nothing more goes, the live device has it and the dead one is off.
+    // Again: nothing more goes, the live device has it and the dead one is off. (The CEO also
+    // holds the browser moved to them above, which is sent its own copy.)
     sent.length = 0;
     await sender.pushNotice(notice.notification_id);
     expect(sent).toHaveLength(0);
-    const log = await q("SELECT status FROM push_delivery WHERE notification_id = $1 ORDER BY status", [notice.notification_id]);
-    expect(log.rows.map((r) => r.status)).toEqual(["gone", "sent"]);
+    const log = await q(
+      "SELECT s.endpoint, d.status FROM push_delivery d JOIN push_subscription s USING (push_subscription_id) WHERE d.notification_id = $1",
+      [notice.notification_id],
+    );
+    const statusOf = Object.fromEntries(log.rows.map((r) => [r.endpoint, r.status]));
+    expect(statusOf).toMatchObject({ [live.endpoint]: "sent", [dead.endpoint]: "gone" });
   });
 
   test("a busy push service is tried again, and only the device still owed; a notice read meanwhile is skipped", async () => {

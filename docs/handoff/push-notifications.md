@@ -209,7 +209,8 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       `foundation.md`; FRONTEND_GUIDE §9.6 and §9.7; BACKEND_STRUCTURE (services/push);
       DATABASE_SCHEMA; MILESTONES §11 note; PROGRESS (M0 item and notes); README map;
       `docs/runbooks/push-notifications.md` for GE.
-- [ ] **14. Verify** (IN PROGRESS: see the last log entry for exactly where it stopped): unit and integration tests (a fake push transport); the whole `npm run ci`;
+- [ ] **14. Verify** (IN PROGRESS: the integration suite passes, 26 suites and 635 tests, 19/10/2026;
+      the whole `npm run ci` and the Chromium run are left; see the last log entry): unit and integration tests (a fake push transport); the whole `npm run ci`;
       a real Chromium run delivering a push to the built service worker over the DevTools protocol
       (`ServiceWorker.deliverPushMessage`) and checking the notification it shows.
 - [ ] **15. Ready**: PR out of draft, its body filled to the template (Native App Feel section),
@@ -362,3 +363,17 @@ Tick with the date as each step lands. Each step ends with its own checks green,
     (c) the whole `npm run ci`; (d) a real Chromium run: build the app, serve it on the API, and
     deliver a push to the built service worker with the DevTools protocol
     (`ServiceWorker.deliverPushMessage`), then check `registration.getNotifications()`; (e) step 15.
+- 19/10/2026 · TB · Step 14, the integration suite, run locally (Postgres 16.15 with pgvector, Redis
+  7.0, Node 20.20 from `/opt/node20/bin` as CI's `.nvmrc` asks; this container's default node is 22).
+  Redis was started from `/tmp` (`cd /tmp && redis-server --daemonize yes --port 6379 --dir /tmp`) so
+  no `dump.rdb` lands in the repository. Fixed: `mailbox.test.js` expects the mail notice as the
+  subject, a new line, the first line ("Venue confirmations\nHello"). The second failing suite was
+  `worker.test.js`, not `community.test.js` (which passes as it is): it expected `push_waiting`,
+  and `notification-deliver` now answers `push_queued` and `push_held`; the test also checks the one
+  `push-<notification_id>` job, not held. `notifications-push.test.js` (10 tests, not 11) read the
+  user id as `people[who].user_id`; `createAdmin` returns `{ employee, user, role }`, so it is
+  `user.user_id`; its delivery log is now checked per device, because the CEO also holds the browser
+  moved to them in the earlier test. All 26 integration suites pass, 635 tests. Note: while that
+  file failed, Jest never exited: a supertest request is listening from the moment it is built, and
+  a body that throws while it is built (`notice.notification_id` of an undefined notice) leaves it
+  open. No product cause; it only shows when the file is already red. Next: step 13, the docs.
