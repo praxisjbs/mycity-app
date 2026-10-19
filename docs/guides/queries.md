@@ -370,6 +370,9 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 19/10/2026 · GE · The definition of done (MILESTONES §8) walked end to end in
+  `tests/integration/queries-done.test.js`, one step a test. ESS's sanctions list orders a day's
+  sanctions newest first.
 - 19/10/2026 · GE · Rules built (§5, §6.3, §7): drafts, activate and pause (`queries.configure`),
   Recent Firings within §6.1, and the evaluator (`query-rule-evaluate`, queued from
   `query_rules.events` beside the attendance events it counts). The breach day is the day of the
