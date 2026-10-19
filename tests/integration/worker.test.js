@@ -600,6 +600,7 @@ describe("schedules and heartbeat", () => {
       "import-cleanup",
       "mail-sync",
       "media-reconcile",
+      "reminders",
       "scheduled-reports",
       "urgent-repeats",
       "workflow-timeout",

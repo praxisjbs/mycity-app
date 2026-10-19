@@ -403,3 +403,6 @@ fields, never in a toast.
   `notification.acknowledged`), the Level field, red and amber cards (`Card` urgency), the reads by
   acknowledgement with their times, and the Important reminder on `announcement-publish` (`remind`).
   GE to review `1145` and the announcement changes.
+- 19/10/2026 · TB · Community's notices are listed in Settings · Notifications
+  (`docs/guides/notifications.md` §6), each naming its audience (`who`): direct messages, channel
+  posts and announcements take no copies, and an announcement's level stays with its poster.

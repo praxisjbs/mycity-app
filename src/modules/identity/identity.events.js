@@ -59,6 +59,7 @@ defineNotification(EVENTS.AUTH_SIGNED_IN, {
     `${e.payload.device_label}${e.payload.ip_address ? `, ${e.payload.ip_address}` : ""}. If this was not you, reset your password now.`,
   priority: "high",
   include_actor: true,
+  who: "The account holder",
 });
 
 // A wrong two-step code comes after the right password, so it says more than a wrong password.
@@ -74,6 +75,7 @@ defineNotification(EVENTS.AUTH_SIGN_IN_THROTTLED, {
       : "Sign-in now waits between attempts. If this was not you, reset your password.",
   priority: "high",
   include_actor: true,
+  who: "The account holder",
 });
 
 defineNotification(EVENTS.AUTH_PASSWORD_CHANGED, {
@@ -85,6 +87,7 @@ defineNotification(EVENTS.AUTH_PASSWORD_CHANGED, {
       : "If this was not you, tell People now.",
   priority: "high",
   include_actor: true,
+  who: "The account holder",
 });
 
 defineNotification(EVENTS.AUTH_PASSWORD_SET, {
@@ -93,6 +96,7 @@ defineNotification(EVENTS.AUTH_PASSWORD_SET, {
   body: "Every session was signed out. If this was not you, tell People now.",
   priority: "high",
   include_actor: true,
+  who: "The account holder",
 });
 
 defineNotification(EVENTS.AUTH_SESSION_ENDED, {
@@ -100,6 +104,7 @@ defineNotification(EVENTS.AUTH_SESSION_ENDED, {
   title: "Your sessions were signed out",
   body: "An administrator signed you out. Sign in again to continue.",
   priority: "high",
+  who: "The account holder",
 });
 
 // The service is required lazily: it requires this file for EVENTS.

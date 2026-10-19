@@ -855,3 +855,7 @@ screen.
 - 16/10/2026 · TB · First version: the remaining M0 and foundation work in four tracks, with TB's
   twenty decisions of 16/10/2026 (§6); the staff sheet and role map go into `seeds/staff/` with
   track A, the repository being private.
+- 19/10/2026 · TB · Approval notices take copies in Settings · Notifications
+  (`docs/guides/notifications.md` §6), each with wording for someone it is not waiting on; the new
+  Approvals Waiting reminder (`workflow.reminded`) brings a waiting approval back to its approvers.
+  Your import finished names its audience and takes no copies.

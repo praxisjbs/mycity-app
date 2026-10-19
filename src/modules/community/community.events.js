@@ -131,6 +131,7 @@ defineNotification(EVENTS.DIRECT_MESSAGE_SENT, {
   priority: "high",
   // Every direct message alerts, replacing the one before from the same conversation.
   push: { tag: conversation, mode: "alert" },
+  who: "The conversation's other members",
 });
 
 defineNotification(EVENTS.CHANNEL_MESSAGE_POSTED, {
@@ -147,6 +148,7 @@ defineNotification(EVENTS.CHANNEL_MESSAGE_POSTED, {
       : firstLine(e),
   // Every post alerts each device, replacing the channel's notification, which counts them (TB, 19/10/2026).
   push: { tag: conversation, mode: "alert" },
+  who: "The channel's members",
 });
 
 defineNotification(EVENTS.RECOGNITION_POSTED, {

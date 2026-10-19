@@ -4,12 +4,17 @@
  * nothing reads or marks another person's inbox. Only rows that go to the bell count:
  * `in_app` in channels (a row the fan-out wrote for email alone is not in the bell).
  *
- * Tables (migrations 0060, 0460, 0470; BACKEND_STRUCTURE §11.1): notification,
- * notification_preference, push_subscription, push_delivery. A person's devices and
- * preferences are pinned to their user_id the same way; the push job and the urgent
- * repeats read by id.
+ * Tables (migrations 0060, 0460, 0470, 0480; BACKEND_STRUCTURE §11.1): notification,
+ * notification_preference, push_subscription, push_delivery, notification_setting. A person's
+ * devices, preferences and settings are pinned to their user_id the same way; the push job and
+ * the urgent repeats read by id.
+ *
+ * Also the company's side (Settings · Notifications, behind `settings` in the routes):
+ * notification_rule and its recipients, notification_reminder_rule; the reminder engine's
+ * occurrences (reminder); and what the company's reminders read (pending approvals, probations).
  */
 const { pageQuery, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
+const { personJson } = require("../../shared/db/person");
 
 const COLUMNS = `n.notification_id, n.category, n.priority, n.urgency, n.acknowledge_required,
   n.acknowledged_at, n.repeat_count, n.title, n.body, n.entity_type, n.entity_id, n.read_at, n.created_at`;
@@ -471,6 +476,449 @@ async function recordDelivery(db, { notificationId, subscriptionId, status, http
   );
 }
 
+/* ------------------------------------------------------------------ *
+ * A person's settings: quiet hours and the digest (notification_setting)
+ * ------------------------------------------------------------------ */
+
+const SETTING_COLUMNS = `s.quiet_enabled, to_char(s.quiet_from, 'HH24:MI') AS quiet_from,
+  to_char(s.quiet_to, 'HH24:MI') AS quiet_to, s.digest`;
+
+/** The person's row, or null before they changed anything. */
+async function settingOf(db, userId) {
+  const { rows } = await db.query(
+    `SELECT ${SETTING_COLUMNS} FROM notification_setting s WHERE s.user_id = $1`,
+    [userId],
+  );
+  return rows[0] || null;
+}
+
+async function saveQuietHours(db, userId, { quiet_enabled: on, quiet_from: from, quiet_to: to }) {
+  const { rows } = await db.query(
+    `INSERT INTO notification_setting AS s (user_id, quiet_enabled, quiet_from, quiet_to)
+     VALUES ($1, $2, $3::time, $4::time)
+     ON CONFLICT (user_id) DO UPDATE
+       SET quiet_enabled = EXCLUDED.quiet_enabled, quiet_from = EXCLUDED.quiet_from, quiet_to = EXCLUDED.quiet_to
+     RETURNING ${SETTING_COLUMNS}`,
+    [userId, on, from, to],
+  );
+  return rows[0];
+}
+
+async function saveDigest(db, userId, digest) {
+  const { rows } = await db.query(
+    `INSERT INTO notification_setting AS s (user_id, digest) VALUES ($1, $2)
+     ON CONFLICT (user_id) DO UPDATE SET digest = EXCLUDED.digest
+     RETURNING ${SETTING_COLUMNS}`,
+    [userId, digest],
+  );
+  return rows[0];
+}
+
+/** Quiet hours of those of these people who turned them on. */
+async function quietHoursOf(db, userIds) {
+  if (userIds.length === 0) return [];
+  // pagination:complete one row per person of one event's notices, each a person told of it
+  const { rows } = await completeQuery(
+    db,
+    `SELECT s.user_id, to_char(s.quiet_from, 'HH24:MI') AS quiet_from, to_char(s.quiet_to, 'HH24:MI') AS quiet_to
+       FROM notification_setting s
+      WHERE s.user_id = ANY($1::uuid[]) AND s.quiet_enabled
+      ORDER BY s.user_id`,
+    [userIds],
+    { label: "quiet hours of one event's people" },
+  );
+  return rows;
+}
+
+/* ------------------------------------------------------------------ *
+ * Settings · Notifications: the company's rule per notice
+ * ------------------------------------------------------------------ */
+
+const RULE_COLUMNS = `r.notification_rule_id, r.enabled, r.urgency, r.in_app, r.email, r.push, r.updated_at`;
+
+/**
+ * One page of notices with their rules. The catalogue is the code's (fanout.notices()), passed
+ * in as arrays in its order, so the page, the category filter and the search are the
+ * database's, as for every other list.
+ */
+function rulePage(db, notices, query) {
+  return pageQuery(
+    db,
+    `SELECT n.event_key, ${RULE_COLUMNS}, ${TOTAL_COL}
+       FROM unnest($1::text[], $2::text[], $3::text[], $4::int[]) AS n(event_key, name, category, position)
+       LEFT JOIN notification_rule r ON r.event_key = n.event_key
+      WHERE ($5::text IS NULL OR n.category = $5)
+        AND ($6::text IS NULL OR search_fold(n.name) LIKE '%' || search_fold($6) || '%')
+      ORDER BY n.position, n.event_key`,
+    [
+      notices.map((n) => n.event_key),
+      notices.map((n) => n.name),
+      notices.map((n) => n.category),
+      notices.map((_, i) => i),
+      query.category ?? null,
+      query.q ?? null,
+    ],
+    query,
+  );
+}
+
+async function ruleOf(db, eventKey, { lock = false } = {}) {
+  const { rows } = await db.query(
+    `SELECT ${RULE_COLUMNS} FROM notification_rule r WHERE r.event_key = $1${lock ? " FOR UPDATE" : ""}`,
+    [eventKey],
+  );
+  return rows[0] || null;
+}
+
+/** The roles each of these rules copies to, as the role picker names them. */
+async function copiedRoles(db, ruleIds) {
+  if (ruleIds.length === 0) return [];
+  // pagination:complete the copies of one page of rules, at most 25 roles each
+  const { rows } = await completeQuery(
+    db,
+    `SELECT rr.notification_rule_id, ro.code::text AS code, ro.name
+       FROM notification_rule_recipient rr JOIN role ro ON ro.role_id = rr.role_id
+      WHERE rr.notification_rule_id = ANY($1::uuid[])
+      ORDER BY rr.notification_rule_id, ro.name, ro.role_id`,
+    [ruleIds],
+    { label: "roles a page of notices is copied to" },
+  );
+  return rows;
+}
+
+/** The people each of these rules copies to, as PersonRef. */
+async function copiedPeople(db, ruleIds) {
+  if (ruleIds.length === 0) return [];
+  // pagination:complete the copies of one page of rules, at most 25 people each
+  const { rows } = await completeQuery(
+    db,
+    `SELECT rr.notification_rule_id, ${personJson("e", "d")} AS person
+       FROM notification_rule_recipient rr
+       JOIN employee e ON e.employee_id = rr.employee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE rr.notification_rule_id = ANY($1::uuid[])
+      ORDER BY rr.notification_rule_id, e.last_name, e.first_name, e.employee_id`,
+    [ruleIds],
+    { label: "people a page of notices is copied to" },
+  );
+  return rows;
+}
+
+async function saveRule(db, { eventKey, enabled, urgency, in_app: inApp, email, push, updatedBy }) {
+  const { rows } = await db.query(
+    `INSERT INTO notification_rule AS r (event_key, enabled, urgency, in_app, email, push, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (event_key) DO UPDATE
+       SET enabled = EXCLUDED.enabled, urgency = EXCLUDED.urgency, in_app = EXCLUDED.in_app,
+           email = EXCLUDED.email, push = EXCLUDED.push, updated_by = EXCLUDED.updated_by
+     RETURNING ${RULE_COLUMNS}`,
+    [eventKey, enabled, urgency, inApp, email, push, updatedBy],
+  );
+  return rows[0];
+}
+
+/** A rule's copies replaced by these roles and people. */
+async function replaceCopies(db, ruleId, { roleIds, employeeIds }) {
+  await db.query("DELETE FROM notification_rule_recipient WHERE notification_rule_id = $1", [ruleId]);
+  await db.query(
+    `INSERT INTO notification_rule_recipient (notification_rule_id, role_id)
+     SELECT $1, unnest($2::uuid[])
+     ON CONFLICT DO NOTHING`,
+    [ruleId, roleIds],
+  );
+  await db.query(
+    `INSERT INTO notification_rule_recipient (notification_rule_id, employee_id)
+     SELECT $1, unnest($2::uuid[])
+     ON CONFLICT DO NOTHING`,
+    [ruleId, employeeIds],
+  );
+}
+
+/** Reset to Default: the rule and its copies go. */
+async function deleteRule(db, eventKey) {
+  const { rowCount } = await db.query("DELETE FROM notification_rule WHERE event_key = $1", [eventKey]);
+  return rowCount > 0;
+}
+
+/** Active roles by code (citext), for copies. */
+async function rolesByCode(db, codes) {
+  if (codes.length === 0) return [];
+  // pagination:complete the roles one notice is copied to, at most 25
+  const { rows } = await completeQuery(
+    db,
+    "SELECT role_id, code::text AS code, name FROM role WHERE code = ANY($1::citext[]) ORDER BY code",
+    [codes],
+    { label: "roles named for one notice's copies" },
+  );
+  return rows;
+}
+
+/** Which of these employees are on the staff (not archived), for copies. */
+async function currentEmployees(db, ids) {
+  if (ids.length === 0) return [];
+  // pagination:complete the people one notice is copied to, at most 25
+  const { rows } = await completeQuery(
+    db,
+    "SELECT employee_id FROM employee WHERE employee_id = ANY($1::uuid[]) AND status <> 'archived' ORDER BY employee_id",
+    [ids],
+    { label: "people named for one notice's copies" },
+  );
+  return rows.map((r) => r.employee_id);
+}
+
+/* ------------------------------------------------------------------ *
+ * Settings · Notifications: the company's reminders
+ * ------------------------------------------------------------------ */
+
+/** The saved reminder rules: at most one per reminder. */
+async function reminderRules(db) {
+  // pagination:complete the company's three reminder rules
+  const { rows } = await completeQuery(
+    db,
+    `SELECT reminder_key, enabled, every_hours, days_ahead, to_char(at_time, 'HH24:MI') AS at_time
+       FROM notification_reminder_rule ORDER BY reminder_key`,
+    [],
+    { label: "the company's reminder rules" },
+  );
+  return rows;
+}
+
+async function saveReminderRule(db, { key, enabled, every_hours: everyHours = null, days_ahead: daysAhead = null, at_time: atTime = null, updatedBy }) {
+  await db.query(
+    `INSERT INTO notification_reminder_rule (reminder_key, enabled, every_hours, days_ahead, at_time, updated_by)
+     VALUES ($1, $2, $3, $4, $5::time, $6)
+     ON CONFLICT (reminder_key) DO UPDATE
+       SET enabled = EXCLUDED.enabled, every_hours = EXCLUDED.every_hours, days_ahead = EXCLUDED.days_ahead,
+           at_time = EXCLUDED.at_time, updated_by = EXCLUDED.updated_by`,
+    [key, enabled, everyHours, daysAhead, atTime, updatedBy],
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The reminder engine (reminder)
+ * ------------------------------------------------------------------ */
+
+const REMINDER_COLUMNS = `reminder_id, reminder_key, entity_type, entity_id, occurrence, due_at, every_minutes,
+  work_hours, payload, fired_count, last_fired_at, state`;
+
+/** Add an occurrence unless it is already there (found). True when added. */
+async function addReminder(db, r) {
+  const { rowCount } = await db.query(
+    `INSERT INTO reminder (reminder_key, entity_type, entity_id, occurrence, due_at, every_minutes, work_hours, payload)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+     ON CONFLICT (reminder_key, entity_type, entity_id, occurrence) DO NOTHING`,
+    [r.key, r.entity_type, String(r.entity_id), r.occurrence || "", r.due_at, r.every_minutes ?? null, Boolean(r.work_hours), JSON.stringify(r.payload || {})],
+  );
+  return rowCount > 0;
+}
+
+/** Schedule an occurrence, or move it and start its count again. */
+async function scheduleReminder(db, r) {
+  const { rows } = await db.query(
+    `INSERT INTO reminder (reminder_key, entity_type, entity_id, occurrence, due_at, every_minutes, work_hours, payload)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+     ON CONFLICT (reminder_key, entity_type, entity_id, occurrence) DO UPDATE
+       SET due_at = EXCLUDED.due_at, every_minutes = EXCLUDED.every_minutes, work_hours = EXCLUDED.work_hours,
+           payload = EXCLUDED.payload, fired_count = 0, last_fired_at = NULL, state = 'pending'
+     RETURNING reminder_id`,
+    [r.key, r.entity_type, String(r.entity_id), r.occurrence || "", r.due_at, r.every_minutes ?? null, Boolean(r.work_hours), JSON.stringify(r.payload || {})],
+  );
+  return rows[0].reminder_id;
+}
+
+/** Cancel a record's pending occurrences of a reminder (one occurrence when named). */
+async function cancelReminders(db, { key, entityType, entityId, occurrence = null }) {
+  const { rowCount } = await db.query(
+    `UPDATE reminder SET state = 'cancelled'
+      WHERE reminder_key = $1 AND entity_type = $2 AND entity_id = $3
+        AND ($4::text IS NULL OR occurrence = $4) AND state = 'pending'`,
+    [key, entityType, String(entityId), occurrence],
+  );
+  return rowCount;
+}
+
+/** Occurrences due now, oldest first. */
+async function dueReminders(db, now, keys) {
+  const { rows } = await db.query(
+    `SELECT reminder_id, reminder_key FROM reminder
+      WHERE state = 'pending' AND due_at <= $1 AND reminder_key = ANY($2::text[])
+      ORDER BY due_at, reminder_id
+      LIMIT 200 -- pagination:batch occurrences one reminders tick fires`,
+    [now, keys],
+  );
+  return rows;
+}
+
+/** One due occurrence, locked for its firing; null when another worker has it or it moved. */
+async function reminderForFiring(db, id, now) {
+  const { rows } = await db.query(
+    `SELECT ${REMINDER_COLUMNS} FROM reminder
+      WHERE reminder_id = $1 AND state = 'pending' AND due_at <= $2
+      FOR UPDATE SKIP LOCKED`,
+    [id, now],
+  );
+  return rows[0] || null;
+}
+
+/** Move an occurrence on without firing it. */
+async function moveReminder(db, id, { dueAt, payload = null, everyMinutes = null }) {
+  await db.query(
+    `UPDATE reminder SET due_at = $2, payload = COALESCE($3::jsonb, payload),
+            every_minutes = COALESCE($4, every_minutes)
+      WHERE reminder_id = $1`,
+    [id, dueAt, payload === null ? null : JSON.stringify(payload), everyMinutes],
+  );
+}
+
+/** Record a firing: the next one at `next`, or finished when there is none. */
+async function reminderFired(db, id, { now, next, everyMinutes = null }) {
+  await db.query(
+    `UPDATE reminder
+        SET fired_count = fired_count + 1, last_fired_at = $2,
+            due_at = COALESCE($3, due_at), every_minutes = COALESCE($4, every_minutes),
+            state = CASE WHEN $3::timestamptz IS NULL THEN 'done' ELSE state END
+      WHERE reminder_id = $1`,
+    [id, now, next, everyMinutes],
+  );
+}
+
+async function finishReminder(db, id) {
+  await db.query("UPDATE reminder SET state = 'done' WHERE reminder_id = $1", [id]);
+}
+
+/**
+ * A new approval interval for every approval already waiting: each next reminder counts from
+ * its last one (or from when its stage started), and never falls before now.
+ */
+async function repaceReminders(db, key, everyMinutes, now) {
+  const { rowCount } = await db.query(
+    `UPDATE reminder
+        SET every_minutes = $2,
+            due_at = GREATEST($3::timestamptz,
+                              COALESCE(last_fired_at, (payload->>'since')::timestamptz, created_at)
+                                + make_interval(mins => $2))
+      WHERE reminder_key = $1 AND state = 'pending'`,
+    [key, everyMinutes, now],
+  );
+  return rowCount;
+}
+
+/* ------------------------------------------------------------------ *
+ * What the company's reminders read
+ * ------------------------------------------------------------------ */
+
+/** Pending approvals with no Approvals Waiting occurrence yet. */
+async function approvalsToRemind(db) {
+  const { rows } = await db.query(
+    `SELECT wi.workflow_instance_id, wi.current_stage, wi.stage_entered_at
+       FROM workflow_instance wi
+      WHERE wi.state = 'pending'
+        AND NOT EXISTS (SELECT 1 FROM reminder r
+                         WHERE r.reminder_key = 'approval_waiting' AND r.entity_type = 'workflow_instance'
+                           AND r.entity_id = wi.workflow_instance_id::text)
+      ORDER BY wi.stage_entered_at, wi.workflow_instance_id
+      LIMIT 200 -- pagination:batch approvals one reminders tick starts counting`,
+  );
+  return rows;
+}
+
+/** One approval as its reminder needs it. */
+async function approvalOf(db, instanceId) {
+  const { rows } = await db.query(
+    `SELECT workflow_instance_id, workflow_definition_id, definition_key, entity_type, entity_id, state,
+            current_stage, stage_entered_at, stage_approvers, subject_employee_id, opened_by
+       FROM workflow_instance WHERE workflow_instance_id = $1`,
+    [instanceId],
+  );
+  return rows[0] || null;
+}
+
+/** Unconfirmed people whose confirmation falls between two days, not yet reminded for that date. */
+async function probationsToRemind(db, { from, until }) {
+  const { rows } = await db.query(
+    `SELECT e.employee_id, e.confirmation_due_on::text AS due_on
+       FROM employee e
+      WHERE e.confirmation_due_on BETWEEN $1::date AND $2::date
+        AND e.confirmed_on IS NULL AND e.status <> 'archived'
+        AND NOT EXISTS (SELECT 1 FROM reminder r
+                         WHERE r.reminder_key = 'probation_ending' AND r.entity_type = 'employee'
+                           AND r.entity_id = e.employee_id::text AND r.occurrence = e.confirmation_due_on::text)
+      ORDER BY e.confirmation_due_on, e.employee_id
+      LIMIT 200 -- pagination:batch probations one reminders tick finds`,
+    [from, until],
+  );
+  return rows;
+}
+
+/** One person as the probation reminder needs them. */
+async function probationOf(db, employeeId) {
+  const { rows } = await db.query(
+    `SELECT e.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name,
+            e.confirmation_due_on::text AS due_on, e.confirmed_on, e.status
+       FROM employee e WHERE e.employee_id = $1`,
+    [employeeId],
+  );
+  return rows[0] || null;
+}
+
+/* ------------------------------------------------------------------ *
+ * The daily digest
+ * ------------------------------------------------------------------ */
+
+/** Active people with the digest on whose digest for this Lagos day is not decided yet. */
+async function digestsDue(db, day) {
+  const { rows } = await db.query(
+    `SELECT u.user_id
+       FROM app_user u
+       LEFT JOIN notification_setting s ON s.user_id = u.user_id
+      WHERE u.status = 'active' AND COALESCE(s.digest, true)
+        AND (s.digest_sent_on IS NULL OR s.digest_sent_on < $1::date)
+      ORDER BY u.user_id
+      LIMIT 200 -- pagination:batch people one tick queues a digest for`,
+    [day],
+  );
+  return rows.map((r) => r.user_id);
+}
+
+/** Note today's digest as decided. False when another tick already did. */
+async function markDigest(db, userId, day) {
+  const { rows } = await db.query(
+    `INSERT INTO notification_setting AS s (user_id, digest_sent_on) VALUES ($1, $2::date)
+     ON CONFLICT (user_id) DO UPDATE SET digest_sent_on = EXCLUDED.digest_sent_on
+      WHERE s.digest_sent_on IS NULL OR s.digest_sent_on < EXCLUDED.digest_sent_on
+     RETURNING user_id`,
+    [userId, day],
+  );
+  return rows.length > 0;
+}
+
+/** Who a digest goes to, and whether they still want it. */
+async function digestPerson(db, userId) {
+  const { rows } = await db.query(
+    `SELECT u.user_id, u.email, e.first_name, e.last_name, COALESCE(s.digest, true) AS digest
+       FROM app_user u
+       JOIN employee e ON e.employee_id = u.employee_id
+       LEFT JOIN notification_setting s ON s.user_id = u.user_id
+      WHERE u.user_id = $1 AND u.status = 'active'`,
+    [userId],
+  );
+  return rows[0] || null;
+}
+
+/** The first page of a person's bell notices that arrived in a window and are still unread. */
+function digestPage(db, userId, { from, until }) {
+  return pageQuery(
+    db,
+    `SELECT n.notification_id, n.title, n.body, n.entity_type, n.entity_id, n.created_at, ${TOTAL_COL}
+       FROM notification n
+      WHERE n.user_id = $1 AND 'in_app' = ANY(n.channels) AND n.read_at IS NULL
+        AND n.created_at >= $2 AND n.created_at < $3
+      ORDER BY n.created_at DESC, n.notification_id DESC`,
+    [userId, from, until],
+    { page: 1 },
+  );
+}
+
 module.exports = {
   list,
   unreadCount,
@@ -505,4 +953,36 @@ module.exports = {
   forPush,
   deliveriesOf,
   recordDelivery,
+  settingOf,
+  saveQuietHours,
+  saveDigest,
+  quietHoursOf,
+  rulePage,
+  ruleOf,
+  copiedRoles,
+  copiedPeople,
+  saveRule,
+  replaceCopies,
+  deleteRule,
+  rolesByCode,
+  currentEmployees,
+  reminderRules,
+  saveReminderRule,
+  addReminder,
+  scheduleReminder,
+  cancelReminders,
+  dueReminders,
+  reminderForFiring,
+  moveReminder,
+  reminderFired,
+  finishReminder,
+  repaceReminders,
+  approvalsToRemind,
+  approvalOf,
+  probationsToRemind,
+  probationOf,
+  digestsDue,
+  markDigest,
+  digestPerson,
+  digestPage,
 };

@@ -1,5 +1,4 @@
 import type { AccessCatalogue, AuditEntry, FailedSignIn, Holiday, LiveSession, NumberingScheme, Organisation, RoleDetail, RoleGrant, RoleRow, RoleSave, UserRow, WorkingDay } from "@mycity/contract/contract.gen.ts";
-import type { NotificationPref } from "@/api/types/settings";
 import type { Status } from "@/api/types/performance";
 import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
 import { exportFile } from "./shared";
@@ -377,28 +376,6 @@ route("DELETE /api/v1/settings/roles/:id", (req) => {
   ROLES.delete(req.params.id);
   audit(who(req.user!), "A role was deleted", `Role · ${r.name}`, describe(r), null, null, "Settings");
   return noContent();
-});
-
-const PREFS = new Map<string, NotificationPref[]>();
-const prefsOf = (u: string) => {
-  let p = PREFS.get(u);
-  if (!p) {
-    p = [["approvals", "Approvals pending", "When something is waiting on you", true, true, false], ["query", "Query raised against you", "You are always told. There is no setting for it", true, true, true], ["payslip", "Payslip ready", "When a run is locked", true, true, false], ["task", "Task assigned to you", "", true, false, false], ["community", "Community messages", "Keep these in app only", true, false, false], ["announcement", "Announcements", "", true, true, false], ["recognition", "Recognition received", "", true, false, false], ["celebration", "Birthday and anniversary", "", true, false, false], ["alert_cleared", "Alert cleared", "", false, false, false]].map(([key, label, help, in_app, email, locked]) => ({ key: key as string, label: label as string, help: help as string, in_app: in_app as boolean, email: email as boolean, locked: locked as boolean }));
-    PREFS.set(u, p);
-  }
-  return p;
-};
-route("GET /api/v1/settings/notifications", (req) => ok(prefsOf(req.user!)));
-route("PATCH /api/v1/settings/notifications", (req) => {
-  const p = prefsOf(req.user!);
-  for (const [k, v] of Object.entries(req.body as Record<string, { in_app: boolean; email: boolean }>)) {
-    const x = p.find((y) => y.key === k);
-    if (!x) return invalid({ [k]: ["Not a notification category"] });
-    if (x.locked && (!v.in_app || !v.email)) return fail(409, "LOCKED", `${x.label} cannot be switched off.`);
-    x.in_app = !!v.in_app;
-    x.email = !!v.email;
-  }
-  return ok(p);
 });
 
 let THEME: "system" | "light" | "dark" = "system";

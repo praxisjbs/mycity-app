@@ -42,23 +42,24 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 31 items below: 30 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
+| M0 Foundation | 32 items below: 31 done, 1 open | | | | | |
+| M1 Core Operations & Employee Management | 30 | 0 | 0 | 30 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
-| M6 Payroll & Notifications | 7 | 7 | 0 | 0 | 0 | 0 |
+| M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **58** | **0** | **36** | **0** | **0** |
+| **Total** | **94** | **57** | **0** | **37** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
 Updates (M9) is built with Settings · Attendance Policy (owner decision, 19/10/2026). M4 and M5 include their public-site
-pages. Settings → Notifications is counted in M6, where it is built.
+pages. Settings → Notifications was brought forward to M0 by TB on 19/10/2026 and is counted with
+M1, like the other M0 screens.
 
 ---
 
@@ -100,9 +101,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
 | Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☑ | 19/10/2026 |
 | Notifications everywhere (TB, 19/10/2026): every device at once, every channel post alerting, urgency with Acknowledge, the urgent bar and urgent repeats (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☑ | 19/10/2026 |
+| Notification rules and reminders (TB, 19/10/2026): Settings · Notifications brought forward from M6 (#74), the reminder engine with approval and probation reminders, the daily digest, quiet hours (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☑ | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Notification rules and reminders built (PR 2 of
+  `docs/handoff/notifications-everywhere.md`, after PR 1 merged as #81): Settings · Notifications
+  (#74) brought forward from M6; the fan-out applies the company's rule per notice (Off, copies,
+  urgency, default channels); one reminder engine (`notifications.reminders.js`, the `reminders`
+  scheduler every 5 minutes) with Approvals Waiting and Probation Ending; the daily digest email
+  (the `reminders` job, `templates/email/digest.html`); quiet hours holding pushes (urgent and
+  Security pass). Left: TB's view on the design choices in the handoff's §5.
 - 19/10/2026 · TB · Exports download on the device that pressed, never by email (TB's four answers, 19/10/2026; `docs/guides/foundation.md` §6.12). One path for every Export and Download button: `src/shared/documents/exports.js` reserves the file in the request (or `documents.generate` for a PDF), the module's outbox handler makes it, `GET /exports/:id` answers while the screen waits, and `GET /documents/:id/content` downloads it; `ExportFile` in the contract replaces the four "queued, and the email it goes to" shapes. The app's `api/exports.ts` waits and saves wherever the person is in the app; `api/download.ts` saves into Downloads (Android, desktop) or opens the share sheet with Save to Files on an iPhone app; `ExportButton` stays busy until the file is saved. Export files are kept 24 hours (`export-cleanup`, hourly, replaces `data-export-cleanup`), never locked. Only a report schedule's files are still emailed. The integration suite passes locally (80 suites, 1,726 tests), and every frontend test (UI 823, app 260). Left: the M6 payslips screen's Email a Copy is still in its plan (`docs/guides/ess.md` §2), for TB to confirm against this decision.
 - 19/10/2026 · TB · Notifications everywhere, started from TB's twelve answers
   (`docs/handoff/notifications-everywhere.md`). An announcement GE posted from the build account
@@ -1016,7 +1025,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 74 | Notifications | `notifications` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
@@ -1026,6 +1035,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · Notifications (#74), brought forward from M6 to M0 by TB with the rest of the
+  notifications work (`docs/handoff/notifications-everywhere.md`, PR 2), built on both shells: the
+  Reminders card (Approvals Waiting, Probation Ending, Daily Digest; Edit Reminders) and every
+  notice the code sends, 25 a page, searched and filtered by category, each with who it goes to,
+  its channels and its level; Edit Notice sets On or Off, the level, the default channels and
+  copies to roles and people where the notice is about someone else, or resets it
+  (`GET /notifications/rules`, `PUT /rules/:key`, `POST /rules/:key/reset`, `GET` and `PUT
+  /reminders`; `0480`). Each person's Notification Settings gains Quiet Hours and the Daily Digest.
+  Tested: `notifications-rules` (10 integration tests), unit tests, the app's form tests. Left:
+  nothing; M2's tasks and calendars declare their reminders from the guide's §7.1.
 - 19/10/2026 · TB · Audit Log (#79): Export saves the whole filtered log as a workbook on the device that pressed, never by email (`docs/guides/foundation.md` §5, §6.12, §7); its cover now says the filters, how many entries and what Restricted means, which the email used to say. A login with no email is no longer refused. Left: nothing.
 - 19/10/2026 · TB · Organisation (#69): the brand files (`docs/guides/foundation.md` §6.11). A Brand card takes the Logo, the White Logo (shown on Deep Green) and the Icon, each one upload that applies at once (`POST`, `DELETE /settings/organisation/brand/:slot`, purpose `brand`: PNG or WebP, kept a PNG, colours untouched), and Remove. Letterheads and PDFs draw the Logo, system mail's header the White Logo inside the message, email signatures the White Logo or the Icon. One reader of the profile for all of them (`shared/organisation/profile.js`) also fixes letterheads and system mail, which read an `organisation.profile` row nothing wrote and so always printed the defaults; the letterhead's footer now carries the RC number. Left: MyCity uploads its files.
 - 19/10/2026 · TB · Imports (#93): a row saved with something missing (a warning: a person left

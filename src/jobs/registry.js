@@ -116,6 +116,11 @@ const JOBS = Object.freeze([
     concurrency: 2,
     summary: "A report schedule's slot: a run for each recipient and format",
   },
+  {
+    queue: "reminders",
+    concurrency: 2,
+    summary: "One person's daily digest of what they have not read",
+  },
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -134,6 +139,7 @@ const SCHEDULERS = Object.freeze([
   "scheduled-reports",
   "export-cleanup",
   "urgent-repeats",
+  "reminders",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

@@ -9,7 +9,7 @@ merged), which built web push, the banner, the pane and personal Notification Se
 | | |
 |---|---|
 | Branch | `ccr-59381f61-k83jfs` (push only here; each PR targets `main`; PR 2 starts from `main` after PR 1 merges) |
-| Pull requests | PR 1 and PR 2, not opened yet |
+| Pull requests | PR 1 #81 (merged 19/10/2026); PR 2 opened 19/10/2026 |
 | Owner | TB (Tom-Blake Asaah), who asked for it on 19/10/2026 |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 19/10/2026 |
@@ -154,22 +154,49 @@ Tick each step with its date and add a line to §8 when it is pushed.
    on every screen (4), red and amber cards and the level on the announcement form,
    acknowledgement on the readers list, the red dot on Community, urgency in the pane and the
    banner.
-8. [ ] Tests (unit, integration, the app's), the whole `npm run ci`, a real-browser check, the PR
-   body, then drive it green and merge with TB's admin rights (TB, 19/10/2026).
+8. [x] 19/10/2026 Tests (unit, integration, the app's), the whole `npm run ci`, a real-browser
+   check, the PR body, then drive it green and merge with TB's admin rights (TB, 19/10/2026):
+   #81, merged.
 
 ### PR 2 · Settings · Notifications, reminders and quiet hours
 
-1. [ ] Guides first: Settings · Notifications in `notifications.md`, the reminder recipe for
-   modules (§7), PROGRESS #74 moved from M6 to now, MILESTONES note.
-2. [ ] Contract and migration `0480`: a rule per notice (on or off, extra roles and people, default
+1. [x] 19/10/2026 Guides first: Settings · Notifications in `notifications.md`, the reminder
+   recipe for modules (§7.1), PROGRESS #74 moved from M6 to M0, MILESTONES note.
+2. [x] 19/10/2026 Contract and migration `0480`: a rule per notice (on or off, extra roles and people, default
    channels, urgency), reminder rules (approvals every N hours, probation N days ahead, the digest's
    time), a person's quiet hours and digest switch.
-3. [ ] Backend: the notice catalogue (a label per declaration), the fan-out applying the company's
+3. [x] 19/10/2026 Backend: the notice catalogue (a label per declaration), the fan-out applying the company's
    rules, approval and probation reminders, the daily digest, quiet hours that hold push (Urgent and
    Security pass, assumption A).
-4. [ ] Screens: Settings · Notifications on both shells (desktop table, phone rows and sheets), quiet
+4. [x] 19/10/2026 Screens: Settings · Notifications on both shells (desktop table, phone rows and sheets), quiet
    hours and the digest in each person's Notification Settings.
 5. [ ] Tests, the whole `npm run ci`, the PR, drive it green and merge.
+
+---
+
+## 5 · PR 2 design (mine, from TB's decisions 10 to 12; open to TB)
+
+- **The notices People see.** Every `defineNotification` declaration, and the Security events that
+  only reach the access watchers. A notice is named by its event's summary in the catalogue; who it
+  goes to as built is read from the declaration (`who` names an audience the code chooses).
+- **Copies, never a new audience.** People add roles or people only to a notice written about
+  someone else, which declares `copy` (approvals, attendance reviews, bank details changed, alerts,
+  probations ending). A notice personal to its audience (a direct message, mail, your own account,
+  "your import finished") takes no copies: nobody reads another person's messages, and nobody is
+  told "waiting on you" when it is not.
+- **Which channel wins.** The person's own switch for the category, else the company's default
+  for the notice, else the category's default. The company's Off beats everything but Security.
+- **Urgency.** People set it for a notice whose urgency the code fixes. Security stays urgent; an
+  announcement's level stays with its poster.
+- **Reminders.** Approvals Waiting: on, every 24 hours between 08:00 and 18:00 Lagos, to the stage's
+  approvers, important (amber). Probation Ending: on, 14 days ahead at 09:00 Lagos, to People and the
+  line managers above. Daily Digest: on, 07:30 Lagos, an email listing up to 25 notices that arrived
+  in the last 24 hours and are still unread, none when there are none; each person can turn it off.
+- **Quiet hours.** Off until a person turns them on (21:00 to 07:00 when first turned on). Pushes
+  wait until they end; urgent notices and Security come through (assumption A).
+- **The engine.** One `reminder` table of occurrences; `defineReminder` (its event, `check`, an
+  optional `find`), `schedule` and `cancel`; the `reminders` scheduler every 5 minutes; each
+  person's digest is a job on the `reminders` queue.
 
 ---
 
@@ -188,3 +215,23 @@ Tick each step with its date and add a line to §8 when it is pushed.
   whole `npm run ci` passes locally (45 of 45) and Chromium shows the pushes as designed
   (`push-check-3`: shown with the app on screen, urgent kept on screen, a repeat not counted as
   new). Next: step 8, the PR.
+- 19/10/2026 · PR 1 opened as #81; scope, checks, backend, frontend and screens green on GitHub;
+  merged with TB's admin rights. PR 2 starts from `main`: §5 records its design. Next: PR 2 step 1,
+  the guides.
+- 19/10/2026 · PR 2 steps 1 and 2 pushed: the guides (`notifications.md` §1 to §11, PROGRESS #74
+  moved to M0, MILESTONES), the contract (rules, reminders, quiet hours, the digest) and `0480`
+  (round trip passes). Next: step 3, the backend.
+- 19/10/2026 · PR 2 step 3 pushed: the notice catalogue (`fanout.notices()`, `who`, `copy`), the
+  company's rules in the fan-out (Off, copies, urgency, default channels), Settings · Notifications'
+  routes (`notifications.rules.js`), the reminder engine with Approvals Waiting and Probation Ending
+  (`notifications.reminders.js`, the `reminders` scheduler), the daily digest (the `reminders` job,
+  `templates/email/digest.html`) and quiet hours holding pushes. New integration suite
+  `notifications-rules` (10 tests) and unit tests pass. Next: step 4, the screens.
+- 19/10/2026 · PR 2 step 4 pushed: Settings · Notifications on both shells
+  (`app/src/features/settings/Notifications.tsx`, the Reminders card and the notices list with
+  Edit Notice), the old mock-only prototype removed, Quiet Hours and Digest in Notification
+  Settings, the mock API for laptops and CI; PROGRESS #74 Built. The screen gates pass. Next:
+  step 5, the whole `npm run ci` and the PR.
+- 19/10/2026 · PR 2 step 5: the whole `npm run ci` passes locally, 45 of 45 (`CI_STRICT=1`,
+  `RUN_DB_TESTS=1`); quiet hours set to the same time twice now say so. PR 2 opened. Next: drive it
+  green and merge with TB's admin rights.

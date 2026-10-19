@@ -28,6 +28,9 @@ const EVENTS = defineEvents("settings", {
   "push_subscription.removed": { summary: "Notifications were turned off for one or more devices" },
   "push_subscription.renewed": { summary: "A device's browser renewed its push subscription" },
   "push.test_requested": { summary: "A test notification was sent to a person's devices" },
+  "notification_setting.changed": { summary: "A person changed their quiet hours or daily digest" },
+  "notification_rule.changed": { summary: "A notice's company rule was changed in Settings" },
+  "notification_reminder.changed": { summary: "The company's reminders were changed in Settings" },
 });
 
 /** The realtime event the bell reloads on, besides a new `notification`. */
@@ -85,3 +88,6 @@ outbox.register("auth.session_ended", "notifications.stop_push_signed_out", asyn
 });
 
 module.exports = { EVENTS, READ_EVENT };
+
+// The reminder engine and the company's reminders, declared in the API and the worker alike.
+require("./notifications.reminders");
