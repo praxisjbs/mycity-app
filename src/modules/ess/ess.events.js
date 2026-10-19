@@ -54,6 +54,7 @@ defineNotification(EVENTS.EMPLOYEE_BANK_DETAILS_CHANGED, {
   to: [{ permission: ["people", "edit"] }],
   title: "Bank details changed",
   body: (e) => `${e.payload.display_name} changed their bank details in My Profile.`,
+  copy: true,
 });
 
 module.exports = { EVENTS, DATA_EXPORT };

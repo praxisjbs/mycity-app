@@ -84,6 +84,7 @@ defineNotification(EVENTS.ORG_CHART_EXPORT_FAILED, {
   to: [{ users: (event) => [event.payload.requested_by] }],
   title: "Your organogram PDF failed",
   body: "It could not be drawn. Press Download PDF again.",
+  who: "Who asked for it",
 });
 
 const bumpTeams = async () => grantsCache.bumpTeamVersion();

@@ -98,12 +98,14 @@ defineNotification(EVENTS.ATTENDANCE_REVIEW_REQUIRED, {
   title: "Attendance needs review",
   body: (e) => `${e.payload.employee_name}, ${formatDate(e.payload.work_date)}: ${whatOf(e.payload.types)}.`,
   include_actor: true,
+  copy: true,
 });
 
 defineNotification(EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED, {
   to: [{ permission: ["people", "approve"] }],
   title: "Attendance explanation",
   body: (e) => `${e.payload.employee_name} explained ${formatDate(e.payload.work_date)}.`,
+  copy: true,
 });
 
 defineNotification(EVENTS.ATTENDANCE_EXCEPTION_DECIDED, {
@@ -116,6 +118,7 @@ defineNotification(EVENTS.ATTENDANCE_HOME_REQUESTED, {
   to: [{ permission: ["people", "approve"] }],
   title: "Home location to approve",
   body: (e) => `${e.payload.employee_name} sent a home location.`,
+  copy: true,
 });
 
 defineNotification(EVENTS.ATTENDANCE_HOME_DECIDED, {

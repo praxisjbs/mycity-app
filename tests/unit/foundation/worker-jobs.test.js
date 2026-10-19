@@ -47,6 +47,7 @@ describe("job registry", () => {
       "notification-deliver",
       "notification-push",
       "pdf-render",
+      "reminders",
       "scheduled-report",
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
@@ -61,6 +62,7 @@ describe("job registry", () => {
       "mail-sync",
       "media-reconcile",
       "outbox-dispatch",
+      "reminders",
       "scheduled-reports",
       "urgent-repeats",
       "workflow-timeout",

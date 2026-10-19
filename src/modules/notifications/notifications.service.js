@@ -23,6 +23,7 @@ const realtime = require("../../services/realtime/emitter");
 const queues = require("../../jobs/queues");
 const { deviceLabel, platformOf } = require("../identity/identity.device-label");
 const { EVENTS } = require("./notifications.events");
+const reminders = require("./notifications.reminders");
 const repo = require("./notifications.repo");
 
 async function tx(fn) {
@@ -266,7 +267,23 @@ async function repeatUrgent(now = new Date()) {
  * Preferences
  * ------------------------------------------------------------------ */
 
-/** Every category with its channels as they are for this person, defaults applied. */
+/** Quiet hours as they first read when a person turns them on. */
+const QUIET = Object.freeze({ from: "21:00", to: "07:00" });
+
+/** The person's quiet hours and digest switch, defaults applied, with the company's digest. */
+async function settingsOf(userId) {
+  const [mine, company] = await Promise.all([repo.settingOf(pool, userId), reminders.rules(pool)]);
+  return {
+    quiet_enabled: mine ? mine.quiet_enabled : false,
+    quiet_from: mine ? mine.quiet_from : QUIET.from,
+    quiet_to: mine ? mine.quiet_to : QUIET.to,
+    digest: mine ? mine.digest : true,
+    digest_offered: company.digest.enabled,
+    digest_at: company.digest.at_time,
+  };
+}
+
+/** Every category with its channels as they are for this person, defaults applied, and their settings. */
 async function preferences(user) {
   const stored = new Map();
   for (const r of await repo.preferenceRows(pool, user.user_id)) {
@@ -275,6 +292,7 @@ async function preferences(user) {
   }
   const three = (fn) => ({ in_app: fn("in_app"), email: fn("email"), push: fn("push") });
   return {
+    settings: await settingsOf(user.user_id),
     categories: categories.CATEGORIES.map((c) => {
       const mine = stored.get(c.key) || {};
       return {
@@ -311,6 +329,62 @@ async function setPreference(user, body) {
   });
   return preferences(user);
 }
+
+/** Quiet hours on or off, and when (docs/guides/notifications.md §6). */
+async function setQuietHours(user, body) {
+  await tx(async (client) => {
+    const after = await repo.saveQuietHours(client, user.user_id, body);
+    await emit(client, {
+      key: EVENTS.NOTIFICATION_SETTING_CHANGED,
+      entity: { type: "account", id: user.user_id },
+      actor: user,
+      after,
+      payload: { user_id: user.user_id, quiet_enabled: after.quiet_enabled, quiet_from: after.quiet_from, quiet_to: after.quiet_to },
+    });
+  });
+  return preferences(user);
+}
+
+/** The person's own daily digest on or off. */
+async function setDigest(user, body) {
+  await tx(async (client) => {
+    const after = await repo.saveDigest(client, user.user_id, body.digest);
+    await emit(client, {
+      key: EVENTS.NOTIFICATION_SETTING_CHANGED,
+      entity: { type: "account", id: user.user_id },
+      actor: user,
+      after,
+      payload: { user_id: user.user_id, digest: after.digest },
+    });
+  });
+  return preferences(user);
+}
+
+/**
+ * When quiet hours that hold `now` end, or null when `now` is outside them. Lagos time; a window
+ * whose end is before its start runs across midnight (21:00 to 07:00).
+ */
+function quietEnd(now, from, to) {
+  const time = lagos.timeOf(now);
+  const day = lagos.dateOf(now);
+  if (from < to) return time >= from && time < to ? lagos.instant(day, to) : null;
+  if (time >= from) return lagos.instant(lagos.addDays(day, 1), to);
+  if (time < to) return lagos.instant(day, to);
+  return null;
+}
+
+/** Per person in quiet hours now, when their pushes may go. */
+async function quietUntil(userIds, now = new Date()) {
+  const out = new Map();
+  for (const r of await repo.quietHoursOf(pool, [...new Set(userIds)])) {
+    const end = quietEnd(now, r.quiet_from, r.quiet_to);
+    if (end) out.set(r.user_id, end);
+  }
+  return out;
+}
+
+/** Urgent notices and Security come through quiet hours (assumption A). */
+const passesQuiet = (row) => row.urgency === "urgent" || row.category === "security";
 
 /* ------------------------------------------------------------------ *
  * Web push: devices
@@ -530,6 +604,11 @@ module.exports = {
   PUSH_RETRY,
   preferences,
   setPreference,
+  setQuietHours,
+  setDigest,
+  quietEnd,
+  quietUntil,
+  passesQuiet,
   pushConfig,
   savePushSubscription,
   pushDevices,

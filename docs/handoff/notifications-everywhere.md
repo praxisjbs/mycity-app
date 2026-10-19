@@ -165,7 +165,7 @@ Tick each step with its date and add a line to §8 when it is pushed.
 2. [x] 19/10/2026 Contract and migration `0480`: a rule per notice (on or off, extra roles and people, default
    channels, urgency), reminder rules (approvals every N hours, probation N days ahead, the digest's
    time), a person's quiet hours and digest switch.
-3. [ ] Backend: the notice catalogue (a label per declaration), the fan-out applying the company's
+3. [x] 19/10/2026 Backend: the notice catalogue (a label per declaration), the fan-out applying the company's
    rules, approval and probation reminders, the daily digest, quiet hours that hold push (Urgent and
    Security pass, assumption A).
 4. [ ] Screens: Settings · Notifications on both shells (desktop table, phone rows and sheets), quiet
@@ -221,3 +221,9 @@ Tick each step with its date and add a line to §8 when it is pushed.
 - 19/10/2026 · PR 2 steps 1 and 2 pushed: the guides (`notifications.md` §1 to §11, PROGRESS #74
   moved to M0, MILESTONES), the contract (rules, reminders, quiet hours, the digest) and `0480`
   (round trip passes). Next: step 3, the backend.
+- 19/10/2026 · PR 2 step 3 pushed: the notice catalogue (`fanout.notices()`, `who`, `copy`), the
+  company's rules in the fan-out (Off, copies, urgency, default channels), Settings · Notifications'
+  routes (`notifications.rules.js`), the reminder engine with Approvals Waiting and Probation Ending
+  (`notifications.reminders.js`, the `reminders` scheduler), the daily digest (the `reminders` job,
+  `templates/email/digest.html`) and quiet hours holding pushes. New integration suite
+  `notifications-rules` (10 tests) and unit tests pass. Next: step 4, the screens.

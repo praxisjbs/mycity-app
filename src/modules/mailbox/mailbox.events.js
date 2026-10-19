@@ -148,6 +148,7 @@ defineNotification(EVENTS.MAIL_MESSAGE_RECEIVED, {
   to: [{ users: ownerOf }],
   title: (e) => e.payload.from || "New mail",
   body: (e) => [e.payload.subject, e.payload.preview].filter(Boolean).join("\n"),
+  who: "The mailbox's owner",
 });
 
 defineNotification(EVENTS.MAIL_ACCOUNT_NEEDS_RECONNECT, {
@@ -155,6 +156,7 @@ defineNotification(EVENTS.MAIL_ACCOUNT_NEEDS_RECONNECT, {
   title: "Reconnect your mailbox",
   body: "The mail server refused the saved password.",
   priority: "high",
+  who: "The mailbox's owner",
 });
 
 defineNotification(EVENTS.MAIL_SEND_FAILED, {
@@ -162,6 +164,7 @@ defineNotification(EVENTS.MAIL_SEND_FAILED, {
   title: (e) => `Not sent: ${e.payload.subject}`,
   body: (e) => e.payload.reason,
   priority: "high",
+  who: "The mailbox's owner",
 });
 
 module.exports = { EVENTS };
