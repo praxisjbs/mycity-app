@@ -9,7 +9,7 @@ merged), which built web push, the banner, the pane and personal Notification Se
 | | |
 |---|---|
 | Branch | `ccr-59381f61-k83jfs` (push only here; each PR targets `main`; PR 2 starts from `main` after PR 1 merges) |
-| Pull requests | PR 1 #81 (merged 19/10/2026); PR 2 opened 19/10/2026 |
+| Pull requests | PR 1 #81 and PR 2 #84, both merged 19/10/2026: this work is done |
 | Owner | TB (Tom-Blake Asaah), who asked for it on 19/10/2026 |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 19/10/2026 |
@@ -170,7 +170,7 @@ Tick each step with its date and add a line to §8 when it is pushed.
    Security pass, assumption A).
 4. [x] 19/10/2026 Screens: Settings · Notifications on both shells (desktop table, phone rows and sheets), quiet
    hours and the digest in each person's Notification Settings.
-5. [ ] Tests, the whole `npm run ci`, the PR, drive it green and merge.
+5. [x] 19/10/2026 Tests, the whole `npm run ci`, the PR, drive it green and merge: #84, merged.
 
 ---
 
@@ -235,3 +235,12 @@ Tick each step with its date and add a line to §8 when it is pushed.
 - 19/10/2026 · PR 2 step 5: the whole `npm run ci` passes locally, 45 of 45 (`CI_STRICT=1`,
   `RUN_DB_TESTS=1`); quiet hours set to the same time twice now say so. PR 2 opened. Next: drive it
   green and merge with TB's admin rights.
+- 19/10/2026 · PR 2 opened as #84. `main` had moved (#82, exports on the device), so it was merged in:
+  `Your organogram PDF failed` went with #82, the guides, PROGRESS and README kept both sides, the
+  contract types were regenerated. GitHub's run on the merged head was green (scope, checks,
+  backend, frontend, screens); merged with TB's admin rights. Seen on the way, not this work's:
+  in this container the accessibility gate twice failed Performance · Targets' Previous Month
+  button at 2.75 contrast, most likely caught mid-fade (it is disabled until the month loads, and
+  `Button` fades its opacity), while GitHub's runner passed it. For AJ: render it enabled once the month is known, or have the a11y
+  crawl wait for transitions to finish. Open to TB: the design choices in §5 and assumptions A to
+  C. Nothing else is left.
