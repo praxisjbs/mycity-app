@@ -45,6 +45,7 @@ describe("job registry", () => {
       "media-derive",
       "media-scan",
       "notification-deliver",
+      "notification-push",
       "pdf-render",
       "scheduled-report",
     ]);

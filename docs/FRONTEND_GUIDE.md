@@ -553,9 +553,11 @@ packages/ui/
     display/                  Pill, StatusPill, Avatar, Who, CountBadge, KeyValue, Banner, EmptyState,
                               EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money
     navigation/               Tabs, SegmentedControl, Chips
-    overlay/                  Modal, SidePanel, ConfirmDialog (useConfirm), Popover, Menu, Tooltip
+    overlay/                  Modal, SidePanel, ConfirmDialog (useConfirm), Popover, Menu, Tooltip,
+                              PhonePage (a full-screen page from the right on a phone)
     help/                     HelpTerm, InfoButton, Details (§5.2)
-    feedback/                 toast and Toaster, ErrorBoundary, ErrorState
+    feedback/                 toast and Toaster, NotificationBanner (notify(), the banner at the top),
+                              ErrorBoundary, ErrorState
     form/                     the form system: the only home of raw form elements (§8.6)
     data/                     ApiError, createApiClient, useApi, usePaged, useInfinite, useMutation, invalidate,
                               DataView (F20), Pager, Toolbar, ExportButton, Kanban (F19), Calendar
@@ -566,7 +568,8 @@ packages/ui/
     illustrations/            Illustration, in token colours; CityShowcase, the sign-in screen's photographs
     shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
                               PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
-                              MoreSheet, FloatingButton, CommandPalette, NotificationRow, ShellNotice
+                              MoreSheet, FloatingButton, CommandPalette, NotificationCenter (the bell's
+                              pane), NotificationRow, ShellNotice
     testing/                  test setup, render helpers, gallery types (not exported from "."), and
                               eslint-rules.test.ts, the shared lint rules' own test
 ```
@@ -581,16 +584,19 @@ app/
   index.html                  theme and density set before first paint (localStorage mc-theme, mc-density)
   vite.config.ts              the shared Vite settings, page size from the contract, API mode, PWA manifest, /api proxy
   eslint.config.js            extends @mycity/ui/eslint
-  public/                     favicon, PWA icons
+  public/                     favicon, PWA icons, badge-96.png (the pin in a phone's status bar)
+  tsconfig.sw.json            types src/sw.ts against the WebWorker library (§9.7)
   scripts/contract-status.mjs which modules still run on INTERIM types, and which are ready for the contract
   src/
     main.tsx  App.tsx         entry; providers (auth, router, modal, toasts)
+    sw.ts                     the service worker: precache, offline, update, web push (§9.7)
     styles/index.css          Tailwind and the @mycity/ui styles; the staging offset; no colour of its own
     lib/                      plan (the delivery plan bound to this app), router, routes (screen URLs)
     api/
       client.ts               the staff app's client, made with createApiClient (session, refresh)
       endpoints.ts  hooks.ts  the typed endpoint map; the shared hooks bound to this client
-      realtime.ts             Socket.io for the bell and presence (§9.6); nothing on the mock
+      realtime.ts             Socket.io for the bell, presence and the in-front heartbeat (§9.6); nothing
+                              on the mock
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       download.ts             the other way: a gated file fetched with the session's token, as a
@@ -611,7 +617,9 @@ app/
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
-                              shared by People, ESS and Settings, and shared/ (sections, KPI tiles, letters)
+                              shared by People, ESS and Settings; notifications (the bell's pane, the banner,
+                              push on the device, Notification Settings, §9.6); and shared/ (sections, KPI
+                              tiles, letters)
 ```
 
 A module's screens are `features/<module>/index.tsx`, whose default export renders the tab it is
@@ -896,21 +904,53 @@ signed in, with the access token from memory in the handshake. The server joins 
 person's own rooms and closes it when the token expires; the client then refreshes the session once
 and reconnects. A refused refresh leaves it closed and the session sheet takes over (§9.2).
 `useRealtime(event, handler)` hands an event to the components listening while they are mounted;
-`usePresence(userId)` keeps who is online from `presence` events. The bell listens for
-`notification` (a new one) and `notification_read` (a read mark made in another tab or on another
-device) and reloads its dot, its list and the badge counts (`GET /api/v1/notifications/unread-count`,
-`GET /api/v1/notifications`, `GET /api/v1/notifications/badges`, on the contract). Open marks a
-notice read before it navigates; a notice with no screen has Mark Read. Realtime is best effort:
-everything also arrives over HTTP, so a dropped socket only means the bell refreshes when it is
-opened. The in-browser mock has no server, so nothing connects in mock mode. The server sends
-`presence` from M1 chat; notification preferences and web push land in M6.
+`usePresence(userId)` keeps who is online from `presence` events. While the tab is on screen and was
+touched in the last 5 minutes the socket says `presence:active` every 30 seconds, and
+`presence:idle` when that stops: the server holds a push to the person's devices for a minute while
+they are looking at the app. Realtime is best effort: everything also arrives over HTTP, so a
+dropped socket only means the bell refreshes when it is opened. The in-browser mock has no server, so
+nothing connects in mock mode; it answers every notification route in the contract's shapes.
+
+Notifications are designed in `docs/guides/notifications.md` (web push and personal preferences
+brought forward from M6 by TB, 19/10/2026). In the staff app:
+
+- **The bell** (`shell/Bell.tsx`) is the pane, `NotificationCenter`: a `PhonePage` from the right on
+  a phone and a 420 px panel under the bell on desktop, All and Unread, Today, Yesterday and
+  Earlier, pages of 25 through `useInfinite` as the list nears its end, pull to refresh, swipe left
+  (phone) or the hover tick (desktop) to mark read, Mark All Read, and the gear for Notification
+  Settings (`features/notifications/Settings.tsx`: a `PhonePage` over the pane on a phone, a
+  `Modal` on desktop). It reloads its dot, its list and the badge counts
+  (`GET /api/v1/notifications/unread-count`, `GET /api/v1/notifications`,
+  `GET /api/v1/notifications/badges`) on `notification` (a new one) and `notification_read` (a read
+  mark made in another tab or on another device). Open marks a notice read before it navigates.
+  Whether the pane and Notification Settings are open is one store (`features/notifications/state.ts`),
+  so the bell, ⌘K and a `pane=notifications` link open the same ones.
+- **Arrivals** (`features/notifications/arrivals.ts`, `useArrivals`): a notice reaching a window on
+  screen, over the socket or from the service worker, shows the banner (`notify()` from
+  `@mycity/ui`, on the second, top `Toaster`, for 3 seconds) and chimes or vibrates (`sound.ts`):
+  once per notice whichever way it came, never for the record already on screen. A window in the
+  background only reloads its bell; the device's own notification sounds. A link from a notification
+  carries `n=<ids>` (marked read, then dropped from the address) or `pane=notifications`. When the
+  app comes to the front it closes the notifications in the shade whose notices are read, and the
+  app icon's count follows the unread count (`setAppBadge`, where the platform has one).
+- **Push** (`features/notifications/push.ts`): the device's state (unsupported, needs-install, ask,
+  blocked, off, on, unavailable); `syncPush()` on every signed-in start, which never asks;
+  `enablePush()`, only from a press; `disablePush()`, remembered on that device; `sendTestPush()`.
+  The device's id, token and key id live in IndexedDB (`device-store.ts`, database `mycity-push`),
+  where the service worker reads them. The one-time Turn On offer is a `ShellNotice`
+  (`shell/Notices.tsx`); the browser's own prompt never shows unasked.
+- **⌘K** runs Notification Settings, Turn On Notifications, Send Test Notification and Mark All Read
+  in the app itself (`shell/Search.tsx`, `src/shared/search/actions.js`).
 
 ### 9.7 PWA (staff app only)
 
-`vite-plugin-pwa` in `generateSW` mode with `registerType: "prompt"`; `shell/pwa.ts` holds what the
-shell shows (`startPwa()` at start, `usePwa()` in the shell):
+`vite-plugin-pwa` in `injectManifest` mode with `registerType: "prompt"`: the service worker is the
+app's own, `src/sw.ts` (typed by `tsconfig.sw.json`, the WebWorker library, and built as
+`dist/sw.js`); the plugin injects the precache list. `shell/pwa.ts` holds what the shell shows
+(`startPwa()` at start, `usePwa()` in the shell):
 
-- **Update**: a new version shows a `ShellNotice` with Reload rather than reloading under someone.
+- **Update**: a new version shows a `ShellNotice` with Reload rather than reloading under someone;
+  Reload sends the waiting worker `SKIP_WAITING`.
 - **Install** (PR 2 question 4): an Install App action in More and in the desktop account menu, and
   a one-time banner (`ShellNotice`: Install App, Not Now) from a person's second signed-in visit on
   that device, on a phone and on desktop; Not Now holds it for 30 days. Neither shows once the app
@@ -918,12 +958,24 @@ shell shows (`startPwa()` at start, `usePwa()` in the shell):
   its own prompt (`beforeinstallprompt`) Install App uses it; on an iPhone or iPad it shows the Add
   to Home Screen steps.
 - **Offline**: the shell and assets are precached, so the installed app opens without a connection;
-  `/api/` is `NetworkOnly`, so every number on screen is live and nothing personal is cached. With
-  no connection the page area shows the offline page (`shell/offline.tsx`: No Connection, Try
-  Again) and the shell stays; when the connection returns every mounted read reloads.
+  the worker answers no `/api/` request, so every number on screen is live and nothing personal is
+  cached. With no connection the page area shows the offline page (`shell/offline.tsx`: No
+  Connection, Try Again) and the shell stays; when the connection returns every mounted read
+  reloads.
+- **Push** (`src/sw.ts`, `docs/guides/notifications.md` §3, §6): `push` asks each visible window of
+  the app on a `MessageChannel` (`mycity:push`, 1.5 seconds) and shows a notification unless one
+  answers `{ ok: true }`; Safari, iPhones and iPads, and a test always show one, because WebKit stops
+  a subscription whose pushes show nothing. One notification per conversation (its tag): mail and
+  direct messages alert again, channel posts update quietly. Each carries the sender's initials
+  (drawn on an `OffscreenCanvas` in the brand colours read from `tokens.css`), the monochrome pin
+  `public/badge-96.png`, Mark Read and the unread count on the app icon. `notificationclick` focuses
+  a window and sends it to the record (`mycity:open`) or opens one on the record's address with
+  `n=<ids>`; sign-in keeps the address, so the record opens once signed in. Mark Read and
+  `pushsubscriptionchange` call the API with the device token, without a session.
 
 The manifest is in `vite.config.ts` (standalone, brand colours, 192, 512 and maskable icons). The
-service worker never answers `/api/` or `/gallery/` with the app shell.
+service worker never answers `/api/` or `/gallery/` with the app shell, and the API serves `sw.js`
+with `Cache-Control: no-cache`, so a new worker is found at the next start.
 
 ---
 

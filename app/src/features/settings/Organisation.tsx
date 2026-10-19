@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import settings from "@mycity/contract/schemas/settings.js";
 import type { Holiday, Organisation, WorkingDay } from "@mycity/contract/contract.gen.ts";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
+import { useFileUrl } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { upload } from "@/api/upload";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
@@ -11,6 +13,7 @@ import {
   Card,
   CardHeader,
   Chips,
+  cn,
   DataView,
   DateField,
   DesktopOnly,
@@ -21,17 +24,22 @@ import {
   FormError,
   FormFooter,
   Grid,
+  Icon,
+  IconButton,
   KeyValue,
   LoadingRows,
   PageHeader,
   PhoneField,
+  PhoneOnly,
   Pill,
+  Stack,
   Switch,
   TextAreaField,
   TextField,
   TimeField,
   toast,
   useConfirm,
+  UploadField,
   useContractForm,
   useModal,
 } from "@mycity/ui";
@@ -87,33 +95,126 @@ export function OrganisationTab() {
         }
       />
       <Grid cols={2}>
-        <Card>
-          <CardHeader title="Company" />
-          {org.error ? (
-            <ErrorState error={org.error} onRetry={org.reload} />
-          ) : !o ? (
-            <LoadingRows count={6} />
-          ) : (
-            <KeyValue
-              items={[
-                ["Legal Name", o.legal_name],
-                ["Trading Name", o.trading_name],
-                ["RC Number", o.registration_number],
-                ["Tax ID", o.tax_id],
-                ["Address", o.address],
-                ["Phone", o.phone],
-                ["Email", o.email],
-                ["Website", o.website],
-                ["Currency", "Naira (NGN)"],
-                ["Time Zone", "Africa/Lagos"],
-              ]}
-            />
-          )}
-        </Card>
+        <Stack gap={3}>
+          <Card>
+            <CardHeader title="Company" />
+            {org.error ? (
+              <ErrorState error={org.error} onRetry={org.reload} />
+            ) : !o ? (
+              <LoadingRows count={6} />
+            ) : (
+              <KeyValue
+                items={[
+                  ["Legal Name", o.legal_name],
+                  ["Trading Name", o.trading_name],
+                  ["RC Number", o.registration_number],
+                  ["Tax ID", o.tax_id],
+                  ["Address", o.address],
+                  ["Phone", o.phone],
+                  ["Email", o.email],
+                  ["Website", o.website],
+                  ["Currency", "Naira (NGN)"],
+                  ["Time Zone", "Africa/Lagos"],
+                ]}
+              />
+            )}
+          </Card>
+          {o && <BrandFiles org={o} canEdit={canEdit} />}
+        </Stack>
         <Holidays canEdit={canEdit} />
       </Grid>
       <WorkingWeek canEdit={canEdit} />
     </>
+  );
+}
+
+/* ───────────── Brand files (foundation.md §6.11) ───────────── */
+
+type BrandSlot = "logo" | "logo_white" | "icon";
+const BRAND: Array<{ slot: BrandSlot; label: string; upload: string; said: string; dark: boolean }> = [
+  { slot: "logo", label: "Logo", upload: "Upload Logo", said: "Logo", dark: false },
+  { slot: "logo_white", label: "White Logo", upload: "Upload White Logo", said: "White logo", dark: true },
+  { slot: "icon", label: "Icon", upload: "Upload Icon", said: "Icon", dark: true },
+];
+const BRAND_MAX_BYTES = 5 * 1024 * 1024;
+
+/** The three brand files, each one upload that applies at once; letters, system mail and signatures use them. */
+function BrandFiles({ org, canEdit }: { org: Organisation; canEdit: boolean }) {
+  return (
+    <Card>
+      <CardHeader title="Brand" help="PNG or WebP with a clear background. Signatures, letters and system mail use them at once." />
+      <div className="grid grid-cols-3 gap-3 max-md:gap-2">
+        {BRAND.map((b) => (
+          <BrandFile key={b.slot} {...b} doc={org[b.slot]} canEdit={canEdit} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function BrandFile({ slot, label, upload: uploadLabel, said, dark, doc, canEdit }: (typeof BRAND)[number] & { doc: Organisation["logo"]; canEdit: boolean }) {
+  const href = useFileUrl(doc ? `/api/v1/documents/${doc.document_id}/content` : null);
+  const remove = async () => {
+    try {
+      await api.call("DELETE /api/v1/settings/organisation/brand/:slot", { params: { slot } });
+      invalidate("/api/v1/settings/organisation");
+      toast(`${said} removed`);
+    } catch (e) {
+      say(e);
+    }
+  };
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className={cn("flex h-20 items-center justify-center rounded-box border border-border p-3", dark ? "bg-deep" : "bg-paper")}>
+        {href ? (
+          <img src={href} alt={label} className="max-h-full max-w-full object-contain" />
+        ) : (
+          <Icon name="image" size="l" className={dark ? "text-on-deep-muted" : "text-paper-faint"} label={doc ? label : `No ${label}`} />
+        )}
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold">{label}</div>
+        {doc && (
+          <div data-copy="content" className="truncate text-2xs text-subtle-foreground">
+            {doc.file_name}
+          </div>
+        )}
+      </div>
+      {canEdit && (
+        <div className="flex flex-wrap gap-1.5">
+          <UploadField
+            upload={upload}
+            purpose="brand"
+            endpoint={`/api/v1/settings/organisation/brand/${slot}`}
+            multiple={false}
+            accept=".png,.webp"
+            maxBytes={BRAND_MAX_BYTES}
+            handOff
+            onUploaded={() => {
+              invalidate("/api/v1/settings/organisation");
+              toast(`${said} updated`);
+            }}
+            trigger={(open) => (
+              <>
+                <DesktopOnly as="span">
+                  <Button size="sm" icon="plus" onClick={open}>
+                    {uploadLabel}
+                  </Button>
+                </DesktopOnly>
+                <PhoneOnly as="span">
+                  <IconButton icon="plus" label={uploadLabel} onClick={open} />
+                </PhoneOnly>
+              </>
+            )}
+          />
+          {doc && (
+            <Button size="sm" variant="ghost" onClick={remove}>
+              Remove
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

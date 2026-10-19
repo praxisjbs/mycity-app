@@ -53,6 +53,18 @@
  * worker. Rows are handed over once (delivery_queued_at), and a failed hand-over is
  * retried with the event.
  *
+ * On a phone or computer, notices of one conversation share a notification
+ * (docs/guides/notifications.md §6). A declaration may say how, with `push`:
+ *
+ *   defineNotification("channel_message.posted", {
+ *     ...,
+ *     push: { tag: (e) => `community_channel:${e.payload.community_channel_id}`, mode: "quiet" },
+ *   });
+ *
+ * `tag` names the conversation (default: the notice's record); `mode` is `alert` (a newer
+ * notice replaces the shown one and alerts again, the default for a record), `quiet` (it
+ * replaces it silently until opened) or `single` (it stands alone).
+ *
  * Tables (migration 0060; BACKEND_STRUCTURE §11.1):
  *   notification             notification_id, user_id, event_id, event_key, category, priority,
  *                            title, body, entity_type, entity_id, channels text[], created_at,
@@ -69,6 +81,7 @@ const categories = require("./categories");
 
 const SPECS = new Map();
 const deliveryHooks = [];
+const PUSH_MODES = ["alert", "quiet", "single"];
 const TITLE_MAX = 200;
 const BODY_MAX = 1000;
 const AUDIENCE_KEYS = [
@@ -124,6 +137,15 @@ function defineNotification(key, spec) {
     throw new Error(`${where}: body is a string or (event) => string`);
   if (spec.priority && !["normal", "high"].includes(spec.priority))
     throw new Error(`${where}: priority is normal or high`);
+  if (spec.push !== undefined) {
+    const p = spec.push;
+    if (!p || typeof p !== "object")
+      throw new Error(`${where}: push is { tag?, mode? }`);
+    if (p.tag !== undefined && typeof p.tag !== "function")
+      throw new Error(`${where}: push.tag is (event) => string`);
+    if (p.mode !== undefined && !PUSH_MODES.includes(p.mode))
+      throw new Error(`${where}: push.mode is ${PUSH_MODES.join(", ")}`);
+  }
   for (const text of [spec.title, spec.body]) {
     if (typeof text === "string" && text.includes("\u2014"))
       throw new Error(`${where}: no em dashes in copy a person reads`);
@@ -132,6 +154,23 @@ function defineNotification(key, spec) {
   if (existing && existing !== spec)
     throw new Error(`${where}: already declared`);
   SPECS.set(key, spec);
+}
+
+/**
+ * How an event's notices group on a device: `{ tag, mode }` from its declaration, either
+ * part null when the declaration leaves it to the record (services/push/payload.styleOf).
+ */
+function pushStyleOf(event) {
+  const spec = SPECS.get(event && event.key);
+  const p = spec && spec.push;
+  if (!p) return null;
+  let tag;
+  try {
+    tag = p.tag ? String(p.tag(event) || "") || null : null;
+  } catch {
+    tag = null;
+  }
+  return { tag, mode: p.mode || null };
 }
 
 /** Register who sends a notification out (email, push, realtime). The worker does this. */
@@ -368,7 +407,8 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
   let handedOver = 0;
   if (deliveryHooks.length) {
     const { rows } = await db.query(
-      `SELECT notification_id, user_id, category, priority, title, body, entity_type, entity_id, channels
+      `SELECT notification_id, user_id, category, priority, title, body, entity_type, entity_id, channels,
+              created_at
          FROM notification
         WHERE event_id = $1 AND delivery_queued_at IS NULL
         ORDER BY notification_id`,
@@ -508,6 +548,7 @@ function __hooks() {
 module.exports = {
   defineNotification,
   onDelivery,
+  pushStyleOf,
   handle,
   watchers,
   permissionHolders,

@@ -8,6 +8,7 @@ const express = require("express");
 const c = require("@mycity/contract");
 const { route } = require("../../http/route");
 const { requirePermission } = require("../../middleware/rbac");
+const upload = require("../../middleware/upload");
 const controller = require("./settings.controller");
 
 const router = express.Router();
@@ -25,6 +26,14 @@ route(router, "get", "/organisation",
 route(router, "patch", "/organisation",
   { body: c.settings.OrganisationPatch, response: c.settings.Organisation, summary: "Change the organisation profile" },
   edit, controller.updateOrganisation);
+
+route(router, "post", "/organisation/brand/:slot",
+  { params: c.settings.BrandSlotParams, body: c.documents.DocumentUpload, response: c.documents.DocumentRef, summary: "Upload a brand file: the logo, the white logo or the icon" },
+  edit, upload.single("file", { purpose: "brand" }), controller.uploadBrand);
+
+route(router, "delete", "/organisation/brand/:slot",
+  { params: c.settings.BrandSlotParams, response: c.settings.Organisation, summary: "Remove a brand file" },
+  edit, controller.removeBrand);
 
 route(router, "get", "/working-week",
   { response: c.settings.WorkingWeek, summary: "The working week, Monday to Sunday" },

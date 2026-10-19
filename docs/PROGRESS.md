@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 93 screens (87 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 94 screens (88 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -42,8 +42,8 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 28 items below: 27 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 2 | 0 | 27 | 0 | 0 |
+| M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
+| M1 Core Operations & Employee Management | 30 | 2 | 0 | 28 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **93** | **59** | **0** | **34** | **0** | **0** |
+| **Total** | **94** | **59** | **0** | **35** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
@@ -97,9 +97,35 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Frontend foundation PR 3 · Build kit: DataView, KPI, charts, kanban, calendar, pickers, upload, editor, PDF preview, voice, maps; app component folders emptied; every screen on the token scale | AJ | ☑ | 16/10/2026 |
 | Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
 | One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
+| Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☑ | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Notifications built (`docs/guides/notifications.md` is Built; PR #72). Web push to
+  phones and computers through the app's own service worker (`app/src/sw.ts`: one notification per
+  conversation, Mark Read, the pin in the status bar and the count on the app icon, a tap through
+  sign-in to the record), the in-app banner (3 s, the chime or a buzz, once per notice, none in a
+  window in the background), the pane on both shells (`NotificationCenter`: a page from the right on
+  a phone, a panel under the bell on desktop), Notification Settings (this device, other devices, In
+  App, Email and Push per category), the one-time Turn On offer, three ⌘K actions, and live mail on
+  staging and production. The integration suite passes locally, 26 suites and 635 tests, with
+  `notifications-push.test.js`. GE's runbook: `docs/runbooks/push-notifications.md` (nothing to set
+  in `.env`; check `MAILBOX_IDLE_MAX` is not 0). The whole `npm run ci` passes locally (45 gates),
+  and pushes delivered to the built service worker in Chromium show as designed (handoff §8). Left:
+  TB's phone check after the staging deploy (handoff §7).
+- 19/10/2026 · TB · Notifications, in progress (TB's eight decisions in `docs/handoff/push-notifications.md`
+  §2; design `docs/guides/notifications.md`). The backend of web push: migration `0460`
+  (`push_subscription` as a device with its token, key id and health; `push_delivery`, one row per
+  notice and device), the environment's VAPID pair made on first start and kept encrypted
+  (`services/push/vapid.js`, `.env` may override, subject `mailto:jbspraxisllc@gmail.com`), the sender
+  with error mapping (`web-push.js`), the payload (`payload.js`), the `notification-push` job (a
+  minute's hold while the person is in front of the app, Security never held; one send per device;
+  dead subscriptions revoked; retries with backoff), the routes for preferences, devices, Send Test,
+  read state and the service worker's two device-token calls, push off on suspension, leaving, Sign
+  Out Everywhere and Sign Out Others. Mail: IMAP IDLE on by default (24 production, 4 staging), the
+  first line in the notice, reading a conversation reads its notices. Channel posts alert once per
+  channel. Left: the service worker, the banner, the pane and Notification Settings on both shells,
+  tests, the runbook for GE.
 - 19/10/2026 · TB · The staff roster and the staff importer (`docs/guides/foundation.md` §6.1, §6.5,
   §6.6, §11), from a review of what staging shows. A VACANT row's Line Manager is the seat's own
   line (the importer dropped it without a word); `roles.json` gives a post outside the sheet its line
@@ -745,9 +771,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 21 | Archive | `archive` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 22 | Spam | `spam` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 23 | Trash | `trash` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 94 | Signature | `signature` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Signature (#94) built, from TB's brief and answers (design B, Street Sign, chosen on the design canvas from three): one signature for everyone, drawn from the employee record, the mailbox and Settings · Organisation, never designed by hand. Backend: contract (`MySignature`, `MySignatureSave`, `SignaturePreview*`, `SignatureConfig*`), migration 1127 (`mail_signature`, `mail_signature_config`), seed 1129 (`mailbox.signature` for System Administrator and Implementation), `mailbox/signature/` (the model, the email-safe full signature and slim line in HTML and text, the pictures drawn at 2x and stored once by hash, placement above the quoted mail), five routes, and `send()` baking the signature into the queued message with its pictures sent inline (`cid:`) and kept on the Sent copy. The slim line goes on replies and on mail only for colleagues. Screens: the tab shows it as it sends (New Mail or Reply) with Copy Signature, the person's numbers (the mobile through the organisation service, as Edit Profile) and two switches; Configure for holders (app links, six social links as icons, what shows); the composer previews it behind Show Signature. 21 unit tests (the model, the drawings, placement, the full-or-slim rule, the pictures) and 7 integration tests on the real migrations (the tab, numbers through the employee record, the preview rule, Configure's capability, sending with inline pictures and the Sent copy, a reply's placement, a queued message keeping its signature, a failed bake leaving without it); the brand files' test in `tests/integration/settings.test.js`. Left: walk it on a phone once staging has it; the brand files are uploaded by MyCity in Settings · Organisation.
+- 19/10/2026 · GE · Signature added with npm run new:screen (catalogue, route map, screen file, Coming Soon); not started.
 - 18/10/2026 · GE · Reader brought level with the reference client: remote content held back by every route it can fetch (images, `srcset`, posters, `background`, style `url()`), so Load Images is offered whenever anything was held; Always Show Images per sender (`mail_image_trust`, migration 1125, `POST /mailbox/image-trust`, Stop Showing Images in the thread menu); signature logos (`cid:` inline parts) drawn from the vault; quoted history folded behind Show Quoted Text, in English and French, from a blockquote, an "On … wrote:" line or trailing `>` lines. Also fixed: the frame's spacing came out of its measured height and clipped the last lines of every message. Checked in the mock app at 390 px and with the integration suite (12 of 12). Left: walk it on a phone once staging has it.
 - 18/10/2026 · GE · Reader fixed from a phone test: HTML mail was written into the page, so a sender's fixed 600 px layout (a cPanel notice) ran off the phone and their styles could reach ours. It now renders in `EmailFrame` (new in `packages/ui`): a sealed frame, as tall as its content, scaled down to the column's width when wider, with its own policy (no scripts, frames or forms; web images after Load Images); a `mailto:` link opens the composer. On a dark surface a message designed for a white page is recoloured as Outlook does (light backgrounds onto our card, dark text onto our foreground, hue kept in OKLab; brand colours already right for dark, accent borders and images untouched; a message with its own `prefers-color-scheme` left alone). Checked in Chromium at 360 px: the 600 px table shows at 0.49 and the page no longer scrolls sideways; the cPanel-style notice draws as sent in light and on our dark card in dark. Left: walk it on a phone once staging has it.
 - 18/10/2026 · GE · Composer fixed from a phone test: attachments were all refused (422, "Check the highlighted fields") because the composer sent the purpose `mail`, which the upload contract does not take; it now sends `attachment`, with an integration test sending a phone photograph the way the composer does. "Draft saved" moved out of the footer to quiet text beside Attach a File (guide §10); on the phone the footer is one row (Discard and Schedule as icons, Send filling the rest). `UploadField` gains Remove on a failed file and `handOff`, so a finished attachment shows once, as its chip. Left: walk it on a phone once staging has it.
@@ -942,7 +971,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -957,6 +986,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · Organisation (#69): the brand files (`docs/guides/foundation.md` §6.11). A Brand card takes the Logo, the White Logo (shown on Deep Green) and the Icon, each one upload that applies at once (`POST`, `DELETE /settings/organisation/brand/:slot`, purpose `brand`: PNG or WebP, kept a PNG, colours untouched), and Remove. Letterheads and PDFs draw the Logo, system mail's header the White Logo inside the message, email signatures the White Logo or the Icon. One reader of the profile for all of them (`shared/organisation/profile.js`) also fixes letterheads and system mail, which read an `organisation.profile` row nothing wrote and so always printed the defaults; the letterhead's footer now carries the RC number. Left: MyCity uploads its files.
 - 19/10/2026 · TB · Imports (#93): a row saved with something missing (a warning: a person left
   without a Line Manager, say) is a problem beside the errors and duplicates. The preview lists
   those rows (`GET /imports/:id/rows?status=problem`, contract `ImportRowListQuery`) and counts

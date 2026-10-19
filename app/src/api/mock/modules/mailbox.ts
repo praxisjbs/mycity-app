@@ -1,8 +1,11 @@
+import type { MySignature, SignatureConfig } from "@mycity/contract/contract.gen.ts";
 import type { MailAttachment, MailDraftSave, MailFolder, MailMessage, MailSend, ThreadRow } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, uuid } from "../core";
 import { byKey } from "../data/people";
 import { UPLOADS } from "../uploads";
+import { phoneOf, setPhone } from "./ess";
+import { me } from "./identity";
 
 /**
  * Each signed-in person's own mailbox on the mock, in the contract's shapes
@@ -218,4 +221,105 @@ route("POST /api/v1/mailbox/queue/:id/cancel", (req) => {
   const release = d.scheduled!.release_at;
   d.scheduled = null;
   return ok({ mail_send_queue_id: req.params.id, status: "cancelled", release_at: release });
+});
+
+/* ── Signatures (mailbox.md §3 steps 7 to 10) ──
+ * A person's numbers and switches, and the company's links. The mock draws the signature's lines
+ * plainly, without the band's colours or pictures: those are the server's (signature.html.js). */
+interface MSig { office_line: string | null; show_mobile: boolean; show_whatsapp: boolean }
+const SIGS = new Map<string, MSig>();
+const SIG_LINKS = ["app_store_url", "google_play_url", "instagram_url", "tiktok_url", "linkedin_url", "x_url", "facebook_url", "youtube_url"] as const;
+const SIG_CONFIG: SignatureConfig = {
+  app_store_url: null, google_play_url: null, instagram_url: null, tiktok_url: null, linkedin_url: null, x_url: null, facebook_url: null, youtube_url: null,
+  confidentiality_note: null, show_whatsapp: true, show_app_links: true, show_social_links: true, show_legal: true, updated_at: null,
+};
+const SOCIAL_NAMES: Record<string, string> = { instagram_url: "Instagram", tiktok_url: "TikTok", linkedin_url: "LinkedIn", x_url: "X", facebook_url: "Facebook", youtube_url: "YouTube" };
+const sigOf = (user: string): MSig => SIGS.get(user) ?? { office_line: null, show_mobile: true, show_whatsapp: true };
+const e164 = (v: string | null) => (v ? v.replace(/[\s\-().]/g, "").replace(/^0(\d{10})$/, "+234$1").replace(/^234(\d{10})$/, "+234$1") : null);
+const PHONE = /^(\+234\d{10}|\+(?!234)[1-9]\d{7,14})$/;
+const shown = (v: string) => { const m = /^\+234(\d{3})(\d{3})(\d{4})$/.exec(v); return m ? `+234 ${m[1]} ${m[2]} ${m[3]}` : v; };
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&${({ "&": "amp", "<": "lt", ">": "gt", '"': "quot" } as Record<string, string>)[c]};`);
+const lines = (rows: Array<string | null | false>) => `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td>${rows.filter(Boolean).map((r) => `<div>${r}</div>`).join("")}</td></tr></table>`;
+
+function drawn(user: string) {
+  const p = byKey(user)!;
+  const s = sigOf(user);
+  const mobile = s.show_mobile ? e164(phoneOf(user)) : null;
+  const wa = mobile && s.show_whatsapp && SIG_CONFIG.show_whatsapp;
+  const socials = SIG_CONFIG.show_social_links ? Object.keys(SOCIAL_NAMES).filter((k) => SIG_CONFIG[k as keyof SignatureConfig]) : [];
+  const apps = SIG_CONFIG.show_app_links ? (["app_store_url", "google_play_url"] as const).filter((k) => SIG_CONFIG[k]) : [];
+  const full = lines([
+    `<b>${esc(p.display_name)}</b>`,
+    esc(p.job_title),
+    esc(p.department),
+    mobile && `<a href="tel:${mobile}">${shown(mobile)}</a>${wa ? ` · <a href="https://wa.me/${mobile.slice(1)}">WhatsApp</a>` : ""}`,
+    s.office_line && `Office <a href="tel:${s.office_line}">${shown(s.office_line)}</a>`,
+    `<a href="mailto:${esc(p.work_email)}">${esc(p.work_email)}</a>`,
+    "<b>MyCity App</b>",
+    socials.length > 0 && socials.map((k) => `<a href="${esc(String(SIG_CONFIG[k as keyof SignatureConfig]))}">${SOCIAL_NAMES[k]}</a>`).join(" · "),
+    apps.length > 0 && `Get the App: ${apps.map((k) => `<a href="${esc(String(SIG_CONFIG[k]))}">${k === "app_store_url" ? "App Store" : "Google Play"}</a>`).join(" · ")}`,
+    "MyCity App Ltd",
+    SIG_CONFIG.show_legal && SIG_CONFIG.confidentiality_note && esc(SIG_CONFIG.confidentiality_note),
+  ]);
+  const phone = mobile ?? s.office_line;
+  const slim = lines([`<b>${esc(p.display_name)}</b>, ${esc(p.job_title)}`, `<b>MyCity App</b>${phone ? ` · ${shown(phone)}` : ""}`]);
+  return { full, slim };
+}
+
+function signature(user: string): MySignature {
+  const p = byKey(user)!;
+  const s = sigOf(user);
+  const d = drawn(user);
+  return {
+    name: p.display_name, job_title: p.job_title, department: p.department, email: p.work_email, mobile: e164(phoneOf(user)),
+    office_line: s.office_line, show_mobile: s.show_mobile, show_whatsapp: s.show_whatsapp, whatsapp_allowed: SIG_CONFIG.show_whatsapp,
+    full_html: d.full, slim_html: d.slim,
+  };
+}
+
+const configures = (user: string) => { const m = me(user); return m.is_ceo || m.capabilities.includes("mailbox.signature"); };
+const notConfigurer = () => fail(403, "CAPABILITY_REQUIRED", "This needs an authority you do not hold");
+
+route("GET /api/v1/mailbox/signature", (req) => ok(signature(req.user!)));
+route("PATCH /api/v1/mailbox/signature", (req) => {
+  const b = req.body as { mobile?: string | null; office_line?: string | null; show_mobile?: boolean; show_whatsapp?: boolean };
+  const mobile = b.mobile ? e164(b.mobile) : null;
+  const office = b.office_line ? e164(b.office_line) : null;
+  const f: Record<string, string[]> = {};
+  if (mobile && !PHONE.test(mobile)) f.mobile = ["Not a phone number"];
+  if (office && !PHONE.test(office)) f.office_line = ["Not a phone number"];
+  if (Object.keys(f).length) return invalid(f);
+  if (mobile) setPhone(req.user!, mobile);
+  const s = sigOf(req.user!);
+  SIGS.set(req.user!, {
+    office_line: b.office_line === undefined ? s.office_line : office,
+    show_mobile: b.show_mobile ?? s.show_mobile,
+    show_whatsapp: b.show_whatsapp ?? s.show_whatsapp,
+  });
+  return ok(signature(req.user!));
+});
+route("POST /api/v1/mailbox/signature/preview", (req) => {
+  const b = req.body as { in_reply_to?: string | null; to_addresses?: string[]; cc_addresses?: string[]; bcc_addresses?: string[] };
+  const all = [...(b.to_addresses ?? []), ...(b.cc_addresses ?? []), ...(b.bcc_addresses ?? [])];
+  const own = byKey(req.user!)!.work_email.split("@").pop()!.toLowerCase();
+  const colleagues = all.length > 0 && all.every((a) => a.split("@").pop()?.toLowerCase() === own);
+  const variant = b.in_reply_to || colleagues ? "slim" : "full";
+  const d = drawn(req.user!);
+  return ok({ variant, html: variant === "slim" ? d.slim : d.full });
+});
+route("GET /api/v1/mailbox/signature/config", (req) => (configures(req.user!) ? ok(SIG_CONFIG) : notConfigurer()));
+route("PUT /api/v1/mailbox/signature/config", (req) => {
+  if (!configures(req.user!)) return notConfigurer();
+  const b = req.body as Record<string, unknown>;
+  const f: Record<string, string[]> = {};
+  for (const k of SIG_LINKS) {
+    const v = String(b[k] ?? "").trim();
+    if (v && !/^https:\/\/[^\s/]+\.[^\s]+$/i.test(v)) f[k] = ["Not a web address"];
+  }
+  if (Object.keys(f).length) return invalid(f);
+  for (const k of SIG_LINKS) SIG_CONFIG[k] = String(b[k] ?? "").trim() || null;
+  SIG_CONFIG.confidentiality_note = String(b.confidentiality_note ?? "").trim() || null;
+  for (const k of ["show_whatsapp", "show_app_links", "show_social_links", "show_legal"] as const) SIG_CONFIG[k] = b[k] !== false;
+  SIG_CONFIG.updated_at = new Date().toISOString();
+  return ok(SIG_CONFIG);
 });

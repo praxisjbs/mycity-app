@@ -419,9 +419,25 @@ export function createApi<E>(config: ApiConfig) {
       setPages(1);
     }, [resetKey]);
 
+    // invalidate() of this list, or reload(): from the first page again. reload() settles once that page is in.
+    const [tick, setTick] = useState(0);
+    const waiting = useRef<Array<() => void>>([]);
+    const reload = useCallback(
+      () =>
+        new Promise<void>((resolve) => {
+          waiting.current.push(resolve);
+          setPages(1);
+          setTick((t) => t + 1);
+        }),
+      [],
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `resetKey` is the serialised key and params
+    useEffect(() => subscribe(pathOf(key, opts.params), () => void reload()), [key, resetKey, reload]);
+
     useEffect(() => {
       if (opts.enabled === false) return;
       let live = true;
+      const settle = () => waiting.current.splice(0).forEach((done) => done());
       const [k, p, f, q] = JSON.parse(resetKey) as [K, ParamsOf<E, K>, Record<string, unknown>, string];
       setState((s) => ({ ...s, loading: true }));
       call(k, { params: p ?? undefined, query: { ...f, page: pages, ...(q ? { q } : {}) } } as Opts<K>)
@@ -435,18 +451,22 @@ export function createApi<E>(config: ApiConfig) {
             loading: false,
             error: null,
           }));
+          settle();
         })
-        .catch((e: unknown) => live && setState((s) => ({ ...s, loading: false, error: e instanceof ApiError ? e : new ApiError(0, null) })));
+        .catch((e: unknown) => {
+          if (live) setState((s) => ({ ...s, loading: false, error: e instanceof ApiError ? e : new ApiError(0, null) }));
+          settle();
+        });
       return () => {
         live = false;
       };
-    }, [resetKey, pages, opts.enabled]);
+    }, [resetKey, pages, opts.enabled, tick]);
 
     const more = useCallback(() => {
       if (!state.loading && state.page?.has_next) setPages((n) => n + 1);
     }, [state.loading, state.page]);
 
-    return { rows: state.reset === resetKey ? state.rows : [], page: state.page, loading: state.loading, error: state.error, more };
+    return { rows: state.reset === resetKey ? state.rows : [], page: state.page, loading: state.loading, error: state.error, more, reload };
   }
 
   /** A write. `fields` holds the server's per-field messages after a 422, for the marks on the form. */

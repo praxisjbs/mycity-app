@@ -234,7 +234,7 @@ in #announcements, which every member of staff reads.
 
 | Event / job | When | Does |
 |---|---|---|
-| `community.message.posted` | After a message commits | Realtime push to `channel:<id>`; notifications to non-muted members not viewing; mentions notify |
+| `community.message.posted` | After a message commits | Realtime push to `channel:<id>`; notifications to non-muted members not viewing; mentions notify. A channel post's notice is titled with the channel (`#general`) and reads "Name: first line"; on a phone a channel's posts share one notification that alerts once and then updates quietly until opened; each direct message alerts, replacing the one before from the same conversation (TB, 19/10/2026; `docs/guides/notifications.md` §6) |
 | `community.recognition.posted` | After a recognition commits | As above; counted for Home and M2 |
 | `announcement.published` | On publish, or when a scheduled one is released | Message in #announcements; notification and push to the audience |
 | `announcement-publish` (delayed job) | At `publish_at` | Releases a scheduled announcement (README §5.15) if it is still scheduled and due |
@@ -364,4 +364,5 @@ fields, never in a toast.
 - 17/10/2026 · GE · #announcements has no composer and a lock on its row; announcements come only from the tab. The tab's figures come from the server (`GET /announcements/stats`): Audience is the active staff an all-staff announcement reaches, not the largest past audience on the first page. Polls sit on the sender's side at up to 560 px; Ctrl+Enter starts a new line.
 - 17/10/2026 · GE · A hand-posted work anniversary carries its years from the start date, as the 05:00 ones do ("Another year" with no start date). The phone's Channels drawer closes when a channel is picked.
 - 17/10/2026 · TB · Header gains the Capabilities row every guide now carries (README §5.2): `announcements.post`, as built and seeded by `0449`.
+- 19/10/2026 · TB · §7: how posts and direct messages reach a phone (one alert per channel, then quiet updates; every direct message alerts, one notification per conversation) and the channel's name in a post's notice (`channel_name` in the event's payload), from TB's notification decisions.
 - 19/10/2026 · AJ · `PersonRef` carries `photo_url` (`shared/db/person.js`, which replaces `community.repo.js`'s own `PERSON`): members, direct messages and their profile panel, posts, celebration and recognition cards, the colleague picker and announcement readers show each face (the app's `usePhotos`), initials when there is none. GE to review.

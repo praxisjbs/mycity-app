@@ -52,6 +52,11 @@ const JOBS = Object.freeze([
     summary: "Notifications sent out: the bell, email and push",
   },
   {
+    queue: "notification-push",
+    concurrency: 4,
+    summary: "One notice pushed to its person's phones and computers",
+  },
+  {
     queue: "media-scan",
     concurrency: 2,
     summary: "A file from outside scanned by clamd",
@@ -280,6 +285,7 @@ function registerDelivery() {
           actor_user_id: event.actor_user_id,
         },
         notifications: rows,
+        push: fanout.pushStyleOf(event),
       },
       { jobId: `notification-deliver-${event.event_id}` },
     );

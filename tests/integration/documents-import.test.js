@@ -152,7 +152,7 @@ async function seed() {
      ON CONFLICT (doc_type) DO UPDATE SET prefix = EXCLUDED.prefix, padding = EXCLUDED.padding`,
   );
   await q(
-    `INSERT INTO setting (key, value) VALUES ('organisation.profile', '{"name": "MyCity App Ltd", "email": "hello@mycityapp.io"}')`,
+    `INSERT INTO setting (key, value) VALUES ('organisation.legal_name', '"MyCity App Ltd"'), ('organisation.email', '"hello@mycityapp.io"')`,
   );
   await q("INSERT INTO test_department (name) VALUES ('Operations')");
 }

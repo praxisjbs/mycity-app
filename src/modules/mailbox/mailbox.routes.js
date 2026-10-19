@@ -7,7 +7,7 @@
 const express = require("express");
 const c = require("@mycity/contract");
 const { route } = require("../../http/route");
-const { requirePermission } = require("../../middleware/rbac");
+const { requirePermission, requireCapability } = require("../../middleware/rbac");
 const upload = require("../../middleware/upload");
 const controller = require("./mailbox.controller");
 
@@ -15,6 +15,8 @@ const router = express.Router();
 const mb = c.mailbox;
 const view = () => requirePermission("mailbox", "view");
 const create = () => requirePermission("mailbox", "create");
+/** Configure Signature: the company's links and switches (mailbox.md §8). */
+const configure = () => requireCapability("mailbox.signature");
 
 route(
   router,
@@ -193,6 +195,61 @@ route(
   },
   create(),
   controller.cancel,
+);
+
+route(
+  router,
+  "get",
+  "/signature",
+  { response: mb.MySignature, summary: "My email signature" },
+  view(),
+  controller.signature,
+);
+route(
+  router,
+  "patch",
+  "/signature",
+  {
+    body: mb.MySignatureSave,
+    response: mb.MySignature,
+    summary: "Change the numbers on my signature",
+  },
+  requirePermission("mailbox", "edit"),
+  controller.saveSignature,
+);
+route(
+  router,
+  "post",
+  "/signature/preview",
+  {
+    body: mb.SignaturePreviewRequest,
+    response: mb.SignaturePreview,
+    summary: "The signature a message would carry",
+  },
+  view(),
+  controller.previewSignature,
+);
+route(
+  router,
+  "get",
+  "/signature/config",
+  { response: mb.SignatureConfig, summary: "The company's signature links" },
+  view(),
+  configure(),
+  controller.signatureConfig,
+);
+route(
+  router,
+  "put",
+  "/signature/config",
+  {
+    body: mb.SignatureConfigSave,
+    response: mb.SignatureConfig,
+    summary: "Set the company's signature links",
+  },
+  view(),
+  configure(),
+  controller.saveSignatureConfig,
 );
 
 module.exports = { basePath: "/mailbox", surface: "staff", router };

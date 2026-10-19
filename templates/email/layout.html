@@ -14,7 +14,7 @@
       <tr><td style="background:#DA1E10;color:#FFFFFF;font-size:12px;font-weight:700;text-align:center;padding:6px 12px;">STAGING. This message came from the test system, not live MyCity App.</td></tr>
       {{/if}}
       <tr><td style="background:#01221D;padding:18px 24px;">
-        <span style="font-size:20px;font-weight:700;color:#FFFFFF;">MyCityApp</span>
+        {{#if org.logo_white}}<img src="{{ org.logo_white.src }}" width="{{ org.logo_white.width }}" height="{{ org.logo_white.height }}" alt="{{ org.display_name }}" style="display:block;border:0;outline:none;color:#FFFFFF;font-size:20px;font-weight:700;">{{else}}<span style="font-size:20px;font-weight:700;color:#FFFFFF;">{{ org.display_name }}</span>{{/if}}
       </td></tr>
       <tr><td style="height:4px;background:#FFDF55;font-size:0;line-height:0;">&nbsp;</td></tr>
       <tr><td style="padding:28px 24px;font-size:15px;line-height:1.6;color:#09090B;">

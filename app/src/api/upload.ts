@@ -35,6 +35,7 @@ function pretend({ endpoint, file, onProgress }: UploadOptions): Promise<Documen
       } as DocumentRef;
       void import("./mock/uploads").then((m) => {
         m.UPLOADS.set(id, doc);
+        m.ON_UPLOAD.forEach((after) => after(endpoint, doc));
         resolve(doc);
       });
     }, TICK);

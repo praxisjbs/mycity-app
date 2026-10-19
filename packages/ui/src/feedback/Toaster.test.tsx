@@ -10,7 +10,7 @@ import { installOverlayTestEnv } from "../overlay/test-env";
 // Sonner captures the pointer on press (swipe to dismiss), which jsdom lacks.
 beforeAll(installOverlayTestEnv);
 
-const region = () => screen.getByRole("region", { name: /Notifications/ });
+const region = () => screen.getByRole("region", { name: /^Notifications/ });
 
 describe("Toaster and toast", () => {
   it("keeps the merged call shape: toast(text) shows a success in a polite live region", async () => {

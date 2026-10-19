@@ -3,7 +3,8 @@
  * Mailbox's events (mailbox.md §7) and what follows them in the worker: a sync when a
  * mailbox is connected or Refresh is pressed, a delivery when a message's time comes,
  * the owner told of new mail, a refused password and a message that could not go.
- * Files on mail are read by the mailbox's owner only.
+ * Files on mail are read by the mailbox's owner only; a signature's pictures by anyone
+ * signed in, since every recipient receives them.
  */
 const { pool } = require("../../config/db");
 const { defineEvents } = require("../../shared/events/catalogue");
@@ -40,12 +41,24 @@ const EVENTS = defineEvents("mailbox", {
   "mail_folder.emptied": { summary: "Spam or Trash was emptied" },
   "mail_account.images_trusted": { summary: "A mailbox owner chose to always show, or stop showing, a sender's images" },
   "mail_send.failed": { summary: "A message could not be sent" },
+  "mail_signature.changed": {
+    summary: "A person changed the numbers or switches on their email signature",
+  },
+  "mail_signature.config_changed": {
+    summary: "The company's email signature links or switches were changed",
+  },
 });
 
 defineDocumentType("mail_attachment", {
   label: "Mail attachment",
   module: "mailbox",
   sensitivity: "personal",
+});
+
+defineDocumentType("mail_signature_image", {
+  label: "Signature picture",
+  module: "mailbox",
+  sensitivity: "normal",
 });
 
 /** A file on mail, or one waiting in the composer: the mailbox's owner reads it, nobody else. */
@@ -64,6 +77,8 @@ vault.defineAccess(
     "SELECT 1 FROM mail_account WHERE mail_account_id = $1 AND user_id = $2",
   ),
 );
+/** A signature's picture (a logo, an icon) goes to every recipient: anyone signed in may read it. */
+vault.defineAccess("mail_signature_image", async () => true);
 
 const syncNow = (event) =>
   queues.enqueue(
@@ -125,10 +140,14 @@ for (const key of [
 
 const ownerOf = (e) => [e.payload.user_id].filter(Boolean);
 
+/**
+ * Sender as the title, then the subject and the message's first line, as a phone shows
+ * mail (TB, 19/10/2026). A conversation's mail shares one notification on a device.
+ */
 defineNotification(EVENTS.MAIL_MESSAGE_RECEIVED, {
   to: [{ users: ownerOf }],
   title: (e) => e.payload.from || "New mail",
-  body: (e) => e.payload.subject,
+  body: (e) => [e.payload.subject, e.payload.preview].filter(Boolean).join("\n"),
 });
 
 defineNotification(EVENTS.MAIL_ACCOUNT_NEEDS_RECONNECT, {

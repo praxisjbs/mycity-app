@@ -365,9 +365,17 @@ describe("realtime", () => {
     expect(await handler(job)).toMatchObject({
       in_app: 1,
       email: 1,
-      push_waiting: 1,
+      push_queued: 1,
+      push_held: 0,
     });
     expect(await handler(job)).toMatchObject({ in_app: 1, email: 0 });
+    // One push job per notice across retries (its id is the notice's), sent at once: nobody
+    // is in front of the app.
+    const push = await queues
+      .getQueue("notification-push")
+      .getJob(`push-${row.notification_id}`);
+    expect(push.data).toMatchObject({ notification_id: row.notification_id });
+    expect(push.opts.delay || 0).toBe(0);
     await until(async () => bells.length >= 1);
     expect(bells[0]).toMatchObject({
       notification_id: row.notification_id,

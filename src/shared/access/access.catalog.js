@@ -210,6 +210,12 @@ const CAPABILITY_CATALOG = [
     label: "Post Announcements",
     description: "Post to the announcements channel and track who has read a post.",
   },
+  {
+    code: "mailbox.signature",
+    module: "mailbox",
+    label: "Configure Signature",
+    description: "Set the company's signature links and what shows on everyone's email signature.",
+  },
 ];
 
 const CAPABILITIES = CAPABILITY_CATALOG.map((c) => c.code);

@@ -122,7 +122,10 @@ mycity-app/
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
 │   │                         first-accounts (the first two logins on a server),
-│   │                         staff-roster (MyCity's staff onto a server that has none)
+│   │                         staff-roster (MyCity's staff onto a server that has none),
+│   │                         push-notifications (web push keys, live mail, a device's health)
+│   ├── handoff/              a build carried across sessions: its decisions, plan and log
+│   │                         (push-notifications)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
 ├── .github/
 │   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml, uptime.yml
@@ -169,6 +172,8 @@ src/
 │   ├── events/        emit · outbox · catalogue
 │   ├── workflow/      engine · conditions · definitions · approvers
 │   ├── access/        access.catalog (the permission module list)
+│   ├── organisation/  profile (Settings · Organisation's profile and brand files, the one reader for
+│   │                  letterheads, system mail and email signatures)
 │   ├── rbac/          grants-cache · field-mask · scope · sessions
 │   ├── money/         money
 │   ├── time/          lagos · working-week · day-first · recurrence
@@ -199,10 +204,10 @@ src/
 │   ├── secrets/       encryption.service
 │   ├── ai/            llm.service · governance · ledger · redact · structured · transcription ·
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
-│   ├── push/          web-push (M6)
+│   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── qr/            qr
-│   └── realtime/      emitter
+│   └── realtime/      emitter · active (who is in front of the app, for the push hold)
 ├── realtime/      socket
 └── jobs/
     ├── queues.js · registry.js · cron-lock.js
@@ -295,6 +300,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `alerts.clear` | `home` | Clear or dismiss an alert, of a rule whose `permission_key` the person also holds | Implementation, Operations & People, Management (`0449`); Head of Department, Line Manager (`1199`) | `0449` |
 | `alerts.manage` | `home` | Create, change and switch off alert rules | Implementation, Operations & People, Management | `1199` |
 | `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
+| `mailbox.signature` | `mailbox` | Configure Signature: the company's signature links and what shows on everyone's email signature | Implementation, System Administrator | `1129` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -306,7 +312,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `audit` | `audit.events.js` (the emailed Excel export) | Audit ledger read at 25 with filters, the summary, masked per reader |
 | `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template), `org-chart.export.js` (Download PDF in the worker: drawn as the person asking, rendered, emailed) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
-| `notifications` | `notifications.preferences.js`, `notifications.reminders.js` (M6) | Caller's own inbox |
+| `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (M6) | Caller's own inbox, preferences and devices |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
 | `documents` | | Upload, download, versions, generated documents |
@@ -326,7 +332,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, emailed, removed after seven days) |
 | `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
 | `announcements` | GE | |
-| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7) |
+| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test` |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
 `services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `shared/geo`,
@@ -404,8 +410,9 @@ Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Template
 | `deductions` | `.acceptance` (nothing deducts itself) |
 | `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
 
-Also: `notifications.preferences`, `notifications.reminders`, `services/push/web-push`,
-`settings` Notifications screen. The daily rate divides by the working days from
+Also: `notifications.reminders` and the `settings` Notifications screen (company reminder rules).
+Web push and each person's preferences were brought forward to M0 by TB on 19/10/2026
+(`docs/guides/notifications.md`). The daily rate divides by the working days from
 `shared/time/working-week` (A22), never by a constant.
 
 ### 5.10 M7 · Partnerships, CRM & Trackers · GE, LA · 30 Nov to 4 Dec
@@ -469,7 +476,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
-| M0 | `email-send`, `pdf-render`, `notification-deliver`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
+| M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
 | M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `data-export-cleanup` (Download My Data files removed after seven days, 03:30 Lagos); loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |

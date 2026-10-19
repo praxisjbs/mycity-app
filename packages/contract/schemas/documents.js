@@ -44,6 +44,7 @@ const UploadPurpose = z.enum([
   "video",
   "attachment",
   "signature",
+  "brand",
 ]);
 
 const DocumentSensitivity = z.enum(["normal", "personal", "restricted"]);

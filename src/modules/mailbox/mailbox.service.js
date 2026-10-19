@@ -9,8 +9,9 @@
  *   and scanned through the vault. Read state comes from the server.
  * - Read, move, empty: local first, then the server, best effort; the local change wins.
  * - Send: the composer saves a draft as the person types; Send puts it on the queue
- *   (now, or at a time) and the worker delivers it through SMTP with its files, appends
- *   a copy to Sent and records it.
+ *   (now, or at a time) with the person's signature drawn into it, and the worker
+ *   delivers it through SMTP with its files and the signature's pictures, appends a
+ *   copy to Sent and records it.
  *
  * Nobody reaches another person's mailbox: every call starts from the caller's account.
  */
@@ -24,6 +25,7 @@ const { AppError } = require("../../shared/errors");
 const vault = require("../../shared/documents/vault");
 const storage = require("../../services/storage/storage.service");
 const encryption = require("../../services/secrets/encryption.service");
+const notifications = require("../notifications/notifications.service");
 const repo = require("./mailbox.repo");
 const { EVENTS } = require("./mailbox.events");
 const { ImapSmtpProvider } = require("./providers/imap-smtp.provider");
@@ -38,6 +40,8 @@ const {
 const { mapSmtpError, mapImapError, retryPlan } = require("./smtp-errors");
 const { cleanHtml, textToHtml } = require("./visible");
 const { outgoingHtml, textOf } = require("./compose");
+const signatures = require("./signature/signature.service");
+const { place } = require("./signature/signature.place");
 
 /** Folders synced from the server. Drafts live in the app (mailbox.md §3 step 4). */
 const SYNCED = ["inbox", "sent", "archive", "spam", "trash"];
@@ -297,6 +301,7 @@ async function ingest(client, a, folder, m) {
         user_id: a.user_id,
         from: m.fromName || m.from,
         subject: m.subject || "(no subject)",
+        preview: snippetOf(m.text || String(m.html || "").replace(/<[^>]+>/g, " "), 140),
       },
     });
   }
@@ -511,6 +516,8 @@ async function markRead(threadId, user) {
   const changed = await tx(async (client) => {
     const rows = await repo.markThreadRead(client, threadId);
     await repo.refreshThread(client, threadId);
+    // Reading the conversation reads its "new mail" notices too, in the bell and on devices.
+    await notifications.markReadForRecord(client, user, "mail_thread", threadId);
     return rows;
   });
   if (changed.length) {
@@ -641,6 +648,23 @@ async function storeAttachment(upload, user) {
   });
 }
 
+/**
+ * The signature this message leaves with, drawn now (mailbox.md §3 step 9). Its own
+ * transaction, so its pictures are stored even if the send is refused after; a signature
+ * that cannot be built is logged and the message goes without it.
+ */
+async function signatureOf(user, body, from) {
+  try {
+    return await tx((client) => signatures.bake(client, user.user_id, body, from));
+  } catch (err) {
+    logger.warn(
+      { err: err.message, code: err.code, user_id: user.user_id },
+      "signature not built; the message goes without it",
+    );
+    return null;
+  }
+}
+
 /** Put a message on the send queue: now, or at `release_at` (in the future). */
 async function send(body, user, idempotencyKey) {
   const a = await account(user);
@@ -657,6 +681,7 @@ async function send(body, user, idempotencyKey) {
       release_at: ["Within 90 days"],
     });
   }
+  const signature = await signatureOf(user, body, String(a.email));
   const queued = await tx(async (client) => {
     await repo.saveDraft(client, {
       id: body.mail_draft_id,
@@ -668,7 +693,7 @@ async function send(body, user, idempotencyKey) {
       user_id: user.user_id,
       mail_account_id: a.mail_account_id,
       mail_draft_id: body.mail_draft_id,
-      payload: { ...body, release_at: undefined },
+      payload: { ...body, release_at: undefined, signature },
       release_at: release,
       idempotency_key: idempotencyKey
         ? `${user.user_id}:${idempotencyKey}`
@@ -700,6 +725,23 @@ async function cancel(queueId, user) {
     status: row.status,
     release_at: iso(row.release_at),
   };
+}
+
+/** The signature's pictures, read back from the vault as parts the HTML names by content id. */
+async function inlineParts(signature) {
+  const out = [];
+  for (const part of (signature && signature.parts) || []) {
+    const doc = await vault.get(pool, part.document_id);
+    if (!doc) continue;
+    out.push({
+      filename: doc.original_name || "signature.png",
+      contentType: doc.mime,
+      content: await storage.get(doc.storage_key),
+      document_id: doc.document_id,
+      cid: part.content_id,
+    });
+  }
+  return out;
 }
 
 /** Recipients one account may send to in an hour, from the host's plan (mailbox.md §6). */
@@ -748,7 +790,8 @@ async function deliver(q) {
         });
       }
     }
-    const html = outgoingHtml(p.body_html);
+    const inline = await inlineParts(p.signature);
+    const { html, text } = place(outgoingHtml(p.body_html), p.signature);
     const provider = await providerFor(pool, a, null);
     const sent = await provider.send({
       to: p.to_addresses,
@@ -756,10 +799,10 @@ async function deliver(q) {
       bcc: p.bcc_addresses,
       subject: p.subject || "",
       html,
-      text: textOf(html),
+      text,
       inReplyTo: parent ? parent.internet_message_id : null,
       references,
-      attachments: files,
+      attachments: [...files, ...inline],
     });
     await tx(async (client) => {
       const sentFolder = await repo.folderOfKind(
@@ -794,9 +837,9 @@ async function deliver(q) {
         to_addresses: p.to_addresses,
         cc_addresses: p.cc_addresses || [],
         subject: p.subject || "",
-        body_text: textOf(html),
-        body_html: html,
-        snippet: snippetOf(textOf(html)),
+        body_text: text,
+        body_html: cleanHtml(html),
+        snippet: snippetOf(text),
         direction: "outgoing",
         sent_at: new Date(),
         received_at: new Date(),
@@ -805,12 +848,20 @@ async function deliver(q) {
         references_header: references,
         has_attachment: files.length > 0,
       });
-      if (row)
+      if (row) {
         for (const f of files)
           await repo.insertAttachment(client, {
             messageId: row.mail_message_id,
             documentId: f.document_id,
           });
+        for (const f of inline)
+          await repo.insertAttachment(client, {
+            messageId: row.mail_message_id,
+            documentId: f.document_id,
+            contentId: f.cid,
+            inline: true,
+          });
+      }
       await repo.refreshThread(client, t.mail_thread_id);
       await repo.markSent(
         client,

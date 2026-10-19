@@ -66,7 +66,7 @@ erDiagram
 | Approvals | `workflow_definition`, `workflow_instance`, `workflow_decision` | `shared/workflow` | `workflow_instance_id` on the record waiting for approval; definitions seeded only if they pass `validateDefinition()` |
 | Files | `document`, `document_variant`, `template`, `template_version`, `document_request` | `shared/documents/vault`; the documents service for `document.verified_at` and `document_request` | `document_id uuid REFERENCES document`; never a path or a URL. A document People asked for and have not been given is a `document_request`, not a `document` (`docs/guides/foundation.md` §6.9) |
 | Numbers | `numbering_scheme`, `numbering_counter` | `numbering.allocate()` | `number citext NOT NULL UNIQUE` (or the contract's name for it, `staff_number`) and a scheme in `schemes.js` |
-| Notifications | `notification`, `notification_preference`, `push_subscription`, `alert` | `shared/notifications` fan-out | An outbox handler that calls the fan-out; never an insert into `notification` |
+| Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
 | Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
@@ -105,8 +105,12 @@ role), `role.two_step_required`, the Audit Log's indexes on `audit_ledger` and l
 `two_step_setup` purpose on `spent_challenge` (`docs/guides/foundation.md` §4, §6.4) · `0449` the
 field visibility of every role and the two capabilities given to Implementation, Operations & People
 and Management (`docs/guides/foundation.md` §6.3) · `0450` `reassign` as a `workflow_decision` (a stage
-given to someone else; `docs/guides/foundation.md` §11) · `0499` the leave flow, `leave.approval` (the
-line manager, then Operations & People over 5 days; §6.5).
+given to someone else; `docs/guides/foundation.md` §11) · `0460` web push (brought forward from M6 by
+TB, 19/10/2026; `docs/guides/notifications.md` §4): `push_subscription` as a device (its
+`known_device`, label and platform, the hash of its device token, the key id it was made under, its
+health and why it stopped) and `push_delivery`, one row per notice and device, so a retried push is
+never sent twice · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
+People over 5 days; §6.5).
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
@@ -136,7 +140,12 @@ and system channels, delivered pointer, the wider message kinds, transcripts, po
 `announcement_read` and the announcement's message, audience size and reminder · `1120` mailbox:
 connection status and errors, folder kinds and sync cursor, thread keys, the reader's message
 fields, `mail_draft` and `mail_send_queue` · `1125` `mail_image_trust` (the senders whose web images a
-mailbox owner always shows) · `1130` an announcement can be `cancelled` · `1140` each
+mailbox owner always shows) · `1127` email signatures: `mail_signature` (a person's office line and
+their Show Mobile and WhatsApp switches; the mobile stays `employee.phone`) and
+`mail_signature_config` (the company's app and social links, the confidentiality note and what
+shows, one row at most); the baked signature rides in `mail_send_queue.payload` and its pictures
+are vault documents (`mail_signature_image`) · `1129` reference data: the `mailbox.signature`
+capability for System Administrator and Implementation · `1130` an announcement can be `cancelled` · `1140` each
 member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and
@@ -276,7 +285,8 @@ cases and checklist items, employment contracts, talent pool · `5099` seed.
 
 ### M6 Payroll & Notifications · 6000 to 6999 · LA
 
-**Built:** nothing in the block. Notifications are M0 (`0060`).
+**Built:** nothing in the block. Notifications are M0 (`0060`), web push and each person's
+preferences too (`0460`, brought forward by TB on 19/10/2026).
 
 **Owes, all of payroll** (MILESTONES §11, in scope): payroll runs, payslips, salary structures
 and pay components, deductions (pending, accepted, in a run, including M3 fines and lateness),

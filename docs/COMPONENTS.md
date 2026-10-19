@@ -70,6 +70,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Overlays | [LockScreen](#lockscreen) | `LockScreen` | The full-screen lock over the staff app when a session ends: who is signed in, why it locked, and their password to carry on. | beta |
 | Overlays | [Menu](#menu) | `Menu` | A short list of actions behind one button (the ⋮ on a record, the + in a composer, the account menu). | stable |
 | Overlays | [Modal](#modal) | `Modal`, `ModalProvider`, `ModalFooter`, `Grow` | THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened with useModal or controlled with open. | stable |
+| Overlays | [PhonePage](#phonepage) | `PhonePage` | A full-screen page that slides in from the right over the screen on a phone, like a native app's next screen: Back, a title, its own actions, a body that scrolls. | beta |
 | Overlays | [Popover](#popover) | `Popover` | A small panel anchored to the button that opens it: filters, a quick pick, a short preview. | stable |
 | Overlays | [Sheet](#sheet) | `Sheet` | The phone's bottom sheet: slides up with a spring, closes by dragging down, a tap on the scrim or Esc; one with a text field closes only on purpose. | stable |
 | Overlays | [SidePanel](#sidepanel) | `SidePanel` | A panel that slides over the right of the screen to edit or inspect the record behind it. | stable |
@@ -79,8 +80,10 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Help | [InfoButton](#infobutton) | `InfoButton` | The ⓘ, for help that has no word to attach to: a chart, an icon-only control, a figure with no title. | stable |
 | Feedback | [ErrorBoundary](#errorboundary) | `ErrorBoundary` | Catches a crash in one screen so the rest of the app keeps working, and shows ErrorState with Try Again in its place. | stable |
 | Feedback | [ErrorState](#errorstate) | `ErrorState` | Something did not load: one line saying so, and Try Again. | stable |
-| Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere. | stable |
+| Feedback | [NotificationBanner](#notificationbanner) | `NotificationBanner` | The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere. | beta |
+| Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top. | stable |
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
+| Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
@@ -129,7 +132,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [DesktopShell](#desktopshell) | `DesktopShell` | The staff app's desktop frame: the rail at the left, the top bar, the module's tab strip and the page, which alone scrolls. | stable |
 | Shell | [FloatingButton](#floatingbutton) | `FloatingButton` | The phone's floating button, bottom right above the bottom bar: a tap fans out the screen's New action, Clock In or Out, Praxis AI and Help, with Hide Here last (F18). | stable |
 | Shell | [MoreSheet](#moresheet) | `MoreSheet` | The phone's More: a launcher in a bottom sheet with the person's row, a search bar, the modules they may open as tiles four to a row, and Sign Out (F17). | stable |
-| Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the bell's list: its glyph in a tone, its title and line, when it came, a dot while unread, and Open. | stable |
+| Shell | [NotificationCenter](#notificationcenter) | `NotificationCenter` | The bell's pane: All and Unread, the notifications grouped Today, Yesterday and Earlier, Mark All Read and the settings gear; a page from the right on a phone, a panel under the bell on desktop. | beta |
+| Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
 | Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls, the floating button, and the bottom bar. | stable |
 | Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer. | stable |
@@ -1922,6 +1926,41 @@ modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })
 <Modal open={open} onClose={() => setOpen(false)} title="Edit Worksite" footer={<Button variant="primary">Save Worksite</Button>}>{fields}</Modal>
 ```
 
+### PhonePage
+
+A full-screen page that slides in from the right over the screen on a phone, like a native app's next screen: Back, a title, its own actions, a body that scrolls.
+
+| | |
+|---|---|
+| Use | A place a person goes into and comes back from without leaving the screen they were on: the notification pane, Notification Settings over it. |
+| Avoid | A form or a record on desktop (use Modal or SidePanel); a short choice (use Sheet); a real screen with its own address (a route). |
+| Phone | This is its phone form: the whole screen, under the status bar and above the home bar, swiped right or Back to close. On desktop it draws the same page as a panel on the right. |
+| Accessibility | A modal dialog named by `title` (Radix underneath, through Vaul): focus moves in and is trapped, Esc and Back close it, focus returns to the opener. Back is a named button; `actions` are IconButtons with labels. |
+| Status | beta |
+| Exports | `PhonePage` |
+| Import | `import { PhonePage } from "@mycity/ui";` |
+| File | `packages/ui/src/overlay/PhonePage.tsx` |
+| Test | `packages/ui/src/overlay/PhonePage.test.tsx` |
+| Gallery | `packages/ui/src/overlay/PhonePage.gallery.tsx` (`npm run gallery`, `#/PhonePage`) |
+
+**PhonePage** props (`PhonePageProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the page is showing. |
+| `onClose` | `() => void` | yes | Called when the person goes back: Back, a swipe to the right, Esc. |
+| `title` | `ReactNode` | yes | The page's title, at most 3 words, Title Case. |
+| `actions` | `ReactNode` |  | IconButtons at the right of the header (Mark All Read, a gear). |
+| `bar` | `ReactNode` |  | Something fixed under the header that does not scroll away (a segmented control). |
+| `children` | `ReactNode` |  | The body; it scrolls. |
+| `bodyRef` | `(el: HTMLDivElement \| null) => void` |  | Called with the scrolling body, for a list that loads more near its end or pulls to refresh. |
+| `container` | `HTMLElement \| null` |  | Where the page mounts; document.body by default (the gallery passes its themed frame). |
+| `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
+
+```tsx
+<PhonePage open={open} onClose={close} title="Notifications" actions={<IconButton icon="cog" label="Notification Settings" />}>{rows}</PhonePage>
+```
+
 ### Popover
 
 A small panel anchored to the button that opens it: filters, a quick pick, a short preview.
@@ -2228,9 +2267,42 @@ Something did not load: one line saying so, and Try Again.
 <ErrorState page message="This screen hit a problem" onRetry={reset} />
 ```
 
+### NotificationBanner
+
+The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere.
+
+| | |
+|---|---|
+| Use | A new notification over realtime or from the service worker while the app is on screen (the app's Bell calls notify), never for the record already on screen. |
+| Avoid | The confirmation after an action (toast, at the bottom); something a person must act on before going on (a Banner or a dialog); the list of notifications (NotificationCenter). |
+| Phone | Full width at the top, under the status bar, as a phone's own notifications arrive; swipe it up to dismiss, tap it to open; 44 px targets. |
+| Accessibility | Shown in a polite live region named New Notifications, so it is read without moving focus; the banner is one button named by its title and text, with a named Dismiss button. It stays while hovered or touched, and fades only when motion is allowed. |
+| Status | beta |
+| Exports | `NotificationBanner` |
+| Import | `import { NotificationBanner } from "@mycity/ui";` |
+| File | `packages/ui/src/feedback/NotificationBanner.tsx` |
+| Test | `packages/ui/src/feedback/NotificationBanner.test.tsx` |
+| Gallery | `packages/ui/src/feedback/NotificationBanner.gallery.tsx` (`npm run gallery`, `#/NotificationBanner`) |
+
+**NotificationBanner** props (`NotificationBannerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | yes | Who it is from, or what happened. |
+| `body` | `string \| null` |  | Its text; two lines show. |
+| `avatar` | `string \| null` |  | A person's name: their initials stand for it. |
+| `icon` | `IconName` |  | The category's glyph when there is no person. |
+| `tone` | `"ok" \| "warn" \| "err" \| "info"` |  | The glyph's tone; info unless set. |
+| `onOpen` | `() => unknown` |  | Opens what it is about. |
+| `onDismiss` | `() => unknown` |  | Dismisses it (the × button). |
+
+```tsx
+notify({ id, title: "Tom-Blake Asaah", body: "Re: Test mail", avatar: "Tom-Blake Asaah", onOpen: () => navigate(path) })
+```
+
 ### Toaster
 
-Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere.
+Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top.
 
 | | |
 |---|---|
@@ -2289,6 +2361,38 @@ The cards a person puts on a KPI row: tick up to four, keep them in order with M
 
 ```tsx
 <CardPicker label="Overview Cards" options={cards} value={draft} onChange={setDraft} />
+```
+
+### ChannelGrid
+
+Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own.
+
+| | |
+|---|---|
+| Use | Notification Settings: where each category reaches the person. Any per-row, per-channel on and off choice that saves at once. |
+| Avoid | A form with a Save button (CheckboxField in a Form); one setting (Switch or ToggleRow); more than four columns. |
+| Phone | One row per category with what is on ("In App, Push", or Off); a tap opens a sheet titled by the category with a ToggleRow per channel. |
+| Accessibility | Desktop is a table: the columns are headers and each switch is named "<row>, <column>". A locked switch is disabled and says why with the lock's label. On a phone each row is a button that opens the sheet. |
+| Status | beta |
+| Exports | `ChannelGrid` |
+| Import | `import { ChannelGrid } from "@mycity/ui";` |
+| File | `packages/ui/src/form/ChannelGrid.tsx` |
+| Test | `packages/ui/src/form/ChannelGrid.test.tsx` |
+| Gallery | `packages/ui/src/form/ChannelGrid.gallery.tsx` (`npm run gallery`, `#/ChannelGrid`) |
+
+**ChannelGrid** props (`ChannelGridProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `columns` | `ChannelGridColumn[]` | yes | The ways a row can reach a person, left to right (In App, Email, Push). |
+| `rows` | `ChannelGridRow[]` | yes | One per category, in the order shown. |
+| `onChange` | `(row: string, column: string, on: boolean) => unknown` | yes | Called with the new state of one switch. Hands back its work; the grid shows the new state at once. |
+| `lockedLabel` | `string` |  | What locked means, as the lock's label ("Always on"). |
+| `label` | `string` |  | Names the grid for assistive technology. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<ChannelGrid columns={[{ key: "in_app", label: "In App" }, { key: "push", label: "Push" }]} rows={rows} onChange={(row, column, on) => save(row, column, on)} />
 ```
 
 ### DateField
@@ -4108,16 +4212,60 @@ The phone's More: a launcher in a bottom sheet with the person's row, a search b
 <MoreSheet open={open} onClose={close} person={{ name: "Cynthia Osakunih", subtitle: "Operations Manager" }} groups={groups} onSearch={openSearch} onSignOut={signOut} />
 ```
 
-### NotificationRow
+### NotificationCenter
 
-One notification in the bell's list: its glyph in a tone, its title and line, when it came, a dot while unread, and Open.
+The bell's pane: All and Unread, the notifications grouped Today, Yesterday and Earlier, Mark All Read and the settings gear; a page from the right on a phone, a panel under the bell on desktop.
 
 | | |
 |---|---|
-| Use | The bell's list (the app's Bell): each notification from GET /api/v1/notifications, newest first, under the shared pager. |
-| Avoid | Alerts, which are conditions to act on (Home · Alerts); a toast (something that just happened in front of the person); a list of records (DataView). |
-| Phone | The same row; Open drops under the text when there is no room, a 44 px target. |
-| Accessibility | An article; unread is said in words as well as by the dot; the title, line and time are content, read as written. |
+| Use | Once, in each shell's top bar, around the bell (the app's Bell wires it to GET /api/v1/notifications and the read marks). |
+| Avoid | Alerts that need clearing (Home · Alerts); a record's own activity (Timeline); confirming an action (a toast). |
+| Phone | A full-screen PhonePage that slides in from the right: Back, Mark All Read and the gear in its header, All and Unread under it, rows with swipe to mark read, pull down to refresh, more rows as you near the end. |
+| Accessibility | On desktop a non-modal panel named Notifications under the bell (Radix popover: Esc or a click outside closes it, focus returns to the bell); on a phone a modal page. All and Unread is a radio group; the groups are headed lists; each row is one button. |
+| Status | beta |
+| Exports | `NotificationCenter` |
+| Import | `import { NotificationCenter } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/NotificationCenter.tsx` |
+| Test | `packages/ui/src/shell/NotificationCenter.test.tsx` |
+| Gallery | `packages/ui/src/shell/NotificationCenter.gallery.tsx` (`npm run gallery`, `#/NotificationCenter`) |
+
+**NotificationCenter** props (`NotificationCenterProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether the pane is open. |
+| `onOpenChange` | `(open: boolean) => void` | yes | Called to open or close it: the bell, Back, Esc, a click outside. |
+| `trigger` | `ReactElement` | yes | The bell button: the desktop panel hangs under it; on a phone it opens the page. |
+| `view` | `"all" \| "unread"` | yes | All, or only the unread. |
+| `onView` | `(view: NotificationView) => void` | yes | Called with the view chosen. |
+| `unread` | `number` | yes | How many are unread, for the Unread choice. |
+| `items` | `NotificationItem[]` | yes | The rows loaded so far, newest first. |
+| `loading` | `boolean` |  | The first page is loading. |
+| `more` | `boolean` |  | There are more rows to load (pages of 25). |
+| `onMore` | `() => unknown` |  | Loads the next page; called as the list nears its end. |
+| `onRefresh` | `() => Promise<unknown>` |  | Reloads the list: pull down on a phone. |
+| `onOpenItem` | `(item: NotificationItem) => unknown` | yes | Opens one: its record (the pane closes), or marks it read when it has none. |
+| `onMarkRead` | `(item: NotificationItem) => unknown` | yes | Marks one read without opening it (hover on desktop, a swipe on a phone). |
+| `onMarkAllRead` | `() => unknown` | yes | Marks every one read. Hands back its work. |
+| `onSettings` | `() => unknown` | yes | The gear: Notification Settings. |
+| `notice` | `ReactNode` |  | Something above the list, such as turning notifications on for this device. |
+| `now` | `Date` |  | Today, for the day groups (tests). |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<NotificationCenter open={open} onOpenChange={setOpen} trigger={bell} view="all" onView={setView} unread={3} items={rows} onOpenItem={open} onMarkRead={read} onMarkAllRead={readAll} onSettings={settings} />
+```
+
+### NotificationRow
+
+One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it.
+
+| | |
+|---|---|
+| Use | The notification pane (NotificationCenter): each notification from GET /api/v1/notifications, newest first, grouped by day. |
+| Avoid | Alerts, which are conditions to act on (Home · Alerts); a toast or the banner (something that just happened in front of the person); a list of records (DataView). |
+| Phone | The same row, 44 px and up; swiping it to the left marks it read (the row slides back and the dot goes); a tap opens it. |
+| Accessibility | The row is one button named by its title, its text and its time; unread is said in words as well as by the dot. Mark Read is a named button on desktop (shown on hover or focus) and the swipe has that button's job on a phone. |
 | Status | stable |
 | Exports | `NotificationRow` |
 | Import | `import { NotificationRow } from "@mycity/ui";` |
@@ -4129,16 +4277,18 @@ One notification in the bell's list: its glyph in a tone, its title and line, wh
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `title` | `ReactNode` | yes | What happened, as the notification says it. |
-| `body` | `ReactNode` |  | Its line, as the notification says it. |
+| `title` | `ReactNode` | yes | What happened, or who it is from, as the notification says it. |
+| `body` | `ReactNode` |  | Its text, as the notification says it; two lines show. |
 | `when` | `string` | yes | When it came, formatted (formatWhen). |
-| `icon` | `IconName` |  | Its glyph, from its category; the bell unless set. |
-| `tone` | `"ok" \| "warn" \| "err" \| "info"` |  | Its tone; info unless set. |
-| `unread` | `boolean` |  | Not read yet: a dot before the title, and the word Unread for screen readers. |
-| `action` | `ReactNode` |  | Open, when it links to a record. |
+| `avatar` | `string \| null` |  | A person's name: their initials stand for the notification instead of a glyph (mail, a message). |
+| `icon` | `IconName` |  | Its glyph, from its category, when there is no person; the bell unless set. |
+| `tone` | `"ok" \| "warn" \| "err" \| "info"` |  | The glyph's tone; info unless set. |
+| `unread` | `boolean` |  | Not read yet: a dot, the title in strong type, and the word Unread for screen readers. |
+| `onOpen` | `() => unknown` |  | Opens it: the record it is about, or marks it read when it has none. Hands back its work. |
+| `onMarkRead` | `() => unknown` |  | Marks it read without opening it: hover on desktop, a swipe to the left on a phone. |
 
 ```tsx
-<NotificationRow title="Expense request waiting on you" body="Bashir Lawal · ₦185,000.00" when="08:41" tone="warn" icon="check" unread action={<Button size="sm">Open</Button>} />
+<NotificationRow title="Tom-Blake Asaah" body="Re: Test mail" when="05:33" avatar="Tom-Blake Asaah" unread onOpen={open} onMarkRead={markRead} />
 ```
 
 ### PhoneHeader
@@ -4399,6 +4549,8 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `initials` | `lib/format.ts` | Initials for an avatar: "Cynthia Osakunih" → "CO". |
 | `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB" from a byte count. |
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |
+| `formatPhone` | `lib/format.ts` | A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. |
+| `formatPhoneLocal` | `lib/format.ts` | A stored number as a person types it at home, for a field to start from: "0803 123 4567". |
 | `ControlIds` (type) | `lib/ids.ts` | The ids of one control and the parts that describe it. |
 | `useControlIds` | `lib/ids.ts` | The ids for one control, from a readable stem (the field name) and a page-unique suffix. |
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |

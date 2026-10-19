@@ -866,7 +866,7 @@ async function endOtherSessions(actor, ip) {
         key: EVENTS.AUTH_SESSION_ENDED,
         entity: account(actor.user_id),
         actor: { ...actor, ip: ip || null },
-        payload: { count: ended.length, reason: "ended_by_user", by: "self" },
+        payload: { count: ended.length, reason: "ended_by_user", by: "self", kept_session_id: actor.session_id || null },
       });
     }
     return ended;

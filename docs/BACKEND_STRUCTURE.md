@@ -165,15 +165,20 @@ src/
 │   │                  prompts/<purpose>.md                                       (§14)
 │   ├── calendar/      ics.js (M2 calendar, M4 interview invites)
 │   ├── qr/            qr.js (M5 verification)
-│   └── realtime/      emitter.js
+│   ├── push/          vapid.js (the environment's key pair: .env, else stored encrypted, else made
+│   │                  once) · web-push.js (one encrypted push to one browser; TTL, urgency, topic;
+│   │                  what a refusal means) · payload.js (the v1 payload under 3 KB; tag and mode)
+│   │                  (web push brought forward from M6 by TB, 19/10/2026;
+│   │                  docs/guides/notifications.md, docs/runbooks/push-notifications.md)
+│   └── realtime/      emitter.js · active.js (who is in front of the app, for the push hold)
 │
 ├── realtime/
 │   └── socket.js                     Socket.io, Redis adapter, rooms user:<id>, channel:<id>
 │
 ├── jobs/
 │   ├── queues.js · registry.js · cron-lock.js
-│   ├── handlers/      email-send · pdf-render · notification-deliver · media-derive ·
-│   │                  media-scan · av-transcode · import-validate · import-commit
+│   ├── handlers/      email-send · pdf-render · notification-deliver · notification-push ·
+│   │                  media-derive · media-scan · av-transcode · import-validate · import-commit
 │   └── schedulers/    outbox-dispatch · workflow-timeout · alert-ageing · media-reconcile ·
 │                      import-cleanup
 │
@@ -184,7 +189,8 @@ src/
     ├── organisation/                 departments, employees (core record), reporting lines
     │   └── employee.import.js        the staff importer (§9.4)
     ├── settings/                     settings, working week, numbering schemes
-    ├── notifications/                caller's own inbox: list, unread count, badges, read marks
+    ├── notifications/                caller's own inbox: list, unread count, badges, read marks;
+    │                                 preferences, push devices, Send Test (notifications.push.js)
     ├── workflow/                     definitions admin, act on an instance, my approvals
     ├── documents/                    upload, download, versions, generated docs (gated)
     └── imports/                      the generic import API over shared/import (§9.3)
@@ -818,12 +824,12 @@ milestone shown, so nothing is retrofitted.
 | Working week, holidays, Lagos dates | M1, M6 | `shared/time` | Built |
 | Money | M6, M8 | `shared/money` | Built |
 | Effective-dated config | M6 statutory, reporting lines | `shared/db/effective-dated` | Built |
-| Notifications: in-app, email, push, preferences | M1, M6 | `shared/notifications`, `jobs/handlers` | Built (push keys in M6) |
+| Notifications: in-app, email, push, preferences | M1, M6 | `shared/notifications`, `modules/notifications`, `services/push`, `jobs/handlers` | Built (web push, its keys and personal preferences brought forward from M6 by TB, 19/10/2026) |
 | Alerts (age, clear by permission) | M1 Home, M3, M7, M8 | `shared/alerts` | Built |
 | Time at stage | M4, M7, M8 | `shared/state` | Built |
 | Rolling-window rules ("3 in 30 days") | M3, M7 inactivity | `shared/rules` | Seam |
 | Geofence maths | M1 clock-in | `shared/geo` | Built |
-| Realtime rooms, presence | M1 chat | `realtime/socket` | Built (presence M1) |
+| Realtime rooms, presence | M1 chat | `realtime/socket`, `services/realtime/active` (in front of the app, for the push hold) | Built (presence M1) |
 | Mailbox secrets, IMAP IDLE loop slot | M1 | `services/secrets`, worker | Seam |
 | Recurrence, ICS invites | M2, M4 | `shared/time/recurrence`, `services/calendar` | Seam |
 | LLM client, governance, spend ledger, stub when off | M2, M4, M7, M10 | `services/ai` (§14) | Built (vendor key M2) |
