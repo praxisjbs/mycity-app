@@ -185,6 +185,45 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(payroll.cells[staffRole]).toEqual(expect.objectContaining({ actions: [], scope: null }));
     });
 
+    test("the Implementation Team holds everything there is, so training runs from the build account", async () => {
+      /* TB, 19/10/2026 (docs/guides/identity.md §8): a module, capability or field added later goes to it too. */
+      const catalog = require("../../src/shared/access/access.catalog");
+      const { FIELD_KEYS } = require("../../src/shared/rbac/field-mask");
+      const { rows: grants } = await q(
+        `SELECT p.module_key::text AS module_key, p.scope::text AS scope, p.can_view, p.can_create, p.can_edit,
+                p.can_delete, p.can_approve, p.can_export
+           FROM permission p JOIN role r ON r.role_id = p.role_id
+          WHERE r.code = 'implementation'
+          ORDER BY p.module_key`,
+      );
+      expect(grants.map((g) => g.module_key)).toEqual([...catalog.MODULES].sort());
+      /* Self-Service and the Mailbox are a person's own whatever a grant says, so they read own. */
+      const ownOnly = new Set([...catalog.OWN_ONLY, "mailbox"]);
+      for (const g of grants)
+        expect(g).toEqual({
+          module_key: g.module_key,
+          scope: ownOnly.has(g.module_key) ? "own" : "all",
+          can_view: true,
+          can_create: true,
+          can_edit: true,
+          can_delete: true,
+          can_approve: true,
+          can_export: true,
+        });
+      const { rows: capabilities } = await q(
+        `SELECT c.code::text AS code FROM role_capability rc
+           JOIN role r ON r.role_id = rc.role_id JOIN capability c ON c.capability_id = rc.capability_id
+          WHERE r.code = 'implementation' ORDER BY 1`,
+      );
+      expect(capabilities.map((r) => r.code)).toEqual([...catalog.CAPABILITIES].sort());
+      const { rows: fields } = await q(
+        `SELECT f.field_key, f.visibility FROM field_visibility f JOIN role r ON r.role_id = f.role_id
+          WHERE r.code = 'implementation' ORDER BY 1`,
+      );
+      const keys = FIELD_KEYS.map((f) => f.key).sort();
+      expect(fields).toEqual(keys.map((field_key) => ({ field_key, visibility: "visible" })));
+    });
+
     test("the §6.3 defaults: fields and capabilities for Operations, Management and the build team", async () => {
       const roles = (await as("ops").get("/settings/roles")).body.data;
       const detail = async (code) =>

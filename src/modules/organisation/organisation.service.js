@@ -12,6 +12,7 @@
  * restricted ones (bank, account, gross pay, personal details) are written here and
  * masked on the way out, in the controller (shared/rbac/field-mask.js).
  */
+const crypto = require("node:crypto");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const numbering = require("../../shared/numbering/numbering");
@@ -19,7 +20,7 @@ const lagos = require("../../shared/time/lagos");
 const routeMap = require("../../shared/route-map");
 const managerText = require("./manager-text");
 const repo = require("./organisation.repo");
-const { EVENTS } = require("./organisation.events");
+const { EVENTS, CHART_EXPORT } = require("./organisation.events");
 
 const findDepartmentByName = (client, name) => repo.findDepartmentByName(client, name);
 const findEmployeeByWorkEmail = (client, email) => repo.findEmployeeByWorkEmail(client, email);
@@ -290,12 +291,13 @@ async function setReportingLine(client, employeeId, input, actor) {
         [key]: ["Not a seat"],
       });
   }
-  if (patch.line_manager_id && (await repo.wouldLoop(client, employeeId, patch.line_manager_id))) {
+  const above = patch.line_manager_id || patch.line_manager_seat_id;
+  if (above && (await repo.wouldLoop(client, employeeId, above))) {
     throw new AppError(
       "REPORTING_LOOP",
       "That would make a loop in the reporting line.",
       422,
-      { line_manager_id: ["Would make a loop"] },
+      { [patch.line_manager_id ? "line_manager_id" : "line_manager_seat_id"]: ["Would make a loop"] },
     );
   }
 
@@ -351,6 +353,11 @@ async function updateSeat(client, seatId, patch, actor) {
   const change = { ...patch };
   if ("line_manager_id" in change && change.line_manager_id) change.line_manager_seat_id = null;
   if ("line_manager_seat_id" in change && change.line_manager_seat_id) change.line_manager_id = null;
+  const above = change.line_manager_id || change.line_manager_seat_id;
+  if (above && (await repo.wouldLoop(client, seatId, above)))
+    throw new AppError("REPORTING_LOOP", "That would make a loop in the reporting line.", 422, {
+      [change.line_manager_id ? "line_manager_id" : "line_manager_seat_id"]: ["Would make a loop"],
+    });
   const after = await repo.updateSeat(client, seatId, change);
   await emit(client, {
     key: EVENTS.ORG_SEAT_UPDATED,
@@ -505,6 +512,24 @@ async function orgChart(client, { view = "viewer" } = {}) {
   };
 }
 
+/**
+ * POST /org-chart/exports, Download PDF: queue the whole chart, in the view asked for, for the
+ * worker, which draws it as the person asking and emails it (org-chart.export.js;
+ * docs/guides/organogram.md §5, §7). In the caller's transaction, with its event.
+ * @returns {Promise<{queued: true, email: string}>}
+ */
+async function requestOrgChartExport(client, { view = "viewer" } = {}, actor) {
+  if (!actor || !actor.email)
+    throw new AppError("NO_EMAIL", "Your login has no email to send the PDF to.", 422);
+  await emit(client, {
+    key: EVENTS.ORG_CHART_EXPORT_REQUESTED,
+    entity: { type: CHART_EXPORT, id: crypto.randomUUID() },
+    actor,
+    payload: { view, requested_by: actor.user_id },
+  });
+  return { queued: true, email: actor.email };
+}
+
 /* ------------------------------------------------------------------ *
  * Managers named in a sheet
  * ------------------------------------------------------------------ */
@@ -618,8 +643,12 @@ async function importRow(client, values, ctx = {}) {
    * are, so no number is freed for nothing. Only the roster loader reclaims a number
    * (`reclaim_staff_numbers`); for anyone importing a sheet by hand the row is a problem
    * to look at.
+   *
+   * A holder with the row's own first and last name is not somebody else: it is the same
+   * person, and the sheet now spells their work email differently (a corrected domain).
+   * The row is theirs by number, and nobody moves.
    */
-  if (byNumber && workEmail && !sameEmail(byNumber.work_email, workEmail)) {
+  if (byNumber && workEmail && !sameEmail(byNumber.work_email, workEmail) && !sameName(byNumber, name)) {
     const onSheet = (options.roster_work_emails || []).some((e) => sameEmail(e, byNumber.work_email));
     if (!byEmail && (!options.reclaim_staff_numbers || onSheet))
       throw new AppError(
@@ -679,6 +708,16 @@ function sameEmail(a, b) {
   return fold(a) !== "" && fold(a) === fold(b);
 }
 
+/** Whether a record and a row's split name have the same first and last name, folded. */
+function sameName(employee, name) {
+  const fold = managerText.fold;
+  return (
+    fold(employee.first_name) !== "" &&
+    fold(employee.first_name) === fold(name.first_name) &&
+    fold(employee.last_name) === fold(name.last_name)
+  );
+}
+
 /** The keys that carry a value, so an empty cell never writes over something. */
 function optional(values, keys) {
   const out = {};
@@ -728,6 +767,7 @@ module.exports = {
   updateSeat,
   findOrCreateSeat,
   orgChart,
+  requestOrgChartExport,
   resolveManager,
   importRow,
   splitName,

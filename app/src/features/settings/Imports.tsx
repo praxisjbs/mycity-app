@@ -59,6 +59,10 @@ const ROW_TONE: Record<string, "ok" | "warn" | "err" | "neutral"> = {
 
 const count = (n: number | undefined) => String(n ?? 0);
 
+/** The rows a person should look at: errors and duplicates block, warnings save with something missing. */
+const problemsOf = (stats: ImportBatch["stats"]) =>
+  Number(stats.error ?? 0) + Number(stats.duplicate ?? 0) + Number(stats.warning ?? 0);
+
 export function Imports() {
   const [params, setParams] = useSearchParams();
   const modal = useModal();
@@ -116,7 +120,7 @@ export function Imports() {
     },
     { key: "created", label: "Created", align: "n" as const, render: (b: ImportBatch) => count(b.stats.create) },
     { key: "updated", label: "Updated", align: "n" as const, desktop: true, render: (b: ImportBatch) => count(b.stats.update) },
-    { key: "problems", label: "Problems", align: "n" as const, desktop: true, render: (b: ImportBatch) => count(b.stats.error) },
+    { key: "problems", label: "Problems", align: "n" as const, desktop: true, render: (b: ImportBatch) => String(problemsOf(b.stats)) },
     {
       key: "status",
       label: "Status",
@@ -195,7 +199,8 @@ function BatchDetail({ batch, confirm }: { batch: ImportBatch; confirm: ReturnTy
 }
 
 function Counts({ stats, className }: { stats: ImportBatch["stats"]; className?: string }) {
-  const problems = Number(stats.error ?? 0) + Number(stats.duplicate ?? 0);
+  const blocking = Number(stats.error ?? 0) + Number(stats.duplicate ?? 0);
+  const problems = problemsOf(stats);
   return (
     <KpiGrid
       className={className}
@@ -210,7 +215,7 @@ function Counts({ stats, className }: { stats: ImportBatch["stats"]; className?:
           value: count(stats.unchanged),
           help: "A row already in the system with nothing different in it. Importing it again changes nothing.",
         },
-        { key: "problems", title: "Problems", value: String(problems), tone: problems > 0 ? "err" : undefined },
+        { key: "problems", title: "Problems", value: String(problems), tone: blocking > 0 ? "err" : problems > 0 ? "warn" : undefined },
       ]}
     />
   );
@@ -231,7 +236,7 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
 
   const rows = usePaged("GET /api/v1/imports/:id/rows", {
     params: { id: batch?.import_batch_id ?? "" },
-    filters: { status: "error" },
+    filters: { status: "problem" },
     enabled: Boolean(batch) && batch?.status === "previewed",
   });
 

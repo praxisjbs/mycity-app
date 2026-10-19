@@ -1,0 +1,40 @@
+<style>
+  @page { size: {{ page.width }}mm {{ page.height }}mm; margin: 12mm 12mm 16mm 12mm; }
+  .oc-meta { margin: 0 0 3mm 0; font-size: 9pt; color: #71717A; }
+  .oc-meta strong { color: #014339; font-weight: 600; }
+  .oc-legend { margin: 0 0 6mm 0; font-size: 8pt; color: #6A6A72; }
+  .oc-key { display: inline-block; margin-right: 6mm; }
+  .oc-key i { display: inline-block; vertical-align: middle; margin-right: 1.5mm; }
+  .oc-key .oc-solid { width: 6mm; border-top: 0.5mm solid #A1A1AA; }
+  .oc-key .oc-dash { width: 6mm; border-top: 0.5mm dashed #71717A; }
+  .oc-key .oc-chief { width: 3mm; height: 3mm; border-radius: 0.8mm; background: #FFDF55; }
+  .oc-key .oc-open { width: 3mm; height: 3mm; border-radius: 0.8mm; border: 0.3mm dashed #71717A; }
+  .oc-chart { position: relative; page-break-inside: avoid; }
+  .oc-ln { position: absolute; }
+  .oc-across { border-top: 0.4mm solid #A1A1AA; }
+  .oc-down { border-left: 0.4mm solid #A1A1AA; }
+  .oc-card { position: absolute; box-sizing: border-box; width: {{ card.width }}mm; height: {{ card.height }}mm; padding: 2mm; overflow: hidden; text-align: center; background: #FFFFFF; border: 0.3mm solid #E4E4E7; border-radius: 2.5mm; }
+  .oc-ceo { border: 0.5mm solid #FFDF55; box-shadow: 0 0 0 0.7mm #FFEFAA; }
+  .oc-vac { border: 0.3mm dashed #71717A; background: transparent; }
+  .oc-av { width: 8mm; height: 8mm; margin: 0 auto 1.2mm auto; border-radius: 50%; background: #FFEFAA; color: #014339; font-size: 7.5pt; font-weight: 700; line-height: 8mm; }
+  .oc-ceo .oc-av { background: #FFDF55; color: #09090B; }
+  .oc-vac .oc-av { background: #F8FAFA; color: #6A6A72; border: 0.3mm dashed #71717A; box-sizing: border-box; line-height: 7.4mm; }
+  .oc-name { font-size: 8pt; font-weight: 600; line-height: 1.2; max-height: 2.4em; overflow: hidden; color: #09090B; }
+  .oc-title { margin-top: 0.5mm; font-size: 6.5pt; line-height: 1.25; max-height: 2.5em; overflow: hidden; color: #71717A; }
+  .oc-dept { display: inline-block; margin-top: 1mm; padding: 0.2mm 2mm; font-size: 6pt; font-weight: 600; color: #6A6A72; background: #F8FAFA; border: 0.25mm solid #E4E4E7; border-radius: 999px; }
+  .oc-sub { margin-top: 0.6mm; font-size: 6pt; color: #6A6A72; }
+  .oc-dotted { display: inline-block; margin-top: 0.8mm; padding: 0 1.5mm; font-size: 5.8pt; color: #6A6A72; border: 0.25mm dashed #71717A; border-radius: 999px; }
+</style>
+<p class="oc-meta"><strong>{{ seats }} seats</strong> · {{ filled }} filled · {{ open }} open</p>
+<p class="oc-legend"><span class="oc-key"><i class="oc-solid"></i>Reporting Line</span><span class="oc-key"><i class="oc-dash"></i>Dotted Line</span><span class="oc-key"><i class="oc-chief"></i>CEO</span><span class="oc-key"><i class="oc-open"></i>Vacant Seat</span></p>
+<div class="oc-chart" style="width: {{ chart.width }}mm; height: {{ chart.height }}mm; zoom: {{ chart.scale }};">
+  {{#each lines}}<div class="oc-ln {{#if across}}oc-across{{else}}oc-down{{/if}}" style="left: {{ x }}mm; top: {{ y }}mm; width: {{ w }}mm; height: {{ h }}mm;"></div>{{/each}}
+  {{#each cards}}<div class="oc-card{{#if ceo}} oc-ceo{{/if}}{{#if vacant}} oc-vac{{/if}}" style="left: {{ x }}mm; top: {{ y }}mm;">
+    <div class="oc-av">{{#if vacant}}+{{else}}{{ initials }}{{/if}}</div>
+    <div class="oc-name">{{ name }}</div>
+    <div class="oc-title">{{ title }}</div>
+    {{#if vacant}}{{else}}<span class="oc-dept">{{ department }}</span>{{/if}}
+    {{#if meta}}<div class="oc-sub">{{ meta }}</div>{{/if}}
+    {{#if dotted}}<div><span class="oc-dotted">Dotted line · {{ dotted }}</span></div>{{/if}}
+  </div>{{/each}}
+</div>

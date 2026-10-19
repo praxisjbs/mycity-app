@@ -151,6 +151,8 @@ const ENTITY_ROUTES = Object.freeze({
   },
   // A post nobody holds yet opens on the Organogram, focused on it.
   org_seat: screen("people", "organogram"),
+  // A Download PDF request: its notice opens the Org Chart, where it can be asked for again.
+  org_chart_export: screen("ess", "org-chart"), // search:none a request for a file that is emailed to the person who asked; nothing to look up
   import_batch: screen("settings", "imports"),
   // A file opens where its record is: on the employee's own My Documents, or on
   // the record's Documents tab for whoever may see it.

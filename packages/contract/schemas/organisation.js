@@ -473,6 +473,51 @@ const OrgChartTree = z
   })
   .strict();
 
+/**
+ * POST /org-chart/exports, Download PDF: the whole tree in the view asked for, drawn in
+ * the worker and emailed to the person asking (docs/guides/organogram.md §5 to §7).
+ */
+const OrgChartExportRequest = z.object({ view: z.enum(["builder", "viewer"]).default("viewer") }).strict();
+const OrgChartExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
+
+/** A length on the PDF's page, in millimetres. */
+const mm = z.number().min(0).max(100000);
+
+/**
+ * The variables of templates/documents/org-chart.html: the chart already laid out
+ * (src/modules/organisation/org-chart.layout.js), so the template only places it.
+ */
+const OrgChartDocumentVars = z
+  .object({
+    page: z.object({ width: mm, height: mm }).strict(),
+    chart: z.object({ width: mm, height: mm, scale: z.number().positive().max(1) }).strict(),
+    card: z.object({ width: mm, height: mm }).strict(),
+    cards: z.array(
+      z
+        .object({
+          x: mm,
+          y: mm,
+          initials: z.string(),
+          name: z.string(),
+          title: z.string(),
+          department: z.string(),
+          meta: z.string().nullable(),
+          dotted: z.string().nullable(),
+          vacant: z.boolean(),
+          ceo: z.boolean(),
+        })
+        .strict(),
+    ),
+    lines: z.array(z.object({ x: mm, y: mm, w: mm, h: mm, across: z.boolean() }).strict()),
+    seats: z.number().int(),
+    filled: z.number().int(),
+    open: z.number().int(),
+  })
+  .strict();
+
+/** The variables of templates/email/org-chart-export.html: when the attached chart was drawn. */
+const OrgChartExportEmailVars = z.object({ as_at: z.string() }).strict();
+
 /* ------------------------------------------------------------------ *
  * The staff import row
  * ------------------------------------------------------------------ */
@@ -626,6 +671,10 @@ const TABLES = {
     reason: "one node of the reporting tree: an employee or a vacant seat, flattened for the chart",
   },
   OrgChartTree: { table: null, reason: "the whole bounded tree and its counts" },
+  OrgChartExportRequest: { table: null, reason: "which view of the tree Download PDF draws" },
+  OrgChartExportQueued: { table: null, reason: "that the PDF was queued, and where it will be emailed" },
+  OrgChartDocumentVars: { table: null, reason: "the variables of templates/documents/org-chart.html, the chart laid out" },
+  OrgChartExportEmailVars: { table: null, reason: "the variables of templates/email/org-chart-export.html, not a row" },
   EmployeeImportRow: {
     table: "employee",
     virtual: {
@@ -690,6 +739,10 @@ module.exports = {
   OrgChartQuery,
   OrgNode,
   OrgChartTree,
+  OrgChartExportRequest,
+  OrgChartExportQueued,
+  OrgChartDocumentVars,
+  OrgChartExportEmailVars,
   EmployeeImportRow,
   AdminBootstrap,
 };

@@ -598,13 +598,29 @@ function setReporting(db, employeeId, patch) {
   );
 }
 
-/** True when `managerId` already reports to `employeeId`, directly or through others. */
-async function wouldLoop(db, employeeId, managerId) {
+/**
+ * True when putting `nodeId` (a person or a seat) under `managerNodeId` would close a
+ * loop: the manager is the node itself, or already sits below it, through people and
+ * seats alike (a seat placed under one of its own reports). Every line is walked,
+ * whatever its status, so no stored line can circle.
+ */
+async function wouldLoop(db, nodeId, managerNodeId) {
+  if (!nodeId || !managerNodeId) return false;
+  if (nodeId === managerNodeId) return true;
   const row = await one(
     db,
-    `SELECT 1 AS x FROM employee_team_closure
-      WHERE manager_id = $1 AND employee_id = $2 AND depth > 0`,
-    [employeeId, managerId],
+    `WITH RECURSIVE up AS (
+       SELECT $2::uuid AS node_id, 0 AS depth
+       UNION ALL
+       SELECT COALESCE(e.line_manager_id, e.line_manager_seat_id, s.line_manager_id, s.line_manager_seat_id),
+              up.depth + 1
+         FROM up
+         LEFT JOIN employee e ON e.employee_id = up.node_id
+         LEFT JOIN org_seat s ON s.org_seat_id = up.node_id
+        WHERE up.node_id IS NOT NULL AND up.node_id <> $1::uuid AND up.depth < 64
+     )
+     SELECT 1 AS x FROM up WHERE node_id = $1::uuid LIMIT 1`,
+    [nodeId, managerNodeId],
   );
   return Boolean(row);
 }
@@ -768,6 +784,19 @@ async function tree(db) {
   return rows;
 }
 
+/**
+ * The document a record already has, when an earlier attempt made it, or null: a Download PDF
+ * request's PDF (org-chart.export.js). The document table is the vault's; this only reads it.
+ */
+async function documentOf(db, entityType, entityId) {
+  const row = await one(
+    db,
+    "SELECT document_id FROM document WHERE entity_type = $1 AND entity_id = $2 LIMIT 1",
+    [entityType, String(entityId)],
+  );
+  return row ? row.document_id : null;
+}
+
 /** The highest sequence a staff number carries, so numbering can be moved past it. */
 async function highestStaffNumberSeq(db) {
   const row = await one(
@@ -824,5 +853,6 @@ module.exports = {
   insertSeat,
   updateSeat,
   tree,
+  documentOf,
   highestStaffNumberSeq,
 };
