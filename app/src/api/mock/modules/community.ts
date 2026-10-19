@@ -1,6 +1,6 @@
 import type { Announcement, AnnouncementStats, Channel, Conversation, Member, Message, ProfileCard } from "@/api/types/community";
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, fold } from "../core";
-import { byId, byKey, DEPARTMENTS, PEOPLE } from "../data/people";
+import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS } from "../data/people";
 import { UPLOADS } from "../uploads";
 
 /**
@@ -70,14 +70,17 @@ interface MockAnnouncement {
   publish_at: string;
   scheduled: boolean;
   departments: string[];
+  /** Who has read it; for an urgent one, who has acknowledged it. */
   read: Set<string>;
   reminded: string | null;
+  urgency: Announcement["urgency"];
 }
 const ANNOUNCEMENTS: MockAnnouncement[] = [
+  ["Fire drill at 11", "Leave by the east stairs and meet at the car park. Wardens wear the yellow vests.", "ifeoma", 0, false, 12, "urgent"],
   ["Q4 review cycle opens", "Self ratings open on the 20th. Managers review from the 27th.", "cynthia", -6, true, 0],
   ["New faces in Enugu", "Two content roles join on the 20th. Say hello in #enugu-launch.", "cynthia", 8, false, 19],
   ["Saturday hours confirmed", "Saturdays are 09:00 to 15:00 for all departments. Clock in applies as on weekdays.", "cynthia", 13, false, 24],
-  ["NDPA refresher due", "Everyone must complete the data protection refresher before 30 November.", "cynthia", 16, false, 23],
+  ["NDPA refresher due", "Everyone must complete the data protection refresher before 30 November.", "cynthia", 16, false, 23, "important"],
   ["Ember to Remember kicks off", "The 100 day calendar runs to 31 December. All hands on the Lagos leg.", "ifeoma", 22, false, 25],
 ].map((a, i) => ({
   announcement_id: sid(`ann:${i}`),
@@ -87,8 +90,13 @@ const ANNOUNCEMENTS: MockAnnouncement[] = [
   publish_at: at(a[3] as number, "09:00"),
   scheduled: a[4] as boolean,
   departments: [],
-  read: new Set(PEOPLE.slice(0, a[5] as number).map((p) => p.user_key)),
+  // An urgent one waits on the demonstration accounts, so the bar and Acknowledge show; its poster has it.
+  read:
+    a[6] === "urgent"
+      ? new Set([a[2] as string, ...PEOPLE.filter((p) => !(p.user_key in SIGN_INS)).slice(0, a[5] as number).map((p) => p.user_key)])
+      : new Set(PEOPLE.slice(0, a[5] as number).map((p) => p.user_key)),
   reminded: null,
+  urgency: (a[6] as Announcement["urgency"] | undefined) ?? "normal",
 }));
 
 interface Chan {
@@ -112,7 +120,13 @@ const chan0 = (name: string, members: string[], msgs: MMsg[], over: Partial<Chan
   for (const m of c.msgs) m.community_channel_id = c.community_channel_id;
   return c;
 };
-const annMsg = (a: MockAnnouncement) => msg("announcement", a.by, a.publish_at, { body: a.body, announcement: { announcement_id: a.announcement_id, title: a.title } });
+const annMsg = (a: MockAnnouncement) =>
+  msg("announcement", a.by, a.publish_at, {
+    body: a.body,
+    announcement: { announcement_id: a.announcement_id, title: a.title, urgency: a.urgency, in_audience: false, acknowledged_at: null },
+  });
+/** Whether `user` is in an announcement's audience: everyone, or its departments' people. */
+const inAudience = (a: MockAnnouncement, user: string) => !a.departments.length || a.departments.includes(PEOPLE.find((p) => p.user_key === user)?.department ?? "");
 
 const rec = msg("recognition", "cynthia", at(0, "07:10"), { body: "Turned the Enugu shot list around in a day." });
 rec.recognition = { to: person("tolu"), count: 6, mine: false };
@@ -209,6 +223,11 @@ function view(m: MMsg, user: string, c: Chan): Message {
     can_delete: !m.deleted && m.message_type !== "announcement" && (mine || moderates(c, user)),
     can_close: !m.deleted && m.message_type === "poll" && !closed && (mine || moderates(c, user)),
   };
+  if (m.announcement) {
+    const a = ANNOUNCEMENTS.find((x) => x.announcement_id === m.announcement!.announcement_id);
+    const acked = !!a && a.urgency === "urgent" && a.read.has(user);
+    out.announcement = { ...m.announcement, in_audience: !!a && inAudience(a, user), acknowledged_at: acked ? m.sent_at : null };
+  }
   if (m.celebration) out.celebration = { ...m.celebration, count: _fans.length, mine: _fans.includes(user), fans: _fans.slice(0, 3).map(person) };
   if (m.recognition) out.recognition = { ...m.recognition, count: _fans.length, mine: _fans.includes(user) };
   if (m.poll) {
@@ -550,6 +569,7 @@ function announcementOut(a: MockAnnouncement): Announcement {
     published_at: a.scheduled ? null : a.publish_at,
     reads: a.scheduled ? 0 : a.read.size,
     audience_size: a.scheduled ? 0 : audience,
+    urgency: a.urgency,
   };
 }
 const poster = (user: string | null) => !!user && ANN_POSTERS.has(user);
@@ -581,7 +601,9 @@ route("POST /api/v1/community/announcements", (req) => {
   if (when && when <= new Date().toISOString()) f.publish_at = ["Time already passed"];
   if (Object.keys(f).length) return invalid(f);
   const departments = audience.kind === "departments" ? DEPARTMENTS.filter((d) => audience.department_ids!.includes(sid(`dept:${d}`))) : [];
-  const a: MockAnnouncement = { announcement_id: sid(`ann:${Date.now()}`), title: String(req.body.title), body: String(req.body.body), by: req.user!, publish_at: when ?? new Date().toISOString(), scheduled: !!when, departments, read: new Set(), reminded: null };
+  const urgency = (req.body.urgency as Announcement["urgency"] | undefined) ?? "normal";
+  // The poster has read what they posted (acknowledged it, when urgent).
+  const a: MockAnnouncement = { announcement_id: sid(`ann:${Date.now()}`), title: String(req.body.title), body: String(req.body.body), by: req.user!, publish_at: when ?? new Date().toISOString(), scheduled: !!when, departments, read: new Set(when ? [] : [req.user!]), reminded: null, urgency };
   ANNOUNCEMENTS.unshift(a);
   if (!a.scheduled) {
     const m = annMsg(a);
@@ -612,6 +634,7 @@ route("PUT /api/v1/community/announcements/:id", (req) => {
   a.title = String(req.body.title);
   a.body = String(req.body.body);
   a.publish_at = when;
+  if (req.body.urgency) a.urgency = req.body.urgency as Announcement["urgency"];
   a.departments = audience.kind === "departments" ? DEPARTMENTS.filter((d) => audience.department_ids!.includes(sid(`dept:${d}`))) : [];
   return ok(announcementOut(a));
 });
@@ -627,7 +650,10 @@ route("GET /api/v1/community/announcements/:id/reads", (req) => {
   const a = ANNOUNCEMENTS.find((x) => x.announcement_id === req.params.id);
   if (!a) return notFound();
   const audience = a.departments.length ? PEOPLE.filter((p) => a.departments.includes(p.department)) : PEOPLE;
-  const rows = audience.map((p, i) => ({ person: person(p.user_key), read_at: a.read.has(p.user_key) ? at(Math.max(0, 3 - (i % 4)), `0${8 + (i % 2)}:${String(10 + i).padStart(2, "0")}`) : null }));
+  const rows = audience.map((p, i) => {
+    const when = a.read.has(p.user_key) ? at(Math.max(0, 3 - (i % 4)), `0${8 + (i % 2)}:${String(10 + i).padStart(2, "0")}`) : null;
+    return { person: person(p.user_key), read_at: when, acknowledged_at: a.urgency === "urgent" ? when : null };
+  });
   return paged(rows, req, { search: (r) => [r.person.display_name], filters: { read: (r, v) => (v === "read" ? !!r.read_at : !r.read_at) } });
 });
 route("POST /api/v1/community/announcements/:id/remind", (req) => {
@@ -638,4 +664,11 @@ route("POST /api/v1/community/announcements/:id/remind", (req) => {
   if (a.reminded === today) return fail(429, "ALREADY_REMINDED", "Already reminded today");
   a.reminded = today;
   return ok({ reminded: PEOPLE.length - a.read.size });
+});
+route("POST /api/v1/community/announcements/:id/acknowledge", (req) => {
+  const a = ANNOUNCEMENTS.find((x) => x.announcement_id === req.params.id && !x.scheduled);
+  if (!a || !inAudience(a, req.user!)) return notFound();
+  if (a.urgency !== "urgent") return fail(422, "NOT_URGENT", "Only an urgent announcement is acknowledged");
+  a.read.add(req.user!);
+  return noContent();
 });

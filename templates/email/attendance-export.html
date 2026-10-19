@@ -1,8 +1,0 @@
----
-subject: "Your {{ title }} export"
-title: Attendance Export
----
-<p style="margin:0 0 16px;">{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}</p>
-<p style="margin:0 0 20px;">The {{ title }} export you asked for is attached: {{ entries }} rows for {{ period }}.</p>
-{{#if capped}}<p style="margin:0 0 20px;">More rows matched than one file holds, so this one has the first. Narrow the filters to export the rest.</p>{{/if}}
-<p style="margin:0;font-size:12px;color:#71717A;">Keep this file where only people allowed to read it can.</p>

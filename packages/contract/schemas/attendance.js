@@ -774,10 +774,10 @@ const WorkScheduleSet = z
  * Exports
  * ------------------------------------------------------------------ */
 
-/** POST /attendance/me/export */
+/** POST /attendance/me/export: my month as a workbook, answered as documents ExportFile. */
 const MyExportRequest = z.object({ month }).strict();
 
-/** POST /attendance/export: at most 31 days. */
+/** POST /attendance/export: the register, at most 31 days, answered as documents ExportFile. */
 const RegisterExportRequest = z
   .object({
     from: isoDate,
@@ -792,18 +792,6 @@ const RegisterExportRequest = z
     (v) => (Date.parse(`${v.to}T00:00:00Z`) - Date.parse(`${v.from}T00:00:00Z`)) / 86_400_000 <= 30,
     { message: "At most 31 days", path: ["to"] },
   );
-
-const AttendanceExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
-
-/** templates/email/attendance-export.html */
-const AttendanceExportEmailVars = z
-  .object({
-    title: z.string(),
-    period: z.string(),
-    entries: z.number().int().min(0),
-    capped: z.boolean(),
-  })
-  .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
@@ -993,11 +981,6 @@ const TABLES = {
   AttendanceRecordRef: { table: null, reason: "the person and day a link to a day or an exception opens" },
   MyExportRequest: { table: null, reason: "the month to export" },
   RegisterExportRequest: { table: null, reason: "the register's filters for an export" },
-  AttendanceExportQueued: { table: null, reason: "that the export was queued, and where it will be emailed" },
-  AttendanceExportEmailVars: {
-    table: null,
-    reason: "the variables of templates/email/attendance-export.html, not a row",
-  },
 };
 
 module.exports = {
@@ -1043,8 +1026,6 @@ module.exports = {
   AttendanceRecordRef,
   MyExportRequest,
   RegisterExportRequest,
-  AttendanceExportQueued,
-  AttendanceExportEmailVars,
   HomeStatus,
   HomeLocation,
   MyHome,

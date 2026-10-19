@@ -7,6 +7,6 @@ export default {
   component: "ExportButton",
   states: {
     Default: () => <ExportButton onExport={wait} />,
-    "Own Label": () => <ExportButton onExport={wait} message="Payslips queued">Export Payslips</ExportButton>,
+    "Own Label": () => <ExportButton onExport={wait} message="Payslips downloaded">Export Payslips</ExportButton>,
   },
 } satisfies GalleryEntry;

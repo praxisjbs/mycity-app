@@ -780,6 +780,7 @@ describe("the routes", () => {
     expect(routes.map((r) => `${r.method} ${r.path}`)).toEqual([
       "GET /overview",
       "POST /overview/export",
+      "GET /overview/export/:id",
       "GET /kpi-picker",
       "PUT /kpi-picks",
       "DELETE /kpi-picks",
@@ -798,6 +799,12 @@ describe("the routes", () => {
       body: c.reports.HomeReportRunNow,
       response: c.reports.HomeReportRun,
     });
+    // The screen that pressed Export waits on its own run here, with no `home.reports` to ask Reports.
+    expect(find("GET", "/overview/export/:id").contract).toMatchObject({
+      params: c.common.IdParams,
+      response: c.reports.HomeReportRun,
+    });
+    expect(find("GET", "/overview/export/:id").capability).toBeNull();
     expect(find("GET", "/team/summary").contract.response).toBe(dashboard.HomeTeamSummary);
     expect(find("GET", "/team").contract).toMatchObject({ query: dashboard.HomeTeamQuery, response: dashboard.HomeTeamPage });
     expect(find("GET", "/team/attendance").contract).toMatchObject({

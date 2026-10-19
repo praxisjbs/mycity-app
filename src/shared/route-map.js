@@ -159,11 +159,11 @@ const ENTITY_ROUTES = Object.freeze({
     self: screen("ess", "my-profile"),
   },
   // A Download My Data workbook (ess.export.js): its record opens My Profile, where it is asked for.
-  data_export: screen("ess", "my-profile"), // search:none a file that is emailed to whoever asked and removed after seven days; nothing to look up
+  data_export: screen("ess", "my-profile"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   // A post nobody holds yet opens on the Organogram, focused on it.
   org_seat: screen("people", "organogram"),
-  // A Download PDF request: its notice opens the Org Chart, where it can be asked for again.
-  org_chart_export: screen("ess", "org-chart"), // search:none a request for a file that is emailed to the person who asked; nothing to look up
+  // A Download PDF file: its record opens the Org Chart, where it is asked for.
+  org_chart_export: screen("ess", "org-chart"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   import_batch: screen("settings", "imports"),
   // A file opens where its record is: on the employee's own My Documents, or on
   // the record's Documents tab for whoever may see it.

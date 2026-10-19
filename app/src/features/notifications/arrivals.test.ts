@@ -29,6 +29,10 @@ const notice = (id: string, over: Partial<Notification> = {}): Notification => (
   notification_id: id,
   category: "comms",
   priority: "normal",
+  urgency: "normal",
+  acknowledge_required: false,
+  acknowledged_at: null,
+  repeat_count: 0,
   title: "Tom-Blake Asaah",
   body: "Re: Test mail\nThe signed copy is attached.",
   entity_type: "mail_thread",
@@ -61,8 +65,21 @@ describe("a notice arriving while the app is open", () => {
     expect(m.notify).toHaveBeenCalledOnce();
     expect(m.notify.mock.calls[0][0]).toMatchObject({ title: "Tom-Blake Asaah", avatar: "Tom-Blake Asaah" });
     expect(m.alertArrival).toHaveBeenCalledOnce();
-    expect(m.alertArrival).toHaveBeenCalledWith("comms");
+    expect(m.alertArrival).toHaveBeenCalledWith("comms", "normal");
     expect(m.invalidate).toHaveBeenCalledWith("/api/v1/notifications");
+  });
+
+  it("an urgent notice is red, and each repeat shows the banner and sounds again", () => {
+    onScreen("visible");
+    renderHook(() => useArrivals(0));
+    const id = "8b3f3a7f-0c6d-4f5e-9a4c-3d4e5f607182";
+    const urgent = { urgency: "urgent" as const, acknowledge_required: true, title: "Fire drill at 11", entity_type: "announcement", link: null };
+    arrives(notice(id, urgent));
+    arrives(notice(id, urgent));
+    arrives(notice(id, { ...urgent, repeat_count: 1 }));
+    expect(m.notify).toHaveBeenCalledTimes(2);
+    expect(m.notify.mock.calls[0][0]).toMatchObject({ title: "Fire drill at 11", tone: "err" });
+    expect(m.alertArrival).toHaveBeenLastCalledWith("comms", "urgent");
   });
 
   it("behind other windows or tabs: only the bell reloads; the device's own notification sounds", () => {

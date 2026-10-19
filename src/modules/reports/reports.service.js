@@ -265,6 +265,17 @@ async function getRun(user, id) {
   return presentRun(row);
 }
 
+/**
+ * GET /home/overview/export/:id: one of the reader's own Overview Export runs, which the screen
+ * that pressed Export waits on to download its file. Open to every Home reader, as the Export
+ * is; any other run is a 404.
+ */
+async function getOverviewRun(user, id) {
+  const row = await repo.runById(pool, id, { seen: { all: false, user_id: user.user_id } });
+  if (!row || row.report_key !== repo.OVERVIEW || row.recipient_user_id !== user.user_id) throw runNotFound();
+  return presentRun(row);
+}
+
 /* ------------------------------------------------------------------ *
  * Building and changing a report
  * ------------------------------------------------------------------ */
@@ -781,6 +792,7 @@ module.exports = {
   summary,
   runs,
   getRun,
+  getOverviewRun,
   create,
   update,
   setActive,

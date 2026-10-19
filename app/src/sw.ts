@@ -7,13 +7,13 @@
  *            is cached and every number is live
  *   update   a new version waits until the page asks it to take over (SKIP_WAITING, the
  *            Reload notice in shell/pwa.ts)
- *   push     a notice for this browser's person. When the app is on screen here and says it
- *            showed the banner, nothing more; otherwise a notification: one per conversation
- *            (tag), alerting again for mail and direct messages, updating quietly for channel
- *            posts, with Mark Read, the sender's initials, the MyCity pin in the status bar and
- *            the unread count on the app icon where the platform has one. Safari and every
- *            iPhone or iPad always show it: WebKit stops a subscription whose pushes show
- *            nothing. A test always shows
+ *   push     a notice for this browser's person: always a notification, on every device, the
+ *            one in the person's hand included (TB, 19/10/2026), and the push passed to each
+ *            window of the app on screen, which shows its banner. One notification per
+ *            conversation (tag), alerting again for each new message, post or mail, with Mark
+ *            Read, the sender's initials, the MyCity pin in the status bar and the unread count
+ *            on the app icon where the platform has one. An urgent notice stays on screen until
+ *            acted on, and its repeats alert again without counting as new
  *   click    opens the record: a window of the app is focused and sent there, else a window is
  *            opened on it. Sign-in keeps the address, so a tap after the session has ended
  *            lands on the record once signed in; `n` marks the notices read
@@ -55,12 +55,10 @@ interface NoticeData {
 type ShowOptions = NotificationOptions & {
   actions?: Array<{ action: string; title: string }>;
   renotify?: boolean;
+  requireInteraction?: boolean;
   timestamp?: number;
 };
 
-const UA = self.navigator.userAgent;
-/** Safari and every iPhone or iPad: a push must always show a notification. */
-const WEBKIT = /AppleWebKit/.test(UA) && !/Chrome|Chromium|CriOS|Edg|OPR|SamsungBrowser|Firefox|FxiOS/.test(UA);
 const ASK_MS = 1500;
 
 /** Posts to one page and waits for its answer; no answer in time is a no. */
@@ -149,15 +147,18 @@ async function show(p: PushPayload): Promise<void> {
   const shown = (await self.registration.getNotifications({ tag: p.tag }))[0];
   const before = shown?.data as NoticeData | undefined;
   const grouped = p.mode !== "single" && before?.mode === p.mode;
-  const count = grouped && before ? before.count + 1 : 1;
-  const ids = [...(grouped && before ? before.ids : []), ...(p.id ? [p.id] : [])].slice(-25);
+  // An urgent repeat of a notice already shown alerts again but is not new.
+  const repeat = grouped && !!p.id && !!before?.ids.includes(p.id);
+  const count = grouped && before ? before.count + (repeat ? 0 : 1) : 1;
+  const ids = repeat && before ? before.ids : [...(grouped && before ? before.ids : []), ...(p.id ? [p.id] : [])].slice(-25);
   const title = count > 1 ? `${p.title} · ${count} new${p.mode === "quiet" ? " posts" : ""}` : p.title;
   const data: NoticeData = { ids, path: p.path, tag: p.tag, mode: p.mode, count };
   const options: ShowOptions = {
     body: p.body,
     tag: p.tag,
-    renotify: p.mode === "alert" && Boolean(shown),
-    silent: p.mode === "quiet" && Boolean(shown),
+    renotify: (p.mode === "alert" || p.urgency === "urgent") && Boolean(shown),
+    silent: p.mode === "quiet" && Boolean(shown) && p.urgency !== "urgent",
+    requireInteraction: p.urgency === "urgent",
     icon: (await avatarOf(p)) ?? "/pwa-192.png",
     badge: "/badge-96.png",
     timestamp: Date.parse(p.ts) || Date.now(),
@@ -185,11 +186,8 @@ async function onPush(event: PushEvent): Promise<void> {
     return;
   }
   await setBadge(p.unread);
-  if (!p.test && !WEBKIT) {
-    const visible = (await pages()).filter((c) => c.visibilityState === "visible");
-    const answers = await Promise.all(visible.map((c) => ask(c, { type: "mycity:push", payload: p })));
-    if (answers.some(Boolean)) return;
-  }
+  // An app on screen shows its banner; the notification shows whatever it answers.
+  if (!p.test) for (const c of await pages()) if (c.visibilityState === "visible") void ask(c, { type: "mycity:push", payload: p });
   await show(p);
 }
 

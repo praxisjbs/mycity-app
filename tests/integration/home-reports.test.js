@@ -702,10 +702,10 @@ describeDb("Home · Reports against the real migrations", () => {
       await drain();
     });
 
-    test("an XLSX is stored and emailed at once: only the rows its recipient may see", async () => {
+    test("an XLSX is stored at once and its run done, for the screen that pressed: only the rows its recipient may see", async () => {
       const manager = await runRow(runs.managerXlsx.home_report_run_id);
       expect(manager).toMatchObject({ status: "done", document_id: expect.any(String), error: null });
-      expect(manager.emailed_at).toBeInstanceOf(Date);
+      expect(manager.emailed_at).toBeNull();
       const mine = await sheetRows(manager.document_id);
       expect(mine.doc).toMatchObject({ doc_type: "home_report" });
       expect(mine.sheets).toEqual(["Cover", "Daily Attendance"]);
@@ -725,20 +725,14 @@ describeDb("Home · Reports against the real migrations", () => {
       expect(await countEvents("home.report_run")).toBe(queued);
     });
 
-    test("the email carries the file, by its document, once it exists", async () => {
-      const emails = reportEmails();
-      const toManager = emails.find((e) => e.job_id === `home-report-run-${runs.managerXlsx.home_report_run_id}`);
-      expect(toManager).toMatchObject({
-        to: { name: "Kemi Alade", email: "manager@reports.mycity.test" },
-        recipient: { first_name: "Kemi" },
-        template: "scheduled-report",
-        data: { report_name: "Late Today", run_number: runs.managerXlsx.number, format: "Excel", scheduled: false },
-        attachments: [{ document_id: (await runRow(runs.managerXlsx.home_report_run_id)).document_id }],
-      });
-      expect(emails.some((e) => e.job_id === `home-report-run-${runs.managerPdf.home_report_run_id}`)).toBe(false);
+    test("a run somebody pressed for is never emailed: its recipient downloads the file", async () => {
+      expect(reportEmails()).toEqual([]);
+      const file = await as("manager").get(`/documents/${(await runRow(runs.managerXlsx.home_report_run_id)).document_id}/content`);
+      expect(file.status).toBe(200);
+      expect(file.headers["content-type"]).toMatch(/spreadsheetml/);
     });
 
-    test("a PDF waits for its render, as the recipient sees it, and is emailed once it exists", async () => {
+    test("a PDF waits for its render, as the recipient sees it, and its run is done once it exists", async () => {
       const waiting = await runRow(runs.managerPdf.home_report_run_id);
       expect(waiting).toMatchObject({ status: "pending", emailed_at: null, document_id: expect.any(String) });
       const listed = (await runsOf("manager")).find((x) => x.home_report_run_id === runs.managerPdf.home_report_run_id);
@@ -756,9 +750,9 @@ describeDb("Home · Reports against the real migrations", () => {
       await documents.renderPending(waiting.document_id, { db: pool, renderPdf: fakePdf });
       await drain();
       expect(await runRow(runs.managerPdf.home_report_run_id)).toMatchObject({ status: "done", error: null });
-      expect(reportEmails().filter((e) => e.job_id === `home-report-run-${runs.managerPdf.home_report_run_id}`)).toHaveLength(1);
+      expect(reportEmails().filter((e) => e.job_id === `home-report-run-${runs.managerPdf.home_report_run_id}`)).toHaveLength(0);
       const done = (await runsOf("manager")).find((x) => x.home_report_run_id === runs.managerPdf.home_report_run_id);
-      expect(done).toMatchObject({ status: "done", document_id: waiting.document_id, emailed_at: expect.any(String) });
+      expect(done).toMatchObject({ status: "done", document_id: waiting.document_id, emailed_at: null });
     });
 
     test("a PDF the render job gives up on fails its run, and nothing is emailed", async () => {
@@ -987,7 +981,8 @@ describeDb("Home · Reports against the real migrations", () => {
       expect(byWho["manager:pdf"]).toMatchObject({ status: "pending", document_id: expect.any(String) });
       const emailed = reportEmails().map((e) => e.to.email).sort();
       expect(emailed).toEqual(["manager@reports.mycity.test", "ops@reports.mycity.test"]);
-      expect(reportEmails().every((e) => e.data.scheduled === true)).toBe(true);
+      // A schedule's file is still emailed to its recipients: nobody pressed anything for it.
+      expect(reportEmails().every((e) => e.template === "scheduled-report" && e.attachments.length === 1)).toBe(true);
       expect(await countEvents("home.report_run_finished")).toBeGreaterThan(0);
     });
 
@@ -1211,6 +1206,17 @@ describeDb("Home · Reports against the real migrations", () => {
       expect(again.home_report_run_id).toBe(runs.staffOverview.home_report_run_id);
     });
 
+    test("the screen that pressed waits on its own run, though it holds no `home.reports`; nobody else's", async () => {
+      const path = `/home/overview/export/${runs.staffOverview.home_report_run_id}`;
+      const mine = await as("staff").get(path);
+      expect(mine.status).toBe(200);
+      expect(r.HomeReportRun.parse(mine.body)).toMatchObject({ home_report_run_id: runs.staffOverview.home_report_run_id, status: "pending" });
+      // Recent Runs is not theirs to ask; someone else's run, or a run of another report, is a 404 here.
+      expect((await as("staff").get(`/home/report-runs/${runs.staffOverview.home_report_run_id}`)).status).toBe(403);
+      expect((await as("ops").get(path)).status).toBe(404);
+      expect((await as("manager").get(`/home/overview/export/${runs.managerXlsx.home_report_run_id}`)).status).toBe(404);
+    });
+
     test("its file is the reader's own Overview, built as them, though they hold no `home.reports`", async () => {
       await drain();
       const run = await runRow(runs.staffOverview.home_report_run_id);
@@ -1226,7 +1232,12 @@ describeDb("Home · Reports against the real migrations", () => {
       runs.opsOverview = r.HomeReportRun.parse(res.body);
       await drain();
       const run = await runRow(runs.opsOverview.home_report_run_id);
-      expect(run).toMatchObject({ status: "done", error: null });
+      expect(run).toMatchObject({ status: "done", error: null, emailed_at: null });
+      // Done, the screen that pressed reads it done and downloads it there; nothing is emailed.
+      const waited = r.HomeReportRun.parse((await as("ops").get(`/home/overview/export/${runs.opsOverview.home_report_run_id}`)).body);
+      expect(waited).toMatchObject({ status: "done", document_id: run.document_id });
+      expect((await as("ops").get(`/documents/${run.document_id}/content`)).status).toBe(200);
+      expect(reportEmails().some((e) => e.job_id === `home-report-run-${runs.opsOverview.home_report_run_id}`)).toBe(false);
       const file = await sheetRows(run.document_id, "Summary");
       expect(file.sheets.slice(0, 3)).toEqual(["Cover", "Summary", "Cards"]);
       expect(file.rows[1][0]).toMatch(/^Hello Tunde\. This is your Home on /);

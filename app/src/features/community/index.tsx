@@ -731,10 +731,10 @@ function Announcements() {
       {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
         <Grid cols={2} className="mt-3">
           {list.rows.map((a) => (
-            <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.status === "scheduled" ? "Scheduled Announcement" : "Announcement Reads", body: (close) => <AnnouncementReads a={a} close={close} done={list.reload} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
+            <Card key={a.announcement_id} urgency={a.urgency} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.status === "scheduled" ? "Scheduled Announcement" : "Announcement Reads", body: (close) => <AnnouncementReads a={a} close={close} done={list.reload} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
               <div className="mb-1.5 flex items-start gap-2">
                 <h2 data-copy="content" className="flex-1 text-sm font-semibold">{a.title}</h2>
-                {a.status === "scheduled" ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience_size ? "ok" : "neutral"}>{a.reads} of {a.audience_size} read</Pill>}
+                {a.status === "scheduled" ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience_size ? "ok" : "neutral"}>{a.reads} of {a.audience_size} {a.urgency === "urgent" ? "acknowledged" : "read"}</Pill>}
               </div>
               <p className="line-clamp-3 text-sm whitespace-pre-wrap text-muted-foreground">{a.body}</p>
               <p className="mt-2 text-2xs text-subtle-foreground">{a.status === "scheduled" ? `Goes out ${formatDateTime(a.publish_at!)}` : `Posted ${formatDate(a.published_at!)}`} by {a.author?.display_name}</p>
@@ -768,6 +768,11 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
   const remind = useMutation("POST /api/v1/community/announcements/:id/remind");
   const pct = Math.round((a.reads * 100) / Math.max(1, a.audience_size));
   const nNot = notRead.page?.total ?? 0;
+  /* An urgent announcement is read once acknowledged (community.md §3 step 12). */
+  const urgent = a.urgency === "urgent";
+  const doneLabel = urgent ? "Acknowledged" : "Read";
+  const notLabel = urgent ? "Not Acknowledged" : "Not Read";
+  const ackAt = new Map(read.rows.map((r) => [r.person.employee_id, r.acknowledged_at]));
   const nudge = async () => {
     try {
       const r = await remind.run({ params: { id: a.announcement_id }, body: {} });
@@ -787,15 +792,21 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       </div>
       {!live ? <Pill tone="info">Scheduled</Pill> : (
         <>
-          <h3 data-ui="title" className="mb-1.5 text-sm font-semibold">Read by {a.reads} of {a.audience_size}</h3>
+          <h3 data-ui="title" className="mb-1.5 text-sm font-semibold">{doneLabel} by {a.reads} of {a.audience_size}</h3>
           <Meter pct={pct} label={`${pct}%`} />
           <div className="mt-4 mb-1.5 flex items-center gap-2">
-            <h3 data-ui="title" className="flex-1 text-sm font-semibold">Not Read · {nNot}</h3>
+            <h3 data-ui="title" className="flex-1 text-sm font-semibold">{notLabel} · {nNot}</h3>
             {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={() => nudge()}>Remind Them</Button>}
           </div>
-          {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">Not Read</Pill>} /> : <p className="text-2xs text-subtle-foreground">Everyone has read it.</p>}
-          <h3 data-ui="title" className="mt-4 mb-1.5 text-sm font-semibold">Read · {read.page?.total ?? 0}</h3>
-          <PeopleList people={read.rows.map((r) => r.person)} right={() => <Pill tone="ok">Read</Pill>} />
+          {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">{notLabel}</Pill>} /> : <p className="text-2xs text-subtle-foreground">{urgent ? "Everyone has acknowledged it." : "Everyone has read it."}</p>}
+          <h3 data-ui="title" className="mt-4 mb-1.5 text-sm font-semibold">{doneLabel} · {read.page?.total ?? 0}</h3>
+          <PeopleList
+            people={read.rows.map((r) => r.person)}
+            right={(p) => {
+              const at = urgent ? ackAt.get(p.employee_id) : null;
+              return <Pill tone="ok">{at ? formatDateTime(at) : doneLabel}</Pill>;
+            }}
+          />
         </>
       )}
       <FormFooter>
@@ -811,6 +822,7 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
 function NewAnnouncement({ close, done, edit }: { close: () => void; done: () => void; edit?: Announcement }) {
   const [when, setWhen] = useState<"now" | "later">(edit ? "later" : "now");
   const [kind, setKind] = useState<"all" | "departments">(edit?.audience.kind ?? "all");
+  const [urgency, setUrgency] = useState<Announcement["urgency"]>(edit?.urgency ?? "normal");
   const [depts, setDepts] = useState<string[]>(edit?.audience.department_ids ?? []);
   const [deptsBad, setDeptsBad] = useState(false);
   const f = useContractForm({ title: edit?.title ?? "", body: edit?.body ?? "", date: edit?.publish_at ? todayIso(new Date(edit.publish_at)) : "" }, { title: (v) => (v.trim().length > 3 ? null : "Add a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
@@ -826,9 +838,9 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
     const publish_at = `${f.values.date}T09:00:00+01:00`;
     try {
       if (edit) {
-        await change.run({ params: { id: edit.announcement_id }, body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, publish_at } });
+        await change.run({ params: { id: edit.announcement_id }, body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, urgency, publish_at } });
       } else {
-        await save.run({ body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, ...(when === "later" && { publish_at }) } });
+        await save.run({ body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, urgency, ...(when === "later" && { publish_at }) } });
       }
       invalidate("/api/v1/community");
       close();
@@ -844,6 +856,9 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
     <>
       <Field label="Headline" {...f.field("title")}><TextField {...f.field("title")} /></Field>
       <Field label="Message" {...f.field("body")}><TextAreaField {...f.field("body")} /></Field>
+      <Field label="Level" help="Urgent stays red on everyone's screens and repeats every 30 minutes of the working day until each person acknowledges. Important reminds the unread after 4 hours.">
+        <ChoiceField value={urgency} onChange={setUrgency} options={[["normal", "Normal"], ["important", "Important"], ["urgent", "Urgent"]]} />
+      </Field>
       <Field label="Audience"><ChoiceField value={kind} onChange={setKind} options={[["all", "All Staff"], ["departments", "Departments"]]} /></Field>
       {kind === "departments" && (
         <Field label="Departments" state={deptsBad ? "bad" : undefined} message={deptsBad ? "Choose a department" : undefined}>

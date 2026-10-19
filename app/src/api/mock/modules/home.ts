@@ -1470,7 +1470,8 @@ for (const [name, recipient, format, runAt, status] of ASKED) {
 function settle(run: MockRun) {
   if (run.status !== "pending" || run.settles_at === null || Date.now() < run.settles_at) return;
   const now = new Date().toISOString();
-  Object.assign(run, { status: "done", document_id: sid(`report-file:${run.number}`), finished_at: now, emailed_at: now, settles_at: null });
+  // A schedule's file is emailed; one somebody pressed for is downloaded where they pressed.
+  Object.assign(run, { status: "done", document_id: sid(`report-file:${run.number}`), finished_at: now, emailed_at: run.scheduled_for ? now : null, settles_at: null });
 }
 
 /**
@@ -2224,4 +2225,12 @@ route("POST /api/v1/home/overview/export", (req) => {
   const body = reportsContract.HomeReportRunNow.safeParse(req.body);
   if (!body.success) return refused422(body.error.issues);
   return queued(runFor(overviewReportOf(req.user!), req.user!, body.data.format, req.idempotency_key));
+});
+
+/* One of the reader's own Overview exports, which the screen that pressed waits on; no capability, as the Export has none. */
+route("GET /api/v1/home/overview/export/:id", (req) => {
+  RUNS.forEach(settle);
+  const run = RUNS.find((r) => r.home_report_run_id === req.params.id && r.recipient === req.user);
+  const report = run && REPORTS.find((r) => r.saved_report_id === run.saved_report_id);
+  return run && report?.report_key === "overview" ? ok(runOf(run)) : notFound();
 });

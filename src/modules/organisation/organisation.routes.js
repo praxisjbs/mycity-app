@@ -58,8 +58,8 @@ route(router, "get", "/employees/:id/history",
 
 /* Download Their Data: the CEO only, one person's data as Download My Data builds it (docs/guides/ess.md §5). */
 route(router, "post", "/employees/:id/data-export",
-  { params: c.common.IdParams, body: c.common.EmptyBody, response: c.organisation.EmployeeDataExportQueued,
-    summary: "Email the CEO a copy of one person's data" },
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: c.documents.ExportFile,
+    summary: "Download a copy of one person's data, for the CEO" },
   view, requireCeo(), controller.requestDataExport);
 
 route(router, "get", "/departments",
@@ -92,11 +92,12 @@ route(router, "get", "/org-chart",
   requirePermission("ess", "view"), controller.orgChart);
 
 /*
- * Download PDF: the same chart as a file, drawn in the worker and emailed to the person asking.
+ * Download PDF: the same chart as a file, drawn by the pdf-render job and downloaded where it was
+ * asked for.
  * It holds nothing the read does not, so it takes the read's grant (docs/guides/organogram.md §8).
  */
 route(router, "post", "/org-chart/exports",
-  { body: c.organisation.OrgChartExportRequest, response: c.organisation.OrgChartExportQueued, summary: "Email the whole chart as a PDF" },
+  { body: c.organisation.OrgChartExportRequest, response: c.documents.ExportFile, summary: "Download the whole chart as a PDF" },
   requirePermission("ess", "view"), controller.requestOrgChartExport);
 
 module.exports = { basePath: "/", surface: "staff", router };

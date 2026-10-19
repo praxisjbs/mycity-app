@@ -2,33 +2,32 @@
 /**
  * Audit events and the export's work (loaded by the API and the worker).
  *
- * An Audit Log export is asked for in the request and built here, after commit, in
- * the worker: the whole filtered log, masked for the person who asked, as a branded
- * workbook kept in the vault (restricted) and emailed to them, so it arrives in their
- * Mailbox. A retried handler builds the same file again and sends it once more,
- * which is the right failure: an export that never arrives is worse than two.
+ * An Audit Log export is asked for in the request, which reserves its file
+ * (shared/documents/exports.js), and built here, after commit, in the worker: the whole
+ * filtered log, masked for the person who asked, as a branded workbook in the restricted
+ * file their Audit Log is waiting on, which it downloads on the device that asked. Nothing is
+ * emailed. A retried handler leaves a file already made alone.
  */
-const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
-const { atomically } = require("../../shared/db/tx");
 const { defineEvents } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
 const { defineDocumentType } = require("../../shared/documents/types");
-const { defineVariables } = require("../../shared/templates/variables");
 
 const EVENTS = defineEvents("settings", {
   "audit.export_requested": { summary: "An Audit Log export was requested" },
 });
 
-defineDocumentType("audit_export", {
+/** The document type an export's file is kept under, and the record it belongs to. */
+const EXPORT_DOC_TYPE = "audit_export";
+
+defineDocumentType(EXPORT_DOC_TYPE, {
   label: "Audit Log export",
   module: "settings",
   sensitivity: "restricted",
+  export: true,
 });
 
-defineVariables("email", "audit-export", c.audit.AuditExportEmailVars);
-
-/** The filters as the email and the cover sheet say them: "module = settings, from = 2026-10-01". */
+/** The filters as the cover sheet says them: "module = settings, from = 2026-10-01". */
 function filtersText(filters) {
   const parts = Object.entries(filters || {})
     .filter(([, v]) => v !== undefined && v !== null && v !== "")
@@ -59,87 +58,60 @@ const asText = (v) =>
       ? v
       : JSON.stringify(v);
 
-/** The outbox handler: build, keep and send the export. */
-async function sendExport(event) {
-  const queues = require("../../jobs/queues");
-  const vault = require("../../shared/documents/vault");
+/**
+ * The outbox handler: the workbook made into the file the request reserved, masked for the
+ * person who asked. One no longer active gets a failed file instead.
+ * @param {object} event  audit.export_requested
+ * @param {{attempt: number, max_attempts: number}} ctx  the outbox's
+ */
+async function buildExport(event, ctx) {
+  const exportFiles = require("../../shared/documents/exports");
   const { buildWorkbook } = require("../../shared/spreadsheet/build");
   const { workbookContext } = require("../../shared/spreadsheet/context");
-  const { exportFilename } = require("../../shared/spreadsheet/cells");
-  const { config } = require("../../config/env");
   const grantsCache = require("../../shared/rbac/grants-cache");
   const service = require("./audit.service");
 
-  const reader = await grantsCache.getAuthUser(
-    pool,
-    event.payload.requested_by || event.actor_user_id,
-  );
-  if (!reader || reader.status !== "active") return;
-  const filters = event.payload.filters || {};
-  const { rows, total, capped } = await service.gather(pool, filters, reader);
+  const p = event.payload || {};
+  // Asked for before exports were downloaded: that one went by email, and has no file here.
+  if (!p.document_id) return;
+  const reader = await grantsCache.getAuthUser(pool, p.requested_by || event.actor_user_id);
+  if (!reader || reader.status !== "active")
+    return exportFiles.fail(p.document_id, "The person who asked is no longer active.");
+  const filters = p.filters || {};
 
-  const buffer = await buildWorkbook({
-    sheets: [
-      {
-        name: "Audit Log",
-        columns: COLUMNS,
-        rows: rows.map((r) => ({
-          ...r,
-          changed_fields: (r.changed_fields || []).join(", "),
-          before: asText(r.before),
-          after: asText(r.after),
-          masked: (r.masked || []).join(", "),
-        })),
-        freeze: { y: 1 },
-      },
-    ],
-    context: workbookContext({
-      actor: { name: reader.display_name },
-      title: "Audit Log",
-      filters,
-    }),
-    cover: true,
-  });
-  const filename = `${exportFilename({ base: "audit-log", env: config.APP_ENV, extension: "xlsx" })}`;
-
-  const client = await pool.connect();
-  let doc;
-  try {
-    doc = await atomically(client, () =>
-      vault.store(client, {
-        file: { buffer, originalname: filename },
-        purpose: "document",
-        doc_type: "audit_export",
-        entity: { type: event.entity.type, id: event.entity.id },
-        sensitivity: "restricted",
-        source: "generated",
-        title: "Audit Log export",
-        actor: reader.user_id,
+  await exportFiles.make(p.document_id, ctx, async () => {
+    const { rows, total, capped } = await service.gather(pool, filters, reader);
+    return buildWorkbook({
+      sheets: [
+        {
+          name: "Audit Log",
+          columns: COLUMNS,
+          rows: rows.map((r) => ({
+            ...r,
+            changed_fields: (r.changed_fields || []).join(", "),
+            before: asText(r.before),
+            after: asText(r.after),
+            masked: (r.masked || []).join(", "),
+          })),
+          freeze: { y: 1 },
+        },
+      ],
+      context: workbookContext({
+        actor: { name: reader.display_name },
+        title: "Audit Log",
+        lines: [
+          ["Filters", filtersText(filters)],
+          ["Entries", capped ? `The newest ${rows.length} of ${total}. Narrow the dates to export the rest.` : String(rows.length)],
+          ["Restricted", "Values your role may not see are left out and named in the Restricted column."],
+        ],
       }),
-    );
-  } finally {
-    client.release();
-  }
-
-  await queues.enqueue(
-    "email-send",
-    "audit-export",
-    {
-      to: { name: reader.display_name, email: reader.email },
-      template: "audit-export",
-      data: {
-        entries: Math.min(total, rows.length),
-        filters: filtersText(filters),
-        capped,
-      },
-      attachments: [{ document_id: doc.document_id }],
-    },
-    { jobId: `audit-export-${event.event_id}` },
-  );
+      cover: true,
+    });
+  });
 }
 
-outbox.register(EVENTS.AUDIT_EXPORT_REQUESTED, "audit.send_export", (event) =>
-  sendExport(event),
+outbox.register(EVENTS.AUDIT_EXPORT_REQUESTED, "audit.build_export", (event, ctx) =>
+  buildExport(event, ctx),
 );
 
-module.exports = { EVENTS, sendExport, filtersText };
+module.exports = { EVENTS, EXPORT_DOC_TYPE, buildExport, filtersText };

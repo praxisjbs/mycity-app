@@ -5,7 +5,7 @@
  * within the `people` scope (scopeOf). A punch's device is the session's and its time
  * is the server's; the controller passes neither from the request body.
  */
-const { ok, created } = require("../../shared/http/respond");
+const { ok, created, accepted } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf } = require("../../shared/rbac/scope");
 const { maskForUser } = require("../../shared/rbac/field-mask");
@@ -47,7 +47,7 @@ module.exports = {
   explainAutomatic: async (req, res) =>
     created(res, await service.explainAutomatic(withActor(req), id(req), req.validated.body)),
 
-  myExport: async (req, res) => ok(res, await service.requestMyExport(withActor(req), req.validated.body)),
+  myExport: async (req, res) => accepted(res, await service.requestMyExport(withActor(req), req.validated.body)),
 
   myHome: async (req, res) => ok(res, await homes.mine(req.user)),
 
@@ -113,5 +113,5 @@ module.exports = {
       await schedules.set(withActor(req), req.validated.params.employee_id, req.validated.body, scopeOf(req)),
     ),
 
-  export: async (req, res) => ok(res, await service.requestRegisterExport(withActor(req), req.validated.body)),
+  export: async (req, res) => accepted(res, await service.requestRegisterExport(withActor(req), req.validated.body)),
 };

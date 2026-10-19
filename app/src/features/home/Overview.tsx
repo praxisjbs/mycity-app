@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import type { HomeKpiCard, HomeOverview, HomeReportFormat } from "@mycity/contract/contract.gen.ts";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
+import { saveRun } from "@/api/exports";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import { useMe } from "@/auth/AuthProvider";
@@ -23,7 +24,7 @@ import { ActivityToday, DayStrip, GoalBars, MainChart, NeedYou, Pipeline, SideDo
  * data; every word on the screen is written here and in ./sections.
  *
  * Export makes a file of the reader's own Overview, PDF or XLSX, through the reports engine
- * (POST /home/overview/export): numbered, kept in the vault and emailed to them.
+ * (POST /home/overview/export): numbered, kept in the vault, and downloaded here once it is made.
  *
  * Both shells come from one tree (§10.2): on a phone the cards are two to a row and the
  * sections stack in the same order; Choose Cards moves into the page menu, New into the
@@ -80,19 +81,29 @@ function useAttendanceRefresh(reload: () => void, overview: HomeOverview | undef
   }, [punch, reload]);
 }
 
-/** Export: the reader's Overview as a file in the format they choose, toasted with its run's number. Desktop only (§10.2). */
+/**
+ * Export: the reader's Overview as a file in the format they choose, waited on and downloaded
+ * here, toasted with its run's number. Desktop only (§10.2).
+ */
 function ExportOverview() {
   const exporting = useMutation("POST /api/v1/home/overview/export");
+  const [waiting, setWaiting] = useState(false);
   const run = async (format: HomeReportFormat) => {
+    setWaiting(true);
     try {
-      const res = await exporting.run({ body: { format }, idempotencyKey: crypto.randomUUID() });
+      const { run: done, saved } = await saveRun(
+        exporting.run({ body: { format }, idempotencyKey: crypto.randomUUID() }),
+        (id) => api.call("GET /api/v1/home/overview/export/:id", { params: { id } }),
+      );
       invalidate("/api/v1/home/report-runs");
-      toast(`${res.number} queued. It arrives by email.`);
+      if (saved) toast(`${done.number} downloaded`);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Export not queued. Try again.");
+      toast.error(e instanceof ApiError ? e.message : "Export failed. Try again.");
+    } finally {
+      setWaiting(false);
     }
   };
-  return <FormatButton label="Export" formats={["pdf", "xlsx"]} busy={exporting.pending} onRun={(format) => void run(format)} item={(format) => `Export ${format}`} size="md" />;
+  return <FormatButton label="Export" formats={["pdf", "xlsx"]} busy={exporting.pending || waiting} onRun={(format) => void run(format)} item={(format) => `Export ${format}`} size="md" />;
 }
 
 /** A section of the Overview, laid out two to a row on desktop. */

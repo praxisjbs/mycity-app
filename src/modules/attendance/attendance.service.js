@@ -30,10 +30,13 @@
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
+const { config } = require("../../config/env");
 const requestContext = require("../../config/request-context");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const exportFiles = require("../../shared/documents/exports");
+const { exportFilename } = require("../../shared/spreadsheet/cells");
 const { assertInScope } = require("../../shared/rbac/scope");
 const lagos = require("../../shared/time/lagos");
 const { formatDate } = require("../../shared/time/day-first");
@@ -46,6 +49,7 @@ const clockWatch = require("./attendance.clock-watch");
 const guard = require("./attendance.clock-guard");
 const { decideGeofence } = require("./attendance.geofence");
 const reconcile = require("./attendance.reconcile");
+const attendanceExport = require("./attendance.export");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
 const { EVENTS } = require("./attendance.events");
@@ -469,18 +473,29 @@ async function myExceptions(user, query) {
   return reconcile.presentPage(page);
 }
 
-/** Ask for a workbook of the request's scope; it is built after commit and emailed. */
-async function requestExport(actor, payload) {
-  if (!actor.email) throw new AppError("NO_EMAIL", "Your login has no email to send the export to.", 422);
-  await tx((client) =>
-    emit(client, {
-      key: EVENTS.ATTENDANCE_EXPORT_REQUESTED,
-      entity: { type: "attendance_export", id: crypto.randomUUID() },
+/**
+ * Ask for a workbook of the request's scope, for the person asking: its file is reserved now,
+ * made after commit (attendance.export.js) and downloaded on the device that asked.
+ * @returns {Promise<object>} the ExportFile, pending
+ */
+function requestExport(actor, payload) {
+  const kind = attendanceExport.KINDS[payload.kind];
+  return tx(async (client) => {
+    const doc = await exportFiles.reserve(client, {
+      doc_type: attendanceExport.DOC_TYPE,
+      entity: { type: attendanceExport.DOC_TYPE, id: crypto.randomUUID() },
+      file_name: exportFilename({ base: kind.base, env: config.APP_ENV, extension: "xlsx" }),
+      title: `${kind.title} export`,
       actor,
-      payload: { ...payload, requested_by: actor.user_id },
-    }),
-  );
-  return { queued: true, email: actor.email };
+    });
+    await emit(client, {
+      key: EVENTS.ATTENDANCE_EXPORT_REQUESTED,
+      entity: { type: doc.entity_type, id: doc.entity_id },
+      actor,
+      payload: { ...payload, requested_by: actor.user_id, document_id: doc.document_id },
+    });
+    return exportFiles.present(doc);
+  });
 }
 
 const requestMyExport = (user, body) => requestExport(user, { kind: "month", month: body.month });

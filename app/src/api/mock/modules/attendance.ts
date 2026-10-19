@@ -7,6 +7,7 @@ import { byId, byKey, PEOPLE, refKey, SIGN_INS, type MockPerson } from "../data/
 import { HISTORY, TODAY } from "../data/attendance";
 import { lastDeviceOf, MAX_REGISTERED, registeredCount, sessionDevice } from "./devices";
 import { peopleGrant, siteOf } from "./worksites";
+import { exportFile } from "./shared";
 
 /**
  * Attendance on the mock, in the contract's shapes (packages/contract/schemas/attendance.js): the
@@ -714,7 +715,7 @@ route("POST /api/v1/attendance/me/events/:id/explanation", (req) => {
 
 route("POST /api/v1/attendance/me/export", (req) => {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(req.body.month ?? ""))) return invalid({ month: ["Pick a month"] });
-  return ok({ queued: true, email: byKey(req.user)!.work_email });
+  return exportFile(req.user!, "my-attendance");
 });
 
 route("GET /api/v1/attendance/me/records/:id", (req) => {
@@ -893,7 +894,7 @@ route("POST /api/v1/attendance/export", (req) => {
   if (!b.from || !b.to) return invalid({ ...(!b.from && { from: ["Required"] }), ...(!b.to && { to: ["Required"] }) });
   if (b.to < b.from) return invalid({ to: ["Ends before it starts"] });
   if ((Date.parse(`${b.to}T00:00:00Z`) - Date.parse(`${b.from}T00:00:00Z`)) / 86400_000 > 30) return invalid({ to: ["At most 31 days"] });
-  return ok({ queued: true, email: byKey(req.user)!.work_email });
+  return exportFile(req.user!, "attendance-register");
 });
 
 function recordRef(id: string): AttendanceRecordRef | null {

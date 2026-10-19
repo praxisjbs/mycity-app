@@ -366,7 +366,6 @@ describe("realtime", () => {
       in_app: 1,
       email: 1,
       push_queued: 1,
-      push_held: 0,
     });
     expect(await handler(job)).toMatchObject({ in_app: 1, email: 0 });
     // One push job per notice across retries (its id is the notice's), sent at once: nobody
@@ -596,12 +595,13 @@ describe("schedules and heartbeat", () => {
       "attendance-clock-watch",
       "attendance-day-close",
       "celebrations",
-      "data-export-cleanup",
+      "export-cleanup",
       "home-alert-sweeps",
       "import-cleanup",
       "mail-sync",
       "media-reconcile",
       "scheduled-reports",
+      "urgent-repeats",
       "workflow-timeout",
     ]);
   });

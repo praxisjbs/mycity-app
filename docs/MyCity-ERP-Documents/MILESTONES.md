@@ -904,7 +904,9 @@ after the session has ended, and a tap opens the record through sign-in), the in
 bell's pane on both shells and each person's Notification Settings (In App, Email and Push per
 category) are built in M0 (`docs/guides/notifications.md`, `docs/runbooks/push-notifications.md`).
 M6 keeps the configurable reminders above (Settings · Notifications, #74) and the definition of
-done below.
+done below. **Added to M0 by TB on the same day:** every device alerted at once, every channel post
+alerting, and urgency (Normal, Important, Urgent) with Acknowledge, a red bar on every screen and
+urgent repeats every 30 minutes of the working day (`docs/handoff/notifications-everywhere.md`).
 
 ### Definition of done
 
