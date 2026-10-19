@@ -187,8 +187,8 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
-  // A reminder to clock in (§6.14): the person's notice opens My Attendance with the clock panel
-  // (`?clock=`). search:none a reminder is a notice about today, not a record anyone looks up
+  // A reminder to clock in (§6.14): the person's notice opens My Attendance with the clock panel (`?clock=`).
+  // search:none a reminder is a notice about today, not a record anyone looks up
   attendance_clock_reminder: {
     ...screen("ess", "my-attendance"),
     param: "clock",

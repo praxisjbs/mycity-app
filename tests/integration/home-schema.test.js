@@ -222,11 +222,11 @@ describeDb("Home schema and reference data against the real migrations", () => {
 
     test("Activity Today reads the day's events through an index; the roster reads a day through the attendance module's", async () => {
       const { rows } = await q("SELECT tablename, indexdef FROM pg_indexes WHERE indexname = ANY($1) ORDER BY tablename, indexname", [
-        ["attendance_event_occurred_idx", "event_log_occurred_idx", "attendance_day_date_status_idx", "attendance_event_one_active_uq"],
+        ["attendance_event_occurred_idx", "event_log_occurred_idx", "attendance_day_date_status_idx", "attendance_event_one_active_person_uq"],
       ]);
       expect(rows.map((r) => [r.tablename, r.indexdef.replace(/^.* USING btree /, "")])).toEqual([
         ["attendance_day", "(attendance_date, status)"],
-        ["attendance_event", "(employee_id, work_date, event_type) WHERE (validation_state = ANY (ARRAY['accepted'::text, 'review'::text]))"],
+        ["attendance_event", "(employee_id, work_date, event_type) WHERE ((validation_state = ANY (ARRAY['accepted'::text, 'review'::text])) AND (source <> 'system'::text))"],
         ["event_log", "(occurred_at DESC)"],
       ]);
     });
