@@ -205,11 +205,11 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       marks read, close read system notifications on focus, `setAppBadge`, presence heartbeats in
       `api/realtime.ts`, ⌘K actions (Notification Settings, Turn On Notifications, Send Test
       Notification), the mock's endpoints in contract shapes.
-- [ ] **13. Docs**: the guide to Built; `mailbox.md`, `community.md`, `identity.md`,
+- [ ] **13. Docs** (NOT STARTED: do this first in the next session): the guide to Built; `mailbox.md`, `community.md`, `identity.md`,
       `foundation.md`; FRONTEND_GUIDE §9.6 and §9.7; BACKEND_STRUCTURE (services/push);
       DATABASE_SCHEMA; MILESTONES §11 note; PROGRESS (M0 item and notes); README map;
       `docs/runbooks/push-notifications.md` for GE.
-- [ ] **14. Verify**: unit and integration tests (a fake push transport); the whole `npm run ci`;
+- [ ] **14. Verify** (IN PROGRESS: see the last log entry for exactly where it stopped): unit and integration tests (a fake push transport); the whole `npm run ci`;
       a real Chromium run delivering a push to the built service worker over the DevTools protocol
       (`ServiceWorker.deliverPushMessage`) and checking the notification it shows.
 - [ ] **15. Ready**: PR out of draft, its body filled to the template (Native App Feel section),
@@ -317,3 +317,48 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   and `src/shared/search/actions.js` the three ⌘K actions (`notify_settings`, `notify_on`,
   `notify_test`, also in `SearchRun`), and the mock answers every new route. App typecheck, lint
   and its 229 tests pass. Next: step 13 (docs) and 14 (tests and verification).
+- 19/10/2026 · TB · Session ended here (TB's credits). State at the last push:
+  - Written and passing: `src/modules/notifications/notifications.test.js` (9 unit tests: payload,
+    error mapping, topic, key id, push style, env defaults), `app/src/features/notifications/sound.test.ts`
+    and `push.test.ts` (7 tests). The backend unit suite (27 suites) and the app suite (229 tests)
+    passed before these were added.
+  - Written, NOT yet run: `tests/integration/notifications-push.test.js` (11 tests: config and
+    keys, a browser as one device with its token and the move to another person, preferences and
+    the Security lock, mail pushed once per device with the first line and a refusing device
+    revoked, retry of a busy push service, skip when read, the one-minute hold in
+    notification-deliver, Mark Read and renewal with the device token, read state and
+    markReadForRecord, Send Test and revocation on suspension). Run it and fix what fails.
+  - The existing integration suite: 623 pass, 2 suites fail, both expected from this work:
+    1. `tests/integration/mailbox.test.js:253` expects the mail notice body "Venue confirmations";
+       it is now subject + new line + first line ("Venue confirmations\nHello", TB's decision 3).
+       Update the expectation.
+    2. A second suite, most likely `tests/integration/community.test.js`: a channel post's notice
+       is now titled "#<channel>" with body "<sender>: <first line>" (it was "<sender> posted").
+       Run it alone to confirm and update its expectations.
+  - **GitHub Actions does not run at all**: since about 05:38 on 19/10/2026 every CI run in the
+    repository (this PR and #70 too) fails in 3 to 4 seconds with no log, while main passed at
+    04:36. That is the account's Actions minutes or spending limit on the private repository, not
+    this code. TB must fix the billing; until then run everything locally (below). No PR comment
+    was posted about it yet.
+  - Local database for the integration suite (what this session used):
+    ```
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-16-pgvector
+    pg_ctlcluster 16 main start
+    su postgres -c "psql -c \"CREATE ROLE mycity LOGIN SUPERUSER PASSWORD 'mycity'\""
+    su postgres -c "createdb -O mycity mycity_test"
+    redis-server --daemonize yes --port 6379
+    RUN_DB_TESTS=1 DATABASE_URL=postgres://mycity:mycity@127.0.0.1:5432/mycity_test \
+      REDIS_URL=redis://127.0.0.1:6379/15 npx jest tests/integration --runInBand
+    ```
+  - Next, in order: (a) fix the 2 suites and run the new one; (b) step 13, the docs:
+    `docs/runbooks/push-notifications.md` for GE (nothing required in `.env`; check neither `.env`
+    pins `MAILBOX_IDLE_MAX=0`; check `/api/v1/notifications/push/config` answers `enabled: true`;
+    how to pin or rotate the keys: set both `VAPID_*` or delete the `integration_secret` row
+    `web_push/vapid`, then restart `mycity-api-*` and `mycity-worker-*`; browsers re-subscribe on
+    their next start), FRONTEND_GUIDE §9.6 and §9.7 (injectManifest, `src/sw.ts`, the pane, the
+    banner, push), BACKEND_STRUCTURE (`services/push`), DATABASE_SCHEMA (`0460`), MILESTONES §11
+    (web push and preferences brought forward by TB, 19/10/2026), the guide to Built with what
+    changed as built (§5 routes, §6, §10), PROGRESS (tick the M0 item, note), `npm run gen:components`;
+    (c) the whole `npm run ci`; (d) a real Chromium run: build the app, serve it on the API, and
+    deliver a push to the built service worker with the DevTools protocol
+    (`ServiceWorker.deliverPushMessage`), then check `registration.getNotifications()`; (e) step 15.
