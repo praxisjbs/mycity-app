@@ -134,22 +134,26 @@ Tick each step with its date and add a line to §8 when it is pushed.
 
 ### PR 1 · Every notice on every device, and urgency
 
-1. [ ] Guides first: `docs/guides/notifications.md` (urgency, every device, banner and notification,
-   repeats, the red bar, Acknowledge, the reminder engine), `docs/guides/community.md`
-   (announcement levels, Acknowledge, every post alerts), MILESTONES and PROGRESS notes.
-2. [ ] Contract: `urgency` on a notice and on an announcement, Acknowledge, open urgent notices for
-   the bar, acknowledgement on the readers list; `npm run gen:contract`.
-3. [ ] Migration `0470`: notice urgency and acknowledgement, announcement urgency,
-   `announcement_read.acknowledged_at`, the `reminder` table, a repeat's round on `push_delivery`.
-4. [ ] Delivery: no hold (decision 9); every channel post alerts (7); direct messages robust (6);
-   the service worker always shows, and passes the push to an open window for its banner (9).
-5. [ ] Urgency: the fan-out's `urgency` (Security and `workflow.escalated` urgent, 8); announcement
-   levels and Acknowledge (1, 3, 5); the Important reminder after 4 hours (1).
-6. [ ] The reminder engine and the urgent repeats: every 30 minutes, 08:00 to 18:00 Lagos, at most
-   8 a day, until acknowledged or opened (2).
-7. [ ] Screens, both shells: the red bar with Acknowledge on every screen (4), red and amber cards
-   and the level on the announcement form, acknowledgement on the readers list, the red dot on
-   Community, urgency in the pane and the banner.
+1. [x] 19/10/2026 Guides first: `docs/guides/notifications.md` (urgency, every device, banner and
+   notification, repeats, the red bar, Acknowledge), `docs/guides/community.md` (announcement
+   levels, Acknowledge, every post alerts), MILESTONES and PROGRESS notes.
+2. [x] 19/10/2026 Contract: `urgency` on a notice and on an announcement, Acknowledge, open urgent
+   notices for the bar, acknowledgement on the readers list; `npm run gen:contract`.
+3. [x] 19/10/2026 Migrations `0470` (notice urgency, Acknowledge, the repeats' pace,
+   `push_delivery.round`) and `1145` (announcement level, `announcement_read.acknowledged_at`; M1's
+   block, because `0470` would run before the tables it alters exist on a new database).
+4. [x] 19/10/2026 Delivery: no hold (decision 9); every channel post alerts (7). The service
+   worker's part is in step 7.
+5. [x] 19/10/2026 Urgency: the fan-out's `urgency` (Security and `workflow.escalated` urgent, 8);
+   announcement levels and Acknowledge (1, 3, 5); the Important reminder after 4 hours (1).
+6. [x] 19/10/2026 The urgent repeats (`urgent-repeats`, on the notice rows): every 30 minutes,
+   08:00 to 18:00 Lagos, at most 8 a day, until acknowledged or opened (2). The general reminder
+   engine moved to PR 2, with the reminders that need it.
+7. [ ] Screens, both shells: the service worker always shows and passes the push to an open window
+   for its banner (9); direct messages' banner and sound robust (6); the red bar with Acknowledge
+   on every screen (4), red and amber cards and the level on the announcement form,
+   acknowledgement on the readers list, the red dot on Community, urgency in the pane and the
+   banner.
 8. [ ] Tests (unit, integration, the app's), the whole `npm run ci`, a real-browser check, the PR
    body, then drive it green and merge with TB's admin rights (TB, 19/10/2026).
 
@@ -176,3 +180,6 @@ Tick each step with its date and add a line to §8 when it is pushed.
 - 19/10/2026 · §3 written from the codebase review: one reminder engine in `notifications`, used by
   declaration. §4 lays out PR 1 and PR 2. TB: open each PR, drive it green, merge it with TB's
   admin rights, then go on. Next: PR 1 step 1, the guides.
+- 19/10/2026 · PR 1 steps 1 to 6 pushed (guides, contract, migrations `0470` and `1145`, the
+  backend). Unit tests and the push, Community and worker integration suites pass locally. Next:
+  step 7, the screens.
