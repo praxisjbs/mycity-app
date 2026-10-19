@@ -500,7 +500,8 @@ describeDb("Staff Community against the real migrations", () => {
 
     const made = await as("ceo").post("/community/announcements").send({ title: "Saturday hours", body: "Saturdays are 09:00 to 15:00." });
     expect(made.status).toBe(201);
-    expect(made.body).toMatchObject({ status: "published", audience: { kind: "all" }, audience_size: 3, reads: 0 });
+    // The poster, never told of their own post, has read it.
+    expect(made.body).toMatchObject({ status: "published", audience: { kind: "all" }, audience_size: 3, reads: 1, urgency: "normal" });
     await drain();
     const told = await one("SELECT title FROM notification WHERE user_id = $1 AND event_key = 'announcement.published' AND title = 'Saturday hours'", [people.bola.user.user_id]);
     expect(told).toBeTruthy();
@@ -521,9 +522,9 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("bola").get("/community/announcements/stats")).status).toBe(403);
 
     const reads = await as("ceo").get(`/community/announcements/${made.body.announcement_id}/reads?read=read`);
-    expect(reads.body.data.map((r) => r.person.display_name)).toEqual(["Bola Ade"]);
+    expect(reads.body.data.map((r) => r.person.display_name)).toEqual(["Bola Ade", "Amaka Eze"]);
     const remind = await as("ceo").post(`/community/announcements/${made.body.announcement_id}/remind`).send({});
-    expect(remind.body).toEqual({ reminded: 2 });
+    expect(remind.body).toEqual({ reminded: 1 });
     expect((await as("ceo").post(`/community/announcements/${made.body.announcement_id}/remind`).send({})).status).toBe(429);
 
     const later = new Date(Date.now() + 3600_000).toISOString();
@@ -543,6 +544,81 @@ describeDb("Staff Community against the real migrations", () => {
     expect(done.released).toBe(1);
     const list = await as("ceo").get("/community/announcements");
     expect(list.body.data.find((a) => a.title === "Q4 reviews").status).toBe("published");
+  });
+
+  test("an urgent announcement: red to its audience, open until each person acknowledges, on the card or the urgent bar", async () => {
+    const made = await as("ceo").post("/community/announcements").send({ title: "Fire drill at 11", body: "Leave by the east stairs.", urgency: "urgent" });
+    expect(made.status).toBe(201);
+    expect(made.body).toMatchObject({ urgency: "urgent", reads: 1, audience_size: 3 });
+    const id = made.body.announcement_id;
+    await drain();
+    const noticeOf = (who) =>
+      one("SELECT * FROM notification WHERE user_id = $1 AND event_key = 'announcement.published' AND entity_id = $2", [people[who].user.user_id, id]);
+    const bola = await noticeOf("bola");
+    expect(bola).toMatchObject({ urgency: "urgent", acknowledge_required: true, body: "Urgent. Acknowledge it in #announcements." });
+    expect(await noticeOf("ceo")).toBeUndefined(); // never told of their own post
+
+    // Opening #announcements is not enough: the card still asks, and the notice stays in the bar.
+    const ann = (await channelsOf("bola")).find((c) => c.name === "announcements");
+    const msgs = await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`);
+    expect(msgs.body.data.find((m) => m.announcement && m.announcement.announcement_id === id).announcement).toEqual({
+      announcement_id: id,
+      title: "Fire drill at 11",
+      urgency: "urgent",
+      in_audience: true,
+      acknowledged_at: null,
+    });
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).toContain(bola.notification_id);
+    expect((await as("ceo").get(`/community/announcements/${id}/reads?read=not_read`)).body.data.map((r) => r.person.display_name).sort()).toEqual(["Bola Ade", "Tunde Ola"]);
+
+    // Bola presses Acknowledge on the card: the reads row and the notice close together.
+    expect((await as("bola").post(`/community/announcements/${id}/acknowledge`).send({})).status).toBe(204);
+    expect((await as("bola").post(`/community/announcements/${id}/acknowledge`).send({})).status).toBe(204);
+    expect((await noticeOf("bola")).acknowledged_at).not.toBeNull();
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).not.toContain(bola.notification_id);
+    const after = await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`);
+    expect(after.body.data.find((m) => m.announcement && m.announcement.announcement_id === id).announcement.acknowledged_at).not.toBeNull();
+
+    // Tunde presses it on the urgent bar instead: the announcement records it once the event is handled.
+    const tunde = await noticeOf("tunde");
+    const pressed = await as("tunde").post(`/notifications/${tunde.notification_id}/acknowledge`).send({});
+    expect(pressed.status).toBe(200);
+    expect(pressed.body).toMatchObject({ notification_id: tunde.notification_id, urgency: "urgent", acknowledge_required: true });
+    expect(pressed.body.acknowledged_at).not.toBeNull();
+    await drain();
+    const reads = await as("ceo").get(`/community/announcements/${id}/reads`);
+    expect(reads.body.data.every((r) => r.acknowledged_at)).toBe(true);
+    expect((await as("ceo").get("/community/announcements")).body.data.find((a) => a.announcement_id === id)).toMatchObject({ reads: 3 });
+
+    // Only an urgent announcement takes Acknowledge, and only from its audience.
+    const plain = await as("ceo").post("/community/announcements").send({ title: "Lunch", body: "On us." });
+    expect((await as("bola").post(`/community/announcements/${plain.body.announcement_id}/acknowledge`).send({})).status).toBe(422);
+  });
+
+  test("an important announcement is amber and reminds whoever has not opened it once, 4 hours later", async () => {
+    const svc = require("../../src/modules/announcements/announcements.service");
+    queues.enqueue.mockClear();
+    const made = await as("ceo").post("/community/announcements").send({ title: "New leave form", body: "Use it from Monday.", urgency: "important" });
+    const id = made.body.announcement_id;
+    await drain();
+    expect(queues.enqueue).toHaveBeenCalledWith(
+      "announcement-publish",
+      "remind",
+      { announcement_id: id },
+      expect.objectContaining({ delay: 4 * 60 * 60 * 1000, jobId: `announcement-remind-${id}` }),
+    );
+    const told = await one("SELECT urgency, acknowledge_required FROM notification WHERE user_id = $1 AND entity_id = $2", [people.bola.user.user_id, id]);
+    expect(told).toEqual({ urgency: "important", acknowledge_required: false });
+
+    const ann = (await channelsOf("bola")).find((c) => c.name === "announcements");
+    await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`); // Bola opens it
+    const job = require("../../src/jobs/handlers/announcement-publish");
+    expect(await job({ name: "remind", data: { announcement_id: id } })).toEqual({ announcement_id: id, reminded: 1 });
+    await drain();
+    expect(await one("SELECT count(*)::int AS n FROM notification WHERE event_key = 'announcement.reminded' AND entity_id = $1", [id])).toEqual({ n: 1 });
+    // A normal one has no reminder of its own.
+    const plain = await as("ceo").post("/community/announcements").send({ title: "Cake", body: "In the kitchen." });
+    expect(await svc.remindUnread(plain.body.announcement_id)).toEqual({ reminded: 0 });
   });
 
   test("a scheduled announcement is edited or cancelled until it goes out; a stale release does nothing", async () => {

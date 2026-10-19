@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "4dff5feb8bfd4b955dff6bb404a2dbbd24c6061cbbf491da309c3b453b44333c",
+  "source_hash": "8a562c1c97696419732297e92749c711ac20eec41c69e997834240026f7b9e6b",
   "schemas": 549,
-  "endpoints": 303,
+  "endpoints": 306,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -71,7 +71,7 @@
     "packages/contract/schemas/workspace.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "src/modules/access/access.routes.js": "b2701c9c63b01069e391675c0d49cd3ab308ecff22e2dbab8e6a77746e2bf4e5",
     "src/modules/alerts/alerts.routes.js": "45a8797d46acfb6a814cb09d990829758da9f9d296f671dd2262ab0afb8faa73",
-    "src/modules/announcements/announcements.routes.js": "2870fa7592a320a68f39a031d65825520f0316fcd31efe38e72e4e15257524f8",
+    "src/modules/announcements/announcements.routes.js": "2db26fa36a250e582f277d309c5026577cbba3f5eb51088dc927ac5d4c443bf9",
     "src/modules/attendance/attendance.routes.js": "611080bf03595e6ee019acf6f972acb6a33b7d909aaa6a3876efaaff005433e2",
     "src/modules/audit/audit.routes.js": "0b20178657d087d71ed69684191a54dc7ecaa271a8c4b63ec5ec5876ffbcacc3",
     "src/modules/community/community.routes.js": "e24c39601d23498ddf6d7c1045276a9b70be100152aa752e3c8d3e3ca9492968",
@@ -83,7 +83,7 @@
     "src/modules/imports/imports.routes.js": "581a544f9a5a30e45bdbc8ce6e13c91a360e031362d543e690c5e29561127fb0",
     "src/modules/leave/leave.routes.js": "feb332b594d58a6a25928a9fc0176be60e918391df78e36d0bad20a68dbd5e9f",
     "src/modules/mailbox/mailbox.routes.js": "f9629bc8c7dcb1a18eae99d13d9a5de7fa8956dcf439921208e612abbc49e9f6",
-    "src/modules/notifications/notifications.routes.js": "20211d926487041803529d32a482cf9a6c79ba9d962d123f2c10b0b2f6b65dfd",
+    "src/modules/notifications/notifications.routes.js": "86285844630f3b0bd61c101104e7332b45f724ea823ec95858685a73c7ba40f8",
     "src/modules/organisation/organisation.routes.js": "ae2d7fb4dfa9abe18cd10677349e6952b95e75c8a279a908858512864c4fbb27",
     "src/modules/reports/reports.routes.js": "7c9e4d8214908d9baf4ed5f1448d190cea08b6b952cf355e0b900f2fbb8a3ebe",
     "src/modules/search/search.routes.js": "0e82222d55484d42635f18d0da8068d4665bb070e4407a57b498ef829a7e44bd",

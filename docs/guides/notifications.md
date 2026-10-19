@@ -179,7 +179,7 @@ Reference-data file(s): none.
 | `notifications.fanout` (outbox, every event) | After any event commits | Writes the rows, hands them to `notification-deliver` |
 | `notification-deliver` (job) | Per event with rows | Socket `notification`; email; queues `notification-push` per row with `push`, at once (counted as `push_queued`) |
 | `notification-push` (job) | Per row; per urgent repeat (`round`); a test from `push.test_requested` | Skips a notice read meanwhile (`skipped_read`, not Security; a repeat skips a closed notice), sends to each device still owed in its round, records `push_delivery`, revokes dead subscriptions; fails to be retried while a device is owed |
-| `urgent-repeats` (scheduler, every 5 minutes, and its job) | 08:00 to 18:00 Lagos | Alerts again each open urgent notice due (§6): socket `notification` with its `repeat`, and `notification-push` for the next round |
+| `urgent-repeats` (scheduler, every 5 minutes) | 08:00 to 18:00 Lagos | Alerts again each open urgent notice due (§6): socket `notification` with its `repeat`, and `notification-push` for the next round |
 | `notification.read`, `notification.read_all` | A read mark | Tells the person's other tabs (`notification_read`) |
 | `notification.acknowledged` | Acknowledge on the urgent bar | Tells the person's other tabs (`notification_read`); the record's module hears it (an announcement records the acknowledgement) |
 | `announcement.acknowledged` (community) | Acknowledge on the announcement in #announcements | Marks the person's notices of that announcement acknowledged and read, and tells their other tabs |

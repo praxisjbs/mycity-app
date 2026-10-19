@@ -145,8 +145,8 @@ defineNotification(EVENTS.CHANNEL_MESSAGE_POSTED, {
     e.payload.channel_name && e.payload.sender_name
       ? `${e.payload.sender_name}: ${firstLine(e)}`
       : firstLine(e),
-  // One alert per channel (TB, 19/10/2026): later posts update it quietly until it is opened.
-  push: { tag: conversation, mode: "quiet" },
+  // Every post alerts each device, replacing the channel's notification, which counts them (TB, 19/10/2026).
+  push: { tag: conversation, mode: "alert" },
 });
 
 defineNotification(EVENTS.RECOGNITION_POSTED, {
