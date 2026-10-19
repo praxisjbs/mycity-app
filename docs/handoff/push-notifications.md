@@ -209,8 +209,9 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       `foundation.md`; FRONTEND_GUIDE §9.1, §9.6 and §9.7; BACKEND_STRUCTURE (services/push);
       DATABASE_SCHEMA; MILESTONES §11 note; PROGRESS (M0 item and notes); README map;
       `docs/runbooks/push-notifications.md` for GE.
-- [ ] **14. Verify** (IN PROGRESS: the integration suite passes, 26 suites and 635 tests, 19/10/2026;
-      the whole `npm run ci` and the Chromium run are left; see the last log entry): unit and integration tests (a fake push transport); the whole `npm run ci`;
+- [ ] **14. Verify** (IN PROGRESS: the integration suite passes, 26 suites and 635 tests, and the
+      whole `npm run ci` passes, 45 gates, 19/10/2026; the Chromium run is left; see the last log
+      entry): unit and integration tests (a fake push transport); the whole `npm run ci`;
       a real Chromium run delivering a push to the built service worker over the DevTools protocol
       (`ServiceWorker.deliverPushMessage`) and checking the notification it shows.
 - [ ] **15. Ready**: PR out of draft, its body filled to the template (Native App Feel section),
@@ -393,3 +394,14 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   `notification`, so a tab in the background chimed on top of the device's own notification; such a
   window now only reloads its bell (`arrivals.test.ts`, which fails without the fix). Next: step 14,
   the whole `npm run ci`.
+- 19/10/2026 · TB · Step 14, the whole `npm run ci`, run locally as `ci.yml` runs it (`CI_STRICT=1`,
+  `RUN_DB_TESTS=1`, `APP_ENV=test`, Node 20, the Postgres and Redis above, Chromium from
+  `/opt/pw-browsers`): 44 of 45 gates passed on the first run, the Jest suite (unit and integration)
+  in 219 s, the screen crawl of gate 8 in 156 s, the frontend tests in 205 s, accessibility in
+  298 s. The one failure was CODEOWNERS: `docs/guides/notifications.md` had no owner line; added
+  (`@swizfcodes @tomblakeasaah196`, as the other guides), and the process gates pass again. Not run
+  here: nothing; `GH_TOKEN` is unset locally, so the process gates read no PR trailers (none are
+  used). Also checked outside CI: a worst-case payload (multi-byte text cut to 120 and 600
+  characters) is 1,751 bytes and 1,854 encrypted with the sender's options (aes128gcm), and it
+  decrypts back exactly with the subscription's keys, so it stays under the push services' 4 KB.
+  Next: step 14's Chromium run.
