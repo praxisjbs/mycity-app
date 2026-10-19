@@ -274,10 +274,12 @@ class ImapSmtpProvider {
         msg.references && msg.references.length
           ? msg.references.join(" ")
           : undefined,
+      // A part with a content id is drawn inside the HTML (a signature's logo), not listed as a file.
       attachments: (msg.attachments || []).map((a) => ({
         filename: a.filename,
         content: a.content,
         contentType: a.contentType,
+        ...(a.cid ? { cid: a.cid, contentDisposition: "inline" } : {}),
       })),
     };
     const raw = await new Promise((resolve, reject) => {

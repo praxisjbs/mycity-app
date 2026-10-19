@@ -36,9 +36,9 @@
  *   });
  *   defineVariables("document", "query-letter", c.queries.QueryLetterVars);
  *
- * Brand: the logo (assets/brand/logo.png when present, the wordmark otherwise) and the
- * Geist fonts (assets/fonts/*.woff2) are embedded as data URLs, because the PDF renderer
- * fetches nothing.
+ * Brand: the Logo uploaded on Settings · Organisation (else assets/brand/logo.png when
+ * present, else the company's name in the letterhead's type) and the Geist fonts
+ * (assets/fonts/*.woff2) are embedded as data URLs, because the PDF renderer fetches nothing.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -57,6 +57,7 @@ const templates = require("../templates/template-store");
 const variables = require("../templates/variables");
 const vault = require("./vault");
 const docTypes = require("./types");
+const organisation = require("../organisation/profile");
 const storage = require("../../services/storage/storage.service");
 
 const ASSETS = path.resolve(__dirname, "..", "..", "..", "assets");
@@ -152,26 +153,32 @@ function brand() {
 }
 
 /**
- * The organisation's name and contacts for letterheads and mail (Settings, Organisation).
- * Table `setting` (migration 0050): key 'organisation.profile', value jsonb.
+ * The organisation for letterheads, spreadsheets and system mail: Settings · Organisation,
+ * read through its one reader (shared/organisation/profile.js), with the brand files fitted
+ * to where they are drawn (foundation.md §6.11).
+ *
+ *   name          the legal name (what a letter is from), else the trading name
+ *   display_name  the name the company goes by, for a heading
+ *   rc            "RC 1234567", or null
+ *   logo          the Logo as a data URL for white paper, or null
+ *   logo_white    the White Logo for Deep Green, { data, buffer, width, height }, or null
  */
 async function orgProfile(client) {
-  let value = {};
-  try {
-    const { rows } = await client.query(
-      "SELECT value FROM setting WHERE key = 'organisation.profile'",
-    );
-    value = (rows[0] && rows[0].value) || {};
-  } catch (err) {
-    if (err.code !== "42P01") throw err;
-  }
+  const p = await organisation.readProfile(client);
+  const logo = await organisation.brandPicture(client, p.logo_document_id, { height: 40, scale: 4 });
+  const white = await organisation.brandPicture(client, p.logo_white_document_id, { height: 28 });
   return {
-    name: value.name || "MyCity App Ltd",
-    address: value.address || null,
-    phone: value.phone || null,
-    email: value.email || null,
-    website: value.website || null,
-    logo: brand().logo,
+    name: p.legal_name || p.trading_name || "MyCity App Ltd",
+    display_name: organisation.displayName(p),
+    rc: organisation.rcOf(p.registration_number),
+    address: p.address,
+    phone: p.phone,
+    email: p.email,
+    website: p.website,
+    logo: logo ? organisation.dataUrl(logo) : brand().logo,
+    logo_white: white
+      ? { data: organisation.dataUrl(white), buffer: white.buffer, width: white.width, height: white.height }
+      : null,
   };
 }
 

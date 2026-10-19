@@ -394,13 +394,14 @@ describeDb("Home schema and reference data against the real migrations", () => {
       );
       const all = ["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team"];
       const managers = ["alerts.clear", "home.reports", "home.team"];
+      // 1129 (Mailbox) adds Configure Signature to System Administrator and Implementation.
       expect(Object.fromEntries(rows.map((r) => [r.role, r.codes]))).toEqual({
-        implementation: all,
+        implementation: [...all, "mailbox.signature"],
         operations_people: all,
         management: all,
         head_of_department: managers,
         manager: managers,
-        administrator: [],
+        administrator: ["mailbox.signature"],
         employee: [],
       });
     });
@@ -467,7 +468,8 @@ describeDb("Home schema and reference data against the real migrations", () => {
         await c.query(SEED.down);
 
         const codes = await c.query("SELECT code::text AS code FROM capability ORDER BY code::text");
-        expect(codes.rows.map((r) => r.code)).toEqual(["alerts.clear", "announcements.post", "home.team"]);
+        // 1129's capability is Mailbox's, untouched by undoing Home's seed.
+        expect(codes.rows.map((r) => r.code)).toEqual(["alerts.clear", "announcements.post", "home.team", "mailbox.signature"]);
         const heldBy = async (role) =>
           (
             await c.query(

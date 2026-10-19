@@ -174,6 +174,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "announcements.post",
         "home.reports",
         "home.team",
+        "mailbox.signature",
       ]);
 
       const m = await as("ops").get("/settings/roles/matrix");
@@ -463,6 +464,60 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(audit.before.legal_name).toBeNull();
       expect(audit.after.legal_name).toBe("MyCity App Ltd");
       expect((await as("viewer").patch("/settings/organisation").send({ legal_name: "X Ltd" })).status).toBe(403);
+    });
+
+    test("brand files: each takes a PNG at once, letters and system mail draw it, Remove brings the name back", async () => {
+      const sharp = require("sharp");
+      const documents = require("../../src/shared/documents/generate");
+      const systemMail = require("../../src/services/mail/system-mail.service");
+      const png = (r, g, b) =>
+        sharp({ create: { width: 400, height: 100, channels: 4, background: { r, g, b, alpha: 1 } } }).png().toBuffer();
+      const upload = (slot, buffer, name) =>
+        as("ops").post(`/settings/organisation/brand/${slot}`).field("purpose", "brand").attach("file", buffer, name);
+
+      const logo = await upload("logo", await png(1, 67, 57), "logo.png");
+      expect(logo.status).toBe(201);
+      expect(logo.body).toMatchObject({ file_name: "logo.png", mime_type: "image/png" });
+      const jpeg = await sharp({ create: { width: 40, height: 10, channels: 3, background: { r: 1, g: 67, b: 57 } } }).jpeg().toBuffer();
+      expect((await upload("icon", jpeg, "icon.jpg")).status).toBe(415);
+      expect((await as("viewer").post("/settings/organisation/brand/logo").field("purpose", "brand").attach("file", await png(0, 0, 0), "x.png")).status).toBe(403);
+      expect((await as("ops").post("/settings/organisation/brand/banner").field("purpose", "brand").attach("file", await png(0, 0, 0), "x.png")).status).toBe(422);
+
+      // Letters: the Logo, fitted to the letterhead's 40 px at four times for print.
+      let org = await documents.orgProfile(pool);
+      expect(org).toMatchObject({ name: "MyCity App Ltd", display_name: "MyCity App Ltd", logo_white: null });
+      const drawn = await sharp(Buffer.from(org.logo.split(",")[1], "base64")).metadata();
+      expect([drawn.format, drawn.width, drawn.height]).toEqual(["png", 640, 160]);
+
+      // System mail: the White Logo inside the message, a data: URL in a preview.
+      const white = await upload("logo_white", await png(255, 255, 255), "white.png");
+      expect(white.status).toBe(201);
+      expect((await as("ops").get("/settings/organisation")).body).toMatchObject({
+        logo: { document_id: logo.body.document_id },
+        logo_white: { document_id: white.body.document_id },
+        icon: null,
+      });
+      const data = { link_url: "https://hub.mycityapp.io/reset?token=abc", minutes: 30 };
+      const recipient = { first_name: "Ada", email: "ada@mycity.test" };
+      const mailed = await systemMail.renderEmail(pool, "password-reset", data, { recipient, inline: true });
+      expect(mailed.html).toContain('src="cid:brand-logo@mycityapp.io" width="112" height="28" alt="MyCity App Ltd"');
+      expect(mailed.inline).toEqual([expect.objectContaining({ cid: "brand-logo@mycityapp.io", contentType: "image/png" })]);
+      const preview = await systemMail.renderEmail(pool, "password-reset", data, { recipient });
+      expect(preview.html).toContain('src="data:image/png;base64,');
+      expect(preview.inline).toEqual([]);
+
+      const removed = await as("ops").delete("/settings/organisation/brand/logo_white");
+      expect(removed.status).toBe(200);
+      expect(removed.body.logo_white).toBeNull();
+      org = await documents.orgProfile(pool);
+      expect(org.logo_white).toBeNull();
+      const plain = await systemMail.renderEmail(pool, "password-reset", data, { recipient, inline: true });
+      expect(plain.html).toContain('color:#FFFFFF;">MyCity App Ltd</span>');
+      expect(plain.inline).toEqual([]);
+      const audit = await one(
+        "SELECT after FROM audit_ledger WHERE action = 'settings.changed' AND after ? 'logo_white_document_id' ORDER BY occurred_at DESC LIMIT 1",
+      );
+      expect(audit.after.logo_white_document_id).toBeNull();
     });
 
     test("A22: Monday to Friday 09:00 to 17:00, Saturday 09:00 to 15:00, Sunday off", async () => {

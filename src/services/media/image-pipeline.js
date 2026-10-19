@@ -22,6 +22,10 @@
  *              96, 192 and 384 px variants. Enhanced like a photo.
  *   signature  a drawn signature (M5). PNG kept, transparency kept, width capped; no
  *              variants, it is stamped into a PDF as is.
+ *   brand      a company logo or icon (Settings · Organisation), and the pictures an email
+ *              signature carries. Always PNG, transparency kept, colours untouched (a logo
+ *              stretched by auto-levels is a different green); no variants, it is drawn
+ *              into letterheads, system mail and signatures as is.
  *
  * `enhance` is the only setting that changes pixels beyond scaling, and it is off
  * everywhere a person might later be asked to trust the image as a record.
@@ -75,6 +79,16 @@ const PROFILES = Object.freeze({
     square: true,
     keepFormat: false,
     variants: { widths: [96, 192, 384], formats: ["avif", "webp"] },
+  },
+  /** A brand file (foundation.md §6.11): kept a PNG with its clear background, colours untouched. */
+  brand: {
+    maxEdge: 2000,
+    quality: 100,
+    enhance: false,
+    square: false,
+    keepFormat: true,
+    png: true,
+    variants: { widths: [], formats: [] },
   },
   signature: {
     maxEdge: 1200,

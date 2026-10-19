@@ -13,7 +13,7 @@ files.
 | `docs/MIGRATIONS.md` | How a migration or reference seed is written and checked |
 | `migrations/`, `seeds/reference/` | The schema itself. Where this file and the SQL disagree, the SQL is the fact and this file is fixed |
 
-Status as of 19/10/2026 (`main` with attendance's clock, `1300` and `1390`, remote staff's approved homes, `1310` and `1391`, work location requests, `1320` and `1392`, field assignments, `1330` and `1393`, Home's foundation, `1150` and `1199`, Home's alerts, `1151`, the mailbox's image trust, `1125`, and the effective manager through a vacant seat, `1160`): 73 files, 161 tables and 6 views. Gate 6
+Status as of 19/10/2026 (`main` with attendance's clock, `1300` and `1390`, remote staff's approved homes, `1310` and `1391`, work location requests, `1320` and `1392`, field assignments, `1330` and `1393`, Home's foundation, `1150` and `1199`, Home's alerts, `1151`, the mailbox's image trust, `1125`, email signatures, `1127` and `1129`, and the effective manager through a vacant seat, `1160`): 75 files, 163 tables and 6 views. Gate 6
 (`check/schema-drift.js`, `check/contract-columns.js`) checks the code and the contract against
 the same reading of the migrations on every PR.
 
@@ -136,7 +136,12 @@ and system channels, delivered pointer, the wider message kinds, transcripts, po
 `announcement_read` and the announcement's message, audience size and reminder · `1120` mailbox:
 connection status and errors, folder kinds and sync cursor, thread keys, the reader's message
 fields, `mail_draft` and `mail_send_queue` · `1125` `mail_image_trust` (the senders whose web images a
-mailbox owner always shows) · `1130` an announcement can be `cancelled` · `1140` each
+mailbox owner always shows) · `1127` email signatures: `mail_signature` (a person's office line and
+their Show Mobile and WhatsApp switches; the mobile stays `employee.phone`) and
+`mail_signature_config` (the company's app and social links, the confidentiality note and what
+shows, one row at most); the baked signature rides in `mail_send_queue.payload` and its pictures
+are vault documents (`mail_signature_image`) · `1129` reference data: the `mailbox.signature`
+capability for System Administrator and Implementation · `1130` an announcement can be `cancelled` · `1140` each
 member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and

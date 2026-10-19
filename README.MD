@@ -169,6 +169,8 @@ src/
 │   ├── events/        emit · outbox · catalogue
 │   ├── workflow/      engine · conditions · definitions · approvers
 │   ├── access/        access.catalog (the permission module list)
+│   ├── organisation/  profile (Settings · Organisation's profile and brand files, the one reader for
+│   │                  letterheads, system mail and email signatures)
 │   ├── rbac/          grants-cache · field-mask · scope · sessions
 │   ├── money/         money
 │   ├── time/          lagos · working-week · day-first · recurrence
@@ -295,6 +297,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `alerts.clear` | `home` | Clear or dismiss an alert, of a rule whose `permission_key` the person also holds | Implementation, Operations & People, Management (`0449`); Head of Department, Line Manager (`1199`) | `0449` |
 | `alerts.manage` | `home` | Create, change and switch off alert rules | Implementation, Operations & People, Management | `1199` |
 | `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
+| `mailbox.signature` | `mailbox` | Configure Signature: the company's signature links and what shows on everyone's email signature | Implementation, System Administrator | `1129` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -326,7 +329,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service) |
 | `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
 | `announcements` | GE | |
-| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7) |
+| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test` |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
 `services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `shared/geo`,

@@ -52,7 +52,7 @@ const phone = z
     else {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "must be a phone number",
+        message: "Not a phone number",
       });
       return z.NEVER;
     }

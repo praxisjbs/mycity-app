@@ -43,6 +43,7 @@ export const COMING: Record<string, string[]> = {
   "mailbox/archive": ["Mail you have filed away, kept and searchable", "Move mail back to the inbox", "Search by sender, subject or date"],
   "mailbox/spam": ["Mail the filter caught, held for 30 days", "Mark a message as not spam", "Block a sender"],
   "mailbox/trash": ["Deleted mail, kept for 30 days", "Restore anything deleted by mistake", "Empty the trash when you are sure"],
+  "mailbox/signature": ["One company signature, built from your record", "The full signature on new mail, a short line on replies", "Change your numbers; the rest follows your record"],
 
   /* People */
   "people/employees": ["Every employee's record, from hire to exit", "Add employees one by one or import the staff sheet", "A 360 view: attendance, leave, KPIs, queries and documents"],

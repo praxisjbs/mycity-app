@@ -19,6 +19,7 @@
 const { z } = require("zod");
 const { uuid, text, isoDate, isoDateTime, email, phone, listQuery, Paged } = require("./common");
 const { SignInMethod } = require("./identity");
+const { DocumentRef } = require("./documents");
 const { RoleCode } = require("./users");
 
 /* ------------------------------------------------------------------ *
@@ -51,6 +52,10 @@ const Organisation = z
     phone: z.string().nullable(),
     email: z.string().nullable(),
     website: z.string().nullable(),
+    /** The brand files (foundation.md §6.11): for white paper, for Deep Green, and the pin. */
+    logo: DocumentRef.nullable(),
+    logo_white: DocumentRef.nullable(),
+    icon: DocumentRef.nullable(),
     /** Fixed for the product (MILESTONES §1.1), shown for reference. */
     currency: z.literal("NGN"),
     time_zone: z.literal("Africa/Lagos"),
@@ -71,6 +76,10 @@ const OrganisationPatch = z
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field");
+
+/** The brand file a route changes: POST and DELETE /settings/organisation/brand/:slot. */
+const BRAND_SLOTS = ["logo", "logo_white", "icon"];
+const BrandSlotParams = z.object({ slot: z.enum(BRAND_SLOTS) }).strict();
 
 /* ------------------------------------------------------------------ *
  * The working week
@@ -308,6 +317,7 @@ const TABLES = {
     reason: "the organisation profile, one setting row per field (organisation.*), with the product's fixed currency and time zone",
   },
   OrganisationPatch: { table: null, reason: "profile fields written as setting rows (organisation.*)" },
+  BrandSlotParams: { table: null, reason: "which brand file, in the path" },
   WorkingDay: { table: "working_week" },
   WorkingWeek: { table: null, reason: "the seven working_week rows" },
   WorkingWeekSave: { table: null, reason: "the seven working_week rows, written together" },
@@ -367,6 +377,8 @@ module.exports = {
   TABLES,
   Organisation,
   OrganisationPatch,
+  BRAND_SLOTS,
+  BrandSlotParams,
   TimeOfDay,
   WorkingDay,
   WorkingWeek,

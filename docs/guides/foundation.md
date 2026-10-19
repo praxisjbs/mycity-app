@@ -77,7 +77,7 @@ These finish M0 and no prompt can do them:
 | Org Chart (#91), Organogram (#92) | ESS and People | Everyone (Org Chart); `people` edit (Organogram) | A | **Built** (17/10/2026) | As `organogram.md` describes, on the real API, with the phone focus view |
 | Settings · Imports (#93, new screen) | Settings; Import Staff on People · Employees opens it | The importer's permission (`people` create for staff); history `settings` view | B | **Built** (17/10/2026) | Upload, map, preview with errors, commit, revert; every batch with its counts, error file and Revert |
 | ESS · My Documents (#14) | ESS | The person (own) | B | **Built** (17/10/2026) | Their documents and the ones People asked for, upload, download, preview |
-| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | **Built** (17/10/2026) | Organisation profile, working week, public holidays (Nigeria's seeded, the moon-dated and weekend ones Expected until confirmed; others entered on screen) |
+| Settings · Organisation (#69) | Settings | `settings` view, edit; holidays `settings` create, delete | C | **Built** (17/10/2026; brand files 19/10/2026, §6.11) | Organisation profile, the brand files (Logo, White Logo, Icon), working week, public holidays (Nigeria's seeded, the moon-dated and weekend ones Expected until confirmed; others entered on screen) |
 | Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | **Built** (17/10/2026; redesigned 18/10/2026, §6.10) | Roles beside the role in view (desktop) or by level (phone), each module's access as one level with Approve and Export, review before save, who holds a role; the grants matrix as a second view; field visibility and capabilities per role |
 | Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Every numbering scheme with its next number, editable. No other document setting is specified yet |
 | Settings · Security (#78) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
@@ -122,7 +122,7 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 | `document_request` | 0350 | B | What People asked an employee for; a Missing row until it is given (§6.9) |
 | `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3). `0400` adds `role.two_step_required` (§6.4) |
 | `role_capability` | 0400 | C | A capability given to everyone holding a role; `user_capability` still gives one to a single person, and a person has the union |
-| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows; security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026); the Work Location Request scheme (`location_request`, WLR-0001, never reset) by `1392` and the Field Assignment scheme (`field_assignment`, FA-0001, never reset) by `1393` (LA, 19/10/2026) |
+| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows, the three brand files among them as `organisation.logo_document_id`, `organisation.logo_white_document_id` and `organisation.icon_document_id` (§6.11), read by everything that prints the company through one reader, `shared/organisation/profile.js` (until 19/10/2026 documents and system mail read a single `organisation.profile` row that nothing wrote, so they always printed the defaults); security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026); the Work Location Request scheme (`location_request`, WLR-0001, never reset) by `1392` and the Field Assignment scheme (`field_assignment`, FA-0001, never reset) by `1393` (LA, 19/10/2026) |
 | `audit_ledger`, `event_log` | 0030 | C | Read only. `0400` adds the indexes the Audit Log filters on (when, module, action, record) and one on live sessions |
 | `spent_challenge` | 0230 | C | `0400` widens its purpose check with `two_step_setup`, the ticket of the set-up step at sign-in (§6.4) |
 | `workflow_definition`, `workflow_instance`, `workflow_decision` | 0070 | D | The leave definition in `0499` |
@@ -188,6 +188,7 @@ employee is (`/employees/:id/documents`) while `src/modules/organisation/` is tr
 | Route | Permission |
 |---|---|
 | `GET /settings/organisation`, `PATCH /settings/organisation` | `settings` view, edit |
+| `POST /settings/organisation/brand/:slot` (multipart `file`, purpose `brand`; `slot` is `logo`, `logo_white` or `icon`) → `DocumentRef`; `DELETE /settings/organisation/brand/:slot` → `Organisation` | `settings` edit |
 | `GET /settings/working-week`, `PUT /settings/working-week` (all seven days at once) | `settings` view, edit |
 | `GET /settings/holidays` (year; sort), `POST /settings/holidays`, `PATCH /settings/holidays/:id`, `DELETE /settings/holidays/:id` | `settings` view, create, edit, delete |
 | `GET /settings/roles` (search; sort), `/roles/catalogue`, `/roles/matrix`, `/roles/:id` | `settings` view |
@@ -328,7 +329,8 @@ a module that its six actions cannot express: everyone views Home, only managers
   label and description; **seeded** by its milestone's reference seed, inserted only when absent,
   with the roles that hold it by default (`0449`: `announcements.post` and `alerts.clear` to
   Implementation, Operations & People and Management; `1199`: Home's `home.team`, `home.reports`,
-  `alerts.manage`, and `alerts.clear` for Heads of Department and Line Managers).
+  `alerts.manage`, and `alerts.clear` for Heads of Department and Line Managers; `1129`: Mailbox's
+  `mailbox.signature` to System Administrator and Implementation, `docs/guides/mailbox.md` §8).
 - **Held** through `role_capability` (edited here) or `user_capability` (one person, until an
   optional date). Roles add up: a person holds every capability any of their roles holds. The CEO
   holds every capability without a grant.
@@ -519,6 +521,24 @@ The screen, decided with TB on 17 and 18/10/2026 from three drawn options for ea
   Settings · Users. The role's summary (what it changes, reads and approves, and whether salary is
   masked) sits behind an ⓘ beside its name.
 
+### 6.11 Brand files (TB, 19/10/2026)
+
+Settings · Organisation holds the company's three brand files, each optional, each one upload
+(purpose `brand`: PNG or WebP with a transparent background, at most 5 MB; the `brand` image profile
+keeps it a PNG, never corrects its colours and fits it within 2000 px). Uploading one replaces it at
+once (no Save) and Remove clears it; the old document stays in the vault, as every replaced file
+does. What changes with each, from the next thing made:
+
+| File | Where it goes | Until it is uploaded |
+|---|---|---|
+| Logo (City Green, for white paper) | Letterheads and every PDF `documents.generate` renders | `assets/brand/logo.png`, else the company's name set in the letterhead's own type |
+| White Logo (for Deep Green) | The email signature's band (`docs/guides/mailbox.md` §3) and the header of system mail, both as an inline picture | The drawn pin with the company's name on the signature; the name in text on system mail |
+| Icon (the pin) | The signature's band beside the company's name when there is no White Logo | The app's drawn pin |
+
+The Icon is drawn on Deep Green, so it must read on a dark ground (the yellow pin does). The app's
+own icons (the favicon, the home-screen icon) are files in the release, which phones keep, so they
+change with a release, not with this screen.
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -583,7 +603,7 @@ screen.
 | Employee record | Profile, Job, Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
-| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | None | Who reads the working week and holidays: §3; why some are Expected: §4 |
+| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
 | Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
@@ -599,7 +619,7 @@ screen.
 | Employee record | Profile card, then sections as tabs that scroll sideways | History detail | Send Invite or Edit, full width in a sheet | Back to the list |
 | Settings · Imports (#93) | Import cards: reference, file, status pill | File, Who, Updated, Problems | Start Import in the floating button | More, Settings |
 | Settings · Imports, the wizard | One step per sheet, counts as cards | The rows with problems (Download Errors instead) | Commit Import, full width | From Employees or Settings |
-| Settings · Organisation (#69) | Company card, then holiday cards by year, then the week | None | New Holiday in the floating button | More, Settings |
+| Settings · Organisation (#69) | Company card, the Brand card (the three pictures in a row, each with its upload as a 44 px icon button and Remove under it), then holiday cards by year, then the week | None | New Holiday in the floating button | More, Settings |
 | Settings · Roles & Permissions | Role cards; a role opens full screen with its modules as chips grouped by level, and a chip (while editing) opens a sheet with the level, records, Approve and Export | The Matrix view and its switch, the Record Scope column | New Role in the floating button; Edit Role, then Save Role, full width | More, Settings; Back closes the role |
 | Settings · Documents & Numbering (#76) | Counts as cards, then document cards: next number, when it starts again | Prefix and Issued columns | A card opens its scheme in a sheet | More, Settings |
 | Settings · Security | Counts as cards, the three rules, two-step by role as switches | Method and address of a session, the person and address of a failed sign-in | Save Rules, full width | More, Settings |
@@ -651,6 +671,8 @@ screen.
 - A locked document (signed, sent, filed): it can never be replaced; a new version is refused.
 - A file whose scan has not finished: reading it waits rather than serving an unchecked file.
 - A sheet whose first row is the header: the header row is 0, which `0100` already allows.
+- A brand file that is not PNG or WebP (a JPEG has no clear background, an SVG may carry script): refused
+  with the types it takes. A very large one is fitted within 2000 px.
 
 ## 12 · Donor code
 
@@ -674,6 +696,10 @@ screen.
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · §2, §4, §5, §6.3, §6.11, §10, §11: the brand files on Settings · Organisation
+  (Logo, White Logo, Icon) and where each goes; one reader of the organisation profile
+  (`shared/organisation/profile.js`) for settings, documents, system mail and signatures; the
+  `mailbox.signature` capability seeded by `1129`.
 - 19/10/2026 · LA · §4: Documents & Numbering gains Field Assignment (`field_assignment`, FA-0001,
   never reset), the number of each field assignment (`docs/guides/attendance.md` §6.12), seeded by
   `seeds/reference/1393`; the settings contract's `DOC_TYPES` and the screen's labels list it. The

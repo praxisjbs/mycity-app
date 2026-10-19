@@ -7,6 +7,8 @@ import {
   formatMoney,
   formatMoneyShort,
   formatMonth,
+  formatPhone,
+  formatPhoneLocal,
   formatTime,
   formatWhen,
   initials,
@@ -88,5 +90,18 @@ describe("counts and names", () => {
     expect(formatBytes(1153434)).toBe("1.1 MB");
     expect(initials("Cynthia Osakunih")).toBe("CO");
     expect(initials("Tobi")).toBe("T");
+  });
+});
+
+describe("phone numbers, from E.164", () => {
+  it("groups a Nigerian number as it is spoken, and keeps one from abroad as stored", () => {
+    expect(formatPhone("+2348031234567")).toBe("+234 803 123 4567");
+    expect(formatPhone("+447884050144")).toBe("+447884050144");
+    expect(formatPhone(null)).toBe("");
+  });
+  it("starts a field from the number as it is typed at home", () => {
+    expect(formatPhoneLocal("+2342012345678")).toBe("0201 234 5678");
+    expect(formatPhoneLocal("+41779539483")).toBe("+41779539483");
+    expect(formatPhoneLocal(undefined)).toBe("");
   });
 });
