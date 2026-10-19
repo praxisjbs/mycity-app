@@ -324,7 +324,7 @@ const ENTITY_ROUTES = Object.freeze({
   performance_period: screen("performance", "goals"),
 
   // Queries & Sanctions
-  query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") }, // search:none not built yet (src/modules/queries)
+  query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") },
   query_rule: screen("queries", "rules"), // search:none not built yet (src/modules/query_rules)
   // search:none not built yet (src/modules/sanctions)
   sanction: {

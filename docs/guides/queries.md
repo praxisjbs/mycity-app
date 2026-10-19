@@ -280,11 +280,12 @@ counts, never coordinates or device identifiers.
   closed queries the reader may see, §6.1), `sanctions.list`, `sanctions.standing` (a person's rungs
   in force and the next one). `queries` view, paged at 25, cited by number. `query_rules` and
   `templates` carry `// ai:none` (configuration, nothing a question needs).
-- **AI routes**: "raise a query for <person>" → `queries.queries` with `action: new` and the employee
+- **AI routes**: "raise a query for <person>" → `queries.queries` with `new: 1` and the employee
   prefilled; "issue a sanction" → `queries.sanctions`.
 - **Search** (`queries.search.js`, `sanctions.search.js`): queries by number, employee and subject
   ("query", "QRY"); sanctions by number, employee and rung ("sanction", "warning", "suspension").
-  Both use §6.1, so a manager finds only their own. `query_rules` and `templates` carry
+  Both use §6.1, so a manager finds only their own: the provider pins results to the raiser
+  (`owner: { column: "q.raised_by", exceptAll: true }`), lifted for scope all. `query_rules` and `templates` carry
   `// search:none` with their screens registered in the route map.
 
 ## 10 · On screen and mobile
@@ -364,6 +365,11 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 19/10/2026 · GE · Queries built (§3 steps 1 to 4, §5, §6.1 to §6.4, §7, §9): raise, remind,
+  close with no action, the ESS response, ⌘K and the AI reads. The letter is emailed with its PDF
+  once rendered (`templates/email/query-raised.html`). ⌘K keeps §6.1 through the search provider's
+  `owner: { exceptAll }`, a pin lifted for scope all. Proposing a sanction arrives with the
+  sanctions module.
 - 19/10/2026 · GE · Letter Templates built (§5, §6.7): `query-letter` ships with wording and is
   seeded active so a rule can raise a query on a fresh database; the sanction letters stay
   `awaiting_sample`. Letter variables carry ISO dates and the template formats them.

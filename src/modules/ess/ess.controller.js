@@ -69,4 +69,9 @@ module.exports = {
   addEvidence: async (req, res) =>
     created(res, await service.performance.addEvidence(withActor(req), readUpload(req), req.validated.body)),
   myReviews: async (req, res) => sendPaged(res, await service.performance.myReviews(req.user, req.validated.query)),
+
+  listQueries: async (req, res) => sendPaged(res, await service.queries.list(req.user, req.validated.query)),
+
+  respondToQuery: async (req, res) =>
+    ok(res, await service.queries.respond(withActor(req), id(req), req.validated.body)),
 };

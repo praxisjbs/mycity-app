@@ -203,6 +203,15 @@ const QueryResponseCreate = z
   })
   .strict();
 
+/** The variables of templates/email/query-raised.html: the letter rides as the attachment. */
+const QueryRaisedEmailVars = z
+  .object({
+    query_number: z.string(),
+    subject: z.string(),
+    response_due: isoDateTime.nullable(),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   EvidenceItem: { table: null, reason: "one item of employee_query.evidence or sanction.evidence (jsonb)" },
@@ -257,6 +266,7 @@ const TABLES = {
   },
   MyQueryPage: { table: null, reason: "a page of the caller's own queries" },
   QueryResponseCreate: { table: "query_response" },
+  QueryRaisedEmailVars: { table: null, reason: "the variables of templates/email/query-raised.html, not a row" },
 };
 
 module.exports = {
@@ -277,4 +287,5 @@ module.exports = {
   MyQuery,
   MyQueryPage,
   QueryResponseCreate,
+  QueryRaisedEmailVars,
 };
