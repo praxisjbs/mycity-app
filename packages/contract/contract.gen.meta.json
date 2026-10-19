@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "48cbfd6956b6201775a132e54fa99946f9cbf25b03666df5d4d3f19a8a10324a",
+  "source_hash": "4dcb388df8acabf11f7d9795651422232f3a8dda97c0c4275ac3b3c28a75fb56",
   "schemas": 595,
-  "endpoints": 319,
+  "endpoints": 326,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -86,6 +86,7 @@
     "src/modules/notifications/notifications.routes.js": "20211d926487041803529d32a482cf9a6c79ba9d962d123f2c10b0b2f6b65dfd",
     "src/modules/organisation/organisation.routes.js": "38cf4fc6da20eed01bf4fe791a71287d5fb7b3f2b30677960e93a6fcae6c85b5",
     "src/modules/queries/queries.routes.js": "edae6636e7c89eaae0e8f565370b0b69c303dca8f32b8f569443687cc28846c5",
+    "src/modules/query_rules/query_rules.routes.js": "9c8d1163019755f57f3a0f546c4a669f3c646bee620d4192bbbfd27ac15f1f0b",
     "src/modules/reports/reports.routes.js": "7c9e4d8214908d9baf4ed5f1448d190cea08b6b952cf355e0b900f2fbb8a3ebe",
     "src/modules/sanctions/sanctions.routes.js": "0e61c2df278d1bed2810458cb83c8808f45093acd154e407b82faabfd289be8a",
     "src/modules/search/search.routes.js": "0e82222d55484d42635f18d0da8068d4665bb070e4407a57b498ef829a7e44bd",

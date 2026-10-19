@@ -45,7 +45,7 @@ saying who agreed and when.
 | M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
-| M3 Queries & Consequence Management | 5 | 2 | 3 | 0 | 0 | 0 |
+| M3 Queries & Consequence Management | 5 | 1 | 4 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 7 | 7 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **55** | **3** | **36** | **0** | **0** |
+| **Total** | **94** | **54** | **4** | **36** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
@@ -885,7 +885,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 34 | Queries | `queries` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
-| 35 | Rules | `rules` | M3 | GE | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
+| 35 | Rules | `rules` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
 | 36 | Sanctions | `sanctions` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
 | 37 | Letter Templates | `letter-templates` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
 
@@ -896,6 +896,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 - 19/10/2026 · GE · Letter Templates (#37) API: `templates` module under `/letter-templates` (list, summary, one with its wording, preview with sample values, add, save the next version, activate; writes behind `queries.configure`); `shared/documents/generate.js` takes the template a caller names for a doc type with `templateChoice`, so a letter added on screen sends without code. `query-letter` ships with wording and is seeded active; the five sanction letters await MyCity's samples. Integration tests in `tests/integration/queries.test.js`. Left: the screen on the real API (AJ's INTERIM types), retiring a letter.
 - 19/10/2026 · GE · Queries (#34) backend, without sanctions: raise (numbered, its letter generated, rendered and emailed with the PDF), the visibility rule (a manager sees only the queries they raised; scope all and the CEO see every one) on the list, the card, the summary, ⌘K and the AI reads, Send Reminder once a day, Close With No Action; ESS · My Queries (#13) lists and answers (`/ess/queries`). 14 integration tests. Left: proposing a sanction (with the sanctions module), then the API tick.
 - 19/10/2026 · GE · Sanctions (#36) and the rest of Queries (#34) API: Chain Settings (add a rung at a position, move, change, retire; `queries.configure`), a sanction proposed from a query's decision and approved on `queries.consequence` (Operations & People, then Management from rank 4; the proposer never approves), issued with its number and letter (emailed with the PDF), the query resolved; a refusal sends it back under review; fines pending for M6 (`sanctions.fines`); standing and next rung; ESS `GET /ess/sanctions`. 22 integration tests. Left: the screens on the real API, M6 taking fines into a run.
+- 19/10/2026 · GE · Rules (#35) API: drafts, change, activate, pause (`queries.configure`), Recent Firings within the visibility rule; the evaluator (job `query-rule-evaluate`) counts a person's late, absent, missing clock-out and unknown-device days through `attendance.auto-query.js` and raises one query per breach (three late arrivals raise exactly one query; a redelivered event raises none; late minutes summed is a setting too). Overdue tasks and missed targets wait for M2. Left: the screen on the real API; the lateness threshold is MyCity's to set (no default seeded).
 
 ### Recruitment
 
