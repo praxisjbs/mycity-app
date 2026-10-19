@@ -1,11 +1,14 @@
 import ess from "@mycity/contract/schemas/ess.js";
 import type { EssProfile } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
+import { useFileUrl } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { upload } from "@/api/upload";
+import { useAuth } from "@/auth/AuthProvider";
 import { employmentType, workPattern } from "@/features/people/status";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Banner, Button, Card, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, useContractForm, useModal, Wizard } from "@mycity/ui";
+import { ActionGroup, Banner, Button, Card, Icon, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, UploadField, useConfirm, useContractForm, useModal, Wizard } from "@mycity/ui";
 
 /**
  * ESS · My Profile (#8, `my-profile`): the caller's own record (docs/guides/ess.md §10).
@@ -19,11 +22,24 @@ const or = (v: string | null | undefined) => v || "Not given";
 export function MyProfilePage() {
   const { data: p, error, reload } = useApi("GET /api/v1/ess/profile");
   const history = usePaged("GET /api/v1/ess/profile/history");
+  const photo = useFileUrl(p?.photo_url ?? null);
   const modal = useModal();
   const { navigate } = useRouter();
+  const exportData = useMutation("POST /api/v1/ess/profile/export");
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!p) return <LoadingRows count={8} />;
+  /* Download My Data: built in the background and emailed; once a day (docs/guides/ess.md §6). */
+  const downloadData = async () => {
+    try {
+      await exportData.run({ body: {} });
+      toast("We'll email it to you");
+    } catch (e) {
+      if (!(e instanceof ApiError)) throw e;
+      toast(e.message);
+    }
+  };
   const edit = () => modal.open({ title: "Edit Profile", body: (close) => <EditProfile p={p} close={close} /> });
+  const changePhoto = () => modal.open({ title: "Profile Photo", body: (close) => <PhotoForm has={Boolean(p.photo_url)} photo={photo} name={p.display_name} close={close} /> });
   const manager = p.line_manager ? p.line_manager.display_name : null;
 
   const personal = (
@@ -85,9 +101,17 @@ export function MyProfilePage() {
     <>
       <PageHeader title="My Profile" actions={<Button variant="primary" icon="edit" onClick={edit}>Edit Profile</Button>} />
       <div className="mb-3 flex flex-wrap items-start gap-4 rounded-card border border-border bg-card p-4 shadow-1 max-md:p-3.5">
-        <span className="flex size-15 flex-none items-center justify-center rounded-sheet bg-secondary text-2xl font-bold tracking-tight text-secondary-foreground max-md:size-13 max-md:text-xl">
-          {initials(p.display_name)}
-        </span>
+        <button
+          type="button"
+          onClick={changePhoto}
+          aria-label={p.photo_url ? "Change Photo" : "Add Photo"}
+          className="relative flex size-15 flex-none items-center justify-center rounded-sheet bg-secondary text-2xl font-bold tracking-tight text-secondary-foreground max-md:size-13 max-md:text-xl"
+        >
+          {photo ? <img src={photo} alt="" className="size-full rounded-sheet object-cover" /> : initials(p.display_name)}
+          <span aria-hidden="true" className="absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground">
+            <Icon name={p.photo_url ? "edit" : "plus"} size="s" />
+          </span>
+        </button>
         <span data-copy="content" className="min-w-0 flex-1 max-md:basis-44">
           <h2 data-copy="content" className="text-xl tracking-tight">{p.display_name}</h2>
           <div className="mt-0.5 text-sm text-muted-foreground">{p.job_title}{p.department ? ` · ${p.department}` : ""}</div>
@@ -98,7 +122,10 @@ export function MyProfilePage() {
           </div>
         </span>
         <span className="flex flex-wrap gap-1.5 max-md:w-full">
-          <Button icon="shield" onClick={() => navigate(`${hrefFor("ess", "my-security")}&action=password`)}>Change Password</Button>
+          <ActionGroup>
+            <Button icon="shield" onClick={() => navigate(`${hrefFor("ess", "my-security")}&action=password`)}>Change Password</Button>
+            <Button icon="download" onClick={downloadData}>Download My Data</Button>
+          </ActionGroup>
         </span>
       </div>
       <PhoneCards
@@ -230,3 +257,55 @@ const CHANGEABLE: Array<[keyof EditValues, string]> = [
   ["account_number", "Account Number"],
 ];
 type EditValues = { phone: string; home_address: string; next_of_kin_name: string; next_of_kin_relationship: string; next_of_kin_phone: string; bank_name: string; account_number: string };
+
+/**
+ * Add, change or remove my photo (docs/guides/ess.md §3 step 1). The upload engine crops it
+ * square to the face and strips its metadata; colleagues see it wherever I appear.
+ */
+function PhotoForm({ has, photo, name, close }: { has: boolean; photo: string | null; name: string; close: () => void }) {
+  const { refreshMe } = useAuth();
+  const confirm = useConfirm();
+  const remove = useMutation("DELETE /api/v1/ess/profile/photo");
+  const done = async (message: string) => {
+    invalidate("/api/v1/ess/profile");
+    await refreshMe().catch(() => undefined);
+    close();
+    toast(message);
+  };
+  const drop = async () => {
+    if (!(await confirm({ title: "Remove Photo", body: "Your initials show in its place.", destructive: true }))) return;
+    try {
+      await remove.run({});
+      await done("Photo removed");
+    } catch {
+      toast("Not removed. Try again.");
+    }
+  };
+  return (
+    <>
+      <div className="mb-3 flex items-center gap-3">
+        <span className="flex size-15 flex-none items-center justify-center overflow-hidden rounded-sheet bg-secondary text-2xl font-bold text-secondary-foreground">
+          {photo ? <img src={photo} alt="" className="size-full object-cover" /> : initials(name)}
+        </span>
+        <p className="text-sm text-muted-foreground">A clear photo of your face. It is cropped square, and colleagues see it wherever you appear.</p>
+      </div>
+      <UploadField
+        purpose="avatar"
+        endpoint="/api/v1/ess/profile/photo"
+        upload={upload}
+        multiple={false}
+        accept=".jpg,.jpeg,.png,.webp,.heic"
+        kinds="JPEG, PNG, WebP or HEIC"
+        maxBytes={5 * 1024 * 1024}
+        label="Choose a Photo"
+        compact
+        onUploaded={() => void done("Photo updated")}
+      />
+      {has && (
+        <div className="mt-3 flex justify-end">
+          <Button variant="danger" icon="trash" onClick={drop}>Remove Photo</Button>
+        </div>
+      )}
+    </>
+  );
+}

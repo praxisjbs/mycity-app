@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ApiError } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import { Banner, Button, Field, Form, LockScreen, LoginField, OtpField } from "@mycity/ui";
-import { useAuth, type LockReason } from "./AuthProvider";
+import { useAuth, useMyPhoto, type LockReason } from "./AuthProvider";
 import { vCode, vPass, vPin, vRecovery } from "./Login";
 import { passkeyProblem, passkeysWork } from "./passkey";
 
@@ -26,6 +26,7 @@ type Step = { kind: "first" } | { kind: "code"; ticket: string; recovery: boolea
  */
 export function LockSheet() {
   const { status, me, lockReason, signIn, signInWithPin, finishTwoStep, signInWithPasskey, signOut } = useAuth();
+  const photo = useMyPhoto();
   const open = status === "locked" && !!me;
   const device = useApi("GET /api/v1/auth/device", { enabled: open });
   const known = device.data?.account && me && device.data.account.email === me.email ? device.data.account : null;
@@ -145,7 +146,7 @@ export function LockSheet() {
       open={open}
       name={me.display_name}
       email={me.email}
-      photo={me.photo_url}
+      photo={photo}
       title={step.kind === "code" ? "Enter Code" : TITLE[reason]}
       reason={step.kind === "code" ? "From your authenticator app" : WHY[reason]}
       footer={

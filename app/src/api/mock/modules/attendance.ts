@@ -33,7 +33,7 @@ type Ev = AttendanceEvent & { key: string };
 type Day = AttendanceDay & { key: string };
 type Ex = AttendanceException & { key: string };
 
-const person = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department });
+const person = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null });
 
 /** A day's shift on the working week: Monday to Friday 09:00 to 17:00, Saturday to 15:00, Sunday off. */
 export function shiftOf(date: string) {

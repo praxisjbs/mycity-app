@@ -451,3 +451,5 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   the CEO's own stays the CEO's. A test in `tests/integration/settings.test.js` holds the role to
   the catalogues, so a seed that adds a module, capability or field without it fails.
 - 19/10/2026 · TB · §7: Sign Out Others names the session it kept (`kept_session_id`), so push stays on that device and goes off on the others; Sign Out Everywhere and suspension turn push off everywhere (`docs/guides/notifications.md`).
+- 19/10/2026 · AJ · `/auth/me` carries the person's `photo_url` (from `employee.photo_document_id`, set on ESS · My Profile; `docs/guides/ess.md` §3 step 1) in place of null. The app fetches it with the session (`useMyPhoto`) for the rail, the phone top bar, More and the lock screen, and `refreshMe` reads `/me` again after the photo changes. TB to review.
+- 19/10/2026 · AJ · Download My Data's Sign-Ins sheet is the person's own `GET /auth/sessions` list, read in the worker through `identity.service.listSessions` (`docs/guides/ess.md` §3 step 8). TB to review.

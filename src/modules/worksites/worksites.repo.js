@@ -7,6 +7,7 @@
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+const { photoUrlSql } = require("../../shared/db/person");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -86,7 +87,7 @@ function employees(db, worksiteId, query, scope) {
   return pageQuery(
     db,
     `SELECT e.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, e.job_title,
-            d.name AS department, e.work_pattern, e.worksite_id, ${TOTAL_COL}
+            d.name AS department, e.work_pattern, e.worksite_id, ${photoUrlSql("e")} AS photo_url, ${TOTAL_COL}
        FROM employee e
        LEFT JOIN department d ON d.department_id = e.department_id
       WHERE e.worksite_id = $1 AND e.status = 'active' ${s.and}
@@ -101,7 +102,7 @@ const employee = (db, employeeId) =>
   one(
     db,
     `SELECT e.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, e.job_title,
-            d.name AS department, e.work_pattern, e.worksite_id, e.status
+            d.name AS department, e.work_pattern, e.worksite_id, ${photoUrlSql("e")} AS photo_url, e.status
        FROM employee e LEFT JOIN department d ON d.department_id = e.department_id
       WHERE e.employee_id = $1`,
     [employeeId],

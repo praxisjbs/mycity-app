@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "@mycity/ui";
 import { session } from "./client";
 
@@ -13,6 +13,8 @@ import { session } from "./client";
  *
  *   await saveFile("/api/v1/imports/x/report", "IMP-0001.xlsx");   // a download
  *   const url = useFileUrl(doc ? `/api/v1/documents/${doc.id}/content` : null);
+ *   const photo = usePhotos(rows.map((r) => r.employee.photo_url));  // people's faces
+ *   <Who name={r.employee.display_name} src={photo(r.employee.photo_url)} />
  *
  * In mock mode (a laptop build only) nothing travels and the screen says so,
  * because the in-browser mock holds no bytes.
@@ -116,4 +118,96 @@ export function useFileUrls(urls: Record<string, string>): Record<string, string
     };
   }, [key]);
   return hrefs;
+}
+
+/*
+ * People's photos (`photo_url` on PersonRef and the other person shapes): the same faces appear
+ * on many screens, so each is fetched once with the session and kept by its URL, shared by every
+ * screen that shows it. A photo nobody shows is released a few minutes later, and every one is
+ * released at sign-out. A photo that fails stays failed until it is released, so a broken face is
+ * not asked for again on every row: the initials show instead.
+ */
+const PHOTO_RELEASE_MS = 5 * 60_000;
+
+interface Photo {
+  href: string | null;
+  users: number;
+  listeners: Set<() => void>;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+const PHOTOS = new Map<string, Photo>();
+
+function releasePhoto(url: string, photo: Photo): void {
+  if (photo.users > 0 || PHOTOS.get(url) !== photo) return;
+  if (photo.href) URL.revokeObjectURL(photo.href);
+  PHOTOS.delete(url);
+}
+
+/** Start using a photo; the returned function stops. `changed` runs when its blob is ready. */
+function acquirePhoto(url: string, changed: () => void): () => void {
+  let photo = PHOTOS.get(url);
+  if (!photo) {
+    const made: Photo = { href: null, users: 0, listeners: new Set(), timer: null };
+    PHOTOS.set(url, made);
+    fetchBlob(url)
+      .then((blob) => {
+        if (PHOTOS.get(url) !== made) return;
+        made.href = URL.createObjectURL(blob);
+        made.listeners.forEach((fn) => fn());
+      })
+      .catch(() => undefined);
+    photo = made;
+  }
+  const held = photo;
+  if (held.timer) {
+    clearTimeout(held.timer);
+    held.timer = null;
+  }
+  held.users += 1;
+  held.listeners.add(changed);
+  return () => {
+    held.users -= 1;
+    held.listeners.delete(changed);
+    if (held.users === 0) held.timer = setTimeout(() => releasePhoto(url, held), PHOTO_RELEASE_MS);
+  };
+}
+
+/** Release every photo: the session ended, and the next person must not see the last one's cache. */
+export function clearPhotos(): void {
+  PHOTOS.forEach((photo) => {
+    if (photo.timer) clearTimeout(photo.timer);
+    if (photo.href) URL.revokeObjectURL(photo.href);
+  });
+  PHOTOS.clear();
+}
+
+/**
+ * Photos for a list of people: pass every `photo_url` the screen shows (nulls are fine), and
+ * read each one back through the returned function, which gives a blob URL for Avatar's or
+ * Who's `src`, or null while it loads, when it failed, when there is none, and in mock mode.
+ */
+export function usePhotos(urls: ReadonlyArray<string | null | undefined>): (url: string | null | undefined) => string | null {
+  const [ready, setReady] = useState<Record<string, string>>({});
+  const key = [...new Set(urls.filter((u): u is string => typeof u === "string" && u !== ""))].sort().join("\n");
+  useEffect(() => {
+    if (!key || MOCK) return;
+    const wanted = key.split("\n");
+    const changed = () => {
+      const pairs = wanted.map((url) => [url, PHOTOS.get(url)?.href] as const);
+      setReady(Object.fromEntries(pairs.filter((p): p is readonly [string, string] => typeof p[1] === "string")));
+    };
+    const stops = wanted.map((url) => acquirePhoto(url, changed));
+    return () => stops.forEach((stop) => stop());
+  }, [key]);
+  // A face already fetched by another screen shows at once; one still loading arrives through `ready`.
+  return useCallback(
+    (url: string | null | undefined) => (url && !MOCK ? (ready[url] ?? PHOTOS.get(url)?.href ?? null) : null),
+    [ready],
+  );
+}
+
+/** One person's photo, from the same cache as usePhotos. */
+export function usePhoto(url: string | null | undefined): string | null {
+  return usePhotos([url])(url);
 }

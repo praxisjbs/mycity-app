@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from "react";
 import type { HomeKpiCell, HomeKpiDetailRow } from "@mycity/contract/contract.gen.ts";
+import { usePhotos } from "@/api/download";
 import { useApi, usePaged } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
 import { ErrorState, formatDate, formatDateTime, formatTime, KpiDetail, LoadingRows, Money, Pill, todayIso, useModal, Who } from "@mycity/ui";
@@ -46,6 +47,7 @@ function Records({ kpiKey, close }: { kpiKey: string; close: () => void }) {
   const meta = useApi("GET /api/v1/home/kpi/:key/meta", { params: { key: kpiKey } });
   const [group, setGroup] = useState("all");
   const list = usePaged("GET /api/v1/home/kpi/:key", { params: { key: kpiKey }, filters: group === "all" ? {} : { group } });
+  const photo = usePhotos(list.rows.flatMap((r) => Object.values(r.cells) as Array<HomeKpiCell | null>).map((c) => (c?.kind === "person" ? c.person.photo_url : null)));
 
   if (meta.error) return <ErrorState error={meta.error} onRetry={meta.reload} />;
   if (!meta.data) return <LoadingRows />;
@@ -72,7 +74,7 @@ function Records({ kpiKey, close }: { kpiKey: string; close: () => void }) {
         align: c.numeric ? ("n" as const) : undefined,
         // A phone card is the first column as its title and the columns the card marks for a phone.
         desktop: i > 0 && !c.phone,
-        render: (r: HomeKpiDetailRow) => <Cell cell={r.cells[c.key] ?? null} />,
+        render: (r: HomeKpiDetailRow) => <Cell cell={r.cells[c.key] ?? null} photo={photo} />,
       }))}
     />
   );
@@ -88,14 +90,14 @@ export function momentOf(at: string, today = todayIso()): string {
 
 const NUMBER = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
 
-/** One cell of a card's records, formatted at render time: dates day-first, money as Naira. */
-export function Cell({ cell }: { cell: HomeKpiCell | null }): ReactNode {
+/** One cell of a card's records, formatted at render time: dates day-first, money as Naira; a person with their photo (usePhotos). */
+export function Cell({ cell, photo }: { cell: HomeKpiCell | null; photo?: (url: string | null) => string | null }): ReactNode {
   if (!cell) return null;
   switch (cell.kind) {
     case "text":
       return cell.text;
     case "person":
-      return <Who name={cell.person.display_name} sub={cell.person.department ?? undefined} />;
+      return <Who name={cell.person.display_name} sub={cell.person.department ?? undefined} src={photo ? photo(cell.person.photo_url) : null} />;
     case "pill":
       return <Pill tone={cell.tone}>{cell.text}</Pill>;
     case "money":

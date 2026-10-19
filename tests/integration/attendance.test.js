@@ -628,6 +628,7 @@ describeDb("attendance against the real migrations", () => {
     expect(page1.status).toBe(200);
     expect(page1.body.page).toMatchObject({ number: 1, size: 25, total: 31, pages: 2, has_next: true });
     expect(page1.body.data).toHaveLength(25);
+    expect(page1.body.data.every((r) => r.employee.photo_url === null)).toBe(true);
     const page2 = await as("ops").get(`/attendance/register?date=${date}&page=2`);
     expect(page2.body.data).toHaveLength(6);
     expect((await as("ops").get(`/attendance/register?date=${date}&limit=100`)).status).toBe(422);

@@ -109,6 +109,10 @@ module.exports = {
 
   orgChart: async (req, res) => ok(res, await service.orgChart(pool, req.validated.query)),
 
+  // Download My Data is ESS's (ess.export.js); the CEO asks for anyone's from their record.
+  requestDataExport: async (req, res) =>
+    accepted(res, await require("../ess/ess.export").requestFor(withActor(req), id(req))),
+
   requestOrgChartExport: async (req, res) =>
     accepted(res, await tx((client) => service.requestOrgChartExport(client, req.validated.body, withActor(req)))),
 };

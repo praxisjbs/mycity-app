@@ -2697,7 +2697,7 @@ Picks people the server searches: their name, job title and department, one page
 |---|---|
 | Use | Any field that names a person: an approver, an interview panel, a task's owner, who a letter is for. |
 | Avoid | Loading every employee into a dropdown (FRONTEND_GUIDE §4); a free-text name box where a record exists; a picker for the person signed in. |
-| Phone | Full width, each person a 44 px row with their initials; the picked chips wrap above the search box. |
+| Phone | Full width, each person a 44 px row with their photo or initials; the picked chips wrap above the search box. |
 | Accessibility | A search box over a listbox whose options say whether they are picked, and each person named by their own words. |
 | Status | stable |
 | Exports | `PersonPicker` |
@@ -2716,6 +2716,7 @@ Picks people the server searches: their name, job title and department, one page
 | `multiple` | `boolean` |  | Pick several; one only unless set. |
 | `placeholder` | `string` |  | A format example of at most 3 words; "Search people" otherwise. |
 | `className` | `string` |  | Layout classes only (spacing). |
+| `photo` | `(person: P) => string \| null` |  | Each person's photo, ready for an image (the app fetches it with the session); initials when null. |
 
 ```tsx
 <PersonPicker list={employees} value={panel} onChange={setPanel} multiple />

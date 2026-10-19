@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePhotos } from "@/api/download";
 import { useApi, usePaged } from "@/api/hooks";
 import type { EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
@@ -49,6 +50,7 @@ export function Employees() {
       ...(pattern && { work_pattern: pattern }),
     },
   });
+  const photo = usePhotos(list.rows.map((r) => r.photo_url));
   const canCreate = me.grants.people?.includes("create");
   const open = (r: EmployeeRow) => navigate(hrefFor("people", "employees", { id: r.employee_id }));
   const add = () => modal.open({ title: "Add Employee", wide: true, body: (close) => <AddEmployee close={close} /> });
@@ -113,7 +115,7 @@ export function Employees() {
         onRowClick={open}
         empty={{ icon: "srch", title: "Nobody Matches", text: "Clear the search or filters." }}
         columns={[
-          { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.display_name} sub={r.job_title} /> },
+          { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.display_name} sub={r.job_title} src={photo(r.photo_url)} /> },
           { key: "staff_number", label: "Number", sortable: true, desktop: true, render: (r) => r.staff_number },
           { key: "department", label: "Department", sortable: true, desktop: true, render: (r) => r.department },
           { key: "m", label: "Line Manager", desktop: true, render: (r) => (r.line_manager ? r.line_manager.display_name : "None") },

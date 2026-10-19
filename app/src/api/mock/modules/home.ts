@@ -76,7 +76,7 @@ const keysOf = (user: string) => new Set(peopleOf(user).map((p) => p.user_key));
 /** A department's id, as the organisation mock gives it (GET /departments). */
 const departmentId = (name: string) => sid(`dept:${name}`);
 /** A person as lists carry them (the contract's PersonRef). */
-const refOf = (p: MockPerson): HomeTeamRow["employee"] => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department });
+const refOf = (p: MockPerson): HomeTeamRow["employee"] => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null });
 const grants = (m: Me, module: string) => (m.grants as Record<string, string[] | undefined>)[module] ?? [];
 const mayView = (m: Me, module: string) => m.is_ceo || grants(m, module).includes("view");
 const holds = (m: Me, code: string) => m.is_ceo || m.capabilities.includes(code);

@@ -28,6 +28,7 @@ const { defineEvents } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const { defineDocType } = require("../../shared/documents/generate");
+const { defineDocumentType } = require("../../shared/documents/types");
 const vault = require("../../shared/documents/vault");
 const { defineVariables } = require("../../shared/templates/variables");
 const { defineNotification } = require("../../shared/notifications/fanout");
@@ -40,6 +41,7 @@ const EVENTS = defineEvents("people", {
   "employee.archived": { summary: "An employee record was archived" },
   "employee.restored": { summary: "An archived employee record was restored" },
   "employee.reporting_line_changed": { summary: "An employee's reporting line changed" },
+  "employee.photo_updated": { summary: "An employee's photo was set or removed" },
   "org_seat.created": { summary: "A vacant seat was added to the structure" },
   "org_seat.updated": { summary: "A vacant seat was changed" },
   "org_chart.export_requested": { summary: "An organogram PDF was requested" },
@@ -63,6 +65,15 @@ defineDocType(CHART_DOC_TYPE, {
 });
 defineVariables("document", "org-chart", c.organisation.OrgChartDocumentVars);
 defineVariables("email", "org-chart-export", c.organisation.OrgChartExportEmailVars);
+
+/**
+ * An employee's photo (organisation.photo.js): uploaded on ESS · My Profile, shown wherever the
+ * person appears, so every signed-in member of staff may read it; the rule decides alone.
+ */
+const PHOTO_DOC_TYPE = "employee_photo";
+const PHOTO_ENTITY = "employee_photo";
+defineDocumentType(PHOTO_DOC_TYPE, { label: "Profile photo", module: "people", sensitivity: "normal" });
+vault.defineAccess(PHOTO_ENTITY, async (client, user) => user.is_ceo === true || Boolean(user.employee_id));
 
 /** A request's PDF is for the person who asked, and the CEO; the rule decides alone. */
 vault.defineAccess(CHART_EXPORT, async (client, user, doc) =>
@@ -97,4 +108,4 @@ outbox.register(vault.EVENTS.DOCUMENT_RENDER_FAILED, "organisation.org_chart_fai
   isChart(event) ? require("./org-chart.export").failed(event.payload.document_id) : undefined,
 );
 
-module.exports = { EVENTS, CHART_DOC_TYPE, CHART_EXPORT };
+module.exports = { EVENTS, CHART_DOC_TYPE, CHART_EXPORT, PHOTO_DOC_TYPE, PHOTO_ENTITY };

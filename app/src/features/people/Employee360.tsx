@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { Employee360 as Record360, ManagerRef } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
@@ -6,6 +7,7 @@ import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { ReportingForm } from "@/features/shared/ReportingForm";
 import { hrefFor, useRouter } from "@/lib/router";
 import {
+  ActionGroup,
   BackButton,
   Button,
   Card,
@@ -67,6 +69,7 @@ export function Employee360({ id }: { id: string }) {
   const [tab, setTab] = useState("profile");
   const { data: e, error, reload } = useApi("GET /api/v1/employees/:id", { params: { id } });
   const restore = useMutation("POST /api/v1/employees/:id/restore");
+  const exportData = useMutation("POST /api/v1/employees/:id/data-export");
   const back = () => navigate(hrefFor("people", "employees"));
 
   if (error)
@@ -88,6 +91,17 @@ export function Employee360({ id }: { id: string }) {
       title: "Archive Record",
       body: (close) => <ArchiveForm id={id} name={e.display_name} close={close} onDone={reload} />,
     });
+
+  /* Download Their Data: the CEO only, emailed to them; the person's one a day (docs/guides/ess.md §6). */
+  const downloadData = async () => {
+    try {
+      await exportData.run({ params: { id }, body: {} });
+      toast("We'll email it to you");
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      toast(err.message);
+    }
+  };
 
   const bringBack = async () => {
     if (!(await confirm({ title: "Restore Record", body: `${e.display_name} goes back on the register.` }))) return;
@@ -112,7 +126,12 @@ export function Employee360({ id }: { id: string }) {
           </>
         }
         actions={
-          <>
+          <ActionGroup>
+            {me.is_ceo && (
+              <Button icon="download" onClick={downloadData}>
+                Download Their Data
+              </Button>
+            )}
             {canInvite && (
               <Button
                 icon="lock"
@@ -146,7 +165,7 @@ export function Employee360({ id }: { id: string }) {
                 Edit Record
               </Button>
             )}
-          </>
+          </ActionGroup>
         }
       />
       <Tabs items={TABS} value={tab} onValueChange={setTab} label="Employee Record" className="mb-3" />

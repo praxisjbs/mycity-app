@@ -19,7 +19,7 @@ const ANNIV = ["Thank you for every one of them.", "Here is to the next one."];
 type PersonRef = NonNullable<Message["author"]>;
 const person = (key: string): PersonRef => {
   const p = byKey(key)!;
-  return { employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department };
+  return { employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null };
 };
 const uid = (key: string) => sid(`user:${key}`);
 const keyOfUser = (userId: string) => PEOPLE.find((p) => uid(p.user_key) === userId)?.user_key;

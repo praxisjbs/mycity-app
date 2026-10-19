@@ -310,6 +310,12 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 19/10/2026 · AJ · Every node carries `photo_url` (`OrgNode`, from `shared/db/person.js` at 192 px; null for a vacant seat): the desktop chart, the phone's tiles and a person's sheet show the face through `Avatar`, initials when there is none. The Download PDF keeps initials. TB to review.
+- 19/10/2026 · AJ · `employee` gained `photo_document_id` (1170): the person's photo, a vault document of type
+  `employee_photo` that every signed-in colleague may read. `organisation.photo.js` sets and clears it
+  (`employee.photo_updated`); ESS · My Profile is where a person changes their own (`docs/guides/ess.md`
+  §3 step 1). The register, the 360 and the organogram cards do not show it yet: their rows gain
+  `photo_url` next. TB to review.
 - 19/10/2026 · TB · The phone and the person's sheet, from TB's four decisions of 19/10/2026 (§2,
   §3, §5 to §8, §10, §11). A phone has Focus and Everyone: Everyone is the whole company as one
   folding, indented list (People opens on it), and Focus gains the path from the top, each card's

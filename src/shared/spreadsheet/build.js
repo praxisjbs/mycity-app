@@ -8,7 +8,7 @@
  *   - header fill City Green, header font white, accent MyCity yellow
  *   - `wb.creator`/`lastModifiedBy`/`company` = the company name
  *   - optional Cover sheet: title, company letterhead lines, generated-at in
- *     Lagos time, actor, filters, and a STAGING stamp for exports made on
+ *     Lagos time, actor, filters, the caller's own lines, and a STAGING stamp for exports made on
  *     staging (the filename says so too: cells.exportFilename)
  *   - money cells are raw typed numbers shown "₦#,##0.00", so a column SUMs
  *   - dates are real date cells shown day-first (dd/mm/yyyy)
@@ -271,6 +271,7 @@ function addCoverSheet(wb, taken, context, colors) {
       .map(([k, v]) => `${k} = ${Array.isArray(v) ? v.join("|") : v}`);
     if (parts.length) line("Filters", parts.join(", "));
   }
+  for (const [label, value] of context.lines || []) line(label, value);
 
   // A staging export must be identifiable with the file open AND from the
   // filename (cells.exportFilename).

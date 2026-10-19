@@ -15,6 +15,7 @@
  */
 const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+const { photoUrlSql } = require("../../shared/db/person");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -159,6 +160,7 @@ const toRow = (r) => ({
   start_date: r.start_date,
   confirmation_due_on: r.confirmation_due_on,
   confirmed_on: r.confirmed_on,
+  photo_url: r.photo_url,
 });
 
 /** The SQL for each field EmployeeListQuery allow-lists. The first is the default order. */
@@ -193,7 +195,7 @@ async function list(db, query, scope) {
     db,
     `SELECT e.employee_id, e.staff_number::text AS staff_number, ${DISPLAY_NAME} AS display_name,
             e.job_title, e.department_id, d.name AS department, e.work_pattern, e.employment_type,
-            e.status, e.start_date, e.confirmation_due_on, e.confirmed_on,
+            e.status, e.start_date, e.confirmation_due_on, e.confirmed_on, ${photoUrlSql("e")} AS photo_url,
             ${LOGIN_STATE} AS login, ${MANAGER_SELECT}, ${TOTAL_COL}
        ${EMPLOYEE_JOINS}
       WHERE ($1::text IS NULL
@@ -421,6 +423,20 @@ function findEmployeeByWorkEmail(db, email) {
 function findEmployeeByStaffNumber(db, staffNumber) {
   return one(db, `SELECT ${EMPLOYEE_COLUMNS} FROM employee e WHERE e.staff_number = $1`, [
     staffNumber,
+  ]);
+}
+
+/** The document of the photo an employee uses, or null (1170). */
+async function photoDocumentOf(db, employeeId) {
+  const row = await one(db, "SELECT e.photo_document_id FROM employee e WHERE e.employee_id = $1", [employeeId]);
+  return row ? row.photo_document_id : null;
+}
+
+/** Point an employee at a photo, or at none (null). */
+function setPhotoDocument(db, employeeId, documentId) {
+  return db.query("UPDATE employee SET photo_document_id = $2, updated_at = now() WHERE employee_id = $1", [
+    employeeId,
+    documentId,
   ]);
 }
 
@@ -765,7 +781,7 @@ async function tree(db) {
             COALESCE(e.dotted_manager_id, e.dotted_manager_seat_id) AS dotted_manager_node_id,
             COALESCE(${DOTTED_NAME}, ds.title) AS dotted_line_to,
             COALESCE(u.is_ceo, false) AS is_ceo, false AS vacant,
-            to_char(e.start_date, 'YYYY') AS since, e.work_pattern
+            to_char(e.start_date, 'YYYY') AS since, e.work_pattern, ${photoUrlSql("e")} AS photo_url
        ${EMPLOYEE_JOINS}
       WHERE e.status = 'active'
       UNION ALL
@@ -773,7 +789,8 @@ async function tree(db) {
             s.title AS display_name, s.title AS job_title, d.name AS department,
             COALESCE(s.line_manager_id, s.line_manager_seat_id) AS manager_node_id,
             NULL::uuid AS dotted_manager_node_id, NULL::text AS dotted_line_to,
-            false AS is_ceo, true AS vacant, NULL::text AS since, NULL::text AS work_pattern
+            false AS is_ceo, true AS vacant, NULL::text AS since, NULL::text AS work_pattern,
+            NULL::text AS photo_url
        FROM org_seat s
        JOIN department d ON d.department_id = s.department_id
       WHERE s.status = 'vacant'
@@ -810,6 +827,8 @@ async function highestStaffNumberSeq(db) {
 
 module.exports = {
   EMPLOYEE_COLUMNS,
+  photoDocumentOf,
+  setPhotoDocument,
   INSERT_COLUMNS,
   UPDATE_COLUMNS,
   TREE_CEILING,

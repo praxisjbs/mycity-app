@@ -12,6 +12,7 @@
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+const { personJson } = require("../../shared/db/person");
 
 const STATUS = `CASE
   WHEN lr.status = 'submitted' AND wi.state IN ('approved', 'timeout_approved') THEN 'approved'
@@ -33,12 +34,7 @@ const WAITING_ON = `CASE WHEN wi.state = 'pending' THEN (
 /** Every request with what a screen needs, and the columns the filters and scope read. */
 const ROWS = `
   SELECT lr.leave_request_id,
-         json_build_object(
-           'employee_id', e.employee_id,
-           'display_name', btrim(e.first_name || ' ' || e.last_name),
-           'job_title', e.job_title,
-           'department', d.name
-         ) AS employee,
+         ${personJson("e", "d")} AS employee,
          lr.employee_id, e.department_id,
          lr.leave_type_id, t.name AS leave_type_name,
          lr.starts_on, lr.ends_on, lr.amount::int AS days, lr.reason,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
+import { usePhoto, usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import "@/api/types/organisation";
@@ -300,11 +301,12 @@ function AddMembers({ c, close, done }: { c: Channel; close: () => void; done: (
 }
 
 function PeopleList({ people, right }: { people: PersonRef[]; right?: (p: PersonRef) => ReactNode }) {
+  const photo = usePhotos(people.map((p) => p.photo_url));
   return (
     <div className="max-h-64 overflow-y-auto rounded-box border border-border">
       {people.map((p) => (
         <div key={p.employee_id} className="flex items-center gap-2.5 border-b border-border px-2.5 py-2 last:border-b-0">
-          <Avatar name={p.display_name} size={30} />
+          <Avatar name={p.display_name} src={photo(p.photo_url)} size={30} />
           <span className="min-w-0 flex-1 text-sm"><b className="block truncate font-semibold">{p.display_name}</b><span className="text-2xs text-subtle-foreground">{p.department ?? p.job_title}</span></span>
           {right?.(p)}
         </div>
@@ -452,6 +454,7 @@ function Direct() {
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const list = usePaged("GET /api/v1/community/direct", { filters: filter === "unread" ? { unread: true } : {} });
+  const photo = usePhotos(list.rows.map((c) => c.person.photo_url));
   const [sel, setSel] = useState<Conversation | null>(null);
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -545,7 +548,7 @@ function Direct() {
             key={c.community_channel_id}
             on={c.community_channel_id === current?.community_channel_id && (!mobile || open)}
             unread={c.unread > 0}
-            lead={<Avatar name={c.person.display_name} size={32} online={c.online && !c.is_self} />}
+            lead={<Avatar name={c.person.display_name} src={photo(c.person.photo_url)} size={32} online={c.online && !c.is_self} />}
             title={chatName(c)}
             sub={`${c.last_mine ? "You: " : ""}${c.last_text ?? "No messages yet"}`}
             when={formatWhen(c.last_at)}
@@ -564,7 +567,7 @@ function Direct() {
     <>
       <ThreadHead onBack={() => setOpen(false)} backLabel="Back to conversations">
         <button type="button" onClick={showProfile} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" aria-label="View profile">
-          <Avatar name={current.person.display_name} size={32} online={current.online && !current.is_self} />
+          <Avatar name={current.person.display_name} src={photo(current.person.photo_url)} size={32} online={current.online && !current.is_self} />
           <span className="min-w-0 flex-1">
             <b className="block truncate text-base font-strong">{chatName(current)}</b>
             <span className="block truncate text-2xs text-subtle-foreground">{current.is_self ? seenLine(current) : `${seenLine(current)} · ${current.person.department}`}</span>
@@ -649,6 +652,7 @@ function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onM
   const { can } = useAuth();
   const card = useApi("GET /api/v1/community/people/:id/card", { params: { id: c.person.employee_id } });
   const p = card.data;
+  const photo = usePhoto(p?.person.photo_url ?? c.person.photo_url);
   if (card.error) return <ErrorState error={card.error} onRetry={card.reload} />;
   if (!p) return <LoadingRows count={4} />;
   const sec = "border-b border-border py-3.5 last:border-b-0";
@@ -664,10 +668,7 @@ function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onM
   return (
     <div>
       <div className="border-b border-border pb-3.5 text-center">
-        <span className="relative mx-auto mb-2.5 flex size-18 items-center justify-center rounded-full bg-primary text-3xl font-bold text-primary-foreground">
-          {p.person.display_name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
-          {p.online && <i className="absolute right-0.5 bottom-0.5 size-3.5 rounded-full border-2 border-card bg-success" />}
-        </span>
+        <Avatar name={p.person.display_name} src={photo} size="2xl" tone="brand" presence={p.online ? "online" : undefined} className="mx-auto mb-2.5 flex" />
         <h2 data-copy="content" className="text-lg font-semibold">{p.person.display_name}</h2>
         <p className="mt-0.5 text-2xs text-subtle-foreground">{p.person.job_title}</p>
         <p className="mt-1">{p.online ? <Pill tone="ok">Online</Pill> : <Pill>{seenLine(p)}</Pill>}</p>

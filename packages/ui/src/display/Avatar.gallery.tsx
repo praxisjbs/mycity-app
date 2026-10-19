@@ -11,6 +11,7 @@ export default {
         <Avatar name="Cynthia Osakunih" size="md" />
         <Avatar name="Cynthia Osakunih" size="lg" />
         <Avatar name="Cynthia Osakunih" size="xl" />
+        <Avatar name="Cynthia Osakunih" size="2xl" />
       </div>
     ),
     Presence: () => (

@@ -75,6 +75,7 @@ const EVENTS = defineEvents("settings", {
   },
   "document.generated": { summary: "A document was generated" },
   "document.render_failed": { summary: "A document could not be generated" },
+  "document.removed": { summary: "A file was removed from the vault" },
 });
 
 const SENSITIVITIES = new Set(["normal", "personal", "restricted"]);
@@ -394,6 +395,48 @@ async function lock(client, documentId, actor) {
   return up[0];
 }
 
+/**
+ * Remove a document that was only ever meant to be kept for a while (a Download My Data
+ * workbook after seven days). The row and its derived files' rows go now, inside the
+ * caller's transaction, with `document.removed` on the record; the bytes go after commit,
+ * when the caller passes what this returns to removeFiles(), so a rolled-back removal
+ * never leaves a row pointing at nothing. A locked document (signed, sent, filed) is never
+ * removed. Gone already is not an error: answers null.
+ * @returns {Promise<string[]|null>} the storage keys to remove after commit
+ */
+async function remove(client, documentId, { actor = null, reason } = {}) {
+  if (!inTransaction(client))
+    throw new Error("vault.remove must run inside atomically()");
+  const { rows } = await client.query(
+    `SELECT ${COLUMNS} FROM document WHERE document_id = $1 FOR UPDATE`,
+    [documentId],
+  );
+  const doc = rows[0];
+  if (!doc) return null;
+  if (doc.locked_at)
+    throw new AppError("DOCUMENT_LOCKED", "A locked document is kept", 409);
+  const { rows: variants } = await client.query(
+    "SELECT storage_key FROM document_variant WHERE document_id = $1",
+    [documentId],
+  );
+  await client.query("DELETE FROM document WHERE document_id = $1", [documentId]);
+  await emit(client, {
+    key: EVENTS.DOCUMENT_REMOVED,
+    entity: { type: "document", id: documentId },
+    module: moduleFor(doc.entity_type),
+    actor,
+    before: doc,
+    payload: { document_id: documentId, doc_type: doc.doc_type },
+    metadata: reason ? { reason } : undefined,
+  });
+  return [doc.storage_key, ...variants.map((v) => v.storage_key)];
+}
+
+/** After commit: delete the bytes remove() gave back. A file already gone is not an error. */
+async function removeFiles(keys) {
+  for (const key of keys || []) await storage.remove(key);
+}
+
 async function get(client, documentId) {
   const { rows } = await client.query(
     `SELECT ${COLUMNS} FROM document WHERE document_id = $1`,
@@ -664,6 +707,8 @@ module.exports = {
   store,
   supersede,
   lock,
+  remove,
+  removeFiles,
   get,
   getReadable,
   variantOf,

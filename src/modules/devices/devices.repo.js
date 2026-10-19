@@ -7,6 +7,7 @@
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+const { personJson } = require("../../shared/db/person");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -18,12 +19,7 @@ const MINE = `
 /** What People read: the device, its owner and who removed it. */
 const ROWS = `
   SELECT ad.attendance_device_id,
-         json_build_object(
-           'employee_id', e.employee_id,
-           'display_name', btrim(e.first_name || ' ' || e.last_name),
-           'job_title', e.job_title,
-           'department', d.name
-         ) AS employee,
+         ${personJson("e", "d")} AS employee,
          ad.employee_id, ad.label, k.platform, ad.status, ad.first_seen_at, ad.last_punch_at,
          ad.registered_at, ad.removed_at,
          CASE WHEN rb.employee_id IS NULL THEN NULL ELSE btrim(rb.first_name || ' ' || rb.last_name) END AS removed_by_name,

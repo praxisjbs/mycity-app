@@ -152,6 +152,14 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "employees"),
     self: screen("ess", "my-profile"),
   },
+  // A person's photo (organisation.photo.js) opens their record, or their own My Profile.
+  // search:none a photo is found through the person it shows
+  employee_photo: {
+    ...screen("people", "employees"),
+    self: screen("ess", "my-profile"),
+  },
+  // A Download My Data workbook (ess.export.js): its record opens My Profile, where it is asked for.
+  data_export: screen("ess", "my-profile"), // search:none a file that is emailed to whoever asked and removed after seven days; nothing to look up
   // A post nobody holds yet opens on the Organogram, focused on it.
   org_seat: screen("people", "organogram"),
   // A Download PDF request: its notice opens the Org Chart, where it can be asked for again.

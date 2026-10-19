@@ -332,6 +332,7 @@ describeDb("leave against the real migrations", () => {
     expect(team.status).toBe(200);
     const names = new Set(team.body.data.map((r) => r.employee.display_name));
     expect(names).toEqual(new Set(["Musa Danjuma"]));
+    expect(team.body.data.every((r) => r.employee.photo_url === null)).toBe(true);
 
     const recorded = (await as("ops").get(`/leave/requests?employee_id=${people.other.employee.employee_id}`)).body.data[0];
     expect((await as("manager").get(`/leave/requests/${recorded.leave_request_id}`)).status).toBe(404);

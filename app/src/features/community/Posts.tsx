@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/api/client";
 import { saveFile, useFileUrl } from "@/api/download";
 import type { Message } from "@/api/types/community";
-import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, initials, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
+import { usePhoto, usePhotos } from "@/api/download";
+import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
 
 /** Highlight search hits inside a message. */
 export function Hl({ text, q }: { text: string; q: string }) {
@@ -15,6 +16,7 @@ export function Hl({ text, q }: { text: string; q: string }) {
 /** Birthday and work anniversary posts: the celebration card. */
 function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }) {
   const c = m.celebration!;
+  const photo = usePhotos([c.subject.photo_url, ...c.fans.map((f) => f.photo_url)]);
   const bday = m.message_type === "birthday";
   const first = c.subject.display_name.split(" ")[0];
   const names = c.fans.slice(0, 2).map((f) => f.display_name.split(" ")[0]);
@@ -30,7 +32,7 @@ function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }
       <Confetti shape={bday ? "paper" : "stars"} />
       <span className="relative flex-none">
         <span className={cn("relative block size-18 animate-spin-slow rounded-full p-1 max-md:size-14", bday ? "ring-warm" : "ring-cool")}>
-          <span className="flex size-full animate-spin-slow-reverse items-center justify-center rounded-full border-2 border-deep bg-primary text-2xl font-bold text-primary-foreground">{initials(c.subject.display_name)}</span>
+          <Avatar name={c.subject.display_name} src={photo(c.subject.photo_url)} size="2xl" tone="brand" className="flex size-full animate-spin-slow-reverse border-2 border-deep text-2xl" />
         </span>
         <span className="absolute -right-1.5 -bottom-1 flex size-7 animate-bob items-center justify-center rounded-full bg-white text-md shadow-3" aria-hidden="true">
           {bday ? "🎂" : "🏆"}
@@ -51,7 +53,7 @@ function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }
           {c.fans.length > 0 && (
             <span className="flex items-center">
               {c.fans.slice(0, 3).map((f, i) => (
-                <span key={f.employee_id} className={cn("flex size-5.5 items-center justify-center rounded-full border-2 border-deep bg-accent text-2xs font-bold text-accent-foreground", i > 0 && "-ml-1.5")}>{initials(f.display_name)}</span>
+                <Avatar key={f.employee_id} name={f.display_name} src={photo(f.photo_url)} size="xs" className={cn("size-5.5 border-2 border-deep", i > 0 && "-ml-1.5")} />
               ))}
             </span>
           )}
@@ -126,6 +128,8 @@ const TICK = { sent: ["tick", "Sent"], delivered: ["ticks", "Delivered"], read: 
 
 /** One post in a channel or a conversation. */
 export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void; menu?: ReactNode }) {
+  const authorPhoto = usePhoto(m.mine ? null : m.author?.photo_url);
+  const toPhoto = usePhoto(m.recognition?.to.photo_url);
   /* A card keeps its look; its menu sits beside it. */
   const withMenu = (card: ReactNode) => (menu ? <div className={cn("flex items-start gap-1", m.mine && "flex-row-reverse")}>{card}{menu}</div> : card);
   if (!m.deleted && (m.message_type === "birthday" || m.message_type === "anniversary")) return m.celebration ? withMenu(<Celebration m={m} onCelebrate={onCelebrate} />) : null;
@@ -134,7 +138,7 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
     return withMenu(
       <div className="max-w-136 rounded-card border border-l-2 border-border border-l-primary bg-accent px-3.5 py-3">
         <div className="flex items-center gap-2 text-sm">
-          <Avatar name={r.to.display_name} size={26} />
+          <Avatar name={r.to.display_name} src={toPhoto} size={26} />
           <span><b>{m.author?.display_name}</b> recognised <b>{r.to.display_name}</b></span>
         </div>
         <q className="mt-1.5 mb-2 block text-sm text-foreground">{m.body}</q>
@@ -193,7 +197,7 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
   else inner = <Hl text={m.body ?? ""} q={q} />;
   return (
     <div className={cn("flex max-w-4/5 gap-2 max-md:max-w-11/12", m.mine && "flex-row-reverse self-end")}>
-      {!m.mine && <Avatar name={m.author?.display_name ?? "MyCity"} size={30} className="mt-0.5" />}
+      {!m.mine && <Avatar name={m.author?.display_name ?? "MyCity"} src={authorPhoto} size={30} className="mt-0.5" />}
       <div className="min-w-0">
         <div className={cn("mb-0.5 flex items-baseline gap-1.5 text-xs font-strong", m.mine && "justify-end")}>
           {!m.mine && m.author?.display_name}

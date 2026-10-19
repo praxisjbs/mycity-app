@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { api } from "@/api/client";
+import { usePhoto, usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { ManagerRef, OrgNode } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
@@ -11,6 +12,7 @@ import { visibleTabs } from "@/shell/access";
 import { moduleByKey } from "@/shell/catalogue";
 import { useScreenAction } from "@/shell/screen-action";
 import {
+  Avatar,
   Banner,
   Button,
   Card,
@@ -22,7 +24,6 @@ import {
   FormFooter,
   HelpTerm,
   Icon,
-  initials,
   KeyValue,
   LoadingRows,
   ModalFooter,
@@ -80,6 +81,8 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   const me = useMe();
   const modal = useModal();
   const { data, error, reload } = useApi("GET /api/v1/org-chart", { query: { view: mode } });
+  /* The desktop chart shows every face at once; a phone's tiles each ask for their own (NodeTile). */
+  const photo = usePhotos(phone ? [] : (data?.nodes ?? []).map((n) => n.photo_url));
   const { navigate } = useRouter();
   const move = useMutation("PATCH /api/v1/employees/:id/line-manager");
   const [q, setQ] = useState("");
@@ -307,9 +310,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           dragging?.node_id === n.node_id && "opacity-50",
         )}
       >
-        <span className={cn("mx-auto mb-2 flex size-10.5 items-center justify-center rounded-full text-sm font-bold", n.is_ceo ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground")}>
-          {initials(n.display_name)}
-        </span>
+        <Avatar name={n.display_name} src={photo(n.photo_url)} size="lg" tone={n.is_ceo ? "brand" : "soft"} className="mx-auto mb-2" />
         <b className="block text-sm leading-tight font-strong">{n.display_name}</b>
         <span className="mt-0.5 block text-2xs text-muted-foreground">{n.job_title}</span>
         <span className="mt-2 inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{n.department}</span>
@@ -460,18 +461,22 @@ function NodeTile({
   dotted?: boolean;
   onPick?: (n: OrgNode) => void;
 }) {
+  const photo = usePhoto(n.photo_url);
   const body = (
     <>
-      <span
-        aria-hidden
-        className={cn(
-          "flex flex-none items-center justify-center rounded-full font-bold",
-          large ? "size-13 text-base" : "size-10.5 text-sm",
-          n.vacant ? "border border-dashed border-input bg-muted text-subtle-foreground" : n.is_ceo ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground",
-        )}
-      >
-        {n.vacant ? <Icon name="plus" /> : initials(n.display_name)}
-      </span>
+      {n.vacant ? (
+        <span
+          aria-hidden
+          className={cn(
+            "flex flex-none items-center justify-center rounded-full border border-dashed border-input bg-muted font-bold text-subtle-foreground",
+            large ? "size-13 text-base" : "size-10.5 text-sm",
+          )}
+        >
+          <Icon name="plus" />
+        </span>
+      ) : (
+        <Avatar name={n.display_name} src={photo} size={large ? "xl" : "lg"} tone={n.is_ceo ? "brand" : "soft"} />
+      )}
       <span className="min-w-0 flex-1" data-copy="content">
         <b className={cn("block truncate font-strong", large ? "text-base" : "text-sm")}>{n.display_name}</b>
         <span className="block truncate text-2xs text-muted-foreground">{n.vacant ? `Vacant · ${n.department}` : `${n.job_title} · ${n.department}`}</span>
@@ -707,6 +712,7 @@ function PersonSheet({
   onMyProfile: () => void;
   onChangeManager: () => void;
 }) {
+  const photo = usePhoto(n.photo_url);
   const items: Array<[ReactNode, ReactNode]> = [["Department", n.department]];
   if (manager) items.push(["Reports To", manager.vacant ? `${manager.display_name} (open role)` : manager.display_name]);
   if (n.dotted_line_to)
@@ -720,7 +726,7 @@ function PersonSheet({
   return (
     <>
       <div className="mb-3" data-copy="content">
-        <Who name={n.display_name} role={n.job_title} size="lg" />
+        <Who name={n.display_name} role={n.job_title} size="lg" src={photo} />
       </div>
       <KeyValue items={items} />
       <ModalFooter>

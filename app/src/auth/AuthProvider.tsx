@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, refreshSession, session } from "@/api/client";
+import { clearPhotos, useFileUrl } from "@/api/download";
 import { invalidate } from "@/api/hooks";
 import { connectRealtime, disconnectRealtime } from "@/api/realtime";
 import type { Me, Session } from "@/api/types/identity";
@@ -74,6 +75,8 @@ interface AuthValue {
   signOut: () => Promise<void>;
   /** Can the user perform `action` on `module`? Hiding is a courtesy; the API enforces. */
   can: (module: string, action?: string) => boolean;
+  /** Read the signed-in person again: after My Profile changes their photo, so the shell shows it. */
+  refreshMe: () => Promise<void>;
 }
 
 /** What follows a first step that did not sign in: the code, or setting two-step up. */
@@ -159,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signedOut = useCallback(() => {
     session.setToken(null);
+    clearPhotos();
     clock.current.sessionUntil = Number.POSITIVE_INFINITY;
     setMe(null);
     setLockReason(null);
@@ -366,6 +370,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const can = useCallback((module: string, action = "view") => !!me?.grants[module]?.includes(action), [me]);
 
+  const refreshMe = useCallback(async () => {
+    setMe(await api.call("GET /api/v1/auth/me"));
+  }, []);
+
   const value = useMemo(
     () => ({
       status,
@@ -378,8 +386,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithPasskey,
       signOut,
       can,
+      refreshMe,
     }),
-    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, finishSetup, signInWithPasskey, signOut, can],
+    [status, me, lockReason, signIn, signInWithPin, finishTwoStep, finishSetup, signInWithPasskey, signOut, can, refreshMe],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -388,6 +397,15 @@ export function useAuth(): AuthValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth outside AuthProvider");
   return ctx;
+}
+
+/**
+ * The signed-in person's photo, ready for an <img>: `photo_url` is an API path that needs the
+ * session, so it is fetched once and handed over as an object URL. Null shows initials.
+ */
+export function useMyPhoto(): string | null {
+  const { me } = useAuth();
+  return useFileUrl(me?.photo_url ?? null);
 }
 
 /** The signed-in user. Only inside the shell, where there always is one (also while the lock screen is up). */

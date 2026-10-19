@@ -815,3 +815,4 @@ rows, and nothing in the code says where anything came from.
   because the organogram's Download PDF now registers on the same document events
   (`docs/guides/organogram.md` §7) and the order they load in is not Home's to fix.
 - 19/10/2026 · LA · The roster's `field` status (attendance.md §6.12): a present day on a field assignment reads Field, counted in Present Today and Clocked In Today, with a Field chip on Team and in Clocked In Today's groups. Team's four cards are unchanged.
+- 19/10/2026 · AJ · Team (the roster and Attendance This Month) and a card's records show each person's photo: `HomeTeamRow.employee`, `HomeTeamAttendanceRow.employee` and a person cell are `PersonRef` with `photo_url` (the roster reads it, `kpi-catalog/shared.js` `PERSON` is now `shared/db/person.js`); initials when there is none. TB to review.
