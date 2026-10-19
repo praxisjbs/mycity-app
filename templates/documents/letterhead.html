@@ -19,7 +19,7 @@
 {{#if staging}}<div class="lh-staging">STAGING</div>{{/if}}
 <header class="lh-head">
   <div class="lh-brand">
-    {{#if org.logo}}<img src="{{ org.logo }}" alt="{{ org.name }}">{{else}}<div class="lh-wordmark">MyCityApp</div>{{/if}}
+    {{#if org.logo}}<img src="{{ org.logo }}" alt="{{ org.display_name }}">{{else}}<div class="lh-wordmark">{{ org.display_name }}</div>{{/if}}
   </div>
   <div class="lh-meta">
     {{#if number}}<div><strong>{{ number }}</strong></div>{{/if}}
@@ -31,5 +31,5 @@
   {{> body}}
 </main>
 <footer class="lh-foot">
-  {{ org.name }}{{#if org.address}} · {{ org.address }}{{/if}}{{#if org.phone}} · {{ org.phone }}{{/if}}{{#if org.email}} · {{ org.email }}{{/if}}{{#if org.website}} · {{ org.website }}{{/if}}
+  {{ org.name }}{{#if org.rc}} · {{ org.rc }}{{/if}}{{#if org.address}} · {{ org.address }}{{/if}}{{#if org.phone}} · {{ org.phone }}{{/if}}{{#if org.email}} · {{ org.email }}{{/if}}{{#if org.website}} · {{ org.website }}{{/if}}
 </footer>

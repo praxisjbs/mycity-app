@@ -37,7 +37,7 @@ export const MODULES: ModuleDef[] = [
     ],
   },
   { key: "community", label: "Staff Community", short: "Community", icon: "msg", area: "Work", tabs: [t("Channels", "channels"), t("Direct Messages", "direct-messages"), t("Announcements", "announcements")] },
-  { key: "mailbox", label: "Mailbox", short: "Mailbox", icon: "mail", area: "Work", tabs: [t("Inbox", "inbox"), t("Sent", "sent"), t("Drafts", "drafts"), t("Archive", "archive"), t("Spam", "spam"), t("Trash", "trash")] },
+  { key: "mailbox", label: "Mailbox", short: "Mailbox", icon: "mail", area: "Work", tabs: [t("Inbox", "inbox"), t("Sent", "sent"), t("Drafts", "drafts"), t("Archive", "archive"), t("Spam", "spam"), t("Trash", "trash"), t("Signature", "signature")] },
   {
     key: "people", label: "People", short: "People", icon: "users", area: "People",
     tabs: [t("Employees", "employees"), t("Organogram", "organogram"), t("Attendance", "attendance"), t("Leave", "leave"), t("Devices", "devices"), t("Worksites", "worksites")],

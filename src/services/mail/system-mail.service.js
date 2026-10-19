@@ -33,7 +33,9 @@
  *
  * Rendering is the same engine as documents (shared/documents/render.js): escaped values,
  * house formats, the subject a template too, inside templates/email/layout.html. A plain
- * text part is derived from the HTML for clients that want one.
+ * text part is derived from the HTML for clients that want one. The header carries the White
+ * Logo from Settings · Organisation when there is one, sent inside the message (cid:) so a
+ * reader sees it without loading anything; otherwise the company's name.
  */
 const nodemailer = require("nodemailer");
 const { config } = require("../../config/env");
@@ -118,27 +120,40 @@ function textOf(html) {
     .trim();
 }
 
+/** The content id of the header's logo inside a message. */
+const LOGO_CID = "brand-logo@mycityapp.io";
+
 /**
  * Render a template to { subject, html, text } without sending (preview in Settings, tests).
  * @param {{query: Function}} db
  * @param {string} key
  * @param {object} data
- * @param {{recipient?: object, org?: object}} [ctx]
+ * @param {{recipient?: object, org?: object, inline?: boolean}} [ctx]
+ *   inline  the header's logo as a part of the message (`inline` lists it), not a data: URL
  */
 async function renderEmail(
   db,
   key,
   data,
-  { recipient = null, org = null } = {},
+  { recipient = null, org = null, inline = false } = {},
 ) {
   const checked = variables.parseData("email", key, data);
   const t = await templates.current(db, "email", key);
   const staging = config.APP_ENV === "staging";
   const profile =
     org || (await require("../../shared/documents/generate").orgProfile(db));
+  const white = profile.logo_white || null;
   const values = {
     ...checked,
-    org: profile,
+    org: {
+      ...profile,
+      display_name: profile.display_name || profile.name || "MyCity App",
+      logo_white: white && {
+        src: inline ? `cid:${LOGO_CID}` : white.data,
+        width: white.width,
+        height: white.height,
+      },
+    },
     recipient,
     staging,
     today: require("../../shared/time/lagos").today(),
@@ -158,6 +173,10 @@ async function renderEmail(
     html,
     text: textOf(html),
     template_version: t.version,
+    inline:
+      inline && white
+        ? [{ filename: "logo.png", content: white.buffer, contentType: "image/png", cid: LOGO_CID }]
+        : [],
   };
 }
 
@@ -229,6 +248,7 @@ async function send(msg) {
     });
   const rendered = await renderEmail(db, msg.template, msg.data || {}, {
     recipient,
+    inline: true,
   });
   if (config.SMTP_HOST) {
     const slot = await pace.reserve(to.length + (cc ? cc.length : 0));
@@ -242,7 +262,7 @@ async function send(msg) {
     subject: rendered.subject,
     html: rendered.html,
     text: rendered.text,
-    attachments: await attachmentsOf(db, msg.attachments),
+    attachments: [...rendered.inline, ...(await attachmentsOf(db, msg.attachments))],
     headers: {
       "X-MyCity-Template": `${msg.template}@${rendered.template_version}`,
       "Auto-Submitted": "auto-generated",

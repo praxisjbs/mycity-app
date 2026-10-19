@@ -136,7 +136,12 @@ and system channels, delivered pointer, the wider message kinds, transcripts, po
 `announcement_read` and the announcement's message, audience size and reminder · `1120` mailbox:
 connection status and errors, folder kinds and sync cursor, thread keys, the reader's message
 fields, `mail_draft` and `mail_send_queue` · `1125` `mail_image_trust` (the senders whose web images a
-mailbox owner always shows) · `1130` an announcement can be `cancelled` · `1140` each
+mailbox owner always shows) · `1127` email signatures: `mail_signature` (a person's office line and
+their Show Mobile and WhatsApp switches; the mobile stays `employee.phone`) and
+`mail_signature_config` (the company's app and social links, the confidentiality note and what
+shows, one row at most); the baked signature rides in `mail_send_queue.payload` and its pictures
+are vault documents (`mail_signature_image`) · `1129` reference data: the `mailbox.signature`
+capability for System Administrator and Implementation · `1130` an announcement can be `cancelled` · `1140` each
 member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and

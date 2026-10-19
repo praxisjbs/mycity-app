@@ -25,6 +25,8 @@ const { AppError } = require("../../shared/errors");
 const numbering = require("../../shared/numbering/numbering");
 const { SCHEMES, DOC_TYPES, validateScheme } = require("../../shared/numbering/schemes");
 const lagos = require("../../shared/time/lagos");
+const vault = require("../../shared/documents/vault");
+const organisationProfile = require("../../shared/organisation/profile");
 const workingWeek = require("../../shared/time/working-week");
 const access = require("../access/access.service");
 const policy = require("../identity/identity.session-policy");
@@ -48,31 +50,91 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
  * Organisation
  * ------------------------------------------------------------------ */
 
-const PROFILE_FIELDS = Object.freeze([
-  "legal_name",
-  "trading_name",
-  "registration_number",
-  "tax_id",
-  "address",
-  "phone",
-  "email",
-  "website",
-]);
-const keyOf = (field) => `organisation.${field}`;
+const PROFILE_FIELDS = organisationProfile.FIELDS;
+const { keyOf, BRAND } = organisationProfile;
 
 async function profileOf(db) {
-  const stored = await repo.settingsByKey(db, PROFILE_FIELDS.map(keyOf));
+  const all = await organisationProfile.readProfile(db);
+  return Object.fromEntries(PROFILE_FIELDS.map((f) => [f, all[f]]));
+}
+
+/** What an upload answers with, and each brand file on the profile. */
+const refOf = (doc) => ({
+  document_id: doc.document_id,
+  file_name: doc.original_name || doc.title || "upload",
+  size_bytes: Number(doc.bytes) || 0,
+  mime_type: doc.mime,
+});
+
+/** The three brand files (foundation.md §6.11), each a DocumentRef or null. */
+async function brandOf(db) {
+  const all = await organisationProfile.readProfile(db);
   const out = {};
-  for (const f of PROFILE_FIELDS) {
-    const v = stored[keyOf(f)];
-    out[f] = typeof v === "string" && v ? v : null;
+  for (const [slot, field] of Object.entries(BRAND)) {
+    const doc = all[field] ? await vault.get(db, all[field]) : null;
+    out[slot] = doc ? refOf(doc) : null;
   }
   return out;
 }
 
 /** GET /settings/organisation */
 async function organisation() {
-  return { ...(await profileOf(pool)), currency: "NGN", time_zone: "Africa/Lagos" };
+  return {
+    ...(await profileOf(pool)),
+    ...(await brandOf(pool)),
+    currency: "NGN",
+    time_zone: "Africa/Lagos",
+  };
+}
+
+/**
+ * POST /settings/organisation/brand/:slot: the file becomes that brand file at once. The old
+ * document stays in the vault, as every replaced file does; the next letter, system mail and
+ * signature use the new one.
+ */
+async function uploadBrand(slot, file, actor) {
+  if (!file) throw new AppError("FILE_REQUIRED", "Choose a file to upload", 422, { file: ["Choose a file"] });
+  return tx(async (client) => {
+    const field = BRAND[slot];
+    const before = (await organisationProfile.readProfile(client))[field];
+    const doc = await vault.store(client, {
+      file,
+      purpose: "brand",
+      doc_type: "brand_image",
+      entity: { type: "brand", id: slot },
+      title: slot,
+      actor,
+    });
+    await repo.putSetting(client, keyOf(field), doc.document_id, actor.user_id);
+    await emit(client, {
+      key: EVENTS.SETTINGS_CHANGED,
+      entity: { type: "setting", id: "organisation" },
+      actor,
+      before: { [field]: before },
+      after: { [field]: doc.document_id },
+      payload: { area: "organisation", brand: slot },
+    });
+    return refOf(doc);
+  });
+}
+
+/** DELETE /settings/organisation/brand/:slot: back to the drawn pin and the company's name. */
+async function removeBrand(slot, actor) {
+  await tx(async (client) => {
+    const field = BRAND[slot];
+    const before = (await organisationProfile.readProfile(client))[field];
+    if (!before) return;
+    await repo.putSetting(client, keyOf(field), null, actor.user_id);
+    await emit(client, {
+      key: EVENTS.SETTINGS_CHANGED,
+      entity: { type: "setting", id: "organisation" },
+      actor,
+      before: { [field]: before },
+      after: { [field]: null },
+      payload: { area: "organisation", brand: slot },
+    });
+  });
+  return organisation();
 }
 
 /** PATCH /settings/organisation: the fields sent, each set or cleared. */
@@ -412,6 +474,8 @@ async function failedSignIns(query) {
 module.exports = {
   organisation,
   updateOrganisation,
+  uploadBrand,
+  removeBrand,
   week,
   saveWeek,
   holidays,

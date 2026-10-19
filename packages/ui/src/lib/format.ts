@@ -157,3 +157,19 @@ export function formatBytes(bytes: number | null | undefined): string {
 
 /** Plural with count: plural(3, "employee") → "3 employees". */
 export const plural = (n: number, one: string, many = `${one}s`) => `${formatCount(n)} ${n === 1 ? one : many}`;
+
+const NIGERIAN = /^\+234(\d{3})(\d{3})(\d{4})$/;
+
+/** A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. */
+export function formatPhone(e164: string | null | undefined): string {
+  const v = (e164 ?? "").trim();
+  const ng = NIGERIAN.exec(v);
+  return ng ? `+234 ${ng[1]} ${ng[2]} ${ng[3]}` : v;
+}
+
+/** A stored number as a person types it at home, for a field to start from: "0803 123 4567". */
+export function formatPhoneLocal(e164: string | null | undefined): string {
+  const v = (e164 ?? "").trim();
+  const ng = NIGERIAN.exec(v);
+  return ng ? `0${ng[1]} ${ng[2]} ${ng[3]}` : v;
+}

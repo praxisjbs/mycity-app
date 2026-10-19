@@ -36,7 +36,7 @@ const {
 } = require("./lib/changes");
 
 const FILE = "docs/PROGRESS.md";
-const SCREENS = 93;
+const SCREENS = 94;
 const STATUSES = [
   "Not started",
   "In progress",

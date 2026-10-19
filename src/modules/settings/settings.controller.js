@@ -8,6 +8,7 @@
 const { ok, created, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { withActor } = require("../../shared/events/emit");
+const { readUpload } = require("../../middleware/upload");
 const access = require("../access/access.service");
 const sessions = require("../security/security.sessions");
 const service = require("./settings.service");
@@ -19,6 +20,10 @@ module.exports = {
   organisation: async (_req, res) => ok(res, await service.organisation()),
   updateOrganisation: async (req, res) =>
     ok(res, await service.updateOrganisation(req.validated.body, withActor(req))),
+  uploadBrand: async (req, res) =>
+    created(res, await service.uploadBrand(req.validated.params.slot, readUpload(req), withActor(req))),
+  removeBrand: async (req, res) =>
+    ok(res, await service.removeBrand(req.validated.params.slot, withActor(req))),
   week: async (_req, res) => ok(res, await service.week()),
   saveWeek: async (req, res) => ok(res, await service.saveWeek(req.validated.body, withActor(req))),
   holidays: async (req, res) => sendPaged(res, await service.holidays(req.validated.query)),
