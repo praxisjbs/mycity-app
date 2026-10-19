@@ -148,6 +148,8 @@ A task is not finished until:
 - Branch `m<N>/<short-name>`. PR titles in Conventional Commits form. One approving review, not
   the author. Merges to `main` deploy to staging; production waits for a person's approval.
 - Do not commit, push or open a PR unless asked.
+- Open a PR as a draft while the work goes on: a draft runs no CI on GitHub, so `npm run ci` runs
+  locally; mark it ready for review once that is green (BACKEND_GUIDE §8.4).
 - Ask only when a decision genuinely blocks the work; otherwise state the assumption you made.
 - When you do ask a question or surface a decision, use the AskUserQuestion tool, not prose, unless
   the person asks for the answer in chat or requests Markdown. Always include a recommendation: put
