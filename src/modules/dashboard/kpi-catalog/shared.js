@@ -49,6 +49,7 @@ const c = require("@mycity/contract");
 const catalog = require("../../../shared/access/access.catalog");
 const fieldMask = require("../../../shared/rbac/field-mask");
 const routeMap = require("../../../shared/route-map");
+const { personJson } = require("../../../shared/db/person");
 
 /** A row of cards holds four. A card that drops out shrinks the row; nothing is put in its place. */
 const MAX_CARDS = c.dashboard.HOME_KPI_MAX;
@@ -199,13 +200,8 @@ function assertEntry(entry) {
  * The records behind a card: rows and cells (schemas/dashboard.js)
  * ------------------------------------------------------------------ */
 
-/** A person as a cell wants them, from a row whose person was read with PERSON(). */
-const PERSON = (e, d) =>
-  `CASE WHEN ${e}.employee_id IS NULL THEN NULL ELSE json_build_object(
-     'employee_id', ${e}.employee_id,
-     'display_name', btrim(${e}.first_name || ' ' || ${e}.last_name),
-     'job_title', ${e}.job_title,
-     'department', ${d}.name) END`;
+/** A person as a cell wants them, with their photo (shared/db/person.js). */
+const PERSON = (e, d) => personJson(e, d);
 
 const iso = (at) => (at instanceof Date ? at.toISOString() : String(at));
 

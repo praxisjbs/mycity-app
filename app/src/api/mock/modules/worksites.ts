@@ -62,6 +62,7 @@ const employeeRow = (p: MockPerson): WorksiteEmployee => ({
   department: p.department,
   work_pattern: p.work_pattern,
   worksite_id: ASSIGNED.get(p.user_key) ?? null,
+  photo_url: null,
 });
 
 function check(b: Record<string, unknown>, partial: boolean) {

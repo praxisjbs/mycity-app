@@ -2,6 +2,7 @@ import attendance from "@mycity/contract/schemas/attendance.js";
 import type { AttendanceEvent, AttendanceException, ExceptionDecision, RegisterRow, RegisterStatus } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
+import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
@@ -94,6 +95,7 @@ function useRecordLink(id: string | null | undefined, openDay: (employeeId: stri
 
 function Register({ date, status, setStatus, openDay }: { date: string; status: RegisterStatus | "all"; setStatus: (s: RegisterStatus | "all") => void; openDay: (employeeId: string, name: string, date: string) => void }) {
   const list = usePaged("GET /api/v1/attendance/register", { filters: { date, ...(status !== "all" && { status }) } });
+  const photo = usePhotos(list.rows.map((r) => r.employee.photo_url));
   const open = (r: RegisterRow) => openDay(r.employee.employee_id, r.employee.display_name, r.date);
   return (
     <>
@@ -109,7 +111,7 @@ function Register({ date, status, setStatus, openDay }: { date: string; status: 
         nounPlural="people"
         empty={{ icon: "srch", title: "Nobody Matches", text: "Choose All to see everyone." }}
         columns={[
-          { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} /> },
+          { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} src={photo(r.employee.photo_url)} /> },
           { key: "s", label: "Status", render: (r) => <Pill tone={REGISTER_STATUS[r.status].tone}>{r.status === "late" ? `Late ${lateBy(r.late_minutes)}` : REGISTER_STATUS[r.status].text}</Pill> },
           { key: "clock_in_at", label: "Clock In", sortable: true, render: (r) => (r.clock_in_at ? formatTime(r.clock_in_at) : null) },
           { key: "o", label: "Clock Out", render: (r) => (r.clock_out_at ? formatTime(r.clock_out_at) : null) },
@@ -169,7 +171,7 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
           rowKey={(x) => x.attendance_exception_id}
           onRowClick={decideOne}
           noun="exception"
-          columns={exceptionColumns(false)}
+          columns={exceptionColumns(null)}
         />
       )}
     </>
@@ -188,8 +190,9 @@ const evidenceColumns = [
   { key: "s", label: "Source", desktop: true, render: (e: AttendanceEvent) => (e.source === "admin" ? `Added by ${e.recorded_by_name ?? "People"}` : "Clock") },
 ];
 
-const exceptionColumns = (withPerson: boolean) => [
-  ...(withPerson ? [{ key: "e", label: "Employee", render: (x: AttendanceException) => <Who name={x.employee.display_name} sub={x.employee.department} /> }] : []),
+/** An exception's columns; `photo` (from usePhotos) puts the person's face beside their name. */
+const exceptionColumns = (photo: ((url: string | null) => string | null) | null) => [
+  ...(photo ? [{ key: "e", label: "Employee", render: (x: AttendanceException) => <Who name={x.employee.display_name} sub={x.employee.department} src={photo(x.employee.photo_url)} /> }] : []),
   { key: "t", label: "Exception", render: (x: AttendanceException) => EXCEPTION_TYPE[x.exception_type] },
   { key: "w", label: "Date", render: (x: AttendanceException) => formatDate(x.work_date) },
   { key: "d", label: "Detail", desktop: true, render: (x: AttendanceException) => x.detail },
@@ -206,6 +209,7 @@ function Exceptions({ date }: { date: string }) {
   const modal = useModal();
   const [status, setStatus] = useState<"open" | "resolved" | "day">("open");
   const list = usePaged("GET /api/v1/attendance/exceptions", { filters: status === "day" ? { date } : { status } });
+  const photo = usePhotos(list.rows.map((x) => x.employee.photo_url));
   const open = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
   return (
     <>
@@ -218,7 +222,7 @@ function Exceptions({ date }: { date: string }) {
         onRowClick={open}
         noun="exception"
         empty={{ icon: "check", title: "Nothing Waiting", text: "Every exception here is decided." }}
-        columns={exceptionColumns(true)}
+        columns={exceptionColumns(photo)}
       />
     </>
   );

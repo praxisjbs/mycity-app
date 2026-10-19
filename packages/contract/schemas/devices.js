@@ -79,7 +79,7 @@ const TABLES = {
   Device: {
     table: "attendance_device",
     virtual: {
-      employee: "the owner, from employee and department",
+      employee: "the owner, from employee and department, with their photo_url",
       platform: "known_device.platform",
       removed_by_name: "who removed it, from employee",
     },

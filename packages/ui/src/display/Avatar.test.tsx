@@ -13,7 +13,7 @@ describe("Avatar", () => {
   });
 
   it("maps a merged pixel size to the nearest named size", () => {
-    const sizes: Array<[number, string]> = [[21, "size-5"], [27, "size-7"], [32, "size-8"], [42, "size-10"], [56, "size-12"]];
+    const sizes: Array<[number, string]> = [[21, "size-5"], [27, "size-7"], [32, "size-8"], [42, "size-10"], [56, "size-12"], [72, "size-18"]];
     for (const [px, cls] of sizes) {
       const { container, unmount } = render(<Avatar name="Tobi Adeyemi" size={px} />);
       expect(container.firstElementChild?.className).toContain(cls);

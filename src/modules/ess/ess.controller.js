@@ -4,7 +4,7 @@
  * Employee Self-Service: the HTTP edge. Every handler reads the employee from
  * the session (`req.user`), never from the request.
  */
-const { ok, created } = require("../../shared/http/respond");
+const { ok, created, accepted } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { withActor } = require("../../shared/events/emit");
 const { readUpload } = require("../../middleware/upload");
@@ -33,6 +33,13 @@ module.exports = {
 
   updateProfile: async (req, res) =>
     ok(res, await service.profile.update(withActor(req), req.validated.body)),
+
+  setPhoto: async (req, res) =>
+    ok(res, await service.profile.setPhoto(withActor(req), readUpload(req))),
+
+  removePhoto: async (req, res) => ok(res, await service.profile.removePhoto(withActor(req))),
+
+  exportData: async (req, res) => accepted(res, await service.data.requestOwn(withActor(req))),
 
   profileHistory: async (req, res) =>
     sendPaged(res, await service.profile.history(req.user, req.validated.query)),

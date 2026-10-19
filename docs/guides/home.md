@@ -815,3 +815,4 @@ rows, and nothing in the code says where anything came from.
 - 19/10/2026 · TB · No change to Home. The reports unit test reads Home's outbox handlers sorted,
   because the organogram's Download PDF now registers on the same document events
   (`docs/guides/organogram.md` §7) and the order they load in is not Home's to fix.
+- 19/10/2026 · AJ · Team (the roster and Attendance This Month) and a card's records show each person's photo: `HomeTeamRow.employee`, `HomeTeamAttendanceRow.employee` and a person cell are `PersonRef` with `photo_url` (the roster reads it, `kpi-catalog/shared.js` `PERSON` is now `shared/db/person.js`); initials when there is none. TB to review.

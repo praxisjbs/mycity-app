@@ -651,7 +651,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
@@ -666,6 +666,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · AJ · My Profile (#8): photos everywhere a person appears and Download My Data. `photo_url` on `PersonRef` and the register, org chart and worksite rows (one SQL helper, `shared/db/person.js`, 192 px for lists), shown through `Avatar`/`Who` on People · Employees, Leave and Attendance, Devices, Worksites, the Organogram and Org Chart, Community, Home Team and a card's records and the pickers (`usePhotos`, fetched once). Download My Data on My Profile (`POST /ess/profile/export`) and the CEO's Download Their Data on the employee record (`POST /employees/:id/data-export`): one workbook (cover and ten sheets) built in the worker, restricted in the vault, emailed, removed after 7 days, once a day. Left: payslips join it in M6; the employee record header and the org chart PDF still show initials.
+- 19/10/2026 · AJ · My Profile (#8): the photo. Profile Photo uploads through the upload engine as an `avatar` (`POST /ess/profile/photo`, Remove Photo `DELETE`), `employee.photo_document_id` (1170) points at it, every colleague may read it, and My Profile and the shell avatar show it. Community and People lists still show initials until their rows carry `photo_url`. Left: Download My Data (needs the lead's decisions on what it holds, its format and delivery).
 - 19/10/2026 · TB · ESS · Org Chart (#91), TB's four decisions on the phone (`docs/guides/organogram.md`
   §8, §10.2): a Focus or Everyone switch, opening on Focus at the person looking, with the path
   from the top, their team, Dotted Line and Same Manager; Everyone opens the way down to them and

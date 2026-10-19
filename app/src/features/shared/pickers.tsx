@@ -1,3 +1,4 @@
+import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
@@ -23,14 +24,17 @@ export function EmployeePicker({
   placeholder?: string;
 }) {
   const list = usePaged("GET /api/v1/employees");
+  const photos = usePhotos(list.rows.map((row) => row.photo_url));
   return (
     <PersonPicker
+      photo={(person) => photos(person.photo_url)}
       list={{
         rows: list.rows.map((row) => ({
           employee_id: row.employee_id,
           display_name: row.display_name,
           job_title: row.job_title,
           department: row.department,
+          photo_url: row.photo_url,
         })),
         page: list.page,
         loading: list.loading,
@@ -52,8 +56,10 @@ export function EmployeePicker({
  */
 export function ColleaguePicker({ value, onChange, multiple, placeholder, withSelf }: { value: PersonRef[]; onChange: (value: PersonRef[]) => void; multiple?: boolean; placeholder?: string; withSelf?: boolean }) {
   const list = usePaged("GET /api/v1/community/people", { filters: withSelf ? { with_self: true } : {} });
+  const photos = usePhotos(list.rows.map((row) => row.photo_url));
   return (
     <PersonPicker
+      photo={(person) => photos(person.photo_url)}
       list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
       value={value}
       onChange={onChange}

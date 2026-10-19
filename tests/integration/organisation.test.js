@@ -240,6 +240,7 @@ describeDb("the organisation module against the real migrations", () => {
       const res = await asManager()(request(app).get("/api/v1/employees"));
       expect(res.status).toBe(200);
       expect(res.body.data.map((r) => r.display_name).sort()).toEqual(["Chidi Nwankwo", "Ngozi Umeh"]);
+      expect(res.body.data.map((r) => r.photo_url)).toEqual([null, null]);
     });
 
     test("the counts above it are computed, and say what needs a decision", async () => {
@@ -619,6 +620,9 @@ describeDb("the organisation module against the real migrations", () => {
       expect(ngozi.manager_node_id).toBe(seat.node_id);
       expect(ngozi.dotted_line_to).toBe("Chidi Nwankwo");
       expect(ngozi.meta).toBeNull();
+      // Nobody here has a photo: a person shows initials, and a seat never has one.
+      expect(ngozi.photo_url).toBeNull();
+      expect(seat.photo_url).toBeNull();
       expect(res.body.open).toBe(1);
       expect(res.body.filled).toBeGreaterThan(0);
     });

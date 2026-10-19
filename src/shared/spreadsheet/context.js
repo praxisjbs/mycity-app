@@ -31,6 +31,8 @@ const BRAND = Object.freeze({
  * @param {{full_name?: string, name?: string}} [opts.actor]  req.user, or a job's actor
  * @param {string} [opts.title]
  * @param {object} [opts.filters]   shown on the cover as "key = value"
+ * @param {Array<[string, string]>} [opts.lines]  more cover lines, label then value, after the
+ *        filters: what each sheet holds, a line the reader must see (Download My Data)
  * @param {Date|string} [opts.generatedAt]
  * @param {{name?: string, address?: string, phone?: string, email?: string, website?: string}} [opts.org]
  */
@@ -38,6 +40,7 @@ function workbookContext({
   actor = null,
   title = null,
   filters = null,
+  lines = [],
   generatedAt = new Date(),
   org = null,
 } = {}) {
@@ -50,6 +53,7 @@ function workbookContext({
     actor: actorName ? { name: actorName } : null,
     title,
     filters,
+    lines: Array.isArray(lines) ? lines : [],
     generatedAt,
   };
 }

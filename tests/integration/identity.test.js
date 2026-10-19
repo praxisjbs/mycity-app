@@ -599,6 +599,8 @@ describeDb("identity against the real migrations", () => {
         "left_on",
         "line_manager_id",
         "line_manager_seat_id",
+        /* 1170: no photo until the person adds one on My Profile. */
+        "photo_document_id",
         "worksite_id",
       ]);
       const row = await one(

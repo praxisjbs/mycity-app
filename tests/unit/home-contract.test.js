@@ -81,7 +81,7 @@ describe("KPI cards", () => {
       requests: [
         {
           leave_request_id: OTHER,
-          employee: { employee_id: ID, display_name: "Ngozi Umeh", job_title: "Analyst", department: "Delivery" },
+          employee: { employee_id: ID, display_name: "Ngozi Umeh", job_title: "Analyst", department: "Delivery", photo_url: null },
           leave_type_id: ID,
           leave_type_name: "Annual",
           starts_on: "2026-12-22",

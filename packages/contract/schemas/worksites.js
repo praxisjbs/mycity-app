@@ -80,6 +80,8 @@ const WorksiteEmployee = z
     department: z.string().nullable(),
     work_pattern: WorkPattern,
     worksite_id: uuid.nullable(),
+    /** Their photo at the list size; null shows their initials. */
+    photo_url: z.string().nullable(),
   })
   .strict();
 const WorksiteEmployeePage = Paged(WorksiteEmployee);
@@ -102,6 +104,7 @@ const TABLES = {
     virtual: {
       display_name: "employee first and last name",
       department: "department.name",
+      photo_url: "the list size of photo_document_id, as an API path (shared/db/person.js)",
     },
   },
   WorksiteEmployeePage: { table: null, reason: "a page of the employees assigned to a worksite" },

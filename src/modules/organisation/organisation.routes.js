@@ -11,7 +11,7 @@
 const express = require("express");
 const c = require("@mycity/contract");
 const { route } = require("../../http/route");
-const { requirePermission } = require("../../middleware/rbac");
+const { requirePermission, requireCeo } = require("../../middleware/rbac");
 const controller = require("./organisation.controller");
 
 const router = express.Router();
@@ -55,6 +55,12 @@ route(router, "patch", "/employees/:id/line-manager",
 route(router, "get", "/employees/:id/history",
   { query: c.common.PageQuery, response: c.organisation.EmployeeHistoryPage, summary: "What has been done to a record" },
   view, controller.history);
+
+/* Download Their Data: the CEO only, one person's data as Download My Data builds it (docs/guides/ess.md §5). */
+route(router, "post", "/employees/:id/data-export",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: c.organisation.EmployeeDataExportQueued,
+    summary: "Email the CEO a copy of one person's data" },
+  view, requireCeo(), controller.requestDataExport);
 
 route(router, "get", "/departments",
   { query: c.organisation.DepartmentListQuery, response: c.organisation.DepartmentPage, summary: "Departments" },

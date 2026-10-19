@@ -486,6 +486,8 @@ describeDb("Staff Community against the real migrations", () => {
     const everyone = await as("bola").get("/community/people");
     expect(everyone.body.data.map((p) => p.display_name)).not.toContain("Bola Ade");
     expect(everyone.body.page.total).toBe(2);
+    // Without a photo a colleague carries photo_url null, and the picker shows initials.
+    expect(everyone.body.data.every((p) => p.photo_url === null)).toBe(true);
 
     const card = await as("bola").get(`/community/people/${people.tunde.employee.employee_id}/card`);
     expect(card.status).toBe(200);

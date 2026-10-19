@@ -120,13 +120,17 @@ const EmployeeStatus = z.enum(EMPLOYEE_STATUSES);
 const LOGIN_STATES = ["none", "invited", "active", "suspended"];
 const LoginState = z.enum(LOGIN_STATES);
 
-/** A person, as a list or a card names them. */
+/**
+ * A person, as a list or a card names them. `photo_url` is their photo's API path at the
+ * list size (src/shared/db/person.js), fetched with the session; null shows their initials.
+ */
 const PersonRef = z
   .object({
     employee_id: uuid,
     display_name: z.string(),
     job_title: z.string().nullable(),
     department: z.string().nullable(),
+    photo_url: z.string().nullable(),
   })
   .strict();
 
@@ -174,6 +178,8 @@ const EmployeeRow = z
     /** Probation: the register shows On Probation until the day it is confirmed. */
     confirmation_due_on: isoDate.nullable(),
     confirmed_on: isoDate.nullable(),
+    /** Their photo at the list size; null shows their initials. */
+    photo_url: z.string().nullable(),
   })
   .strict();
 
@@ -460,6 +466,8 @@ const OrgNode = z
     vacant: z.boolean(),
     /** Builder only: the since and arrangement line. */
     meta: z.string().nullable(),
+    /** The person's photo at the list size; null for a vacant seat or someone with none. */
+    photo_url: z.string().nullable(),
   })
   .strict();
 
@@ -514,6 +522,13 @@ const OrgChartDocumentVars = z
     open: z.number().int(),
   })
   .strict();
+
+/**
+ * POST /employees/:id/data-export, Download Their Data: the CEO only. One person's data as
+ * Download My Data builds it, emailed to the CEO; the person's one a day counts it
+ * (docs/guides/ess.md §5, §6).
+ */
+const EmployeeDataExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
 
 /** The variables of templates/email/org-chart-export.html: when the attached chart was drawn. */
 const OrgChartExportEmailVars = z.object({ as_at: z.string() }).strict();
@@ -606,6 +621,7 @@ const TABLES = {
       department: "the department's name, joined from department",
       line_manager: "the manager above them: a person or a vacant seat, from line_manager_id or line_manager_seat_id",
       login: "whether they have a login and its state, from app_user",
+      photo_url: "the list size of photo_document_id, as an API path (shared/db/person.js)",
     },
   },
   EmployeePage: { table: null, reason: "a page of the register" },
@@ -646,7 +662,7 @@ const TABLES = {
   DepartmentUpdate: { table: "department" },
   PersonRef: {
     table: null,
-    reason: "a person as a list or a card names them, from employee",
+    reason: "a person as a list or a card names them, from employee, with the list size of photo_document_id as photo_url",
     virtual: {},
   },
   ManagerRef: {
@@ -668,13 +684,14 @@ const TABLES = {
   OrgChartQuery: { table: null, reason: "which view of the tree is asked for" },
   OrgNode: {
     table: null,
-    reason: "one node of the reporting tree: an employee or a vacant seat, flattened for the chart",
+    reason: "one node of the reporting tree: an employee or a vacant seat, flattened for the chart, with the employee's photo_url",
   },
   OrgChartTree: { table: null, reason: "the whole bounded tree and its counts" },
   OrgChartExportRequest: { table: null, reason: "which view of the tree Download PDF draws" },
   OrgChartExportQueued: { table: null, reason: "that the PDF was queued, and where it will be emailed" },
   OrgChartDocumentVars: { table: null, reason: "the variables of templates/documents/org-chart.html, the chart laid out" },
   OrgChartExportEmailVars: { table: null, reason: "the variables of templates/email/org-chart-export.html, not a row" },
+  EmployeeDataExportQueued: { table: null, reason: "that Download Their Data was queued, and the CEO's email it goes to" },
   EmployeeImportRow: {
     table: "employee",
     virtual: {
@@ -743,6 +760,7 @@ module.exports = {
   OrgChartExportQueued,
   OrgChartDocumentVars,
   OrgChartExportEmailVars,
+  EmployeeDataExportQueued,
   EmployeeImportRow,
   AdminBootstrap,
 };

@@ -415,7 +415,7 @@ describeDb("Home · Team against the real migrations", () => {
       const page = d.HomeTeamPage.parse(wire(await team.roster(ops, { page: 1, q: "danjuma" }, { now: NOW })));
       expect(page.data).toEqual([
         {
-          employee: { employee_id: ids.staff, display_name: "Musa Danjuma", job_title: "Field Officer", department: "Programmes" },
+          employee: { employee_id: ids.staff, display_name: "Musa Danjuma", job_title: "Field Officer", department: "Programmes", photo_url: null },
           department_id: departments.Programmes,
           status: "late",
           clock_in_at: at(TODAY, "09:12").toISOString(),

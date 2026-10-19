@@ -74,6 +74,7 @@ const personOf = (r) => ({
   display_name: display(r.first_name, r.last_name),
   job_title: r.job_title,
   department: r.department,
+  photo_url: r.photo_url ?? null,
 });
 
 /**

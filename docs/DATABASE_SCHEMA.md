@@ -154,7 +154,8 @@ capabilities `home.team`, `home.reports` and `alerts.manage` with their role gra
 `alerts.clear` for Heads of Department and Managers), the `report_run` numbering scheme
 (`RPT-0001`), and `1099`'s three alert thresholds removed (A26, §5) · `1200` leave requests as the
 leave module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list
-indexes) · `1290` the leave status code list (Cancelled added, Draft switched off) and the four
+indexes) · `1170` `employee.photo_document_id`, the photo an employee uses (a vault document;
+cleared if it is deleted) · `1290` the leave status code list (Cancelled added, Draft switched off) and the four
 leave types · `1300` attendance as the clock writes it: the policy's `geofence_mode`,
 `device_mode` and `max_accuracy_m`; `attendance_device` (a person's clock-in devices on
 `known_device`, observed, registered or removed); the event's `work_date`, `device_at`, device,

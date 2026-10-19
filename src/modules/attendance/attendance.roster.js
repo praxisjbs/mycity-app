@@ -57,6 +57,7 @@
 const { AppError } = require("../../shared/errors");
 const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+const { photoUrlSql } = require("../../shared/db/person");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const rules = require("./attendance.rules");
@@ -236,7 +237,7 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
            CASE WHEN f.clock_in_at IS NOT NULL AND f.work_pattern <> 'remote' THEN f.clock_in_worksite END AS worksite
       FROM (
         SELECT e.employee_id, e.first_name, e.last_name, e.job_title, e.department_id,
-               d.name AS department, e.work_pattern, ${working} AS working_day,
+               d.name AS department, ${photoUrlSql("e")} AS photo_url, e.work_pattern, ${working} AS working_day,
                ad.status AS day_status, ${grantedLeave("e.employee_id", date)} AS on_leave,
                ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
                COALESCE(ad.late_minutes, 0) AS late_minutes, w.name AS clock_in_worksite,
@@ -356,7 +357,7 @@ async function page(client, filters, scope, query = {}) {
   return pageQuery(
     client,
     `SELECT r.employee_id, r.first_name, r.last_name, r.job_title, r.department_id, r.department,
-            r.work_pattern, r.status, r.clock_in_at, r.clock_out_at, r.late_minutes,
+            r.photo_url, r.work_pattern, r.status, r.clock_in_at, r.clock_out_at, r.late_minutes,
             r.worksite, r.no_clock_out_yesterday, ${FLAGGED} AS flagged, ${TOTAL_COL}
        FROM (${roster}) r
       WHERE (${wanted}::text IS NULL OR r.status = ${wanted}::text)
@@ -388,7 +389,7 @@ const MONTH_SORTS = {
  * @param {{scope: string, scope_ids: string[]|null}} scope
  * @param {{page?: number, sort?: {field: string, dir: string}}} query  the validated list query
  * @returns {Promise<{data: Array<{employee_id: string, first_name: string, last_name: string,
- *   job_title: string|null, department_id: string, department: string|null, expected: number,
+ *   job_title: string|null, department_id: string, department: string|null, photo_url: string|null, expected: number,
  *   on_time: number, late: number, absent: number, on_leave: number}>, page: object}>}
  */
 async function month(client, filters, scope, query = {}) {
@@ -405,6 +406,7 @@ async function month(client, filters, scope, query = {}) {
     `SELECT m.*, ${TOTAL_COL}
        FROM (
          SELECT e.employee_id, e.first_name, e.last_name, e.job_title, e.department_id, d.name AS department,
+                ${photoUrlSql("e")} AS photo_url,
                 count(*) FILTER (WHERE ad.status IN ('present', 'late'))::int AS days_present,
                 count(*) FILTER (WHERE ad.status = 'late')::int AS late_days,
                 count(*) FILTER (WHERE ad.status = 'absent')::int AS absent_days,
@@ -430,6 +432,7 @@ async function month(client, filters, scope, query = {}) {
       job_title: r.job_title,
       department_id: r.department_id,
       department: r.department,
+      photo_url: r.photo_url,
       ...totalsOf(r),
     })),
     page: result.page,

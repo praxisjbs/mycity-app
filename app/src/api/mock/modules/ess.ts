@@ -1,4 +1,5 @@
-import { at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
+import type { RawResponse } from "../../client";
+import { accepted, at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
 import type { EmployeeHistoryEntry, EssProfile } from "@mycity/contract/contract.gen.ts";
 import { byKey, managerOf } from "../data/people";
 
@@ -45,6 +46,7 @@ function profile(key: string): EssProfile {
     next_of_kin_phone: x.next_of_kin_phone ?? "+2348065542210",
     bank_name: x.bank_name ?? p.bank_name,
     account_last4: (x.account_number ?? p.account_last4).slice(-4),
+    photo_url: null,
     working_week: WEEK,
   };
 }
@@ -217,3 +219,21 @@ route("GET /api/v1/ess/documents/summary", (req) => {
   });
 });
 
+
+/*
+ * Download My Data: once a day for a person, the CEO's Download Their Data counted with their own
+ * (docs/guides/ess.md §6). Nothing is built in the mock; the answer says where it would go.
+ */
+const DATA_ASKED = new Map<string, string>();
+export function askDataExport(employeeId: string, email: string, own: boolean): RawResponse {
+  const today = new Date().toISOString().slice(0, 10);
+  if (DATA_ASKED.get(employeeId) === today)
+    return fail(429, "DATA_EXPORT_LIMIT", own ? "You already asked for your data today. Try again tomorrow." : "A copy of this person's data was already asked for today. Try again tomorrow.");
+  DATA_ASKED.set(employeeId, today);
+  return { ...accepted(), body: { queued: true, email } };
+}
+
+route("POST /api/v1/ess/profile/export", (req) => {
+  const me = byKey(req.user!)!;
+  return askDataExport(me.employee_id, me.work_email, true);
+});

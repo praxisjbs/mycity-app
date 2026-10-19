@@ -564,10 +564,10 @@ const TABLES = {
   HomeKpiDetailPage: { table: null, reason: "a page of the records behind a card" },
   HomeTeamSummary: { table: null, reason: "the Team tab's scope and its cards from the shared attendance roster" },
   HomeTeamQuery: { table: null, reason: "list controls and the Team Roster's filters" },
-  HomeTeamRow: { table: null, reason: "a person's day on the shared attendance roster" },
+  HomeTeamRow: { table: null, reason: "a person's day on the shared attendance roster, the person with their photo_url" },
   HomeTeamPage: { table: null, reason: "a page of the Team Roster" },
   HomeTeamAttendanceQuery: { table: null, reason: "list controls and the department filter of Attendance This Month" },
-  HomeTeamAttendanceRow: { table: null, reason: "a person's month so far, counted from the shared attendance roster" },
+  HomeTeamAttendanceRow: { table: null, reason: "a person's month so far, counted from the shared attendance roster, the person with their photo_url" },
   HomeTeamAttendancePage: { table: null, reason: "a page of Attendance This Month" },
 };
 

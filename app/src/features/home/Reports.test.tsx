@@ -31,7 +31,7 @@ import { awaited, runFormats } from "./Reports";
  * checked on the server before its toast, so a toast is never taken for the change itself.
  */
 
-vi.mock("@/api/download", () => ({ saveFile: vi.fn(), useFileUrl: () => null }));
+vi.mock("@/api/download", () => ({ saveFile: vi.fn(), useFileUrl: () => null, usePhotos: () => () => null, usePhoto: () => null, clearPhotos: vi.fn() }));
 
 expect.extend(axeMatchers);
 installMatchMedia();

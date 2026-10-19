@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { HomeRosterStatus, HomeTeamAttendanceRow, HomeTeamQuery, HomeTeamRow, HomeTeamSummary } from "@mycity/contract/contract.gen.ts";
+import { usePhotos } from "@/api/download";
 import { useApi, usePaged } from "@/api/hooks";
 import type { Me } from "@/api/types/identity";
 import { useAuth, useMe } from "@/auth/AuthProvider";
@@ -121,6 +122,7 @@ export function Team() {
 
   const roster = usePaged("GET /api/v1/home/team", { filters: rosterFilters(chip, department) });
   const month = usePaged("GET /api/v1/home/team/attendance", { filters: department ? { department_id: department } : {} });
+  const photo = usePhotos([...roster.rows, ...month.rows].map((r) => r.employee.photo_url));
 
   const opens: Record<string, boolean> = { attendance: useScreenState("people", "attendance").open, employees: useScreenState("people", "employees").open };
   const openPerson = (row: HomeTeamRow) => {
@@ -131,7 +133,7 @@ export function Team() {
   const filtered = chip !== "everyone" || department !== "" || roster.q !== "";
   const rosterColumns: DataViewColumn<HomeTeamRow>[] = [
     // A phone card has no Department column, so the department goes under the name there.
-    { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.employee.display_name} sub={(phone ? r.employee.department : r.employee.job_title) ?? undefined} /> },
+    { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.employee.display_name} sub={(phone ? r.employee.department : r.employee.job_title) ?? undefined} src={photo(r.employee.photo_url)} /> },
     { key: "department", label: "Department", sortable: true, desktop: true, render: (r) => r.employee.department },
     { key: "status", label: "Status", render: (r) => <Today row={r} /> },
     { key: "clock_in_at", label: "Clock-In", sortable: true, render: (r) => timeOf(r.clock_in_at) },
@@ -174,15 +176,15 @@ export function Team() {
         noun="person"
         nounPlural="people"
         empty={department ? { icon: "srch", title: "Nobody Matches", text: "Try another department." } : { title: "Nobody This Month" }}
-        columns={MONTH_COLUMNS}
+        columns={monthColumns(photo)}
       />
     </>
   );
 }
 
 /** Each person's working days this month so far, by how each went; on a phone, On Leave is left off. */
-const MONTH_COLUMNS: DataViewColumn<HomeTeamAttendanceRow>[] = [
-  { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.employee.display_name} sub={r.employee.department ?? undefined} /> },
+const monthColumns = (photo: (url: string | null) => string | null): DataViewColumn<HomeTeamAttendanceRow>[] => [
+  { key: "display_name", label: "Employee", sortable: true, render: (r) => <Who name={r.employee.display_name} sub={r.employee.department ?? undefined} src={photo(r.employee.photo_url)} /> },
   // Out of the days they were expected in; someone on leave all month has none to count.
   { key: "on_time", label: "On Time", align: "n", sortable: true, render: (r) => (r.expected > 0 ? `${formatCount(r.on_time)} of ${formatCount(r.expected)}` : null) },
   { key: "late", label: "Late", align: "n", render: (r) => formatCount(r.late) },

@@ -13,6 +13,7 @@
  */
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+const { personJson } = require("../../shared/db/person");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -31,11 +32,8 @@ const WORKING_DAY = (dateExpr) => `(
        ELSE extract(isodow FROM ${dateExpr}) <= 5 END
   AND NOT EXISTS (SELECT 1 FROM public_holiday h WHERE h.holiday_date = ${dateExpr}))`;
 
-const PERSON = (alias = "e", dept = "d") => `json_build_object(
-  'employee_id', ${alias}.employee_id,
-  'display_name', btrim(${alias}.first_name || ' ' || ${alias}.last_name),
-  'job_title', ${alias}.job_title,
-  'department', ${dept}.name)`;
+/** A person as the contract's PersonRef, with their photo (shared/db/person.js). */
+const PERSON = (alias = "e", dept = "d") => personJson(alias, dept);
 
 const nameOf = (alias) =>
   `CASE WHEN ${alias}.employee_id IS NULL THEN NULL ELSE btrim(${alias}.first_name || ' ' || ${alias}.last_name) END`;

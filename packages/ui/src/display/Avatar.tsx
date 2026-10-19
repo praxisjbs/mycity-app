@@ -15,8 +15,8 @@ import { useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { initials } from "../lib/format";
 
-/** The named sizes: xs 20 px, sm 28 px (the default), md 32 px, lg 40 px, xl 48 px. */
-export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
+/** The named sizes: xs 20 px, sm 28 px (the default), md 32 px, lg 40 px, xl 48 px, 2xl 72 px (a profile header). */
+export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
 
 /** Whether the person is here: online (green), away (amber), busy (red), offline (grey ring). */
 export type Presence = "online" | "away" | "busy" | "offline";
@@ -27,8 +27,9 @@ const SIZE: Record<AvatarSize, string> = {
   md: "size-8 text-xs",
   lg: "size-10 text-sm",
   xl: "size-12 text-lg",
+  "2xl": "size-18 text-3xl",
 };
-const DOT: Record<AvatarSize, string> = { xs: "size-2", sm: "size-2.5", md: "size-2.5", lg: "size-3", xl: "size-3.5" };
+const DOT: Record<AvatarSize, string> = { xs: "size-2", sm: "size-2.5", md: "size-2.5", lg: "size-3", xl: "size-3.5", "2xl": "size-3.5" };
 const PRESENCE: Record<Presence, string> = { online: "bg-success", away: "bg-warning", busy: "bg-destructive", offline: "bg-muted-foreground" };
 const PRESENCE_WORD: Record<Presence, string> = { online: "Online", away: "Away", busy: "Busy", offline: "Offline" };
 
@@ -39,7 +40,8 @@ function sizeOf(size: AvatarSize | number): AvatarSize {
   if (size <= 29) return "sm";
   if (size <= 35) return "md";
   if (size <= 43) return "lg";
-  return "xl";
+  if (size <= 60) return "xl";
+  return "2xl";
 }
 
 export interface AvatarProps {

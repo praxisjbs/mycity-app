@@ -18,7 +18,7 @@ import {
   type MenuItem,
 } from "@mycity/ui";
 import { useApi } from "@/api/hooks";
-import { useAuth, useMe } from "@/auth/AuthProvider";
+import { useAuth, useMe, useMyPhoto } from "@/auth/AuthProvider";
 import { ClockButton, useClockSync } from "@/features/attendance/ClockButton";
 import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
@@ -141,6 +141,7 @@ function readCollapsed() {
 
 function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: FrameProps) {
   const me = useMe();
+  const photo = useMyPhoto();
   const { navigate } = useRouter();
   const menu = useAccountMenu();
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -162,7 +163,7 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: Fra
           current={mod?.key ?? null}
           collapsed={collapsed}
           onNavigate={navigate}
-          account={{ name: me.display_name, subtitle: me.job_title, photo: me.photo_url, menu }}
+          account={{ name: me.display_name, subtitle: me.job_title, photo, menu }}
           foot={
             <>
               Engineered by{" "}
@@ -215,6 +216,7 @@ function useAccountMenu(): MenuItem[] {
 
 function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }: FrameProps) {
   const me = useMe();
+  const photo = useMyPhoto();
   const { navigate } = useRouter();
   const [more, setMore] = useState(false);
   return (
@@ -233,7 +235,7 @@ function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }:
                 <IconButton icon="srch" label="Search" onClick={openSearch} />
                 <BellButton />
                 <button type="button" aria-label="Your Account" aria-haspopup="dialog" aria-expanded={more} onClick={() => setMore(true)} className="flex size-tap items-center justify-center rounded-full">
-                  <Avatar name={me.display_name} src={me.photo_url} size="sm" tone="brand" />
+                  <Avatar name={me.display_name} src={photo} size="sm" tone="brand" />
                 </button>
               </>
             }

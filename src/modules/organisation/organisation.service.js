@@ -501,6 +501,7 @@ async function orgChart(client, { view = "viewer" } = {}) {
       is_ceo: r.is_ceo,
       vacant: r.vacant,
       meta,
+      photo_url: r.photo_url,
     };
   });
   return {

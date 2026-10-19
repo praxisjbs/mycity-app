@@ -1,6 +1,6 @@
 import { Button, IconButton, MoreSheet, useDensity, useTheme } from "@mycity/ui";
 import type { NavBadges } from "@/api/types/identity";
-import { useAuth, useMe } from "@/auth/AuthProvider";
+import { useAuth, useMe, useMyPhoto } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
 import type { ModuleDef } from "./catalogue";
 import { moreGroups } from "./nav";
@@ -14,6 +14,7 @@ import { usePwa } from "./pwa";
  */
 export function More({ open, onClose, modules, badges, current, onSearch }: { open: boolean; onClose: () => void; modules: ModuleDef[]; badges: NavBadges | undefined; current: string | null; onSearch: () => void }) {
   const me = useMe();
+  const photo = useMyPhoto();
   const { signOut, can } = useAuth();
   const { navigate } = useRouter();
   const { theme, toggle } = useTheme();
@@ -24,7 +25,7 @@ export function More({ open, onClose, modules, badges, current, onSearch }: { op
     <MoreSheet
       open={open}
       onClose={onClose}
-      person={{ name: me.display_name, subtitle: me.job_title, photo: me.photo_url }}
+      person={{ name: me.display_name, subtitle: me.job_title, photo }}
       personActions={
         <>
           <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Light Theme" : "Dark Theme"} onClick={toggle} />
