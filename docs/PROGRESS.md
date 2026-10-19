@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 30 | 2 | 0 | 28 | 0 | 0 |
+| M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
