@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 28 items below: 27 done, 1 open | | | | | |
+| M0 Foundation | 29 items below: 27 done, 2 open | | | | | |
 | M1 Core Operations & Employee Management | 29 | 2 | 0 | 27 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -97,9 +97,23 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Frontend foundation PR 3 · Build kit: DataView, KPI, charts, kanban, calendar, pickers, upload, editor, PDF preview, voice, maps; app component folders emptied; every screen on the token scale | AJ | ☑ | 16/10/2026 |
 | Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
 | One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
+| Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☐ | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Notifications, in progress (TB's eight decisions in `docs/handoff/push-notifications.md`
+  §2; design `docs/guides/notifications.md`). The backend of web push: migration `0460`
+  (`push_subscription` as a device with its token, key id and health; `push_delivery`, one row per
+  notice and device), the environment's VAPID pair made on first start and kept encrypted
+  (`services/push/vapid.js`, `.env` may override, subject `mailto:jbspraxisllc@gmail.com`), the sender
+  with error mapping (`web-push.js`), the payload (`payload.js`), the `notification-push` job (a
+  minute's hold while the person is in front of the app, Security never held; one send per device;
+  dead subscriptions revoked; retries with backoff), the routes for preferences, devices, Send Test,
+  read state and the service worker's two device-token calls, push off on suspension, leaving, Sign
+  Out Everywhere and Sign Out Others. Mail: IMAP IDLE on by default (24 production, 4 staging), the
+  first line in the notice, reading a conversation reads its notices. Channel posts alert once per
+  channel. Left: the service worker, the banner, the pane and Notification Settings on both shells,
+  tests, the runbook for GE.
 - 19/10/2026 · TB · The staff roster and the staff importer (`docs/guides/foundation.md` §6.1, §6.5,
   §6.6, §11), from a review of what staging shows. A VACANT row's Line Manager is the seat's own
   line (the importer dropped it without a word); `roles.json` gives a post outside the sheet its line

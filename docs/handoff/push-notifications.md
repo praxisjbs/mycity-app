@@ -8,7 +8,7 @@ checklist with its status, the repo rules that bite, and how to verify. The desi
 | | |
 |---|---|
 | Branch | `ccr-e8c7b487-ld2ig7` (push only here; the PR targets `main`) |
-| Pull request | Draft PR "feat(notifications): web push, in-app banner and the notification pane" |
+| Pull request | #72, draft: https://github.com/tomblakeasaah196/mycity-app/pull/72 |
 | Owner | TB (Tom-Blake Asaah), who asked for it on 19/10/2026 |
 | Type | Full stack plus ops (CLAUDE.md step 1) |
 | Started | 19/10/2026 |
@@ -153,25 +153,25 @@ service checks the token in constant time.
 Tick with the date as each step lands. Each step ends with its own checks green, a commit and a push.
 
 - [x] **0. Plan.** This handoff, the guide draft (`docs/guides/notifications.md`), the draft PR. 19/10/2026
-- [ ] **1. Contract** `packages/contract/schemas/notifications.js`: `PushConfig`,
+- [x] **1. Contract** (19/10/2026) `packages/contract/schemas/notifications.js`: `PushConfig`,
       `PushSubscriptionCreate` → `PushDevice` (with the one-time `device_token`), `PushDevicePage`,
       `PushRenew`, `PushDeviceRead`, `PushTestResult`, `NotificationPreferences`,
       `NotificationPreferenceUpdate`, `NotificationReadStateQuery` → `NotificationReadState`; the
       `TABLES` map (gate 6); `npm run gen:contract`.
-- [ ] **2. Migration** `migrations/0460_web_push.sql` (M0 block; check `docs/MIGRATIONS.md`):
+- [x] **2. Migration** (19/10/2026) `migrations/0460_web_push.sql` (M0 block; check `docs/MIGRATIONS.md`):
       `push_subscription` gains `known_device_id`, `label`, `platform`, `device_token_hash`,
       `vapid_key_id`, `last_seen_at`, `last_success_at`, `last_failure_at`, `failure_count`,
       `last_error`, `revoked_reason`; new `push_delivery` (`notification_id` nullable for tests,
       `push_subscription_id`, `status`, `http_status`, `error`, `attempts`, `sent_at`, unique per
       pair). Update `docs/DATABASE_SCHEMA.md`.
-- [ ] **3. Env** in `src/config/env.js`: `VAPID_SUBJECT` (default `mailto:jbspraxisllc@gmail.com`),
+- [x] **3. Env** (19/10/2026) in `src/config/env.js`: `VAPID_SUBJECT` (default `mailto:jbspraxisllc@gmail.com`),
       `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (secret, optional, both or neither);
       `MAILBOX_IDLE_MAX` unset → 24 production, 4 staging, 0 otherwise; `npm run gen:env`.
-- [ ] **4. `services/push`**: `vapid.js` (env pair, else stored pair, else generate and insert with
+- [x] **4. `services/push`** (19/10/2026): `vapid.js` (env pair, else stored pair, else generate and insert with
       `ON CONFLICT DO NOTHING` then read back; key id = short hash of the public key; cached),
       `web-push.js` (send with TTL, urgency, topic; error mapping), `payload.js` (v1 payload, byte cap).
       `npm i web-push` at the root.
-- [ ] **5. `notifications` module**: routes `GET /notifications/push/config`,
+- [x] **5. `notifications` module** (19/10/2026; integration tests still to write, step 14): routes `GET /notifications/push/config`,
       `POST /notifications/push/subscriptions` (upsert by endpoint; moves a device to the caller),
       `GET /notifications/push/devices` (25 a page), `POST /notifications/push/devices/:id/remove`,
       `POST /notifications/push/test`, `GET /notifications/preferences`,
@@ -180,14 +180,14 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       service with `emit()` for every write; revoke on suspension, leaving, Sign Out Everywhere and
       Sign Out Others (outbox handlers on those events); `notification.read_for_record` used by
       mailbox.
-- [ ] **6. Jobs**: queue `notification-push` and its handler; `notification-deliver` enqueues it
+- [x] **6. Jobs** (19/10/2026): queue `notification-push` and its handler; `notification-deliver` enqueues it
       (hold when active, not for security); registry and worker wiring; retries and backoff.
-- [ ] **7. Realtime presence**: `presence:active` and `presence:idle` in `src/realtime/socket.js`,
+- [x] **7. Realtime presence** (19/10/2026; the page's heartbeats are step 12): `presence:active` and `presence:idle` in `src/realtime/socket.js`,
       the Redis hash, an `isActive(userId)` reader for the worker.
-- [ ] **8. Mail**: `mail_message.received` payload gains `preview` (the first line, about 140
+- [x] **8. Mail** (19/10/2026): `mail_message.received` payload gains `preview` (the first line, about 140
       characters); the notification body becomes subject + new line + preview; reading a thread
       marks its notices read; IDLE defaults (step 3) and `docs/guides/mailbox.md` §6.
-- [ ] **9. Community**: channel posts push in quiet mode (tag `community_channel:<id>`); direct
+- [x] **9. Community** (19/10/2026): channel posts push in quiet mode (tag `community_channel:<id>`); direct
       messages tag per conversation and buzz each time.
 - [ ] **10. Service worker**: `vite-plugin-pwa` to `injectManifest` with `app/src/sw.ts`
       (precache, cleanup, navigation fallback with the `/api/` and `/gallery` denylist, the
@@ -270,5 +270,14 @@ Tick with the date as each step lands. Each step ends with its own checks green,
 
 ## 8 · Log
 
-- 19/10/2026 · TB · Investigation, the eight decisions, this handoff and the guide draft; PR opened.
-  Next: step 1, the contract.
+- 19/10/2026 · TB · Investigation, the eight decisions, this handoff and the guide draft; PR #72 opened.
+- 19/10/2026 · TB · Steps 1 to 9, the backend: contract, `0460`, env (VAPID_*, live mail defaults),
+  `services/push` (vapid, web-push, payload), routes, service, `notifications.push.js`, the
+  `notification-push` job and the hold, `services/realtime/active.js` with the socket's
+  `presence:active` and `presence:idle`, mail's first line and read clearing, channel posts quiet.
+  Lint, the 27 unit suites and the static gates pass; the integration suite was not run here (no
+  Postgres in this session). As built, beyond §3: `PushSubscriptionCreate` also takes
+  `push_subscription_id` (with `device_token`) so a browser whose endpoint changed keeps its row;
+  Sign Out Others carries `kept_session_id`; the in-app socket payload is now the contract's
+  `Notification`; `notification-deliver` counts `push_queued` and `push_held`. Next: step 10, the
+  service worker.

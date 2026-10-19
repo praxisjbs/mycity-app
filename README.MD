@@ -199,10 +199,10 @@ src/
 │   ├── secrets/       encryption.service
 │   ├── ai/            llm.service · governance · ledger · redact · structured · transcription ·
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
-│   ├── push/          web-push (M6)
+│   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── qr/            qr
-│   └── realtime/      emitter
+│   └── realtime/      emitter · active (who is in front of the app, for the push hold)
 ├── realtime/      socket
 └── jobs/
     ├── queues.js · registry.js · cron-lock.js
@@ -306,7 +306,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `audit` | `audit.events.js` (the emailed Excel export) | Audit ledger read at 25 with filters, the summary, masked per reader |
 | `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template), `org-chart.export.js` (Download PDF in the worker: drawn as the person asking, rendered, emailed) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
-| `notifications` | `notifications.preferences.js`, `notifications.reminders.js` (M6) | Caller's own inbox |
+| `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (M6) | Caller's own inbox, preferences and devices |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
 | `documents` | | Upload, download, versions, generated documents |
@@ -404,8 +404,9 @@ Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Template
 | `deductions` | `.acceptance` (nothing deducts itself) |
 | `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
 
-Also: `notifications.preferences`, `notifications.reminders`, `services/push/web-push`,
-`settings` Notifications screen. The daily rate divides by the working days from
+Also: `notifications.reminders` and the `settings` Notifications screen (company reminder rules).
+Web push and each person's preferences were brought forward to M0 by TB on 19/10/2026
+(`docs/guides/notifications.md`). The daily rate divides by the working days from
 `shared/time/working-week` (A22), never by a constant.
 
 ### 5.10 M7 · Partnerships, CRM & Trackers · GE, LA · 30 Nov to 4 Dec
@@ -469,7 +470,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
-| M0 | `email-send`, `pdf-render`, `notification-deliver`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
+| M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
 | M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`; loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |

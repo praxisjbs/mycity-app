@@ -125,10 +125,14 @@ for (const key of [
 
 const ownerOf = (e) => [e.payload.user_id].filter(Boolean);
 
+/**
+ * Sender as the title, then the subject and the message's first line, as a phone shows
+ * mail (TB, 19/10/2026). A conversation's mail shares one notification on a device.
+ */
 defineNotification(EVENTS.MAIL_MESSAGE_RECEIVED, {
   to: [{ users: ownerOf }],
   title: (e) => e.payload.from || "New mail",
-  body: (e) => e.payload.subject,
+  body: (e) => [e.payload.subject, e.payload.preview].filter(Boolean).join("\n"),
 });
 
 defineNotification(EVENTS.MAIL_ACCOUNT_NEEDS_RECONNECT, {

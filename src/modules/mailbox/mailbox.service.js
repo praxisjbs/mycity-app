@@ -24,6 +24,7 @@ const { AppError } = require("../../shared/errors");
 const vault = require("../../shared/documents/vault");
 const storage = require("../../services/storage/storage.service");
 const encryption = require("../../services/secrets/encryption.service");
+const notifications = require("../notifications/notifications.service");
 const repo = require("./mailbox.repo");
 const { EVENTS } = require("./mailbox.events");
 const { ImapSmtpProvider } = require("./providers/imap-smtp.provider");
@@ -297,6 +298,7 @@ async function ingest(client, a, folder, m) {
         user_id: a.user_id,
         from: m.fromName || m.from,
         subject: m.subject || "(no subject)",
+        preview: snippetOf(m.text || String(m.html || "").replace(/<[^>]+>/g, " "), 140),
       },
     });
   }
@@ -511,6 +513,8 @@ async function markRead(threadId, user) {
   const changed = await tx(async (client) => {
     const rows = await repo.markThreadRead(client, threadId);
     await repo.refreshThread(client, threadId);
+    // Reading the conversation reads its "new mail" notices too, in the bell and on devices.
+    await notifications.markReadForRecord(client, user, "mail_thread", threadId);
     return rows;
   });
   if (changed.length) {
