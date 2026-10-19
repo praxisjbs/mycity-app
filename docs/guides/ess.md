@@ -97,9 +97,10 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    leave requests and balances, attendance days and punches without coordinates or device
    identifiers, the list of their documents, their sign-ins) → one workbook, a sheet per area and a
    cover (who, when, what each sheet holds, the NDPA line) → the vault as a restricted
-   `data_export` the person and the CEO alone may open → emailed to whoever asked, so it lands in
-   their Mailbox → removed from the vault after 7 days (`data-export-cleanup`). The file is not
-   listed in My Documents. Payslips join it with Payroll (M6).
+   `data_export` the person and the CEO alone may open → downloaded on the device that asked, which
+   waits for it (`docs/guides/foundation.md` §6.12); nothing is emailed → removed from the vault a
+   day later (`export-cleanup`). The file is not listed in My Documents. Payslips join it with
+   Payroll (M6).
 
 ## 4 · Data
 
@@ -132,7 +133,7 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `GET /profile/history` | `PageQuery` → `EmployeeHistoryPage` | `ess` · own | yes | Built 17/10/2026. Record History |
 | `POST /profile/photo` | multipart `file` (purpose `avatar`, 5 MB, an image) → `DocumentRef` (the stored file, as every upload answers) | `ess` · own | | Built 19/10/2026. Through `organisation.photo.setPhoto`; a file that is not an image is a 415 |
 | `DELETE /profile/photo` | → `EssProfile` | `ess` · own | | Built 19/10/2026. Clears the pointer; the file stays in the vault |
-| `POST /profile/export` | `EmptyBody` → `EssDataExportQueued` (202) | `ess` · own | | Built 19/10/2026. Download My Data (§3 step 8): queued and audited at once, built and emailed after commit. A second in one Lagos day, the CEO's for this person included, is a 429 `DATA_EXPORT_LIMIT`; no email on the login is a 422 |
+| `POST /profile/export` | `EmptyBody` → `ExportFile` (documents, 202) | `ess` · own | | Built 19/10/2026. Download My Data (§3 step 8): the file reserved and the request audited at once, built after commit and downloaded where it was asked for. Pressed again the same Lagos day, the same file again; when the CEO already made one for this person that day, a 429 `DATA_EXPORT_LIMIT` |
 | `GET /payslips` | `EssPayslipQuery` (`year`) → `PayslipPage` | `ess` · own | yes | Locked payslips only |
 | `GET /payslips/:id/pdf` | → PDF | `ess` · own | | |
 | `POST /payslips/:id/email` | → `{ sent }` | `ess` · own | | To the work email |
@@ -152,9 +153,9 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `GET /performance` | → `EssPerformance` | `ess` · own | | M2 |
 
 Download Their Data is the organisation module's route, built by ESS (`ess.export.js`):
-`POST /api/v1/employees/:id/data-export` (`EmptyBody` → `EmployeeDataExportQueued`, 202), `people`
-view then `requireCeo()`: anyone else is a 403, an unknown person a 404. The same workbook, emailed to
-the CEO, counted in the person's one a day.
+`POST /api/v1/employees/:id/data-export` (`EmptyBody` → `ExportFile`, 202), `people`
+view then `requireCeo()`: anyone else is a 403, an unknown person a 404. The same workbook,
+downloaded by the CEO, counted in the person's one a day.
 
 People · Leave calls the `leave` module under `/api/v1/leave` (`schemas/leave.js`): `GET /requests` (`LeaveListQuery`: status, type, employee, `from` and `to` overlap, search, sort), `GET /summary`, `GET /requests/:id`, `GET /requests/:id/clashes`, all `people` view within scope; `POST /requests` (`LeaveRecordCreate`, `people` create, approved at once); `POST /requests/:id/cancel` (`people` edit); `GET /types` (`ess` view, so every form can list them), `POST /types` and `PATCH /types/:id` (`people` create, edit), `DELETE /types/:id` (`people` delete; refused with `LEAVE_TYPE_IN_USE` once a request or allowance names it, so it is retired instead); `GET /balances` (`LeaveBalanceQuery`: one person's year, `people` view within scope) and `PUT /balances` (`LeaveAllowanceSet`: one person's allowance of a type for a year, `null` back to the type's, `people` edit; the person is told). A waiting request is decided with the approval's own routes (`POST /workflow/instances/:id/approve`, `reject`), never a leave route.
 
@@ -215,10 +216,12 @@ check ownership, not the `settings` grant (README §5.2).
 - Download My Data holds what the person can already see about themselves in the app, nothing
   more: the bank account by its last four digits, punches with their location check and the
   device's label but never coordinates or a device identifier, the documents as a list without the
-  files, no salary or pay (Payroll adds payslips in M6). At most one request a day for a person,
-  counting the CEO's Download Their Data for them; the limit is per Lagos day. The file is
-  restricted (the person and the CEO alone may open it), emailed to whoever asked and removed from
-  the vault after 7 days; the emailed copy stays in their Mailbox.
+  files, no salary or pay (Payroll adds payslips in M6). At most one file a day for a person,
+  counting the CEO's Download Their Data for them; the limit is per Lagos day. Whoever asked
+  pressing again that day gets the same file again, so a download that failed can be done again;
+  anyone else is refused until tomorrow, and a file that failed does not count. The file is
+  restricted (the person and the CEO alone may open it), downloaded on the device that asked, never
+  emailed, and removed from the vault a day later.
 - Every list that shows a person shows their photo at 192 px (`shared/db/person.js` chooses the
   sizes once, `organisation.photo.js` exports both); a person with none shows initials.
 - Coming Soon: a tab whose module is not yet delivered shows a Coming Soon page naming the milestone
@@ -236,8 +239,8 @@ check ownership, not the `settings` grant (README §5.2).
 | `employee.updated` (organisation) | After an own-profile change commits | Audit row with before and after |
 | `employee.bank_details_changed` (`ess.events.js`) | After a bank change commits | "Bank details changed" to `people` edit holders within scope; never the account |
 | `employee.photo_updated` | After a photo is set or removed (organisation, 19/10/2026) | Shell and Community pick up the new avatar |
-| `employee.data_export_requested` (`ess.events.js`) | Download My Data or Download Their Data, at once | On the person's record with who asked (audit); after commit `ess.data_export` builds the workbook, stores it as a restricted `data_export` and queues `data-export` mail to whoever asked |
-| `data-export-cleanup` (scheduler, 03:30 Lagos) | Every night | Removes `data_export` files older than 7 days from the vault (`vault.remove`, `document.removed`) |
+| `employee.data_export_requested` (`ess.events.js`) | Download My Data or Download Their Data, at once | On the person's record with who asked (audit), with the restricted `data_export` file it reserved; after commit `ess.data_export` builds the workbook into that file, which the screen that asked downloads; nothing is emailed |
+| `export-cleanup` (scheduler, every hour) | A file is a day old | Removes it from the vault (`vault.remove`, `document.removed`), as every export (`docs/guides/foundation.md` §6.12) |
 | `payroll.run_approved` (M6) | Run approved | Payslips become visible; notification "Your payslip is ready" |
 | `query.raised` (M3) | Query raised against the employee | Notification opening My Queries |
 | `document.requested` | People request a document | Notification opening My Documents |
@@ -281,7 +284,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| ESS · My Profile (`my-profile`) | The photo or initials, with a + (none yet) or a pencil, opening Profile Photo (Choose a Photo; Remove Photo while there is one); name, role and pills (Confirmed or On Probation, arrangement, Reports To); Edit Profile, Change Password (opens My Security), Download My Data (toast "We'll email it to you", or why not today); Personal (Full Name, Date of Birth, Phone, Work Email, Address); Employment (Job Title, Department, Line Manager, Start Date, Employment Type, Work Arrangement, Status) with the Work Schedule inside it (each day Office, Remote or Off, hours and place; a Set by People pill); Bank Details (Bank, Account Name, masked Account Number); Next of Kin; Record History. Edit Profile: Phone, Address, Next of Kin, Next of Kin Phone, Bank, New Account Number (Optional); Cancel, Save Profile | Help terms on the card titles: Employment, "Only People can change these, including your work schedule."; Work Schedule, "Lateness is measured against these hours."; Bank Details, "Expense refunds are paid into this account. A change is logged and People are notified." On the New Account Number label: "Leave blank to keep the account ending 4417. A bank change is logged and People are notified." | The What You Can Change card (which fields an employee may change; a bank change logged): §6, and Edit Profile offers only those fields. "Every change to this record is written to the audit log": §6, §7. Where the schedule comes from and that approved leave never counts as absence: §3 steps 2 and 5. The page subtitle "What People see, and what you can change yourself" is removed |
+| ESS · My Profile (`my-profile`) | The photo or initials, with a + (none yet) or a pencil, opening Profile Photo (Choose a Photo; Remove Photo while there is one); name, role and pills (Confirmed or On Probation, arrangement, Reports To); Edit Profile, Change Password (opens My Security), Download My Data (busy while the file is made, then saved on this device: toast "Your data downloaded", or why not today); Personal (Full Name, Date of Birth, Phone, Work Email, Address); Employment (Job Title, Department, Line Manager, Start Date, Employment Type, Work Arrangement, Status) with the Work Schedule inside it (each day Office, Remote or Off, hours and place; a Set by People pill); Bank Details (Bank, Account Name, masked Account Number); Next of Kin; Record History. Edit Profile: Phone, Address, Next of Kin, Next of Kin Phone, Bank, New Account Number (Optional); Cancel, Save Profile | Help terms on the card titles: Employment, "Only People can change these, including your work schedule."; Work Schedule, "Lateness is measured against these hours."; Bank Details, "Expense refunds are paid into this account. A change is logged and People are notified." On the New Account Number label: "Leave blank to keep the account ending 4417. A bank change is logged and People are notified." | The What You Can Change card (which fields an employee may change; a bank change logged): §6, and Edit Profile offers only those fields. "Every change to this record is written to the audit log": §6, §7. Where the schedule comes from and that approved leave never counts as absence: §3 steps 2 and 5. The page subtitle "What People see, and what you can change yourself" is removed |
 | ESS · My Attendance (`my-attendance`) | Owned by LA: the attendance guide §1, §2 | The attendance guide | The attendance guide. ESS strips the "A correction never overwrites a punch" footnote from LA's page (attendance guide §5) |
 | ESS · Work Location Requests (`work-location-requests`) | Owned by LA: the attendance guide §6 | The attendance guide | The attendance guide §6 |
 | ESS · My Devices (`my-devices`) | Owned by LA: the attendance guide §1 | The attendance guide | The attendance guide §1, §7 (device rules) |
@@ -408,5 +411,6 @@ Deductions figure and every form open the shared modal.
 - 19/10/2026 · LA · My Attendance (#9) shows the person's field assignments in progress and to come, under Today (attendance guide §6.12, §10); §10.2 row updated.
 - 19/10/2026 · LA · My Profile's Work Schedule shows each day's place (Office, Remote or Off, `EssWorkDay.place`), read from attendance's week (attendance guide §6.13): People set a hybrid employee's office days on the employee record's Attendance tab, which is the Attendance setup of §2 and §3 step 2.
 - 19/10/2026 · AJ · The photo also reaches the employee record's header in People · Employees and Settings · Users and Roles (`Employee360.photo_url`, `UserRow.photo_url`); the organogram PDF is the one place left with initials.
+- 19/10/2026 · TB · Download My Data and Download Their Data download on the device that pressed, never by email (`docs/guides/foundation.md` §6.12, TB's decision; §3 step 8, §5, §6, §7, §10): the request reserves the `data_export` file (its person on `subject_employee_id`, which the vault rule now reads) and answers 202 `ExportFile`; the screen waits and saves it. The same asker pressing again that day gets the same file; anyone else is still refused that day, and a failed file does not count. Kept a day, not seven (`export-cleanup` replaces `data-export-cleanup`); no email on the login is no longer refused. The `data-export` email template is gone.
 - 19/10/2026 · TB · Bank details changed takes copies in Settings · Notifications
   (`docs/guides/notifications.md` §6): People may copy it to other roles or people, Payroll say.

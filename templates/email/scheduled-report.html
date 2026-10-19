@@ -3,5 +3,5 @@ subject: "{{ report_name }} ({{ run_number }})"
 title: Report
 ---
 <p style="margin:0 0 16px;">{{#if recipient.first_name}}Hello {{ recipient.first_name }},{{else}}Hello,{{/if}}</p>
-<p style="margin:0 0 20px;">{{#if scheduled}}Your scheduled report, {{ report_name }}, is attached as {{ format }}.{{else}}The report you asked for, {{ report_name }}, is attached as {{ format }}.{{/if}} Its number is {{ run_number }}.</p>
+<p style="margin:0 0 20px;">Your scheduled report, {{ report_name }}, is attached as {{ format }}. Its number is {{ run_number }}.</p>
 <p style="margin:0;font-size:12px;color:#71717A;">It holds only what you may open in MyCity App. Keep this file where only people allowed to read it can.</p>

@@ -396,12 +396,13 @@ async function lock(client, documentId, actor) {
 }
 
 /**
- * Remove a document that was only ever meant to be kept for a while (a Download My Data
- * workbook after seven days). The row and its derived files' rows go now, inside the
- * caller's transaction, with `document.removed` on the record; the bytes go after commit,
+ * Remove a document that was only ever meant to be kept for a while (an export, a day after
+ * it was made: shared/documents/exports.js). The row and its derived files' rows go now, inside
+ * the caller's transaction, with `document.removed` on the record; the bytes go after commit,
  * when the caller passes what this returns to removeFiles(), so a rolled-back removal
  * never leaves a row pointing at nothing. A locked document (signed, sent, filed) is never
- * removed. Gone already is not an error: answers null.
+ * removed, unless it is an export, which a render locked before exports were kept a day.
+ * Gone already is not an error: answers null.
  * @returns {Promise<string[]|null>} the storage keys to remove after commit
  */
 async function remove(client, documentId, { actor = null, reason } = {}) {
@@ -413,7 +414,7 @@ async function remove(client, documentId, { actor = null, reason } = {}) {
   );
   const doc = rows[0];
   if (!doc) return null;
-  if (doc.locked_at)
+  if (doc.locked_at && !docTypes.isExport(doc.doc_type))
     throw new AppError("DOCUMENT_LOCKED", "A locked document is kept", 409);
   const { rows: variants } = await client.query(
     "SELECT storage_key FROM document_variant WHERE document_id = $1",

@@ -40,8 +40,8 @@ route(
   "/exports",
   {
     body: c.audit.AuditExportRequest,
-    response: c.audit.AuditExportQueued,
-    summary: "Email the filtered log as a workbook",
+    response: c.documents.ExportFile,
+    summary: "Export the filtered log as a workbook",
   },
   requirePermission("settings", "export"),
   controller.requestExport,

@@ -144,22 +144,6 @@ const EssLeaveBalanceQuery = z
   .object({ year: z.coerce.number().int().min(2000).max(2100).optional() })
   .strict();
 
-/**
- * POST /ess/profile/export, Download My Data: everything the caller can see about themselves in
- * the app, as one workbook, built after the request and emailed to their work email. At most
- * one a day for a person, counting the CEO's requests for them (docs/guides/ess.md §6).
- */
-const EssDataExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
-
-/** templates/email/data-export.html: whose data is attached, and for how long MyCity keeps it. */
-const DataExportEmailVars = z
-  .object({
-    subject_name: z.string(),
-    own: z.boolean(),
-    kept_days: z.number().int().min(1),
-  })
-  .strict();
-
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   EssDocumentUpload: {
@@ -191,8 +175,6 @@ const TABLES = {
   },
   EssLeaveBalanceQuery: { table: null, reason: "which year of the caller's leave to read" },
   EssLeaveCalendarQuery: { table: null, reason: "the month the leave calendar shows" },
-  EssDataExportQueued: { table: null, reason: "that Download My Data was queued, and the email it goes to" },
-  DataExportEmailVars: { table: null, reason: "the variables of templates/email/data-export.html, not a row" },
 };
 
 module.exports = {
@@ -205,6 +187,4 @@ module.exports = {
   EssLeaveListQuery,
   EssLeaveBalanceQuery,
   EssLeaveCalendarQuery,
-  EssDataExportQueued,
-  DataExportEmailVars,
 };

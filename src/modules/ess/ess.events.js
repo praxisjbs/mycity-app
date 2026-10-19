@@ -8,18 +8,16 @@
  * (docs/guides/ess.md §6, §7). The notice names the person, never the account.
  *
  * Download My Data (ess.export.js): `employee.data_export_requested` is on the person's record,
- * with who asked (the person, or the CEO for Download Their Data). After commit the worker
- * builds the workbook, keeps it in the vault as a `data_export` only the person and the CEO
- * may open, and emails it to whoever asked. The data-export-cleanup job removes it after
- * seven days.
+ * with who asked (the person, or the CEO for Download Their Data), and its file is reserved as a
+ * `data_export` only the person and the CEO may open. After commit the worker builds the
+ * workbook into that file, which the screen that asked downloads; nothing is emailed. The
+ * export-cleanup job removes it a day later (shared/documents/exports.js).
  */
-const c = require("@mycity/contract");
 const { defineEvents } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
 const vault = require("../../shared/documents/vault");
 const { defineNotification } = require("../../shared/notifications/fanout");
 const { defineDocumentType } = require("../../shared/documents/types");
-const { defineVariables } = require("../../shared/templates/variables");
 
 const EVENTS = defineEvents("people", {
   "employee.bank_details_changed": {
@@ -31,23 +29,20 @@ const EVENTS = defineEvents("people", {
   },
 });
 
-/** The record type a Download My Data workbook is held against: its request's event. */
+/** The document type a Download My Data workbook is kept under, and the record it belongs to. */
 const DATA_EXPORT = "data_export";
 
-defineDocumentType(DATA_EXPORT, { label: "Download My Data", module: "people", sensitivity: "restricted" });
+defineDocumentType(DATA_EXPORT, { label: "Download My Data", module: "people", sensitivity: "restricted", export: true });
 
 /** The workbook is for the person it is about and the CEO; the rule decides alone. */
 vault.defineAccess(DATA_EXPORT, async (client, user, doc) => {
   if (user.is_ceo === true) return true;
-  if (!user.employee_id) return false;
-  return (await require("./ess.export").subjectOf(client, doc.entity_id)) === user.employee_id;
+  return Boolean(user.employee_id) && doc.subject_employee_id === user.employee_id;
 });
 
-defineVariables("email", "data-export", c.ess.DataExportEmailVars);
-
 /* The work is required when the handler runs: ess.export requires the services, which require this file. */
-outbox.register(EVENTS.EMPLOYEE_DATA_EXPORT_REQUESTED, "ess.data_export", (event) =>
-  require("./ess.export").build(event),
+outbox.register(EVENTS.EMPLOYEE_DATA_EXPORT_REQUESTED, "ess.data_export", (event, ctx) =>
+  require("./ess.export").build(event, ctx),
 );
 
 defineNotification(EVENTS.EMPLOYEE_BANK_DETAILS_CHANGED, {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { api } from "@/api/client";
 import { usePhoto, usePhotos } from "@/api/download";
+import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { ManagerRef, OrgNode } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
@@ -348,7 +349,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   const colleagues = focused?.manager_node_id ? (children.get(focused.manager_node_id) ?? []).filter((n) => n.node_id !== focused.node_id) : [];
   const matches = term ? nodes.filter(hit) : [];
   const focusOn = (id: string) => (setFocus(id), setQ(""), setView("focus"));
-  const exportPdf = () => api.call("POST /api/v1/org-chart/exports", { body: { view: mode } });
+  const exportPdf = () => saveExport(api.call("POST /api/v1/org-chart/exports", { body: { view: mode } }));
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
@@ -362,7 +363,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
             <SearchInput value={q} onChange={setQ} placeholder="Name or role" className="w-48 max-md:w-full" />
             {builder && !phone && <Button onClick={() => (setCollapsed(new Set()), setExpandedAll((n) => n + 1))}>Expand All</Button>}
             {builder && !phone && <Button icon="plus" onClick={addRole}>Add Role</Button>}
-            <ExportButton onExport={exportPdf} message="PDF on its way to your email">
+            <ExportButton onExport={exportPdf} message="PDF downloaded">
               Download PDF
             </ExportButton>
           </>

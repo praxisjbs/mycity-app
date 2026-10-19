@@ -16,6 +16,12 @@ import { session } from "./client";
  *   const photo = usePhotos(rows.map((r) => r.employee.photo_url));  // people's faces
  *   <Who name={r.employee.display_name} src={photo(r.employee.photo_url)} />
  *
+ * A download lands on the device that asked for it (docs/guides/foundation.md §6.12): the
+ * browser's own download on a computer and on Android, into Downloads; on an iPhone or iPad
+ * app opened from the home screen, which cannot save a download, the share sheet, whose Save
+ * to Files keeps it. Exports go through api/exports.ts, which waits for the file and then
+ * saves it here.
+ *
  * In mock mode (a laptop build only) nothing travels and the screen says so,
  * because the in-browser mock holds no bytes.
  */
@@ -32,23 +38,66 @@ async function fetchBlob(url: string): Promise<Blob> {
   return res.blob();
 }
 
-/** Fetch a gated file and save it under `filename`. */
-export async function saveFile(url: string, filename: string): Promise<void> {
+/** An iPhone or iPad app opened from the home screen: it cannot save a download, but it can share a file. */
+const homeScreenApple = () => (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+/** The share sheet with the file: true once shared or saved, false when the person closed it. */
+async function shareFile(file: File): Promise<boolean> {
+  try {
+    await navigator.share({ files: [file] });
+    return true;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") return false;
+    throw e;
+  }
+}
+
+/**
+ * Hand a file the app already holds to this device: the share sheet on a home-screen iPhone or
+ * iPad, the browser's download everywhere else. True once it is handed over, false when it was
+ * not (the share sheet closed, or offered again behind a tap).
+ */
+export async function saveBlob(blob: Blob, filename: string): Promise<boolean> {
+  if (homeScreenApple()) {
+    const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
+    if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+      try {
+        return await shareFile(file);
+      } catch {
+        // The press that asked for it was too long ago for the share sheet: one more tap opens it.
+        toast("Your file is ready", {
+          action: { label: "Save File", onClick: () => void shareFile(file).catch(() => toast.error(FAILED)) },
+          duration: 30_000,
+        });
+        return false;
+      }
+    }
+  }
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 10_000);
+  return true;
+}
+
+/**
+ * Fetch a gated file and save it under `filename` on this device. True once it is saved; false
+ * when it was not, and the screen has already been told why.
+ */
+export async function saveFile(url: string, filename: string): Promise<boolean> {
   if (MOCK) {
     toast("Files download once the API is connected");
-    return;
+    return false;
   }
   try {
-    const href = URL.createObjectURL(await fetchBlob(url));
-    const link = document.createElement("a");
-    link.href = href;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(href), 10_000);
+    return await saveBlob(await fetchBlob(url), filename);
   } catch {
     toast(FAILED);
+    return false;
   }
 }
 

@@ -53,10 +53,10 @@ route(router, "delete", "/profile/photo",
   { response: c.ess.EssProfile, self: true, summary: "Remove my photo; my initials show" },
   controller.removePhoto);
 
-/* Download My Data: everything I can see about myself, built after the request and emailed. */
+/* Download My Data: everything I can see about myself, built after the request and downloaded here. */
 route(router, "post", "/profile/export",
-  { body: c.common.EmptyBody, response: c.ess.EssDataExportQueued, self: true,
-    summary: "Email me a copy of my data" },
+  { body: c.common.EmptyBody, response: c.documents.ExportFile, self: true,
+    summary: "Download a copy of my data" },
   controller.exportData);
 
 route(router, "get", "/profile/history",

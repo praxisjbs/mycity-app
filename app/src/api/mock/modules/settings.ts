@@ -1,6 +1,7 @@
 import type { AccessCatalogue, AuditEntry, FailedSignIn, Holiday, LiveSession, NumberingScheme, Organisation, RoleDetail, RoleGrant, RoleRow, RoleSave, UserRow, WorkingDay } from "@mycity/contract/contract.gen.ts";
 import type { Status } from "@/api/types/performance";
-import { accepted, at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { exportFile } from "./shared";
 import { CAPABILITIES, ROLE_CAPABILITIES } from "../data/access";
 import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
@@ -518,4 +519,4 @@ route("GET /api/v1/audit", (req) =>
       })
     : fail(403, "PERMISSION_DENIED", "You do not have access to this"),
 );
-route("POST /api/v1/audit/exports", (req) => (admin(req.user!) ? { ...accepted(), body: { queued: true, email: byKey(req.user!)!.work_email } } : fail(403, "PERMISSION_DENIED", "You do not have access to this")));
+route("POST /api/v1/audit/exports", (req) => (admin(req.user!) ? exportFile(req.user!, "audit-log") : fail(403, "PERMISSION_DENIED", "You do not have access to this")));

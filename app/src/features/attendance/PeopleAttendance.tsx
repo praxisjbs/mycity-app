@@ -1,9 +1,10 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import type { AttendanceEvent, AttendanceException, ExceptionDecision, FieldAssignment, HomeDecision, HomeRequest, HomeStatus, LocationRequest, LocationRequestStatus, RegisterRow, RegisterStatus } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceEvent, AttendanceException, ExceptionDecision, ExportFile, FieldAssignment, HomeDecision, HomeRequest, HomeStatus, LocationRequest, LocationRequestStatus, RegisterRow, RegisterStatus } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { usePhotos } from "@/api/download";
+import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
@@ -635,7 +636,16 @@ function RequestDecisionForm({ r, instanceId, close }: { r: LocationRequest; ins
   );
 }
 
-/** The register between two dates as a workbook, emailed to the person asking. */
+/** The register's file, made after the sheet has closed: it downloads wherever the person is in the app. */
+async function downloadRegister(file: ExportFile) {
+  try {
+    if (await saveExport(Promise.resolve(file))) toast("Export downloaded");
+  } catch (e) {
+    toast.error(e instanceof ApiError ? e.message : "Export failed. Try again.");
+  }
+}
+
+/** The register between two dates as a workbook, downloaded on this device once it is made. */
 function ExportForm({ close, date, status }: { close: () => void; date: string; status: RegisterStatus | "all" }) {
   const f = useContractForm({ period: { from: `${date.slice(0, 8)}01`, to: date } }, {
     safeParse: (v: { period: { from: string; to: string } }) => {
@@ -648,11 +658,12 @@ function ExportForm({ close, date, status }: { close: () => void; date: string; 
     if (!f.check()) return;
     setBusy(true);
     try {
-      await api.call("POST /api/v1/attendance/export", { body: { from: f.values.period.from, to: f.values.period.to, ...(status !== "all" && { status }) } });
+      const file = await api.call("POST /api/v1/attendance/export", { body: { from: f.values.period.from, to: f.values.period.to, ...(status !== "all" && { status }) } });
       close();
-      toast("Export queued for your email");
+      toast.info("Preparing your export");
+      void downloadRegister(file);
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Export not queued");
+      toast.error(e instanceof ApiError ? e.message : "Export failed. Try again.");
     } finally {
       setBusy(false);
     }
