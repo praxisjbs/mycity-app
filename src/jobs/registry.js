@@ -141,6 +141,13 @@ const JOBS = Object.freeze([
     concurrency: 1,
     summary: "A Find Prices run: the providers' pricing pages searched, 20 models a request",
   },
+  {
+    queue: "query-rule-evaluate",
+    concurrency: 2,
+    summary: "A person's query rules counted after an attendance event, one query per breach",
+  },
+  // query-rule-evaluate is queued by src/modules/query_rules/query_rules.events.js, beside the
+  // attendance events it listens to.
 ]);
 
 /** Files in jobs/schedulers/. */

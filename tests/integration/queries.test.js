@@ -19,6 +19,7 @@ const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const documents = require("../../src/shared/documents/generate");
 const chromium = require("../../src/services/pdf/chromium");
+const realtime = require("../../src/services/realtime/emitter");
 
 // The queues would hold Redis connections open past the run: the jobs a handler queues are
 // kept here (the letter's PDF render, its email).
@@ -72,6 +73,8 @@ describeDb("queries and sanctions against the real migrations", () => {
   };
 
   beforeAll(async () => {
+    // Attendance's own handlers push a punch to the person's screen; no socket here.
+    jest.spyOn(realtime, "toUser").mockReturnValue(true);
     await rebuild(pool, config.DB_NAME);
     outbox.markReady();
     ({ app } = buildApp({ strict: true, accessLog: false }));
@@ -589,6 +592,165 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect((await as("ops").get("/sanctions")).body.page.total).toBe(4);
       const standing = await as("hod").get(`/sanctions/standing?employee_id=${people.other.employee.employee_id}`);
       expect(standing.status).toBe(404);
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * Query rules (guide §6.3)
+   * ---------------------------------------------------------------- */
+
+  describe("query rules", () => {
+    const lagos = require("../../src/shared/time/lagos");
+    const evaluator = require("../../src/modules/query_rules/query_rules.evaluator");
+    const today = lagos.today();
+    const day = (n) => lagos.addDays(today, -n);
+    const rules = {};
+    const late = (who, date, minutes) =>
+      q(
+        `INSERT INTO attendance_day (employee_id, attendance_date, status, late_minutes)
+         VALUES ($1, $2, 'late', $3)
+         ON CONFLICT (employee_id, attendance_date) DO UPDATE SET status = 'late', late_minutes = EXCLUDED.late_minutes`,
+        [people[who].employee.employee_id, date, minutes],
+      );
+    const evaluate = (who, date) =>
+      evaluator.evaluate({ sources: ["lateness"], employee_id: people[who].employee.employee_id, date });
+    const ruleQueries = async (ruleId) =>
+      (await q("SELECT employee_query_id FROM employee_query WHERE query_rule_id = $1", [ruleId])).rows;
+
+    test("People write rules, saved as drafts; a manager cannot; a trigger not counted yet stays a draft", async () => {
+      const body = { name: "Repeated Lateness", source_event: "lateness", threshold: 3, window_days: 30 };
+      expect((await as("manager").post("/query-rules", body)).status).toBe(403);
+      const res = await as("ops").post("/query-rules", body);
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({ code: "repeated_lateness", state: "draft", active: false, measure: "count" });
+      rules.lateness = res.body.query_rule_id;
+
+      const minutesOnAbsence = await as("ops").post("/query-rules", {
+        name: "Absent Minutes",
+        source_event: "absence",
+        measure: "minutes",
+        threshold: 300,
+        window_days: 30,
+      });
+      expect(minutesOnAbsence.status).toBe(422);
+
+      const tasks = await as("ops").post("/query-rules", { name: "Overdue Tasks", source_event: "overdue_task", threshold: 2, window_days: 7 });
+      const refused = await as("ops").post(`/query-rules/${tasks.body.query_rule_id}/activate`);
+      expect(refused.status).toBe(409);
+      expect(refused.body.error.code).toBe("TRIGGER_NOT_AVAILABLE");
+    });
+
+    test("a draft counts nothing; switched on, it counts from then, never back", async () => {
+      await late("staff", day(6), 10);
+      expect((await evaluate("staff", day(6))).raised).toEqual([]);
+      const on = await as("ops").post(`/query-rules/${rules.lateness}/activate`);
+      expect(on.body).toMatchObject({ state: "active", active: true });
+      // Switched on today: the late day before it does not count.
+      expect((await evaluate("staff", day(6))).raised).toEqual([]);
+      // For the rest of the test the rule was switched on a week ago.
+      await q("UPDATE query_rule SET activated_at = $2 WHERE query_rule_id = $1", [rules.lateness, lagos.startOfDay(day(5))]);
+    });
+
+    test("three late arrivals in thirty days raise exactly one query, not three", async () => {
+      await late("staff", day(5), 12);
+      expect((await evaluate("staff", day(5))).raised).toEqual([]);
+      await late("staff", day(3), 25);
+      expect((await evaluate("staff", day(3))).raised).toEqual([]);
+      await late("staff", day(1), 7);
+      const third = await evaluate("staff", day(1));
+      expect(third.raised).toHaveLength(1);
+
+      // The event delivered again, and a fourth late day: still one query.
+      expect((await evaluate("staff", day(1))).raised).toEqual([]);
+      await late("staff", day(0), 9);
+      expect((await evaluate("staff", day(0))).raised).toEqual([]);
+      expect(await ruleQueries(rules.lateness)).toHaveLength(1);
+
+      const id = third.raised[0];
+      const query = await as("ops").get(`/queries/${id}`);
+      expect(query.body).toMatchObject({
+        subject: "Repeated Lateness",
+        raised_by: null,
+        rule_name: "Repeated Lateness",
+        status: "awaiting_response",
+      });
+      expect(query.body.evidence.map((e) => e.date)).toEqual([day(5), day(3), day(1)]);
+      expect(query.body.evidence[0].label).toBe("Late arrival, 12 minutes");
+      expect(query.body.details).toContain("(3 in 30 days)");
+      expect(query.body.letter_document_id).toBeTruthy();
+    });
+
+    test("a rule's query is People's to see: not the manager's, though the person is on their team", async () => {
+      const [{ employee_query_id: id }] = await ruleQueries(rules.lateness);
+      expect((await as("manager").get(`/queries/${id}`)).status).toBe(404);
+      expect((await as("manager").get("/query-rules/firings")).body.page.total).toBe(0);
+      const firings = await as("ops").get("/query-rules/firings");
+      expect(firings.body.data.map((f) => [f.rule_name, f.employee.display_name])).toEqual([["Repeated Lateness", "Musa Danjuma"]]);
+      const summary = await as("ops").get("/query-rules/summary");
+      expect(summary.body).toMatchObject({ active: 1, draft: 1, queries_raised: 1 });
+      const list = await as("manager").get("/query-rules?sort=name");
+      expect(list.body.data.find((r) => r.code === "repeated_lateness").fired_this_month).toBeGreaterThanOrEqual(0);
+    });
+
+    test("late minutes summed: five hours in a month is a setting too", async () => {
+      const res = await as("ops").post("/query-rules", {
+        name: "Late Hours",
+        source_event: "lateness",
+        measure: "minutes",
+        threshold: 300,
+        window_days: 31,
+      });
+      rules.minutes = res.body.query_rule_id;
+      await as("ops").post(`/query-rules/${rules.minutes}/activate`);
+      await q("UPDATE query_rule SET activated_at = $2 WHERE query_rule_id = $1", [rules.minutes, lagos.startOfDay(day(5))]);
+      await late("other", day(4), 200);
+      expect((await evaluate("other", day(4))).raised).toEqual([]);
+      await late("other", day(2), 110);
+      const breach = await evaluate("other", day(2));
+      expect(breach.raised).toHaveLength(1);
+      const query = await as("ops").get(`/queries/${breach.raised[0]}`);
+      expect(query.body.details).toContain("310 late minutes in 31 days");
+    });
+
+    test("once it has fired, a rule's trigger is fixed; it is paused, never deleted", async () => {
+      const change = await as("ops").patch(`/query-rules/${rules.lateness}`, { source_event: "absence" });
+      expect(change.status).toBe(409);
+      const threshold = await as("ops").patch(`/query-rules/${rules.lateness}`, { threshold: 4 });
+      expect(threshold.body.threshold).toBe(4);
+      const off = await as("ops").post(`/query-rules/${rules.lateness}/pause`);
+      expect(off.body.state).toBe("paused");
+      await late("staff", day(-1), 30);
+      expect((await evaluate("staff", day(-1))).raised).toEqual([]);
+    });
+
+    test("an attendance event becomes the evaluation job for the person and day", async () => {
+      const { jobOf } = require("../../src/modules/query_rules/query_rules.events");
+      const who = people.staff.employee.employee_id;
+      const job = (key, payload) => jobOf({ key, payload: { employee_id: who, work_date: today, ...payload } });
+      expect(job("attendance.punched", { event_type: "clock_in" })).toEqual({ sources: ["lateness"], employee_id: who, date: today });
+      expect(job("attendance.punched", { event_type: "clock_out" })).toBeNull();
+      expect(job("attendance.day_closed", { status: "absent" }).sources).toEqual(["absence"]);
+      expect(job("attendance.day_closed", { status: "present" })).toBeNull();
+      expect(job("attendance.review_required", { types: ["unknown_device", "missing_clock_out"] }).sources).toEqual([
+        "missing_clock_out",
+        "unenrolled_device",
+      ]);
+
+      // Through the outbox: a committed late clock-in queues the job, once.
+      sent.length = 0;
+      await tx((client) =>
+        require("../../src/shared/events/emit").emit(client, {
+          key: "attendance.punched",
+          entity: { type: "attendance_event", id: "00000000-0000-4000-8000-000000000001" },
+          actor: null,
+          payload: { employee_id: who, subject_employee_id: who, event_type: "clock_in", work_date: today, result: "accepted" },
+        }),
+      );
+      await drain();
+      await drain();
+      expect(sent.filter((j) => j.queue === "query-rule-evaluate").map((j) => j.data)).toEqual([
+        { sources: ["lateness"], employee_id: who, date: today },
+      ]);
     });
   });
 });

@@ -325,7 +325,7 @@ const ENTITY_ROUTES = Object.freeze({
 
   // Queries & Sanctions
   query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") },
-  query_rule: screen("queries", "rules"), // search:none not built yet (src/modules/query_rules)
+  query_rule: screen("queries", "rules"), // search:none a handful of rules, listed whole on Rules, which ⌘K finds by name
   sanction: {
     ...screen("queries", "sanctions"),
     self: screen("ess", "my-queries"),

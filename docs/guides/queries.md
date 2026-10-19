@@ -180,7 +180,10 @@ here.
   evidence.
 - `dedup_key` is `<query_rule_id>:<employee_id>:<breach date>`; the outbox delivers at least once,
   and the unique key makes the second delivery a no-op.
-- Counts come from the owning module's service (attendance, tasks, kpis), never their tables.
+- Counts come from the owning module, never their tables: attendance answers in
+  `attendance.auto-query.js` (`offences()`); an exception People accepted ("the record stands") is not
+  an offence. `overdue_task` and `missed_target` may be drafted but not switched on until M2's
+  tasks and KPIs count them (409 `TRIGGER_NOT_AVAILABLE`).
 - A draft or paused rule never fires. Activating a rule does not reach back: it counts events from
   its activation onwards.
 - A rule may not be deleted once it has fired; it is paused.
@@ -258,7 +261,7 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | `consequence_step.saved` | Chain Settings writes | Audit |
 | `sanction_fine.accepted`, `.settled`, `.waived` | M6 takes, deducts or waives a fine (`sanctions.fines`) | Audit |
 | `letter_template.saved`, `letter_template.activated` | Letter Templates writes | Audit |
-| job `query-rule-evaluate` | Outbox, on each trigger event | Counts and raises (§6.3); idempotent |
+| job `query-rule-evaluate` | Queued by `query_rules.events` on `attendance.punched` (a clock-in), `attendance.day_closed` (absent) and `attendance.review_required` (a missing clock-out, an unknown device), once per event | Counts the person's active rules as of the event's day and raises one query per breach (§6.3); idempotent |
 
 ## 8 · Permissions and visibility by role
 
@@ -367,6 +370,11 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 19/10/2026 · GE · Rules built (§5, §6.3, §7): drafts, activate and pause (`queries.configure`),
+  Recent Firings within §6.1, and the evaluator (`query-rule-evaluate`, queued from
+  `query_rules.events` beside the attendance events it counts). The breach day is the day of the
+  offence that reached the threshold; the window starts after the last breach the rule raised.
+  M2's two triggers wait for their modules.
 - 19/10/2026 · GE · Sanctions and the chain built (§3 steps 4 to 6, §5, §6.4 to §6.6, §7, §9): Chain
   Settings' writes renumber the ladder in one transaction; a proposal opens `queries.consequence`
   with the rung's position as its rank; the approval's end issues (numbered, lettered, emailed),

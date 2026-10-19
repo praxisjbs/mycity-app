@@ -1,0 +1,133 @@
+"use strict";
+/**
+ * Query rules: the one write path for a rule (docs/guides/queries.md §6.3). A rule is
+ * saved as a draft, switched on when People are ready (it counts from then, never
+ * back), and paused rather than deleted once it has fired. Its trigger and measure are
+ * fixed once it has raised a query: the queries it raised were counted that way.
+ *
+ * Triggers whose records arrive with a later milestone (overdue tasks, missed targets:
+ * M2) may be drafted but not switched on until their module counts them.
+ */
+const { pool } = require("../../config/db");
+const { atomically } = require("../../shared/db/tx");
+const { AppError } = require("../../shared/errors");
+const { emit } = require("../../shared/events/emit");
+const lagos = require("../../shared/time/lagos");
+const attendance = require("../attendance/attendance.auto-query");
+const repo = require("./query_rules.repo");
+const { EVENTS } = require("./query_rules.events");
+
+async function tx(fn) {
+  const client = await pool.connect();
+  try {
+    return await atomically(client, () => fn(client));
+  } finally {
+    client.release();
+  }
+}
+
+const notFound = () => new AppError("NOT_FOUND", "That rule does not exist", 404);
+const monthStart = () => lagos.startOfDay(`${lagos.today().slice(0, 7)}-01`);
+
+/** `Repeated Lateness` → `repeated_lateness`. */
+function codeFrom(name) {
+  return (
+    String(name)
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 60) || "rule"
+  );
+}
+
+/** Whether something counts this trigger yet. */
+const countable = (source) => attendance.SOURCES.includes(source);
+
+const list = (query) => repo.list(pool, query, monthStart());
+const summary = () => repo.summary(pool, monthStart());
+const firings = (query, reader) => repo.firings(pool, query, reader);
+
+async function get(id) {
+  const row = await repo.get(pool, id, monthStart());
+  if (!row) throw notFound();
+  return row;
+}
+
+async function assertLetter(db, key) {
+  if (key && !(await repo.isQueryLetter(db, key)))
+    throw new AppError("LETTER_NOT_FOUND", "Pick a query letter", 422, { letter_template: ["Not a query letter"] });
+}
+
+async function create(actor, body) {
+  const id = await tx(async (client) => {
+    await assertLetter(client, body.letter_template);
+    let code = codeFrom(body.name);
+    for (let n = 2; await repo.codeTaken(client, code); n += 1) code = codeFrom(`${body.name} ${n}`);
+    const ruleId = await repo.insert(client, { ...body, code, created_by: actor.user_id });
+    await emit(client, {
+      key: EVENTS.QUERY_RULE_SAVED,
+      entity: { type: "query_rule", id: ruleId },
+      actor,
+      after: { ...body, code },
+      payload: { query_rule_id: ruleId, code },
+    });
+    return ruleId;
+  });
+  return get(id);
+}
+
+async function update(actor, id, body) {
+  await tx(async (client) => {
+    const before = await repo.get(client, id, monthStart());
+    if (!before) throw notFound();
+    const changesHow = (body.source_event && body.source_event !== before.source_event) ||
+      (body.measure && body.measure !== before.measure);
+    if (changesHow && (await repo.hasFired(client, id)))
+      throw new AppError("RULE_HAS_FIRED", "This rule has raised queries; start a new one instead", 409, {
+        source_event: ["Fixed once it has fired"],
+      });
+    const measure = body.measure || before.measure;
+    const source = body.source_event || before.source_event;
+    if (measure === "minutes" && source !== "lateness")
+      throw new AppError("RULE_INVALID", "Minutes count lateness only", 422, { measure: ["Lateness only"] });
+    if (body.letter_template) await assertLetter(client, body.letter_template);
+    await repo.update(client, id, body);
+    await emit(client, {
+      key: EVENTS.QUERY_RULE_SAVED,
+      entity: { type: "query_rule", id },
+      actor,
+      before,
+      after: body,
+      payload: { query_rule_id: id, code: before.code },
+    });
+  });
+  return get(id);
+}
+
+async function setActive(actor, id, on) {
+  await tx(async (client) => {
+    const before = await repo.get(client, id, monthStart());
+    if (!before) throw notFound();
+    if (before.active === on) return;
+    if (on && !countable(before.source_event))
+      throw new AppError("TRIGGER_NOT_AVAILABLE", "This trigger is not counted yet", 409, {
+        source_event: ["Comes with M2"],
+      });
+    await repo.setActive(client, id, on);
+    await emit(client, {
+      key: on ? EVENTS.QUERY_RULE_ACTIVATED : EVENTS.QUERY_RULE_PAUSED,
+      entity: { type: "query_rule", id },
+      actor,
+      before: { active: before.active },
+      after: { active: on },
+      payload: { query_rule_id: id, code: before.code },
+    });
+  });
+  return get(id);
+}
+
+const activate = (actor, id) => setActive(actor, id, true);
+const pause = (actor, id) => setActive(actor, id, false);
+
+module.exports = { codeFrom, countable, list, summary, firings, get, create, update, activate, pause };
