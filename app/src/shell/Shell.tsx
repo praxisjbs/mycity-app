@@ -19,7 +19,7 @@ import {
 } from "@mycity/ui";
 import { useApi } from "@/api/hooks";
 import { useAuth, useMe, useMyPhoto } from "@/auth/AuthProvider";
-import { ClockButton, useClockSync } from "@/features/attendance/ClockButton";
+import { ClockButton, ClockPrompts, useClockSync } from "@/features/attendance/ClockButton";
 import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
 import { visibleModules, visibleTabs } from "./access";
@@ -112,6 +112,7 @@ export function Shell() {
       <ScreenActionProvider>
         {phone ? <PhoneFrame {...frame} /> : <DesktopFrame {...frame} />}
         <Search open={search} onClose={() => setSearch(false)} />
+        <ClockPrompts />
       </ScreenActionProvider>
     </FitContext.Provider>
   );

@@ -10,6 +10,7 @@
  *   GET   /me/events                     one of my days' punches
  *   GET   /me/exceptions                 my exceptions
  *   POST  /me/exceptions/:id/explanation say why
+ *   POST  /me/events/:id/explanation     say why an automatic clock-out's time is wrong
  *   POST  /me/export                     my month, emailed as a workbook
  *   GET   /me/records/:id                the day a link to my day or exception opens
  *   GET   /me/home, POST /me/home        my home location, and a new one for People (remote)
@@ -76,6 +77,11 @@ route(router, "post", "/me/exceptions/:id/explanation",
   { params: c.common.IdParams, body: a.ExceptionExplanation, response: a.AttendanceException, self: true,
     summary: "Explain one of my exceptions" },
   controller.explain);
+
+route(router, "post", "/me/events/:id/explanation",
+  { params: c.common.IdParams, body: a.ExceptionExplanation, response: a.AttendanceException, self: true,
+    summary: "Explain one of my automatic clock-outs" },
+  controller.explainAutomatic);
 
 route(router, "post", "/me/export",
   { body: a.MyExportRequest, response: a.AttendanceExportQueued, self: true, summary: "Email me my month" },

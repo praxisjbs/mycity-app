@@ -33,6 +33,7 @@ export const EXCEPTION_TYPE: Record<ExceptionType, string> = {
   unknown_device: "Unknown Device",
   suspicious_timestamp: "Device Time Ahead",
   missing_clock_out: "Missing Clock-Out",
+  automatic_clock_out: "Automatic Clock-Out",
 };
 
 export const PUNCH_STATE: Record<PunchState, Shown> = {

@@ -24,7 +24,9 @@
  *
  * The unique index on active events is the backstop for anything the lock missed: its
  * violation is the same 409. A rejected punch is recorded as an attempt, counts for
- * nothing and opens no exception.
+ * nothing and opens no exception. A clock-in that counts reads the day's reminder to clock
+ * in, if the clock watch sent one (attendance.clock-watch.js, which also writes the
+ * system's automatic clock-out).
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
@@ -36,9 +38,11 @@ const { assertInScope } = require("../../shared/rbac/scope");
 const lagos = require("../../shared/time/lagos");
 const { formatDate } = require("../../shared/time/day-first");
 const identity = require("../identity/identity.service");
+const notifications = require("../notifications/notifications.service");
 const devices = require("../devices/devices.service");
 const deviceGuard = require("../devices/devices.guard");
 const calendar = require("./attendance.calendar");
+const clockWatch = require("./attendance.clock-watch");
 const guard = require("./attendance.clock-guard");
 const { decideGeofence } = require("./attendance.geofence");
 const reconcile = require("./attendance.reconcile");
@@ -62,6 +66,7 @@ const SEVERITY = Object.freeze({
   unknown_device: "high",
   suspicious_timestamp: "medium",
   missing_clock_out: "medium",
+  automatic_clock_out: "low",
 });
 
 /** What a person reads about each reason, inside a sentence. */
@@ -163,6 +168,7 @@ async function today(user, { now = new Date() } = {}) {
     leave: leave ? { starts_on: leave.starts_on, ends_on: leave.ends_on, leave_type_name: leave.leave_type_name } : null,
     clock_in_at: clockIn ? new Date(clockIn.occurred_at).toISOString() : null,
     clock_out_at: clockOut ? new Date(clockOut.occurred_at).toISOString() : null,
+    clock_out_automatic: Boolean(clockOut && clockOut.source === "system"),
     review: (await repo.openExceptionCount(pool, day ? day.attendance_day_id : null)) > 0,
     shift: ctx.shift,
     work_pattern: person.work_pattern,
@@ -376,6 +382,13 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
       }
     }
 
+    // The day's reminder to clock in has done its work: a push still held is not sent.
+    if (body.event_type === "clock_in" && result !== "rejected") {
+      const reminder = await repo.reminderOn(client, employeeId, workDate, "clock_in_due");
+      if (reminder)
+        await notifications.markReadForRecord(client, user, "attendance_clock_reminder", reminder.attendance_clock_reminder_id);
+    }
+
     const facts = {
       attendance_event_id: row.attendance_event_id,
       attendance_day_id: dayId,
@@ -558,6 +571,7 @@ module.exports = {
   myEvents,
   myExceptions,
   explain: reconcile.explain,
+  explainAutomatic: reconcile.explainAutomatic,
   requestMyExport,
   register,
   summary,
@@ -569,4 +583,5 @@ module.exports = {
   myRecord,
   requestRegisterExport,
   closeDays: reconcile.closeDays,
+  watchClock: clockWatch.watch,
 };

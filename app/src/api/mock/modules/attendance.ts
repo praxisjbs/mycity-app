@@ -67,6 +67,7 @@ const SEVERITY: Record<ExceptionType, "low" | "medium" | "high"> = {
   unknown_device: "high",
   suspicious_timestamp: "medium",
   missing_clock_out: "medium",
+  automatic_clock_out: "low",
 };
 const LOCATION_REASON: Record<string, string> = {
   denied: "location was not shared",
@@ -89,7 +90,7 @@ let seq = 0;
 function dayOf(key: string, date: string): Day {
   let d = DAYS.get(dk(key, date));
   if (!d) {
-    d = { key, attendance_day_id: sid(`day:${key}:${date}`), attendance_date: date, status: null, first_clock_in_at: null, last_clock_out_at: null, worked_minutes: 0, late_minutes: 0, overtime_minutes: 0, closed_at: null, open_exceptions: 0 };
+    d = { key, attendance_day_id: sid(`day:${key}:${date}`), attendance_date: date, status: null, first_clock_in_at: null, last_clock_out_at: null, clock_out_automatic: false, worked_minutes: 0, late_minutes: 0, overtime_minutes: 0, closed_at: null, open_exceptions: 0 };
     DAYS.set(dk(key, date), d);
   }
   return d;
@@ -107,6 +108,7 @@ function recompute(key: string, date: string) {
   const last = [...evs].reverse().find((e) => e.event_type === "clock_out") ?? null;
   d.first_clock_in_at = first?.occurred_at ?? null;
   d.last_clock_out_at = last?.occurred_at ?? null;
+  d.clock_out_automatic = last?.source === "system";
   d.late_minutes = first ? lateOf(date, first.occurred_at) : 0;
   d.worked_minutes = first && last ? Math.max(0, Math.floor((Date.parse(last.occurred_at) - Date.parse(first.occurred_at)) / 60000)) : 0;
   d.overtime_minutes = last ? overtimeOf(date, last.occurred_at) : 0;
@@ -175,6 +177,9 @@ function addException(key: string, date: string, type: ExceptionType, ev: Ev | n
   return x;
 }
 
+/** An automatic clock-out: the system's, with no location, device or device time (§6.14). */
+const AUTOMATIC: Partial<Ev> = { source: "system", device_at: null, skew_seconds: null, latitude: null, longitude: null, accuracy_m: null, distance_m: null, worksite_name: null, geofence: "not_applied", location_reason: null, device_label: null, device_state: "none" };
+
 /** The demonstration history: 45 days of punches, the exceptions they opened, and today so far. */
 (() => {
   const today = isoDaysAgo(0);
@@ -199,7 +204,16 @@ function addException(key: string, date: string, type: ExceptionType, ev: Ev | n
       addException(key, h.date, "outside_worksite", inEv, `260 m from ${site?.name ?? "the office"}, radius ${site?.radius_m ?? 100} m`, daysBack > 7 ? { outcome: "accepted", by: "cynthia", resolution: "Client meeting agreed in advance" } : undefined);
     }
     const missedOut = key === "emeka" && daysBack === 1;
-    if (h.clock_out_at && !missedOut) addEvent(key, h.date, "clock_out", h.clock_out_at);
+    // Two shifts the clock watch closed: Cynthia's, and Bashir's, which he has explained (§6.14).
+    const automatic = (key === "cynthia" && daysBack === 2) || (key === "bashir" && daysBack === 3);
+    if (h.clock_out_at && !missedOut && !automatic) addEvent(key, h.date, "clock_out", h.clock_out_at);
+    if (automatic) {
+      const out = addEvent(key, h.date, "clock_out", new Date(`${h.date}T${shiftOf(h.date).ends_at ?? "17:00"}:00+01:00`).toISOString(), AUTOMATIC);
+      if (key === "bashir") {
+        const x = addException(key, h.date, "automatic_clock_out", out, `Clocked out automatically at ${formatTime(out.occurred_at)}`);
+        Object.assign(x, { employee_note: "I left at four for the bank", employee_noted_at: out.occurred_at });
+      }
+    }
     if (missedOut) addException(key, h.date, "missing_clock_out", null, `Clocked in ${formatTime(h.clock_in_at)}, no clock-out`);
     if (key === "bashir" && daysBack === 2) {
       inEv.validation_state = "review";
@@ -432,6 +446,7 @@ export function todayOf(key: string): AttendanceToday {
     leave: onLeave ? { starts_on: isoDaysAgo(1), ends_on: isoDaysAhead(2), leave_type_name: "Annual" } : null,
     clock_in_at: inEv?.occurred_at ?? null,
     clock_out_at: outEv?.occurred_at ?? null,
+    clock_out_automatic: outEv?.source === "system",
     review: evs.some((e) => e.validation_state === "review"),
     shift: shiftOf(date),
     work_pattern: p.work_pattern,
@@ -681,6 +696,20 @@ route("POST /api/v1/attendance/me/exceptions/:id/explanation", (req) => {
   return ok(exOut(x));
 });
 
+route("POST /api/v1/attendance/me/events/:id/explanation", (req) => {
+  const ev = EVENTS.find((e) => e.attendance_event_id === req.params.id && e.key === req.user);
+  if (!ev) return notFound();
+  if (ev.source !== "system" || ev.event_type !== "clock_out") return fail(422, "NOT_AUTOMATIC", "Only an automatic clock-out is explained here");
+  if (EXCS.some((x) => x.attendance_event_id === ev.attendance_event_id && x.exception_type === "automatic_clock_out"))
+    return fail(409, "ALREADY_EXPLAINED", "You have already explained this clock-out");
+  const note = String(req.body.employee_note ?? "").trim();
+  if (!note) return invalid({ employee_note: ["Required"] });
+  const x = addException(ev.key, ev.work_date, "automatic_clock_out", ev, `Clocked out automatically at ${formatTime(ev.occurred_at)}`);
+  Object.assign(x, { employee_note: note, employee_noted_at: new Date().toISOString(), created_at: new Date().toISOString() });
+  recompute(ev.key, ev.work_date);
+  return created(exOut(x));
+});
+
 route("POST /api/v1/attendance/me/export", (req) => {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(req.body.month ?? ""))) return invalid({ month: ["Pick a month"] });
   return ok({ queued: true, email: byKey(req.user)!.work_email });
@@ -700,7 +729,8 @@ function registerRows(date: string, viewer: string): Array<RegisterRow & { key: 
   const shift = shiftOf(date);
   return PEOPLE.filter((p) => g.sees(p.user_key) && p.start_date <= date).map((p) => {
     const day = DAYS.get(dk(p.user_key, date));
-    const evs = activeOn(p.user_key, date);
+    // The person's own latest punch: an automatic clock-out has no location or device to show.
+    const evs = activeOn(p.user_key, date).filter((e) => e.source !== "system");
     const last = evs[evs.length - 1] ?? null;
     const site = siteOf(p.user_key);
     return {
@@ -824,13 +854,20 @@ route("POST /api/v1/attendance/exceptions/:id/decision", (req) => {
   if (x.status !== "open") return fail(409, "EXCEPTION_DECIDED", "This exception was already decided");
   const b = req.body as { decision: "accept" | "reject" | "add_clock_out"; resolution: string; clock_out_time?: string };
   if (String(b.resolution ?? "").trim().length < 10) return invalid({ resolution: ["At least 10 characters"] });
-  if (b.decision === "add_clock_out" && x.exception_type !== "missing_clock_out") return fail(422, "DECISION_INVALID", "Only a missing clock-out takes a time", { decision: ["Not for this"] });
+  const takesTime = x.exception_type === "missing_clock_out" || x.exception_type === "automatic_clock_out";
+  if (b.decision === "add_clock_out" && !takesTime) return fail(422, "DECISION_INVALID", "Only a missing or automatic clock-out takes a time", { decision: ["Not for this"] });
   if (b.decision === "reject" && !x.attendance_event_id) return fail(422, "DECISION_INVALID", "There is no punch to reject", { decision: ["Not for this"] });
+  if (b.decision === "reject" && x.exception_type === "automatic_clock_out") return fail(422, "DECISION_INVALID", "Keep or correct an automatic clock-out", { decision: ["Not for this"] });
   if (b.decision === "add_clock_out") {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.clock_out_time ?? "")) return invalid({ clock_out_time: ["Give the time"] });
     const iso = new Date(`${x.work_date}T${b.clock_out_time}:00+01:00`).toISOString();
     const first = activeOn(x.key, x.work_date).find((e) => e.event_type === "clock_in");
     if (!first || iso <= first.occurred_at) return fail(422, "CLOCK_OUT_TIME", "Give a time after the clock-in", { clock_out_time: ["After the clock-in"] });
+    // People's time stands in place of an automatic clock-out, which stops counting.
+    if (x.exception_type === "automatic_clock_out") {
+      const auto = EVENTS.find((e) => e.attendance_event_id === x.attendance_event_id);
+      if (auto) auto.excluded = true;
+    }
     addEvent(x.key, x.work_date, "clock_out", iso, { source: "admin", device_at: null, skew_seconds: null, latitude: null, longitude: null, accuracy_m: null, distance_m: null, geofence: "not_applied", location_reason: null, device_label: null, device_state: "none", recorded_by_name: byKey(req.user)!.display_name, reason: b.resolution.trim() });
   }
   if (b.decision === "reject") {

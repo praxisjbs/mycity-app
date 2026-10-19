@@ -2,8 +2,8 @@
 /**
  * Attendance: the SQL. Writes only the attendance tables (attendance_event,
  * attendance_day, attendance_exception, attendance_home, attendance_location_request, the
- * field assignment tables attendance_field_assignment, _site and _member, and
- * attendance_schedule); reads
+ * field assignment tables attendance_field_assignment, _site and _member,
+ * attendance_schedule and attendance_clock_reminder); reads
  * employee, worksite, leave, approvals and the working week for what a day means. Never emits
  * (BACKEND_GUIDE §2).
  *
@@ -60,6 +60,14 @@ const REQUEST_PLACE = (col) =>
 const PUNCH_PLACE = `COALESCE(w.name, CASE ev.validation #>> '{geofence,place}' WHEN 'home' THEN 'Home'
   WHEN 'field' THEN ev.validation #>> '{geofence,worksite_name}'
   ELSE ${REQUEST_PLACE("ev.validation #>> '{geofence,place}'")} END)`;
+
+/**
+ * A punch the day does not count: an exception on it was decided rejected, or it is an automatic
+ * clock-out whose exception People corrected, their clock-out standing in its place (§6.8, §6.14).
+ */
+const EXCLUDED = (ev) => `EXISTS (SELECT 1 FROM attendance_exception x
+   WHERE x.attendance_event_id = ${ev}.attendance_event_id
+     AND (x.outcome = 'rejected' OR (${ev}.source = 'system' AND x.outcome = 'corrected')))`;
 
 const nameOf = (alias) =>
   `CASE WHEN ${alias}.employee_id IS NULL THEN NULL ELSE btrim(${alias}.first_name || ' ' || ${alias}.last_name) END`;
@@ -135,17 +143,17 @@ function grantedLeave(db, employeeId, date) {
 
 /**
  * A work date's active events (accepted or under review), oldest first; `excluded` when
- * an exception on the event was decided rejected. Rejected attempts are left out: they
- * change neither the guard nor the day. The unique index allows one active event of each
- * type a day, so this is a handful, never a list a person pages through.
+ * the day does not count it (EXCLUDED). Rejected attempts are left out: they change
+ * neither the guard nor the day. The unique indexes allow one active event of each type a
+ * day, and one automatic clock-out beside it, so this is a handful, never a list a person
+ * pages through.
  */
 async function eventsOn(db, employeeId, date) {
   // pagination:complete the guard and the day's figures need every active event of the day
   const { rows } = await completeQuery(
     db,
     `SELECT ev.attendance_event_id, ev.event_type, ev.validation_state, ev.occurred_at, ev.source,
-            EXISTS (SELECT 1 FROM attendance_exception x
-                     WHERE x.attendance_event_id = ev.attendance_event_id AND x.outcome = 'rejected') AS excluded
+            ${EXCLUDED("ev")} AS excluded
        FROM attendance_event ev
       WHERE ev.employee_id = $1 AND ev.work_date = $2::date AND ev.validation_state IN ('accepted', 'review')
       ORDER BY ev.occurred_at, ev.attendance_event_id`,
@@ -281,7 +289,17 @@ async function openExceptionCount(db, dayId) {
  * Days and punches, read
  * ------------------------------------------------------------------ */
 
+/**
+ * Whether the day's counted clock-out is the system's: its last clock-out is an automatic one
+ * the day still counts (§6.14).
+ */
+const CLOCK_OUT_AUTOMATIC = (dayAlias) => `EXISTS (SELECT 1 FROM attendance_event ao
+   WHERE ao.employee_id = ${dayAlias}.employee_id AND ao.work_date = ${dayAlias}.attendance_date
+     AND ao.source = 'system' AND ao.event_type = 'clock_out' AND ao.validation_state = 'accepted'
+     AND ao.occurred_at = ${dayAlias}.last_clock_out_at AND NOT ${EXCLUDED("ao")})`;
+
 const DAY_ROW = `ad.attendance_day_id, ad.attendance_date, ad.status, ad.first_clock_in_at, ad.last_clock_out_at,
+  ${CLOCK_OUT_AUTOMATIC("ad")} AS clock_out_automatic,
   ad.worked_minutes, ad.late_minutes, ad.overtime_minutes, ad.closed_at,
   (SELECT count(*)::int FROM attendance_exception x
     WHERE x.attendance_day_id = ad.attendance_day_id AND x.status = 'open') AS open_exceptions`;
@@ -345,8 +363,7 @@ function listEvents(db, employeeId, date, query, { coordinates }) {
             COALESCE(ev.validation #>> '{device,state}', 'none') AS device_state,
             ARRAY(SELECT jsonb_array_elements_text(COALESCE(ev.validation -> 'reasons', '[]'::jsonb))) AS reasons,
             ev.note,
-            EXISTS (SELECT 1 FROM attendance_exception x
-                     WHERE x.attendance_event_id = ev.attendance_event_id AND x.outcome = 'rejected') AS excluded,
+            ${EXCLUDED("ev")} AS excluded,
             ${nameOf("re")} AS recorded_by_name,
             ev.reason,
             ${TOTAL_COL}
@@ -498,10 +515,11 @@ const REGISTER = `
          AND x.starts_on <= $1::date AND x.ends_on >= $1::date
     ) lr ON true
     LEFT JOIN (
+      -- The person's own latest punch: an automatic clock-out has no location or device to show.
       SELECT DISTINCT ON (ev.employee_id) ev.employee_id, ev.validation, adv.label AS device_label
         FROM attendance_event ev
         LEFT JOIN attendance_device adv ON adv.attendance_device_id = ev.attendance_device_id
-       WHERE ev.work_date = $1::date
+       WHERE ev.work_date = $1::date AND ev.source <> 'system'
        ORDER BY ev.employee_id, ev.occurred_at DESC, ev.attendance_event_id DESC
     ) last ON last.employee_id = e.employee_id
    WHERE ad.attendance_day_id IS NOT NULL
@@ -617,6 +635,111 @@ async function withoutDay(db, date) {
     { label: "people with no attendance day" },
   );
   return rows;
+}
+
+/* ------------------------------------------------------------------ *
+ * The clock watch (attendance.clock-watch.js, §6.14)
+ * ------------------------------------------------------------------ */
+
+/**
+ * The people a clock-in reminder is due to on a date: at work (active, started, not left), with a
+ * login to tell, not on granted leave, with no clock-in that counts and no reminder yet.
+ */
+async function dueForReminder(db, date) {
+  // pagination:complete the watch reminds everyone who is due, not a page of them
+  const { rows } = await completeQuery(
+    db,
+    `SELECT e.employee_id
+       FROM employee e
+      WHERE e.status = 'active' AND (e.start_date IS NULL OR e.start_date <= $1::date)
+        AND (e.left_on IS NULL OR e.left_on > $1::date)
+        AND EXISTS (SELECT 1 FROM app_user u WHERE u.employee_id = e.employee_id AND u.status = 'active')
+        AND NOT ${GRANTED_LEAVE("e.employee_id", "$1::date")}
+        AND NOT EXISTS (SELECT 1 FROM attendance_event ev
+                         WHERE ev.employee_id = e.employee_id AND ev.work_date = $1::date
+                           AND ev.event_type = 'clock_in' AND ev.validation_state IN ('accepted', 'review')
+                           AND NOT ${EXCLUDED("ev")})
+        AND NOT EXISTS (SELECT 1 FROM attendance_clock_reminder r
+                         WHERE r.employee_id = e.employee_id AND r.work_date = $1::date AND r.kind = 'clock_in_due')
+      ORDER BY e.employee_id`,
+    [date],
+    { label: "people due a clock-in reminder" },
+  );
+  return rows;
+}
+
+/** Record a reminder as sent, once: null when it already was. */
+function recordReminder(client, employeeId, date, kind) {
+  return one(
+    client,
+    `INSERT INTO attendance_clock_reminder (employee_id, work_date, kind) VALUES ($1, $2::date, $3)
+     ON CONFLICT (employee_id, work_date, kind) DO NOTHING
+     RETURNING attendance_clock_reminder_id, employee_id, work_date::text AS work_date, kind`,
+    [employeeId, date, kind],
+  );
+}
+
+/** The reminder sent to a person for a date, or null. */
+function reminderOn(db, employeeId, date, kind) {
+  return one(
+    db,
+    `SELECT attendance_clock_reminder_id FROM attendance_clock_reminder
+      WHERE employee_id = $1 AND work_date = $2::date AND kind = $3`,
+    [employeeId, date, kind],
+  );
+}
+
+/**
+ * Shifts still open on work dates from `from` to `to`: a clock-in that counts, no clock-out, and
+ * a day not closed; with the person's active logins, whose presence decides the automatic
+ * clock-out.
+ */
+async function openShifts(db, from, to) {
+  // pagination:complete the watch closes every open shift it may, not a page of them
+  const { rows } = await completeQuery(
+    db,
+    `SELECT ev.employee_id, ev.work_date::text AS work_date, ev.occurred_at AS clock_in_at,
+            ARRAY(SELECT u.user_id FROM app_user u
+                   WHERE u.employee_id = ev.employee_id AND u.status = 'active' ORDER BY u.user_id) AS user_ids
+       FROM attendance_event ev
+       JOIN employee e ON e.employee_id = ev.employee_id AND e.status = 'active'
+       LEFT JOIN attendance_day ad ON ad.employee_id = ev.employee_id AND ad.attendance_date = ev.work_date
+      WHERE ev.event_type = 'clock_in' AND ev.validation_state IN ('accepted', 'review')
+        AND ev.work_date BETWEEN $1::date AND $2::date
+        AND ad.closed_at IS NULL
+        AND NOT ${EXCLUDED("ev")}
+        AND NOT EXISTS (SELECT 1 FROM attendance_event o
+                         WHERE o.employee_id = ev.employee_id AND o.work_date = ev.work_date
+                           AND o.event_type = 'clock_out' AND o.validation_state IN ('accepted', 'review'))
+      ORDER BY ev.work_date, ev.employee_id`,
+    [from, to],
+    { label: "open shifts" },
+  );
+  return rows;
+}
+
+/** One punch, with whether the day counts it, for the person's explanation of an automatic one. */
+function eventFor(db, eventId) {
+  return one(
+    db,
+    `SELECT ev.attendance_event_id, ev.employee_id, ev.event_type, ev.source, ev.validation_state,
+            ev.work_date::text AS work_date, ev.occurred_at, ${EXCLUDED("ev")} AS excluded,
+            ev.validation #>> '{time,timezone}' AS timezone, ad.attendance_day_id
+       FROM attendance_event ev
+       LEFT JOIN attendance_day ad ON ad.employee_id = ev.employee_id AND ad.attendance_date = ev.work_date
+      WHERE ev.attendance_event_id = $1`,
+    [eventId],
+  );
+}
+
+/** Whether a punch already has an exception of a type (open or decided). */
+async function hasException(db, eventId, type) {
+  const r = await one(
+    db,
+    "SELECT 1 AS ok FROM attendance_exception WHERE attendance_event_id = $1 AND exception_type = $2",
+    [eventId, type],
+  );
+  return Boolean(r);
 }
 
 
@@ -1196,6 +1319,12 @@ module.exports = {
   attendanceStart,
   unclosedDays,
   withoutDay,
+  dueForReminder,
+  recordReminder,
+  reminderOn,
+  openShifts,
+  eventFor,
+  hasException,
   approvedHome,
   homesOf,
   supersedePending,

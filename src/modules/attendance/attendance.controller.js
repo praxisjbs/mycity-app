@@ -44,6 +44,9 @@ module.exports = {
 
   explain: async (req, res) => ok(res, await service.explain(withActor(req), id(req), req.validated.body)),
 
+  explainAutomatic: async (req, res) =>
+    created(res, await service.explainAutomatic(withActor(req), id(req), req.validated.body)),
+
   myExport: async (req, res) => ok(res, await service.requestMyExport(withActor(req), req.validated.body)),
 
   myHome: async (req, res) => ok(res, await homes.mine(req.user)),

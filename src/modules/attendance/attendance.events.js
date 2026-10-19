@@ -29,6 +29,12 @@
  *   field_assignment.member_removed someone was taken off it: they are told why
  *   attendance.schedule_set         People set a hybrid employee's office days: they are told,
  *                                   and their clock reloads; audited on the employee
+ *   attendance.clock_in_due         the clock watch found someone expected and not clocked in,
+ *                                   in the first hour after the start: they are reminded (the bell,
+ *                                   and push as their preference allows); clocking in reads it
+ *   attendance.clocked_out_automatically
+ *                                   the clock watch closed a shift left open once it ended and
+ *                                   the person was away from the app: they are told when
  *
  * Payloads carry ids, dates, results and exception types (a field assignment's number and
  * name too): never coordinates, an address, a device identifier or the evidence itself.
@@ -60,6 +66,8 @@ const EVENTS = defineEvents("people", {
   "field_assignment.cancelled": { summary: "A field assignment was cancelled" },
   "field_assignment.member_removed": { summary: "Someone was taken off a field assignment" },
   "attendance.schedule_set": { summary: "A hybrid employee's work schedule was set" },
+  "attendance.clock_in_due": { summary: "An employee was reminded to clock in" },
+  "attendance.clocked_out_automatically": { summary: "An open shift was clocked out automatically" },
 });
 
 /** The approval every work location request opens (docs/guides/attendance.md §6.11). */
@@ -81,6 +89,7 @@ const WHAT = Object.freeze({
   unknown_device: "an unregistered device",
   suspicious_timestamp: "the device clock ahead",
   missing_clock_out: "no clock-out",
+  automatic_clock_out: "the automatic clock-out's time",
 });
 const whatOf = (types) => (types || []).map((t) => WHAT[t] || t).join(", ");
 
@@ -139,6 +148,18 @@ defineNotification(EVENTS.FIELD_ASSIGNMENT_MEMBER_REMOVED, {
   to: [{ subject: true }],
   title: "Taken off a field assignment",
   body: (e) => `${assignmentOf(e.payload)}: ${e.payload.reason}`,
+});
+
+defineNotification(EVENTS.ATTENDANCE_CLOCK_IN_DUE, {
+  to: [{ subject: true }],
+  title: "Time to clock in",
+  body: (e) => `Your shift started at ${e.payload.starts_at}.`,
+});
+
+defineNotification(EVENTS.ATTENDANCE_CLOCKED_OUT_AUTOMATICALLY, {
+  to: [{ subject: true }],
+  title: "Clocked out automatically",
+  body: (e) => `${formatDate(e.payload.work_date)}: clocked out at ${e.payload.clock_out_time}.`,
 });
 
 defineNotification(EVENTS.ATTENDANCE_SCHEDULE_SET, {

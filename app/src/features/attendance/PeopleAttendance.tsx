@@ -228,7 +228,7 @@ const evidenceColumns = [
   { key: "c", label: "Accuracy", desktop: true, render: (e: AttendanceEvent) => (e.accuracy_m !== null ? `${Math.round(e.accuracy_m)} m` : null) },
   { key: "g", label: "Coordinates", desktop: true, render: (e: AttendanceEvent) => (e.latitude !== null && e.longitude !== null ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}` : null) },
   { key: "d", label: "Device", desktop: true, render: (e: AttendanceEvent) => e.device_label },
-  { key: "s", label: "Source", desktop: true, render: (e: AttendanceEvent) => (e.source === "admin" ? `Added by ${e.recorded_by_name ?? "People"}` : "Clock") },
+  { key: "s", label: "Source", desktop: true, render: (e: AttendanceEvent) => (e.source === "admin" ? `Added by ${e.recorded_by_name ?? "People"}` : e.source === "system" ? "Automatic" : "Clock") },
 ];
 
 /** An exception's columns; `photo` (from usePhotos) puts the person's face beside their name. */
@@ -307,9 +307,24 @@ function ExceptionView({ x, close }: { x: AttendanceException; close: () => void
 
 const DECISIONS: Record<ExceptionDecision["decision"], string> = { accept: "Accept", reject: "Reject", add_clock_out: "Add Clock-Out" };
 
-/** Decide: accept the punch, stop it counting, or add the missing clock-out. The punch itself never changes. */
+/** What each kind of exception can be decided as, and the words the choice and its help use. */
+function decisionsFor(type: AttendanceException["exception_type"]): { options: Array<ExceptionDecision["decision"]>; label: (d: ExceptionDecision["decision"]) => string; help: string } {
+  if (type === "automatic_clock_out")
+    return {
+      options: ["accept", "add_clock_out"],
+      label: (d) => (d === "add_clock_out" ? "Correct Time" : DECISIONS[d]),
+      help: "Accept keeps the automatic time. Correct Time records when the person really left.",
+    };
+  return {
+    options: type === "missing_clock_out" ? ["add_clock_out", "accept"] : ["accept", "reject"],
+    label: (d) => DECISIONS[d],
+    help: "Accept keeps the punch. Reject stops it counting for the day. Add Clock-Out records the time the person left.",
+  };
+}
+
+/** Decide: accept the punch, stop it counting, add the missing clock-out or correct an automatic one. The punch itself never changes. */
 function DecisionForm({ x, close }: { x: AttendanceException; close: () => void }) {
-  const options = (x.exception_type === "missing_clock_out" ? ["add_clock_out", "accept"] : ["accept", "reject"]) as Array<ExceptionDecision["decision"]>;
+  const { options, label, help } = decisionsFor(x.exception_type);
   const f = useContractForm({ decision: options[0], resolution: "", clock_out_time: "" }, {
     safeParse: (v: { decision: ExceptionDecision["decision"]; resolution: string; clock_out_time: string }) =>
       attendance.ExceptionDecision.safeParse({ decision: v.decision, resolution: v.resolution, ...(v.decision === "add_clock_out" && v.clock_out_time ? { clock_out_time: v.clock_out_time } : {}) }),
@@ -334,8 +349,8 @@ function DecisionForm({ x, close }: { x: AttendanceException; close: () => void 
   return (
     <Card className="mt-3">
       <CardHeader title="Decide" />
-      <Field label={<HelpTerm help="Accept keeps the punch. Reject stops it counting for the day. Add Clock-Out records the time the person left.">Outcome</HelpTerm>} {...f.status("decision")}>
-        <ChoiceField value={v.decision} onChange={(d) => f.set("decision", d)} options={options.map((o) => [o, DECISIONS[o]] as [ExceptionDecision["decision"], string])} />
+      <Field label={<HelpTerm help={help}>Outcome</HelpTerm>} {...f.status("decision")}>
+        <ChoiceField value={v.decision} onChange={(d) => f.set("decision", d)} options={options.map((o) => [o, label(o)] as [ExceptionDecision["decision"], string])} />
       </Field>
       {v.decision === "add_clock_out" && (
         <Field label="Clock-Out Time" {...f.status("clock_out_time")}>
