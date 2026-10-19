@@ -9,10 +9,14 @@
  * Queries & Sanctions, never this tab.
  */
 const queries = require("../queries/queries.service");
+const sanctions = require("../sanctions/sanctions.service");
 const { meOf } = require("./ess.documents");
 
 const list = (user, query) => queries.listMine(meOf(user), query);
 
 const respond = (user, id, body) => queries.respond(user, meOf(user), id, body);
 
-module.exports = { list, respond };
+/** My Queries · Sanctions: the caller's own issued sanctions. */
+const listSanctions = (user, query) => sanctions.listMine(meOf(user), query);
+
+module.exports = { list, respond, listSanctions };

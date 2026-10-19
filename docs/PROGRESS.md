@@ -45,7 +45,7 @@ saying who agreed and when.
 | M0 Foundation | 35 items below: 34 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 11 | 0 | 0 | 11 | 0 | 0 |
-| M3 Queries & Consequence Management | 5 | 3 | 2 | 0 | 0 | 0 |
+| M3 Queries & Consequence Management | 5 | 2 | 3 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **101** | **38** | **2** | **61** | **0** | **0** |
+| **Total** | **101** | **37** | **3** | **61** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -1122,9 +1122,9 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 34 | Queries | `queries` | M3 | GE | ☐ | ☐ | ☐ | In progress | 19/10/2026 |
+| 34 | Queries | `queries` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
 | 35 | Rules | `rules` | M3 | GE | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
-| 36 | Sanctions | `sanctions` | M3 | GE | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
+| 36 | Sanctions | `sanctions` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
 | 37 | Letter Templates | `letter-templates` | M3 | GE | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
 
 **Notes**
@@ -1134,6 +1134,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 - 19/10/2026 · GE · Guide (`docs/guides/queries.md`) and contract written before the build: `schemas/queries.js`, `query_rules.js`, `sanctions.js`, `templates.js`; migration `3010` (the chain as `consequence_step` rows, `letter_template`, rule measure and drafts, the one-query-per-breach `dedup_key`, sanction numbers and approvals) and seed `3190` (`queries.configure`, the `queries.consequence` approval in `definitions.js` DEFAULTS, the shipped letters' rows, `3099`'s invalid `employee_consequence` switched off). Decided with GE: chain as step rows over the approval engine, six rungs with Second Warning, every sanction follows a query, rule-raised queries seen by People and the CEO only. No ticks: no route exists yet. Left: the four backend modules, the rule evaluator job, the letters, then the frontend swaps its INTERIM types (Second Warning added, the Issue Sanction form starts from a query, the Queries empty state changes; guide §13).
 - 19/10/2026 · GE · Letter Templates (#37) API: `templates` module under `/letter-templates` (list, summary, one with its wording, preview with sample values, add, save the next version, activate; writes behind `queries.configure`); `shared/documents/generate.js` takes the template a caller names for a doc type with `templateChoice`, so a letter added on screen sends without code. `query-letter` ships with wording and is seeded active; the five sanction letters await MyCity's samples. Integration tests in `tests/integration/queries.test.js`. Left: the screen on the real API (AJ's INTERIM types), retiring a letter.
 - 19/10/2026 · GE · Queries (#34) backend, without sanctions: raise (numbered, its letter generated, rendered and emailed with the PDF), the visibility rule (a manager sees only the queries they raised; scope all and the CEO see every one) on the list, the card, the summary, ⌘K and the AI reads, Send Reminder once a day, Close With No Action; ESS · My Queries (#13) lists and answers (`/ess/queries`). 14 integration tests. Left: proposing a sanction (with the sanctions module), then the API tick.
+- 19/10/2026 · GE · Sanctions (#36) and the rest of Queries (#34) API: Chain Settings (add a rung at a position, move, change, retire; `queries.configure`), a sanction proposed from a query's decision and approved on `queries.consequence` (Operations & People, then Management from rank 4; the proposer never approves), issued with its number and letter (emailed with the PDF), the query resolved; a refusal sends it back under review; fines pending for M6 (`sanctions.fines`); standing and next rung; ESS `GET /ess/sanctions`. 22 integration tests. Left: the screens on the real API, M6 taking fines into a run.
 
 ### Recruitment
 

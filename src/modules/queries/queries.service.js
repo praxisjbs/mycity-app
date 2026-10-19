@@ -59,11 +59,11 @@ async function visibleRow(db, reader, id) {
   return visibility.assertVisible(reader, await repo.get(db, id));
 }
 
-/** The rung a new offence is offered first; filled by the sanctions module (guide §6.5). */
-async function nextStepFor(employeeId) {
-  const sanctions = require("../sanctions/sanctions.service");
-  return typeof sanctions.nextStep === "function" ? sanctions.nextStep(pool, employeeId) : null;
-}
+/**
+ * The rung a new offence is offered first (guide §6.5). Required when it is asked: the
+ * sanctions service requires this one for its queries' settlement.
+ */
+const nextStepFor = (employeeId) => require("../sanctions/sanctions.service").nextStep(pool, employeeId);
 
 /** Whether the reader may decide this query now (guide §6.4). */
 function decidable(row, user, canEdit) {

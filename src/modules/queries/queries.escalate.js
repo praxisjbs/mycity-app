@@ -5,7 +5,6 @@
  * its letter belong to the sanctions module, so this hands the decision across inside
  * the same transaction and marks the query as waiting on that approval.
  */
-const { AppError } = require("../../shared/errors");
 const repo = require("./queries.repo");
 
 /**
@@ -15,10 +14,8 @@ const repo = require("./queries.repo");
  * @param {object} body    QueryDecision with outcome `sanction`
  */
 async function propose(client, actor, row, body) {
-  const sanctions = require("../sanctions/sanctions.service");
-  if (typeof sanctions.propose !== "function")
-    throw new AppError("SANCTIONS_NOT_READY", "Sanctions cannot be proposed yet", 409);
-  const proposal = await sanctions.propose(client, actor, row, body);
+  // Required when it is asked: the sanctions service requires the queries service.
+  const proposal = await require("../sanctions/sanctions.service").propose(client, actor, row, body);
   await repo.setReview(client, row.employee_query_id, proposal.workflow_instance_id);
   return proposal;
 }

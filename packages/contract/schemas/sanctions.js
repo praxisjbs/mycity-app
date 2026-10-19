@@ -216,6 +216,15 @@ const MySanction = z
 
 const MySanctionPage = Paged(MySanction);
 
+/** The variables of templates/email/sanction-issued.html: the letter rides as the attachment. */
+const SanctionIssuedEmailVars = z
+  .object({
+    sanction_number: z.string(),
+    step_name: z.string(),
+    query_number: z.string(),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   ConsequenceStep: {
@@ -264,6 +273,7 @@ const TABLES = {
     },
   },
   MySanctionPage: { table: null, reason: "a page of the caller's own sanctions" },
+  SanctionIssuedEmailVars: { table: null, reason: "the variables of templates/email/sanction-issued.html, not a row" },
 };
 
 module.exports = {
@@ -286,4 +296,5 @@ module.exports = {
   SanctionStanding,
   MySanction,
   MySanctionPage,
+  SanctionIssuedEmailVars,
 };
