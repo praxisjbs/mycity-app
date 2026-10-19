@@ -73,6 +73,8 @@ module.exports = {
       res,
       await service.storeMedia(p(req).id, readUpload(req), req.user),
     ),
+  linkPreview: async (req, res) =>
+    ok(res, await service.linkPreview(req.validated.body, req.user)),
   recognise: async (req, res) =>
     created(res, await service.recognise(req.validated.body, req.user)),
   react: async (req, res) => ok(res, await service.react(p(req).id, req.user)),

@@ -33,8 +33,9 @@ track who has read them.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Staff Community · Channels (`channels`) | Staff app | Every employee; only channels they belong to | Channel list (#announcements pinned first), the open channel's thread, its composer | Read, post, react, vote, recognise, celebrate, attach files, record voice notes, create a channel, view or edit members |
-| Staff Community · Direct Messages (`direct-messages`) | Staff app | Every employee; only their own conversations | Conversation list (All / Unread), the open conversation, the colleague's profile | Message one colleague, attach files, record voice notes, view their profile, search the conversation, mute |
+| Staff Community · Channels (`channels`) | Staff app | Every employee; only channels they belong to | Channel list (#announcements pinned first), the open channel's thread with its photos, albums, videos, files and link cards in place, its composer | Read, post, react, vote, recognise, celebrate, send photos and files with a caption, open them full screen, download or share them, post links with their card, record voice notes, create a channel, view or edit members |
+| Staff Community · Direct Messages (`direct-messages`) | Staff app | Every employee; only their own conversations | Conversation list (All / Unread), the open conversation with its media and link cards, the colleague's profile | Message one colleague, send photos and files with a caption, open, download or share them, post links with their card, record voice notes, view their profile and the files shared, search the conversation, mute |
+| File viewer (full screen, over either tab) | Staff app | Members of the conversation | One photo, video or PDF at a time, with the others on screen beside it | Zoom, step to the next or previous, Download, Share (phone) |
 | Staff Community · Announcements (`announcements`) | Staff app | People and the CEO | The configuration and tracking side: KPI strip, every announcement with read counts and its level | Publish or schedule an announcement as Normal, Important or Urgent, see who has and has not read or acknowledged it |
 | #announcements channel | Staff app, inside Channels | Every employee, read only | Published announcements, newest last, Urgent ones red and Important ones amber | Read; acknowledge an Urgent one; only People and the CEO post |
 | Knowledge Hub · Announcements (M10) | Staff app | Every employee | The same announcement records, as an archive | Read. No second copy of the data |
@@ -139,17 +140,58 @@ track who has read them.
     Notifications (⋮ in a channel, the Mute switch on a conversation's profile) stops that
     conversation's notifications and push; its messages still arrive and count as unread, and its
     row shows a muted bell. Both are the caller's own and change nothing for anyone else.
+17. **Photos, videos and files** (TB, 19/10/2026: shown in place as on WhatsApp, sent several at
+    once with a caption, opened full screen). ＋ → Attach a File in a channel, or Attach → Photo or
+    Video and Document in a direct message, opens **Send Files**: the device's picker opens at once
+    where the browser allows it (else the person taps the drop zone), up to 10 files upload with a
+    percentage each, and each one that arrives becomes a tile (a photo as its picture, anything
+    else as its glyph and name) with Remove; Add More picks more. **Caption** (optional) goes with
+    the first file. **Send Files** posts each file as its own message, in the order picked, all
+    carrying one album key. In the conversation:
+    - a **photo** shows in place at its own shape, a very tall or very wide one cropped to fit;
+    - **four or more** photos or videos sent together show as one **album**, a 2 by 2 grid whose
+      fourth tile carries "+N" when there are more; fewer than four show one by one;
+    - a **video** shows its first frame (the `poster` `av-transcode` makes) with a play mark and
+      its length;
+    - a **PDF** shows its first page (drawn by the worker), its name and "N pages · PDF · size";
+      any other file (Word, Excel, PowerPoint, CSV, text) shows its name, type and size, and
+      downloads when tapped;
+    - a **caption** shows under its media, its links clickable;
+    - pictures are fetched with the session as they come into view, never from outside.
+
+    Tapping a photo, video or PDF opens the **file viewer**, full screen: a photo zooms (pinch or
+    double tap on a phone, Zoom In and Zoom Out on desktop), a video plays, and a PDF's pages are
+    drawn in the app by PDF.js, on a phone as on desktop, with the page number and zoom. The
+    viewer steps through the photos, videos and PDFs of the messages on screen (the arrows or the
+    keyboard on desktop, a swipe on a phone). **Download** saves the file; on a phone **Share**
+    opens the phone's share sheet (Save Image to Photos on an iPhone, or another app). Close or
+    Esc returns to the conversation. The profile's Shared in Conversation opens the same viewer.
+18. **Links** (TB, 19/10/2026). Every link in a message, a caption or an announcement is
+    clickable and opens in a new tab. While a person types, the first link in the composer gets
+    its **card** above the message box: the page's picture, the site, the title and the
+    description; **Remove Preview** sends the message without it. Our server fetches the card,
+    never the person's browser (`POST /community/link-previews`): it reads the page's Open Graph
+    and Twitter tags (else its title and description), copies its picture into the vault
+    (resized, metadata stripped), and keeps the card for a week, so the next person to post the
+    link gets it at once and no phone ever contacts the site. A page with no title, one that
+    cannot be reached, or one on a private address shows no card. A message sent before its card
+    arrived gets it from the worker a moment after it is posted, in place. Only a text message
+    carries a card (the first link's); editing the text within its 15 minutes follows the new
+    first link. A caption's links are clickable without a card.
 
 ## 4 · Data
 
-Built in migrations `1000` (the tables) and `1110` (what the first version left out). Column names
-are the contract's keys (gate 6).
+Built in migrations `1000` (the tables), `1110` (what the first version left out), `1140` (each
+member's own pin), `1145` (an announcement's level and its acknowledgements) and `1147` (link
+cards, and a PDF's page count on its document). Column names are
+the contract's keys (gate 6).
 
 | Table | Key columns | Notes |
 |---|---|---|
 | `community_channel` | `community_channel_id`, `channel_type` (`company` / `department` / `team` / `group` / `direct`), `name` (unique among live, named channels; `^[a-z0-9][a-z0-9-]{1,29}$`), `description`, `post_policy` (`everyone` / `admins` / `people_ceo`), `pinned`, `system_key` (`general` / `announcements`), `created_by` (null for the two system channels), `archived_at` | A direct conversation is a channel of type `direct` with its two members. #general and #announcements are made by the system the first time they are needed |
 | `community_member` | `community_channel_id`, `user_id`, `member_role` (`admin` / `member`), `muted_until` (`infinity` when muted), `pinned_at` (the member's own pin, 1140), `last_read_at`, `last_delivered_at`, `joined_at` | **Membership is the authorisation boundary** for every read and write. The two pointers drive unread counts and the ticks. Everyone who opens Community joins #general and #announcements |
-| `community_message` | `community_message_id`, `community_channel_id`, `sender_user_id` (null for system posts), `message_type` (`text` / `image` / `audio` / `video` / `file` / `system` / `poll` / `recognition` / `birthday` / `anniversary` / `announcement`), `body`, `document_id`, `metadata` jsonb, `transcript`, `sent_at`, `deleted_at` | `audio` is a voice note. `metadata` holds the kind's extras: a voice note's `duration_s`, a poll's `options`, a card's `subject_employee_id` and `years`. `transcript` is filled on first request |
+| `community_message` | `community_message_id`, `community_channel_id`, `sender_user_id` (null for system posts), `message_type` (`text` / `image` / `audio` / `video` / `file` / `system` / `poll` / `recognition` / `birthday` / `anniversary` / `announcement`), `body` (a file's caption), `document_id`, `community_link_preview_id` (the first link's card, 1147), `metadata` jsonb, `transcript`, `sent_at`, `deleted_at` | `audio` is a voice note. `metadata` holds the kind's extras: a voice note's `duration_s`, a poll's `options`, a card's `subject_employee_id` and `years`, the `album_key` of files sent together, `no_link_preview` when the sender removed the card. `transcript` is filled on first request |
+| `community_link_preview` | `community_link_preview_id`, `url` (unique: the link as posted, normalised), `status` (`ready` / `empty` / `failed`), `site_name`, `title`, `description`, `image_document_id` (the page's picture, copied into the vault), `fetched_at` | One card per address, shared by every message that posts it. A `ready` card is used for a week, an `empty` or `failed` one is tried again after an hour; written by `community.links.js` only |
 | `community_reaction` | `community_message_id`, `user_id`, `reaction` | Celebrate (🎉 or 👏) and thumbs up (👍) are reactions, one per person, toggled |
 | `community_poll_vote` | `community_message_id`, `user_id`, `option_index` | One vote per person; voting again moves it |
 | `peer_recognition` | `from_employee_id`, `to_employee_id`, `message`, `community_message_id`, `note_written_by_system` | Kept separately so M2 performance and Home can count recognitions |
@@ -161,7 +203,13 @@ Files (images, voice notes, video, documents) are uploaded to the conversation f
 (`POST /channels/:id/media`, purpose `attachment`) and stored by the vault against the channel
 (`entity_type` `community_channel`, doc type `community_media`); a vault rule lets only the
 channel's members read them, whoever they are. Audio and video are made playable by
-`av-transcode`.
+`av-transcode` (a video gets `mp4-720` and its `poster`). A photo's `webp-320` and `webp-960` are
+made when it is stored; a PDF's are its first page, drawn by `media-derive` with PDF.js, which
+also writes `document.page_count`. A message's file travels as a `MediaRef`: the `DocumentRef`
+with its width, height, page count, length and the derived sizes it has, so a screen draws it
+at its own shape before a byte of it arrives. A link card's picture is a vault document too (doc
+type `link_preview_image`, entity `community_link_preview`), readable by every member of staff:
+it came from a public page.
 
 ## 5 · API
 
@@ -180,9 +228,10 @@ member of answers 404, whatever their grants.
 | `POST /channels/:id/mute`, `POST /channels/:id/read` | `MuteSet`, empty | member | | |
 | `PUT /channels/:id/pin` | `PinSet` → 204 | member | | The caller's own pin, channels and direct conversations alike; at most 3 (409 `PIN_LIMIT`); not on #general or #announcements, which are pinned for everyone |
 | `POST /channels/:id/delivered` | `DeliveredAck` | member | | The client acknowledges direct messages it received: the delivered tick |
-| `GET /channels/:id/messages` | `MessageListQuery` → `MessagePage` | member | yes | Newest page first, each page oldest to newest; "Load Older" asks for the next page. `q` returns only the matches, and the screen steps between them |
-| `POST /channels/:id/media` | multipart `file` → `DocumentRef` | member, `post_policy` | | Upload first, then post the message with its `document_id` |
-| `POST /channels/:id/messages` | `MessageCreate` → `Message` | member, `post_policy` | | `text`, `image`/`audio`/`video`/`file` with `document_id` (`audio` with `duration_s`), `poll` with 2 to 4 `options`, `birthday`/`anniversary` with `subject_employee_id`. Idempotency-Key honoured |
+| `GET /channels/:id/messages` | `MessageListQuery` → `MessagePage` | member | yes | Newest page first, each page oldest to newest; "Load Older" asks for the next page. `q` returns only the matches (captions included), and the screen steps between them. A message's file is a `MediaRef`; `link` is its card; `album_key` groups files sent together |
+| `POST /channels/:id/media` | multipart `file` → `MediaRef` | member, `post_policy` | | Upload first, then post the message with its `document_id`. The answer says the sizes the file already has, so Send Files draws a photo's tile from its 320 px size |
+| `POST /channels/:id/messages` | `MessageCreate` → `Message` | member, `post_policy` | | `text`, `image`/`audio`/`video`/`file` with `document_id` (`audio` with `duration_s`; `body` as the caption; `album_key` on files sent together), `poll` with 2 to 4 `options`, `birthday`/`anniversary` with `subject_employee_id`. `no_link_preview` when the sender removed the card. The kind of a file message is the stored file's (a photo is `image` whatever was asked). Idempotency-Key honoured |
+| `POST /link-previews` | `LinkPreviewRequest` → `LinkPreviewAnswer` | `community` create | | The composer's card for one link: from the week's cache, else fetched now (8 seconds at most per request). `preview` is null when the page shows nothing or cannot be reached; a private address is never fetched. 30 a minute per person (429 after) |
 | `POST /recognitions` | `RecognitionCreate` → `Message` | `community` create | | Always posted to #general (A19). `to_employee_id` cannot be the sender |
 | `PUT /messages/:id` | `MessageEdit` → `Message` | author | | Text within 15 minutes; a poll's question and options before its first vote (409 after) |
 | `DELETE /messages/:id` | → 204 | author or moderator | | Soft delete (`deleted_at`); a recognition's `peer_recognition` row goes too; not an announcement's post |
@@ -192,7 +241,7 @@ member of answers 404, whatever their grants.
 | `GET /direct` | `ConversationListQuery` → `ConversationPage` | own | yes | Filters `q`, `unread` |
 | `POST /direct` | `{ employee_id }` → `Conversation` | `community` create | | Returns the existing conversation if there is one (one per pair, under a lock) |
 | `GET /people` | `ColleagueListQuery` → `ColleaguePage` | `community` view | yes | Colleagues with a login, for the people pickers (New Message, Recognise, Celebrate, members): public work fields only, open to every member of staff. The caller is left out unless `with_self` is set: New Message offers a conversation with oneself; Recognise, Celebrate and the member pickers never offer the caller. The staff register needs People |
-| `GET /people/:id/card` | → `ProfileCard` | `community` view | | The profile panel: public work fields only (work email, phone, worksite), presence, what this conversation shares |
+| `GET /people/:id/card` | → `ProfileCard` | `community` view | | The profile panel: public work fields only (work email, phone, worksite), presence, what this conversation shares (its files as `MediaRef`s, which open the viewer) |
 | `GET /announcements` | `AnnouncementListQuery` → `AnnouncementPage` | `announcements.post` capability | yes | The tracking tab |
 | `GET /announcements/stats` | → `AnnouncementStats` | capability | | The tab's figures, counted on the server over every announcement: published, scheduled, average read, this month, and the audience (active staff an all-staff announcement reaches now) |
 | `POST /announcements` | `AnnouncementCreate` → `Announcement` | `announcements.post` capability | | `audience` all staff or departments; `urgency` normal (the default), important or urgent; `publish_at` optional and in the future (day-first on screen, ISO on the wire) |
@@ -247,6 +296,28 @@ in #announcements, which every member of staff reads.
 - Read counts on announcements are visible to the poster and to holders of `announcements.post` only.
 - Calls are **not** part of this module (no call button, no WebRTC): they do not work on the donor
   either (TB, 12 October).
+- **Files sent together** are posted one message each, in the order picked, sharing an
+  `album_key`; the caption rides on the first. Four or more photos or videos in a row with the
+  same key, none deleted, show as one album; fewer show one by one. Up to 10 files a pick, 25 MB
+  each (the upload engine's caps).
+- **What opens in the app**: photos, videos and PDFs, in the file viewer. Word, Excel,
+  PowerPoint, CSV and text files download when tapped. A PDF is drawn by PDF.js (F22, its own
+  chunk, loaded when a PDF is first opened), not by the browser, so it opens the same on Android,
+  an iPhone and desktop. Download is always there; Share only where the device can share files.
+- **A PDF's first page** is drawn by the worker (`media-derive`) at 960 and 320 px, and its pages
+  counted, in a process of its own with a 60 second limit; a PDF it cannot read keeps the plain
+  file card. Until the picture exists, the card shows the file's glyph.
+- **Link cards.** Only `http` and `https` links, on ports 80 and 443, are fetched, and only by
+  the server. Every address a name resolves to is checked, and the connection is made to that
+  checked address, before each request and each of at most 4 redirects: loopback, private,
+  link-local, carrier-grade NAT, multicast, documentation and other reserved ranges, IPv4 and
+  IPv6, are refused. A page is read for at most 1 MB and 8 seconds; its picture must be a photo
+  type the vault takes, at most 5 MB. The card shows the site (`og:site_name`, else the host),
+  the title (at most 200 characters) and the description (at most 300). The server says who it is
+  in its user agent. A ready card is kept for a week, a page that gave nothing for an hour.
+- A message's first link is the first `http://` or `https://` address in it, or a `www.` or bare
+  domain on a known ending (`nfelia.com`, `mycityapp.io`); the composer and the server find it by
+  the same rule.
 - Copy a person reads: Title Case chrome, no em dashes, day-first dates.
 
 ## 7 · Events, jobs and notifications
@@ -263,7 +334,11 @@ in #announcements, which every member of staff reads.
 | `announcement.cancelled` | A scheduled announcement cancelled | Audit; nothing is posted |
 | `community.channel.members_changed` | Members added or removed, or an admin made or unmade | Audit; the channel list refreshes for those affected |
 | `celebrations` (scheduler + handler) | 05:00 Africa/Lagos daily | Birthday and anniversary cards in #general |
-| `av-transcode`, `media-scan` | After an upload | Voice note to Opus, video to MP4; a file from outside scanned. Image variants are made at upload; `media-derive` makes a file's variants again on request |
+| `av-transcode`, `media-scan` | After an upload | Voice note to Opus, video to MP4 and its poster; a file from outside scanned. Image variants are made at upload; `media-derive` makes a file's variants again on request |
+| `media-derive` | After a PDF is stored (`document.stored` with `needs` `pdf`) | Page 1 drawn as `webp-960` and `webp-320`, the pages counted (`services/media/pdf-pipeline.js`); then `document.derived` |
+| `document.derived` | A PDF's page or a video's poster is ready | Realtime `community.message_updated` to the members of every conversation holding that file, so its card fills in |
+| `link_preview.fetched` | A link's card was fetched (`POST /link-previews`, or the job below) | Audit: the address and who asked. The card is kept for every later message |
+| `link-preview` (job) | `channel_message.posted`, `direct_message.sent` or `channel_message.edited` carrying `link_url`: a text message whose first link had no card yet | Fetches the card, attaches it to the message (`channel_message.link_previewed`), and pushes `community.message_updated` to the members |
 
 ## 8 · Permissions and visibility by role
 
@@ -303,8 +378,8 @@ received, not interface copy; the copy rules apply to the chrome around them.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Staff Community · Channels (`channels`) | "6 channels · 25 staff" (desktop subtitle); New Channel; Search Channels; Pinned and Channels, each row the channel name (a lock when read only), its last message, time and unread count; the open channel: name, member count, a Read Only pill, the ⋮ menu (View Members, Edit Members, Channel Details, Search in Channel, Pin to Top or Unpin, Mute Notifications); a pin and a muted bell on rows, the messages and the celebration, recognition and poll cards (Celebrate, votes), each message's menu (Edit, Close Poll, Delete, only those the caller may use), an "Edited" mark and "Message deleted" in place; the composer with ＋ (Recognise a Colleague, Celebrate and Start a Poll where the caller may, Attach a File), record a voice note and Send; Edit Message (Message; Cancel, Save Changes; "Too late to edit" on the field when the 15 minutes have passed) and Edit Poll (the poll form; Save Changes); Delete asks once (Keep It, Delete Message); Close Poll asks once (Keep Open, Close Poll) and the poll shows a Closed pill; voice notes (Play, Transcribe, Hide Transcript); where the user may not post (an admins-only channel), "Only admins post here" in place of the composer; #announcements has none. New Channel: Channel Name, Purpose (Optional), Departments (Optional), People (Optional, with the count selected), Who Can Post (Every Member, Admins Only); Cancel, Create Channel. Channel Members and Edit Members (Make Admin or Remove Admin, Remove, Add People, Close); Channel Details (Channel, Members, Who Can Post). Recognise a Colleague (Colleague, Note Optional; Post Recognition; the toast "Posted to #general"); Celebrate (Colleague, Occasion: Birthday or Work Anniversary; Post Celebration); Start a Poll (Question, Option 1 to 4, the last two Optional; Post Poll); Attach a File (the files, then the upload percentage). Field errors of at most 4 words on the field: "Not a valid name", "Choose a colleague", "Add a question", "Add an option" | Help term on Channel Name: "Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name." Help term on Note in Recognise a Colleague: "Leave it blank and a thank you note is written for you." | Who can post being fixed when the channel is created, that only members read a channel, that channels are internal with no join link: §3 step 5, §6 (the New Channel ⓘ text is removed, and so is the Visibility row of Channel Details). Files going to the vault: §4 (the "Files are stored in the vault" line is removed). Who posts: §6 |
-| Staff Community · Direct Messages (`direct-messages`) | "N unread" or "All caught up" (desktop subtitle); New Message; Search People; All and Unread; each conversation: avatar with the online dot, name, last message ("You:" when it was the user's), time, unread count; the open conversation: name, Online or Last Seen, department, search, ⋮ (View Profile, Search in Conversation, Pin to Top or Unpin, Mute Notifications), a pin and a muted bell on rows, the messages with their ticks, voice notes (Play, Transcribe, Hide Transcript), the composer (Attach: Photo or Video, Document; record a voice note; Send). Profile: avatar, name, title, status pill, Message, View in People; Contact (work email, phone, worksite, local time); Shared in Conversation; Channels in Common; Mute Notifications; Search in Conversation. New Message: the person picker | None | What one tick, two grey and two blue mean: §3 step 10. Transcripts stored once per voice note: §3 step 11. The profile reading the employee record and showing no work details: §3 step 8. Search covering only the caller's own conversation: §3 step 9 |
+| Staff Community · Channels (`channels`) | "6 channels · 25 staff" (desktop subtitle); New Channel; Search Channels; Pinned and Channels, each row the channel name (a lock when read only), its last message, time and unread count; the open channel: name, member count, a Read Only pill, the ⋮ menu (View Members, Edit Members, Channel Details, Search in Channel, Pin to Top or Unpin, Mute Notifications); a pin and a muted bell on rows, the messages and the celebration, recognition and poll cards (Celebrate, votes), each message's menu (Edit, Close Poll, Delete, only those the caller may use), an "Edited" mark and "Message deleted" in place; the composer with ＋ (Recognise a Colleague, Celebrate and Start a Poll where the caller may, Attach a File), record a voice note and Send; Edit Message (Message; Cancel, Save Changes; "Too late to edit" on the field when the 15 minutes have passed) and Edit Poll (the poll form; Save Changes); Delete asks once (Keep It, Delete Message); Close Poll asks once (Keep Open, Close Poll) and the poll shows a Closed pill; voice notes (Play, Transcribe, Hide Transcript); photos in place at their own shape, an album of four tiles with "+N", a video's first frame with Play and its length, a PDF's first page with its name and "N pages · PDF · size", any other file with its name, type, size and Download; captions; clickable links and a link's card (picture, site, title, description); the composer's link card with Remove Preview; the file viewer (the sender and time, Close, Previous and Next, Zoom In and Zoom Out, a PDF's page number, Download, Share on a phone; "Cannot Open File" with Download when a file will not open); where the user may not post (an admins-only channel), "Only admins post here" in place of the composer; #announcements has none. New Channel: Channel Name, Purpose (Optional), Departments (Optional), People (Optional, with the count selected), Who Can Post (Every Member, Admins Only); Cancel, Create Channel. Channel Members and Edit Members (Make Admin or Remove Admin, Remove, Add People, Close); Channel Details (Channel, Members, Who Can Post). Recognise a Colleague (Colleague, Note Optional; Post Recognition; the toast "Posted to #general"); Celebrate (Colleague, Occasion: Birthday or Work Anniversary; Post Celebration); Start a Poll (Question, Option 1 to 4, the last two Optional; Post Poll); Send Files (the drop zone, each file's upload percentage, the files as tiles with Remove, Add More, Caption Optional; Cancel, Send Files). Field errors of at most 4 words on the field: "Not a valid name", "Choose a colleague", "Add a question", "Add an option" | Help term on Channel Name: "Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name." Help term on Note in Recognise a Colleague: "Leave it blank and a thank you note is written for you." | Who can post being fixed when the channel is created, that only members read a channel, that channels are internal with no join link: §3 step 5, §6 (the New Channel ⓘ text is removed, and so is the Visibility row of Channel Details). Files going to the vault: §4 (the "Files are stored in the vault" line is removed). Who posts: §6. How a link card is fetched (by the server, private addresses refused, its picture copied, kept a week), when files become an album, who draws a PDF's first page, which files open in the app: §3 steps 17 and 18, §6 |
+| Staff Community · Direct Messages (`direct-messages`) | "N unread" or "All caught up" (desktop subtitle); New Message; Search People; All and Unread; each conversation: avatar with the online dot, name, last message ("You:" when it was the user's), time, unread count; the open conversation: name, Online or Last Seen, department, search, ⋮ (View Profile, Search in Conversation, Pin to Top or Unpin, Mute Notifications), a pin and a muted bell on rows, the messages with their ticks, voice notes (Play, Transcribe, Hide Transcript), photos, albums, videos, files, captions, links and link cards as in Channels, the composer (Attach: Photo or Video, Document, each opening Send Files; the link card with Remove Preview; record a voice note; Send), the file viewer as in Channels. Profile: avatar, name, title, status pill, Message, View in People; Contact (work email, phone, worksite, local time); Shared in Conversation (each file opens the viewer); Channels in Common; Mute Notifications; Search in Conversation. New Message: the person picker | None | What one tick, two grey and two blue mean: §3 step 10. Transcripts stored once per voice note: §3 step 11. The profile reading the employee record and showing no work details: §3 step 8. Search covering only the caller's own conversation: §3 step 9 |
 | Staff Community · Announcements (`announcements`) | New Announcement; Published, Scheduled, Average Read, Audience, This Month (desktop); a card per announcement: headline, a Scheduled or "N of 25 read" pill, the body, "Posted" or "Goes out" with the date and author. A card opens Announcement Reads (or Scheduled Announcement, with Edit and Cancel Announcement; Edit opens Edit Announcement, the New Announcement form filled in, with Save Changes; Cancel Announcement asks once, Keep It or Cancel Announcement): headline, posted line, body, "Read by N of 25" with its bar, Not Read with Remind Them, Read; Close. An Urgent card has a red edge and reads "N of 25 acknowledged", and its modal lists Not Acknowledged (with Remind Them) and Acknowledged, each with its time; an Important card has an amber edge. New Announcement: Headline, Message, Level (Normal, Important, Urgent), Audience (All Staff or Departments, then the department chips), When (Now or Schedule, then Publish Date, DD/MM/YYYY); Cancel, Publish Announcement (Schedule Announcement when scheduled) | Help term on Average Read: "Across published announcements, the share of the audience who have opened each one." Help term on Level: "Urgent stays red on everyone's screens and repeats every 30 minutes of the working day until each person acknowledges. Important reminds the unread after 4 hours." | Who may post, #announcements being pinned and read only, the notification on publish, scheduling, read counts visible to the poster only: §3 step 2, §6, §7, §8 (the page subtitle "Posted by People and the CEO · staff read them in #announcements" and its ⓘ text are removed). "Not yet visible to staff" on the scheduled pill: §3 step 2. "Posting as" in the form: §6 |
 | #announcements channel | As Channels: the published announcements as cards (author, date, headline, body), newest last; a lock on its row and the Read Only pill; no composer at all, for anyone (announcements are published from the Announcements tab). An Urgent card is red and pulses slowly (steady when motion is off) with Acknowledge until pressed, then "Acknowledged" and its time; an Important card has an amber edge. A red dot on Community while an urgent announcement waits on the person | None | The `announcements.post` capability: §5, §8. The repeat schedule: `docs/guides/notifications.md` §6 |
 | Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub (M10): the same announcement records, read only | The M10 guide | The M10 guide. That it reads the same records, no second copy: §2 |
@@ -317,8 +392,8 @@ received, not interface copy; the copy rules apply to the chrome around them.
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Staff Community · Channels (`channels`) | New Channel beside the title; the search box; Pinned and Channels as full-width rows (channel name, last message, time, unread count) | The subtitle; the open channel beside the list (a channel opens full screen instead); the resizable divider | Tap a channel: it opens full screen over the top bar, tabs and bottom bar, with Back; the composer is locked at the bottom (＋, the voice note button and Send, 44 px) and only the messages scroll; ＋ opens Recognise, Celebrate, Poll and Attach as a menu, each form as a bottom sheet | Bottom bar Chat; the three tabs along the top; inside a channel the menu button opens the channel list as a side drawer; Back returns to the list |
-| Staff Community · Direct Messages (`direct-messages`) | New Message beside the title; the search box; All and Unread as a full-width two-part switch (44 px); the conversation rows | The subtitle; the profile column (View Profile opens it as a sheet); the resizable divider | Tap a conversation: it opens full screen with Back; Attach, the voice note button and Send at the bottom, 44 px | As Channels |
+| Staff Community · Channels (`channels`) | New Channel beside the title; the search box; Pinned and Channels as full-width rows (channel name, last message, time, unread count) | The subtitle; the open channel beside the list (a channel opens full screen instead); the resizable divider; the viewer's arrows and zoom buttons (a swipe and a pinch instead) | Tap a channel: it opens full screen over the top bar, tabs and bottom bar, with Back; the composer is locked at the bottom (＋, the voice note button and Send, 44 px) and only the messages scroll; ＋ opens Recognise, Celebrate, Poll and Attach as a menu, each form as a bottom sheet; Send Files is a bottom sheet with Send Files full width at its foot; the link card sits above the message box with its Remove Preview; a photo, video or PDF opens the viewer over everything, black, with Close, the sender, Share and Download in its top bar, swiped left and right, a photo pinched or double tapped to zoom | Bottom bar Chat; the three tabs along the top; inside a channel the menu button opens the channel list as a side drawer; Back returns to the list; Close or the phone's Back leaves the viewer |
+| Staff Community · Direct Messages (`direct-messages`) | New Message beside the title; the search box; All and Unread as a full-width two-part switch (44 px); the conversation rows | The subtitle; the profile column (View Profile opens it as a sheet); the resizable divider; the viewer's arrows and zoom buttons | Tap a conversation: it opens full screen with Back; Attach, the voice note button and Send at the bottom, 44 px; Send Files, the link card and the viewer as in Channels | As Channels |
 | Staff Community · Announcements (`announcements`) | New Announcement under the title; four stat cards two to a row (Published, Scheduled, Average Read, Audience; Average Read's help opens as a sheet); the announcement cards one to a row | This Month | New Announcement opens the form as a bottom sheet, the primary full width; a card opens its reads as a sheet | Bottom bar Chat; the three tabs along the top |
 | #announcements channel | As Channels | As Channels | Staff read only; Acknowledge on an Urgent card, full width at 44 px | As Channels |
 | Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub | The M10 guide | The M10 guide | The M10 guide |
@@ -343,6 +418,21 @@ fields, never in a toast.
 - **Huge history**: paged at 25; "Load Older" fetches the next page.
 - **Unsupported file type**: refused by the upload engine's mime policy, with the reason.
 - **Announcement scheduled in the past**: refused; the date must be today or later.
+- **A photo or a page picture that fails to load**: its tile keeps its shape with the file's glyph;
+  tapping it still opens the viewer, which offers Download.
+- **A PDF that is broken, locked with a password or too heavy**: no first page in the bubble; the
+  viewer says Cannot Open File and offers Download.
+- **A video before `av-transcode` has finished**: a dark tile with Play; the viewer plays the
+  original if the browser can, else offers Download. The poster arrives in place once made.
+- **A deleted photo in an album**: shown as "Message deleted" in its place; the rest of the album
+  shows one by one when fewer than four remain.
+- **A link to a private or internal address** (`http://10.0.0.5`, `localhost`, an address that
+  resolves to one): never fetched; the link stays clickable, with no card.
+- **A page with no title, a page that times out, a picture that is too big or not a photo**: no
+  card, or a card without its picture. Asked again after an hour.
+- **The same link posted twice in a week**: the second message gets the card at once from the
+  cache; nothing is fetched again.
+- **Sent before the card arrived**: posted at once; the card fills in a moment later.
 - **Urgent announcement acknowledged on the bar**: the card in #announcements turns to
   "Acknowledged" too, and the other way round; both reach the same reads row.
 - **Urgent announcement for chosen departments**: only their people get the bar and the repeats;
@@ -358,6 +448,7 @@ fields, never in a toast.
 | praxis-ls | `smartcomm.call.*`, `diagnostics.*`, `turn.*` (5,750 loc) | **Not ported** |
 | praxis-ls | `client/src/features/comms/team-chat.tsx`, `chat/` (composer, message-bubble, voice-note, voice-recorder, attachments) | Layout and behaviour ported; MyCity branding |
 | new | Recognition, celebrations, polls, announcements tracking | Built here (A19, A20) |
+| new | Photos in place, albums, the file viewer, PDF pages drawn by PDF.js, link cards fetched by the server | Built here (TB, 19/10/2026) |
 
 ## 13 · Open questions
 
@@ -393,6 +484,7 @@ fields, never in a toast.
 - 17/10/2026 · TB · Header gains the Capabilities row every guide now carries (README §5.2): `announcements.post`, as built and seeded by `0449`.
 - 19/10/2026 · TB · §7: how posts and direct messages reach a phone (one alert per channel, then quiet updates; every direct message alerts, one notification per conversation) and the channel's name in a post's notice (`channel_name` in the event's payload), from TB's notification decisions.
 - 19/10/2026 · AJ · `PersonRef` carries `photo_url` (`shared/db/person.js`, which replaces `community.repo.js`'s own `PERSON`): members, direct messages and their profile panel, posts, celebration and recognition cards, the colleague picker and announcement readers show each face (the app's `usePhotos`), initials when there is none. GE to review.
+- 19/10/2026 · TB · Media and links, from TB's four answers: photos show in place and 4 or more sent together as an album; Send Files takes several files with a caption; photos, videos and PDFs open in a full-screen viewer with Download and, on a phone, Share; PDFs are drawn by PDF.js on every device (the browser's own viewer cannot draw one on Android, and the app's security policy blocks it everywhere), their first page drawn by the worker for the bubble; links are clickable and the first carries a card the server fetches, shown in the composer with Remove Preview. §2, §3 steps 17 and 18, §4 (`1147`, `community_link_preview`, `MediaRef`), §5 (`POST /link-previews`), §6, §7, §10, §11 and §12. FRONTEND_FOUNDATION §5 PR 3 question 4 records the PDF change.
 - 19/10/2026 · TB · From TB's answers (`docs/handoff/notifications-everywhere.md` §2): announcements get
   a level (Normal, Important, Urgent; §3 step 2, §6); Urgent needs Acknowledge, shows red with the
   urgent bar and repeats until acknowledged; Important reminds the unread after 4 hours; every

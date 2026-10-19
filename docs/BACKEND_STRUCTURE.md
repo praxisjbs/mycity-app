@@ -362,6 +362,7 @@ and only then moves the file into the vault. A staff user never opens an unscann
 | Signature capture (M5) | profile `document`, PNG kept | Stamped into the PDF execution block |
 | Voice note (M1 chat, M2 dictation) | `av-pipeline` | Opus in Ogg, duration stored; original kept |
 | Video (chat) | `av-pipeline` | H.264 MP4 ≤ 720p + poster frame |
+| PDF (chat, documents) | `pdf-pipeline`: PDF.js in a child process (60 s, 512 MB), nothing in the file runs | Page count on `document.page_count`; the first page as WebP 960 and 320 |
 | HEIC from iPhones | `image-pipeline` normalisation | Converted on the way in |
 
 Brand images (logo, pin, white variant, app icons) come from `assets/brand/` vector masters and are

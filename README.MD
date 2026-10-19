@@ -169,7 +169,8 @@ src/
 │                  idempotency · auth · rbac · public-token · upload · error-handler
 ├── shared/
 │   ├── errors.js · route-map.js
-│   ├── db/            tx · query-helpers · pg-types · effective-dated · person (PersonRef in SQL, photo sizes)
+│   ├── db/            tx · query-helpers · pg-types · effective-dated · person (PersonRef in SQL, photo sizes) ·
+│   │                  media (MediaRef in SQL: a file's shape, page count and sizes)
 │   ├── crud/          resource (makeRepo / makeService / makeController / mountResource)
 │   ├── http/          validate · paged (THE pagination gate, 25 per page) · body-limits · respond
 │   ├── events/        emit · outbox · catalogue
@@ -200,7 +201,8 @@ src/
 │                      server's mycity-alert)
 ├── services/
 │   ├── storage/       storage.service
-│   ├── media/         image-pipeline · av-pipeline · scan · reconcile
+│   ├── media/         image-pipeline · av-pipeline · pdf-pipeline (a PDF's page count and first page) ·
+│   │                  pdf-page (the first page drawn by PDF.js in its own process) · scan · reconcile
 │   ├── pdf/           chromium · pdf.service
 │   ├── mail/          system-mail.service · pace (the hourly sending limit) · deliverability/{check,
 │   │                  route-check, dns-check, dmarc, ptr, rbl, evaluate}
@@ -210,6 +212,9 @@ src/
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── qr/            qr
+│   ├── web/           links (what counts as a link, the first one's card form) · public-fetch (a page or a
+│   │                  picture from the public web only: private addresses refused, size and time capped) ·
+│   │                  page-card (a page's Open Graph card)
 │   └── realtime/      emitter · active (who is in front of the app, for the push hold)
 ├── realtime/      socket
 └── jobs/
@@ -333,12 +338,13 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `worksites` | LA | |
 | `leave` | AJ | `.balance` (the dates and allowance rules), `.clash` (who else in the department is away); requests open the `leave.approval` flow, decided in `workflow` |
 | `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, downloaded where it was asked for, removed a day later) |
-| `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
+| `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20), `.links` (link cards: fetched once per address and kept for a week, their pictures in the vault) |
 | `announcements` | GE | |
 | `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test` |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
-`services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `shared/geo`,
+`services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `services/media/pdf-pipeline`
+and `services/web` (Staff Community's PDF previews and link cards), `shared/geo`,
 `shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence),
 `shared/documents/exports` (every Export and Download button's file: reserved in the request, made
 in the worker, downloaded on the device that asked, removed a day later; `docs/guides/foundation.md` §6.12).
@@ -483,7 +489,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
 | M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit`, `reminders` (one person's daily digest; brought forward from M6) | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup`, `urgent-repeats` (open urgent notices alerted again every 30 minutes, 08:00 to 18:00 Lagos), `reminders` (the reminder engine's tick every 5 minutes, and each person's daily digest queued; brought forward from M6) |
-| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `attendance-clock-watch` (clock-in reminders and automatic clock-outs, every 5 minutes), `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `export-cleanup` (export files removed a day after they were made, every hour); loop `loops/mail-idle` |
+| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail), `link-preview` (a chat link's card, fetched after the message commits) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `attendance-clock-watch` (clock-in reminders and automatic clock-outs, every 5 minutes), `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `export-cleanup` (export files removed a day after they were made, every hour); loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |
 | M4 | `assessment-expire`, `interview-feedback-reminder` | `assessment-expiry`, `interview-reminders` |

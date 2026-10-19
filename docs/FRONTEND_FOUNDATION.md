@@ -189,10 +189,17 @@ app's session on the upload engine.
 3. What draws the rich text editor? **TipTap (ProseMirror), in its own lazy chunk** (F22). Selection,
    paste sanitising, lists and undo are the parts that are not worth hand-rolling, and the composer
    and announcements both take pasted mail. The toolbar and every style are ours, on tokens.
-4. How is a document previewed? **The browser's own viewer**: a PDF streams from the vault into an
-   `<object>`, and anything that refuses it inline gets a Download card instead. An **image viewer**
-   sits beside it for pictures, and **both carry Open in Tab**, so a preview opens full size.
-   Our own generated documents keep rendering through `Paper`.
+4. How is a document previewed? **PDF.js, in its own chunk** (changed 19/10/2026, TB): every page
+   of a PDF is drawn in the app, the same on Android, an iPhone and desktop, by `PdfViewer`, whose
+   PDF.js part loads only when a PDF is first opened (F22). Until then the answer was the browser's
+   own viewer, a PDF in an `<object>`; Android's browser cannot draw a PDF inside a page, and the
+   app's security policy (`object-src 'none'`) blocked the `<object>` on staging and production for
+   every browser. An **image viewer** sits beside it for pictures; `DocumentPreview` draws both,
+   with Open in Tab, and `MediaViewer` opens photos, videos and PDFs full screen with Download and,
+   on a phone, Share. Every screen that opens an uploaded file uses them (TB, 19/10/2026): a photo,
+   a video or a PDF opens in `MediaViewer` (the staff app binds it to its session in
+   `features/shared/files.tsx`) and anything else downloads. Our own generated documents keep
+   rendering through `Paper`.
 
 **F26 · One press, one request** (18/10/2026, TB)
 
@@ -220,6 +227,12 @@ app's session on the upload engine.
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 19/10/2026 · TB · PR 3 question 4 changed (§5): PDFs are drawn by PDF.js (`PdfViewer`, its
+  drawing in its own chunk, with the font and code files served from `/pdfjs/`), because the
+  browser's own viewer could not draw a PDF on Android and the security policy blocked it
+  everywhere else. `DocumentPreview` draws a PDF through it; `MediaViewer` (photos, videos and
+  PDFs full screen, Download and Share), `MediaTile`, `FileCard`, `LinkCard` and `LinkText` join
+  the kit for Staff Community's media and links (`docs/guides/community.md` §3 steps 17 and 18).
 - 18/10/2026 · TB · F26, one press, one request. Reload on "A new version is ready" looked dead: no
   sign of work while the new version took over, and after a hard refresh nothing at all, because the
   PWA plugin reloads only a page a service worker controlled when it loaded. Now every press answers

@@ -69,7 +69,12 @@ const JOBS = Object.freeze([
   {
     queue: "media-derive",
     concurrency: 1,
-    summary: "A stored document's derived files made again",
+    summary: "A stored document's derived files: a PDF's first page, or any file's made again",
+  },
+  {
+    queue: "link-preview",
+    concurrency: 2,
+    summary: "A link's card fetched and added to a message posted before it had one",
   },
   {
     queue: "import-validate",
@@ -174,6 +179,13 @@ const TRIGGERS = Object.freeze([
     name: "jobs.av-transcode",
     queue: "av-transcode",
     when: needs("av"),
+    data: (e) => ({ document_id: documentIdOf(e) }),
+  },
+  {
+    event: "document.stored",
+    name: "jobs.media-derive",
+    queue: "media-derive",
+    when: needs("pdf"),
     data: (e) => ({ document_id: documentIdOf(e) }),
   },
 ]);

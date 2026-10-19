@@ -156,7 +156,10 @@ are vault documents (`mail_signature_image`) · `1129` reference data: the `mail
 capability for System Administrator and Implementation · `1130` an announcement can be `cancelled` · `1140` each
 member's own pin (`community_member.pinned_at`) · `1145` an announcement's level
 (`announcement.urgency`) and who acknowledged an urgent one (`announcement_read.acknowledged_at`;
-TB, 19/10/2026) · `1150` Home: a rule's name and who made and
+TB, 19/10/2026) · `1147` community media and links: `community_link_preview` (a link's card, one
+per address: the site, title, description and the picture as a vault document, ready, empty or
+failed, and when it was fetched), `community_message.community_link_preview_id` (the card a text
+carries), and `document.page_count` (a PDF's pages, counted by the worker) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and
 recipients as users, one schedule per report; `home_report_run` (one numbered file per recipient and

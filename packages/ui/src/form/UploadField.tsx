@@ -9,7 +9,7 @@
  * @status stable
  * @example <UploadField purpose="receipt" endpoint="/api/v1/documents" upload={api.upload} onUploaded={(docs) => form.set("receipts", docs)} />
  */
-import { useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { formatBytes } from "../lib/format";
 import { uploadFile, type DocumentRef, type Uploader } from "../lib/upload";
@@ -63,6 +63,11 @@ export interface UploadFieldProps {
   /** A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. */
   trigger?: (open: () => void) => ReactNode;
   /**
+   * Open the device's picker as soon as the field shows, where the browser allows it (a sheet
+   * opened from a menu, such as Send Files); otherwise the person taps the drop zone.
+   */
+  autoOpen?: boolean;
+  /**
    * The caller lists what arrived itself (a composer's attachment chips), so a
    * finished file leaves the tray once it is handed over and is never shown twice.
    */
@@ -84,10 +89,18 @@ export function UploadField({
   kinds,
   compact,
   trigger,
+  autoOpen,
   handOff,
   className,
 }: UploadFieldProps) {
   const input = useRef<HTMLInputElement>(null);
+  const opened = useRef(false);
+  useEffect(() => {
+    // Once, while the press that opened the sheet still lets a page open the picker.
+    if (!autoOpen || opened.current) return;
+    opened.current = true;
+    input.current?.click();
+  }, [autoOpen]);
   const [files, setFiles] = useState<Travelling[]>([]);
   const [over, setOver] = useState(false);
 
@@ -105,7 +118,8 @@ export function UploadField({
     }));
     setFiles((list) => (multiple ? [...list, ...added] : added));
 
-    const arrived: DocumentRef[] = [];
+    // Kept in the order picked, whichever finishes first, so photos sent together stay in order.
+    const done: Array<DocumentRef | undefined> = [];
     let waiting = added.filter((f) => !f.error).length;
     if (waiting === 0) return;
 
@@ -114,11 +128,12 @@ export function UploadField({
       upload({ endpoint, file: chosen[i]!, fields: { purpose, ...fields }, onProgress: (percent) => patch(item.key, { percent }) })
         .then((doc) => {
           patch(item.key, { percent: 100, doc });
-          arrived.push(doc);
+          done[i] = doc;
         })
         .catch((e: Error) => patch(item.key, { error: e.message }))
         .finally(() => {
           waiting -= 1;
+          const arrived = done.filter((d): d is DocumentRef => d !== undefined);
           if (waiting > 0 || arrived.length === 0) return;
           onUploaded?.(arrived);
           if (handOff) {
