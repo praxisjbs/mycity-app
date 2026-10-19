@@ -253,14 +253,18 @@ performance cycles, reviews and review items · `2099` seed.
 
 ### M3 Queries & Consequence Management · 3000 to 3999 · GE
 
-**Built:** `3000` query rules, queries, responses, sanctions, fines, letters · `3099` seed.
+**Built:** `3000` query rules, queries, responses, sanctions, fines, letters · `3099` seed ·
+`3010` the chain (`consequence_step`, one rung a row in position order), `letter_template`, a rule's
+`measure`, letter and drafts, the query's `dedup_key` (three punches raise exactly one query),
+outcome and letter, a sanction's number, rung, evidence and approval · `3190` the `queries.configure`
+capability, the `queries.consequence` approval (replacing `3099`'s invalid `employee_consequence`,
+switched off) and the shipped letters' rows (docs/guides/queries.md §4).
 
 **Owes:**
-- Query rules: the action, and the dedup key so three punches raise exactly one query.
-- Letters for a query, not only for a sanction.
-- Fines as pending deductions for the M6 payroll run (MILESTONES §8).
-- The consequence workflow: `3099`'s `employee_consequence` fails `validateDefinition()` and must
-  be replaced by a valid definition in a new seed.
+- Fines as pending deductions accepted into the M6 payroll run (MILESTONES §8): M6 reads
+  `sanction_fine` through `sanctions.fines`; the deduction table links back to it.
+- `sanction_fine.employee_accepted_at`, `employee_rejected_at`, `rejection_reason` are unused
+  (queries.md §13): dropped in a later release unless M6 needs them.
 
 ### M4 Recruitment · 4000 to 4999 · TB
 

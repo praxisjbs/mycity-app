@@ -121,9 +121,9 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `GET /leave/:id` | → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Someone else's is a 404 |
 | `POST /leave` | `LeaveRequestCreate` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Opens the `leave.approval` flow in the same transaction |
 | `POST /leave/:id/cancel` | `LeaveCancel` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. While it waits (the approval is withdrawn too) or once granted until it starts |
-| `GET /queries` | `EssQueryList` (`status`: open, archived) → `QueryPage` | `ess` · own | yes | |
-| `POST /queries/:id/response` | `QueryResponse` | `ess` · own | | Through the queries service |
-| `GET /sanctions` | `PageQuery` → `SanctionPage` | `ess` · own | yes | |
+| `GET /queries` | `EssQueryListQuery` (`status`: open, archived) → `MyQueryPage` | `ess` · own | yes | Contract in `schemas/queries.js` (queries guide §5) |
+| `POST /queries/:id/response` | `QueryResponseCreate` → `MyQuery` | `ess` · own | | Through the queries service |
+| `GET /sanctions` | `PageQuery` → `MySanctionPage` | `ess` · own | yes | Issued sanctions only; contract in `schemas/sanctions.js` |
 | `GET /documents` | `DocumentListQuery` (`status`) → `DocumentListPage` | `ess` · own | yes | Built 17/10/2026. Documents held and ones People asked for, in one list |
 | `GET /documents/summary` | → `DocumentSummary` | `ess` · own | | Built 17/10/2026. The five counts, over every row, not the page |
 | `POST /documents` | multipart `EssDocumentUpload` → `DocumentRow` | `ess` · own | | Built 17/10/2026. Upload engine and vault; `document_request_id` answers a Missing row |
@@ -362,3 +362,4 @@ Deductions figure and every form open the shared modal.
 - 18/10/2026 · AJ · Edit Profile gains a fourth step, Review: each change as before → after (the account by its last four digits), and a note when the bank changes; the Bank step shows the bank and account on record. The leave calendar and My Attendance pick a month by arrows or directly (a year and its months).
 - 19/10/2026 · LA · Work Location Requests (#87) is built on the real API from the attendance guide, which owns it (§6.11, §10): §10.2 row follows its phone layout. Policy Updates (#89) stays on INTERIM shapes until M9 (attendance guide §13).
 - 19/10/2026 · LA · My Attendance (#9) shows the person's field assignments in progress and to come, under Today (attendance guide §6.12, §10); §10.2 row updated.
+- 19/10/2026 · GE · §5: the ESS queries and sanctions rows name the contract the queries guide wrote (`EssQueryListQuery`, `MyQueryPage`, `QueryResponseCreate`, `MySanctionPage`).

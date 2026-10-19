@@ -19,6 +19,8 @@
  * change on Settings, Approvals.
  * M1 adds `attendance.location_request` (docs/guides/attendance.md §6.11, seeded in
  * 1392): a work location request, the line manager then Operations & People.
+ * M3 adds `queries.consequence` (docs/guides/queries.md §6.5, seeded in 3190): a proposed
+ * sanction, Operations & People, then Management from the fourth rung.
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -97,6 +99,30 @@ const DEFAULTS = Object.freeze({
         key: "operations_people",
         name: "Operations & People",
         approver: { type: "role", value: "operations_people" },
+        sla_hours: 48,
+      },
+    ],
+  },
+  // M3, seeded in 3190 (docs/guides/queries.md §6.5): who approves a proposed sanction.
+  // `rank` is the rung's position on the chain when it was proposed.
+  "queries.consequence": {
+    key: "queries.consequence",
+    module: "queries",
+    name: "Sanction",
+    description: "Operations & People, then Management from Suspension up.",
+    context: { rank: "number", fine_amount: "money" },
+    stages: [
+      {
+        key: "operations_people",
+        name: "Operations & People",
+        approver: { type: "role", value: "operations_people" },
+        sla_hours: 48,
+      },
+      {
+        key: "management",
+        name: "Management",
+        approver: { type: "role", value: "management" },
+        condition: { field: "rank", op: ">=", value: 4 },
         sla_hours: 48,
       },
     ],

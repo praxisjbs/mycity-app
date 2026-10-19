@@ -216,6 +216,12 @@ const CAPABILITY_CATALOG = [
     label: "Configure Signature",
     description: "Set the company's signature links and what shows on everyone's email signature.",
   },
+  {
+    code: "queries.configure",
+    module: "queries",
+    label: "Configure Queries",
+    description: "Write the query rules, the consequence chain and the letter templates.",
+  },
 ];
 
 const CAPABILITIES = CAPABILITY_CATALOG.map((c) => c.code);
