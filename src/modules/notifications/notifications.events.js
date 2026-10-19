@@ -22,6 +22,7 @@ const realtime = require("../../services/realtime/emitter");
 const EVENTS = defineEvents("settings", {
   "notification.read": { summary: "A notification was marked read" },
   "notification.read_all": { summary: "Every notification was marked read" },
+  "notification.acknowledged": { summary: "An urgent notification was acknowledged" },
   "notification.preference_changed": { summary: "A person changed where a kind of notice reaches them" },
   "push_subscription.saved": { summary: "Notifications were turned on for a device" },
   "push_subscription.removed": { summary: "Notifications were turned off for one or more devices" },
@@ -39,6 +40,10 @@ function tellTheirTabs(event) {
 
 outbox.register(EVENTS.NOTIFICATION_READ, "notifications.sync_read", async (event) => tellTheirTabs(event));
 outbox.register(EVENTS.NOTIFICATION_READ_ALL, "notifications.sync_read_all", async (event) => tellTheirTabs(event));
+// Acknowledge closes the urgent bar on every other tab and device too.
+outbox.register(EVENTS.NOTIFICATION_ACKNOWLEDGED, "notifications.sync_acknowledged", async (event) =>
+  tellTheirTabs(event),
+);
 
 /** Send Test: the worker pushes to the device asked for, or every device of the person. */
 outbox.register(EVENTS.PUSH_TEST_REQUESTED, "notifications.send_test_push", (event) =>

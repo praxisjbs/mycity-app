@@ -10,6 +10,7 @@
  * @exports CardHeader
  * @example <Card><CardHeader title="Leave Requests" actions={<Button size="sm">View All</Button>} />...</Card>
  * @example <Card details={<Details>...</Details>}>...</Card>
+ * @example <Card urgency="urgent">...</Card>
  */
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "../lib/cn";
@@ -23,16 +24,25 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
   as?: "div" | "section" | "article";
   /** The one Details row at the foot of the card (a Details from @mycity/ui), closed by default. */
   details?: ReactNode;
+  /** A notice's level: an amber edge when important; a red edge that pulses slowly when urgent (steady when motion is off). */
+  urgency?: "normal" | "important" | "urgent";
   /** The card's content. */
   children?: ReactNode;
 }
 
-export const Card = forwardRef<HTMLElement, CardProps>(function Card({ pad = true, as: Comp = "div", details, className, children, ...rest }, ref) {
+const URGENCY = {
+  normal: "",
+  important: "border-warning border-l-4",
+  urgent: "animate-urgent border-destructive border-l-4",
+} as const;
+
+export const Card = forwardRef<HTMLElement, CardProps>(function Card({ pad = true, as: Comp = "div", details, urgency = "normal", className, children, ...rest }, ref) {
   return (
     <Comp
       ref={ref as never}
       data-card=""
-      className={cn("max-w-full min-w-0 rounded-card border border-border bg-card text-card-foreground shadow-1", pad ? "p-3.5" : "overflow-hidden", className)}
+      data-urgency={urgency === "normal" ? undefined : urgency}
+      className={cn("max-w-full min-w-0 rounded-card border border-border bg-card text-card-foreground shadow-1", URGENCY[urgency], pad ? "p-3.5" : "overflow-hidden", className)}
       {...rest}
     >
       {children}

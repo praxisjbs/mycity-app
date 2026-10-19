@@ -237,29 +237,36 @@ route("POST /api/v1/auth/password", (req) => {
   return ok({ sessions_signed_out: 1 });
 });
 
-/** The bell's rows: [category, title, line, days ago, time, priority, module, tab, entity type]. */
+/** The bell's rows: [category, title, line, days ago, time, priority, module, tab, entity type, urgency]. */
 const NOTES = [
-  ["approvals", "Expense request waiting on you", "Bashir Lawal · Lagos activation transport, ₦185,000.00", 0, "08:41", "high", "expenses", "approvals", "expense"],
-  ["queries", "3 late arrivals in 30 days", "A query was raised automatically for Bashir Lawal.", 0, "09:44", "high", "queries", "queries", "query"],
-  ["recruitment", "New application", "Adaeze Okonkwo applied for Content Producer.", 0, "07:20", "normal", "recruitment", "candidates", "candidate"],
-  ["comms", "You were recognised", "Ifeoma Chukwu: \"Kept the Enugu shoot on schedule.\"", 1, "16:12", "normal", "community", "channels", "recognition"],
-  ["people", "Leave request", "Tobi Ojo requested 5 days from 20/10.", 1, "11:03", "normal", "people", "leave", "leave_request"],
-  ["partnerships", "Eko Hotels has gone quiet", "34 days since the last contact.", 2, "09:00", "high", "partnerships", "partners", "partner"],
-  ["payroll", "Payroll preview ready", "October run, 25 employees.", 3, "10:30", "normal", "payroll", "payroll-runs", "payroll_run"],
+  ["approvals", "Expense request waiting on you", "Bashir Lawal · Lagos activation transport, ₦185,000.00", 0, "08:41", "high", "expenses", "approvals", "expense", "normal"],
+  ["comms", "Fire drill at 11", "Urgent. Acknowledge it in #announcements.", 0, "09:30", "high", "community", "channels", "announcement", "urgent"],
+  ["queries", "3 late arrivals in 30 days", "A query was raised automatically for Bashir Lawal.", 0, "09:44", "high", "queries", "queries", "query", "normal"],
+  ["recruitment", "New application", "Adaeze Okonkwo applied for Content Producer.", 0, "07:20", "normal", "recruitment", "candidates", "candidate", "normal"],
+  ["comms", "You were recognised", "Ifeoma Chukwu: \"Kept the Enugu shoot on schedule.\"", 1, "16:12", "normal", "community", "channels", "recognition", "normal"],
+  ["people", "Leave request", "Tobi Ojo requested 5 days from 20/10.", 1, "11:03", "normal", "people", "leave", "leave_request", "normal"],
+  ["partnerships", "Eko Hotels has gone quiet", "34 days since the last contact.", 2, "09:00", "high", "partnerships", "partners", "partner", "important"],
+  ["payroll", "Payroll preview ready", "October run, 25 employees.", 3, "10:30", "normal", "payroll", "payroll-runs", "payroll_run", "normal"],
 ] as const;
 
 const noteId = (i: number) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`;
-/** Read marks, kept for the session: the first three arrive unread. */
-const READ = new Set(NOTES.map((_, i) => noteId(i)).slice(3));
+/** Read marks, kept for the session: the first four arrive unread. Acknowledgements likewise. */
+const READ = new Set(NOTES.map((_, i) => noteId(i)).slice(4));
+const ACKED = new Set<string>();
 
 const notes = () =>
   NOTES.map((n, i) => {
     const id = noteId(i);
     const entityId = `${n[8]}-${i + 1}`;
+    const ack = n[9] === "urgent" && n[8] === "announcement";
     return {
       notification_id: id,
       category: n[0],
       priority: n[5],
+      urgency: n[9],
+      acknowledge_required: ack,
+      acknowledged_at: ack && ACKED.has(id) ? at(n[3], n[4]) : null,
+      repeat_count: 0,
       title: n[1],
       body: n[2],
       entity_type: n[8],
@@ -273,6 +280,20 @@ const notes = () =>
 route("GET /api/v1/notifications", (req) =>
   paged(notes(), req, { filters: { status: (r, v) => (v === "unread" ? r.read_at === null : r.read_at !== null) } }),
 );
+route("GET /api/v1/notifications/urgent", (req) =>
+  paged(
+    notes().filter((n) => n.urgency === "urgent" && (n.acknowledge_required ? n.acknowledged_at === null : n.read_at === null)),
+    req,
+  ),
+);
+route("POST /api/v1/notifications/:id/acknowledge", (req) => {
+  const n = notes().find((x) => x.notification_id === req.params.id);
+  if (!n) return fail(404, "NOT_FOUND", "There is no such notification.");
+  if (!n.acknowledge_required) return fail(422, "NOT_ACKNOWLEDGEABLE", "This notice needs no acknowledgement.");
+  ACKED.add(n.notification_id);
+  READ.add(n.notification_id);
+  return ok(notes().find((x) => x.notification_id === req.params.id));
+});
 route("GET /api/v1/notifications/unread-count", () => ok({ unread: notes().filter((n) => n.read_at === null).length }));
 route("GET /api/v1/notifications/badges", () => {
   const out: Record<string, number> = {};

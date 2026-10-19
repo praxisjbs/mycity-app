@@ -22,6 +22,10 @@ route(router, "get", "/",
   { query: c.notifications.NotificationListQuery, response: c.notifications.NotificationPage, self: true, summary: "My notifications" },
   controller.list);
 
+route(router, "get", "/urgent",
+  { query: c.notifications.UrgentNoticeQuery, response: c.notifications.NotificationPage, self: true, summary: "My open urgent notices" },
+  controller.urgent);
+
 route(router, "get", "/unread-count",
   { response: c.notifications.UnreadCount, self: true, summary: "How many of my notifications are unread" },
   controller.unreadCount);
@@ -77,5 +81,9 @@ route(router, "post", "/read-all",
 route(router, "post", "/:id/read",
   { body: c.common.EmptyBody, no_content: true, self: true, summary: "Mark one of my notifications read" },
   controller.markRead);
+
+route(router, "post", "/:id/acknowledge",
+  { body: c.common.EmptyBody, response: c.notifications.Notification, self: true, summary: "Acknowledge one of my urgent notifications" },
+  controller.acknowledge);
 
 module.exports = { basePath: "/notifications", surface: "staff", router };

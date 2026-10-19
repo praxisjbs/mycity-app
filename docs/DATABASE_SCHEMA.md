@@ -109,7 +109,10 @@ given to someone else; `docs/guides/foundation.md` §11) · `0460` web push (bro
 TB, 19/10/2026; `docs/guides/notifications.md` §4): `push_subscription` as a device (its
 `known_device`, label and platform, the hash of its device token, the key id it was made under, its
 health and why it stopped) and `push_delivery`, one row per notice and device, so a retried push is
-never sent twice · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
+never sent twice · `0470` notice urgency (TB, 19/10/2026; `docs/guides/notifications.md` §4, §6):
+`notification.urgency`, `acknowledge_required` and `acknowledged_at`, the urgent repeats' pace
+(`repeat_count`, `last_alert_at`, `repeat_day`, `repeats_on_day`) and `push_delivery.round`
+· `0499` the leave flow, `leave.approval` (the line manager, then Operations &
 People over 5 days; §6.5).
 
 **Owes:**
@@ -146,7 +149,9 @@ their Show Mobile and WhatsApp switches; the mobile stays `employee.phone`) and
 shows, one row at most); the baked signature rides in `mail_send_queue.payload` and its pictures
 are vault documents (`mail_signature_image`) · `1129` reference data: the `mailbox.signature`
 capability for System Administrator and Implementation · `1130` an announcement can be `cancelled` · `1140` each
-member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
+member's own pin (`community_member.pinned_at`) · `1145` an announcement's level
+(`announcement.urgency`) and who acknowledged an urgent one (`announcement_read.acknowledged_at`;
+TB, 19/10/2026) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and
 recipients as users, one schedule per report; `home_report_run` (one numbered file per recipient and

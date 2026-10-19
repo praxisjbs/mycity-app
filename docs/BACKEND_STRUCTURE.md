@@ -180,7 +180,7 @@ src/
 │   ├── handlers/      email-send · pdf-render · notification-deliver · notification-push ·
 │   │                  media-derive · media-scan · av-transcode · import-validate · import-commit
 │   └── schedulers/    outbox-dispatch · workflow-timeout · alert-ageing · media-reconcile ·
-│                      import-cleanup
+│                      import-cleanup · urgent-repeats
 │
 └── modules/                          M0 ships these nine; each follows §8
     ├── identity/                     login, refresh, logout, me, sessions, known devices
@@ -829,7 +829,7 @@ milestone shown, so nothing is retrofitted.
 | Time at stage | M4, M7, M8 | `shared/state` | Built |
 | Rolling-window rules ("3 in 30 days") | M3, M7 inactivity | `shared/rules` | Seam |
 | Geofence maths | M1 clock-in | `shared/geo` | Built |
-| Realtime rooms, presence | M1 chat | `realtime/socket`, `services/realtime/active` (in front of the app, for the push hold) | Built (presence M1) |
+| Realtime rooms, presence | M1 chat | `realtime/socket`, `services/realtime/active` (in front of the app, for attendance's clock watch) | Built (presence M1) |
 | Mailbox secrets, IMAP IDLE loop slot | M1 | `services/secrets`, worker | Seam |
 | Recurrence, ICS invites | M2, M4 | `shared/time/recurrence`, `services/calendar` | Seam |
 | LLM client, governance, spend ledger, stub when off | M2, M4, M7, M10 | `services/ai` (§14) | Built (vendor key M2) |

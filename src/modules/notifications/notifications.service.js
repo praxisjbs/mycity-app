@@ -17,7 +17,10 @@ const { AppError } = require("../../shared/errors");
 const routeMap = require("../../shared/route-map");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const categories = require("../../shared/notifications/categories");
+const lagos = require("../../shared/time/lagos");
 const vapid = require("../../services/push/vapid");
+const realtime = require("../../services/realtime/emitter");
+const queues = require("../../jobs/queues");
 const { deviceLabel, platformOf } = require("../identity/identity.device-label");
 const { EVENTS } = require("./notifications.events");
 const repo = require("./notifications.repo");
@@ -57,6 +60,40 @@ async function present(rows, canOpen) {
 
 async function list(user, query) {
   const page = await repo.list(pool, user.user_id, query);
+  return { ...page, data: await present(page.data, opener(user)) };
+}
+
+const iso = (v) => (v ? new Date(v).toISOString() : null);
+
+/**
+ * A row as a socket carries it to the bell, the banner and the urgent bar: the contract's
+ * Notification, its link only when its person may open the record's module.
+ */
+async function asNotice(row) {
+  const user = await grantsCache.getAuthUser(pool, row.user_id);
+  const canOpen = user ? opener(user) : async () => false;
+  const [shown] = await present([row], canOpen);
+  return {
+    notification_id: row.notification_id,
+    category: row.category,
+    priority: row.priority,
+    urgency: row.urgency || "normal",
+    acknowledge_required: Boolean(row.acknowledge_required),
+    acknowledged_at: iso(row.acknowledged_at),
+    repeat_count: Number(row.repeat_count || 0),
+    title: row.title,
+    body: row.body || null,
+    entity_type: row.entity_type ?? null,
+    entity_id: row.entity_id ?? null,
+    link: shown.link,
+    read_at: iso(row.read_at),
+    created_at: iso(row.created_at || Date.now()),
+  };
+}
+
+/** The caller's open urgent notices, newest first: the urgent bar. */
+async function urgent(user, query) {
+  const page = await repo.urgentOpen(pool, user.user_id, query);
   return { ...page, data: await present(page.data, opener(user)) };
 }
 
@@ -134,6 +171,95 @@ async function markReadForRecord(client, user, entityType, entityId) {
     });
   }
   return ids.length;
+}
+
+/* ------------------------------------------------------------------ *
+ * Acknowledge and the urgent repeats
+ * ------------------------------------------------------------------ */
+
+/**
+ * Acknowledge on the urgent bar: one of the caller's notices that only Acknowledge closes,
+ * acknowledged and read. Already acknowledged is a quiet no-op. The record's module hears
+ * `notification.acknowledged` (an announcement records who acknowledged it).
+ */
+async function acknowledge(user, notificationId) {
+  const row = await tx(async (client) => {
+    const before = await repo.findOwnForUpdate(client, user.user_id, notificationId);
+    if (!before) throw new AppError("NOT_FOUND", "There is no such notification.", 404);
+    if (!before.acknowledge_required)
+      throw new AppError("NOT_ACKNOWLEDGEABLE", "This notice needs no acknowledgement.", 422);
+    if (before.acknowledged_at) return before;
+    const after = await repo.acknowledge(client, notificationId);
+    await emit(client, {
+      key: EVENTS.NOTIFICATION_ACKNOWLEDGED,
+      entity: { type: "notification", id: notificationId },
+      actor: user,
+      before,
+      after,
+      payload: {
+        user_id: user.user_id,
+        notification_id: notificationId,
+        entity_type: before.entity_type,
+        entity_id: before.entity_id,
+      },
+    });
+    return after;
+  });
+  const [shown] = await present([row], opener(user));
+  return shown;
+}
+
+/**
+ * Closes the person's notices about one record inside the caller's transaction: acknowledged
+ * where Acknowledge closes them, read everywhere (an urgent announcement acknowledged on its
+ * card, announcements.service acknowledge). Their other tabs and devices are told.
+ */
+async function acknowledgeForRecord(client, user, entityType, entityId) {
+  const ids = await repo.acknowledgeForRecord(client, user.user_id, entityType, entityId);
+  for (const id of ids) {
+    await emit(client, {
+      key: EVENTS.NOTIFICATION_READ,
+      entity: { type: "notification", id },
+      actor: user,
+      payload: { user_id: user.user_id, notification_id: id },
+      metadata: { by_record: `${entityType}:${entityId}`, acknowledged: true },
+    });
+  }
+  return ids.length;
+}
+
+/** The urgent repeats' pace (TB, 19/10/2026; docs/guides/notifications.md §6). */
+const REPEAT = Object.freeze({ every: 30, perDay: 8, from: "08:00", until: "18:00" });
+/** A push job retries for about 20 minutes: 10 s, doubling, eight tries. */
+const PUSH_RETRY = Object.freeze({ attempts: 8, backoff: { type: "exponential", delay: 10_000 } });
+
+/**
+ * The `urgent-repeats` sweep: each open urgent notice whose last alert is 30 minutes old, between
+ * 08:00 and 18:00 Lagos time and fewer than 8 times that day, alerted again: the banner and the
+ * bar over the person's sockets, and a push to every device as the next round.
+ * @param {Date} [now]
+ * @returns {Promise<{repeated: number, outside_hours?: boolean}>}
+ */
+async function repeatUrgent(now = new Date()) {
+  const time = lagos.timeOf(now);
+  if (time < REPEAT.from || time >= REPEAT.until) return { repeated: 0, outside_hours: true };
+  const pace = { day: lagos.today(now), every: REPEAT.every, perDay: REPEAT.perDay };
+  let repeated = 0;
+  for (const id of await repo.dueRepeats(pool, pace)) {
+    const row = await repo.markRepeated(pool, id, pace);
+    if (!row) continue;
+    repeated += 1;
+    realtime.toUser(row.user_id, "notification", await asNotice(row));
+    if ((row.channels || []).includes("push")) {
+      await queues.enqueue(
+        "notification-push",
+        "send",
+        { notification_id: id, push: null, round: row.repeat_count },
+        { ...PUSH_RETRY, jobId: `push-${id}-r${row.repeat_count}` },
+      );
+    }
+  }
+  return { repeated };
 }
 
 /* ------------------------------------------------------------------ *
@@ -387,6 +513,8 @@ async function markReadFromDevice(body) {
 
 module.exports = {
   list,
+  asNotice,
+  urgent,
   unreadCount,
   badges,
   markRead,
@@ -395,6 +523,11 @@ module.exports = {
   present,
   readState,
   markReadForRecord,
+  acknowledge,
+  acknowledgeForRecord,
+  repeatUrgent,
+  REPEAT,
+  PUSH_RETRY,
   preferences,
   setPreference,
   pushConfig,

@@ -13,6 +13,8 @@ const service = require("./notifications.service");
 
 module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.user, req.validated.query)),
+  urgent: async (req, res) => sendPaged(res, await service.urgent(req.user, req.validated.query)),
+  acknowledge: async (req, res) => ok(res, await service.acknowledge(withActor(req), req.validated.params.id)),
   unreadCount: async (req, res) => ok(res, await service.unreadCount(req.user)),
   badges: async (req, res) => ok(res, await service.badges(req.user)),
   markRead: async (req, res) => {

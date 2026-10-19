@@ -20,6 +20,7 @@ import {
 import { useApi } from "@/api/hooks";
 import { useAuth, useMe, useMyPhoto } from "@/auth/AuthProvider";
 import { ClockButton, ClockPrompts, useClockSync } from "@/features/attendance/ClockButton";
+import { UrgentNotices, urgentModules, useUrgentNotices } from "@/features/notifications/UrgentNotices";
 import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
 import { visibleModules, visibleTabs } from "./access";
@@ -59,6 +60,8 @@ export function Shell() {
   const { location, navigate } = useRouter();
   const modules = useMemo(() => visibleModules(me), [me]);
   const { data: badges } = useApi("GET /api/v1/notifications/badges");
+  const urgentRows = useUrgentNotices();
+  const urgent = useMemo(() => urgentModules(urgentRows), [urgentRows]);
 
   const key = location.module ? moduleKeyOf(location.module) : null;
   const mod = moduleByKey(key);
@@ -105,7 +108,19 @@ export function Shell() {
         items={tabs.map((t) => ({ value: t.slug, label: t.label, href: hrefFor(allowed.key, t.slug) }))}
       />
     ) : undefined;
-  const frame: FrameProps = { modules, mod: allowed, tab, tabs: strip, page, fit, badges, openSearch, path: `${location.path}?tab=${tab?.slug ?? ""}` };
+  const frame: FrameProps = {
+    modules,
+    mod: allowed,
+    tab,
+    tabs: strip,
+    page,
+    fit,
+    badges,
+    urgent,
+    alert: <UrgentNotices rows={urgentRows} />,
+    openSearch,
+    path: `${location.path}?tab=${tab?.slug ?? ""}`,
+  };
 
   return (
     <FitContext.Provider value={useCallback((f: boolean) => setFit(f), [])}>
@@ -126,6 +141,10 @@ interface FrameProps {
   page: ReactNode;
   fit: boolean;
   badges: Record<string, number> | undefined;
+  /** Modules an open urgent notice is about: their badges show red. */
+  urgent: Set<string>;
+  /** The urgent bar, under the top bar on every screen. */
+  alert: ReactNode;
   openSearch: () => void;
   /** The screen in view (path and tab): a new one resets the scroll and Hide Here. */
   path: string;
@@ -140,7 +159,7 @@ function readCollapsed() {
   }
 }
 
-function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: FrameProps) {
+function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, openSearch }: FrameProps) {
   const me = useMe();
   const photo = useMyPhoto();
   const { navigate } = useRouter();
@@ -160,7 +179,7 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: Fra
       fit={fit}
       rail={
         <Rail
-          items={railItems(modules, badges)}
+          items={railItems(modules, badges, urgent)}
           current={mod?.key ?? null}
           collapsed={collapsed}
           onNavigate={navigate}
@@ -188,6 +207,7 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: Fra
         />
       }
       tabs={tabs}
+      alert={alert}
       notice={<ShellNotices />}
     >
       {page}
@@ -215,7 +235,7 @@ function useAccountMenu(): MenuItem[] {
   ];
 }
 
-function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }: FrameProps) {
+function PhoneFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, openSearch, path }: FrameProps) {
   const me = useMe();
   const photo = useMyPhoto();
   const { navigate } = useRouter();
@@ -242,8 +262,9 @@ function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }:
             }
           />
         }
-        bottomBar={<BottomBar items={bottomItems(modules, badges, () => setMore(true), more)} current={more ? "more" : bottomKey(mod?.key ?? null)} onNavigate={navigate} />}
+        bottomBar={<BottomBar items={bottomItems(modules, badges, () => setMore(true), more, urgent)} current={more ? "more" : bottomKey(mod?.key ?? null)} onNavigate={navigate} />}
         fab={<Fab page={path} />}
+        alert={alert}
         notice={<ShellNotices />}
       >
         {page}

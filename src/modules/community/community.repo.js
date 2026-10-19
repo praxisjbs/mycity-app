@@ -406,7 +406,10 @@ const MESSAGE = `
          (SELECT count(*)::int FROM community_reaction r WHERE r.community_message_id = x.community_message_id) AS reactions,
          EXISTS (SELECT 1 FROM community_reaction r WHERE r.community_message_id = x.community_message_id AND r.user_id = $1) AS reacted,
          pr.to_employee_id AS recognised_employee_id,
-         a.announcement_id, a.title AS announcement_title`;
+         a.announcement_id, a.title AS announcement_title, a.urgency AS announcement_urgency,
+         (ar.user_id IS NOT NULL) AS announcement_in_audience,
+         ar.acknowledged_at AS announcement_acknowledged_at`;
+/** $1 is the reader: their own reads row of an announcement says whether they acknowledged it. */
 const MESSAGE_FROM = `
     FROM community_message x
     LEFT JOIN app_user u ON u.user_id = x.sender_user_id
@@ -414,7 +417,8 @@ const MESSAGE_FROM = `
     LEFT JOIN department d ON d.department_id = e.department_id
     LEFT JOIN document doc ON doc.document_id = x.document_id
     LEFT JOIN peer_recognition pr ON pr.community_message_id = x.community_message_id
-    LEFT JOIN announcement a ON a.community_message_id = x.community_message_id`;
+    LEFT JOIN announcement a ON a.community_message_id = x.community_message_id
+    LEFT JOIN announcement_read ar ON ar.announcement_id = a.announcement_id AND ar.user_id = $1`;
 
 /** A page of a channel's messages, newest first; with `q`, only those that match. */
 function listMessages(db, channelId, userId, query) {

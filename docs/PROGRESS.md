@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
+| M0 Foundation | 31 items below: 30 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -99,10 +99,18 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
 | One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
 | Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☑ | 19/10/2026 |
+| Notifications everywhere (TB, 19/10/2026): every device at once, every channel post alerting, urgency with Acknowledge, the urgent bar and urgent repeats (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☑ | 19/10/2026 |
 
 **Notes**
 
 - 19/10/2026 · TB · Exports download on the device that pressed, never by email (TB's four answers, 19/10/2026; `docs/guides/foundation.md` §6.12). One path for every Export and Download button: `src/shared/documents/exports.js` reserves the file in the request (or `documents.generate` for a PDF), the module's outbox handler makes it, `GET /exports/:id` answers while the screen waits, and `GET /documents/:id/content` downloads it; `ExportFile` in the contract replaces the four "queued, and the email it goes to" shapes. The app's `api/exports.ts` waits and saves wherever the person is in the app; `api/download.ts` saves into Downloads (Android, desktop) or opens the share sheet with Save to Files on an iPhone app; `ExportButton` stays busy until the file is saved. Export files are kept 24 hours (`export-cleanup`, hourly, replaces `data-export-cleanup`), never locked. Only a report schedule's files are still emailed. The integration suite passes locally (80 suites, 1,726 tests), and every frontend test (UI 823, app 260). Left: the M6 payslips screen's Email a Copy is still in its plan (`docs/guides/ess.md` §2), for TB to confirm against this decision.
+- 19/10/2026 · TB · Notifications everywhere, started from TB's twelve answers
+  (`docs/handoff/notifications-everywhere.md`). An announcement GE posted from the build account
+  reached no device signed in as that account, by design: nobody is told of their own action.
+  Built in PR 1: every device at once, every channel post alerting, urgency with Acknowledge, the
+  urgent bar on both shells, urgent repeats (`0470`, `1145`); the whole `npm run ci` passes locally
+  and Chromium shows the pushes as designed. Left: PR 2 (Settings · Notifications brought forward
+  from M6, the reminder engine, the digest, quiet hours).
 - 19/10/2026 · AJ · CI runs as four jobs side by side (`.github/workflows/ci.yml`: backend, frontend, screens, checks, and the `ci` check over them; `npm run ci -- --group=<name>`), the three frontend workspaces' tests at once (`scripts/fe-test.js`: 430 s to 254 s here), Chromium and ffmpeg's packages cached. Left: compare a week of run times and Actions minutes; four jobs bill more minutes than one.
 - 19/10/2026 · AJ · Frontend foundation: a module's tab strip on a narrow desktop window keeps the tabs that fit (the active one always) and folds the rest into More Tabs, a ⋯ menu, instead of scrolling sideways (`packages/ui` `Tabs`; every module). Phones unchanged.
 - 19/10/2026 · TB · CI does only what a change needs (`.github/workflows/ci.yml`,

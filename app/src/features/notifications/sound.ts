@@ -96,8 +96,13 @@ export function chime(): void {
 }
 
 /** A notice arrived while the app is open: chime or vibrate, as this device allows. */
-export function alertArrival(category: string, now = Date.now()): "chime" | "vibrate" | "both" | "none" {
-  if (!SOUNDING.has(category) || now - last < GAP_MS) return "none";
+/**
+ * The chime or the buzz for an arrival: mail, messages and approvals, and anything important or
+ * urgent whatever its category (an urgent repeat included), at most once every 5 seconds.
+ */
+export function alertArrival(category: string, urgency: string = "normal", now = Date.now()): "chime" | "vibrate" | "both" | "none" {
+  const sounds = SOUNDING.has(category) || urgency === "important" || urgency === "urgent";
+  if (!sounds || now - last < GAP_MS) return "none";
   last = now;
   const sound = stored();
   if (isAndroid()) {

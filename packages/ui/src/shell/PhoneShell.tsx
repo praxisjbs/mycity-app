@@ -24,6 +24,8 @@ export interface PhoneShellProps {
   fab?: ReactNode;
   /** A notice floating above the bottom bar (ShellNotice). */
   notice?: ReactNode;
+  /** The urgent bar (UrgentBar), under the header on every screen while something urgent waits on the person. */
+  alert?: ReactNode;
   /** A fit page: it fills the height and only its panes scroll. */
   fit?: boolean;
   /** Changes when the screen changes (its path): the page scrolls back to the top and the title returns. */
@@ -32,7 +34,7 @@ export interface PhoneShellProps {
   landmarks?: boolean;
 }
 
-export function PhoneShell({ header, children, bottomBar, fab, notice, fit = false, pageKey, landmarks = true }: PhoneShellProps) {
+export function PhoneShell({ header, children, bottomBar, fab, notice, alert, fit = false, pageKey, landmarks = true }: PhoneShellProps) {
   const Main = landmarks ? "main" : "div";
   const scroller = useRef<HTMLElement | null>(null);
   const { state, onScroll, reset } = useScrollDirection();
@@ -47,6 +49,7 @@ export function PhoneShell({ header, children, bottomBar, fab, notice, fit = fal
       <FanContext.Provider value={setFan}>
         <div data-shell="phone" className="flex h-full min-h-0 flex-col bg-muted">
           {header}
+          {alert != null && <div className="flex-none">{alert}</div>}
           <div className="relative flex min-h-0 flex-1 flex-col">
             <Main
               ref={(el: HTMLElement | null) => {

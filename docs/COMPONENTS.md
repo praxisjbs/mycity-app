@@ -82,6 +82,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Feedback | [ErrorState](#errorstate) | `ErrorState` | Something did not load: one line saying so, and Try Again. | stable |
 | Feedback | [NotificationBanner](#notificationbanner) | `NotificationBanner` | The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere. | beta |
 | Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top. | stable |
+| Feedback | [UrgentBar](#urgentbar) | `UrgentBar` | The red bar under the top bar on every screen while an urgent notice waits on the person: its title, how many wait, and Acknowledge or Open. | beta |
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
@@ -285,6 +286,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | `pad` | `boolean` |  | Inner padding (the default). `false` lets a table, a list or an image run to the card's edges. |
 | `as` | `"div" \| "section" \| "article"` |  | The element: `section` when the card has its own heading in a long page, `article` for one record. |
 | `details` | `ReactNode` |  | The one Details row at the foot of the card (a Details from |
+| `urgency` | `"normal" \| "important" \| "urgent"` |  | A notice's level: an amber edge when important; a red edge that pulses slowly when urgent (steady when motion is off). |
 | `children` | `ReactNode` |  | The card's content. |
 
 **CardHeader** props (`CardHeaderProps`)
@@ -303,6 +305,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 ```tsx
 <Card><CardHeader title="Leave Requests" actions={<Button size="sm">View All</Button>} />...</Card>
 <Card details={<Details>...</Details>}>...</Card>
+<Card urgency="urgent">...</Card>
 ```
 
 ### Grid
@@ -2330,6 +2333,41 @@ toast("Rule created")
 toast.success("Alert cleared", { undo: () => restore(alert) })
 ```
 
+### UrgentBar
+
+The red bar under the top bar on every screen while an urgent notice waits on the person: its title, how many wait, and Acknowledge or Open.
+
+| | |
+|---|---|
+| Use | An open urgent notice of the signed-in person (an urgent announcement, a change to who can do what, an approval past its time limit); each shell mounts one, fed by the app. |
+| Avoid | A notice that can wait (the bell and the banner carry it); a page's own warning (Banner); news after an action (a toast). |
+| Phone | Full width under the top bar: the title on one line, the count, the action at 44 px; swipe the bar sideways to step through several (the arrows are desktop only). |
+| Accessibility | An alert region, so a new urgent notice is announced without moving focus. The title opens the notice and the action is a real button named by its verb; the arrows are named Previous Notice and Next Notice. It pulses slowly, every 2 seconds and never flashing, and is steady red when motion is off. |
+| Status | beta |
+| Exports | `UrgentBar` |
+| Import | `import { UrgentBar } from "@mycity/ui";` |
+| File | `packages/ui/src/feedback/UrgentBar.tsx` |
+| Test | `packages/ui/src/feedback/UrgentBar.test.tsx` |
+| Gallery | `packages/ui/src/feedback/UrgentBar.gallery.tsx` (`npm run gallery`, `#/UrgentBar`) |
+
+**UrgentBar** props (`UrgentBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | yes | The notice's title: what waits on the person (their own notice, not interface copy). |
+| `position` | `number` |  | Which of the open urgent notices this is, from 1. |
+| `count` | `number` |  | How many urgent notices are open; "1 of 3" shows when more than one. |
+| `actionLabel` | `string` | yes | The action's verb: Acknowledge when only that closes the notice, else Open. |
+| `onAction` | `() => unknown` | yes | The action. Return the work and the button spins until it settles. |
+| `onOpen` | `() => unknown` |  | Opens what the notice is about (a tap on the title). |
+| `onPrevious` | `() => unknown` |  | The notice before (a desktop arrow, or a swipe right on a phone). |
+| `onNext` | `() => unknown` |  | The notice after (a desktop arrow, or a swipe left on a phone). |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<UrgentBar title="Fire drill at 11" position={1} count={2} actionLabel="Acknowledge" onAction={acknowledge} onNext={next} />
+```
+
 ## Forms
 
 ### CardPicker
@@ -4139,6 +4177,7 @@ The staff app's desktop frame: the rail at the left, the top bar, the module's t
 | `children` | `ReactNode` | yes | The screen. |
 | `fit` | `boolean` |  | A fit page: it fills the height and only its panes scroll; scrolling past a pane's end slides the page's header away. |
 | `notice` | `ReactNode` |  | A notice floating at the foot of the page (ShellNotice: the update prompt, the install offer). |
+| `alert` | `ReactNode` |  | The urgent bar (UrgentBar), under the top bar on every screen while something urgent waits on the person. |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
 
 ```tsx
@@ -4349,6 +4388,7 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 | `bottomBar` | `ReactNode` | yes | The BottomBar. |
 | `fab` | `ReactNode` |  | The FloatingButton; when given, the page keeps clear space under its content for it. |
 | `notice` | `ReactNode` |  | A notice floating above the bottom bar (ShellNotice). |
+| `alert` | `ReactNode` |  | The urgent bar (UrgentBar), under the header on every screen while something urgent waits on the person. |
 | `fit` | `boolean` |  | A fit page: it fills the height and only its panes scroll. |
 | `pageKey` | `string` |  | Changes when the screen changes (its path): the page scrolls back to the top and the title returns. |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |

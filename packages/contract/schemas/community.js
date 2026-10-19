@@ -14,6 +14,7 @@ const { z } = require("zod");
 const { uuid, text, optionalText, isoDateTime, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
 const { DocumentRef } = require("./documents");
+const { NotificationUrgency } = require("./notifications");
 
 /** Who may post in a channel, fixed when it is created (§6). */
 const POST_POLICIES = ["everyone", "admins", "people_ceo"];
@@ -171,7 +172,20 @@ const Message = z
       })
       .strict()
       .nullable(),
-    announcement: z.object({ announcement_id: uuid, title: z.string() }).strict().nullable(),
+    /**
+     * The announcement this message publishes. An urgent one waits on the caller's Acknowledge when
+     * they are in its audience (`in_audience`) and `acknowledged_at` is still null.
+     */
+    announcement: z
+      .object({
+        announcement_id: uuid,
+        title: z.string(),
+        urgency: NotificationUrgency,
+        in_audience: z.boolean(),
+        acknowledged_at: isoDateTime.nullable(),
+      })
+      .strict()
+      .nullable(),
     status: MessageStatus.nullable(),
     deleted: z.boolean(),
     edited_at: isoDateTime.nullable(),

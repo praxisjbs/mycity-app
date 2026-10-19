@@ -68,7 +68,8 @@ describe("how an event's notices group on a device", () => {
     const fanout = require("../../shared/notifications/fanout");
     require("../community/community.events");
     const style = fanout.pushStyleOf({ key: "channel_message.posted", payload: { community_channel_id: "c-1" } });
-    expect(style).toEqual({ tag: "community_channel:c-1", mode: "quiet" });
+    // Every channel post alerts (TB, 19/10/2026).
+    expect(style).toEqual({ tag: "community_channel:c-1", mode: "alert" });
     expect(fanout.pushStyleOf({ key: "direct_message.sent", payload: { community_channel_id: "c-2" } })).toEqual({ tag: "community_channel:c-2", mode: "alert" });
     expect(fanout.pushStyleOf({ key: "no.such_event" })).toBeNull();
   });

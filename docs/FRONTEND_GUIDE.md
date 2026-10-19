@@ -914,8 +914,8 @@ and reconnects. A refused refresh leaves it closed and the session sheet takes o
 `useRealtime(event, handler)` hands an event to the components listening while they are mounted;
 `usePresence(userId)` keeps who is online from `presence` events. While the tab is on screen and was
 touched in the last 5 minutes the socket says `presence:active` every 30 seconds, and
-`presence:idle` when that stops: the server holds a push to the person's devices for a minute while
-they are looking at the app. Realtime is best effort: everything also arrives over HTTP, so a
+`presence:idle` when that stops (attendance's clock watch reads it; a push is never held for it, TB
+19/10/2026). Realtime is best effort: everything also arrives over HTTP, so a
 dropped socket only means the bell refreshes when it is opened. The in-browser mock has no server, so
 nothing connects in mock mode; it answers every notification route in the contract's shapes.
 
@@ -930,14 +930,16 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
   `Modal` on desktop). It reloads its dot, its list and the badge counts
   (`GET /api/v1/notifications/unread-count`, `GET /api/v1/notifications`,
   `GET /api/v1/notifications/badges`) on `notification` (a new one) and `notification_read` (a read
-  mark made in another tab or on another device). Open marks a notice read before it navigates.
+  mark or an Acknowledge made in another tab or on another device). Open marks a notice read before
+  it navigates. A row is red for an urgent notice and amber for an important one.
   Whether the pane and Notification Settings are open is one store (`features/notifications/state.ts`),
   so the bell, ⌘K and a `pane=notifications` link open the same ones.
 - **Arrivals** (`features/notifications/arrivals.ts`, `useArrivals`): a notice reaching a window on
   screen, over the socket or from the service worker, shows the banner (`notify()` from
   `@mycity/ui`, on the second, top `Toaster`, for 3 seconds) and chimes or vibrates (`sound.ts`):
-  once per notice whichever way it came, never for the record already on screen. A window in the
-  background only reloads its bell; the device's own notification sounds. A link from a notification
+  once per notice whichever way it came, and again on each urgent repeat, never for the record
+  already on screen. A window in the background only reloads its bell. The device shows its own
+  notification as well, the one in the person's hand included (`app/src/sw.ts`, TB 19/10/2026). A link from a notification
   carries `n=<ids>` (marked read, then dropped from the address) or `pane=notifications`. When the
   app comes to the front it closes the notifications in the shade whose notices are read, and the
   app icon's count follows the unread count (`setAppBadge`, where the platform has one).
@@ -947,6 +949,11 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
   The device's id, token and key id live in IndexedDB (`device-store.ts`, database `mycity-push`),
   where the service worker reads them. The one-time Turn On offer is a `ShellNotice`
   (`shell/Notices.tsx`); the browser's own prompt never shows unasked.
+- **The urgent bar** (`features/notifications/UrgentNotices.tsx`, `UrgentBar` from `@mycity/ui`,
+  the shells' `alert` slot): the person's open urgent notices (`GET /api/v1/notifications/urgent`)
+  under the top bar on every screen of both shells, red and pulsing slowly, with Acknowledge (an
+  urgent announcement, `POST /api/v1/notifications/:id/acknowledge`) or Open. The modules they are
+  about show their nav count in red (`urgent` on `Rail` and `BottomBar` items).
 - **⌘K** runs Notification Settings, Turn On Notifications, Send Test Notification and Mark All Read
   in the app itself (`shell/Search.tsx`, `src/shared/search/actions.js`).
 
