@@ -17,6 +17,21 @@ const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
+const documents = require("../../src/shared/documents/generate");
+const chromium = require("../../src/services/pdf/chromium");
+
+// The queues would hold Redis connections open past the run: the jobs a handler queues are
+// kept here (the letter's PDF render, its email).
+const sent = [];
+jest.mock("../../src/jobs/queues", () => ({
+  enqueue: jest.fn(async (queue, name, data, opts) => {
+    sent.push({ queue, name, data, opts });
+    return { id: String(sent.length) };
+  }),
+  getQueue: jest.fn(),
+  closeQueues: jest.fn(async () => undefined),
+  DEFAULTS: {},
+}));
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -106,6 +121,7 @@ describeDb("queries and sanctions against the real migrations", () => {
   });
 
   afterAll(async () => {
+    await chromium.close();
     await require("../../src/shared/observability/error-reporter").flush();
     await pool.end();
   });
@@ -219,6 +235,168 @@ describeDb("queries and sanctions against the real migrations", () => {
         "letter_template.saved",
         "letter_template.activated",
       ]);
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * Queries (guide §3, §6.1 to §6.4)
+   * ---------------------------------------------------------------- */
+
+  describe("queries", () => {
+    const raise = (who, employee, subject = "Missing clock-out on Thursday") =>
+      as(who).post("/queries", {
+        employee_id: people[employee].employee.employee_id,
+        subject,
+        details: "There is no clock-out recorded for Thursday's shift at the Yaba site.",
+      });
+    const notified = async (who, key) =>
+      (
+        await q(
+          "SELECT count(*)::int AS n FROM notification WHERE user_id = $1 AND event_key = $2",
+          [people[who].user.user_id, key],
+        )
+      ).rows[0].n;
+    const ids = {};
+
+    test("a manager raises a query: numbered, awaiting a response, with its letter; the employee is told", async () => {
+      const res = await raise("manager", "staff");
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({
+        number: "QRY-0001",
+        status: "awaiting_response",
+        raised_by: people.manager.user.user_id,
+        raised_by_name: "Kemi Alade",
+        response: null,
+        can_decide: false,
+        can_remind: true,
+      });
+      expect(res.body.employee.display_name).toBe("Musa Danjuma");
+      expect(res.body.letter_document_id).toBeTruthy();
+      expect(new Date(res.body.response_due_at) - new Date(res.body.created_at)).toBeGreaterThan(47 * 3600 * 1000);
+      ids.first = res.body.employee_query_id;
+
+      await drain();
+      expect(await notified("staff", "query.raised")).toBe(1);
+    });
+
+    test("the letter renders with the query's facts and is emailed to the employee as a PDF", async () => {
+      const { letter_document_id: docId } = (await as("ops").get(`/queries/${ids.first}`)).body;
+      // The HTML is kept until the PDF exists, then cleared.
+      const html = (await q("SELECT render_html FROM document WHERE document_id = $1", [docId])).rows[0].render_html;
+      expect(html).toContain("QRY-0001");
+      expect(html).toContain("Dear Musa,");
+      expect(html).toContain("Kemi Alade");
+      const doc = await documents.renderPending(docId, { db: pool });
+      expect(doc.locked_at).toBeTruthy();
+
+      sent.length = 0;
+      await drain();
+      const mail = sent.find((j) => j.queue === "email-send" && j.name === "query-raised");
+      expect(mail.data).toMatchObject({
+        to: { email: "staff@mycity.test" },
+        template: "query-raised",
+        data: { query_number: "QRY-0001" },
+        attachments: [{ document_id: docId }],
+      });
+    });
+
+    test("nobody raises a query on themselves, or on someone who has left", async () => {
+      const self = await raise("manager", "manager");
+      expect(self.status).toBe(422);
+      expect(self.body.error.code).toBe("QUERY_SELF");
+    });
+
+    test("a manager sees only the queries they raised; People and Management see all (§6.1)", async () => {
+      const hod = await raise("hod", "other", "Late arrival on Monday");
+      expect(hod.status).toBe(201);
+      ids.hod = hod.body.employee_query_id;
+
+      const mine = await as("manager").get("/queries");
+      expect(mine.body.data.map((r) => r.number)).toEqual(["QRY-0001"]);
+      expect((await as("manager").get(`/queries/${ids.hod}`)).status).toBe(404);
+      expect((await as("hod").get(`/queries/${ids.first}`)).status).toBe(404);
+
+      for (const who of ["ops", "mgmt"]) {
+        const all = await as(who).get("/queries?sort=number");
+        expect(all.body.data.map((r) => r.number)).toEqual(["QRY-0001", "QRY-0002"]);
+      }
+      const raisedByMe = await as("ops").get("/queries?raised=mine");
+      expect(raisedByMe.body.page.total).toBe(0);
+
+      const summary = await as("manager").get("/queries/summary");
+      expect(summary.body).toMatchObject({ open: 1, awaiting_response: 1, escalated: 0 });
+      expect(summary.body.by_reason).toEqual([{ label: "Raised by a Person", count: 1 }]);
+    });
+
+    test("⌘K finds a query by number within the same rule", async () => {
+      const hits = async (who) => {
+        const res = await as(who).get("/search?q=QRY-0001");
+        expect(res.status).toBe(200);
+        const group = res.body.groups.find((g) => g.type === "query");
+        return group ? group.items.map((i) => i.ref) : [];
+      };
+      // The term also finds QRY-0002 by similarity; each reader gets only what they may open.
+      expect(await hits("manager")).toEqual(["QRY-0001"]);
+      expect(await hits("hod")).toEqual(["QRY-0002"]);
+      expect((await hits("ops")).sort()).toEqual(["QRY-0001", "QRY-0002"]);
+    });
+
+    test("a reminder goes once a day, only while the query waits", async () => {
+      const first = await as("manager").post(`/queries/${ids.first}/remind`);
+      expect(first.status).toBe(200);
+      expect(first.body.can_remind).toBe(false);
+      expect((await as("manager").post(`/queries/${ids.first}/remind`)).status).toBe(409);
+      expect((await as("hod").post(`/queries/${ids.first}/remind`)).status).toBe(404);
+      await drain();
+      expect(await notified("staff", "query.reminded")).toBe(1);
+    });
+
+    test("the employee sees it in My Queries and answers it once; the raiser is told", async () => {
+      const open = await as("staff").get("/ess/queries?status=open");
+      expect(open.status).toBe(200);
+      expect(open.body.data.map((r) => [r.number, r.can_respond])).toEqual([["QRY-0001", true]]);
+      expect((await as("other").post(`/ess/queries/${ids.first}/response`, { body: "This is not my query to answer at all." })).status).toBe(404);
+
+      const res = await as("staff").post(`/ess/queries/${ids.first}/response`, {
+        body: "My phone died on the way out; I left at 17:10 and can show the gate log.",
+      });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ status: "under_review", can_respond: false });
+      expect(res.body.response.body).toContain("gate log");
+      const again = await as("staff").post(`/ess/queries/${ids.first}/response`, {
+        body: "A second answer is refused because the first one stands.",
+      });
+      expect(again.status).toBe(409);
+
+      await drain();
+      expect(await notified("manager", "query.responded")).toBe(1);
+    });
+
+    test("a decision needs edit; before the answer or the deadline it waits; the subject never decides", async () => {
+      const close = { outcome: "no_action", reason: "The gate log shows the departure time." };
+      expect((await as("manager").post(`/queries/${ids.first}/decision`, close)).status).toBe(403);
+      // HoD raised QRY-0002; Zainab has not answered and the 48 hours are not over.
+      const early = await as("hod").post(`/queries/${ids.hod}/decision`, close);
+      expect(early.status).toBe(409);
+      expect(early.body.error.code).toBe("QUERY_NOT_DECIDABLE");
+      expect((await as("hod").get(`/queries/${ids.hod}`)).body.can_decide).toBe(false);
+    });
+
+    test("People close it with no action: resolved, archived in My Queries, the employee told", async () => {
+      const before = await as("ops").get(`/queries/${ids.first}`);
+      expect(before.body.can_decide).toBe(true);
+      const res = await as("ops").post(`/queries/${ids.first}/decision`, {
+        outcome: "no_action",
+        reason: "The gate log shows the departure time.",
+      });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ status: "resolved", outcome: "no_action", reviewed_by_name: "Tunde Bakare", can_decide: false });
+      expect((await as("ops").post(`/queries/${ids.first}/decision`, { outcome: "no_action", reason: "Closing it a second time." })).status).toBe(409);
+
+      const archived = await as("staff").get("/ess/queries?status=archived");
+      expect(archived.body.data.map((r) => [r.number, r.outcome])).toEqual([["QRY-0001", "no_action"]]);
+      await drain();
+      expect(await notified("staff", "query.closed")).toBe(1);
     });
   });
 });

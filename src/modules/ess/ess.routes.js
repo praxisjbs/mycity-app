@@ -8,8 +8,8 @@
  * nothing a wrong employee id could slip past; the service reads the employee
  * from `req.user` and there is no parameter that names another.
  *
- * My Profile, My Documents (M0, track B) and My Leave (M1) are on the real API. The other
- * tabs are added here as their milestones land.
+ * My Profile, My Documents (M0, track B), My Leave (M1) and My Queries (M3) are on the real
+ * API. The other tabs are added here as their milestones land.
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -80,5 +80,15 @@ route(router, "post", "/leave/:id/cancel",
   { params: c.common.IdParams, body: c.leave.LeaveCancel, response: c.leave.LeaveRequest,
     self: true, summary: "Cancel one of my leave requests" },
   controller.cancelLeave);
+
+route(router, "get", "/queries",
+  { query: c.queries.EssQueryListQuery, response: c.queries.MyQueryPage, self: true,
+    summary: "My queries" },
+  controller.listQueries);
+
+route(router, "post", "/queries/:id/response",
+  { params: c.common.IdParams, body: c.queries.QueryResponseCreate, response: c.queries.MyQuery,
+    self: true, summary: "Respond to one of my queries" },
+  controller.respondToQuery);
 
 module.exports = { basePath: "/ess", surface: "staff", router };

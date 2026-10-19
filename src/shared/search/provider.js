@@ -24,7 +24,9 @@
  * `owner: { column }` is for records that belong to one person whatever their grant says
  * (their own mail): the query always adds `column = <the caller's user_id>`, so a scope of
  * `all` (the CEO, People) still finds only the caller's own rows. Without a caller it
- * finds nothing.
+ * finds nothing. `owner: { column, exceptAll: true }` is the same pin, lifted for a reader
+ * whose scope is `all` (queries: a manager finds only the queries they raised, People
+ * find every one, docs/guides/queries.md §6.1).
  *
  * What a provider may not do:
  *  - decide who sees it. The service checks the module's `view` grant before the query
@@ -142,7 +144,8 @@ function recordProvider(spec) {
     if (spec.scope && spec.scope.through && s.and)
       s = { and: `AND EXISTS (SELECT 1 FROM ${spec.scope.through} ${s.and})` };
     let owned = "";
-    if (spec.owner) {
+    const ownerLifted = spec.owner && spec.owner.exceptAll === true && scope && scope.scope === "all";
+    if (spec.owner && !ownerLifted) {
       params.push(user.user_id);
       owned = `AND ${spec.owner.column} = $${params.length}`;
     }
