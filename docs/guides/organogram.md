@@ -10,7 +10,7 @@
 | Capabilities | none; the builder is the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
 | Status | Built |
-| Last changed | 17/10/2026 |
+| Last changed | 19/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -73,13 +73,19 @@ adds archiving, so a record that leaves the tree keeps its history.
 who is no longer an active node (archived, or left) is dropped from the line, so their former
 reports show as roots the builder flags rather than vanishing (§11).
 
+**Who answers for an empty seat** (TB, 19/10/2026). The view `employee_effective_manager`
+(`migrations/1160_employee_effective_manager.sql`) gives every employee the person they answer to:
+their line manager, or, when they report to a vacant seat, the first person above that seat,
+through any vacant seats between. Approvals, team scope and the notifications that follow team
+scope read it (§6); the chart still draws the seat, because the seat is the true line.
+
 ## 5 · API
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
 | `GET /api/v1/org-chart?view=builder\|viewer` | `OrgChartQuery` to `OrgChartTree` | `ess` view (every member of staff) | no, bounded | The whole company: a node is a person or a vacant seat (`node_id`, `node_kind`), the solid line above it is `manager_node_id` and the dotted one `dotted_manager_node_id`. `view=builder` adds the since and arrangement line; nothing restricted is in the payload for anybody |
-| `PATCH /api/v1/employees/:id/line-manager` | `EmployeeReportingUpdate` | `people` edit · team/all | n/a | Sets `line_manager_id` **or** `line_manager_seat_id`, and the dotted one beside it. A loop, reporting to oneself, and naming both a person and a seat are each refused |
-| `GET /api/v1/org-seats`, `POST /api/v1/org-seats`, `PATCH /api/v1/org-seats/:id` | `OrgSeat*` | `people` view, create, edit | list at 25 | The seats themselves: Add Role on the builder, and the seat a sheet's VACANT row becomes |
+| `PATCH /api/v1/employees/:id/line-manager` | `EmployeeReportingUpdate` | `people` edit · team/all | n/a | Sets `line_manager_id` **or** `line_manager_seat_id`, and the dotted one beside it. A loop (through people or vacant seats), reporting to oneself, and naming both a person and a seat are each refused |
+| `GET /api/v1/org-seats`, `POST /api/v1/org-seats`, `PATCH /api/v1/org-seats/:id` | `OrgSeat*` | `people` view, create, edit | list at 25 | The seats themselves: Add Role on the builder, and the seat a sheet's VACANT row becomes. A seat placed under one of its own reports is refused as a loop |
 
 A drag on the chart calls the same employee write a form would. Export is client side (no endpoint).
 **Paging:** a tree must load whole to draw, so the org-chart read is the one bounded read in the
@@ -91,16 +97,20 @@ stays off the table until MyCity is near that size.
 ## 6 · Rules and calculations
 
 - The tree is built from `line_manager_id`. The root is the single employee with no line manager
-  (the CEO). Exactly one root is expected.
-- A reporting line may **not** form a cycle (A reports to B who reports to A). The write rejects a
-  change that would create one.
+  (the CEO). Exactly one root is expected. The CEO is always the top: the chart draws the CEO's
+  tree first and opens centred on it, and a phone starts there.
+- A reporting line may **not** form a cycle (A reports to B who reports to A), directly or through
+  a vacant seat. The write rejects a change that would create one, on a person and on a seat.
 - `dotted_manager_id` is an optional second relationship. It is drawn as a dashed connector or a
   "Dotted line: <manager>" tag, never as the primary line, and it does not affect permission scope:
   approvals of leave, expenses and tasks follow the solid line only (§1).
 - Departments are data (`department` rows, §4): adding or renaming one is a setting, never a code
   change.
 - A **vacant seat** is a node with a role and department but no employee. It may have reports. It
-  carries no person data and never shows a card field that implies one.
+  carries no person data and never shows a card field that implies one. While it is empty, the
+  first person above it answers for its reports: their leave, expenses and tasks go to that person
+  for approval, and they are in that person's team scope. Only a seat with nobody above it leaves
+  them to the CEO (TB, 19/10/2026; `employee_effective_manager`, §4).
 - The viewer shows the **whole company**. The builder shows the whole company with edit affordances.
 - Restricted fields (`bank_name`, `account_number`, `gross_monthly`, per BACKEND_STRUCTURE §9.4)
   and phone are never rendered on any organogram card, in either page.
@@ -157,18 +167,22 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| People · Organogram (`organogram`) | A focus view, not the tree shrunk: Search and Add Role; Reports To with the focused person's manager as a card; the focused person's card, larger and outlined; Direct Reports with a count, one card each showing its own report count. It starts at the top of the tree | The whole tree, the legend and its help terms, the seat count, Expand All, Download PDF, the since and arrangement line, and dragging to reassign (desktop only) | Tap a card to move the focus to that person; Show Top returns to the top; on a focused vacant seat, Create Vacancy and Edit Role full width; Open Record on a person | Bottom bar People; the People tabs along the top |
-| ESS · Org Chart (`org-chart`) | The same focus view, starting on the signed-in employee: their manager, them, their direct reports | The whole tree, the legend, the seat count, Download PDF, every edit | Tap a card to move the focus; Show Me returns to the employee; Open Record on a person | Bottom bar; the ESS tabs along the top |
+| People · Organogram (`organogram`) | A focus view, not the tree shrunk: Search and Add Role; Reports To with the focused person's manager as a card; the focused person's card, larger and outlined; Direct Reports with a count, one card each showing its own report count. It starts at the top of the tree, the CEO. When more than one card sits at the top, the others follow under Also At The Top, so each can be reached and given a line. A search lists the people and roles that match as cards; a tap focuses one | The whole tree, the legend and its help terms, the seat count, Expand All, Download PDF, the since and arrangement line, and dragging to reassign (desktop only) | Tap a card to move the focus to that person; Show Top returns to the top; on a focused vacant seat, Create Vacancy and Edit Role full width; Open Record on a person | Bottom bar People; the People tabs along the top |
+| ESS · Org Chart (`org-chart`) | The same focus view, starting on the signed-in employee: their manager, them, their direct reports; at the top, the CEO, for someone who is not on the chart. Search and Also At The Top work as on the builder | The whole tree, the legend, the seat count, Download PDF, every edit | Tap a card to move the focus; Show Me returns to the employee; Open Record on a person | Bottom bar; the ESS tabs along the top |
 | Recruitment · Vacancies (`vacancies`) | Not in the demo yet: suggested vacancies as cards (role title, department, a status pill) | The reporting line, shown in the card's sheet | Create Vacancy, full width at the foot of the sheet | Bottom bar; the Recruitment tabs along the top |
 | People · Employees (`employees`) | Import and Add Employee; the four KPI cards two to a row; the count per work arrangement; All Employees as person cards (name and department, Employment Status pill, Department, Line Manager) | The page subtitle; the Arrangement, Attendance Today and View Details columns (they show in the employee sheet) | Tap a person card: the employee modal as a bottom sheet, its buttons full width | Bottom bar People; the People tabs along the top |
 
 ## 11 · Edge cases
 
 - **No CEO / multiple roots:** more than one employee without a line manager. The chart shows each
-  root and flags it; HR resolves it on the builder.
-- **Cycle:** a reassignment that would close a loop is rejected at the write with a clear message.
+  root and flags it; HR resolves it on the builder. The CEO's tree comes first; on a phone the other
+  roots are listed under Also At The Top.
+- **Cycle:** a reassignment that would close a loop is rejected at the write with a clear message,
+  including a loop through a vacant seat (a seat placed under one of its own reports).
 - **Vacant seat with reports:** drawn as a dashed node; its reports hang from it; it offers the
-  Recruitment hand-off.
+  Recruitment hand-off. Their approvals and team scope pass to the first person above the seat (§6).
+- **A seat the sheet gives a line manager:** the importer gives the seat that line. The roster
+  fills it only while the seat has none, so a line set on screen (Edit Role) stays.
 - **Dotted line to a vacant seat:** allowed; the dashed tag names the vacant role.
 - **Deactivated or departed employee:** drops out of the tree; their former reports surface as
   needing a new line manager on the builder.
@@ -188,21 +202,23 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 Recorded here so the real senior structure is not lost before the import is built. Names, titles and
 reporting lines only, no contact details, pay or bank. Lines marked "(assumed)" were reconstructed
-where the sheet was ambiguous and a human should confirm them (see §13). Twenty seats, eighteen
-filled and two vacant.
+where the sheet was ambiguous and a human should confirm them (see §13). Twenty seats from the
+sheet, eighteen filled and two vacant; with the build account the chart holds twenty-one.
 
 - Ifeoma Mbonu · Chief Executive Officer · General Management (root, no line manager)
   - Bode Oluwasanmi · Chief Technology Officer · Technology
     - Oladotun Shola-Adido · Back-end Manager · Backend Operations
       - Tobiloba Iyanuoluwa Dada · Content & Listing Associate
       - Bassey Ekpe · Content & Listing Associate
+    - JBS Praxis Team · Implementation Partner · Implementation (the build account: not in the
+      sheet; `roles.json` puts the post under the CTO, TB 19/10/2026)
   - Etudor Edidiong · Program Manager · General Management
     - Cynthia Osasere Osakunih · Operations & People Lead · HR & Operations (assumed: her row was column-shifted and the manager cell read "Program Manager")
     - Chinyere Elechi · Head PR, Marketing & Brand Strategy · Sales & Marketing
       - Precious Iyeserhen · Graphics Designer
       - Aaron Agama · Social Media Manager
       - Similoluwa Michael · Graphics Design Associate
-    - [Vacant] Head Sales & Revenue · Sales & Marketing (assumed parent: Program Manager; the sheet does not say)
+    - [Vacant] Head Sales & Revenue · Sales & Marketing (under the Program Manager: the sheet's VACANT row says so since TB confirmed it, 19/10/2026)
       - Tochukwu Ifeanyi · Marketing Lead, Abuja (dotted line to Head PR)
       - John Ojelola · Marketing Lead, South West (dotted line to Head PR)
       - David Idowu-Agida · PR & Marketing Lead, MyLagosApp (dotted line to Head PR)
@@ -210,12 +226,13 @@ filled and two vacant.
       - Adaeze Chike · Marketing & Growth Officer, Abia (dotted line to Head PR)
       - Victor Esuk · Marketing & Growth Officer, Imo (dotted line to Head PR)
       - Rabi'a Zawiya · Marketing & Growth Officer, Kano (dotted line to Head PR)
-  - [Vacant] Technical Assistant · General Management (assumed parent: CEO)
+  - [Vacant] Technical Assistant · General Management (under the CEO, TB 19/10/2026)
 
 The CTO (Bode Oluwasanmi) heads the technology line under the CEO, with the back-end team beneath
 him. The two vacant seats (Head Sales & Revenue, Technical Assistant) seed as vacant seats and can
 be sent to Recruitment (§3). The marketing and growth officers report to the vacant Head Sales &
-Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 full matrix draws.
+Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 full matrix draws;
+while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6).
 
 ## 13 · Open questions
 
@@ -237,12 +254,24 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
   dotted line beside it), resolved to a person or to the seat holding that post, and a cell that
   matches nothing is a problem on that row, never a guess. The sheet's own DOB and Phone columns are
   not imported at all (`docs/guides/foundation.md` §6.1).
-- **Seed reporting-line gaps (§12.1).** The sheet does not state who the vacant Head Sales & Revenue
-  reports to, and Cynthia Osakunih's line manager is inferred from a column-shifted row. Confirm both
-  with People before import.
+- **Seed reporting-line gaps (§12.1).** ~~Who the vacant Head Sales & Revenue reports to.~~ Settled
+  19/10/2026 (TB): the Program Manager, and the Technical Assistant seat the CEO, both written into
+  the sheet's VACANT rows. Still open: Cynthia Osakunih's line manager is inferred from a
+  column-shifted row. Confirm it with People.
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · The structure the deploy loaded drew four tops (the CEO, both open seats and the
+  build account), and the seven marketing officers hung from a seat a phone could not reach. TB's
+  four decisions of 19/10/2026 fix it. The sheet's VACANT rows name the seats' lines (Head Sales &
+  Revenue under the Program Manager, Technical Assistant under the CEO), and the importer now applies
+  a seat's line, which it used to drop without a word. `roles.json` puts the Implementation Partner
+  (the build account) under the CTO. While a seat is empty, its reports' approvals, team scope and
+  team notifications go to the first person above it (`employee_effective_manager`, `1160`, §4,
+  §6), and a loop through a seat is refused. Screens: the CEO is the top on both pages; on a phone a
+  search lists the matching cards to tap, the other cards at the top are listed under Also At The
+  Top, and Org Chart starts at the top for someone not on the chart; the desktop tree opens centred
+  on the CEO (§10.2, §11).
 - 17/10/2026 · TB · Header gains the Capabilities row every guide now carries (README §5.2): none. In the
   `organisation` module this guide covers, the register's counts now take the Lagos date they count
   from (`organisation.repo.counts(db, scope, today)`, from `lagos.today()`) instead of the database's

@@ -37,6 +37,8 @@ const outbox = require("../../src/shared/events/outbox");
 const organisation = require("../../src/modules/organisation/organisation.service");
 const loader = require("../../scripts/db/load-staff");
 const lagos = require("../../src/shared/time/lagos");
+const approvers = require("../../src/shared/workflow/approvers");
+const grantsCache = require("../../src/shared/rbac/grants-cache");
 const c = require("@mycity/contract");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -942,6 +944,153 @@ describeDb("the organisation module against the real migrations", () => {
       ).rejects.toMatchObject({ code: "STAFF_NUMBER_TAKEN" });
       const kept = await one("SELECT work_email::text AS work_email FROM employee WHERE staff_number = 'T0001'");
       expect(kept.work_email).toBe("zuri@mycity.test");
+    });
+
+    test("a VACANT row's Line Manager is the seat's own line, given only while the seat has none", async () => {
+      const zuri = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0001'");
+      const risk = [
+        ["", "VACANT", "Head of Risk", "Trading Desk", "", "", "", "Chief Executive Officer", "", "", "FTE", "Hybrid", "Mon - Fri", ""],
+        ["T0401", "Femi Ojo", "Risk Analyst", "Trading Desk", "Male", new Date(Date.UTC(2026, 6, 6)), "", "Head of Risk", "femi@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+      ];
+      const file = path.join(temp, "seat-line.xlsx");
+      fs.writeFileSync(file, await sheet(risk));
+      const first = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(first.stats).toMatchObject({ create: 2, warning: 0, error: 0 });
+      const seat = await one("SELECT org_seat_id, line_manager_id FROM org_seat WHERE title = 'Head of Risk'");
+      expect(seat.line_manager_id).toBe(zuri.employee_id);
+      const femi = await one("SELECT line_manager_seat_id FROM employee WHERE staff_number = 'T0401'");
+      expect(femi.line_manager_seat_id).toBe(seat.org_seat_id);
+
+      /* A line set on screen stays: the next sheet names someone else, and the roster leaves it. */
+      const onScreen = await asOps()(request(app).patch(`/api/v1/org-seats/${seat.org_seat_id}`)).send({
+        line_manager_id: people.ops.employee.employee_id,
+      });
+      expect(onScreen.status).toBe(200);
+      risk[0][7] = "Hauwa Lawal";
+      fs.writeFileSync(file, await sheet(risk));
+      const again = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(again.status).toBe("loaded");
+      expect(again.stats).toMatchObject({ create: 0, update: 0, unchanged: 2, error: 0 });
+      const kept = await one("SELECT line_manager_id FROM org_seat WHERE org_seat_id = $1", [seat.org_seat_id]);
+      expect(kept.line_manager_id).toBe(people.ops.employee.employee_id);
+    });
+
+    test("while a seat is empty, the first person above it approves for its reports and has them in team scope", async () => {
+      const femi = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0401'");
+      expect(
+        await approvers.resolve(pool, [{ type: "manager_of_subject" }], { subject_employee_id: femi.employee_id }),
+      ).toEqual([{ type: "employee", value: people.ops.employee.employee_id, via: "manager_of_subject" }]);
+      await drain();
+      expect(await grantsCache.getTeamEmployeeIds(pool, people.ops.employee.employee_id)).toContain(femi.employee_id);
+      const me = await asOps()(request(app).get("/api/v1/auth/me"));
+      expect(me.body.manages_people).toBe(true);
+    });
+
+    test("a seat under one of its own reports, or a person under a seat below them, is a loop", async () => {
+      const seat = await one("SELECT org_seat_id FROM org_seat WHERE title = 'Head of Risk'");
+      const femi = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0401'");
+      const seatUnderReport = await asOps()(request(app).patch(`/api/v1/org-seats/${seat.org_seat_id}`)).send({
+        line_manager_id: femi.employee_id,
+      });
+      expect(seatUnderReport.status).toBe(422);
+      expect(seatUnderReport.body.error.code).toBe("REPORTING_LOOP");
+      /* The seat reports to Ada (set on screen above), so Ada under the seat would circle. */
+      await expect(
+        tx((client) =>
+          organisation.setReportingLine(client, people.ops.employee.employee_id, { line_manager_seat_id: seat.org_seat_id }, null),
+        ),
+      ).rejects.toMatchObject({ code: "REPORTING_LOOP" });
+    });
+
+    test("a post the sheet does not hold is given the line manager roles.json names, only while it has none", async () => {
+      const partner = await asOps()(request(app).post("/api/v1/employees")).send({
+        first_name: "Praxis",
+        last_name: "Partner",
+        work_email: "partner@mycity.test",
+        phone: "08031234575",
+        job_title: "Implementation Partner",
+        start_date: "2026-05-05",
+        employment_type: "consultant",
+        work_pattern: "remote",
+        department_id: people.delivery.department_id,
+      });
+      expect(partner.status).toBe(201);
+      const roles = path.join(temp, "roles-partner.json");
+      fs.writeFileSync(
+        roles,
+        JSON.stringify({
+          default: { roles: ["employee"] },
+          by_job_title: {
+            "Chief Executive Officer": { roles: ["management"], is_ceo: true },
+            "Implementation Partner": { line_manager: "Chief Executive Officer" },
+          },
+        }),
+      );
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: roles, log: (m) => log.push(m) });
+      expect(result.status).toBe("already_loaded");
+      expect(result.lines).toEqual({ set: 1, unresolved: 0 });
+      expect(log.join("\n")).toMatch(/Praxis Partner \(Implementation Partner\) now reports to the Chief Executive Officer/);
+      const zuri = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0001'");
+      const line = await one("SELECT line_manager_id FROM employee WHERE employee_id = $1", [partner.body.employee_id]);
+      expect(line.line_manager_id).toBe(zuri.employee_id);
+
+      /* A manager set on screen stays. */
+      const moved = await asOps()(request(app).patch(`/api/v1/employees/${partner.body.employee_id}/line-manager`)).send({
+        line_manager_id: people.ops.employee.employee_id,
+      });
+      expect(moved.status).toBe(200);
+      const again = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: roles });
+      expect(again.lines).toEqual({ set: 0, unresolved: 0 });
+      const kept = await one("SELECT line_manager_id FROM employee WHERE employee_id = $1", [partner.body.employee_id]);
+      expect(kept.line_manager_id).toBe(people.ops.employee.employee_id);
+    });
+
+    test("a corrected work email keeps the person on their number, with no second record", async () => {
+      const before = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0003'");
+      const corrected = rows().map((r) => (r[0] === "T0003" ? Object.assign([...r], { 8: "emeka.obiora@mycity.test" }) : r));
+      const file = path.join(temp, "corrected-email.xlsx");
+      fs.writeFileSync(file, await sheet(corrected));
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(result.stats).toMatchObject({ create: 0, error: 0 });
+      const after = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0003'");
+      expect(after.employee_id).toBe(before.employee_id);
+      expect(await one("SELECT count(*)::int AS n FROM employee WHERE first_name = 'Emeka' AND last_name = 'Obiora'")).toEqual({ n: 1 });
+    });
+
+    test("a dotted line to someone the same sheet creates is kept from the preview to the commit", async () => {
+      const file = path.join(temp, "dotted-new.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([
+          ["T0501", "Kemi Bello", "Settlement Lead", "Trading Desk", "Female", new Date(Date.UTC(2026, 7, 3)), "", "Zuri Danladi", "kemi.bello@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+          ["T0502", "Tunde Ade", "Settlement Officer", "Trading Desk", "Male", new Date(Date.UTC(2026, 7, 4)), "", "Head of Settlement, with dotted line to Kemi Bello", "tunde@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+        ]),
+      );
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(result.stats).toMatchObject({ create: 2, error: 0 });
+      const tunde = await one(
+        `SELECT s.title, btrim(d.first_name || ' ' || d.last_name) AS dotted
+           FROM employee e
+           JOIN org_seat s ON s.org_seat_id = e.line_manager_seat_id
+           LEFT JOIN employee d ON d.employee_id = e.dotted_manager_id
+          WHERE e.staff_number = 'T0502'`,
+      );
+      expect(tunde).toEqual({ title: "Head of Settlement", dotted: "Kemi Bello" });
+    });
+
+    test("an import's problem list carries the rows saved with something missing, beside the errors", async () => {
+      const batch = await one(
+        `SELECT b.import_batch_id FROM import_batch b
+          WHERE EXISTS (SELECT 1 FROM import_row r WHERE r.import_batch_id = b.import_batch_id AND r.status = 'warning')
+          ORDER BY b.created_at DESC`,
+      );
+      const res = await asOps()(request(app).get(`/api/v1/imports/${batch.import_batch_id}/rows?status=problem`));
+      expect(res.status).toBe(200);
+      expect(c.imports.ImportRowPage.safeParse(res.body).success).toBe(true);
+      expect(res.body.data.map((r) => r.status)).toContain("warning");
+      const errors = await asOps()(request(app).get(`/api/v1/imports/${batch.import_batch_id}/rows?status=error`));
+      expect(errors.body.data.every((r) => r.status === "error")).toBe(true);
     });
 
     test("no sheet in the build means nothing happens at all", async () => {

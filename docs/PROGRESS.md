@@ -100,6 +100,21 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · The staff roster and the staff importer (`docs/guides/foundation.md` §6.1, §6.5,
+  §6.6, §11), from a review of what staging shows. A VACANT row's Line Manager is the seat's own
+  line (the importer dropped it without a word); `roles.json` gives a post outside the sheet its line
+  manager (the build account reports to the CTO), only while it has none; a row whose staff number
+  is held by someone with its own name is that person, so a corrected email no longer takes their
+  number and makes a second record; each row's dotted line comes from its own cell, so a preview no
+  longer costs its commit a dotted line; a link that writes nothing is not counted as an update;
+  the import preview lists warning rows (someone saved without a Line Manager) with the errors.
+  Approvals, team scope, the notifications that follow it and `manages_people` pass through a
+  vacant seat to the first person above it (`1160` `employee_effective_manager`); a loop through a
+  seat is refused. MyCity's sheet corrected (TB, 19/10/2026). Left: the server's `deploy-gate` is
+  still the one provisioned before the roster step (no `[staff]` line in staging's Release run 159),
+  so `docs/runbooks/staff-roster.md` §2 needs someone with root on the server; staging's on-screen
+  corrections are §6 there.
+
 - 18/10/2026 · TB · One press, one request (F26, FRONTEND_GUIDE §8.4). Reload on "A new version is
   ready" looked dead, and after a hard refresh did nothing; any button could send its request twice.
   Now `Button`, `IconButton` and `BigButton` are busy from the press until the work their handler
@@ -647,9 +662,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 16/10/2026 |
-| 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
+
+- 19/10/2026 · TB · ESS · Org Chart (#91): someone who is not on the chart starts at the top, the
+  CEO, instead of a card of their own with nowhere to go; on a phone a search lists the matching
+  cards to tap, and anyone else at the top is listed under Also At The Top (`docs/guides/organogram.md`
+  §10.2). The build account now sits under the CTO, so it opens with Reports To. Left: nothing.
 
 - 18/10/2026 · AJ · My Attendance (#9): the 12 October asks (`docs/guides/ess.md` §13) on LA's screen, LA to review: the month picker beside Export Month (arrows, or a year and month picked directly), the share of days present on Late Days, Days Present, Late Days and Absent opening their days paged at 25 (`GET /attendance/me` takes `status`), and the days as a table or a chart of hours. Leave on staging: `seeds/staging/30_leave.js` puts the mock's twelve sample requests on the real staff through the leave service. My Leave (#12) gains Leave Calendar (`GET /ess/leave/calendar`): approved and waiting leave for the reader and everyone under them, everyone for the CEO and Operations & People (the team lead, 18/10/2026).
 - 17/10/2026 · LA · My Attendance (#9) and My Devices (#88) on the real API (`docs/guides/attendance.md`): the clock panel (location read only after the press, the worksite named first; Retry Location and Clock In Anyway; No Connection keeps the punch's key and body for Try Again; the server's result, with Send Note on a punch under review), the month's figures and days with each day's punches, open exceptions with Explain, Export Month by email; My Devices lists the person's devices, registers this one behind a fresh sign-in (three at most) and removes one. Checked on the real API at 390 and 1440 px. Left: Work Location Requests (#87) and Policy Updates (#89) stay on INTERIM shapes until home locations and policy versions are decided (attendance guide §13).
@@ -738,9 +758,22 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
+
+- 19/10/2026 · TB · People · Organogram (#92), from a review of the roster on staging, which drew
+  four tops (the CEO, both open seats and the build account) and hid the seven marketing officers
+  under a seat a phone could not reach. TB's four decisions of 19/10/2026: the sheet's VACANT rows
+  name their seat's line (Head Sales & Revenue under the Program Manager, Technical Assistant under
+  the CEO) and the importer applies it; `roles.json` puts the build account under the CTO; while a
+  seat is empty the first person above it approves for its reports and has them in team scope
+  (`employee_effective_manager`, `1160`); the sheet's errors are corrected. Screens: the CEO first,
+  the desktop tree opens and returns (Expand All) centred on the CEO, an open seat's branch folds
+  and unfolds like a person's, a phone search lists the matching cards, and Also At The Top lists
+  any other card at the top. Loops through a seat are refused. Left: staging takes the sheet's
+  corrections on screen and the roster step goes back on the server
+  (`docs/runbooks/staff-roster.md` §2, §6).
 
 - 17/10/2026 · LA · People · Attendance (#25), Devices (#27) and Worksites (#28) on the real API (`docs/guides/attendance.md`): modules `attendance`, `devices`, `worksites`, migration `1300`, reference seed `1390`. The punch is judged on the server (clock guard, geofence off, warn or block, device off, warn or block, device time ahead), recorded with its evidence and the day in one transaction with its event, audit and outbox rows, under an advisory lock and an Idempotency-Key; the day-close (01:30) opens missing clock-outs and absences once. People see the day's figures and register within their scope, a person's day with each punch's evidence (coordinates for scope all only), and decide exceptions (accept, reject, add the clock-out; scope all, never their own); Export Register emails up to 31 days. Devices: Remove Device with a reason. Worksites: add, edit, retire, restore, assign. 34 integration tests on the real migrations, 43 unit tests, 4 panel tests; checked on the real API at 390 and 1440 px. Left: the map and address search (F21), field assignments and approved homes (§13), the late-query rule (M3), Settings · Attendance Policy (M9).
 - 17/10/2026 · AJ · People · Leave (#26): Leave Types (add, change, retire; delete only a type nothing has used, `LEAVE_TYPE_IN_USE` otherwise) and Allowances (one person's allowance of a type for a year, or back to the type's; the person is told). The four types are seeded in `seeds/reference/1290_seed_leave.sql` with DO NOTHING, by the team lead's decision of 17/10/2026 (an exception to A26), replacing the staging seed. 15 leave integration tests.

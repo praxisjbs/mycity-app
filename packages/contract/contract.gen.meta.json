@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "7fc1be82b8bda0faa8b19581923518f1c001c25339db0346d96d61dfd66c17e1",
+  "source_hash": "9dc63c0d656cfddb06f193a604889600704ae61b9caf98badd39e125303cb8d1",
   "schemas": 478,
   "endpoints": 260,
   "inputs": {
@@ -29,7 +29,7 @@
     "packages/contract/schemas/expenses.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/goals.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/identity.js": "74ef903e07887424c0ca9b7bac9ea1eebcf74ba2c44210ea5917acfeb8752734",
-    "packages/contract/schemas/imports.js": "6fec7e8432f107c19ffe33a58b5b43c19bef60ef71e22bb6fdb578258c6fe24d",
+    "packages/contract/schemas/imports.js": "f4eec9ade13913b528e42706da42f7abf9b9a3251cb39bf8e8a1e472f4876d6c",
     "packages/contract/schemas/integrations.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/interactions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/interviews.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

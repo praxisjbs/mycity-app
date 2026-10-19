@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   cn,
+  EmptyState,
   ErrorState,
   Field,
   FormFooter,
@@ -37,7 +38,8 @@ import {
  * approves what (§6). Salary, bank details and phone numbers are never on a card.
  *
  * On a phone it is not the tree shrunk but a focus view (§10.2): who the focused person
- * reports to, the person, and their direct reports, each a tap away.
+ * reports to, the person, and their direct reports, each a tap away. The CEO is the top;
+ * anyone else at the top is listed beside them, and a search lists the matching cards.
  */
 /**
  * `openId`: a node to open on (a search result for an open seat, `?id=` in the address):
@@ -55,6 +57,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   const [dragging, setDragging] = useState<OrgNode | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string> | null>(null);
+  const [expandedAll, setExpandedAll] = useState(0);
   const [focus, setFocus] = useState<string | null>(null);
   const addRole = () => modal.open({ title: "Add Open Role", body: (close) => <SeatForm close={close} onSaved={reload} /> });
   const editRole = (n: OrgNode) =>
@@ -70,21 +73,34 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   useEffect(() => {
     if (!opened) return;
     setFocus(opened.node_id);
-    setQ(opened.display_name);
-  }, [opened]);
+    /* The desktop tree marks it as a search would; a phone opens straight on it. */
+    if (!phone) setQ(opened.display_name);
+  }, [opened, phone]);
   const children = useMemo(() => {
     const m = new Map<string | null, OrgNode[]>();
     for (const n of nodes) m.set(n.manager_node_id, [...(m.get(n.manager_node_id) ?? []), n]);
     return m;
   }, [nodes]);
-  const roots = useMemo(() => children.get(null) ?? [], [children]);
+  /* The CEO is the top whatever else sits there; the rest keep the server's order. */
+  const roots = useMemo(
+    () => [...(children.get(null) ?? [])].sort((a, b) => Number(b.is_ceo) - Number(a.is_ceo)),
+    [children],
+  );
+  const top = roots[0]?.node_id ?? null;
   const scroller = useRef<HTMLDivElement>(null);
 
-  /* A wide tree opens centred on its top. */
+  /*
+   * A wide tree opens centred on its top, the CEO's card, wherever the other roots fall,
+   * and comes back to it after Expand All, which widens every branch at once.
+   */
   useEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
-  }, [data]);
+    const card = el?.querySelector<HTMLElement>("[data-top]");
+    if (!el || !card) return;
+    const box = el.getBoundingClientRect();
+    const at = card.getBoundingClientRect();
+    el.scrollLeft += at.left + at.width / 2 - (box.left + box.width / 2);
+  }, [data, expandedAll]);
 
   /* Start with the top three levels open; deeper branches open on a tap. */
   const folded = useMemo(() => {
@@ -99,7 +115,8 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
     return out;
   }, [collapsed, children, roots]);
 
-  const hit = (n: OrgNode) => !!q.trim() && `${n.display_name} ${n.job_title} ${n.department}`.toLowerCase().includes(q.trim().toLowerCase());
+  const term = q.trim().toLowerCase();
+  const hit = (n: OrgNode) => !!term && `${n.display_name} ${n.job_title} ${n.department}`.toLowerCase().includes(term);
 
   const drop = async (target: OrgNode, e: DragEvent) => {
     e.preventDefault();
@@ -124,10 +141,34 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
     if (n.employee_id) navigate(hrefFor("people", "employees", { id: n.employee_id }));
   };
 
+  /* A card with reports, a person's or an open seat's, folds and unfolds its branch. */
+  const toggle = (n: OrgNode) =>
+    (children.get(n.node_id)?.length ?? 0) > 0 && (
+      <button
+        type="button"
+        aria-label={folded.has(n.node_id) ? "Expand" : "Collapse"}
+        onClick={(e) => (
+          e.stopPropagation(),
+          setCollapsed(() => {
+            const x = new Set(folded);
+            if (x.has(n.node_id)) x.delete(n.node_id);
+            else x.add(n.node_id);
+            return x;
+          })
+        )}
+        className="absolute -bottom-2.5 left-1/2 z-1 flex h-5.5 min-w-5.5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card px-1.5 text-2xs font-bold text-muted-foreground"
+      >
+        {folded.has(n.node_id) ? `+${children.get(n.node_id)!.length}` : "−"}
+      </button>
+    );
+
   const card = (n: OrgNode) => {
     if (n.vacant)
       return (
-        <div className={cn("og-card relative w-44 rounded-card border border-dashed border-input bg-transparent px-3 py-2.5 text-center", hit(n) && "border-ring ring-2 ring-accent")}>
+        <div
+          data-top={n.node_id === top ? "" : undefined}
+          className={cn("og-card relative w-44 rounded-card border border-dashed border-input bg-transparent px-3 py-2.5 text-center", hit(n) && "border-ring ring-2 ring-accent")}
+        >
           <span className="mx-auto mb-2 flex size-10.5 items-center justify-center rounded-full border border-dashed border-input bg-muted text-subtle-foreground">
             <Icon name="plus" />
           </span>
@@ -155,11 +196,13 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           ) : (
             <span className="mt-2 inline-block rounded-full border border-dashed border-input px-2 py-0.5 text-2xs font-strong text-subtle-foreground">Open role</span>
           )}
+          {toggle(n)}
         </div>
       );
     return (
       <div
         tabIndex={0}
+        data-top={n.node_id === top ? "" : undefined}
         draggable={builder && !n.is_ceo}
         onDragStart={() => setDragging(n)}
         onDragEnd={() => (setDragging(null), setOver(null))}
@@ -179,24 +222,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         <span className="mt-2 inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{n.department}</span>
         {n.meta && <span className="mt-1.5 block text-2xs text-subtle-foreground">{n.meta}</span>}
         {n.dotted_line_to && <span className="mt-1.5 inline-block rounded-full border border-dashed border-input px-2 py-px text-2xs text-subtle-foreground">{`Dotted line · ${n.dotted_line_to}`}</span>}
-        {(children.get(n.node_id)?.length ?? 0) > 0 && (
-          <button
-            type="button"
-            aria-label={folded.has(n.node_id) ? "Expand" : "Collapse"}
-            onClick={(e) => (
-              e.stopPropagation(),
-              setCollapsed(() => {
-                const x = new Set(folded);
-                if (x.has(n.node_id)) x.delete(n.node_id);
-                else x.add(n.node_id);
-                return x;
-              })
-            )}
-            className="absolute -bottom-2.5 left-1/2 z-1 flex h-5.5 min-w-5.5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card px-1.5 text-2xs font-bold text-muted-foreground"
-          >
-            {folded.has(n.node_id) ? `+${children.get(n.node_id)!.length}` : "−"}
-          </button>
-        )}
+        {toggle(n)}
       </div>
     );
   };
@@ -217,9 +243,16 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
     );
   };
 
-  /* The phone's focus: the signed-in person on the viewer, the top of the tree on the builder. */
-  const start = builder ? (roots[0]?.node_id ?? null) : (me.employee_id ?? roots[0]?.node_id ?? null);
-  const focused = (focus && byId.get(focus)) || (start ? byId.get(start) : undefined) || roots[0];
+  /*
+   * The phone's focus: the signed-in person on the viewer, or the top when they are not
+   * on the chart; the top on the builder. Anyone else at the top is listed beside a root,
+   * so every card can be reached, and a search lists the cards that match instead.
+   */
+  const mine = !builder && me.employee_id && byId.has(me.employee_id) ? me.employee_id : null;
+  const start = mine ?? top;
+  const focused = (focus && byId.get(focus)) || (start ? byId.get(start) : undefined);
+  const others = focused && !focused.manager_node_id ? roots.filter((r) => r.node_id !== focused.node_id) : [];
+  const matches = term ? nodes.filter(hit) : [];
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
 
@@ -231,7 +264,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         actions={
           <>
             <SearchInput value={q} onChange={setQ} placeholder="Name or role" className="w-48 max-md:w-full" />
-            {builder && !phone && <Button onClick={() => setCollapsed(new Set())}>Expand All</Button>}
+            {builder && !phone && <Button onClick={() => (setCollapsed(new Set()), setExpandedAll((n) => n + 1))}>Expand All</Button>}
             {builder && <Button icon="plus" onClick={addRole}>Add Role</Button>}
             {!phone && (
               <Button icon="doc" onClick={() => toast("PDF queued, check your Mailbox")}>
@@ -270,17 +303,21 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         <Card className="p-1.5">
           <LoadingRows count={5} />
         </Card>
+      ) : phone && term ? (
+        <Matches nodes={matches} childrenOf={(id) => (children.get(id) ?? []).length} onPick={(id) => (setFocus(id), setQ(""))} />
       ) : phone ? (
         <Focus
           focused={focused}
           manager={focused?.manager_node_id ? byId.get(focused.manager_node_id) : undefined}
           reports={children.get(focused?.node_id ?? "") ?? []}
+          others={others}
           childrenOf={(id) => (children.get(id) ?? []).length}
           onFocus={setFocus}
           onOpen={openNode}
           onEditRole={editRole}
           builder={builder}
           atStart={!focus || focus === start}
+          startLabel={mine ? "Show Me" : "Show Top"}
           onStart={() => setFocus(null)}
         />
       ) : (
@@ -294,42 +331,17 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   );
 }
 
-/** The phone's focus view: the manager above, the person, and the reports below. */
-function Focus({
-  focused,
-  manager,
-  reports,
-  childrenOf,
-  onFocus,
-  onOpen,
-  onEditRole,
-  builder,
-  atStart,
-  onStart,
-}: {
-  focused: OrgNode | undefined;
-  manager: OrgNode | undefined;
-  reports: OrgNode[];
-  childrenOf: (id: string) => number;
-  onFocus: (id: string) => void;
-  onOpen: (n: OrgNode) => void;
-  onEditRole: (n: OrgNode) => void;
-  builder: boolean;
-  atStart: boolean;
-  onStart: () => void;
-}) {
-  const { navigate } = useRouter();
-  if (!focused) return null;
-  const tile = (n: OrgNode, size: "sm" | "lg") => (
+/** One card of the phone's focus view or search: a tap moves the focus to it. */
+function NodeTile({ n, large = false, reports, onPick }: { n: OrgNode; large?: boolean; reports: number; onPick: (id: string) => void }) {
+  return (
     <button
-      key={n.node_id}
       type="button"
-      onClick={() => onFocus(n.node_id)}
+      onClick={() => onPick(n.node_id)}
       data-copy="content"
       className={cn(
         "flex min-h-tap w-full items-center gap-3 rounded-card border bg-card px-3 py-2.5 text-left",
         n.vacant ? "border-dashed border-input" : "border-border",
-        size === "lg" && "border-2 border-secondary",
+        large && "border-2 border-secondary",
       )}
     >
       <span className={cn("flex size-10.5 flex-none items-center justify-center rounded-full text-sm font-bold", n.vacant ? "border border-dashed border-input bg-muted text-subtle-foreground" : "bg-accent text-accent-foreground")}>
@@ -340,9 +352,59 @@ function Focus({
         <span className="block truncate text-2xs text-muted-foreground">{n.vacant ? `Vacant · ${n.department}` : n.job_title}</span>
         {n.dotted_line_to && <span className="block truncate text-2xs text-subtle-foreground">{`Dotted line · ${n.dotted_line_to}`}</span>}
       </span>
-      {childrenOf(n.node_id) > 0 && <span className="flex-none rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{childrenOf(n.node_id)}</span>}
+      {reports > 0 && <span className="flex-none rounded-full border border-border bg-muted px-2 py-0.5 text-2xs font-strong text-subtle-foreground">{reports}</span>}
     </button>
   );
+}
+
+/** The phone's search: the people and open roles that match, each a tap from the focus. */
+function Matches({ nodes, childrenOf, onPick }: { nodes: OrgNode[]; childrenOf: (id: string) => number; onPick: (id: string) => void }) {
+  if (!nodes.length) return <EmptyState illustration="Search" title="No Match" text="Try another name or role." />;
+  return (
+    <section>
+      <h2 className="mb-1.5 text-2xs font-strong text-subtle-foreground uppercase" data-ui="title">
+        {`Matches · ${nodes.length}`}
+      </h2>
+      <div className="flex flex-col gap-2">
+        {nodes.map((n) => (
+          <NodeTile key={n.node_id} n={n} reports={childrenOf(n.node_id)} onPick={onPick} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** The phone's focus view: the manager above, the person, the reports below, and anyone else at the top. */
+function Focus({
+  focused,
+  manager,
+  reports,
+  others,
+  childrenOf,
+  onFocus,
+  onOpen,
+  onEditRole,
+  builder,
+  atStart,
+  startLabel,
+  onStart,
+}: {
+  focused: OrgNode | undefined;
+  manager: OrgNode | undefined;
+  reports: OrgNode[];
+  others: OrgNode[];
+  childrenOf: (id: string) => number;
+  onFocus: (id: string) => void;
+  onOpen: (n: OrgNode) => void;
+  onEditRole: (n: OrgNode) => void;
+  builder: boolean;
+  atStart: boolean;
+  startLabel: string;
+  onStart: () => void;
+}) {
+  const { navigate } = useRouter();
+  if (!focused) return null;
+  const tile = (n: OrgNode, size: "sm" | "lg") => <NodeTile key={n.node_id} n={n} large={size === "lg"} reports={childrenOf(n.node_id)} onPick={onFocus} />;
 
   return (
     <div className="flex flex-col gap-3">
@@ -376,9 +438,17 @@ function Focus({
         </h2>
         <div className="flex flex-col gap-2">{reports.map((r) => tile(r, "sm"))}</div>
       </section>
+      {others.length > 0 && (
+        <section>
+          <h2 className="mb-1.5 text-2xs font-strong text-subtle-foreground uppercase" data-ui="title">
+            {`Also At The Top · ${others.length}`}
+          </h2>
+          <div className="flex flex-col gap-2">{others.map((r) => tile(r, "sm"))}</div>
+        </section>
+      )}
       {!atStart && (
         <Button className="w-full" onClick={onStart}>
-          {builder ? "Show Top" : "Show Me"}
+          {startLabel}
         </Button>
       )}
     </div>

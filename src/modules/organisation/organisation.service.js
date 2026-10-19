@@ -290,12 +290,13 @@ async function setReportingLine(client, employeeId, input, actor) {
         [key]: ["Not a seat"],
       });
   }
-  if (patch.line_manager_id && (await repo.wouldLoop(client, employeeId, patch.line_manager_id))) {
+  const above = patch.line_manager_id || patch.line_manager_seat_id;
+  if (above && (await repo.wouldLoop(client, employeeId, above))) {
     throw new AppError(
       "REPORTING_LOOP",
       "That would make a loop in the reporting line.",
       422,
-      { line_manager_id: ["Would make a loop"] },
+      { [patch.line_manager_id ? "line_manager_id" : "line_manager_seat_id"]: ["Would make a loop"] },
     );
   }
 
@@ -351,6 +352,11 @@ async function updateSeat(client, seatId, patch, actor) {
   const change = { ...patch };
   if ("line_manager_id" in change && change.line_manager_id) change.line_manager_seat_id = null;
   if ("line_manager_seat_id" in change && change.line_manager_seat_id) change.line_manager_id = null;
+  const above = change.line_manager_id || change.line_manager_seat_id;
+  if (above && (await repo.wouldLoop(client, seatId, above)))
+    throw new AppError("REPORTING_LOOP", "That would make a loop in the reporting line.", 422, {
+      [change.line_manager_id ? "line_manager_id" : "line_manager_seat_id"]: ["Would make a loop"],
+    });
   const after = await repo.updateSeat(client, seatId, change);
   await emit(client, {
     key: EVENTS.ORG_SEAT_UPDATED,
@@ -618,8 +624,12 @@ async function importRow(client, values, ctx = {}) {
    * are, so no number is freed for nothing. Only the roster loader reclaims a number
    * (`reclaim_staff_numbers`); for anyone importing a sheet by hand the row is a problem
    * to look at.
+   *
+   * A holder with the row's own first and last name is not somebody else: it is the same
+   * person, and the sheet now spells their work email differently (a corrected domain).
+   * The row is theirs by number, and nobody moves.
    */
-  if (byNumber && workEmail && !sameEmail(byNumber.work_email, workEmail)) {
+  if (byNumber && workEmail && !sameEmail(byNumber.work_email, workEmail) && !sameName(byNumber, name)) {
     const onSheet = (options.roster_work_emails || []).some((e) => sameEmail(e, byNumber.work_email));
     if (!byEmail && (!options.reclaim_staff_numbers || onSheet))
       throw new AppError(
@@ -677,6 +687,16 @@ async function importRow(client, values, ctx = {}) {
 function sameEmail(a, b) {
   const fold = (v) => String(v ?? "").trim().toLowerCase();
   return fold(a) !== "" && fold(a) === fold(b);
+}
+
+/** Whether a record and a row's split name have the same first and last name, folded. */
+function sameName(employee, name) {
+  const fold = managerText.fold;
+  return (
+    fold(employee.first_name) !== "" &&
+    fold(employee.first_name) === fold(name.first_name) &&
+    fold(employee.last_name) === fold(name.last_name)
+  );
 }
 
 /** The keys that carry a value, so an empty cell never writes over something. */

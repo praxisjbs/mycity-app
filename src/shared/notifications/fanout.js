@@ -24,7 +24,8 @@
  *   { permission: [module, action] }   active users whose roles grant the action. When the
  *                                      event has a subject employee (payload.subject_employee_id
  *                                      or payload.employee_id), scope applies: `all` holders,
- *                                      `team` holders above the subject, the subject for `own`.
+ *                                      `team` holders above the subject (through any vacant
+ *                                      seat, employee_effective_manager), the subject for `own`.
  *                                      Without a subject, only `all` holders. Also a function
  *                                      (event) => [module, action] for a rule-chosen permission.
  *   { subject: true }                  the subject employee's login
@@ -154,11 +155,13 @@ async function permissionHolders(client, [module, action], subjectId) {
   if (!catalog.isAction(action))
     throw new Error(`fanout: unknown action "${action}"`);
   const { rows } = await client.query(
-    `WITH RECURSIVE chain AS (
-       SELECT employee_id, line_manager_id, 0 AS depth FROM employee WHERE employee_id = $2::uuid
+    `WITH RECURSIVE line AS MATERIALIZED (
+       SELECT employee_id, manager_id FROM employee_effective_manager
+     ), chain AS (
+       SELECT employee_id, manager_id, 0 AS depth FROM line WHERE employee_id = $2::uuid
        UNION ALL
-       SELECT e.employee_id, e.line_manager_id, c.depth + 1
-         FROM employee e JOIN chain c ON e.employee_id = c.line_manager_id
+       SELECT l.employee_id, l.manager_id, c.depth + 1
+         FROM line l JOIN chain c ON l.employee_id = c.manager_id
         WHERE c.depth < 20
      ), holders AS (
        SELECT u.user_id, u.employee_id, p.scope

@@ -7,7 +7,9 @@
  * One follow-on runs here: a change to who reports to whom moves the boundary of
  * "my team", and team scope is cached (shared/rbac/grants-cache.js). The cache's
  * version is bumped after the change commits, so the next request reads the new
- * tree rather than yesterday's (docs/guides/foundation.md §7).
+ * tree rather than yesterday's (docs/guides/foundation.md §7). A vacant seat's line
+ * or status moves it too: the people under an empty seat are in the team of the first
+ * person above it (docs/guides/organogram.md §6).
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
@@ -31,5 +33,6 @@ outbox.register(EVENTS.EMPLOYEE_REPORTING_LINE_CHANGED, "organisation.refresh_te
 outbox.register(EVENTS.EMPLOYEE_CREATED, "organisation.refresh_team_scope", bumpTeams);
 outbox.register(EVENTS.EMPLOYEE_ARCHIVED, "organisation.refresh_team_scope", bumpTeams);
 outbox.register(EVENTS.EMPLOYEE_RESTORED, "organisation.refresh_team_scope", bumpTeams);
+outbox.register(EVENTS.ORG_SEAT_UPDATED, "organisation.refresh_team_scope", bumpTeams);
 
 module.exports = { EVENTS };

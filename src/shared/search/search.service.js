@@ -244,8 +244,9 @@ async function readerOf(db, user) {
   let managesPeople = false;
   if (user.employee_id) {
     const { rows } = await db.query(
-      `SELECT EXISTS (SELECT 1 FROM employee r
-                       WHERE r.line_manager_id = $1 AND r.status = 'active') AS manages`,
+      `SELECT EXISTS (SELECT 1 FROM employee_effective_manager m
+                        JOIN employee r ON r.employee_id = m.employee_id
+                       WHERE m.manager_id = $1 AND r.status = 'active') AS manages`,
       [user.employee_id],
     );
     managesPeople = Boolean(rows[0] && rows[0].manages);

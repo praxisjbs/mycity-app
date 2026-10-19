@@ -17,9 +17,10 @@
  *  - **A line manager in prose.** A name, a name and a post, a post on its own, or a
  *    post nobody holds with a dotted line beside it (manager-text.js). It resolves to a
  *    person or to the vacant seat holding that post, in the second pass, once every row
- *    of the file exists. A cell that matches nothing is an error on that row.
+ *    of the file exists. A cell that matches nothing is a problem on that row.
  *  - **VACANT rows.** A row whose Name says VACANT is a seat in the structure, not a
- *    person: it carries reports and becomes a suggested vacancy in Recruitment.
+ *    person: it carries reports and becomes a suggested vacancy in Recruitment. Its own
+ *    Line Manager is the line above the seat.
  *
  * Four options only the roster loader sets (`ctx.options`):
  *   keep_existing            fill what is missing, never write over what the app holds
@@ -38,24 +39,29 @@ const managerText = require("./manager-text");
 const repo = require("./organisation.repo");
 const service = require("./organisation.service");
 
-/**
- * Per-batch notes resolve() leaves for link(): which dotted manager a line-manager text
- * named. The engine resolves every row before it links any, and hands link the resolved
- * id rather than the words, so the pair is remembered here, by the id the words resolved
- * to. A post that is named with a dotted line on one row and without it on another is
- * "mixed": no dotted line is written from a sheet that contradicts itself.
- */
-const BATCHES = new Map();
-const BATCH_MEMORY = 8;
+/** The id a manager resolved to: a person's, or the vacant seat's. */
+const idOf = (target) => (target ? target.employee_id || target.org_seat_id : null);
 
-function notesFor(ctx) {
-  const id = (ctx && ctx.batch && ctx.batch.import_batch_id) || "none";
-  if (!BATCHES.has(id)) {
-    BATCHES.set(id, { dottedByPrimary: new Map() });
-    for (const old of [...BATCHES.keys()].slice(0, Math.max(0, BATCHES.size - BATCH_MEMORY)))
-      BATCHES.delete(old);
-  }
-  return BATCHES.get(id);
+/**
+ * A VACANT row's Line Manager: the line above the seat itself. The roster gives it only
+ * while the seat has none, so a line set on screen (Edit Role) stays.
+ * @returns {Promise<boolean>} whether the seat's line was written
+ */
+async function linkSeat(client, seatId, managerId, { keep, actor }) {
+  const seat = await repo.findSeatById(client, seatId);
+  if (!seat) return false;
+  const current = seat.line_manager
+    ? seat.line_manager.employee_id || seat.line_manager.org_seat_id
+    : null;
+  if (current === managerId || (keep && current)) return false;
+  const toSeat = await repo.findSeatById(client, managerId);
+  await service.updateSeat(
+    client,
+    seatId,
+    toSeat ? { line_manager_seat_id: managerId } : { line_manager_id: managerId },
+    actor,
+  );
+  return true;
 }
 
 /**
@@ -224,28 +230,13 @@ defineImporter({
   },
 
   /** A department by name; a line manager by name, post, or the seat holding the post. */
-  resolve: async (client, field, value, ctx) => {
+  resolve: async (client, field, value) => {
     if (field.key === "department") {
       const department = await repo.findDepartmentByName(client, value);
       return department ? department.department_id : null;
     }
     if (field.key !== "line_manager") return null;
-    const { primary, dotted } = managerText.parse(value);
-    const target = await service.resolveManager(client, primary);
-    if (!target) return null;
-    const id = target.employee_id || target.org_seat_id;
-    const notes = notesFor(ctx).dottedByPrimary;
-    const dottedTarget = dotted ? await service.resolveManager(client, dotted) : null;
-    const dottedId = dottedTarget
-      ? dottedTarget.employee_id || dottedTarget.org_seat_id
-      : null;
-    if (notes.has(id)) {
-      const seen = notes.get(id);
-      if (seen.dotted !== dottedId) seen.mixed = true;
-    } else {
-      notes.set(id, { dotted: dottedId, mixed: false });
-    }
-    return id;
+    return idOf(await service.resolveManager(client, managerText.parse(value).primary));
   },
 
   /** A department the sheet names and the system does not have yet. */
@@ -261,23 +252,30 @@ defineImporter({
     return { id: result.target_id, action: result.action };
   },
 
-  /** The second pass: the reporting line, now that every row of the file exists. */
+  /**
+   * The second pass: the reporting line, now that every row of the file exists. A
+   * person's dotted line comes from their own Line Manager cell (the engine hands link
+   * the row's values), so each row gets what it says and a preview leaves nothing behind
+   * for its commit. A VACANT row's line is the seat's own. Answers whether anything was
+   * written, so a row the roster leaves as it was is not counted as an update.
+   */
   link: async (client, id, refs, ctx) => {
     const managerId = refs.line_manager;
-    if (!managerId) return;
-    const employee = await repo.findEmployeeById(client, id);
-    if (!employee) return; // a VACANT row: a seat's own line is set on the organogram
+    if (!managerId) return false;
     const keep = Boolean(ctx.options && ctx.options.keep_existing);
+    const employee = await repo.findEmployeeById(client, id);
+    if (!employee) return linkSeat(client, id, managerId, { keep, actor: ctx.actor });
     const seat = await repo.findSeatById(client, managerId);
     const patch = seat ? { line_manager_seat_id: managerId } : { line_manager_id: managerId };
-    const note = notesFor(ctx).dottedByPrimary.get(managerId);
-    if (note && note.dotted && !note.mixed) {
-      const dottedSeat = await repo.findSeatById(client, note.dotted);
+    const { dotted } = managerText.parse(ctx.values ? ctx.values.line_manager : null);
+    const dottedId = dotted
+      ? idOf(await service.resolveManager(client, dotted, { exclude: id }))
+      : null;
+    if (dottedId) {
+      const dottedSeat = await repo.findSeatById(client, dottedId);
       Object.assign(
         patch,
-        dottedSeat
-          ? { dotted_manager_seat_id: note.dotted }
-          : { dotted_manager_id: note.dotted },
+        dottedSeat ? { dotted_manager_seat_id: dottedId } : { dotted_manager_id: dottedId },
       );
     }
     /* The roster fills what is missing and never writes over what a person set on screen. */
@@ -291,13 +289,16 @@ defineImporter({
         delete patch.dotted_manager_seat_id;
       }
     }
-    if (Object.keys(patch).length === 0) return;
+    /* Nothing to write when the person already reports exactly as the row says. */
+    for (const k of Object.keys(patch)) if ((employee[k] ?? null) === patch[k]) delete patch[k];
+    if (Object.keys(patch).length === 0) return false;
     await service.setReportingLine(
       client,
       id,
       { ...patch, reason: `Staff import row ${ctx.row_number}` },
       ctx.actor,
     );
+    return true;
   },
 
   /** Revert a create: the person is archived, a seat is closed. Nothing is deleted. */

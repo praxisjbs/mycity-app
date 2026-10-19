@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `/auth/me` lists the ones the person holds (§5) |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
-| Last changed | 17/10/2026 |
+| Last changed | 19/10/2026 |
 
 Sources: MILESTONES §5.3 (brand on the sign-in screen), §14 (roles) and A2; BACKEND_STRUCTURE §11
 and §17; the session rules of the donor product (REUSE_MAP), chosen by TB on 16/10/2026. Two-step
@@ -436,3 +436,6 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   Team, Alerts and Reports tabs on what the API allows (README §5.2). `CapabilityCode` moves from
   `access.js` to `identity.js`, which `access.js` imports. Header gains the Capabilities row.
 - 18/10/2026 · TB · `AuthProvider` no longer carries `justSignedIn` and `clearJustSignedIn`: their one reader was the shell's after-sign-in clock-in prompt, which moved to Home · Overview on the server's `prompt_clock_in` (home.md §6, attendance.md change log). Sign-in, the lock and Welcome back are unchanged.
+- 19/10/2026 · TB · `Me.manages_people` counts the people under a vacant seat the reader answers for
+  (the first person above the seat), as team scope does (`employee_effective_manager`, `1160`;
+  `docs/guides/organogram.md` §6), so the manager above an empty post sees My Team and approvals.
