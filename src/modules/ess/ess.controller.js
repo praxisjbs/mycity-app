@@ -55,6 +55,8 @@ module.exports = {
 
   listQueries: async (req, res) => sendPaged(res, await service.queries.list(req.user, req.validated.query)),
 
+  listSanctions: async (req, res) => sendPaged(res, await service.queries.listSanctions(req.user, req.validated.query)),
+
   respondToQuery: async (req, res) =>
     ok(res, await service.queries.respond(withActor(req), id(req), req.validated.body)),
 };

@@ -91,4 +91,9 @@ route(router, "post", "/queries/:id/response",
     self: true, summary: "Respond to one of my queries" },
   controller.respondToQuery);
 
+route(router, "get", "/sanctions",
+  { query: c.common.PageQuery, response: c.sanctions.MySanctionPage, self: true,
+    summary: "My sanctions" },
+  controller.listSanctions);
+
 module.exports = { basePath: "/ess", surface: "staff", router };

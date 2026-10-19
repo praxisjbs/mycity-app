@@ -364,3 +364,4 @@ Deductions figure and every form open the shared modal.
 - 19/10/2026 · LA · My Attendance (#9) shows the person's field assignments in progress and to come, under Today (attendance guide §6.12, §10); §10.2 row updated.
 - 19/10/2026 · GE · §5: the ESS queries and sanctions rows name the contract the queries guide wrote (`EssQueryListQuery`, `MyQueryPage`, `QueryResponseCreate`, `MySanctionPage`).
 - 19/10/2026 · GE · My Queries (#13) API: `GET /ess/queries` and `POST /ess/queries/:id/response` (`ess.queries.js`, through the queries service, queries guide §3 step 3). The screen stays on INTERIM shapes until the frontend swap; sanctions follow with the sanctions module.
+- 19/10/2026 · GE · My Queries · Sanctions API: `GET /ess/sanctions` (`MySanctionPage`), the caller's issued sanctions, through the sanctions service.

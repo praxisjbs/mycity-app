@@ -399,4 +399,201 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(await notified("staff", "query.closed")).toBe(1);
     });
   });
+
+  /* ---------------------------------------------------------------- *
+   * The chain and sanctions (guide §3 steps 4 to 6, §6.4 to §6.6)
+   * ---------------------------------------------------------------- */
+
+  describe("the chain and sanctions", () => {
+    const steps = {};
+    const letterId = async (key) =>
+      (await as("ops").get("/letter-templates?sort=name")).body.data.find((t) => t.key === key).letter_template_id;
+    const ready = async (key) => {
+      const id = await letterId(key);
+      await as("ops").put(`/letter-templates/${id}/body`, {
+        body: `Dear {{ employee.first_name }}, following query {{ query_number }}: {{ step_name }}. {{ reason }}`,
+      });
+      await as("ops").post(`/letter-templates/${id}/activate`);
+    };
+    const chain = async () => (await as("ops").get("/sanctions/chain?sort=position")).body.data.map((r) => [r.position, r.name]);
+
+    /** HoD raises a query on Zainab, she answers, and it waits for a decision. */
+    const answered = async (subject) => {
+      const raised = await as("hod").post("/queries", {
+        employee_id: people.other.employee.employee_id,
+        subject,
+        details: "The incident is recorded in the site log for the day in question.",
+      });
+      expect(raised.status).toBe(201);
+      const id = raised.body.employee_query_id;
+      const res = await as("other").post(`/ess/queries/${id}/response`, {
+        body: "I accept that this happened and have nothing further to add.",
+      });
+      expect(res.status).toBe(200);
+      return id;
+    };
+    const propose = (id, step, extra = {}) =>
+      as("hod").post(`/queries/${id}/decision`, {
+        outcome: "sanction",
+        consequence_step_id: steps[step],
+        reason: "The explanation does not account for the incident.",
+        ...extra,
+      });
+    const approve = async (who, instanceId) => {
+      const res = await as(who).post(`/workflow/instances/${instanceId}/approve`, {});
+      expect(res.status).toBe(200);
+      await drain();
+    };
+
+    test("the chain starts empty; only queries.configure adds a rung", async () => {
+      expect(await chain()).toEqual([]);
+      const refused = await as("manager").post("/sanctions/chain", { name: "Caution" });
+      expect(refused.status).toBe(403);
+    });
+
+    test("People build the ladder; a rung inserted at a position moves the ones below", async () => {
+      await ready("caution-letter");
+      for (const [name, body] of [
+        ["Caution", { letter_template: "caution-letter" }],
+        ["Warning", { letter_template: "warning-letter", valid_days: 365 }],
+        ["Suspension", { letter_template: "suspension-letter", financial_effect: "unpaid_days", default_days: 3 }],
+      ]) {
+        const res = await as("ops").post("/sanctions/chain", { name, ...body });
+        expect(res.status).toBe(201);
+        steps[name] = res.body.consequence_step_id;
+      }
+      const second = await as("ops").post("/sanctions/chain", {
+        name: "Second Warning",
+        position: 3,
+        letter_template: "warning-letter",
+        valid_days: 365,
+      });
+      expect(second.body).toMatchObject({ code: "second_warning", position: 3, letter_ready: true });
+      steps["Second Warning"] = second.body.consequence_step_id;
+      expect(await chain()).toEqual([
+        [1, "Caution"],
+        [2, "Warning"],
+        [3, "Second Warning"],
+        [4, "Suspension"],
+      ]);
+
+      const moved = await as("ops").patch(`/sanctions/chain/${steps.Suspension}`, { position: 1 });
+      expect(moved.body.position).toBe(1);
+      expect((await chain()).map((r) => r[1])).toEqual(["Suspension", "Caution", "Warning", "Second Warning"]);
+      await as("ops").patch(`/sanctions/chain/${steps.Suspension}`, { position: 4 });
+      expect((await chain()).map((r) => r[1])).toEqual(["Caution", "Warning", "Second Warning", "Suspension"]);
+
+      const bad = await as("ops").post("/sanctions/chain", { name: "Odd", letter_template: "query-letter" });
+      expect(bad.status).toBe(422);
+    });
+
+    test("a first offence is offered the first rung; proposed, it waits for Operations & People", async () => {
+      const id = await answered("Damaged the site generator");
+      const card = await as("hod").get(`/queries/${id}`);
+      expect(card.body.next_step).toMatchObject({ name: "Caution", position: 1 });
+      expect(card.body.can_decide).toBe(true);
+
+      const res = await propose(id, "Caution");
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ status: "under_review", escalated: true, can_decide: false });
+      expect(res.body.sanction).toMatchObject({ step_name: "Caution", status: "pending_approval", number: null });
+      expect((await propose(id, "Caution")).status).toBe(409);
+
+      // The proposer never approves it; Operations & People do.
+      const instance = res.body.workflow_instance_id;
+      expect((await as("hod").post(`/workflow/instances/${instance}/approve`, {})).status).not.toBe(200);
+      await approve("ops", instance);
+
+      const after = await as("hod").get(`/queries/${id}`);
+      expect(after.body).toMatchObject({ status: "resolved", outcome: "sanctioned", escalated: false });
+      expect(after.body.sanction).toMatchObject({ number: "SAN-0001", status: "issued" });
+      const issued = await as("ops").get(`/sanctions/${after.body.sanction.sanction_id}`);
+      expect(issued.body).toMatchObject({ step_name: "Caution", status: "issued", sanction_type: "caution" });
+      expect(issued.body.letter_document_id).toBeTruthy();
+
+      const mine = await as("other").get("/ess/sanctions");
+      expect(mine.body.data.map((r) => [r.number, r.step_name])).toEqual([["SAN-0001", "Caution"]]);
+      const told = await q("SELECT count(*)::int AS n FROM notification WHERE user_id = $1 AND event_key = 'sanction.issued'", [
+        people.other.user.user_id,
+      ]);
+      expect(told.rows[0].n).toBe(1);
+    });
+
+    test("the sanction letter renders from its rung's template and is emailed with the PDF", async () => {
+      const list = await as("ops").get("/sanctions");
+      const docId = (await as("ops").get(`/sanctions/${list.body.data[0].sanction_id}`)).body.letter_document_id;
+      const html = (await q("SELECT render_html FROM document WHERE document_id = $1", [docId])).rows[0].render_html;
+      expect(html).toContain("Dear Zainab, following query");
+      expect(html).toContain("Caution.");
+      await documents.renderPending(docId, { db: pool });
+      sent.length = 0;
+      await drain();
+      expect(sent.find((j) => j.name === "sanction-issued").data).toMatchObject({
+        to: { email: "other@mycity.test" },
+        data: { sanction_number: "SAN-0001", step_name: "Caution" },
+        attachments: [{ document_id: docId }],
+      });
+    });
+
+    test("a second offence offers the next rung without code; a fine waits, pending, for payroll", async () => {
+      const id = await answered("Damaged the site generator again");
+      expect((await as("hod").get(`/queries/${id}`)).body.next_step.name).toBe("Warning");
+      const res = await propose(id, "Warning", { fine_amount: "15000.00" });
+      expect(res.status).toBe(200);
+      await approve("ops", res.body.workflow_instance_id);
+
+      const fines = await require("../../src/modules/sanctions/sanctions.fines").pending();
+      expect(fines.data.map((f) => [f.sanction_number, f.amount_ngn, f.settlement_status])).toEqual([
+        ["SAN-0002", "15000.00", "pending"],
+      ]);
+      const summary = await as("ops").get("/sanctions/summary");
+      expect(summary.body).toMatchObject({ active: 2, pending_approval: 0, fines_this_year: "15000.00", fines_recovered: "0.00" });
+      const standing = await as("ops").get(`/sanctions/standing?employee_id=${people.other.employee.employee_id}`);
+      expect(standing.body.in_force.map((r) => r.step_name)).toEqual(["Warning", "Caution"]);
+      expect(standing.body.next_step.name).toBe("Second Warning");
+    });
+
+    test("a refusal sends the query back under review; a rung whose letter waits for a sample is not offered", async () => {
+      const id = await answered("Left the site unattended");
+      const res = await propose(id, "Second Warning");
+      const reject = await as("ops").post(`/workflow/instances/${res.body.workflow_instance_id}/reject`, {
+        reason: "A second warning is too much for this.",
+      });
+      expect(reject.status).toBe(200);
+      await drain();
+      const back = await as("hod").get(`/queries/${id}`);
+      expect(back.body).toMatchObject({ status: "under_review", escalated: false, can_decide: true });
+      expect(back.body.sanction).toMatchObject({ status: "rejected" });
+
+      const noLetter = await propose(id, "Suspension");
+      expect(noLetter.status).toBe(422);
+      expect(noLetter.body.error.code).toBe("LETTER_NOT_READY");
+    });
+
+    test("Suspension and above also need Management; its days follow the rung", async () => {
+      await ready("suspension-letter");
+      const id = await answered("Left the site unattended again");
+      const res = await propose(id, "Suspension");
+      expect(res.status).toBe(200);
+      await approve("ops", res.body.workflow_instance_id);
+      expect((await as("hod").get(`/queries/${id}`)).body.sanction.status).toBe("pending_approval");
+      await approve("mgmt", res.body.workflow_instance_id);
+      const sanction = await as("ops").get(`/sanctions/${(await as("hod").get(`/queries/${id}`)).body.sanction.sanction_id}`);
+      expect(sanction.body.status).toBe("issued");
+      expect(lagosDays(sanction.body.effective_on, sanction.body.ends_on)).toBe(3);
+    });
+
+    test("sanctions follow their query's visibility; a standing is People's alone", async () => {
+      expect((await as("manager").get("/sanctions")).body.page.total).toBe(0);
+      expect((await as("hod").get("/sanctions")).body.page.total).toBe(4);
+      expect((await as("ops").get("/sanctions")).body.page.total).toBe(4);
+      const standing = await as("hod").get(`/sanctions/standing?employee_id=${people.other.employee.employee_id}`);
+      expect(standing.status).toBe(404);
+    });
+  });
 });
+
+/** Inclusive days from one ISO date to another. */
+function lagosDays(from, to) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+}

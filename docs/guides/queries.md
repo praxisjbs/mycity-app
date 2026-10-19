@@ -249,12 +249,14 @@ the fact; a mistake is a withdrawn sanction or a further note, both audited.
 | `query.reminded` | Send Reminder | Notification and email to the employee |
 | `query.responded` | The employee responds | Notification to the raiser, or People when a rule raised it |
 | `query.closed` | Close, no action | Notification to the employee |
-| `query.escalated` | A sanction is proposed | Opens `queries.consequence`; the engine tells the first approvers |
+| `sanction.proposed` | A sanction is proposed from a query's decision | Opens `queries.consequence`; the engine tells the first approvers |
 | `query_rule.fired` | A rule raised a query | Recent Firings refresh |
 | `query_rule.saved`, `query_rule.activated`, `query_rule.paused` | Rules writes | Audit |
-| `sanction.issued` | `queries.consequence` approved | Letter generated, filed, emailed; fine pending; query resolved; notification to the employee |
-| `sanction.rejected` | The approval rejected it | Proposal withdrawn; the proposer is told |
+| `sanction.issued` | `queries.consequence` approved | Numbered; letter generated, filed, emailed with the PDF once rendered (`templates/email/sanction-issued.html`); fine pending; query resolved; notification to the employee |
+| `sanction.rejected` | The approval rejected it | Query back under review; the proposer is told |
+| `sanction.withdrawn` | The approval was withdrawn | Query back under review |
 | `consequence_step.saved` | Chain Settings writes | Audit |
+| `sanction_fine.accepted`, `.settled`, `.waived` | M6 takes, deducts or waives a fine (`sanctions.fines`) | Audit |
 | `letter_template.saved`, `letter_template.activated` | Letter Templates writes | Audit |
 | job `query-rule-evaluate` | Outbox, on each trigger event | Counts and raises (§6.3); idempotent |
 
@@ -278,7 +280,7 @@ counts, never coordinates or device identifiers.
 
 - **AI reads** (`queries.ai.js`, `sanctions.ai.js`): `queries.list` and `queries.get` (open and
   closed queries the reader may see, §6.1), `sanctions.list`, `sanctions.standing` (a person's rungs
-  in force and the next one). `queries` view, paged at 25, cited by number. `query_rules` and
+  in force and the next one; scope all only). `queries` view, paged at 25, cited by number. `query_rules` and
   `templates` carry `// ai:none` (configuration, nothing a question needs).
 - **AI routes**: "raise a query for <person>" → `queries.queries` with `new: 1` and the employee
   prefilled; "issue a sanction" → `queries.sanctions`.
@@ -365,6 +367,11 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 19/10/2026 · GE · Sanctions and the chain built (§3 steps 4 to 6, §5, §6.4 to §6.6, §7, §9): Chain
+  Settings' writes renumber the ladder in one transaction; a proposal opens `queries.consequence`
+  with the rung's position as its rank; the approval's end issues (numbered, lettered, emailed),
+  rejects or withdraws it. §7 names `sanction.proposed` (not `query.escalated`), the fine events
+  and the sanction email. The standing (scope all only) names the next rung.
 - 19/10/2026 · GE · Queries built (§3 steps 1 to 4, §5, §6.1 to §6.4, §7, §9): raise, remind,
   close with no action, the ESS response, ⌘K and the AI reads. The letter is emailed with its PDF
   once rendered (`templates/email/query-raised.html`). ⌘K keeps §6.1 through the search provider's
