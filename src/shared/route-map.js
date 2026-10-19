@@ -233,7 +233,7 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("queries", "sanctions"),
     self: screen("ess", "my-queries"),
   },
-  letter_template: screen("queries", "letter-templates"), // search:none not built yet (src/modules/templates)
+  letter_template: screen("queries", "letter-templates"), // search:none a handful of letters, listed whole on Letter Templates, which ⌘K finds by name
 
   // Recruitment
   vacancy: screen("recruitment", "vacancies"), // search:none not built yet (src/modules/vacancies)
@@ -298,7 +298,7 @@ const ENTITY_ROUTES = Object.freeze({
   workflow_definition: screen("settings", "approvals"),
   numbering_scheme: screen("settings", "documents-and-numbering"),
   public_holiday: screen("settings", "organisation"),
-  template: screen("settings", "documents-and-numbering"), // search:none not built yet (src/modules/templates)
+  template: screen("settings", "documents-and-numbering"), // search:none a template is opened from Settings, Documents and Numbering, which ⌘K finds by name; letters are letter_template
   integration: screen("settings", "integrations"), // search:none not built yet (src/modules/integrations)
 });
 

@@ -8,6 +8,8 @@
 --                     type) and is replaced by queries.consequence; it is switched off, not deleted.
 --   letter templates  one row per shipped file in templates/documents/, so the screen lists them and
 --                     a rung or rule can name them. Template defaults the generator needs (A26).
+--                     query-letter ships with wording and is active, so a rule can raise a query
+--                     on a fresh database; the sanction letters wait for MyCity's samples (drafts).
 --
 -- The ladder itself (consequence_step) and every query rule are MyCity's choices, entered on
 -- Sanctions, Chain Settings and on Rules (A26): none are seeded. Rows people edit later are inserted
@@ -41,7 +43,7 @@ UPDATE workflow_definition
 
 INSERT INTO letter_template (key, name, purpose, status)
 VALUES
-  ('query-letter', 'Query Letter', 'query', 'draft'),
+  ('query-letter', 'Query Letter', 'query', 'active'),
   ('caution-letter', 'Caution Letter', 'sanction', 'draft'),
   ('warning-letter', 'Warning Letter', 'sanction', 'draft'),
   ('suspension-letter', 'Suspension Letter', 'sanction', 'draft'),
