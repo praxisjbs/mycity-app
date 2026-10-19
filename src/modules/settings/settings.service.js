@@ -220,6 +220,7 @@ const DOC_LABELS = Object.freeze({
   import_batch: "Import",
   report_run: "Report Run",
   location_request: "Work Location Request",
+  field_assignment: "Field Assignment",
   query: "Query",
   sanction: "Sanction",
   letter: "Letter",

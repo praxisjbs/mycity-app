@@ -97,7 +97,7 @@ const AttendanceToday = z
      */
     location: z
       .object({
-        kind: z.enum(["worksite", "home", "none", "remote", "temporary_home", "approved_day"]),
+        kind: z.enum(["worksite", "home", "none", "remote", "temporary_home", "approved_day", "field"]),
         name: z.string().nullable(),
         radius_m: z.number().int().nullable(),
         home_state: z.enum(["approved", "pending", "none"]).nullable(),
@@ -546,6 +546,117 @@ const LocationRequestListQuery = listQuery(
 const LocationRequestCancel = z.object({ reason: optionalText(500) }).strict();
 
 /* ------------------------------------------------------------------ *
+ * Field assignments: people sent to one or two sites for some days by their
+ * line manager or People, in force at once (guide §6.12)
+ * ------------------------------------------------------------------ */
+
+/** Worked out on the day in Lagos; `cancelled` is the status. */
+const FieldAssignmentState = z.enum(["upcoming", "in_progress", "done", "cancelled"]);
+const FieldAssignmentStatus = z.enum(["active", "cancelled"]);
+
+/** One of an assignment's sites: a client's venue, typed as a worksite is. */
+const FieldSite = z
+  .object({
+    field_site_id: uuid,
+    position: z.number().int().min(1).max(2),
+    name: z.string(),
+    address: z.string().nullable(),
+    latitude: z.number(),
+    longitude: z.number(),
+    radius_m: z.number().int(),
+  })
+  .strict();
+
+/** One person on it; `removed_at` once taken off, with the reason they read. */
+const FieldMember = z
+  .object({
+    employee: PersonRef,
+    added_at: isoDateTime,
+    removed_at: isoDateTime.nullable(),
+    removed_reason: z.string().nullable(),
+  })
+  .strict();
+
+/**
+ * A field assignment. `people` counts those still on it; `members` lists everyone who was (at most
+ * 25: people are only ever taken off). `can_change` says whether the reader may cancel it or take
+ * someone off.
+ */
+const FieldAssignment = z
+  .object({
+    field_assignment_id: uuid,
+    number: z.string(),
+    name: z.string(),
+    client: z.string(),
+    note: z.string().nullable(),
+    starts_on: isoDate,
+    ends_on: isoDate,
+    days: z.number().int().min(1),
+    status: FieldAssignmentStatus,
+    state: FieldAssignmentState,
+    sites: z.array(FieldSite).min(1).max(2),
+    members: z.array(FieldMember).max(25),
+    people: z.number().int().min(0),
+    assigned_by_name: z.string().nullable(),
+    assigned_at: isoDateTime,
+    cancelled_at: isoDateTime.nullable(),
+    cancel_reason: z.string().nullable(),
+    can_change: z.boolean(),
+  })
+  .strict();
+const FieldAssignmentPage = Paged(FieldAssignment);
+
+const minLength = (n) => (v) => v.length >= n;
+const reasonText = text(500).refine(minLength(10), "At least 10 characters");
+
+/** A site as it is set: its centre and radius typed until address search exists (F21). */
+const FieldSiteInput = z
+  .object({
+    name: text(120).refine(minLength(2), "At least 2 characters"),
+    address: optionalText(300),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    radius_m: z.number().int().min(100, "At least 100 m").max(500, "At most 500 m"),
+  })
+  .strict();
+
+/**
+ * POST /attendance/field-assignments. Who may be put on it, the dates against today and the overlap
+ * are the service's (guide §6.12).
+ */
+const FieldAssignmentCreate = z
+  .object({
+    name: text(120).refine(minLength(3), "At least 3 characters"),
+    client: text(120).refine(minLength(2), "At least 2 characters"),
+    note: optionalText(500),
+    starts_on: isoDate,
+    ends_on: isoDate,
+    employee_ids: z
+      .array(uuid)
+      .min(1, "Pick someone")
+      .max(25, "At most 25 people")
+      .refine((ids) => new Set(ids).size === ids.length, "Each person once"),
+    sites: z.array(FieldSiteInput).min(1, "Add a site").max(2, "At most two sites"),
+  })
+  .strict()
+  .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] });
+
+/** GET /attendance/field-assignments: within the reader's `people` scope, in progress and upcoming first. */
+const FieldAssignmentListQuery = listQuery(
+  { state: FieldAssignmentState.optional(), employee_id: uuid.optional() },
+  ["starts_on"],
+);
+
+/** GET /attendance/me/field-assignments: the person's own. */
+const MyFieldAssignmentListQuery = listQuery({ state: FieldAssignmentState.optional() }, ["starts_on"]);
+
+/** POST /attendance/field-assignments/:id/cancel: everyone on it reads the reason. */
+const FieldAssignmentCancel = z.object({ reason: reasonText }).strict();
+
+/** POST /attendance/field-assignments/:id/remove: the person taken off reads the reason. */
+const FieldMemberRemove = z.object({ employee_id: uuid, reason: reasonText }).strict();
+
+/* ------------------------------------------------------------------ *
  * Exports
  * ------------------------------------------------------------------ */
 
@@ -642,6 +753,39 @@ const TABLES = {
   LocationRequestCancel: {
     table: null,
     reason: "why a request is withdrawn or cancelled; kept on the request and the audit row",
+  },
+  FieldSite: { table: "attendance_field_site" },
+  FieldMember: {
+    table: "attendance_field_member",
+    virtual: { employee: "the person, from employee and department" },
+  },
+  FieldAssignment: {
+    table: "attendance_field_assignment",
+    virtual: {
+      days: "calendar days from starts_on to ends_on",
+      state: "upcoming, in progress or done against today in Lagos, else cancelled",
+      sites: "its attendance_field_site rows",
+      members: "its attendance_field_member rows",
+      people: "how many attendance_field_member rows are not removed",
+      assigned_by_name: "who set it, from employee",
+      can_change: "whether the reader holds people approve over everyone still on it",
+    },
+  },
+  FieldAssignmentPage: { table: null, reason: "a page of field assignments" },
+  FieldSiteInput: { table: "attendance_field_site" },
+  FieldAssignmentCreate: {
+    table: "attendance_field_assignment",
+    virtual: {
+      employee_ids: "written as attendance_field_member rows",
+      sites: "written as attendance_field_site rows",
+    },
+  },
+  FieldAssignmentListQuery: { table: null, reason: "list controls for People's field assignments" },
+  MyFieldAssignmentListQuery: { table: null, reason: "list controls for the person's own field assignments" },
+  FieldAssignmentCancel: { table: null, reason: "why it is cancelled; kept as cancel_reason and on the audit row" },
+  FieldMemberRemove: {
+    table: null,
+    reason: "who is taken off and why; kept as removed_reason on their attendance_field_member row",
   },
   AttendanceToday: {
     table: null,
@@ -788,4 +932,16 @@ module.exports = {
   MyLocationRequestListQuery,
   LocationRequestListQuery,
   LocationRequestCancel,
+  FieldAssignmentState,
+  FieldAssignmentStatus,
+  FieldSite,
+  FieldMember,
+  FieldAssignment,
+  FieldAssignmentPage,
+  FieldSiteInput,
+  FieldAssignmentCreate,
+  FieldAssignmentListQuery,
+  MyFieldAssignmentListQuery,
+  FieldAssignmentCancel,
+  FieldMemberRemove,
 };

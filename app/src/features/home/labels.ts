@@ -24,6 +24,7 @@ type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 export const ROSTER_STATUS: Record<HomeRosterStatus, { tone: Tone; text: string }> = {
   on_site: { tone: "ok", text: "On Site" },
   remote: { tone: "ok", text: "Remote" },
+  field: { tone: "ok", text: "Field" },
   late: { tone: "warn", text: "Late" },
   not_in: { tone: "neutral", text: "Not In" },
   on_leave: { tone: "info", text: "On Leave" },

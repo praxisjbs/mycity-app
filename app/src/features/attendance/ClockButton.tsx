@@ -231,6 +231,8 @@ function ClockPanel({ close }: { close: () => void }) {
           ? `Temporary Home · ${t.location.radius_m} m`
           : t.location.kind === "approved_day"
             ? (t.location.name ?? "Approved Request")
+            : t.location.kind === "field"
+              ? `${t.location.name}${t.location.radius_m ? ` · ${t.location.radius_m} m` : ""}`
             : t.location.kind === "remote"
               ? t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
               : "No Worksite Assigned";

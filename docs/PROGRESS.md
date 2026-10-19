@@ -548,10 +548,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
-| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · LA · Home · Team (#86) and Clocked In Today: the roster's `field` status (`docs/guides/attendance.md` §6.9, §6.12; `docs/guides/home.md` §6): someone present on a field assignment's day reads Field, counted in Present Today and Clocked In Today, with a Field chip on Team and in Clocked In Today's groups, and the site in the Worksite column. Team's four cards are unchanged. Left: nothing.
 - 18/10/2026 · TB · Home PR 5 (`m1/home-reports`): Reports #3 built on the real API, desktop and
   phone, which completes Home. `src/modules/reports`: the source registry (Daily Attendance, Leave,
   Open Alerts, Headcount, the four forward sources and the reader's own Overview, each over its
@@ -653,7 +654,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
@@ -667,6 +668,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · LA · My Attendance (#9): Field Assignments, the person's in progress and to come (number and name, dates, the site), each opening with the client, its sites with their address and radius, and who else is on it; on an assignment's day the clock names its site (both, "A or B", when there are two) and matches the punch to the nearer, as a worksite. Opened from a notice by `?assignment=`. Checked by a screen test and on the mock at 390 and 1440 px (Adedotun). Left: nothing.
 - 19/10/2026 · LA · Work Location Requests (#87) built on the real API (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.11): a temporary home (remote staff, with one reading taken there and refused when too coarse), a remote day (on-site and hybrid staff) or a client visit (anyone), for at most 90, 5 or 14 days, from today and within 90 days, never overlapping another. Each is numbered `WLR-0001` and approved by the line manager, then Operations & People; the person withdraws one waiting or cancels an approved one before its first day, and each request opens with its approval route and every decision's reason. On an approved day the clock names the place (Temporary Home · 100 m, or the request), fences a temporary home like a home, and otherwise keeps the reading as evidence; a present remote day counts as remote on Home's roster. A request waiting on someone is in their Need You on Home and opens on People · Attendance. ⌘K: New Request and the requests by number. Checked by 3 screen tests and 6 integration tests, and on the mock at 390 and 1440 px (Chidera, Kemi, Cynthia). Policy Updates (#89) moves to M9 with Settings · Attendance Policy (owner decision, 19/10/2026). Left: field assignments.
 - 19/10/2026 · TB · ESS · Org Chart (#91), TB's four decisions on the phone (`docs/guides/organogram.md`
   §8, §10.2): a Focus or Everyone switch, opening on Focus at the person looking, with the path
@@ -770,6 +772,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · LA · People · Attendance (#25): Field beside Requests, field assignments (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.12). A line manager (their team) or People (anyone) send one to 25 people to one or two sites, typed with a centre and a radius of 100 to 500 m, for up to 31 days from today: New Assignment, numbered `FA-0001`, in force at once, each person told. Never yourself; one active assignment a person a day. An assignment opens with its details, sites and people; Take Off (a reason, never the last) and Cancel Assignment (a reason) while it runs. On its days it decides the place before anything else; beyond every site is outside the worksite, named with the nearer. Search finds one by number, name, client or person. `1330`, `1393`; seven routes; three events. Checked by 5 integration tests, 2 screen tests and on the mock at 390 and 1440 px (Cynthia). Left: adding people to an assignment or changing its sites and dates (cancel and set a new one); fencing a site from its address once address search exists (F21).
 - 19/10/2026 · LA · People · Attendance (#25): Requests beside Homes, the work location requests in the reader's scope waiting first (Waiting, Approved, Rejected, Cancelled, All), searched by name or number, each opening with its details, its approval route and the decisions so far; Record Decision (Approve, or Reject with the reason the person reads) when its stage waits on the reader, through the approval's own routes. The temporary home's point is shown to People with scope all only. Left: nothing.
 - 19/10/2026 · TB · People · Organogram (#92), TB's four decisions on the phone
   (`docs/guides/organogram.md` §5 to §8, §10): Focus and Everyone, opening on Everyone, the whole

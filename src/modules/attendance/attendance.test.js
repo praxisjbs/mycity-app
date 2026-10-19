@@ -174,6 +174,29 @@ describe("the geofence", () => {
       verdict: "outside", result: "review", exception: "outside_worksite", place: "worksite", worksite_id: "w-1", home_id: null,
     });
   });
+
+  test("a field assignment's day is judged at the nearer of its sites, named by it, as a worksite is", () => {
+    const near = { field_site_id: "s-1", name: "Venue Hall", latitude: OFFICE.latitude, longitude: OFFICE.longitude, radius_m: 200 };
+    const far = { field_site_id: "s-2", name: "Depot Yard", latitude: OFFICE.latitude + 0.05, longitude: OFFICE.longitude, radius_m: 300 };
+    const FIELD = {
+      kind: "field", place: "field", worksite_id: null, attendance_home_id: null, field_assignment_id: "fa-1",
+      name: "Venue Hall or Depot Yard", latitude: near.latitude, longitude: near.longitude, radius_m: null, sites: [near, far],
+    };
+    expect(judge({ expected: FIELD, point: north(150) })).toMatchObject({
+      verdict: "inside", result: "accepted", place: "field", worksite_id: null, worksite_name: "Venue Hall",
+      assignment_id: "fa-1", site_id: "s-1", radius_m: 200,
+    });
+    // Beyond every site: outside the nearer one, as outside a worksite.
+    const out = judge({ expected: FIELD, point: north(900), mode: "warn" });
+    expect(out).toMatchObject({ verdict: "outside", exception: "outside_worksite", worksite_name: "Venue Hall", site_id: "s-1" });
+    expect(judge({ expected: FIELD, point: north(900), mode: "block" })).toMatchObject({ result: "rejected", outside: "outside_worksite" });
+    // A remote employee sent out is judged at the site, never as at home.
+    expect(judge({ expected: FIELD, work_pattern: "remote", point: north(150) })).toMatchObject({ verdict: "inside", home_id: null });
+    // No reading: unverified against the first site, never rejected.
+    expect(judge({ expected: FIELD, point: null, location_error: "denied", mode: "block" })).toMatchObject({
+      verdict: "unverified", result: "review", worksite_name: "Venue Hall",
+    });
+  });
 });
 
 /* ------------------------------------------------------------------ *
@@ -408,6 +431,18 @@ describe("the routes", () => {
     const punch = routes.find((r) => r.method === "POST" && r.path === "/punches");
     const keys = Object.keys(punch.contract.body._def.schema.shape);
     expect(keys.sort()).toEqual(["accuracy_m", "device_at", "event_type", "latitude", "location_error", "longitude", "note"]);
+  });
+
+  test("a field assignment is set, cancelled and changed under people approve; read under view", () => {
+    const by = (method, path) => routes.find((r) => r.method === method && r.path === path);
+    for (const path of ["/field-assignments", "/field-assignments/:id/cancel", "/field-assignments/:id/remove"])
+      expect(by("POST", path).permission).toMatchObject({ key: "people", action: "approve" });
+    for (const path of ["/field-assignments", "/field-assignments/:id"])
+      expect(by("GET", path).permission).toMatchObject({ key: "people", action: "view" });
+    expect(Object.keys(shapeOf(by("POST", "/field-assignments").contract.body)).sort()).toEqual([
+      "client", "employee_ids", "ends_on", "name", "note", "sites", "starts_on",
+    ]);
+    expect(by("GET", "/me/field-assignments").contract.self).toBe(true);
   });
 
   test("lists page through the contract's controls, with no page size", () => {

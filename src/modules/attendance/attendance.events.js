@@ -22,9 +22,14 @@
  *   location_request.approved,      its approval ended; copied onto the request after commit
  *   location_request.rejected       (the approval already told the person); the clock reloads
  *   location_request.cancelled      the person withdrew or cancelled it; the clock reloads
+ *   field_assignment.assigned       a line manager or People sent someone out (one event a
+ *                                   person): they are told, and their clock reloads
+ *   field_assignment.cancelled      it was cancelled (one a person still on it): they are told
+ *                                   why, and their clock reloads
+ *   field_assignment.member_removed someone was taken off it: they are told why
  *
- * Payloads carry ids, dates, results and exception types: never coordinates, an address,
- * a device identifier or the evidence itself.
+ * Payloads carry ids, dates, results and exception types (a field assignment's number and
+ * name too): never coordinates, an address, a device identifier or the evidence itself.
  */
 const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
@@ -49,6 +54,9 @@ const EVENTS = defineEvents("people", {
   "location_request.approved": { summary: "A work location request was approved" },
   "location_request.rejected": { summary: "A work location request was rejected" },
   "location_request.cancelled": { summary: "A work location request was withdrawn or cancelled" },
+  "field_assignment.assigned": { summary: "Someone was sent out on a field assignment" },
+  "field_assignment.cancelled": { summary: "A field assignment was cancelled" },
+  "field_assignment.member_removed": { summary: "Someone was taken off a field assignment" },
 });
 
 /** The approval every work location request opens (docs/guides/attendance.md §6.11). */
@@ -107,6 +115,29 @@ defineNotification(EVENTS.ATTENDANCE_HOME_DECIDED, {
       : "Send it again from My Attendance.",
 });
 
+/** "FA-0001 · Venue Setup" */
+const assignmentOf = (p) => `${p.number} · ${p.name}`;
+const daysOf = (p) =>
+  p.starts_on === p.ends_on ? formatDate(p.starts_on) : `${formatDate(p.starts_on)} to ${formatDate(p.ends_on)}`;
+
+defineNotification(EVENTS.FIELD_ASSIGNMENT_ASSIGNED, {
+  to: [{ subject: true }],
+  title: "Field assignment",
+  body: (e) => `${assignmentOf(e.payload)}, ${daysOf(e.payload)}.`,
+});
+
+defineNotification(EVENTS.FIELD_ASSIGNMENT_CANCELLED, {
+  to: [{ subject: true }],
+  title: "Field assignment cancelled",
+  body: (e) => `${assignmentOf(e.payload)}: ${e.payload.reason}`,
+});
+
+defineNotification(EVENTS.FIELD_ASSIGNMENT_MEMBER_REMOVED, {
+  to: [{ subject: true }],
+  title: "Taken off a field assignment",
+  body: (e) => `${assignmentOf(e.payload)}: ${e.payload.reason}`,
+});
+
 /*
  * After commit: tell the screens that show this person's attendance to reload. The
  * person's own sockets, and the sockets of everyone whose `people` view reaches them
@@ -136,6 +167,9 @@ for (const key of [
   EVENTS.LOCATION_REQUEST_APPROVED,
   EVENTS.LOCATION_REQUEST_REJECTED,
   EVENTS.LOCATION_REQUEST_CANCELLED,
+  EVENTS.FIELD_ASSIGNMENT_ASSIGNED,
+  EVENTS.FIELD_ASSIGNMENT_CANCELLED,
+  EVENTS.FIELD_ASSIGNMENT_MEMBER_REMOVED,
 ])
   outbox.register(key, "attendance.push_updated", pushUpdated);
 

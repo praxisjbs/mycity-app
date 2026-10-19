@@ -5,7 +5,9 @@
  * People · Attendance (the person's own on ESS · My Attendance); an exception opens the
  * same way (shared/route-map.js attendance_record, attendance_exception). A remote
  * employee's home location is found by their name and opens in Homes; a work location request
- * by its number or the person's name, and opens in Requests. Neither by its address.
+ * by its number or the person's name, and opens in Requests. Neither by its address. A field
+ * assignment by its number, name, client or anyone on it (seen when one of them is in scope),
+ * opening in Field; never by a site's address.
  */
 const { recordProvider } = require("../../shared/search/provider");
 
@@ -63,5 +65,28 @@ module.exports = [
       "r.location_request_id AS id, r.number AS ref, btrim(e.first_name || ' ' || e.last_name) AS title, replace(r.request_type, '_', ' ') AS sub, r.status AS status",
     order: "r.requested_at DESC",
     scope: { column: "r.employee_id" },
+  }),
+  recordProvider({
+    type: "attendance_field_assignment",
+    module: "people",
+    label: "Field Assignments",
+    words: ["field assignment", "field work", "sent out", "venue", "crew"],
+    from: "attendance_field_assignment a",
+    key: "a.field_assignment_id",
+    columns: [
+      "a.number",
+      "a.name",
+      "a.client",
+      `(SELECT string_agg(fe.first_name || ' ' || fe.last_name || ' ' || COALESCE(fe.preferred_name, ''), ' ')
+          FROM attendance_field_member fm JOIN employee fe ON fe.employee_id = fm.employee_id
+         WHERE fm.field_assignment_id = a.field_assignment_id)`,
+    ],
+    select:
+      "a.field_assignment_id AS id, a.number AS ref, a.name AS title, a.client AS sub, a.status AS status",
+    order: "a.starts_on DESC",
+    scope: {
+      column: "m.employee_id",
+      through: "attendance_field_member m WHERE m.field_assignment_id = a.field_assignment_id",
+    },
   }),
 ];

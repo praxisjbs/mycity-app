@@ -14,7 +14,8 @@
  *   5. the device: the session's known device, recorded by the devices service the first
  *      time it punches, judged by the device mode (devices.guard.js)
  *   6. the geofence: the reading against the expected worksite (for remote staff, the
- *      approved home; on a day an approved work location request covers, what it names),
+ *      approved home; on a day an approved work location request covers, what it names; on a
+ *      field assignment's day, the nearer of its sites),
  *      judged by the geofence mode (attendance.geofence.js); the time: the device's clock
  *      against the server's
  *   7. the strictest result is recorded with its evidence (attendance_event, append-only),
@@ -291,6 +292,8 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         worksite_name: geofence.worksite_name,
         home_id: geofence.home_id,
         request_id: geofence.request_id,
+        assignment_id: geofence.assignment_id,
+        site_id: geofence.site_id,
         result: geofence.result,
       },
       device: {

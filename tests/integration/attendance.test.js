@@ -1244,4 +1244,167 @@ describeDb("attendance against the real migrations", () => {
       expect(failed.rows[0].n).toBe(0);
     });
   });
+  describe("field assignments", () => {
+    const lagos = require("../../src/shared/time/lagos");
+    const roster = require("../../src/modules/attendance/attendance.roster");
+    const day = (n) => lagos.addDays(today(), n);
+    const ALL = { scope: "all", scope_ids: null };
+    // Two invented venues, far from the office and from each other.
+    const HALL = { name: "Venue Hall", address: "12 Hidden Avenue", latitude: 6.731234, longitude: 3.481234, radius_m: 200 };
+    const YARD = { name: "Depot Yard", address: "3 Quiet Lane", latitude: 6.781234, longitude: 3.481234, radius_m: 300 };
+    const near = (venue, m) => ({ latitude: venue.latitude + m / 111_195, longitude: venue.longitude });
+    const id = (who) => people[who].employee.employee_id;
+    const send = (who, body) =>
+      as(who).post("/attendance/field-assignments", {
+        name: "Venue Setup",
+        client: "Northwind Events",
+        starts_on: day(40),
+        ends_on: day(41),
+        sites: [HALL],
+        ...body,
+      });
+
+    test("who may send whom: within scope and never yourself; the dates, the sites and the people", async () => {
+      const no = async (who, body, status, code) => {
+        const res = await send(who, body);
+        expect([res.status, res.body.error && res.body.error.code]).toEqual([status, code]);
+      };
+      await no("staff", { employee_ids: [id("other")] }, 403, "PERMISSION_DENIED");
+      await no("manager", { employee_ids: [id("outsider")] }, 403, "FORBIDDEN");
+      await no("manager", { employee_ids: [id("staff"), id("manager")] }, 403, "OWN_RECORD");
+      await no("manager", { employee_ids: [id("staff")], starts_on: day(-1), ends_on: day(0) }, 422, "ASSIGNMENT_IN_THE_PAST");
+      await no("manager", { employee_ids: [id("staff")], starts_on: day(95), ends_on: day(95) }, 422, "ASSIGNMENT_TOO_FAR");
+      await no("manager", { employee_ids: [id("staff")], starts_on: day(40), ends_on: day(71) }, 422, "ASSIGNMENT_TOO_LONG");
+      expect((await send("manager", { employee_ids: [id("staff")], sites: [{ ...HALL, radius_m: 600 }] })).status).toBe(422);
+      expect((await send("manager", { employee_ids: [id("staff")], sites: [HALL, YARD, HALL] })).status).toBe(422);
+      expect((await send("manager", { employee_ids: [id("staff"), id("staff")] })).status).toBe(422);
+      expect((await send("manager", { employee_ids: [] })).status).toBe(422);
+      const none = await q("SELECT count(*)::int AS n FROM attendance_field_assignment", []);
+      expect(none.rows[0].n).toBe(0);
+    });
+
+    test("a manager sends two of their team to two sites: numbered, in force at once, each told; one a person a day", async () => {
+      const res = await send("manager", { employee_ids: [id("staff"), id("other")], sites: [HALL, YARD], note: "Bring the banners" });
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({
+        name: "Venue Setup", client: "Northwind Events", status: "active", state: "upcoming", days: 2, people: 2,
+        can_change: true, assigned_by_name: "Kemi Alade", note: "Bring the banners",
+      });
+      expect(res.body.number).toMatch(/^FA-\d{4}$/);
+      expect(res.body.sites.map((x) => [x.position, x.name, x.radius_m])).toEqual([[1, "Venue Hall", 200], [2, "Depot Yard", 300]]);
+      const fid = res.body.field_assignment_id;
+
+      const clash = await send("ops", { employee_ids: [id("other")], starts_on: day(41), ends_on: day(42) });
+      expect([clash.status, clash.body.error.code]).toEqual([409, "ASSIGNMENT_OVERLAPS"]);
+      expect(clash.body.error.message).toContain("Zainab Lawal");
+
+      await drain();
+      for (const who of ["staff", "other"]) {
+        const told = await q("SELECT title, body FROM notification WHERE user_id = $1 AND entity_type = 'attendance_field_assignment'", [people[who].user.user_id]);
+        expect(told.rows[0]).toMatchObject({ title: "Field assignment" });
+        expect(told.rows[0].body).toContain(res.body.number);
+      }
+      const mine = await as("staff").get("/attendance/me/field-assignments");
+      expect(mine.body.page.size).toBe(25);
+      expect(mine.body.data.find((x) => x.field_assignment_id === fid)).toMatchObject({ can_change: false, state: "upcoming" });
+      expect((await as("outsider").get(`/attendance/me/field-assignments/${fid}`)).status).toBe(404);
+      expect((await as("staff").get("/attendance/field-assignments")).status).toBe(403);
+      expect((await as("manager").get("/attendance/field-assignments")).body.data.map((x) => x.field_assignment_id)).toContain(fid);
+      expect((await as("ops").get(`/attendance/field-assignments/${fid}`)).body).toMatchObject({ can_change: true, people: 2 });
+    });
+
+    test("on its days the assignment decides the place: the nearer site judges, a remote person too, and the roster reads field", async () => {
+      await setPolicy("block", "off");
+      const [fa] = (await as("ops").get(`/attendance/field-assignments?employee_id=${id("staff")}`)).body.data;
+      const inside = await punchAt("staff", `${day(40)}T07:00:00Z`, near(YARD, 100));
+      expect(inside).toMatchObject({ validation_state: "accepted", distance_m: 100, worksite_name: "Depot Yard" });
+      expect(inside.today.location).toMatchObject({ kind: "field", name: "Venue Hall or Depot Yard", radius_m: null });
+      const ev = await q("SELECT worksite_id, validation->'geofence' AS g FROM attendance_event WHERE attendance_event_id = $1", [inside.attendance_event_id]);
+      expect(ev.rows[0].worksite_id).toBeNull();
+      expect(ev.rows[0].g).toMatchObject({ verdict: "inside", place: "field", assignment_id: fa.field_assignment_id, worksite_name: "Depot Yard" });
+
+      const out = await punchAt("other", `${day(41)}T07:00:00Z`, near(HALL, 900));
+      expect(out).toMatchObject({ validation_state: "rejected", reasons: ["outside_worksite"] });
+      expect(out.message).toBe("Not counted: you were 900 m from Venue Hall.");
+
+      const reg = await as("ops").get(`/attendance/register?date=${day(40)}&q=musa`);
+      expect(reg.body.data[0]).toMatchObject({ expected_location: "Venue Hall or Depot Yard" });
+      const row = (await roster.page(pool, { date: day(40), q: "Musa" }, ALL, {})).data[0];
+      expect(row).toMatchObject({ status: "field", worksite: "Depot Yard" });
+      const sum = await roster.summary(pool, { date: day(40) }, ALL);
+      expect(sum.field).toBeGreaterThanOrEqual(1);
+      expect(sum.present).toBe(sum.late + sum.on_site + sum.remote + sum.field);
+
+      // A remote employee sent out is judged at the site, not at home.
+      const out45 = await send("ops", { employee_ids: [id("remote")], starts_on: day(45), ends_on: day(45) });
+      expect(out45.status).toBe(201);
+      const remote = await punchAt("remote", `${day(45)}T07:00:00Z`, near(HALL, 50));
+      expect(remote).toMatchObject({ validation_state: "accepted", worksite_name: "Venue Hall" });
+      expect((await roster.page(pool, { date: day(45), q: "Femi" }, ALL, {})).data[0]).toMatchObject({ status: "field" });
+    });
+
+    test("cancel and take off: within scope, with a reason, never the last; the days to come go back", async () => {
+      await setPolicy("block", "off");
+      const res = await send("ops", { name: "Stand Build", employee_ids: [id("staff"), id("other")], starts_on: day(50), ends_on: day(52) });
+      const fid = res.body.field_assignment_id;
+      const remoteOne = (await as("ops").get(`/attendance/field-assignments?employee_id=${id("remote")}`)).body.data[0];
+      expect((await as("manager").post(`/attendance/field-assignments/${remoteOne.field_assignment_id}/cancel`, { reason: "No longer needed there" })).status).toBe(404);
+
+      expect((await as("manager").post(`/attendance/field-assignments/${fid}/remove`, { employee_id: id("other"), reason: "short" })).status).toBe(422);
+      const off = await as("manager").post(`/attendance/field-assignments/${fid}/remove`, { employee_id: id("other"), reason: "Needed at the office that week" });
+      expect(off.status).toBe(200);
+      expect(off.body.people).toBe(1);
+      expect(off.body.members.find((m) => m.employee.display_name === "Zainab Lawal")).toMatchObject({ removed_reason: "Needed at the office that week" });
+      const last = await as("manager").post(`/attendance/field-assignments/${fid}/remove`, { employee_id: id("staff"), reason: "Needed at the office that week" });
+      expect([last.status, last.body.error.code]).toEqual([409, "ASSIGNMENT_LAST_PERSON"]);
+      // Taken off: back to the office on its days.
+      const back = await punchAt("other", `${day(50)}T07:00:00Z`);
+      expect(back).toMatchObject({ validation_state: "accepted", worksite_name: "Testbed Office" });
+
+      expect((await as("manager").post(`/attendance/field-assignments/${fid}/cancel`, { reason: "no" })).status).toBe(422);
+      const cancelled = await as("manager").post(`/attendance/field-assignments/${fid}/cancel`, { reason: "The client moved the event" });
+      expect(cancelled.body).toMatchObject({ status: "cancelled", state: "cancelled", cancel_reason: "The client moved the event", can_change: false });
+      const again = await as("manager").post(`/attendance/field-assignments/${fid}/cancel`, { reason: "The client moved the event" });
+      expect([again.status, again.body.error.code]).toEqual([409, "ASSIGNMENT_CANCELLED"]);
+      expect((await punchAt("staff", `${day(51)}T07:00:00Z`)).worksite_name).toBe("Testbed Office");
+
+      await drain();
+      const told = await q(
+        "SELECT event_key FROM notification WHERE user_id = $1 AND entity_id = $2 ORDER BY created_at",
+        [people.other.user.user_id, fid],
+      );
+      expect(told.rows.map((r) => r.event_key)).toEqual(["field_assignment.assigned", "field_assignment.member_removed"]);
+
+      // Over: an assignment whose last day has passed cannot be changed.
+      const old = await send("ops", { employee_ids: [id("outsider")], starts_on: day(60), ends_on: day(60) });
+      await q("UPDATE attendance_field_assignment SET starts_on = $2, ends_on = $2 WHERE field_assignment_id = $1", [old.body.field_assignment_id, day(-2)]);
+      const ended = await as("ops").post(`/attendance/field-assignments/${old.body.field_assignment_id}/cancel`, { reason: "The client moved the event" });
+      expect([ended.status, ended.body.error.code]).toEqual([409, "ASSIGNMENT_ENDED"]);
+      expect((await as("ops").get(`/attendance/field-assignments/${old.body.field_assignment_id}`)).body.state).toBe("done");
+    });
+
+    test("search finds an assignment by number, name or person within scope, never by a site; events carry no site", async () => {
+      const first = (await as("ops").get("/attendance/field-assignments?q=Venue")).body.data[0];
+      const byNumber = await as("ops").get(`/search?q=${first.number}`);
+      expect((byNumber.body.groups || []).map((g) => g.type)).toContain("attendance_field_assignment");
+      const byPerson = await as("manager").get("/search?q=zainab");
+      const group = (byPerson.body.groups || []).find((g) => g.type === "attendance_field_assignment");
+      expect(group && group.items.length).toBeGreaterThan(0);
+      expect(new Set(group.items.map((i) => i.id)).size).toBe(group.items.length);
+      const bySite = await as("ops").get("/search?q=hidden");
+      expect((bySite.body.groups || []).map((g) => g.type)).not.toContain("attendance_field_assignment");
+
+      await drain();
+      const logged = await q(
+        `SELECT l.payload, a.before, a.after FROM event_log l LEFT JOIN audit_ledger a ON a.event_id = l.event_id
+          WHERE l.event_key LIKE 'field_assignment.%'`,
+        [],
+      );
+      expect(logged.rows.length).toBeGreaterThan(0);
+      const text = JSON.stringify(logged.rows);
+      for (const secret of ["Hidden Avenue", "Quiet Lane", "6.731", "6.781", "3.481"]) expect(text).not.toContain(secret);
+      const failed = await q("SELECT count(*)::int AS n FROM event_outbox WHERE status = 'failed'", []);
+      expect(failed.rows[0].n).toBe(0);
+    });
+  });
 });

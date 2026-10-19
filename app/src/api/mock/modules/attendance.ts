@@ -1,4 +1,4 @@
-import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, PunchResult, PunchState, RegisterRow } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, FieldAssignment, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, PunchResult, PunchState, RegisterRow } from "@mycity/contract/contract.gen.ts";
 import { formatDate, formatTime, todayIso } from "@mycity/ui";
 import { audit } from "../data/audit";
 import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
@@ -251,8 +251,12 @@ const newestHome = (key: string) => HOMES.filter((h) => h.key === key).sort((a, 
 const isRemote = (key: string) => byKey(key)?.work_pattern === "remote";
 
 /** Where a person's punch is judged: their approved home when they work remotely, else their worksite. */
-function fenceOf(key: string): { kind: "worksite" | "home" | "temporary_home"; name: string; latitude: number; longitude: number; radius_m: number } | null {
-  // An approved work location request for today decides the place first (§6.11).
+type Fence = { kind: "worksite" | "home" | "temporary_home" | "field"; name: string; latitude: number; longitude: number; radius_m: number | null; sites?: MockSite[] };
+function fenceOf(key: string): Fence | null {
+  // A field assignment covering today decides the place before anything (§6.12), then an approved
+  // work location request (§6.11).
+  const fa = fieldOn(key, todayIso());
+  if (fa) return { kind: "field", name: fa.sites.map((x) => x.name).join(" or "), latitude: fa.sites[0].latitude, longitude: fa.sites[0].longitude, radius_m: fa.sites.length === 1 ? fa.sites[0].radius_m : null, sites: fa.sites };
   const r = approvedReqOn(key, todayIso());
   if (r?.request_type === "temporary_home") return { kind: "temporary_home", name: "Temporary Home", latitude: r.latitude!, longitude: r.longitude!, radius_m: HOME_RADIUS_M };
   if (r?.request_type === "remote_day") {
@@ -270,6 +274,7 @@ function fenceOf(key: string): { kind: "worksite" | "home" | "temporary_home"; n
 
 /** Today's approved remote day or client visit with no fence: the approval is the check. */
 function approvedDayOf(key: string): { name: string } | null {
+  if (fieldOn(key, todayIso())) return null;
   const r = approvedReqOn(key, todayIso());
   if (!r || r.request_type === "temporary_home" || (r.request_type === "remote_day" && homeOf(key, "approved"))) return null;
   return { name: r.request_type === "remote_day" ? "Remote Day" : "Client Visit" };
@@ -457,7 +462,16 @@ route("POST /api/v1/attendance/punches", (req) => {
   if (b.event_type === "clock_out" && hasOut) return fail(409, "ALREADY_CLOCKED_OUT", GUARD_MESSAGES.ALREADY_CLOCKED_OUT);
 
   const now = new Date().toISOString();
-  const site = fenceOf(key);
+  const fence = fenceOf(key);
+  const reading = b.latitude !== null && b.longitude !== null ? { latitude: b.latitude, longitude: b.longitude } : null;
+  // On a field assignment's day, the site the reading is nearest judges it (§6.12).
+  const nearest = fence?.sites && reading
+    ? [...fence.sites].sort((x, y) => {
+        const dx = distanceM(reading, x), dy = distanceM(reading, y);
+        return Number(dy <= y.radius_m) - Number(dx <= x.radius_m) || (dx - x.radius_m) - (dy - y.radius_m);
+      })[0]
+    : fence?.sites?.[0];
+  const site = fence && nearest ? { ...fence, name: nearest.name, latitude: nearest.latitude, longitude: nearest.longitude, radius_m: nearest.radius_m } : fence;
   const approvedDay = approvedDayOf(key);
   const point = b.latitude !== null && b.longitude !== null ? { latitude: b.latitude, longitude: b.longitude } : null;
   const accuracy = point && b.accuracy_m !== null ? (b.accuracy_m <= GOOD_ACCURACY_M ? "good" : b.accuracy_m <= POLICY_MODES.max_accuracy_m ? "fair" : "poor") : null;
@@ -471,14 +485,14 @@ route("POST /api/v1/attendance/punches", (req) => {
   else {
     distance = distanceM(point, site);
     if (accuracy === "poor") [geofence, locationReason] = ["unverified", "poor_accuracy"];
-    else geofence = distance <= site.radius_m ? "inside" : "outside";
+    else geofence = distance <= (site.radius_m ?? 0) ? "inside" : "outside";
   }
   const reasons: ExceptionType[] = [];
   const mode = POLICY_MODES.geofence_mode as string;
   let fenceResult: PunchState = "accepted";
   if (mode !== "off" && geofence === "outside") {
     fenceResult = mode === "block" ? "rejected" : "review";
-    reasons.push(site?.kind === "worksite" ? "outside_worksite" : "outside_home");
+    reasons.push(site?.kind === "worksite" || site?.kind === "field" ? "outside_worksite" : "outside_home");
   } else if (mode !== "off" && geofence === "unverified") {
     fenceResult = "review";
     reasons.push("location_unverified");
@@ -651,7 +665,7 @@ function registerRows(date: string, viewer: string): Array<RegisterRow & { key: 
       clock_out_at: day?.last_clock_out_at ?? null,
       worked_minutes: day?.worked_minutes ?? 0,
       late_minutes: day?.late_minutes ?? 0,
-      expected_location: p.work_pattern === "remote" ? (homeOf(p.user_key, "approved") ? "Home" : "Remote") : (site?.name ?? null),
+      expected_location: fieldOn(p.user_key, date)?.sites.map((x) => x.name).join(" or ") ?? (p.work_pattern === "remote" ? (homeOf(p.user_key, "approved") ? "Home" : "Remote") : (site?.name ?? null)),
       location_verdict: last?.geofence ?? null,
       device_label: last?.device_label ?? null,
       device_state: last?.device_state ?? null,
@@ -1000,6 +1014,149 @@ export function locationRequestInstance(user: string, wid: string): ApprovalInst
     can_decide: canDecideReq(r, user), can_withdraw: false, can_reassign: false, link: null,
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Field assignments (docs/guides/attendance.md §6.12)
+ * ------------------------------------------------------------------ */
+type MockSite = { id: string; name: string; address: string | null; latitude: number; longitude: number; radius_m: number };
+type MockField = {
+  id: string; number: string; name: string; client: string; note: string | null; starts_on: string; ends_on: string;
+  status: "active" | "cancelled"; sites: MockSite[]; by: string; assigned_at: string; cancelled_at: string | null; cancel_reason: string | null;
+  members: Array<{ key: string; added_at: string; removed_at: string | null; removed_reason: string | null }>;
+};
+const FIELD: MockField[] = [];
+let fieldSeq = 0;
+const addField = (f: Omit<MockField, "id" | "number" | "status" | "cancelled_at" | "cancel_reason" | "members"> & { keys: string[] }) => {
+  fieldSeq += 1;
+  const { keys, ...rest } = f;
+  const row: MockField = {
+    id: sid(`fa:${fieldSeq}`), number: `FA-${String(fieldSeq).padStart(4, "0")}`, status: "active", cancelled_at: null, cancel_reason: null,
+    members: keys.map((key) => ({ key, added_at: f.assigned_at, removed_at: null, removed_reason: null })), ...rest,
+  };
+  FIELD.unshift(row);
+  return row;
+};
+const site = (n: number, name: string, address: string, latitude: number, longitude: number, radius_m: number): MockSite => ({ id: sid(`fa-site:${fieldSeq + 1}:${n}`), name, address, latitude, longitude, radius_m });
+/** Invented assignments for the demonstration: one done, one in progress today, one to come. */
+(() => {
+  addField({ keys: ["obinna"], name: "Venue Check", client: "Sample Events Ltd", note: null, starts_on: isoDaysAgo(10), ends_on: isoDaysAgo(9), sites: [site(1, "Event Grounds", "1 Example Parade, Ikeja", 6.6018, 3.3515, 300)], by: "ifeoma", assigned_at: at(14, "10:00") });
+  addField({ keys: ["adedotun", "grace"], name: "Stand Build", client: "Example Expo", note: "Badges at the gate", starts_on: isoDaysAgo(1), ends_on: isoDaysAhead(1), sites: [site(1, "Expo Hall", "9 Example Road, Victoria Island", 6.4281, 3.4219, 300)], by: "cynthia", assigned_at: at(3, "15:30") });
+  addField({ keys: ["bashir"], name: "Partner Visits", client: "Placeholder Bank", note: null, starts_on: isoDaysAhead(5), ends_on: isoDaysAhead(6), sites: [site(1, "Partner Office", "4 Sample Close, Ikoyi", 6.4549, 3.4246, 200), site(2, "Branch Office", "22 Fixture Avenue, Yaba", 6.5095, 3.3711, 200)], by: "cynthia", assigned_at: at(1, "09:10") });
+})();
+
+const onIt = (f: MockField, key: string) => f.members.some((m) => m.key === key && !m.removed_at);
+/** The active assignment a person is still on today, if any (one a day). */
+const fieldOn = (key: string, date: string) => FIELD.find((f) => f.status === "active" && f.starts_on <= date && f.ends_on >= date && onIt(f, key)) ?? null;
+const stateOf = (f: MockField): FieldAssignment["state"] => {
+  const today = todayIso();
+  return f.status === "cancelled" ? "cancelled" : f.starts_on > today ? "upcoming" : f.ends_on < today ? "done" : "in_progress";
+};
+/** May this login change it: people approve over everyone still on it, active, not over, and not on it themselves. */
+const canChange = (f: MockField, user: string) => {
+  const g = peopleGrant(user, "approve");
+  const active = f.members.filter((m) => !m.removed_at);
+  return g.may && f.status === "active" && f.ends_on >= todayIso() && !onIt(f, user) && active.every((m) => g.sees(m.key));
+};
+const fieldOut = (f: MockField, user: string): FieldAssignment => ({
+  field_assignment_id: f.id, number: f.number, name: f.name, client: f.client, note: f.note, starts_on: f.starts_on, ends_on: f.ends_on,
+  days: Math.round((Date.parse(`${f.ends_on}T12:00:00Z`) - Date.parse(`${f.starts_on}T12:00:00Z`)) / 86400_000) + 1,
+  status: f.status, state: stateOf(f),
+  sites: f.sites.map((x, i) => ({ field_site_id: x.id, position: i + 1, name: x.name, address: x.address, latitude: x.latitude, longitude: x.longitude, radius_m: x.radius_m })),
+  members: [...f.members].sort((a, b) => Number(!!a.removed_at) - Number(!!b.removed_at)).map((m) => ({ employee: person(byKey(m.key)!), added_at: m.added_at, removed_at: m.removed_at, removed_reason: m.removed_reason })),
+  people: f.members.filter((m) => !m.removed_at).length,
+  assigned_by_name: byKey(f.by)?.display_name ?? null, assigned_at: f.assigned_at, cancelled_at: f.cancelled_at, cancel_reason: f.cancel_reason,
+  can_change: canChange(f, user),
+});
+const ORDER: Record<FieldAssignment["state"], number> = { in_progress: 0, upcoming: 1, done: 2, cancelled: 3 };
+const currentFirst = (a: FieldAssignment, b: FieldAssignment) => ORDER[a.state] - ORDER[b.state] || (a.state === "done" ? b.ends_on.localeCompare(a.ends_on) : a.starts_on.localeCompare(b.starts_on));
+const fieldPage = (rows: FieldAssignment[], req: Parameters<typeof paged>[1]) =>
+  paged(rows, req, {
+    search: (r) => [r.number, r.name, r.client, ...r.members.map((m) => m.employee.display_name)],
+    filters: { state: (r, v) => r.state === v, employee_id: (r, v) => r.members.some((m) => m.employee.employee_id === v) },
+    sort: { current: currentFirst, starts_on: (a, b) => a.starts_on.localeCompare(b.starts_on) },
+  });
+
+route("GET /api/v1/attendance/me/field-assignments", (req) =>
+  fieldPage(FIELD.filter((f) => f.members.some((m) => m.key === req.user)).map((f) => fieldOut(f, req.user!)), req),
+);
+route("GET /api/v1/attendance/me/field-assignments/:id", (req) => {
+  const f = FIELD.find((x) => x.id === req.params.id && x.members.some((m) => m.key === req.user));
+  return f ? ok(fieldOut(f, req.user!)) : notFound();
+});
+route("GET /api/v1/attendance/field-assignments", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  return fieldPage(FIELD.filter((f) => f.members.some((m) => g.sees(m.key))).map((f) => fieldOut(f, req.user!)), req);
+});
+route("GET /api/v1/attendance/field-assignments/:id", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  const f = FIELD.find((x) => x.id === req.params.id);
+  return f && f.members.some((m) => g.sees(m.key)) ? ok(fieldOut(f, req.user!)) : notFound();
+});
+route("POST /api/v1/attendance/field-assignments", (req) => {
+  const user = req.user!;
+  const g = peopleGrant(user, "approve");
+  if (!g.may) return fail(403, "PERMISSION_DENIED", "You need people approve to send people out.");
+  const b = req.body as { name: string; client: string; note?: string; starts_on: string; ends_on: string; employee_ids: string[]; sites: Array<Omit<MockSite, "id">> };
+  const fields: Record<string, string[]> = {};
+  if (!b.name || b.name.trim().length < 3) fields.name = ["At least 3 characters"];
+  if (!b.client || b.client.trim().length < 2) fields.client = ["At least 2 characters"];
+  if (!b.starts_on) fields.starts_on = ["Pick the first day"];
+  if (!b.ends_on) fields.ends_on = ["Pick the last day"];
+  if (b.starts_on && b.ends_on && b.ends_on < b.starts_on) fields.ends_on = ["Ends before it starts"];
+  if (!b.employee_ids?.length) fields.employee_ids = ["Pick someone"];
+  if (!b.sites?.length) fields.sites = ["Add a site"];
+  if (Object.keys(fields).length) return invalid(fields);
+  const keys = b.employee_ids.map((id) => byId(id)?.user_key).filter((k): k is string => !!k);
+  if (keys.includes(user)) return fail(403, "OWN_RECORD", "Someone else sends you out", { employee_ids: ["Not yourself"] });
+  if (!keys.every((k) => g.sees(k))) return fail(403, "FORBIDDEN", "You can only send out people in your team", { employee_ids: ["Outside your team"] });
+  if (b.starts_on < todayIso()) return fail(422, "ASSIGNMENT_IN_THE_PAST", "Pick a first day from today on", { starts_on: ["Already past"] });
+  const days = Math.round((Date.parse(`${b.ends_on}T12:00:00Z`) - Date.parse(`${b.starts_on}T12:00:00Z`)) / 86400_000) + 1;
+  if (days > 31) return fail(422, "ASSIGNMENT_TOO_LONG", "A field assignment covers at most 31 days", { ends_on: ["At most 31 days"] });
+  const clash = FIELD.find((f) => f.status === "active" && f.starts_on <= b.ends_on && f.ends_on >= b.starts_on && keys.some((k) => onIt(f, k)));
+  if (clash) {
+    const who = keys.find((k) => onIt(clash, k))!;
+    return fail(409, "ASSIGNMENT_OVERLAPS", `${byKey(who)!.display_name} is already on ${clash.number}`, { starts_on: ["Overlaps another"] });
+  }
+  const f = addField({
+    keys, name: b.name.trim(), client: b.client.trim(), note: b.note?.trim() || null, starts_on: b.starts_on, ends_on: b.ends_on, by: user, assigned_at: new Date().toISOString(),
+    sites: b.sites.map((x, i) => ({ id: sid(`fa-site:${fieldSeq + 1}:${i + 1}`), name: x.name.trim(), address: x.address?.trim() || null, latitude: x.latitude, longitude: x.longitude, radius_m: x.radius_m })),
+  });
+  return created(fieldOut(f, user));
+});
+/** Cancel or take someone off: the same grant over everyone still on it, while it runs. */
+function changeable(user: string, id: string) {
+  const g = peopleGrant(user, "approve");
+  const f = FIELD.find((x) => x.id === id);
+  if (!g.may) return { error: fail(403, "PERMISSION_DENIED", "You need people approve to change it.") };
+  if (!f || !f.members.some((m) => g.sees(m.key))) return { error: notFound() };
+  if (onIt(f, user)) return { error: fail(403, "OWN_RECORD", "Someone else changes your field assignment") };
+  if (!f.members.filter((m) => !m.removed_at).every((m) => g.sees(m.key))) return { error: fail(403, "FORBIDDEN", "Someone on it is outside your team") };
+  if (f.status !== "active") return { error: fail(409, "ASSIGNMENT_CANCELLED", "This field assignment is cancelled") };
+  if (f.ends_on < todayIso()) return { error: fail(409, "ASSIGNMENT_ENDED", "This field assignment has ended") };
+  return { f };
+}
+route("POST /api/v1/attendance/field-assignments/:id/cancel", (req) => {
+  const reason = String((req.body as { reason?: string }).reason ?? "").trim();
+  if (reason.length < 10) return invalid({ reason: ["At least 10 characters"] });
+  const { f, error } = changeable(req.user!, req.params.id);
+  if (!f) return error;
+  Object.assign(f, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: reason });
+  return ok(fieldOut(f, req.user!));
+});
+route("POST /api/v1/attendance/field-assignments/:id/remove", (req) => {
+  const b = req.body as { employee_id: string; reason?: string };
+  const reason = String(b.reason ?? "").trim();
+  if (reason.length < 10) return invalid({ reason: ["At least 10 characters"] });
+  const { f, error } = changeable(req.user!, req.params.id);
+  if (!f) return error;
+  const m = f.members.find((x) => byKey(x.key)?.employee_id === b.employee_id && !x.removed_at);
+  if (!m) return fail(409, "NOT_ON_ASSIGNMENT", "That person is not on this field assignment", { employee_id: ["Not on it"] });
+  if (f.members.filter((x) => !x.removed_at).length === 1) return fail(409, "ASSIGNMENT_LAST_PERSON", "Cancel the field assignment instead");
+  Object.assign(m, { removed_at: new Date().toISOString(), removed_reason: reason });
+  return ok(fieldOut(f, req.user!));
+});
 
 /* ------------------------------------------------------------------ *
  * The offices the INTERIM employee setup tab offers (People · Employees)

@@ -7,7 +7,9 @@
  *   policy     their own active policy for the date (employee_attendance_policy), else the
  *              organisation's (the oldest active one), else the code's defaults. MyCity
  *              enters policies; none is seeded (A26)
- *   fence      an approved work location request covering the date first (§6.11): its
+ *   fence      a field assignment the person is still on covering the date before anything
+ *              (§6.12): its sites, the nearer judging the punch (attendance.geofence.js).
+ *              Then an approved work location request covering the date (§6.11): its
  *              temporary home, fenced like a home; a remote day, the approved home when the
  *              person has one; otherwise no fence and `approved` names the day, the approval
  *              being the check. Then remote staff: their approved home, with the policy's
@@ -53,6 +55,8 @@ async function contextFor(db, person, date) {
   const policy = await policyFor(db, person.employee_id, date);
   const calendar = await workingWeek.loadCalendar(db);
   const shift = rules.shiftFor(date, calendar, policy);
+  const assignment = await repo.fieldAssignmentOn(db, person.employee_id, date);
+  if (assignment) return { policy, shift, timeZone: zoneOf(person), fence: fieldFence(assignment), approved: null };
   const request = await repo.approvedRequestOn(db, person.employee_id, date);
   if (request) return { policy, shift, timeZone: zoneOf(person), ...(await requestPlace(db, person, request, policy)) };
   if (person.work_pattern === "remote") {
@@ -91,6 +95,33 @@ async function contextFor(db, person, date) {
       : null,
     timeZone: (fence && fence.timezone) || zoneOf(person),
     shift,
+  };
+}
+
+/**
+ * A field assignment's fence (§6.12): its sites, the first standing for the place until the punch
+ * picks the nearer. `name` is how the panel names it: the site, or both when there are two.
+ */
+function fieldFence(assignment) {
+  const sites = assignment.sites.map((x) => ({
+    field_site_id: x.field_site_id,
+    name: x.name,
+    latitude: Number(x.latitude),
+    longitude: Number(x.longitude),
+    radius_m: Number(x.radius_m),
+  }));
+  return {
+    kind: "field",
+    place: "field",
+    attendance_home_id: null,
+    worksite_id: null,
+    field_assignment_id: assignment.field_assignment_id,
+    assignment_number: assignment.number,
+    name: sites.map((x) => x.name).join(" or "),
+    latitude: sites[0].latitude,
+    longitude: sites[0].longitude,
+    radius_m: sites.length === 1 ? sites[0].radius_m : null,
+    sites,
   };
 }
 

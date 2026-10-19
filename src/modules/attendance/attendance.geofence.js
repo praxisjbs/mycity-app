@@ -5,9 +5,10 @@
  *
  * What the server knows is the reading the browser sent (or why it sent none) and
  * the place the person is expected: their worksite, for remote staff their approved home,
- * or on a day an approved work location request covers, its temporary home or approved
- * home (§6.11). A distance or an "inside" flag from the client is never read; the server
- * works it out from the coordinates.
+ * on a day an approved work location request covers, its temporary home or approved home
+ * (§6.11), and on a field assignment's day its sites, the nearer judging the punch (§6.12).
+ * A distance or an "inside" flag from the client is never read; the server works it out from
+ * the coordinates.
  *
  *   verdict       inside       within the radius (the boundary counts as inside)
  *                 outside      beyond it, with a reading good enough to say so
@@ -32,20 +33,40 @@ const { GOOD_ACCURACY_M } = require("./attendance.rules");
  * @param {{latitude: number, longitude: number}|null} input.point
  * @param {number|null} input.accuracy_m
  * @param {string|null} input.location_error  why there is no reading
- * @param {{kind?: "worksite"|"home"|"temporary_home", place?: string, attendance_home_id?: string|null,
- *          location_request_id?: string|null, worksite_id: string|null, name: string,
- *          latitude: number, longitude: number, radius_m: number}|null} input.expected
+ * @param {{kind?: "worksite"|"home"|"temporary_home"|"field", place?: string, attendance_home_id?: string|null,
+ *          location_request_id?: string|null, field_assignment_id?: string|null, worksite_id: string|null,
+ *          name: string, latitude: number, longitude: number, radius_m: number|null,
+ *          sites?: Array<{field_site_id: string, name: string, latitude: number, longitude: number,
+ *          radius_m: number}>}|null} input.expected
  * @param {{location_request_id: string, place: string, name: string}|null} [input.approved]  an approved
  *          day with no fence
  * @param {"on_site"|"hybrid"|"remote"} input.work_pattern
  * @param {number} input.max_accuracy_m
  * @returns {{verdict: string, reason: string|null, distance_m: number|null, radius_m: number|null,
  *            accuracy: "good"|"fair"|"poor"|null, place: "worksite"|"home"|null, worksite_id: string|null,
- *            worksite_name: string|null, home_id: string|null, request_id: string|null, outside: string,
+ *            worksite_name: string|null, home_id: string|null, request_id: string|null,
+ *            assignment_id: string|null, site_id: string|null, outside: string,
  *            result: "accepted"|"review"|"rejected", exception: string|null, retry_location: boolean}}
  */
-function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected, approved = null, work_pattern: pattern, max_accuracy_m: maxAccuracyM }) {
+/**
+ * Of a field assignment's sites, the one a reading is judged against: the nearest it is inside,
+ * else the one it is least far outside. Without a reading, the first.
+ */
+function nearestSite(sites, point) {
+  if (!geo.isPoint(point)) return sites[0];
+  const scored = sites.map((x) => ({ x, d: geo.distanceM(point, x) }));
+  const inside = scored.filter((c) => c.d <= c.x.radius_m).sort((a, b) => a.d - b.d);
+  if (inside.length) return inside[0].x;
+  return scored.sort((a, b) => a.d - a.x.radius_m - (b.d - b.x.radius_m))[0].x;
+}
+
+function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected: given, approved = null, work_pattern: pattern, max_accuracy_m: maxAccuracyM }) {
   const hasPoint = geo.isPoint(point);
+  // A field assignment's day: judged as at the site the reading is nearest, named by it.
+  const site = given && Array.isArray(given.sites) && given.sites.length ? nearestSite(given.sites, point) : null;
+  const expected = site
+    ? { ...given, name: site.name, latitude: site.latitude, longitude: site.longitude, radius_m: site.radius_m, site_id: site.field_site_id }
+    : given;
   const accuracy =
     !hasPoint || accuracyM === null || accuracyM === undefined
       ? null
@@ -65,6 +86,8 @@ function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: lo
     worksite_name: expected ? expected.name : onApprovedDay ? approved.name : null,
     home_id: atHome ? expected.attendance_home_id || null : null,
     request_id: (expected && expected.location_request_id) || (onApprovedDay ? approved.location_request_id : null),
+    assignment_id: (expected && expected.field_assignment_id) || null,
+    site_id: (expected && expected.site_id) || null,
     // The exception an outside reading is, whether it is reviewed or rejected.
     outside: atHome ? "outside_home" : "outside_worksite",
     retry_location: false,

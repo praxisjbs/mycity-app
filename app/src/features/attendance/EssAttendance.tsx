@@ -1,7 +1,7 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import devices from "@mycity/contract/schemas/devices.js";
-import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, MyDevice } from "@mycity/contract/contract.gen.ts";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice } from "@mycity/contract/contract.gen.ts";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
@@ -11,12 +11,14 @@ import { useScreenAction } from "@/shell/screen-action";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useClock } from "./ClockButton";
 import { HomeLocationCard } from "./HomeLocation";
+import { AssignmentView, MyFieldAssignments, useAssignmentLink } from "./FieldAssignments";
 import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
 import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 
 /**
- * ESS · My Attendance (#9), My Devices (#88), and Policy Updates (#89), still on INTERIM shapes
- * until M9 (docs/guides/attendance.md §10). Work Location Requests (#87) is WorkLocationRequests.tsx.
+ * ESS · My Attendance (#9, with the person's field assignments), My Devices (#88), and Policy
+ * Updates (#89), still on INTERIM shapes until M9 (docs/guides/attendance.md §10). Work Location
+ * Requests (#87) is WorkLocationRequests.tsx.
  * Everything here is the caller's own: the routes take no employee id.
  */
 
@@ -55,6 +57,8 @@ export function MyAttendancePage() {
       openDay(link.data.date, days.rows.find((d) => d.attendance_day_id === link.data?.attendance_day_id));
     }
   });
+  const openAssignment = useCallback((a: FieldAssignment) => modal.open({ title: a.number, wide: true, body: (close) => <AssignmentView a={a} close={close} /> }), [modal]);
+  useAssignmentLink(params.get("assignment"), openAssignment, { mine: true });
   const openFigure = (status: FigureStatus) =>
     modal.open({ title: `${FIGURE[status]}, ${formatMonth(month)}`, wide: true, body: <FigureDays month={month} status={status} /> });
   const explain = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], body: (close) => <ExplainForm x={x} close={close} /> });
@@ -100,6 +104,7 @@ export function MyAttendancePage() {
       />
       {t?.work_pattern === "remote" && <HomeLocationCard openOnLoad={params.get("home") === "set"} />}
       {todayCard}
+      <MyFieldAssignments open={openAssignment} />
       <Grid cols="4m2" className="mt-3">
         <KpiCard title="Days Present" value={s ? String(s.days_present) : ""} onOpen={() => openFigure("present")} />
         <KpiCard

@@ -1,4 +1,4 @@
-import type { AttendanceDay, DeviceStatus, ExceptionType, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus } from "@mycity/contract/contract.gen.ts";
 
 /**
  * The words and tones the attendance screens show for the API's values (docs/guides/attendance.md
@@ -75,6 +75,14 @@ export const REQUEST_STATUS: Record<LocationRequestStatus, Shown> = {
   rejected: { tone: "err", text: "Rejected" },
   cancelled: { tone: "neutral", text: "Cancelled" },
 };
+/** Where a field assignment stands today. */
+export const ASSIGNMENT_STATE: Record<FieldAssignmentState, Shown> = {
+  in_progress: { tone: "ok", text: "In Progress" },
+  upcoming: { tone: "info", text: "Upcoming" },
+  done: { tone: "neutral", text: "Done" },
+  cancelled: { tone: "neutral", text: "Cancelled" },
+};
+
 export const REQUEST_TYPE_HELP = "Temporary Home: clock in at another home, within 100 m. Remote Day: work away from the office. Client Visit: work at a client's site.";
 
 export const DEVICE_STATUS_HELP = "New: seen on a punch, not registered. Registered: one of your three. Removed: taken off, and it can be registered again.";

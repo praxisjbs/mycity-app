@@ -133,6 +133,12 @@ const ACTIONS = Object.freeze([
     params: { action: "new" },
     words: ["work location", "work from home", "remote day", "temporary home", "client visit", "work elsewhere"],
   }),
+  a("new_field_assignment", "New Assignment", {
+    screen: "people.attendance",
+    params: { action: "new" },
+    need: ["people", "approve"],
+    words: ["field assignment", "send out", "field work", "venue", "crew", "event staff"],
+  }),
   a("change_password", "Change Password", {
     screen: "ess.my-security",
     params: { action: "password" },

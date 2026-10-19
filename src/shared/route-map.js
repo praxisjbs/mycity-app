@@ -190,6 +190,13 @@ const ENTITY_ROUTES = Object.freeze({
     param: "request",
     self: screen("ess", "work-location-requests"),
   },
+  // A field assignment: People · Attendance opens it in Field (`?assignment=`); someone on it
+  // opens it on My Attendance.
+  attendance_field_assignment: {
+    ...screen("people", "attendance"),
+    param: "assignment",
+    self: screen("ess", "my-attendance"),
+  },
   leave_request: {
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),

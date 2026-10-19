@@ -156,7 +156,7 @@ async function attendance(client, { today, scopes }) {
     },
     donut: {
       kind: "on_time",
-      on_time: sum("on_site") + sum("remote"),
+      on_time: sum("on_site") + sum("remote") + sum("field"),
       late: sum("late"),
       absent: sum("absent"),
     },

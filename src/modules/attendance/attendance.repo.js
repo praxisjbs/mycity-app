@@ -1,7 +1,8 @@
 "use strict";
 /**
  * Attendance: the SQL. Writes only the attendance tables (attendance_event,
- * attendance_day, attendance_exception, attendance_home, attendance_location_request); reads
+ * attendance_day, attendance_exception, attendance_home, attendance_location_request and the
+ * field assignment tables attendance_field_assignment, _site and _member); reads
  * employee, worksite, leave, approvals and the working week for what a day means. Never emits
  * (BACKEND_GUIDE §2).
  *
@@ -44,8 +45,9 @@ const REQUEST_PLACE = (col) =>
   `CASE ${col} WHEN 'temporary_home' THEN 'Temporary Home' WHEN 'remote_day' THEN 'Remote Day'
      WHEN 'client_visit' THEN 'Client Visit' END`;
 
-/** The place a punch was judged against, named, when it was not a worksite (§6.10, §6.11). */
-const PUNCH_PLACE = `COALESCE(w.name, CASE WHEN ev.validation #>> '{geofence,place}' = 'home' THEN 'Home'
+/** The place a punch was judged against, named, when it was not a worksite (§6.10 to §6.12). */
+const PUNCH_PLACE = `COALESCE(w.name, CASE ev.validation #>> '{geofence,place}' WHEN 'home' THEN 'Home'
+  WHEN 'field' THEN ev.validation #>> '{geofence,worksite_name}'
   ELSE ${REQUEST_PLACE("ev.validation #>> '{geofence,place}'")} END)`;
 
 const nameOf = (alias) =>
@@ -448,7 +450,8 @@ const REGISTER = `
          ad.attendance_day_id, ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
          COALESCE(ad.worked_minutes, 0) AS worked_minutes, COALESCE(ad.late_minutes, 0) AS late_minutes,
          COALESCE(ad.overtime_minutes, 0) AS overtime_minutes, ad.closed_at,
-         CASE WHEN lr.request_type IS NOT NULL THEN ${REQUEST_PLACE("lr.request_type")}
+         CASE WHEN fa.sites IS NOT NULL THEN fa.sites
+              WHEN lr.request_type IS NOT NULL THEN ${REQUEST_PLACE("lr.request_type")}
               WHEN e.work_pattern = 'remote'
               THEN CASE WHEN EXISTS (SELECT 1 FROM attendance_home ah
                                       WHERE ah.employee_id = e.employee_id AND ah.status = 'approved')
@@ -467,6 +470,16 @@ const REGISTER = `
     LEFT JOIN department d ON d.department_id = e.department_id
     LEFT JOIN worksite w ON w.worksite_id = e.worksite_id
     LEFT JOIN attendance_day ad ON ad.employee_id = e.employee_id AND ad.attendance_date = $1::date
+    LEFT JOIN LATERAL (
+      -- At most one active field assignment covers a person's day (attendance.assignments.js): its
+      -- sites' names, read unpaged with min().
+      SELECT min((SELECT string_agg(fs.name, ' or ' ORDER BY fs.position) FROM attendance_field_site fs
+                   WHERE fs.field_assignment_id = fx.field_assignment_id)) AS sites
+        FROM attendance_field_member fm
+        JOIN attendance_field_assignment fx ON fx.field_assignment_id = fm.field_assignment_id
+       WHERE fm.employee_id = e.employee_id AND fm.removed_at IS NULL AND fx.status = 'active'
+         AND fx.starts_on <= $1::date AND fx.ends_on >= $1::date
+    ) fa ON true
     LEFT JOIN LATERAL (
       -- At most one approved request covers a day (attendance.requests.js); min() reads it unpaged.
       SELECT min(x.request_type) AS request_type FROM attendance_location_request x
@@ -888,6 +901,201 @@ async function requestRow(db, id, { place, reader }) {
   return one(db, `${select} ${REQUEST_FROM} WHERE r.location_request_id = $1`, params);
 }
 
+/* ------------------------------------------------------------------ *
+ * Field assignments (attendance.assignments.js)
+ * ------------------------------------------------------------------ */
+
+/** An assignment's sites as JSON, in position order. */
+const SITES = (alias) => `COALESCE((
+  SELECT json_agg(json_build_object('field_site_id', fs.field_site_id, 'position', fs.position, 'name', fs.name,
+           'address', fs.address, 'latitude', fs.latitude::float8, 'longitude', fs.longitude::float8,
+           'radius_m', fs.radius_m) ORDER BY fs.position)
+    FROM attendance_field_site fs WHERE fs.field_assignment_id = ${alias}.field_assignment_id), '[]'::json)`;
+
+/** The active assignment a person is still on for a work date, with its sites (one a day, §6.12). */
+function fieldAssignmentOn(db, employeeId, date) {
+  return one(
+    db,
+    `SELECT a.field_assignment_id, a.number, a.name, ${SITES("a")} AS sites
+       FROM attendance_field_assignment a
+       JOIN attendance_field_member m ON m.field_assignment_id = a.field_assignment_id
+      WHERE m.employee_id = $1 AND m.removed_at IS NULL AND a.status = 'active'
+        AND a.starts_on <= $2::date AND a.ends_on >= $2::date
+      ORDER BY a.starts_on LIMIT 1`,
+    [employeeId, date],
+  );
+}
+
+/** Someone of `employeeIds` already on an active assignment sharing a day with `from`..`to`. */
+function overlappingAssignment(db, employeeIds, from, to) {
+  return one(
+    db,
+    `SELECT m.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, a.number
+       FROM attendance_field_member m
+       JOIN attendance_field_assignment a ON a.field_assignment_id = m.field_assignment_id
+       JOIN employee e ON e.employee_id = m.employee_id
+      WHERE m.employee_id = ANY($1::uuid[]) AND m.removed_at IS NULL AND a.status = 'active'
+        AND a.starts_on <= $3::date AND a.ends_on >= $2::date
+      ORDER BY a.starts_on, m.employee_id LIMIT 1`,
+    [employeeIds, from, to],
+  );
+}
+
+async function insertAssignment(client, a) {
+  const row = await one(
+    client,
+    `INSERT INTO attendance_field_assignment (number, name, client, note, starts_on, ends_on, assigned_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING field_assignment_id`,
+    [a.number, a.name, a.client, a.note, a.starts_on, a.ends_on, a.assigned_by],
+  );
+  for (const [i, site] of a.sites.entries())
+    await client.query(
+      `INSERT INTO attendance_field_site (field_assignment_id, position, name, address, latitude, longitude, radius_m)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [row.field_assignment_id, i + 1, site.name, site.address, site.latitude, site.longitude, site.radius_m],
+    );
+  await client.query(
+    `INSERT INTO attendance_field_member (field_assignment_id, employee_id)
+     SELECT $1, x FROM unnest($2::uuid[]) AS x`,
+    [row.field_assignment_id, a.employee_ids],
+  );
+  return row;
+}
+
+/** An assignment's own columns and who is still on it (sorted); locked when `forUpdate`. */
+function getAssignment(db, id, { forUpdate = false } = {}) {
+  return one(
+    db,
+    `SELECT a.field_assignment_id, a.number, a.name, a.starts_on, a.ends_on, a.status,
+            ARRAY(SELECT m.employee_id FROM attendance_field_member m
+                   WHERE m.field_assignment_id = a.field_assignment_id AND m.removed_at IS NULL
+                   ORDER BY m.employee_id) AS active_ids,
+            ARRAY(SELECT m.employee_id FROM attendance_field_member m
+                   WHERE m.field_assignment_id = a.field_assignment_id ORDER BY m.employee_id) AS member_ids
+       FROM attendance_field_assignment a WHERE a.field_assignment_id = $1${forUpdate ? " FOR UPDATE OF a" : ""}`,
+    [id],
+  );
+}
+
+/** Cancel an active assignment; null when it was not active. */
+function cancelAssignment(client, id, userId, reason) {
+  return one(
+    client,
+    `UPDATE attendance_field_assignment
+        SET status = 'cancelled', cancelled_at = now(), cancelled_by = $2, cancel_reason = $3
+      WHERE field_assignment_id = $1 AND status = 'active'
+      RETURNING field_assignment_id`,
+    [id, userId, reason],
+  );
+}
+
+/** Take one person off; null when they were not on it. */
+function removeMember(client, id, employeeId, userId, reason) {
+  return one(
+    client,
+    `UPDATE attendance_field_member SET removed_at = now(), removed_by = $3, removed_reason = $4
+      WHERE field_assignment_id = $1 AND employee_id = $2 AND removed_at IS NULL
+      RETURNING employee_id`,
+    [id, employeeId, userId, reason],
+  );
+}
+
+/** Where an assignment stands on the date `today` (a param), as the contract's FieldAssignmentState. */
+const STATE = (today) => `CASE WHEN a.status = 'cancelled' THEN 'cancelled'
+  WHEN a.starts_on > ${today}::date THEN 'upcoming'
+  WHEN a.ends_on < ${today}::date THEN 'done' ELSE 'in_progress' END`;
+
+/**
+ * Assignments as the screens read them. `changer` is the reader's `people` approve scope (null when
+ * they hold none): they may change an assignment that is active, not over, and has everyone still
+ * on it within that scope.
+ */
+function assignmentSelect(params, { today, changer }) {
+  params.push(today);
+  const t = `$${params.length}`;
+  let canChange = "false";
+  if (changer) {
+    const open = `(a.status = 'active' AND a.ends_on >= ${t}::date)`;
+    if (changer.scope === "all") canChange = open;
+    else {
+      params.push(changer.scope_ids || []);
+      canChange = `(${open} AND NOT EXISTS (
+        SELECT 1 FROM attendance_field_member mc
+         WHERE mc.field_assignment_id = a.field_assignment_id AND mc.removed_at IS NULL
+           AND NOT (mc.employee_id = ANY($${params.length}::uuid[]))))`;
+    }
+  }
+  return {
+    today: t,
+    sql: `SELECT a.field_assignment_id, a.number, a.name, a.client, a.note, a.starts_on, a.ends_on,
+            (a.ends_on - a.starts_on + 1)::int AS days, a.status, ${STATE(t)} AS state,
+            ${SITES("a")} AS sites,
+            COALESCE((
+              SELECT json_agg(json_build_object('employee', ${PERSON("me", "md")}, 'added_at', m.added_at,
+                       'removed_at', m.removed_at, 'removed_reason', m.removed_reason)
+                       ORDER BY m.removed_at NULLS FIRST, me.last_name, me.first_name)
+                FROM attendance_field_member m
+                JOIN employee me ON me.employee_id = m.employee_id
+                LEFT JOIN department md ON md.department_id = me.department_id
+               WHERE m.field_assignment_id = a.field_assignment_id), '[]'::json) AS members,
+            (SELECT count(*)::int FROM attendance_field_member mp
+              WHERE mp.field_assignment_id = a.field_assignment_id AND mp.removed_at IS NULL) AS people,
+            (SELECT btrim(ue.first_name || ' ' || ue.last_name) FROM app_user u
+               JOIN employee ue ON ue.employee_id = u.employee_id WHERE u.user_id = a.assigned_by) AS assigned_by_name,
+            a.assigned_at, a.cancelled_at, a.cancel_reason, ${canChange} AS can_change`,
+  };
+}
+
+const ASSIGNMENT_SORTS = {
+  current: `CASE ${STATE("$__today")} WHEN 'in_progress' THEN 0 WHEN 'upcoming' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
+            CASE WHEN a.ends_on < $__today::date THEN NULL ELSE a.starts_on END, a.ends_on DESC`,
+  starts_on: "a.starts_on",
+};
+
+/**
+ * A page of assignments: with anyone in `scope` on them (People's), or the person's own (`mine`,
+ * every one they are or were on). In progress and upcoming first.
+ */
+function listAssignments(db, query, scope, { today, changer, mine = null }) {
+  const params = [query.state || null, query.employee_id || null, query.q || null];
+  const { sql, today: t } = assignmentSelect(params, { today, changer });
+  let who;
+  if (mine) {
+    params.push(mine);
+    who = `AND EXISTS (SELECT 1 FROM attendance_field_member mv
+                        WHERE mv.field_assignment_id = a.field_assignment_id AND mv.employee_id = $${params.length})`;
+  } else {
+    const s = scopeClause(scope, { column: "mv.employee_id" }, params);
+    who = `AND EXISTS (SELECT 1 FROM attendance_field_member mv
+                        WHERE mv.field_assignment_id = a.field_assignment_id ${s.and})`;
+  }
+  const sorts = Object.fromEntries(Object.entries(ASSIGNMENT_SORTS).map(([k, v]) => [k, v.split("$__today").join(t)]));
+  return pageQuery(
+    db,
+    `${sql}, ${TOTAL_COL}
+       FROM attendance_field_assignment a
+      WHERE ($1::text IS NULL OR ${STATE(t)} = $1)
+        AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM attendance_field_member mf
+                                          WHERE mf.field_assignment_id = a.field_assignment_id AND mf.employee_id = $2))
+        AND ($3::text IS NULL OR search_fold(a.number || ' ' || a.name || ' ' || a.client || ' ' || COALESCE((
+              SELECT string_agg(mq.first_name || ' ' || mq.last_name || ' ' || COALESCE(mq.preferred_name, ''), ' ')
+                FROM attendance_field_member mm JOIN employee mq ON mq.employee_id = mm.employee_id
+               WHERE mm.field_assignment_id = a.field_assignment_id), '')) LIKE '%' || search_fold($3) || '%')
+        ${who}
+      ORDER BY ${orderBy(query, sorts, "a.field_assignment_id")}`,
+    params,
+    query,
+  );
+}
+
+/** One assignment as a screen reads it (the caller checked who may see it). */
+function assignmentRow(db, id, { today, changer }) {
+  const params = [id];
+  const { sql } = assignmentSelect(params, { today, changer });
+  return one(db, `${sql} FROM attendance_field_assignment a WHERE a.field_assignment_id = $1`, params);
+}
+
 module.exports = {
   WORKING_DAY,
   lockEmployee,
@@ -934,4 +1142,12 @@ module.exports = {
   cancelRequest,
   listRequests,
   requestRow,
+  fieldAssignmentOn,
+  overlappingAssignment,
+  insertAssignment,
+  getAssignment,
+  cancelAssignment,
+  removeMember,
+  listAssignments,
+  assignmentRow,
 };

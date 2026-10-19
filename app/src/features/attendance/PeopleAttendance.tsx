@@ -1,25 +1,28 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import type { AttendanceEvent, AttendanceException, ExceptionDecision, HomeDecision, HomeRequest, HomeStatus, LocationRequest, LocationRequestStatus, RegisterRow, RegisterStatus } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceEvent, AttendanceException, ExceptionDecision, FieldAssignment, HomeDecision, HomeRequest, HomeStatus, LocationRequest, LocationRequestStatus, RegisterRow, RegisterStatus } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { useScreenAction } from "@/shell/screen-action";
+import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, DesktopOnly, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, PATTERN, PUNCH_STATE, REGISTER_STATUS, REQUEST_TYPE, VERDICT } from "./labels";
 import { RequestApproval, requestDates, requestPill, requestPlace } from "./WorkLocationRequests";
+import { AssignmentView, FieldView, NewAssignmentForm, useAssignmentLink } from "./FieldAssignments";
 
 /**
  * People · Attendance (#25, docs/guides/attendance.md §10): one day's register for everyone in the
  * reader's `people` scope, with its figures, each person's day and the evidence of every punch,
- * the exceptions waiting on People, remote staff's home locations, and work location requests. A
+ * the exceptions waiting on People, remote staff's home locations, work location requests and field
+ * assignments (set, cancelled and changed here by a line manager or People). A
  * manager sees their team; the coordinates, the home addresses and the home decisions are for
  * People with scope all, which the API enforces. A request is decided in its approval by whoever
  * it waits on.
  */
 
-type View = "register" | "exceptions" | "homes" | "requests";
+type View = "register" | "exceptions" | "homes" | "requests" | "field";
 const STATUS_CHIPS: Array<[RegisterStatus | "all", string]> = [
   ["all", "All"],
   ["present", "Present"],
@@ -34,6 +37,7 @@ export function PeopleAttendance() {
   const id = params.get("id");
   const homeId = params.get("home");
   const requestId = params.get("request");
+  const assignmentId = params.get("assignment");
   const { can } = useAuth();
   const modal = useModal();
   const [date, setDate] = useState(todayIso());
@@ -47,6 +51,12 @@ export function PeopleAttendance() {
   useHomeLink(homeId, openHome, () => setView("homes"));
   const openRequest = useCallback((r: LocationRequest) => modal.open({ title: `${r.number} · ${r.employee.display_name}`, body: (close) => <RequestView r={r} close={close} /> }), [modal]);
   useRequestLink(requestId, openRequest, () => setView("requests"));
+  const openAssignment = useCallback((a: FieldAssignment) => modal.open({ title: a.number, wide: true, body: (close) => <AssignmentView a={a} close={close} /> }), [modal]);
+  const toField = useCallback(() => setView("field"), []);
+  useAssignmentLink(assignmentId, openAssignment, { before: toField });
+  const mayAssign = can("people", "approve");
+  const newAssignment = useCallback(() => (setView("field"), modal.open({ title: "New Assignment", wide: true, body: (close) => <NewAssignmentForm close={close} /> })), [modal]);
+  useScreenAction(mayAssign ? { label: "New Assignment", onSelect: newAssignment } : null);
 
   const exportRange = () => modal.open({ title: "Export Register", body: (close) => <ExportForm close={close} date={date} status={status} /> });
   const tile = (title: string, value: number | undefined, filter: RegisterStatus | null, tone?: "ok" | "warn" | "err", help?: string) => (
@@ -58,7 +68,18 @@ export function PeopleAttendance() {
       <PageHeader
         title="Attendance"
         sub={formatDate(date)}
-        actions={can("people", "export") ? <Button icon="download" onClick={exportRange}>Export</Button> : undefined}
+        actions={
+          can("people", "export") || mayAssign ? (
+            <>
+              {can("people", "export") && <Button icon="download" onClick={exportRange}>Export</Button>}
+              {mayAssign && (
+                <DesktopOnly>
+                  <Button variant="primary" icon="plus" onClick={newAssignment}>New Assignment</Button>
+                </DesktopOnly>
+              )}
+            </>
+          ) : undefined
+        }
       >
         <Field label="Date">
           <DateField value={date} onChange={(d) => d && setDate(d)} max={todayIso()} />
@@ -83,7 +104,7 @@ export function PeopleAttendance() {
         />
       </Grid>
       <div className="my-3">
-        <SegmentedControl label="View" value={view} onChange={setView} options={[["register", "Register"], ["exceptions", "Exceptions"], ["homes", "Homes"], ["requests", "Requests"]]} />
+        <SegmentedControl label="View" value={view} onChange={setView} options={[["register", "Register"], ["exceptions", "Exceptions"], ["homes", "Homes"], ["requests", "Requests"], ["field", "Field"]]} />
       </div>
       {view === "register" ? (
         <Register date={date} status={status} setStatus={setStatus} openDay={openDay} />
@@ -91,8 +112,10 @@ export function PeopleAttendance() {
         <Exceptions date={date} />
       ) : view === "homes" ? (
         <Homes openHome={openHome} />
-      ) : (
+      ) : view === "requests" ? (
         <Requests openRequest={openRequest} />
+      ) : (
+        <FieldView openAssignment={openAssignment} />
       )}
     </>
   );
