@@ -18,7 +18,9 @@ import { PeopleAttendance } from "./PeopleAttendance";
  * Remote staff's homes on the in-browser mock (docs/guides/attendance.md §6.10, §10): with no
  * approved home the clock still asks for the location and says People will review it; Set Home
  * Location takes one reading good enough and the address; People approve or reject what waits.
- * The demonstration sign-ins work hybrid, so one is made remote for this file only.
+ * Chidera, who has not clocked in today on the mock, is made remote for this file only, so each
+ * test starts from the same day whatever the date (the Remote demonstration account's day comes
+ * from the mock's history).
  */
 
 type Position = { coords: { latitude: number; longitude: number; accuracy: number } };
