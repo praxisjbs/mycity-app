@@ -426,3 +426,12 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   possible here: a push through a real push service (this Chromium has none, so TB's phone check
   covers it) and a tap on a notification (no protocol call clicks one; its address was opened
   instead). Next: step 15.
+- 19/10/2026 · TB · Step 15 began with one more whole `npm run ci` on the final head (`e4d19a0`): 44 of
+  45 gates passed; the Jest gate failed once in `tests/integration/security.test.js`, "no PIN
+  reaches an event or the audit", which passed in the first full run and passes alone. Not this
+  PR's change: the test looked for the PINs' four digits anywhere in the CEO's event payloads and
+  audit rows, and those carry random UUIDs (the user, employee and session ids), so a UUID holding
+  4826, 5821 or 9157 failed it about once in a hundred runs, on `main` too. The check now matches a
+  PIN only on its own (a value, a number or a word, never inside a run of hex digits and hyphens);
+  tried in Postgres on a leaked value, number and sentence (caught) and on UUIDs (not). The other
+  leak checks use long secrets and cannot collide. A whole `npm run ci` runs again on the fix.
