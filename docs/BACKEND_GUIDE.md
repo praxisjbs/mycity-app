@@ -466,15 +466,17 @@ git add .
 git commit -m "feat(attendance): clock-in with geofence check"
 ```
 
-Push the branch and open the pull request:
+Push the branch and open the pull request, as a draft while you are still working:
 
 ```
 git push -u origin m1/attendance-clock-in
-gh pr create --base main --title "feat(attendance): clock-in with geofence check"
+gh pr create --draft --base main --title "feat(attendance): clock-in with geofence check"
 ```
 
-or open it from the **Compare & pull request** button GitHub shows after the push. The PR
-description is pre-filled from `.github/pull_request_template.md`; fill it in.
+or open it from the **Compare & pull request** button GitHub shows after the push (its arrow offers
+*Create draft pull request*). The PR description is pre-filled from
+`.github/pull_request_template.md`; fill it in. A draft runs no CI on GitHub (§8.4): run
+`npm run ci` yourself, and press **Ready for review** when it is green.
 
 - **Branch names**: `m<milestone>/<short-name>`, e.g. `m3/query-rules`, `m0/numbering`.
 - **PR titles**: Conventional Commits, `type(module): what it does`. Types: `feat`, `fix`,
@@ -501,9 +503,22 @@ If the rebase stops on a conflict, fix the files, `git add` them, `git rebase --
 
 ### 8.4 What CI checks, and why your PR will fail
 
-CI runs `npm run ci` on every push to a PR. **Run it yourself before pushing**; it is the same
-command and the same result. A PR cannot merge until it is green. These are the usual reasons it is
-red:
+CI runs `npm run ci` when a PR is marked ready for review and on every push to it after that; a
+draft runs none (a week of CI used a month of GitHub's Actions minutes, TB 19/10/2026). **Run it
+yourself before pushing**; it is the same command and the same result. A PR cannot merge until it
+is green.
+
+A run does only what its change needs (`scripts/check/lib/scope.js`; the run's step *How much this
+run needs* says which and why):
+
+- **A change to documents only** (Markdown at the root, under `docs/` or in `.github/`, other than
+  `docs/PROGRESS.md` and `MILESTONES.md`, which the apps' build reads) runs the gates that read
+  documents: progress, guides, README map, CODEOWNERS, dashes and the component catalogue.
+- **After a merge**, `main` runs the whole suite again only when its tree is not the one the PR's
+  last run passed. When nothing reached `main` in between, it is the same tree, and the document
+  gates are enough; Release then deploys it as before.
+
+These are the usual reasons a run is red:
 
 | CI says | Why | Fix |
 |---|---|---|
@@ -524,7 +539,8 @@ Progress-unchanged: renamed a private helper, no screen affected
 Guide-unchanged: tests only, behaviour as the guide describes
 ```
 
-A line with no reason does not count. Editing the PR description re-runs CI.
+A line with no reason does not count. Editing the PR description re-runs CI (not on a draft, and
+not for a new title alone).
 
 `npm run ci` also lists gates as **NOT BUILT**. Those are rules whose check is not written yet
 (money, dates, migrations and others during M0). They do not fail your PR today, but the rules
