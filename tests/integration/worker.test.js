@@ -593,6 +593,7 @@ describe("schedules and heartbeat", () => {
     expect(ids).toEqual([
       "alert-ageing",
       "announcement-release",
+      "attendance-clock-watch",
       "attendance-day-close",
       "celebrations",
       "data-export-cleanup",

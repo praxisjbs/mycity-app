@@ -287,6 +287,23 @@ describe("useModal", () => {
     expect(screen.getByTestId("state")).toHaveTextContent("shut");
   });
 
+  it("opens one that must be answered: Esc does nothing, the close button still closes", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <ModalProvider>
+        <Opener spec={{ dismissible: false, onClose }} />
+      </ModalProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: "New Task" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "New Task" })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("replaces rather than stacks", async () => {
     let api: ReturnType<typeof useModal> | null = null;
     function Grab() {

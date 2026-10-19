@@ -22,6 +22,18 @@ import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, Expor
  * Everything here is the caller's own: the routes take no employee id.
  */
 
+/** A clock-out's time, and Automatic when the system made it once the shift ended (§6.14). */
+function clockOutOf(at: string | null, automatic: boolean): ReactNode {
+  if (!at) return null;
+  if (!automatic) return formatTime(at);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {formatTime(at)}
+      <Pill tone="info">Automatic</Pill>
+    </span>
+  );
+}
+
 /** Today's place as the Today card names it; a worksite and an approved request's day by their own name. */
 const LOCATION_NAME: Partial<Record<AttendanceToday["location"]["kind"], string>> = {
   home: "Approved Home",
@@ -62,6 +74,14 @@ export function MyAttendancePage() {
   const openFigure = (status: FigureStatus) =>
     modal.open({ title: `${FIGURE[status]}, ${formatMonth(month)}`, wide: true, body: <FigureDays month={month} status={status} /> });
   const explain = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], body: (close) => <ExplainForm x={x} close={close} /> });
+  // A reminder's notice (`?clock=`) opens the clock panel, once.
+  const clockLink = params.get("clock");
+  const clockOpened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!clockLink || !clock.today || clockOpened.current === clockLink) return;
+    clockOpened.current = clockLink;
+    if (clock.ready && !clock.unavailable) clock.open();
+  }, [clockLink, clock]);
 
   const todayCard = t && (
     <Card>
@@ -76,7 +96,7 @@ export function MyAttendancePage() {
       <KeyValue
         items={[
           ["Clock In", t.clock_in_at ? formatTime(t.clock_in_at) : null],
-          ["Clock Out", t.clock_out_at ? formatTime(t.clock_out_at) : null],
+          ["Clock Out", clockOutOf(t.clock_out_at, t.clock_out_automatic)],
           ["Location", LOCATION_NAME[t.location.kind] ?? t.location.name],
         ]}
       />
@@ -166,7 +186,7 @@ export function MyAttendancePage() {
 const DAY_COLUMNS: Array<{ key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode }> = [
   { key: "attendance_date", label: "Date", sortable: true, render: (d) => formatDate(d.attendance_date) },
   { key: "i", label: "Clock In", render: (d) => (d.first_clock_in_at ? formatTime(d.first_clock_in_at) : null) },
-  { key: "o", label: "Clock Out", render: (d) => (d.last_clock_out_at ? formatTime(d.last_clock_out_at) : null) },
+  { key: "o", label: "Clock Out", render: (d) => clockOutOf(d.last_clock_out_at, d.clock_out_automatic) },
   { key: "h", label: "Hours", align: "n", render: (d) => (d.worked_minutes ? hours(d.worked_minutes) : null) },
   { key: "s", label: "Status", render: (d) => <Pill tone={dayStatus(d).tone}>{dayStatus(d).text}</Pill> },
 ];
@@ -180,9 +200,12 @@ function FigureDays({ month, status }: { month: string; status: FigureStatus }) 
   return <DataView bare caption={FIGURE[status]} list={list} rowKey={(d) => d.attendance_day_id} noun="day" empty={{ icon: "clock", title: "No Days", text: "None this month." }} columns={DAY_COLUMNS} />;
 }
 
-/** One of my days: its punches with what the server decided about each. */
+/** One of my days: its punches with what the server decided about each, and Explain Time on an automatic clock-out. */
 function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
+  const modal = useModal();
   const events = usePaged("GET /api/v1/attendance/me/events", { filters: { date } });
+  const automatic = events.rows.find((e) => e.source === "system" && e.event_type === "clock_out" && !e.excluded);
+  const explainTime = (e: AttendanceEvent) => modal.open({ title: "Automatic Clock-Out", body: (close) => <ExplainAutomatic e={e} close={close} /> });
   return (
     <>
       {day && (
@@ -206,9 +229,49 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
           { key: "a", label: "Time", render: (e: AttendanceEvent) => formatTime(e.occurred_at) },
           { key: "l", label: "Location", render: (e: AttendanceEvent) => (e.worksite_name ? `${VERDICT[e.geofence]}${e.distance_m !== null ? `, ${e.distance_m} m` : ""}` : VERDICT[e.geofence]) },
           { key: "d", label: "Device", desktop: true, render: (e: AttendanceEvent) => e.device_label },
-          { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Not Counted" : PUNCH_STATE[e.validation_state].text}</Pill> },
+          {
+            key: "r",
+            label: "Result",
+            render: (e: AttendanceEvent) =>
+              e.excluded ? <Pill tone="err">Not Counted</Pill> : e.source === "system" ? <Pill tone="info">Automatic</Pill> : <Pill tone={PUNCH_STATE[e.validation_state].tone}>{PUNCH_STATE[e.validation_state].text}</Pill>,
+          },
         ]}
       />
+      {automatic && (
+        <FormFooter>
+          <Button icon="send" onClick={() => explainTime(automatic)}>Explain Time</Button>
+        </FormFooter>
+      )}
+    </>
+  );
+}
+
+/** Say why an automatic clock-out's time is wrong; People keep or correct it (§6.8). */
+function ExplainAutomatic({ e, close }: { e: AttendanceEvent; close: () => void }) {
+  const f = useContractForm({ employee_note: "" }, attendance.ExceptionExplanation);
+  const save = useMutation("POST /api/v1/attendance/me/events/:id/explanation");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id: e.attendance_event_id }, body: { employee_note: f.values.employee_note.trim() } });
+      invalidate("/api/v1/attendance");
+      close();
+      toast("Note sent to People");
+    } catch (err) {
+      if (err instanceof ApiError && Object.keys(err.fields).length) f.setServerErrors(err.fields);
+      else toast(err instanceof ApiError ? err.message : "Note not sent");
+    }
+  };
+  return (
+    <>
+      <KeyValue items={[["Date", formatDate(e.work_date)], ["Clock Out", formatTime(e.occurred_at)]]} />
+      <Field label="Your Note" className="mt-3" {...f.status("employee_note")}>
+        <TextAreaField {...f.field("employee_note")} placeholder="Left at 16:00" rows={3} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" icon="send" busy={save.pending} onClick={() => submit()}>Send Note</Button>
+      </FormFooter>
     </>
   );
 }

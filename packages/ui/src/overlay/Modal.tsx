@@ -268,6 +268,8 @@ export interface ModalSpec {
   side?: boolean;
   /** Unsaved changes from the start (forms usually say so with useUnsavedChanges instead). */
   dirty?: boolean;
+  /** false: Esc, the scrim and a drag do nothing; the close button and the footer still close it (a prompt that must be answered). */
+  dismissible?: boolean;
   /** Called once the modal closes, however it closed. */
   onClose?: () => void;
 }
@@ -376,6 +378,7 @@ export function ModalProvider({ children, resetKey, container }: ModalProviderPr
             full={current.spec.full}
             side={current.spec.side}
             dirty={current.spec.dirty}
+            dismissible={current.spec.dismissible}
             container={container}
             footer={current.spec.footer}
           >

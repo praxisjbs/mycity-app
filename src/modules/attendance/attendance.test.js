@@ -432,6 +432,51 @@ describe("what a person reads", () => {
     expect(detailOf("unknown_device", { device_label: "Chrome on Android" })).toBe("Unregistered device: Chrome on Android");
     expect(detailOf("suspicious_timestamp", { skew_seconds: -540 })).toBe("Device clock 9 min ahead");
     expect(detailOf("missing_clock_out", { clock_in_at: "2026-10-16T07:58:00Z", timezone: TZ })).toBe("Clocked in 08:58, no clock-out");
+    expect(detailOf("automatic_clock_out", { clock_out_at: "2026-10-16T16:00:00Z", timezone: TZ })).toBe(
+      "Clocked out automatically at 17:00",
+    );
+  });
+});
+
+describe("the clock watch", () => {
+  const { decideAutomatic, shiftEnd, AWAY_MIN } = require("./attendance.clock-watch");
+  const end = new Date("2026-10-16T16:00:00Z"); // 17:00 in Lagos
+  const clockInAt = new Date("2026-10-16T07:55:00Z");
+  const seen = (last, active = false, known = true) => ({ known, active, last_active_at: last ? new Date(last) : null });
+  const decide = (now, activity) => decideAutomatic({ shiftEnd: end, clockInAt, now: new Date(now), activity });
+
+  test("a shift ends at the working week's end in the workplace's zone; an end before the start is the next morning", () => {
+    const day = { working_day: true, starts_at: "09:00", ends_at: "17:00" };
+    expect(shiftEnd("2026-10-16", day, TZ).toISOString()).toBe("2026-10-16T16:00:00.000Z");
+    expect(shiftEnd("2026-10-16", { working_day: true, starts_at: "22:00", ends_at: "06:00" }, TZ).toISOString()).toBe(
+      "2026-10-17T05:00:00.000Z",
+    );
+    expect(shiftEnd("2026-10-18", { working_day: false, starts_at: null, ends_at: null }, TZ)).toBeNull();
+  });
+
+  test("nothing before the end, while they are in front of the app, recently there, or when presence cannot answer", () => {
+    expect(decide("2026-10-16T15:59:00Z", seen(null))).toEqual({ due: false, reason: "shift_running" });
+    expect(decide("2026-10-16T16:30:00Z", seen("2026-10-16T16:29:00Z", true))).toEqual({ due: false, reason: "in_front" });
+    expect(decide("2026-10-16T16:30:00Z", seen(null, false, false))).toEqual({ due: false, reason: "presence_unknown" });
+    expect(decide("2026-10-16T16:10:00Z", seen("2026-10-16T15:58:00Z"))).toEqual({ due: false, reason: "recently_active" });
+    expect(decideAutomatic({ shiftEnd: null, clockInAt, now: new Date(), activity: seen(null) })).toEqual({ due: false, reason: "no_end" });
+  });
+
+  test(`away ${AWAY_MIN} minutes: the end's time, or the last moment on the app after it, never before the clock-in`, () => {
+    expect(decide("2026-10-16T16:15:00Z", seen("2026-10-16T15:58:00Z"))).toEqual({ due: true, at: end, reason: "away_at_end" });
+    expect(decide("2026-10-16T16:05:00Z", seen(null))).toEqual({ due: true, at: end, reason: "away_at_end" });
+    expect(decide("2026-10-16T18:00:00Z", seen("2026-10-16T17:40:00Z"))).toEqual({
+      due: true,
+      at: new Date("2026-10-16T17:40:00Z"),
+      reason: "left_app",
+    });
+    const evening = decideAutomatic({
+      shiftEnd: end,
+      clockInAt: new Date("2026-10-16T17:10:00Z"),
+      now: new Date("2026-10-16T18:00:00Z"),
+      activity: seen(null),
+    });
+    expect(evening).toEqual({ due: true, at: new Date("2026-10-16T17:10:00Z"), reason: "away_at_end" });
   });
 });
 

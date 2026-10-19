@@ -42,6 +42,7 @@ const ExceptionType = z.enum([
   "unknown_device",
   "suspicious_timestamp",
   "missing_clock_out",
+  "automatic_clock_out",
 ]);
 const ExceptionStatus = z.enum(["open", "resolved"]);
 const ExceptionOutcome = z.enum(["accepted", "rejected", "corrected"]);
@@ -76,6 +77,8 @@ const AttendanceToday = z
       .nullable(),
     clock_in_at: isoDateTime.nullable(),
     clock_out_at: isoDateTime.nullable(),
+    /** The clock-out was the system's, made once the shift ended and the person was away (§6.14). */
+    clock_out_automatic: z.boolean(),
     review: z.boolean(),
     shift: z
       .object({
@@ -166,6 +169,8 @@ const AttendanceDay = z
     status: DayStatus.nullable(),
     first_clock_in_at: isoDateTime.nullable(),
     last_clock_out_at: isoDateTime.nullable(),
+    /** The clock-out that counts was the system's (§6.14). */
+    clock_out_automatic: z.boolean(),
     worked_minutes: minutes,
     late_minutes: minutes,
     overtime_minutes: minutes,
@@ -272,10 +277,16 @@ const ExceptionListQuery = listQuery(
   ["created_at"],
 );
 
-/** POST /attendance/me/exceptions/:id/explanation */
+/**
+ * POST /attendance/me/exceptions/:id/explanation, and POST /attendance/me/events/:id/explanation
+ * for an automatic clock-out, which opens its exception with the note.
+ */
 const ExceptionExplanation = z.object({ employee_note: text(1000) }).strict();
 
-/** POST /attendance/exceptions/:id/decision. A correction names the missing clock-out's time. */
+/**
+ * POST /attendance/exceptions/:id/decision. A correction names the clock-out's time: the missing
+ * one, or the real one in place of an automatic clock-out.
+ */
 const ExceptionDecision = z
   .object({
     decision: z.enum(["accept", "reject", "add_clock_out"]),
@@ -916,7 +927,10 @@ const TABLES = {
   },
   AttendanceDay: {
     table: "attendance_day",
-    virtual: { open_exceptions: "count of the day's open attendance_exception rows" },
+    virtual: {
+      open_exceptions: "count of the day's open attendance_exception rows",
+      clock_out_automatic: "the day's counted clock-out is an attendance_event with source system",
+    },
   },
   AttendanceDayPage: { table: null, reason: "a page of a person's days" },
   MyDayListQuery: { table: null, reason: "list controls for my days" },
@@ -932,7 +946,8 @@ const TABLES = {
       device_label: "attendance_device.label",
       device_state: "the device's state when it punched, from attendance_event.validation",
       reasons: "the exception types the punch opened, from attendance_event.validation",
-      excluded: "an exception on it was decided rejected, so the day does not count it",
+      excluded:
+        "an exception on it was decided rejected, or an automatic clock-out's was corrected, so the day does not count it",
       recorded_by_name: "who recorded a correction, from employee",
     },
   },

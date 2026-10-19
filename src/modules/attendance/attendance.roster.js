@@ -240,7 +240,8 @@ const binder = (params) => (value) => {
  * holds and their status. `filters` narrows the people before anything is worked out.
  *
  * The clock-in's worksite is the one its punch was judged against, read from the day's
- * active clock-in (one a day, attendance_event_one_active_uq), or on a field assignment's day
+ * active clock-in (one a day among the person's and People's punches,
+ * attendance_event_one_active_person_uq; the system never clocks in), or on a field assignment's day
  * the site it was judged against; it shows only while the day's record has a clock-in, so a
  * punch a decision excluded names none.
  *
@@ -279,6 +280,7 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
           LEFT JOIN attendance_day yd ON yd.employee_id = e.employee_id AND yd.attendance_date = ${yDate}
           LEFT JOIN attendance_event ci ON ci.employee_id = e.employee_id AND ci.work_date = ${date}
                 AND ci.event_type = 'clock_in' AND ci.validation_state IN ('accepted', 'review')
+                AND ci.source <> 'system'
           LEFT JOIN worksite w ON w.worksite_id = ci.worksite_id
          WHERE ${onRegister(date)}
            AND ${narrowed}

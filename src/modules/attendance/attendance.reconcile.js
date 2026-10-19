@@ -6,8 +6,13 @@
  *
  * The source punch is never edited (attendance_event is append-only). A decision is
  * written on the exception; a rejected punch stops counting because its exception says
- * so; a missing clock-out People supply is a new `admin` event. Every change
- * recalculates the day in the same transaction and is audited with before and after.
+ * so; a missing clock-out People supply is a new `admin` event, and so is the time they
+ * give in place of an automatic clock-out, which then stops counting (its exception is
+ * corrected). Every change recalculates the day in the same transaction and is audited
+ * with before and after.
+ *
+ * An automatic clock-out (attendance.clock-watch.js) opens nothing by itself: the person
+ * explains one they think wrong (explainAutomatic), and only then do People decide it.
  *
  * The day-close (jobs/schedulers/attendance-day-close.js, 01:30 Lagos) closes every day
  * before today within 14 days that is still open: an open shift becomes one
@@ -108,6 +113,10 @@ function detailOf(type, evidence = {}) {
       return ev.clock_in_at
         ? `Clocked in ${rules.localTime(ev.clock_in_at, ev.timezone || rules.DEFAULT_TZ)}, no clock-out`
         : "No clock-out";
+    case "automatic_clock_out":
+      return ev.clock_out_at
+        ? `Clocked out automatically at ${rules.localTime(ev.clock_out_at, ev.timezone || rules.DEFAULT_TZ)}`
+        : "Clocked out automatically";
     default:
       return type;
   }
@@ -128,6 +137,10 @@ const OUTCOME_TEXT = Object.freeze({
   rejected: "the punch does not count",
   corrected: "a clock-out was added",
 });
+/** The exception types a clock-out time decides: the missing one, or the real one in place of the automatic. */
+const TAKES_TIME = new Set(["missing_clock_out", "automatic_clock_out"]);
+const outcomeText = (type, outcome) =>
+  type === "automatic_clock_out" && outcome === "corrected" ? "the clock-out time was corrected" : OUTCOME_TEXT[outcome];
 
 /**
  * People decide an open exception: accept it, reject the punch, or add the missing
@@ -141,10 +154,15 @@ async function decide(actor, scope, id, body) {
   if (x.employee_id === actor.employee_id)
     throw new AppError("OWN_RECORD", "Someone else decides your own attendance", 403);
   if (x.status !== "open") throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
-  if (body.decision === "add_clock_out" && x.exception_type !== "missing_clock_out")
-    throw new AppError("DECISION_INVALID", "Only a missing clock-out takes a time", 422, { decision: ["Not for this"] });
+  if (body.decision === "add_clock_out" && !TAKES_TIME.has(x.exception_type))
+    throw new AppError("DECISION_INVALID", "Only a missing or automatic clock-out takes a time", 422, {
+      decision: ["Not for this"],
+    });
   if (body.decision === "reject" && !x.attendance_event_id)
     throw new AppError("DECISION_INVALID", "There is no punch to reject", 422, { decision: ["Not for this"] });
+  // Rejecting an automatic clock-out would leave the shift open: keep its time or correct it.
+  if (body.decision === "reject" && x.exception_type === "automatic_clock_out")
+    throw new AppError("DECISION_INVALID", "Keep or correct an automatic clock-out", 422, { decision: ["Not for this"] });
 
   const outcome = OUTCOME[body.decision];
   await tx(async (client) => {
@@ -195,7 +213,7 @@ async function decide(actor, scope, id, body) {
         work_date: x.work_date,
         exception_type: x.exception_type,
         outcome,
-        outcome_text: OUTCOME_TEXT[outcome],
+        outcome_text: outcomeText(x.exception_type, outcome),
       },
     });
   });
@@ -224,6 +242,48 @@ async function explain(user, id, body) {
         work_date: x.work_date,
       },
     });
+  });
+  return present(await repo.getException(pool, id));
+}
+
+/**
+ * The person explains an automatic clock-out of their own: its exception opens with the note, for
+ * People to keep or correct its time (§6.8, §6.14). Once per punch.
+ */
+async function explainAutomatic(user, eventId, body) {
+  const ev = await repo.eventFor(pool, eventId);
+  if (!ev || ev.employee_id !== user.employee_id || !ev.attendance_day_id)
+    throw new AppError("NOT_FOUND", "Not found", 404);
+  if (ev.source !== "system" || ev.event_type !== "clock_out")
+    throw new AppError("NOT_AUTOMATIC", "Only an automatic clock-out is explained here", 422);
+  const already = () => new AppError("ALREADY_EXPLAINED", "You have already explained this clock-out", 409);
+  const id = await tx(async (client) => {
+    await repo.lockEmployee(client, ev.employee_id);
+    if (await repo.hasException(client, eventId, "automatic_clock_out")) throw already();
+    const person = await repo.person(client, ev.employee_id);
+    const x = await repo.insertException(client, {
+      attendance_day_id: ev.attendance_day_id,
+      attendance_event_id: eventId,
+      exception_type: "automatic_clock_out",
+      severity: "low",
+      evidence: { clock_out_at: ev.occurred_at, timezone: ev.timezone || rules.DEFAULT_TZ, event_type: "clock_out" },
+    });
+    if (!x) throw already();
+    await repo.explainException(client, x.attendance_exception_id, body.employee_note);
+    await emit(client, {
+      key: EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED,
+      entity: { type: "attendance_exception", id: x.attendance_exception_id },
+      actor: user,
+      after: { exception_type: "automatic_clock_out", employee_note: body.employee_note },
+      payload: {
+        attendance_exception_id: x.attendance_exception_id,
+        employee_id: ev.employee_id,
+        subject_employee_id: ev.employee_id,
+        employee_name: person.ref.display_name,
+        work_date: ev.work_date,
+      },
+    });
+    return x.attendance_exception_id;
   });
   return present(await repo.getException(pool, id));
 }
@@ -334,6 +394,7 @@ module.exports = {
   presentPage,
   decide,
   explain,
+  explainAutomatic,
   getFor,
   closeDay,
   closeDays,

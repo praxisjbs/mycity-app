@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "35c97db0967328e2b75415e9a5dcd19c5bdd2b0794597922a4388d0f09654c5f",
+  "source_hash": "409e4ae5afb8e7ee4387da2e1f7334574ce0f37bb4a6623e410439c29bfc5d92",
   "schemas": 547,
-  "endpoints": 302,
+  "endpoints": 303,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -11,7 +11,7 @@
     "packages/contract/schemas/announcements.js": "2825c9735dff34df5b71b02883997415532cd89edbd09f6026312521aa3ccc2f",
     "packages/contract/schemas/assessments.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/assistant.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/attendance.js": "92f624c194aad1eeefcca2324796744275803bb2b81846867d79c2f834ff25df",
+    "packages/contract/schemas/attendance.js": "83118eeb44cc43758d2f59e74754c8e8ba4c4ba5c8bb168cbd465ac739ac6295",
     "packages/contract/schemas/audit.js": "0c00d7df362ac816400e63ebcf1c825649a9b9e763eb937aa5d7865d7171e0d9",
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/calendar.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -72,7 +72,7 @@
     "src/modules/access/access.routes.js": "b2701c9c63b01069e391675c0d49cd3ab308ecff22e2dbab8e6a77746e2bf4e5",
     "src/modules/alerts/alerts.routes.js": "45a8797d46acfb6a814cb09d990829758da9f9d296f671dd2262ab0afb8faa73",
     "src/modules/announcements/announcements.routes.js": "2870fa7592a320a68f39a031d65825520f0316fcd31efe38e72e4e15257524f8",
-    "src/modules/attendance/attendance.routes.js": "cbbd39ea540e4442f4627b7ea0c759759e5806d9e5c7dc3f0e476fc4a1e9ae05",
+    "src/modules/attendance/attendance.routes.js": "611080bf03595e6ee019acf6f972acb6a33b7d909aaa6a3876efaaff005433e2",
     "src/modules/audit/audit.routes.js": "0b20178657d087d71ed69684191a54dc7ecaa271a8c4b63ec5ec5876ffbcacc3",
     "src/modules/community/community.routes.js": "e24c39601d23498ddf6d7c1045276a9b70be100152aa752e3c8d3e3ca9492968",
     "src/modules/dashboard/dashboard.routes.js": "e6c6eca2aecce06155220d2be2ca323c2b4a92aea8ddc31ff8921bee44b19a4b",

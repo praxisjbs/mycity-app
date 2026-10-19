@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
+import { useAuth, useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
+import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Menu, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
+import { claimStart, closeDue, noteShown, promptDue, REMIND_CHOICES, remindIn, type PromptKind } from "./prompts";
 
 /**
  * Clocking in and out, for the shell: the desktop top bar's ClockButton and the phone's floating
@@ -31,12 +33,65 @@ export function useClock() {
 }
 
 /**
- * Called once by the shell: a punch made on another device or decided by People refreshes the
- * state. When the panel opens by itself is Home's to decide (docs/guides/home.md §6 Clock-in
- * prompt): the Overview opens it with useClock().open.
+ * Called once by the shell: a punch made on another device or decided by People, or an automatic
+ * clock-out, refreshes the state. The sign-in prompt is Home's to open (docs/guides/home.md §6
+ * Clock-in prompt, with useClock().open); the start and closing prompts are ClockPrompts'.
  */
 export function useClockSync() {
   useRealtime("attendance.updated", () => invalidate("/api/v1/attendance"));
+}
+
+/** How often an open app looks at the time for a prompt that has come due. */
+const PROMPT_CHECK_MS = 30_000;
+
+/**
+ * Rendered once by the shell, on both shells: opens the panel by itself at the shift's start for
+ * someone not yet clocked in, and at its end for someone still clocked in
+ * (docs/guides/attendance.md §6.14; the rules in ./prompts). It looks every half minute and when
+ * the app comes to the front, on the server's clock, and never opens over a dialog that is open
+ * or a locked session: it waits until that one closes, so a half-filled form is never lost.
+ */
+export function ClockPrompts() {
+  const me = useMe();
+  const { status } = useAuth();
+  const { data: t } = useApi("GET /api/v1/attendance/me/today");
+  const modal = useModal();
+  const openPanel = useClockPanel();
+  const offset = useRef(0);
+  const latest = useRef({ t, busy: modal.isOpen || status !== "signed-in" });
+  latest.current = { t, busy: modal.isOpen || status !== "signed-in" };
+  useEffect(() => {
+    if (t) offset.current = Date.parse(t.server_time) - Date.now();
+  }, [t]);
+
+  const check = useCallback(() => {
+    const { t: today, busy } = latest.current;
+    if (!today || busy) return;
+    const now = new Date(Date.now() + offset.current);
+    const kind = promptDue(today, now);
+    if (kind === "start" && claimStart(me.user_id, today.date)) openPanel("Clock In", "start");
+    else if (kind === "close" && closeDue(me.user_id, today.date, now)) {
+      // Until it is answered, closing it means the shortest Remind Me.
+      remindIn(me.user_id, today.date, now);
+      openPanel("Clock Out", "close");
+    }
+  }, [me.user_id, openPanel]);
+
+  useEffect(() => {
+    check();
+  }, [check, t, modal.isOpen, status]);
+  useEffect(() => {
+    const i = setInterval(check, PROMPT_CHECK_MS);
+    const front = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", front);
+    return () => {
+      clearInterval(i);
+      document.removeEventListener("visibilitychange", front);
+    };
+  }, [check]);
+  return null;
 }
 
 /** The desktop top bar's Clock In / Clock Out button. */
@@ -64,9 +119,13 @@ export function ClockButton({ compact }: { compact?: boolean }) {
   );
 }
 
+/** Opens the panel; as a prompt it must be answered: the scrim, Esc and a drag leave it open. */
 function useClockPanel() {
   const modal = useModal();
-  return useCallback((title: string) => modal.open({ title, body: (close) => <ClockPanel close={close} /> }), [modal]);
+  return useCallback(
+    (title: string, prompt?: PromptKind) => modal.open({ title, dismissible: !prompt, body: (close) => <ClockPanel close={close} prompt={prompt} /> }),
+    [modal],
+  );
 }
 
 type Fix = { latitude: number; longitude: number; accuracy_m: number };
@@ -105,16 +164,21 @@ function useServerClock(t: AttendanceToday | undefined) {
     const i = setInterval(() => setNow(new Date(Date.now() + offset.current)), 15000);
     return () => clearInterval(i);
   }, []);
-  return t ? zoneClock(now, t.timezone) : null;
+  return t ? { ...zoneClock(now, t.timezone), at: now } : null;
 }
 
-function ClockPanel({ close }: { close: () => void }) {
+function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind }) {
   const { navigate } = useRouter();
+  const me = useMe();
   const { data: t, error, reload } = useApi("GET /api/v1/attendance/me/today");
   const [stage, setStage] = useState<Stage>({ kind: "ready" });
   const inFlight = useRef(false);
   const clock = useServerClock(t);
   const toDevices = () => (close(), navigate(hrefFor("ess", "my-devices")));
+  // Shown since the start: the start prompt has nothing left to do today on this device.
+  useEffect(() => {
+    if (t) noteShown(me.user_id, t, new Date(t.server_time));
+  }, [t, me.user_id]);
 
   if (error && !t) {
     return (
@@ -279,7 +343,12 @@ function ClockPanel({ close }: { close: () => void }) {
   if (t.state === "clocked_out") {
     return (
       <>
-        <Result tone={t.review ? "warn" : "ok"} label={t.review ? "Review Required" : "Day Complete"} title={`${formatTime(t.clock_in_at)} to ${formatTime(t.clock_out_at)}`} text={formatDate(t.date)} />
+        <Result
+          tone={t.review ? "warn" : t.clock_out_automatic ? "info" : "ok"}
+          label={t.review ? "Review Required" : t.clock_out_automatic ? "Automatic Clock-Out" : "Day Complete"}
+          title={`${formatTime(t.clock_in_at)} to ${formatTime(t.clock_out_at)}`}
+          text={formatDate(t.date)}
+        />
         <FormFooter>
           <Button onClick={() => (close(), navigate(hrefFor("ess", "my-attendance")))}>My Attendance</Button>
           <Button variant="primary" onClick={close}>Close</Button>
@@ -297,6 +366,25 @@ function ClockPanel({ close }: { close: () => void }) {
       <Button variant="primary" icon="clock" busy={stage.kind === "sending" || stage.kind === "locating"} onClick={() => start()}>
         {verb}
       </Button>
+    );
+
+  /** At the shift's end: bring the prompt back later instead of clocking out now. */
+  const remindLater = (minutes: number) => {
+    const now = clock.at;
+    remindIn(me.user_id, t.date, now, minutes);
+    close();
+    toast(`Reminder set for ${formatTime(new Date(now.getTime() + minutes * 60_000).toISOString())}`);
+  };
+  const later =
+    prompt === "close" && eventType === "clock_out" ? (
+      <Menu
+        label="Remind Me"
+        align="start"
+        trigger={(p) => <Button {...p} icon="bell">Remind Me</Button>}
+        items={REMIND_CHOICES.map((m) => ({ label: m === 60 ? "In 1 Hour" : `In ${m} Minutes`, icon: "clock" as const, onSelect: () => remindLater(m) }))}
+      />
+    ) : (
+      <Button onClick={close}>Not Now</Button>
     );
 
   return (
@@ -344,7 +432,7 @@ function ClockPanel({ close }: { close: () => void }) {
         ) : stage.kind === "no_location" ? (
           <Button onClick={() => punch({ location_error: stage.error })}>{`${verb} Anyway`}</Button>
         ) : (
-          <Button onClick={close}>Not Now</Button>
+          later
         )}
         {primary}
       </FormFooter>
