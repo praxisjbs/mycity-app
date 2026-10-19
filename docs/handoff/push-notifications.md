@@ -189,7 +189,7 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       marks its notices read; IDLE defaults (step 3) and `docs/guides/mailbox.md` §6.
 - [x] **9. Community** (19/10/2026): channel posts push in quiet mode (tag `community_channel:<id>`); direct
       messages tag per conversation and buzz each time.
-- [ ] **10. Service worker**: `vite-plugin-pwa` to `injectManifest` with `app/src/sw.ts`
+- [x] **10. Service worker** (19/10/2026): `vite-plugin-pwa` to `injectManifest` with `app/src/sw.ts`
       (precache, cleanup, navigation fallback with the `/api/` and `/gallery` denylist, the
       `SKIP_WAITING` message the update prompt sends), push, notificationclick, pushsubscriptionchange;
       `app/public/badge-96.png` (white pin on transparent); check `src/http/static.js` serves
@@ -281,3 +281,13 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   Sign Out Others carries `kept_session_id`; the in-app socket payload is now the contract's
   `Notification`; `notification-deliver` counts `push_queued` and `push_held`. Next: step 10, the
   service worker.
+- 19/10/2026 · TB · Step 10: `app/src/sw.ts` on `injectManifest` (precache, cleanup, the navigation
+  fallback with its denylist, SKIP_WAITING), push (asks visible pages on a MessageChannel, 1.5 s, and
+  shows a notification unless one answers `{ ok: true }`; WebKit and tests always show), grouping by
+  tag, initials avatars drawn on an OffscreenCanvas in `--deep` and `--primary` read from
+  `tokens.css?raw` (no hex in app code), `badge-96.png`, Mark Read and renewal with the device token
+  from `features/notifications/device-store.ts` (IndexedDB `mycity-push`), `n=` ids on the URL a tap
+  opens (`pane=notifications` when the notice has no screen). `tsconfig.sw.json` types the worker
+  (WebWorker lib); `tsconfig.app.json` excludes it. Built: `dist/sw.js` 11.6 kB gzipped, 82 files
+  precached. Next: step 11, the components. The page must answer `mycity:push` and `mycity:open`
+  messages (type `WorkerMessage` exported from `sw.ts`) with `{ ok: true }` on the port.
