@@ -61,6 +61,24 @@ describe("UploadField", () => {
     expect(screen.getByText("good.pdf")).toBeInTheDocument();
   });
 
+  it("lets a person clear a file that failed", async () => {
+    const upload: Uploader = () => Promise.reject(new Error("Check the highlighted fields"));
+    const { container } = render(<UploadField purpose="attachment" upload={upload} />);
+    await userEvent.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, file("bad.pdf"));
+    await userEvent.click(await screen.findByRole("button", { name: "Remove bad.pdf" }));
+    expect(screen.queryByText("bad.pdf")).toBeNull();
+  });
+
+  it("hands finished files to the caller and keeps only the failed ones", async () => {
+    const onUploaded = vi.fn();
+    const upload: Uploader = ({ file: f }) => (f.name === "bad.pdf" ? Promise.reject(new Error("Upload failed. Try again.")) : Promise.resolve(doc(f.name)));
+    const { container } = render(<UploadField purpose="attachment" upload={upload} handOff onUploaded={onUploaded} />);
+    await userEvent.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, [file("good.pdf"), file("bad.pdf")]);
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledWith([doc("good.pdf")]));
+    await waitFor(() => expect(screen.queryByText("good.pdf")).toBeNull());
+    expect(screen.getByText("bad.pdf")).toBeInTheDocument();
+  });
+
   it("keeps only the newest file when exactly one is allowed", async () => {
     const { container } = render(<UploadField purpose="cv" upload={fine} multiple={false} />);
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;

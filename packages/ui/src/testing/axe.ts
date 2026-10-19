@@ -8,8 +8,14 @@ import axe from "axe-core";
  * every token pair instead) and `region` (a component tested alone sits outside
  * any landmark by design).
  */
-export async function axeCheck(container: Element, rules: Record<string, { enabled: boolean }> = {}): Promise<axe.AxeResults> {
+export async function axeCheck(
+  container: Element,
+  rules: Record<string, { enabled: boolean }> = {},
+  /** `iframes: false` checks a frame element (its title) but not what is inside: a sender's email is not ours to fix. */
+  { iframes = true }: { iframes?: boolean } = {},
+): Promise<axe.AxeResults> {
   return axe.run(container, {
+    iframes,
     rules: { "color-contrast": { enabled: false }, region: { enabled: false }, ...rules },
   });
 }

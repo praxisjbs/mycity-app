@@ -75,6 +75,15 @@ const MailAttachment = z
   })
   .strict();
 
+/** A part of a message drawn inside its body (a signature logo), which the body names as `cid:<content_id>`. */
+const MailInlinePart = z
+  .object({
+    content_id: z.string(),
+    document_id: uuid,
+    mime_type: z.string(),
+  })
+  .strict();
+
 /** One message of a thread. `body_html` is sanitised; it is null for spam (not rendered). */
 const MailMessage = z
   .object({
@@ -85,6 +94,17 @@ const MailMessage = z
     sent_at: isoDateTime,
     body_html: z.string().nullable(),
     attachments: z.array(MailAttachment),
+    inline_parts: z.array(MailInlinePart),
+    /** The owner chose Always Show Images for this sender: web images load without asking. */
+    images_trusted: z.boolean(),
+  })
+  .strict();
+
+/** POST /mailbox/image-trust: always show, or stop showing, web images from one sender. */
+const MailImageTrust = z
+  .object({
+    sender_address: email,
+    trusted: z.boolean(),
   })
   .strict();
 
@@ -196,7 +216,17 @@ const TABLES = {
       to: "to_addresses",
       cc: "cc_addresses",
       attachments: "the message's files, from mail_attachment and document",
+      inline_parts: "the parts the body draws by cid:, from mail_attachment where content_id is set",
+      images_trusted: "whether the owner trusts this sender's images, from mail_image_trust",
     },
+  },
+  MailInlinePart: {
+    table: "mail_attachment",
+    virtual: { mime_type: "the stored file's type, from document" },
+  },
+  MailImageTrust: {
+    table: "mail_image_trust",
+    virtual: { trusted: "true adds the sender's row, false removes it" },
   },
   Thread: {
     table: "mail_thread",
@@ -232,7 +262,9 @@ module.exports = {
   ThreadListQuery,
   ThreadPage,
   MailAttachment,
+  MailInlinePart,
   MailMessage,
+  MailImageTrust,
   Thread,
   ThreadMove,
   FolderParams,

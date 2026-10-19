@@ -132,7 +132,8 @@ seed · `1100` `home_alert` columns the alerts code writes · `1110` community: 
 and system channels, delivered pointer, the wider message kinds, transcripts, poll votes, presence,
 `announcement_read` and the announcement's message, audience size and reminder · `1120` mailbox:
 connection status and errors, folder kinds and sync cursor, thread keys, the reader's message
-fields, `mail_draft` and `mail_send_queue` · `1130` an announcement can be `cancelled` · `1140` each
+fields, `mail_draft` and `mail_send_queue` · `1125` `mail_image_trust` (the senders whose web images a
+mailbox owner always shows) · `1130` an announcement can be `cancelled` · `1140` each
 member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and
