@@ -107,7 +107,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [Wizard](#wizard) | `Wizard` | A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result. | stable |
 | Data | [Calendar](#calendar) | `Calendar` | A month at a glance, Monday first, with what happens on each day. | stable |
 | Data | [DataView](#dataview) | `DataView`, `LoadingRows` | THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export. | stable |
-| Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox. | stable |
+| Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file and saves it on the device that pressed, once the worker has made it. | stable |
 | Data | [Kanban](#kanban) | `Kanban`, `KanbanCardBody` | A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19). | stable |
 | Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
@@ -3318,7 +3318,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 | `onRowClick` | `(row: R) => void` |  | Opens a row. A phone card becomes one tap target; a desktop row is reachable by Tab. |
 | `selectedKey` | `string \| null` |  | The row drawn as the one being looked at (a desktop list beside a panel). |
 | `selection` | `DataViewSelection` |  | Row selection and its bulk actions. |
-| `onExport` | `() => Promise<unknown>` |  | Queues the export of the whole filtered list on the server. |
+| `onExport` | `() => Promise<unknown>` |  | Makes the whole filtered list into a file on the server and saves it on this device (ExportButton). |
 | `noun` | `string` |  | What one row is, for the pager's count ("employee"). |
 | `nounPlural` | `string` |  | The plural, when it is not the noun with an s. |
 | `empty` | `{ title: ReactNode; text?: ReactNode; icon?: IconName }` |  | What to show when there are no rows. |
@@ -3340,14 +3340,14 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 
 ### ExportButton
 
-Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox.
+Asks the server for the whole filtered list as a file and saves it on the device that pressed, once the worker has made it.
 
 | | |
 |---|---|
 | Use | Beside a list that a person needs outside the product (a payroll run, an attendance month, an expense claim set). |
-| Avoid | Building a file in the browser from the 25 rows on screen; a download that blocks the page while a large list is gathered. |
-| Phone | The same button, full width in the toolbar; the toast confirms where the file will arrive. |
-| Accessibility | Busy while the request is in flight, and the button stays pressable rather than disabled (FRONTEND_GUIDE §9.4). |
+| Avoid | Building a file in the browser from the 25 rows on screen; sending the file anywhere but the device that pressed. |
+| Phone | The same button, full width in the toolbar; the file goes to Downloads, or the share sheet on an iPhone app. |
+| Accessibility | Busy until the file is saved, and the button stays pressable rather than disabled (FRONTEND_GUIDE §9.4). |
 | Status | stable |
 | Exports | `ExportButton` |
 | Import | `import { ExportButton } from "@mycity/ui";` |
@@ -3359,13 +3359,13 @@ Asks the server for the whole filtered list as a file; the work goes to the work
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `onExport` | `() => Promise<unknown>` | yes | Queues the export on the server for the list's CURRENT filters, which the caller holds. It must ask the server for the whole filtered list, never the page on screen. |
+| `onExport` | `() => Promise<unknown>` | yes | Makes the file of the list's CURRENT filters, which the caller holds, and saves it on this device: it asks the server for the whole filtered list, never the page on screen, waits for the file and saves it. Resolves once it is saved; resolving `false` means nothing was saved and the person has already been told why, so no toast says otherwise. |
 | `children` | `string` |  | The label: Verb Noun, at most 3 words. "Export" unless set. |
-| `message` | `string` |  | What the toast says once it is queued. At most 8 words. |
+| `message` | `string` |  | What the toast says once the file is saved. At most 8 words. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
-<ExportButton onExport={() => api.call("POST /api/v1/exports", { body: { source: "employees", filters } })} />
+<ExportButton onExport={() => saveExport(api.call("POST /api/v1/audit/exports", { body: filters }))} />
 ```
 
 ### Kanban

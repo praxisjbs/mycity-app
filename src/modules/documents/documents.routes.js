@@ -12,6 +12,8 @@
  *   POST /documents                    any signed-in employee, for their own upload
  *   GET  /documents/:id*               vault.canRead decides, per document; a
  *                                      document the caller may not read is a 404
+ *   GET  /exports/:id                  the person who pressed Export or Download, while
+ *                                      the screen waits for their file (exports.js)
  *   /employees/:id/documents           `people`, within the caller's scope
  *   POST /documents/:id/verify         `people` edit: accepting what arrived
  *
@@ -55,6 +57,11 @@ route(router, "get", "/documents/:id/variant/:kind",
   { params: c.documents.VariantParams, no_content: true, self: true,
     summary: "A derived size of an image, or a playable voice note" },
   controller.variant);
+
+route(router, "get", "/exports/:id",
+  { params: c.common.IdParams, response: c.documents.ExportFile, self: true,
+    summary: "An export I asked for: pending, done or failed" },
+  controller.exportFile);
 
 route(router, "get", "/documents/:id/versions",
   { query: c.documents.DocumentVersionQuery, response: c.documents.DocumentVersionPage, self: true,

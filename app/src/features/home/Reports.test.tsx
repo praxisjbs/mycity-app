@@ -558,7 +558,8 @@ describe("on a phone", () => {
  * ------------------------------------------------------------------ */
 
 describe("Run Now", () => {
-  it("runs a report with one format at once, toasted with the run's number, which waits in Recent Runs as Pending", async () => {
+  it("runs a report with one format, busy while its file is made, Pending in Recent Runs meanwhile, then downloads it here", async () => {
+    vi.mocked(saveFile).mockResolvedValue(true);
     await reportsAs("cynthia@mycityapp.io");
     const before = (await runsNow()).page.total;
     const runNow = () => within(card("Daily Attendance")).getByRole("button", { name: "Run Now" });
@@ -567,23 +568,33 @@ describe("Run Now", () => {
     const run = await newestRun();
     expect(run).toMatchObject({ report_name: "Daily Attendance", format: "pdf", status: "pending", document_id: null, recipient_name: "Cynthia Osakunih" });
 
-    // Pressed again while the file waits: the same run, no second file.
-    await waitFor(() => expect(runNow().getAttribute("aria-busy")).not.toBe("true"));
-    fireEvent.click(runNow());
-    await waitFor(() => expect(screen.getAllByText(`${run.number} queued`)).toHaveLength(2), { timeout: 5000 });
-    expect((await runsNow()).page.total).toBe(before + 1);
+    // The press waits for its file: the button busy, and the run Pending on Recent Runs meanwhile.
+    expect(runNow().getAttribute("aria-busy")).toBe("true");
     const row = (await within(runsTable()).findByText(run.number)).closest("tr")!;
     expect(within(row).getByText("Pending")).toBeTruthy();
+    // Asked again while it waits, the server answers the same run, so no second file.
+    const report = await mustBe("Daily Attendance");
+    const again = reports.HomeReportRun.parse(await api.call("POST /api/v1/home/reports/:id/run", { params: { id: report.saved_report_id }, body: { format: "pdf" } }));
+    expect(again.home_report_run_id).toBe(run.home_report_run_id);
+
+    // Made, it is saved on this device under its number, and toasted; nothing is emailed.
+    expect(await screen.findByText(`${run.number} downloaded`, {}, { timeout: 12000 })).toBeTruthy();
+    const done = (await runsNow()).data.find((x) => x.home_report_run_id === run.home_report_run_id)!;
+    expect(done).toMatchObject({ status: "done", emailed_at: null });
+    expect(saveFile).toHaveBeenCalledWith(`/api/v1/documents/${done.document_id}/content`, `${run.number}.pdf`);
+    await waitFor(() => expect(runNow().getAttribute("aria-busy")).not.toBe("true"));
+    expect((await runsNow()).page.total).toBe(before + 1);
   }, 30000);
 
   it("asks the format when the report has both, or runs on demand, and runs the one chosen", async () => {
+    vi.mocked(saveFile).mockResolvedValue(true);
     await reportsAs("cynthia@mycityapp.io");
     const { menu, items } = await openMenu(within(card("Leave This Month")).getByRole("button", { name: "Run Now" }));
     expect(items).toEqual(["Run as PDF", "Run as XLSX"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Run as XLSX" }));
-    await waitFor(async () => expect(await newestRun()).toMatchObject({ report_name: "Leave This Month", format: "xlsx", status: "pending" }));
+    await waitFor(async () => expect(await newestRun()).toMatchObject({ report_name: "Leave This Month", format: "xlsx" }));
     const run = await newestRun();
-    expect(await toastSaying(`${run.number} queued`)).toBeTruthy();
+    expect(await screen.findByText(`${run.number} downloaded`, {}, { timeout: 12000 })).toBeTruthy();
 
     expect((await openMenu(within(card("Headcount by Department")).getByRole("button", { name: "Run Now" }))).items).toEqual(["Run as PDF", "Run as XLSX"]);
   }, 30000);

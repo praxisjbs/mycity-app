@@ -182,7 +182,7 @@ src/
 │   ├── time/          lagos · working-week · day-first · recurrence
 │   ├── numbering/     numbering · schemes
 │   ├── files/         sniff · mime-policy · hash · safe-name · variant-key
-│   ├── documents/     vault · generate · render · markdown · canonical
+│   ├── documents/     vault · generate · exports · render · markdown · canonical
 │   ├── templates/     template-store · variables
 │   ├── spreadsheet/   parse · build · csv · cells · day-first-cells · context
 │   ├── import/        engine · mapping · registry · report · revert
@@ -312,8 +312,8 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `identity` | | Login, refresh, logout, me, sessions, known devices |
 | `security` | `.mfa` (TOTP codes, recovery codes), `.passkeys` (WebAuthn), `.pin`, `.challenge` (single-use tickets), `.signin` (what `identity`'s sign-in calls) | Each person's two-step sign-in, passkeys and PIN, the fresh-sign-in check, Reset Two-Step (`docs/guides/identity.md`); came forward from M9 (TB, 16/10/2026) |
 | `access` | | Roles created, edited and deleted with their grants, record scope, field visibility and capabilities; the matrix; two-step required by role (`docs/guides/foundation.md` §6.3) |
-| `audit` | `audit.events.js` (the emailed Excel export) | Audit ledger read at 25 with filters, the summary, masked per reader |
-| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template), `org-chart.export.js` (Download PDF in the worker: drawn as the person asking, rendered, emailed) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF |
+| `audit` | `audit.events.js` (the Excel export, made in the worker and downloaded where it was asked for) | Audit ledger read at 25 with filters, the summary, masked per reader |
+| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template, in the request; the pdf-render job draws it and the screen downloads it) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
 | `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (M6) | Caller's own inbox, preferences and devices |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
@@ -327,24 +327,25 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 |---|---|---|
 | `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.prompt` (when the Overview opens Attendance's clock-in panel), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
 | `alerts` | TB | `.metrics` (the metric registry: what each of the nine metrics reads, from which module, about whom, a batch at a time), `.sweeps` (the 06:00 sweep, and one person's re-read on an attendance signal) |
-| `reports` | TB | `.sources` (the source registry: each source's module, grant, filters and columns over its own screen's query, gathered page by page as the reader, at most 2,000 rows a table; and the reader's own Overview for the Export), `.schedule` (a schedule's next slot in Lagos from its recurrence rule, start day and time), `.generate` (each run's file built as its recipient, PDF or XLSX, emailed once it exists; skipped or failed with why), `.files` (a report's tables as the PDF's variables and the XLSX workbook, day-first and in Naira) |
+| `reports` | TB | `.sources` (the source registry: each source's module, grant, filters and columns over its own screen's query, gathered page by page as the reader, at most 2,000 rows a table; and the reader's own Overview for the Export), `.schedule` (a schedule's next slot in Lagos from its recurrence rule, start day and time), `.generate` (each run's file built as its recipient, PDF or XLSX: a schedule's emailed once it exists, one somebody pressed for downloaded where they pressed; skipped or failed with why), `.files` (a report's tables as the PDF's variables and the XLSX workbook, day-first and in Naira) |
 | `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, the worksite or approved home, and the shift for a date), `.home` (home locations of staff who work from home: sent, decided, read), `.requests` (work location requests: asked, withdrawn or cancelled, settled from their approval, read), `.assignments` (field assignments: set, cancelled, someone taken off, read), `.schedule` (hybrid staff's weekly schedule: the office days set, the week read), `.clock-watch` (the reminder to clock in and the automatic clock-out of a shift left open, every 5 minutes), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
 | `devices` | LA | `.guard` |
 | `worksites` | LA | |
 | `leave` | AJ | `.balance` (the dates and allowance rules), `.clash` (who else in the department is away); requests open the `leave.approval` flow, decided in `workflow` |
-| `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, emailed, removed after seven days) |
+| `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, downloaded where it was asked for, removed a day later) |
 | `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
 | `announcements` | GE | |
 | `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test` |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
 `services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `shared/geo`,
-`shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence).
+`shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence),
+`shared/documents/exports` (every Export and Download button's file: reserved in the request, made
+in the worker, downloaded on the device that asked, removed a day later; `docs/guides/foundation.md` §6.12).
 
 Templates first filled in M1: `templates/documents/report.html` (a report run, landscape, its RPT
-number on it) and `templates/email/scheduled-report.html` (the report's file attached);
-`templates/documents/org-chart.html` (Download PDF: the whole organogram on one page sized to it)
-and `templates/email/org-chart-export.html` (the PDF attached).
+number on it) and `templates/email/scheduled-report.html` (a schedule's file attached);
+`templates/documents/org-chart.html` (Download PDF: the whole organogram on one page sized to it).
 
 **M1 mailbox rule:** cut the five `require` lines into triage, binding and assist before anything else
 (MILESTONES §6.5). `mailbox/binding/` stays empty until M7.
@@ -480,7 +481,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
 | M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
-| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `attendance-clock-watch` (clock-in reminders and automatic clock-outs, every 5 minutes), `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `data-export-cleanup` (Download My Data files removed after seven days, 03:30 Lagos); loop `loops/mail-idle` |
+| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `attendance-clock-watch` (clock-in reminders and automatic clock-outs, every 5 minutes), `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `export-cleanup` (export files removed a day after they were made, every hour); loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |
 | M4 | `assessment-expire`, `interview-feedback-reminder` | `assessment-expiry`, `interview-reminders` |

@@ -75,18 +75,11 @@ const AuditSummary = z
   })
   .strict();
 
-/** POST /audit/exports: the whole filtered ledger as a workbook, emailed to the person who asked. */
+/**
+ * POST /audit/exports: the whole filtered ledger as a workbook for the person who asked,
+ * answered as documents ExportFile and downloaded on the device that pressed Export.
+ */
 const AuditExportRequest = z.object(filters).strict();
-const AuditExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
-
-/** templates/email/audit-export.html */
-const AuditExportEmailVars = z
-  .object({
-    entries: z.number().int().min(0),
-    filters: z.string(),
-    capped: z.boolean(),
-  })
-  .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
@@ -102,8 +95,6 @@ const TABLES = {
   AuditPage: { table: null, reason: "a page of ledger entries" },
   AuditSummary: { table: null, reason: "counts over audit_ledger, and the module list of the access catalogue" },
   AuditExportRequest: { table: null, reason: "the Audit Log's filters, carried to the worker that builds the export" },
-  AuditExportQueued: { table: null, reason: "that the export was queued, and where it will be emailed" },
-  AuditExportEmailVars: { table: null, reason: "the variables of templates/email/audit-export.html, not a row" },
 };
 
 module.exports = {
@@ -115,6 +106,4 @@ module.exports = {
   AuditPage,
   AuditSummary,
   AuditExportRequest,
-  AuditExportQueued,
-  AuditExportEmailVars,
 };

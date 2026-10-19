@@ -5,9 +5,9 @@
  *
  *   generate(runId, ctx)       home.report_run: check the recipient may still have the report,
  *                              gather it as them and make the file. An XLSX is built and kept
- *                              in the vault here, then emailed. A PDF is queued through
+ *                              in the vault here, then delivered. A PDF is queued through
  *                              documents.generate and rendered by the pdf-render job.
- *   fileReady(documentId, ctx) document.generated for a report's PDF: email it.
+ *   fileReady(documentId, ctx) document.generated for a report's PDF: deliver it.
  *   fileFailed(documentId)     document.render_failed for a report's PDF: the run failed.
  *
  * AS THE RECIPIENT. The report is gathered with the recipient's own grants, scope and masked
@@ -17,8 +17,10 @@
  * `home.reports`, gets no file: the run is skipped and nothing is emailed. They are asked
  * before the file is built and again before it is emailed, since a PDF renders in between.
  *
- * ONLY ONCE THE FILE EXISTS is it emailed, through the shared mailer (the email-send queue)
- * with the file attached by its document id; then the run is done.
+ * ONLY ONCE THE FILE EXISTS is it delivered, and the run done. A schedule's run is emailed to
+ * its recipient through the shared mailer (the email-send queue), the file attached by its
+ * document id. A run somebody pressed for (Run Now, the Overview's Export) is not: the screen
+ * that pressed is waiting for it and downloads it on that device (docs/guides/home.md §6).
  *
  * SAFE TO RUN TWICE, as every outbox handler is: a run no longer waiting is left alone; one
  * whose XLSX is already in the vault is only emailed; one whose PDF is being rendered waits for
@@ -102,10 +104,11 @@ async function refusal(run) {
 }
 
 /**
- * Email a run's file to its recipient, then settle the run done. The recipient is asked again
- * first, since a PDF is emailed once it has rendered, after it was built: one who may no longer
- * have it is skipped and sent nothing. On the last attempt a mailer that cannot take the file
- * still leaves it: the run is done, not emailed, and says why.
+ * Deliver a run's file, then settle the run done. The recipient is asked again first, since a
+ * PDF is delivered once it has rendered, after it was built: one who may no longer have it is
+ * skipped and sent nothing. A run on demand is done once its file exists, for the screen that
+ * pressed to download; a schedule's run is emailed. On the last attempt a mailer that cannot take
+ * the file still leaves it: the run is done, not emailed, and says why.
  * @param {object} run  repo.runToGenerate, its document_id set
  * @param {{last: boolean}} opts
  */
@@ -113,6 +116,10 @@ async function deliver(run, { last }) {
   const why = await refusal(run);
   if (why) {
     await settle(run, { status: "skipped", error: SKIPPED[why] });
+    return;
+  }
+  if (!run.scheduled_for) {
+    await settle(run, { status: "done" });
     return;
   }
   const [person] = await repo.people(pool, [run.recipient_user_id]);
@@ -129,7 +136,6 @@ async function deliver(run, { last }) {
           report_name: run.report_name,
           run_number: run.number,
           format: FORMAT_WORD[run.format],
-          scheduled: Boolean(run.report_schedule_id),
         },
         attachments: [{ document_id: run.document_id }],
       },

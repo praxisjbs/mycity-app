@@ -3,24 +3,33 @@
  * Attendance as a workbook (docs/guides/attendance.md §5, §7): a person's month from
  * ESS · My Attendance, or the register over up to 31 days from People · Attendance.
  *
- * Asked for in the request (attendance.export_requested) and built here, in the worker,
- * after commit: the rows gathered 25 at a time through the same reads the screens use,
- * kept in the vault as a restricted document and emailed to the person who asked, so it
- * arrives in their Mailbox. The register is read with the asker's `people` export
- * scope as it stands when the file is built, so a grant taken away in the meantime
- * narrows what they receive. At most EXPORT_CEILING rows go into one file.
+ * Asked for in the request (attendance.export_requested), which reserves the file
+ * (shared/documents/exports.js), and built here, in the worker, after commit: the rows
+ * gathered 25 at a time through the same reads the screens use, into the restricted file the
+ * person who asked is waiting on, which their screen downloads on the device that asked.
+ * Nothing is emailed. The register is read with the asker's `people` export scope as it stands
+ * when the file is built, so a grant taken away in the meantime narrows what they get. At
+ * most EXPORT_CEILING rows go into one file.
  *
  * Coordinates and device identifiers are never in a file: the location column is the
  * verdict, the device column its label.
  */
 const { pool } = require("../../config/db");
-const { atomically } = require("../../shared/db/tx");
 const { formatDate, formatMonth } = require("../../shared/time/day-first");
 const lagos = require("../../shared/time/lagos");
 const repo = require("./attendance.repo");
 
 /** The most rows one export file holds. */
 const EXPORT_CEILING = 5000;
+
+/** The document type an export's file is kept under, and the record it belongs to. */
+const DOC_TYPE = "attendance_export";
+
+/** Each export's title and the name its file is saved under, before the date. */
+const KINDS = Object.freeze({
+  month: { title: "My Attendance", base: "my-attendance" },
+  register: { title: "Attendance Register", base: "attendance-register" },
+});
 
 const STATUS = Object.freeze({
   present: "Present",
@@ -111,74 +120,41 @@ async function registerRows(scope, { from, to, ...filters }) {
   return { rows, total, capped: capped || total > EXPORT_CEILING, period: `${formatDate(from)} to ${formatDate(to)}` };
 }
 
-/** The outbox handler: build, keep and send the export. */
-async function sendExport(event) {
-  const queues = require("../../jobs/queues");
-  const vault = require("../../shared/documents/vault");
+/**
+ * The outbox handler: the workbook made into the file the request reserved, as the person
+ * who asked may see it now. One no longer active, or no longer holding the register's export
+ * grant, gets a failed file instead.
+ * @param {object} event  attendance.export_requested
+ * @param {{attempt: number, max_attempts: number}} ctx  the outbox's
+ */
+async function buildExport(event, ctx) {
+  const exportFiles = require("../../shared/documents/exports");
   const { buildWorkbook } = require("../../shared/spreadsheet/build");
   const { workbookContext } = require("../../shared/spreadsheet/context");
-  const { exportFilename } = require("../../shared/spreadsheet/cells");
-  const { config } = require("../../config/env");
   const grantsCache = require("../../shared/rbac/grants-cache");
   const { scopeFor } = require("../../middleware/rbac");
 
   const p = event.payload || {};
+  // Asked for before exports were downloaded: that one went by email, and has no file here.
+  if (!p.document_id) return;
   const reader = await grantsCache.getAuthUser(pool, p.requested_by || event.actor_user_id);
-  if (!reader || reader.status !== "active") return;
+  if (!reader || reader.status !== "active")
+    return exportFiles.fail(p.document_id, "The person who asked is no longer active.");
+  if (p.kind === "month" && !reader.employee_id)
+    return exportFiles.fail(p.document_id, "The person who asked has no attendance.");
+  const scope = p.kind === "month" ? null : await scopeFor(reader, "people", "export");
+  if (p.kind !== "month" && !scope)
+    return exportFiles.fail(p.document_id, "The person who asked may no longer export the register.");
 
-  let title;
-  let built;
-  let columns;
-  if (p.kind === "month") {
-    if (!reader.employee_id) return;
-    title = "My Attendance";
-    columns = MONTH_COLUMNS;
-    built = await monthRows(reader.employee_id, p.month);
-  } else {
-    const scope = await scopeFor(reader, "people", "export");
-    if (!scope) return;
-    title = "Attendance Register";
-    columns = REGISTER_COLUMNS;
-    built = await registerRows(scope, p.filters);
-  }
-
-  const buffer = await buildWorkbook({
-    sheets: [{ name: title, columns, rows: built.rows, freeze: { y: 1 } }],
-    context: workbookContext({ actor: { name: reader.display_name }, title, filters: { period: built.period } }),
-    cover: true,
+  const { title } = KINDS[p.kind === "month" ? "month" : "register"];
+  await exportFiles.make(p.document_id, ctx, async () => {
+    const built = p.kind === "month" ? await monthRows(reader.employee_id, p.month) : await registerRows(scope, p.filters);
+    return buildWorkbook({
+      sheets: [{ name: title, columns: p.kind === "month" ? MONTH_COLUMNS : REGISTER_COLUMNS, rows: built.rows, freeze: { y: 1 } }],
+      context: workbookContext({ actor: { name: reader.display_name }, title, filters: { period: built.period } }),
+      cover: true,
+    });
   });
-  const filename = exportFilename({ base: p.kind === "month" ? "my-attendance" : "attendance-register", env: config.APP_ENV, extension: "xlsx" });
-
-  const client = await pool.connect();
-  let doc;
-  try {
-    doc = await atomically(client, () =>
-      vault.store(client, {
-        file: { buffer, originalname: filename },
-        purpose: "document",
-        doc_type: "attendance_export",
-        entity: { type: event.entity.type, id: event.entity.id },
-        sensitivity: "restricted",
-        source: "generated",
-        title: `${title} export`,
-        actor: reader.user_id,
-      }),
-    );
-  } finally {
-    client.release();
-  }
-
-  await queues.enqueue(
-    "email-send",
-    "attendance-export",
-    {
-      to: { name: reader.display_name, email: reader.email },
-      template: "attendance-export",
-      data: { title, period: built.period, entries: built.rows.length, capped: built.capped },
-      attachments: [{ document_id: doc.document_id }],
-    },
-    { jobId: `attendance-export-${event.event_id}` },
-  );
 }
 
-module.exports = { sendExport, monthRows, registerRows, EXPORT_CEILING, STATUS };
+module.exports = { DOC_TYPE, KINDS, buildExport, monthRows, registerRows, EXPORT_CEILING, STATUS };

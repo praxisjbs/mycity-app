@@ -600,7 +600,12 @@ app/
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       download.ts             the other way: a gated file fetched with the session's token, as a
-                              download (saveFile) or a blob URL a preview can draw (useFileUrl)
+                              download (saveFile) or a blob URL a preview can draw (useFileUrl); a
+                              download lands on this device: Downloads, or the share sheet on an
+                              iPhone app opened from the home screen
+      exports.ts              every Export and Download button's file: asked for, waited on while the
+                              worker makes it, then saved on this device (saveExport, saveRun); never
+                              emailed (docs/guides/foundation.md §6.12)
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
     auth/                     AuthProvider (useAuth, useMe; the session clock and the locked state; every way in),
                               Login (with the code step and the PIN), LockSheet, passkey (the browser's WebAuthn

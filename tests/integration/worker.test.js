@@ -596,7 +596,7 @@ describe("schedules and heartbeat", () => {
       "attendance-clock-watch",
       "attendance-day-close",
       "celebrations",
-      "data-export-cleanup",
+      "export-cleanup",
       "home-alert-sweeps",
       "import-cleanup",
       "mail-sync",

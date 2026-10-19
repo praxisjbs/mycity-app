@@ -129,7 +129,7 @@ export interface DataViewProps<R> {
   selectedKey?: string | null;
   /** Row selection and its bulk actions. */
   selection?: DataViewSelection;
-  /** Queues the export of the whole filtered list on the server. */
+  /** Makes the whole filtered list into a file on the server and saves it on this device (ExportButton). */
   onExport?: () => Promise<unknown>;
   /** What one row is, for the pager's count ("employee"). */
   noun?: string;
