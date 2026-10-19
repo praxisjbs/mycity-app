@@ -2,6 +2,7 @@ import devices from "@mycity/contract/schemas/devices.js";
 import type { Device, DeviceStatus } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
+import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
@@ -20,6 +21,7 @@ export function Devices() {
   const modal = useModal();
   const [status, setStatus] = useState<DeviceStatus | "all">("all");
   const list = usePaged("GET /api/v1/devices", { filters: status === "all" ? {} : { status } });
+  const photo = usePhotos(list.rows.map((d) => d.employee.photo_url));
   const open = (d: Device) => modal.open({ title: d.label, body: (close) => <DeviceView d={d} close={close} canRemove={can("people", "edit")} /> });
 
   const link = useApi("GET /api/v1/devices/:id", { params: { id: id ?? "" }, enabled: !!id });
@@ -54,7 +56,7 @@ export function Devices() {
         noun="device"
         empty={{ icon: "lock", title: "No Devices", text: "Devices appear after their first punch." }}
         columns={[
-          { key: "e", label: "Employee", render: (d) => <Who name={d.employee.display_name} sub={d.employee.department} /> },
+          { key: "e", label: "Employee", render: (d) => <Who name={d.employee.display_name} sub={d.employee.department} src={photo(d.employee.photo_url)} /> },
           { key: "n", label: "Device", render: (d) => d.label },
           { key: "s", label: <HelpTerm help={DEVICE_STATUS_HELP}>Status</HelpTerm>, render: (d) => <Pill tone={DEVICE_STATUS[d.status].tone}>{DEVICE_STATUS[d.status].text}</Pill> },
           { key: "f", label: "First Seen", desktop: true, render: (d) => formatDate(d.first_seen_at) },

@@ -13,10 +13,10 @@
 #                                             load the staff roster, switch, restart, wait for
 #                                             readiness on that sha
 #                    seal <sha> <run-id>      after verify-staging passed: write STAGING_VERIFIED
-#                    status
+#                    status                   this script's sha256, then each environment's release
 #   production key   promote <sha> <run-id>   the sealed staging tree, byte for byte, to production
 #                    rollback production <sha>  switch production back to a release still on disk
-#                    status
+#                    status                   as above
 #
 # Anything else is refused. A leaked staging key cannot touch production, even typed by hand.
 #
@@ -327,6 +327,10 @@ rollback() {
 
 status() {
   local e s
+  # This script's own fingerprint. A release never replaces it, so release.yml compares it with
+  # the copy in the commit it deploys and stops, saying how to install that copy, when they differ
+  # (scripts/deploy/check-gate.js, docs/runbooks/deploy.md §5).
+  printf 'gate\tsha256=%s\n' "$(sha256sum "${BASH_SOURCE[0]}" | cut -d' ' -f1)"
   for e in stg prod; do
     s="$(current_sha "$e")"
     printf '%s\tcurrent=%s' "$e" "${s:-none}"

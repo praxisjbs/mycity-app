@@ -942,7 +942,7 @@ const TABLES = {
   AttendanceException: {
     table: "attendance_exception",
     virtual: {
-      employee: "the person, from attendance_day and employee",
+      employee: "the person, from attendance_day and employee, with their photo_url",
       work_date: "attendance_day.attendance_date",
       detail: "one line from attendance_exception.evidence",
       reviewed_by_name: "who decided it, from employee",

@@ -21,6 +21,11 @@ const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : d
 
 const q = (sql, params) => pool.query(sql, params);
 const PASSWORD = "Profile-Page9Test";
+/** A one-pixel PNG: enough for the image pipeline to crop and size as an avatar. */
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -49,6 +54,14 @@ describeDb("My Profile against the real migrations", () => {
     get: (path) => request(app).get(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`),
     patch: (path, body = {}) =>
       request(app).patch(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
+    // As the app's UploadField sends it: the file and its purpose.
+    upload: (path, file, name) =>
+      request(app)
+        .post(`/api/v1${path}`)
+        .set("Authorization", `Bearer ${tokens[who]}`)
+        .field("purpose", "avatar")
+        .attach("file", file, name),
+    del: (path) => request(app).delete(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`),
   });
 
   beforeAll(async () => {
@@ -181,5 +194,70 @@ describeDb("My Profile against the real migrations", () => {
     const mine = await as("manager").get("/ess/profile");
     expect(mine.body.display_name).toBe("Kemi Alade");
     expect(mine.body.line_manager).toBeNull();
+  });
+
+  test("my photo: uploaded, shown to colleagues and in my session, then removed", async () => {
+    expect((await as("staff").get("/ess/profile")).body.photo_url).toBeNull();
+    // Not a picture: refused by the upload engine.
+    expect((await as("staff").upload("/ess/profile/photo", Buffer.from("not an image"), "me.png")).status).toBe(415);
+
+    // Answered as every upload is, with the stored file: the app's upload engine waits for its id.
+    const set = await as("staff").upload("/ess/profile/photo", PNG, "me.png");
+    expect(set.status).toBe(200);
+    expect(set.body.document_id).toMatch(/^[0-9a-f-]{36}$/);
+    const url = (await as("staff").get("/ess/profile")).body.photo_url;
+    expect(url).toBe(`/api/v1/documents/${set.body.document_id}/variant/webp-384`);
+    expect((await as("staff").get("/auth/me")).body.photo_url).toBe(url);
+    // Any colleague may see it.
+    const seen = await request(app).get(url).set("Authorization", `Bearer ${tokens.ops}`);
+    expect(seen.status).toBe(200);
+    expect(seen.headers["content-type"]).toMatch(/image\/webp/);
+    const changed = await q(
+      "SELECT count(*)::int AS n FROM event_outbox WHERE event_key = 'employee.photo_updated'",
+    );
+    expect(changed.rows[0].n).toBe(1);
+
+    const gone = await as("staff").del("/ess/profile/photo");
+    expect(gone.status).toBe(200);
+    expect(gone.body.photo_url).toBeNull();
+    expect((await as("staff").get("/auth/me")).body.photo_url).toBeNull();
+  });
+
+  test("my photo shows wherever I appear: the register, leave, Community and the org chart", async () => {
+    const staff = people.staff.employee.employee_id;
+    // A leave request, so People · Leave has a row of mine.
+    const types = (await as("staff").get("/leave/types?active=true")).body.data;
+    const annual = types.find((t) => t.code === "annual");
+    const day = new Date(Date.now() + 21 * 86_400_000);
+    while (day.getUTCDay() === 0 || day.getUTCDay() === 6) day.setUTCDate(day.getUTCDate() + 1);
+    const on = day.toISOString().slice(0, 10);
+    const asked = await request(app)
+      .post("/api/v1/ess/leave")
+      .set("Authorization", `Bearer ${tokens.staff}`)
+      .send({ leave_type_id: annual.leave_type_id, starts_on: on, ends_on: on });
+    expect(asked.status).toBe(201);
+
+    /** My photo_url on each list a colleague reads. */
+    const seen = async () => {
+      const register = (await as("ops").get("/employees")).body.data.find((r) => r.employee_id === staff);
+      const leave = (await as("ops").get("/leave/requests")).body.data.find((r) => r.employee.employee_id === staff);
+      const colleagues = (await as("ops").get("/community/people")).body.data.find((p) => p.employee_id === staff);
+      const node = (await as("ops").get("/org-chart")).body.nodes.find((n) => n.employee_id === staff);
+      return [register.photo_url, leave.employee.photo_url, colleagues.photo_url, node.photo_url];
+    };
+    expect(await seen()).toEqual([null, null, null, null]);
+
+    const set = await as("staff").upload("/ess/profile/photo", PNG, "me.png");
+    expect(set.status).toBe(200);
+    // Lists read the 192 px size; My Profile keeps the 384 px one.
+    const small = `/api/v1/documents/${set.body.document_id}/variant/webp-192`;
+    expect(await seen()).toEqual([small, small, small, small]);
+    expect((await request(app).get(small).set("Authorization", `Bearer ${tokens.manager}`)).status).toBe(200);
+    // Someone without a photo still reads null beside mine.
+    const manager = (await as("ops").get("/employees")).body.data.find((r) => r.employee_id === people.manager.employee.employee_id);
+    expect(manager.photo_url).toBeNull();
+
+    await as("staff").del("/ess/profile/photo");
+    expect(await seen()).toEqual([null, null, null, null]);
   });
 });

@@ -3,6 +3,7 @@ import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/a
 import { accepted, at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
 import roster from "../data/roster.json";
+import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
 
 /**
@@ -82,6 +83,7 @@ const row = (p: MockPerson): EmployeeRow => ({
   start_date: p.start_date,
   confirmation_due_on: probationDue(p),
   confirmed_on: confirmedOn(p),
+  photo_url: null,
 });
 
 /** Archived records, so Archive and Restore work on a laptop too. */
@@ -426,6 +428,7 @@ route("GET /api/v1/org-chart", (req) => {
         is_ceo: p.user_key === "ifeoma",
         vacant: false,
         meta: builder ? [`Since ${p.start_date.slice(0, 4)}`, PATTERNS[p.work_pattern]].join(" · ") : null,
+        photo_url: null,
       };
     }),
     ...SEATS.filter((s) => s.status === "vacant").map((s) => ({
@@ -442,6 +445,7 @@ route("GET /api/v1/org-chart", (req) => {
       is_ceo: false,
       vacant: true,
       meta: null,
+      photo_url: null,
     })),
   ];
   return ok({
@@ -454,6 +458,13 @@ route("GET /api/v1/org-chart", (req) => {
 });
 
 /* Download PDF: the real API queues the chart for the worker, which emails it; the mock only says where it would go. */
+route("POST /api/v1/employees/:id/data-export", (req) => {
+  if (req.user !== "ifeoma") return fail(403, "PERMISSION_DENIED", "Only the CEO can do this");
+  const who = byId(req.params.id);
+  if (!who) return notFound();
+  return askDataExport(who.employee_id, byKey(req.user)!.work_email, false);
+});
+
 route("POST /api/v1/org-chart/exports", (req) => ({ ...accepted(), body: { queued: true, email: byKey(req.user!)!.work_email } }));
 
 /* ------------------------------------------------------------------ *
@@ -469,7 +480,7 @@ const LEAVE_TYPES: LeaveType[] = (
   ] as Array<[LeaveTypeCode, string, number | null]>
 ).map(([code, name, days]) => ({ leave_type_id: sid(`leave_type:${code}`), code, name, days_per_year: days, active: true }));
 const typeOf = (code: string) => LEAVE_TYPES.find((t) => t.code === code)!;
-const personRef = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department });
+const personRef = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null as string | null });
 
 /** The sample requests, in days from today; shared with the local seed (roster.json). */
 type L = { key: string; type: LeaveTypeCode; from: number; to: number; days: number; status: LeaveStatus; reason: string | null };

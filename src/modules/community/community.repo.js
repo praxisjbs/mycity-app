@@ -9,17 +9,13 @@
  * channel is taken with an ordered aggregate rather than a sub-select with its own LIMIT.
  */
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
+const { personJson } = require("../../shared/db/person");
 
 const one = async (db, sql, params) =>
   (await db.query(sql, params)).rows[0] || null;
 
-/** A person as the contract's PersonRef, from employee `e` and department `d`. */
-const PERSON = (e = "e", d = "d") =>
-  `CASE WHEN ${e}.employee_id IS NULL THEN NULL ELSE json_build_object(
-     'employee_id', ${e}.employee_id,
-     'display_name', btrim(${e}.first_name || ' ' || ${e}.last_name),
-     'job_title', ${e}.job_title,
-     'department', ${d}.name) END`;
+/** A person as the contract's PersonRef, with their photo, from employee `e` and department `d`. */
+const PERSON = (e = "e", d = "d") => personJson(e, d);
 
 /** Online is a socket touch inside the last 90 seconds (community.presence.js). */
 const ONLINE = (p = "p") =>

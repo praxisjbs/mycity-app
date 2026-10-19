@@ -107,7 +107,7 @@ const TABLES = {
   AnnouncementUpdate: { table: "announcement" },
   AnnouncementReader: {
     table: "announcement_read",
-    virtual: { person: "the reader's employee, as a PersonRef" },
+    virtual: { person: "the reader's employee, as a PersonRef with their photo_url" },
   },
   AnnouncementReadQuery: { table: null, reason: "list controls and the read filter" },
   AnnouncementReadPage: { table: null, reason: "a page of the audience with their read marks" },

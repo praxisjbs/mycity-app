@@ -93,7 +93,7 @@ const asPeople = (r: Row): Device => {
   const p = byKey(r.key)!;
   return {
     attendance_device_id: r.attendance_device_id,
-    employee: { employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department },
+    employee: { employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null },
     label: r.label,
     platform: r.platform,
     status: r.status,

@@ -73,6 +73,8 @@ const EssProfile = z
     next_of_kin_phone: z.string().nullable(),
     bank_name: z.string().nullable(),
     account_last4: z.string().nullable(),
+    /** The photo's path on the API, fetched with the session; null shows initials. */
+    photo_url: z.string().nullable(),
     working_week: z.array(EssWorkDay).max(7),
   })
   .strict();
@@ -111,6 +113,12 @@ const EssDocumentUpload = z
   })
   .strict();
 
+/**
+ * POST /ess/profile/photo: the multipart's text fields beside the file. The upload field sends
+ * the purpose it was given; the route takes only `avatar` (the image pipeline's face crop).
+ */
+const EssPhotoUpload = z.object({ purpose: z.literal("avatar").optional() }).strict();
+
 /** GET /ess/leave: my own requests, by status and by the year they start in. */
 const EssLeaveListQuery = listQuery(
   {
@@ -136,6 +144,22 @@ const EssLeaveBalanceQuery = z
   .object({ year: z.coerce.number().int().min(2000).max(2100).optional() })
   .strict();
 
+/**
+ * POST /ess/profile/export, Download My Data: everything the caller can see about themselves in
+ * the app, as one workbook, built after the request and emailed to their work email. At most
+ * one a day for a person, counting the CEO's requests for them (docs/guides/ess.md §6).
+ */
+const EssDataExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
+
+/** templates/email/data-export.html: whose data is attached, and for how long MyCity keeps it. */
+const DataExportEmailVars = z
+  .object({
+    subject_name: z.string(),
+    own: z.boolean(),
+    kept_days: z.number().int().min(1),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   EssDocumentUpload: {
@@ -155,16 +179,20 @@ const TABLES = {
       confirmed: "employee.confirmed_on is set",
       line_manager: "the line manager or vacant seat, from employee and org_seat",
       account_last4: "the last four digits of employee.account_number",
+      photo_url: "the shown size of employee.photo_document_id (organisation.photo.js)",
       working_week: "the organisation's week, from working_week",
     },
   },
   EssProfileUpdate: { table: "employee" },
+  EssPhotoUpload: { table: null, reason: "the upload's purpose, beside the photo file" },
   EssLeaveListQuery: {
     table: null,
     reason: "list controls for the caller's own leave requests",
   },
   EssLeaveBalanceQuery: { table: null, reason: "which year of the caller's leave to read" },
   EssLeaveCalendarQuery: { table: null, reason: "the month the leave calendar shows" },
+  EssDataExportQueued: { table: null, reason: "that Download My Data was queued, and the email it goes to" },
+  DataExportEmailVars: { table: null, reason: "the variables of templates/email/data-export.html, not a row" },
 };
 
 module.exports = {
@@ -173,7 +201,10 @@ module.exports = {
   EssWorkDay,
   EssProfile,
   EssProfileUpdate,
+  EssPhotoUpload,
   EssLeaveListQuery,
   EssLeaveBalanceQuery,
   EssLeaveCalendarQuery,
+  EssDataExportQueued,
+  DataExportEmailVars,
 };

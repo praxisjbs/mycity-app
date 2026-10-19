@@ -9,6 +9,9 @@
  * next of kin and bank. A bank change also tells People, who pay expense refunds into
  * that account.
  *
+ * The photo is the organisation module's too (organisation.photo.js): uploaded here through the
+ * upload engine as an avatar, read by every colleague.
+ *
  * The work schedule shows the organisation's week (Settings, A22) with each day's place,
  * Office, Remote or Off, from the attendance module: the work pattern and, for hybrid
  * staff, the schedule People set (attendance guide §6.13).
@@ -19,6 +22,8 @@ const { emit } = require("../../shared/events/emit");
 const workingWeek = require("../../shared/time/working-week");
 const organisation = require("../organisation/organisation.service");
 const employee360 = require("../organisation/employee-360.service");
+const photo = require("../organisation/organisation.photo");
+const documents = require("../documents/documents.service");
 const schedules = require("../attendance/attendance.schedule");
 const { meOf } = require("./ess.documents");
 const { EVENTS } = require("./ess.events");
@@ -45,7 +50,7 @@ async function workingWeekOf(client, employeeId) {
 }
 
 /** The 360 cut to what My Profile shows. */
-function profileOf(e, week) {
+function profileOf(e, week, photoUrl = null) {
   const account = e.account_number ? String(e.account_number) : null;
   return {
     employee_id: e.employee_id,
@@ -70,13 +75,41 @@ function profileOf(e, week) {
     next_of_kin_phone: e.next_of_kin_phone,
     bank_name: e.bank_name,
     account_last4: account ? account.slice(-4) : null,
+    photo_url: photoUrl,
     working_week: week,
   };
 }
 
 async function get(user) {
   const me = meOf(user);
-  return profileOf(await employee360.get(pool, me), await workingWeekOf(pool, me));
+  return profileOf(await employee360.get(pool, me), await workingWeekOf(pool, me), await photo.photoOf(pool, me));
+}
+
+/**
+ * Upload my photo (purpose `avatar`) and use it: My Profile, the shell, wherever I appear.
+ * Answers with the stored file as every upload does (DocumentRef: the upload engine in the
+ * apps waits for a document_id); the screen then reads my profile again.
+ */
+async function setPhoto(user, file) {
+  const me = meOf(user);
+  const client = await pool.connect();
+  try {
+    return documents.refOf(await atomically(client, () => photo.setPhoto(client, me, file, user)));
+  } finally {
+    client.release();
+  }
+}
+
+/** Stop using my photo; my initials show again. */
+async function removePhoto(user) {
+  const me = meOf(user);
+  const client = await pool.connect();
+  try {
+    await atomically(client, () => photo.clearPhoto(client, me, user));
+  } finally {
+    client.release();
+  }
+  return get(user);
 }
 
 /** What has been done to my record, a page at a time. */
@@ -114,4 +147,4 @@ async function update(user, body) {
   return get(user);
 }
 
-module.exports = { get, history, update, workingWeekOf, profileOf };
+module.exports = { get, history, update, setPhoto, removePhoto, workingWeekOf, profileOf };

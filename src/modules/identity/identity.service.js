@@ -45,6 +45,8 @@ const throttle = require("./identity.throttle");
 const cookies = require("./identity.cookies");
 const { deviceLabel, platformOf } = require("./identity.device-label");
 const repo = require("./identity.repo");
+// The path only; the photo itself is the organisation module's (organisation.photo.js).
+const { photoUrl } = require("../organisation/organisation.photo");
 const { EVENTS } = require("./identity.events");
 const waysIn = require("../security/security.signin");
 const access = require("../access/access.service");
@@ -171,7 +173,7 @@ async function me(db, userId) {
     first_name: row.first_name,
     job_title: row.job_title,
     department: row.department,
-    photo_url: null,
+    photo_url: photoUrl(row.photo_document_id),
     is_ceo: row.is_ceo === true,
     grants,
     capabilities,

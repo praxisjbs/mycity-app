@@ -122,7 +122,7 @@ function meOf(db, userId) {
     db,
     `SELECT u.user_id, u.employee_id, u.email::text AS email, u.is_ceo, u.status,
             e.first_name, trim(e.first_name || ' ' || e.last_name) AS display_name,
-            e.job_title, d.name AS department,
+            e.job_title, d.name AS department, e.photo_document_id,
             EXISTS (SELECT 1 FROM employee_effective_manager m
                       JOIN employee r ON r.employee_id = m.employee_id
                      WHERE m.manager_id = e.employee_id AND r.status = 'active') AS manages_people

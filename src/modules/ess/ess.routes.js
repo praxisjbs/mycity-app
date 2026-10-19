@@ -44,6 +44,21 @@ route(router, "patch", "/profile",
     summary: "Change my contact, next-of-kin and bank details" },
   controller.updateProfile);
 
+route(router, "post", "/profile/photo",
+  { body: c.ess.EssPhotoUpload, response: c.documents.DocumentRef, self: true,
+    summary: "Upload my photo and use it" },
+  upload.single("file", { purpose: "avatar" }), controller.setPhoto);
+
+route(router, "delete", "/profile/photo",
+  { response: c.ess.EssProfile, self: true, summary: "Remove my photo; my initials show" },
+  controller.removePhoto);
+
+/* Download My Data: everything I can see about myself, built after the request and emailed. */
+route(router, "post", "/profile/export",
+  { body: c.common.EmptyBody, response: c.ess.EssDataExportQueued, self: true,
+    summary: "Email me a copy of my data" },
+  controller.exportData);
+
 route(router, "get", "/profile/history",
   { query: c.common.PageQuery, response: c.organisation.EmployeeHistoryPage, self: true,
     summary: "What has been done to my record" },

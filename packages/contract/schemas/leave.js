@@ -236,7 +236,7 @@ const TABLES = {
   LeaveRequest: {
     table: "leave_request",
     virtual: {
-      employee: "the person, from employee and department",
+      employee: "the person, from employee and department, with their photo_url",
       leave_type_name: "leave_type.name",
       days: "leave_request.amount, in working days",
       waiting_on: "the name of the approval stage it waits at, from workflow_instance",

@@ -2,6 +2,7 @@ import worksites from "@mycity/contract/schemas/worksites.js";
 import type { Worksite, WorksiteEmployee } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
+import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
@@ -76,6 +77,7 @@ function WorksiteView({ id, close }: { id: string; close: () => void }) {
   const confirm = useConfirm();
   const site = useApi("GET /api/v1/worksites/:id", { params: { id } });
   const people = usePaged("GET /api/v1/worksites/:id/employees", { params: { id } });
+  const photo = usePhotos(people.rows.map((e) => e.photo_url));
   const save = useMutation("PATCH /api/v1/worksites/:id");
   const w = site.data;
   if (!w) return site.error ? <p className="text-sm">{site.error.message}</p> : null;
@@ -117,7 +119,7 @@ function WorksiteView({ id, close }: { id: string; close: () => void }) {
           actions={can("people", "edit") && w.active ? <Button size="sm" icon="plus" onClick={assign}>Assign Employee</Button> : undefined}
           empty={{ icon: "users", title: "Nobody Assigned", text: "Assign the people who work here." }}
           columns={[
-            { key: "n", label: "Employee", render: (e: WorksiteEmployee) => <Who name={e.display_name} sub={e.job_title} /> },
+            { key: "n", label: "Employee", render: (e: WorksiteEmployee) => <Who name={e.display_name} sub={e.job_title} src={photo(e.photo_url)} /> },
             { key: "p", label: "Arrangement", render: (e: WorksiteEmployee) => PATTERN[e.work_pattern] },
           ]}
         />

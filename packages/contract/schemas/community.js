@@ -320,7 +320,7 @@ const TABLES = {
   },
   Member: {
     table: "community_member",
-    virtual: { person: "the member's employee, as a PersonRef" },
+    virtual: { person: "the member's employee, as a PersonRef with their photo_url" },
   },
   MemberListQuery: { table: null, reason: "list controls for a channel's members" },
   MemberPage: { table: null, reason: "a page of members" },
@@ -337,12 +337,12 @@ const TABLES = {
   Message: {
     table: "community_message",
     virtual: {
-      author: "the sender's employee, as a PersonRef; null for a system post",
+      author: "the sender's employee, as a PersonRef with their photo_url; null for a system post",
       mine: "whether the caller sent it",
       document: "the attached file, from document",
       duration_s: "a voice note's length, from metadata",
-      celebration: "a birthday or anniversary card: its person from metadata, reactions counted",
-      recognition: "a recognition card: who it recognises from peer_recognition, reactions counted",
+      celebration: "a birthday or anniversary card: its person (a PersonRef with photo_url) from metadata, reactions counted",
+      recognition: "a recognition card: who it recognises (a PersonRef with photo_url) from peer_recognition, reactions counted",
       poll: "a poll's options from metadata and the votes in community_poll_vote",
       announcement: "the announcement this message publishes, from announcement",
       status: "a direct message's ticks, from the other member's read and delivered pointers",
@@ -371,16 +371,16 @@ const TABLES = {
   Transcript: { table: "community_message" },
   Conversation: {
     table: null,
-    reason: "a direct community_channel as the caller's list shows it: the other person and the latest message",
+    reason: "a direct community_channel as the caller's list shows it: the other person (with photo_url) and the latest message",
   },
   ConversationListQuery: { table: null, reason: "list controls and the unread filter for direct messages" },
   ConversationPage: { table: null, reason: "a page of conversations" },
   DirectCreate: { table: null, reason: "the colleague to talk to; becomes a direct community_channel and two members" },
   ColleagueListQuery: { table: null, reason: "list controls for the colleague picker, and whether to offer the caller" },
-  ColleaguePage: { table: null, reason: "a page of colleagues, each a PersonRef" },
+  ColleaguePage: { table: null, reason: "a page of colleagues, each a PersonRef with their photo_url" },
   ProfileCard: {
     table: null,
-    reason: "a colleague's public work details from employee, with what this conversation shares",
+    reason: "a colleague's public work details and photo_url from employee, with what this conversation shares",
   },
 };
 

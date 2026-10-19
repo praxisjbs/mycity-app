@@ -4,7 +4,7 @@
  * @summary Picks people the server searches: their name, job title and department, one page of 25 at a time.
  * @use Any field that names a person: an approver, an interview panel, a task's owner, who a letter is for.
  * @avoid Loading every employee into a dropdown (FRONTEND_GUIDE §4); a free-text name box where a record exists; a picker for the person signed in.
- * @phone Full width, each person a 44 px row with their initials; the picked chips wrap above the search box.
+ * @phone Full width, each person a 44 px row with their photo or initials; the picked chips wrap above the search box.
  * @a11y A search box over a listbox whose options say whether they are picked, and each person named by their own words.
  * @status stable
  * @example <PersonPicker list={employees} value={panel} onChange={setPanel} multiple />
@@ -38,9 +38,11 @@ export interface PersonPickerProps<P extends PickedPerson> {
   placeholder?: string;
   /** Layout classes only (spacing). */
   className?: string;
+  /** Each person's photo, ready for an image (the app fetches it with the session); initials when null. */
+  photo?: (person: P) => string | null;
 }
 
-export function PersonPicker<P extends PickedPerson>({ list, value, onChange, multiple, placeholder = "Search people", className }: PersonPickerProps<P>) {
+export function PersonPicker<P extends PickedPerson>({ list, value, onChange, multiple, placeholder = "Search people", className, photo }: PersonPickerProps<P>) {
   return (
     <RecordPicker
       list={list}
@@ -53,7 +55,7 @@ export function PersonPicker<P extends PickedPerson>({ list, value, onChange, mu
       title={(person) => person.display_name}
       chip={(person) => person.display_name}
       sub={(person) => [person.job_title, person.department].filter(Boolean).join(" · ")}
-      lead={(person) => <Avatar name={person.display_name} size={30} />}
+      lead={(person) => <Avatar name={person.display_name} src={photo ? photo(person) : null} size={30} />}
     />
   );
 }

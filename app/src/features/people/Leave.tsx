@@ -3,6 +3,7 @@ import leave from "@mycity/contract/schemas/leave.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
 import type { LeaveRequest, LeaveStatus } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
+import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
@@ -72,6 +73,7 @@ export function PeopleLeave() {
     filters: status === "all" ? {} : { status },
     sort: "-starts_on",
   });
+  const photo = usePhotos(list.rows.map((r) => r.employee.photo_url));
   const [selected, setSelected] = useState<LeaveRequest | null>(null);
   const sel = selected ?? list.rows.find((r) => r.status === "submitted") ?? list.rows[0] ?? null;
   const now = todayIso();
@@ -125,7 +127,7 @@ export function PeopleLeave() {
             onRowClick={(r) => setSelected(r)}
             empty={{ title: "No Leave Requests", text: "Requests appear here once made." }}
             columns={[
-              { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department ?? undefined} /> },
+              { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department ?? undefined} src={photo(r.employee.photo_url)} /> },
               { key: "t", label: "Type", render: (r) => r.leave_type_name },
               { key: "f", label: "From", render: (r) => formatDate(r.starts_on) },
               { key: "o", label: "To", render: (r) => formatDate(r.ends_on) },
