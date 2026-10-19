@@ -960,9 +960,30 @@ describeDb("Staff Community against the real migrations", () => {
       expect(await count()).toBe(before);
     });
 
-    test("a mail attachment goes to a chat as a copy in Community, only from its mailbox's owner and once scanned", async () => {
+    test("a PDF forwarded before its first page is drawn fills in where it was forwarded too", async () => {
+      const src = await channel("fwd-pdf-source", ["tunde"]);
+      const dest = await channel("fwd-pdf-dest", ["ceo"]);
+      const up = await as("tunde").post(`/community/channels/${src}/media`).attach("file", pdfOf(2), "Run of show.pdf");
+      const sent = await post("tunde", src, { message_type: "file", document_id: up.body.document_id });
+      const res = await as("bola").post("/community/forward").send({ message_ids: [sent.body.community_message_id], channel_ids: [dest] });
+      expect(res.status).toBe(201);
+      const copy = (await as("ceo").get(`/community/channels/${dest}/messages`)).body.data.at(-1);
+      expect(copy.document).toMatchObject({ page_count: null, variants: [] });
+
+      await mediaDerive({ data: { document_id: up.body.document_id } });
+      await drain();
+      expect(realtime.toUser).toHaveBeenCalledWith(
+        people.ceo.user.user_id,
+        "community.message_updated",
+        expect.objectContaining({ community_channel_id: dest, community_message_id: copy.community_message_id }),
+      );
+      const filled = (await as("ceo").get(`/community/channels/${dest}/messages`)).body.data.at(-1);
+      expect(filled.document).toMatchObject({ page_count: 2, variants: ["webp-320", "webp-960"] });
+    });
+
+    test("a mail attachment goes to a chat as a copy in Community, only from its mailbox's owner, once scanned and never from Spam", async () => {
       const dest = await channel("fwd-mail", ["tunde"]);
-      const { attachment, document } = await tx(async (client) => {
+      const { attachment, document, accountId, messageId } = await tx(async (client) => {
         const secret = await client.query("INSERT INTO integration_secret (provider, key, ciphertext) VALUES ('mail', 'mail_conn:fwd', 'x') RETURNING integration_secret_id");
         const account = await client.query(
           `INSERT INTO mail_account (user_id, email, incoming_protocol, incoming_host, incoming_port, outgoing_host, outgoing_port, username, integration_secret_id)
@@ -986,7 +1007,7 @@ describeDb("Staff Community against the real migrations", () => {
           message.rows[0].mail_message_id,
           doc.document_id,
         ]);
-        return { attachment: att.rows[0].mail_attachment_id, document: doc.document_id };
+        return { attachment: att.rows[0].mail_attachment_id, document: doc.document_id, accountId, messageId: message.rows[0].mail_message_id };
       });
 
       // Not the owner: nothing to send.
@@ -995,6 +1016,11 @@ describeDb("Staff Community against the real migrations", () => {
       await q("UPDATE document SET scan_status = 'pending' WHERE document_id = $1", [document]);
       expect((await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest] })).status).toBe(409);
       await q("UPDATE document SET scan_status = 'clean' WHERE document_id = $1", [document]);
+      // A spam mail's attachment is never forwarded.
+      const spam = await q("INSERT INTO mail_folder (mail_account_id, remote_key, name, kind) VALUES ($1, 'Junk', 'Junk', 'spam') RETURNING mail_folder_id", [accountId]);
+      await q("UPDATE mail_message SET mail_folder_id = $2 WHERE mail_message_id = $1", [messageId, spam.rows[0].mail_folder_id]);
+      expect((await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest] })).status).toBe(404);
+      await q("UPDATE mail_message SET mail_folder_id = NULL WHERE mail_message_id = $1", [messageId]);
 
       const res = await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest], employee_ids: [people.tunde.employee.employee_id] });
       expect(res.status).toBe(201);

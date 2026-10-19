@@ -194,7 +194,7 @@ track who has read them.
     the record's history, never shown. Polls, celebrations, recognitions and announcements are
     not forwarded. In the file viewer, Forward sends the message holding the file on view. In
     Mailbox, **Forward to Chat** beside an attachment (and in the viewer for it) sends that file
-    the same way. Files in My Documents are never forwarded: they hold IDs, contracts and other
+    the same way, except from Spam. Files in My Documents are never forwarded: they hold IDs, contracts and other
     personal or restricted files.
 
 ## 4 · Data

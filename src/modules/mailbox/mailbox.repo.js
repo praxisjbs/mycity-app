@@ -542,7 +542,7 @@ async function sentLastHour(db, accountId) {
   return row.n;
 }
 
-/** One attachment of a mail in the user's own mailbox; null for anyone else's or none. */
+/** One attachment of a mail in the user's own mailbox, outside Spam; null for anyone else's, a spam mail's or none. */
 function attachmentOf(db, mailAttachmentId, userId) {
   return one(
     db,
@@ -550,7 +550,8 @@ function attachmentOf(db, mailAttachmentId, userId) {
        FROM mail_attachment a
        JOIN mail_message m ON m.mail_message_id = a.mail_message_id
        JOIN mail_account ac ON ac.mail_account_id = m.mail_account_id
-      WHERE a.mail_attachment_id = $1 AND ac.user_id = $2`,
+       LEFT JOIN mail_folder f ON f.mail_folder_id = m.mail_folder_id
+      WHERE a.mail_attachment_id = $1 AND ac.user_id = $2 AND f.kind IS DISTINCT FROM 'spam'`,
     [mailAttachmentId, userId],
   );
 }

@@ -165,19 +165,22 @@ for (const key of [
   });
 }
 
-/* A PDF's first page or a video's poster is ready: the conversations holding the file redraw it. */
+/*
+ * A PDF's first page or a video's poster is ready: every conversation holding the file redraws
+ * it, the one it was posted in and any it was forwarded to.
+ */
 outbox.register(vault.EVENTS.DOCUMENT_DERIVED, "community.push_derived", async (event) => {
   if (event.payload.entity_type !== "community_channel") return;
   const { rows } = await pool.query(
-    `SELECT community_message_id FROM community_message
-      WHERE community_channel_id = $1 AND document_id = $2 AND deleted_at IS NULL`,
-    [event.payload.entity_id, event.payload.document_id],
+    `SELECT community_channel_id, community_message_id FROM community_message
+      WHERE document_id = $1 AND deleted_at IS NULL`,
+    [event.payload.document_id],
   );
   for (const r of rows) {
     await pushToMembers(
       {
         payload: {
-          community_channel_id: event.payload.entity_id,
+          community_channel_id: r.community_channel_id,
           community_message_id: r.community_message_id,
         },
       },
