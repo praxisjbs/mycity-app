@@ -110,8 +110,9 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   App, Email and Push per category), the one-time Turn On offer, three ⌘K actions, and live mail on
   staging and production. The integration suite passes locally, 26 suites and 635 tests, with
   `notifications-push.test.js`. GE's runbook: `docs/runbooks/push-notifications.md` (nothing to set
-  in `.env`; check `MAILBOX_IDLE_MAX` is not 0). Left: the whole `npm run ci` and a real Chromium
-  push in this PR, then TB's phone check after the staging deploy (handoff §7).
+  in `.env`; check `MAILBOX_IDLE_MAX` is not 0). The whole `npm run ci` passes locally (45 gates),
+  and pushes delivered to the built service worker in Chromium show as designed (handoff §8). Left:
+  TB's phone check after the staging deploy (handoff §7).
 - 19/10/2026 · TB · Notifications, in progress (TB's eight decisions in `docs/handoff/push-notifications.md`
   §2; design `docs/guides/notifications.md`). The backend of web push: migration `0460`
   (`push_subscription` as a device with its token, key id and health; `push_delivery`, one row per

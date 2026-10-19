@@ -209,9 +209,8 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       `foundation.md`; FRONTEND_GUIDE §9.1, §9.6 and §9.7; BACKEND_STRUCTURE (services/push);
       DATABASE_SCHEMA; MILESTONES §11 note; PROGRESS (M0 item and notes); README map;
       `docs/runbooks/push-notifications.md` for GE.
-- [ ] **14. Verify** (IN PROGRESS: the integration suite passes, 26 suites and 635 tests, and the
-      whole `npm run ci` passes, 45 gates, 19/10/2026; the Chromium run is left; see the last log
-      entry): unit and integration tests (a fake push transport); the whole `npm run ci`;
+- [x] **14. Verify** (19/10/2026: the integration suite, 26 suites and 635 tests; the whole
+      `npm run ci`, 45 gates; 18 checks in a real Chromium; see the log): unit and integration tests (a fake push transport); the whole `npm run ci`;
       a real Chromium run delivering a push to the built service worker over the DevTools protocol
       (`ServiceWorker.deliverPushMessage`) and checking the notification it shows.
 - [ ] **15. Ready**: PR out of draft, its body filled to the template (Native App Feel section),
@@ -405,3 +404,25 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   characters) is 1,751 bytes and 1,854 encrypted with the sender's options (aes128gcm), and it
   decrypts back exactly with the subscription's keys, so it stays under the push services' 4 KB.
   Next: step 14's Chromium run.
+- 19/10/2026 · TB · Step 14, push in a real browser. The release build of the staff app
+  (`npm run build -w @mycity/app`: `dist/sw.js` 11.6 kB gzipped, 81 files precached) served by the
+  API on `http://localhost:8080` (`STAFF_ORIGIN` and `PUBLIC_ORIGIN` both that), a `mycity_dev`
+  database from the real migrations with one person made by `createAdmin()`, the worker running,
+  Chromium from `/opt/pw-browsers`. Pushes went to the built service worker over the DevTools
+  protocol (`ServiceWorker.enable` for the registration id, then `ServiceWorker.deliverPushMessage`)
+  and were read back with `registration.getNotifications()`. 18 checks pass: `/sw.js` served with
+  `no-cache`; the worker controls the page; signed out, a mail push shows the sender, the subject and
+  first line, the pin as its badge, the initials as its icon, and Mark Read; a second mail in the
+  conversation reads "Tom-Blake Asaah · 2 new" and alerts again; two channel posts read "#general ·
+  2 new posts", the second silent; a push it cannot read shows "MyCity"; signed in with the window
+  on screen, the push becomes the banner and no notification, gone after 3 s; a test push always
+  shows; a tap's address `/mailbox?tab=inbox&id=…&n=<id>` marked that notice (a real one, made by
+  the fan-out) read in the database and dropped `n=`; `/?pane=notifications` opens the pane. With
+  the worker running, the real pipeline (`mail_message.received`, fan-out, `notification-deliver`,
+  the socket) put the banner on the window on screen and none on a window behind another tab, and a
+  push to that window showed the device's notification. Playwright keeps every page visible (even
+  headed under Xvfb), so the background-tab cases ran in the same Chrome through `puppeteer-core`.
+  Screenshots of the banner and the pane, desktop and phone (Pixel 7), match the guide's §10. Not
+  possible here: a push through a real push service (this Chromium has none, so TB's phone check
+  covers it) and a tap on a notification (no protocol call clicks one; its address was opened
+  instead). Next: step 15.
