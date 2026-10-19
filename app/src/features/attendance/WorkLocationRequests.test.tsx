@@ -91,7 +91,7 @@ const fill = (dialog: HTMLElement, label: string, value: string) => fireEvent.ch
 const pressIn = (dialog: HTMLElement, name: string) => fireEvent.click(within(dialog).getByRole("button", { name }));
 
 describe("work location requests", () => {
-  it("a hybrid employee asks for a client visit, sees it wait on their line manager and withdraws it", async () => {
+  it("a hybrid employee asks for a client visit with its site, sees it wait on their line manager and withdraws it", async () => {
     await signedInAs("chidera@mycityapp.io", <WorkLocationRequestsPage />);
     await screen.findByText("WLR-0003 · Remote Day");
     fireEvent.click((await screen.findAllByRole("button", { name: "New Request" }))[0]);
@@ -105,10 +105,15 @@ describe("work location requests", () => {
     pressIn(dialog, "Send Request");
     await waitFor(() => expect(within(dialog).getByLabelText("First Day").getAttribute("aria-invalid")).toBe("true"));
     expect(within(dialog).getByLabelText("Address").getAttribute("aria-invalid")).toBe("true");
+    // The client's site is typed, as a field site's is: a point and a radius.
+    expect(within(dialog).getByLabelText("Latitude").getAttribute("aria-invalid")).toBe("true");
+    expect(within(dialog).getByLabelText("Longitude").getAttribute("aria-invalid")).toBe("true");
 
     fill(dialog, "First Day", typed(5));
     fill(dialog, "Last Day", typed(6));
     fill(dialog, "Address", "Client office, 9 Sample Close, Yaba");
+    fill(dialog, "Latitude", "6.5095");
+    fill(dialog, "Longitude", "3.3711");
     fill(dialog, "Reason", "Setting up the client's new meeting rooms");
     pressIn(dialog, "Send Request");
     const row = await screen.findByText("WLR-0006 · Client Visit");
@@ -116,6 +121,7 @@ describe("work location requests", () => {
 
     fireEvent.click(row);
     dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("6.50950, 3.37110 · 200 m")).toBeTruthy();
     const route = await within(dialog).findByRole("list", { name: "Approval route" });
     expect(within(route).getByText("Line Manager").textContent).toBe("Line Manager, waiting here");
     pressIn(dialog, "Withdraw Request");

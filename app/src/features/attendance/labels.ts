@@ -1,4 +1,4 @@
-import type { AttendanceDay, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus, SchedulePlace } from "@mycity/contract/contract.gen.ts";
 
 /**
  * The words and tones the attendance screens show for the API's values (docs/guides/attendance.md
@@ -88,6 +88,26 @@ export const REQUEST_TYPE_HELP = "Temporary Home: clock in at another home, with
 export const DEVICE_STATUS_HELP = "New: seen on a punch, not registered. Registered: one of your three. Removed: taken off, and it can be registered again.";
 
 export const PATTERN: Record<string, string> = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
+
+/** Where a person works on a day of their week (§6.13). */
+export const PLACE: Record<SchedulePlace, Shown> = {
+  office: { tone: "ok", text: "Office" },
+  remote: { tone: "info", text: "Remote" },
+  off: { tone: "neutral", text: "Off" },
+};
+
+/** The weekdays by ISO number, as the week and the schedule name them. */
+export const WEEKDAY: Record<number, string> = { 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday" };
+
+/** Office days in short: "Mon, Tue, Thu". */
+export const officeDaysText = (days: number[]) => [...days].sort((a, b) => a - b).map((d) => WEEKDAY[d].slice(0, 3)).join(", ");
+
+/** The home of someone who works from home on some days, as the record's Attendance tab shows it. */
+export const HOME_STATE: Record<"approved" | "pending" | "none", Shown> = {
+  approved: { tone: "ok", text: "Approved" },
+  pending: { tone: "warn", text: "Waiting" },
+  none: { tone: "neutral", text: "Not Set" },
+};
 
 /** The last six months, newest first, as the month picker offers them. */
 export function recentMonths(today: string, count = 6): string[] {

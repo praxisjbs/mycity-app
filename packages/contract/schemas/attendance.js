@@ -88,16 +88,18 @@ const AttendanceToday = z
       .strict(),
     work_pattern: WorkPattern,
     /**
-     * Where the punch is matched: a worksite, a remote employee's approved home, a remote employee
-     * with no approved home yet (`remote`, judged unverified), or nowhere (`none`). On a day an
-     * approved work location request covers: its temporary home (`temporary_home`, fenced), or an
-     * approved remote day or client visit with no fence (`approved_day`, named in `name`).
-     * `home_state` is the remote employee's home: approved, waiting on People, or none; null for
-     * anyone else.
+     * Where the punch is matched: a worksite, the approved home of someone working from home that
+     * day (remote staff, or a hybrid employee's home day), someone working from home with no
+     * approved home yet (`remote`, judged unverified), or someone expected at an office with none
+     * assigned (`none`, judged unverified). On a day an approved work location request covers: its
+     * temporary home (`temporary_home`, fenced), a client visit's site (`client_visit`, fenced), or
+     * an approved remote day, or a client visit sent before sites were asked for, with no fence
+     * (`approved_day`, named in `name`). `home_state` is the home of a remote employee, or of a
+     * hybrid employee on a home day: approved, waiting on People, or none; null for anyone else.
      */
     location: z
       .object({
-        kind: z.enum(["worksite", "home", "none", "remote", "temporary_home", "approved_day", "field"]),
+        kind: z.enum(["worksite", "home", "none", "remote", "temporary_home", "approved_day", "field", "client_visit"]),
         name: z.string().nullable(),
         radius_m: z.number().int().nullable(),
         home_state: z.enum(["approved", "pending", "none"]).nullable(),
@@ -467,8 +469,11 @@ const LocationRequestStatus = z.enum(["submitted", "approved", "rejected", "canc
 
 /**
  * A work location request. `home_latitude`, `home_longitude` and `accuracy_m` are a temporary
- * home's reading (null for the other types, and below scope all for People). `waiting_on` is the
- * stage it waits at; `can_decide` says whether that stage waits on the reader.
+ * home's reading (null for the other types, and below scope all for People). `site_latitude`,
+ * `site_longitude` and `site_radius_m` are a client visit's site, a client's venue that everyone
+ * who reads the request sees (null for the other types, and for a client visit sent before sites
+ * were asked for). `waiting_on` is the stage it waits at; `can_decide` says whether that stage
+ * waits on the reader.
  */
 const LocationRequest = z
   .object({
@@ -483,6 +488,9 @@ const LocationRequest = z
     home_latitude: z.number().nullable(),
     home_longitude: z.number().nullable(),
     accuracy_m: z.number().nullable(),
+    site_latitude: z.number().nullable(),
+    site_longitude: z.number().nullable(),
+    site_radius_m: z.number().int().nullable(),
     reason: z.string(),
     status: LocationRequestStatus,
     workflow_instance_id: uuid.nullable(),
@@ -496,10 +504,13 @@ const LocationRequest = z
   .strict();
 const LocationRequestPage = Paged(LocationRequest);
 
+const isNumber = (v) => typeof v === "number";
+
 /**
  * POST /attendance/me/requests. A temporary home carries one reading taken there and its address;
- * a client visit its address; a remote day may name one. Who may ask which type, the spans and the
- * overlap are the service's (guide §6.11).
+ * a client visit its address and its site, typed as a field site's is (a centre and a radius of 100
+ * to 500 m); a remote day may name an address. Who may ask which type, the spans and the overlap are
+ * the service's (guide §6.11).
  */
 const LocationRequestCreate = z
   .object({
@@ -511,6 +522,9 @@ const LocationRequestCreate = z
     home_latitude: z.number().min(-90).max(90).nullable().optional(),
     home_longitude: z.number().min(-180).max(180).nullable().optional(),
     accuracy_m: z.number().min(0).max(100000).nullable().optional(),
+    site_latitude: z.number().min(-90).max(90).nullable().optional(),
+    site_longitude: z.number().min(-180).max(180).nullable().optional(),
+    site_radius_m: z.number().int().min(100, "At least 100 m").max(500, "At most 500 m").nullable().optional(),
   })
   .strict()
   .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] })
@@ -527,7 +541,25 @@ const LocationRequestCreate = z
   .refine((v) => v.request_type === "temporary_home" || (typeof v.home_latitude !== "number" && typeof v.home_longitude !== "number"), {
     message: "Only for a temporary home",
     path: ["home_latitude"],
-  });
+  })
+  .refine((v) => v.request_type !== "client_visit" || isNumber(v.site_latitude), {
+    message: "Enter the latitude",
+    path: ["site_latitude"],
+  })
+  .refine((v) => v.request_type !== "client_visit" || isNumber(v.site_longitude), {
+    message: "Enter the longitude",
+    path: ["site_longitude"],
+  })
+  .refine((v) => v.request_type !== "client_visit" || isNumber(v.site_radius_m), {
+    message: "Enter the radius",
+    path: ["site_radius_m"],
+  })
+  .refine(
+    (v) =>
+      v.request_type === "client_visit" ||
+      (!isNumber(v.site_latitude) && !isNumber(v.site_longitude) && !isNumber(v.site_radius_m)),
+    { message: "Only for a client visit", path: ["site_latitude"] },
+  );
 
 /** GET /attendance/me/requests: the person's own, newest first. */
 const MyLocationRequestListQuery = listQuery({ status: LocationRequestStatus.optional() }, ["starts_on"]);
@@ -657,6 +689,72 @@ const FieldAssignmentCancel = z.object({ reason: reasonText }).strict();
 const FieldMemberRemove = z.object({ employee_id: uuid, reason: reasonText }).strict();
 
 /* ------------------------------------------------------------------ *
+ * Hybrid staff's weekly schedule: the days at the office, set by People;
+ * the other working days are worked from home (guide §6.13)
+ * ------------------------------------------------------------------ */
+
+/** An ISO weekday: 1 is Monday, 7 is Sunday. */
+const Weekday = z.number().int().min(1).max(7);
+
+/** Where a person works on a day of the week. */
+const SchedulePlace = z.enum(["office", "remote", "off"]);
+
+/** One day of the person's week. */
+const ScheduleDay = z.object({ weekday: Weekday, place: SchedulePlace }).strict();
+
+/** One version of a hybrid employee's schedule: the office days from a first day. */
+const ScheduleVersion = z
+  .object({
+    attendance_schedule_id: uuid,
+    office_days: z.array(Weekday).min(1).max(7),
+    effective_from: isoDate,
+    reason: z.string(),
+    set_by_name: z.string().nullable(),
+    set_at: isoDateTime,
+  })
+  .strict();
+
+/**
+ * GET /attendance/schedules/:employee_id: how a person's week is worked. `week` is each weekday
+ * (Monday first) by the pattern, the organisation's week and the schedule in force today; `current`
+ * is that schedule and `next` one waiting to start (hybrid staff only). `worksite` is the office an
+ * office day is matched to, when one is assigned and active. `home_state` is the home of someone who
+ * works from home on some days (remote staff, hybrid staff with a home day), else null. `can_edit`
+ * says whether the reader may set the schedule.
+ */
+const WorkSchedule = z
+  .object({
+    employee: PersonRef,
+    work_pattern: WorkPattern,
+    worksite: z.object({ worksite_id: uuid, name: z.string(), radius_m: z.number().int() }).strict().nullable(),
+    home_state: z.enum(["approved", "pending", "none"]).nullable(),
+    week: z.array(ScheduleDay).length(7),
+    current: ScheduleVersion.nullable(),
+    next: ScheduleVersion.nullable(),
+    can_edit: z.boolean(),
+  })
+  .strict();
+
+const ScheduleParams = z.object({ employee_id: uuid }).strict();
+
+/**
+ * POST /attendance/schedules/:employee_id. The office days, each once; that they are working days,
+ * that one is left for home, the first day against today and who may set it are the service's
+ * (guide §6.13).
+ */
+const WorkScheduleSet = z
+  .object({
+    office_days: z
+      .array(Weekday)
+      .min(1, "Pick an office day")
+      .max(6, "Leave a home day")
+      .refine((days) => new Set(days).size === days.length, "Each day once"),
+    effective_from: isoDate,
+    reason: reasonText,
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
  * Exports
  * ------------------------------------------------------------------ */
 
@@ -729,6 +827,17 @@ const TABLES = {
     table: "attendance_home",
     virtual: { decision: "written as attendance_home.status approved or rejected", reason: "attendance_home.decision_reason" },
   },
+  ScheduleDay: { table: null, reason: "one weekday's place, from the pattern, working_week and attendance_schedule" },
+  ScheduleVersion: {
+    table: "attendance_schedule",
+    virtual: { set_by_name: "who set it, from app_user and employee" },
+  },
+  WorkSchedule: {
+    table: null,
+    reason: "a person's week, from employee, worksite, attendance_home, working_week and attendance_schedule",
+  },
+  ScheduleParams: { table: null, reason: "the person whose schedule it is" },
+  WorkScheduleSet: { table: "attendance_schedule" },
   LocationRequest: {
     table: "attendance_location_request",
     virtual: {
@@ -944,4 +1053,11 @@ module.exports = {
   MyFieldAssignmentListQuery,
   FieldAssignmentCancel,
   FieldMemberRemove,
+  Weekday,
+  SchedulePlace,
+  ScheduleDay,
+  ScheduleVersion,
+  WorkSchedule,
+  ScheduleParams,
+  WorkScheduleSet,
 };

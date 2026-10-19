@@ -1,6 +1,7 @@
 import { at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
 import type { EmployeeHistoryEntry, EssProfile } from "@mycity/contract/contract.gen.ts";
 import { byKey, managerOf } from "../data/people";
+import { weekOf } from "./attendance";
 
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
 
@@ -14,12 +15,15 @@ export const phoneOf = (key: string): string | null => PATCHES.get(key)?.phone ?
 export function setPhone(key: string, phone: string) {
   PATCHES.set(key, { ...(PATCHES.get(key) ?? {}), phone });
 }
-const WEEK: EssProfile["working_week"] = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
-  weekday,
-  is_working_day: weekday <= 6,
-  starts_at: weekday <= 6 ? "09:00" : null,
-  ends_at: weekday === 6 ? "15:00" : weekday <= 5 ? "17:00" : null,
-}));
+/** The organisation's week with where this person works each day (the attendance mock's week). */
+const weekFor = (key: string): EssProfile["working_week"] =>
+  weekOf(key).map(({ weekday, place }) => ({
+    weekday,
+    is_working_day: weekday <= 6,
+    starts_at: weekday <= 6 ? "09:00" : null,
+    ends_at: weekday === 6 ? "15:00" : weekday <= 5 ? "17:00" : null,
+    place,
+  }));
 const TYPES: EssProfile["employment_type"][] = ["full_time", "part_time", "contractor", "consultant"];
 
 function profile(key: string): EssProfile {
@@ -51,7 +55,7 @@ function profile(key: string): EssProfile {
     next_of_kin_phone: x.next_of_kin_phone ?? "+2348065542210",
     bank_name: x.bank_name ?? p.bank_name,
     account_last4: (x.account_number ?? p.account_last4).slice(-4),
-    working_week: WEEK,
+    working_week: weekFor(key),
   };
 }
 

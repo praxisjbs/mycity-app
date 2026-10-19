@@ -1,10 +1,11 @@
 "use strict";
 /**
- * Remote staff's home locations: the one write path for a request and People's decision
- * on it, and the reads behind My Attendance's Home Location and People · Attendance's
- * Homes (docs/guides/attendance.md §6.10).
+ * Home locations: the one write path for a request and People's decision on it, and the reads
+ * behind My Attendance's Home Location and People · Attendance's Homes (docs/guides/attendance.md
+ * §6.10). Remote staff need one, and so do hybrid staff whose schedule leaves a working day for
+ * home (§6.13, attendance.schedule.js needsHome).
  *
- *   request    a remote employee, at home, sends one location reading (within the policy's
+ *   request    an employee who works from home, at home, sends one location reading (within the policy's
  *              max_accuracy_m) and the address in their words. A request still waiting is
  *              superseded by the new one; the approved home stays the fence meanwhile
  *   decide     People with `people` approve and scope all approve or reject it, never their
@@ -24,6 +25,7 @@ const { assertInScope } = require("../../shared/rbac/scope");
 const lagos = require("../../shared/time/lagos");
 const calendar = require("./attendance.calendar");
 const repo = require("./attendance.repo");
+const schedules = require("./attendance.schedule");
 const { EVENTS } = require("./attendance.events");
 
 async function tx(fn) {
@@ -68,7 +70,7 @@ async function mine(user) {
   const policy = await calendar.policyFor(pool, user.employee_id, lagos.today());
   const homes = await repo.homesOf(pool, user.employee_id);
   return {
-    needed: person.work_pattern === "remote",
+    needed: await schedules.needsHome(pool, person),
     approved: asLocation(homes.approved, policy.home_radius_m),
     pending: asLocation(homes.pending, policy.home_radius_m),
     rejected: asLocation(homes.rejected, policy.home_radius_m),
@@ -86,8 +88,8 @@ async function request(user, body) {
   await tx(async (client) => {
     await repo.lockEmployee(client, employeeId);
     const person = await personOf(client, employeeId);
-    if (person.work_pattern !== "remote")
-      throw new AppError("HOME_NOT_NEEDED", "Only remote staff set a home location.", 422);
+    if (!(await schedules.needsHome(client, person)))
+      throw new AppError("HOME_NOT_NEEDED", "Only staff who work from home set a home location.", 422);
     const policy = await calendar.policyFor(client, employeeId, lagos.today());
     if (Number(body.accuracy_m) > Number(policy.max_accuracy_m))
       throw new AppError("HOME_READING_WEAK", "The location reading was not accurate enough.", 422, {

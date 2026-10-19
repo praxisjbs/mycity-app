@@ -13,10 +13,11 @@
  *   settle()   after commit, an approval's outcome is copied onto the request, at least once and
  *              only while it waits (attendance.events.js)
  *
- * Approved, a request decides the place a punch on its days is matched to (attendance.calendar.js).
+ * Approved, a request decides the place a punch on its days is matched to (attendance.calendar.js):
+ * a client visit is fenced at its site, a client's venue that everyone reading the request sees.
  * A temporary home's point is personal data: the person reads it, People read it with scope all
  * (masked by the controller under employee.personal). Events carry ids and statuses, never the
- * address or the point.
+ * address, the point or the site.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -149,6 +150,7 @@ async function request(user, body) {
 
     const { number } = await numbering.allocate(client, "location_request");
     const home = body.request_type === "temporary_home";
+    const visit = body.request_type === "client_visit";
     const row = await repo.insertRequest(client, {
       number,
       employee_id: employeeId,
@@ -159,6 +161,9 @@ async function request(user, body) {
       latitude: home ? body.home_latitude : null,
       longitude: home ? body.home_longitude : null,
       accuracy_m: home ? body.accuracy_m : null,
+      site_latitude: visit ? body.site_latitude : null,
+      site_longitude: visit ? body.site_longitude : null,
+      site_radius_m: visit ? body.site_radius_m : null,
       reason: body.reason,
       requested_by: user.user_id,
     });

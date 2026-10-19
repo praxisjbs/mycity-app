@@ -20,6 +20,7 @@ const { uuid, optionalText, isoDate, listQuery, phone, blank } = require("./comm
 const { UploadPurpose } = require("./documents");
 const { LeaveStatus } = require("./leave");
 const { EmployeeStatus, EmploymentType, WorkPattern, ManagerRef } = require("./organisation");
+const { SchedulePlace } = require("./attendance");
 
 /* ------------------------------------------------------------------ *
  * My Profile
@@ -30,9 +31,9 @@ const clock = z.string().regex(/^\d{2}:\d{2}$/);
 
 /**
  * One day of the week as the organisation works it (Settings, the working week:
- * Monday to Friday 09:00 to 17:00 and Saturday 09:00 to 15:00, A22). Weekday 1 is
- * Monday. Each person's own arrangement (Office, Remote, Off, and where) comes with
- * the attendance module.
+ * Monday to Friday 09:00 to 17:00 and Saturday 09:00 to 15:00, A22), and where the
+ * person works it: `place` is office, remote or off, from their work pattern and, for
+ * hybrid staff, the schedule People set (attendance guide §6.13). Weekday 1 is Monday.
  */
 const EssWorkDay = z
   .object({
@@ -40,6 +41,7 @@ const EssWorkDay = z
     is_working_day: z.boolean(),
     starts_at: clock.nullable(),
     ends_at: clock.nullable(),
+    place: SchedulePlace,
   })
   .strict();
 
@@ -141,7 +143,10 @@ const TABLES = {
     reason:
       "the text fields beside a file when an employee uploads their own document",
   },
-  EssWorkDay: { table: "working_week" },
+  EssWorkDay: {
+    table: "working_week",
+    virtual: { place: "the person's place that weekday, from the work pattern and attendance_schedule" },
+  },
   EssProfile: {
     table: "employee",
     virtual: {

@@ -66,5 +66,7 @@ module.exports = defineManifest({
     { intent: "approve work location requests", screen: "people.attendance" },
     { intent: "send people out on a field assignment", screen: "people.attendance" },
     { intent: "see my field assignments", screen: "ess.my-attendance" },
+    { intent: "set a hybrid employee's office days", screen: "people.employees" },
+    { intent: "see my work week", screen: "ess.my-profile" },
   ],
 });

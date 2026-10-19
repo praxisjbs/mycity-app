@@ -2,6 +2,7 @@ import ess from "@mycity/contract/schemas/ess.js";
 import type { EssProfile } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { PLACE } from "@/features/attendance/labels";
 import { employmentType, workPattern } from "@/features/people/status";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { hrefFor, useRouter } from "@/lib/router";
@@ -38,7 +39,7 @@ export function MyProfilePage() {
       {p.working_week.map((d) => (
         <div key={d.weekday} className="flex flex-wrap items-center gap-2.5 border-b border-border py-2 last:border-b-0">
           <b className="w-20 text-xs">{DAYS[d.weekday - 1]}</b>
-          <Pill tone={d.is_working_day ? "ok" : "neutral"}>{d.is_working_day ? "Working" : "Off"}</Pill>
+          <Pill tone={PLACE[d.place].tone}>{PLACE[d.place].text}</Pill>
           <span className="ml-auto text-2xs text-subtle-foreground">{d.is_working_day ? `${d.starts_at} to ${d.ends_at}` : "Not working"}</span>
         </div>
       ))}
