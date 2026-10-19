@@ -8,6 +8,12 @@ const fmt = (iso: string) => iso.split("-").reverse().join("/");
 const AREA = ["Lekki Phase 1", "Surulere", "Gbagada", "Yaba", "Ikeja", "Ajah", "Magodo"];
 const PATCHES = new Map<string, Record<string, string>>();
 const HISTORY = new Map<string, EmployeeHistoryEntry[]>();
+
+/** A person's phone as My Profile shows it; the signature mock reads and changes the same one. */
+export const phoneOf = (key: string): string | null => PATCHES.get(key)?.phone ?? byKey(key)?.phone ?? null;
+export function setPhone(key: string, phone: string) {
+  PATCHES.set(key, { ...(PATCHES.get(key) ?? {}), phone });
+}
 const WEEK: EssProfile["working_week"] = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
   weekday,
   is_working_day: weekday <= 6,

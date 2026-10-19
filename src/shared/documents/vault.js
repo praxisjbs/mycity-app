@@ -92,6 +92,7 @@ const AREA_FOR = Object.freeze({
   photo: "vault",
   document: "vault",
   signature: "vault",
+  brand: "vault",
   voice_note: "comms",
   video: "comms",
   attachment: "comms",
@@ -102,6 +103,7 @@ const PROFILE_FOR = Object.freeze({
   avatar: "avatar",
   photo: "photo",
   signature: "signature",
+  brand: "brand",
 });
 
 /** entity_type → (client, user, doc) => Promise<boolean> */

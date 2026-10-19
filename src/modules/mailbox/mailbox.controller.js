@@ -4,6 +4,7 @@ const { ok, created, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { readUpload } = require("../../middleware/upload");
 const service = require("./mailbox.service");
+const signatures = require("./signature/signature.service");
 
 const id = (req) => req.validated.params.id;
 
@@ -51,4 +52,12 @@ module.exports = {
       ),
     ),
   cancel: async (req, res) => ok(res, await service.cancel(id(req), req.user)),
+  signature: async (req, res) => ok(res, await signatures.mine(req.user)),
+  saveSignature: async (req, res) =>
+    ok(res, await signatures.saveMine(req.validated.body, req.user)),
+  previewSignature: async (req, res) =>
+    ok(res, await signatures.preview(req.validated.body, req.user)),
+  signatureConfig: async (req, res) => ok(res, await signatures.config()),
+  saveSignatureConfig: async (req, res) =>
+    ok(res, await signatures.saveConfig(req.validated.body, req.user)),
 };

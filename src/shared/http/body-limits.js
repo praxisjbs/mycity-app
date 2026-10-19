@@ -37,6 +37,7 @@ const UPLOAD_CAPS = Object.freeze({
   attachment: 25 * MB,
   import_sheet: 10 * MB,
   signature: 2 * MB,
+  brand: 5 * MB,
 });
 
 /** "15 MB", for messages people read. */
