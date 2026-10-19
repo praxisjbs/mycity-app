@@ -227,7 +227,8 @@ function QuietAndDigest() {
     quiet
       .run({ body: { quiet_enabled: s.quiet_enabled, quiet_from: s.quiet_from, quiet_to: s.quiet_to, ...patch } })
       .then((next) => prefs.set(next))
-      .catch((e) => toast.error(e instanceof ApiError ? e.message : "Could not save that"));
+      // The same time twice is refused on `quiet_to`: say that, not the form's general line.
+      .catch((e) => toast.error(e instanceof ApiError ? (Object.values(e.fields)[0]?.[0] ?? e.message) : "Could not save that"));
   return (
     <Card>
       <CardHeader title="Quiet Hours and Digest" />

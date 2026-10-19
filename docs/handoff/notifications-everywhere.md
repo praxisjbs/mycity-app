@@ -9,7 +9,7 @@ merged), which built web push, the banner, the pane and personal Notification Se
 | | |
 |---|---|
 | Branch | `ccr-59381f61-k83jfs` (push only here; each PR targets `main`; PR 2 starts from `main` after PR 1 merges) |
-| Pull requests | PR 1 #81 (merged 19/10/2026); PR 2 not opened yet |
+| Pull requests | PR 1 #81 (merged 19/10/2026); PR 2 opened 19/10/2026 |
 | Owner | TB (Tom-Blake Asaah), who asked for it on 19/10/2026 |
 | Type | Full stack (CLAUDE.md step 1) |
 | Started | 19/10/2026 |
@@ -232,3 +232,6 @@ Tick each step with its date and add a line to §8 when it is pushed.
   Edit Notice), the old mock-only prototype removed, Quiet Hours and Digest in Notification
   Settings, the mock API for laptops and CI; PROGRESS #74 Built. The screen gates pass. Next:
   step 5, the whole `npm run ci` and the PR.
+- 19/10/2026 · PR 2 step 5: the whole `npm run ci` passes locally, 45 of 45 (`CI_STRICT=1`,
+  `RUN_DB_TESTS=1`); quiet hours set to the same time twice now say so. PR 2 opened. Next: drive it
+  green and merge with TB's admin rights.
