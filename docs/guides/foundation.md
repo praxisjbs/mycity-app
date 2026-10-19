@@ -221,14 +221,17 @@ The `workflow` module mounts at the API root, because its halves live under `/wo
 `/settings/approvals`. `GET /search` lives in a module of its own, `search`, because routes are found
 only under `src/modules/`; the work is `shared/search`.
 
-**The address search, `maps`** (built 19/10/2026, §6.12)
+**Maps, `maps`** (built 19/10/2026, §6.12)
 
 | Route | Permission |
 |---|---|
 | `GET /maps/search` (`q`, 3 to 200 characters → `PlaceMatches`: at most six `Place`s, each `place_id`, `formatted`, `lat`, `lon`) | everyone signed in (`self`); it reads no record and writes nothing |
+| `GET /maps/tiles/:z/:x/:y.png` (`TileParams`: zoom 0 to 20, a column and row that exist at it → the PNG, `no_content` in the contract, `Cache-Control: private, max-age=604800`) | everyone signed in (`self`) |
+| `GET /maps/reverse` (`PointQuery`: `lat`, `lon` as degrees → `PlaceAddress`: `formatted`, null when the provider knows none) | `people` create or edit: the address at a worksite's centre, and nothing else (§6.12) |
 
 503 `MAPS_OFF` when the environment has no `GEOAPIFY_API_KEY`, 429 `MAPS_BUSY` over the provider's
-quota, 502 `MAPS_UNAVAILABLE` when the provider refuses or takes longer than 4.5 seconds.
+quota, 502 `MAPS_UNAVAILABLE` when the provider refuses, sends a tile that is not an image, or takes
+longer than 4.5 seconds.
 
 ## 6 · Rules and calculations
 
@@ -550,10 +553,11 @@ The Icon is drawn on Deep Green, so it must read on a dark ground (the yellow pi
 own icons (the favicon, the home-screen icon) are files in the release, which phones keep, so they
 change with a release, not with this screen.
 
-### 6.12 Address search (F21, 19/10/2026)
+### 6.12 Address search, maps and a worksite's address (F21, 19/10/2026)
 
 Every address a person types is an `AddressField` (`packages/ui/src/form/`): a text field that
 suggests places as it is typed, through our own API, so the Geoapify key never reaches a browser.
+The map's tiles and the address at a worksite's centre go through the same API.
 
 - **Where**: People · Worksites, a field assignment's sites, a work location request (the client
   visit's site, a temporary home), a remote employee's home, My Profile's home address, Settings ·
@@ -578,9 +582,19 @@ suggests places as it is typed, through our own API, so the Geoapify key never r
 - **Nothing is stored** by the search, so it carries no event, audit row, AI read or ⌘K provider
   (`// ai:none`, `// search:none` in `maps.controller.js`). The save of each form checks its own
   grant as before.
-- **Still to come from F21**: the map tiles and the reverse lookup through our API (`MapView`,
-  `LocationLabel`); tiles load as images without the session's token, so they need their own answer
-  for who may fetch them (attendance.md §13).
+- **Tiles** (decided 19/10/2026): the tile route is signed in like every staff route, and an image
+  request carries no token, so `MapView` takes `loadTile` and fetches each tile with the session
+  (`fetchBlob` in `app/src/api/download.ts`, the same way photos load), drawing it from the bytes.
+  Nothing about the map is public, so nobody outside spends the quota. One style, `osm-bright`, to
+  zoom 20; the server keeps about 300 tiles for a day and the browser keeps each for a week. On the
+  in-browser mock there are no tiles and the map draws its points alone.
+- **A worksite's address from its point** (decided 19/10/2026, worksites only): when People type
+  a worksite's coordinates or tap its map and the address is still empty, the form asks
+  `GET /maps/reverse` after a 600 ms pause and fills the address; an address already written is never
+  replaced, each centre is asked about once (an address cleared on purpose stays clear), and an
+  existing worksite opened for a change is not looked up. The route answers only
+  `people` create or edit, so a home's or a punch's coordinates are never sent to the provider;
+  `LocationLabel` is not used on attendance screens for that reason.
 
 ## 7 · Events, jobs and notifications
 
@@ -740,6 +754,7 @@ screen.
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · Map tiles and a worksite's address (F21, §5, §6.12; decided 19/10/2026): `GET /maps/tiles/:z/:x/:y.png` (signed in, fetched by the map with the session through `MapView`'s new `loadTile`) and `GET /maps/reverse` (`people` create or edit, a worksite's centre only; homes and punches are never sent). People · Worksites shows the fence on a map in the form and the worksite's details, tapping the map moves the centre, and typed coordinates fill an empty address.
 - 19/10/2026 · TB · The address search (F21, §5, §6.12): `GET /maps/search` in a new `maps` module over `services/maps/geoapify.service.js` (`GEOAPIFY_API_KEY`), and `AddressField` in `packages/ui`, now on every address a person types: People · Worksites, field sites, work location requests, homes, My Profile, Settings · Organisation (§10.1) and a vacancy's location. On a worksite, a field site and a client visit the place picked fills Latitude and Longitude. Map tiles and the reverse lookup stay open.
 - 19/10/2026 · AJ · A module's tab strip on a narrow desktop window (People, ESS, Settings and every other module): `Tabs` keeps the tabs that fit, the active one always among them, and folds the rest into More Tabs, a ⋯ menu at the end of the strip (dotted when a hidden tab has a count), instead of scrolling sideways. Phones keep the sideways row. FRONTEND_GUIDE §9.2 updated. TB to review.
 - 19/10/2026 · AJ · The employee record's header shows the person's photo (`Employee360.photo_url`, the 384 px size; `ProfileHeader` gains `photo`), and Settings · Users and a role's people show each face (`UserRow.photo_url`, 192 px, read in `users.repo.js` through `shared/db/person.js`); initials when there is none. TB to review.

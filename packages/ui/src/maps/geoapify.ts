@@ -3,10 +3,9 @@
  * tiles, the address search and the reverse lookup, and ALL THREE go through
  * our own API, so the Geoapify key never reaches a browser.
  *
- * These are the paths the backend's proxy answers on. They are agreed here so
- * the components can be built before the attendance and worksite routes land
- * (FRONTEND_FOUNDATION F21: "the proxy routes are backend work"); a screen may
- * pass its own, and the apps' INTERIM types name the same shapes.
+ * These are the paths our API answers on (the `maps` module, docs/guides/foundation.md
+ * §6.12); a screen may pass its own. The tile route is signed in like every staff
+ * route, so a screen hands the map a `LoadTile` that fetches with its session.
  */
 
 /** The tile path, with Leaflet's own placeholders left in it. */
@@ -48,6 +47,12 @@ export type SearchPlaces = (q: string) => Promise<Place[]>;
 
 /** How a screen turns a point into an address: its own API call. */
 export type ResolveAddress = (point: LatLon) => Promise<string>;
+
+/**
+ * How a screen fetches one tile: its own call with its session, because our tile route
+ * is signed in and a plain image request carries no token. The map draws the bytes.
+ */
+export type LoadTile = (url: string) => Promise<Blob>;
 
 /** A point written out for anyone who cannot see the map. */
 export const describePoint = ({ lat, lon }: LatLon) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;

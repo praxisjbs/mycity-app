@@ -209,7 +209,7 @@ src/
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
-│   ├── maps/          geoapify.service (the address search behind every location field, F21)
+│   ├── maps/          geoapify.service (address search, map tiles and a worksite's address, F21)
 │   ├── qr/            qr
 │   └── realtime/      emitter · active (who is in front of the app, for the push hold)
 ├── realtime/      socket
@@ -320,7 +320,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (M6) | Caller's own inbox, preferences and devices |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
-| `maps` | routes and controller only | `GET /maps/search`, the address search every location field types into (`services/maps`; `docs/guides/foundation.md` §6.12) |
+| `maps` | routes and controller only | `GET /maps/search` (the address search every location field types into), `/maps/tiles` (the map's tiles, signed in), `/maps/reverse` (a worksite's address) (`services/maps`; `docs/guides/foundation.md` §6.12) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
 

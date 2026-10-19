@@ -8,15 +8,16 @@ import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { coordinatesOf, searchPlaces } from "@/features/shared/places";
+import { coordinatesOf, loadTile, resolveWorksiteAddress, searchPlaces } from "@/features/shared/places";
 import { useScreenAction } from "@/shell/screen-action";
-import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who, type LatLon } from "@mycity/ui";
 import { PATTERN } from "./labels";
 
 /**
  * People · Worksites (#28, docs/guides/attendance.md §10): the offices a punch is matched to, each
  * a centre, a radius and a timezone, and who is assigned to each. People add, change, retire and
- * restore them; the address is searched as it is typed, and the place picked fills the centre.
+ * restore them; the address is searched as it is typed, and the place picked fills the centre,
+ * drawn on a map with its fence.
  */
 export function Worksites() {
   const [params] = useSearchParams();
@@ -110,6 +111,14 @@ function WorksiteView({ id, close }: { id: string; close: () => void }) {
               ["Assigned", String(w.assigned_count)],
             ]}
           />
+          <MapView
+            className="mt-3"
+            height="sm"
+            zoom={zoomFor(w.radius_m)}
+            markers={[{ key: w.worksite_id, lat: w.latitude, lon: w.longitude, label: w.name, tone: "brand" }]}
+            radiusMetres={w.radius_m}
+            loadTile={loadTile}
+          />
         </Card>
         <DataView
           title="Assigned People"
@@ -140,12 +149,21 @@ function WorksiteView({ id, close }: { id: string; close: () => void }) {
 
 type Values = { name: string; address: string; latitude: string; longitude: string; radius_m: string };
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
+/** The centre typed so far, once both numbers are real coordinates. */
+const pointOf = (lat: string, lon: string): LatLon | null => {
+  const a = num(lat);
+  const b = num(lon);
+  return a !== undefined && b !== undefined && Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180 ? { lat: a, lon: b } : null;
+};
+/** Close enough that the whole fence shows on a small map. */
+const zoomFor = (radius: number) => (radius <= 150 ? 16 : radius <= 400 ? 15 : 14);
 const bodyOf = (v: Values) => ({ name: v.name, address: v.address, latitude: num(v.latitude), longitude: num(v.longitude), radius_m: num(v.radius_m) });
 
 /**
  * Add a worksite, or change one. The address searches as it is typed and the place picked
- * fills Latitude and Longitude, which stay open to correct. The numbers are typed as text
- * and checked as numbers by the contract.
+ * fills Latitude and Longitude, which stay open to correct, by typing or by tapping the map.
+ * Coordinates the person gives with no address yet are looked up for one. The numbers are
+ * typed as text and checked as numbers by the contract.
  */
 function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
   const f = useContractForm<Values>(
@@ -161,6 +179,39 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
   const create = useMutation("POST /api/v1/worksites");
   const update = useMutation("PATCH /api/v1/worksites/:id");
   const busy = create.pending || update.pending;
+  const { set } = f;
+  const point = pointOf(f.values.latitude, f.values.longitude);
+  const radius = num(f.values.radius_m);
+  const fence = radius !== undefined && Number.isInteger(radius) && radius >= 25 && radius <= 1000 ? radius : undefined;
+  // Only a centre the person moved is looked up: a picked place brings its own address, and
+  // an existing worksite opened for a change is left as it was. Each centre is asked about
+  // once, so an address cleared on purpose is not written back for the same point.
+  const moved = useRef(false);
+  const asked = useRef<string | null>(null);
+  const typed = (key: "latitude" | "longitude") => (value: string) => {
+    moved.current = true;
+    set(key, value);
+  };
+  const address = f.values.address;
+  const lat = point?.lat;
+  const lon = point?.lon;
+  useEffect(() => {
+    if (!moved.current || lat === undefined || lon === undefined || address.trim()) return;
+    const at = `${lat},${lon}`;
+    if (asked.current === at) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      asked.current = at;
+      resolveWorksiteAddress({ lat, lon })
+        .then((found) => live && set("address", found))
+        // No address for that point, or the lookup is off: the field stays the person's to fill.
+        .catch(() => undefined);
+    }, 600);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [lat, lon, address, set]);
   const submit = async () => {
     if (!f.check()) return;
     const b = bodyOf(f.values) as { name: string; address: string; latitude: number; longitude: number; radius_m: number };
@@ -195,15 +246,29 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
       </Field>
       <Grid cols={2}>
         <Field label="Latitude" {...f.status("latitude")}>
-          <NumberField decimal {...f.field("latitude")} placeholder="6.4470" />
+          <NumberField decimal {...f.field("latitude")} onChange={typed("latitude")} placeholder="6.4470" />
         </Field>
         <Field label="Longitude" {...f.status("longitude")}>
-          <NumberField decimal {...f.field("longitude")} placeholder="3.4720" />
+          <NumberField decimal {...f.field("longitude")} onChange={typed("longitude")} placeholder="3.4720" />
         </Field>
       </Grid>
       <Field label={<HelpTerm help="A punch inside this distance from the centre counts as on site. Between 25 and 1000 metres.">Radius, Metres</HelpTerm>} {...f.status("radius_m")}>
         <NumberField {...f.field("radius_m")} />
       </Field>
+      {point && (
+        <MapView
+          className="mb-3"
+          height="sm"
+          zoom={zoomFor(fence ?? 100)}
+          markers={[{ key: "centre", lat: point.lat, lon: point.lon, label: f.values.address.trim() || f.values.name.trim() || "Centre", tone: "brand" }]}
+          radiusMetres={fence}
+          loadTile={loadTile}
+          onPick={(p) => {
+            typed("latitude")(p.lat.toFixed(6));
+            typed("longitude")(p.lon.toFixed(6));
+          }}
+        />
+      )}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={busy} onClick={() => submit()}>{site ? "Save Worksite" : "Add Worksite"}</Button>

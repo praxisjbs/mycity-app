@@ -3970,6 +3970,7 @@ A map with the points a screen cares about, drawn by Leaflet on tiles our own AP
 | `zoom` | `number` |  | How close in; 15 unless set (a street), 11 for a city. |
 | `radiusMetres` | `number` |  | A circle around the first point, in metres: a worksite's geofence. |
 | `tileUrl` | `string` |  | Where the tiles come from; our own proxy unless a screen passes its own. |
+| `loadTile` | `LoadTile` |  | Fetches each tile with the app's session (our tile route is signed in); a plain image request otherwise. |
 | `onPick` | `(point: LatLon) => void` |  | Called with the point pressed, for choosing a place (setting up a worksite). |
 | `interactive` | `boolean` |  | Let the person drag and zoom. Off by default, so a map inside a page cannot swallow its scroll. |
 | `height` | `"sm" \| "md" \| "lg"` |  | How tall; `sm` in a card, `md` on a page, `lg` on a screen of its own. |
@@ -3979,6 +3980,7 @@ A map with the points a screen cares about, drawn by Leaflet on tiles our own AP
 ```tsx
 <MapView markers={[{ key: "in", lat, lon, label: "Clocked in 07:52" }]} />
 <MapView centre={site} radiusMetres={site.radius_metres} onPick={setPoint} interactive />
+<MapView markers={[site]} radiusMetres={site.radius_m} loadTile={loadTile} />
 ```
 
 ### PlaceSearch

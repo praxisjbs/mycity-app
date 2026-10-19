@@ -5,10 +5,10 @@
  * map downloads no Leaflet.
  *
  * `geoapify.ts` holds the paths our API answers on, and a screen may pass its
- * own. The search is served (`GET /api/v1/maps/search`, and `AddressField` in
- * Forms types into it); the tiles and the reverse lookup are still to come.
+ * own. The search, the tiles and the reverse lookup are served (the `maps`
+ * module); `AddressField` in Forms types into the search.
  */
 export { MapView, type MapViewProps, type MapMarker } from "./MapView";
 export { PlaceSearch, type PlaceSearchProps } from "./PlaceSearch";
 export { LocationLabel, type LocationLabelProps } from "./LocationLabel";
-export { TILES, SEARCH, REVERSE, ATTRIBUTION, LAGOS, describePoint, type LatLon, type Place, type SearchPlaces, type ResolveAddress } from "./geoapify";
+export { TILES, SEARCH, REVERSE, ATTRIBUTION, LAGOS, describePoint, type LatLon, type Place, type SearchPlaces, type ResolveAddress, type LoadTile } from "./geoapify";

@@ -1,8 +1,8 @@
 "use strict";
 /**
- * Maps: the address search's contract, its route, and what the Geoapify client makes of
- * the provider's answers. The provider is a stub here; nothing leaves the machine. The
- * places are invented.
+ * Maps: the contract, the routes, and what the Geoapify client makes of the provider's
+ * answers for the address search, the tiles and a worksite's address. The provider is a
+ * stub here; nothing leaves the machine. The places are invented.
  */
 const c = require("@mycity/contract");
 const { routesOf } = require("../../http/route");
@@ -28,12 +28,36 @@ describe("the contract", () => {
   });
 });
 
-describe("the route", () => {
-  test("anyone signed in may search, with no module grant", () => {
-    const routes = routesOf(require("./maps.routes").router);
-    expect(routes).toHaveLength(1);
-    expect(routes[0].contract.self).toBe(true);
-    expect(routes[0].permission).toBeFalsy();
+describe("the routes", () => {
+  const routes = routesOf(require("./maps.routes").router);
+  const at = (path) => routes.find((r) => r.path === path);
+
+  test("anyone signed in may search and see a map, with no module grant", () => {
+    expect(routes).toHaveLength(3);
+    for (const path of ["/search", "/tiles/:z/:x/:y.png"]) {
+      expect(at(path).contract.self).toBe(true);
+      expect(at(path).permission).toBeFalsy();
+    }
+    expect(at("/tiles/:z/:x/:y.png").contract.no_content).toBe(true);
+  });
+
+  test("an address for a point needs the grants that set worksites up", () => {
+    expect(at("/reverse").contract.self).toBeFalsy();
+    expect(at("/reverse").permission).toBeTruthy();
+  });
+
+  test("a tile must exist at its zoom; a point must be degrees", () => {
+    const tile = (z, x, y) => c.maps.TileParams.safeParse({ z, x, y }).success;
+    expect(tile("15", "18525", "15632")).toBe(true);
+    expect(tile("0", "0", "0")).toBe(true);
+    expect(tile("2", "4", "0")).toBe(false);
+    expect(tile("21", "0", "0")).toBe(false);
+    expect(tile("15", "-1", "0")).toBe(false);
+    const point = (lat, lon) => c.maps.PointQuery.safeParse({ lat, lon }).success;
+    expect(point("6.4321", "3.4219")).toBe(true);
+    expect(point("", "3.4")).toBe(false);
+    expect(point("91", "3.4")).toBe(false);
+    expect(point("6.4", "east")).toBe(false);
   });
 });
 
@@ -117,5 +141,75 @@ describe("when the provider cannot answer", () => {
     await geoapify.searchPlaces("Testbed", { apiKey: "k", fetchImpl: answer([], 500) }).catch(() => undefined);
     const fetchImpl = answer([{ place_id: "a", formatted: "Testbed Road", lat: 6.4, lon: 3.4 }]);
     expect(await geoapify.searchPlaces("Testbed", { apiKey: "k", fetchImpl })).toHaveLength(1);
+  });
+});
+
+const png = (status = 200, type = "image/png") =>
+  jest.fn(async () => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h) => (h.toLowerCase() === "content-type" ? type : null) },
+    arrayBuffer: async () => new Uint8Array([137, 80, 78, 71]).buffer,
+  }));
+
+describe("map tiles", () => {
+  test("a tile comes back as the provider's PNG, asked for with the server's key", async () => {
+    const fetchImpl = png();
+    const t = await geoapify.tile(15, 18525, 15632, { apiKey: "secret-key", fetchImpl });
+    expect(t.type).toBe("image/png");
+    expect([...t.bytes]).toEqual([137, 80, 78, 71]);
+    const url = fetchImpl.mock.calls[0][0];
+    expect(url.pathname).toBe("/v1/tile/osm-bright/15/18525/15632.png");
+    expect(url.searchParams.get("apiKey")).toBe("secret-key");
+  });
+
+  test("the same tile again is answered from memory", async () => {
+    const fetchImpl = png();
+    await geoapify.tile(15, 1, 2, { apiKey: "k", fetchImpl });
+    await geoapify.tile(15, 1, 2, { apiKey: "k", fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  test("a tile that cannot exist is a 404, and nobody is asked", async () => {
+    const fetchImpl = png();
+    await expect(geoapify.tile(2, 4, 0, { apiKey: "k", fetchImpl })).rejects.toMatchObject({ status: 404 });
+    await expect(geoapify.tile(21, 0, 0, { apiKey: "k", fetchImpl })).rejects.toMatchObject({ status: 404 });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test("anything but an image from the provider is a failure, never passed on", async () => {
+    await expect(geoapify.tile(3, 1, 1, { apiKey: "k", fetchImpl: png(200, "text/html") })).rejects.toMatchObject({ code: "MAPS_UNAVAILABLE" });
+  });
+
+  test("no key is 503 MAPS_OFF; over the quota 429", async () => {
+    await expect(geoapify.tile(3, 1, 1, { apiKey: "", fetchImpl: png() })).rejects.toMatchObject({ code: "MAPS_OFF", status: 503 });
+    await expect(geoapify.tile(3, 1, 1, { apiKey: "k", fetchImpl: png(429) })).rejects.toMatchObject({ code: "MAPS_BUSY", status: 429 });
+  });
+});
+
+describe("a worksite's address", () => {
+  const found = (results, status = 200) =>
+    jest.fn(async () => ({ ok: status >= 200 && status < 300, status, json: async () => ({ results }) }));
+
+  test("the provider's address for the point, asked for by its coordinates", async () => {
+    const fetchImpl = found([{ formatted: "12 Testbed Road, Lagos", lat: 6.4321, lon: 3.4219 }]);
+    expect(await geoapify.reverseGeocode(6.4321, 3.4219, { apiKey: "k", fetchImpl })).toBe("12 Testbed Road, Lagos");
+    const url = fetchImpl.mock.calls[0][0];
+    expect(url.searchParams.get("lat")).toBe("6.4321");
+    expect(url.searchParams.get("lon")).toBe("3.4219");
+  });
+
+  test("null when the provider knows no address there, and that is remembered too", async () => {
+    const fetchImpl = found([]);
+    expect(await geoapify.reverseGeocode(0.5, 0.5, { apiKey: "k", fetchImpl })).toBeNull();
+    expect(await geoapify.reverseGeocode(0.5, 0.5, { apiKey: "k", fetchImpl })).toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  test("a point off the globe is refused before anyone is asked; no key is 503", async () => {
+    const fetchImpl = found([]);
+    await expect(geoapify.reverseGeocode(95, 3, { apiKey: "k", fetchImpl })).rejects.toMatchObject({ status: 422 });
+    await expect(geoapify.reverseGeocode(6.4, 3.4, { apiKey: "", fetchImpl })).rejects.toMatchObject({ code: "MAPS_OFF" });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

@@ -14,7 +14,9 @@ import { Worksites } from "./Worksites";
 /**
  * People · Worksites on the in-browser mock (docs/guides/attendance.md §10): the address
  * searches as it is typed, through the mock's own answer for /maps/search, and the place
- * picked fills the centre, which stays open to correct before the worksite is added.
+ * picked fills the centre, which stays open to correct before the worksite is added; the
+ * centre is drawn on a map with its fence; coordinates typed with no address are looked up
+ * for one (/maps/reverse). The mock has no tiles, so the maps draw their points only.
  */
 
 expect.extend(axeMatchers);
@@ -79,6 +81,8 @@ describe("adding a worksite", () => {
     expect(valueOf(within(dialog).getByLabelText("Latitude"))).toBe("6.432100");
     expect(valueOf(within(dialog).getByLabelText("Longitude"))).toBe("3.421900");
     expect(within(dialog).queryByRole("listbox")).toBeNull();
+    // The centre on a map, with the fence around it.
+    await waitFor(() => expect(dialog.querySelector("[data-points]")?.getAttribute("data-points")).toBe("6.43210, 3.42190"));
 
     // The centre stays open to correct.
     fill(dialog, "Longitude", "3.4221");
@@ -98,5 +102,36 @@ describe("adding a worksite", () => {
     await within(dialog).findByText("No address matches", undefined, { timeout: 5000 });
     expect(valueOf(address)).toBe("Plot 9 Unlisted Close");
     expect(valueOf(within(dialog).getByLabelText("Latitude"))).toBe("");
+  }, 30000);
+
+  it("coordinates typed with no address are looked up for one; an address already written is kept", async () => {
+    await signedInAs("cynthia@mycityapp.io", <Worksites />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Add Worksite" }))[0]!);
+    const dialog = await screen.findByRole("dialog", { name: "Add Worksite" });
+    fill(dialog, "Latitude", "6.4321");
+    fill(dialog, "Longitude", "3.4219");
+    const address = within(dialog).getByRole("combobox", { name: /Address/ });
+    await waitFor(() => expect(valueOf(address)).toBe("12 Admiralty Way, Lekki Phase 1, Lagos"), { timeout: 5000 });
+
+    // Cleared on purpose, it stays cleared for the same point.
+    fireEvent.change(address, { target: { value: "" } });
+    fireEvent.blur(address);
+    await new Promise((r) => setTimeout(r, 900));
+    expect(valueOf(address)).toBe("");
+
+    fireEvent.change(address, { target: { value: "Gate 2, Admiralty Way" } });
+    fireEvent.blur(address);
+    fill(dialog, "Latitude", "6.4338");
+    fill(dialog, "Longitude", "3.4255");
+    await new Promise((r) => setTimeout(r, 900));
+    expect(valueOf(address)).toBe("Gate 2, Admiralty Way");
+  }, 30000);
+
+  it("a worksite opens with its centre and fence on a map", async () => {
+    await signedInAs("cynthia@mycityapp.io", <Worksites />);
+    fireEvent.click(await screen.findByText("MyCity Office, Lekki", undefined, { timeout: 5000 }));
+    const dialog = await screen.findByRole("dialog", { name: "MyCity Office, Lekki" });
+    await waitFor(() => expect(dialog.querySelector("[data-points]")?.getAttribute("data-points")).toBe("6.44700, 3.47200"), { timeout: 5000 });
+    expect(within(dialog).getByText("MyCity Office, Lekki: 6.44700, 3.47200")).toBeTruthy();
   }, 30000);
 });
