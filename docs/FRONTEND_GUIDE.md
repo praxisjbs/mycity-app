@@ -697,8 +697,11 @@ screens still call it `useIsMobile`, the same hook), both from the Shell group o
 - **Desktop** (`DesktopShell`): the `Rail` (collapsible to 66 px, remembered in `mc-rail`; the
   person's menu at its foot: My Profile, My Security, Theme, Density, Install App, Sign Out), the
   `TopBar` (rail toggle, `SearchButton`, Clock In or Out, the bell), the module's `Tabs`, the page.
+  When the window is too narrow for every tab, `Tabs` shows the ones that fit (the active one
+  always among them) and folds the rest into More Tabs, a ⋯ menu at the end of the strip; it never
+  scrolls sideways on desktop.
 - **Phone** (`PhoneShell`): `PhoneHeader` (§7: the pin; search, the bell, the avatar; the title rail
-  over the tabs), the page, the `FloatingButton` and the `BottomBar` with `MoreSheet` (F16 to F18).
+  over the tabs, which scroll sideways), the page, the `FloatingButton` and the `BottomBar` with `MoreSheet` (F16 to F18).
 
 A screen may also render a different layout per shell; it never shrinks the desktop one. Chat and
 Mailbox are "fit" pages (`useFitPage`): only their panes scroll, and scrolling past a pane's end

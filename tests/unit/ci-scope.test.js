@@ -134,6 +134,18 @@ describe("names the workflow and the build share with the scope", () => {
     expect(yml).toContain(`name: ${TREE_ARTIFACT}`);
     expect(yml).toContain(`path: ${TREE_FILE}`);
     expect(yml).toContain("node scripts/ci-local.js --decide-scope");
-    expect(yml).toContain("CI_SCOPE: ${{ steps.scope.outputs.scope }}");
+    expect(yml).toContain("CI_SCOPE: ${{ needs.scope.outputs.scope }}");
+  });
+
+  test("ci.yml runs every group of gates in its own job, and a job named ci waits for them all", () => {
+    const yml = read(".github/workflows/ci.yml");
+    const groups = [...read("scripts/ci-local.js").matchAll(/const GROUPS = \[([^\]]+)\]/g)][0][1].match(/"([a-z]+)"/g).map((g) => g.slice(1, -1));
+    expect(groups).toEqual(["backend", "frontend", "screens", "checks"]);
+    for (const g of groups) {
+      expect(yml).toContain(`npm run ci -- --group=${g}`);
+      expect(yml).toMatch(new RegExp(`\\n  ${g}:\\n    name: ${g}\\n`));
+    }
+    // Branch protection requires the check called "ci": it must wait for every job.
+    expect(yml).toContain("  ci:\n    name: ci\n    needs: [scope, backend, frontend, screens, checks]");
   });
 });

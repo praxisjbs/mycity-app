@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "9f0440cf3c080c161001deba0ca9d7753cd9516d0e4bb95c7305b896f78c5b8c",
+  "source_hash": "35c97db0967328e2b75415e9a5dcd19c5bdd2b0794597922a4388d0f09654c5f",
   "schemas": 547,
   "endpoints": 302,
   "inputs": {
@@ -41,7 +41,7 @@
     "packages/contract/schemas/notifications.js": "7ee6c7cb96a93623dd727711fab963b3759ea741d10b3fccee3db22a3dea6709",
     "packages/contract/schemas/offers.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/onboarding.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/organisation.js": "6e2d4044bb01ae3c5bed1f02c649614f637d24598d7071c5b7d24a1f087dcb0b",
+    "packages/contract/schemas/organisation.js": "189495f37d9325f5e94e047c354b3ac54f7d3817cdd38a847e652752ad87369d",
     "packages/contract/schemas/partner_pipeline.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partners.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partnership_analytics.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -64,7 +64,7 @@
     "packages/contract/schemas/targets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/tasks.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/templates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/users.js": "07a02e6964c887eae06598cbec08a3836c3d95ef4c0d93410908f5e5097e5060",
+    "packages/contract/schemas/users.js": "4241d4066108527d374d6656531795f693ab9a292718c296647bb025de51abcb",
     "packages/contract/schemas/vacancies.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/workflow.js": "ad6cb8b65ecee968ba9da4106009bcb0633e2c1287733011a56061acab45c986",
     "packages/contract/schemas/worksites.js": "6bfcf73bf96cd85e1fa21bbb1d230aac9259971c08598c4fe0a0db6269a0260c",

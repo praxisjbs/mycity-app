@@ -75,6 +75,7 @@ mycity-app/
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, full report
+│   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md
 │   ├── new-component.js      npm run new:component: a shared component with header, test and gallery page
 │   ├── new-screen.js         npm run new:screen: a staff-app screen in its module, the route map, PROGRESS and the gates
@@ -130,7 +131,7 @@ mycity-app/
 │   │                         (push-notifications)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
 ├── .github/
-│   ├── workflows/            ci.yml (runs `npm run ci`; none on a draft PR), release.yml, rollback.yml, uptime.yml
+│   ├── workflows/            ci.yml (`npm run ci` as four parallel jobs, backend, frontend, screens and checks, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml
 │   │                         (the uptime probe every 10 minutes)
 │   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
 │   └── pull_request_template.md

@@ -42,6 +42,8 @@ const UserRow = z
     two_step: z.boolean(),
     last_seen_at: isoDateTime.nullable(),
     created_at: isoDateTime,
+    /** The person's photo at the list size (shared/db/person.js); null shows their initials. */
+    photo_url: z.string().nullable(),
   })
   .strict();
 
@@ -112,6 +114,7 @@ const TABLES = {
       roles: "the login's roles, from user_role and role",
       two_step: "whether app_user.mfa_enrolled_at is set",
       last_seen_at: "the latest user_session.last_seen_at of the login",
+      photo_url: "the list size of the employee's photo_document_id, as an API path (shared/db/person.js)",
     },
   },
   UserListQuery: { table: null, reason: "list controls and the status and role filters for Settings, Users" },

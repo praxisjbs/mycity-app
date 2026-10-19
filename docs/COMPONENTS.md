@@ -50,7 +50,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [LevelMeter](#levelmeter) | `LevelMeter` | A level drawn as a few short bars, filled up to the level: how much access a role has to a module. | stable |
 | Display | [Money](#money) | `Money` | An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word. | stable |
 | Display | [Pill](#pill) | `Pill`, `StatusPill` | A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }). | stable |
-| Display | [ProfileHeader](#profileheader) | `ProfileHeader`, `BackButton` | The head of a record page: who or what it is, in big initials, with its chips and its actions. | stable |
+| Display | [ProfileHeader](#profileheader) | `ProfileHeader`, `BackButton` | The head of a record page: who or what it is, in their photo or big initials, with its chips and its actions. | stable |
 | Display | [ProgressBar](#progressbar) | `ProgressBar`, `Meter` | How far along something is: a bar with its percent, or a moving bar when the end is unknown; Meter is the thin inline bar with its figure (the merged Mini). | stable |
 | Display | [Quote](#quote) | `Quote` | A quoted passage a person wrote or received, with the yellow rule at its left. | stable |
 | Display | [Result](#result) | `Result` | The outcome of something a person just did: clocking in, signing, a check that passed or failed. | stable |
@@ -1224,13 +1224,13 @@ A small rounded label in a status tone, with a dot; StatusPill draws one from a 
 
 ### ProfileHeader
 
-The head of a record page: who or what it is, in big initials, with its chips and its actions.
+The head of a record page: who or what it is, in their photo or big initials, with its chips and its actions.
 
 | | |
 |---|---|
 | Use | A 360 page (an employee, a partner, a candidate, a vacancy), above the tabs or sections of that record. |
 | Avoid | A page title (use PageHeader); a list row (use DataView); more than four chips or three actions. |
-| Phone | The initials and the name sit together with the actions full width under them, so nothing is squeezed. |
+| Phone | The photo or initials and the name sit together with the actions full width under them, so nothing is squeezed. |
 | Accessibility | The name is the page's own heading, and the initials are decorative, since the name is right beside them. |
 | Status | stable |
 | Exports | `ProfileHeader`, `BackButton` |
@@ -1249,6 +1249,7 @@ The head of a record page: who or what it is, in big initials, with its chips an
 | `actions` | `ReactNode` |  | Up to three actions, the primary last. |
 | `brand` | `boolean` |  | Draw the initials in the brand yellow instead of City Green (a partner, not a person). |
 | `avatar` | `ReactNode` |  | A picture instead of the initials. |
+| `photo` | `string \| null` |  | The person's photo, ready for an image (fetched with the session); the initials show while there is none. |
 | `level` | `1 \| 2` |  | The heading level; h1 on a record's own page, h2 inside one. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -1724,7 +1725,7 @@ The module's tab strip: one row of tabs under the page header, one of them activ
 |---|---|
 | Use | Sibling views of one module or record (Register, Field Assignments, Location Requests). Controlled by value, so the router drives it from ?tab=; give each tab an href so it opens in a new tab and survives a reload. |
 | Avoid | Two or three views of one list in a toolbar (use SegmentedControl); filtering a list (use Chips); steps of a form (use Wizard); more than one strip on a screen. |
-| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. |
+| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). |
 | Accessibility | A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing. |
 | Status | stable |
 | Exports | `Tabs`, `TabPanel` |

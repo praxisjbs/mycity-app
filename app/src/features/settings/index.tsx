@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/api/client";
+import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/settings";
 import type { UserRow } from "@mycity/contract/contract.gen.ts";
@@ -83,6 +84,7 @@ function Users() {
   const [status, setStatus] = useState<"" | UserRow["status"]>("");
   const s = useApi("GET /api/v1/users/summary");
   const list = usePaged("GET /api/v1/users", { filters: status ? { status } : {} });
+  const photo = usePhotos(list.rows.map((u) => u.photo_url));
   return (
     <>
       <PageHeader
@@ -120,7 +122,7 @@ function Users() {
         noun="user"
         onRowClick={(u) => modal.open({ title: u.display_name, body: (close) => <UserDetail u={u} close={close} /> })}
         columns={[
-          { key: "u", label: "User", render: (u) => <Who name={u.display_name} sub={u.email} /> },
+          { key: "u", label: "User", render: (u) => <Who name={u.display_name} sub={u.email} src={photo(u.photo_url)} /> },
           { key: "r", label: "Roles", render: (u) => (u.is_ceo ? ["CEO", ...u.roles.map((r) => r.name)] : u.roles.map((r) => r.name)).join(", ") },
           { key: "l", label: "Last Seen", render: (u) => (u.last_seen_at ? formatWhen(u.last_seen_at) : "Never"), desktop: true },
           { key: "t", label: "Two-Step", render: (u) => (u.two_step ? "On" : "Off"), desktop: true },

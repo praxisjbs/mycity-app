@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AccessCatalogue, RoleGrant, RoleMatrix, RoleOption, RoleRow, UserRow } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
+import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { hrefFor, useLeaveGuard, useRouter, useSearchParams } from "@/lib/router";
@@ -770,6 +771,7 @@ const USER_STATUS: Record<UserRow["status"], { tone: "ok" | "warn" | "err" | "ne
 function PeoplePanel({ code }: { code: string }) {
   const { navigate } = useRouter();
   const list = usePaged("GET /api/v1/users", { filters: { role: code } });
+  const photo = usePhotos(list.rows.map((u) => u.photo_url));
   return (
     <DataView
       bare
@@ -780,7 +782,7 @@ function PeoplePanel({ code }: { code: string }) {
       onRowClick={(u: UserRow) => navigate(hrefFor("settings", "users", { id: u.user_id }))}
       empty={{ title: "Nobody Holds It", text: "Roles are given on Users." }}
       columns={[
-        { key: "u", label: "Person", render: (u) => <Who name={u.display_name} sub={u.email} /> },
+        { key: "u", label: "Person", render: (u) => <Who name={u.display_name} sub={u.email} src={photo(u.photo_url)} /> },
         { key: "s", label: "Status", render: (u) => <Pill tone={USER_STATUS[u.status].tone}>{USER_STATUS[u.status].text}</Pill> },
       ]}
     />

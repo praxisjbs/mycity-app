@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
-import { TabPanel, Tabs, type TabItem } from "./Tabs";
+import { setViewport } from "../testing/viewport";
+import { TabPanel, Tabs, visibleTabs, type TabItem } from "./Tabs";
 
 const ITEMS: TabItem[] = [
   { value: "register", label: "Register", href: "#/attendance?tab=register" },
@@ -77,5 +78,68 @@ describe("Tabs", () => {
       </Tabs>,
     );
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  describe("on a desktop too narrow for every tab", () => {
+    const ESS: TabItem[] = ["My Profile", "My Attendance", "My Devices", "My Leave", "My Queries", "My Documents"].map((label) => ({
+      value: label.toLowerCase().replace(" ", "-"),
+      label,
+    }));
+
+    /** jsdom lays nothing out: each tab is 100 px wide (with the gap) and the strip `room` px. */
+    function lay(room: number) {
+      vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(98);
+      vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(room);
+    }
+    afterEach(() => {
+      vi.restoreAllMocks();
+      setViewport(1440);
+    });
+
+    it("keeps what fits, with room for More Tabs, and always the active tab", () => {
+      const w = [100, 100, 100, 100, 100, 100];
+      expect(visibleTabs(w, 700, 0)).toEqual([0, 1, 2, 3, 4, 5]);
+      expect(visibleTabs(w, 450, 0)).toEqual([0, 1, 2, 3]);
+      expect(visibleTabs(w, 450, 5)).toEqual([0, 1, 2, 5]);
+      expect(visibleTabs(w, 120, 3)).toEqual([3]);
+      expect(visibleTabs(w, 0, 2)).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+
+    it("folds the rest into More Tabs, and a hidden tab opens from it", async () => {
+      setViewport(1440);
+      lay(450);
+      const user = userEvent.setup();
+      const onValueChange = vi.fn();
+      const items = ESS.map((t, i) => (i === 5 ? { ...t, count: 2 } : t));
+      render(<Tabs label="Employee Self-Service" value="my-profile" onValueChange={onValueChange} items={items} />);
+      expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["My Profile", "My Attendance", "My Devices", "My Leave"]);
+      const more = screen.getByRole("button", { name: "More Tabs" });
+      await user.click(more);
+      await user.click(await screen.findByRole("menuitem", { name: /My Documents/ }));
+      expect(onValueChange).toHaveBeenCalledWith("my-documents");
+    });
+
+    it("brings the active tab into the row when it would have been hidden", () => {
+      setViewport(1440);
+      lay(450);
+      render(<Tabs label="Employee Self-Service" value="my-documents" items={ESS} />);
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs.map((t) => t.textContent)).toEqual(["My Profile", "My Attendance", "My Devices", "My Documents"]);
+      expect(screen.getByRole("tab", { name: "My Documents" })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("shows every tab and no More Tabs when they fit, and on a phone, which scrolls", () => {
+      setViewport(1440);
+      lay(1200);
+      const wide = render(<Tabs label="Employee Self-Service" value="my-profile" items={ESS} />);
+      expect(screen.getAllByRole("tab")).toHaveLength(6);
+      expect(screen.queryByRole("button", { name: "More Tabs" })).toBeNull();
+      wide.unmount();
+      setViewport(390);
+      lay(300);
+      render(<Tabs label="Employee Self-Service" value="my-profile" items={ESS} />);
+      expect(screen.getAllByRole("tab")).toHaveLength(6);
+      expect(screen.queryByRole("button", { name: "More Tabs" })).toBeNull();
+    });
   });
 });

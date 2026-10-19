@@ -44,7 +44,7 @@
     "gallery": "npm -w @mycity/ui run gallery",
     "fe:typecheck": "npm run typecheck -w @mycity/ui -w @mycity/app -w @mycity/public-app",
     "fe:lint": "npm run lint -w @mycity/ui -w @mycity/app -w @mycity/public-app",
-    "fe:test": "npm run test -w @mycity/ui -w @mycity/app -w @mycity/public-app",
+    "fe:test": "node scripts/fe-test.js",
     "fe:build": "npm run build -w @mycity/ui -w @mycity/app -w @mycity/public-app"
   },
   "dependencies": {

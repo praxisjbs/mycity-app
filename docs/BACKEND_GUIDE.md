@@ -508,8 +508,18 @@ draft runs none (a week of CI used a month of GitHub's Actions minutes, TB 19/10
 yourself before pushing**; it is the same command and the same result. A PR cannot merge until it
 is green.
 
-A run does only what its change needs (`scripts/check/lib/scope.js`; the run's step *How much this
-run needs* says which and why):
+On GitHub the gates run as four jobs side by side, so a run takes as long as its slowest job
+(AJ, 19/10/2026): **backend** (PostgreSQL, Redis and ffmpeg: jest and the schema gates),
+**frontend** (typecheck, lint, the three workspaces' tests at once, builds), **screens** (Chromium:
+the gates that open every screen) and **checks** (the fast static and process gates). The check
+called **ci** waits for all four, and it is the one branch protection requires. To run one job's
+gates yourself, `npm run ci -- --group=<name>`; `node scripts/ci-local.js --groups` lists them.
+Chromium, ffmpeg's packages and npm's downloads are cached between runs. Four jobs bill more
+runner minutes than one (each installs its own packages), so the draft rule below matters more,
+not less.
+
+A run does only what its change needs (`scripts/check/lib/scope.js`; the *scope* job says which
+and why):
 
 - **A change to documents only** (Markdown at the root, under `docs/` or in `.github/`, other than
   `docs/PROGRESS.md` and `MILESTONES.md`, which the apps' build reads) runs the gates that read
@@ -517,6 +527,9 @@ run needs* says which and why):
 - **After a merge**, `main` runs the whole suite again only when its tree is not the one the PR's
   last run passed. When nothing reached `main` in between, it is the same tree, and the document
   gates are enough; Release then deploys it as before.
+
+In both cases only the **checks** job runs; backend, frontend and screens are skipped and start no
+runner.
 
 These are the usual reasons a run is red:
 

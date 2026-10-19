@@ -64,7 +64,8 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    `employee.photo_updated`. My Profile and the shell avatar (rail, phone top bar, More, the lock
    screen) show it at 384 px; every list and card that names a person shows it at 192 px, because
    every person in a list is read through `shared/db/person.js` (`PersonRef.photo_url`): People ·
-   Employees, Leave and Attendance, Devices, Worksites, the Organogram and Org Chart, Staff
+   Employees (the list, and the record's header at 384 px), Leave and Attendance, Devices,
+   Worksites, Settings · Users and Roles, the Organogram and Org Chart, Staff
    Community (channels, direct messages, members, the profile panel, posts, celebrations,
    recognitions, the people pickers) and Home (Team, a card's records). Remove Photo clears the
    pointer and the initials return. `photo_url` is an API path fetched with the session, never a
@@ -406,3 +407,4 @@ Deductions figure and every form open the shared modal.
 - 19/10/2026 · LA · Work Location Requests (#87) is built on the real API from the attendance guide, which owns it (§6.11, §10): §10.2 row follows its phone layout. Policy Updates (#89) stays on INTERIM shapes until M9 (attendance guide §13).
 - 19/10/2026 · LA · My Attendance (#9) shows the person's field assignments in progress and to come, under Today (attendance guide §6.12, §10); §10.2 row updated.
 - 19/10/2026 · LA · My Profile's Work Schedule shows each day's place (Office, Remote or Off, `EssWorkDay.place`), read from attendance's week (attendance guide §6.13): People set a hybrid employee's office days on the employee record's Attendance tab, which is the Attendance setup of §2 and §3 step 2.
+- 19/10/2026 · AJ · The photo also reaches the employee record's header in People · Employees and Settings · Users and Roles (`Employee360.photo_url`, `UserRow.photo_url`); the organogram PDF is the one place left with initials.

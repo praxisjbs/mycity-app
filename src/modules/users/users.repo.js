@@ -5,6 +5,7 @@
  * login) and access (the roles); this file only reads.
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { photoUrlSql } = require("../../shared/db/person");
 
 /** invited / active / suspended / left, from the stored status and whether a password was ever chosen. */
 const STATUS = `CASE WHEN u.status = 'active' AND u.password_changed_at IS NULL THEN 'invited' ELSE u.status END`;
@@ -18,7 +19,7 @@ const ROW = `
              WHERE ur.user_id = u.user_id
                AND (ur.effective_to IS NULL OR ur.effective_to > CURRENT_DATE)), '[]'::json) AS roles,
   (SELECT max(s.last_seen_at) FROM user_session s WHERE s.user_id = u.user_id) AS last_seen_at,
-  u.created_at`;
+  u.created_at, ${photoUrlSql("e")} AS photo_url`;
 
 const FROM = `
   FROM app_user u
