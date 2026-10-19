@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "8a562c1c97696419732297e92749c711ac20eec41c69e997834240026f7b9e6b",
+  "source_hash": "9d7a6ba6594d0f031b6593230e9bc71e551466c0253ee28b1b7c5f68b8e53db1",
   "schemas": 549,
   "endpoints": 306,
   "inputs": {
@@ -38,7 +38,7 @@
     "packages/contract/schemas/leads.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/leave.js": "baca565771dabcd91426f446f8bd02ff89d1635b95a206542e9bd290eb84550c",
     "packages/contract/schemas/mailbox.js": "0aa0c621f65a6e591ec6d5cd1ca93188946499f0da64bdf8dd4daec0db5722ca",
-    "packages/contract/schemas/notifications.js": "007dc4ff0cdd9b94b417f4d943be5cfbadbe5619ca7e2e24f882279f3355f898",
+    "packages/contract/schemas/notifications.js": "85ce91174831ba62c0a6df9825bb7a3367723460e90cb57e5ba03c4461a3c9ae",
     "packages/contract/schemas/offers.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/onboarding.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/organisation.js": "189495f37d9325f5e94e047c354b3ac54f7d3817cdd38a847e652752ad87369d",

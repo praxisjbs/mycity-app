@@ -6,3 +6,4 @@ export { toast, type ToastApi, type ToastOptions, type ShowToast } from "./toast
 export { ErrorState, type ErrorStateProps, type ErrorLike } from "./ErrorState";
 export { ErrorBoundary, type ErrorBoundaryProps } from "./ErrorBoundary";
 export * from "./NotificationBanner";
+export * from "./UrgentBar";

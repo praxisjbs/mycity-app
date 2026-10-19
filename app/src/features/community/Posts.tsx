@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/api/client";
+import { invalidate } from "@/api/hooks";
 import { saveFile, useFileUrl } from "@/api/download";
 import type { Message } from "@/api/types/community";
 import { usePhoto, usePhotos } from "@/api/download";
-import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
+import { Avatar, Button, Card, cn, Confetti, formatBytes, formatDate, formatDateTime, formatTime, Icon, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
 
 /** Highlight search hits inside a message. */
 export function Hl({ text, q }: { text: string; q: string }) {
@@ -124,6 +125,41 @@ function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
   );
 }
 
+/**
+ * An announcement in #announcements, at its level: amber when important, red and pulsing when
+ * urgent, with Acknowledge for each person in its audience until they press it (community.md §3).
+ */
+function AnnouncementPost({ m, q }: { m: Message; q: string }) {
+  const a = m.announcement;
+  const asks = a?.urgency === "urgent" && a.in_audience;
+  const acknowledge = () =>
+    api
+      .call("POST /api/v1/community/announcements/:id/acknowledge", { params: { id: a!.announcement_id }, body: {} })
+      .then(() => invalidate("/api/v1/community", "/api/v1/notifications"));
+  return (
+    <Card urgency={a?.urgency ?? "normal"} className="max-w-152">
+      <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground">
+        <Icon name="flag" />
+        {m.author?.display_name} · {formatDate(m.sent_at)}
+        {a?.urgency === "urgent" && <Pill tone="err">Urgent</Pill>}
+        {a?.urgency === "important" && <Pill tone="warn">Important</Pill>}
+      </div>
+      <h3 data-copy="content" className="text-base"><Hl text={a?.title ?? ""} q={q} /></h3>
+      <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
+      {asks &&
+        (a.acknowledged_at ? (
+          <p className="mt-2.5 flex items-center gap-1.5 text-xs text-success">
+            <Icon name="tick" />Acknowledged {formatDateTime(a.acknowledged_at)}
+          </p>
+        ) : (
+          <Button variant="primary" size="sm" className="mt-2.5 phone:w-full" onClick={acknowledge}>
+            Acknowledge
+          </Button>
+        ))}
+    </Card>
+  );
+}
+
 const TICK = { sent: ["tick", "Sent"], delivered: ["ticks", "Delivered"], read: ["ticks", "Read"] } as const;
 
 /** One post in a channel or a conversation. */
@@ -171,15 +207,7 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
     /* A poll reads as a block up to 560 px, as in the demo, not shrunk to its words. */
     return <div className={cn("flex w-full max-w-140 items-start gap-1", m.mine && "flex-row-reverse")}>{card}{menu}</div>;
   }
-  if (m.message_type === "announcement") {
-    return (
-      <div className="max-w-152 rounded-card border border-border bg-background px-3.5 py-3">
-        <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground"><Icon name="flag" />{m.author?.display_name} · {formatDate(m.sent_at)}</div>
-        <h3 data-copy="content" className="text-base"><Hl text={m.announcement?.title ?? ""} q={q} /></h3>
-        <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
-      </div>
-    );
-  }
+  if (m.message_type === "announcement") return <AnnouncementPost m={m} q={q} />;
   let inner: ReactNode;
   if (m.deleted) inner = <span className="italic opacity-70">Message deleted</span>;
   else if (m.message_type === "audio") inner = <VoiceNote m={m} mine={m.mine} />;

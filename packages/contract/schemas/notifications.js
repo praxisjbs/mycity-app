@@ -28,8 +28,9 @@ const NotificationLink = z
  * How hard a notice insists (docs/guides/notifications.md §6): `important` is amber, `urgent` is
  * red, stays in the urgent bar and is alerted again until it closes.
  */
-const NOTIFICATION_URGENCIES = ["normal", "important", "urgent"];
-const NotificationUrgency = z.enum(NOTIFICATION_URGENCIES);
+// Inline, so the generated type is the three values, not any string.
+const NotificationUrgency = z.enum(["normal", "important", "urgent"]);
+const NOTIFICATION_URGENCIES = NotificationUrgency.options;
 
 /**
  * One row of the bell. `link` is null when the record has no screen, or the reader cannot open it.
