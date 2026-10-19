@@ -42,23 +42,24 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 31 items below: 30 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
+| M0 Foundation | 32 items below: 30 done, 2 open | | | | | |
+| M1 Core Operations & Employee Management | 30 | 0 | 1 | 29 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
-| M6 Payroll & Notifications | 7 | 7 | 0 | 0 | 0 | 0 |
+| M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **58** | **0** | **36** | **0** | **0** |
+| **Total** | **94** | **57** | **1** | **36** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
 Updates (M9) is built with Settings · Attendance Policy (owner decision, 19/10/2026). M4 and M5 include their public-site
-pages. Settings → Notifications is counted in M6, where it is built.
+pages. Settings → Notifications was brought forward to M0 by TB on 19/10/2026 and is counted with
+M1, like the other M0 screens.
 
 ---
 
@@ -100,9 +101,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
 | Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☑ | 19/10/2026 |
 | Notifications everywhere (TB, 19/10/2026): every device at once, every channel post alerting, urgency with Acknowledge, the urgent bar and urgent repeats (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☑ | 19/10/2026 |
+| Notification rules and reminders (TB, 19/10/2026): Settings · Notifications brought forward from M6 (#74), the reminder engine with approval and probation reminders, the daily digest, quiet hours (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☐ | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Notifications everywhere, PR 1 merged (#81). PR 2 started from `main`: Settings ·
+  Notifications (#74) brought forward from M6, the reminder engine, approval and probation reminders,
+  the daily digest and quiet hours, designed in `docs/guides/notifications.md` (the new M0 item).
+  Left: build and ship PR 2.
 - 19/10/2026 · TB · Notifications everywhere, started from TB's twelve answers
   (`docs/handoff/notifications-everywhere.md`). An announcement GE posted from the build account
   reached no device signed in as that account, by design: nobody is told of their own action.
@@ -1012,7 +1018,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 74 | Notifications | `notifications` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| 74 | Notifications | `notifications` | M0 | TB | ☐ | ☐ | ☐ | In progress | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
@@ -1022,6 +1028,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · Notifications (#74), brought forward from M6 to M0 by TB with the rest of the
+  notifications work (`docs/handoff/notifications-everywhere.md`, PR 2): the guide is written
+  (`docs/guides/notifications.md` §2 to §11: the company's rule per notice, copies, the reminders,
+  the digest, quiet hours, the reminder recipe for M2). Left: the contract, `0480`, the backend
+  and both shells.
 - 19/10/2026 · TB · Organisation (#69): the brand files (`docs/guides/foundation.md` §6.11). A Brand card takes the Logo, the White Logo (shown on Deep Green) and the Icon, each one upload that applies at once (`POST`, `DELETE /settings/organisation/brand/:slot`, purpose `brand`: PNG or WebP, kept a PNG, colours untouched), and Remove. Letterheads and PDFs draw the Logo, system mail's header the White Logo inside the message, email signatures the White Logo or the Icon. One reader of the profile for all of them (`shared/organisation/profile.js`) also fixes letterheads and system mail, which read an `organisation.profile` row nothing wrote and so always printed the defaults; the letterhead's footer now carries the RC number. Left: MyCity uploads its files.
 - 19/10/2026 · TB · Imports (#93): a row saved with something missing (a warning: a person left
   without a Line Manager, say) is a problem beside the errors and duplicates. The preview lists
