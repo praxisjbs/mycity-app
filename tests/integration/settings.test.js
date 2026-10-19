@@ -175,6 +175,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "home.reports",
         "home.team",
         "mailbox.signature",
+        "queries.configure",
       ]);
 
       const m = await as("ops").get("/settings/roles/matrix");
@@ -231,7 +232,14 @@ describeDb("access, settings and audit against the real migrations", () => {
         (await as("ops").get(`/settings/roles/${roles.find((r) => r.code === code).role_id}`)).body;
       const ops = await detail("operations_people");
       expect(ops.visible_fields).toHaveLength(4);
-      expect(ops.capabilities).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team"]);
+      expect(ops.capabilities).toEqual([
+        "alerts.clear",
+        "alerts.manage",
+        "announcements.post",
+        "home.reports",
+        "home.team",
+        "queries.configure",
+      ]);
       const staff = await detail("employee");
       expect(staff.visible_fields).toEqual([]);
       expect(staff.capabilities).toEqual([]);
@@ -249,6 +257,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "announcements.post",
         "home.reports",
         "home.team",
+        "queries.configure",
       ]);
       expect(await grantsCache.getCapabilities(pool, people.staff.user.user_id)).toEqual([]);
     });

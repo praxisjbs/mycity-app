@@ -152,8 +152,15 @@ describeDb("approvals against the real migrations", () => {
   });
 
   test("a flow stored before the rules is listed with what is wrong with it", async () => {
-    const consequence = (await flowsOf("ops")).find((f) => f.key === "employee_consequence");
-    expect(consequence.problems.length).toBeGreaterThan(0);
+    // 3099 seeded one (employee_consequence) and 3190 switched it off; this stores its shape again.
+    await pool.query(
+      `INSERT INTO workflow_definition (key, version, module_key, name, context_types, stages, active)
+       VALUES ('test_legacy', 1, 'queries', 'Legacy Flow', '{}'::jsonb,
+               '[{"key":"manager_review","approver":{"role":"manager"},"sla_hours":48}]'::jsonb, true)
+       ON CONFLICT (key, version) DO NOTHING`,
+    );
+    const legacy = (await flowsOf("ops")).find((f) => f.key === "test_legacy");
+    expect(legacy.problems.length).toBeGreaterThan(0);
     expect((await as("ops").get("/settings/approvals/summary")).body.needs_fixing).toBeGreaterThanOrEqual(1);
   });
 
