@@ -100,6 +100,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · CI does only what a change needs (`.github/workflows/ci.yml`,
+  `scripts/check/lib/scope.js`, BACKEND_GUIDE §8.4), after a week of CI used 2,275 Actions minutes
+  (902 of them re-testing merges on `main`) and GitHub stopped starting jobs. A draft PR runs no CI
+  on GitHub (marking it ready starts the run); editing a PR's description re-runs it only when the
+  description or the base changed; a change to documents only runs the seven gates that read
+  documents (about a minute instead of about 13); a push to `main` whose tree the PR's last full run
+  passed runs those gates too, not the whole suite, and Release deploys it as before. Left: compare
+  a week of runs with these numbers.
 - 19/10/2026 · TB · The staff roster and the staff importer (`docs/guides/foundation.md` §6.1, §6.5,
   §6.6, §11), from a review of what staging shows. A VACANT row's Line Manager is the seat's own
   line (the importer dropped it without a word); `roles.json` gives a post outside the sheet its line

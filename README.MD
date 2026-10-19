@@ -81,6 +81,8 @@ mycity-app/
 │   ├── check/                the CI gates (§8); frontend: components (palette, contrast and more in PR 1)
 │   │   ├── lib/changes.js    what a change touched (git diff vs main) and its trailers,
 │   │   │                     shared by check/progress.js, check/guides.js, check/readme-map.js
+│   │   ├── lib/scope.js      how much of `npm run ci` a GitHub run needs: full, docs (documents
+│   │   │                     only) or tested (main's tree already passed in its PR); ci.yml asks it
 │   │   ├── lib/copy.js       the screen copy rules: word LIMITS, word count, Title Case, explainer
 │   │   │                     titles, refused button labels (gates 8, 11, 12, 17; FRONTEND_GUIDE §5)
 │   │   ├── lib/gallery.js    builds packages/ui's gallery when stale and serves it (gates 8, 11, a11y)
@@ -125,7 +127,7 @@ mycity-app/
 │   │                         staff-roster (MyCity's staff onto a server that has none)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
 ├── .github/
-│   ├── workflows/            ci.yml (runs `npm run ci`), release.yml, rollback.yml, uptime.yml
+│   ├── workflows/            ci.yml (runs `npm run ci`; none on a draft PR), release.yml, rollback.yml, uptime.yml
 │   │                         (the uptime probe every 10 minutes)
 │   ├── CODEOWNERS            who must approve each path (checked by check/codeowners.js)
 │   └── pull_request_template.md
