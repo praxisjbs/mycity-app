@@ -4,11 +4,13 @@
  * post in #announcements, its audience, its schedule and who has read it. Published and
  * tracked by holders of the announcements.post capability (People and the CEO).
  *
- * Read counts are visible to the poster and capability holders only (§6).
+ * Read counts are visible to the poster and capability holders only (§6). An announcement's level
+ * is its urgency (TB, 19/10/2026): an urgent one counts as read only once acknowledged.
  */
 const { z } = require("zod");
 const { uuid, text, isoDateTime, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
+const { NotificationUrgency } = require("./notifications");
 
 const ANNOUNCEMENT_STATUSES = ["draft", "scheduled", "published", "archived", "cancelled"];
 const AnnouncementStatus = z.enum(ANNOUNCEMENT_STATUSES);
@@ -34,6 +36,7 @@ const Announcement = z
     audience: Audience,
     departments: z.array(z.string()),
     status: AnnouncementStatus,
+    urgency: NotificationUrgency,
     author: PersonRef.nullable(),
     publish_at: isoDateTime.nullable(),
     published_at: isoDateTime.nullable(),
@@ -54,26 +57,33 @@ const AnnouncementCreate = z
     title: text(120),
     body: text(4000),
     audience: Audience.default({ kind: "all", department_ids: [] }),
+    urgency: NotificationUrgency.default("normal"),
     publish_at: isoDateTime.optional(),
   })
   .strict();
 
 /**
  * PUT /community/announcements/:id: change a scheduled announcement before it goes out.
- * publish_at stays required, and in the future: an edit never publishes.
+ * publish_at stays required, and in the future: an edit never publishes. Without `urgency` the
+ * level stays as it was.
  */
 const AnnouncementUpdate = z
   .object({
     title: text(120),
     body: text(4000),
     audience: Audience,
+    urgency: NotificationUrgency.optional(),
     publish_at: isoDateTime,
   })
   .strict();
 
 /** GET /community/announcements/:id/reads: one person in the audience. */
 const AnnouncementReader = z
-  .object({ person: PersonRef, read_at: isoDateTime.nullable() })
+  .object({
+    person: PersonRef,
+    read_at: isoDateTime.nullable(),
+    acknowledged_at: isoDateTime.nullable(),
+  })
   .strict();
 const AnnouncementReadQuery = listQuery({ read: z.enum(["read", "not_read"]).optional() });
 const AnnouncementReadPage = Paged(AnnouncementReader);
@@ -98,7 +108,7 @@ const TABLES = {
     virtual: {
       departments: "the names of the audience's departments, from department",
       author: "who posted it, from published_by",
-      reads: "how many of the audience have opened it, from announcement_read",
+      reads: "how many of the audience have opened it (acknowledged it, when urgent), from announcement_read",
     },
   },
   AnnouncementListQuery: { table: null, reason: "list controls for the tracking tab" },

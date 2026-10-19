@@ -154,8 +154,8 @@ are the contract's keys (gate 6).
 | `community_poll_vote` | `community_message_id`, `user_id`, `option_index` | One vote per person; voting again moves it |
 | `peer_recognition` | `from_employee_id`, `to_employee_id`, `message`, `community_message_id`, `note_written_by_system` | Kept separately so M2 performance and Home can count recognitions |
 | `community_presence` | `user_id`, `last_seen_at` | Touched by the socket on connect, every 30 seconds and on disconnect; online means a touch in the last 90 seconds |
-| `announcement` | `announcement_id`, `title`, `body`, `audience` jsonb (`{ kind: all \| departments, department_ids }`), `status` (`scheduled` / `published` / `cancelled`), `publish_at`, `published_at`, `published_by`, `community_message_id`, `audience_size`, `last_reminded_at`, and from `0470`: `urgency` (`normal`, `important`, `urgent`) | The record. #announcements and the M10 Knowledge Hub both read it |
-| `announcement_read` | `announcement_id`, `user_id`, `read_at`, and from `0470`: `acknowledged_at` | One row per person in the audience, written when it is published; `read_at` is set when they open #announcements, and also by Acknowledge; `acknowledged_at` only by Acknowledge |
+| `announcement` | `announcement_id`, `title`, `body`, `audience` jsonb (`{ kind: all \| departments, department_ids }`), `status` (`scheduled` / `published` / `cancelled`), `publish_at`, `published_at`, `published_by`, `community_message_id`, `audience_size`, `last_reminded_at`, and from `1145`: `urgency` (`normal`, `important`, `urgent`) | The record. #announcements and the M10 Knowledge Hub both read it |
+| `announcement_read` | `announcement_id`, `user_id`, `read_at`, and from `1145`: `acknowledged_at` | One row per person in the audience, written when it is published; `read_at` is set when they open #announcements, and also by Acknowledge; `acknowledged_at` only by Acknowledge |
 
 Files (images, voice notes, video, documents) are uploaded to the conversation first
 (`POST /channels/:id/media`, purpose `attachment`) and stored by the vault against the channel

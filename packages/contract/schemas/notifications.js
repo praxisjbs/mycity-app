@@ -24,12 +24,27 @@ const NotificationLink = z
   })
   .strict();
 
-/** One row of the bell. `link` is null when the record has no screen, or the reader cannot open it. */
+/**
+ * How hard a notice insists (docs/guides/notifications.md §6): `important` is amber, `urgent` is
+ * red, stays in the urgent bar and is alerted again until it closes.
+ */
+const NOTIFICATION_URGENCIES = ["normal", "important", "urgent"];
+const NotificationUrgency = z.enum(NOTIFICATION_URGENCIES);
+
+/**
+ * One row of the bell. `link` is null when the record has no screen, or the reader cannot open it.
+ * An urgent notice is open until acknowledged (`acknowledge_required`) or else until read;
+ * `repeat_count` grows with each urgent repeat, so an app shows the banner again.
+ */
 const Notification = z
   .object({
     notification_id: uuid,
     category: z.string(),
     priority: z.enum(["normal", "high"]),
+    urgency: NotificationUrgency,
+    acknowledge_required: z.boolean(),
+    acknowledged_at: isoDateTime.nullable(),
+    repeat_count: z.number().int().min(0),
     title: z.string(),
     body: z.string().nullable(),
     entity_type: z.string().nullable(),
@@ -45,6 +60,9 @@ const NotificationListQuery = listQuery({
   status: z.enum(["unread", "read"]).optional(),
 });
 const NotificationPage = Paged(Notification);
+
+/** GET /notifications/urgent: the caller's open urgent notices, newest first (the urgent bar). */
+const UrgentNoticeQuery = listQuery();
 
 /** GET /notifications/unread-count: the bell's dot. */
 const UnreadCount = z.object({ unread: z.number().int().min(0) }).strict();
@@ -218,7 +236,7 @@ const PushDeviceRead = z
  * What a push carries to the service worker (version 1, under 3 KB). `path` opens the
  * record; `tag` groups a conversation on the device; `mode` says how a newer push for the
  * same tag behaves: `alert` replaces and alerts again, `quiet` replaces silently until it
- * is opened, `single` stands alone.
+ * is opened, `single` stands alone. `round` is 0 for the first alert and counts urgent repeats.
  */
 const PushPayload = z
   .object({
@@ -231,6 +249,8 @@ const PushPayload = z
     mode: z.enum(["alert", "quiet", "single"]),
     category: z.string(),
     priority: z.enum(["normal", "high"]),
+    urgency: NotificationUrgency,
+    round: z.number().int().min(0),
     ts: isoDateTime,
     unread: z.number().int().min(0),
     test: z.boolean(),
@@ -246,6 +266,7 @@ const TABLES = {
   },
   NotificationListQuery: { table: null, reason: "list controls and the read filter for the bell" },
   NotificationPage: { table: null, reason: "a page of notifications" },
+  UrgentNoticeQuery: { table: null, reason: "list controls for the caller's open urgent notices" },
   UnreadCount: { table: null, reason: "a count of the caller's unread notifications" },
   NotificationEmailVars: { table: null, reason: "the variables of templates/email/notification.html, not a row" },
   NotificationReadStateQuery: { table: null, reason: "the ids of shown notifications to check" },
@@ -281,10 +302,13 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  NOTIFICATION_URGENCIES,
+  NotificationUrgency,
   NotificationLink,
   Notification,
   NotificationListQuery,
   NotificationPage,
+  UrgentNoticeQuery,
   UnreadCount,
   NavBadges,
   NotificationEmailVars,
