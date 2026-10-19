@@ -1,4 +1,4 @@
-import type { LoadTile, Place, ResolveAddress, SearchPlaces } from "@mycity/ui";
+import type { LatLon, LoadTile, Place, ResolveAddress, SearchPlaces } from "@mycity/ui";
 import { api } from "@/api/client";
 import { fetchBlob } from "@/api/download";
 
@@ -12,6 +12,17 @@ export const searchPlaces: SearchPlaces = (q) => api.call("GET /api/v1/maps/sear
 
 /** A picked place's centre as the text a coordinate field holds, to about 10 cm. */
 export const coordinatesOf = (place: Place) => ({ latitude: place.lat.toFixed(6), longitude: place.lon.toFixed(6) });
+
+/** The centre typed so far, once both coordinate fields hold real coordinates; null until then. */
+export const pointOf = (latitude: string, longitude: string): LatLon | null => {
+  if (!latitude.trim() || !longitude.trim()) return null;
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? { lat, lon } : null;
+};
+
+/** Close enough that a fence of this radius, in metres, shows whole on a small map. */
+export const zoomFor = (radius: number) => (radius <= 150 ? 16 : radius <= 400 ? 15 : 14);
 
 /**
  * Each map tile fetched with the session, since the tile route is signed in. On the

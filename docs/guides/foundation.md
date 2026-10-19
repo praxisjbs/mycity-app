@@ -587,7 +587,9 @@ The map's tiles and the address at a worksite's centre go through the same API.
   (`fetchBlob` in `app/src/api/download.ts`, the same way photos load), drawing it from the bytes.
   Nothing about the map is public, so nobody outside spends the quota. One style, `osm-bright`, to
   zoom 20; the server keeps about 300 tiles for a day and the browser keeps each for a week. On the
-  in-browser mock there are no tiles and the map draws its points alone.
+  in-browser mock there are no tiles and the map draws its points alone. Maps today: a worksite's form
+  and details, a field assignment's sites and a client visit's site (`SiteMap.tsx` in attendance, a
+  tap moving the centre).
 - **A worksite's address from its point** (decided 19/10/2026, worksites only): when People type
   a worksite's coordinates or tap its map and the address is still empty, the form asks
   `GET /maps/reverse` after a 600 ms pause and fills the address; an address already written is never
@@ -754,6 +756,7 @@ screen.
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · §6.12: a field assignment's sites and a client visit's site show the same map as a worksite's form (`app/src/features/attendance/SiteMap.tsx`), without the address lookup.
 - 19/10/2026 · TB · Map tiles and a worksite's address (F21, §5, §6.12; decided 19/10/2026): `GET /maps/tiles/:z/:x/:y.png` (signed in, fetched by the map with the session through `MapView`'s new `loadTile`) and `GET /maps/reverse` (`people` create or edit, a worksite's centre only; homes and punches are never sent). People · Worksites shows the fence on a map in the form and the worksite's details, tapping the map moves the centre, and typed coordinates fill an empty address.
 - 19/10/2026 · TB · The address search (F21, §5, §6.12): `GET /maps/search` in a new `maps` module over `services/maps/geoapify.service.js` (`GEOAPIFY_API_KEY`), and `AddressField` in `packages/ui`, now on every address a person types: People · Worksites, field sites, work location requests, homes, My Profile, Settings · Organisation (§10.1) and a vacancy's location. On a worksite, a field site and a client visit the place picked fills Latitude and Longitude. Map tiles and the reverse lookup stay open.
 - 19/10/2026 · AJ · A module's tab strip on a narrow desktop window (People, ESS, Settings and every other module): `Tabs` keeps the tabs that fit, the active one always among them, and folds the rest into More Tabs, a ⋯ menu at the end of the strip (dotted when a hidden tab has a count), instead of scrolling sideways. Phones keep the sideways row. FRONTEND_GUIDE §9.2 updated. TB to review.

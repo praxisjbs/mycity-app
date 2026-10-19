@@ -8,10 +8,11 @@ import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { coordinatesOf, loadTile, resolveWorksiteAddress, searchPlaces } from "@/features/shared/places";
+import { coordinatesOf, loadTile, pointOf, resolveWorksiteAddress, searchPlaces, zoomFor } from "@/features/shared/places";
 import { useScreenAction } from "@/shell/screen-action";
-import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who, type LatLon } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
 import { PATTERN } from "./labels";
+import { SiteMap } from "./SiteMap";
 
 /**
  * People · Worksites (#28, docs/guides/attendance.md §10): the offices a punch is matched to, each
@@ -149,14 +150,6 @@ function WorksiteView({ id, close }: { id: string; close: () => void }) {
 
 type Values = { name: string; address: string; latitude: string; longitude: string; radius_m: string };
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
-/** The centre typed so far, once both numbers are real coordinates. */
-const pointOf = (lat: string, lon: string): LatLon | null => {
-  const a = num(lat);
-  const b = num(lon);
-  return a !== undefined && b !== undefined && Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180 ? { lat: a, lon: b } : null;
-};
-/** Close enough that the whole fence shows on a small map. */
-const zoomFor = (radius: number) => (radius <= 150 ? 16 : radius <= 400 ? 15 : 14);
 const bodyOf = (v: Values) => ({ name: v.name, address: v.address, latitude: num(v.latitude), longitude: num(v.longitude), radius_m: num(v.radius_m) });
 
 /**
@@ -181,8 +174,6 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
   const busy = create.pending || update.pending;
   const { set } = f;
   const point = pointOf(f.values.latitude, f.values.longitude);
-  const radius = num(f.values.radius_m);
-  const fence = radius !== undefined && Number.isInteger(radius) && radius >= 25 && radius <= 1000 ? radius : undefined;
   // Only a centre the person moved is looked up: a picked place brings its own address, and
   // an existing worksite opened for a change is left as it was. Each centre is asked about
   // once, so an address cleared on purpose is not written back for the same point.
@@ -255,20 +246,18 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
       <Field label={<HelpTerm help="A punch inside this distance from the centre counts as on site. Between 25 and 1000 metres.">Radius, Metres</HelpTerm>} {...f.status("radius_m")}>
         <NumberField {...f.field("radius_m")} />
       </Field>
-      {point && (
-        <MapView
-          className="mb-3"
-          height="sm"
-          zoom={zoomFor(fence ?? 100)}
-          markers={[{ key: "centre", lat: point.lat, lon: point.lon, label: f.values.address.trim() || f.values.name.trim() || "Centre", tone: "brand" }]}
-          radiusMetres={fence}
-          loadTile={loadTile}
-          onPick={(p) => {
-            typed("latitude")(p.lat.toFixed(6));
-            typed("longitude")(p.lon.toFixed(6));
-          }}
-        />
-      )}
+      <SiteMap
+        latitude={f.values.latitude}
+        longitude={f.values.longitude}
+        radius={f.values.radius_m}
+        min={25}
+        max={1000}
+        label={f.values.address || f.values.name}
+        onMove={(latitude, longitude) => {
+          typed("latitude")(latitude);
+          typed("longitude")(longitude);
+        }}
+      />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={busy} onClick={() => submit()}>{site ? "Save Worksite" : "Add Worksite"}</Button>

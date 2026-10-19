@@ -111,8 +111,12 @@ describe("field assignments", () => {
     fill(dialog, "First Day", typed(5));
     fill(dialog, "Last Day", typed(5));
     fill(dialog, "Site Name", "Hall B");
+    expect(dialog.querySelector("[data-points]")).toBeNull();
     fill(dialog, "Latitude", "6.5");
     fill(dialog, "Longitude", "3.4");
+    // The site's centre and its fence on a map once both coordinates are real.
+    await waitFor(() => expect(dialog.querySelector("[data-points]")?.getAttribute("data-points")).toBe("6.50000, 3.40000"));
+    expect(within(dialog).getByText("Hall B: 6.50000, 3.40000")).toBeTruthy();
     pressIn(dialog, "Save Assignment");
     // Bashir is already on FA-0003 that day: the server marks the first day.
     await waitFor(() => expect(within(dialog).getByText("Overlaps another")).toBeTruthy());

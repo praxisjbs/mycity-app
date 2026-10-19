@@ -10,6 +10,7 @@ import { AddressField, Button, Card, CardHeader, Chain, ChoiceField, DataView, D
 import { useClock } from "./ClockButton";
 import { ReadingStep, useReading } from "./HomeLocation";
 import { REQUEST_STATUS, REQUEST_TYPE, REQUEST_TYPE_HELP } from "./labels";
+import { SiteMap } from "./SiteMap";
 
 /**
  * ESS · Work Location Requests (#87, docs/guides/attendance.md §6.11, §10): the person's own
@@ -299,6 +300,18 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
           <Field label={<HelpTerm help="A punch within this distance of the site counts at the site. Between 100 and 500 metres.">Radius, Metres</HelpTerm>} {...f.status("site_radius")}>
             <NumberField {...f.field("site_radius")} />
           </Field>
+          <SiteMap
+            latitude={v.site_latitude}
+            longitude={v.site_longitude}
+            radius={v.site_radius}
+            min={100}
+            max={500}
+            label={v.address}
+            onMove={(latitude, longitude) => {
+              f.set("site_latitude", latitude);
+              f.set("site_longitude", longitude);
+            }}
+          />
         </Card>
       )}
       <Field label="Reason" {...f.status("reason")}>

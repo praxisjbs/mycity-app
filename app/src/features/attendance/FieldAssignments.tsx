@@ -8,6 +8,7 @@ import { EmployeePicker } from "@/features/shared/pickers";
 import { coordinatesOf, searchPlaces } from "@/features/shared/places";
 import { AddressField, Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, NumberField, Pill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { ASSIGNMENT_STATE } from "./labels";
+import { SiteMap } from "./SiteMap";
 
 /**
  * Field assignments (docs/guides/attendance.md §6.12, §10): People · Attendance's Field view, where a
@@ -283,6 +284,18 @@ export function NewAssignmentForm({ close }: { close: () => void }) {
       <Field label={<HelpTerm help="A punch within this distance of the site counts at the site. Between 100 and 500 metres.">Radius, Metres</HelpTerm>} {...f.status(`s${n}_radius`)}>
         <NumberField {...f.field(`s${n}_radius`)} />
       </Field>
+      <SiteMap
+        latitude={v[`s${n}_latitude`]}
+        longitude={v[`s${n}_longitude`]}
+        radius={v[`s${n}_radius`]}
+        min={100}
+        max={500}
+        label={v[`s${n}_address`] || v[`s${n}_name`]}
+        onMove={(latitude, longitude) => {
+          f.set(`s${n}_latitude`, latitude);
+          f.set(`s${n}_longitude`, longitude);
+        }}
+      />
     </Card>
   );
   return (
