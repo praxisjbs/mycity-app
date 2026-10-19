@@ -9,7 +9,8 @@
  *   ?importer=<key>    Settings, Imports opens its wizard on that importer
  *
  * `run` is for an action with no screen of its own, which the app does itself: Clock In
- * or Out (the clock sheet), Mark All Read (the bell), the theme and density the person
+ * or Out (the clock sheet), Mark All Read, Notification Settings, Turn On Notifications and
+ * Send Test Notification (the bell, docs/guides/notifications.md §9), the theme and density the person
  * prefers, Install App (the app drops it where the browser cannot install) and Sign Out.
  *
  * Every screen's New action is here: the search coverage gate fails a
@@ -26,7 +27,18 @@
 const routeMap = require("../route-map");
 const catalog = require("../access/access.catalog");
 
-const RUNS = new Set(["clock", "read_all", "theme_dark", "theme_light", "density", "install", "sign_out"]);
+const RUNS = new Set([
+  "clock",
+  "read_all",
+  "notify_settings",
+  "notify_on",
+  "notify_test",
+  "theme_dark",
+  "theme_light",
+  "density",
+  "install",
+  "sign_out",
+]);
 
 /**
  * @param {string} key  snake_case, unique
@@ -153,6 +165,21 @@ const ACTIONS = Object.freeze([
     run: "read_all",
     need: null,
     words: ["notifications", "read all", "clear notifications", "bell"],
+  }),
+  a("notification_settings", "Notification Settings", {
+    run: "notify_settings",
+    need: null,
+    words: ["notifications", "push", "alerts on my phone", "email notices", "mute", "sound"],
+  }),
+  a("turn_on_notifications", "Turn On Notifications", {
+    run: "notify_on",
+    need: null,
+    words: ["push", "phone notifications", "enable notifications", "allow notifications"],
+  }),
+  a("send_test_notification", "Send Test Notification", {
+    run: "notify_test",
+    need: null,
+    words: ["test push", "test notification", "check notifications"],
   }),
   a("theme_dark", "Use Dark Theme", {
     run: "theme_dark",

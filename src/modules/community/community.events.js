@@ -121,18 +121,32 @@ for (const key of [
 
 const firstLine = (e) => e.payload.preview || "New message";
 
+/** On a phone, a conversation's notices share one notification (docs/guides/notifications.md §6). */
+const conversation = (e) => `community_channel:${e.payload.community_channel_id}`;
+
 defineNotification(EVENTS.DIRECT_MESSAGE_SENT, {
   to: [{ users: (e, client) => others(e, client, { skipMuted: true }) }],
   title: (e) => e.payload.sender_name || "New message",
   body: firstLine,
   priority: "high",
+  // Every direct message alerts, replacing the one before from the same conversation.
+  push: { tag: conversation, mode: "alert" },
 });
 
 defineNotification(EVENTS.CHANNEL_MESSAGE_POSTED, {
   to: [{ users: (e, client) => others(e, client, { skipMuted: true }) }],
   title: (e) =>
-    e.payload.sender_name ? `${e.payload.sender_name} posted` : "New post",
-  body: firstLine,
+    e.payload.channel_name
+      ? `#${e.payload.channel_name}`
+      : e.payload.sender_name
+        ? `${e.payload.sender_name} posted`
+        : "New post",
+  body: (e) =>
+    e.payload.channel_name && e.payload.sender_name
+      ? `${e.payload.sender_name}: ${firstLine(e)}`
+      : firstLine(e),
+  // One alert per channel (TB, 19/10/2026): later posts update it quietly until it is opened.
+  push: { tag: conversation, mode: "quiet" },
 });
 
 defineNotification(EVENTS.RECOGNITION_POSTED, {

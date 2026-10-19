@@ -214,6 +214,17 @@ const passkeyLimiter = makeLimiter({
   windowMs: 15 * 60_000,
 });
 
+/**
+ * A service worker's two calls with its device token (Mark Read, renewing its push
+ * subscription). Only a refused token counts, so a busy person never waits.
+ */
+const pushDeviceLimiter = makeLimiter({
+  name: "push-device",
+  max: 30,
+  windowMs: 15 * 60_000,
+  failuresOnly: true,
+});
+
 /** Confirming it is you before a sign-in method changes: per person, after auth. */
 const confirmLimiter = makeLimiter({
   name: "confirm",
@@ -238,6 +249,7 @@ module.exports = {
   deviceLimiter,
   twoStepLimiter,
   pinLimiter,
+  pushDeviceLimiter,
   passkeyLimiter,
   confirmLimiter,
   TOO_MANY,

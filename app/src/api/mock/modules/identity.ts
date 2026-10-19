@@ -288,6 +288,53 @@ route("POST /api/v1/notifications/read-all", () => {
   NOTES.forEach((_, i) => READ.add(noteId(i)));
   return noContent();
 });
+route("GET /api/v1/notifications/read-state", (req) =>
+  ok({ read: String(req.query.ids ?? "").split(",").filter((id) => READ.has(id)) }),
+);
+
+/** The categories and their defaults (src/shared/notifications/categories.js): key, label, locked, email, push. */
+const CATEGORIES: Array<[string, string, boolean, boolean, boolean]> = [
+  ["security", "Security", true, true, true],
+  ["approvals", "Approvals", false, true, true],
+  ["tasks", "Tasks", false, true, true],
+  ["alerts", "Alerts", false, true, false],
+  ["comms", "Messages and Mail", false, false, true],
+  ["people", "Attendance and Leave", false, false, true],
+  ["performance", "Performance", false, false, false],
+  ["queries", "Queries and Sanctions", false, true, true],
+  ["recruitment", "Recruitment", false, false, false],
+  ["payroll", "Payroll", false, true, false],
+  ["partnerships", "Partnerships", false, false, false],
+  ["expenses", "Expenses", false, false, true],
+  ["knowledge", "Knowledge Hub", false, false, false],
+  ["system", "System", false, false, false],
+];
+const PREFS = new Map<string, boolean>();
+const prefsBody = () => ({
+  categories: CATEGORIES.map(([category, label, locked, email, push]) => {
+    const defaults = { in_app: true, email, push };
+    const on = (ch: "in_app" | "email" | "push") => (locked && defaults[ch]) || (PREFS.get(`${category}:${ch}`) ?? defaults[ch]);
+    return { category, label, locked, channels: { in_app: on("in_app"), email: on("email"), push: on("push") }, defaults };
+  }),
+});
+route("GET /api/v1/notifications/preferences", () => ok(prefsBody()));
+route("PUT /api/v1/notifications/preferences", (req) => {
+  const { category, channel, enabled } = req.body as { category: string; channel: "in_app" | "email" | "push"; enabled: boolean };
+  const c = CATEGORIES.find(([key]) => key === category);
+  if (!c) return fail(404, "NOT_FOUND", "There is no such category.");
+  if (c[2] && !enabled) return fail(422, "CATEGORY_LOCKED", "Security notices stay on.");
+  PREFS.set(`${category}:${channel}`, enabled);
+  return ok(prefsBody());
+});
+
+// The mock has no push service: the device reads Not Available, and the calls answer as the API would.
+route("GET /api/v1/notifications/push/config", () => ok({ enabled: false, public_key: null, key_id: null }));
+route("POST /api/v1/notifications/push/subscriptions", () => fail(422, "PUSH_UNAVAILABLE", "Push is not available here."));
+route("GET /api/v1/notifications/push/devices", (req) => paged([], req));
+route("POST /api/v1/notifications/push/devices/:id/remove", () => noContent());
+route("POST /api/v1/notifications/push/test", () => fail(422, "NO_DEVICE", "Turn on notifications on this device first."));
+route("POST /api/v1/notifications/push/renew", () => noContent(), { anonymous: true });
+route("POST /api/v1/notifications/push/read", () => noContent(), { anonymous: true });
 
 route("GET /api/v1/search", (req) => {
   for (const k of Object.keys(req.query)) if (!["q", "page", "type"].includes(k)) return invalid({ [k]: ["is not a filter on this list"] });

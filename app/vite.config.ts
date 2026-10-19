@@ -63,9 +63,13 @@ export default defineConfig(({ mode }) =>
       tailwindcss(),
       screenList(),
       VitePWA({
+        // Our own service worker (src/sw.ts): the precache and offline rules below, and web push.
+        strategies: "injectManifest",
+        srcDir: "src",
+        filename: "sw.ts",
         registerType: "prompt",
         injectRegister: false,
-        includeAssets: ["favicon.svg", "apple-touch-icon.png"],
+        includeAssets: ["favicon.svg", "apple-touch-icon.png", "badge-96.png"],
         manifest: {
           id: "/",
           name: "MyCity App",
@@ -84,14 +88,11 @@ export default defineConfig(({ mode }) =>
             { src: "pwa-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
           ],
         },
-        workbox: {
+        // What the worker precaches. The navigation fallback (never /api/ or /gallery, F10) and
+        // the API left to the network (FRONTEND_GUIDE §8) are in src/sw.ts.
+        injectManifest: {
           globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-          navigateFallback: "/index.html",
-          // The API, and the component gallery staging serves beside the app (F10), are never the app shell.
-          navigateFallbackDenylist: [/^\/api\//, /^\/gallery(\/|$)/],
-          cleanupOutdatedCaches: true,
-          // The API is never cached: every number on a screen is live (FRONTEND_GUIDE §8).
-          runtimeCaching: [{ urlPattern: /^\/api\//, handler: "NetworkOnly" }],
+          rollupFormat: "iife",
         },
         devOptions: { enabled: false },
     }),
