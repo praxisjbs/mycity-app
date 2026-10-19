@@ -82,6 +82,15 @@ describe("MediaViewer", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("offers Forward only where the screen gives it, for the file on view", async () => {
+    view();
+    expect(screen.queryByRole("button", { name: "Forward" })).toBeNull();
+    const onForward = vi.fn();
+    view({ onForward, index: 2 });
+    await userEvent.click(screen.getAllByRole("button", { name: "Forward" })[0]!);
+    expect(onForward).toHaveBeenCalledWith(ITEMS[2]);
+  });
+
   it("asks for a file once while it is on its way, however often the screen redraws", async () => {
     let arrive: (b: Blob) => void = () => undefined;
     const load = vi.fn(() => new Promise<Blob>((resolve) => (arrive = resolve)));

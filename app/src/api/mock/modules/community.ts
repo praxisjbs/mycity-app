@@ -3,6 +3,7 @@ import { firstLink, hostOf } from "@mycity/ui";
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, fold } from "../core";
 import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS } from "../data/people";
 import { UPLOADS } from "../uploads";
+import { attachmentOf } from "./mailbox";
 
 /**
  * Staff Community on the mock, in the contract's own shapes (packages/contract/schemas/
@@ -39,6 +40,7 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     document: null,
     album_key: null,
     link: null,
+    forwarded: false,
     duration_s: null,
     transcript: null,
     celebration: null,
@@ -486,6 +488,85 @@ route("POST /api/v1/community/channels/:id/messages", (req) => {
   c!.msgs.push(m);
   for (const k of c!.members) if (k !== req.user) c!.unread[k] = (c!.unread[k] ?? 0) + 1;
   return created(view(m, req.user!, c!));
+});
+/* Forwarding (community.md §3 step 19): where to, then a copy of each message in each chat. */
+const FORWARDABLE = new Set(["text", "image", "audio", "video", "file"]);
+const directOf = (a: string, b: string) => {
+  const pair = [...new Set([a, b])];
+  let c = CHANNELS.find((x) => x.channel_type === "direct" && x.members.length === pair.length && pair.every((k) => x.members.includes(k)));
+  if (!c) {
+    c = chan0(`dm-${pair.join("-")}`, pair, [], { channel_type: "direct", admins: [] });
+    CHANNELS.push(c);
+  }
+  return c;
+};
+route("GET /api/v1/community/forward-targets", (req) => {
+  const user = req.user!;
+  const last = (c: Chan) => String(c.msgs.at(-1)?.sent_at ?? "");
+  const mine = CHANNELS.filter((c) => isMember(c, user) && canPost(c, user) && (c.channel_type !== "direct" || c.msgs.length > 0)).sort((a, b) => last(b).localeCompare(last(a)));
+  const talked = new Set(mine.filter((c) => c.channel_type === "direct").map((c) => c.members.find((k) => k !== user) ?? user));
+  const rows = [
+    ...mine.map((c) => {
+      if (c.channel_type !== "direct") return { kind: "channel" as const, community_channel_id: c.community_channel_id, employee_id: null, name: c.name, person: null, members: c.members.length };
+      const other = c.members.find((k) => k !== user) ?? user;
+      return { kind: "direct" as const, community_channel_id: c.community_channel_id, employee_id: byKey(other)!.employee_id, name: byKey(other)!.display_name, person: person(other), members: null };
+    }),
+    ...PEOPLE.filter((p) => !talked.has(p.user_key)).map((p) => ({ kind: "person" as const, community_channel_id: null, employee_id: p.employee_id, name: p.display_name, person: person(p.user_key), members: null })),
+  ];
+  return paged(rows, req, { search: (t) => [t.name] });
+});
+route("POST /api/v1/community/forward", (req) => {
+  const user = req.user!;
+  const b = req.body as { message_ids?: string[]; mail_attachment_id?: string; channel_ids?: string[]; employee_ids?: string[] };
+  const chats: Chan[] = [];
+  for (const id of b.channel_ids ?? []) {
+    const c = chan(id);
+    if (!isMember(c, user)) return notFound();
+    if (!canPost(c!, user)) return fail(403, "CANNOT_POST", c!.name.startsWith("dm-") ? "You cannot post in this conversation" : `You cannot post in #${c!.name}`);
+    if (!chats.includes(c!)) chats.push(c!);
+  }
+  for (const id of b.employee_ids ?? []) {
+    const p = byId(id);
+    if (!p) return notFound();
+    const c = directOf(user, p.user_key);
+    if (!chats.includes(c)) chats.push(c);
+  }
+  if (!chats.length) return invalid({ channel_ids: ["Choose a chat"] });
+  if (chats.length > 5) return invalid({ channel_ids: ["At most 5 chats"] });
+  let items: MMsg[];
+  if (b.mail_attachment_id) {
+    const a = attachmentOf(user, b.mail_attachment_id);
+    if (!a) return notFound();
+    const doc: MediaRef = { document_id: sid(`fwd:${a.document_id}`), file_name: a.file_name, size_bytes: a.size_bytes, mime_type: a.mime_type, width: null, height: null, page_count: null, duration_ms: null, variants: [] };
+    items = [msg(/^image\//.test(a.mime_type) ? "image" : /^video\//.test(a.mime_type) ? "video" : "file", user, new Date().toISOString(), { document: doc })];
+  } else {
+    const found = (b.message_ids ?? []).map(located);
+    if (!found.length || found.some((f) => !f || f.m.deleted)) return fail(404, "MESSAGE_GONE", "A message was deleted");
+    if (found.some((f) => !isMember(f!.c, user))) return notFound();
+    if (found.some((f) => !FORWARDABLE.has(f!.m.message_type))) return fail(422, "NOT_FORWARDABLE", "Polls, cards and announcements are not forwarded");
+    items = found.map((f) => f!.m).sort((x, y) => x.sent_at.localeCompare(y.sent_at));
+  }
+  let sent = 0;
+  for (const c of chats) {
+    const albums = new Map<string, string>();
+    for (const it of items) {
+      const album_key = it.album_key ? (albums.get(it.album_key) ?? albums.set(it.album_key, crypto.randomUUID()).get(it.album_key)!) : null;
+      const copy = msg(it.message_type, user, new Date(Date.now() + sent).toISOString(), {
+        body: it.body,
+        document: it.document,
+        album_key,
+        link: it.link,
+        duration_s: it.duration_s,
+        transcript: it.transcript,
+        forwarded: true,
+      });
+      copy.community_channel_id = c.community_channel_id;
+      c.msgs.push(copy);
+      for (const k of c.members) if (k !== user) c.unread[k] = (c.unread[k] ?? 0) + 1;
+      sent += 1;
+    }
+  }
+  return created({ sent, community_channel_ids: chats.map((c) => c.community_channel_id) });
 });
 route("POST /api/v1/community/link-previews", (req) => {
   const url = String(req.body.url ?? "").trim();

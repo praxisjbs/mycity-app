@@ -54,15 +54,23 @@ const EVENTS = defineEvents("community", {
   },
 });
 
-/** Files posted in a conversation: read by its members only, whoever they are. */
+/**
+ * Files posted in a conversation: read by its members, whoever they are, and by the members of
+ * any other conversation holding a live message with the same file (a forwarded copy, §4).
+ */
 defineDocumentType("community_media", {
   label: "Chat file",
   module: "community",
 });
 vault.defineAccess("community_channel", async (client, user, doc) => {
   const { rows } = await client.query(
-    "SELECT 1 FROM community_member WHERE community_channel_id = $1 AND user_id = $2",
-    [doc.entity_id, user.user_id],
+    `SELECT 1 FROM community_member WHERE community_channel_id = $1 AND user_id = $2
+     UNION ALL
+     SELECT 1 FROM community_message x
+       JOIN community_member m ON m.community_channel_id = x.community_channel_id AND m.user_id = $2
+      WHERE x.document_id = $3 AND x.deleted_at IS NULL
+     LIMIT 1`,
+    [doc.entity_id, user.user_id, doc.document_id],
   );
   return rows.length > 0;
 });
