@@ -160,9 +160,9 @@ Tick each step with its date and add a line to §8 when it is pushed.
 
 ### PR 2 · Settings · Notifications, reminders and quiet hours
 
-1. [ ] Guides first: Settings · Notifications in `notifications.md`, the reminder recipe for
-   modules (§7), PROGRESS #74 moved from M6 to now, MILESTONES note.
-2. [ ] Contract and migration `0480`: a rule per notice (on or off, extra roles and people, default
+1. [x] 19/10/2026 Guides first: Settings · Notifications in `notifications.md`, the reminder
+   recipe for modules (§7.1), PROGRESS #74 moved from M6 to M0, MILESTONES note.
+2. [x] 19/10/2026 Contract and migration `0480`: a rule per notice (on or off, extra roles and people, default
    channels, urgency), reminder rules (approvals every N hours, probation N days ahead, the digest's
    time), a person's quiet hours and digest switch.
 3. [ ] Backend: the notice catalogue (a label per declaration), the fan-out applying the company's
@@ -218,3 +218,6 @@ Tick each step with its date and add a line to §8 when it is pushed.
 - 19/10/2026 · PR 1 opened as #81; scope, checks, backend, frontend and screens green on GitHub;
   merged with TB's admin rights. PR 2 starts from `main`: §5 records its design. Next: PR 2 step 1,
   the guides.
+- 19/10/2026 · PR 2 steps 1 and 2 pushed: the guides (`notifications.md` §1 to §11, PROGRESS #74
+  moved to M0, MILESTONES), the contract (rules, reminders, quiet hours, the digest) and `0480`
+  (round trip passes). Next: step 3, the backend.
