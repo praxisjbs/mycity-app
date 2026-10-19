@@ -19,7 +19,8 @@ const { messageOf } = require("./attendance.service");
 const { routesOf } = require("../../http/route");
 
 const TZ = "Africa/Lagos";
-const OFFICE = { worksite_id: "w-1", name: "Testbed Office", latitude: 6.5, longitude: 3.4, radius_m: 100 };
+const OFFICE = { kind: "worksite", worksite_id: "w-1", name: "Testbed Office", latitude: 6.5, longitude: 3.4, radius_m: 100 };
+const HOME = { kind: "home", attendance_home_id: "h-1", worksite_id: null, name: "Home", latitude: 6.5, longitude: 3.4, radius_m: 100 };
 
 /** A point `metres` north of the office (one degree of latitude is about 111,195 m). */
 const north = (metres) => ({ latitude: 6.5 + metres / 111_195, longitude: 3.4 });
@@ -119,13 +120,82 @@ describe("the geofence", () => {
     expect(judge({ accuracy_m: 75 })).toMatchObject({ verdict: "inside", accuracy: "fair", result: "accepted" });
   });
 
-  test("no worksite, or remote work, is not judged on location", () => {
+  test("someone not remote with no worksite is not judged on location", () => {
     expect(judge({ expected: null, mode: "block" })).toMatchObject({ verdict: "not_applied", reason: "no_worksite", result: "accepted" });
-    expect(judge({ work_pattern: "remote", point: north(5000), mode: "block" })).toMatchObject({ verdict: "not_applied", reason: "remote", result: "accepted" });
+    expect(judge({ expected: null, work_pattern: "hybrid", mode: "block" })).toMatchObject({ verdict: "not_applied" });
+  });
+
+  test("a remote employee is judged against their approved home: inside, the boundary, outside", () => {
+    const remote = (over) => judge({ work_pattern: "remote", expected: HOME, ...over });
+    expect(remote({ point: north(60) })).toMatchObject({
+      verdict: "inside", result: "accepted", place: "home", home_id: "h-1", worksite_id: null, worksite_name: "Home", distance_m: 60,
+    });
+    expect(remote({ point: north(100) })).toMatchObject({ verdict: "inside", result: "accepted" });
+    expect(remote({ point: north(101), mode: "warn" })).toMatchObject({ verdict: "outside", result: "review", exception: "outside_home", worksite_id: null });
+    expect(remote({ point: north(2500), mode: "block" })).toMatchObject({ verdict: "outside", result: "rejected", exception: null });
+    expect(remote({ point: null, location_error: "denied", mode: "block" })).toMatchObject({
+      verdict: "unverified", result: "review", exception: "location_unverified", retry_location: true,
+    });
+  });
+
+  test("a remote employee with no approved home is reviewed under warn and block, never rejected", () => {
+    for (const mode of ["warn", "block"]) {
+      const r = judge({ work_pattern: "remote", expected: null, point: north(5000), mode });
+      expect(r).toMatchObject({ verdict: "unverified", reason: "no_home", result: "review", exception: "location_unverified", retry_location: false, place: null });
+    }
+    expect(judge({ work_pattern: "remote", expected: null, point: null, mode: "block" })).toMatchObject({ reason: "no_home", result: "review" });
+    expect(judge({ work_pattern: "remote", expected: null, mode: "off" })).toMatchObject({ result: "accepted", exception: null });
+  });
+
+  test("on an approved remote day or client visit with no fence the approval is the check, under every mode", () => {
+    const approved = { location_request_id: "r-1", place: "client_visit", name: "Client Visit" };
+    for (const mode of ["off", "warn", "block"]) {
+      expect(judge({ expected: null, approved, point: north(9000), mode })).toMatchObject({
+        verdict: "not_applied", reason: "approved_request", result: "accepted", exception: null, place: "client_visit",
+        worksite_name: "Client Visit", request_id: "r-1", worksite_id: null, distance_m: null,
+      });
+    }
+    expect(judge({ expected: null, approved, point: null, location_error: "denied", mode: "block" })).toMatchObject({ result: "accepted", retry_location: false });
+    expect(judge({ expected: null, approved: { ...approved, place: "remote_day", name: "Remote Day" }, work_pattern: "remote", mode: "block" }))
+      .toMatchObject({ verdict: "not_applied", reason: "approved_request", place: "remote_day" });
+  });
+
+  test("a temporary home is fenced like a home and names itself", () => {
+    const TEMP = { ...HOME, kind: "temporary_home", place: "temporary_home", attendance_home_id: null, location_request_id: "r-2", name: "Temporary Home" };
+    expect(judge({ work_pattern: "remote", expected: TEMP, point: north(40) })).toMatchObject({
+      verdict: "inside", result: "accepted", place: "temporary_home", request_id: "r-2", home_id: null, worksite_name: "Temporary Home",
+    });
+    expect(judge({ work_pattern: "remote", expected: TEMP, point: north(400), mode: "warn" })).toMatchObject({ exception: "outside_home", outside: "outside_home" });
+    expect(judge({ work_pattern: "remote", expected: TEMP, point: north(400), mode: "block" })).toMatchObject({ result: "rejected", outside: "outside_home" });
   });
 
   test("a hybrid employee is judged against their worksite", () => {
-    expect(judge({ work_pattern: "hybrid", point: north(340) })).toMatchObject({ verdict: "outside", result: "review" });
+    expect(judge({ work_pattern: "hybrid", point: north(340) })).toMatchObject({
+      verdict: "outside", result: "review", exception: "outside_worksite", place: "worksite", worksite_id: "w-1", home_id: null,
+    });
+  });
+
+  test("a field assignment's day is judged at the nearer of its sites, named by it, as a worksite is", () => {
+    const near = { field_site_id: "s-1", name: "Venue Hall", latitude: OFFICE.latitude, longitude: OFFICE.longitude, radius_m: 200 };
+    const far = { field_site_id: "s-2", name: "Depot Yard", latitude: OFFICE.latitude + 0.05, longitude: OFFICE.longitude, radius_m: 300 };
+    const FIELD = {
+      kind: "field", place: "field", worksite_id: null, attendance_home_id: null, field_assignment_id: "fa-1",
+      name: "Venue Hall or Depot Yard", latitude: near.latitude, longitude: near.longitude, radius_m: null, sites: [near, far],
+    };
+    expect(judge({ expected: FIELD, point: north(150) })).toMatchObject({
+      verdict: "inside", result: "accepted", place: "field", worksite_id: null, worksite_name: "Venue Hall",
+      assignment_id: "fa-1", site_id: "s-1", radius_m: 200,
+    });
+    // Beyond every site: outside the nearer one, as outside a worksite.
+    const out = judge({ expected: FIELD, point: north(900), mode: "warn" });
+    expect(out).toMatchObject({ verdict: "outside", exception: "outside_worksite", worksite_name: "Venue Hall", site_id: "s-1" });
+    expect(judge({ expected: FIELD, point: north(900), mode: "block" })).toMatchObject({ result: "rejected", outside: "outside_worksite" });
+    // A remote employee sent out is judged at the site, never as at home.
+    expect(judge({ expected: FIELD, work_pattern: "remote", point: north(150) })).toMatchObject({ verdict: "inside", home_id: null });
+    // No reading: unverified against the first site, never rejected.
+    expect(judge({ expected: FIELD, point: null, location_error: "denied", mode: "block" })).toMatchObject({
+      verdict: "unverified", result: "review", worksite_name: "Venue Hall",
+    });
   });
 });
 
@@ -293,12 +363,28 @@ describe("what a person reads", () => {
       "Clocked in at 08:58. People will review it: you were 340 m from Testbed Office.",
     );
     expect(messageOf(row("rejected", ["unknown_device"]))).toBe("Not counted: this device is not registered.");
+    expect(messageOf(row("review", ["outside_home"]))).toBe(
+      "Clocked in at 08:58. People will review it: you were 340 m from your approved home.",
+    );
+    expect(
+      messageOf(row("review", ["location_unverified"], { geofence: { reason: "no_home", distance_m: null, worksite_name: null } })),
+    ).toBe("Clocked in at 08:58. People will review it: you have no approved home location yet.");
+    expect(
+      messageOf(row("rejected", ["outside_home"], { geofence: { distance_m: 400, place: "temporary_home", worksite_name: "Temporary Home" } })),
+    ).toBe("Not counted: you were 400 m from your temporary home.");
   });
 
   test("an exception's detail comes from its evidence", () => {
     expect(detailOf("outside_worksite", { distance_m: 340, worksite_name: "Testbed Office", radius_m: 100 })).toBe(
       "340 m from Testbed Office, radius 100 m",
     );
+    expect(detailOf("outside_home", { distance_m: 2400, worksite_name: "Home", radius_m: 100 })).toBe(
+      "2400 m from the approved home, radius 100 m",
+    );
+    expect(detailOf("outside_home", { distance_m: 400, place: "temporary_home", radius_m: 100 })).toBe(
+      "400 m from the temporary home, radius 100 m",
+    );
+    expect(detailOf("location_unverified", { reason: "no_home" })).toBe("No approved home");
     expect(detailOf("location_unverified", { reason: "denied" })).toBe("No location: location was not shared");
     expect(detailOf("location_unverified", { reason: "poor_accuracy", accuracy_m: 180.4 })).toBe("Reading accurate to 180 m");
     expect(detailOf("unknown_device", { device_label: "Chrome on Android" })).toBe("Unregistered device: Chrome on Android");
@@ -309,6 +395,8 @@ describe("what a person reads", () => {
 
 describe("the routes", () => {
   const routes = routesOf(require("./attendance.routes").router);
+  /** A body's fields, through any refinements around it. */
+  const shapeOf = (schema) => (schema.shape ? schema.shape : shapeOf(schema._def.schema));
 
   test("the person's own routes are self and name no employee; People's carry the people grant", () => {
     expect(routes.length).toBeGreaterThan(10);
@@ -316,17 +404,45 @@ describe("the routes", () => {
       if (r.path.startsWith("/me") || r.path === "/punches") {
         expect(r.contract.self).toBe(true);
         expect(r.path).not.toMatch(/employee_id/);
-        if (r.contract.body) expect(Object.keys(r.contract.body._def.schema ? r.contract.body._def.schema.shape : r.contract.body.shape)).not.toContain("employee_id");
+        if (r.contract.body) expect(Object.keys(shapeOf(r.contract.body))).not.toContain("employee_id");
       } else {
         expect(r.permission && r.permission.key).toBe("people");
       }
     }
   });
 
+  test("a work location request names no employee or status; People read requests, and decide them in the approval", () => {
+    const send = routes.find((r) => r.method === "POST" && r.path === "/me/requests");
+    expect(Object.keys(shapeOf(send.contract.body)).sort()).toEqual([
+      "accuracy_m", "address", "ends_on", "home_latitude", "home_longitude", "reason", "request_type", "starts_on",
+    ]);
+    expect(routes.find((r) => r.method === "GET" && r.path === "/requests").permission).toMatchObject({ key: "people", action: "view" });
+    expect(routes.some((r) => /decision|approve/.test(r.path) && r.path.startsWith("/requests"))).toBe(false);
+  });
+
+  test("a home request carries no employee or status, and only People decide one", () => {
+    const send = routes.find((r) => r.method === "POST" && r.path === "/me/home");
+    expect(Object.keys(send.contract.body.shape).sort()).toEqual(["accuracy_m", "home_address", "home_latitude", "home_longitude"]);
+    const decide = routes.find((r) => r.method === "POST" && r.path === "/homes/:id/decision");
+    expect(decide.permission).toMatchObject({ key: "people", action: "approve" });
+  });
+
   test("a punch carries no distance, inside flag, device or employee: the server works those out", () => {
     const punch = routes.find((r) => r.method === "POST" && r.path === "/punches");
     const keys = Object.keys(punch.contract.body._def.schema.shape);
     expect(keys.sort()).toEqual(["accuracy_m", "device_at", "event_type", "latitude", "location_error", "longitude", "note"]);
+  });
+
+  test("a field assignment is set, cancelled and changed under people approve; read under view", () => {
+    const by = (method, path) => routes.find((r) => r.method === method && r.path === path);
+    for (const path of ["/field-assignments", "/field-assignments/:id/cancel", "/field-assignments/:id/remove"])
+      expect(by("POST", path).permission).toMatchObject({ key: "people", action: "approve" });
+    for (const path of ["/field-assignments", "/field-assignments/:id"])
+      expect(by("GET", path).permission).toMatchObject({ key: "people", action: "view" });
+    expect(Object.keys(shapeOf(by("POST", "/field-assignments").contract.body)).sort()).toEqual([
+      "client", "employee_ids", "ends_on", "name", "note", "sites", "starts_on",
+    ]);
+    expect(by("GET", "/me/field-assignments").contract.self).toBe(true);
   });
 
   test("lists page through the contract's controls, with no page size", () => {

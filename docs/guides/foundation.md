@@ -122,7 +122,7 @@ own migration block (§1.1), to every rule in `docs/MIGRATIONS.md`.
 | `document_request` | 0350 | B | What People asked an employee for; a Missing row until it is given (§6.9) |
 | `role`, `permission`, `field_visibility`, `capability`, `user_capability` | 0020, 0290 | C | Defaults for field visibility and capabilities in `0449` (§6.3). `0400` adds `role.two_step_required` (§6.4) |
 | `role_capability` | 0400 | C | A capability given to everyone holding a role; `user_capability` still gives one to a single person, and a person has the union |
-| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows, the three brand files among them as `organisation.logo_document_id`, `organisation.logo_white_document_id` and `organisation.icon_document_id` (§6.11), read by everything that prints the company through one reader, `shared/organisation/profile.js` (until 19/10/2026 documents and system mail read a single `organisation.profile` row that nothing wrote, so they always printed the defaults); security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026) |
+| `setting` rows, working week, holidays, numbering schemes | 0050, 0055, 0099 | C | The organisation profile is `organisation.<field>` rows, the three brand files among them as `organisation.logo_document_id`, `organisation.logo_white_document_id` and `organisation.icon_document_id` (§6.11), read by everything that prints the company through one reader, `shared/organisation/profile.js` (until 19/10/2026 documents and system mail read a single `organisation.profile` row that nothing wrote, so they always printed the defaults); security rules are `security.<rule>` rows with an `.env` floor (§6.4). Nigeria's public holidays for 2026 and 2027 are seeded by `0448`; `0410` adds `public_holiday.expected` for the Eids and the weekday given for a weekend holiday, until someone confirms them (TB, 17/10/2026). The Report Run scheme (`report_run`, RPT-0001, never reset) is seeded by `1199` (TB, 17/10/2026); the Work Location Request scheme (`location_request`, WLR-0001, never reset) by `1392` and the Field Assignment scheme (`field_assignment`, FA-0001, never reset) by `1393` (LA, 19/10/2026) |
 | `audit_ledger`, `event_log` | 0030 | C | Read only. `0400` adds the indexes the Audit Log filters on (when, module, action, record) and one on live sessions |
 | `spent_challenge` | 0230 | C | `0400` widens its purpose check with `two_step_setup`, the ticket of the set-up step at sign-in (§6.4) |
 | `workflow_definition`, `workflow_instance`, `workflow_decision` | 0070 | D | The leave definition in `0499` |
@@ -711,6 +711,14 @@ screen.
   (Logo, White Logo, Icon) and where each goes; one reader of the organisation profile
   (`shared/organisation/profile.js`) for settings, documents, system mail and signatures; the
   `mailbox.signature` capability seeded by `1129`.
+- 19/10/2026 · LA · §4: Documents & Numbering gains Field Assignment (`field_assignment`, FA-0001,
+  never reset), the number of each field assignment (`docs/guides/attendance.md` §6.12), seeded by
+  `seeds/reference/1393`; the settings contract's `DOC_TYPES` and the screen's labels list it. The
+  search provider's `scope` takes `through` for a record about several people (shared/search/provider.js).
+- 19/10/2026 · LA · §4: Documents & Numbering gains Work Location Request (`location_request`,
+  WLR-0001, never reset), the number of each work location request (`docs/guides/attendance.md`
+  §6.11). Its scheme is seeded by `seeds/reference/1392`; the settings contract's `DOC_TYPES` and
+  the screen's labels list it.
 - 19/10/2026 · TB · §6.1, §6.5, §6.6, §10.1, §11, from a review of the roster as staging shows it.
   A VACANT row's Line Manager becomes the seat's line (the importer dropped it). `roles.json` can
   give a post outside the sheet its line manager (the Implementation Partner reports to the CTO).

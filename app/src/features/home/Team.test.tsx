@@ -198,7 +198,7 @@ describe("Home · Team, by scope", () => {
     const summary = dashboard.HomeTeamSummary.parse(await api.call("GET /api/v1/home/team/summary"));
     const present = summary.cards.find((c) => c.key === "team_present")!;
     const page = await team();
-    expect(present.value).toBe(page.data.filter((r) => r.status === "on_site" || r.status === "remote" || r.status === "late").length);
+    expect(present.value).toBe(page.data.filter((r) => ["on_site", "remote", "field", "late"].includes(r.status ?? "")).length);
     expect(screen.getByRole("button", { name: /^Present Today/ }).textContent).toContain(`${present.value} of ${present.denominator}`);
 
     fireEvent.click(screen.getByRole("button", { name: /^Present Today/ }));
@@ -242,6 +242,7 @@ describe("the roster's filters", () => {
       "Everyone",
       "On Site",
       "Remote",
+      "Field",
       "Late",
       "Not In",
       "On Leave",

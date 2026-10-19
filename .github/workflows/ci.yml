@@ -5,14 +5,22 @@ name: CI
 #
 # This workflow never deploys and never references the production environment
 # (check/production-environment-refs.js). Deploys are release.yml.
+#
+# Each run does only what its change needs (TB, 19/10/2026: a week of CI used GitHub's monthly
+# Actions minutes in under three days; docs/BACKEND_GUIDE.md §8.4):
+#   - a draft pull request runs nothing: its author runs `npm run ci` while working, and the run
+#     starts when it is marked ready (ready_for_review), then on every push
+#   - a change to documents only, or a push to main whose tree a pull request's run already
+#     passed, runs only the gates that read documents (scripts/check/lib/scope.js)
 
 on:
   pull_request:
     branches: [main]
     # `edited`: the process gates read trailers from the PR description
     # ("Progress-unchanged: <reason>"). Without this, fixing the description
-    # fires no event and the red run stands.
-    types: [opened, synchronize, reopened, edited]
+    # fires no event and the red run stands. Only a changed description or base
+    # runs CI again (the job's `if`); a new title changes no gate's answer.
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches: [main]
   # Run CI by hand on a ref an outage skipped. GitHub does not replay dropped
@@ -28,10 +36,17 @@ permissions:
   # On a push to main the process gates read the merged PR's description for its trailers
   # ("Guide-unchanged: <reason>"); GitHub sends none with a push event.
   pull-requests: read
+  # On a push to main, the scope step reads the merged pull request's CI runs and the tree
+  # each one passed (the ci-tree artifact).
+  actions: read
 
 jobs:
   ci:
     name: ci
+    if: >-
+      github.event_name != 'pull_request' ||
+      (!github.event.pull_request.draft &&
+      (github.event.action != 'edited' || github.event.changes.body || github.event.changes.base))
     runs-on: ubuntu-latest
     # The screen gates and the a11y gate crawl the gallery and every app screen at two
     # sizes (about 7 minutes on a laptop); the margin keeps a slow runner from timing out.
@@ -68,6 +83,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # full, docs or tested, and why (printed in the log). Needs nothing installed.
+      - name: How much this run needs
+        id: scope
+        run: node scripts/ci-local.js --decide-scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       # One install for the backend and the workspaces (packages/*, app,
       # public-app): gates 8 and 11 build the staff app's mock build from it.
       - name: Install
@@ -77,10 +99,12 @@ jobs:
       # (scripts/check/lib/screens.js). The browser matches the pinned
       # playwright version in package-lock.json.
       - name: Chromium for the screen gates
+        if: steps.scope.outputs.scope == 'full'
         run: npx playwright install --with-deps chromium
 
       # The integration suite transcodes voice notes and reads media durations.
       - name: ffmpeg for the integration suite
+        if: steps.scope.outputs.scope == 'full'
         run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
 
       - name: All gates
@@ -89,9 +113,25 @@ jobs:
           # Every gate script is built (gate 6 was the last), so a gate whose script is
           # empty fails the run instead of being reported as NOT BUILT.
           CI_STRICT: "1"
+          CI_SCOPE: ${{ steps.scope.outputs.scope }}
           # Integration suite and gate 4's live round trip, against the services above.
           RUN_DB_TESTS: "1"
           APP_ENV: test
           DATABASE_URL: postgres://mycity:mycity@127.0.0.1:5432/mycity_test
           REDIS_URL: redis://127.0.0.1:6379/15
           GH_TOKEN: ${{ github.token }}
+
+      # The tree this pull request's full run passed (GitHub's merge of it into main as main is
+      # now). After the merge, main's run finds it and skips what this tree already passed
+      # (scripts/check/lib/scope.js, TREE_ARTIFACT and TREE_FILE).
+      - name: Record the tree this run passed
+        if: success() && github.event_name == 'pull_request' && steps.scope.outputs.scope == 'full'
+        run: git rev-parse 'HEAD^{tree}' > ci-tree.txt
+
+      - name: Keep it for main's run after the merge
+        if: success() && github.event_name == 'pull_request' && steps.scope.outputs.scope == 'full'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-tree
+          path: ci-tree.txt
+          retention-days: 14

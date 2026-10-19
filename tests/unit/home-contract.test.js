@@ -105,7 +105,7 @@ describe("KPI cards", () => {
   test("the Team list takes its filters and refuses a page size", () => {
     expect(dashboard.HomeTeamQuery.safeParse({ status: "late", sort: "-clock_in_at" }).success).toBe(true);
     expect(dashboard.HomeTeamQuery.safeParse({ limit: "100" }).success).toBe(false);
-    expect(dashboard.HomeTeamQuery.safeParse({ status: "field" }).success).toBe(false);
+    expect(dashboard.HomeTeamQuery.safeParse({ status: "elsewhere" }).success).toBe(false);
   });
 });
 
@@ -240,7 +240,7 @@ describe("reports", () => {
     expect(reportIssues({ filters: { roster_status: "late", department_id: ID } })).toEqual([]);
     expect(reportIssues({ filters: { category: "people" } })).toEqual(["filters.category: Not for this source"]);
     expect(reportIssues({ report_key: "overview" })).toEqual(["report_key: Choose a source"]);
-    expect(reportIssues({ filters: { roster_status: "field" } })).toHaveLength(1);
+    expect(reportIssues({ filters: { roster_status: "elsewhere" } })).toHaveLength(1);
     expect(reportIssues({ filters: { owner: ID } })).toHaveLength(1);
   });
 

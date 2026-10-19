@@ -43,7 +43,7 @@ const NO_CLOCK_OUT = "no_clock_out_yesterday";
  */
 export type RosterChip = "everyone" | Exclude<HomeRosterStatus, "absent"> | typeof NO_CLOCK_OUT;
 
-const CHIP_STATUSES = ["on_site", "remote", "late", "not_in", "on_leave"] as const;
+const CHIP_STATUSES = ["on_site", "remote", "field", "late", "not_in", "on_leave"] as const;
 const CHIPS: Array<[RosterChip, string]> = [
   ["everyone", "Everyone"],
   ...CHIP_STATUSES.map((s): [RosterChip, string] => [s, ROSTER_STATUS[s].text]),

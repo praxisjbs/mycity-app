@@ -19,6 +19,13 @@
  *   node scripts/ci-local.js --strict   NOT BUILT counts as a failure
  *   node scripts/ci-local.js --list     print the gates and exit
  *   node scripts/ci-local.js --only=progress,guides   run just these (by id)
+ *   node scripts/ci-local.js --decide-scope   GitHub Actions: how much this run needs
+ *
+ * SCOPE. In GitHub Actions, ci.yml first asks how much of this a run needs
+ * (scripts/check/lib/scope.js) and passes it as CI_SCOPE: `full` runs every
+ * gate; `docs` (a change to documents only) and `tested` (a push to main whose
+ * tree a pull request's run already passed) run only the gates that read
+ * documents, and report the rest as skipped. Unset, or on a laptop, it is full.
  */
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
@@ -31,6 +38,17 @@ const onlyArg = argv.find((a) => a.startsWith("--only="));
 const ONLY = onlyArg ? new Set(onlyArg.slice(7).split(",")) : null;
 const FAST = has("fast");
 const STRICT = has("strict") || process.env.CI_STRICT === "1";
+const SCOPE = process.env.CI_SCOPE || "full";
+const scope = require("./check/lib/scope");
+
+if (has("decide-scope")) {
+  scope.main();
+  process.exit(0);
+}
+if (!["full", "docs", "tested"].includes(SCOPE)) {
+  console.error(`CI_SCOPE is "${SCOPE}": it must be full, docs or tested`);
+  process.exit(2);
+}
 
 const bin = (pkg, rel) => path.join(ROOT, "node_modules", pkg, rel);
 
@@ -139,6 +157,10 @@ if (has("list")) {
 const results = [];
 for (const gate of GATES) {
   if (ONLY && !ONLY.has(gate.id)) continue;
+  if (SCOPE !== "full" && !scope.DOC_GATES.includes(gate.id)) {
+    results.push({ gate, status: "SKIPPED" });
+    continue;
+  }
   const c = command(gate);
   if (c.notBuilt) {
     results.push({ gate, status: "NOT BUILT" });
@@ -161,6 +183,7 @@ for (const gate of GATES) {
 
 const failed = results.filter((r) => r.status === "FAIL");
 const notBuilt = results.filter((r) => r.status === "NOT BUILT");
+const skipped = results.filter((r) => r.status === "SKIPPED");
 const passed = results.filter((r) => r.status === "PASS");
 
 for (const r of failed) {
@@ -172,6 +195,8 @@ console.log("\n════ Summary ════");
 console.log(`passed     ${passed.length}`);
 console.log(`failed     ${failed.length}${failed.length ? `: ${failed.map((r) => r.gate.id).join(", ")}` : ""}`);
 console.log(`not built  ${notBuilt.length}${notBuilt.length ? `: ${notBuilt.map((r) => r.gate.id).join(", ")}` : ""}`);
+if (skipped.length)
+  console.log(`skipped    ${skipped.length}: scope ${SCOPE}, so only the gates that read documents ran`);
 if (notBuilt.length) {
   console.log(
     STRICT

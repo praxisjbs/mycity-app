@@ -12,6 +12,11 @@
  *   POST  /me/exceptions/:id/explanation say why
  *   POST  /me/export                     my month, emailed as a workbook
  *   GET   /me/records/:id                the day a link to my day or exception opens
+ *   GET   /me/home, POST /me/home        my home location, and a new one for People (remote)
+ *   GET   /me/requests, POST /me/requests  my work location requests, and a new one (approval)
+ *   GET   /me/requests/:id               one of mine
+ *   POST  /me/requests/:id/cancel        withdraw or cancel one of mine
+ *   GET   /me/field-assignments, /me/field-assignments/:id  the field assignments I am or was on
  *
  * People, within the `people` grant's scope (all, team, own):
  *   GET   /register, /summary            the day's register and its figures (view)
@@ -20,6 +25,15 @@
  *   GET   /exceptions                    the exceptions (view)
  *   POST  /exceptions/:id/decision       decide one (approve, scope all; never your own)
  *   GET   /records/:id                   the person and day a link opens (view)
+ *   GET   /homes, /homes/:id             remote staff's home locations (view; the address
+ *                                        and the point for scope all only)
+ *   POST  /homes/:id/decision            approve or reject one (approve, scope all; never your own)
+ *   GET   /requests, /requests/:id       work location requests (view); decided through the
+ *                                        approval's own routes (/workflow/instances/:id/...)
+ *   GET   /field-assignments, /field-assignments/:id  field assignments with someone in scope (view)
+ *   POST  /field-assignments             send people out (approve, within scope; never yourself)
+ *   POST  /field-assignments/:id/cancel  cancel one (approve, everyone still on it in scope)
+ *   POST  /field-assignments/:id/remove  take one person off (approve, as cancel)
  *   POST  /export                        the register over up to 31 days, emailed (export)
  */
 const express = require("express");
@@ -70,6 +84,40 @@ route(router, "get", "/me/records/:id",
     summary: "The day a link to my record opens" },
   controller.myRecord);
 
+route(router, "get", "/me/home",
+  { response: a.MyHome, self: true, summary: "My home location" },
+  controller.myHome);
+
+route(router, "post", "/me/home",
+  { body: a.HomeRequestCreate, response: a.MyHome, self: true, summary: "Send my home location for approval" },
+  controller.requestHome);
+
+route(router, "get", "/me/requests",
+  { query: a.MyLocationRequestListQuery, response: a.LocationRequestPage, self: true, summary: "My work location requests" },
+  controller.myRequests);
+
+route(router, "post", "/me/requests",
+  { body: a.LocationRequestCreate, response: a.LocationRequest, self: true, summary: "Ask to work somewhere else for some days" },
+  controller.requestLocation);
+
+route(router, "get", "/me/requests/:id",
+  { params: c.common.IdParams, response: a.LocationRequest, self: true, summary: "One of my work location requests" },
+  controller.myRequest);
+
+route(router, "post", "/me/requests/:id/cancel",
+  { params: c.common.IdParams, body: a.LocationRequestCancel, response: a.LocationRequest, self: true,
+    summary: "Withdraw or cancel one of my work location requests" },
+  controller.cancelRequest);
+
+route(router, "get", "/me/field-assignments",
+  { query: a.MyFieldAssignmentListQuery, response: a.FieldAssignmentPage, self: true,
+    summary: "The field assignments I am or was on" },
+  controller.myAssignments);
+
+route(router, "get", "/me/field-assignments/:id",
+  { params: c.common.IdParams, response: a.FieldAssignment, self: true, summary: "One of my field assignments" },
+  controller.myAssignment);
+
 route(router, "get", "/register",
   { query: a.RegisterQuery, response: a.RegisterPage, summary: "The attendance register for a day" },
   requirePermission("people", "view"), controller.register);
@@ -98,6 +146,49 @@ route(router, "post", "/exceptions/:id/decision",
 route(router, "get", "/records/:id",
   { params: c.common.IdParams, response: a.AttendanceRecordRef, summary: "The day a link to a record opens" },
   requirePermission("people", "view"), controller.record);
+
+route(router, "get", "/homes",
+  { query: a.HomeListQuery, response: a.HomeRequestPage, summary: "Remote staff's home locations" },
+  requirePermission("people", "view"), controller.homes);
+
+route(router, "get", "/homes/:id",
+  { params: c.common.IdParams, response: a.HomeRequest, summary: "One home location" },
+  requirePermission("people", "view"), controller.home);
+
+route(router, "post", "/homes/:id/decision",
+  { params: c.common.IdParams, body: a.HomeDecision, response: a.HomeRequest,
+    summary: "Approve or reject a home location" },
+  requirePermission("people", "approve"), controller.decideHome);
+
+route(router, "get", "/requests",
+  { query: a.LocationRequestListQuery, response: a.LocationRequestPage, summary: "Work location requests" },
+  requirePermission("people", "view"), controller.requests);
+
+route(router, "get", "/requests/:id",
+  { params: c.common.IdParams, response: a.LocationRequest, summary: "One work location request" },
+  requirePermission("people", "view"), controller.request);
+
+route(router, "get", "/field-assignments",
+  { query: a.FieldAssignmentListQuery, response: a.FieldAssignmentPage, summary: "Field assignments" },
+  requirePermission("people", "view"), controller.assignments);
+
+route(router, "get", "/field-assignments/:id",
+  { params: c.common.IdParams, response: a.FieldAssignment, summary: "One field assignment" },
+  requirePermission("people", "view"), controller.assignment);
+
+route(router, "post", "/field-assignments",
+  { body: a.FieldAssignmentCreate, response: a.FieldAssignment, summary: "Send people out on a field assignment" },
+  requirePermission("people", "approve"), controller.assign);
+
+route(router, "post", "/field-assignments/:id/cancel",
+  { params: c.common.IdParams, body: a.FieldAssignmentCancel, response: a.FieldAssignment,
+    summary: "Cancel a field assignment" },
+  requirePermission("people", "approve"), controller.cancelAssignment);
+
+route(router, "post", "/field-assignments/:id/remove",
+  { params: c.common.IdParams, body: a.FieldMemberRemove, response: a.FieldAssignment,
+    summary: "Take someone off a field assignment" },
+  requirePermission("people", "approve"), controller.removeFromAssignment);
 
 route(router, "post", "/export",
   { body: a.RegisterExportRequest, response: a.AttendanceExportQueued, summary: "Email the register" },

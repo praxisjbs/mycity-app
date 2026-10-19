@@ -145,7 +145,7 @@ function rosterOf(user: string): RosterRow[] {
   });
 }
 
-const present = (r: RosterRow) => r.status === "on_site" || r.status === "remote" || r.status === "late";
+const present = (r: RosterRow) => r.status === "on_site" || r.status === "remote" || r.status === "field" || r.status === "late";
 
 /* ------------------------------------------------------------------ *
  * The KPI catalogue's live cards
@@ -204,6 +204,7 @@ const tally = (rows: Rec[]) => {
 const ROSTER_GROUPS: Array<[string, string]> = [
   ["on_site", "On Site"],
   ["remote", "Remote"],
+  ["field", "Field"],
   ["late", "Late"],
   ["not_in", "Not In"],
   ["on_leave", "On Leave"],
@@ -212,6 +213,7 @@ const ROSTER_GROUPS: Array<[string, string]> = [
 const ROSTER_PILL: Record<HomeRosterStatus, [Tone, string]> = {
   on_site: ["ok", "On Site"],
   remote: ["ok", "Remote"],
+  field: ["ok", "Field"],
   late: ["warn", "Late"],
   not_in: ["neutral", "Not In"],
   on_leave: ["info", "On Leave"],
@@ -236,7 +238,7 @@ const rosterRecords = (rows: RosterRow[]): Rec[] =>
 /** Present out of expected, as the register counts them: nobody on leave is expected. */
 const rosterFigure = (rows: Rec[]): Figure => {
   const g = tally(rows);
-  const presentCount = (g.on_site ?? 0) + (g.remote ?? 0) + (g.late ?? 0);
+  const presentCount = (g.on_site ?? 0) + (g.remote ?? 0) + (g.field ?? 0) + (g.late ?? 0);
   return counted(presentCount, { denominator: rows.length - (g.on_leave ?? 0), groups: g, extra: { late: g.late ?? 0, on_leave: g.on_leave ?? 0 } });
 };
 
@@ -1793,7 +1795,7 @@ route("GET /api/v1/home/kpi/:key", (req: Req) => {
  * Team: today's roster and each person's month, in the reader's `home` scope
  * ------------------------------------------------------------------ */
 const TEAM_CARDS = ["team_present", "team_on_site", "team_remote", "team_flags"];
-const ROSTER_STATUSES: readonly string[] = ["on_leave", "late", "on_site", "remote", "absent", "not_in"];
+const ROSTER_STATUSES: readonly string[] = ["on_leave", "late", "on_site", "remote", "field", "absent", "not_in"];
 
 /** The routes check the capability before reading anything, as requireCapability does. */
 const withoutTeam = (user: string) => (holds(me(user), "home.team") ? null : fail(403, "CAPABILITY_REQUIRED", "This needs an authority you do not hold"));

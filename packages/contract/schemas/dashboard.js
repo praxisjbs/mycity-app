@@ -185,11 +185,12 @@ const HomeDonut = z.discriminatedUnion("kind", [
 /**
  * One person's status for a day on the shared attendance roster: the attendance register's
  * status in Home's words (home.md §6, attendance.md §6.9). On leave; late (the day's record
- * has late minutes); on site or remote (in on time; remote for someone who works remotely);
+ * has late minutes); on site, remote or field (in on time; field on a field assignment's day,
+ * remote for someone who works remotely or is on an approved remote day);
  * absent (a working day the day-close closed with no clock-in); not in (a working day not
  * closed, no clock-in yet). A day that is not worked, with nothing recorded, has no status.
  */
-const HomeRosterStatus = z.enum(["on_leave", "late", "on_site", "remote", "absent", "not_in"]);
+const HomeRosterStatus = z.enum(["on_leave", "late", "on_site", "remote", "field", "absent", "not_in"]);
 
 /** Staff: today's shift, their clock-in, where they are, their status and hours. */
 const HomeDayStrip = z

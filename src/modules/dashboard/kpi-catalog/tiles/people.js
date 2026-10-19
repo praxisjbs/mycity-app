@@ -44,6 +44,7 @@ const display = (first, last) => `${first} ${last}`.trim();
 const STATUS_PILL = Object.freeze({
   on_site: ["ok", "On Site"],
   remote: ["info", "Remote"],
+  field: ["info", "Field"],
   late: ["warn", "Late"],
   absent: ["err", "Absent"],
   not_in: ["neutral", "Not In"],
@@ -57,6 +58,7 @@ const STATUS_PILL = Object.freeze({
 const ROSTER_GROUPS = Object.freeze([
   { value: "on_site", label: "On Site" },
   { value: "remote", label: "Remote" },
+  { value: "field", label: "Field" },
   { value: "late", label: "Late" },
   { value: "not_in", label: "Not In" },
   { value: "on_leave", label: "On Leave" },
@@ -77,12 +79,14 @@ const rosterFigure = (s) => ({
   denominator: s.expected,
   on_site: s.on_site,
   remote: s.remote,
+  field: s.field,
   late: s.late,
   on_leave: s.on_leave,
   no_clock_out_yesterday: s.no_clock_out_yesterday,
   groups: {
     on_site: s.on_site,
     remote: s.remote,
+    field: s.field,
     late: s.late,
     not_in: s.not_in,
     on_leave: s.on_leave,

@@ -37,6 +37,7 @@ const DayStatus = z.enum(["present", "late", "absent", "leave"]);
 const RegisterStatus = z.enum(["present", "late", "absent", "leave", "not_in", "off"]);
 const ExceptionType = z.enum([
   "outside_worksite",
+  "outside_home",
   "location_unverified",
   "unknown_device",
   "suspicious_timestamp",
@@ -86,11 +87,20 @@ const AttendanceToday = z
       })
       .strict(),
     work_pattern: WorkPattern,
+    /**
+     * Where the punch is matched: a worksite, a remote employee's approved home, a remote employee
+     * with no approved home yet (`remote`, judged unverified), or nowhere (`none`). On a day an
+     * approved work location request covers: its temporary home (`temporary_home`, fenced), or an
+     * approved remote day or client visit with no fence (`approved_day`, named in `name`).
+     * `home_state` is the remote employee's home: approved, waiting on People, or none; null for
+     * anyone else.
+     */
     location: z
       .object({
-        kind: z.enum(["worksite", "none", "remote"]),
+        kind: z.enum(["worksite", "home", "none", "remote", "temporary_home", "approved_day", "field"]),
         name: z.string().nullable(),
         radius_m: z.number().int().nullable(),
+        home_state: z.enum(["approved", "pending", "none"]).nullable(),
       })
       .strict(),
     policy: z
@@ -347,7 +357,7 @@ const DayDetail = z
     late_minutes: minutes,
     overtime_minutes: minutes,
     closed: z.boolean(),
-    expected_location: z.object({ name: z.string(), radius_m: z.number().int() }).strict().nullable(),
+    expected_location: z.object({ name: z.string(), radius_m: z.number().int().nullable() }).strict().nullable(),
     policy: z.object({ geofence_mode: PolicyMode, device_mode: PolicyMode }).strict(),
     open_exceptions: z.number().int().min(0),
   })
@@ -365,6 +375,286 @@ const AttendanceRecordRef = z
     date: isoDate,
   })
   .strict();
+
+/* ------------------------------------------------------------------ *
+ * Home locations: a remote employee's approved home is their fence
+ * ------------------------------------------------------------------ */
+
+const HomeStatus = z.enum(["pending", "approved", "rejected", "superseded"]);
+
+/**
+ * One of my home locations. The address and the point are personal data: the person's own here,
+ * and only People with scope all see them elsewhere (masked under `employee.personal`).
+ */
+const HomeLocation = z
+  .object({
+    attendance_home_id: uuid,
+    status: HomeStatus,
+    home_address: z.string(),
+    home_latitude: z.number(),
+    home_longitude: z.number(),
+    accuracy_m: z.number().nullable(),
+    radius_m: z.number().int(),
+    requested_at: isoDateTime,
+    decided_at: isoDateTime.nullable(),
+    decision_reason: z.string().nullable(),
+  })
+  .strict();
+
+/** GET /attendance/me/home: the home in force, the one waiting, and the last one rejected since. */
+const MyHome = z
+  .object({
+    needed: z.boolean(),
+    approved: HomeLocation.nullable(),
+    pending: HomeLocation.nullable(),
+    rejected: HomeLocation.nullable(),
+    max_accuracy_m: z.number().int().min(1),
+  })
+  .strict();
+
+/** POST /attendance/me/home: one reading taken at home, and the address in the person's words. */
+const HomeRequestCreate = z
+  .object({
+    home_address: text(300),
+    home_latitude: z.number().min(-90).max(90),
+    home_longitude: z.number().min(-180).max(180),
+    accuracy_m: z.number().min(0).max(100000),
+  })
+  .strict();
+
+/** A home location as People see it; the address and point are null below scope all. */
+const HomeRequest = z
+  .object({
+    attendance_home_id: uuid,
+    employee: PersonRef,
+    status: HomeStatus,
+    home_address: z.string().nullable(),
+    home_latitude: z.number().nullable(),
+    home_longitude: z.number().nullable(),
+    accuracy_m: z.number().nullable(),
+    radius_m: z.number().int(),
+    distance_from_approved_m: z.number().nullable(),
+    requested_at: isoDateTime,
+    decided_at: isoDateTime.nullable(),
+    decided_by_name: z.string().nullable(),
+    decision_reason: z.string().nullable(),
+  })
+  .strict();
+const HomeRequestPage = Paged(HomeRequest);
+
+/** GET /attendance/homes: waiting first, newest first. */
+const HomeListQuery = listQuery({ status: HomeStatus.optional(), employee_id: uuid.optional() }, ["requested_at"]);
+
+/** POST /attendance/homes/:id/decision. A rejection says why, for the person to read. */
+const HomeDecision = z
+  .object({
+    decision: z.enum(["approve", "reject"]),
+    reason: optionalText(500),
+  })
+  .strict()
+  .refine((v) => v.decision !== "reject" || (v.reason || "").length >= 10, {
+    message: "At least 10 characters",
+    path: ["reason"],
+  });
+
+/* ------------------------------------------------------------------ *
+ * Work location requests: somewhere else to work for some days, approved
+ * by the line manager and then Operations & People (attendance.location_request)
+ * ------------------------------------------------------------------ */
+
+const LocationRequestType = z.enum(["temporary_home", "remote_day", "client_visit"]);
+const LocationRequestStatus = z.enum(["submitted", "approved", "rejected", "cancelled"]);
+
+/**
+ * A work location request. `home_latitude`, `home_longitude` and `accuracy_m` are a temporary
+ * home's reading (null for the other types, and below scope all for People). `waiting_on` is the
+ * stage it waits at; `can_decide` says whether that stage waits on the reader.
+ */
+const LocationRequest = z
+  .object({
+    location_request_id: uuid,
+    number: z.string(),
+    employee: PersonRef,
+    request_type: LocationRequestType,
+    starts_on: isoDate,
+    ends_on: isoDate,
+    days: z.number().int().min(1),
+    address: z.string().nullable(),
+    home_latitude: z.number().nullable(),
+    home_longitude: z.number().nullable(),
+    accuracy_m: z.number().nullable(),
+    reason: z.string(),
+    status: LocationRequestStatus,
+    workflow_instance_id: uuid.nullable(),
+    waiting_on: z.string().nullable(),
+    can_decide: z.boolean(),
+    requested_at: isoDateTime,
+    decided_at: isoDateTime.nullable(),
+    cancelled_at: isoDateTime.nullable(),
+    cancel_reason: z.string().nullable(),
+  })
+  .strict();
+const LocationRequestPage = Paged(LocationRequest);
+
+/**
+ * POST /attendance/me/requests. A temporary home carries one reading taken there and its address;
+ * a client visit its address; a remote day may name one. Who may ask which type, the spans and the
+ * overlap are the service's (guide §6.11).
+ */
+const LocationRequestCreate = z
+  .object({
+    request_type: LocationRequestType,
+    starts_on: isoDate,
+    ends_on: isoDate,
+    address: optionalText(300),
+    reason: text(500).refine((v) => v.length >= 10, "At least 10 characters"),
+    home_latitude: z.number().min(-90).max(90).nullable().optional(),
+    home_longitude: z.number().min(-180).max(180).nullable().optional(),
+    accuracy_m: z.number().min(0).max(100000).nullable().optional(),
+  })
+  .strict()
+  .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] })
+  .refine((v) => v.request_type === "remote_day" || Boolean(v.address), {
+    message: "Enter the address",
+    path: ["address"],
+  })
+  .refine(
+    (v) =>
+      v.request_type !== "temporary_home" ||
+      (typeof v.home_latitude === "number" && typeof v.home_longitude === "number" && typeof v.accuracy_m === "number"),
+    { message: "Take a reading there", path: ["home_latitude"] },
+  )
+  .refine((v) => v.request_type === "temporary_home" || (typeof v.home_latitude !== "number" && typeof v.home_longitude !== "number"), {
+    message: "Only for a temporary home",
+    path: ["home_latitude"],
+  });
+
+/** GET /attendance/me/requests: the person's own, newest first. */
+const MyLocationRequestListQuery = listQuery({ status: LocationRequestStatus.optional() }, ["starts_on"]);
+
+/** GET /attendance/requests: within the reader's `people` scope, waiting first. */
+const LocationRequestListQuery = listQuery(
+  {
+    status: LocationRequestStatus.optional(),
+    request_type: LocationRequestType.optional(),
+    employee_id: uuid.optional(),
+  },
+  ["starts_on", "requested_at"],
+);
+
+/** POST /attendance/me/requests/:id/cancel */
+const LocationRequestCancel = z.object({ reason: optionalText(500) }).strict();
+
+/* ------------------------------------------------------------------ *
+ * Field assignments: people sent to one or two sites for some days by their
+ * line manager or People, in force at once (guide §6.12)
+ * ------------------------------------------------------------------ */
+
+/** Worked out on the day in Lagos; `cancelled` is the status. */
+const FieldAssignmentState = z.enum(["upcoming", "in_progress", "done", "cancelled"]);
+const FieldAssignmentStatus = z.enum(["active", "cancelled"]);
+
+/** One of an assignment's sites: a client's venue, typed as a worksite is. */
+const FieldSite = z
+  .object({
+    field_site_id: uuid,
+    position: z.number().int().min(1).max(2),
+    name: z.string(),
+    address: z.string().nullable(),
+    latitude: z.number(),
+    longitude: z.number(),
+    radius_m: z.number().int(),
+  })
+  .strict();
+
+/** One person on it; `removed_at` once taken off, with the reason they read. */
+const FieldMember = z
+  .object({
+    employee: PersonRef,
+    added_at: isoDateTime,
+    removed_at: isoDateTime.nullable(),
+    removed_reason: z.string().nullable(),
+  })
+  .strict();
+
+/**
+ * A field assignment. `people` counts those still on it; `members` lists everyone who was (at most
+ * 25: people are only ever taken off). `can_change` says whether the reader may cancel it or take
+ * someone off.
+ */
+const FieldAssignment = z
+  .object({
+    field_assignment_id: uuid,
+    number: z.string(),
+    name: z.string(),
+    client: z.string(),
+    note: z.string().nullable(),
+    starts_on: isoDate,
+    ends_on: isoDate,
+    days: z.number().int().min(1),
+    status: FieldAssignmentStatus,
+    state: FieldAssignmentState,
+    sites: z.array(FieldSite).min(1).max(2),
+    members: z.array(FieldMember).max(25),
+    people: z.number().int().min(0),
+    assigned_by_name: z.string().nullable(),
+    assigned_at: isoDateTime,
+    cancelled_at: isoDateTime.nullable(),
+    cancel_reason: z.string().nullable(),
+    can_change: z.boolean(),
+  })
+  .strict();
+const FieldAssignmentPage = Paged(FieldAssignment);
+
+const minLength = (n) => (v) => v.length >= n;
+const reasonText = text(500).refine(minLength(10), "At least 10 characters");
+
+/** A site as it is set: its centre and radius typed until address search exists (F21). */
+const FieldSiteInput = z
+  .object({
+    name: text(120).refine(minLength(2), "At least 2 characters"),
+    address: optionalText(300),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    radius_m: z.number().int().min(100, "At least 100 m").max(500, "At most 500 m"),
+  })
+  .strict();
+
+/**
+ * POST /attendance/field-assignments. Who may be put on it, the dates against today and the overlap
+ * are the service's (guide §6.12).
+ */
+const FieldAssignmentCreate = z
+  .object({
+    name: text(120).refine(minLength(3), "At least 3 characters"),
+    client: text(120).refine(minLength(2), "At least 2 characters"),
+    note: optionalText(500),
+    starts_on: isoDate,
+    ends_on: isoDate,
+    employee_ids: z
+      .array(uuid)
+      .min(1, "Pick someone")
+      .max(25, "At most 25 people")
+      .refine((ids) => new Set(ids).size === ids.length, "Each person once"),
+    sites: z.array(FieldSiteInput).min(1, "Add a site").max(2, "At most two sites"),
+  })
+  .strict()
+  .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] });
+
+/** GET /attendance/field-assignments: within the reader's `people` scope, in progress and upcoming first. */
+const FieldAssignmentListQuery = listQuery(
+  { state: FieldAssignmentState.optional(), employee_id: uuid.optional() },
+  ["starts_on"],
+);
+
+/** GET /attendance/me/field-assignments: the person's own. */
+const MyFieldAssignmentListQuery = listQuery({ state: FieldAssignmentState.optional() }, ["starts_on"]);
+
+/** POST /attendance/field-assignments/:id/cancel: everyone on it reads the reason. */
+const FieldAssignmentCancel = z.object({ reason: reasonText }).strict();
+
+/** POST /attendance/field-assignments/:id/remove: the person taken off reads the reason. */
+const FieldMemberRemove = z.object({ employee_id: uuid, reason: reasonText }).strict();
 
 /* ------------------------------------------------------------------ *
  * Exports
@@ -403,6 +693,100 @@ const AttendanceExportEmailVars = z
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  HomeLocation: {
+    table: "attendance_home",
+    virtual: {
+      home_address: "attendance_home.address, named for the personal-details mask",
+      home_latitude: "attendance_home.latitude, named for the personal-details mask",
+      home_longitude: "attendance_home.longitude, named for the personal-details mask",
+      radius_m: "the policy's home_radius_m",
+    },
+  },
+  MyHome: { table: null, reason: "the person's home locations: in force, waiting and last rejected" },
+  HomeRequestCreate: {
+    table: "attendance_home",
+    virtual: {
+      home_address: "written to attendance_home.address",
+      home_latitude: "written to attendance_home.latitude",
+      home_longitude: "written to attendance_home.longitude",
+    },
+  },
+  HomeRequest: {
+    table: "attendance_home",
+    virtual: {
+      employee: "the person, from employee and department",
+      home_address: "attendance_home.address, null below scope all",
+      home_latitude: "attendance_home.latitude, null below scope all",
+      home_longitude: "attendance_home.longitude, null below scope all",
+      radius_m: "the policy's home_radius_m",
+      distance_from_approved_m: "metres between this point and the person's approved home",
+      decided_by_name: "who decided it, from employee",
+    },
+  },
+  HomeRequestPage: { table: null, reason: "a page of home locations" },
+  HomeListQuery: { table: null, reason: "list controls for the home locations" },
+  HomeDecision: {
+    table: "attendance_home",
+    virtual: { decision: "written as attendance_home.status approved or rejected", reason: "attendance_home.decision_reason" },
+  },
+  LocationRequest: {
+    table: "attendance_location_request",
+    virtual: {
+      employee: "the person, from employee and department",
+      days: "calendar days from starts_on to ends_on",
+      home_latitude: "attendance_location_request.latitude, named for the personal-details mask",
+      home_longitude: "attendance_location_request.longitude, named for the personal-details mask",
+      waiting_on: "the name of the approval stage it waits at, from workflow_instance",
+      can_decide: "whether that stage waits on the reader (shared/workflow/approvers.js)",
+    },
+  },
+  LocationRequestPage: { table: null, reason: "a page of work location requests" },
+  LocationRequestCreate: {
+    table: "attendance_location_request",
+    virtual: {
+      home_latitude: "written to attendance_location_request.latitude",
+      home_longitude: "written to attendance_location_request.longitude",
+    },
+  },
+  MyLocationRequestListQuery: { table: null, reason: "list controls for the person's own requests" },
+  LocationRequestListQuery: { table: null, reason: "list controls for People's requests" },
+  LocationRequestCancel: {
+    table: null,
+    reason: "why a request is withdrawn or cancelled; kept on the request and the audit row",
+  },
+  FieldSite: { table: "attendance_field_site" },
+  FieldMember: {
+    table: "attendance_field_member",
+    virtual: { employee: "the person, from employee and department" },
+  },
+  FieldAssignment: {
+    table: "attendance_field_assignment",
+    virtual: {
+      days: "calendar days from starts_on to ends_on",
+      state: "upcoming, in progress or done against today in Lagos, else cancelled",
+      sites: "its attendance_field_site rows",
+      members: "its attendance_field_member rows",
+      people: "how many attendance_field_member rows are not removed",
+      assigned_by_name: "who set it, from employee",
+      can_change: "whether the reader holds people approve over everyone still on it",
+    },
+  },
+  FieldAssignmentPage: { table: null, reason: "a page of field assignments" },
+  FieldSiteInput: { table: "attendance_field_site" },
+  FieldAssignmentCreate: {
+    table: "attendance_field_assignment",
+    virtual: {
+      employee_ids: "written as attendance_field_member rows",
+      sites: "written as attendance_field_site rows",
+    },
+  },
+  FieldAssignmentListQuery: { table: null, reason: "list controls for People's field assignments" },
+  MyFieldAssignmentListQuery: { table: null, reason: "list controls for the person's own field assignments" },
+  FieldAssignmentCancel: { table: null, reason: "why it is cancelled; kept as cancel_reason and on the audit row" },
+  FieldMemberRemove: {
+    table: null,
+    reason: "who is taken off and why; kept as removed_reason on their attendance_field_member row",
+  },
   AttendanceToday: {
     table: null,
     reason: "the person's state now, from their day, the working week, their policy, worksite and device",
@@ -532,4 +916,32 @@ module.exports = {
   RegisterExportRequest,
   AttendanceExportQueued,
   AttendanceExportEmailVars,
+  HomeStatus,
+  HomeLocation,
+  MyHome,
+  HomeRequestCreate,
+  HomeRequest,
+  HomeRequestPage,
+  HomeListQuery,
+  HomeDecision,
+  LocationRequestType,
+  LocationRequestStatus,
+  LocationRequest,
+  LocationRequestPage,
+  LocationRequestCreate,
+  MyLocationRequestListQuery,
+  LocationRequestListQuery,
+  LocationRequestCancel,
+  FieldAssignmentState,
+  FieldAssignmentStatus,
+  FieldSite,
+  FieldMember,
+  FieldAssignment,
+  FieldAssignmentPage,
+  FieldSiteInput,
+  FieldAssignmentCreate,
+  FieldAssignmentListQuery,
+  MyFieldAssignmentListQuery,
+  FieldAssignmentCancel,
+  FieldMemberRemove,
 };

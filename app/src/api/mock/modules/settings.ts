@@ -415,6 +415,8 @@ route("PATCH /api/v1/settings/appearance", (req) => {
 /* ── Numbering: a scheme per numbered document type (shared/numbering/schemes.js) ── */
 const LABELS: Array<[NumberingScheme["doc_type"], string, string, number, string, NumberingScheme["reset"], number]> = [
   ["employee", "Staff Number", "", 5, "", "never", 18], ["document", "Document", "DOC", 4, "-", "never", 240], ["import_batch", "Import", "IMP", 4, "-", "never", 3],
+  ["location_request", "Work Location Request", "WLR", 4, "-", "never", 5],
+  ["field_assignment", "Field Assignment", "FA", 4, "-", "never", 3],
   ["query", "Query", "QRY", 4, "-", "never", 15], ["sanction", "Sanction", "SAN", 4, "-", "never", 4], ["letter", "Letter", "LTR", 4, "-", "never", 9],
   ["vacancy", "Vacancy", "VAC", 4, "-", "never", 6], ["offer", "Offer Letter", "OFF", 4, "-", "never", 19], ["contract", "Employment Contract", "CON", 4, "-", "never", 16],
   ["payroll_run", "Payroll Run", "PAY", 0, "-", "monthly", 1], ["payslip", "Payslip", "PAY", 4, "-", "monthly", 18], ["proposal", "Proposal", "PRO", 4, "-", "never", 30],

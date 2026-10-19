@@ -38,8 +38,10 @@
  *
  *   leave     on_leave
  *   late      late
- *   present   remote for someone who works remotely (work_pattern remote, as the geofence,
- *             the clock panel and the register read it), else on_site
+ *   present   field on a day a field assignment they are still on covers (attendance.md
+ *             §6.12); else remote for someone who works remotely (work_pattern remote, as the
+ *             geofence, the clock panel and the register read it) or is on an approved remote
+ *             day (§6.11); else on_site
  *   absent    absent: a working day the day-close closed with no clock-in
  *   not_in    not_in: a working day not closed, no clock-in yet
  *   off       none: a day that is not worked, with nothing recorded
@@ -64,7 +66,7 @@ const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
 
 /** Home's statuses (packages/contract HomeRosterStatus), in display order. */
-const STATUSES = Object.freeze(["on_leave", "late", "on_site", "remote", "absent", "not_in"]);
+const STATUSES = Object.freeze(["on_leave", "late", "on_site", "remote", "field", "absent", "not_in"]);
 
 /** The longest stretch personal() and month() read: a calendar month, or the last 30 days. */
 const MAX_DAYS = 31;
@@ -101,9 +103,12 @@ function yesterdayOf(date, cal) {
  * One person's status on one day, as the register gives it, in Home's words; null on a
  * day that is not worked with nothing recorded.
  *
- * @param {{day_status: string|null, on_leave: boolean, working_day: boolean, work_pattern: string}} f
+ * @param {{day_status: string|null, on_leave: boolean, working_day: boolean, work_pattern: string,
+ *          remote_day?: boolean, field_day?: boolean}} f
  *   day_status  attendance_day.status for the day, null when there is no record or it has none
  *   on_leave    granted leave covers the day
+ *   remote_day  an approved remote day covers the day
+ *   field_day   a field assignment the person is still on covers the day
  */
 function statusOf(f) {
   switch (f.day_status) {
@@ -112,7 +117,8 @@ function statusOf(f) {
     case "late":
       return "late";
     case "present":
-      return f.work_pattern === "remote" ? "remote" : "on_site";
+      if (f.field_day) return "field";
+      return f.work_pattern === "remote" || f.remote_day ? "remote" : "on_site";
     case "absent":
       return "absent";
     default:
@@ -161,6 +167,19 @@ const grantedLeave = (employee, day) => `EXISTS (
      AND (lr.status = 'approved'
           OR (lr.status = 'submitted' AND wi.state IN ('approved', 'timeout_approved'))))`;
 
+/** Whether an approved remote day (attendance.md §6.11) covers `day` for `employee` (SQL). */
+const remoteDay = (employee, day) => `EXISTS (
+  SELECT 1 FROM attendance_location_request lr
+   WHERE lr.employee_id = ${employee} AND lr.status = 'approved' AND lr.request_type = 'remote_day'
+     AND lr.starts_on <= ${day} AND lr.ends_on >= ${day})`;
+
+/** Whether a field assignment `employee` is still on covers `day` (attendance.md §6.12) (SQL). */
+const fieldDay = (employee, day) => `EXISTS (
+  SELECT 1 FROM attendance_field_member fm
+    JOIN attendance_field_assignment fa ON fa.field_assignment_id = fm.field_assignment_id
+   WHERE fm.employee_id = ${employee} AND fm.removed_at IS NULL AND fa.status = 'active'
+     AND fa.starts_on <= ${day} AND fa.ends_on >= ${day})`;
+
 /**
  * Whether employee `e` is on the register on `day`, `ad` being their day's record: anyone
  * with a record, and everyone active, started and not yet left (attendance.repo.js REGISTER).
@@ -183,7 +202,8 @@ const onRegisterBetween = (from, to) => `(EXISTS (SELECT 1 FROM attendance_day x
 const STATUS = `CASE f.day_status
   WHEN 'leave' THEN 'on_leave'
   WHEN 'late' THEN 'late'
-  WHEN 'present' THEN CASE WHEN f.work_pattern = 'remote' THEN 'remote' ELSE 'on_site' END
+  WHEN 'present' THEN CASE WHEN f.field_day THEN 'field'
+                           WHEN f.work_pattern = 'remote' OR f.remote_day THEN 'remote' ELSE 'on_site' END
   WHEN 'absent' THEN 'absent'
   ELSE CASE WHEN f.on_leave THEN 'on_leave' WHEN f.working_day THEN 'not_in' END
 END`;
@@ -215,8 +235,9 @@ const binder = (params) => (value) => {
  * holds and their status. `filters` narrows the people before anything is worked out.
  *
  * The clock-in's worksite is the one its punch was judged against, read from the day's
- * active clock-in (one a day, attendance_event_one_active_uq); it shows only while the
- * day's record has a clock-in, so a punch a decision excluded names none.
+ * active clock-in (one a day, attendance_event_one_active_uq), or on a field assignment's day
+ * the site it was judged against; it shows only while the day's record has a clock-in, so a
+ * punch a decision excluded names none.
  *
  * @param {ReturnType<typeof dayOf>} day
  * @param {ReturnType<typeof dayOf>} yesterday
@@ -234,13 +255,18 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
   return `
     SELECT f.*, ${STATUS} AS status,
-           CASE WHEN f.clock_in_at IS NOT NULL AND f.work_pattern <> 'remote' THEN f.clock_in_worksite END AS worksite
+           CASE WHEN f.clock_in_at IS NOT NULL AND (f.field_day OR (f.work_pattern <> 'remote' AND NOT f.remote_day))
+                THEN f.clock_in_worksite END AS worksite
       FROM (
         SELECT e.employee_id, e.first_name, e.last_name, e.job_title, e.department_id,
-               d.name AS department, ${photoUrlSql("e")} AS photo_url, e.work_pattern, ${working} AS working_day,
+               d.name AS department, ${photoUrlSql("e")} AS photo_url, e.work_pattern, ${remoteDay("e.employee_id", date)} AS remote_day,
+               ${fieldDay("e.employee_id", date)} AS field_day,
+               ${working} AS working_day,
                ad.status AS day_status, ${grantedLeave("e.employee_id", date)} AS on_leave,
                ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
-               COALESCE(ad.late_minutes, 0) AS late_minutes, w.name AS clock_in_worksite,
+               COALESCE(ad.late_minutes, 0) AS late_minutes,
+               COALESCE(w.name, CASE WHEN ci.validation #>> '{geofence,place}' = 'field'
+                                     THEN ci.validation #>> '{geofence,worksite_name}' END) AS clock_in_worksite,
                (yd.first_clock_in_at IS NOT NULL AND yd.last_clock_out_at IS NULL) AS no_clock_out_yesterday
           FROM employee e
           LEFT JOIN department d ON d.department_id = e.department_id
@@ -290,7 +316,7 @@ async function dayAndYesterday(client, date) {
  *
  *   expected  on a working day, everyone on the register but those on leave
  *             (present + absent + not_in); 0 on a day that is not worked
- *   present   late + on_site + remote: a clock-in that counts, on any day
+ *   present   late + on_site + remote + field: a clock-in that counts, on any day
  *   flagged   the people late or with no clock-out yesterday, each once: at most
  *             late + no_clock_out_yesterday, less when someone carries both
  *
@@ -304,9 +330,10 @@ async function summary(client, { date }, scope) {
   const roster = rosterSql(day, yesterday, scope, params);
   const { rows } = await client.query(
     `SELECT count(*) FILTER (WHERE r.working_day AND r.status <> 'on_leave')::int AS expected,
-            count(*) FILTER (WHERE r.status IN ('late', 'on_site', 'remote'))::int AS present,
+            count(*) FILTER (WHERE r.status IN ('late', 'on_site', 'remote', 'field'))::int AS present,
             count(*) FILTER (WHERE r.status = 'on_site')::int AS on_site,
             count(*) FILTER (WHERE r.status = 'remote')::int AS remote,
+            count(*) FILTER (WHERE r.status = 'field')::int AS field,
             count(*) FILTER (WHERE r.status = 'late')::int AS late,
             count(*) FILTER (WHERE r.status = 'absent')::int AS absent,
             count(*) FILTER (WHERE r.status = 'on_leave')::int AS on_leave,
@@ -465,6 +492,8 @@ async function personal(client, { employee_id: employeeId, from, to, today = lag
 
   const { rows } = await client.query(
     `SELECT dy.on_date, ${repo.WORKING_DAY("dy.on_date")} AS working_day, e.work_pattern,
+            ${remoteDay("e.employee_id", "dy.on_date")} AS remote_day,
+            ${fieldDay("e.employee_id", "dy.on_date")} AS field_day,
             ${onRegister("dy.on_date")} AS on_register,
             ad.status AS day_status, ${grantedLeave("e.employee_id", "dy.on_date")} AS on_leave,
             ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,

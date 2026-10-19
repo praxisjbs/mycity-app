@@ -34,6 +34,7 @@ const DEFAULT_POLICY = Object.freeze({
   geofence_mode: "warn",
   device_mode: "off",
   max_accuracy_m: 100,
+  home_radius_m: 100,
 });
 
 /** Accuracy at or under this many metres is a good reading (the guide's §6.5). */

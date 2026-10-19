@@ -71,6 +71,8 @@ const FIELDS = Object.freeze({
     props: [
       "date_of_birth",
       "home_address",
+      "home_latitude",
+      "home_longitude",
       "residential_address",
       "personal_email",
       "personal_phone",

@@ -84,7 +84,7 @@ describe("the day", () => {
 describe("the register's statuses in Home's words", () => {
   test("the vocabulary is the contract's", () => {
     expect(roster.STATUSES).toEqual(c.dashboard.HomeRosterStatus.options);
-    expect(roster.STATUSES).toEqual(["on_leave", "late", "on_site", "remote", "absent", "not_in"]);
+    expect(roster.STATUSES).toEqual(["on_leave", "late", "on_site", "remote", "field", "absent", "not_in"]);
   });
 
   test("a recorded day keeps its status, whatever else holds", () => {
@@ -99,6 +99,14 @@ describe("the register's statuses in Home's words", () => {
     expect(roster.statusOf(fact({ day_status: "present", work_pattern: "hybrid" }))).toBe("on_site");
     expect(roster.statusOf(fact({ day_status: "present", work_pattern: "on_site" }))).toBe("on_site");
     expect(roster.statusOf(fact({ day_status: "late", work_pattern: "remote" }))).toBe("late");
+  });
+
+  test("present on a field assignment's day is field, whatever the work pattern; late stays late", () => {
+    expect(roster.statusOf(fact({ day_status: "present", field_day: true }))).toBe("field");
+    expect(roster.statusOf(fact({ day_status: "present", work_pattern: "remote", field_day: true }))).toBe("field");
+    expect(roster.statusOf(fact({ day_status: "present", remote_day: true, field_day: true }))).toBe("field");
+    expect(roster.statusOf(fact({ day_status: "late", field_day: true }))).toBe("late");
+    expect(roster.statusOf(fact({ field_day: true }))).toBe("not_in");
   });
 
   test("with nothing recorded: granted leave, else not in on a working day, else nothing", () => {
