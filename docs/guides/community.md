@@ -9,8 +9,8 @@
 | Permission key(s) | `community` |
 | Capabilities | `announcements.post` (post to the announcements channel and track who has read a post: the Announcements tab's routes) |
 | Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements; reads shared with #66 Knowledge Hub · Announcements (M10) |
-| Status | Built |
-| Last changed | 17/10/2026 |
+| Status | Agreed |
+| Last changed | 19/10/2026 |
 
 Sources: MILESTONES §6.4 and A19, A20; REUSE_MAP §2.4; the internal workflow meeting of 12 October
 2026 (GE presenting, TB reviewing). The demo (`demo.html`, Staff Community) was updated the same day
@@ -35,8 +35,8 @@ track who has read them.
 |---|---|---|---|---|
 | Staff Community · Channels (`channels`) | Staff app | Every employee; only channels they belong to | Channel list (#announcements pinned first), the open channel's thread, its composer | Read, post, react, vote, recognise, celebrate, attach files, record voice notes, create a channel, view or edit members |
 | Staff Community · Direct Messages (`direct-messages`) | Staff app | Every employee; only their own conversations | Conversation list (All / Unread), the open conversation, the colleague's profile | Message one colleague, attach files, record voice notes, view their profile, search the conversation, mute |
-| Staff Community · Announcements (`announcements`) | Staff app | People and the CEO | The configuration and tracking side: KPI strip, every announcement with read counts | Publish or schedule an announcement, see who has and has not read it |
-| #announcements channel | Staff app, inside Channels | Every employee, read only | Published announcements, newest last | Read; only People and the CEO post |
+| Staff Community · Announcements (`announcements`) | Staff app | People and the CEO | The configuration and tracking side: KPI strip, every announcement with read counts and its level | Publish or schedule an announcement as Normal, Important or Urgent, see who has and has not read or acknowledged it |
+| #announcements channel | Staff app, inside Channels | Every employee, read only | Published announcements, newest last, Urgent ones red and Important ones amber | Read; acknowledge an Urgent one; only People and the CEO post |
 | Knowledge Hub · Announcements (M10) | Staff app | Every employee | The same announcement records, as an archive | Read. No second copy of the data |
 | Notification bell and web push | Staff app, phone | Recipients | New announcement, direct message, mention | Open the message |
 | People · Employees (employee record) | Staff app | People | `date_of_birth`, `start_date`, avatar | Source of the birthday and anniversary posts. Nothing is entered in Community for them |
@@ -47,8 +47,9 @@ track who has read them.
 
 1. **Posting.** A member posts in a channel → `community.message.posted` is emitted in the
    transaction → after commit the worker pushes it to the Socket.io room `channel:<id>` (everyone
-   with the channel open sees it at once, no polling) and fans out notifications to members who are
-   not looking at the channel and have not muted it.
+   with the channel open sees it at once, no polling) and fans out notifications to the members who
+   have not muted it: every post alerts each of their devices (TB, 19/10/2026), and the open app
+   shows no banner for the conversation already on screen.
 2. **Announcements.** People or the CEO publish from Announcements → one `announcement` row and one
    message in #announcements, in the same transaction → `announcement.published` → notification to
    the whole audience (all staff, or chosen departments). A scheduled announcement is stored with
@@ -58,6 +59,13 @@ track who has read them.
    list and is never posted. The release checks the announcement is still scheduled and due, so a
    job queued for a date since moved does nothing. Opening the message marks it read; the Announcements tab shows the
    counts and the list of who has not read it.
+   **Levels** (TB, 19/10/2026): the poster chooses Normal, Important or Urgent. Normal alerts the
+   audience once. Important is amber, alerts once, and 4 hours later reminds whoever has not opened
+   it. Urgent is red and pulses, puts the urgent bar on every screen of everyone in the audience,
+   and alerts them again every 30 minutes from 08:00 to 18:00 Lagos time (at most 8 times a day)
+   until each person presses **Acknowledge**, on the card in #announcements or on the bar
+   (`docs/guides/notifications.md` §6). Opening an urgent announcement does not count as read; its
+   Acknowledge does.
 3. **Celebrations.** The `celebrations` scheduler runs at 05:00 Africa/Lagos, reads employees whose
    `date_of_birth` (day and month) or `start_date` anniversary is today, and posts one celebration
    card each to #general, as the system. The card uses the employee's avatar, or their initials when
@@ -103,7 +111,10 @@ track who has read them.
     by N of 25" with its bar, and under that two lists, **Not Read** (with a **Remind Them** button
     that notifies only those people) and **Read**. The lists live in the modal only, never on the
     card. **Average Read** on the tab is the mean, across published announcements, of the share of
-    the audience who have opened each one.
+    the audience who have opened each one. For an Urgent announcement, read means acknowledged: the
+    pill reads "N of 25 acknowledged", and the lists are **Not Acknowledged** (with Remind Them) and
+    **Acknowledged**, each person with the time they pressed it. Each card shows its level: a red
+    edge for Urgent, amber for Important.
 13. **Resizable list.** On desktop the divider between the list and the conversation can be dragged
     (or moved with the arrow keys; double click resets). The width is remembered per browser. The
     list and the conversation each scroll on their own; the page never scrolls behind them.
@@ -143,8 +154,8 @@ are the contract's keys (gate 6).
 | `community_poll_vote` | `community_message_id`, `user_id`, `option_index` | One vote per person; voting again moves it |
 | `peer_recognition` | `from_employee_id`, `to_employee_id`, `message`, `community_message_id`, `note_written_by_system` | Kept separately so M2 performance and Home can count recognitions |
 | `community_presence` | `user_id`, `last_seen_at` | Touched by the socket on connect, every 30 seconds and on disconnect; online means a touch in the last 90 seconds |
-| `announcement` | `announcement_id`, `title`, `body`, `audience` jsonb (`{ kind: all \| departments, department_ids }`), `status` (`scheduled` / `published` / `cancelled`), `publish_at`, `published_at`, `published_by`, `community_message_id`, `audience_size`, `last_reminded_at` | The record. #announcements and the M10 Knowledge Hub both read it |
-| `announcement_read` | `announcement_id`, `user_id`, `read_at` | One row per person in the audience, written when it is published; `read_at` is set when they open #announcements |
+| `announcement` | `announcement_id`, `title`, `body`, `audience` jsonb (`{ kind: all \| departments, department_ids }`), `status` (`scheduled` / `published` / `cancelled`), `publish_at`, `published_at`, `published_by`, `community_message_id`, `audience_size`, `last_reminded_at`, and from `0470`: `urgency` (`normal`, `important`, `urgent`) | The record. #announcements and the M10 Knowledge Hub both read it |
+| `announcement_read` | `announcement_id`, `user_id`, `read_at`, and from `0470`: `acknowledged_at` | One row per person in the audience, written when it is published; `read_at` is set when they open #announcements, and also by Acknowledge; `acknowledged_at` only by Acknowledge |
 
 Files (images, voice notes, video, documents) are uploaded to the conversation first
 (`POST /channels/:id/media`, purpose `attachment`) and stored by the vault against the channel
@@ -184,11 +195,12 @@ member of answers 404, whatever their grants.
 | `GET /people/:id/card` | → `ProfileCard` | `community` view | | The profile panel: public work fields only (work email, phone, worksite), presence, what this conversation shares |
 | `GET /announcements` | `AnnouncementListQuery` → `AnnouncementPage` | `announcements.post` capability | yes | The tracking tab |
 | `GET /announcements/stats` | → `AnnouncementStats` | capability | | The tab's figures, counted on the server over every announcement: published, scheduled, average read, this month, and the audience (active staff an all-staff announcement reaches now) |
-| `POST /announcements` | `AnnouncementCreate` → `Announcement` | `announcements.post` capability | | `audience` all staff or departments; `publish_at` optional and in the future (day-first on screen, ISO on the wire) |
-| `PUT /announcements/:id` | `AnnouncementUpdate` → `Announcement` | capability | | Scheduled only (409 once posted or cancelled): headline, message, audience, `publish_at` in the future |
+| `POST /announcements` | `AnnouncementCreate` → `Announcement` | `announcements.post` capability | | `audience` all staff or departments; `urgency` normal (the default), important or urgent; `publish_at` optional and in the future (day-first on screen, ISO on the wire) |
+| `PUT /announcements/:id` | `AnnouncementUpdate` → `Announcement` | capability | | Scheduled only (409 once posted or cancelled): headline, message, audience, level, `publish_at` in the future |
+| `POST /announcements/:id/acknowledge` | empty → 204 | `community` view, in its audience | | Urgent only (422 `NOT_URGENT`); 404 for anyone outside its audience. Sets `acknowledged_at` and `read_at` once (pressing again changes nothing); emits `announcement.acknowledged` |
 | `POST /announcements/:id/cancel` | empty → `Announcement` | capability | | Scheduled only; it is never posted |
-| `GET /announcements/:id/reads` | `AnnouncementReadQuery` → `AnnouncementReadPage` | capability | yes | Filter `read` / `not_read` |
-| `POST /announcements/:id/remind` | → `RemindResult` | capability | | Notifies only those who have not read it; once per day per announcement (429 after) |
+| `GET /announcements/:id/reads` | `AnnouncementReadQuery` → `AnnouncementReadPage` | capability | yes | Filter `read` / `not_read`; for an Urgent announcement read means acknowledged, and each row carries `acknowledged_at` |
+| `POST /announcements/:id/remind` | → `RemindResult` | capability | | Notifies only those who have not read it (not acknowledged, for Urgent); once per day per announcement (429 after) |
 
 Posting to #announcements and the Announcements routes are gated by the `announcements.post`
 capability (BACKEND_STRUCTURE §11, `capability` / `role_capability`), held by People and the CEO.
@@ -203,6 +215,13 @@ in #announcements, which every member of staff reads.
   creator is the first. An admin cannot remove themselves, and the last admin cannot step down.
 - A scheduled announcement can be edited or cancelled until it goes out, by anyone holding
   `announcements.post`; once posted it is never edited, because people may have read it.
+- An announcement's level is Normal unless its poster chooses Important or Urgent; anyone holding
+  `announcements.post` (People and the CEO) may choose any level (TB, 19/10/2026). It cannot change
+  once posted.
+- An Important announcement reminds whoever has not opened it once, 4 hours after it went out, as
+  the system (Remind Them stays available to the poster). An Urgent one needs Acknowledge from each
+  person in its audience. The poster, who is never told of their own post, counts as having read it
+  (and acknowledged it, when Urgent) from the moment it goes out.
 - `post_policy` is chosen when a channel is created and cannot be changed afterwards. #announcements
   is `people_ceo`.
 - The author of a message, recognition, poll, channel or announcement is always the signed-in user.
@@ -234,9 +253,11 @@ in #announcements, which every member of staff reads.
 
 | Event / job | When | Does |
 |---|---|---|
-| `community.message.posted` | After a message commits | Realtime push to `channel:<id>`; notifications to non-muted members not viewing; mentions notify. A channel post's notice is titled with the channel (`#general`) and reads "Name: first line"; on a phone a channel's posts share one notification that alerts once and then updates quietly until opened; each direct message alerts, replacing the one before from the same conversation (TB, 19/10/2026; `docs/guides/notifications.md` §6) |
+| `community.message.posted` | After a message commits | Realtime push to `channel:<id>`; notifications to non-muted members. A channel post's notice is titled with the channel (`#general`) and reads "Name: first line"; every post and every direct message alerts each device, replacing the one before from the same conversation, which counts them ("#general · 3 new"; TB, 19/10/2026; `docs/guides/notifications.md` §6) |
 | `community.recognition.posted` | After a recognition commits | As above; counted for Home and M2 |
-| `announcement.published` | On publish, or when a scheduled one is released | Message in #announcements; notification and push to the audience |
+| `announcement.published` | On publish, or when a scheduled one is released | Message in #announcements; notification and push to the audience at its level (urgent ones need Acknowledge); an Important one queues `announcement-remind` for 4 hours later |
+| `announcement-remind` (delayed job) | 4 hours after an Important announcement went out | Reminds, as the system, whoever has not opened it (`announcement.reminded`) |
+| `announcement.acknowledged` | Acknowledge on the card or, through `notification.acknowledged`, on the urgent bar | Records it on the reads; the person's notices of it close on every device |
 | `announcement-publish` (delayed job) | At `publish_at` | Releases a scheduled announcement (README §5.15) if it is still scheduled and due |
 | `announcement.updated` | A scheduled announcement edited | A new delayed release at its new `publish_at`; audit |
 | `announcement.cancelled` | A scheduled announcement cancelled | Audit; nothing is posted |
@@ -284,8 +305,8 @@ received, not interface copy; the copy rules apply to the chrome around them.
 |---|---|---|---|
 | Staff Community · Channels (`channels`) | "6 channels · 25 staff" (desktop subtitle); New Channel; Search Channels; Pinned and Channels, each row the channel name (a lock when read only), its last message, time and unread count; the open channel: name, member count, a Read Only pill, the ⋮ menu (View Members, Edit Members, Channel Details, Search in Channel, Pin to Top or Unpin, Mute Notifications); a pin and a muted bell on rows, the messages and the celebration, recognition and poll cards (Celebrate, votes), each message's menu (Edit, Close Poll, Delete, only those the caller may use), an "Edited" mark and "Message deleted" in place; the composer with ＋ (Recognise a Colleague, Celebrate and Start a Poll where the caller may, Attach a File), record a voice note and Send; Edit Message (Message; Cancel, Save Changes; "Too late to edit" on the field when the 15 minutes have passed) and Edit Poll (the poll form; Save Changes); Delete asks once (Keep It, Delete Message); Close Poll asks once (Keep Open, Close Poll) and the poll shows a Closed pill; voice notes (Play, Transcribe, Hide Transcript); where the user may not post (an admins-only channel), "Only admins post here" in place of the composer; #announcements has none. New Channel: Channel Name, Purpose (Optional), Departments (Optional), People (Optional, with the count selected), Who Can Post (Every Member, Admins Only); Cancel, Create Channel. Channel Members and Edit Members (Make Admin or Remove Admin, Remove, Add People, Close); Channel Details (Channel, Members, Who Can Post). Recognise a Colleague (Colleague, Note Optional; Post Recognition; the toast "Posted to #general"); Celebrate (Colleague, Occasion: Birthday or Work Anniversary; Post Celebration); Start a Poll (Question, Option 1 to 4, the last two Optional; Post Poll); Attach a File (the files, then the upload percentage). Field errors of at most 4 words on the field: "Not a valid name", "Choose a colleague", "Add a question", "Add an option" | Help term on Channel Name: "Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name." Help term on Note in Recognise a Colleague: "Leave it blank and a thank you note is written for you." | Who can post being fixed when the channel is created, that only members read a channel, that channels are internal with no join link: §3 step 5, §6 (the New Channel ⓘ text is removed, and so is the Visibility row of Channel Details). Files going to the vault: §4 (the "Files are stored in the vault" line is removed). Who posts: §6 |
 | Staff Community · Direct Messages (`direct-messages`) | "N unread" or "All caught up" (desktop subtitle); New Message; Search People; All and Unread; each conversation: avatar with the online dot, name, last message ("You:" when it was the user's), time, unread count; the open conversation: name, Online or Last Seen, department, search, ⋮ (View Profile, Search in Conversation, Pin to Top or Unpin, Mute Notifications), a pin and a muted bell on rows, the messages with their ticks, voice notes (Play, Transcribe, Hide Transcript), the composer (Attach: Photo or Video, Document; record a voice note; Send). Profile: avatar, name, title, status pill, Message, View in People; Contact (work email, phone, worksite, local time); Shared in Conversation; Channels in Common; Mute Notifications; Search in Conversation. New Message: the person picker | None | What one tick, two grey and two blue mean: §3 step 10. Transcripts stored once per voice note: §3 step 11. The profile reading the employee record and showing no work details: §3 step 8. Search covering only the caller's own conversation: §3 step 9 |
-| Staff Community · Announcements (`announcements`) | New Announcement; Published, Scheduled, Average Read, Audience, This Month (desktop); a card per announcement: headline, a Scheduled or "N of 25 read" pill, the body, "Posted" or "Goes out" with the date and author. A card opens Announcement Reads (or Scheduled Announcement, with Edit and Cancel Announcement; Edit opens Edit Announcement, the New Announcement form filled in, with Save Changes; Cancel Announcement asks once, Keep It or Cancel Announcement): headline, posted line, body, "Read by N of 25" with its bar, Not Read with Remind Them, Read; Close. New Announcement: Headline, Message, Audience (All Staff or Departments, then the department chips), When (Now or Schedule, then Publish Date, DD/MM/YYYY); Cancel, Publish Announcement (Schedule Announcement when scheduled) | Help term on Average Read: "Across published announcements, the share of the audience who have opened each one." | Who may post, #announcements being pinned and read only, the notification on publish, scheduling, read counts visible to the poster only: §3 step 2, §6, §7, §8 (the page subtitle "Posted by People and the CEO · staff read them in #announcements" and its ⓘ text are removed). "Not yet visible to staff" on the scheduled pill: §3 step 2. "Posting as" in the form: §6 |
-| #announcements channel | As Channels: the published announcements as cards (author, date, headline, body), newest last; a lock on its row and the Read Only pill; no composer at all, for anyone (announcements are published from the Announcements tab) | None | The `announcements.post` capability: §5, §8 |
+| Staff Community · Announcements (`announcements`) | New Announcement; Published, Scheduled, Average Read, Audience, This Month (desktop); a card per announcement: headline, a Scheduled or "N of 25 read" pill, the body, "Posted" or "Goes out" with the date and author. A card opens Announcement Reads (or Scheduled Announcement, with Edit and Cancel Announcement; Edit opens Edit Announcement, the New Announcement form filled in, with Save Changes; Cancel Announcement asks once, Keep It or Cancel Announcement): headline, posted line, body, "Read by N of 25" with its bar, Not Read with Remind Them, Read; Close. An Urgent card has a red edge and reads "N of 25 acknowledged", and its modal lists Not Acknowledged (with Remind Them) and Acknowledged, each with its time; an Important card has an amber edge. New Announcement: Headline, Message, Level (Normal, Important, Urgent), Audience (All Staff or Departments, then the department chips), When (Now or Schedule, then Publish Date, DD/MM/YYYY); Cancel, Publish Announcement (Schedule Announcement when scheduled) | Help term on Average Read: "Across published announcements, the share of the audience who have opened each one." Help term on Level: "Urgent stays red on everyone's screens and repeats every 30 minutes of the working day until each person acknowledges. Important reminds the unread after 4 hours." | Who may post, #announcements being pinned and read only, the notification on publish, scheduling, read counts visible to the poster only: §3 step 2, §6, §7, §8 (the page subtitle "Posted by People and the CEO · staff read them in #announcements" and its ⓘ text are removed). "Not yet visible to staff" on the scheduled pill: §3 step 2. "Posting as" in the form: §6 |
+| #announcements channel | As Channels: the published announcements as cards (author, date, headline, body), newest last; a lock on its row and the Read Only pill; no composer at all, for anyone (announcements are published from the Announcements tab). An Urgent card is red and pulses slowly (steady when motion is off) with Acknowledge until pressed, then "Acknowledged" and its time; an Important card has an amber edge. A red dot on Community while an urgent announcement waits on the person | None | The `announcements.post` capability: §5, §8. The repeat schedule: `docs/guides/notifications.md` §6 |
 | Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub (M10): the same announcement records, read only | The M10 guide | The M10 guide. That it reads the same records, no second copy: §2 |
 | Notification bell and web push | Owned by the frontend foundation (FRONTEND_GUIDE §9.6): the sender and first line; a tap opens the conversation | None | Fan-out, muting and who is notified: §3 step 1, §7 |
 | People · Employees (employee record) | Owned by People: that module's guide | That module's guide | How birthdays and anniversaries become posts: §3 step 3, §6 |
@@ -299,7 +320,7 @@ received, not interface copy; the copy rules apply to the chrome around them.
 | Staff Community · Channels (`channels`) | New Channel beside the title; the search box; Pinned and Channels as full-width rows (channel name, last message, time, unread count) | The subtitle; the open channel beside the list (a channel opens full screen instead); the resizable divider | Tap a channel: it opens full screen over the top bar, tabs and bottom bar, with Back; the composer is locked at the bottom (＋, the voice note button and Send, 44 px) and only the messages scroll; ＋ opens Recognise, Celebrate, Poll and Attach as a menu, each form as a bottom sheet | Bottom bar Chat; the three tabs along the top; inside a channel the menu button opens the channel list as a side drawer; Back returns to the list |
 | Staff Community · Direct Messages (`direct-messages`) | New Message beside the title; the search box; All and Unread as a full-width two-part switch (44 px); the conversation rows | The subtitle; the profile column (View Profile opens it as a sheet); the resizable divider | Tap a conversation: it opens full screen with Back; Attach, the voice note button and Send at the bottom, 44 px | As Channels |
 | Staff Community · Announcements (`announcements`) | New Announcement under the title; four stat cards two to a row (Published, Scheduled, Average Read, Audience; Average Read's help opens as a sheet); the announcement cards one to a row | This Month | New Announcement opens the form as a bottom sheet, the primary full width; a card opens its reads as a sheet | Bottom bar Chat; the three tabs along the top |
-| #announcements channel | As Channels | As Channels | Staff read only; People and the CEO post from the composer | As Channels |
+| #announcements channel | As Channels | As Channels | Staff read only; Acknowledge on an Urgent card, full width at 44 px | As Channels |
 | Knowledge Hub · Announcements (M10) | Owned by Knowledge Hub | The M10 guide | The M10 guide | The M10 guide |
 | Notification bell and web push | The bell in the top bar; push on the phone | None | A tap opens the conversation full screen | The top bar |
 | People · Employees (employee record) | Owned by People | That module's guide | That module's guide | That module's guide |
@@ -322,6 +343,12 @@ fields, never in a toast.
 - **Huge history**: paged at 25; "Load Older" fetches the next page.
 - **Unsupported file type**: refused by the upload engine's mime policy, with the reason.
 - **Announcement scheduled in the past**: refused; the date must be today or later.
+- **Urgent announcement acknowledged on the bar**: the card in #announcements turns to
+  "Acknowledged" too, and the other way round; both reach the same reads row.
+- **Urgent announcement for chosen departments**: only their people get the bar and the repeats;
+  everyone else sees a red card in #announcements without Acknowledge.
+- **The build account posts**: it is never told of its own announcement; test the alerts from a
+  second account.
 
 ## 12 · Donor code
 
@@ -366,3 +393,8 @@ fields, never in a toast.
 - 17/10/2026 · TB · Header gains the Capabilities row every guide now carries (README §5.2): `announcements.post`, as built and seeded by `0449`.
 - 19/10/2026 · TB · §7: how posts and direct messages reach a phone (one alert per channel, then quiet updates; every direct message alerts, one notification per conversation) and the channel's name in a post's notice (`channel_name` in the event's payload), from TB's notification decisions.
 - 19/10/2026 · AJ · `PersonRef` carries `photo_url` (`shared/db/person.js`, which replaces `community.repo.js`'s own `PERSON`): members, direct messages and their profile panel, posts, celebration and recognition cards, the colleague picker and announcement readers show each face (the app's `usePhotos`), initials when there is none. GE to review.
+- 19/10/2026 · TB · From TB's answers (`docs/handoff/notifications-everywhere.md` §2): announcements get
+  a level (Normal, Important, Urgent; §3 step 2, §6); Urgent needs Acknowledge, shows red with the
+  urgent bar and repeats until acknowledged; Important reminds the unread after 4 hours; every
+  channel post alerts each device (§3 step 1, §7); the poster counts as having read their own.
+  §2 to §7, §10 and §11 updated; Status In progress until built.
