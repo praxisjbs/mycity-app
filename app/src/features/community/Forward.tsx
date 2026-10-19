@@ -14,7 +14,9 @@ export const forwardable = (m: { message_type: string; deleted: boolean }) => !m
 
 const MAX_CHATS = 5;
 const keyOf = (t: ForwardTarget) => t.community_channel_id ?? `person:${t.employee_id}`;
-const label = (t: ForwardTarget) => (t.kind === "channel" ? `#${t.name}` : t.name);
+const label = (t: ForwardTarget) => (t.kind === "channel" ? `#${t.name}` : t.is_self ? "You" : t.name);
+const subOf = (t: ForwardTarget) =>
+  t.kind === "channel" ? "Channel" : t.is_self ? "Message yourself" : t.kind === "direct" ? "Direct Message" : (t.person?.job_title ?? "Colleague");
 
 /**
  * Forward To (community.md §3 step 19): one search over the channels the person may post in,
@@ -62,7 +64,7 @@ export function ForwardTo({ source, close, done }: { source: ForwardSource; clos
         onChange={pick}
         id={keyOf}
         title={label}
-        sub={(t) => (t.kind === "channel" ? "Channel" : t.kind === "direct" ? "Direct Message" : (t.person?.job_title ?? "Colleague"))}
+        sub={subOf}
         lead={(t) =>
           t.kind === "channel" ? (
             <span className="flex size-8 flex-none items-center justify-center rounded-box bg-muted font-strong text-subtle-foreground">#</span>

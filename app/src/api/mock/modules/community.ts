@@ -507,11 +507,11 @@ route("GET /api/v1/community/forward-targets", (req) => {
   const talked = new Set(mine.filter((c) => c.channel_type === "direct").map((c) => c.members.find((k) => k !== user) ?? user));
   const rows = [
     ...mine.map((c) => {
-      if (c.channel_type !== "direct") return { kind: "channel" as const, community_channel_id: c.community_channel_id, employee_id: null, name: c.name, person: null, members: c.members.length };
+      if (c.channel_type !== "direct") return { kind: "channel" as const, community_channel_id: c.community_channel_id, employee_id: null, name: c.name, person: null, members: c.members.length, is_self: false };
       const other = c.members.find((k) => k !== user) ?? user;
-      return { kind: "direct" as const, community_channel_id: c.community_channel_id, employee_id: byKey(other)!.employee_id, name: byKey(other)!.display_name, person: person(other), members: null };
+      return { kind: "direct" as const, community_channel_id: c.community_channel_id, employee_id: byKey(other)!.employee_id, name: byKey(other)!.display_name, person: person(other), members: null, is_self: other === user };
     }),
-    ...PEOPLE.filter((p) => !talked.has(p.user_key)).map((p) => ({ kind: "person" as const, community_channel_id: null, employee_id: p.employee_id, name: p.display_name, person: person(p.user_key), members: null })),
+    ...PEOPLE.filter((p) => !talked.has(p.user_key)).map((p) => ({ kind: "person" as const, community_channel_id: null, employee_id: p.employee_id, name: p.display_name, person: person(p.user_key), members: null, is_self: p.user_key === user })),
   ];
   return paged(rows, req, { search: (t) => [t.name] });
 });

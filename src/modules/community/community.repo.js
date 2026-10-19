@@ -550,12 +550,12 @@ async function messagesForForward(db, messageIds) {
 function forwardTargets(db, userId, query) {
   return pageQuery(
     db,
-    `SELECT kind, community_channel_id, employee_id, name, person, members, ${TOTAL_COL}
+    `SELECT kind, community_channel_id, employee_id, name, person, members, is_self, ${TOTAL_COL}
        FROM (
          SELECT 'channel'::text AS kind, c.community_channel_id, NULL::uuid AS employee_id, c.name,
                 NULL::json AS person,
                 (SELECT count(*)::int FROM community_member mm WHERE mm.community_channel_id = c.community_channel_id) AS members,
-                0 AS bucket, COALESCE(lm.last_at, c.created_at) AS active_at
+                false AS is_self, 0 AS bucket, COALESCE(lm.last_at, c.created_at) AS active_at
            FROM community_channel c
            JOIN community_member m ON m.community_channel_id = c.community_channel_id AND m.user_id = $1
            ${LAST}
@@ -564,13 +564,13 @@ function forwardTargets(db, userId, query) {
             AND ($2::text IS NULL OR search_fold(c.name) LIKE '%' || search_fold($2) || '%')
          UNION ALL
          SELECT 'direct', c.community_channel_id, e.employee_id, e.first_name || ' ' || e.last_name,
-                ${PERSON("e", "d")}, NULL, 0, COALESCE(lm.last_at, c.created_at)
+                ${PERSON("e", "d")}, NULL, other.user_id = $1, 0, COALESCE(lm.last_at, c.created_at)
            ${CONVERSATION_FROM}
           WHERE c.channel_type = 'direct' AND c.archived_at IS NULL AND (lm.last_at IS NOT NULL OR c.created_by = $1)
             AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($2) || '%')
          UNION ALL
          SELECT 'person', NULL, e.employee_id, e.first_name || ' ' || e.last_name,
-                ${PERSON("e", "d")}, NULL, 1, NULL
+                ${PERSON("e", "d")}, NULL, u.user_id = $1, 1, NULL
            FROM employee e
            JOIN app_user u ON u.employee_id = e.employee_id AND u.status = 'active'
            LEFT JOIN department d ON d.department_id = e.department_id

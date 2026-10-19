@@ -874,9 +874,12 @@ describeDb("Staff Community against the real migrations", () => {
       expect(kinds.slice(kinds.indexOf("person")).every((k) => k === "person")).toBe(true);
       const tunde = res.body.data.filter((t) => t.name === "Tunde Ola");
       expect(tunde).toHaveLength(1);
-      expect(tunde[0]).toMatchObject({ kind: "direct", employee_id: people.tunde.employee.employee_id });
+      expect(tunde[0]).toMatchObject({ kind: "direct", employee_id: people.tunde.employee.employee_id, is_self: false });
       const found = await as("bola").get("/community/forward-targets?q=amaka");
       expect(found.body.data.map((t) => t.name)).toEqual(["Amaka Eze"]);
+      // The caller's own chat is offered once, marked as theirs (the screen names it "You").
+      const self = (await as("bola").get("/community/forward-targets?q=bola")).body.data.filter((t) => t.employee_id === people.bola.employee.employee_id);
+      expect(self).toEqual([expect.objectContaining({ is_self: true })]);
     });
 
     test("messages go to a channel and a colleague in the order sent, marked forwarded, their files readable there", async () => {

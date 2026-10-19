@@ -341,6 +341,7 @@ const ForwardTarget = z
     name: z.string(),
     person: PersonRef.nullable(),
     members: z.number().int().min(0).nullable(),
+    is_self: z.boolean(),
   })
   .strict();
 const ForwardTargetQuery = listQuery();

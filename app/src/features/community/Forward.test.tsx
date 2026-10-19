@@ -38,7 +38,7 @@ afterEach(() => {
 let auth: ReturnType<typeof useAuth> | null = null;
 function Harness() {
   auth = useAuth();
-  return auth.status === "signed-in" ? <Community tab="channels" /> : null;
+  return auth.status === "signed-in" ? <Community tab="channels" id={null} /> : null;
 }
 
 async function asCynthia() {
