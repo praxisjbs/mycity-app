@@ -310,7 +310,7 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   `notify()` from the socket or the worker, deduped by id, none for the record on screen; answers
   the worker's `mycity:push` and `mycity:open`; `n=` and `pane=` links; closes read notifications
   in the shade on visibility; `setAppBadge`), `state.ts` (pane and settings open, for ⌘K) and
-  `Settings.tsx` (This Device, Other Devices, Where Notices Reach You on `ChannelGrid`).
+  `Settings.tsx` (This Device, Other Devices, Notice Categories on `ChannelGrid`).
   `shell/Bell.tsx` is the pane on `NotificationCenter` with `useInfinite` (which now reloads on
   `invalidate()` and has `reload()`), `shell/Notices.tsx` the Turn On notice (`mc-push-later`, 14
   days), `api/realtime.ts` the `presence:active` and `presence:idle` heartbeats, `shell/Search.tsx`

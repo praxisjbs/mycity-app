@@ -189,11 +189,11 @@ function Categories() {
   return (
     <Card pad={false}>
       <div className="px-4 pt-3">
-        <CardHeader title="Where Notices Reach You" />
+        <CardHeader title="Notice Categories" />
       </div>
       <div className="px-4 pb-2 phone:px-0">
         <ChannelGrid
-          label="Where Notices Reach You"
+          label="Notice Categories"
           columns={CHANNELS}
           rows={rows}
           lockedLabel="Always on"
