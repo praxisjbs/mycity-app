@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
-| M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
+| M2 Productivity & Performance | 10 | 0 | 6 | 4 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **58** | **0** | **36** | **0** | **0** |
+| **Total** | **94** | **48** | **6** | **40** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
@@ -683,13 +683,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 4 | Today | `today` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 5 | Tasks | `tasks` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 6 | Calendar | `calendar` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 7 | Analytics | `analytics` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · AJ · My Workspace on the real API (#4 to #7; `docs/guides/workspace.md`). Tasks: a manager sets a task for anyone in their workspace scope and the employee adds their own beside it (A24), Cadence Daily or Weekly due at the end of that working day or week (Saturday 15:00), numbers from `numbering` (`TSK-0001`), the board moves by drag and Move To (`POST /tasks/:id/move`, fractional order within a column), Mark Blocked, Cancel Task with a reason (the setter only; Show Cancelled lists them), comments and history on the panel, repeats made by the morning `task-recurrence` sweep with due-today and due-tomorrow reminders. Calendar: events with attendees, visibility and Accept or Decline, the reader's task deadlines and approved leave on the month. Today and Analytics (completion rate, overdue, average completion time, done per week, workload by person, by priority) over the same scope. Migration 2010, seed 2090, contracts `tasks`, `calendar`, `workspace`; screens on `contract.gen.ts`, INTERIM `api/types/workspace.ts` deleted, mock in the contract's shapes; ⌘K New Task and New Event; Home's task and calendar adapters count cancelled and invitations. 10 integration tests on the real migrations; screen gates green. Left: Counts Towards on the task form waits for the KPIs API (#31); the staging seed (with Home's forward rows taken away); a click-through on the live API.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/workspace/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/workspace.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Employee Self-Service
@@ -698,7 +699,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | In progress | 19/10/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
@@ -884,14 +885,15 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 29 | Goals | `goals` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 30 | Targets | `targets` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 31 | KPIs | `kpis` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 32 | Reviews | `reviews` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 33 | Analytics | `analytics` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 29 | Goals | `goals` | M2 | AJ | ☐ | ☐ | ☐ | In progress | 19/10/2026 |
+| 30 | Targets | `targets` | M2 | AJ | ☐ | ☐ | ☐ | In progress | 19/10/2026 |
+| 31 | KPIs | `kpis` | M2 | AJ | ☐ | ☐ | ☐ | In progress | 19/10/2026 |
+| 32 | Reviews | `reviews` | M2 | AJ | ☐ | ☐ | ☐ | In progress | 19/10/2026 |
+| 33 | Analytics | `analytics` | M2 | AJ | ☐ | ☐ | ☐ | In progress | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · AJ · Performance schema and reference data (#29 to #33, #10; `docs/guides/performance.md` §4). Migration 2020 (goal cascade): goal levels as A16 sets them (organisational, annual, monthly, departmental) replacing 2000's list, goal number, strategic theme, success measure and baseline, status checks, `organisational_goal_quarter`, `performance_plan` (a department's month, approved as one), and on `employee_target` the month, unit, direction, progress source, setter and plan; the FK indexes and Home's two. Migration 2030 (reviews): cycle statuses and `opened_by`, `performance_cycle_question`, the review's workflow, PDF and statuses (draft, submitted, second level, with HR, closed, returned), ratings 1 to 5, `performance_review_answer` with dictation audio, transcript and AI run. Seed 2091: OG, AG, MG and DT numbering, the status codes, `performance.goal` (Management, Operations & People, CEO) and `performance.review` (the reviewer's line manager, Operations & People), and the five capabilities with their holders; matching entries in `schemes.js`, `definitions.js` and the capability catalogue. Gates 3, 4 (static), 5, capabilities and numbering pass. Left: the round trip on a database (`RUN_DB_TESTS=1`), contracts, the four modules' services and routes, dictation, the screens onto `contract.gen.ts`, and the staging seed that replaces Home's raw goal and review rows.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/performance/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/performance.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Queries & Sanctions

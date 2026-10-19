@@ -778,6 +778,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 19/10/2026 · AJ · M2 paid part of what Home's task and calendar adapters were owed (§4.1): Overdue Tasks, My Overdue Tasks and Your Week leave out cancelled tasks, Your Week carries the invitations a person has not declined and leaves out called-off events, and the indexes Home asked for exist (migration 2010). What is left owed is moving the two reads into the tasks and calendar modules, with TB's review.
 - 14/10/2026 · GE · Alert tables aligned with the shared alert engine (`src/shared/alerts/alerts.js`): primary keys named `<table>_id`, `permission_key` written `<module>.<action>`, and `last_seen_at`, `escalated_at`, `outcome`, `note` added. No screen behaviour changed.
 - 13/10/2026 · TB · First draft for the real build. Written from the 02/09 discovery call and the
   two 12/10 meetings (kickoff and module demos), with attendance read from the shared roster per the

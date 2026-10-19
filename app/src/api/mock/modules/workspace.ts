@@ -1,8 +1,14 @@
-import type { Task, TaskStatus } from "@/api/types/workspace";
-import { at, created, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
-import { byId, byKey, managerOf, ref, refKey, teamOf } from "../data/people";
+import type { CalendarEvent, CalendarItem, Task, TaskActivity, TaskComment, TaskDetail } from "@mycity/contract/contract.gen.ts";
+import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
+import { byId, byKey, ref, refKey, teamOf } from "../data/people";
 
-type R = [string, TaskStatus, string, number | null, Task["priority"], string | null, string | null];
+/**
+ * My Workspace in the browser, in the contract's shapes (docs/guides/workspace.md §5).
+ * The same records seed staging (F13). Rules the API applies are kept where a screen
+ * shows them: who may set a task for whom (A24), and a cancelled task off the board.
+ */
+type Status = Task["status"];
+type R = [string, Status, string, number | null, Task["priority"], string | null, string | null];
 const ROWS: R[] = [
   ["Confirm Ember to Remember venue list with MTN", "todo", "cynthia", -2, "urgent", null, "MTN Nigeria"],
   ["Draft Enugu launch partnership brief", "todo", "ngozi", 0, "high", null, null],
@@ -34,119 +40,298 @@ const ROWS: R[] = [
   ["Renew facilities contract", "todo", "damilola", 12, "low", "cynthia", null],
   ["Q3 people report", "done", "damilola", -10, "normal", "cynthia", null],
 ];
-const duePill = (status: TaskStatus, d: number | null) =>
-  status === "done" ? { tone: "ok" as const, text: "Done" } : d == null ? { tone: "neutral" as const, text: "No date" } : d < 0 ? { tone: "err" as const, text: `Overdue ${-d}d` } : d === 0 ? { tone: "warn" as const, text: "Due Today" } : { tone: "neutral" as const, text: isoDaysAhead(d).split("-").reverse().slice(0, 2).join("/") };
-const TASKS: Task[] = ROWS.map((r, i) => ({
-  task_id: sid(`task:${i}`), number: `TSK-${String(400 - i).padStart(4, "0")}`, title: r[0], status: r[1], owner: refKey(r[2]), set_by: r[5] ? refKey(r[5]) : null,
-  due: r[3] == null ? null : r[3] < 0 ? isoDaysAgo(-r[3]) : isoDaysAhead(r[3]), priority: r[4], linked: r[6] ? { kind: "partner", label: r[6], link: "/partnerships?tab=partners" } : null,
-  due_pill: duePill(r[1], r[3]), description: null,
-}));
-const refresh = (t: Task) => {
-  const d = t.due ? Math.round((Date.parse(t.due) - Date.parse(isoDaysAgo(0))) / 86400000) : null;
-  t.due_pill = duePill(t.status, d);
-  return t;
-};
-const scoped = (user: string, scope?: string) => {
-  const me = byKey(user)!.employee_id;
-  if (scope === "team") {
-    const team = new Set([me, ...teamOf(user).map((p) => p.employee_id)]);
-    return TASKS.filter((t) => team.has(t.owner.employee_id));
-  }
-  return TASKS.filter((t) => t.owner.employee_id === me || (["cynthia", "ifeoma"].includes(user) && t.owner.employee_id !== me && t.owner.employee_id === byKey("ngozi")!.employee_id));
-};
 
-route("GET /api/v1/workspace/today", (req) => {
-  const me = byKey(req.user)!.employee_id;
-  const mine = TASKS.filter((t) => t.owner.employee_id === me && t.status !== "done");
-  const due = mine.filter((t) => t.due_pill.text === "Due Today");
-  const over = mine.filter((t) => t.due_pill.tone === "err");
-  return ok({
-    date: isoDaysAgo(0),
-    kpis: [{ key: "due", label: "Due Today", value: String(due.length) }, { key: "over", label: "Overdue", value: String(over.length), tone: over.length ? "err" : undefined }, { key: "meet", label: "Meetings", value: "2" }, { key: "in", label: "Clocked in", value: "08:04", tone: "ok" }],
-    my_day: [...over, ...due].filter((t) => !t.set_by).slice(0, 6),
-    set_by_manager: mine.filter((t) => t.set_by && t.set_by.employee_id !== me).slice(0, 6),
-    diary: [
-      { time: "09:30", title: "Partnerships standup", sub: "30 min · #partnerships", confirmed: true },
-      { time: "11:00", title: "MTN venue walkthrough", sub: "1 hour · Victoria Island", confirmed: true },
-      { time: "14:00", title: "Payroll preview with Amara", sub: "45 min · call", confirmed: false },
-      { time: "16:30", title: "Panel prep, Adaeze Nnamdi", sub: "30 min · call", confirmed: false },
-    ],
-    activity: [
-      { title: "Adedotun Oyinloye moved a task to In review", when: "08:20", text: "ProvidusBank logo on ticket email.", tone: "hi" },
-      { title: "Tolu Adeyemi completed the Enugu shot list", when: "Yesterday 16:40", tone: "ok" },
-      { title: "Ifeoma Chukwu approved the Content target", when: "Yesterday 16:40", tone: "ok" },
-      { title: "Seyi Balogun commented on your task", when: "Yesterday 11:02", text: "\"Assessment is ready to publish.\"" },
-    ],
+const due = (d: number | null) => (d == null ? null : at(-d, d === 0 ? "17:00" : "17:00"));
+const TASKS: Task[] = ROWS.map((r, i) => ({
+  task_id: sid(`task:${i}`),
+  number: `TSK-${String(400 - i).padStart(4, "0")}`,
+  title: r[0],
+  description: null,
+  status: r[1],
+  priority: r[4],
+  cadence: r[5] ? "weekly" : null,
+  assignee: refKey(r[2]),
+  set_by: refKey(r[5] ?? r[2]),
+  due_at: due(r[3]),
+  overdue: false,
+  started_at: r[1] === "todo" ? null : at(3, "10:00"),
+  completed_at: r[1] === "done" ? at(Math.max(1, -(r[3] ?? 1)), "15:00") : null,
+  cancelled_at: null,
+  cancel_reason: null,
+  blocked_reason: null,
+  blocked_at: null,
+  counts_towards: null,
+  entity_type: r[6] ? "partner" : null,
+  entity_id: r[6] ? sid(`partner:${r[6]}`) : null,
+  link: r[6] ? { module: "partnerships", tab: "partners", id: sid(`partner:${r[6]}`), path: `/partnerships?tab=partners&id=${sid(`partner:${r[6]}`)}` } : null,
+  recurrence: null,
+  comment_count: 0,
+  created_at: at(10, "09:00"),
+  updated_at: at(1, "09:00"),
+}));
+const COMMENTS: TaskComment[] = [];
+const ACTIVITY: TaskActivity[] = [];
+
+const open = (t: Task) => t.status !== "done" && t.status !== "cancelled";
+const fresh = (t: Task): Task => ({ ...t, overdue: Boolean(open(t) && t.due_at && Date.parse(t.due_at) < Date.now()) });
+const me = (user?: string | null) => byKey(user)!.employee_id;
+const mine = (user: string, t: Task) => t.assignee?.employee_id === me(user) || t.set_by?.employee_id === me(user);
+const scoped = (user: string, scope?: string) => {
+  if (scope !== "team") return TASKS.filter((t) => mine(user, t));
+  const team = new Set([me(user), ...teamOf(user).map((p) => p.employee_id)]);
+  return TASKS.filter((t) => (t.assignee && team.has(t.assignee.employee_id)) || mine(user, t));
+};
+const canSetFor = (user: string, id: string) => id === me(user) || teamOf(user).some((p) => p.employee_id === id);
+const manages = (user: string, t: Task) => t.set_by?.employee_id === me(user) || (t.assignee?.employee_id !== me(user) && canSetFor(user, t.assignee!.employee_id));
+const weekBounds = () => {
+  const d = new Date();
+  const wd = (d.getUTCDay() + 6) % 7;
+  return [isoDaysAgo(wd), isoDaysAhead(7 - wd)];
+};
+const log = (user: string, t: Task, kind: TaskActivity["kind"], from: Status | null = null, to: Status | null = null) =>
+  ACTIVITY.unshift({ task_activity_id: sid(`act:${Date.now()}:${ACTIVITY.length}`), task_id: t.task_id, task_title: t.title, actor: refKey(user), kind, from_status: from, to_status: to, detail: null, created_at: new Date().toISOString() });
+const find = (user: string, id: string) => {
+  const t = TASKS.find((x) => x.task_id === id);
+  return t && (mine(user, t) || scoped(user, "team").includes(t)) ? t : undefined;
+};
+const detail = (user: string, t: Task): TaskDetail => ({ ...fresh(t), can_edit: true, can_reassign: manages(user, t), can_cancel: manages(user, t) && t.status !== "cancelled" });
+
+route("GET /api/v1/tasks", (req) => {
+  const { scope, ...query } = req.query;
+  const list = scoped(req.user!, scope).filter((t) => (query.status ? true : t.status !== "cancelled")).map(fresh);
+  const [from, to] = weekBounds();
+  const today = isoDaysAgo(0);
+  return paged(list, { ...req, query }, {
+    search: (t) => [t.title, t.number, t.assignee?.display_name],
+    filters: {
+      status: (t, v) => t.status === v,
+      assignee_id: (t, v) => t.assignee?.employee_id === v,
+      cadence: (t, v) => t.cadence === v,
+      priority: (t, v) => t.priority === v,
+      employee_target_id: (t, v) => t.counts_towards?.employee_target_id === v,
+      due: (t, v) => (v === "overdue" ? t.overdue : v === "today" ? Boolean(t.due_at?.startsWith(today)) : Boolean(t.due_at && t.due_at >= from && t.due_at < to)),
+    },
+    sort: { due_at: (a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"), created_at: (a, b) => a.created_at.localeCompare(b.created_at) },
   });
 });
 route("GET /api/v1/tasks/summary", (req) => {
-  const l = scoped(req.user!, req.query.scope);
-  const open = l.filter((t) => t.status !== "done");
-  return ok({ kpis: [
-    { key: "open", label: "Open", value: String(open.length) },
-    { key: "week", label: "Due This Week", value: String(open.filter((t) => t.due && t.due <= isoDaysAhead(6) && t.due >= isoDaysAgo(0)).length) },
-    { key: "over", label: "Overdue", value: String(open.filter((t) => t.due_pill.tone === "err").length), tone: "err" },
-    { key: "done", label: "Completed, 30d", value: String(l.filter((t) => t.status === "done").length + 41), tone: "ok" },
-  ] });
-});
-route("GET /api/v1/tasks", (req) =>
-  paged(scoped(req.user!, req.query.scope).map(refresh), { ...req, query: Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "scope")) }, {
-    search: (t) => [t.title, t.owner.display_name, t.number],
-    filters: { status: (t, v) => t.status === v },
-  }),
-);
-route("POST /api/v1/tasks", (req) => {
-  const b = req.body as { title: string; owner_id?: string; due?: string; priority: Task["priority"]; description?: string };
-  if (!b.title || b.title.trim().length < 3) return invalid({ title: ["Name the task"] });
-  const owner = b.owner_id ? byId(b.owner_id)! : byKey(req.user)!;
-  const meKey = req.user!;
-  const t: Task = { task_id: sid(`task:${Date.now()}`), number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`, title: b.title.trim(), status: "todo", owner: ref(owner)!, set_by: owner.user_key !== meKey ? ref(byKey(meKey))! : null, due: b.due || null, priority: b.priority, linked: null, due_pill: { tone: "neutral", text: "" }, description: b.description ?? null };
-  TASKS.unshift(refresh(t));
-  return created(t);
-});
-route("PATCH /api/v1/tasks/:id", (req) => {
-  const t = TASKS.find((x) => x.task_id === req.params.id);
-  if (!t) return notFound();
-  Object.assign(t, req.body);
-  return ok(refresh(t));
-});
-
-const EVENTS = [
-  [-5, "Management review", "Meeting", true], [-2, "Payroll preview", "Payroll", false], [2, "MTN venue list", "Deadline", true], [3, "Q4 targets close", "Task", false],
-  [4, "Panel: Adaeze Nnamdi", "Interview", false], [5, "Ember to Remember, Lagos", "Campaign", false], [6, "Onboarding pack, Enugu", "Task", false], [9, "Fatima Sani interview", "Interview", false],
-  [11, "Q4 review cycle opens", "Cycle", false], [11, "Chiamaka Eze starts", "Onboarding", false], [13, "Enugu shoot", "Studio", false], [14, "Enugu shoot", "Studio", false],
-  [15, "Chidera probation ends", "Decision", false], [0, "Partnerships standup", "Meeting", false],
-].map((e, i) => ({ event_id: sid(`ev:${i}`), date: (e[0] as number) < 0 ? isoDaysAgo(-(e[0] as number)) : isoDaysAhead(e[0] as number), title: e[1] as string, kind: e[2] as string, highlight: e[3] as boolean, link: null as string | null }));
-const payday = () => { const d = new Date(); d.setUTCDate(27); return d.toISOString().slice(0, 10); };
-route("GET /api/v1/calendar", (req) => {
-  const all = [...EVENTS, { event_id: sid("ev:payday"), date: payday(), title: "Payday", kind: "Payroll", highlight: true, link: "/ess?tab=my-payslips" }].sort((a, b) => a.date.localeCompare(b.date));
-  return paged(all, req, { search: (e) => [e.title, e.kind], filters: { month: (e, v) => e.date.startsWith(v) } });
-});
-route("POST /api/v1/calendar", (req) => {
-  const b = req.body as { title: string; date: string; kind: string };
-  const f: Record<string, string[]> = {};
-  if (!b.title) f.title = ["Name the event"];
-  if (!b.date) f.date = ["Pick a date"];
-  if (Object.keys(f).length) return invalid(f);
-  const e = { event_id: sid(`ev:${Date.now()}`), date: b.date, title: b.title, kind: b.kind || "Event", highlight: false, link: null };
-  EVENTS.push(e);
-  return created(e);
-});
-
-route("GET /api/v1/workspace/analytics", (req) => {
-  const l = scoped(req.user!, "team");
-  const open = l.filter((t) => t.status !== "done");
-  const by = new Map<string, number>();
-  open.forEach((t) => by.set(t.owner.display_name, (by.get(t.owner.display_name) ?? 0) + 1));
-  const top = [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const max = top[0]?.[1] ?? 1;
+  const l = scoped(req.user!, req.query.scope).map(fresh);
+  const [from, to] = weekBounds();
   return ok({
-    kpis: [{ key: "rate", label: "Completion Rate", value: "78%", trend: "up 6 points", dir: "up" }, { key: "over", label: "Overdue", value: String(open.filter((t) => t.due_pill.tone === "err").length), tone: "err" }, { key: "avg", label: "Avg Completion", value: "2.4 days" }, { key: "open", label: "Open Tasks", value: String(open.length) }],
-    completed_per_week: [18, 22, 19, 26, 24, 31],
-    workload: top.map(([label, n]) => ({ label, pct: Math.round((n / max) * 100), value: `${n} open` })),
-    priority: [["Urgent", 22, "7", "warn"], ["High", 38, "12"], ["Normal", 66, "21"], ["Low", 25, "8"]].map(([label, pct, value, e]) => ({ label: label as string, pct: pct as number, value: value as string, ...(e ? { emphasis: "warn" as const } : {}) })),
-    late_reasons: [["Waiting on somebody else", 3, 43], ["Underestimated", 2, 29], ["Deprioritised, not reassigned", 1, 14], ["No reason recorded", 1, 14]].map(([reason, count, pct]) => ({ reason: reason as string, count: count as number, pct: pct as number })),
+    open: l.filter(open).length,
+    due_this_week: l.filter((t) => open(t) && t.due_at && t.due_at >= from && t.due_at < to).length,
+    overdue: l.filter((t) => t.overdue).length,
+    done_this_week: l.filter((t) => t.status === "done" && t.completed_at && t.completed_at >= from).length,
   });
 });
-export const _m = managerOf;
-export const _a = at;
+route("GET /api/v1/tasks/:id", (req) => {
+  const t = find(req.user!, req.params.id);
+  return t ? ok(detail(req.user!, t)) : notFound();
+});
+route("POST /api/v1/tasks", (req) => {
+  const b = req.body as { title?: string; primary_assignee_id?: string; due_on?: string; cadence?: Task["cadence"]; priority?: Task["priority"]; description?: string };
+  if (!b.title || !b.title.trim()) return invalid({ title: ["Name the task"] });
+  const assignee = b.primary_assignee_id ? byId(b.primary_assignee_id) : byKey(req.user);
+  if (!assignee || !canSetFor(req.user!, assignee.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
+  const t: Task = {
+    ...TASKS[0], task_id: sid(`task:${Date.now()}`), number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`, title: b.title.trim(),
+    description: b.description || null, status: "todo", priority: b.priority ?? "normal", cadence: b.cadence || null,
+    assignee: ref(assignee)!, set_by: refKey(req.user!), due_at: b.due_on ? `${b.due_on}T16:00:00.000Z` : null,
+    started_at: null, completed_at: null, entity_type: null, entity_id: null, link: null, comment_count: 0,
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  };
+  TASKS.unshift(t);
+  log(req.user!, t, "created", null, "todo");
+  return created(fresh(t));
+});
+route("PATCH /api/v1/tasks/:id", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  const b = req.body as Record<string, unknown>;
+  if (["title", "due_on", "cadence", "primary_assignee_id"].some((k) => k in b) && !manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can change that");
+  if (typeof b.title === "string") t.title = b.title;
+  if ("description" in b) t.description = (b.description as string) || null;
+  if (b.priority) t.priority = b.priority as Task["priority"];
+  if ("due_on" in b) t.due_at = b.due_on ? `${b.due_on}T16:00:00.000Z` : null;
+  log(req.user!, t, "edited");
+  return ok(fresh(t));
+});
+route("POST /api/v1/tasks/:id/move", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  if (t.status === "cancelled") return fail(409, "TASK_CANCELLED", "This task was cancelled");
+  const to = (req.body as { status: Status }).status;
+  const from = t.status;
+  if (to === "in_progress" && !t.started_at) t.started_at = new Date().toISOString();
+  t.completed_at = to === "done" ? new Date().toISOString() : null;
+  t.status = to;
+  if (from !== to) log(req.user!, t, "status_changed", from, to);
+  return ok(fresh(t));
+});
+route("POST /api/v1/tasks/:id/block", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  t.blocked_reason = (req.body as { blocked_reason: string }).blocked_reason;
+  t.blocked_at = new Date().toISOString();
+  log(req.user!, t, "blocked");
+  return ok(fresh(t));
+});
+route("POST /api/v1/tasks/:id/unblock", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  t.blocked_reason = null;
+  t.blocked_at = null;
+  log(req.user!, t, "unblocked");
+  return ok(fresh(t));
+});
+route("POST /api/v1/tasks/:id/cancel", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  if (!manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can cancel it");
+  log(req.user!, t, "cancelled", t.status, "cancelled");
+  Object.assign(t, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: (req.body as { cancel_reason: string }).cancel_reason });
+  return ok(fresh(t));
+});
+route("GET /api/v1/tasks/:id/comments", (req) => {
+  const t = find(req.user!, req.params.id);
+  return t ? paged(COMMENTS.filter((c) => c.task_id === t.task_id), req, { sort: { created_at: (a, b) => a.created_at.localeCompare(b.created_at) } }) : notFound();
+});
+route("POST /api/v1/tasks/:id/comments", (req) => {
+  const t = find(req.user!, req.params.id);
+  if (!t) return notFound();
+  const c: TaskComment = { task_comment_id: sid(`c:${Date.now()}`), task_id: t.task_id, author: refKey(req.user!), body: (req.body as { body: string }).body, created_at: new Date().toISOString() };
+  COMMENTS.push(c);
+  t.comment_count += 1;
+  log(req.user!, t, "commented");
+  return created(c);
+});
+route("GET /api/v1/tasks/:id/activity", (req) => {
+  const t = find(req.user!, req.params.id);
+  return t ? paged(ACTIVITY.filter((a) => a.task_id === t.task_id), req, { sort: { created_at: (a, b) => a.created_at.localeCompare(b.created_at) } }) : notFound();
+});
+
+/* Calendar */
+type E = [number, string, CalendarEvent["event_type"], string, number];
+const EVENT_ROWS: E[] = [
+  [-5, "Management review", "meeting", "10:00", 90], [2, "MTN venue list", "deadline", "17:00", 30], [4, "Panel: Adaeze Nnamdi", "interview", "11:00", 60],
+  [5, "Ember to Remember, Lagos", "campaign", "09:00", 480], [9, "Fatima Sani interview", "interview", "14:00", 45], [13, "Enugu shoot", "event", "08:00", 480],
+  [0, "Partnerships standup", "meeting", "09:30", 30], [0, "MTN venue walkthrough", "meeting", "11:00", 60],
+];
+const EVENTS: CalendarEvent[] = EVENT_ROWS.map(([d, title, type, hm, mins], i) => {
+  const starts = at(-d, hm);
+  return {
+    calendar_event_id: sid(`ev:${i}`), title, description: null, event_type: type, owner: refKey("cynthia"),
+    starts_at: starts, ends_at: new Date(Date.parse(starts) + mins * 60000).toISOString(), all_day: false, location: null,
+    visibility: "everyone", attendees: [], my_response: null, entity_type: null, entity_id: null, link: null, cancelled_at: null, can_edit: false,
+    created_at: at(20, "09:00"),
+  };
+});
+const asItem = (e: CalendarEvent): CalendarItem => ({ item_kind: "event", item_id: e.calendar_event_id, title: e.title, starts_at: e.starts_at, ends_at: e.ends_at, all_day: e.all_day, event_type: e.event_type, location: e.location, my_response: e.my_response, link: { module: "workspace", tab: "calendar", id: e.calendar_event_id, path: `/workspace?tab=calendar&id=${e.calendar_event_id}` } });
+const taskItem = (t: Task): CalendarItem => ({ item_kind: "task", item_id: t.task_id, title: t.title, starts_at: t.due_at!, ends_at: new Date(Date.parse(t.due_at!) + 60000).toISOString(), all_day: false, event_type: "deadline", location: null, my_response: null, link: { module: "workspace", tab: "tasks", id: t.task_id, path: `/workspace?tab=tasks&id=${t.task_id}` } });
+const sees = (user: string, e: CalendarEvent) => e.visibility === "everyone" || e.owner?.employee_id === me(user) || e.attendees.some((a) => a.employee.employee_id === me(user));
+const view = (user: string, e: CalendarEvent): CalendarEvent => ({ ...e, my_response: e.attendees.find((a) => a.employee.employee_id === me(user))?.response ?? null, can_edit: e.owner?.employee_id === me(user) && !e.cancelled_at });
+
+route("GET /api/v1/calendar", (req) => {
+  const { month } = req.query;
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) return invalid({ month: ["must be a month as YYYY-MM"] });
+  const items = [
+    ...EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e)).map(asItem),
+    ...TASKS.filter((t) => t.assignee?.employee_id === me(req.user) && open(t) && t.due_at).map(taskItem),
+  ].filter((i) => i.starts_at.startsWith(month)).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  return paged(items, { ...req, query: Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "month")) }, {
+    search: (i) => [i.title],
+    filters: { item_kind: (i, v) => i.item_kind === v },
+    sort: { starts_at: (a, b) => a.starts_at.localeCompare(b.starts_at) },
+  });
+});
+route("GET /api/v1/calendar/:id", (req) => {
+  const e = EVENTS.find((x) => x.calendar_event_id === req.params.id);
+  return e && sees(req.user!, e) ? ok(view(req.user!, e)) : notFound();
+});
+route("POST /api/v1/calendar", (req) => {
+  const b = req.body as { title?: string; starts_at?: string; ends_at?: string; event_type?: CalendarEvent["event_type"]; all_day?: boolean; location?: string; visibility?: CalendarEvent["visibility"]; attendee_ids?: string[] };
+  const f: Record<string, string[]> = {};
+  if (!b.title) f.title = ["Name the event"];
+  if (!b.starts_at) f.starts_at = ["Pick a start"];
+  if (b.starts_at && b.ends_at && b.ends_at <= b.starts_at) f.ends_at = ["Ends before it starts"];
+  if (Object.keys(f).length) return invalid(f);
+  const e: CalendarEvent = {
+    calendar_event_id: sid(`ev:${Date.now()}`), title: b.title!, description: null, event_type: b.event_type ?? "meeting", owner: refKey(req.user!),
+    starts_at: b.starts_at!, ends_at: b.ends_at!, all_day: Boolean(b.all_day), location: b.location || null, visibility: b.visibility ?? "attendees",
+    attendees: (b.attendee_ids ?? []).map((id) => ({ employee: ref(byId(id))!, response: "pending" as const })), my_response: null,
+    entity_type: null, entity_id: null, link: null, cancelled_at: null, can_edit: true, created_at: new Date().toISOString(),
+  };
+  EVENTS.push(e);
+  return created(view(req.user!, e));
+});
+route("PATCH /api/v1/calendar/:id", (req) => {
+  const e = EVENTS.find((x) => x.calendar_event_id === req.params.id);
+  if (!e || !sees(req.user!, e)) return notFound();
+  if (e.owner?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only the person who made this event can change it");
+  Object.assign(e, req.body);
+  return ok(view(req.user!, e));
+});
+route("POST /api/v1/calendar/:id/cancel", (req) => {
+  const e = EVENTS.find((x) => x.calendar_event_id === req.params.id);
+  if (!e || !sees(req.user!, e)) return notFound();
+  if (e.owner?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only the person who made this event can change it");
+  e.cancelled_at = new Date().toISOString();
+  return ok(view(req.user!, e));
+});
+route("POST /api/v1/calendar/:id/respond", (req) => {
+  const e = EVENTS.find((x) => x.calendar_event_id === req.params.id);
+  if (!e || !sees(req.user!, e)) return notFound();
+  const a = e.attendees.find((x) => x.employee.employee_id === me(req.user));
+  if (!a) return fail(409, "NOT_INVITED", "You are not invited to this event");
+  a.response = (req.body as { response: "accepted" | "declined" }).response;
+  return ok(view(req.user!, e));
+});
+
+/* Today and Analytics */
+route("GET /api/v1/workspace/today", (req) => {
+  const id = me(req.user);
+  const today = isoDaysAgo(0);
+  const own = TASKS.filter((t) => t.assignee?.employee_id === id && open(t)).map(fresh);
+  const dueToday = own.filter((t) => t.due_at?.startsWith(today));
+  const overdue = own.filter((t) => t.overdue);
+  const fromOthers = own.filter((t) => t.set_by && t.set_by.employee_id !== id);
+  const [from] = weekBounds();
+  const diary = EVENTS.filter((e) => sees(req.user!, e) && e.starts_at.startsWith(today)).map(asItem);
+  const since = ACTIVITY.filter((a) => TASKS.some((t) => t.task_id === a.task_id && t.assignee?.employee_id === id) && a.actor?.employee_id !== id).slice(0, 25);
+  return ok({
+    date: today,
+    due_today: dueToday.length,
+    overdue: overdue.length,
+    in_review: own.filter((t) => t.status === "in_review").length,
+    done_this_week: TASKS.filter((t) => t.assignee?.employee_id === id && t.status === "done" && (t.completed_at ?? "") >= from).length,
+    my_day: { data: [...overdue, ...dueToday.filter((t) => !t.overdue)].slice(0, 25), total: overdue.length + dueToday.length },
+    set_by_manager: { data: fromOthers.slice(0, 25), total: fromOthers.length },
+    diary: { data: diary, total: diary.length },
+    since: { data: since.map((a) => ({ task_id: a.task_id, task_title: a.task_title, actor: a.actor, kind: a.kind, to_status: a.to_status, created_at: a.created_at })), total: since.length },
+  });
+});
+route("GET /api/v1/workspace/analytics", (req) => {
+  const l = scoped(req.user!, req.query.scope).map(fresh);
+  const done = l.filter((t) => t.status === "done");
+  const openNow = l.filter(open);
+  const by = new Map<string, { employee: NonNullable<Task["assignee"]>; open: number }>();
+  for (const t of openNow) {
+    if (!t.assignee) continue;
+    const e = by.get(t.assignee.employee_id) ?? { employee: t.assignee, open: 0 };
+    e.open += 1;
+    by.set(t.assignee.employee_id, e);
+  }
+  const days = req.query.period === "90d" ? 90 : req.query.period === "year" ? 290 : 30;
+  return ok({
+    from: isoDaysAgo(days - 1),
+    to: isoDaysAgo(0),
+    completion_rate: done.length + openNow.length ? Math.round((done.length / (done.length + openNow.length)) * 1000) / 10 : null,
+    overdue: openNow.filter((t) => t.overdue).length,
+    avg_completion_days: 2.4,
+    done: done.length,
+    cancelled: l.filter((t) => t.status === "cancelled").length,
+    completed_per_week: [18, 22, 19, 26, 24, 31].map((count, i) => ({ week_start: isoDaysAgo(7 * (5 - i)), count })),
+    workload: [...by.values()].sort((a, b) => b.open - a.open).slice(0, 25),
+    by_priority: (["urgent", "high", "normal", "low"] as const).map((priority) => ({ priority, open: openNow.filter((t) => t.priority === priority).length })),
+  });
+});

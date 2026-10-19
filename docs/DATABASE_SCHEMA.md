@@ -222,17 +222,18 @@ other M1 modules take numbers outside them. The organogram takes `1160` to `1169
 ### M2 Productivity & Performance · 2000 to 2999 · AJ
 
 **Built:** `2000` projects, tasks, assignees, comments, calendar events, goals, KPIs, targets,
-performance cycles, reviews and review items · `2099` seed.
+performance cycles, reviews and review items · `2010` a task's number, setter (`set_by_employee_id`),
+cadence, KPI (`employee_target_id`), record pointer (`entity_type`, `entity_id`), the cancelled
+status, blockers and `task_activity`; calendar visibility, record pointer, called-off events and
+`calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2090` the
+`task` numbering scheme and the cancelled status · `2020` the goal cascade (A16): levels
+organisational, annual, monthly, departmental, `code`, theme, success measure, baseline,
+`organisational_goal_quarter`, `performance_plan`, and the KPI's month, unit, direction, progress
+source, setter and plan on `employee_target` · `2030` reviews: cycle statuses and questions, the
+review's workflow, PDF and statuses, `performance_review_answer` with dictation (A18) · `2091` goal
+numbering, statuses, `performance.goal` and `performance.review`, five capabilities · `2099` seed.
 
 **Owes:**
-- Goals cascade as A16 sets it (organisational, annual, monthly, departmental, individual KPI),
-  with code, strategic theme, success measure, baseline and the CEO's final approval.
-- Tasks: the record a task points at (`entity_type`, `entity_id`), the KPI it counts towards,
-  manager-set weekly and daily cadence (A24), the cancelled status.
-- Calendar: attendees, visibility, the interview it belongs to.
-- Reviews: the second-level and HR stages and their workflow; dictation transcript, cleaned text
-  and `ai_run_id` (A18).
-- Numbering: `project` has `number NOT NULL` and no scheme in `schemes.js`.
 - **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
   `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;
   `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,

@@ -215,6 +215,35 @@ const CAPABILITY_CATALOG = [
     module: "mailbox",
     label: "Configure Signature",
     description: "Set the company's signature links and what shows on everyone's email signature.",
+  },  {
+    code: "goals.organisation",
+    module: "performance",
+    label: "Set Organisational Goals",
+    description: "Record and activate the organisation's goals.",
+  },
+  {
+    code: "goals.company",
+    module: "performance",
+    label: "Set Company Goals",
+    description: "Set annual and monthly goals under the organisational goals.",
+  },
+  {
+    code: "goals.department",
+    module: "performance",
+    label: "Set Department Targets",
+    description: "Set a department's monthly targets and submit its month.",
+  },
+  {
+    code: "kpis.assign",
+    module: "performance",
+    label: "Assign KPIs",
+    description: "Set the monthly KPIs and weights of the people in scope.",
+  },
+  {
+    code: "reviews.cycles",
+    module: "performance",
+    label: "Run Review Cycles",
+    description: "Open and close review cycles and edit their questions.",
   },
 ];
 

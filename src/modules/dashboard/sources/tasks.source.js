@@ -14,7 +14,7 @@
  *
  * A task is someone's when they are its primary assignee: scope runs on
  * t.primary_assignee_id, so an unassigned task is seen only with `all` scope. Overdue is
- * as of an instant: due before it, not done, not completed, not archived.
+ * as of an instant: due before it, not done, not cancelled, not completed, not archived.
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../../shared/http/paged");
 const { scopeClause } = require("../../../shared/rbac/scope");
@@ -27,13 +27,13 @@ const TABLES = Object.freeze({
 
 /** What M2 still owes these queries. */
 const OWES = Object.freeze([
-  "The cancelled status (DATABASE_SCHEMA M2): until it exists a cancelled task still counts as overdue.",
-  "Whose a task is: Home counts its primary assignee; co-assignees in task_assignee count once M2 says they share it.",
-  "Index task (due_at) WHERE archived_at IS NULL AND completed_at IS NULL, for the overdue count (asked by Home).",
+  "Move these reads into src/modules/tasks (a read the tasks module owns) with TB's review; " +
+    "the cancelled status, whose a task is (its primary assignee, as the board's team scope) " +
+    "and the overdue index are paid (AJ, 19/10/2026; docs/guides/workspace.md §6).",
 ]);
 
 /** Open and past its due time at `$1`. */
-const OVERDUE = `t.archived_at IS NULL AND t.completed_at IS NULL AND t.status <> 'done'
+const OVERDUE = `t.archived_at IS NULL AND t.completed_at IS NULL AND t.status NOT IN ('done', 'cancelled')
   AND t.due_at < $1::timestamptz`;
 
 /**
@@ -82,7 +82,7 @@ function dueBetween(client, { employee_id: employeeId, from, to }, query) {
     `SELECT t.task_id, t.title, t.due_at, ${TOTAL_COL}
        FROM task t
       WHERE t.primary_assignee_id = $1 AND t.archived_at IS NULL AND t.completed_at IS NULL
-        AND t.status <> 'done' AND t.due_at >= $2::timestamptz AND t.due_at < $3::timestamptz
+        AND t.status NOT IN ('done', 'cancelled') AND t.due_at >= $2::timestamptz AND t.due_at < $3::timestamptz
       ORDER BY t.due_at, t.task_id`,
     [employeeId, from, to],
     query,
