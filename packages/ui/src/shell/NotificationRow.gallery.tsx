@@ -1,28 +1,27 @@
 import type { GalleryEntry } from "../testing/gallery";
-import { Button } from "../actions/Button";
 import { NotificationRow } from "./NotificationRow";
+
+const nothing = () => undefined;
 
 export default {
   component: "NotificationRow",
   states: {
-    Unread: () => (
-      <NotificationRow
-        title="Expense request waiting on you"
-        body="Bashir Lawal · Lagos activation transport, ₦185,000.00"
-        when="08:41"
-        tone="warn"
-        icon="check"
-        unread
-        action={<Button size="sm">Open</Button>}
-      />
+    "Unread Mail": () => (
+      <NotificationRow title="Tom-Blake Asaah" body={"Re: Confirm attachments work\nThe signed copy is attached, please check the second page."} when="05:33" avatar="Tom-Blake Asaah" unread onOpen={nothing} onMarkRead={nothing} />
     ),
-    Read: () => <NotificationRow title="Payroll preview ready" body="October run, 25 employees." when="12/10/2026" icon="wallet" />,
+    "Read Approval": () => <NotificationRow title="Approval needed: Leave request" body="Line manager is waiting on you." when="Yesterday" icon="check" tone="warn" onOpen={nothing} />,
     List: () => (
-      <div>
-        <NotificationRow title="New application" body="Adaeze Okonkwo applied for Content Producer." when="07:20" icon="brief" unread />
-        <NotificationRow title="You were recognised" body="Kept the Enugu shoot on schedule." when="Yesterday" tone="ok" icon="thumb" />
-        <NotificationRow title="3 late arrivals in 30 days" when="Yesterday" tone="err" icon="clock" />
-      </div>
+      <ul className="divide-y divide-border">
+        <li>
+          <NotificationRow title="#general · 4 new posts" body="Ada Okafor: Lunch is here!" when="12:02" avatar="#general" unread onOpen={nothing} onMarkRead={nothing} />
+        </li>
+        <li>
+          <NotificationRow title="New sign-in to your account" body="Edge on Windows, 105.127.11.59. If this was not you, reset your password now." when="Yesterday" icon="lock" tone="warn" onOpen={nothing} />
+        </li>
+        <li>
+          <NotificationRow title="You were recognised" body="Kept the Enugu shoot on schedule." when="16/10/2026" icon="thumb" tone="ok" onOpen={nothing} />
+        </li>
+      </ul>
     ),
   },
 } satisfies GalleryEntry;

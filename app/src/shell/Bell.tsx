@@ -84,17 +84,8 @@ function BellBody({ close }: { close: () => void }) {
             icon={ICONS[n.category] ?? "bell"}
             tone={n.priority === "high" ? "warn" : "info"}
             unread={!n.read_at}
-            action={
-              n.link ? (
-                <Button size="sm" onClick={() => open(n)}>
-                  Open
-                </Button>
-              ) : !n.read_at ? (
-                <Button size="sm" busy={read.pending} onClick={() => markRead(n)}>
-                  Mark Read
-                </Button>
-              ) : undefined
-            }
+            onOpen={() => (n.link ? open(n) : n.read_at ? undefined : markRead(n))}
+            onMarkRead={() => markRead(n)}
           />
         ))
       )}

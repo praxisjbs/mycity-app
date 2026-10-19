@@ -194,7 +194,7 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       `SKIP_WAITING` message the update prompt sends), push, notificationclick, pushsubscriptionchange;
       `app/public/badge-96.png` (white pin on transparent); check `src/http/static.js` serves
       `sw.js` uncached.
-- [ ] **11. `packages/ui`** (each with `npm run new:component`: header, test, gallery page):
+- [x] **11. `packages/ui`** (19/10/2026) (each with `npm run new:component`: header, test, gallery page):
       the banner on the branded `Toaster` (a second, top Toaster id), the notification centre
       (phone full-screen page and desktop panel, rows with swipe and hover Mark Read, day groups,
       All and Unread), the settings parts; `npm run gen:components`.
@@ -291,3 +291,14 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   (WebWorker lib); `tsconfig.app.json` excludes it. Built: `dist/sw.js` 11.6 kB gzipped, 82 files
   precached. Next: step 11, the components. The page must answer `mycity:push` and `mycity:open`
   messages (type `WorkerMessage` exported from `sw.ts`) with `{ ok: true }` on the port.
+- 19/10/2026 · TB · Step 11: `PhonePage` (Overlays: Vaul's right drawer, Back, swipe back, `bar`,
+  `bodyRef`), `NotificationRow` rebuilt (the whole row is the button, avatar initials or a glyph,
+  unread dot and words, swipe left to mark read on a phone, a hover tick on desktop; its API changed:
+  `onOpen`, `onMarkRead`, `avatar`, no `action`), `NotificationCenter` (Shell: the pane, a 420 px
+  Radix popover on desktop and a PhonePage on a phone; All and Unread with a count; Today, Yesterday,
+  Earlier; Mark All Read and the gear; pages of 25 as the list nears its end; pull to refresh),
+  `NotificationBanner` with `notify()` (Feedback: a second sonner Toaster, id `notices`, top-center on
+  a phone and top-right on desktop, 3 s, mounted by `Toaster` itself so the apps change nothing) and
+  `ChannelGrid` (Forms: a table of switches on desktop, rows opening a sheet on a phone). Each with
+  its gallery page and tests; the package's 815 tests, typecheck, lint and the components gate pass.
+  `app/src/shell/Bell.tsx` only adapted to the new row so the app builds; step 12 replaces it.
