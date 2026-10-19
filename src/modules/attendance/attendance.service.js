@@ -68,13 +68,16 @@ const SEVERITY = Object.freeze({
 function reasonText(code, ev) {
   switch (code) {
     case "outside_worksite":
-      return `you were ${ev.geofence.distance_m} m from ${ev.geofence.worksite_name}`;
+      return ev.geofence.place === "client_visit"
+        ? `you were ${ev.geofence.distance_m} m from the client's site`
+        : `you were ${ev.geofence.distance_m} m from ${ev.geofence.worksite_name}`;
     case "outside_home":
       return ev.geofence.place === "temporary_home"
         ? `you were ${ev.geofence.distance_m} m from your temporary home`
         : `you were ${ev.geofence.distance_m} m from your approved home`;
     case "location_unverified":
       if (ev.geofence.reason === "no_home") return "you have no approved home location yet";
+      if (ev.geofence.reason === "no_worksite") return "you have no office assigned yet";
       return ev.geofence.reason === "poor_accuracy"
         ? "your location reading was not accurate enough"
         : "your location could not be checked";
@@ -137,9 +140,10 @@ async function today(user, { now = new Date() } = {}) {
   const clockIn = active.find((e) => e.event_type === "clock_in") || null;
   const clockOut = active.find((e) => e.event_type === "clock_out") || null;
   const device = await devices.statusForSession(pool, user);
-  const remote = person.work_pattern === "remote";
+  // Working from home: remote staff, or a hybrid employee's home day (§6.13).
+  const remote = ctx.home_day;
   let homeState = null;
-  if (remote) {
+  if (person.work_pattern === "remote" || remote) {
     const homes = await repo.homesOf(pool, user.employee_id);
     homeState = homes.approved ? "approved" : homes.pending ? "pending" : "none";
   }
@@ -259,6 +263,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
       expected: ctx.fence,
       approved: ctx.approved || null,
       work_pattern: person.work_pattern,
+      home_day: ctx.home_day,
       max_accuracy_m: ctx.policy.max_accuracy_m,
     });
     const time = rules.timeCheck({ server_at: now, device_at: body.device_at });

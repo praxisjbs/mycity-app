@@ -7,8 +7,9 @@ import { Button, Card, CardHeader, Field, FormFooter, KeyValue, Pill, Result, Te
 import { HOME_STATUS } from "./labels";
 
 /**
- * ESS · My Attendance's Home Location (docs/guides/attendance.md §6.10, §10): a remote employee's
- * approved home, the one waiting on People, or the reason the last one was rejected, and the sheet
+ * ESS · My Attendance's Home Location (docs/guides/attendance.md §6.10, §10): the approved home of a
+ * remote employee, or of a hybrid employee whose schedule has home days (`needed`), the one waiting
+ * on People, or the reason the last one was rejected, and the sheet
  * that sends a new one. The reading is taken on this device when the person presses Use This
  * Location, at home; the address is their own words. People approve it; the API decides who may.
  */
@@ -60,7 +61,7 @@ export function ReadingStep({ reading, idle }: { reading: Reading; idle: { title
   return <Result tone="info" label="Location Check" title={idle.title} text={idle.text} icon="home" />;
 }
 
-/** The card, for remote staff only. `?home=set` (the clock panel's Set Home) opens the sheet once. */
+/** The card, for whoever needs a home (`needed`). `?home=set` (the clock panel's Set Home) opens the sheet once. */
 export function HomeLocationCard({ openOnLoad }: { openOnLoad: boolean }) {
   const modal = useModal();
   const { data: h } = useApi("GET /api/v1/attendance/me/home");

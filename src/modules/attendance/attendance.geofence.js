@@ -4,20 +4,22 @@
  * shared/geo's (docs/guides/attendance.md §6.5).
  *
  * What the server knows is the reading the browser sent (or why it sent none) and
- * the place the person is expected: their worksite, for remote staff their approved home,
- * on a day an approved work location request covers, its temporary home or approved home
- * (§6.11), and on a field assignment's day its sites, the nearer judging the punch (§6.12).
+ * the place the person is expected: their worksite, for remote staff and a hybrid employee's
+ * home day their approved home (§6.13), on a day an approved work location request covers, its
+ * temporary home, client's site or approved home (§6.11), and on a field assignment's day its
+ * sites, the nearer judging the punch (§6.12).
  * A distance or an "inside" flag from the client is never read; the server works it out from
  * the coordinates.
  *
  *   verdict       inside       within the radius (the boundary counts as inside)
  *                 outside      beyond it, with a reading good enough to say so
  *                 unverified   no reading (denied, unavailable, timeout, unsupported),
- *                              or one coarser than the policy's accuracy, or a remote
- *                              person with no approved home yet (no_home)
- *                 not_applied  nowhere to judge against: someone not remote with no worksite, or
- *                              an approved remote day or client visit with no fence, where
- *                              the approval is the check (approved_request)
+ *                              or one coarser than the policy's accuracy, or someone working
+ *                              from home with no approved home yet (no_home), or someone
+ *                              expected at an office with none assigned (no_worksite)
+ *                 not_applied  an approved remote day, or a client visit sent before sites were
+ *                              asked for, with no fence: the approval is the check
+ *                              (approved_request)
  *
  *   mode off      every verdict is accepted; it is kept as evidence
  *   mode warn     outside or unverified goes to review, with an exception
@@ -41,6 +43,7 @@ const { GOOD_ACCURACY_M } = require("./attendance.rules");
  * @param {{location_request_id: string, place: string, name: string}|null} [input.approved]  an approved
  *          day with no fence
  * @param {"on_site"|"hybrid"|"remote"} input.work_pattern
+ * @param {boolean} [input.home_day]  the date is worked from home by the schedule (a hybrid home day)
  * @param {number} input.max_accuracy_m
  * @returns {{verdict: string, reason: string|null, distance_m: number|null, radius_m: number|null,
  *            accuracy: "good"|"fair"|"poor"|null, place: "worksite"|"home"|null, worksite_id: string|null,
@@ -60,7 +63,7 @@ function nearestSite(sites, point) {
   return scored.sort((a, b) => a.d - a.x.radius_m - (b.d - b.x.radius_m))[0].x;
 }
 
-function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected: given, approved = null, work_pattern: pattern, max_accuracy_m: maxAccuracyM }) {
+function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected: given, approved = null, work_pattern: pattern, home_day: homeDay = false, max_accuracy_m: maxAccuracyM }) {
   const hasPoint = geo.isPoint(point);
   // A field assignment's day: judged as at the site the reading is nearest, named by it.
   const site = given && Array.isArray(given.sites) && given.sites.length ? nearestSite(given.sites, point) : null;
@@ -99,12 +102,13 @@ function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: lo
     // An approved remote day or client visit with no fence: the approval is the check.
     verdict = "not_applied";
     reason = "approved_request";
-  } else if (pattern === "remote" && !expected) {
+  } else if ((pattern === "remote" || homeDay) && !expected) {
     // Nothing approved to match the reading to: People check it by hand, never a refusal.
     verdict = "unverified";
     reason = "no_home";
   } else if (!expected) {
-    verdict = "not_applied";
+    // Expected at an office with none assigned: the missing setup shows on the first punch.
+    verdict = "unverified";
     reason = "no_worksite";
   } else if (!hasPoint) {
     verdict = "unverified";
@@ -118,7 +122,8 @@ function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: lo
       verdict = base.distance_m <= Number(expected.radius_m) ? "inside" : "outside";
     }
   }
-  base.retry_location = verdict === "unverified" && reason !== "no_home";
+  // A new reading changes nothing when there is no place to match it to.
+  base.retry_location = verdict === "unverified" && reason !== "no_home" && reason !== "no_worksite";
 
   const judged = { ...base, verdict, reason };
   if (mode === "off" || verdict === "inside" || verdict === "not_applied")

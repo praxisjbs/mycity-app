@@ -6,6 +6,7 @@ import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/tes
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
+import { siteOf } from "@/api/mock/modules/worksites";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import { useClock } from "./ClockButton";
@@ -163,5 +164,28 @@ describe("the clock panel", () => {
     fireEvent.click(screen.getByRole("button", { name: /Clock Out/ }));
     await screen.findByText(/Clocked Out/);
     expect(call.mock.calls.filter((c) => c[0] === "POST /api/v1/attendance/punches")).toHaveLength(1);
+  }, 20000);
+
+  it("with no office to match, says so, still asks for the location, and the punch goes to People", async () => {
+    permission = "prompt";
+    const office = siteOf("ngozi")!;
+    office.active = false;
+    try {
+      await signedInAs("ngozi@mycityapp.io");
+      act(() => clock!.open());
+      // The mock may have clocked Ngozi in already today: the panel then offers Clock Out.
+      await screen.findByText(/^(Start|Finish) Your Day$/);
+      expect(screen.getByText("No Office Assigned")).toBeTruthy();
+      expect(screen.getByText("No office assigned yet.")).toBeTruthy();
+
+      press(screen.queryByRole("button", { name: "Clock In" }) ? "Clock In" : "Clock Out");
+      await screen.findByText("Share Your Location");
+      expect(screen.getByText(/goes to People with your location/)).toBeTruthy();
+      press("Allow Location");
+      act(() => answer!({ coords: { latitude: 6.4281, longitude: 3.4219, accuracy: 12 } }));
+      expect(await screen.findByText(/People will review it: you have no office assigned yet/)).toBeTruthy();
+    } finally {
+      office.active = true;
+    }
   }, 20000);
 });

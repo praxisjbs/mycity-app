@@ -91,11 +91,12 @@ function detailOf(type, evidence = {}) {
   const ev = evidence || {};
   switch (type) {
     case "outside_worksite":
-      return `${ev.distance_m} m from ${ev.worksite_name}, radius ${ev.radius_m} m`;
+      return `${ev.distance_m} m from ${ev.place === "client_visit" ? "the client's site" : ev.worksite_name}, radius ${ev.radius_m} m`;
     case "outside_home":
       return `${ev.distance_m} m from the ${ev.place === "temporary_home" ? "temporary" : "approved"} home, radius ${ev.radius_m} m`;
     case "location_unverified":
       if (ev.reason === "no_home") return "No approved home";
+      if (ev.reason === "no_worksite") return "No office assigned";
       return ev.reason === "poor_accuracy" && ev.accuracy_m
         ? `Reading accurate to ${Math.round(ev.accuracy_m)} m`
         : `No location: ${LOCATION_REASON[ev.reason] || "no location reading"}`;

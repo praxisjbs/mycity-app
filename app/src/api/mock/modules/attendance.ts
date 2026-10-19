@@ -1,12 +1,12 @@
-import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, FieldAssignment, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, PunchResult, PunchState, RegisterRow } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, FieldAssignment, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, PunchResult, PunchState, RegisterRow, ScheduleDay, ScheduleVersion, WorkSchedule } from "@mycity/contract/contract.gen.ts";
 import { formatDate, formatTime, todayIso } from "@mycity/ui";
 import { audit } from "../data/audit";
 import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
-import { byId, byKey, PEOPLE, ref, refKey, SIGN_INS, type MockPerson } from "../data/people";
+import { byId, byKey, PEOPLE, refKey, SIGN_INS, type MockPerson } from "../data/people";
 import { HISTORY, TODAY } from "../data/attendance";
 import { lastDeviceOf, MAX_REGISTERED, registeredCount, sessionDevice } from "./devices";
-import { peopleGrant, siteOf, WORKSITES } from "./worksites";
+import { peopleGrant, siteOf } from "./worksites";
 
 /**
  * Attendance on the mock, in the contract's shapes (packages/contract/schemas/attendance.js): the
@@ -250,8 +250,52 @@ const homeOf = (key: string, status: HomeStatus) => HOMES.find((h) => h.key === 
 const newestHome = (key: string) => HOMES.filter((h) => h.key === key).sort((a, b) => b.requested_at.localeCompare(a.requested_at))[0] ?? null;
 const isRemote = (key: string) => byKey(key)?.work_pattern === "remote";
 
+/* ------------------------------------------------------------------ *
+ * Hybrid staff's weekly schedule (docs/guides/attendance.md §6.13)
+ * ------------------------------------------------------------------ */
+type MockSchedule = { id: string; key: string; office_days: number[]; effective_from: string; reason: string; set_by: string; set_at: string };
+const SCHEDULES: MockSchedule[] = [];
+/** Invented schedules for three hybrid people who do not sign in, and one waiting to start. */
+(() => {
+  const add = (key: string, office_days: number[], from: string, reason: string, n: number) =>
+    SCHEDULES.push({ id: sid(`schedule:${key}:${from}`), key, office_days, effective_from: from, reason, set_by: "cynthia", set_at: at(n, "10:00") });
+  add("tolu", [1, 2, 4], isoDaysAgo(30), "Team planning days at the office", 31);
+  add("bashir", [2, 4], isoDaysAgo(20), "Partner meetings mid-week", 21);
+  add("grace", [1, 3, 5], isoDaysAgo(14), "Office on partner review days", 15);
+  add("tolu", [1, 2, 3], isoDaysAhead(7), "Planning moves to Wednesday", 1);
+})();
+/** The weekdays the organisation works: Monday to Saturday (shiftOf). */
+const WORKING = [1, 2, 3, 4, 5, 6];
+const weekdayOf = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
+const scheduleOn = (key: string, date: string) =>
+  SCHEDULES.filter((x) => x.key === key && x.effective_from <= date).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0] ?? null;
+const scheduleAfter = (key: string, date: string) =>
+  SCHEDULES.filter((x) => x.key === key && x.effective_from > date).sort((a, b) => a.effective_from.localeCompare(b.effective_from))[0] ?? null;
+/** A hybrid employee's home day: the schedule in force then leaves its weekday out. */
+function homeDay(key: string, date: string) {
+  if (byKey(key)?.work_pattern !== "hybrid") return false;
+  const x = scheduleOn(key, date);
+  return !!x && !x.office_days.includes(weekdayOf(date));
+}
+/** Each weekday's place (office, remote, off), as My Profile and the employee record show it. */
+export function weekOf(key: string): ScheduleDay[] {
+  const p = byKey(key)!;
+  const x = p.work_pattern === "hybrid" ? scheduleOn(key, todayIso()) : null;
+  return [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
+    weekday,
+    place: !WORKING.includes(weekday) ? "off" : p.work_pattern === "remote" || (x && !x.office_days.includes(weekday)) ? "remote" : "office",
+  }));
+}
+/** Remote staff, and hybrid staff whose schedule leaves a working day for home, need an approved home. */
+function needsHome(key: string) {
+  const p = byKey(key);
+  if (!p || p.work_pattern === "on_site") return false;
+  if (p.work_pattern === "remote") return true;
+  return [scheduleOn(key, todayIso()), scheduleAfter(key, todayIso())].some((x) => x && WORKING.some((d) => !x.office_days.includes(d)));
+}
+
 /** Where a person's punch is judged: their approved home when they work remotely, else their worksite. */
-type Fence = { kind: "worksite" | "home" | "temporary_home" | "field"; name: string; latitude: number; longitude: number; radius_m: number | null; sites?: MockSite[] };
+type Fence = { kind: "worksite" | "home" | "temporary_home" | "field" | "client_visit"; name: string; latitude: number; longitude: number; radius_m: number | null; sites?: MockSite[] };
 function fenceOf(key: string): Fence | null {
   // A field assignment covering today decides the place before anything (§6.12), then an approved
   // work location request (§6.11).
@@ -259,12 +303,14 @@ function fenceOf(key: string): Fence | null {
   if (fa) return { kind: "field", name: fa.sites.map((x) => x.name).join(" or "), latitude: fa.sites[0].latitude, longitude: fa.sites[0].longitude, radius_m: fa.sites.length === 1 ? fa.sites[0].radius_m : null, sites: fa.sites };
   const r = approvedReqOn(key, todayIso());
   if (r?.request_type === "temporary_home") return { kind: "temporary_home", name: "Temporary Home", latitude: r.latitude!, longitude: r.longitude!, radius_m: HOME_RADIUS_M };
+  if (r?.request_type === "client_visit" && r.site_latitude !== null)
+    return { kind: "client_visit", name: "Client Visit", latitude: r.site_latitude, longitude: r.site_longitude!, radius_m: r.site_radius_m };
   if (r?.request_type === "remote_day") {
     const h = homeOf(key, "approved");
     return h ? { kind: "home", name: "Home", latitude: h.latitude, longitude: h.longitude, radius_m: HOME_RADIUS_M } : null;
   }
   if (r) return null;
-  if (isRemote(key)) {
+  if (isRemote(key) || homeDay(key, todayIso())) {
     const h = homeOf(key, "approved");
     return h ? { kind: "home", name: "Home", latitude: h.latitude, longitude: h.longitude, radius_m: HOME_RADIUS_M } : null;
   }
@@ -276,7 +322,7 @@ function fenceOf(key: string): Fence | null {
 function approvedDayOf(key: string): { name: string } | null {
   if (fieldOn(key, todayIso())) return null;
   const r = approvedReqOn(key, todayIso());
-  if (!r || r.request_type === "temporary_home" || (r.request_type === "remote_day" && homeOf(key, "approved"))) return null;
+  if (!r || r.request_type === "temporary_home" || (r.request_type === "client_visit" && r.site_latitude !== null) || (r.request_type === "remote_day" && homeOf(key, "approved"))) return null;
   return { name: r.request_type === "remote_day" ? "Remote Day" : "Client Visit" };
 }
 
@@ -285,7 +331,7 @@ const asLocation = (h: Home | null): HomeLocation | null =>
 
 function myHome(key: string): MyHome {
   const newest = newestHome(key);
-  return { needed: isRemote(key), approved: asLocation(homeOf(key, "approved")), pending: asLocation(homeOf(key, "pending")), rejected: asLocation(newest?.status === "rejected" ? newest : null), max_accuracy_m: POLICY_MODES.max_accuracy_m };
+  return { needed: needsHome(key), approved: asLocation(homeOf(key, "approved")), pending: asLocation(homeOf(key, "pending")), rejected: asLocation(newest?.status === "rejected" ? newest : null), max_accuracy_m: POLICY_MODES.max_accuracy_m };
 }
 
 /** A home as People read it: the address and the point only for scope all. */
@@ -313,7 +359,7 @@ route("GET /api/v1/attendance/me/home", (req) => ok(myHome(req.user!)));
 route("POST /api/v1/attendance/me/home", (req) => {
   const key = req.user!;
   const b = req.body as { home_address: string; home_latitude: number; home_longitude: number; accuracy_m: number };
-  if (!isRemote(key)) return fail(422, "HOME_NOT_NEEDED", "Only remote staff set a home location.");
+  if (!needsHome(key)) return fail(422, "HOME_NOT_NEEDED", "Only staff who work from home set a home location.");
   if (!b.home_address?.trim()) return invalid({ home_address: ["Required"] });
   if (b.accuracy_m > POLICY_MODES.max_accuracy_m) return fail(422, "HOME_READING_WEAK", "The location reading was not accurate enough.", { accuracy_m: ["Reading too weak"] });
   const waiting = homeOf(key, "pending");
@@ -369,7 +415,8 @@ export function todayOf(key: string): AttendanceToday {
   const date = todayIso();
   const fence = fenceOf(key);
   const approvedDay = approvedDayOf(key);
-  const homeState = p.work_pattern === "remote" ? (homeOf(key, "approved") ? "approved" : homeOf(key, "pending") ? "pending" : "none") : null;
+  const fromHome = isRemote(key) || homeDay(key, date);
+  const homeState = fromHome ? (homeOf(key, "approved") ? "approved" : homeOf(key, "pending") ? "pending" : "none") : null;
   const evs = activeOn(key, date);
   const inEv = evs.find((e) => e.event_type === "clock_in");
   const outEv = evs.find((e) => e.event_type === "clock_out");
@@ -392,7 +439,7 @@ export function todayOf(key: string): AttendanceToday {
       ? { kind: "approved_day", name: approvedDay.name, radius_m: null, home_state: homeState }
       : fence
         ? { kind: fence.kind, name: fence.name, radius_m: fence.radius_m, home_state: homeState }
-        : { kind: p.work_pattern === "remote" ? "remote" : "none", name: null, radius_m: null, home_state: homeState },
+        : { kind: fromHome ? "remote" : "none", name: null, radius_m: null, home_state: homeState },
     policy: POLICY_MODES,
     device: { state: dev.status, label: dev.label, registered_count: count, can_register: dev.status !== "registered" && count < MAX_REGISTERED },
   };
@@ -410,11 +457,12 @@ const GUARD_MESSAGES = {
 function reasonText(code: ExceptionType, ev: Ev, accuracy: number | null) {
   switch (code) {
     case "outside_worksite":
-      return `you were ${ev.distance_m} m from ${ev.worksite_name}`;
+      return `you were ${ev.distance_m} m from ${ev.worksite_name === "Client Visit" ? "the client's site" : ev.worksite_name}`;
     case "outside_home":
       return `you were ${ev.distance_m} m from your approved home`;
     case "location_unverified":
       if (ev.location_reason === "no_home") return "you have no approved home location yet";
+      if (ev.location_reason === "no_worksite") return "you have no office assigned yet";
       return ev.location_reason === "poor_accuracy" && accuracy ? "your location reading was not accurate enough" : "your location could not be checked";
     case "unknown_device":
       return "this device is not registered";
@@ -479,8 +527,8 @@ route("POST /api/v1/attendance/punches", (req) => {
   let locationReason: string | null = null;
   let distance: number | null = null;
   if (approvedDay) [geofence, locationReason] = ["not_applied", "approved_request"];
-  else if (!site && p.work_pattern === "remote") [geofence, locationReason] = ["unverified", "no_home"];
-  else if (!site) [geofence, locationReason] = ["not_applied", "no_worksite"];
+  else if (!site && (p.work_pattern === "remote" || homeDay(key, date))) [geofence, locationReason] = ["unverified", "no_home"];
+  else if (!site) [geofence, locationReason] = ["unverified", "no_worksite"];
   else if (!point) [geofence, locationReason] = ["unverified", b.location_error || "no_location"];
   else {
     distance = distanceM(point, site);
@@ -492,7 +540,7 @@ route("POST /api/v1/attendance/punches", (req) => {
   let fenceResult: PunchState = "accepted";
   if (mode !== "off" && geofence === "outside") {
     fenceResult = mode === "block" ? "rejected" : "review";
-    reasons.push(site?.kind === "worksite" || site?.kind === "field" ? "outside_worksite" : "outside_home");
+    reasons.push(site?.kind === "worksite" || site?.kind === "field" || site?.kind === "client_visit" ? "outside_worksite" : "outside_home");
   } else if (mode !== "off" && geofence === "unverified") {
     fenceResult = "review";
     reasons.push("location_unverified");
@@ -543,12 +591,14 @@ route("POST /api/v1/attendance/punches", (req) => {
     for (const r of reasons) {
       const detail =
         r === "outside_worksite"
-          ? `${distance} m from ${site!.name}, radius ${site!.radius_m} m`
+          ? `${distance} m from ${site!.kind === "client_visit" ? "the client's site" : site!.name}, radius ${site!.radius_m} m`
           : r === "outside_home"
             ? `${distance} m from the ${site!.kind === "temporary_home" ? "temporary" : "approved"} home, radius ${site!.radius_m} m`
           : r === "location_unverified"
             ? locationReason === "no_home"
               ? "No approved home"
+              : locationReason === "no_worksite"
+              ? "No office assigned"
               : locationReason === "poor_accuracy" && b.accuracy_m
               ? `Reading accurate to ${Math.round(b.accuracy_m)} m`
               : `No location: ${LOCATION_REASON[locationReason ?? ""] ?? "no location reading"}`
@@ -665,7 +715,7 @@ function registerRows(date: string, viewer: string): Array<RegisterRow & { key: 
       clock_out_at: day?.last_clock_out_at ?? null,
       worked_minutes: day?.worked_minutes ?? 0,
       late_minutes: day?.late_minutes ?? 0,
-      expected_location: fieldOn(p.user_key, date)?.sites.map((x) => x.name).join(" or ") ?? (p.work_pattern === "remote" ? (homeOf(p.user_key, "approved") ? "Home" : "Remote") : (site?.name ?? null)),
+      expected_location: fieldOn(p.user_key, date)?.sites.map((x) => x.name).join(" or ") ?? (p.work_pattern === "remote" || homeDay(p.user_key, date) ? (homeOf(p.user_key, "approved") ? "Home" : "Remote") : (site?.name ?? null)),
       location_verdict: last?.geofence ?? null,
       device_label: last?.device_label ?? null,
       device_state: last?.device_state ?? null,
@@ -822,18 +872,14 @@ route("GET /api/v1/attendance/records/:id", (req) => {
   return r && g.sees(byId(r.employee_id)!.user_key) ? ok(r) : notFound();
 });
 
-/** The arrangement the INTERIM employee setup tab shows, until approved homes and field days exist. */
-const ARR: Record<string, "Remote" | "Hybrid" | "Field" | "Office-only"> = { hybrid: "Hybrid", remote: "Remote", on_site: "Office-only" };
-const arrOf = (key: string) => (key === "adedotun" || key === "grace" ? "Field" : ARR[byKey(key)!.work_pattern]);
-const PROFILE: Record<string, string> = { Remote: "Remote · approved home geofence", Hybrid: "Hybrid · office and home days", Field: "Field · assignment first", "Office-only": "Office-only · worksite geofence" };
-
 /* ------------------------------------------------------------------ *
  * Work location requests (docs/guides/attendance.md §6.11)
  * ------------------------------------------------------------------ */
 type ReqType = LocationRequest["request_type"];
 type MockReq = {
   id: string; number: string; key: string; request_type: ReqType; starts_on: string; ends_on: string; address: string | null;
-  latitude: number | null; longitude: number | null; accuracy_m: number | null; reason: string; status: LocationRequest["status"];
+  latitude: number | null; longitude: number | null; accuracy_m: number | null;
+  site_latitude: number | null; site_longitude: number | null; site_radius_m: number | null; reason: string; status: LocationRequest["status"];
   stage: Stage | null; wid: string; requested_at: string; decided_at: string | null; cancelled_at: string | null; cancel_reason: string | null;
   /** The moves on its approval, oldest first: who, at which stage, and why. */
   trail: Array<{ stage: Stage; decision: "approve" | "reject" | "cancel"; by: string; reason: string | null; at: string }>;
@@ -844,9 +890,9 @@ const MAY_ASK: Record<ReqType, string[]> = { temporary_home: ["remote"], remote_
 const STAGE_NAME = { line_manager: "Line Manager", operations_people: "Operations & People" } as const;
 const LOC_REQS: MockReq[] = [];
 let reqSeq = 0;
-const addReq = (r: Omit<MockReq, "id" | "number" | "wid" | "decided_at" | "cancelled_at" | "cancel_reason" | "trail"> & Partial<MockReq>) => {
+const addReq = (r: Omit<MockReq, "id" | "number" | "wid" | "decided_at" | "cancelled_at" | "cancel_reason" | "trail" | "site_latitude" | "site_longitude" | "site_radius_m"> & Partial<MockReq>) => {
   reqSeq += 1;
-  const row: MockReq = { id: sid(`wlr:${reqSeq}`), number: `WLR-${String(reqSeq).padStart(4, "0")}`, wid: sid(`wlr-flow:${reqSeq}`), decided_at: null, cancelled_at: null, cancel_reason: null, trail: [], ...r };
+  const row: MockReq = { id: sid(`wlr:${reqSeq}`), number: `WLR-${String(reqSeq).padStart(4, "0")}`, wid: sid(`wlr-flow:${reqSeq}`), decided_at: null, cancelled_at: null, cancel_reason: null, trail: [], site_latitude: null, site_longitude: null, site_radius_m: null, ...r };
   LOC_REQS.unshift(row);
   return row;
 };
@@ -854,11 +900,11 @@ const addReq = (r: Omit<MockReq, "id" | "number" | "wid" | "decided_at" | "cance
 const lineManagerOf = (key: string) => byKey(key)?.manager ?? "ifeoma";
 /** Invented requests for the demonstration: one waiting on each stage, one approved, one rejected, one cancelled. */
 (() => {
-  addReq({ key: "bashir", request_type: "client_visit", starts_on: isoDaysAgo(3), ends_on: isoDaysAgo(3), address: "Partner office, 4 Example Road, Victoria Island", latitude: null, longitude: null, accuracy_m: null, reason: "Quarterly review with a partner on their site", status: "approved", stage: null, requested_at: at(9, "10:12"), decided_at: at(8, "09:40"), trail: [{ stage: "line_manager", decision: "approve", by: lineManagerOf("bashir"), reason: null, at: at(9, "15:02") }, { stage: "operations_people", decision: "approve", by: "cynthia", reason: null, at: at(8, "09:40") }] });
+  addReq({ key: "bashir", request_type: "client_visit", starts_on: isoDaysAgo(3), ends_on: isoDaysAgo(3), address: "Partner office, 4 Example Road, Victoria Island", latitude: null, longitude: null, accuracy_m: null, site_latitude: 6.4281, site_longitude: 3.4219, site_radius_m: 200, reason: "Quarterly review with a partner on their site", status: "approved", stage: null, requested_at: at(9, "10:12"), decided_at: at(8, "09:40"), trail: [{ stage: "line_manager", decision: "approve", by: lineManagerOf("bashir"), reason: null, at: at(9, "15:02") }, { stage: "operations_people", decision: "approve", by: "cynthia", reason: null, at: at(8, "09:40") }] });
   addReq({ key: "kemi", request_type: "temporary_home", starts_on: isoDaysAhead(4), ends_on: isoDaysAhead(20), address: "Flat 3, 11 Sample Crescent, Ikeja", latitude: 6.6018, longitude: 3.3515, accuracy_m: 18, reason: "Staying with family while my flat is repaired", status: "submitted", stage: "operations_people", requested_at: at(2, "18:05"), trail: [{ stage: "line_manager", decision: "approve", by: lineManagerOf("kemi"), reason: null, at: at(1, "09:20") }] });
   addReq({ key: "chidera", request_type: "remote_day", starts_on: isoDaysAhead(2), ends_on: isoDaysAhead(2), address: null, latitude: null, longitude: null, accuracy_m: null, reason: "Waiting in for a delivery in the morning", status: "submitted", stage: "line_manager", requested_at: at(1, "16:30") });
-  addReq({ key: "obinna", request_type: "client_visit", starts_on: isoDaysAhead(6), ends_on: isoDaysAhead(7), address: "Client site, 22 Placeholder Avenue, Lekki", latitude: null, longitude: null, accuracy_m: null, reason: "On-site setup for a client's new office", status: "rejected", stage: null, requested_at: at(4, "11:00"), decided_at: at(3, "09:15"), trail: [{ stage: "line_manager", decision: "reject", by: lineManagerOf("obinna"), reason: "The team is short that week", at: at(3, "09:15") }] });
-  addReq({ key: "seyi", request_type: "client_visit", starts_on: isoDaysAhead(10), ends_on: isoDaysAhead(10), address: "Client office, 3 Fixture Road, Ikoyi", latitude: null, longitude: null, accuracy_m: null, reason: "Workshop with a client's engineering team", status: "cancelled", stage: null, requested_at: at(5, "14:20"), cancelled_at: at(4, "08:00"), cancel_reason: "Moved online", trail: [{ stage: "line_manager", decision: "cancel", by: "seyi", reason: "Moved online", at: at(4, "08:00") }] });
+  addReq({ key: "obinna", request_type: "client_visit", starts_on: isoDaysAhead(6), ends_on: isoDaysAhead(7), address: "Client site, 22 Placeholder Avenue, Lekki", latitude: null, longitude: null, accuracy_m: null, site_latitude: 6.4474, site_longitude: 3.4723, site_radius_m: 150, reason: "On-site setup for a client's new office", status: "rejected", stage: null, requested_at: at(4, "11:00"), decided_at: at(3, "09:15"), trail: [{ stage: "line_manager", decision: "reject", by: lineManagerOf("obinna"), reason: "The team is short that week", at: at(3, "09:15") }] });
+  addReq({ key: "seyi", request_type: "client_visit", starts_on: isoDaysAhead(10), ends_on: isoDaysAhead(10), address: "Client office, 3 Fixture Road, Ikoyi", latitude: null, longitude: null, accuracy_m: null, site_latitude: 6.4549, site_longitude: 3.4246, site_radius_m: 200, reason: "Workshop with a client's engineering team", status: "cancelled", stage: null, requested_at: at(5, "14:20"), cancelled_at: at(4, "08:00"), cancel_reason: "Moved online", trail: [{ stage: "line_manager", decision: "cancel", by: "seyi", reason: "Moved online", at: at(4, "08:00") }] });
 })();
 
 /** The approved request covering a person's day, if any (two never overlap). */
@@ -879,6 +925,7 @@ const reqOut = (r: MockReq, user: string, place: boolean): LocationRequest => ({
   location_request_id: r.id, number: r.number, employee: person(byKey(r.key)!), request_type: r.request_type, starts_on: r.starts_on, ends_on: r.ends_on,
   days: Math.round((Date.parse(`${r.ends_on}T12:00:00Z`) - Date.parse(`${r.starts_on}T12:00:00Z`)) / 86400_000) + 1,
   address: r.address, home_latitude: place ? r.latitude : null, home_longitude: place ? r.longitude : null, accuracy_m: r.accuracy_m,
+  site_latitude: r.site_latitude, site_longitude: r.site_longitude, site_radius_m: r.site_radius_m,
   reason: r.reason, status: r.status, workflow_instance_id: r.wid, waiting_on: r.status === "submitted" && r.stage ? STAGE_NAME[r.stage] : null,
   can_decide: canDecideReq(r, user), requested_at: r.requested_at, decided_at: r.decided_at, cancelled_at: r.cancelled_at, cancel_reason: r.cancel_reason,
 });
@@ -895,7 +942,10 @@ route("GET /api/v1/attendance/me/requests/:id", (req) => {
 });
 route("POST /api/v1/attendance/me/requests", (req) => {
   const key = req.user!;
-  const b = req.body as { request_type: ReqType; starts_on: string; ends_on: string; address?: string; reason: string; home_latitude?: number | null; home_longitude?: number | null; accuracy_m?: number | null };
+  const b = req.body as {
+    request_type: ReqType; starts_on: string; ends_on: string; address?: string; reason: string; home_latitude?: number | null; home_longitude?: number | null; accuracy_m?: number | null;
+    site_latitude?: number | null; site_longitude?: number | null; site_radius_m?: number | null;
+  };
   const fields: Record<string, string[]> = {};
   if (!b.starts_on) fields.starts_on = ["Pick the first day"];
   if (!b.ends_on) fields.ends_on = ["Pick the last day"];
@@ -903,6 +953,12 @@ route("POST /api/v1/attendance/me/requests", (req) => {
   if (b.request_type !== "remote_day" && !b.address?.trim()) fields.address = ["Enter the address"];
   if (!b.reason || b.reason.trim().length < 10) fields.reason = ["At least 10 characters"];
   if (b.request_type === "temporary_home" && typeof b.home_latitude !== "number") fields.home_latitude = ["Take a reading there"];
+  if (b.request_type === "client_visit") {
+    if (typeof b.site_latitude !== "number") fields.site_latitude = ["Enter the latitude"];
+    if (typeof b.site_longitude !== "number") fields.site_longitude = ["Enter the longitude"];
+    if (typeof b.site_radius_m !== "number") fields.site_radius_m = ["Enter the radius"];
+    else if (b.site_radius_m < 100 || b.site_radius_m > 500) fields.site_radius_m = [b.site_radius_m < 100 ? "At least 100 m" : "At most 500 m"];
+  }
   if (Object.keys(fields).length) return invalid(fields);
   if (!MAY_ASK[b.request_type].includes(byKey(key)!.work_pattern)) return fail(422, "REQUEST_TYPE_NOT_ALLOWED", b.request_type === "remote_day" ? "Remote staff already work remotely every day." : "Only remote staff ask for a temporary home.", { request_type: ["Not for your work pattern"] });
   const today = todayIso();
@@ -913,7 +969,13 @@ route("POST /api/v1/attendance/me/requests", (req) => {
   const clash = LOC_REQS.find((r) => r.key === key && ["submitted", "approved"].includes(r.status) && r.starts_on <= b.ends_on && r.ends_on >= b.starts_on);
   if (clash) return fail(409, "REQUEST_OVERLAPS", `${clash.number} already covers one of these days`, { starts_on: ["Overlaps another"] });
   const home = b.request_type === "temporary_home";
-  const r = addReq({ key, request_type: b.request_type, starts_on: b.starts_on, ends_on: b.ends_on, address: b.address?.trim() || null, latitude: home ? b.home_latitude! : null, longitude: home ? b.home_longitude! : null, accuracy_m: home ? b.accuracy_m! : null, reason: b.reason.trim(), status: "submitted", stage: "line_manager", requested_at: new Date().toISOString() });
+  const visit = b.request_type === "client_visit";
+  const r = addReq({
+    key, request_type: b.request_type, starts_on: b.starts_on, ends_on: b.ends_on, address: b.address?.trim() || null,
+    latitude: home ? b.home_latitude! : null, longitude: home ? b.home_longitude! : null, accuracy_m: home ? b.accuracy_m! : null,
+    site_latitude: visit ? b.site_latitude! : null, site_longitude: visit ? b.site_longitude! : null, site_radius_m: visit ? b.site_radius_m! : null,
+    reason: b.reason.trim(), status: "submitted", stage: "line_manager", requested_at: new Date().toISOString(),
+  });
   return created(reqOut(r, key, true));
 });
 route("POST /api/v1/attendance/me/requests/:id/cancel", (req) => {
@@ -1159,15 +1221,57 @@ route("POST /api/v1/attendance/field-assignments/:id/remove", (req) => {
 });
 
 /* ------------------------------------------------------------------ *
- * The offices the INTERIM employee setup tab offers (People · Employees)
+ * A person's week: People · Employees, the record's Attendance tab (§6.13)
  * ------------------------------------------------------------------ */
-route("GET /api/v1/attendance/worksites", (req) =>
-  paged(
-    WORKSITES.filter((w) => w.active).map((w) => ({ location_id: w.worksite_id, name: w.name, type: "Office" as const, address: w.address ?? "", radius_m: w.radius_m, assigned: "", attendance_today: 0, dates: "Onwards", mode: "Warn", status: "Active", status_tone: "ok" as const, map: null })),
-    req,
-    { search: (r) => [r.name, r.address], filters: { type: (r, v) => r.type === v } },
-  ),
-);
+const versionOut = (x: MockSchedule | null): ScheduleVersion | null =>
+  x && { attendance_schedule_id: x.id, office_days: [...x.office_days].sort((a, b) => a - b), effective_from: x.effective_from, reason: x.reason, set_by_name: byKey(x.set_by)?.display_name ?? null, set_at: x.set_at };
+function scheduleOut(key: string, viewer: string): WorkSchedule {
+  const p = byKey(key)!;
+  const site = siteOf(key);
+  const hybrid = p.work_pattern === "hybrid";
+  const edit = peopleGrant(viewer, "edit");
+  return {
+    employee: person(p),
+    work_pattern: p.work_pattern,
+    worksite: site ? { worksite_id: site.worksite_id, name: site.name, radius_m: site.radius_m } : null,
+    home_state: needsHome(key) ? (homeOf(key, "approved") ? "approved" : homeOf(key, "pending") ? "pending" : "none") : null,
+    week: weekOf(key),
+    current: hybrid ? versionOut(scheduleOn(key, todayIso())) : null,
+    next: hybrid ? versionOut(scheduleAfter(key, todayIso())) : null,
+    can_edit: hybrid && key !== viewer && edit.may && edit.sees(key),
+  };
+}
+route("GET /api/v1/attendance/schedules/:employee_id", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  const p = byId(req.params.employee_id);
+  return p && g.sees(p.user_key) ? ok(scheduleOut(p.user_key, req.user!)) : notFound();
+});
+route("POST /api/v1/attendance/schedules/:employee_id", (req) => {
+  const g = peopleGrant(req.user!, "edit");
+  if (!g.may) return forbidden();
+  const p = byId(req.params.employee_id);
+  if (!p || !g.sees(p.user_key)) return notFound();
+  const b = req.body as { office_days?: number[]; effective_from?: string; reason?: string };
+  const days = Array.isArray(b.office_days) ? b.office_days : [];
+  const fields: Record<string, string[]> = {};
+  if (!days.length) fields.office_days = ["Pick an office day"];
+  else if (new Set(days).size !== days.length) fields.office_days = ["Each day once"];
+  if (!b.effective_from) fields.effective_from = ["Pick the first day"];
+  if (String(b.reason ?? "").trim().length < 10) fields.reason = ["At least 10 characters"];
+  if (Object.keys(fields).length) return invalid(fields);
+  if (p.user_key === req.user) return fail(403, "OWN_RECORD", "Someone else sets your work schedule");
+  if (p.work_pattern !== "hybrid") return fail(422, "SCHEDULE_NOT_NEEDED", "Only hybrid staff have a weekly schedule.", { office_days: ["Not hybrid"] });
+  if (b.effective_from! < todayIso()) return fail(422, "SCHEDULE_IN_THE_PAST", "Pick a first day from today on", { effective_from: ["Already past"] });
+  if (b.effective_from! > isoDaysAhead(90)) return fail(422, "SCHEDULE_TOO_FAR", "Pick a first day within 90 days", { effective_from: ["Too far ahead"] });
+  if (days.some((d) => !WORKING.includes(d))) return fail(422, "SCHEDULE_DAY_NOT_WORKED", "Pick office days the organisation works", { office_days: ["Not a working day"] });
+  if (WORKING.every((d) => days.includes(d))) return fail(422, "SCHEDULE_NO_HOME_DAY", "Every working day at the office is on site: change the work pattern", { office_days: ["Leave a home day"] });
+  const same = SCHEDULES.find((x) => x.key === p.user_key && x.effective_from === b.effective_from);
+  const row = { office_days: [...days].sort((a, c) => a - c), reason: String(b.reason).trim(), set_by: req.user!, set_at: new Date().toISOString() };
+  if (same) Object.assign(same, row);
+  else SCHEDULES.push({ id: sid(`schedule:${p.user_key}:${b.effective_from}`), key: p.user_key, effective_from: b.effective_from!, ...row });
+  return created(scheduleOut(p.user_key, req.user!));
+});
 
 /* ------------------------------------------------------------------ *
  * Policy: versions, a draft, publishing, acknowledgment
@@ -1248,42 +1352,6 @@ route("POST /api/v1/attendance/policies/:version/acknowledge", (req) => {
   return ok(withAck(req.user!, POLICY.current));
 });
 
-
-/* ------------------------------------------------------------------ *
- * A person's attendance setup (People · Employees)
- * ------------------------------------------------------------------ */
-const SETUP_OVERRIDES = new Map<string, { arrangement?: string; schedule?: Record<string, "Office" | "Remote">; history: Array<{ title: string; when: string; text: string }> }>();
-route("GET /api/v1/attendance/setup/:employee_id", (req) => {
-  const p = byId(req.params.employee_id);
-  if (!p) return notFound();
-  const o = SETUP_OVERRIDES.get(p.user_key);
-  const arr = (o?.arrangement as ReturnType<typeof arrOf> | undefined) ?? arrOf(p.user_key);
-  const home = arr === "Remote" || arr === "Hybrid";
-  const tmp = LOC_REQS.find((r) => r.key === p.user_key && r.request_type === "temporary_home" && ["submitted", "approved"].includes(r.status));
-  return ok({
-    employee: ref(p)!, arrangement: arr, primary_location: arr === "Remote" ? "Approved home" : arr === "Field" ? "Field assignment first" : p.worksite,
-    office: p.worksite === "Remote" ? "MTN Head Office, Ikoyi" : p.worksite, office_radius_m: 120,
-    home_area: home ? ["Lekki", "Surulere", "Gbagada", "Yaba", "Ikeja"][PEOPLE.indexOf(p) % 5] : null,
-    home_address: home ? `${10 + PEOPLE.indexOf(p)} Adebayo Street, ${["Lekki", "Surulere", "Gbagada", "Yaba", "Ikeja"][PEOPLE.indexOf(p) % 5]}, Lagos` : null,
-    home_radius_m: home ? 100 : null, field_assignment_today: null,
-    temporary_location: tmp ? { tone: tmp.status === "approved" ? "ok" : "warn", text: `${tmp.status === "approved" ? "Approved" : "Waiting"} · ${tmp.address ?? "Temporary home"}` } : { tone: "neutral", text: "None" },
-    schedule: arr === "Hybrid" ? (o?.schedule ?? { Mon: "Office", Tue: "Office", Wed: "Remote", Thu: "Office", Fri: "Office", Sat: "Remote" }) : null,
-    profile: `${PROFILE[arr]} · policy v${POLICY.current.version}`,
-    history: o?.history ?? [{ title: `Arrangement set to ${arr}`, when: `${p.start_date.split("-").reverse().join("/")} · Cynthia Osakunih`, text: "On joining." }],
-  });
-});
-route("PATCH /api/v1/attendance/setup/:employee_id", (req) => {
-  const p = byId(req.params.employee_id);
-  if (!p) return notFound();
-  if (String(req.body.reason ?? "").trim().length < 5) return invalid({ reason: ["Give a reason"] });
-  const o = SETUP_OVERRIDES.get(p.user_key) ?? { history: [] };
-  const before = o.arrangement ?? arrOf(p.user_key);
-  if (req.body.arrangement) o.arrangement = String(req.body.arrangement);
-  if (req.body.schedule) o.schedule = req.body.schedule as Record<string, "Office">;
-  o.history.unshift({ title: `Arrangement: ${before} → ${o.arrangement ?? before}`, when: `Just now · ${byKey(req.user)!.display_name}`, text: String(req.body.reason) });
-  SETUP_OVERRIDES.set(p.user_key, o);
-  return ok({ ok: true });
-});
 
 /** Read by Payroll: is the lateness tier setting on in the published policy? */
 export const deductionTiersOn = () => SETTINGS.find((x) => x.key === "deduction_tiers")?.value === true;

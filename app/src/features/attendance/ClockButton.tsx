@@ -190,9 +190,8 @@ function ClockPanel({ close }: { close: () => void }) {
     );
   };
 
-  /** The press: a place to match means the location is read now, after saying why; otherwise the punch goes as it is. */
+  /** The press: the location is read now, after saying why, and the server matches it (or keeps it for People). */
   const start = async () => {
-    if (t.location.kind === "none") return punch();
     if (await locationGranted()) return locate();
     setStage({ kind: "ask" });
   };
@@ -231,15 +230,15 @@ function ClockPanel({ close }: { close: () => void }) {
           ? `Temporary Home · ${t.location.radius_m} m`
           : t.location.kind === "approved_day"
             ? (t.location.name ?? "Approved Request")
-            : t.location.kind === "field"
+            : t.location.kind === "field" || t.location.kind === "client_visit"
               ? `${t.location.name}${t.location.radius_m ? ` · ${t.location.radius_m} m` : ""}`
             : t.location.kind === "remote"
               ? t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
-              : "No Worksite Assigned";
+              : "No Office Assigned";
   const punchName = eventType === "clock_out" ? "clock-out" : "clock-in";
-  const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home" };
+  const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home", client_visit: "the client's site" };
   const askText =
-    t.location.kind === "remote"
+    t.location.kind === "remote" || t.location.kind === "none"
       ? `Your ${punchName} goes to People with your location.`
       : t.location.kind === "approved_day"
         ? `Your ${punchName} is recorded with your location.`
@@ -314,6 +313,11 @@ function ClockPanel({ close }: { close: () => void }) {
       {t.location.kind === "remote" && stage.kind === "ready" && (
         <Banner tone="warn" icon="home" action={t.location.home_state === "none" ? <Button size="sm" onClick={toHome}>Set Home</Button> : undefined}>
           {t.location.home_state === "pending" ? "Your home location is waiting for approval." : "No approved home location yet."}
+        </Banner>
+      )}
+      {t.location.kind === "none" && stage.kind === "ready" && (
+        <Banner tone="warn" icon="pin">
+          No office assigned yet.
         </Banner>
       )}
       {unregistered && t.policy.device_mode !== "off" && stage.kind === "ready" && (

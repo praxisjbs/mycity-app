@@ -40,8 +40,8 @@
  *   late      late
  *   present   field on a day a field assignment they are still on covers (attendance.md
  *             §6.12); else remote for someone who works remotely (work_pattern remote, as the
- *             geofence, the clock panel and the register read it) or is on an approved remote
- *             day (§6.11); else on_site
+ *             geofence, the clock panel and the register read it), is on an approved remote
+ *             day (§6.11) or on a hybrid home day by their schedule (§6.13); else on_site
  *   absent    absent: a working day the day-close closed with no clock-in
  *   not_in    not_in: a working day not closed, no clock-in yet
  *   off       none: a day that is not worked, with nothing recorded
@@ -107,7 +107,7 @@ function yesterdayOf(date, cal) {
  *          remote_day?: boolean, field_day?: boolean}} f
  *   day_status  attendance_day.status for the day, null when there is no record or it has none
  *   on_leave    granted leave covers the day
- *   remote_day  an approved remote day covers the day
+ *   remote_day  an approved remote day covers the day, or it is a hybrid home day (§6.13)
  *   field_day   a field assignment the person is still on covers the day
  */
 function statusOf(f) {
@@ -167,11 +167,16 @@ const grantedLeave = (employee, day) => `EXISTS (
      AND (lr.status = 'approved'
           OR (lr.status = 'submitted' AND wi.state IN ('approved', 'timeout_approved'))))`;
 
-/** Whether an approved remote day (attendance.md §6.11) covers `day` for `employee` (SQL). */
-const remoteDay = (employee, day) => `EXISTS (
+/**
+ * Whether `day` is worked remotely for `employee` beyond their pattern (SQL): an approved remote
+ * day covers it (attendance.md §6.11), or it is a hybrid employee's home day by the schedule in
+ * force then (§6.13, repo.HOME_DAY over the employee `e`).
+ */
+const remoteDay = (employee, day) => `(EXISTS (
   SELECT 1 FROM attendance_location_request lr
    WHERE lr.employee_id = ${employee} AND lr.status = 'approved' AND lr.request_type = 'remote_day'
-     AND lr.starts_on <= ${day} AND lr.ends_on >= ${day})`;
+     AND lr.starts_on <= ${day} AND lr.ends_on >= ${day})
+  OR ${repo.HOME_DAY(employee, "e.work_pattern", day)})`;
 
 /** Whether a field assignment `employee` is still on covers `day` (attendance.md §6.12) (SQL). */
 const fieldDay = (employee, day) => `EXISTS (

@@ -602,7 +602,7 @@ screen.
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
-| Employee record | Profile, Job, Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "We'll email it to you", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
+| Employee record | Profile, Job, Reporting Line, Login, Attendance (attendance.md §10, LA) and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "We'll email it to you", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
@@ -687,9 +687,10 @@ screen.
 
 ## 13 · Open questions
 
-- Attendance Today on the register, and the attendance and location modal a row used to open: both
-  wait on LA's attendance routes (M1). The screen pieces are kept in
-  `app/src/features/people/EmployeeDetails.tsx` and nothing links to them until then.
+- Attendance Today on the register, and the attendance and location modal a row used to open:
+  closed 19/10/2026. A person's day opens on People · Attendance, and their setup (pattern, office,
+  home, week and Set Schedule) is the employee record's Attendance tab (attendance.md §6.13, §10);
+  the INTERIM `EmployeeDetails.tsx` is deleted.
 - The leave flow's day threshold for the second stage: Operations & People decide on screen; the
   seed sets 5 days until they do.
 - Home's Waiting on You card: D provides the count (`GET /workflow/mine/count`, built); Home wires it
@@ -698,6 +699,11 @@ screen.
 
 ## 14 · Change log
 
+- 19/10/2026 · LA · §10, §13: the employee record gains an Attendance tab (the person's pattern,
+  office, home and week, and Set Schedule for hybrid staff; `docs/guides/attendance.md` §6.13), which
+  closes the open question on the attendance and location modal; the INTERIM
+  `app/src/features/people/EmployeeDetails.tsx` is deleted. Record History names a schedule change
+  Work schedule set.
 - 19/10/2026 · AJ · Photos and Download My Data (`docs/guides/ess.md` §3 steps 1 and 8). The register row (`EmployeeRow.photo_url`), `PersonRef` and the 360's colleagues read the photo through `shared/db/person.js` (192 px; `organisation.photo.js` exports both sizes); the register shows faces, initials when none. The employee record gains Download Their Data, the CEO only (`POST /employees/:id/data-export`, `requireCeo`), the same workbook ESS builds, emailed to the CEO. Foundation pieces: `vault.remove` and `vault.removeFiles` (a kept-for-a-while file leaves the vault with `document.removed`; locked documents never), `workbookContext({ lines })` cover lines, `Avatar` size `2xl` and `PersonPicker`'s `photo`, the app's `usePhotos` cache (fetched once with the session, released after five minutes unseen and at sign-out), the `data-export-cleanup` scheduler. TB to review.
 - 19/10/2026 · AJ · `employee` gained `photo_document_id` (1170): the person's photo, a vault document of type
   `employee_photo` that every signed-in colleague may read. `organisation.photo.js` sets and clears it

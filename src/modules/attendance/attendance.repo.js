@@ -1,8 +1,9 @@
 "use strict";
 /**
  * Attendance: the SQL. Writes only the attendance tables (attendance_event,
- * attendance_day, attendance_exception, attendance_home, attendance_location_request and the
- * field assignment tables attendance_field_assignment, _site and _member); reads
+ * attendance_day, attendance_exception, attendance_home, attendance_location_request, the
+ * field assignment tables attendance_field_assignment, _site and _member, and
+ * attendance_schedule); reads
  * employee, worksite, leave, approvals and the working week for what a day means. Never emits
  * (BACKEND_GUIDE §2).
  *
@@ -34,6 +35,18 @@ const WORKING_DAY = (dateExpr) => `(
                        WHERE ww.weekday = extract(isodow FROM ${dateExpr})::int), false)
        ELSE extract(isodow FROM ${dateExpr}) <= 5 END
   AND NOT EXISTS (SELECT 1 FROM public_holiday h WHERE h.holiday_date = ${dateExpr}))`;
+
+/**
+ * Is `dateExpr` a home day of a hybrid employee (§6.13): their pattern is hybrid and the schedule in
+ * force that date (the latest first day by then, unique per person) leaves its weekday out. No
+ * schedule is an office day. No LIMIT: lists built on it go through pageQuery.
+ */
+const HOME_DAY = (employeeCol, patternCol, dateExpr) => `(${patternCol} = 'hybrid' AND COALESCE((
+  SELECT NOT (extract(isodow FROM ${dateExpr})::smallint = ANY (hs.office_days))
+    FROM attendance_schedule hs
+   WHERE hs.employee_id = ${employeeCol}
+     AND hs.effective_from = (SELECT max(hm.effective_from) FROM attendance_schedule hm
+                               WHERE hm.employee_id = ${employeeCol} AND hm.effective_from <= ${dateExpr})), false))`;
 
 /** A person as the contract's PersonRef, with their photo (shared/db/person.js). */
 const PERSON = (alias = "e", dept = "d") => personJson(alias, dept);
@@ -450,7 +463,7 @@ const REGISTER = `
          COALESCE(ad.overtime_minutes, 0) AS overtime_minutes, ad.closed_at,
          CASE WHEN fa.sites IS NOT NULL THEN fa.sites
               WHEN lr.request_type IS NOT NULL THEN ${REQUEST_PLACE("lr.request_type")}
-              WHEN e.work_pattern = 'remote'
+              WHEN e.work_pattern = 'remote' OR ${HOME_DAY("e.employee_id", "e.work_pattern", "$1::date")}
               THEN CASE WHEN EXISTS (SELECT 1 FROM attendance_home ah
                                       WHERE ah.employee_id = e.employee_id AND ah.status = 'approved')
                         THEN 'Home' ELSE 'Remote' END
@@ -746,6 +759,7 @@ function homeRow(db, id, { place }) {
 
 const REQUEST = `r.location_request_id, r.number, r.employee_id, r.request_type, r.starts_on, r.ends_on,
   r.address, r.latitude::float8 AS latitude, r.longitude::float8 AS longitude, r.accuracy_m::float8 AS accuracy_m,
+  r.site_latitude::float8 AS site_latitude, r.site_longitude::float8 AS site_longitude, r.site_radius_m,
   r.reason, r.status, r.workflow_instance_id`;
 
 /** The approved request covering a person's work date, if any (two never overlap, §6.11). */
@@ -775,8 +789,9 @@ function insertRequest(client, r) {
   return one(
     client,
     `INSERT INTO attendance_location_request
-       (number, employee_id, request_type, starts_on, ends_on, address, latitude, longitude, accuracy_m, reason, requested_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       (number, employee_id, request_type, starts_on, ends_on, address, latitude, longitude, accuracy_m,
+        site_latitude, site_longitude, site_radius_m, reason, requested_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      RETURNING location_request_id`,
     [
       r.number,
@@ -788,6 +803,9 @@ function insertRequest(client, r) {
       r.latitude,
       r.longitude,
       r.accuracy_m,
+      r.site_latitude,
+      r.site_longitude,
+      r.site_radius_m,
       r.reason,
       r.requested_by,
     ],
@@ -853,7 +871,9 @@ async function requestRows(db, { place, reader }, params) {
             (r.ends_on - r.starts_on + 1)::int AS days, r.address,
             CASE WHEN ${placeParam}::boolean THEN r.latitude::float8 END AS home_latitude,
             CASE WHEN ${placeParam}::boolean THEN r.longitude::float8 END AS home_longitude,
-            r.accuracy_m::float8 AS accuracy_m, r.reason, r.status, r.workflow_instance_id,
+            r.accuracy_m::float8 AS accuracy_m, r.site_latitude::float8 AS site_latitude,
+            r.site_longitude::float8 AS site_longitude, r.site_radius_m,
+            r.reason, r.status, r.workflow_instance_id,
             CASE WHEN wi.state = 'pending' THEN (
               SELECT min(st ->> 'name') FROM workflow_definition wd, jsonb_array_elements(wd.stages) st
                WHERE wd.workflow_definition_id = wi.workflow_definition_id AND st ->> 'key' = wi.current_stage
@@ -1094,8 +1114,62 @@ function assignmentRow(db, id, { today, changer }) {
   return one(db, `${sql} FROM attendance_field_assignment a WHERE a.field_assignment_id = $1`, params);
 }
 
+/* ------------------------------------------------------------------ *
+ * Hybrid staff's weekly schedule (attendance.schedule.js)
+ * ------------------------------------------------------------------ */
+
+const SCHEDULE = `s.attendance_schedule_id, s.employee_id, s.office_days::int[] AS office_days, s.effective_from,
+  s.reason, s.set_at,
+  (SELECT btrim(se.first_name || ' ' || se.last_name) FROM app_user su
+     JOIN employee se ON se.employee_id = su.employee_id WHERE su.user_id = s.set_by) AS set_by_name`;
+
+/** The schedule in force for a person on a date: the latest that started by then, or null. */
+function scheduleOn(db, employeeId, date) {
+  return one(
+    db,
+    `SELECT ${SCHEDULE} FROM attendance_schedule s
+      WHERE s.employee_id = $1 AND s.effective_from <= $2::date
+      ORDER BY s.effective_from DESC LIMIT 1`,
+    [employeeId, date],
+  );
+}
+
+/** The next schedule waiting to start after a date, or null. */
+function scheduleAfter(db, employeeId, date) {
+  return one(
+    db,
+    `SELECT ${SCHEDULE} FROM attendance_schedule s
+      WHERE s.employee_id = $1 AND s.effective_from > $2::date
+      ORDER BY s.effective_from LIMIT 1`,
+    [employeeId, date],
+  );
+}
+
+/** The schedule a person set from exactly this first day, or null (for the audit's before). */
+function scheduleFrom(db, employeeId, from) {
+  return one(
+    db,
+    `SELECT ${SCHEDULE} FROM attendance_schedule s WHERE s.employee_id = $1 AND s.effective_from = $2::date`,
+    [employeeId, from],
+  );
+}
+
+/** Set a schedule from its first day; one from the same first day is replaced. */
+function upsertSchedule(client, x) {
+  return one(
+    client,
+    `INSERT INTO attendance_schedule (employee_id, office_days, effective_from, reason, set_by)
+     VALUES ($1, $2::smallint[], $3, $4, $5)
+     ON CONFLICT (employee_id, effective_from)
+       DO UPDATE SET office_days = EXCLUDED.office_days, reason = EXCLUDED.reason, set_by = EXCLUDED.set_by, set_at = now()
+     RETURNING attendance_schedule_id`,
+    [x.employee_id, x.office_days, x.effective_from, x.reason, x.set_by],
+  );
+}
+
 module.exports = {
   WORKING_DAY,
+  HOME_DAY,
   lockEmployee,
   person,
   assignedPolicy,
@@ -1148,4 +1222,8 @@ module.exports = {
   removeMember,
   listAssignments,
   assignmentRow,
+  scheduleOn,
+  scheduleAfter,
+  scheduleFrom,
+  upsertSchedule,
 };

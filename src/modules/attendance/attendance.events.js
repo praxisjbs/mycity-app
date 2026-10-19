@@ -27,6 +27,8 @@
  *   field_assignment.cancelled      it was cancelled (one a person still on it): they are told
  *                                   why, and their clock reloads
  *   field_assignment.member_removed someone was taken off it: they are told why
+ *   attendance.schedule_set         People set a hybrid employee's office days: they are told,
+ *                                   and their clock reloads; audited on the employee
  *
  * Payloads carry ids, dates, results and exception types (a field assignment's number and
  * name too): never coordinates, an address, a device identifier or the evidence itself.
@@ -57,6 +59,7 @@ const EVENTS = defineEvents("people", {
   "field_assignment.assigned": { summary: "Someone was sent out on a field assignment" },
   "field_assignment.cancelled": { summary: "A field assignment was cancelled" },
   "field_assignment.member_removed": { summary: "Someone was taken off a field assignment" },
+  "attendance.schedule_set": { summary: "A hybrid employee's work schedule was set" },
 });
 
 /** The approval every work location request opens (docs/guides/attendance.md §6.11). */
@@ -138,6 +141,12 @@ defineNotification(EVENTS.FIELD_ASSIGNMENT_MEMBER_REMOVED, {
   body: (e) => `${assignmentOf(e.payload)}: ${e.payload.reason}`,
 });
 
+defineNotification(EVENTS.ATTENDANCE_SCHEDULE_SET, {
+  to: [{ subject: true }],
+  title: "Work schedule set",
+  body: (e) => `Office ${e.payload.office_days_text} from ${formatDate(e.payload.effective_from)}.`,
+});
+
 /*
  * After commit: tell the screens that show this person's attendance to reload. The
  * person's own sockets, and the sockets of everyone whose `people` view reaches them
@@ -170,6 +179,7 @@ for (const key of [
   EVENTS.FIELD_ASSIGNMENT_ASSIGNED,
   EVENTS.FIELD_ASSIGNMENT_CANCELLED,
   EVENTS.FIELD_ASSIGNMENT_MEMBER_REMOVED,
+  EVENTS.ATTENDANCE_SCHEDULE_SET,
 ])
   outbox.register(key, "attendance.push_updated", pushUpdated);
 

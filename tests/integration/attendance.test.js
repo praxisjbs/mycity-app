@@ -410,12 +410,23 @@ describeDb("attendance against the real migrations", () => {
       expect(outside.message).toBe("Clocked in at 08:00. People will review it: you were 340 m from Testbed Office.");
     });
 
-    test("someone not remote with no worksite punches unjudged; a remote one with no approved home is reviewed", async () => {
+    test("someone expected at an office with none assigned is reviewed, as a remote one with no approved home is; never rejected", async () => {
       await setPolicy("block", "off");
       await q("UPDATE employee SET worksite_id = NULL WHERE employee_id = $1", [people.outsider.employee.employee_id]);
       const r = await punchAt("outsider", nextMorning(), { ...north(5000) });
-      expect(r).toMatchObject({ validation_state: "accepted", reasons: [], worksite_name: null });
+      expect(r).toMatchObject({ validation_state: "review", reasons: ["location_unverified"], worksite_name: null, distance_m: null });
+      expect(r.message).toBe("Clocked in at 08:00. People will review it: you have no office assigned yet.");
       expect(r.today.location).toEqual({ kind: "none", name: null, radius_m: null, home_state: null });
+      const ev = await q(
+        "SELECT validation -> 'geofence' AS g, latitude::float8 AS lat FROM attendance_event WHERE attendance_event_id = $1",
+        [r.attendance_event_id],
+      );
+      expect(ev.rows[0].g).toMatchObject({ verdict: "unverified", reason: "no_worksite" });
+      expect(ev.rows[0].lat).not.toBeNull();
+      const exceptions = await q("SELECT exception_type, evidence ->> 'reason' AS why FROM attendance_exception WHERE attendance_event_id = $1", [
+        r.attendance_event_id,
+      ]);
+      expect(exceptions.rows).toEqual([{ exception_type: "location_unverified", why: "no_worksite" }]);
       const remote = await punchAt("remote", nextMorning(), { ...north(9000) });
       expect(remote).toMatchObject({ validation_state: "review", reasons: ["location_unverified"], worksite_name: null });
       expect(remote.message).toBe("Clocked in at 08:00. People will review it: you have no approved home location yet.");
@@ -1079,6 +1090,9 @@ describeDb("attendance against the real migrations", () => {
     const day = (n) => lagos.addDays(today(), n);
     const ask = (who, body) =>
       as(who).post("/attendance/me/requests", { reason: "Working with a partner on site", ...body });
+    /** A client's venue, typed as a field site is; `visitAt(m)` is a reading m metres north of it. */
+    const SITE = { site_latitude: 6.46, site_longitude: 3.41, site_radius_m: 200 };
+    const visitAt = (m) => ({ latitude: SITE.site_latitude + m / 111_195, longitude: SITE.site_longitude });
     const approve = (who, wid) => as(who).post(`/workflow/instances/${wid}/approve`, {});
     const ALL = { scope: "all", scope_ids: null };
     /** Both stages: the line manager, then Operations & People; the outcome is copied after commit. */
@@ -1100,7 +1114,14 @@ describeDb("attendance against the real migrations", () => {
       await no("staff", { request_type: "remote_day", starts_on: day(-1), ends_on: day(-1) }, "REQUEST_IN_THE_PAST");
       await no("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(7) }, "REQUEST_TOO_LONG");
       await no("staff", { request_type: "remote_day", starts_on: day(95), ends_on: day(95) }, "REQUEST_TOO_FAR");
-      expect((await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2) })).status).toBe(422);
+      expect((await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2), ...SITE })).status).toBe(422);
+      const noSite = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2), address: "Partner office, Invented Way" });
+      expect([noSite.status, Object.keys(noSite.body.error.fields).sort()]).toEqual([
+        422, ["site_latitude", "site_longitude", "site_radius_m"],
+      ]);
+      const wide = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2), address: "Partner office, Invented Way", ...SITE, site_radius_m: 900 });
+      expect(wide.status).toBe(422);
+      expect((await ask("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(2), ...SITE })).status).toBe(422);
       expect((await ask("remote", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: "1 Made Up Lane" })).status).toBe(422);
       expect((await ask("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(2), reason: "short" })).status).toBe(422);
       expect((await ask("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(2), employee_id: people.other.employee.employee_id })).status).toBe(422);
@@ -1118,7 +1139,7 @@ describeDb("attendance against the real migrations", () => {
       const id = asked.body.location_request_id;
       const wid = asked.body.workflow_instance_id;
 
-      const clash = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(4), address: "Partner office, Invented Way" });
+      const clash = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(4), address: "Partner office, Invented Way", ...SITE });
       expect([clash.status, clash.body.error.code]).toEqual([409, "REQUEST_OVERLAPS"]);
 
       const byManager = await as("manager").get("/attendance/requests?status=submitted");
@@ -1153,14 +1174,37 @@ describeDb("attendance against the real migrations", () => {
       expect(next).toMatchObject({ validation_state: "rejected", reasons: ["outside_worksite"] });
     });
 
-    test("a client visit: accepted wherever, even with the location off", async () => {
+    test("a client visit is fenced on its site: inside counts, outside is rejected under block, no reading is reviewed", async () => {
       await setPolicy("block", "off");
-      const asked = await ask("other", { request_type: "client_visit", starts_on: day(5), ends_on: day(6), address: "Client office, 4 Example Road" });
+      const asked = await ask("other", { request_type: "client_visit", starts_on: day(5), ends_on: day(6), address: "Client office, 4 Example Road", ...SITE });
       expect(asked.status).toBe(201);
+      expect(asked.body).toMatchObject({ ...SITE, home_latitude: null, home_longitude: null });
       await approveBoth(asked.body.workflow_instance_id);
-      const denied = await punchAt("other", `${day(6)}T07:00:00Z`, { latitude: null, longitude: null, accuracy_m: null, location_error: "denied" });
-      expect(denied).toMatchObject({ validation_state: "accepted", reasons: [], worksite_name: "Client Visit" });
-      expect(denied.today.location).toMatchObject({ kind: "approved_day", name: "Client Visit", radius_m: null });
+
+      const inside = await punchAt("other", `${day(5)}T07:00:00Z`, visitAt(150));
+      expect(inside).toMatchObject({ validation_state: "accepted", reasons: [], worksite_name: "Client Visit", distance_m: 150 });
+      expect(inside.today.location).toMatchObject({ kind: "client_visit", name: "Client Visit", radius_m: 200 });
+      const ev = await q("SELECT worksite_id, validation->'geofence' AS g FROM attendance_event WHERE attendance_event_id = $1", [inside.attendance_event_id]);
+      expect(ev.rows[0].worksite_id).toBeNull();
+      expect(ev.rows[0].g).toMatchObject({ verdict: "inside", place: "client_visit", request_id: asked.body.location_request_id });
+
+      const out = await punchAt("other", `${day(6)}T07:00:00Z`, visitAt(600));
+      expect(out).toMatchObject({ validation_state: "rejected", reasons: ["outside_worksite"] });
+      expect(out.message).toBe("Not counted: you were 600 m from the client's site.");
+      const denied = await punchAt("other", `${day(6)}T07:01:00Z`, { latitude: null, longitude: null, accuracy_m: null, location_error: "denied" });
+      expect(denied).toMatchObject({ validation_state: "review", reasons: ["location_unverified"] });
+    });
+
+    test("a client visit sent before sites were asked for keeps its approval as the check", async () => {
+      await setPolicy("block", "off");
+      const asked = await ask("other", { request_type: "client_visit", starts_on: day(11), ends_on: day(11), address: "Client office, 4 Example Road", ...SITE });
+      await q("UPDATE attendance_location_request SET site_latitude = NULL, site_longitude = NULL, site_radius_m = NULL WHERE location_request_id = $1", [
+        asked.body.location_request_id,
+      ]);
+      await approveBoth(asked.body.workflow_instance_id);
+      const far = await punchAt("other", `${day(11)}T07:00:00Z`, { ...north(9000) });
+      expect(far).toMatchObject({ validation_state: "accepted", reasons: [], worksite_name: "Client Visit" });
+      expect(far.today.location).toMatchObject({ kind: "approved_day", name: "Client Visit", radius_m: null });
     });
 
     test("a temporary home is fenced like a home for its days, over the approved one", async () => {
@@ -1196,18 +1240,18 @@ describeDb("attendance against the real migrations", () => {
     });
 
     test("withdrawn while waiting, cancelled before it starts, never once it has started", async () => {
-      const waiting = await ask("other", { request_type: "client_visit", starts_on: day(20), ends_on: day(20), address: "Client office, 4 Example Road" });
+      const waiting = await ask("other", { request_type: "client_visit", starts_on: day(20), ends_on: day(20), address: "Client office, 4 Example Road", ...SITE });
       const withdrawn = await as("other").post(`/attendance/me/requests/${waiting.body.location_request_id}/cancel`, { reason: "Meeting moved online" });
       expect(withdrawn.body).toMatchObject({ status: "cancelled", cancel_reason: "Meeting moved online", waiting_on: null });
       const instance = await q("SELECT state FROM workflow_instance WHERE workflow_instance_id = $1", [waiting.body.workflow_instance_id]);
       expect(instance.rows[0].state).toBe("cancelled");
       expect((await as("other").post(`/attendance/me/requests/${waiting.body.location_request_id}/cancel`, {})).status).toBe(409);
 
-      const later = await ask("other", { request_type: "client_visit", starts_on: day(22), ends_on: day(23), address: "Client office, 4 Example Road" });
+      const later = await ask("other", { request_type: "client_visit", starts_on: day(22), ends_on: day(23), address: "Client office, 4 Example Road", ...SITE });
       await approveBoth(later.body.workflow_instance_id);
       expect((await as("other").post(`/attendance/me/requests/${later.body.location_request_id}/cancel`, {})).body.status).toBe("cancelled");
 
-      const started = await ask("other", { request_type: "client_visit", starts_on: day(0), ends_on: day(1), address: "Client office, 4 Example Road" });
+      const started = await ask("other", { request_type: "client_visit", starts_on: day(0), ends_on: day(1), address: "Client office, 4 Example Road", ...SITE });
       await approveBoth(started.body.workflow_instance_id);
       const refused = await as("other").post(`/attendance/me/requests/${started.body.location_request_id}/cancel`, {});
       expect([refused.status, refused.body.error.code]).toEqual([409, "REQUEST_NOT_CANCELLABLE"]);
@@ -1406,6 +1450,149 @@ describeDb("attendance against the real migrations", () => {
       for (const secret of ["Hidden Avenue", "Quiet Lane", "6.731", "6.781", "3.481"]) expect(text).not.toContain(secret);
       const failed = await q("SELECT count(*)::int AS n FROM event_outbox WHERE status = 'failed'", []);
       expect(failed.rows[0].n).toBe(0);
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * Hybrid staff's weekly schedule (guide §6.13)
+   * ---------------------------------------------------------------- */
+
+  describe("hybrid staff's weekly schedule", () => {
+    const lagos = require("../../src/shared/time/lagos");
+    const roster = require("../../src/modules/attendance/attendance.roster");
+    const day = (n) => lagos.addDays(today(), n);
+    /** The first date from day(n) on that falls on ISO weekday `wd`. */
+    const onWeekday = (n, wd) => {
+      let d = day(n);
+      while (lagos.weekday(d) !== wd) d = lagos.addDays(d, 1);
+      return d;
+    };
+    const ALL = { scope: "all", scope_ids: null };
+    const musa = () => people.staff.employee.employee_id;
+    const set = (who, id, body) => as(who).post(`/attendance/schedules/${id}`, { reason: "Office on the team's days", ...body });
+    const homeAt = (m) => ({ latitude: 6.62 + m / 111_195, longitude: 3.52 });
+
+    beforeAll(async () => {
+      await q("UPDATE employee SET work_pattern = 'hybrid' WHERE employee_id = $1", [musa()]);
+    });
+    afterAll(async () => {
+      await q("UPDATE employee SET work_pattern = 'on_site' WHERE employee_id = $1", [musa()]);
+    });
+
+    test("read within scope; set under people edit, never your own, hybrid only, with its checks", async () => {
+      const read = await as("manager").get(`/attendance/schedules/${musa()}`);
+      expect(read.status).toBe(200);
+      expect(read.body).toMatchObject({
+        employee: { display_name: "Musa Danjuma" }, work_pattern: "hybrid", worksite: { name: "Testbed Office", radius_m: 100 },
+        home_state: null, current: null, next: null, can_edit: false,
+      });
+      // No schedule yet: every working day is at the office.
+      expect(new Set(read.body.week.filter((d) => d.place !== "off").map((d) => d.place))).toEqual(new Set(["office"]));
+      expect(read.body.week.find((d) => d.weekday === 7).place).toBe("off");
+      expect((await as("manager").get(`/attendance/schedules/${people.outsider.employee.employee_id}`)).status).toBe(404);
+      expect((await as("outsider").get(`/attendance/schedules/${musa()}`)).status).toBe(403);
+      expect((await as("ops").get(`/attendance/schedules/${musa()}`)).body.can_edit).toBe(true);
+
+      expect((await set("manager", musa(), { office_days: [1, 2], effective_from: day(1) })).status).toBe(403);
+      const no = async (who, id, body, status, code) => {
+        const res = await set(who, id, body);
+        expect([res.status, res.body.error && res.body.error.code]).toEqual([status, code]);
+      };
+      await no("ops", people.ops.employee.employee_id, { office_days: [1, 2], effective_from: day(1) }, 403, "OWN_RECORD");
+      await no("ops", people.other.employee.employee_id, { office_days: [1, 2], effective_from: day(1) }, 422, "SCHEDULE_NOT_NEEDED");
+      await no("ops", musa(), { office_days: [1, 2], effective_from: day(-1) }, 422, "SCHEDULE_IN_THE_PAST");
+      await no("ops", musa(), { office_days: [1, 2], effective_from: day(95) }, 422, "SCHEDULE_TOO_FAR");
+      await no("ops", musa(), { office_days: [1, 7], effective_from: day(1) }, 422, "SCHEDULE_DAY_NOT_WORKED");
+      const working = read.body.week.filter((d) => d.place !== "off").map((d) => d.weekday);
+      await no("ops", musa(), { office_days: working, effective_from: day(1) }, 422, "SCHEDULE_NO_HOME_DAY");
+      expect((await set("ops", musa(), { office_days: [1, 1], effective_from: day(1) })).status).toBe(422);
+      expect((await set("ops", musa(), { office_days: [1, 2], effective_from: day(1), reason: "short" })).status).toBe(422);
+      expect((await q("SELECT count(*)::int AS n FROM attendance_schedule", [])).rows[0].n).toBe(0);
+    });
+
+    test("set from today, replaced from the same day, a later one waits; history, the notice, My Profile and the home", async () => {
+      const first = await set("ops", musa(), { office_days: [4, 1, 2], effective_from: today() });
+      expect(first.status).toBe(201);
+      expect(first.body).toMatchObject({
+        current: { office_days: [1, 2, 4], effective_from: today(), set_by_name: "Tunde Bakare" },
+        next: null, home_state: "none", can_edit: true,
+      });
+      expect(first.body.week.find((d) => d.weekday === 3).place).toBe("remote");
+      expect(first.body.week.find((d) => d.weekday === 1).place).toBe("office");
+
+      const again = await set("ops", musa(), { office_days: [1, 2, 3], effective_from: today() });
+      expect(again.body.current.office_days).toEqual([1, 2, 3]);
+      expect((await q("SELECT count(*)::int AS n FROM attendance_schedule WHERE employee_id = $1", [musa()])).rows[0].n).toBe(1);
+
+      const later = await set("ops", musa(), { office_days: [1, 2], effective_from: day(60) });
+      expect(later.body).toMatchObject({ current: { office_days: [1, 2, 3] }, next: { office_days: [1, 2], effective_from: day(60) } });
+
+      await drain();
+      const history = await as("ops").get(`/employees/${musa()}/history`);
+      expect(history.body.data.filter((h) => h.summary.startsWith("Work schedule set")).length).toBe(3);
+      const told = await q("SELECT title, body FROM notification WHERE user_id = $1 AND event_key = 'attendance.schedule_set' ORDER BY created_at", [
+        people.staff.user.user_id,
+      ]);
+      expect(told.rows.map((r) => r.title)).toEqual(["Work schedule set", "Work schedule set", "Work schedule set"]);
+      expect(told.rows[1].body).toBe(`Office Mon, Tue, Wed from ${today().split("-").reverse().join("/")}.`);
+
+      const profile = await as("staff").get("/ess/profile");
+      const place = (wd) => profile.body.working_week.find((d) => d.weekday === wd).place;
+      expect([place(1), place(3), place(4), place(7)]).toEqual(["office", "office", "remote", "off"]);
+      expect((await as("staff").get("/attendance/me/home")).body.needed).toBe(true);
+      expect((await as("other").get("/attendance/me/home")).body.needed).toBe(false);
+    });
+
+    test("on the clock: an office day at the worksite, a home day at the approved home, no home is reviewed", async () => {
+      await setPolicy("block", "off");
+      const monday = onWeekday(61, 1);
+      const thursday = onWeekday(61, 4);
+      const friday = onWeekday(61, 5);
+      const wednesday = onWeekday(68, 3);
+
+      const office = await punchAt("staff", `${monday}T07:00:00Z`, { ...north(20) });
+      expect(office).toMatchObject({ validation_state: "accepted", worksite_name: "Testbed Office" });
+      expect(office.today.location).toMatchObject({ kind: "worksite", name: "Testbed Office", home_state: null });
+
+      const noHome = await punchAt("staff", `${thursday}T07:00:00Z`, homeAt(0));
+      expect(noHome).toMatchObject({ validation_state: "review", reasons: ["location_unverified"] });
+      expect(noHome.message).toBe("Clocked in at 08:00. People will review it: you have no approved home location yet.");
+      expect(noHome.today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "none" });
+
+      const homeSent = await as("staff").post("/attendance/me/home", {
+        home_address: "3 Example Close, Yaba", home_latitude: homeAt(0).latitude, home_longitude: homeAt(0).longitude, accuracy_m: 12,
+      });
+      expect(homeSent.status).toBe(201);
+      const decided = await as("ops").post(`/attendance/homes/${homeSent.body.pending.attendance_home_id}/decision`, { decision: "approve" });
+      expect(decided.status).toBe(200);
+
+      const inside = await punchAt("staff", `${friday}T07:00:00Z`, homeAt(60));
+      expect(inside).toMatchObject({ validation_state: "accepted", worksite_name: "Home", distance_m: 60 });
+      expect(inside.today.location).toMatchObject({ kind: "home", radius_m: 100, home_state: "approved" });
+      const ev = await q("SELECT worksite_id, validation->'geofence' AS g FROM attendance_event WHERE attendance_event_id = $1", [inside.attendance_event_id]);
+      expect(ev.rows[0].worksite_id).toBeNull();
+      expect(ev.rows[0].g).toMatchObject({ verdict: "inside", place: "home" });
+
+      // The schedule from day(60) leaves Wednesday for home too.
+      const away = await punchAt("staff", `${wednesday}T07:00:00Z`, { ...north(20) });
+      expect(away).toMatchObject({ validation_state: "rejected", reasons: ["outside_home"] });
+    });
+
+    test("Home's roster and the register read a present home day as remote, an office day as on site", async () => {
+      const monday = onWeekday(61, 1);
+      const friday = onWeekday(61, 5);
+      const row = async (date) =>
+        (await roster.page(pool, { date, q: "Musa" }, ALL, { page: 1 })).data.find((r) => r.employee_id === musa());
+      expect(await row(friday)).toMatchObject({ status: "remote", worksite: null });
+      expect(await row(monday)).toMatchObject({ status: "on_site", worksite: "Testbed Office" });
+      expect(await roster.summary(pool, { date: friday }, ALL)).toMatchObject({ remote: 1 });
+
+      const reg = await as("ops").get(`/attendance/register?date=${friday}&q=Musa`);
+      expect(reg.body.data[0]).toMatchObject({ expected_location: "Home", work_pattern: "hybrid", status: "present" });
+      const office = await as("ops").get(`/attendance/register?date=${monday}&q=Musa`);
+      expect(office.body.data[0]).toMatchObject({ expected_location: "Testbed Office" });
+      const detail = await as("ops").get(`/attendance/register/${musa()}?date=${friday}`);
+      expect(detail.body.expected_location).toEqual({ name: "Home", radius_m: 100 });
     });
   });
 });

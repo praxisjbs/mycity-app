@@ -5,7 +5,7 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chain, ChoiceField, DataView, DateField, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, KeyValue, LoadingRows, PageHeader, PhoneOnly, Pill, TextAreaField, TextField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { Button, Card, CardHeader, Chain, ChoiceField, DataView, DateField, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, NumberField, PageHeader, PhoneOnly, Pill, TextAreaField, TextField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 import { useClock } from "./ClockButton";
 import { ReadingStep, useReading } from "./HomeLocation";
 import { REQUEST_STATUS, REQUEST_TYPE, REQUEST_TYPE_HELP } from "./labels";
@@ -13,8 +13,9 @@ import { REQUEST_STATUS, REQUEST_TYPE, REQUEST_TYPE_HELP } from "./labels";
 /**
  * ESS · Work Location Requests (#87, docs/guides/attendance.md §6.11, §10): the person's own
  * requests to work somewhere else for some days, each with its approval route, and the New Request
- * sheet. A temporary home carries one reading taken there, as a home does. The sheet offers the
- * types the person's work pattern allows; the API decides.
+ * sheet. A temporary home carries one reading taken there, as a home does; a client visit its site,
+ * typed as a field site is. The sheet offers the types the person's work pattern allows; the API
+ * decides.
  */
 
 /** The types each work pattern may ask for (§6.11). */
@@ -29,6 +30,9 @@ export const requestDates = (r: Pick<LocationRequest, "starts_on" | "ends_on">) 
   r.starts_on === r.ends_on ? formatDate(r.starts_on) : `${formatDate(r.starts_on)} to ${formatDate(r.ends_on)}`;
 /** Where the request is for: its address, or home for a remote day without one. */
 export const requestPlace = (r: Pick<LocationRequest, "address" | "request_type">) => r.address ?? (r.request_type === "remote_day" ? "Home" : null);
+/** A client visit's site: its centre and radius, or null for any other request (and one sent before sites). */
+export const requestSite = (r: Pick<LocationRequest, "site_latitude" | "site_longitude" | "site_radius_m">) =>
+  r.site_latitude !== null && r.site_longitude !== null ? `${r.site_latitude.toFixed(5)}, ${r.site_longitude.toFixed(5)} · ${r.site_radius_m} m` : null;
 
 export function WorkLocationRequestsPage() {
   const [params] = useSearchParams();
@@ -160,6 +164,7 @@ function RequestView({ r, close }: { r: LocationRequest; close: () => void }) {
             ["Last Day", formatDate(r.ends_on)],
             ["Days", String(r.days)],
             ["Place", requestPlace(r)],
+            ...(requestSite(r) ? ([["Site", requestSite(r)]] as Array<[string, string]>) : []),
             ...(r.accuracy_m !== null ? ([["Reading", `Accurate to ${Math.round(r.accuracy_m)} m`]] as Array<[string, string]>) : []),
             ["Reason", r.reason],
             ["Requested", formatDateTime(r.requested_at)],
@@ -190,9 +195,13 @@ type Values = {
   home_latitude: number | null;
   home_longitude: number | null;
   accuracy_m: number | null;
+  site_latitude: string;
+  site_longitude: string;
+  site_radius: string;
 };
 
-/** The body the API takes: the reading only for a temporary home, the address only when written. */
+const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
+/** The body the API takes: the reading only for a temporary home, the site only for a client visit, the address only when written. */
 const bodyOf = (v: Values) => ({
   request_type: v.request_type,
   starts_on: v.starts_on,
@@ -200,13 +209,25 @@ const bodyOf = (v: Values) => ({
   ...(v.address.trim() && { address: v.address.trim() }),
   reason: v.reason.trim(),
   ...(v.request_type === "temporary_home" && { home_latitude: v.home_latitude, home_longitude: v.home_longitude, accuracy_m: v.accuracy_m }),
+  ...(v.request_type === "client_visit" && { site_latitude: num(v.site_latitude), site_longitude: num(v.site_longitude), site_radius_m: num(v.site_radius) }),
 });
+/** The contract's names on the form's fields: the radius is typed in metres as `site_radius`. */
+const fieldOf = (key: PropertyKey) => (key === "site_radius_m" ? "site_radius" : String(key));
 
 /** The sheet: the type, the days, where and why; a temporary home takes its reading first. */
 function RequestForm({ types, max, close }: { types: LocationRequestType[]; max: number; close: () => void }) {
   const f = useContractForm<Values>(
-    { request_type: types[0], starts_on: "", ends_on: "", address: "", reason: "", home_latitude: null, home_longitude: null, accuracy_m: null },
-    { safeParse: (v: unknown) => attendance.LocationRequestCreate.safeParse(bodyOf(v as Values)) },
+    {
+      request_type: types[0], starts_on: "", ends_on: "", address: "", reason: "", home_latitude: null, home_longitude: null, accuracy_m: null,
+      site_latitude: "", site_longitude: "", site_radius: "200",
+    },
+    {
+      safeParse: (v: unknown) => {
+        const r = attendance.LocationRequestCreate.safeParse(bodyOf(v as Values));
+        if (r.success) return r;
+        return { success: false, error: { issues: r.error.issues.map((i) => ({ ...i, path: [fieldOf(i.path[0])] })) } };
+      },
+    },
   );
   const send = useMutation("POST /api/v1/attendance/me/requests");
   const { reading, setReading, locate } = useReading(max, (fix) => {
@@ -216,6 +237,7 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
   });
   const v = f.values;
   const home = v.request_type === "temporary_home";
+  const visit = v.request_type === "client_visit";
 
   const submit = async () => {
     if (!f.check()) return;
@@ -227,7 +249,8 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
       toast(`${r.number} sent to your line manager`);
     } catch (e) {
       if (e instanceof ApiError && e.code === "HOME_READING_WEAK" && reading.kind === "fix") setReading({ kind: "weak", fix: reading.fix });
-      else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else if (e instanceof ApiError && Object.keys(e.fields).length)
+        f.setServerErrors(Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [fieldOf(k), m])));
       else toast(e instanceof ApiError ? e.message : "Request not sent");
     }
   };
@@ -251,6 +274,22 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
       <Field label="Address" optional={v.request_type === "remote_day"} {...f.status("address")}>
         <TextField {...f.field("address")} placeholder="Street, area, city" />
       </Field>
+      {visit && (
+        <Card className="mb-3">
+          <CardHeader title="Client Site" />
+          <Grid cols={2}>
+            <Field label="Latitude" {...f.status("site_latitude")}>
+              <NumberField decimal {...f.field("site_latitude")} placeholder="6.4281" />
+            </Field>
+            <Field label="Longitude" {...f.status("site_longitude")}>
+              <NumberField decimal {...f.field("site_longitude")} placeholder="3.4219" />
+            </Field>
+          </Grid>
+          <Field label={<HelpTerm help="A punch within this distance of the site counts at the site. Between 100 and 500 metres.">Radius, Metres</HelpTerm>} {...f.status("site_radius")}>
+            <NumberField {...f.field("site_radius")} />
+          </Field>
+        </Card>
+      )}
       <Field label="Reason" {...f.status("reason")}>
         <TextAreaField {...f.field("reason")} placeholder="Family visit" rows={2} />
       </Field>
