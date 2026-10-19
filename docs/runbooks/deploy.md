@@ -100,3 +100,41 @@ crash yet exit 0, so the install is checked. `tests/unit/foundation/deploy.test.
 refusals, the manifest and verify-staging's judgement under test.
 
 Not yet run: a release from GitHub Actions to the real server (needs DNS, mail settings and §1).
+
+## 5 · The server's deploy-gate is out of date
+
+A release never carries `scripts/deploy`, so no deploy can replace `/srv/mycity/bin/deploy-gate`.
+That is the point of it: the gate is the one command CI may run on the server, and a release that
+could rewrite it could drop the checksum, the seal and the freeze with it. The cost is that a change
+to the gate in the repository reaches the server only when a person installs it.
+
+So every deploy asks first. Before `stage` and before `promote`, `release.yml` runs `status`, which
+prints the gate's own `sha256`, and `scripts/deploy/check-gate.js` compares it with the copy in the
+commit being deployed. A gate older than that line prints no fingerprint and counts as out of date.
+On a mismatch the job fails before anything on the server is touched, and its summary lists the
+steps below with that commit's exact download link and the hash to expect.
+
+On the server, as `administrator`:
+
+```sh
+# 1. This commit's gate (a GitHub token with read access to the repository's contents)
+curl -fsSL -H "Authorization: Bearer <your-token>" \
+  -H "Accept: application/vnd.github.raw" \
+  "https://api.github.com/repos/tomblakeasaah196/mycity-app/contents/scripts/deploy/deploy-gate?ref=<sha>" \
+  -o ~/deploy-gate
+#    or, from a computer with the repository at that commit:
+#    scp scripts/deploy/deploy-gate administrator@108.181.196.53:~/deploy-gate
+
+# 2. It must print the hash the job summary gives
+sha256sum ~/deploy-gate
+
+# 3. Install it
+sudo install -m 755 -o root -g root ~/deploy-gate /srv/mycity/bin/deploy-gate
+rm ~/deploy-gate
+```
+
+Then re-run the failed job (Actions, the run, *Re-run failed jobs*). Re-running
+`ops/provision/provision.sh` from a full checkout installs it too.
+
+The gate serves both environments, so one install covers staging and production. Whatever the
+new gate adds that the old one skipped (the staff roster step, for one) happens on the re-run.

@@ -44,6 +44,9 @@ sudo LE_EMAIL=ops@mycityapp.io bash ops/provision/provision.sh
 Check it took: `grep -c load-staff /srv/mycity/bin/deploy-gate` prints `1`. `0` means the old script
 is still there. One script serves both environments, so this fixes production too.
 
+This cannot go unnoticed again: every deploy now checks the server's gate against the commit it
+deploys and stops, with the steps to install it, when they differ (`docs/runbooks/deploy.md` §5).
+
 ## 3 · Production
 
 Deploy a current release to production first (Release, run by an approver after staging). The first

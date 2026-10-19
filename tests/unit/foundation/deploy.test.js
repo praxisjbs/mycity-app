@@ -1,7 +1,7 @@
 "use strict";
 /**
- * The release pipeline's pure parts: the release manifest, verify-staging's judgement, and
- * deploy-gate's refusals (which key may run what, and every promote check that runs before
+ * The release pipeline's pure parts: the release manifest, verify-staging's judgement, the check
+ * that the server runs this commit's deploy-gate, and deploy-gate's refusals (which key may run what, and every promote check that runs before
  * anything is touched). The full stage, seal, promote and rollback round trip needs a server
  * layout, Postgres and running services; docs/runbooks/deploy.md says how it was exercised.
  */
@@ -12,6 +12,7 @@ const { spawnSync } = require("node:child_process");
 
 const manifest = require("../../../scripts/deploy/release-manifest");
 const staging = require("../../../scripts/deploy/verify-staging");
+const gateCheck = require("../../../scripts/deploy/check-gate");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const GATE = path.join(ROOT, "scripts", "deploy", "deploy-gate");
@@ -150,6 +151,32 @@ describe("verify-staging", () => {
   });
 });
 
+describe("check-gate", () => {
+  const want = gateCheck.expected();
+
+  test("passes only when status reports this commit's gate", () => {
+    expect(gateCheck.check(`gate\tsha256=${want}\nstg\tcurrent=none\n`)).toEqual({ ok: true, got: want, want });
+    expect(gateCheck.check(`gate\tsha256=${"0".repeat(64)}\n`).ok).toBe(false);
+  });
+
+  test("a gate from before the fingerprint line is out of date", () => {
+    const r = gateCheck.check("stg\tcurrent=none\treleases=\nprod\tcurrent=none\treleases=\n");
+    expect(r).toEqual({ ok: false, got: null, want });
+  });
+
+  test("the fix names this commit's download, the hash to check, the install and the re-run", () => {
+    const text = gateCheck.remedy({ sha: SHA, want, got: null, host: "10.0.0.1" });
+    expect(text).toMatch(/Nothing was deployed/);
+    expect(text).toMatch(/from before gates reported their version/);
+    expect(text).toContain("ssh administrator@10.0.0.1");
+    expect(text).toContain(`contents/scripts/deploy/deploy-gate?ref=${SHA}`);
+    expect(text).toContain(want);
+    expect(text).toContain("sudo install -m 755 -o root -g root ~/deploy-gate /srv/mycity/bin/deploy-gate");
+    expect(text).toMatch(/Re-run failed jobs/);
+    expect(gateCheck.remedy({ sha: SHA, want, got: "c".repeat(64) })).toMatch(/runs deploy-gate `cccccccccccc…`/);
+  });
+});
+
 const hasBash = process.platform !== "win32" && spawnSync("bash", ["--version"]).status === 0;
 (hasBash ? describe : describe.skip)("deploy-gate refusals", () => {
   let root;
@@ -190,6 +217,7 @@ const hasBash = process.platform !== "win32" && spawnSync("bash", ["--version"])
     const s = gate("production", "status");
     expect(s.status).toBe(0);
     expect(s.out).toMatch(/stg\tcurrent=none/);
+    expect(gateCheck.reported(s.out)).toBe(gateCheck.expected());
   });
 
   test("promote refuses before touching anything: unsealed, wrong seal, moved on, stale, changed, frozen", () => {

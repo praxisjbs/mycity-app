@@ -124,6 +124,24 @@ jobs:
           fi
           printf '%s\n' "$KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
 
+      # The gate on the server is installed by hand and never by a release, so check it is the
+      # one this commit carries before asking it to deploy; on a mismatch the job summary says
+      # how to install it (scripts/deploy/check-gate.js, docs/runbooks/deploy.md §5).
+      - name: Check out the release's commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.sha }}
+          path: repo
+
+      - name: The server runs this commit's deploy-gate
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          SHA: ${{ needs.build.outputs.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "mycity-deploy@$HOST" "status" > gate-status.txt
+          node repo/scripts/deploy/check-gate.js --status=gate-status.txt --sha="$SHA" --host="$HOST"
+
       - name: deploy-gate stage
         env:
           HOST: ${{ vars.DEPLOY_HOST }}
@@ -251,6 +269,15 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+
+      - name: The server runs this commit's deploy-gate
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "mycity-deploy@$HOST" "status" > gate-status.txt
+          node scripts/deploy/check-gate.js --status=gate-status.txt --sha="$SHA" --host="$HOST"
 
       - name: deploy-gate promote
         env:

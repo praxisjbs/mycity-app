@@ -100,7 +100,7 @@ mycity-app/
 │   │                         restore-drill.js (weekly), installed on the server as mycity-backup,
 │   │                         mycity-restore-drill
 │   ├── import/               command-line import
-│   └── deploy/               deploy-gate, release-manifest, verify-staging, rollback
+│   └── deploy/               deploy-gate, check-gate, release-manifest, verify-staging, rollback
 ├── ops/
 │   ├── systemd/              four units + env templates; mycity-backup.service + .timer (nightly
 │   │                         02:30), mycity-restore-drill.service + .timer (Sundays 04:00)
