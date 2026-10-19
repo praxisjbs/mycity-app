@@ -133,6 +133,7 @@ const SCHEDULERS = Object.freeze([
   "home-alert-sweeps",
   "scheduled-reports",
   "data-export-cleanup",
+  "urgent-repeats",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

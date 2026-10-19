@@ -290,7 +290,7 @@ describeDb("Web push against the real migrations", () => {
     expect(sent).toHaveLength(0);
   });
 
-  test("the delivery job holds a push a minute while its person is in front of the app, never for Security", async () => {
+  test("the delivery job queues every push at once, whether or not its person is in the app (TB, 19/10/2026)", async () => {
     jest.spyOn(active, "isActive").mockResolvedValue(true);
     const base = { user_id: userOf("bola"), priority: "normal", title: "Hello", body: null, entity_type: null, entity_id: null, created_at: new Date().toISOString() };
     const rows = [
@@ -298,11 +298,92 @@ describeDb("Web push against the real migrations", () => {
       { ...base, notification_id: crypto.randomUUID(), category: "security", channels: ["in_app", "push"] },
     ];
     const out = await deliver({ data: { notifications: rows, event: { key: "x.y" }, push: null }, updateData: jest.fn() });
-    expect(out).toMatchObject({ push_queued: 2, push_held: 1 });
-    const [comms, security] = queues.enqueue.mock.calls.filter((c) => c[0] === "notification-push");
-    expect(comms[3]).toMatchObject({ jobId: `push-${rows[0].notification_id}`, delay: 60_000 });
-    expect(security[3]).toMatchObject({ jobId: `push-${rows[1].notification_id}`, delay: 0 });
-    expect(realtime.toUser).toHaveBeenCalledWith(userOf("bola"), "notification", expect.objectContaining({ notification_id: rows[0].notification_id, read_at: null }));
+    expect(out).toMatchObject({ push_queued: 2 });
+    const pushes = queues.enqueue.mock.calls.filter((c) => c[0] === "notification-push");
+    expect(pushes.map((c) => c[3].jobId)).toEqual(rows.map((r) => `push-${r.notification_id}`));
+    for (const c of pushes) expect(c[3].delay).toBeUndefined();
+    expect(realtime.toUser).toHaveBeenCalledWith(
+      userOf("bola"),
+      "notification",
+      expect.objectContaining({ notification_id: rows[0].notification_id, read_at: null, urgency: "normal", repeat_count: 0 }),
+    );
+  });
+
+  /** A change to who can do what: the CEO watches it, so it reaches them as an urgent notice. */
+  async function securityNotice() {
+    const roleId = crypto.randomUUID();
+    await tx((client) =>
+      emit(client, {
+        key: "role.created",
+        entity: { type: "role", id: roleId },
+        actor: userOf("bola"),
+        payload: { role_id: roleId, name: "Field Auditors" },
+      }),
+    );
+    await drain();
+    return one("SELECT * FROM notification WHERE user_id = $1 AND entity_id = $2", [userOf("ceo"), roleId]);
+  }
+
+  test("a Security notice is urgent: in the urgent bar until opened; Acknowledge is not for it", async () => {
+    const notice = await securityNotice();
+    expect(notice).toMatchObject({ urgency: "urgent", acknowledge_required: false, repeat_count: 0 });
+    const bar = await as("ceo").get("/notifications/urgent");
+    expect(bar.status).toBe(200);
+    expect(bar.body.data.map((n) => n.notification_id)).toContain(notice.notification_id);
+    expect(bar.body.data.find((n) => n.notification_id === notice.notification_id)).toMatchObject({ urgency: "urgent", acknowledge_required: false });
+    expect((await as("ceo").post(`/notifications/${notice.notification_id}/acknowledge`).send({})).status).toBe(422);
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).not.toContain(notice.notification_id);
+
+    await as("ceo").post(`/notifications/${notice.notification_id}/read`).send({});
+    expect((await as("ceo").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).not.toContain(notice.notification_id);
+  });
+
+  test("an open urgent notice comes back every 30 minutes from 08:00 to 18:00 Lagos, at most 8 times a day, until opened", async () => {
+    const service = require("../../src/modules/notifications/notifications.service");
+    const b = browser(8);
+    await as("ceo").post("/notifications/push/subscriptions").send(b);
+    const notice = await securityNotice();
+    const id = notice.notification_id;
+    const lagosAt = (day, hhmm) => new Date(`${day}T${hhmm}:00+01:00`);
+    const state = () => one("SELECT repeat_count, repeats_on_day, to_char(repeat_day, 'YYYY-MM-DD') AS repeat_day FROM notification WHERE notification_id = $1", [id]);
+
+    expect(await service.repeatUrgent(lagosAt("2026-10-20", "07:55"))).toEqual({ repeated: 0, outside_hours: true });
+    expect(await service.repeatUrgent(lagosAt("2026-10-20", "18:00"))).toEqual({ repeated: 0, outside_hours: true });
+    await service.repeatUrgent(lagosAt("2026-10-20", "09:00"));
+    expect((await state()).repeat_count).toBe(0); // its first alert is not 30 minutes old yet
+
+    await q("UPDATE notification SET created_at = now() - interval '31 minutes' WHERE notification_id = $1", [id]);
+    await service.repeatUrgent(lagosAt("2026-10-20", "09:00"));
+    expect(await state()).toEqual({ repeat_count: 1, repeats_on_day: 1, repeat_day: "2026-10-20" });
+    expect(realtime.toUser).toHaveBeenCalledWith(userOf("ceo"), "notification", expect.objectContaining({ notification_id: id, urgency: "urgent", repeat_count: 1 }));
+    const push = queues.enqueue.mock.calls.find((c) => c[0] === "notification-push" && c[2].notification_id === id);
+    expect(push[2]).toMatchObject({ round: 1 });
+    expect(push[3]).toMatchObject({ jobId: `push-${id}-r1` });
+    await service.repeatUrgent(lagosAt("2026-10-20", "09:05"));
+    expect((await state()).repeat_count).toBe(1); // not again within 30 minutes
+
+    // The repeat's push reaches every device as round 1, once.
+    await sender.pushNotice(id, null, 1);
+    await sender.pushNotice(id, null, 1);
+    const toDevice = sent.filter((s) => s.endpoint === b.endpoint);
+    expect(toDevice).toHaveLength(1);
+    expect(toDevice[0].payload).toMatchObject({ id, urgency: "urgent", round: 1 });
+    expect(toDevice[0].options.urgency).toBe("high");
+    expect(await one("SELECT round, status FROM push_delivery WHERE notification_id = $1", [id])).toEqual({ round: 1, status: "sent" });
+
+    // Eight in a day, then nothing until the next morning, when the count starts again.
+    await q("UPDATE notification SET repeats_on_day = 8, last_alert_at = now() - interval '31 minutes' WHERE notification_id = $1", [id]);
+    await service.repeatUrgent(lagosAt("2026-10-20", "11:00"));
+    expect((await state()).repeat_count).toBe(1);
+    await service.repeatUrgent(lagosAt("2026-10-21", "08:05"));
+    expect(await state()).toEqual({ repeat_count: 2, repeats_on_day: 1, repeat_day: "2026-10-21" });
+
+    // Opened: no more repeats, and a repeat already queued sends nothing.
+    await as("ceo").post(`/notifications/${id}/read`).send({});
+    await q("UPDATE notification SET last_alert_at = now() - interval '31 minutes' WHERE notification_id = $1", [id]);
+    await service.repeatUrgent(lagosAt("2026-10-21", "09:00"));
+    expect((await state()).repeat_count).toBe(2);
+    expect(await sender.pushNotice(id, null, 3)).toEqual({ skipped: "read" });
   });
 
   test("the service worker's calls: Mark Read with its token, renewal with a new endpoint", async () => {

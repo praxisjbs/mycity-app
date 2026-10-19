@@ -12,9 +12,8 @@
  *           the open app shows the banner. Best effort: the inbox is the record.
  *   email   system mail with templates/email/notification.html, linking to the record
  *           (shared/route-map). Sent only to active users.
- *   push    one `notification-push` job per row (jobs/handlers/notification-push.js). When
- *           the person is in front of the app on any device, it waits a minute and goes only
- *           if the notice is still unread (TB, 19/10/2026); Security never waits.
+ *   push    one `notification-push` job per row (jobs/handlers/notification-push.js), at once:
+ *           every device of the person, whether or not they are in the app (TB, 19/10/2026).
  *
  * Paced like all system mail (services/mail/pace.js): when the hourly limit is reached, the
  * emails already sent are recorded and the job is put back in the queue for the rest.
@@ -33,15 +32,10 @@ const variables = require("../../shared/templates/variables");
 const systemMail = require("../../services/mail/system-mail.service");
 const pace = require("../../services/mail/pace");
 const realtime = require("../../services/realtime/emitter");
-const active = require("../../services/realtime/active");
-const grantsCache = require("../../shared/rbac/grants-cache");
 const notifications = require("../../modules/notifications/notifications.service");
 const queues = require("../queues");
 
-/** How long a push waits while its person is in front of the app. */
-const HOLD_MS = 60_000;
-/** A push job retries for about 20 minutes: 10 s, doubling, eight tries. */
-const PUSH_RETRY = { attempts: 8, backoff: { type: "exponential", delay: 10_000 } };
+const { PUSH_RETRY } = notifications;
 
 const TEMPLATE = "notification";
 variables.defineVariables(
@@ -53,25 +47,6 @@ variables.defineVariables(
 function linkOf(row) {
   const link = routeMap.linkFor(row.entity_type, row.entity_id);
   return link ? new URL(link.path, config.STAFF_ORIGIN).href : null;
-}
-
-/** A new notice as the bell and the banner read it: the contract's Notification. */
-async function bell(row) {
-  const user = await grantsCache.getAuthUser(pool, row.user_id);
-  const canOpen = user ? notifications.opener(user) : async () => false;
-  const [shown] = await notifications.present([row], canOpen);
-  return {
-    notification_id: row.notification_id,
-    category: row.category,
-    priority: row.priority,
-    title: row.title,
-    body: row.body || null,
-    entity_type: row.entity_type ?? null,
-    entity_id: row.entity_id ?? null,
-    link: shown.link,
-    read_at: null,
-    created_at: new Date(row.created_at || Date.now()).toISOString(),
-  };
 }
 
 async function recipients(userIds) {
@@ -91,23 +66,21 @@ module.exports = async function notificationDeliver(job, token) {
     throw new UnrecoverableError(
       "notification-deliver: the job needs notifications",
     );
-  const out = { in_app: 0, email: 0, email_skipped: 0, push_queued: 0, push_held: 0 };
+  const out = { in_app: 0, email: 0, email_skipped: 0, push_queued: 0 };
   const has = (row, ch) =>
     Array.isArray(row.channels) && row.channels.includes(ch);
 
   for (const row of rows) {
-    if (has(row, "in_app") && realtime.toUser(row.user_id, "notification", await bell(row)))
+    if (has(row, "in_app") && realtime.toUser(row.user_id, "notification", await notifications.asNotice(row)))
       out.in_app += 1;
     if (has(row, "push")) {
-      const hold = row.category !== "security" && (await active.isActive(row.user_id));
       await queues.enqueue(
         "notification-push",
         "send",
         { notification_id: row.notification_id, push: job.data.push || null },
-        { ...PUSH_RETRY, jobId: `push-${row.notification_id}`, delay: hold ? HOLD_MS : 0 },
+        { ...PUSH_RETRY, jobId: `push-${row.notification_id}` },
       );
       out.push_queued += 1;
-      if (hold) out.push_held += 1;
     }
   }
 

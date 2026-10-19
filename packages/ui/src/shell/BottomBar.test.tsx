@@ -16,6 +16,13 @@ describe("BottomBar", () => {
     expect(screen.getByRole("link", { name: /Community/ })).toHaveAttribute("aria-current", "page");
   });
 
+  it("an urgent place shows its count in red, at least 1", () => {
+    setViewport(390);
+    const items = BOTTOM_ITEMS(() => undefined).map((i) => (i.key === "community" ? { ...i, count: 0, urgent: true } : i));
+    render(<BottomBar items={items} current="home" />);
+    expect(screen.getByRole("link", { name: /Community/ })).toHaveTextContent("1");
+  });
+
   it("navigates on a tap, and More opens its sheet", async () => {
     setViewport(390);
     const onNavigate = vi.fn();

@@ -58,17 +58,31 @@
  *
  *   defineNotification("channel_message.posted", {
  *     ...,
- *     push: { tag: (e) => `community_channel:${e.payload.community_channel_id}`, mode: "quiet" },
+ *     push: { tag: (e) => `community_channel:${e.payload.community_channel_id}`, mode: "alert" },
  *   });
  *
  * `tag` names the conversation (default: the notice's record); `mode` is `alert` (a newer
  * notice replaces the shown one and alerts again, the default for a record), `quiet` (it
  * replaces it silently until opened) or `single` (it stands alone).
  *
+ * How hard a notice insists (docs/guides/notifications.md §6), with `urgency`: `normal` (the
+ * default), `important` (amber) or `urgent` (red, in the urgent bar, alerted again every 30
+ * minutes of the working day until it closes), a value or (event) => value. Every Security
+ * notice is urgent. `acknowledge: true` (or (event) => boolean) makes an urgent notice close
+ * only on Acknowledge, not on opening:
+ *
+ *   defineNotification("announcement.published", {
+ *     ...,
+ *     urgency: (e) => e.payload.urgency,
+ *     acknowledge: (e) => e.payload.urgency === "urgent",
+ *   });
+ *
  * Tables (migration 0060; BACKEND_STRUCTURE §11.1):
  *   notification             notification_id, user_id, event_id, event_key, category, priority,
  *                            title, body, entity_type, entity_id, channels text[], created_at,
- *                            read_at, delivery_queued_at; UNIQUE (event_id, user_id)
+ *                            read_at, delivery_queued_at; UNIQUE (event_id, user_id). From 0470:
+ *                            urgency, acknowledge_required, acknowledged_at and the urgent
+ *                            repeats' pace (repeat_count, last_alert_at, repeat_day, repeats_on_day)
  *   notification_preference  user_id, category, channel, enabled; PRIMARY KEY (user_id, category, channel)
  */
 const { pool: defaultPool } = require("../../config/db");
@@ -82,6 +96,7 @@ const categories = require("./categories");
 const SPECS = new Map();
 const deliveryHooks = [];
 const PUSH_MODES = ["alert", "quiet", "single"];
+const URGENCIES = ["normal", "important", "urgent"];
 const TITLE_MAX = 200;
 const BODY_MAX = 1000;
 const AUDIENCE_KEYS = [
@@ -137,6 +152,17 @@ function defineNotification(key, spec) {
     throw new Error(`${where}: body is a string or (event) => string`);
   if (spec.priority && !["normal", "high"].includes(spec.priority))
     throw new Error(`${where}: priority is normal or high`);
+  if (
+    spec.urgency !== undefined &&
+    typeof spec.urgency !== "function" &&
+    !URGENCIES.includes(spec.urgency)
+  )
+    throw new Error(`${where}: urgency is ${URGENCIES.join(", ")} or (event) => one of them`);
+  if (
+    spec.acknowledge !== undefined &&
+    !["boolean", "function"].includes(typeof spec.acknowledge)
+  )
+    throw new Error(`${where}: acknowledge is a boolean or (event) => boolean`);
   if (spec.push !== undefined) {
     const p = spec.push;
     if (!p || typeof p !== "object")
@@ -171,6 +197,23 @@ function pushStyleOf(event) {
     tag = null;
   }
   return { tag, mode: p.mode || null };
+}
+
+/**
+ * How hard an event's notices insist: Security is always urgent; otherwise the declaration's
+ * `urgency`, else normal. A function that throws or answers something else counts as normal.
+ * `acknowledge` holds only for an urgent notice.
+ */
+function urgencyOf(event, spec, security) {
+  if (security) return { urgency: "urgent", acknowledge: false };
+  try {
+    const u = spec && textOf(spec.urgency, event);
+    const urgency = URGENCIES.includes(u) ? u : "normal";
+    const acknowledge = urgency === "urgent" && Boolean(spec && textOf(spec.acknowledge, event));
+    return { urgency, acknowledge };
+  } catch {
+    return { urgency: "normal", acknowledge: false };
+  }
 }
 
 /** Register who sends a notification out (email, push, realtime). The worker does this. */
@@ -339,6 +382,7 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
     ? "security"
     : categories.categoryFor(event.key, event.module);
   const priority = security ? "high" : (spec && spec.priority) || "normal";
+  const { urgency, acknowledge } = urgencyOf(event, spec, security);
 
   // Who, and what each group is told. A security event's watchers get the security
   // message; anyone the module named gets the module's.
@@ -382,8 +426,10 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
   if (users.length) {
     const res = await db.query(
       `INSERT INTO notification
-         (user_id, event_id, event_key, category, priority, title, body, entity_type, entity_id, channels)
-       SELECT t.user_id, $5, $6, $7, $8, t.title, NULLIF(t.body, ''), $9, $10, string_to_array(t.channels, ',')
+         (user_id, event_id, event_key, category, priority, title, body, entity_type, entity_id, channels,
+          urgency, acknowledge_required)
+       SELECT t.user_id, $5, $6, $7, $8, t.title, NULLIF(t.body, ''), $9, $10, string_to_array(t.channels, ','),
+              $11, $12
          FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[]) AS t(user_id, channels, title, body)
        ON CONFLICT (event_id, user_id) DO NOTHING`,
       [
@@ -397,6 +443,8 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
         priority,
         event.entity.type,
         event.entity.id,
+        urgency,
+        acknowledge,
       ],
     );
     inserted = res.rowCount;
@@ -407,8 +455,8 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
   let handedOver = 0;
   if (deliveryHooks.length) {
     const { rows } = await db.query(
-      `SELECT notification_id, user_id, category, priority, title, body, entity_type, entity_id, channels,
-              created_at
+      `SELECT notification_id, user_id, category, priority, urgency, acknowledge_required, acknowledged_at,
+              repeat_count, title, body, entity_type, entity_id, channels, created_at
          FROM notification
         WHERE event_id = $1 AND delivery_queued_at IS NULL
         ORDER BY notification_id`,
@@ -497,6 +545,8 @@ defineNotification(WORKFLOW.WORKFLOW_ESCALATED, {
   body: (e) =>
     `${e.payload.stage_name || "A stage"} passed its time limit without a decision.`,
   priority: "high",
+  // Past its time limit, an approval stays red and repeats until opened (TB, 19/10/2026).
+  urgency: "urgent",
 });
 
 defineNotification(WORKFLOW.WORKFLOW_CANCELLED, {

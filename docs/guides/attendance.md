@@ -574,7 +574,7 @@ request.
   counts and no clock-out) on a work date not yet closed (today, or yesterday before the
   day-close), once the workplace's clock is past that date's shift end:
   - in front of the app now on any of their logins (a tab on screen and touched in the last 5
-    minutes, as the push hold reads it, `services/realtime/active.js`): nothing; they have the
+    minutes, as `services/realtime/active.js` reads it): nothing; they have the
     closing prompt.
   - away for at least 15 minutes since the last moment they were in front of it, or never seen:
     clocked out at the later of the shift's end and that last moment, never before the clock-in

@@ -20,6 +20,14 @@ describe("Rail", () => {
     expect(screen.getByRole("link", { name: /Mailbox/ })).toHaveTextContent("12");
   });
 
+  it("an urgent module's count shows red, at least 1", () => {
+    const items = RAIL_ITEMS.map((i) => (i.key === "community" ? { ...i, count: undefined, urgent: true } : i));
+    render(<Rail items={items} current="home" />);
+    const link = screen.getByRole("link", { name: /Community/ });
+    expect(link).toHaveTextContent("1");
+    expect(link.querySelector("[data-urgent]")).not.toBeNull();
+  });
+
   it("navigates through the app on a plain click, and leaves a modified click to the browser", async () => {
     const onNavigate = vi.fn();
     render(<Rail items={RAIL_ITEMS} current="home" onNavigate={onNavigate} />);

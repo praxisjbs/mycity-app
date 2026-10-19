@@ -62,6 +62,7 @@ describe("job registry", () => {
       "media-reconcile",
       "outbox-dispatch",
       "scheduled-reports",
+      "urgent-repeats",
       "workflow-timeout",
     ]);
   });

@@ -4,14 +4,19 @@
  * nothing reads or marks another person's inbox. Only rows that go to the bell count:
  * `in_app` in channels (a row the fan-out wrote for email alone is not in the bell).
  *
- * Tables (migrations 0060, 0460; BACKEND_STRUCTURE §11.1): notification,
+ * Tables (migrations 0060, 0460, 0470; BACKEND_STRUCTURE §11.1): notification,
  * notification_preference, push_subscription, push_delivery. A person's devices and
- * preferences are pinned to their user_id the same way; the push job reads by id.
+ * preferences are pinned to their user_id the same way; the push job and the urgent
+ * repeats read by id.
  */
 const { pageQuery, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 
-const COLUMNS = `n.notification_id, n.category, n.priority, n.title, n.body, n.entity_type,
-  n.entity_id, n.read_at, n.created_at`;
+const COLUMNS = `n.notification_id, n.category, n.priority, n.urgency, n.acknowledge_required,
+  n.acknowledged_at, n.repeat_count, n.title, n.body, n.entity_type, n.entity_id, n.read_at, n.created_at`;
+
+/** An urgent notice still open: closed by Acknowledge when it needs one, else by reading it. */
+const OPEN_URGENT = `n.urgency = 'urgent'
+  AND CASE WHEN n.acknowledge_required THEN n.acknowledged_at IS NULL ELSE n.read_at IS NULL END`;
 
 /** Newest first; `status` narrows to unread or read. */
 function list(db, userId, query) {
@@ -116,6 +121,93 @@ async function markReadForRecord(db, userId, entityType, entityId) {
     [userId, entityType, String(entityId)],
   );
   return rows.map((r) => r.notification_id);
+}
+
+/* ------------------------------------------------------------------ *
+ * Urgent notices: the bar, Acknowledge and the repeats
+ * ------------------------------------------------------------------ */
+
+/** The caller's open urgent notices, newest first: the urgent bar. */
+function urgentOpen(db, userId, query) {
+  return pageQuery(
+    db,
+    `SELECT ${COLUMNS}, ${TOTAL_COL}
+       FROM notification n
+      WHERE n.user_id = $1 AND 'in_app' = ANY(n.channels) AND ${OPEN_URGENT}
+      ORDER BY n.created_at DESC, n.notification_id DESC`,
+    [userId],
+    query,
+  );
+}
+
+/** Acknowledges one row and reads it, each once; returns it as the bell shows it. */
+async function acknowledge(db, notificationId) {
+  const { rows } = await db.query(
+    `UPDATE notification n
+        SET acknowledged_at = COALESCE(n.acknowledged_at, now()), read_at = COALESCE(n.read_at, now()),
+            updated_at = now()
+      WHERE n.notification_id = $1
+      RETURNING ${COLUMNS}`,
+    [notificationId],
+  );
+  return rows[0];
+}
+
+/**
+ * Closes the person's notices about one record: acknowledged where Acknowledge closes them, read
+ * everywhere. Returns the ids changed (an urgent announcement acknowledged on its card).
+ */
+async function acknowledgeForRecord(db, userId, entityType, entityId) {
+  const { rows } = await db.query(
+    `UPDATE notification
+        SET acknowledged_at = CASE WHEN acknowledge_required THEN COALESCE(acknowledged_at, now())
+                                   ELSE acknowledged_at END,
+            read_at = COALESCE(read_at, now()), updated_at = now()
+      WHERE user_id = $1 AND entity_type = $2 AND entity_id = $3
+        AND (read_at IS NULL OR (acknowledge_required AND acknowledged_at IS NULL))
+      RETURNING notification_id`,
+    [userId, entityType, String(entityId)],
+  );
+  return rows.map((r) => r.notification_id);
+}
+
+/**
+ * Open urgent notices of active people whose last alert is `every` minutes old or more and that
+ * have repeated fewer than `perDay` times on `day` (a Lagos date).
+ */
+async function dueRepeats(db, { day, every, perDay }) {
+  // pagination:complete the open urgent notices due a repeat, a few at a time across the company
+  const { rows } = await completeQuery(
+    db,
+    `SELECT n.notification_id
+       FROM notification n JOIN app_user u ON u.user_id = n.user_id AND u.status = 'active'
+      WHERE ${OPEN_URGENT}
+        AND COALESCE(n.last_alert_at, n.created_at) <= now() - make_interval(mins => $2::int)
+        AND (n.repeat_day IS DISTINCT FROM $1::date OR n.repeats_on_day < $3::int)
+      ORDER BY n.created_at, n.notification_id`,
+    [day, every, perDay],
+    { label: "urgent notices due a repeat" },
+  );
+  return rows.map((r) => r.notification_id);
+}
+
+/**
+ * Counts one repeat of a notice still open and due, once: null when it closed meanwhile or
+ * another sweep already counted it. Returns the row as the bell shows it, with its person.
+ */
+async function markRepeated(db, notificationId, { day, every, perDay }) {
+  const { rows } = await db.query(
+    `UPDATE notification n
+        SET repeat_count = n.repeat_count + 1, last_alert_at = now(),
+            repeats_on_day = CASE WHEN n.repeat_day = $2::date THEN n.repeats_on_day + 1 ELSE 1 END,
+            repeat_day = $2::date, updated_at = now()
+      WHERE n.notification_id = $1 AND ${OPEN_URGENT}
+        AND COALESCE(n.last_alert_at, n.created_at) <= now() - make_interval(mins => $3::int)
+        AND (n.repeat_day IS DISTINCT FROM $2::date OR n.repeats_on_day < $4::int)
+      RETURNING ${COLUMNS}, n.user_id, n.channels`,
+    [notificationId, day, every, perDay],
+  );
+  return rows[0] || null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -326,8 +418,9 @@ async function noteFailure(db, id, error) {
 /** A notice as the push job needs it, with whether its person can still be reached. */
 async function forPush(db, notificationId) {
   const { rows } = await db.query(
-    `SELECT n.notification_id, n.user_id, n.category, n.priority, n.title, n.body, n.entity_type,
-            n.entity_id, n.channels, n.read_at, n.created_at, (u.status = 'active') AS reachable
+    `SELECT n.notification_id, n.user_id, n.category, n.priority, n.urgency, n.acknowledge_required,
+            n.acknowledged_at, n.title, n.body, n.entity_type, n.entity_id, n.channels, n.read_at,
+            n.created_at, (u.status = 'active') AS reachable
        FROM notification n JOIN app_user u ON u.user_id = n.user_id
       WHERE n.notification_id = $1`,
     [notificationId],
@@ -340,7 +433,7 @@ async function deliveriesOf(db, notificationId) {
   // pagination:complete one notice's sends, one per device of one person
   const { rows } = await completeQuery(
     db,
-    `SELECT push_subscription_id, status, attempts FROM push_delivery
+    `SELECT push_subscription_id, status, attempts, round FROM push_delivery
       WHERE notification_id = $1
       ORDER BY push_subscription_id`,
     [notificationId],
@@ -349,8 +442,12 @@ async function deliveriesOf(db, notificationId) {
   return new Map(rows.map((r) => [r.push_subscription_id, r]));
 }
 
-/** Records what happened to one send (a test push has no notice). */
-async function recordDelivery(db, { notificationId, subscriptionId, status, httpStatus, error }) {
+/**
+ * Records what happened to one send (a test push has no notice). A notice keeps one row per
+ * device: a later round (an urgent repeat) starts it again, and a late retry of an earlier
+ * round changes nothing.
+ */
+async function recordDelivery(db, { notificationId, subscriptionId, status, httpStatus, error, round = 0 }) {
   if (!notificationId) {
     await db.query(
       `INSERT INTO push_delivery (notification_id, push_subscription_id, status, http_status, error, attempts, sent_at)
@@ -360,13 +457,17 @@ async function recordDelivery(db, { notificationId, subscriptionId, status, http
     return;
   }
   await db.query(
-    `INSERT INTO push_delivery (notification_id, push_subscription_id, status, http_status, error, attempts, sent_at)
-     VALUES ($1, $2, $3, $4, $5, 1, CASE WHEN $3 = 'sent' THEN now() END)
+    `INSERT INTO push_delivery (notification_id, push_subscription_id, status, http_status, error, attempts, sent_at, round)
+     VALUES ($1, $2, $3, $4, $5, 1, CASE WHEN $3 = 'sent' THEN now() END, $6)
      ON CONFLICT (notification_id, push_subscription_id) WHERE notification_id IS NOT NULL
      DO UPDATE SET status = EXCLUDED.status, http_status = EXCLUDED.http_status, error = EXCLUDED.error,
-                   attempts = push_delivery.attempts + 1,
-                   sent_at = COALESCE(push_delivery.sent_at, EXCLUDED.sent_at), updated_at = now()`,
-    [notificationId, subscriptionId, status, httpStatus ?? null, error ?? null],
+                   attempts = CASE WHEN EXCLUDED.round > push_delivery.round THEN 1
+                                   ELSE push_delivery.attempts + 1 END,
+                   sent_at = CASE WHEN EXCLUDED.round > push_delivery.round THEN EXCLUDED.sent_at
+                                  ELSE COALESCE(push_delivery.sent_at, EXCLUDED.sent_at) END,
+                   round = EXCLUDED.round, updated_at = now()
+     WHERE EXCLUDED.round >= push_delivery.round`,
+    [notificationId, subscriptionId, status, httpStatus ?? null, error ?? null, round],
   );
 }
 
@@ -379,6 +480,11 @@ module.exports = {
   markAllRead,
   readIds,
   markReadForRecord,
+  urgentOpen,
+  acknowledge,
+  acknowledgeForRecord,
+  dueRepeats,
+  markRepeated,
   preferenceRows,
   savePreference,
   subscriptionByEndpointForUpdate,

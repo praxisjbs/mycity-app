@@ -460,7 +460,15 @@ async function present(
       recognition,
       poll,
       announcement: r.announcement_id
-        ? { announcement_id: r.announcement_id, title: r.announcement_title }
+        ? {
+            announcement_id: r.announcement_id,
+            title: r.announcement_title,
+            urgency: r.announcement_urgency || "normal",
+            in_audience: Boolean(r.announcement_in_audience),
+            acknowledged_at: r.announcement_acknowledged_at
+              ? new Date(r.announcement_acknowledged_at).toISOString()
+              : null,
+          }
         : null,
       status: direct && mine && other ? statusOf(r, other) : null,
       deleted,

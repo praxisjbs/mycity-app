@@ -3,7 +3,7 @@ import { Button, IconButton, NotificationCenter, type NotificationItem, type Not
 import type { Notification } from "@mycity/contract/contract.gen.ts";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
-import { CATEGORY_ICONS, markRead, personOf, useArrivals } from "@/features/notifications/arrivals";
+import { CATEGORY_ICONS, markRead, personOf, toneOf, useArrivals } from "@/features/notifications/arrivals";
 import { enablePush, syncPush, usePushState } from "@/features/notifications/push";
 import { NotificationSettings } from "@/features/notifications/Settings";
 import { openNotificationSettings, setPaneOpen, setSettingsOpen, useNotificationsUi } from "@/features/notifications/state";
@@ -29,7 +29,7 @@ function itemOf(n: Notification): NotificationItem {
     unread: !n.read_at,
     avatar: personOf(n.entity_type, n.title),
     icon: CATEGORY_ICONS[n.category] ?? "bell",
-    tone: n.priority === "high" ? "warn" : "info",
+    tone: toneOf(n),
   };
 }
 
