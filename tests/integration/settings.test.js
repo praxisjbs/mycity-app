@@ -181,6 +181,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "mailbox.signature",
         "performance.manage",
         "policies.manage",
+        "queries.configure",
         "workspace.late_reasons",
       ]);
 
@@ -247,6 +248,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "home.team",
         "performance.manage",
         "policies.manage",
+        "queries.configure",
         "workspace.late_reasons",
       ]);
       const staff = await detail("employee");
@@ -269,6 +271,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "home.team",
         "performance.manage",
         "policies.manage",
+        "queries.configure",
         "workspace.late_reasons",
       ]);
       expect(await grantsCache.getCapabilities(pool, people.staff.user.user_id)).toEqual([]);
