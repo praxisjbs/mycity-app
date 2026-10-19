@@ -198,7 +198,7 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       the banner on the branded `Toaster` (a second, top Toaster id), the notification centre
       (phone full-screen page and desktop panel, rows with swipe and hover Mark Read, day groups,
       All and Unread), the settings parts; `npm run gen:components`.
-- [ ] **12. App wiring** `app/src/features/notifications/`: `push.ts` (support state, permission,
+- [x] **12. App wiring** (19/10/2026; app tests for push.ts, sound.ts and arrivals.ts still to write, step 14) `app/src/features/notifications/`: `push.ts` (support state, permission,
       subscribe, sync on sign-in, device token in IndexedDB, disable), the pane and settings
       wiring, banner on the socket and on service-worker messages (dedupe by id, none for the
       record on screen), chime and vibration (§2.3), the soft ask in `shell/Notices.tsx`, `n=`
@@ -302,3 +302,18 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   `ChannelGrid` (Forms: a table of switches on desktop, rows opening a sheet on a phone). Each with
   its gallery page and tests; the package's 815 tests, typecheck, lint and the components gate pass.
   `app/src/shell/Bell.tsx` only adapted to the new row so the app builds; step 12 replaces it.
+- 19/10/2026 · TB · Step 12: `app/src/features/notifications/` holds `push.ts` (the states unsupported,
+  needs-install, ask, blocked, off, on, unavailable; `syncPush()` on every signed-in start from
+  `BellButton`, `enablePush()` from a press, `disablePush()` remembered per device as `mc-push-off`,
+  `sendTestPush()`), `sound.ts` (chime of two sine notes at 0.6 gain, 5 s gap, iOS ambient session,
+  Android vibrates unless Sound in App, `mc-sound-in-app`), `arrivals.ts` (`useArrivals`: banner via
+  `notify()` from the socket or the worker, deduped by id, none for the record on screen; answers
+  the worker's `mycity:push` and `mycity:open`; `n=` and `pane=` links; closes read notifications
+  in the shade on visibility; `setAppBadge`), `state.ts` (pane and settings open, for ⌘K) and
+  `Settings.tsx` (This Device, Other Devices, Where Notices Reach You on `ChannelGrid`).
+  `shell/Bell.tsx` is the pane on `NotificationCenter` with `useInfinite` (which now reloads on
+  `invalidate()` and has `reload()`), `shell/Notices.tsx` the Turn On notice (`mc-push-later`, 14
+  days), `api/realtime.ts` the `presence:active` and `presence:idle` heartbeats, `shell/Search.tsx`
+  and `src/shared/search/actions.js` the three ⌘K actions (`notify_settings`, `notify_on`,
+  `notify_test`, also in `SearchRun`), and the mock answers every new route. App typecheck, lint
+  and its 229 tests pass. Next: step 13 (docs) and 14 (tests and verification).

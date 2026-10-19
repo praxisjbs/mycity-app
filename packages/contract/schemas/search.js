@@ -26,7 +26,18 @@ const SearchKind = z.enum(["screen", "action", "record"]);
  *   install      installs the app (offered only where the browser can)
  *   sign_out     signs out
  */
-const SearchRun = z.enum(["clock", "read_all", "theme_dark", "theme_light", "density", "install", "sign_out"]);
+const SearchRun = z.enum([
+  "clock",
+  "read_all",
+  "notify_settings",
+  "notify_on",
+  "notify_test",
+  "theme_dark",
+  "theme_light",
+  "density",
+  "install",
+  "sign_out",
+]);
 
 /** GET /search: `type` keeps one group, to page through it. */
 const SearchQuery = listQuery({
