@@ -132,7 +132,7 @@ const SCHEDULERS = Object.freeze([
   "attendance-clock-watch",
   "home-alert-sweeps",
   "scheduled-reports",
-  "data-export-cleanup",
+  "export-cleanup",
   "urgent-repeats",
 ]);
 

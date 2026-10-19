@@ -12,14 +12,16 @@
  *   home.report_run_finished   a run was settled: its file done, failed, or skipped because its
  *                              recipient may no longer have it
  *
- * All are audit lines; nobody is notified. The file itself is the recipient's email.
+ * All are audit lines; nobody is notified. A schedule's file is emailed to its recipient; a
+ * file somebody pressed for is downloaded on the device that pressed.
  *
  * Outbox handlers, each safe to run twice (reports.generate.js):
  *
  *   home.report_run            reports.generate     build the file as its recipient: an XLSX
- *                                                   is kept in the vault and emailed here; a
+ *                                                   is kept in the vault and delivered here; a
  *                                                   PDF is queued for the pdf-render job
- *   document.generated         reports.file-ready   a report's PDF exists: email it, the run done
+ *   document.generated         reports.file-ready   a report's PDF exists: deliver it (a
+ *                                                   schedule's by email), the run done
  *   document.render_failed     reports.file-failed  a report's PDF could not be made: the run failed
  *
  * The document type `home_report` is declared once, here: the PDF template and its

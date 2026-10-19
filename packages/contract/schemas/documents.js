@@ -13,6 +13,9 @@
  *   DocumentRow    the Vault list on My Documents and an employee's record: a
  *                  document that is held, OR one that was asked for and not
  *                  yet given (status "missing")
+ *   ExportFile     a file somebody pressed Export or Download for: pending
+ *                  while the worker makes it, then done (downloaded on the
+ *                  device that pressed) or failed
  *
  * Statuses a person reads, derived rather than stored (one per row):
  *   missing                a document asked for, not yet uploaded
@@ -127,6 +130,19 @@ const Document = z
   })
   .strict();
 
+/**
+ * What an export answers (202) and GET /exports/:id answers while the screen waits: the file
+ * the worker is making for the person who pressed (docs/guides/foundation.md §6.12). Done, it
+ * is downloaded from GET /documents/:id/content on the device that pressed; nothing is emailed.
+ */
+const ExportFile = z
+  .object({
+    document_id: uuid,
+    file_name: z.string(),
+    status: z.enum(["pending", "done", "failed"]),
+  })
+  .strict();
+
 /** GET /documents/:id/versions: the chain, newest version first. */
 const DocumentVersionQuery = listQuery({}, ["version"]);
 const DocumentVersionPage = Paged(Document);
@@ -215,6 +231,13 @@ const TABLES = {
       uploaded_by_name: "the uploader's name, joined from app_user and employee",
     },
   },
+  ExportFile: {
+    table: "document",
+    virtual: {
+      file_name: "document.original_name, the name the file is saved under",
+      status: "document.render_status: pending while the worker makes it, then done or failed",
+    },
+  },
   DocumentVersionQuery: {
     table: null,
     reason: "list controls for a document's version chain",
@@ -258,6 +281,7 @@ module.exports = {
   EmployeeDocumentUpload,
   DocumentRef,
   Document,
+  ExportFile,
   DocumentVersionQuery,
   DocumentVersionPage,
   VariantParams,

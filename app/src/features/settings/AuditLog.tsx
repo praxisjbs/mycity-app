@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AuditEntry } from "@mycity/contract/contract.gen.ts";
 import { api } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { useApi, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useRouter } from "@/lib/router";
@@ -43,7 +44,7 @@ const valueText = (v: unknown) => (v === null || v === undefined ? null : typeof
 /**
  * Settings · Audit Log (docs/guides/foundation.md §10): every write in every module,
  * who, what, which record and when, filtered at 25 a page, with the whole filtered
- * log exported by email. Values the reader's roles mask show as Restricted.
+ * log exported as a workbook downloaded here. Values the reader's roles mask show as Restricted.
  */
 export function AuditLog() {
   const modal = useModal();
@@ -53,7 +54,7 @@ export function AuditLog() {
   const s = summary.data;
   const modules: Array<[string, string]> = [["", "Every Module"], ...(s?.modules ?? []).map((m) => [m.key, m.label] as [string, string])];
   const set = (patch: Filters) => setFilters((f) => Object.fromEntries(Object.entries({ ...f, ...patch }).filter(([, v]) => v)) as Filters);
-  const exportLog = () => api.call("POST /api/v1/audit/exports", { body: filters });
+  const exportLog = () => saveExport(api.call("POST /api/v1/audit/exports", { body: filters }));
 
   if (summary.error) return (<><PageHeader title="Audit Log" /><Card><ErrorState error={summary.error} onRetry={summary.reload} /></Card></>);
 
@@ -72,7 +73,7 @@ export function AuditLog() {
         title="Audit Log"
         actions={
           <DesktopOnly>
-            <ExportButton message="Export on its way to your email" onExport={exportLog} />
+            <ExportButton onExport={exportLog} />
           </DesktopOnly>
         }
       />

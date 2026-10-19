@@ -81,7 +81,7 @@ These finish M0 and no prompt can do them:
 | Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | **Built** (17/10/2026; redesigned 18/10/2026, §6.10) | Roles beside the role in view (desktop) or by level (phone), each module's access as one level with Approve and Export, review before save, who holds a role; the grants matrix as a second view; field visibility and capabilities per role |
 | Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Every numbering scheme with its next number, editable. No other document setting is specified yet |
 | Settings · Security (#78) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
-| Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export by email, values masked per reader |
+| Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export downloaded where it was asked for (§6.12), values masked per reader |
 | Settings · Approvals (#72) | Settings | `settings` view; edit to change | D | **Built** (17/10/2026) | Every flow, its stages and version; Edit Stages saves a new version |
 | ⌘K Search | Everywhere | Everyone, by permission | D | **Built** (17/10/2026) | Screens with synonyms, actions, and every module's records (employees, logins, departments, roles, numbering, holidays, approval flows, imports), 25 a group |
 | Settings · Integrations (#77), Appearance (#75), Notifications (#74), Attendance Policy (#73) | Settings | | none | Mock | Coming Soon (#74 is M6; #73 is LA's attendance) |
@@ -197,7 +197,8 @@ employee is (`/employees/:id/documents`) while `src/modules/organisation/` is tr
 | `GET /settings/security`, `PATCH /settings/security` | `settings` view, edit |
 | `GET /settings/security/failed-logins` (days; sort), `/security/sessions` (search; sort), `POST /settings/security/sessions/:id/end` | `settings` view, edit |
 | `GET /audit` (module, action, actor, record, dates; search; sort), `/audit/summary` | `settings` view with scope all, or the CEO |
-| `POST /audit/exports` (the same filters; the workbook is emailed) | `settings` export with scope all, or the CEO |
+| `POST /audit/exports` (the same filters; 202 with the workbook's file pending, downloaded where it was asked for, §6.12) | `settings` export with scope all, or the CEO |
+| `GET /exports/:id` (an export's file while its screen waits: pending, done or failed, §6.12) | the person who asked, nobody else (`self`) |
 | `POST /auth/two-step/setup`, `POST /auth/two-step/enrol` (anonymous, the set-up ticket) | none; `identity.md` §5 |
 
 `PUT /settings/roles/:id` replaces a role's grants, visible fields and capabilities together, so the
@@ -541,6 +542,43 @@ The Icon is drawn on Deep Green, so it must read on a dark ground (the yellow pi
 own icons (the favicon, the home-screen icon) are files in the release, which phones keep, so they
 change with a release, not with this screen.
 
+### 6.12 Exports and downloads (TB, 19/10/2026)
+
+Every Export and Download button makes its file for the person who pressed it and saves it on the
+device they pressed it on. Nothing pressed is emailed. Only a report schedule's files go by email
+(`docs/guides/home.md` §6), because nobody presses anything when a schedule fires. Decided by TB on
+19/10/2026; before that every export was emailed and arrived in the Mailbox.
+
+- **One path** (`src/shared/documents/exports.js`, BACKEND_GUIDE §4). The request reserves the
+  file in its transaction beside the module's own event (`exports.reserve()`; a PDF is
+  `documents.generate()`, pending the same way) and answers 202 `ExportFile`
+  (`document_id`, `file_name`, `status` pending). The module's outbox handler makes it after commit
+  (`exports.make()`: built as the person who asked, filled, done) or fails it (`exports.fail()`:
+  the asker no longer active, or the outbox's last attempt). The screen waits on
+  `GET /exports/:id` (the asker alone) and downloads `GET /documents/:id/content`.
+- **Which buttons.** Export Month (My Attendance), Export Register (People · Attendance), the Audit
+  Log's Export, Download PDF (Org Chart and Organogram), Download My Data, Download Their Data. A
+  report run somebody pressed for (Run Now, the Overview's Export) is a numbered run, not an
+  export: its screen waits on the run (`GET /home/report-runs/:id`; the Overview's own run on
+  `GET /home/overview/export/:id`, which Staff may read without `home.reports`) and downloads its
+  file the same way. The screens of later milestones (Payroll, Expenses, Partnerships,
+  Performance, Recruitment, Praxis AI) already call the shared `ExportAction`
+  (`app/src/features/shared/sections.tsx`), so their exports arrive on this path when their
+  modules land.
+- **The wait is the app's, not the screen's** (`app/src/api/exports.ts`). It looks soon, then every
+  few seconds, and gives up after five minutes. Someone who moves to another screen still gets the
+  file, and its toast, wherever they are in the app; someone who closes the app gets nothing and
+  presses again. Export Register's sheet closes once the request is taken, so nobody is held in it.
+- **On the device** (`app/src/api/download.ts`). Desktop and Android: the browser's own download,
+  into Downloads. An iPhone or iPad app opened from the home screen, which cannot save a download:
+  the share sheet, whose Save to Files keeps it; when the press is too long ago for the share sheet,
+  a toast offers Save File for one more tap.
+- **Kept a day.** An export's document type says `export: true` (`attendance_export`,
+  `audit_export`, `data_export`, `org_chart`): restricted, never locked, and removed from the vault
+  24 hours after it was made by the `export-cleanup` job (every hour), long enough to download it
+  again. Who asked for what stays on the event log and the audit ledger. A report run's file is not
+  an export: it stays on Recent Runs.
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -552,7 +590,8 @@ change with a release, not with this screen.
 | `document.verified`, `document.request_cancelled` | B | Audit only |
 | `role.*`, `permission.changed`, `field_visibility.changed`, `capability.changed`, `settings.security_changed` | C | `security: true`: the watchers are told; the grants cache cleared |
 | `settings.changed` (organisation, working week, holidays, numbering) | C | Audit only; the working week and holidays clear the calendar cache |
-| `audit.export_requested` | C | `audit.send_export` builds the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked), files it in the vault and emails it to them |
+| `audit.export_requested` | C | `audit.build_export` makes the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked) into the file the request reserved, which the Audit Log downloads (§6.12); nothing is emailed |
+| `export-cleanup` (scheduler, every hour at twenty past) | B | Removes every export file 24 hours after it was made (`vault.remove`, `document.removed`; §6.12) |
 | The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
 | `workflow.definition_saved` | D | Audit only (the stages before and after) |
 | `workflow.reassigned` | D | The new approver is told; the stage's time limit starts again |
@@ -602,7 +641,7 @@ screen.
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
-| Employee record | Profile, Job, Reporting Line, Login, Attendance (attendance.md §10, LA) and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "We'll email it to you", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
+| Employee record | Profile, Job, Reporting Line, Login, Attendance (attendance.md §10, LA) and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
@@ -699,6 +738,7 @@ screen.
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · Exports download on the device that pressed, never by email (§6.12, TB's four answers): one path for every Export and Download button (`shared/documents/exports.js`: reserved in the request, made in the worker, `GET /exports/:id` while the screen waits, `ExportFile` in the contract), the Audit Log's export on it (§5, §7; no `NO_EMAIL` refusal any more), phones saving to Downloads or the iPhone share sheet, and every export file removed a day later by `export-cleanup`, which replaces `data-export-cleanup`. `vault.remove` takes an export a render had locked; `documents.generate` no longer locks one. The export email templates are gone.
 - 19/10/2026 · AJ · A module's tab strip on a narrow desktop window (People, ESS, Settings and every other module): `Tabs` keeps the tabs that fit, the active one always among them, and folds the rest into More Tabs, a ⋯ menu at the end of the strip (dotted when a hidden tab has a count), instead of scrolling sideways. Phones keep the sideways row. FRONTEND_GUIDE §9.2 updated. TB to review.
 - 19/10/2026 · AJ · The employee record's header shows the person's photo (`Employee360.photo_url`, the 384 px size; `ProfileHeader` gains `photo`), and Settings · Users and a role's people show each face (`UserRow.photo_url`, 192 px, read in `users.repo.js` through `shared/db/person.js`); initials when there is none. TB to review.
 - 19/10/2026 · LA · §10, §13: the employee record gains an Attendance tab (the person's pattern,

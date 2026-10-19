@@ -16,6 +16,7 @@
  */
 const crypto = require("node:crypto");
 const request = require("supertest");
+const contract = require("@mycity/contract");
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
@@ -825,28 +826,38 @@ describeDb("attendance against the real migrations", () => {
     expect(to("outsider")).toHaveLength(0);
   });
 
-  test("an export is queued after commit and its rows are the month's days", async () => {
+  test("an export is reserved at once, made after commit into the file the screen downloads, and its rows are the month's days", async () => {
     const res = await as("manager").post("/attendance/me/export", { month: "2026-10" });
-    expect(res.body).toEqual({ queued: true, email: "manager@mycity.test" });
+    expect(res.status).toBe(202);
+    const mine = contract.documents.ExportFile.parse(res.body);
+    expect(mine).toMatchObject({ status: "pending", file_name: expect.stringMatching(/^my-attendance-.+\.xlsx$/) });
     const queued = await q("SELECT payload FROM event_log WHERE event_key = 'attendance.export_requested' ORDER BY occurred_at DESC LIMIT 1", []);
-    expect(queued.rows[0].payload).toMatchObject({ kind: "month", month: "2026-10" });
+    expect(queued.rows[0].payload).toMatchObject({ kind: "month", month: "2026-10", document_id: mine.document_id });
     const rows = await require("../../src/modules/attendance/attendance.export").monthRows(people.manager.employee.employee_id, "2026-10");
     expect(rows.rows.map((r) => r.attendance_date)).toEqual([...managerToday(), "2026-10-08", "2026-10-04", "2026-10-03", "2026-10-01"]);
     expect((await as("staff").post("/attendance/export", { from: "2026-10-01", to: "2026-10-05" })).status).toBe(403);
     expect((await as("ops").post("/attendance/export", { from: "2026-09-01", to: "2026-10-05" })).status).toBe(422);
-    expect((await as("ops").post("/attendance/export", { from: "2026-10-01", to: "2026-10-05" })).status).toBe(200);
+    const register = await as("ops").post("/attendance/export", { from: "2026-10-01", to: "2026-10-05" });
+    expect(register.status).toBe(202);
+    const theirs = contract.documents.ExportFile.parse(register.body);
+    expect((await as("ops").get(`/exports/${theirs.document_id}`)).body.status).toBe("pending");
 
-    // After commit the outbox builds each workbook, keeps it restricted in the vault and mails it.
+    // After commit the outbox makes each workbook into its restricted file; nothing is emailed.
     await drain();
-    const docs = await q("SELECT sensitivity, title FROM document WHERE doc_type = 'attendance_export' ORDER BY title", []);
+    const docs = await q("SELECT sensitivity, title, render_status FROM document WHERE doc_type = 'attendance_export' ORDER BY title", []);
     expect(docs.rows).toEqual([
-      { sensitivity: "restricted", title: "Attendance Register export" },
-      { sensitivity: "restricted", title: "My Attendance export" },
+      { sensitivity: "restricted", title: "Attendance Register export", render_status: "done" },
+      { sensitivity: "restricted", title: "My Attendance export", render_status: "done" },
     ]);
-    const sentOut = sent.filter((m) => m.name === "attendance-export");
-    expect(sentOut.map((m) => m.data.to.email).sort()).toEqual(["manager@mycity.test", "ops@mycity.test"]);
-    expect(sentOut.find((m) => m.data.to.email === "ops@mycity.test").data.data).toMatchObject({ title: "Attendance Register", capped: false });
-    expect(sentOut.every((m) => m.data.attachments.length === 1)).toBe(true);
+    expect(sent.filter((m) => m.queue === "email-send" && /export/.test(m.name))).toEqual([]);
+    for (const [who, file] of [["manager", mine], ["ops", theirs]]) {
+      expect((await as(who).get(`/exports/${file.document_id}`)).body.status).toBe("done");
+      const content = await as(who).get(`/documents/${file.document_id}/content`);
+      expect(content.status).toBe(200);
+      expect(content.headers["content-type"]).toMatch(/spreadsheetml/);
+    }
+    // Each waits for the person who asked alone.
+    expect((await as("ops").get(`/exports/${mine.document_id}`)).status).toBe(404);
     const failed = await q("SELECT count(*)::int AS n FROM event_outbox WHERE event_key = 'attendance.export_requested' AND status <> 'done'", []);
     expect(failed.rows[0].n).toBe(0);
   });

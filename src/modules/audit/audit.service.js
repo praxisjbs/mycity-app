@@ -9,26 +9,30 @@
  * say Restricted rather than show an empty value. An entry about the reader's own
  * employee record is not masked from them. The export is masked the same way.
  *
- * The export is the whole filtered log, not the page on screen: the request records
- * audit.export_requested, and the worker gathers the entries 25 at a time, builds the
- * workbook, keeps it in the vault and emails it to the person who asked, so it
- * arrives in their Mailbox (audit.events.js). At most EXPORT_CEILING entries go into
- * one file; past that the email says so and asks for narrower filters.
+ * The export is the whole filtered log, not the page on screen: the request reserves its
+ * file (shared/documents/exports.js) and records audit.export_requested, and the worker
+ * gathers the entries 25 at a time into the workbook the Audit Log is waiting on, which it
+ * downloads on the device that asked (audit.events.js). Nothing is emailed. At most
+ * EXPORT_CEILING entries go into one file; past that its cover says so and asks for
+ * narrower filters.
  */
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pool } = require("../../config/db");
+const { config } = require("../../config/env");
 const { logger } = require("../../config/logger");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
+const exportFiles = require("../../shared/documents/exports");
+const { exportFilename } = require("../../shared/spreadsheet/cells");
 const catalog = require("../../shared/access/access.catalog");
 const catalogue = require("../../shared/events/catalogue");
 const fieldMask = require("../../shared/rbac/field-mask");
 const routeMap = require("../../shared/route-map");
 const repo = require("./audit.repo");
-const { EVENTS } = require("./audit.events");
+const { EVENTS, EXPORT_DOC_TYPE } = require("./audit.events");
 
 /** The most entries one export file holds. */
 const EXPORT_CEILING = 10_000;
@@ -168,31 +172,33 @@ async function summary(scope) {
 }
 
 /**
- * POST /audit/exports: queue the whole filtered log for the worker, which emails it.
- * @returns {Promise<{queued: true, email: string}>}
+ * POST /audit/exports: reserve the whole filtered log's file for the person asking, which the
+ * worker makes after commit and their screen downloads.
+ * @returns {Promise<object>} the ExportFile, pending
  */
 async function requestExport(filters, actor, scope) {
   assertWholeLog(scope);
-  if (!actor.email)
-    throw new AppError(
-      "NO_EMAIL",
-      "Your login has no email to send the export to.",
-      422,
-    );
   const client = await pool.connect();
   try {
-    await atomically(client, () =>
-      emit(client, {
-        key: EVENTS.AUDIT_EXPORT_REQUESTED,
-        entity: { type: "audit_export", id: crypto.randomUUID() },
+    return await atomically(client, async () => {
+      const doc = await exportFiles.reserve(client, {
+        doc_type: EXPORT_DOC_TYPE,
+        entity: { type: EXPORT_DOC_TYPE, id: crypto.randomUUID() },
+        file_name: exportFilename({ base: "audit-log", env: config.APP_ENV, extension: "xlsx" }),
+        title: "Audit Log export",
         actor,
-        payload: { filters, requested_by: actor.user_id },
-      }),
-    );
+      });
+      await emit(client, {
+        key: EVENTS.AUDIT_EXPORT_REQUESTED,
+        entity: { type: doc.entity_type, id: doc.entity_id },
+        actor,
+        payload: { filters, requested_by: actor.user_id, document_id: doc.document_id },
+      });
+      return exportFiles.present(doc);
+    });
   } finally {
     client.release();
   }
-  return { queued: true, email: actor.email };
 }
 
 /**
