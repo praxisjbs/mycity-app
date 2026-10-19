@@ -205,8 +205,8 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       marks read, close read system notifications on focus, `setAppBadge`, presence heartbeats in
       `api/realtime.ts`, ⌘K actions (Notification Settings, Turn On Notifications, Send Test
       Notification), the mock's endpoints in contract shapes.
-- [ ] **13. Docs** (NOT STARTED: do this first in the next session): the guide to Built; `mailbox.md`, `community.md`, `identity.md`,
-      `foundation.md`; FRONTEND_GUIDE §9.6 and §9.7; BACKEND_STRUCTURE (services/push);
+- [x] **13. Docs** (19/10/2026): the guide to Built; `mailbox.md`, `community.md`, `identity.md`,
+      `foundation.md`; FRONTEND_GUIDE §9.1, §9.6 and §9.7; BACKEND_STRUCTURE (services/push);
       DATABASE_SCHEMA; MILESTONES §11 note; PROGRESS (M0 item and notes); README map;
       `docs/runbooks/push-notifications.md` for GE.
 - [ ] **14. Verify** (IN PROGRESS: the integration suite passes, 26 suites and 635 tests, 19/10/2026;
@@ -377,3 +377,19 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   file failed, Jest never exited: a supertest request is listening from the moment it is built, and
   a body that throws while it is built (`notice.notification_id` of an undefined notice) leaves it
   open. No product cause; it only shows when the file is already red. Next: step 13, the docs.
+- 19/10/2026 · TB · Step 13, the docs. `docs/runbooks/push-notifications.md` for GE: nothing to set
+  in `.env`; check neither `.env` pins `MAILBOX_IDLE_MAX=0`; the key row and the journal line; a
+  one-liner that makes or reads the pair from the release (tried on the test database); reading
+  `push_delivery` and `revoked_reason`; pinning (`node_modules/.bin/web-push generate-vapid-keys`
+  into both `VAPID_*`) or replacing the stored pair, then restarting `mycity-api-<env>` and
+  `mycity-worker-<env>`. The pair is made the first time a browser asks for it
+  (`GET /push/config`), not at boot; the guide and the runbook say so. The guide is Built and
+  matches the code (§2 to §7, §10, §11, change log); FRONTEND_GUIDE §9.1 (the new files and
+  components), §9.6 and §9.7 (`injectManifest`, `src/sw.ts`, the pane, the banner, push);
+  BACKEND_STRUCTURE §2 and §12; DATABASE_SCHEMA §2, M0 and M6; the MILESTONES §11 note;
+  `foundation.md` §6.7 (the three ⌘K actions); README (the runbook, `docs/handoff/`); PROGRESS (the
+  M0 item ticked, the summary corrected to 30 items, 29 done, and a note). `docs/COMPONENTS.md` was
+  already current. Found while documenting and fixed (`ae6b6ff`): every socket of a person gets
+  `notification`, so a tab in the background chimed on top of the device's own notification; such a
+  window now only reloads its bell (`arrivals.test.ts`, which fails without the fix). Next: step 14,
+  the whole `npm run ci`.

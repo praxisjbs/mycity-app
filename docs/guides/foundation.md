@@ -424,7 +424,8 @@ As built (17/10/2026):
 - `GET /search` answers in groups, each the first page of 25: **Screens** (every tab of the staff app by
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
   Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
-  Set PIN, Mark All Read, Use Dark Theme, Use Light Theme, Change Density, Install App, Sign Out), then
+  Set PIN, Mark All Read, Notification Settings, Turn On Notifications, Send Test Notification, Use
+  Dark Theme, Use Light Theme, Change Density, Install App, Sign Out), then
   one group per kind of record from each `<module>.search.js` (Employees, Departments, Open Seats, Users,
   Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's).
 - **Waiting on You** comes first: the requests waiting on the reader's decision (the My Approvals list),
@@ -446,7 +447,8 @@ As built (17/10/2026):
   type; the screens and actions are still matched on the whole line.
 - An action opens its screen asked to start it: `?action=new` runs the screen's New action
   (`useScreenAction`), another word runs what the screen names with `useUrlAction` (`password`, `pin`),
-  and `?importer=employees` opens the Import wizard. Clock In and Mark All Read run in the app itself.
+  and `?importer=employees` opens the Import wizard. Clock In, Mark All Read and the three
+  notification actions run in the app itself (`docs/guides/notifications.md` §9).
 - **The gate** (`scripts/check/search-coverage.js`): every screen in the route map has a search entry
   whose label equals the shell's; every entity type in `ENTITY_ROUTES` is declared by a provider or its
   line carries `// search:none <reason>`; every `useScreenAction({ label })` in the app is an action in
@@ -674,6 +676,9 @@ screen.
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · §6.7: ⌘K's actions gain Notification Settings, Turn On Notifications and Send
+  Test Notification, run in the app like Mark All Read (`docs/guides/notifications.md`, web push
+  brought forward from M6).
 - 19/10/2026 · TB · §6.1, §6.5, §6.6, §10.1, §11, from a review of the roster as staging shows it.
   A VACANT row's Line Manager becomes the seat's line (the importer dropped it). `roles.json` can
   give a post outside the sheet its line manager (the Implementation Partner reports to the CTO).

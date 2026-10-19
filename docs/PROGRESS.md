@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 29 items below: 27 done, 2 open | | | | | |
+| M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 29 | 2 | 0 | 27 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -97,10 +97,21 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Frontend foundation PR 3 · Build kit: DataView, KPI, charts, kanban, calendar, pickers, upload, editor, PDF preview, voice, maps; app component folders emptied; every screen on the token scale | AJ | ☑ | 16/10/2026 |
 | Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
 | One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
-| Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☐ | 19/10/2026 |
+| Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☑ | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Notifications built (`docs/guides/notifications.md` is Built; PR #72). Web push to
+  phones and computers through the app's own service worker (`app/src/sw.ts`: one notification per
+  conversation, Mark Read, the pin in the status bar and the count on the app icon, a tap through
+  sign-in to the record), the in-app banner (3 s, the chime or a buzz, once per notice, none in a
+  window in the background), the pane on both shells (`NotificationCenter`: a page from the right on
+  a phone, a panel under the bell on desktop), Notification Settings (this device, other devices, In
+  App, Email and Push per category), the one-time Turn On offer, three ⌘K actions, and live mail on
+  staging and production. The integration suite passes locally, 26 suites and 635 tests, with
+  `notifications-push.test.js`. GE's runbook: `docs/runbooks/push-notifications.md` (nothing to set
+  in `.env`; check `MAILBOX_IDLE_MAX` is not 0). Left: the whole `npm run ci` and a real Chromium
+  push in this PR, then TB's phone check after the staging deploy (handoff §7).
 - 19/10/2026 · TB · Notifications, in progress (TB's eight decisions in `docs/handoff/push-notifications.md`
   §2; design `docs/guides/notifications.md`). The backend of web push: migration `0460`
   (`push_subscription` as a device with its token, key id and health; `push_delivery`, one row per
