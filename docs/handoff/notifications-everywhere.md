@@ -168,7 +168,7 @@ Tick each step with its date and add a line to §8 when it is pushed.
 3. [x] 19/10/2026 Backend: the notice catalogue (a label per declaration), the fan-out applying the company's
    rules, approval and probation reminders, the daily digest, quiet hours that hold push (Urgent and
    Security pass, assumption A).
-4. [ ] Screens: Settings · Notifications on both shells (desktop table, phone rows and sheets), quiet
+4. [x] 19/10/2026 Screens: Settings · Notifications on both shells (desktop table, phone rows and sheets), quiet
    hours and the digest in each person's Notification Settings.
 5. [ ] Tests, the whole `npm run ci`, the PR, drive it green and merge.
 
@@ -227,3 +227,8 @@ Tick each step with its date and add a line to §8 when it is pushed.
   (`notifications.reminders.js`, the `reminders` scheduler), the daily digest (the `reminders` job,
   `templates/email/digest.html`) and quiet hours holding pushes. New integration suite
   `notifications-rules` (10 tests) and unit tests pass. Next: step 4, the screens.
+- 19/10/2026 · PR 2 step 4 pushed: Settings · Notifications on both shells
+  (`app/src/features/settings/Notifications.tsx`, the Reminders card and the notices list with
+  Edit Notice), the old mock-only prototype removed, Quiet Hours and Digest in Notification
+  Settings, the mock API for laptops and CI; PROGRESS #74 Built. The screen gates pass. Next:
+  step 5, the whole `npm run ci` and the PR.
