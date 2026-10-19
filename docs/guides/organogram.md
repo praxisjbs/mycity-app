@@ -266,7 +266,7 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
   with it. §12.1 is now what the deploy actually loads: the CEO over the CTO and the Program
   Manager, the back-end line, the PR branch, and the seven marketing people under the vacant Head
   Sales & Revenue with their dotted line to the Head of PR.
-- 16/10/2026 · TB · §4 names the built tables: `org_seat` for vacant seats, and on `employee` the
+- 16/10/2026 · GE · §4 names the built tables: `org_seat` for vacant seats, and on `employee` the
   `dotted_manager_id`, `line_manager_seat_id` and `dotted_manager_seat_id` columns
   (`migrations/0110_employee_profile.sql`). A person reports to a person or to a seat, never both.
 - 14/10/2026 · TB · §10 rewritten as On screen and mobile with the content tiers and phone layout

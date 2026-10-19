@@ -22,6 +22,10 @@ module.exports = {
     await service.markRead(id(req), req.user);
     noContent(res);
   },
+  imageTrust: async (req, res) => {
+    await service.setImageTrust(req.validated.body, req.user);
+    noContent(res);
+  },
   move: async (req, res) => {
     await service.move(id(req), req.validated.body.to, req.user);
     noContent(res);

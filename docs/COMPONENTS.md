@@ -115,6 +115,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both. | stable |
+| Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
@@ -3067,6 +3068,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 | `kinds` | `string` |  | What kinds of file are wanted, lower case, for the line under the words ("PDF or Word"). |
 | `compact` | `boolean` |  | A tighter drop zone, inside a sheet or beside a form's footer. |
 | `trigger` | `(open: () => void) => ReactNode` |  | A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. |
+| `handOff` | `boolean` |  | The caller lists what arrived itself (a composer's attachment chips), so a finished file leaves the tray once it is handed over and is never shown twice. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3602,6 +3604,37 @@ A file from the vault as the browser draws it: a PDF inline, a picture in the im
 
 ```tsx
 <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
+```
+
+### EmailFrame
+
+One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app.
+
+| | |
+|---|---|
+| Use | The body of a received or drafted email, wherever HTML mail is read (the mailbox reader, a draft preview). |
+| Avoid | Writing mail HTML into the page with dangerouslySetInnerHTML: its widths overflow a phone and its styles leak; any other HTML (use Reader for our own long text). |
+| Phone | In the dark theme a message designed for a white page is recoloured (light backgrounds dark, dark text light, brand colours and images kept). A message laid out wider than the screen (the 600 px newsletter, a cPanel notice) is scaled down to the screen's width, as mail apps do, never scrolled sideways. |
+| Accessibility | An iframe named by `title` (the subject), as its aria-label so no browser tooltip appears. Nothing in the message runs: no scripts, forms or frames, whatever the sanitiser missed. |
+| Status | beta |
+| Exports | `EmailFrame` |
+| Import | `import { EmailFrame } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/EmailFrame.tsx` |
+| Test | `packages/ui/src/documents/EmailFrame.test.tsx` |
+| Gallery | `packages/ui/src/documents/EmailFrame.gallery.tsx` (`npm run gallery`, `#/EmailFrame`) |
+
+**EmailFrame** props (`EmailFrameProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `html` | `string` | yes | The message body, already sanitised by the server. |
+| `title` | `string` | yes | What a screen reader announces for the frame: the subject. |
+| `remoteImages` | `boolean` |  | Lets images load from the web; until then only embedded ones show. |
+| `onMailto` | `(mailto: Mailto) => void` |  | A `mailto:` link was pressed; open the composer with it. Without this it opens the device's mail app. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<EmailFrame title="Client configuration settings" html={message.body_html} onMailto={(m) => compose(m)} />
 ```
 
 ### ImageViewer
@@ -4324,6 +4357,25 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | Export | File | What it does |
 |---|---|---|
 | `cn` | `lib/cn.ts` | Join class names, skipping the falsy ones; of two that conflict, the later wins (`cn("h-control", "h-9")` is `h-9`). |
+| `referencedCids` | `lib/email-body.ts` | The content ids a body draws, so only those parts are fetched. |
+| `PreparedEmail` (type) | `lib/email-body.ts` |  |
+| `prepareEmail` | `lib/email-body.ts` | A body ready for EmailFrame: unsafe parts stripped, remote fetches held back unless `showRemote`, and each `cid:` drawn from `inline` (content id to a local URL, keys compared case-insensitively). |
+| `SplitEmail` (type) | `lib/email-body.ts` |  |
+| `splitQuoted` | `lib/email-body.ts` | Split a body into what is new and the history it quotes. |
+| `Rgb` (type) | `lib/email-dark.ts` | An email recoloured for the dark theme, by partial inversion: only the colours that would be wrong on a dark page move. |
+| `DarkTheme` (type) | `lib/email-dark.ts` | Where white lands (our card) and where black lands (our foreground). |
+| `toOklab` | `lib/email-dark.ts` | sRGB to OKLab. |
+| `fromOklab` | `lib/email-dark.ts` | OKLab to sRGB, clamped into gamut. |
+| `Role` (type) | `lib/email-dark.ts` |  |
+| `mapColour` | `lib/email-dark.ts` | Where one colour lands on a dark page, or the colour itself when it is already right there. |
+| `parseColour` | `lib/email-dark.ts` | One colour token as channels and alpha, or null for anything that is not a colour. |
+| `mapValue` | `lib/email-dark.ts` | Every colour inside one declaration's value, moved for its role; a gradient's stops each move. |
+| `rewriteDeclarations` | `lib/email-dark.ts` | Split a declaration list on `;` outside quotes and parentheses, rewriting each value; anything unchanged comes back as it was. |
+| `recolourDeclarations` | `lib/email-dark.ts` | One declaration list: an inline `style`, or the inside of one CSS block. |
+| `recolourStylesheet` | `lib/email-dark.ts` | A whole stylesheet: each run between braces is a declaration list; a selector there has no colour property, so it passes through. |
+| `hasOwnDarkMode` | `lib/email-dark.ts` | Does this message bring its own dark design? |
+| `recolourFragment` | `lib/email-dark.ts` | Recolour a parsed body in place: inline styles, `bgcolor` and `color` attributes, and `<style>` blocks. |
+| `recolourHtml` | `lib/email-dark.ts` | A body as HTML, recoloured for a dark page. |
 | `Environment` (type) | `lib/environment.ts` | Staging, or anything else (production, a laptop, CI). |
 | `isStagingHost` | `lib/environment.ts` | A staging host name: hub.staging.mycityapp.io, go.staging.mycityapp.io. |
 | `markStaging` | `lib/environment.ts` | Marks the page as staging: the attribute, the amber tab icon and the browser bar colour. |

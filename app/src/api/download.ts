@@ -79,3 +79,41 @@ export function useFileUrl(url: string | null): string | null {
   }, [url]);
   return href;
 }
+
+/**
+ * Blob URLs for several gated files at once, by key: a mail body's inline parts,
+ * keyed by content id. A part that fails is simply missing, and draws nothing.
+ * Every URL is released when the set changes and when the screen goes.
+ */
+export function useFileUrls(urls: Record<string, string>): Record<string, string> {
+  const [hrefs, setHrefs] = useState<Record<string, string>>({});
+  const key = JSON.stringify(urls);
+  useEffect(() => {
+    const wanted = Object.entries(JSON.parse(key) as Record<string, string>);
+    if (!wanted.length || MOCK) {
+      setHrefs({});
+      return;
+    }
+    let live = true;
+    const made: string[] = [];
+    void Promise.all(
+      wanted.map(([k, url]) =>
+        fetchBlob(url)
+          .then((blob) => {
+            const href = URL.createObjectURL(blob);
+            made.push(href);
+            return [k, href] as const;
+          })
+          .catch(() => null),
+      ),
+    ).then((pairs) => {
+      if (live) setHrefs(Object.fromEntries(pairs.filter((p) => p !== null)));
+    });
+    return () => {
+      live = false;
+      made.forEach((h) => URL.revokeObjectURL(h));
+      setHrefs({});
+    };
+  }, [key]);
+  return hrefs;
+}

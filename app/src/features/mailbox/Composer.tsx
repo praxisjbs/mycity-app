@@ -3,7 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
-import { Button, cn, DateField, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, Pill, RichTextField, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
+import { Button, cn, DateField, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
 
 export interface ComposeInit {
@@ -161,13 +161,18 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
       <div className="flex flex-wrap items-center gap-0.5 border-b border-border py-1.5">
         <UploadField
           upload={upload}
-          purpose="mail"
+          purpose="attachment"
           endpoint="/api/v1/mailbox/attachments"
+          handOff
+          className="min-w-0 flex-1"
           onUploaded={(docs) => (setFiles((f) => [...f, ...docs]), touch())}
           trigger={(open) => (
-            <Tooltip label="Attach File"><button type="button" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground"><Icon name="clip" /></button></Tooltip>
+            <Tooltip label="Attach File"><button type="button" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground phone:size-tap"><Icon name="clip" /></button></Tooltip>
           )}
         />
+        <span role="status" className="flex flex-none items-center gap-1 self-start pt-2 text-2xs text-subtle-foreground">
+          {saved === "saved" ? <><Icon name="ok" className="size-3.5" />Draft saved</> : saved === "saving" ? "Saving…" : null}
+        </span>
       </div>
       <RichTextField
         label="Message Body"
@@ -205,18 +210,18 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           </div>
         </div>
       )}
-      <div className="sticky -bottom-4 z-1 -mx-4.5 mt-3 -mb-4 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card px-4.5 py-3 max-md:pb-safe-3">
+      {/* One row on a phone: Discard and Schedule as icons, Send taking the rest of the width. */}
+      <div className="sticky -bottom-4 z-1 -mx-4.5 mt-3 -mb-4 flex items-center justify-end gap-2 border-t border-border bg-card px-4.5 py-3 max-md:pb-safe-3">
         {confirmDiscard ? (
           <>
-            <Button onClick={() => setConfirmDiscard(false)}>Keep Editing</Button>
-            <Button variant="danger" icon="x" onClick={discard}>Discard Draft</Button>
+            <Button className="max-md:flex-1" onClick={() => setConfirmDiscard(false)}>Keep Editing</Button>
+            <Button className="max-md:flex-1" variant="danger" icon="x" onClick={discard}>Discard Draft</Button>
           </>
         ) : (
           <>
-            <span className="mr-auto">{saved === "saved" ? <Pill>Draft saved</Pill> : saved === "saving" ? <span className="text-2xs text-subtle-foreground">Saving…</span> : null}</span>
-            <Button onClick={() => setConfirmDiscard(true)}>Discard</Button>
+            <Button icon="trash" className="max-md:px-3" onClick={() => setConfirmDiscard(true)}><span className="max-md:sr-only">Discard</span></Button>
             <Menu
-              trigger={(p) => <Button {...p} icon="clock">Schedule</Button>}
+              trigger={(p) => <Button {...p} icon="clock" className="max-md:px-3"><span className="max-md:sr-only">Schedule</span></Button>}
               items={[
                 { label: `Tomorrow, ${formatDate(q.tomorrow).slice(0, 5)} at 08:00`, icon: "clock", onSelect: () => void send(at(q.tomorrow, "08:00")) },
                 { label: `Monday, ${formatDate(q.monday).slice(0, 5)} at 08:00`, icon: "clock", onSelect: () => void send(at(q.monday, "08:00")) },
@@ -224,7 +229,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
                 { label: "Pick Date and Time", icon: "check", onSelect: () => setSched((s) => ({ ...s, open: true })) },
               ]}
             />
-            <Button variant="primary" icon="send" busy={busy} onClick={() => send()}>Send</Button>
+            <Button variant="primary" icon="send" className="max-md:flex-1" busy={busy} onClick={() => send()}>Send</Button>
           </>
         )}
       </div>

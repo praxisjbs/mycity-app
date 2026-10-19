@@ -107,6 +107,18 @@ route(
 route(
   router,
   "post",
+  "/image-trust",
+  {
+    body: mb.MailImageTrust,
+    no_content: true,
+    summary: "Always show, or stop showing, a sender's images",
+  },
+  view(),
+  controller.imageTrust,
+);
+route(
+  router,
+  "post",
   "/folders/:kind/empty",
   {
     params: mb.FolderParams,
