@@ -146,7 +146,8 @@ const QueryDecision = z
     message: "Only with a sanction",
     path: ["consequence_step_id"],
   })
-  .refine((v) => !v.fine_amount || Number(v.fine_amount) > 0, {
+  // Above 0.00 without turning money into a number: not negative, and some digit not zero.
+  .refine((v) => !v.fine_amount || (!v.fine_amount.startsWith("-") && /[1-9]/.test(v.fine_amount)), {
     message: "Enter the fine",
     path: ["fine_amount"],
   })
