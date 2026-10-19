@@ -1068,4 +1068,180 @@ describeDb("attendance against the real migrations", () => {
       expect((team.body.groups || []).map((g) => g.type)).not.toContain("attendance_home");
     });
   });
+  /* ---------------------------------------------------------------- *
+   * Work location requests
+   * ---------------------------------------------------------------- */
+
+  describe("work location requests", () => {
+    const lagos = require("../../src/shared/time/lagos");
+    const roster = require("../../src/modules/attendance/attendance.roster");
+    const day = (n) => lagos.addDays(today(), n);
+    const ask = (who, body) =>
+      as(who).post("/attendance/me/requests", { reason: "Working with a partner on site", ...body });
+    const approve = (who, wid) => as(who).post(`/workflow/instances/${wid}/approve`, {});
+    const ALL = { scope: "all", scope_ids: null };
+    /** Both stages: the line manager, then Operations & People; the outcome is copied after commit. */
+    async function approveBoth(wid) {
+      expect((await approve("manager", wid)).status).toBe(200);
+      expect((await approve("ops", wid)).status).toBe(200);
+      await drain();
+    }
+
+    test("who may ask which type, the first day, the span and the reason", async () => {
+      const no = async (who, body, code) => {
+        const res = await ask(who, body);
+        expect([res.status, res.body.error && res.body.error.code]).toEqual([res.status, code]);
+        expect(res.status).toBeGreaterThanOrEqual(400);
+        return res;
+      };
+      await no("staff", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: "1 Made Up Lane", home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 10 }, "REQUEST_TYPE_NOT_ALLOWED");
+      await no("remote", { request_type: "remote_day", starts_on: day(2), ends_on: day(2) }, "REQUEST_TYPE_NOT_ALLOWED");
+      await no("staff", { request_type: "remote_day", starts_on: day(-1), ends_on: day(-1) }, "REQUEST_IN_THE_PAST");
+      await no("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(7) }, "REQUEST_TOO_LONG");
+      await no("staff", { request_type: "remote_day", starts_on: day(95), ends_on: day(95) }, "REQUEST_TOO_FAR");
+      expect((await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2) })).status).toBe(422);
+      expect((await ask("remote", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: "1 Made Up Lane" })).status).toBe(422);
+      expect((await ask("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(2), reason: "short" })).status).toBe(422);
+      expect((await ask("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(2), employee_id: people.other.employee.employee_id })).status).toBe(422);
+      const weak = await ask("remote", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: "1 Made Up Lane", home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 250 });
+      expect(weak.body.error.code).toBe("HOME_READING_WEAK");
+      expect(await q("SELECT count(*)::int AS n FROM attendance_location_request", []).then((r) => r.rows[0].n)).toBe(0);
+    });
+
+    test("a remote day is numbered, waits on the line manager then Operations & People, and nobody decides out of turn", async () => {
+      await setPolicy("block", "off");
+      const asked = await ask("staff", { request_type: "remote_day", starts_on: day(3), ends_on: day(3), reason: "Waiting in for a delivery" });
+      expect(asked.status).toBe(201);
+      expect(asked.body).toMatchObject({ request_type: "remote_day", status: "submitted", waiting_on: "Line Manager", can_decide: false, days: 1, address: null });
+      expect(asked.body.number).toMatch(/^WLR-\d{4}$/);
+      const id = asked.body.location_request_id;
+      const wid = asked.body.workflow_instance_id;
+
+      const clash = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(4), address: "Partner office, Invented Way" });
+      expect([clash.status, clash.body.error.code]).toEqual([409, "REQUEST_OVERLAPS"]);
+
+      const byManager = await as("manager").get("/attendance/requests?status=submitted");
+      expect(byManager.body.data.find((r) => r.location_request_id === id)).toMatchObject({ can_decide: true, waiting_on: "Line Manager" });
+      const byOps = await as("ops").get(`/attendance/requests/${id}`);
+      expect(byOps.body).toMatchObject({ can_decide: false, employee: { display_name: "Musa Danjuma" } });
+      expect((await approve("ops", wid)).status).toBe(403);
+      expect((await approve("staff", wid)).status).toBeGreaterThanOrEqual(403);
+
+      expect((await approve("manager", wid)).status).toBe(200);
+      const atOps = await as("ops").get(`/attendance/requests/${id}`);
+      expect(atOps.body).toMatchObject({ waiting_on: "Operations & People", can_decide: true, status: "submitted" });
+      expect((await approve("ops", wid)).status).toBe(200);
+      await drain();
+      const mine = await as("staff").get(`/attendance/me/requests/${id}`);
+      expect(mine.body).toMatchObject({ status: "approved", waiting_on: null });
+      expect(mine.body.decided_at).toBeTruthy();
+      expect((await as("other").get(`/attendance/me/requests/${id}`)).status).toBe(404);
+
+      // On the day the approval is the check: far from the office, under block, accepted.
+      const punched = await punchAt("staff", `${day(3)}T07:00:00Z`, { ...north(9000) });
+      expect(punched).toMatchObject({ validation_state: "accepted", reasons: [], worksite_name: "Remote Day" });
+      const ev = await q("SELECT worksite_id, validation->'geofence' AS g FROM attendance_event WHERE attendance_event_id = $1", [punched.attendance_event_id]);
+      expect(ev.rows[0].worksite_id).toBeNull();
+      expect(ev.rows[0].g).toMatchObject({ verdict: "not_applied", reason: "approved_request", place: "remote_day", request_id: id });
+      const reg = await as("ops").get(`/attendance/register?date=${day(3)}&q=musa`);
+      expect(reg.body.data[0]).toMatchObject({ expected_location: "Remote Day" });
+      const row = (await roster.page(pool, { date: day(3), q: "Musa" }, ALL, {})).data[0];
+      expect(row).toMatchObject({ status: "remote", worksite: null });
+      // The day after, the office again.
+      const next = await punchAt("staff", `${day(4)}T07:00:00Z`, { ...north(9000) });
+      expect(next).toMatchObject({ validation_state: "rejected", reasons: ["outside_worksite"] });
+    });
+
+    test("a client visit: accepted wherever, even with the location off", async () => {
+      await setPolicy("block", "off");
+      const asked = await ask("other", { request_type: "client_visit", starts_on: day(5), ends_on: day(6), address: "Client office, 4 Example Road" });
+      expect(asked.status).toBe(201);
+      await approveBoth(asked.body.workflow_instance_id);
+      const denied = await punchAt("other", `${day(6)}T07:00:00Z`, { latitude: null, longitude: null, accuracy_m: null, location_error: "denied" });
+      expect(denied).toMatchObject({ validation_state: "accepted", reasons: [], worksite_name: "Client Visit" });
+      expect(denied.today.location).toMatchObject({ kind: "approved_day", name: "Client Visit", radius_m: null });
+    });
+
+    test("a temporary home is fenced like a home for its days, over the approved one", async () => {
+      await setPolicy("block", "off");
+      const temp = (m) => ({ latitude: 6.62 + m / 111_195, longitude: 3.52 });
+      await q("UPDATE employee SET line_manager_id = $1 WHERE employee_id = $2", [people.manager.employee.employee_id, people.remote.employee.employee_id]);
+      await grantsCache.bumpTeamVersion();
+      try {
+        const asked = await ask("remote", {
+          request_type: "temporary_home", starts_on: day(7), ends_on: day(9), address: "Flat 2, 9 Sample Crescent",
+          home_latitude: temp(0).latitude, home_longitude: temp(0).longitude, accuracy_m: 14,
+        });
+        expect(asked.status).toBe(201);
+        expect(asked.body).toMatchObject({ days: 3, address: "Flat 2, 9 Sample Crescent", accuracy_m: 14 });
+        expect(asked.body.home_latitude).toBeCloseTo(temp(0).latitude, 5);
+        const team = await as("manager").get(`/attendance/requests/${asked.body.location_request_id}`);
+        expect([team.body.home_latitude, team.body.home_longitude]).toEqual([null, null]);
+        expect(team.body.address).toBe("Flat 2, 9 Sample Crescent");
+        await approveBoth(asked.body.workflow_instance_id);
+
+        const inside = await punchAt("remote", `${day(8)}T07:00:00Z`, temp(40));
+        expect(inside).toMatchObject({ validation_state: "accepted", distance_m: 40, worksite_name: "Temporary Home" });
+        expect(inside.today.location).toMatchObject({ kind: "temporary_home", name: "Temporary Home", radius_m: 100, home_state: "approved" });
+        const out = await punchAt("remote", `${day(9)}T07:00:00Z`, temp(600));
+        expect(out).toMatchObject({ validation_state: "rejected", reasons: ["outside_home"] });
+        expect(out.message).toBe("Not counted: you were 600 m from your temporary home.");
+        const detail = await as("ops").get(`/attendance/register/${people.remote.employee.employee_id}?date=${day(8)}`);
+        expect(detail.body.expected_location).toEqual({ name: "Temporary Home", radius_m: 100 });
+      } finally {
+        await q("UPDATE employee SET line_manager_id = NULL WHERE employee_id = $1", [people.remote.employee.employee_id]);
+        await grantsCache.bumpTeamVersion();
+      }
+    });
+
+    test("withdrawn while waiting, cancelled before it starts, never once it has started", async () => {
+      const waiting = await ask("other", { request_type: "client_visit", starts_on: day(20), ends_on: day(20), address: "Client office, 4 Example Road" });
+      const withdrawn = await as("other").post(`/attendance/me/requests/${waiting.body.location_request_id}/cancel`, { reason: "Meeting moved online" });
+      expect(withdrawn.body).toMatchObject({ status: "cancelled", cancel_reason: "Meeting moved online", waiting_on: null });
+      const instance = await q("SELECT state FROM workflow_instance WHERE workflow_instance_id = $1", [waiting.body.workflow_instance_id]);
+      expect(instance.rows[0].state).toBe("cancelled");
+      expect((await as("other").post(`/attendance/me/requests/${waiting.body.location_request_id}/cancel`, {})).status).toBe(409);
+
+      const later = await ask("other", { request_type: "client_visit", starts_on: day(22), ends_on: day(23), address: "Client office, 4 Example Road" });
+      await approveBoth(later.body.workflow_instance_id);
+      expect((await as("other").post(`/attendance/me/requests/${later.body.location_request_id}/cancel`, {})).body.status).toBe("cancelled");
+
+      const started = await ask("other", { request_type: "client_visit", starts_on: day(0), ends_on: day(1), address: "Client office, 4 Example Road" });
+      await approveBoth(started.body.workflow_instance_id);
+      const refused = await as("other").post(`/attendance/me/requests/${started.body.location_request_id}/cancel`, {});
+      expect([refused.status, refused.body.error.code]).toEqual([409, "REQUEST_NOT_CANCELLABLE"]);
+      expect((await as("staff").post(`/attendance/me/requests/${started.body.location_request_id}/cancel`, {})).status).toBe(404);
+    });
+
+    test("lists page at 25 within scope; search finds a request by number, never by its address; events carry no place", async () => {
+      const mine = await as("other").get("/attendance/me/requests");
+      expect(mine.body.page.size).toBe(25);
+      for (const r of mine.body.data) expect(r.employee.display_name).toBe("Zainab Lawal");
+      expect((await as("staff").get("/attendance/requests")).status).toBe(403);
+      const team = await as("manager").get("/attendance/requests");
+      const names = new Set(team.body.data.map((r) => r.employee.display_name));
+      expect(names.has("Bisi Ade")).toBe(false);
+      expect((await as("outsider").get("/attendance/requests")).status).toBe(403);
+
+      const one = (await as("ops").get("/attendance/requests?request_type=temporary_home")).body.data[0];
+      const byNumber = await as("ops").get(`/search?q=${one.number}`);
+      expect((byNumber.body.groups || []).map((g) => g.type)).toContain("attendance_location_request");
+      const byAddress = await as("ops").get("/search?q=crescent");
+      expect((byAddress.body.groups || []).map((g) => g.type)).not.toContain("attendance_location_request");
+
+      await drain();
+      const logged = await q(
+        `SELECT l.payload, a.before, a.after FROM event_log l LEFT JOIN audit_ledger a ON a.event_id = l.event_id
+          WHERE l.event_key LIKE 'location_request.%'`,
+        [],
+      );
+      expect(logged.rows.length).toBeGreaterThan(0);
+      const text = JSON.stringify(logged.rows);
+      for (const secret of ["Sample Crescent", "Example Road", "6.62", "3.52"]) expect(text).not.toContain(secret);
+      const told = await q("SELECT count(*)::int AS n FROM notification WHERE user_id = $1 AND entity_type = 'attendance_location_request'", [people.manager.user.user_id]);
+      expect(told.rows[0].n).toBeGreaterThan(0);
+      const failed = await q("SELECT count(*)::int AS n FROM event_outbox WHERE status = 'failed'", []);
+      expect(failed.rows[0].n).toBe(0);
+    });
+  });
 });

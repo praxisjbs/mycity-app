@@ -13,10 +13,52 @@ import { HOME_STATUS } from "./labels";
  * Location, at home; the address is their own words. People approve it; the API decides who may.
  */
 
-type Fix = { latitude: number; longitude: number; accuracy_m: number };
-type Reading = { kind: "none" } | { kind: "locating" } | { kind: "fix"; fix: Fix } | { kind: "weak"; fix: Fix } | { kind: "failed"; error: LocationError };
+export type Fix = { latitude: number; longitude: number; accuracy_m: number };
+export type Reading = { kind: "none" } | { kind: "locating" } | { kind: "fix"; fix: Fix } | { kind: "weak"; fix: Fix } | { kind: "failed"; error: LocationError };
 
 const LOCATION_ERROR: Record<number, LocationError> = { 1: "denied", 2: "unavailable", 3: "timeout" };
+
+/**
+ * One location reading taken on this device when the person asks for it, refused when coarser
+ * than `max` metres. A home and a work location request's temporary home are both read this way.
+ */
+export function useReading(max: number, onFix: (fix: Fix) => void) {
+  const [reading, setReading] = useState<Reading>({ kind: "none" });
+  const locate = () => {
+    if (!navigator.geolocation) return setReading({ kind: "failed", error: "unsupported" });
+    setReading({ kind: "locating" });
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const fix = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy_m: Math.round(p.coords.accuracy) };
+        if (fix.accuracy_m > max) return setReading({ kind: "weak", fix });
+        onFix(fix);
+        setReading({ kind: "fix", fix });
+      },
+      (e) => setReading({ kind: "failed", error: LOCATION_ERROR[e.code] ?? "unavailable" }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  };
+  return { reading, setReading, locate };
+}
+
+/** Where the reading stands, as the step above a form shows it; `idle` is the line before the first press. */
+export function ReadingStep({ reading, idle }: { reading: Reading; idle: { title: string; text: string } }) {
+  if (reading.kind === "fix") return <Result tone="ok" label="Location Check" title="Location Found" text={`Accurate to ${reading.fix.accuracy_m} m.`} icon="target" />;
+  if (reading.kind === "locating") return <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />;
+  if (reading.kind === "weak")
+    return <Result tone="warn" label="Location Check" title="Weak Location Signal" text={`Accurate to about ${reading.fix.accuracy_m} m. Move near a window, then retry.`} icon="target" />;
+  if (reading.kind === "failed")
+    return (
+      <Result
+        tone="warn"
+        label="Location Check"
+        title={reading.error === "denied" ? "Location Is Off" : reading.error === "unsupported" ? "No Location Support" : "Location Not Found"}
+        text={reading.error === "denied" ? "Allow location for this site in your browser settings, then retry." : reading.error === "unsupported" ? "This browser cannot share a location." : "Move near a window or outside, then retry."}
+        icon="target"
+      />
+    );
+  return <Result tone="info" label="Location Check" title={idle.title} text={idle.text} icon="home" />;
+}
 
 /** The card, for remote staff only. `?home=set` (the clock panel's Set Home) opens the sheet once. */
 export function HomeLocationCard({ openOnLoad }: { openOnLoad: boolean }) {
@@ -59,29 +101,16 @@ type HomeValues = { home_address: string; home_latitude: number | null; home_lon
 
 /** The sheet: one reading taken here, the address, and Send for Approval. */
 export function SetHomeForm({ max, close }: { max: number; close: () => void }) {
-  const [reading, setReading] = useState<Reading>({ kind: "none" });
   const f = useContractForm<HomeValues>(
     { home_address: "", home_latitude: null, home_longitude: null, accuracy_m: null },
     { safeParse: (v: unknown) => attendance.HomeRequestCreate.safeParse({ ...(v as HomeValues), home_address: (v as HomeValues).home_address.trim() }) },
   );
   const send = useMutation("POST /api/v1/attendance/me/home");
-
-  const locate = () => {
-    if (!navigator.geolocation) return setReading({ kind: "failed", error: "unsupported" });
-    setReading({ kind: "locating" });
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        const fix = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy_m: Math.round(p.coords.accuracy) };
-        if (fix.accuracy_m > max) return setReading({ kind: "weak", fix });
-        f.set("home_latitude", fix.latitude);
-        f.set("home_longitude", fix.longitude);
-        f.set("accuracy_m", fix.accuracy_m);
-        setReading({ kind: "fix", fix });
-      },
-      (e) => setReading({ kind: "failed", error: LOCATION_ERROR[e.code] ?? "unavailable" }),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
-  };
+  const { reading, setReading, locate } = useReading(max, (fix) => {
+    f.set("home_latitude", fix.latitude);
+    f.set("home_longitude", fix.longitude);
+    f.set("accuracy_m", fix.accuracy_m);
+  });
 
   const submit = async () => {
     if (!f.check()) return;
@@ -98,29 +127,12 @@ export function SetHomeForm({ max, close }: { max: number; close: () => void }) 
     }
   };
 
-  const step =
-    reading.kind === "fix" ? (
-      <Result tone="ok" label="Location Check" title="Location Found" text={`Accurate to ${reading.fix.accuracy_m} m.`} icon="target" />
-    ) : reading.kind === "locating" ? (
-      <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />
-    ) : reading.kind === "weak" ? (
-      <Result tone="warn" label="Location Check" title="Weak Location Signal" text={`Accurate to about ${reading.fix.accuracy_m} m. Move near a window, then retry.`} icon="target" />
-    ) : reading.kind === "failed" ? (
-      <Result
-        tone="warn"
-        label="Location Check"
-        title={reading.error === "denied" ? "Location Is Off" : reading.error === "unsupported" ? "No Location Support" : "Location Not Found"}
-        text={reading.error === "denied" ? "Allow location for this site in your browser settings, then retry." : reading.error === "unsupported" ? "This browser cannot share a location." : "Move near a window or outside, then retry."}
-        icon="target"
-      />
-    ) : (
-      <Result tone="info" label="Location Check" title="At Home Now" text="Take the reading where you work from home." icon="home" />
-    );
-
   const located = reading.kind === "fix";
   return (
     <>
-      <div className="mb-3">{step}</div>
+      <div className="mb-3">
+        <ReadingStep reading={reading} idle={{ title: "At Home Now", text: "Take the reading where you work from home." }} />
+      </div>
       <Field label="Address" {...f.status("home_address")}>
         <TextAreaField {...f.field("home_address")} placeholder="12 Sample Street" rows={2} />
       </Field>

@@ -1,4 +1,4 @@
-import type { AttendanceDay, DeviceStatus, ExceptionType, GeofenceVerdict, HomeStatus, PunchState, RegisterStatus } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, DeviceStatus, ExceptionType, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus } from "@mycity/contract/contract.gen.ts";
 
 /**
  * The words and tones the attendance screens show for the API's values (docs/guides/attendance.md
@@ -62,6 +62,20 @@ export const HOME_STATUS: Record<HomeStatus, Shown> = {
   rejected: { tone: "err", text: "Rejected" },
   superseded: { tone: "neutral", text: "Replaced" },
 };
+
+/** A work location request's kind and where it stands, as ESS and People's Requests show them. */
+export const REQUEST_TYPE: Record<LocationRequestType, string> = {
+  temporary_home: "Temporary Home",
+  remote_day: "Remote Day",
+  client_visit: "Client Visit",
+};
+export const REQUEST_STATUS: Record<LocationRequestStatus, Shown> = {
+  submitted: { tone: "warn", text: "Waiting" },
+  approved: { tone: "ok", text: "Approved" },
+  rejected: { tone: "err", text: "Rejected" },
+  cancelled: { tone: "neutral", text: "Cancelled" },
+};
+export const REQUEST_TYPE_HELP = "Temporary Home: clock in at another home, within 100 m. Remote Day: work away from the office. Client Visit: work at a client's site.";
 
 export const DEVICE_STATUS_HELP = "New: seen on a punch, not registered. Registered: one of your three. Removed: taken off, and it can be registered again.";
 

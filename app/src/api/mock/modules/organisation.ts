@@ -3,6 +3,7 @@ import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/a
 import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
 import roster from "../data/roster.json";
+import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
 
 /**
  * The organisation module on the mock, in the contract's own shapes
@@ -629,10 +630,11 @@ route("POST /api/v1/leave/requests/:id/cancel", (req) => {
   return ok(out(l));
 });
 
-/* The decision on a waiting request: the approval's own routes, for the mock's leave flows only. */
-const decide = (req: { params: Record<string, string>; user: string | null }, approve: boolean) => {
+/* The decision on a waiting request: the approval's own routes, for the mock's leave flows and, passed on, its work location requests. */
+const decide = (req: { params: Record<string, string>; user: string | null; body?: unknown }, approve: boolean) => {
   const l = LEAVE.find((x) => x.workflow_instance_id === req.params.id);
-  if (!l || l.status !== "submitted") return notFound();
+  if (!l) return decideLocationRequest(req.user!, req.params.id, approve, (req.body as { reason?: string } | undefined)?.reason) ?? notFound();
+  if (l.status !== "submitted") return notFound();
   if (l.key === req.user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
   if (approve && l.days > 5 && l.waiting_on === "Line Manager") {
     l.waiting_on = "Operations & People";
@@ -643,18 +645,23 @@ const decide = (req: { params: Record<string, string>; user: string | null }, ap
   l.decided_at = new Date().toISOString();
   return ok({ workflow_instance_id: l.workflow_instance_id, state: l.status, stage_name: null });
 };
+route("GET /api/v1/workflow/instances/:id", (req) => {
+  const wlr = locationRequestInstance(req.user!, req.params.id);
+  return wlr ? ok(wlr) : notFound();
+});
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));
 route("POST /api/v1/workflow/instances/:id/reject", (req) => decide(req, false));
 
 /*
  * The requests waiting on the caller (GET /workflow/mine), Home's Need You. A leave request
  * waits on the requester's line manager, and one of more than 5 days on Operations & People,
- * as the leave flow's stages read; each stage has 48 hours before it is overdue. Oldest first.
+ * as the leave flow's stages read; each stage has 48 hours before it is overdue. Work location
+ * requests waiting on the caller join them. Oldest first.
  */
 const STAGE_HOURS = 48;
 export function waitingOn(user: string): ApprovalWaiting[] {
   return LEAVE.filter((l) => l.status === "submitted" && l.workflow_instance_id && (l.days > 5 ? full(user) : byKey(l.key)?.manager === user))
-    .map((l) => {
+    .map((l): ApprovalWaiting => {
       const operations = l.days > 5;
       const entered = l.submitted_at ?? l.created_at;
       const due = new Date(Date.parse(entered) + STAGE_HOURS * 3600000).toISOString();
@@ -679,6 +686,7 @@ export function waitingOn(user: string): ApprovalWaiting[] {
         link: `/people?tab=leave&id=${l.leave_request_id}`,
       };
     })
+    .concat(locationRequestsWaitingOn(user))
     .sort((a, b) => a.stage_entered_at.localeCompare(b.stage_entered_at));
 }
 route("GET /api/v1/workflow/mine", (req) => paged(waitingOn(req.user!), req, { filters: { module_key: (r, v) => r.module_key === v } }));

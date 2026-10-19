@@ -148,6 +148,7 @@ const DOC_TYPES = [
   "document",
   "import_batch",
   "report_run",
+  "location_request",
   "query",
   "sanction",
   "letter",

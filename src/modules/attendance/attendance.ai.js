@@ -11,7 +11,8 @@
  * a device identifier or the evidence behind a punch. The assistant never clocks
  * anyone in, decides an exception or guesses a missing location (A23); it sends the
  * person to the screen that does. A home location is never read: its address and point are
- * personal data, so the assistant only sends people to where homes are set and approved.
+ * personal data, so the assistant only sends people to where homes are set and approved; a work
+ * location request is never read either (its address can be a home).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
@@ -61,5 +62,7 @@ module.exports = defineManifest({
     { intent: "review attendance", screen: "people.attendance" },
     { intent: "set my home location", screen: "ess.my-attendance" },
     { intent: "approve home locations", screen: "people.attendance" },
+    { intent: "ask for a work location", screen: "ess.work-location-requests" },
+    { intent: "approve work location requests", screen: "people.attendance" },
   ],
 });

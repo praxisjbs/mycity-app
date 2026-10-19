@@ -147,6 +147,28 @@ describe("the geofence", () => {
     expect(judge({ work_pattern: "remote", expected: null, mode: "off" })).toMatchObject({ result: "accepted", exception: null });
   });
 
+  test("on an approved remote day or client visit with no fence the approval is the check, under every mode", () => {
+    const approved = { location_request_id: "r-1", place: "client_visit", name: "Client Visit" };
+    for (const mode of ["off", "warn", "block"]) {
+      expect(judge({ expected: null, approved, point: north(9000), mode })).toMatchObject({
+        verdict: "not_applied", reason: "approved_request", result: "accepted", exception: null, place: "client_visit",
+        worksite_name: "Client Visit", request_id: "r-1", worksite_id: null, distance_m: null,
+      });
+    }
+    expect(judge({ expected: null, approved, point: null, location_error: "denied", mode: "block" })).toMatchObject({ result: "accepted", retry_location: false });
+    expect(judge({ expected: null, approved: { ...approved, place: "remote_day", name: "Remote Day" }, work_pattern: "remote", mode: "block" }))
+      .toMatchObject({ verdict: "not_applied", reason: "approved_request", place: "remote_day" });
+  });
+
+  test("a temporary home is fenced like a home and names itself", () => {
+    const TEMP = { ...HOME, kind: "temporary_home", place: "temporary_home", attendance_home_id: null, location_request_id: "r-2", name: "Temporary Home" };
+    expect(judge({ work_pattern: "remote", expected: TEMP, point: north(40) })).toMatchObject({
+      verdict: "inside", result: "accepted", place: "temporary_home", request_id: "r-2", home_id: null, worksite_name: "Temporary Home",
+    });
+    expect(judge({ work_pattern: "remote", expected: TEMP, point: north(400), mode: "warn" })).toMatchObject({ exception: "outside_home", outside: "outside_home" });
+    expect(judge({ work_pattern: "remote", expected: TEMP, point: north(400), mode: "block" })).toMatchObject({ result: "rejected", outside: "outside_home" });
+  });
+
   test("a hybrid employee is judged against their worksite", () => {
     expect(judge({ work_pattern: "hybrid", point: north(340) })).toMatchObject({
       verdict: "outside", result: "review", exception: "outside_worksite", place: "worksite", worksite_id: "w-1", home_id: null,
@@ -324,6 +346,9 @@ describe("what a person reads", () => {
     expect(
       messageOf(row("review", ["location_unverified"], { geofence: { reason: "no_home", distance_m: null, worksite_name: null } })),
     ).toBe("Clocked in at 08:58. People will review it: you have no approved home location yet.");
+    expect(
+      messageOf(row("rejected", ["outside_home"], { geofence: { distance_m: 400, place: "temporary_home", worksite_name: "Temporary Home" } })),
+    ).toBe("Not counted: you were 400 m from your temporary home.");
   });
 
   test("an exception's detail comes from its evidence", () => {
@@ -332,6 +357,9 @@ describe("what a person reads", () => {
     );
     expect(detailOf("outside_home", { distance_m: 2400, worksite_name: "Home", radius_m: 100 })).toBe(
       "2400 m from the approved home, radius 100 m",
+    );
+    expect(detailOf("outside_home", { distance_m: 400, place: "temporary_home", radius_m: 100 })).toBe(
+      "400 m from the temporary home, radius 100 m",
     );
     expect(detailOf("location_unverified", { reason: "no_home" })).toBe("No approved home");
     expect(detailOf("location_unverified", { reason: "denied" })).toBe("No location: location was not shared");
@@ -344,6 +372,8 @@ describe("what a person reads", () => {
 
 describe("the routes", () => {
   const routes = routesOf(require("./attendance.routes").router);
+  /** A body's fields, through any refinements around it. */
+  const shapeOf = (schema) => (schema.shape ? schema.shape : shapeOf(schema._def.schema));
 
   test("the person's own routes are self and name no employee; People's carry the people grant", () => {
     expect(routes.length).toBeGreaterThan(10);
@@ -351,11 +381,20 @@ describe("the routes", () => {
       if (r.path.startsWith("/me") || r.path === "/punches") {
         expect(r.contract.self).toBe(true);
         expect(r.path).not.toMatch(/employee_id/);
-        if (r.contract.body) expect(Object.keys(r.contract.body._def.schema ? r.contract.body._def.schema.shape : r.contract.body.shape)).not.toContain("employee_id");
+        if (r.contract.body) expect(Object.keys(shapeOf(r.contract.body))).not.toContain("employee_id");
       } else {
         expect(r.permission && r.permission.key).toBe("people");
       }
     }
+  });
+
+  test("a work location request names no employee or status; People read requests, and decide them in the approval", () => {
+    const send = routes.find((r) => r.method === "POST" && r.path === "/me/requests");
+    expect(Object.keys(shapeOf(send.contract.body)).sort()).toEqual([
+      "accuracy_m", "address", "ends_on", "home_latitude", "home_longitude", "reason", "request_type", "starts_on",
+    ]);
+    expect(routes.find((r) => r.method === "GET" && r.path === "/requests").permission).toMatchObject({ key: "people", action: "view" });
+    expect(routes.some((r) => /decision|approve/.test(r.path) && r.path.startsWith("/requests"))).toBe(false);
   });
 
   test("a home request carries no employee or status, and only People decide one", () => {

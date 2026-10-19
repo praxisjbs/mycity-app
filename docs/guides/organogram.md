@@ -10,7 +10,7 @@
 | Capabilities | none; the builder is the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
 | Status | Built |
-| Last changed | 17/10/2026 |
+| Last changed | 19/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -291,3 +291,4 @@ Revenue with a dotted line to Chinyere Elechi (Head PR), the matrix case the v1 
 - 16/10/2026 · TB · The `organisation` module gained its first service code, for sign-in only: find and create a department (with a generated code) and an employee (number from `numbering.allocate("employee")`, extra fields in `profile`), used by `create-admin` and the Users invitation. No routes yet; the tree and the employee screens still run on the mock. The employee 360 has Send Invite (`docs/guides/identity.md`).
 - 16/10/2026 · TB · `employee` gained `home_address` (masked as personal details) and `contract_ends_on` for consultants and contractors (`0210`), in the contract and the organisation insert; `create-admin --build-account` writes both.
 - 16/10/2026 · TB · `EmployeeCreate` and the organisation insert also take `middle_name`, `preferred_name`, `personal_email` (masked as personal details), `confirmation_due_on` and `confirmed_on`, columns since `0040`; the build account fills them all.
+- 19/10/2026 · LA · ESS's tab switch (`app/src/features/ess/index.tsx`) takes Work Location Requests from its own file (`docs/guides/attendance.md` §10); Org Chart is unchanged.

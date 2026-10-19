@@ -128,6 +128,11 @@ const ACTIONS = Object.freeze([
     need: ["ess", "create"],
     words: ["leave", "apply for leave", "holiday", "vacation", "time off", "day off", "sick leave"],
   }),
+  a("request_work_location", "New Request", {
+    screen: "ess.work-location-requests",
+    params: { action: "new" },
+    words: ["work location", "work from home", "remote day", "temporary home", "client visit", "work elsewhere"],
+  }),
   a("change_password", "Change Password", {
     screen: "ess.my-security",
     params: { action: "password" },

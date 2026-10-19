@@ -93,7 +93,7 @@ function detailOf(type, evidence = {}) {
     case "outside_worksite":
       return `${ev.distance_m} m from ${ev.worksite_name}, radius ${ev.radius_m} m`;
     case "outside_home":
-      return `${ev.distance_m} m from the approved home, radius ${ev.radius_m} m`;
+      return `${ev.distance_m} m from the ${ev.place === "temporary_home" ? "temporary" : "approved"} home, radius ${ev.radius_m} m`;
     case "location_unverified":
       if (ev.reason === "no_home") return "No approved home";
       return ev.reason === "poor_accuracy" && ev.accuracy_m

@@ -4,16 +4,19 @@
  * shared/geo's (docs/guides/attendance.md §6.5).
  *
  * What the server knows is the reading the browser sent (or why it sent none) and
- * the place the person is expected: their worksite, or for remote staff their approved
- * home. A distance or an "inside" flag from the client is never read; the server works
- * it out from the coordinates.
+ * the place the person is expected: their worksite, for remote staff their approved home,
+ * or on a day an approved work location request covers, its temporary home or approved
+ * home (§6.11). A distance or an "inside" flag from the client is never read; the server
+ * works it out from the coordinates.
  *
  *   verdict       inside       within the radius (the boundary counts as inside)
  *                 outside      beyond it, with a reading good enough to say so
  *                 unverified   no reading (denied, unavailable, timeout, unsupported),
  *                              or one coarser than the policy's accuracy, or a remote
  *                              person with no approved home yet (no_home)
- *                 not_applied  nowhere to judge against: someone not remote with no worksite
+ *                 not_applied  nowhere to judge against: someone not remote with no worksite, or
+ *                              an approved remote day or client visit with no fence, where
+ *                              the approval is the check (approved_request)
  *
  *   mode off      every verdict is accepted; it is kept as evidence
  *   mode warn     outside or unverified goes to review, with an exception
@@ -29,16 +32,19 @@ const { GOOD_ACCURACY_M } = require("./attendance.rules");
  * @param {{latitude: number, longitude: number}|null} input.point
  * @param {number|null} input.accuracy_m
  * @param {string|null} input.location_error  why there is no reading
- * @param {{kind?: "worksite"|"home", attendance_home_id?: string|null, worksite_id: string|null, name: string,
+ * @param {{kind?: "worksite"|"home"|"temporary_home", place?: string, attendance_home_id?: string|null,
+ *          location_request_id?: string|null, worksite_id: string|null, name: string,
  *          latitude: number, longitude: number, radius_m: number}|null} input.expected
+ * @param {{location_request_id: string, place: string, name: string}|null} [input.approved]  an approved
+ *          day with no fence
  * @param {"on_site"|"hybrid"|"remote"} input.work_pattern
  * @param {number} input.max_accuracy_m
  * @returns {{verdict: string, reason: string|null, distance_m: number|null, radius_m: number|null,
  *            accuracy: "good"|"fair"|"poor"|null, place: "worksite"|"home"|null, worksite_id: string|null,
- *            worksite_name: string|null, home_id: string|null,
+ *            worksite_name: string|null, home_id: string|null, request_id: string|null, outside: string,
  *            result: "accepted"|"review"|"rejected", exception: string|null, retry_location: boolean}}
  */
-function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected, work_pattern: pattern, max_accuracy_m: maxAccuracyM }) {
+function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected, approved = null, work_pattern: pattern, max_accuracy_m: maxAccuracyM }) {
   const hasPoint = geo.isPoint(point);
   const accuracy =
     !hasPoint || accuracyM === null || accuracyM === undefined
@@ -48,21 +54,29 @@ function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: lo
         : Number(accuracyM) <= Number(maxAccuracyM)
           ? "fair"
           : "poor";
-  const atHome = Boolean(expected) && expected.kind === "home";
+  const atHome = Boolean(expected) && (expected.kind === "home" || expected.kind === "temporary_home");
+  const onApprovedDay = !expected && Boolean(approved);
   const base = {
     distance_m: null,
     radius_m: expected ? Number(expected.radius_m) : null,
     accuracy,
-    place: expected ? (atHome ? "home" : "worksite") : null,
+    place: expected ? expected.place || (atHome ? "home" : "worksite") : onApprovedDay ? approved.place : null,
     worksite_id: expected && !atHome ? expected.worksite_id : null,
-    worksite_name: expected ? expected.name : null,
+    worksite_name: expected ? expected.name : onApprovedDay ? approved.name : null,
     home_id: atHome ? expected.attendance_home_id || null : null,
+    request_id: (expected && expected.location_request_id) || (onApprovedDay ? approved.location_request_id : null),
+    // The exception an outside reading is, whether it is reviewed or rejected.
+    outside: atHome ? "outside_home" : "outside_worksite",
     retry_location: false,
   };
 
   let verdict;
   let reason = null;
-  if (pattern === "remote" && !expected) {
+  if (onApprovedDay) {
+    // An approved remote day or client visit with no fence: the approval is the check.
+    verdict = "not_applied";
+    reason = "approved_request";
+  } else if (pattern === "remote" && !expected) {
     // Nothing approved to match the reading to: People check it by hand, never a refusal.
     verdict = "unverified";
     reason = "no_home";
@@ -91,7 +105,7 @@ function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: lo
   return {
     ...judged,
     result: "review",
-    exception: verdict === "outside" ? (atHome ? "outside_home" : "outside_worksite") : "location_unverified",
+    exception: verdict === "outside" ? base.outside : "location_unverified",
   };
 }
 

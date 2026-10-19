@@ -58,6 +58,13 @@ const SCHEMES = Object.freeze({
     reset: "never",
     include_period: false,
   }, // M1 Home: one generated report file, "RPT-0001"
+  location_request: {
+    prefix: "WLR",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M1 attendance: a work location request, "WLR-0001" (seeded in 1392)
   query: {
     prefix: "QRY",
     padding: 4,

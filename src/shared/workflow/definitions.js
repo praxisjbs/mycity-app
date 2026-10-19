@@ -17,6 +17,8 @@
  * leave flow (docs/guides/foundation.md §6.5, seeded in 0499): the line manager, then
  * Operations & People when the request is over 5 days, a number Operations & People
  * change on Settings, Approvals.
+ * M1 adds `attendance.location_request` (docs/guides/attendance.md §6.11, seeded in
+ * 1392): a work location request, the line manager then Operations & People.
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -73,6 +75,28 @@ const DEFAULTS = Object.freeze({
         name: "Operations & People",
         approver: { type: "role", value: "operations_people" },
         condition: { field: "days", op: ">", value: 5 },
+        sla_hours: 48,
+      },
+    ],
+  },
+  // M1, seeded in 1392 (docs/guides/attendance.md §6.11).
+  "attendance.location_request": {
+    key: "attendance.location_request",
+    module: "people",
+    name: "Work Location Request",
+    description: "The line manager, then Operations & People.",
+    context: { days: "number" },
+    stages: [
+      {
+        key: "line_manager",
+        name: "Line Manager",
+        approver: { type: "manager_of_subject" },
+        sla_hours: 48,
+      },
+      {
+        key: "operations_people",
+        name: "Operations & People",
+        approver: { type: "role", value: "operations_people" },
         sla_hours: 48,
       },
     ],

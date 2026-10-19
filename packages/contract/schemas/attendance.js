@@ -89,12 +89,15 @@ const AttendanceToday = z
     work_pattern: WorkPattern,
     /**
      * Where the punch is matched: a worksite, a remote employee's approved home, a remote employee
-     * with no approved home yet (`remote`, judged unverified), or nowhere (`none`). `home_state` is
-     * the remote employee's home: approved, waiting on People, or none; null for anyone else.
+     * with no approved home yet (`remote`, judged unverified), or nowhere (`none`). On a day an
+     * approved work location request covers: its temporary home (`temporary_home`, fenced), or an
+     * approved remote day or client visit with no fence (`approved_day`, named in `name`).
+     * `home_state` is the remote employee's home: approved, waiting on People, or none; null for
+     * anyone else.
      */
     location: z
       .object({
-        kind: z.enum(["worksite", "home", "none", "remote"]),
+        kind: z.enum(["worksite", "home", "none", "remote", "temporary_home", "approved_day"]),
         name: z.string().nullable(),
         radius_m: z.number().int().nullable(),
         home_state: z.enum(["approved", "pending", "none"]).nullable(),
@@ -354,7 +357,7 @@ const DayDetail = z
     late_minutes: minutes,
     overtime_minutes: minutes,
     closed: z.boolean(),
-    expected_location: z.object({ name: z.string(), radius_m: z.number().int() }).strict().nullable(),
+    expected_location: z.object({ name: z.string(), radius_m: z.number().int().nullable() }).strict().nullable(),
     policy: z.object({ geofence_mode: PolicyMode, device_mode: PolicyMode }).strict(),
     open_exceptions: z.number().int().min(0),
   })
@@ -455,6 +458,94 @@ const HomeDecision = z
   });
 
 /* ------------------------------------------------------------------ *
+ * Work location requests: somewhere else to work for some days, approved
+ * by the line manager and then Operations & People (attendance.location_request)
+ * ------------------------------------------------------------------ */
+
+const LocationRequestType = z.enum(["temporary_home", "remote_day", "client_visit"]);
+const LocationRequestStatus = z.enum(["submitted", "approved", "rejected", "cancelled"]);
+
+/**
+ * A work location request. `home_latitude`, `home_longitude` and `accuracy_m` are a temporary
+ * home's reading (null for the other types, and below scope all for People). `waiting_on` is the
+ * stage it waits at; `can_decide` says whether that stage waits on the reader.
+ */
+const LocationRequest = z
+  .object({
+    location_request_id: uuid,
+    number: z.string(),
+    employee: PersonRef,
+    request_type: LocationRequestType,
+    starts_on: isoDate,
+    ends_on: isoDate,
+    days: z.number().int().min(1),
+    address: z.string().nullable(),
+    home_latitude: z.number().nullable(),
+    home_longitude: z.number().nullable(),
+    accuracy_m: z.number().nullable(),
+    reason: z.string(),
+    status: LocationRequestStatus,
+    workflow_instance_id: uuid.nullable(),
+    waiting_on: z.string().nullable(),
+    can_decide: z.boolean(),
+    requested_at: isoDateTime,
+    decided_at: isoDateTime.nullable(),
+    cancelled_at: isoDateTime.nullable(),
+    cancel_reason: z.string().nullable(),
+  })
+  .strict();
+const LocationRequestPage = Paged(LocationRequest);
+
+/**
+ * POST /attendance/me/requests. A temporary home carries one reading taken there and its address;
+ * a client visit its address; a remote day may name one. Who may ask which type, the spans and the
+ * overlap are the service's (guide §6.11).
+ */
+const LocationRequestCreate = z
+  .object({
+    request_type: LocationRequestType,
+    starts_on: isoDate,
+    ends_on: isoDate,
+    address: optionalText(300),
+    reason: text(500).refine((v) => v.length >= 10, "At least 10 characters"),
+    home_latitude: z.number().min(-90).max(90).nullable().optional(),
+    home_longitude: z.number().min(-180).max(180).nullable().optional(),
+    accuracy_m: z.number().min(0).max(100000).nullable().optional(),
+  })
+  .strict()
+  .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] })
+  .refine((v) => v.request_type === "remote_day" || Boolean(v.address), {
+    message: "Enter the address",
+    path: ["address"],
+  })
+  .refine(
+    (v) =>
+      v.request_type !== "temporary_home" ||
+      (typeof v.home_latitude === "number" && typeof v.home_longitude === "number" && typeof v.accuracy_m === "number"),
+    { message: "Take a reading there", path: ["home_latitude"] },
+  )
+  .refine((v) => v.request_type === "temporary_home" || (typeof v.home_latitude !== "number" && typeof v.home_longitude !== "number"), {
+    message: "Only for a temporary home",
+    path: ["home_latitude"],
+  });
+
+/** GET /attendance/me/requests: the person's own, newest first. */
+const MyLocationRequestListQuery = listQuery({ status: LocationRequestStatus.optional() }, ["starts_on"]);
+
+/** GET /attendance/requests: within the reader's `people` scope, waiting first. */
+const LocationRequestListQuery = listQuery(
+  {
+    status: LocationRequestStatus.optional(),
+    request_type: LocationRequestType.optional(),
+    employee_id: uuid.optional(),
+  },
+  ["starts_on", "requested_at"],
+);
+
+/** POST /attendance/me/requests/:id/cancel */
+const LocationRequestCancel = z.object({ reason: optionalText(500) }).strict();
+
+/* ------------------------------------------------------------------ *
  * Exports
  * ------------------------------------------------------------------ */
 
@@ -526,6 +617,31 @@ const TABLES = {
   HomeDecision: {
     table: "attendance_home",
     virtual: { decision: "written as attendance_home.status approved or rejected", reason: "attendance_home.decision_reason" },
+  },
+  LocationRequest: {
+    table: "attendance_location_request",
+    virtual: {
+      employee: "the person, from employee and department",
+      days: "calendar days from starts_on to ends_on",
+      home_latitude: "attendance_location_request.latitude, named for the personal-details mask",
+      home_longitude: "attendance_location_request.longitude, named for the personal-details mask",
+      waiting_on: "the name of the approval stage it waits at, from workflow_instance",
+      can_decide: "whether that stage waits on the reader (shared/workflow/approvers.js)",
+    },
+  },
+  LocationRequestPage: { table: null, reason: "a page of work location requests" },
+  LocationRequestCreate: {
+    table: "attendance_location_request",
+    virtual: {
+      home_latitude: "written to attendance_location_request.latitude",
+      home_longitude: "written to attendance_location_request.longitude",
+    },
+  },
+  MyLocationRequestListQuery: { table: null, reason: "list controls for the person's own requests" },
+  LocationRequestListQuery: { table: null, reason: "list controls for People's requests" },
+  LocationRequestCancel: {
+    table: null,
+    reason: "why a request is withdrawn or cancelled; kept on the request and the audit row",
   },
   AttendanceToday: {
     table: null,
@@ -664,4 +780,12 @@ module.exports = {
   HomeRequestPage,
   HomeListQuery,
   HomeDecision,
+  LocationRequestType,
+  LocationRequestStatus,
+  LocationRequest,
+  LocationRequestPage,
+  LocationRequestCreate,
+  MyLocationRequestListQuery,
+  LocationRequestListQuery,
+  LocationRequestCancel,
 };

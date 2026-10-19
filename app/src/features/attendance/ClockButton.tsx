@@ -227,11 +227,21 @@ function ClockPanel({ close }: { close: () => void }) {
       ? `${t.location.name} · ${t.location.radius_m} m`
       : t.location.kind === "home"
         ? `Approved Home · ${t.location.radius_m} m`
-        : t.location.kind === "remote"
-          ? t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
-          : "No Worksite Assigned";
+        : t.location.kind === "temporary_home"
+          ? `Temporary Home · ${t.location.radius_m} m`
+          : t.location.kind === "approved_day"
+            ? (t.location.name ?? "Approved Request")
+            : t.location.kind === "remote"
+              ? t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
+              : "No Worksite Assigned";
   const punchName = eventType === "clock_out" ? "clock-out" : "clock-in";
-  const askText = t.location.kind === "remote" ? `Your ${punchName} goes to People with your location.` : `Your ${punchName} is matched to ${t.location.kind === "home" ? "your approved home" : t.location.name}.`;
+  const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home" };
+  const askText =
+    t.location.kind === "remote"
+      ? `Your ${punchName} goes to People with your location.`
+      : t.location.kind === "approved_day"
+        ? `Your ${punchName} is recorded with your location.`
+        : `Your ${punchName} is matched to ${MATCHED[t.location.kind] ?? t.location.name}.`;
   const toHome = () => (close(), navigate(hrefFor("ess", "my-attendance", { home: "set" })));
   const unregistered = t.device.state !== "registered";
   const deviceHelp =

@@ -13,6 +13,9 @@
  *   POST  /me/export                     my month, emailed as a workbook
  *   GET   /me/records/:id                the day a link to my day or exception opens
  *   GET   /me/home, POST /me/home        my home location, and a new one for People (remote)
+ *   GET   /me/requests, POST /me/requests  my work location requests, and a new one (approval)
+ *   GET   /me/requests/:id               one of mine
+ *   POST  /me/requests/:id/cancel        withdraw or cancel one of mine
  *
  * People, within the `people` grant's scope (all, team, own):
  *   GET   /register, /summary            the day's register and its figures (view)
@@ -24,6 +27,8 @@
  *   GET   /homes, /homes/:id             remote staff's home locations (view; the address
  *                                        and the point for scope all only)
  *   POST  /homes/:id/decision            approve or reject one (approve, scope all; never your own)
+ *   GET   /requests, /requests/:id       work location requests (view); decided through the
+ *                                        approval's own routes (/workflow/instances/:id/...)
  *   POST  /export                        the register over up to 31 days, emailed (export)
  */
 const express = require("express");
@@ -82,6 +87,23 @@ route(router, "post", "/me/home",
   { body: a.HomeRequestCreate, response: a.MyHome, self: true, summary: "Send my home location for approval" },
   controller.requestHome);
 
+route(router, "get", "/me/requests",
+  { query: a.MyLocationRequestListQuery, response: a.LocationRequestPage, self: true, summary: "My work location requests" },
+  controller.myRequests);
+
+route(router, "post", "/me/requests",
+  { body: a.LocationRequestCreate, response: a.LocationRequest, self: true, summary: "Ask to work somewhere else for some days" },
+  controller.requestLocation);
+
+route(router, "get", "/me/requests/:id",
+  { params: c.common.IdParams, response: a.LocationRequest, self: true, summary: "One of my work location requests" },
+  controller.myRequest);
+
+route(router, "post", "/me/requests/:id/cancel",
+  { params: c.common.IdParams, body: a.LocationRequestCancel, response: a.LocationRequest, self: true,
+    summary: "Withdraw or cancel one of my work location requests" },
+  controller.cancelRequest);
+
 route(router, "get", "/register",
   { query: a.RegisterQuery, response: a.RegisterPage, summary: "The attendance register for a day" },
   requirePermission("people", "view"), controller.register);
@@ -123,6 +145,14 @@ route(router, "post", "/homes/:id/decision",
   { params: c.common.IdParams, body: a.HomeDecision, response: a.HomeRequest,
     summary: "Approve or reject a home location" },
   requirePermission("people", "approve"), controller.decideHome);
+
+route(router, "get", "/requests",
+  { query: a.LocationRequestListQuery, response: a.LocationRequestPage, summary: "Work location requests" },
+  requirePermission("people", "view"), controller.requests);
+
+route(router, "get", "/requests/:id",
+  { params: c.common.IdParams, response: a.LocationRequest, summary: "One work location request" },
+  requirePermission("people", "view"), controller.request);
 
 route(router, "post", "/export",
   { body: a.RegisterExportRequest, response: a.AttendanceExportQueued, summary: "Email the register" },

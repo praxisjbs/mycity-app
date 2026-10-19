@@ -4,7 +4,8 @@
  * within the reader's `people` scope, as People · Attendance shows them. A day opens on
  * People · Attendance (the person's own on ESS · My Attendance); an exception opens the
  * same way (shared/route-map.js attendance_record, attendance_exception). A remote
- * employee's home location is found by their name and opens in Homes; never by its address.
+ * employee's home location is found by their name and opens in Homes; a work location request
+ * by its number or the person's name, and opens in Requests. Neither by its address.
  */
 const { recordProvider } = require("../../shared/search/provider");
 
@@ -49,5 +50,18 @@ module.exports = [
       "h.attendance_home_id AS id, to_char(h.requested_at, 'DD/MM/YYYY') AS ref, btrim(e.first_name || ' ' || e.last_name) AS title, h.status AS sub, h.status AS status",
     order: "h.requested_at DESC",
     scope: { column: "h.employee_id" },
+  }),
+  recordProvider({
+    type: "attendance_location_request",
+    module: "people",
+    label: "Work Location Requests",
+    words: ["work location", "location request", "remote day", "client visit", "temporary home"],
+    from: "attendance_location_request r JOIN employee e ON e.employee_id = r.employee_id",
+    key: "r.location_request_id",
+    columns: ["r.number", "e.first_name", "e.last_name", "e.preferred_name"],
+    select:
+      "r.location_request_id AS id, r.number AS ref, btrim(e.first_name || ' ' || e.last_name) AS title, replace(r.request_type, '_', ' ') AS sub, r.status AS status",
+    order: "r.requested_at DESC",
+    scope: { column: "r.employee_id" },
   }),
 ];

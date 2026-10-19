@@ -181,6 +181,13 @@ const ENTITY_ROUTES = Object.freeze({
     param: "home",
     self: screen("ess", "my-attendance"),
   },
+  // A work location request: People · Attendance opens it in Requests (`?request=`); the
+  // person's own opens on Work Location Requests.
+  attendance_location_request: {
+    ...screen("people", "attendance"),
+    param: "request",
+    self: screen("ess", "work-location-requests"),
+  },
   leave_request: {
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),
