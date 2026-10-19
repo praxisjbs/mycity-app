@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 30 | 2 | 0 | 28 | 0 | 0 |
+| M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -51,12 +51,13 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 7 | 7 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 10 | 3 | 0 | 7 | 0 | 0 |
+| M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **59** | **0** | **35** | **0** | **0** |
+| **Total** | **94** | **58** | **0** | **36** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
-milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). M4 and M5 include their public-site
+milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
+Updates (M9) is built with Settings · Attendance Policy (owner decision, 19/10/2026). M4 and M5 include their public-site
 pages. Settings → Notifications is counted in M6, where it is built.
 
 ---
@@ -581,10 +582,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
-| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · LA · Home · Team (#86) and Clocked In Today: the roster's `field` status (`docs/guides/attendance.md` §6.9, §6.12; `docs/guides/home.md` §6): someone present on a field assignment's day reads Field, counted in Present Today and Clocked In Today, with a Field chip on Team and in Clocked In Today's groups, and the site in the Worksite column. Team's four cards are unchanged. Left: nothing.
 - 18/10/2026 · TB · Home PR 5 (`m1/home-reports`): Reports #3 built on the real API, desktop and
   phone, which completes Home. `src/modules/reports`: the source registry (Daily Attendance, Leave,
   Open Alerts, Headcount, the four forward sources and the reader's own Overview, each over its
@@ -686,20 +688,22 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
+| 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 89 | Policy Updates | `policy-updates` | M1 | LA | ☐ | ☐ | ☐ | Not started | |
+| 89 | Policy Updates | `policy-updates` | M9 | LA | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · LA · My Attendance (#9): Field Assignments, the person's in progress and to come (number and name, dates, the site), each opening with the client, its sites with their address and radius, and who else is on it; on an assignment's day the clock names its site (both, "A or B", when there are two) and matches the punch to the nearer, as a worksite. Opened from a notice by `?assignment=`. Checked by a screen test and on the mock at 390 and 1440 px (Adedotun). Left: nothing.
+- 19/10/2026 · LA · Work Location Requests (#87) built on the real API (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.11): a temporary home (remote staff, with one reading taken there and refused when too coarse), a remote day (on-site and hybrid staff) or a client visit (anyone), for at most 90, 5 or 14 days, from today and within 90 days, never overlapping another. Each is numbered `WLR-0001` and approved by the line manager, then Operations & People; the person withdraws one waiting or cancels an approved one before its first day, and each request opens with its approval route and every decision's reason. On an approved day the clock names the place (Temporary Home · 100 m, or the request), fences a temporary home like a home, and otherwise keeps the reading as evidence; a present remote day counts as remote on Home's roster. A request waiting on someone is in their Need You on Home and opens on People · Attendance. ⌘K: New Request and the requests by number. Checked by 3 screen tests and 6 integration tests, and on the mock at 390 and 1440 px (Chidera, Kemi, Cynthia). Policy Updates (#89) moves to M9 with Settings · Attendance Policy (owner decision, 19/10/2026). Left: field assignments.
 - 19/10/2026 · TB · ESS · Org Chart (#91), TB's four decisions on the phone (`docs/guides/organogram.md`
   §8, §10.2): a Focus or Everyone switch, opening on Focus at the person looking, with the path
   from the top, their team, Dotted Line and Same Manager; Everyone opens the way down to them and
@@ -710,7 +714,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   CEO, instead of a card of their own with nowhere to go; on a phone a search lists the matching
   cards to tap, and anyone else at the top is listed under Also At The Top (`docs/guides/organogram.md`
   §10.2). The build account now sits under the CTO, so it opens with Reports To. Left: nothing.
-
+- 18/10/2026 · LA · My Attendance (#9): remote staff are fenced on an approved home (owner decision, 18/10/2026; `docs/guides/attendance.md` §6.5, §6.10). A remote employee sees a Home Location card first (Approved, Waiting, Not Set, or Rejected with People's reason) and sends their home from Set Home Location: one reading taken at home, refused when coarser than the policy's accuracy, and the address in their words. The clock panel asks a remote employee for their location too, matches it to the approved home (100 m), and without one shows No Approved Home with Set Home and sends the punch to People's review, never rejected. Checked on the mock at 390 and 1440 px through People's side; the card and sheet by 3 panel tests (the demonstration sign-ins work hybrid). Left: hybrid staff's home days (a per-day schedule), temporary homes (#87).
 - 18/10/2026 · AJ · My Attendance (#9): the 12 October asks (`docs/guides/ess.md` §13) on LA's screen, LA to review: the month picker beside Export Month (arrows, or a year and month picked directly), the share of days present on Late Days, Days Present, Late Days and Absent opening their days paged at 25 (`GET /attendance/me` takes `status`), and the days as a table or a chart of hours. Leave on staging: `seeds/staging/30_leave.js` puts the mock's twelve sample requests on the real staff through the leave service. My Leave (#12) gains Leave Calendar (`GET /ess/leave/calendar`): approved and waiting leave for the reader and everyone under them, everyone for the CEO and Operations & People (the team lead, 18/10/2026).
 - 17/10/2026 · LA · My Attendance (#9) and My Devices (#88) on the real API (`docs/guides/attendance.md`): the clock panel (location read only after the press, the worksite named first; Retry Location and Clock In Anyway; No Connection keeps the punch's key and body for Try Again; the server's result, with Send Note on a punch under review), the month's figures and days with each day's punches, open exceptions with Explain, Export Month by email; My Devices lists the person's devices, registers this one behind a fresh sign-in (three at most) and removes one. Checked on the real API at 390 and 1440 px. Left: Work Location Requests (#87) and Policy Updates (#89) stay on INTERIM shapes until home locations and policy versions are decided (attendance guide §13).
 - 17/10/2026 · AJ · My Profile (#8) on the real API: the caller's record from the employee 360 (account by its last four digits), Edit Profile for phone, home address, next of kin and bank through the organisation service (a bank change tells `people` edit holders), Record History, the organisation's working week (Saturday 09:00 to 15:00). Screen on `contract.gen.ts`, INTERIM `MyProfile` gone, mock in the contract's shapes; 5 integration tests. Left, each needing a module AJ does not own: the photo (`employee.photo_document_id`, written by the organisation module, read by the shell and Community; GE, TB), each person's own schedule (LA, attendance), Download My Data.
@@ -797,7 +801,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -805,6 +809,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · LA · People · Attendance (#25): Field beside Requests, field assignments (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.12). A line manager (their team) or People (anyone) send one to 25 people to one or two sites, typed with a centre and a radius of 100 to 500 m, for up to 31 days from today: New Assignment, numbered `FA-0001`, in force at once, each person told. Never yourself; one active assignment a person a day. An assignment opens with its details, sites and people; Take Off (a reason, never the last) and Cancel Assignment (a reason) while it runs. On its days it decides the place before anything else; beyond every site is outside the worksite, named with the nearer. Search finds one by number, name, client or person. `1330`, `1393`; seven routes; three events. Checked by 5 integration tests, 2 screen tests and on the mock at 390 and 1440 px (Cynthia). Left: adding people to an assignment or changing its sites and dates (cancel and set a new one); fencing a site from its address once address search exists (F21).
+- 19/10/2026 · LA · People · Attendance (#25): Requests beside Homes, the work location requests in the reader's scope waiting first (Waiting, Approved, Rejected, Cancelled, All), searched by name or number, each opening with its details, its approval route and the decisions so far; Record Decision (Approve, or Reject with the reason the person reads) when its stage waits on the reader, through the approval's own routes. The temporary home's point is shown to People with scope all only. Left: nothing.
 - 19/10/2026 · TB · People · Organogram (#92), TB's four decisions on the phone
   (`docs/guides/organogram.md` §5 to §8, §10): Focus and Everyone, opening on Everyone, the whole
   company as one folding list; Focus has the path from the top, each card's team ("3 direct · 13 in
@@ -827,7 +833,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   any other card at the top. Loops through a seat are refused. Left: staging takes the sheet's
   corrections on screen and the roster step goes back on the server
   (`docs/runbooks/staff-roster.md` §2, §6).
-
+- 18/10/2026 · LA · People · Attendance (#25): Homes beside Register and Exceptions, remote staff's home locations waiting first (Waiting, Approved, Rejected, All), each with the person, accuracy, when it was sent, how far it is from the home in force and, for scope all, the address and point (masked under personal details); People with scope all approve or reject one (a reason the person reads, never their own), and a link opens it (`?home=`). A remote punch outside the approved home is `outside_home` (warn reviews, block rejects); no approved home is Location Unverified for review. `attendance_home`, `home_radius_m` and the type in `1310`, its name in `1391`; five routes, two events; no address or point in any event, notification, audit line, AI read or search result. 41 integration tests on the real migrations, 35 unit tests. Left: hybrid staff's home days, temporary homes and field assignments (§13).
 - 17/10/2026 · LA · People · Attendance (#25), Devices (#27) and Worksites (#28) on the real API (`docs/guides/attendance.md`): modules `attendance`, `devices`, `worksites`, migration `1300`, reference seed `1390`. The punch is judged on the server (clock guard, geofence off, warn or block, device off, warn or block, device time ahead), recorded with its evidence and the day in one transaction with its event, audit and outbox rows, under an advisory lock and an Idempotency-Key; the day-close (01:30) opens missing clock-outs and absences once. People see the day's figures and register within their scope, a person's day with each punch's evidence (coordinates for scope all only), and decide exceptions (accept, reject, add the clock-out; scope all, never their own); Export Register emails up to 31 days. Devices: Remove Device with a reason. Worksites: add, edit, retire, restore, assign. 34 integration tests on the real migrations, 43 unit tests, 4 panel tests; checked on the real API at 390 and 1440 px. Left: the map and address search (F21), field assignments and approved homes (§13), the late-query rule (M3), Settings · Attendance Policy (M9).
 - 17/10/2026 · AJ · People · Leave (#26): Leave Types (add, change, retire; delete only a type nothing has used, `LEAVE_TYPE_IN_USE` otherwise) and Allowances (one person's allowance of a type for a year, or back to the type's; the person is told). The four types are seeded in `seeds/reference/1290_seed_leave.sql` with DO NOTHING, by the team lead's decision of 17/10/2026 (an exception to A26), replacing the staging seed. 15 leave integration tests.
 - 17/10/2026 · AJ · People · Leave (#26) on the real API: the `leave` module (`/api/v1/leave`): requests within the `people` scope (Operations & People everyone, a line manager their team) with search, status, type, employee and date filters; the four figures; Also Away (who else in the department is away on those days); Record Leave for someone, approved at once and the person told (`people` create); cancel granted leave before it ends (`people` edit); leave types listed for every form and added or changed by People. Approve and Reject use the approval's own routes. `1200` checks the four statuses and indexes the lists, `1290` adds Cancelled to the code list. Leave types and allowances followed the same day (note above).

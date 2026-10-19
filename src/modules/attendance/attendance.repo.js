@@ -1,8 +1,10 @@
 "use strict";
 /**
  * Attendance: the SQL. Writes only the attendance tables (attendance_event,
- * attendance_day, attendance_exception); reads employee, worksite, leave and the
- * working week for what a day means. Never emits (BACKEND_GUIDE §2).
+ * attendance_day, attendance_exception, attendance_home, attendance_location_request and the
+ * field assignment tables attendance_field_assignment, _site and _member); reads
+ * employee, worksite, leave, approvals and the working week for what a day means. Never emits
+ * (BACKEND_GUIDE §2).
  *
  * attendance_event is append-only (a trigger refuses UPDATE and DELETE): a decision on
  * an exception is written on the exception, and a correction is a new event.
@@ -13,6 +15,7 @@
  */
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+const approvers = require("../../shared/workflow/approvers");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -36,6 +39,16 @@ const PERSON = (alias = "e", dept = "d") => `json_build_object(
   'display_name', btrim(${alias}.first_name || ' ' || ${alias}.last_name),
   'job_title', ${alias}.job_title,
   'department', ${dept}.name)`;
+
+/** A work location request's place, named as the register and a punch show it (§6.11). */
+const REQUEST_PLACE = (col) =>
+  `CASE ${col} WHEN 'temporary_home' THEN 'Temporary Home' WHEN 'remote_day' THEN 'Remote Day'
+     WHEN 'client_visit' THEN 'Client Visit' END`;
+
+/** The place a punch was judged against, named, when it was not a worksite (§6.10 to §6.12). */
+const PUNCH_PLACE = `COALESCE(w.name, CASE ev.validation #>> '{geofence,place}' WHEN 'home' THEN 'Home'
+  WHEN 'field' THEN ev.validation #>> '{geofence,worksite_name}'
+  ELSE ${REQUEST_PLACE("ev.validation #>> '{geofence,place}'")} END)`;
 
 const nameOf = (alias) =>
   `CASE WHEN ${alias}.employee_id IS NULL THEN NULL ELSE btrim(${alias}.first_name || ' ' || ${alias}.last_name) END`;
@@ -64,7 +77,7 @@ function person(db, employeeId) {
 }
 
 const POLICY = `p.attendance_policy_id, p.name, p.grace_minutes, p.latest_clock_out_minutes,
-  p.geofence_mode, p.device_mode, p.max_accuracy_m`;
+  p.geofence_mode, p.device_mode, p.max_accuracy_m, p.home_radius_m`;
 
 /** The person's own policy and worksite for a date, when People set one (effective-dated). */
 function assignedPolicy(db, employeeId, date) {
@@ -132,7 +145,8 @@ async function eventsOn(db, employeeId, date) {
 }
 
 const EVENT_RESULT = `ev.attendance_event_id, ev.employee_id, ev.event_type, ev.validation_state, ev.occurred_at,
-  ev.device_at, ev.work_date, ev.distance_m::float8 AS distance_m, ev.validation, w.name AS worksite_name`;
+  ev.device_at, ev.work_date, ev.distance_m::float8 AS distance_m, ev.validation,
+  ${PUNCH_PLACE} AS worksite_name`;
 
 /** The punch an idempotency key already made, or null. */
 function eventByKey(db, employeeId, key) {
@@ -313,7 +327,7 @@ function listEvents(db, employeeId, date, query, { coordinates }) {
             CASE WHEN $3::boolean THEN ev.latitude::float8 END AS latitude,
             CASE WHEN $3::boolean THEN ev.longitude::float8 END AS longitude,
             ev.accuracy_m::float8 AS accuracy_m, ev.distance_m::float8 AS distance_m,
-            w.name AS worksite_name,
+            ${PUNCH_PLACE} AS worksite_name,
             COALESCE(ev.validation #>> '{geofence,verdict}', 'not_applied') AS geofence,
             ev.validation #>> '{geofence,reason}' AS location_reason,
             adv.label AS device_label,
@@ -436,7 +450,13 @@ const REGISTER = `
          ad.attendance_day_id, ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
          COALESCE(ad.worked_minutes, 0) AS worked_minutes, COALESCE(ad.late_minutes, 0) AS late_minutes,
          COALESCE(ad.overtime_minutes, 0) AS overtime_minutes, ad.closed_at,
-         CASE WHEN e.work_pattern = 'remote' THEN 'Remote' WHEN w.active THEN w.name END AS expected_location,
+         CASE WHEN fa.sites IS NOT NULL THEN fa.sites
+              WHEN lr.request_type IS NOT NULL THEN ${REQUEST_PLACE("lr.request_type")}
+              WHEN e.work_pattern = 'remote'
+              THEN CASE WHEN EXISTS (SELECT 1 FROM attendance_home ah
+                                      WHERE ah.employee_id = e.employee_id AND ah.status = 'approved')
+                        THEN 'Home' ELSE 'Remote' END
+              WHEN w.active THEN w.name END AS expected_location,
          CASE WHEN w.active THEN w.radius_m END AS expected_radius_m,
          last.validation #>> '{geofence,verdict}' AS location_verdict,
          last.device_label,
@@ -450,6 +470,22 @@ const REGISTER = `
     LEFT JOIN department d ON d.department_id = e.department_id
     LEFT JOIN worksite w ON w.worksite_id = e.worksite_id
     LEFT JOIN attendance_day ad ON ad.employee_id = e.employee_id AND ad.attendance_date = $1::date
+    LEFT JOIN LATERAL (
+      -- At most one active field assignment covers a person's day (attendance.assignments.js): its
+      -- sites' names, read unpaged with min().
+      SELECT min((SELECT string_agg(fs.name, ' or ' ORDER BY fs.position) FROM attendance_field_site fs
+                   WHERE fs.field_assignment_id = fx.field_assignment_id)) AS sites
+        FROM attendance_field_member fm
+        JOIN attendance_field_assignment fx ON fx.field_assignment_id = fm.field_assignment_id
+       WHERE fm.employee_id = e.employee_id AND fm.removed_at IS NULL AND fx.status = 'active'
+         AND fx.starts_on <= $1::date AND fx.ends_on >= $1::date
+    ) fa ON true
+    LEFT JOIN LATERAL (
+      -- At most one approved request covers a day (attendance.requests.js); min() reads it unpaged.
+      SELECT min(x.request_type) AS request_type FROM attendance_location_request x
+       WHERE x.employee_id = e.employee_id AND x.status = 'approved'
+         AND x.starts_on <= $1::date AND x.ends_on >= $1::date
+    ) lr ON true
     LEFT JOIN (
       SELECT DISTINCT ON (ev.employee_id) ev.employee_id, ev.validation, adv.label AS device_label
         FROM attendance_event ev
@@ -572,6 +608,494 @@ async function withoutDay(db, date) {
   return rows;
 }
 
+
+/* ------------------------------------------------------------------ *
+ * Home locations (attendance.home.js)
+ * ------------------------------------------------------------------ */
+
+const HOME = `h.attendance_home_id, h.employee_id, h.status, h.address, h.latitude::float8 AS latitude,
+  h.longitude::float8 AS longitude, h.accuracy_m::float8 AS accuracy_m, h.requested_at, h.decided_at,
+  h.decision_reason`;
+
+/** The person's approved home, the fence a remote punch is judged against, or null. */
+function approvedHome(db, employeeId) {
+  return one(db, `SELECT ${HOME} FROM attendance_home h WHERE h.employee_id = $1 AND h.status = 'approved'`, [
+    employeeId,
+  ]);
+}
+
+/**
+ * The person's homes as My Attendance shows them: the approved one, the one waiting, and the
+ * newest request when People rejected it (until the person sends another).
+ */
+async function homesOf(db, employeeId) {
+  // One after the other: `db` may be a transaction's client, which runs one query at a time.
+  const approved = await approvedHome(db, employeeId);
+  const pending = await one(db, `SELECT ${HOME} FROM attendance_home h WHERE h.employee_id = $1 AND h.status = 'pending'`, [
+    employeeId,
+  ]);
+  const newest = await one(
+    db,
+    `SELECT ${HOME} FROM attendance_home h WHERE h.employee_id = $1
+      ORDER BY h.requested_at DESC, h.attendance_home_id DESC LIMIT 1`,
+    [employeeId],
+  );
+  return { approved, pending, rejected: newest && newest.status === "rejected" ? newest : null };
+}
+
+/** A request still waiting stops waiting: the newer one replaces it. */
+function supersedePending(client, employeeId) {
+  return client.query(
+    "UPDATE attendance_home SET status = 'superseded' WHERE employee_id = $1 AND status = 'pending'",
+    [employeeId],
+  );
+}
+
+function insertHome(client, h) {
+  return one(
+    client,
+    `INSERT INTO attendance_home (employee_id, address, latitude, longitude, accuracy_m, requested_by)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING ${HOME.replace(/h\./g, "")}`,
+    [h.employee_id, h.address, h.latitude, h.longitude, h.accuracy_m, h.requested_by],
+  );
+}
+
+/** One home location with its owner, locked for a decision when `forUpdate`. */
+function getHome(db, id, { forUpdate = false } = {}) {
+  return one(
+    db,
+    `SELECT ${HOME} FROM attendance_home h WHERE h.attendance_home_id = $1${forUpdate ? " FOR UPDATE" : ""}`,
+    [id],
+  );
+}
+
+/** Approve: the home in force before it is superseded, then this one is approved. */
+async function approveHome(client, id, employeeId, by) {
+  await client.query(
+    "UPDATE attendance_home SET status = 'superseded' WHERE employee_id = $1 AND status = 'approved'",
+    [employeeId],
+  );
+  return one(
+    client,
+    `UPDATE attendance_home SET status = 'approved', decided_by = $2, decided_at = now()
+      WHERE attendance_home_id = $1 AND status = 'pending' RETURNING attendance_home_id`,
+    [id, by],
+  );
+}
+
+function rejectHome(client, id, by, reason) {
+  return one(
+    client,
+    `UPDATE attendance_home SET status = 'rejected', decided_by = $2, decided_at = now(), decision_reason = $3
+      WHERE attendance_home_id = $1 AND status = 'pending' RETURNING attendance_home_id`,
+    [id, by, reason],
+  );
+}
+
+const HOME_SORTS = {
+  waiting: "(h.status = 'pending') DESC, h.requested_at DESC",
+  requested_at: "h.requested_at",
+};
+
+/**
+ * Home locations as People read them. `$1` says whether the address and the point travel
+ * (scope all); the request's point and the approved home's come along for the distance and
+ * are dropped by the service.
+ */
+const HOME_ROWS = (extra = "") => `SELECT h.attendance_home_id, ${PERSON()} AS employee, h.status,
+            CASE WHEN $1::boolean THEN h.address END AS home_address,
+            CASE WHEN $1::boolean THEN h.latitude::float8 END AS home_latitude,
+            CASE WHEN $1::boolean THEN h.longitude::float8 END AS home_longitude,
+            h.accuracy_m::float8 AS accuracy_m, h.requested_at, h.decided_at,
+            ${nameOf("de")} AS decided_by_name, h.decision_reason,
+            h.latitude::float8 AS point_latitude, h.longitude::float8 AS point_longitude,
+            ap.latitude::float8 AS approved_latitude, ap.longitude::float8 AS approved_longitude${extra}
+       FROM attendance_home h
+       JOIN employee e ON e.employee_id = h.employee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+       LEFT JOIN app_user du ON du.user_id = h.decided_by
+       LEFT JOIN employee de ON de.employee_id = du.employee_id
+       LEFT JOIN attendance_home ap
+         ON ap.employee_id = h.employee_id AND ap.status = 'approved' AND ap.attendance_home_id <> h.attendance_home_id`;
+
+/** A page of home locations within the reader's scope, waiting first. */
+function listHomes(db, query, scope, { place }) {
+  const params = [Boolean(place), query.status || null, query.employee_id || null, query.q || null];
+  const s = scopeClause(scope, { column: "h.employee_id" }, params);
+  return pageQuery(
+    db,
+    `${HOME_ROWS(`, ${TOTAL_COL}`)}
+      WHERE ($2::text IS NULL OR h.status = $2)
+        AND ($3::uuid IS NULL OR h.employee_id = $3)
+        AND ($4::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name || ' ' || COALESCE(e.preferred_name, ''))
+                                  LIKE '%' || search_fold($4) || '%')
+        ${s.and}
+      ORDER BY ${orderBy(query, HOME_SORTS, "h.attendance_home_id")}`,
+    params,
+    query,
+  );
+}
+
+/** One home location as People read it (the caller checked the scope). */
+function homeRow(db, id, { place }) {
+  return one(db, `${HOME_ROWS()} WHERE h.attendance_home_id = $2`, [Boolean(place), id]);
+}
+
+/* ------------------------------------------------------------------ *
+ * Work location requests (attendance.requests.js)
+ * ------------------------------------------------------------------ */
+
+const REQUEST = `r.location_request_id, r.number, r.employee_id, r.request_type, r.starts_on, r.ends_on,
+  r.address, r.latitude::float8 AS latitude, r.longitude::float8 AS longitude, r.accuracy_m::float8 AS accuracy_m,
+  r.reason, r.status, r.workflow_instance_id`;
+
+/** The approved request covering a person's work date, if any (two never overlap, §6.11). */
+function approvedRequestOn(db, employeeId, date) {
+  return one(
+    db,
+    `SELECT ${REQUEST} FROM attendance_location_request r
+      WHERE r.employee_id = $1 AND r.status = 'approved' AND r.starts_on <= $2::date AND r.ends_on >= $2::date
+      ORDER BY r.starts_on LIMIT 1`,
+    [employeeId, date],
+  );
+}
+
+/** A request of the person's, waiting or approved, sharing a day with `from`..`to`. */
+function overlappingRequest(db, employeeId, from, to) {
+  return one(
+    db,
+    `SELECT r.location_request_id, r.number FROM attendance_location_request r
+      WHERE r.employee_id = $1 AND r.status IN ('submitted', 'approved')
+        AND r.starts_on <= $3::date AND r.ends_on >= $2::date
+      ORDER BY r.starts_on LIMIT 1`,
+    [employeeId, from, to],
+  );
+}
+
+function insertRequest(client, r) {
+  return one(
+    client,
+    `INSERT INTO attendance_location_request
+       (number, employee_id, request_type, starts_on, ends_on, address, latitude, longitude, accuracy_m, reason, requested_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     RETURNING location_request_id`,
+    [
+      r.number,
+      r.employee_id,
+      r.request_type,
+      r.starts_on,
+      r.ends_on,
+      r.address,
+      r.latitude,
+      r.longitude,
+      r.accuracy_m,
+      r.reason,
+      r.requested_by,
+    ],
+  );
+}
+
+function setRequestWorkflow(client, id, workflowInstanceId) {
+  return client.query("UPDATE attendance_location_request SET workflow_instance_id = $2 WHERE location_request_id = $1", [
+    id,
+    workflowInstanceId,
+  ]);
+}
+
+/** One request's own columns, without the person or the approval. */
+function getRequest(db, id) {
+  return one(db, `SELECT ${REQUEST} FROM attendance_location_request r WHERE r.location_request_id = $1`, [id]);
+}
+
+/** Copy an approval's outcome onto a request still waiting; null when it was not waiting. */
+function settleRequest(client, id, status) {
+  return one(
+    client,
+    `UPDATE attendance_location_request
+        SET status = $2,
+            decided_at = CASE WHEN $2 = 'cancelled' THEN decided_at ELSE now() END,
+            cancelled_at = CASE WHEN $2 = 'cancelled' THEN now() ELSE cancelled_at END
+      WHERE location_request_id = $1 AND status = 'submitted'
+      RETURNING location_request_id, employee_id, number`,
+    [id, status],
+  );
+}
+
+/** The person cancels a request still waiting or approved; null when it was neither. */
+function cancelRequest(client, id, reason) {
+  return one(
+    client,
+    `UPDATE attendance_location_request SET status = 'cancelled', cancelled_at = now(), cancel_reason = $2
+      WHERE location_request_id = $1 AND status IN ('submitted', 'approved')
+      RETURNING location_request_id`,
+    [id, reason || null],
+  );
+}
+
+const REQUEST_SORTS = {
+  waiting: "(r.status = 'submitted') DESC, r.requested_at DESC",
+  starts_on: "r.starts_on",
+  requested_at: "r.requested_at",
+};
+
+/**
+ * Requests as the screens read them. `$1` says whether a temporary home's point travels; `reader`
+ * (People's lists) works out whether the stage each one waits at names the reader, else none does.
+ */
+async function requestRows(db, { place, reader }, params) {
+  params.push(Boolean(place));
+  const placeParam = `$${params.length}`;
+  let canDecide = "false";
+  if (reader && reader.approves) {
+    const roleCodes = await approvers.roleCodesOf(db, reader.user.role_ids || []);
+    canDecide = `(wi.state = 'pending' AND ${approvers.waitingOnClause("wi", reader.user, roleCodes, params)})`;
+  }
+  return `SELECT r.location_request_id, r.number, ${PERSON()} AS employee, r.request_type, r.starts_on, r.ends_on,
+            (r.ends_on - r.starts_on + 1)::int AS days, r.address,
+            CASE WHEN ${placeParam}::boolean THEN r.latitude::float8 END AS home_latitude,
+            CASE WHEN ${placeParam}::boolean THEN r.longitude::float8 END AS home_longitude,
+            r.accuracy_m::float8 AS accuracy_m, r.reason, r.status, r.workflow_instance_id,
+            CASE WHEN wi.state = 'pending' THEN (
+              SELECT min(st ->> 'name') FROM workflow_definition wd, jsonb_array_elements(wd.stages) st
+               WHERE wd.workflow_definition_id = wi.workflow_definition_id AND st ->> 'key' = wi.current_stage
+            ) END AS waiting_on,
+            ${canDecide} AS can_decide,
+            r.requested_at, r.decided_at, r.cancelled_at, r.cancel_reason`;
+}
+
+const REQUEST_FROM = `
+       FROM attendance_location_request r
+       JOIN employee e ON e.employee_id = r.employee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+       LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = r.workflow_instance_id`;
+
+/** A page of requests within the reader's scope, waiting first (the person's own: newest first). */
+async function listRequests(db, query, scope, { place, reader, mine = false }) {
+  const params = [query.status || null, query.request_type || null, query.employee_id || null, query.q || null];
+  const select = await requestRows(db, { place, reader }, params);
+  const s = scopeClause(scope, { column: "r.employee_id" }, params);
+  const sorts = mine
+    ? { requested_at: "r.requested_at DESC", starts_on: REQUEST_SORTS.starts_on }
+    : REQUEST_SORTS;
+  return pageQuery(
+    db,
+    `${select}, ${TOTAL_COL}
+     ${REQUEST_FROM}
+      WHERE ($1::text IS NULL OR r.status = $1)
+        AND ($2::text IS NULL OR r.request_type = $2)
+        AND ($3::uuid IS NULL OR r.employee_id = $3)
+        AND ($4::text IS NULL OR search_fold(r.number || ' ' || e.first_name || ' ' || e.last_name || ' '
+                                             || COALESCE(e.preferred_name, '')) LIKE '%' || search_fold($4) || '%')
+        ${s.and}
+      ORDER BY ${orderBy(query, sorts, "r.location_request_id")}`,
+    params,
+    query,
+  );
+}
+
+/** One request as a screen reads it (the caller checked the scope). */
+async function requestRow(db, id, { place, reader }) {
+  const params = [id];
+  const select = await requestRows(db, { place, reader }, params);
+  return one(db, `${select} ${REQUEST_FROM} WHERE r.location_request_id = $1`, params);
+}
+
+/* ------------------------------------------------------------------ *
+ * Field assignments (attendance.assignments.js)
+ * ------------------------------------------------------------------ */
+
+/** An assignment's sites as JSON, in position order. */
+const SITES = (alias) => `COALESCE((
+  SELECT json_agg(json_build_object('field_site_id', fs.field_site_id, 'position', fs.position, 'name', fs.name,
+           'address', fs.address, 'latitude', fs.latitude::float8, 'longitude', fs.longitude::float8,
+           'radius_m', fs.radius_m) ORDER BY fs.position)
+    FROM attendance_field_site fs WHERE fs.field_assignment_id = ${alias}.field_assignment_id), '[]'::json)`;
+
+/** The active assignment a person is still on for a work date, with its sites (one a day, §6.12). */
+function fieldAssignmentOn(db, employeeId, date) {
+  return one(
+    db,
+    `SELECT a.field_assignment_id, a.number, a.name, ${SITES("a")} AS sites
+       FROM attendance_field_assignment a
+       JOIN attendance_field_member m ON m.field_assignment_id = a.field_assignment_id
+      WHERE m.employee_id = $1 AND m.removed_at IS NULL AND a.status = 'active'
+        AND a.starts_on <= $2::date AND a.ends_on >= $2::date
+      ORDER BY a.starts_on LIMIT 1`,
+    [employeeId, date],
+  );
+}
+
+/** Someone of `employeeIds` already on an active assignment sharing a day with `from`..`to`. */
+function overlappingAssignment(db, employeeIds, from, to) {
+  return one(
+    db,
+    `SELECT m.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, a.number
+       FROM attendance_field_member m
+       JOIN attendance_field_assignment a ON a.field_assignment_id = m.field_assignment_id
+       JOIN employee e ON e.employee_id = m.employee_id
+      WHERE m.employee_id = ANY($1::uuid[]) AND m.removed_at IS NULL AND a.status = 'active'
+        AND a.starts_on <= $3::date AND a.ends_on >= $2::date
+      ORDER BY a.starts_on, m.employee_id LIMIT 1`,
+    [employeeIds, from, to],
+  );
+}
+
+async function insertAssignment(client, a) {
+  const row = await one(
+    client,
+    `INSERT INTO attendance_field_assignment (number, name, client, note, starts_on, ends_on, assigned_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING field_assignment_id`,
+    [a.number, a.name, a.client, a.note, a.starts_on, a.ends_on, a.assigned_by],
+  );
+  for (const [i, site] of a.sites.entries())
+    await client.query(
+      `INSERT INTO attendance_field_site (field_assignment_id, position, name, address, latitude, longitude, radius_m)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [row.field_assignment_id, i + 1, site.name, site.address, site.latitude, site.longitude, site.radius_m],
+    );
+  await client.query(
+    `INSERT INTO attendance_field_member (field_assignment_id, employee_id)
+     SELECT $1, x FROM unnest($2::uuid[]) AS x`,
+    [row.field_assignment_id, a.employee_ids],
+  );
+  return row;
+}
+
+/** An assignment's own columns and who is still on it (sorted); locked when `forUpdate`. */
+function getAssignment(db, id, { forUpdate = false } = {}) {
+  return one(
+    db,
+    `SELECT a.field_assignment_id, a.number, a.name, a.starts_on, a.ends_on, a.status,
+            ARRAY(SELECT m.employee_id FROM attendance_field_member m
+                   WHERE m.field_assignment_id = a.field_assignment_id AND m.removed_at IS NULL
+                   ORDER BY m.employee_id) AS active_ids,
+            ARRAY(SELECT m.employee_id FROM attendance_field_member m
+                   WHERE m.field_assignment_id = a.field_assignment_id ORDER BY m.employee_id) AS member_ids
+       FROM attendance_field_assignment a WHERE a.field_assignment_id = $1${forUpdate ? " FOR UPDATE OF a" : ""}`,
+    [id],
+  );
+}
+
+/** Cancel an active assignment; null when it was not active. */
+function cancelAssignment(client, id, userId, reason) {
+  return one(
+    client,
+    `UPDATE attendance_field_assignment
+        SET status = 'cancelled', cancelled_at = now(), cancelled_by = $2, cancel_reason = $3
+      WHERE field_assignment_id = $1 AND status = 'active'
+      RETURNING field_assignment_id`,
+    [id, userId, reason],
+  );
+}
+
+/** Take one person off; null when they were not on it. */
+function removeMember(client, id, employeeId, userId, reason) {
+  return one(
+    client,
+    `UPDATE attendance_field_member SET removed_at = now(), removed_by = $3, removed_reason = $4
+      WHERE field_assignment_id = $1 AND employee_id = $2 AND removed_at IS NULL
+      RETURNING employee_id`,
+    [id, employeeId, userId, reason],
+  );
+}
+
+/** Where an assignment stands on the date `today` (a param), as the contract's FieldAssignmentState. */
+const STATE = (today) => `CASE WHEN a.status = 'cancelled' THEN 'cancelled'
+  WHEN a.starts_on > ${today}::date THEN 'upcoming'
+  WHEN a.ends_on < ${today}::date THEN 'done' ELSE 'in_progress' END`;
+
+/**
+ * Assignments as the screens read them. `changer` is the reader's `people` approve scope (null when
+ * they hold none): they may change an assignment that is active, not over, and has everyone still
+ * on it within that scope.
+ */
+function assignmentSelect(params, { today, changer }) {
+  params.push(today);
+  const t = `$${params.length}`;
+  let canChange = "false";
+  if (changer) {
+    const open = `(a.status = 'active' AND a.ends_on >= ${t}::date)`;
+    if (changer.scope === "all") canChange = open;
+    else {
+      params.push(changer.scope_ids || []);
+      canChange = `(${open} AND NOT EXISTS (
+        SELECT 1 FROM attendance_field_member mc
+         WHERE mc.field_assignment_id = a.field_assignment_id AND mc.removed_at IS NULL
+           AND NOT (mc.employee_id = ANY($${params.length}::uuid[]))))`;
+    }
+  }
+  return {
+    today: t,
+    sql: `SELECT a.field_assignment_id, a.number, a.name, a.client, a.note, a.starts_on, a.ends_on,
+            (a.ends_on - a.starts_on + 1)::int AS days, a.status, ${STATE(t)} AS state,
+            ${SITES("a")} AS sites,
+            COALESCE((
+              SELECT json_agg(json_build_object('employee', ${PERSON("me", "md")}, 'added_at', m.added_at,
+                       'removed_at', m.removed_at, 'removed_reason', m.removed_reason)
+                       ORDER BY m.removed_at NULLS FIRST, me.last_name, me.first_name)
+                FROM attendance_field_member m
+                JOIN employee me ON me.employee_id = m.employee_id
+                LEFT JOIN department md ON md.department_id = me.department_id
+               WHERE m.field_assignment_id = a.field_assignment_id), '[]'::json) AS members,
+            (SELECT count(*)::int FROM attendance_field_member mp
+              WHERE mp.field_assignment_id = a.field_assignment_id AND mp.removed_at IS NULL) AS people,
+            (SELECT btrim(ue.first_name || ' ' || ue.last_name) FROM app_user u
+               JOIN employee ue ON ue.employee_id = u.employee_id WHERE u.user_id = a.assigned_by) AS assigned_by_name,
+            a.assigned_at, a.cancelled_at, a.cancel_reason, ${canChange} AS can_change`,
+  };
+}
+
+const ASSIGNMENT_SORTS = {
+  current: `CASE ${STATE("$__today")} WHEN 'in_progress' THEN 0 WHEN 'upcoming' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
+            CASE WHEN a.ends_on < $__today::date THEN NULL ELSE a.starts_on END, a.ends_on DESC`,
+  starts_on: "a.starts_on",
+};
+
+/**
+ * A page of assignments: with anyone in `scope` on them (People's), or the person's own (`mine`,
+ * every one they are or were on). In progress and upcoming first.
+ */
+function listAssignments(db, query, scope, { today, changer, mine = null }) {
+  const params = [query.state || null, query.employee_id || null, query.q || null];
+  const { sql, today: t } = assignmentSelect(params, { today, changer });
+  let who;
+  if (mine) {
+    params.push(mine);
+    who = `AND EXISTS (SELECT 1 FROM attendance_field_member mv
+                        WHERE mv.field_assignment_id = a.field_assignment_id AND mv.employee_id = $${params.length})`;
+  } else {
+    const s = scopeClause(scope, { column: "mv.employee_id" }, params);
+    who = `AND EXISTS (SELECT 1 FROM attendance_field_member mv
+                        WHERE mv.field_assignment_id = a.field_assignment_id ${s.and})`;
+  }
+  const sorts = Object.fromEntries(Object.entries(ASSIGNMENT_SORTS).map(([k, v]) => [k, v.split("$__today").join(t)]));
+  return pageQuery(
+    db,
+    `${sql}, ${TOTAL_COL}
+       FROM attendance_field_assignment a
+      WHERE ($1::text IS NULL OR ${STATE(t)} = $1)
+        AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM attendance_field_member mf
+                                          WHERE mf.field_assignment_id = a.field_assignment_id AND mf.employee_id = $2))
+        AND ($3::text IS NULL OR search_fold(a.number || ' ' || a.name || ' ' || a.client || ' ' || COALESCE((
+              SELECT string_agg(mq.first_name || ' ' || mq.last_name || ' ' || COALESCE(mq.preferred_name, ''), ' ')
+                FROM attendance_field_member mm JOIN employee mq ON mq.employee_id = mm.employee_id
+               WHERE mm.field_assignment_id = a.field_assignment_id), '')) LIKE '%' || search_fold($3) || '%')
+        ${who}
+      ORDER BY ${orderBy(query, sorts, "a.field_assignment_id")}`,
+    params,
+    query,
+  );
+}
+
+/** One assignment as a screen reads it (the caller checked who may see it). */
+function assignmentRow(db, id, { today, changer }) {
+  const params = [id];
+  const { sql } = assignmentSelect(params, { today, changer });
+  return one(db, `${sql} FROM attendance_field_assignment a WHERE a.field_assignment_id = $1`, params);
+}
+
 module.exports = {
   WORKING_DAY,
   lockEmployee,
@@ -600,4 +1124,30 @@ module.exports = {
   attendanceStart,
   unclosedDays,
   withoutDay,
+  approvedHome,
+  homesOf,
+  supersedePending,
+  insertHome,
+  getHome,
+  approveHome,
+  rejectHome,
+  listHomes,
+  homeRow,
+  approvedRequestOn,
+  overlappingRequest,
+  insertRequest,
+  setRequestWorkflow,
+  getRequest,
+  settleRequest,
+  cancelRequest,
+  listRequests,
+  requestRow,
+  fieldAssignmentOn,
+  overlappingAssignment,
+  insertAssignment,
+  getAssignment,
+  cancelAssignment,
+  removeMember,
+  listAssignments,
+  assignmentRow,
 };

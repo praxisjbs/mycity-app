@@ -328,6 +328,7 @@ describeDb("the attendance roster against the real migrations", () => {
         present: 11,
         on_site: 6,
         remote: 1,
+        field: 0,
         late: 4,
         absent: 0,
         on_leave: 2,
@@ -763,6 +764,45 @@ describeDb("the attendance roster against the real migrations", () => {
       await expect(
         roster.personal(pool, { employee_id: "00000000-0000-4000-8000-000000000000", from: FRIDAY, to: FRIDAY }),
       ).rejects.toMatchObject({ code: "NOT_FOUND", status: 404 });
+    });
+  });
+
+  describe("a field assignment's day", () => {
+    test("present on it is field, on the list, the counts and a person's own days alike; late stays late", async () => {
+      const before = await roster.summary(pool, { date: FRIDAY }, ALL);
+      const rows = await everyone(FRIDAY);
+      const onSite = rows.find((r) => r.status === "on_site");
+      const late = rows.find((r) => r.status === "late");
+      const fa = await one(
+        `INSERT INTO attendance_field_assignment (number, name, client, starts_on, ends_on)
+         VALUES ('FA-9001', 'Venue Setup', 'Northwind Events', $1, $1) RETURNING field_assignment_id`,
+        [FRIDAY],
+      );
+      try {
+        await q(
+          `INSERT INTO attendance_field_site (field_assignment_id, position, name, latitude, longitude, radius_m)
+           VALUES ($1, 1, 'Venue Hall', 6.731234, 3.481234, 200)`,
+          [fa.field_assignment_id],
+        );
+        await q(
+          "INSERT INTO attendance_field_member (field_assignment_id, employee_id) SELECT $1, x FROM unnest($2::uuid[]) x",
+          [fa.field_assignment_id, [onSite.employee_id, late.employee_id]],
+        );
+        const after = await roster.summary(pool, { date: FRIDAY }, ALL);
+        expect(after).toMatchObject({ field: 1, on_site: before.on_site - 1, late: before.late, present: before.present });
+        const now = byName(await everyone(FRIDAY));
+        expect(now[`${onSite.first_name} ${onSite.last_name}`].status).toBe("field");
+        expect(now[`${late.first_name} ${late.last_name}`].status).toBe("late");
+        const filtered = await roster.page(pool, { date: FRIDAY, status: "field" }, ALL, {});
+        expect(filtered.data.map((r) => r.employee_id)).toEqual([onSite.employee_id]);
+        const { days } = await roster.personal(pool, { employee_id: onSite.employee_id, from: FRIDAY, to: FRIDAY, today: FRIDAY });
+        expect(days[0].status).toBe("field");
+        // Taken off it, the day reads as before.
+        await q("UPDATE attendance_field_member SET removed_at = now() WHERE employee_id = $1", [onSite.employee_id]);
+        expect((await roster.summary(pool, { date: FRIDAY }, ALL)).field).toBe(0);
+      } finally {
+        await q("DELETE FROM attendance_field_assignment WHERE field_assignment_id = $1", [fa.field_assignment_id]);
+      }
     });
   });
 });

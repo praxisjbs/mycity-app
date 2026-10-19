@@ -407,6 +407,7 @@ describe("shapes on the wire", () => {
     expect(meta.groups.map((g) => [g.value, g.count])).toEqual([
       ["on_site", 1],
       ["remote", 0],
+      ["field", 0],
       ["late", 1],
       ["not_in", 0],
       ["on_leave", 0],

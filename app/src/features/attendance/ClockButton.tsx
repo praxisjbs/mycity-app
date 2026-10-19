@@ -10,9 +10,11 @@ import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, He
 /**
  * Clocking in and out, for the shell: the desktop top bar's ClockButton and the phone's floating
  * button (F18) both use useClock (docs/guides/attendance.md §10). The panel asks; the API decides.
- * It reads the location only after the person presses Clock In, and only when there is a worksite
- * to match it to; every punch carries one Idempotency-Key, kept for a retry of the same press, so
- * a lost answer never makes a second punch. What the panel shows after a punch is the server's.
+ * It reads the location only after the person presses Clock In, and only when there is a place to
+ * match it to: a worksite, or for remote staff their approved home (asked too while they have none,
+ * so People see where they were); every punch carries one Idempotency-Key, kept for a retry of the
+ * same press, so a lost answer never makes a second punch. What the panel shows after a punch is
+ * the server's.
  */
 
 const PATTERN: Record<AttendanceToday["work_pattern"], string> = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
@@ -188,9 +190,9 @@ function ClockPanel({ close }: { close: () => void }) {
     );
   };
 
-  /** The press: a worksite to match means the location is read now, after saying why; otherwise the punch goes as it is. */
+  /** The press: a place to match means the location is read now, after saying why; otherwise the punch goes as it is. */
   const start = async () => {
-    if (t.location.kind !== "worksite") return punch();
+    if (t.location.kind === "none") return punch();
     if (await locationGranted()) return locate();
     setStage({ kind: "ask" });
   };
@@ -220,7 +222,29 @@ function ClockPanel({ close }: { close: () => void }) {
     );
   }
 
-  const fence = t.location.kind === "worksite" ? `${t.location.name} · ${t.location.radius_m} m` : t.location.kind === "remote" ? "Remote, Not Checked" : "No Worksite Assigned";
+  const fence =
+    t.location.kind === "worksite"
+      ? `${t.location.name} · ${t.location.radius_m} m`
+      : t.location.kind === "home"
+        ? `Approved Home · ${t.location.radius_m} m`
+        : t.location.kind === "temporary_home"
+          ? `Temporary Home · ${t.location.radius_m} m`
+          : t.location.kind === "approved_day"
+            ? (t.location.name ?? "Approved Request")
+            : t.location.kind === "field"
+              ? `${t.location.name}${t.location.radius_m ? ` · ${t.location.radius_m} m` : ""}`
+            : t.location.kind === "remote"
+              ? t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
+              : "No Worksite Assigned";
+  const punchName = eventType === "clock_out" ? "clock-out" : "clock-in";
+  const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home" };
+  const askText =
+    t.location.kind === "remote"
+      ? `Your ${punchName} goes to People with your location.`
+      : t.location.kind === "approved_day"
+        ? `Your ${punchName} is recorded with your location.`
+        : `Your ${punchName} is matched to ${MATCHED[t.location.kind] ?? t.location.name}.`;
+  const toHome = () => (close(), navigate(hrefFor("ess", "my-attendance", { home: "set" })));
   const unregistered = t.device.state !== "registered";
   const deviceHelp =
     t.policy.device_mode === "block"
@@ -230,7 +254,7 @@ function ClockPanel({ close }: { close: () => void }) {
         : "Register up to three devices you clock in from in My Devices.";
 
   let step;
-  if (stage.kind === "ask") step = <Result tone="info" label="Location Check" title="Share Your Location" text={`Your ${eventType === "clock_out" ? "clock-out" : "clock-in"} is matched to ${t.location.name}.`} icon="target" />;
+  if (stage.kind === "ask") step = <Result tone="info" label="Location Check" title="Share Your Location" text={askText} icon="target" />;
   else if (stage.kind === "locating") step = <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />;
   else if (stage.kind === "weak") step = <Result tone="warn" label="Location Check" title="Weak Location Signal" text={`Accurate to about ${stage.fix.accuracy_m} m. Move near a window, then retry.`} icon="target" />;
   else if (stage.kind === "no_location")
@@ -287,6 +311,11 @@ function ClockPanel({ close }: { close: () => void }) {
         <div className="mt-2">{statePill}</div>
       </div>
       {step && <div className="mb-3">{step}</div>}
+      {t.location.kind === "remote" && stage.kind === "ready" && (
+        <Banner tone="warn" icon="home" action={t.location.home_state === "none" ? <Button size="sm" onClick={toHome}>Set Home</Button> : undefined}>
+          {t.location.home_state === "pending" ? "Your home location is waiting for approval." : "No approved home location yet."}
+        </Banner>
+      )}
       {unregistered && t.policy.device_mode !== "off" && stage.kind === "ready" && (
         <Banner tone={t.policy.device_mode === "block" ? "err" : "warn"} icon="lock" action={t.device.can_register ? <Button size="sm" onClick={toDevices}>Register Device</Button> : undefined}>
           {t.policy.device_mode === "block" ? "Register this device to clock in." : "This device is not registered."}

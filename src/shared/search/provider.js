@@ -17,6 +17,10 @@
  *     phones: ["e.phone"],                      // found by a number typed any way (below)
  *   });
  *
+ * A record about several people (a crew sent out together) names where they are listed:
+ * `scope: { column: "m.employee_id", through: "attendance_field_member m WHERE m.field_assignment_id
+ * = a.field_assignment_id" }` finds it when any one of them is in the caller's scope, once.
+ *
  * `owner: { column }` is for records that belong to one person whatever their grant says
  * (their own mail): the query always adds `column = <the caller's user_id>`, so a scope of
  * `all` (the CEO, People) still finds only the caller's own rows. Without a caller it
@@ -134,7 +138,9 @@ function recordProvider(spec) {
       like.push(...phones.map((p) => `${p} LIKE $${n - 1}::text`));
       rank.push(...phones.map((p) => `CASE WHEN ${p} LIKE $${n}::text THEN 3 WHEN ${p} LIKE $${n - 1}::text THEN 2 ELSE 0 END`));
     }
-    const s = spec.scope ? scopeClause(scope, spec.scope, params) : { and: "" };
+    let s = spec.scope ? scopeClause(scope, { column: spec.scope.column }, params) : { and: "" };
+    if (spec.scope && spec.scope.through && s.and)
+      s = { and: `AND EXISTS (SELECT 1 FROM ${spec.scope.through} ${s.and})` };
     let owned = "";
     if (spec.owner) {
       params.push(user.user_id);

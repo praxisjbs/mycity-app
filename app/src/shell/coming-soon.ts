@@ -25,7 +25,7 @@ export const COMING: Record<string, string[]> = {
   "ess/my-leave": ["Your entitlement, what you have taken and what is left", "Request leave; your line manager decides", "Approved leave shows on the team calendar"],
   "ess/my-queries": ["Open queries with a 48 hour response window", "Archived queries, with your response kept on record", "Sanctions, and any deduction they carried"],
   "ess/my-documents": ["Your documents in the vault: contract, ID, certificates", "Upload what is missing, with a progress bar", "Expiry dates, with a reminder before they lapse"],
-  "ess/work-location-requests": ["Ask to work from home or another site for a period", "Your line manager recommends; People decides", "Approved locations count as on site when you clock in"],
+  "ess/work-location-requests": ["Ask for a temporary home, a remote day or a client visit", "Your line manager, then People, approve it", "On those days your clock-in is matched to that place"],
   "ess/my-devices": ["The phones and laptops you clock in from", "Approve a new device, or remove a lost one", "Clock-in is refused from a device you have not approved"],
   "ess/policy-updates": ["Each new version of the attendance policy, in plain words", "What changed, and from when", "Acknowledge you have read it; People sees who has"],
   "ess/my-security": ["Your password and two-step sign-in", "Where you are signed in, and sign out anywhere", "Recent sign-ins, so a stranger's stands out"],

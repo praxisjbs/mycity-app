@@ -1,26 +1,34 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import devices from "@mycity/contract/schemas/devices.js";
-import type { AttendanceDay, AttendanceEvent, AttendanceException, MyDevice } from "@mycity/contract/contract.gen.ts";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice } from "@mycity/contract/contract.gen.ts";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import type { LocationRequest, LocationRequestBody } from "@/api/types/attendance";
 import { useMe } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
-import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
+import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useClock } from "./ClockButton";
+import { HomeLocationCard } from "./HomeLocation";
+import { AssignmentView, MyFieldAssignments, useAssignmentLink } from "./FieldAssignments";
 import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
-import { Banner, BarChart, Button, Card, CardHeader, DataView, DateField, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, rules, SegmentedControl, SelectField, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 
 /**
- * ESS · My Attendance (#9), My Devices (#88), and the two attendance screens still on INTERIM
- * shapes, Work Location Requests (#87) and Policy Updates (#89) (docs/guides/attendance.md §10).
+ * ESS · My Attendance (#9, with the person's field assignments), My Devices (#88), and Policy
+ * Updates (#89), still on INTERIM shapes until M9 (docs/guides/attendance.md §10). Work Location
+ * Requests (#87) is WorkLocationRequests.tsx.
  * Everything here is the caller's own: the routes take no employee id.
  */
 
-export const REQ_TONE: Record<LocationRequest["status"], "ok" | "warn" | "err" | "neutral" | "info"> = { Approved: "ok", Rejected: "err", "Awaiting manager": "warn", "Awaiting HR": "info", Draft: "neutral", Expired: "neutral" };
+/** Today's place as the Today card names it; a worksite and an approved request's day by their own name. */
+const LOCATION_NAME: Partial<Record<AttendanceToday["location"]["kind"], string>> = {
+  home: "Approved Home",
+  temporary_home: "Temporary Home",
+  remote: "Remote",
+  none: "No Worksite",
+};
 
 /* ------------------------------------------------------------------ *
  * My Attendance
@@ -49,6 +57,8 @@ export function MyAttendancePage() {
       openDay(link.data.date, days.rows.find((d) => d.attendance_day_id === link.data?.attendance_day_id));
     }
   });
+  const openAssignment = useCallback((a: FieldAssignment) => modal.open({ title: a.number, wide: true, body: (close) => <AssignmentView a={a} close={close} /> }), [modal]);
+  useAssignmentLink(params.get("assignment"), openAssignment, { mine: true });
   const openFigure = (status: FigureStatus) =>
     modal.open({ title: `${FIGURE[status]}, ${formatMonth(month)}`, wide: true, body: <FigureDays month={month} status={status} /> });
   const explain = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], body: (close) => <ExplainForm x={x} close={close} /> });
@@ -67,7 +77,7 @@ export function MyAttendancePage() {
         items={[
           ["Clock In", t.clock_in_at ? formatTime(t.clock_in_at) : null],
           ["Clock Out", t.clock_out_at ? formatTime(t.clock_out_at) : null],
-          ["Location", t.location.kind === "worksite" ? t.location.name : t.location.kind === "remote" ? "Remote" : "No Worksite"],
+          ["Location", LOCATION_NAME[t.location.kind] ?? t.location.name],
         ]}
       />
       {clock.ready && !clock.unavailable && (
@@ -92,7 +102,9 @@ export function MyAttendancePage() {
           </>
         }
       />
+      {t?.work_pattern === "remote" && <HomeLocationCard openOnLoad={params.get("home") === "set"} />}
       {todayCard}
+      <MyFieldAssignments open={openAssignment} />
       <Grid cols="4m2" className="mt-3">
         <KpiCard title="Days Present" value={s ? String(s.days_present) : ""} onOpen={() => openFigure("present")} />
         <KpiCard
@@ -355,105 +367,6 @@ function RegisterForm({ close }: { close: () => void }) {
 /* ------------------------------------------------------------------ *
  * INTERIM: Work Location Requests (#87) and Policy Updates (#89)
  * ------------------------------------------------------------------ */
-
-/** Shows the acknowledgment banner while the latest policy version waits on this person. */
-function AckBanner() {
-  const { data: p } = useApi("GET /api/v1/attendance/policies/current");
-  const { navigate } = useRouter();
-  if (!p || p.acknowledged_at) return null;
-  return (
-    <Banner tone="warn" icon="doc" actions={<Button onClick={() => navigate(hrefFor("ess", "policy-updates"))}>Read and Acknowledge</Button>}>
-      <b>Attendance policy v{p.version} needs your acknowledgment.</b> {p.summary}
-    </Banner>
-  );
-}
-
-
-const TYPES: Array<[LocationRequestBody["type"], string]> = [["Temporary home-location change", "Temporary home-location change"], ["Remote day", "One-day remote-work exception"], ["Client visit", "Client-site visit"], ["Field correction", "Field-assignment correction"]];
-
-export function WorkLocationRequestsPage() {
-  const me = useMe();
-  const modal = useModal();
-  const setup = useApi("GET /api/v1/attendance/setup/:employee_id", { params: { employee_id: me.employee_id } });
-  const list = usePaged("GET /api/v1/attendance/location-requests", { filters: { scope: "own" } });
-  const s = setup.data;
-  const open = (r: LocationRequest) =>
-    modal.open({
-      title: r.number,
-      body: (
-        <>
-          <KeyValue items={[["Type", r.type], ["Dates", `${formatDate(r.from)} to ${formatDate(r.to)}`], ["Location", `${r.area} · ${r.radius_m} m`], ["Reason", r.reason], ["Status", <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill>], ["People's note", r.hr_note ?? "None"]]} />
-          <div className="mt-3 border-t border-border pt-3">
-            {r.history.map((h, i) => <p key={i} className="text-2xs text-subtle-foreground">{formatDateTime(h.at)} · {h.by} · {h.text}</p>)}
-          </div>
-        </>
-      ),
-    });
-  return (
-    <>
-      <PageHeader title="Work Location Requests" sub="Temporary clock-in locations" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
-      <AckBanner />
-      <Grid cols={2}>
-        {s ? (
-          <Card>
-            <CardHeader title="Your Location Today" />
-            <KeyValue items={[["Arrangement", <><Pill>{s.arrangement}</Pill> {s.profile.split(" · policy")[0]}</>], ["Permanent home", s.home_area ? `Approved home · ${s.home_area} · fixed 100 m geofence` : "None on file"], ["Temporary location", <Pill tone={s.temporary_location.tone}>{s.temporary_location.text}</Pill>], ["Field assignment today", s.field_assignment_today ?? "None"], ["Office", s.office]]} />
-          </Card>
-        ) : <Card><LoadingRows /></Card>}
-      </Grid>
-      <DataView
-        title="My Requests"
-        rows={list.rows}
-        rowKey={(r) => r.request_id}
-        loading={list.loading}
-        onRowClick={open}
-        empty={{ icon: "target", title: "No Requests Yet", text: "Use New Request to ask for a temporary home, a one-day remote day, a client-site visit or a correction." }}
-        columns={[
-          { key: "n", label: "Request", render: (r) => r.number },
-          { key: "t", label: "Type", render: (r) => r.type },
-          { key: "d", label: "Dates", render: (r) => (r.from === r.to ? formatDate(r.from) : `${formatDate(r.from)} to ${formatDate(r.to)}`) },
-          { key: "l", label: "Location", desktop: true, render: (r) => r.area },
-          { key: "r", label: "Radius", align: "n", desktop: true, render: (r) => `${r.radius_m} m` },
-          { key: "s", label: "Status", render: (r) => <Pill tone={REQ_TONE[r.status]}>{r.status}</Pill> },
-        ]}
-        footer={<Pager page={list.page} onPage={list.setPage} noun="request" />}
-      />
-    </>
-  );
-}
-
-function RequestForm({ close }: { close: () => void }) {
-  const f = useContractForm(
-    { type: "Remote day", from: "", to: "", address: "", reason: "", evidence: "" },
-    { from: rules.required("Pick the first day"), to: (v, a) => (!v ? "Pick the last day" : v < (a.from as string) ? "Ends before it starts" : null), address: rules.min(6, "Enter the address"), reason: rules.min(10, "At least 10 characters") },
-  );
-  const save = useMutation("POST /api/v1/attendance/location-requests");
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      const r = await save.run({ body: { type: f.values.type as LocationRequestBody["type"], from: f.values.from, to: f.values.to, address: f.values.address, reason: f.values.reason, ...(f.values.evidence && { evidence: f.values.evidence }) } });
-      invalidate("/api/v1/attendance");
-      close();
-      toast(`${r.number} sent to your line manager`);
-    } catch {
-      f.setServerErrors(save.fields);
-    }
-  };
-  return (
-    <>
-      <Field label="Type"><SelectField options={TYPES} {...f.field("type")} /></Field>
-      <Field label="From" {...f.field("from")}><DateField {...f.field("from")} min={todayIso()} /></Field>
-      <Field label="To" {...f.field("to")}><DateField {...f.field("to")} min={f.values.from || todayIso()} /></Field>
-      <Field label="Address" {...f.field("address")} info="Homes always use a fixed 100 m geofence. You cannot choose the radius."><TextField {...f.field("address")} placeholder="Street, area, city" /></Field>
-      <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Visiting a client" /></Field>
-      <Field label="Evidence Label"><TextField {...f.field("evidence")} placeholder="tenancy-letter.pdf" /></Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Submit Request</Button>
-      </FormFooter>
-    </>
-  );
-}
 
 export function PolicyUpdatesPage() {
   const me = useMe();

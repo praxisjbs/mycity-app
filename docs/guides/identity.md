@@ -442,6 +442,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   Team, Alerts and Reports tabs on what the API allows (README §5.2). `CapabilityCode` moves from
   `access.js` to `identity.js`, which `access.js` imports. Header gains the Capabilities row.
 - 18/10/2026 · TB · `AuthProvider` no longer carries `justSignedIn` and `clearJustSignedIn`: their one reader was the shell's after-sign-in clock-in prompt, which moved to Home · Overview on the server's `prompt_clock_in` (home.md §6, attendance.md change log). Sign-in, the lock and Welcome back are unchanged.
+- 19/10/2026 · LA · The mock's sign-in screen gains a Remote demonstration account (Kemi Adebayo, `kemi@mycityapp.io`, a remote employee already on the mock's roster), so a laptop can see My Attendance's Home Location card and the clock matched to an approved home (attendance.md §6.10). Mock mode only; sign-in itself is unchanged.
 - 19/10/2026 · TB · `Me.manages_people` counts the people under a vacant seat the reader answers for
   (the first person above the seat), as team scope does (`employee_effective_manager`, `1160`;
   `docs/guides/organogram.md` §6), so the manager above an empty post sees My Team and approvals.

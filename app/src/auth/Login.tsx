@@ -642,13 +642,17 @@ function LinkForm({ token, onDone, onExpired }: { token: string; onDone: (email:
   );
 }
 
-/** Mock mode only: the demonstration accounts, one per Home view. Never in a live build. */
+/**
+ * Mock mode only: the demonstration accounts, one per Home view, a remote employee (whose clock is
+ * matched to an approved home) and a suspended one. Never in a live build.
+ */
 function MockAccounts({ onPick }: { onPick: (email: string) => void }) {
   const accounts: Array<[string, string]> = [
     ["cynthia@mycityapp.io", "Operations"],
     ["ifeoma@mycityapp.io", "CEO"],
     ["ngozi@mycityapp.io", "Partnerships"],
     ["chidera@mycityapp.io", "Staff"],
+    ["kemi@mycityapp.io", "Remote"],
     ["musa@mycityapp.io", "Suspended"],
   ];
   return (
