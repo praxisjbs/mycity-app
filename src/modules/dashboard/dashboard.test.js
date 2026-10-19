@@ -767,7 +767,7 @@ describe("the card picker", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * The Overview's routes, controller, layout, activity and prompt
+ * The Overview's routes, controller, layout and activity
  * ------------------------------------------------------------------ */
 
 describe("the routes", () => {
@@ -1059,51 +1059,6 @@ describe("Activity Today", () => {
     const public_ = activity.visibleWhere(new Map([["community", scope("own")]]), open);
     expect(public_).not.toContain("se.employee_id");
     expect(open).toEqual(["community", ["recognition.posted", "celebration.posted"]]);
-  });
-});
-
-describe("the clock-in prompt", () => {
-  const prompt = require("./dashboard.prompt");
-  const attendance = require("../attendance/attendance.service");
-  const SESSION = "5a4c0a52-0d0b-4f87-8f53-0c6b3f0c0e11";
-  const now = new Date("2026-10-14T07:30:00Z");
-  const user = { user_id: ID, employee_id: ID, session_id: SESSION };
-  const db = (first) => ({ query: jest.fn(async () => ({ rows: first ? [{ session_id: first }] : [] })) });
-  const stand = (state, working = true) => ({ state, shift: { working_day: working } });
-
-  test("only the first session of the day asks Attendance where the person stands", async () => {
-    const today = jest.spyOn(attendance, "today").mockResolvedValue(stand("not_clocked_in"));
-    expect(await prompt.shouldPrompt(db(SESSION), user, { now, today: "2026-10-14" })).toBe(true);
-    expect(today).toHaveBeenCalledWith(user, { now });
-    today.mockClear();
-    expect(await prompt.shouldPrompt(db(ID), user, { now, today: "2026-10-14" })).toBe(false);
-    expect(await prompt.shouldPrompt(db(null), user, { now, today: "2026-10-14" })).toBe(false);
-    expect(today).not.toHaveBeenCalled();
-  });
-
-  test("the day's bounds are Lagos's", async () => {
-    const client = db(SESSION);
-    jest.spyOn(attendance, "today").mockResolvedValue(stand("not_clocked_in"));
-    await prompt.shouldPrompt(client, user, { now, today: "2026-10-14" });
-    const [, params] = client.query.mock.calls[0];
-    expect(params).toEqual([ID, new Date("2026-10-13T23:00:00Z"), new Date("2026-10-14T23:00:00Z")]);
-  });
-
-  test.each([
-    ["clocked in", stand("clocked_in")],
-    ["clocked out", stand("clocked_out")],
-    ["on leave, or no longer employed", stand("unavailable")],
-    ["a day that is not worked", stand("not_clocked_in", false)],
-  ])("not when %s", async (_name, where) => {
-    jest.spyOn(attendance, "today").mockResolvedValue(where);
-    expect(await prompt.shouldPrompt(db(SESSION), user, { now, today: "2026-10-14" })).toBe(false);
-  });
-
-  test("not without a session or an employee", async () => {
-    const client = db(SESSION);
-    expect(await prompt.shouldPrompt(client, { ...user, session_id: undefined }, { now, today: "2026-10-14" })).toBe(false);
-    expect(await prompt.shouldPrompt(client, { ...user, employee_id: null }, { now, today: "2026-10-14" })).toBe(false);
-    expect(client.query).not.toHaveBeenCalled();
   });
 });
 

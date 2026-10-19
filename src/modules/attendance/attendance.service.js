@@ -158,6 +158,9 @@ async function today(user, { now = new Date() } = {}) {
   else if (session.date) state = "clocked_in";
   else if (leave) state = "unavailable";
   else if (clockIn && clockOut) state = "clocked_out";
+  // The sign-in prompt (§6.14): the first session of a working day, not yet clocked in.
+  const signInPrompt =
+    state === "not_clocked_in" && ctx.shift.working_day === true && (await repo.firstSessionOn(pool, user, lagos.today(now)));
 
   return {
     date: sessionDate,
@@ -169,6 +172,7 @@ async function today(user, { now = new Date() } = {}) {
     clock_in_at: clockIn ? new Date(clockIn.occurred_at).toISOString() : null,
     clock_out_at: clockOut ? new Date(clockOut.occurred_at).toISOString() : null,
     clock_out_automatic: Boolean(clockOut && clockOut.source === "system"),
+    sign_in_prompt: signInPrompt,
     review: (await repo.openExceptionCount(pool, day ? day.attendance_day_id : null)) > 0,
     shift: ctx.shift,
     work_pattern: person.work_pattern,

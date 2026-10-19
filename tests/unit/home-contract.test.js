@@ -69,7 +69,6 @@ describe("KPI cards", () => {
       activity: null,
       week: null,
       alerts_to_clear: null,
-      prompt_clock_in: false,
     };
     expect(issues(dashboard.HomeOverview.safeParse(empty))).toEqual([]);
     expect(dashboard.HomeOverview.safeParse({ ...empty, cards: Array(5).fill(null) }).success).toBe(false);
