@@ -94,15 +94,78 @@ built now rather than in M6, with reminders strong enough for tasks and calendar
 
 ## 3 · What the codebase needs (TB's decision 12)
 
-To be written: every time-based notice the modules already declare or will need (M2 tasks and
-calendars first), and the one reminder engine that serves them.
+Reviewed on 19/10/2026.
+
+- **Notices today.** 49 `defineNotification` declarations: the shared layer (workflow, Home
+  alerts) and 13 modules (attendance 11, identity 5, community 3, mailbox 3, leave 3, imports 2,
+  announcements 2, documents, security, devices, ess, organisation, workflow). Every one goes
+  through the fan-out (`src/shared/notifications/fanout.js`), so a rule there reaches all of them.
+- **Time-based notices today** each run their own clock: scheduled announcements
+  (`announcement-publish`), clock-in reminders (`attendance-clock-watch`), approval time limits
+  (`workflow-timeout`, then `workflow.escalated`), Home's alert ageing, celebrations.
+- **Waiting for their milestones, reminders by nature:** M2 `task-recurrence` and
+  `review-cycle-open` with the empty `tasks` and `calendar` modules (AJ, 20 to 23 Oct); M4
+  `interview-feedback-reminder`, `assessment-expire`; M5 `offer-expiry`, `signature-reminder`; M6
+  `notifications.reminders.js` and the `reminders` job and scheduler (README §5.15, the planned
+  engine); M7 `agreement-renewal`.
+- **M2 will need**: a task assigned, due soon, overdue (repeating until done), sent for review and
+  done; a calendar invite, a change, a cancellation, and "starting in N minutes" before each event;
+  a review's self-rating and manager stage due.
+
+**So one reminder engine, in `notifications`, that every module uses by declaration** instead of
+writing its own clock (the planned M6 `notifications.reminders.js`, filled now):
+
+- A module declares a reminder once (`defineReminder(key, …)`: who, what it says, its urgency) and,
+  inside its own transaction, schedules or cancels occurrences: `reminders.schedule(client,
+  { key, user_ids, entity, at, repeat })` and `reminders.cancel(client, { key, entity })`.
+- One `reminder` table holds every occurrence; the `reminders` scheduler fires what is due through
+  the fan-out, so a reminder is an ordinary notice: preferences, every device, the banner, urgency.
+- A repeat is part of the occurrence (every N minutes, inside Lagos work hours, at most N a day,
+  until a condition holds), which is how urgent notices repeat (decision 2).
+- First users: urgent repeats and the Important reminder (PR 1). Then approvals waiting, probations
+  ending and the daily digest as company rules (PR 2). M2's tasks and calendars declare theirs
+  from the guide's recipe (`docs/guides/notifications.md` §7).
 
 ---
 
 ## 4 · Build checklist
 
-To be written after §3: PR 1 (every notice everywhere, and urgency) and PR 2 (Settings ·
-Notifications, reminders, digest, quiet hours).
+Tick each step with its date and add a line to §8 when it is pushed.
+
+### PR 1 · Every notice on every device, and urgency
+
+1. [ ] Guides first: `docs/guides/notifications.md` (urgency, every device, banner and notification,
+   repeats, the red bar, Acknowledge, the reminder engine), `docs/guides/community.md`
+   (announcement levels, Acknowledge, every post alerts), MILESTONES and PROGRESS notes.
+2. [ ] Contract: `urgency` on a notice and on an announcement, Acknowledge, open urgent notices for
+   the bar, acknowledgement on the readers list; `npm run gen:contract`.
+3. [ ] Migration `0470`: notice urgency and acknowledgement, announcement urgency,
+   `announcement_read.acknowledged_at`, the `reminder` table, a repeat's round on `push_delivery`.
+4. [ ] Delivery: no hold (decision 9); every channel post alerts (7); direct messages robust (6);
+   the service worker always shows, and passes the push to an open window for its banner (9).
+5. [ ] Urgency: the fan-out's `urgency` (Security and `workflow.escalated` urgent, 8); announcement
+   levels and Acknowledge (1, 3, 5); the Important reminder after 4 hours (1).
+6. [ ] The reminder engine and the urgent repeats: every 30 minutes, 08:00 to 18:00 Lagos, at most
+   8 a day, until acknowledged or opened (2).
+7. [ ] Screens, both shells: the red bar with Acknowledge on every screen (4), red and amber cards
+   and the level on the announcement form, acknowledgement on the readers list, the red dot on
+   Community, urgency in the pane and the banner.
+8. [ ] Tests (unit, integration, the app's), the whole `npm run ci`, a real-browser check, the PR
+   body, then drive it green and merge with TB's admin rights (TB, 19/10/2026).
+
+### PR 2 · Settings · Notifications, reminders and quiet hours
+
+1. [ ] Guides first: Settings · Notifications in `notifications.md`, the reminder recipe for
+   modules (§7), PROGRESS #74 moved from M6 to now, MILESTONES note.
+2. [ ] Contract and migration `0480`: a rule per notice (on or off, extra roles and people, default
+   channels, urgency), reminder rules (approvals every N hours, probation N days ahead, the digest's
+   time), a person's quiet hours and digest switch.
+3. [ ] Backend: the notice catalogue (a label per declaration), the fan-out applying the company's
+   rules, approval and probation reminders, the daily digest, quiet hours that hold push (Urgent and
+   Security pass, assumption A).
+4. [ ] Screens: Settings · Notifications on both shells (desktop table, phone rows and sheets), quiet
+   hours and the digest in each person's Notification Settings.
+5. [ ] Tests, the whole `npm run ci`, the PR, drive it green and merge.
 
 ---
 
@@ -110,3 +173,6 @@ Notifications, reminders, digest, quiet hours).
 
 - 19/10/2026 · TB answered twelve questions (§2). Diagnosis of the silent announcement recorded
   (§1). Next: §3, the codebase review for reminders.
+- 19/10/2026 · §3 written from the codebase review: one reminder engine in `notifications`, used by
+  declaration. §4 lays out PR 1 and PR 2. TB: open each PR, drive it green, merge it with TB's
+  admin rights, then go on. Next: PR 1 step 1, the guides.
