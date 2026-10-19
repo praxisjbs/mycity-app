@@ -213,8 +213,8 @@ Tick with the date as each step lands. Each step ends with its own checks green,
       `npm run ci`, 45 gates; 18 checks in a real Chromium; see the log): unit and integration tests (a fake push transport); the whole `npm run ci`;
       a real Chromium run delivering a push to the built service worker over the DevTools protocol
       (`ServiceWorker.deliverPushMessage`) and checking the notification it shows.
-- [ ] **15. Ready**: PR out of draft, its body filled to the template (Native App Feel section),
-      TB told what to check on his phone after the staging deploy (§7).
+- [x] **15. Ready** (19/10/2026): PR out of draft, its body filled to the template (Native App Feel section),
+      TB told what to check on the phone after the staging deploy (§7).
 
 ---
 
@@ -435,3 +435,11 @@ Tick with the date as each step lands. Each step ends with its own checks green,
   PIN only on its own (a value, a number or a word, never inside a run of hex digits and hyphens);
   tried in Postgres on a leaked value, number and sentence (caught) and on UUIDs (not). The other
   leak checks use long secrets and cannot collide. A whole `npm run ci` runs again on the fix.
+- 19/10/2026 · TB · Step 15. The whole `npm run ci` on `c52e3a3`: 45 of 45 gates pass. The PR body is
+  filled to the template (what it changes and how it was checked, the M0 item, the checklist, Native
+  App Feel for both shells, no exemptions); one comment on the PR says why GitHub's `ci` check is red
+  (Actions starts no job on this account) and what passed locally; the PR is out of draft; TB has the
+  phone checks of §7. Left for people: a review and the merge (a merge to `main` deploys to
+  staging), GE's checks on the server after that deploy (`docs/runbooks/push-notifications.md` §2),
+  TB's phone checks, re-running `ci` once Actions starts jobs again, and ticking the guide's Written
+  box in `docs/guides/README.md` once TB has read it as built.
