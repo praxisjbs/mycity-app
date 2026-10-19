@@ -13,8 +13,9 @@ import Community from "./index";
 
 /**
  * Forwarding on the in-browser mock (docs/guides/community.md §3 step 19): a message's menu
- * forwards it to up to 5 chats, Select picks several to forward together, and the copies arrive
- * marked Forwarded. The mock's #ember-to-remember holds texts, a photo, an album and a PDF.
+ * forwards it to up to 5 chats, Select (a long press on a phone) picks several to forward
+ * together, and the copies arrive marked Forwarded. The mock's #ember-to-remember holds texts,
+ * a photo, an album and a PDF.
  */
 
 expect.extend(axeMatchers);
@@ -137,4 +138,35 @@ describe("forwarding", () => {
     const copies = (await messagesIn("operations")).filter((m) => m.forwarded);
     expect(copies.map((m) => m.body)).toEqual([expect.stringMatching(/^Shot list for the Enugu/), expect.stringMatching(/^Good\. Link it to the MOU/)]);
   }, 30000);
+
+  describe("on a phone", () => {
+    beforeEach(() => setViewport(390));
+    const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const holdOn = async (row: HTMLElement) => {
+      fireEvent.pointerDown(row, { pointerType: "touch" });
+      expect(await screen.findByText("1 Selected", {}, { timeout: 2000 })).toBeTruthy();
+      fireEvent.pointerUp(row, { pointerType: "touch" });
+    };
+
+    it("starts picking with a long press, and the next tap ticks another message", async () => {
+      await asCynthia();
+      fireEvent.click(await screen.findByRole("button", { name: /ember-to-remember/ }, { timeout: 5000 }));
+      await holdOn(await rowOf(/Shot list for the Enugu segment/));
+      // This phone sends no click as the finger lifts, so nothing is left waiting to eat the next tap.
+      await pause(450);
+      fireEvent.click(await rowOf(/Link it to the MOU/));
+      expect(await screen.findByText("2 Selected")).toBeTruthy();
+    }, 30000);
+
+    it("ignores the click a phone sends as the finger lifts, and never opens the phone's own menu", async () => {
+      await asCynthia();
+      fireEvent.click(await screen.findByRole("button", { name: /ember-to-remember/ }, { timeout: 5000 }));
+      const row = await rowOf(/Shot list for the Enugu segment/);
+      await holdOn(row);
+      fireEvent.click(row);
+      expect(screen.getByText("1 Selected")).toBeTruthy();
+      // false: the long-press menu was refused.
+      expect(fireEvent.contextMenu(await rowOf(/Shot list for the Enugu segment/))).toBe(false);
+    }, 30000);
+  });
 });

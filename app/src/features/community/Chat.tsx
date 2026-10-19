@@ -190,6 +190,27 @@ export function PickBar({ t }: { t: ReturnType<typeof useThread> }) {
 const HOLD_MS = 450;
 const HOLD_SLOP_PX = 10;
 
+/**
+ * The click some phones send when the finger lifts after a long press opens nothing and ticks
+ * nothing. Phones that send none leave nothing waiting: the next tap is the person's own.
+ */
+function ignoreLiftClick() {
+  const off = new AbortController();
+  const opts = { capture: true, signal: off.signal };
+  window.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      off.abort();
+    },
+    opts,
+  );
+  const lifted = () => setTimeout(() => off.abort(), 400);
+  window.addEventListener("pointerup", lifted, opts);
+  window.addEventListener("pointercancel", lifted, opts);
+}
+
 /** A thread's rows: one message, or four or more photos and videos sent together (an album, §6). */
 type ThreadRow = { key: string; ms: Message[] };
 const inAlbum = (m: Message) => Boolean(m.album_key) && !m.deleted && (m.message_type === "image" || m.message_type === "video");
@@ -238,34 +259,38 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
       // Unticking the last one ends picking, as on WhatsApp.
       return next.length ? next : null;
     });
-  /* A long press on a phone starts picking; the tap that ends it opens nothing. */
+  /* A long press on a phone starts picking. */
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
-  const swallow = useRef(false);
   const letGo = () => {
     if (hold.current) clearTimeout(hold.current.timer);
     hold.current = null;
   };
   const pressFor = (ids: string[], canPick: boolean) =>
-    phone && !picking && canPick
-      ? {
-          onPointerDown: (e: ReactPointerEvent) => {
-            letGo();
-            const timer = setTimeout(() => {
-              hold.current = null;
-              swallow.current = true;
-              setPicking(ids);
-            }, HOLD_MS);
-            hold.current = { timer, x: e.clientX, y: e.clientY };
-          },
-          onPointerMove: (e: ReactPointerEvent) => {
-            const h = hold.current;
-            if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP_PX) letGo();
-          },
-          onPointerUp: letGo,
-          onPointerCancel: letGo,
+    !phone || !canPick
+      ? {}
+      : {
+          // The phone's own long-press menu never opens on a message, picking or not.
           onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
-        }
-      : {};
+          ...(picking
+            ? {}
+            : {
+                onPointerDown: (e: ReactPointerEvent) => {
+                  letGo();
+                  const timer = setTimeout(() => {
+                    hold.current = null;
+                    ignoreLiftClick();
+                    setPicking(ids);
+                  }, HOLD_MS);
+                  hold.current = { timer, x: e.clientX, y: e.clientY };
+                },
+                onPointerMove: (e: ReactPointerEvent) => {
+                  const h = hold.current;
+                  if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP_PX) letGo();
+                },
+                onPointerUp: letGo,
+                onPointerCancel: letGo,
+              }),
+        };
   const react = async (m: Message) => t.replace(await api.call("POST /api/v1/community/messages/:id/reactions", { params: { id: m.community_message_id }, body: {} }));
   const vote = async (m: Message, i: number) => t.replace(await api.call("POST /api/v1/community/messages/:id/vote", { params: { id: m.community_message_id }, body: { option_index: i } }));
   const failed = (e: unknown) => {
@@ -356,11 +381,7 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
             <div
               className={cn("group flex items-start gap-2", picking && canPick && "cursor-pointer", phone && "no-callout select-none")}
               onClickCapture={(e) => {
-                if (swallow.current) {
-                  swallow.current = false;
-                  e.preventDefault();
-                  e.stopPropagation();
-                } else if (picking && canPick) {
+                if (picking && canPick) {
                   e.preventDefault();
                   e.stopPropagation();
                   toggle(ids);
