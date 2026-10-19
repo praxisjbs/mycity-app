@@ -5,7 +5,8 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, NumberField, Pill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { coordinatesOf, searchPlaces } from "@/features/shared/places";
+import { AddressField, Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, NumberField, Pill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { ASSIGNMENT_STATE } from "./labels";
 
 /**
@@ -259,7 +260,17 @@ export function NewAssignmentForm({ close }: { close: () => void }) {
         <TextField {...f.field(`s${n}_name`)} placeholder="Expo Hall" maxLength={120} />
       </Field>
       <Field label="Address" optional {...f.status(`s${n}_address`)}>
-        <TextField {...f.field(`s${n}_address`)} placeholder="Street, area, city" maxLength={300} />
+        <AddressField
+          {...f.field(`s${n}_address`)}
+          search={searchPlaces}
+          onPick={(place) => {
+            const at = coordinatesOf(place);
+            f.set(`s${n}_latitude`, at.latitude);
+            f.set(`s${n}_longitude`, at.longitude);
+          }}
+          placeholder="Street, area, city"
+          maxLength={300}
+        />
       </Field>
       <Grid cols={2}>
         <Field label="Latitude" {...f.status(`s${n}_latitude`)}>

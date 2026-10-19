@@ -8,8 +8,9 @@ import { useAuth } from "@/auth/AuthProvider";
 import { PLACE } from "@/features/attendance/labels";
 import { employmentType, workPattern } from "@/features/people/status";
 import { PhoneCards } from "@/features/shared/PhoneCards";
+import { searchPlaces } from "@/features/shared/places";
 import { hrefFor, useRouter } from "@/lib/router";
-import { ActionGroup, Banner, Button, Card, Icon, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, UploadField, useConfirm, useContractForm, useModal, Wizard } from "@mycity/ui";
+import { ActionGroup, AddressField, Banner, Button, Card, Icon, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, UploadField, useConfirm, useContractForm, useModal, Wizard } from "@mycity/ui";
 
 /**
  * ESS · My Profile (#8, `my-profile`): the caller's own record (docs/guides/ess.md §10).
@@ -197,7 +198,7 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
           body: (
             <>
               <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" autoComplete="tel" {...f.field("phone")} placeholder="0803 123 4567" /></Field>
-              <Field label="Home Address" {...f.field("home_address")}><TextField autoComplete="street-address" {...f.field("home_address")} /></Field>
+              <Field label="Home Address" {...f.field("home_address")}><AddressField {...f.field("home_address")} search={searchPlaces} /></Field>
             </>
           ),
         },

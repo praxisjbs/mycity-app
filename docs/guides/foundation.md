@@ -4,7 +4,7 @@
 |---|---|
 | Owner | TB |
 | Milestone | M0 |
-| Backend modules | `organisation`, `access`, `audit`, `settings`, `workflow`, `documents`, `imports` |
+| Backend modules | `organisation`, `access`, `audit`, `settings`, `workflow`, `documents`, `imports`, `maps` (the address search, §6.12) |
 | Frontend paths | `app/src/features/people/`, `app/src/features/settings/`, `app/src/shell/Search.tsx` |
 | Permission key(s) | `people`, `settings`, `ess` (own records) |
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
@@ -220,6 +220,15 @@ Users keeps `GET /access/roles`.
 The `workflow` module mounts at the API root, because its halves live under `/workflow` and
 `/settings/approvals`. `GET /search` lives in a module of its own, `search`, because routes are found
 only under `src/modules/`; the work is `shared/search`.
+
+**The address search, `maps`** (built 19/10/2026, §6.12)
+
+| Route | Permission |
+|---|---|
+| `GET /maps/search` (`q`, 3 to 200 characters → `PlaceMatches`: at most six `Place`s, each `place_id`, `formatted`, `lat`, `lon`) | everyone signed in (`self`); it reads no record and writes nothing |
+
+503 `MAPS_OFF` when the environment has no `GEOAPIFY_API_KEY`, 429 `MAPS_BUSY` over the provider's
+quota, 502 `MAPS_UNAVAILABLE` when the provider refuses or takes longer than 4.5 seconds.
 
 ## 6 · Rules and calculations
 
@@ -541,6 +550,38 @@ The Icon is drawn on Deep Green, so it must read on a dark ground (the yellow pi
 own icons (the favicon, the home-screen icon) are files in the release, which phones keep, so they
 change with a release, not with this screen.
 
+### 6.12 Address search (F21, 19/10/2026)
+
+Every address a person types is an `AddressField` (`packages/ui/src/form/`): a text field that
+suggests places as it is typed, through our own API, so the Geoapify key never reaches a browser.
+
+- **Where**: People · Worksites, a field assignment's sites, a work location request (the client
+  visit's site, a temporary home), a remote employee's home, My Profile's home address, Settings ·
+  Organisation's address and a vacancy's location. Each app binds the search once
+  (`app/src/features/shared/places.ts`); a screen passes it to the field.
+- **What a pick fills**: the address always. Where the form holds a point (a worksite, a field site,
+  a client visit) `onPick` also fills Latitude and Longitude to six places, and the person may still
+  correct them. A home keeps the coordinates of its reading: a suggestion never moves the point a
+  punch is fenced on (attendance.md §6.10).
+- **The address stays the person's**: what they type is kept when nothing matches, and the address
+  a record already holds is never searched until they change it.
+- **When it asks**: after three characters and a 300 ms pause; a slower answer to text already
+  typed past is dropped (`maps/usePlaces.ts`, shared with `PlaceSearch`).
+- **Keys**: the arrows move through the suggestions, Enter picks, Esc closes the list. Inside a
+  modal or sheet, Esc on an open list closes the list only; the next Esc reaches the dialog
+  (`escapeClosesList` in `overlay/context.ts`, which `Modal` and `Sheet` both ask).
+- **The server** (`services/maps/geoapify.service.js`, called by `maps.controller`): Geoapify's
+  autocomplete, biased to Lagos and Nigeria but never filtered, so a site abroad is found; every
+  field of the answer coerced and capped, a result without a point or an address dropped, one
+  suggestion per point, six at most; the same text answered from memory for ten minutes, so the
+  day's quota goes on new addresses. Outside any transaction, and the key is never logged.
+- **Nothing is stored** by the search, so it carries no event, audit row, AI read or ⌘K provider
+  (`// ai:none`, `// search:none` in `maps.controller.js`). The save of each form checks its own
+  grant as before.
+- **Still to come from F21**: the map tiles and the reverse lookup through our API (`MapView`,
+  `LocationLabel`); tiles load as images without the session's token, so they need their own answer
+  for who may fetch them (attendance.md §13).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -605,7 +646,7 @@ screen.
 | Employee record | Profile, Job, Reporting Line, Login, Attendance (attendance.md §10, LA) and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "We'll email it to you", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
-| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
+| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address (suggestions as it is typed, §6.12), phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
 | Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
@@ -699,6 +740,7 @@ screen.
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · The address search (F21, §5, §6.12): `GET /maps/search` in a new `maps` module over `services/maps/geoapify.service.js` (`GEOAPIFY_API_KEY`), and `AddressField` in `packages/ui`, now on every address a person types: People · Worksites, field sites, work location requests, homes, My Profile, Settings · Organisation (§10.1) and a vacancy's location. On a worksite, a field site and a client visit the place picked fills Latitude and Longitude. Map tiles and the reverse lookup stay open.
 - 19/10/2026 · AJ · A module's tab strip on a narrow desktop window (People, ESS, Settings and every other module): `Tabs` keeps the tabs that fit, the active one always among them, and folds the rest into More Tabs, a ⋯ menu at the end of the strip (dotted when a hidden tab has a count), instead of scrolling sideways. Phones keep the sideways row. FRONTEND_GUIDE §9.2 updated. TB to review.
 - 19/10/2026 · AJ · The employee record's header shows the person's photo (`Employee360.photo_url`, the 384 px size; `ProfileHeader` gains `photo`), and Settings · Users and a role's people show each face (`UserRow.photo_url`, 192 px, read in `users.repo.js` through `shared/db/person.js`); initials when there is none. TB to review.
 - 19/10/2026 · LA · §10, §13: the employee record gains an Attendance tab (the person's pattern,

@@ -31,7 +31,7 @@ import { Button } from "../actions/Button";
 import { ActionGroup } from "../actions/ActionGroup";
 import { PressGroupContext, usePressGroup } from "../actions/press";
 import { Chrome, Sheet } from "./Sheet";
-import { FooterContext, HostContext, IN_FOOTER, OverlayContext, focusInto, useReturnFocus, type HostLayer, type OverlayState } from "./context";
+import { FooterContext, HostContext, IN_FOOTER, OverlayContext, escapeClosesList, focusInto, useReturnFocus, type HostLayer, type OverlayState } from "./context";
 
 /** Content, or a function of `close` so a form can close its own modal after saving. */
 export type ModalContent = ReactNode | ((close: () => void) => ReactNode);
@@ -166,7 +166,7 @@ export function Modal({
                   focusInto(box.current, false);
                 }}
                 onCloseAutoFocus={returnFocus}
-                onEscapeKeyDown={(e) => !dismissible && e.preventDefault()}
+                onEscapeKeyDown={(e) => (!dismissible || escapeClosesList(e)) && e.preventDefault()}
                 onPointerDownOutside={(e) => !dismissible && e.preventDefault()}
                 className={cn(
                   "flex w-full flex-col bg-card text-card-foreground shadow-3 outline-none",

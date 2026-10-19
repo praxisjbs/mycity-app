@@ -3,7 +3,8 @@ import type { LocationError, MyHome } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
-import { Button, Card, CardHeader, Field, FormFooter, KeyValue, Pill, Result, TextAreaField, toast, useContractForm, useModal } from "@mycity/ui";
+import { searchPlaces } from "@/features/shared/places";
+import { AddressField, Button, Card, CardHeader, Field, FormFooter, KeyValue, Pill, Result, toast, useContractForm, useModal } from "@mycity/ui";
 import { HOME_STATUS } from "./labels";
 
 /**
@@ -135,7 +136,7 @@ export function SetHomeForm({ max, close }: { max: number; close: () => void }) 
         <ReadingStep reading={reading} idle={{ title: "At Home Now", text: "Take the reading where you work from home." }} />
       </div>
       <Field label="Address" {...f.status("home_address")}>
-        <TextAreaField {...f.field("home_address")} placeholder="12 Sample Street" rows={2} />
+        <AddressField {...f.field("home_address")} search={searchPlaces} placeholder="12 Sample Street" maxLength={300} />
       </Field>
       <FormFooter>
         {located ? (

@@ -3,9 +3,10 @@ import type { ApprovalDecision, LocationRequest, LocationRequestType } from "@my
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { coordinatesOf, searchPlaces } from "@/features/shared/places";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chain, ChoiceField, DataView, DateField, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, NumberField, PageHeader, PhoneOnly, Pill, TextAreaField, TextField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, Chain, ChoiceField, DataView, DateField, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, NumberField, PageHeader, PhoneOnly, Pill, TextAreaField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 import { useClock } from "./ClockButton";
 import { ReadingStep, useReading } from "./HomeLocation";
 import { REQUEST_STATUS, REQUEST_TYPE, REQUEST_TYPE_HELP } from "./labels";
@@ -272,7 +273,17 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
         <DateField {...f.field("ends_on")} min={v.starts_on || todayIso()} />
       </Field>
       <Field label="Address" optional={v.request_type === "remote_day"} {...f.status("address")}>
-        <TextField {...f.field("address")} placeholder="Street, area, city" />
+        <AddressField
+          {...f.field("address")}
+          search={searchPlaces}
+          onPick={(place) => {
+            // The client site's centre; a temporary home keeps its own reading.
+            const at = coordinatesOf(place);
+            f.set("site_latitude", at.latitude);
+            f.set("site_longitude", at.longitude);
+          }}
+          placeholder="Street, area, city"
+        />
       </Field>
       {visit && (
         <Card className="mb-3">

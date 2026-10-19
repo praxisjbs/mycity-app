@@ -209,6 +209,7 @@ src/
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
+│   ├── maps/          geoapify.service (the address search behind every location field, F21)
 │   ├── qr/            qr
 │   └── realtime/      emitter · active (who is in front of the app, for the push hold)
 ├── realtime/      socket
@@ -265,10 +266,11 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
 | `knowledge` | `knowledge` (announcements are read here too) |
 | `praxis_ai` | `assistant`, `ai_governance` |
-| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures`, `search` |
+| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures`, `search`, `maps` |
 
 The settings modules that every user touches (`identity` login, own `notifications`, own `documents`,
-`search`, the requests waiting on them in `workflow`) check ownership, not the `settings` grant.
+`search`, the address search in `maps`, the requests waiting on them in `workflow`) check ownership,
+not the `settings` grant.
 
 **Capabilities.** A capability is a named authority inside a module that its six actions cannot
 express: Home's `view` opens Home to every employee, `home.team` opens its Team tab to the people
@@ -318,6 +320,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (M6) | Caller's own inbox, preferences and devices |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
+| `maps` | routes and controller only | `GET /maps/search`, the address search every location field types into (`services/maps`; `docs/guides/foundation.md` §6.12) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
 

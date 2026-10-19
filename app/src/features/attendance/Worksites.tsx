@@ -8,14 +8,15 @@ import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { coordinatesOf, searchPlaces } from "@/features/shared/places";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
 import { PATTERN } from "./labels";
 
 /**
  * People · Worksites (#28, docs/guides/attendance.md §10): the offices a punch is matched to, each
  * a centre, a radius and a timezone, and who is assigned to each. People add, change, retire and
- * restore them; the coordinates are typed until the map's address search is served (§13).
+ * restore them; the address is searched as it is typed, and the place picked fills the centre.
  */
 export function Worksites() {
   const [params] = useSearchParams();
@@ -141,7 +142,11 @@ type Values = { name: string; address: string; latitude: string; longitude: stri
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
 const bodyOf = (v: Values) => ({ name: v.name, address: v.address, latitude: num(v.latitude), longitude: num(v.longitude), radius_m: num(v.radius_m) });
 
-/** Add a worksite, or change one. The numbers are typed as text and checked as numbers by the contract. */
+/**
+ * Add a worksite, or change one. The address searches as it is typed and the place picked
+ * fills Latitude and Longitude, which stay open to correct. The numbers are typed as text
+ * and checked as numbers by the contract.
+ */
 function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
   const f = useContractForm<Values>(
     {
@@ -176,7 +181,17 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
         <TextField {...f.field("name")} placeholder="Lekki Office" maxLength={120} />
       </Field>
       <Field label="Address" optional {...f.status("address")}>
-        <TextField {...f.field("address")} placeholder="7 Admiralty Way" maxLength={300} />
+        <AddressField
+          {...f.field("address")}
+          search={searchPlaces}
+          onPick={(place) => {
+            const at = coordinatesOf(place);
+            f.set("latitude", at.latitude);
+            f.set("longitude", at.longitude);
+          }}
+          placeholder="7 Admiralty Way"
+          maxLength={300}
+        />
       </Field>
       <Grid cols={2}>
         <Field label="Latitude" {...f.status("latitude")}>

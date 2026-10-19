@@ -14,7 +14,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Drawer } from "vaul";
 import { cn } from "../lib/cn";
 import { IconButton } from "../actions/Button";
-import { FooterContext, IN_FOOTER, TEXT_ENTRY, focusInto, useReturnFocus } from "./context";
+import { FooterContext, IN_FOOTER, TEXT_ENTRY, escapeClosesList, focusInto, useReturnFocus } from "./context";
 
 export interface ChromeProps {
   /** The heading. */
@@ -211,7 +211,7 @@ export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, chi
             focusInto(content.current, true);
           }}
           onCloseAutoFocus={returnFocus}
-          onEscapeKeyDown={(e) => !dismissible && e.preventDefault()}
+          onEscapeKeyDown={(e) => (!dismissible || escapeClosesList(e)) && e.preventDefault()}
           onPointerDownOutside={(e) => {
             if (!locked) return;
             e.preventDefault();

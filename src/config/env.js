@@ -600,6 +600,17 @@ const ENTRIES = [
     },
   ],
 
+  // Maps (FRONTEND_FOUNDATION F21). The browser never sees the key: the address search goes through our API.
+  [
+    "GEOAPIFY_API_KEY",
+    str(""),
+    {
+      group: "Maps",
+      doc: "Geoapify API key for the address search behind every location field. Empty: the search answers 503 and the fields take a typed address and coordinates.",
+      secret: true,
+    },
+  ],
+
   // Rate limits (SYSTEM_ARCHITECTURE §3)
   [
     "RATE_LIMIT_STAFF_PER_MIN",

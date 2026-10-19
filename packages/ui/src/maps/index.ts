@@ -4,8 +4,9 @@
  * reaches a browser. The drawing is its own chunk (F22), so a screen with no
  * map downloads no Leaflet.
  *
- * The proxy routes are backend work (attendance, worksites); `geoapify.ts`
- * holds the paths they answer on, and a screen may pass its own.
+ * `geoapify.ts` holds the paths our API answers on, and a screen may pass its
+ * own. The search is served (`GET /api/v1/maps/search`, and `AddressField` in
+ * Forms types into it); the tiles and the reverse lookup are still to come.
  */
 export { MapView, type MapViewProps, type MapMarker } from "./MapView";
 export { PlaceSearch, type PlaceSearchProps } from "./PlaceSearch";
