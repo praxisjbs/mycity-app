@@ -304,7 +304,7 @@ function listMine(db, employeeId, query) {
             v.fine, v.letter_document_id, ${TOTAL_COL}
        FROM (${ROWS}) v
       WHERE v.employee_id = $1 AND v.status = 'issued'
-      ORDER BY v.effective_on DESC, v.sanction_id`,
+      ORDER BY v.effective_on DESC, v.created_at DESC, v.sanction_id`,
     [employeeId],
     query,
   );
