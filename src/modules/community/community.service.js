@@ -16,7 +16,7 @@
  * outbox handlers in community.events.js.
  */
 const crypto = require("node:crypto");
-const c = require("@mycity/contract");
+const { FORWARDABLE: FORWARDABLE_TYPES } = require("@mycity/contract").community;
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
@@ -1020,7 +1020,7 @@ async function openDirect(employeeId, user) {
  * Forwarding (§3 step 19)
  * ------------------------------------------------------------------ */
 
-const FORWARDABLE = new Set(c.community.FORWARDABLE);
+const FORWARDABLE = new Set(FORWARDABLE_TYPES);
 
 async function listForwardTargets(user, query) {
   return repo.forwardTargets(pool, user.user_id, query);

@@ -983,7 +983,7 @@ describeDb("Staff Community against the real migrations", () => {
 
     test("a mail attachment goes to a chat as a copy in Community, only from its mailbox's owner, once scanned and never from Spam", async () => {
       const dest = await channel("fwd-mail", ["tunde"]);
-      const { attachment, document, accountId, messageId } = await tx(async (client) => {
+      const { attachment, document, account: mailAccountId, message: mailMessageId } = await tx(async (client) => {
         const secret = await client.query("INSERT INTO integration_secret (provider, key, ciphertext) VALUES ('mail', 'mail_conn:fwd', 'x') RETURNING integration_secret_id");
         const account = await client.query(
           `INSERT INTO mail_account (user_id, email, incoming_protocol, incoming_host, incoming_port, outgoing_host, outgoing_port, username, integration_secret_id)
@@ -1007,7 +1007,7 @@ describeDb("Staff Community against the real migrations", () => {
           message.rows[0].mail_message_id,
           doc.document_id,
         ]);
-        return { attachment: att.rows[0].mail_attachment_id, document: doc.document_id, accountId, messageId: message.rows[0].mail_message_id };
+        return { attachment: att.rows[0].mail_attachment_id, document: doc.document_id, account: accountId, message: message.rows[0].mail_message_id };
       });
 
       // Not the owner: nothing to send.
@@ -1017,10 +1017,10 @@ describeDb("Staff Community against the real migrations", () => {
       expect((await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest] })).status).toBe(409);
       await q("UPDATE document SET scan_status = 'clean' WHERE document_id = $1", [document]);
       // A spam mail's attachment is never forwarded.
-      const spam = await q("INSERT INTO mail_folder (mail_account_id, remote_key, name, kind) VALUES ($1, 'Junk', 'Junk', 'spam') RETURNING mail_folder_id", [accountId]);
-      await q("UPDATE mail_message SET mail_folder_id = $2 WHERE mail_message_id = $1", [messageId, spam.rows[0].mail_folder_id]);
+      const spam = await q("INSERT INTO mail_folder (mail_account_id, remote_key, name, kind) VALUES ($1, 'Junk', 'Junk', 'spam') RETURNING mail_folder_id", [mailAccountId]);
+      await q("UPDATE mail_message SET mail_folder_id = $2 WHERE mail_message_id = $1", [mailMessageId, spam.rows[0].mail_folder_id]);
       expect((await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest] })).status).toBe(404);
-      await q("UPDATE mail_message SET mail_folder_id = NULL WHERE mail_message_id = $1", [messageId]);
+      await q("UPDATE mail_message SET mail_folder_id = NULL WHERE mail_message_id = $1", [mailMessageId]);
 
       const res = await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest], employee_ids: [people.tunde.employee.employee_id] });
       expect(res.status).toBe(201);
