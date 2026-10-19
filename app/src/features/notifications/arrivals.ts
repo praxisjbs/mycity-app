@@ -104,6 +104,12 @@ export function useArrivals(unread: number | undefined): void {
     (a: Arrival): boolean => {
       if (!live.current) return false;
       if (seen.current.has(a.notification_id)) return true;
+      // A window behind other windows or tabs only reloads its bell: the device's own
+      // notification is the one that shows and sounds (docs/guides/notifications.md §11).
+      if (document.visibilityState !== "visible") {
+        reloadBell();
+        return false;
+      }
       seen.current.add(a.notification_id);
       if (seen.current.size > 200) seen.current = new Set([...seen.current].slice(-100));
       reloadBell();
