@@ -3,7 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
-import { Button, cn, DateField, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
+import { Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
 
 export interface ComposeInit {
@@ -58,6 +58,41 @@ function Recipients({ id, label, list, onChange, bad, error, right }: { id: stri
   );
 }
 
+/**
+ * The signature this message will carry, as the server will add it (mailbox.md §3 step 8): the
+ * slim line on a reply or mail only for colleagues, the full signature otherwise. Asked again
+ * when the recipients change; addresses not yet valid are left out.
+ */
+function SignaturePreview({ inReplyTo, to, cc, bcc }: { inReplyTo: string | null; to: string[]; cc: string[]; bcc: string[] }) {
+  const valid = (list: string[]) => list.filter((a) => EMAIL.test(a));
+  const key = JSON.stringify([inReplyTo, valid(to), valid(cc), valid(bcc)]);
+  const [html, setHtml] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const [in_reply_to, to_addresses, cc_addresses, bcc_addresses] = JSON.parse(key) as [string | null, string[], string[], string[]];
+    const wait = setTimeout(() => {
+      api
+        .call("POST /api/v1/mailbox/signature/preview", { body: { in_reply_to, to_addresses, cc_addresses, bcc_addresses } })
+        .then((r) => {
+          if (!live) return;
+          setHtml(r.html);
+          setFailed(false);
+        })
+        .catch(() => {
+          if (live) setFailed(true);
+        });
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(wait);
+    };
+  }, [key]);
+  if (failed) return <p className="py-2 text-xs text-subtle-foreground">Signature not available</p>;
+  if (html === null) return <Skeleton lines={3} />;
+  return <EmailFrame title="Signature" html={html} />;
+}
+
 /** Next 08:00 tomorrow and next Monday, Lagos time. */
 function quickTimes() {
   const day = (offset: number) => todayIso(new Date(Date.now() + offset * 86400000));
@@ -86,6 +121,8 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   const [toBad, setToBad] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [body, setBody] = useState(init.body_html ?? "");
+  /* Hidden each time the composer opens, to keep the room for writing (TB, 19/10/2026). */
+  const [showSignature, setShowSignature] = useState(false);
   const dirty = useRef(0);
 
   const payload = (): MailDraftSave => ({ to_addresses: to, cc_addresses: cc, bcc_addresses: bcc, subject, body_html: body, document_ids: files.map((f) => f.document_id), in_reply_to: init.in_reply_to ?? null });
@@ -183,6 +220,16 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           touch();
         }}
       />
+      <div className="pt-2">
+        <Button size="sm" variant="ghost" icon={showSignature ? "hide" : "eye"} onClick={() => setShowSignature((v) => !v)}>
+          {showSignature ? "Hide Signature" : "Show Signature"}
+        </Button>
+        {showSignature && (
+          <div className="mt-2 rounded-box border border-border p-3">
+            <SignaturePreview inReplyTo={init.in_reply_to ?? null} to={to} cc={cc} bcc={bcc} />
+          </div>
+        )}
+      </div>
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-2">
           {files.map((f) => (

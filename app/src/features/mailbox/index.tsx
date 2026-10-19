@@ -11,11 +11,22 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, type ComposeInit } from "./Composer";
 import { ApiError } from "@/api/client";
 import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, prepareEmail, referencedCids, SearchInput, splitQuoted, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
+import { MailSignature } from "./MailSignature";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
 
-export default function Mailbox({ tab, id }: ModuleScreenProps) {
+export default function Mailbox(props: ModuleScreenProps) {
+  switch (props.tab) {
+    case "signature":
+      return <MailSignature />;
+    default:
+      return <Folders {...props} />;
+  }
+}
+
+/** The six folders: the list beside the reader, the composer and the Connect sheet. */
+function Folders({ tab, id }: ModuleScreenProps) {
   const folder = (tab in NAMES ? tab : "inbox") as MailFolder;
   const mobile = useIsMobile();
   useFitPage(!mobile);

@@ -4548,6 +4548,8 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `initials` | `lib/format.ts` | Initials for an avatar: "Cynthia Osakunih" → "CO". |
 | `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB" from a byte count. |
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |
+| `formatPhone` | `lib/format.ts` | A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. |
+| `formatPhoneLocal` | `lib/format.ts` | A stored number as a person types it at home, for a field to start from: "0803 123 4567". |
 | `ControlIds` (type) | `lib/ids.ts` | The ids of one control and the parts that describe it. |
 | `useControlIds` | `lib/ids.ts` | The ids for one control, from a readable stem (the field name) and a page-unique suffix. |
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |

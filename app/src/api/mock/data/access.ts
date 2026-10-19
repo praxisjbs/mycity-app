@@ -10,19 +10,21 @@ export const CAPABILITIES = [
   { code: "announcements.post", name: "Post Announcements", description: "Post to the announcements channel and track who has read a post." },
   { code: "home.reports", name: "Run Reports", description: "Build, schedule and run reports on Home, and receive them." },
   { code: "home.team", name: "View Team", description: "Open the Team tab on Home: who is in today and the team's figures." },
+  { code: "mailbox.signature", name: "Configure Signature", description: "Set the company's signature links and what shows on everyone's email signature." },
 ];
 
 const EVERY = CAPABILITIES.map((c) => c.code);
+const HOME = ["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team"];
 const MANAGES = ["alerts.clear", "home.reports", "home.team"];
 
 /** Role code → the capabilities it holds by default. */
 export const ROLE_CAPABILITIES: Record<string, string[]> = {
   implementation: EVERY,
-  operations_people: EVERY,
-  management: EVERY,
+  operations_people: HOME,
+  management: HOME,
   head_of_department: MANAGES,
   manager: MANAGES,
-  administrator: [],
+  administrator: ["mailbox.signature"],
   employee: [],
 };
 
