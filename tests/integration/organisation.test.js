@@ -1004,7 +1004,7 @@ describeDb("the organisation module against the real migrations", () => {
 
     test("a post the sheet does not hold is given the line manager roles.json names, only while it has none", async () => {
       const partner = await asOps()(request(app).post("/api/v1/employees")).send({
-        first_name: "Praxis",
+        first_name: "Build",
         last_name: "Partner",
         work_email: "partner@mycity.test",
         phone: "08031234575",
@@ -1030,7 +1030,7 @@ describeDb("the organisation module against the real migrations", () => {
       const result = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: roles, log: (m) => log.push(m) });
       expect(result.status).toBe("already_loaded");
       expect(result.lines).toEqual({ set: 1, unresolved: 0 });
-      expect(log.join("\n")).toMatch(/Praxis Partner \(Implementation Partner\) now reports to the Chief Executive Officer/);
+      expect(log.join("\n")).toMatch(/Build Partner \(Implementation Partner\) now reports to the Chief Executive Officer/);
       const zuri = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0001'");
       const line = await one("SELECT line_manager_id FROM employee WHERE employee_id = $1", [partner.body.employee_id]);
       expect(line.line_manager_id).toBe(zuri.employee_id);

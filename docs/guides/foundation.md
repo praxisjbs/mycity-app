@@ -616,9 +616,9 @@ screen.
   over a person left at the top of the tree.
 - A VACANT row with a Line Manager: the seat is given that line; the roster gives it only while the
   seat has none.
-- A dotted line on a row whose manager already exists and whose dotted manager the same sheet
-  creates: kept. The preview and the commit each read the sheet afresh, so a preview's ids never
-  make the commit's dotted line look contradictory.
+- A dotted line to someone the same sheet creates: set once every row is written, in the preview
+  and the commit alike. Each run reads the dotted manager from the row's own Line Manager cell,
+  never from an earlier run, whose ids a preview rolls back.
 - A person removed from the sheet: nothing happens; archiving is a person's decision on screen.
 - A person edited on screen, then the deploy runs: the screen's version stays.
 - Two people with the same name: matched by staff number or email, never by name alone.
