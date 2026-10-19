@@ -13,7 +13,7 @@ files.
 | `docs/MIGRATIONS.md` | How a migration or reference seed is written and checked |
 | `migrations/`, `seeds/reference/` | The schema itself. Where this file and the SQL disagree, the SQL is the fact and this file is fixed |
 
-Status as of 19/10/2026 (`main` with attendance's clock, `1300` and `1390`, remote staff's approved homes, `1310` and `1391`, work location requests, `1320` and `1392`, field assignments, `1330` and `1393`, Home's foundation, `1150` and `1199`, Home's alerts, `1151`, the mailbox's image trust, `1125`, email signatures, `1127` and `1129`, web push, `0460`, and the effective manager through a vacant seat, `1160`): 76 files, 164 tables and 6 views. Gate 6
+Status as of 19/10/2026 (`main` with attendance's clock, `1300` and `1390`, remote staff's approved homes, `1310` and `1391`, work location requests, `1320` and `1392`, field assignments, `1330` and `1393`, hybrid staff's weekly schedule, `1340`, a client visit's site, `1350`, Home's foundation, `1150` and `1199`, Home's alerts, `1151`, the mailbox's image trust, `1125`, email signatures, `1127` and `1129`, web push, `0460`, and the effective manager through a vacant seat, `1160`): 76 files, 164 tables and 6 views. Gate 6
 (`check/schema-drift.js`, `check/contract-columns.js`) checks the code and the contract against
 the same reading of the migrations on every PR.
 
@@ -183,7 +183,11 @@ version 1 of the `attendance.location_request` approval (the line manager, then 
 days by their line manager or People, numbered, in force at once), `attendance_field_site` (its one
 or two sites, a centre and a radius of 100 to 500 m) and `attendance_field_member` (the people on
 it, a person taken off keeping their row) · `1393` the `field_assignment` numbering scheme
-(`FA-0001`).
+(`FA-0001`) · `1340` hybrid staff's weekly schedule: `attendance_schedule` (the office days, ISO
+weekdays, from a first day, one row per person per first day; the latest started by a date is in
+force; the other working days are home days) · `1350` a client visit's site on
+`attendance_location_request` (`site_latitude`, `site_longitude`, `site_radius_m` 100 to 500 m, all
+three or none, client visits only).
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
 other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026).
@@ -198,7 +202,8 @@ other M1 modules take numbers outside them. The organogram takes `1160` to `1169
   and a day with no record by the register's rules, through `1300`'s and `1200`'s indexes; it needs
   no index of its own, so `1150` no longer adds `attendance_event (occurred_at)`. Its statuses are
   the register's (`present`, `late`, `absent`, `leave`, checked by `1300`) in Home's words, with
-  `present` split into on site, remote (by `employee.work_pattern` or an approved remote day) and
+  `present` split into on site, remote (by `employee.work_pattern`, an approved remote day or a
+  hybrid home day by `attendance_schedule`, `1340`) and
   field (a field assignment covering the day, `1330`). When the register's statuses change, the
   roster's mapping changes in the same PR (`tests/integration/attendance-roster.test.js` holds the
   two together).

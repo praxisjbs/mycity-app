@@ -1,7 +1,20 @@
 name: CI
 
-# One job, one command: `npm run ci`, exactly what everyone runs locally
-# (scripts/ci-local.js). Branch protection on main requires the "ci" check.
+# Every gate in scripts/ci-local.js, the same command everyone runs locally (`npm run ci`), split
+# into four jobs that run side by side, so a run takes as long as its slowest job rather than the
+# sum of them all (AJ, 19/10/2026; docs/BACKEND_GUIDE.md §8.4):
+#
+#   backend   PostgreSQL, Redis and ffmpeg: the whole jest suite and the schema gates
+#   frontend  the workspaces' typecheck, lint, tests (side by side, scripts/fe-test.js) and builds
+#   screens   Chromium: the gates that open every screen at phone and desktop size
+#   checks    the fast static and process gates, every gate that reads documents among them
+#
+# Each job runs `npm run ci -- --group=<name>`; `node scripts/ci-local.js --groups` lists which
+# gate is where. A last job named "ci" passes only when all four did: branch protection on main
+# requires that one check, so it keeps its name.
+#
+# Downloads that never change between runs are cached: npm's (setup-node), Chromium (keyed on the
+# pinned playwright version) and ffmpeg's packages.
 #
 # This workflow never deploys and never references the production environment
 # (check/production-environment-refs.js). Deploys are release.yml.
@@ -11,7 +24,8 @@ name: CI
 #   - a draft pull request runs nothing: its author runs `npm run ci` while working, and the run
 #     starts when it is marked ready (ready_for_review), then on every push
 #   - a change to documents only, or a push to main whose tree a pull request's run already
-#     passed, runs only the gates that read documents (scripts/check/lib/scope.js)
+#     passed, runs only the gates that read documents (scripts/check/lib/scope.js): the checks
+#     job alone; backend, frontend and screens are skipped and start no runner
 
 on:
   pull_request:
@@ -40,17 +54,44 @@ permissions:
   # each one passed (the ci-tree artifact).
   actions: read
 
+env:
+  # Every gate script is built (gate 6 was the last), so a gate whose script is
+  # empty fails the run instead of being reported as NOT BUILT.
+  CI_STRICT: "1"
+
 jobs:
-  ci:
-    name: ci
+  # full, docs or tested, and why (printed in the log). Needs nothing installed.
+  scope:
+    name: scope
     if: >-
       github.event_name != 'pull_request' ||
       (!github.event.pull_request.draft &&
       (github.event.action != 'edited' || github.event.changes.body || github.event.changes.base))
     runs-on: ubuntu-latest
-    # The screen gates and the a11y gate crawl the gallery and every app screen at two
-    # sizes (about 7 minutes on a laptop); the margin keeps a slow runner from timing out.
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+    steps:
+      - name: Check out (full history, the scope diffs against main)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: How much this run needs
+        id: scope
+        run: node scripts/ci-local.js --decide-scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  backend:
+    name: backend
+    needs: scope
+    if: needs.scope.outputs.scope == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     # A real PostgreSQL 16 with pgvector and Redis, so the integration suite and gate 4's round
     # trip run the shared layer against the real migrations on every PR (docs/MIGRATIONS.md §12).
     # A throwaway database for CI only; nothing here is staging or production.
@@ -72,48 +113,42 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
-      - name: Check out (full history, the process gates diff against main)
+      - name: Check out (full history, the migration gates diff against main)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Node from .nvmrc
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-
-      # full, docs or tested, and why (printed in the log). Needs nothing installed.
-      - name: How much this run needs
-        id: scope
-        run: node scripts/ci-local.js --decide-scope
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      # One install for the backend and the workspaces (packages/*, app,
-      # public-app): gates 8 and 11 build the staff app's mock build from it.
       - name: Install
         run: npm ci
 
-      # Gates 8, 11 and 21 open every screen at phone and desktop size
-      # (scripts/check/lib/screens.js). The browser matches the pinned
-      # playwright version in package-lock.json.
-      - name: Chromium for the screen gates
-        if: steps.scope.outputs.scope == 'full'
-        run: npx playwright install --with-deps chromium
-
-      # The integration suite transcodes voice notes and reads media durations.
+      # The integration suite transcodes voice notes and reads media durations. The .deb files
+      # are kept between runs; a cache miss (or a runner image they no longer fit) downloads them.
+      - name: ffmpeg's packages, cached
+        uses: actions/cache@v4
+        with:
+          path: ~/ffmpeg-debs
+          key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-v1
       - name: ffmpeg for the integration suite
-        if: steps.scope.outputs.scope == 'full'
-        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+        run: |
+          if ls ~/ffmpeg-debs/*.deb >/dev/null 2>&1 && sudo apt-get install -y -q --no-download ~/ffmpeg-debs/*.deb; then
+            echo "ffmpeg from the cache"
+          else
+            sudo apt-get update -q
+            sudo apt-get install -y -q --download-only ffmpeg
+            sudo apt-get install -y -q ffmpeg
+            mkdir -p ~/ffmpeg-debs
+            cp /var/cache/apt/archives/*.deb ~/ffmpeg-debs/ 2>/dev/null || true
+          fi
+          ffmpeg -version | head -1
 
-      - name: All gates
-        run: npm run ci
+      - name: Backend gates
+        run: npm run ci -- --group=backend
         env:
-          # Every gate script is built (gate 6 was the last), so a gate whose script is
-          # empty fails the run instead of being reported as NOT BUILT.
-          CI_STRICT: "1"
-          CI_SCOPE: ${{ steps.scope.outputs.scope }}
+          CI_SCOPE: ${{ needs.scope.outputs.scope }}
           # Integration suite and gate 4's live round trip, against the services above.
           RUN_DB_TESTS: "1"
           APP_ENV: test
@@ -121,15 +156,131 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6379/15
           GH_TOKEN: ${{ github.token }}
 
+  frontend:
+    name: frontend
+    needs: scope
+    if: needs.scope.outputs.scope == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Frontend gates
+        run: npm run ci -- --group=frontend
+        env:
+          CI_SCOPE: ${{ needs.scope.outputs.scope }}
+          GH_TOKEN: ${{ github.token }}
+
+  screens:
+    name: screens
+    needs: scope
+    if: needs.scope.outputs.scope == 'full'
+    runs-on: ubuntu-latest
+    # The screen gates and the a11y gate crawl the gallery and every app screen at two
+    # sizes (about 7 minutes on a laptop); the margin keeps a slow runner from timing out.
+    timeout-minutes: 25
+    steps:
+      - name: Check out (full history, the screen gates read what changed)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install
+        run: npm ci
+
+      # Gates 8, 11 and 21 open every screen at phone and desktop size
+      # (scripts/check/lib/screens.js). The browser matches the pinned playwright version in
+      # package-lock.json, so that version is the cache key: Chromium downloads once per upgrade.
+      - name: Which Chromium
+        id: playwright
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Chromium, cached
+        id: chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+      - name: Chromium for the screen gates
+        if: steps.chromium.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      # The browser comes from the cache; the system libraries it needs do not.
+      - name: Chromium's system libraries
+        if: steps.chromium.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Screen gates
+        run: npm run ci -- --group=screens
+        env:
+          CI_SCOPE: ${{ needs.scope.outputs.scope }}
+          GH_TOKEN: ${{ github.token }}
+
+  checks:
+    name: checks
+    needs: scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out (full history, the process gates diff against main)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Static and process gates
+        run: npm run ci -- --group=checks
+        env:
+          CI_SCOPE: ${{ needs.scope.outputs.scope }}
+          GH_TOKEN: ${{ github.token }}
+
+  # The one check branch protection requires: green only when every job above passed, or was
+  # skipped because this run's scope did not need it.
+  ci:
+    name: ci
+    needs: [scope, backend, frontend, screens, checks]
+    if: always() && needs.scope.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | node -e '
+            const needs = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const bad = Object.entries(needs).filter(([, n]) => !["success", "skipped"].includes(n.result));
+            for (const [job, n] of Object.entries(needs)) console.log(`${job.padEnd(9)} ${n.result}`);
+            if (needs.scope.result !== "success" || needs.checks.result !== "success" || bad.length) process.exit(1);
+          '
+
       # The tree this pull request's full run passed (GitHub's merge of it into main as main is
       # now). After the merge, main's run finds it and skips what this tree already passed
       # (scripts/check/lib/scope.js, TREE_ARTIFACT and TREE_FILE).
+      - name: Check out (only to read the tree)
+        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.scope == 'full'
+        uses: actions/checkout@v4
       - name: Record the tree this run passed
-        if: success() && github.event_name == 'pull_request' && steps.scope.outputs.scope == 'full'
+        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.scope == 'full'
         run: git rev-parse 'HEAD^{tree}' > ci-tree.txt
-
       - name: Keep it for main's run after the merge
-        if: success() && github.event_name == 'pull_request' && steps.scope.outputs.scope == 'full'
+        if: success() && github.event_name == 'pull_request' && needs.scope.outputs.scope == 'full'
         uses: actions/upload-artifact@v4
         with:
           name: ci-tree

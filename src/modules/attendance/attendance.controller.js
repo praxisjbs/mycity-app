@@ -15,6 +15,7 @@ const service = require("./attendance.service");
 const homes = require("./attendance.home");
 const requests = require("./attendance.requests");
 const assignments = require("./attendance.assignments");
+const schedules = require("./attendance.schedule");
 
 const q = (req) => req.validated.query || {};
 const id = (req) => req.validated.params.id;
@@ -100,6 +101,14 @@ module.exports = {
 
   removeFromAssignment: async (req, res) =>
     ok(res, await assignments.remove(withActor(req), id(req), req.validated.body, scopeOf(req))),
+
+  schedule: async (req, res) => ok(res, await schedules.get(req.user, req.validated.params.employee_id, scopeOf(req))),
+
+  setSchedule: async (req, res) =>
+    created(
+      res,
+      await schedules.set(withActor(req), req.validated.params.employee_id, req.validated.body, scopeOf(req)),
+    ),
 
   export: async (req, res) => ok(res, await service.requestRegisterExport(withActor(req), req.validated.body)),
 };

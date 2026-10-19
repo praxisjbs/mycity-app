@@ -10,17 +10,21 @@
  *   fence      a field assignment the person is still on covering the date before anything
  *              (§6.12): its sites, the nearer judging the punch (attendance.geofence.js).
  *              Then an approved work location request covering the date (§6.11): its
- *              temporary home, fenced like a home; a remote day, the approved home when the
- *              person has one; otherwise no fence and `approved` names the day, the approval
- *              being the check. Then remote staff: their approved home, with the policy's
- *              home_radius_m, or none until People approve one. Everyone else: the policy row's
- *              worksite for the date when it names one, else the employee's own
- *              (employee.worksite_id); only an active worksite fences
+ *              temporary home, fenced like a home; a client visit, its site; a remote day, the
+ *              approved home when the person has one; otherwise no fence and `approved` names
+ *              the day, the approval being the check. Then someone working from home that date
+ *              (remote staff, or a hybrid employee's home day by their schedule, §6.13): their
+ *              approved home, with the policy's home_radius_m, or none until People approve one.
+ *              Everyone else: the policy row's worksite for the date when it names one, else the
+ *              employee's own (employee.worksite_id); only an active worksite fences
+ *   home_day   the date is worked from home by the pattern or the schedule, so having no fence
+ *              means no approved home (no_home) rather than no office (no_worksite)
  *   zone       the worksite's timezone, else Africa/Lagos (a home has none of its own)
  *   shift      the working week's hours for that weekday, the policy's grace, and whether
  *              the day is worked at all (shared/time/working-week)
  */
 const workingWeek = require("../../shared/time/working-week");
+const lagos = require("../../shared/time/lagos");
 const worksites = require("../worksites/worksites.service");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
@@ -46,6 +50,32 @@ async function policyFor(db, employeeId, date) {
 const zoneOf = (person) => (person && person.timezone) || rules.DEFAULT_TZ;
 
 /**
+ * Whether a hybrid employee works `date` from home: the schedule in force then leaves its weekday
+ * out (§6.13). No schedule, or any other pattern, is not a home day here.
+ */
+async function hybridHomeDay(db, person, date) {
+  if (person.work_pattern !== "hybrid") return false;
+  const schedule = await repo.scheduleOn(db, person.employee_id, date);
+  return Boolean(schedule) && !schedule.office_days.includes(lagos.weekday(date));
+}
+
+/** The approved home as a fence, or null when People have approved none. */
+async function homeFence(db, person, policy, extra = {}) {
+  const home = await repo.approvedHome(db, person.employee_id);
+  if (!home) return null;
+  return {
+    ...extra,
+    kind: "home",
+    attendance_home_id: home.attendance_home_id,
+    worksite_id: null,
+    name: "Home",
+    latitude: Number(home.latitude),
+    longitude: Number(home.longitude),
+    radius_m: Number(policy.home_radius_m),
+  };
+}
+
+/**
  * Everything a punch or a day of a person on `date` is judged with.
  * @param {{query: Function}} db
  * @param {{employee_id: string, worksite_id: string|null, work_pattern: string}} person  repo.person()
@@ -56,27 +86,13 @@ async function contextFor(db, person, date) {
   const calendar = await workingWeek.loadCalendar(db);
   const shift = rules.shiftFor(date, calendar, policy);
   const assignment = await repo.fieldAssignmentOn(db, person.employee_id, date);
-  if (assignment) return { policy, shift, timeZone: zoneOf(person), fence: fieldFence(assignment), approved: null };
+  if (assignment)
+    return { policy, shift, timeZone: zoneOf(person), fence: fieldFence(assignment), approved: null, home_day: false };
   const request = await repo.approvedRequestOn(db, person.employee_id, date);
-  if (request) return { policy, shift, timeZone: zoneOf(person), ...(await requestPlace(db, person, request, policy)) };
-  if (person.work_pattern === "remote") {
-    const home = await repo.approvedHome(db, person.employee_id);
-    return {
-      policy,
-      fence: home
-        ? {
-            kind: "home",
-            attendance_home_id: home.attendance_home_id,
-            worksite_id: null,
-            name: "Home",
-            latitude: Number(home.latitude),
-            longitude: Number(home.longitude),
-            radius_m: Number(policy.home_radius_m),
-          }
-        : null,
-      timeZone: zoneOf(person),
-      shift,
-    };
+  if (request)
+    return { policy, shift, timeZone: zoneOf(person), home_day: false, ...(await requestPlace(db, person, request, policy)) };
+  if (person.work_pattern === "remote" || (await hybridHomeDay(db, person, date))) {
+    return { policy, fence: await homeFence(db, person, policy), timeZone: zoneOf(person), shift, home_day: true };
   }
   const fence =
     (await worksites.fenceFor(db, policy.override_worksite_id)) || (await worksites.fenceFor(db, person.worksite_id));
@@ -95,6 +111,7 @@ async function contextFor(db, person, date) {
       : null,
     timeZone: (fence && fence.timezone) || zoneOf(person),
     shift,
+    home_day: false,
   };
 }
 
@@ -143,22 +160,22 @@ async function requestPlace(db, person, request, policy) {
       },
       approved: null,
     };
+  if (request.request_type === "client_visit" && request.site_latitude !== null)
+    return {
+      fence: {
+        ...base,
+        kind: "client_visit",
+        place: "client_visit",
+        name: PLACE_NAME.client_visit,
+        latitude: Number(request.site_latitude),
+        longitude: Number(request.site_longitude),
+        radius_m: Number(request.site_radius_m),
+      },
+      approved: null,
+    };
   if (request.request_type === "remote_day") {
-    const home = await repo.approvedHome(db, person.employee_id);
-    if (home)
-      return {
-        fence: {
-          ...base,
-          kind: "home",
-          place: "remote_day",
-          attendance_home_id: home.attendance_home_id,
-          name: "Home",
-          latitude: Number(home.latitude),
-          longitude: Number(home.longitude),
-          radius_m: Number(policy.home_radius_m),
-        },
-        approved: null,
-      };
+    const fence = await homeFence(db, person, policy, { ...base, place: "remote_day" });
+    if (fence) return { fence, approved: null };
   }
   return {
     fence: null,
@@ -170,4 +187,4 @@ async function requestPlace(db, person, request, policy) {
   };
 }
 
-module.exports = { policyFor, contextFor, zoneOf, PLACE_NAME };
+module.exports = { policyFor, contextFor, zoneOf, hybridHomeDay, PLACE_NAME };

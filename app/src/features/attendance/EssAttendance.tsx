@@ -102,7 +102,7 @@ export function MyAttendancePage() {
           </>
         }
       />
-      {t?.work_pattern === "remote" && <HomeLocationCard openOnLoad={params.get("home") === "set"} />}
+      {(t?.work_pattern === "remote" || t?.work_pattern === "hybrid") && <HomeLocationCard openOnLoad={params.get("home") === "set"} />}
       {todayCard}
       <MyFieldAssignments open={openAssignment} />
       <Grid cols="4m2" className="mt-3">

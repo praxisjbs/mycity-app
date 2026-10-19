@@ -136,8 +136,9 @@ describeDb("My Profile against the real migrations", () => {
     const week = res.body.working_week;
     expect(week.map((d) => d.weekday)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     // A22: Saturday is a working day, 09:00 to 15:00; Sunday is not.
-    expect(week[5]).toEqual({ weekday: 6, is_working_day: true, starts_at: "09:00", ends_at: "15:00" });
-    expect(week[6]).toMatchObject({ weekday: 7, is_working_day: false, starts_at: null });
+    // Each day's place is the attendance module's: an on-site employee works every working day at the office.
+    expect(week[5]).toEqual({ weekday: 6, is_working_day: true, starts_at: "09:00", ends_at: "15:00", place: "office" });
+    expect(week[6]).toMatchObject({ weekday: 7, is_working_day: false, starts_at: null, place: "off" });
   });
 
   test("I change my contact and next of kin; nothing else is mine to change", async () => {

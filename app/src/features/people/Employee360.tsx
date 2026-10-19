@@ -4,6 +4,7 @@ import { usePhoto } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { Employee360 as Record360, ManagerRef } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
+import { EmployeeAttendance } from "@/features/attendance/WorkSetup";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { ReportingForm } from "@/features/shared/ReportingForm";
 import { hrefFor, useRouter } from "@/lib/router";
@@ -36,8 +37,8 @@ import { employmentStatus, employmentType, loginStatus, RESTRICTED_HELP, workPat
 
 /**
  * The employee 360 (docs/guides/foundation.md §2, §10): one person, with their profile,
- * job, reporting line, login and history as tabs. Documents arrive with the documents
- * module's own tab.
+ * job, reporting line, login, attendance (their week, attendance.md §6.13) and history as tabs.
+ * Documents arrive with the documents module's own tab.
  *
  * A field the viewer may not see comes back null and shows Restricted, with a help term
  * naming who may see it (§10.1). A person's own record is never masked from them.
@@ -47,6 +48,7 @@ const TABS = [
   { value: "job", label: "Job" },
   { value: "line", label: "Reporting Line" },
   { value: "login", label: "Login" },
+  { value: "attendance", label: "Attendance" },
   { value: "history", label: "History" },
 ];
 
@@ -176,6 +178,7 @@ export function Employee360({ id }: { id: string }) {
       {tab === "job" && <Job employee={e} />}
       {tab === "line" && <ReportingLine employee={e} onChanged={reload} />}
       {tab === "login" && <Login employee={e} onChanged={reload} />}
+      {tab === "attendance" && <EmployeeAttendance id={id} />}
       {tab === "history" && <History id={id} />}
     </>
   );

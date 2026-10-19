@@ -106,6 +106,7 @@ function summaryOf(row) {
     "employee.archived": "Record archived",
     "employee.restored": "Record restored",
     "employee.reporting_line_changed": "Reporting line changed",
+    "attendance.schedule_set": "Work schedule set",
   }[row.action];
   const what = said || row.action.replace(/^employee\./, "").replace(/_/g, " ");
   return fields.length ? `${what}: ${fields.join(", ")}` : what;

@@ -10,7 +10,7 @@ import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, DesktopOnly, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, PATTERN, PUNCH_STATE, REGISTER_STATUS, REQUEST_TYPE, VERDICT } from "./labels";
-import { RequestApproval, requestDates, requestPill, requestPlace } from "./WorkLocationRequests";
+import { RequestApproval, requestDates, requestPill, requestPlace, requestSite } from "./WorkLocationRequests";
 import { AssignmentView, FieldView, NewAssignmentForm, useAssignmentLink } from "./FieldAssignments";
 
 /**
@@ -547,6 +547,7 @@ function RequestView({ r, close }: { r: LocationRequest; close: () => void }) {
             ["Last Day", formatDate(r.ends_on)],
             ["Days", String(r.days)],
             ["Place", requestPlace(r)],
+            ...(requestSite(r) ? ([["Site", requestSite(r)]] as Array<[string, string]>) : []),
             ...(r.home_latitude !== null && r.home_longitude !== null
               ? ([["Coordinates", `${r.home_latitude.toFixed(5)}, ${r.home_longitude.toFixed(5)}`]] as Array<[string, string]>)
               : []),

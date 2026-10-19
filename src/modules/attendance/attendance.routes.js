@@ -34,6 +34,8 @@
  *   POST  /field-assignments             send people out (approve, within scope; never yourself)
  *   POST  /field-assignments/:id/cancel  cancel one (approve, everyone still on it in scope)
  *   POST  /field-assignments/:id/remove  take one person off (approve, as cancel)
+ *   GET   /schedules/:employee_id        a person's week, office and home state (view)
+ *   POST  /schedules/:employee_id        set a hybrid employee's office days (edit; never your own)
  *   POST  /export                        the register over up to 31 days, emailed (export)
  */
 const express = require("express");
@@ -189,6 +191,15 @@ route(router, "post", "/field-assignments/:id/remove",
   { params: c.common.IdParams, body: a.FieldMemberRemove, response: a.FieldAssignment,
     summary: "Take someone off a field assignment" },
   requirePermission("people", "approve"), controller.removeFromAssignment);
+
+route(router, "get", "/schedules/:employee_id",
+  { params: a.ScheduleParams, response: a.WorkSchedule, summary: "A person's work week" },
+  requirePermission("people", "view"), controller.schedule);
+
+route(router, "post", "/schedules/:employee_id",
+  { params: a.ScheduleParams, body: a.WorkScheduleSet, response: a.WorkSchedule,
+    summary: "Set a hybrid employee's office days" },
+  requirePermission("people", "edit"), controller.setSchedule);
 
 route(router, "post", "/export",
   { body: a.RegisterExportRequest, response: a.AttendanceExportQueued, summary: "Email the register" },
