@@ -32,6 +32,7 @@ section exists to stop.
 | `identity.md` | Sign-in, sessions and the lock screen, credential links, My Security (password and sessions), Settings · Users | TB | M0 | ☑ |
 | `foundation.md` | Foundation completion: People · Employees and the staff roster, imports, documents, roles and permissions, settings, audit, approvals, ⌘K search, in four tracks | TB | M0 | ☑ |
 | `organogram.md` | Organogram: People · Organogram (HR builder) and ESS · Org Chart (read-only viewer) over the live reporting tree | TB | M1 | ☐ |
+| `queries.md` | Queries & Sanctions: Queries, Rules, Sanctions and the consequence chain, Letter Templates; the employee's side in ESS · My Queries | GE | M3 | ☐ |
 | `notifications.md` | Notifications: the bell's pane on both shells, the in-app banner, web push to phones and computers, Notification Settings (brought forward from M6) | TB | M0 | ☐ |
 | `workspace.md` | My Workspace: Today, Tasks (the board, manager-set weekly and daily tasks, A24), Calendar, Analytics | AJ | M2 | ☑ |
 | `performance.md` | Performance Management: the OKR cascade from MyCity's Q4 workbooks, KPIs, scorecards, commitments, the monthly check-in and review chain, PIPs and probation, Analytics, ESS · My Performance; the five-PR build plan with its prompts | TB | M2 | ☑ |

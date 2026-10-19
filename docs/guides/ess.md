@@ -146,9 +146,9 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `GET /leave/:id` | → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Someone else's is a 404 |
 | `POST /leave` | `LeaveRequestCreate` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. Opens the `leave.approval` flow in the same transaction |
 | `POST /leave/:id/cancel` | `LeaveCancel` → `LeaveRequest` | `ess` · own | | Built 17/10/2026. While it waits (the approval is withdrawn too) or once granted until it starts |
-| `GET /queries` | `EssQueryList` (`status`: open, archived) → `QueryPage` | `ess` · own | yes | |
-| `POST /queries/:id/response` | `QueryResponse` | `ess` · own | | Through the queries service |
-| `GET /sanctions` | `PageQuery` → `SanctionPage` | `ess` · own | yes | |
+| `GET /queries` | `EssQueryListQuery` (`status`: open, archived) → `MyQueryPage` | `ess` · own | yes | Contract in `schemas/queries.js` (queries guide §5) |
+| `POST /queries/:id/response` | `QueryResponseCreate` → `MyQuery` | `ess` · own | | Through the queries service |
+| `GET /sanctions` | `PageQuery` → `MySanctionPage` | `ess` · own | yes | Issued sanctions only; contract in `schemas/sanctions.js` |
 | `GET /documents` | `DocumentListQuery` (`status`) → `DocumentListPage` | `ess` · own | yes | Built 17/10/2026. Documents held and ones People asked for, in one list |
 | `GET /documents/summary` | → `DocumentSummary` | `ess` · own | | Built 17/10/2026. The five counts, over every row, not the page |
 | `POST /documents` | multipart `EssDocumentUpload` → `DocumentRow` | `ess` · own | | Built 17/10/2026. Upload engine and vault; `document_request_id` answers a Missing row |
@@ -461,3 +461,4 @@ Deductions figure and every form open the shared modal.
 - 22/10/2026 · TB · Performance PR 1: ESS · My Performance is composed of its parts in `app/src/features/performance/my/` (My Scorecard, My Reviews; My Commitments empty until Performance PR 4) with behaviour unchanged; `ess.js` gains `MyPerformance`, `MyReview`, `MyReviewPage` and `MyReviewListQuery` for Performance PR 3, and `src/modules/ess/ess.performance.js` is laid out empty for it (`docs/guides/performance.md` §5, §12).
 - 22/10/2026 · TB · Performance PR 3: ESS · My Performance (#10) is built on the real API (`GET /ess/performance`, the check-in routes and `GET /ess/performance/reviews`, `docs/guides/performance.md` §5, §10): the figures, a banner when the scorecard or the check-in waits, My Scorecard with Agree and Disagree, This Month's Check-In with evidence, Dictate, Tidy With AI and Change Score, Rolls Up To, My Reviews and My PIP; the interim KPI and review shapes are gone. My Commitments joins with Performance PR 4.
 - 25/10/2026 · JP · People · Leave opens for a line manager (`manages_people`), as §2 says ("a line manager their team"): the shell and ⌘K showed People's Leave tab only with Settings, so a leave request in Need You landed a line manager on Organogram with no way to decide it (`app/src/shell/access.ts`, `src/shared/search/screens.js`, with tests). My Security's Sign Out Others says why when it is refused. Found while writing the M1 User Guide.
+- 19/10/2026 · GE · §5: the ESS queries and sanctions rows name the contract the queries guide wrote (`EssQueryListQuery`, `MyQueryPage`, `QueryResponseCreate`, `MySanctionPage`).

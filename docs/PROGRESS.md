@@ -1122,15 +1122,16 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 34 | Queries | `queries` | M3 | GE | ☐ | ☐ | ☐ | Not started | |
-| 35 | Rules | `rules` | M3 | GE | ☐ | ☐ | ☐ | Not started | |
-| 36 | Sanctions | `sanctions` | M3 | GE | ☐ | ☐ | ☐ | Not started | |
-| 37 | Letter Templates | `letter-templates` | M3 | GE | ☐ | ☐ | ☐ | Not started | |
+| 34 | Queries | `queries` | M3 | GE | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
+| 35 | Rules | `rules` | M3 | GE | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
+| 36 | Sanctions | `sanctions` | M3 | GE | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
+| 37 | Letter Templates | `letter-templates` | M3 | GE | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
 
 **Notes**
 
 - 25/10/2026 · JP · Queries (#34) and Letter Templates (#37), on the mock: a tapped query or template opens in a sheet on a phone (F31: `DetailPane`, `ListDetail`), never under the list; on desktop the summary's focus and the first template still show unasked. A row opens its query in place rather than through the address. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/queries/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/queries.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
+- 19/10/2026 · GE · Guide (`docs/guides/queries.md`) and contract written before the build: `schemas/queries.js`, `query_rules.js`, `sanctions.js`, `templates.js`; migration `3010` (the chain as `consequence_step` rows, `letter_template`, rule measure and drafts, the one-query-per-breach `dedup_key`, sanction numbers and approvals) and seed `3190` (`queries.configure`, the `queries.consequence` approval in `definitions.js` DEFAULTS, the shipped letters' rows, `3099`'s invalid `employee_consequence` switched off). Decided with GE: chain as step rows over the approval engine, six rungs with Second Warning, every sanction follows a query, rule-raised queries seen by People and the CEO only. No ticks: no route exists yet. Left: the four backend modules, the rule evaluator job, the letters, then the frontend swaps its INTERIM types (Second Warning added, the Issue Sanction form starts from a query, the Queries empty state changes; guide §13).
 
 ### Recruitment
 
