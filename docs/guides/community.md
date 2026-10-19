@@ -9,7 +9,7 @@
 | Permission key(s) | `community` |
 | Capabilities | `announcements.post` (post to the announcements channel and track who has read a post: the Announcements tab's routes) |
 | Screens (PROGRESS.md rows) | #15 Channels, #16 Direct Messages, #17 Announcements; reads shared with #66 Knowledge Hub · Announcements (M10) |
-| Status | Agreed |
+| Status | Built |
 | Last changed | 19/10/2026 |
 
 Sources: MILESTONES §6.4 and A19, A20; REUSE_MAP §2.4; the internal workflow meeting of 12 October
@@ -397,4 +397,9 @@ fields, never in a toast.
   a level (Normal, Important, Urgent; §3 step 2, §6); Urgent needs Acknowledge, shows red with the
   urgent bar and repeats until acknowledged; Important reminds the unread after 4 hours; every
   channel post alerts each device (§3 step 1, §7); the poster counts as having read their own.
-  §2 to §7, §10 and §11 updated; Status In progress until built.
+  §2 to §7, §10 and §11 updated.
+- 19/10/2026 · TB · Built: migration `1145` (M1's block, after the tables it alters), Acknowledge on
+  the card (`POST /announcements/:id/acknowledge`) or the urgent bar (recorded through
+  `notification.acknowledged`), the Level field, red and amber cards (`Card` urgency), the reads by
+  acknowledgement with their times, and the Important reminder on `announcement-publish` (`remind`).
+  GE to review `1145` and the announcement changes.

@@ -9,7 +9,7 @@
 | Permission key(s) | none: every route is the caller's own (`self`), and two are reached by a device token (`anonymous`) |
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | none of their own: the bell, its pane, the banner, the urgent bar and Notification Settings are shell parts on every screen; Settings · Notifications (#74) comes forward from M6 in the next pull request |
-| Status | Agreed |
+| Status | Built |
 | Last changed | 19/10/2026 |
 
 TB's decisions of 19/10/2026 and their build logs are in `docs/handoff/push-notifications.md` (web
@@ -298,5 +298,11 @@ quiet hours; reading on one device still clears the others; Settings · Notifica
   device is alerted at once, the one in hand included (the hold and the service worker's silence
   for an open app are gone); every channel post alerts; urgency (normal, important, urgent) with
   Acknowledge, the urgent bar on every screen and urgent repeats every 30 minutes of the working
-  day; Security and approvals past their time limit are urgent. Status back to In progress until it
-  is built. §1 to §7, §10, §11 and §13 updated.
+  day; Security and approvals past their time limit are urgent. §1 to §7, §10, §11 and §13 updated.
+- 19/10/2026 · TB · Built (PR 1 of `docs/handoff/notifications-everywhere.md`). As built: urgent
+  repeats run on the notice rows (`0470`; the general reminder engine follows with Settings ·
+  Notifications); `UrgentBar` in `@mycity/ui` sits in the shells' new `alert` slot; a module's nav
+  count shows red while an urgent notice waits there; a read mark or Acknowledge on another device
+  reloads the bell and the bar; the service worker keeps an urgent notification on screen until
+  acted on, and a repeat replaces it without counting as new. Checked in Chromium (pushes over the
+  DevTools protocol) and by the whole `npm run ci`.

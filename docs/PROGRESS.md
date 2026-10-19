@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 31 items below: 29 done, 2 open | | | | | |
+| M0 Foundation | 31 items below: 30 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -99,16 +99,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
 | One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
 | Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☑ | 19/10/2026 |
-| Notifications everywhere (TB, 19/10/2026): every device at once, every channel post alerting, urgency with Acknowledge, the urgent bar and urgent repeats (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☐ | 19/10/2026 |
+| Notifications everywhere (TB, 19/10/2026): every device at once, every channel post alerting, urgency with Acknowledge, the urgent bar and urgent repeats (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☑ | 19/10/2026 |
 
 **Notes**
 
 - 19/10/2026 · TB · Notifications everywhere, started from TB's twelve answers
   (`docs/handoff/notifications-everywhere.md`). An announcement GE posted from the build account
   reached no device signed in as that account, by design: nobody is told of their own action.
-  Guides updated first (`notifications.md`, `community.md`). Left: PR 1 (every device at once,
-  every channel post alerting, urgency with Acknowledge, the urgent bar, urgent repeats), then PR 2
-  (Settings · Notifications brought forward from M6, the reminder engine, the digest, quiet hours).
+  Built in PR 1: every device at once, every channel post alerting, urgency with Acknowledge, the
+  urgent bar on both shells, urgent repeats (`0470`, `1145`); the whole `npm run ci` passes locally
+  and Chromium shows the pushes as designed. Left: PR 2 (Settings · Notifications brought forward
+  from M6, the reminder engine, the digest, quiet hours).
 - 19/10/2026 · AJ · CI runs as four jobs side by side (`.github/workflows/ci.yml`: backend, frontend, screens, checks, and the `ci` check over them; `npm run ci -- --group=<name>`), the three frontend workspaces' tests at once (`scripts/fe-test.js`: 430 s to 254 s here), Chromium and ffmpeg's packages cached. Left: compare a week of run times and Actions minutes; four jobs bill more minutes than one.
 - 19/10/2026 · AJ · Frontend foundation: a module's tab strip on a narrow desktop window keeps the tabs that fit (the active one always) and folds the rest into More Tabs, a ⋯ menu, instead of scrolling sideways (`packages/ui` `Tabs`; every module). Phones unchanged.
 - 19/10/2026 · TB · CI does only what a change needs (`.github/workflows/ci.yml`,

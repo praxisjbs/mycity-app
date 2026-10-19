@@ -149,7 +149,7 @@ Tick each step with its date and add a line to §8 when it is pushed.
 6. [x] 19/10/2026 The urgent repeats (`urgent-repeats`, on the notice rows): every 30 minutes,
    08:00 to 18:00 Lagos, at most 8 a day, until acknowledged or opened (2). The general reminder
    engine moved to PR 2, with the reminders that need it.
-7. [ ] Screens, both shells: the service worker always shows and passes the push to an open window
+7. [x] 19/10/2026 Screens, both shells: the service worker always shows and passes the push to an open window
    for its banner (9); direct messages' banner and sound robust (6); the red bar with Acknowledge
    on every screen (4), red and amber cards and the level on the announcement form,
    acknowledgement on the readers list, the red dot on Community, urgency in the pane and the
@@ -183,3 +183,8 @@ Tick each step with its date and add a line to §8 when it is pushed.
 - 19/10/2026 · PR 1 steps 1 to 6 pushed (guides, contract, migrations `0470` and `1145`, the
   backend). Unit tests and the push, Community and worker integration suites pass locally. Next:
   step 7, the screens.
+- 19/10/2026 · PR 1 step 7 pushed: `UrgentBar`, `Card` urgency, the shells' `alert` slot, red nav
+  counts, the service worker always showing, the announcement level, Acknowledge and reads. The
+  whole `npm run ci` passes locally (45 of 45) and Chromium shows the pushes as designed
+  (`push-check-3`: shown with the app on screen, urgent kept on screen, a repeat not counted as
+  new). Next: step 8, the PR.
