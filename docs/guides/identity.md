@@ -308,13 +308,19 @@ or the audit.
 
 | Role (`code`) | Sees | Can do |
 |---|---|---|
-| Implementation Team (`implementation`) | Everything | Everything; for the build team, removed (soft) after handover |
+| Implementation Team (`implementation`) | Everything | Everything: every module and action over everything, every capability, every field. For the build team, and training runs from it (TB, 19/10/2026); removed (soft) after handover |
 | Operations & People (`operations_people`) | Everything in operations | Users: invite, roles, suspend, reset links |
 | Management (`management`) | Everything | Read across modules |
 | Head of Department (`head_of_department`) | Their department | Partnerships home |
 | System Administrator (`administrator`) | Settings | Users and settings |
 | Line Manager (`manager`) | Their team | Approvals for their team |
 | Staff (`employee`) | Their own records | Self-service |
+
+The build account (`create-admin --build-account`) holds the Implementation Team role. Until
+handover that role is complete: a module, action, capability or masked field added later is given
+to it in the same seed, and `tests/integration/settings.test.js` fails a seed that leaves it out.
+What is the CEO's own stays the CEO's: a workflow stage addressed to the CEO, withdrawing someone
+else's request, and a login that cannot be suspended.
 
 The CEO is a flag on the login (`is_ceo`) and holds every action and every capability. Every person
 sees and manages only their own sessions, two-step, passkeys and PIN on My Security (`self` routes:
@@ -439,3 +445,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 - 19/10/2026 · TB · `Me.manages_people` counts the people under a vacant seat the reader answers for
   (the first person above the seat), as team scope does (`employee_effective_manager`, `1160`;
   `docs/guides/organogram.md` §6), so the manager above an empty post sees My Team and approvals.
+- 19/10/2026 · TB · §8: the build account keeps the Implementation Team role, complete (every
+  module, action, capability and field), until handover, because training runs from it; what is
+  the CEO's own stays the CEO's. A test in `tests/integration/settings.test.js` holds the role to
+  the catalogues, so a seed that adds a module, capability or field without it fails.

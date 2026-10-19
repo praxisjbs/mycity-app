@@ -645,6 +645,88 @@ describeDb("the organisation module against the real migrations", () => {
   });
 
   /* ------------------------------------------------------------------ *
+   * Download PDF (docs/guides/organogram.md §5 to §7)
+   * ------------------------------------------------------------------ */
+
+  describe("Download PDF", () => {
+    const documents = require("../../src/shared/documents/generate");
+    const vault = require("../../src/shared/documents/vault");
+    const exporter = require("../../src/modules/organisation/org-chart.export");
+    /* Tests have no Chromium; this stands in for it, as the reports tests do. */
+    const fakePdf = async () => Buffer.from("%PDF-1.4\n% an organogram\n");
+    const chartDocuments = async () =>
+      (await q("SELECT document_id, render_status, render_html, uploaded_by, entity_id FROM document WHERE doc_type = 'org_chart' ORDER BY created_at")).rows;
+    const emails = () => sent.filter((m) => m.queue === "email-send" && m.name === "org-chart-export");
+
+    test("any member of staff may ask: the chart is drawn as them and emailed to them", async () => {
+      const before = (await chartDocuments()).length;
+      const res = await asManager()(request(app).post("/api/v1/org-chart/exports")).send({ view: "viewer" });
+      expect(res.status).toBe(202);
+      expect(c.organisation.OrgChartExportQueued.parse(res.body)).toEqual({ queued: true, email: "manager@mycity.test" });
+
+      sent.length = 0;
+      await drain();
+      const docs = await chartDocuments();
+      expect(docs).toHaveLength(before + 1);
+      const doc = docs[docs.length - 1];
+      expect(doc).toMatchObject({ render_status: "pending", uploaded_by: people.manager.user.user_id });
+      /* Every card is on the page, the open role as one; the viewer's card has no since line. */
+      expect(doc.render_html).toContain("Ngozi Umeh");
+      expect(doc.render_html).toContain("Vacant · ");
+      expect(doc.render_html).toContain("Dotted line · Chidi Nwankwo");
+      expect(doc.render_html).not.toContain("Since 2026 · Hybrid");
+      expect(emails()).toHaveLength(0);
+
+      await documents.renderPending(doc.document_id, { db: pool, renderPdf: fakePdf });
+      await drain();
+      expect(emails()).toHaveLength(1);
+      expect(emails()[0].data).toMatchObject({
+        to: { email: "manager@mycity.test" },
+        recipient: { first_name: "Chidi" },
+        template: "org-chart-export",
+        attachments: [{ document_id: doc.document_id }],
+      });
+      expect(emails()[0].opts.jobId).toBe(`org-chart-export-${doc.document_id}`);
+
+      /* The file is the asker's: they and the CEO open it, not even Operations. */
+      const row = await vault.get(pool, doc.document_id);
+      expect(await vault.canRead(pool, await grantsCache.getAuthUser(pool, people.manager.user.user_id), row)).toBe(true);
+      expect(await vault.canRead(pool, await grantsCache.getAuthUser(pool, people.ops.user.user_id), row)).toBe(false);
+
+      /* Run again, the request draws nothing more, and the email keeps its job id. */
+      const asked = await one(
+        "SELECT entity_type, entity_id, payload FROM event_log WHERE event_key = 'org_chart.export_requested' ORDER BY occurred_at DESC",
+      );
+      await exporter.build({ entity: { type: asked.entity_type, id: asked.entity_id }, payload: asked.payload });
+      expect(await chartDocuments()).toHaveLength(before + 1);
+      await exporter.deliver(doc.document_id);
+      expect(new Set(emails().map((m) => m.opts.jobId)).size).toBe(1);
+    });
+
+    test("the builder's PDF carries the since and arrangement line", async () => {
+      await asOps()(request(app).post("/api/v1/org-chart/exports")).send({ view: "builder" });
+      await drain();
+      const docs = await chartDocuments();
+      expect(docs[docs.length - 1].render_html).toContain("Since 2026 · Hybrid");
+    });
+
+    test("a PDF the render job gives up on tells the person who asked", async () => {
+      await asManager()(request(app).post("/api/v1/org-chart/exports")).send({});
+      await drain();
+      const docs = await chartDocuments();
+      const doc = docs[docs.length - 1];
+      await documents.failRender(doc.document_id, new Error("Chromium went away"), { db: pool });
+      await drain();
+      const told = await q("SELECT title, body, entity_type FROM notification WHERE user_id = $1 AND event_key = 'org_chart.export_failed'", [
+        people.manager.user.user_id,
+      ]);
+      expect(told.rows).toEqual([
+        { title: "Your organogram PDF failed", body: "It could not be drawn. Press Download PDF again.", entity_type: "org_chart_export" },
+      ]);
+    });
+  });
+
+  /* ------------------------------------------------------------------ *
    * The staff importer and the roster loader
    * ------------------------------------------------------------------ */
 

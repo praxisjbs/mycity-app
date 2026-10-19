@@ -666,6 +666,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · ESS · Org Chart (#91), TB's four decisions on the phone (`docs/guides/organogram.md`
+  §8, §10.2): a Focus or Everyone switch, opening on Focus at the person looking, with the path
+  from the top, their team, Dotted Line and Same Manager; Everyone opens the way down to them and
+  marks their row You. A card opens the person's sheet on both shells: Send Message (My Profile on
+  your own), Open Record and Change Manager only by grant, so staff are no longer sent to Home.
+  Download PDF works: drawn in the worker as the person asking and emailed to them. Left: nothing.
 - 19/10/2026 · TB · ESS · Org Chart (#91): someone who is not on the chart starts at the top, the
   CEO, instead of a card of their own with nowhere to go; on a phone a search lists the matching
   cards to tap, and anyone else at the top is listed under Also At The Top (`docs/guides/organogram.md`
@@ -762,6 +768,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · People · Organogram (#92), TB's four decisions on the phone
+  (`docs/guides/organogram.md` §5 to §8, §10): Focus and Everyone, opening on Everyone, the whole
+  company as one folding list; Focus has the path from the top, each card's team ("3 direct · 13 in
+  all"), Dotted Line and Same Manager, and cards carry their department again. A card opens the
+  person's sheet on both shells, with Change Manager (the record's reporting line form, now
+  `app/src/features/shared/ReportingForm.tsx`), so a phone moves a line without dragging. Download
+  PDF is real (`POST /org-chart/exports`, `org-chart.layout.js`, `templates/documents/org-chart.html`,
+  emailed; a failed render tells the person), where it was a toast that made nothing. Add Role is in
+  the floating button alone on a phone. The build account keeps every grant until handover
+  (`docs/guides/identity.md` §8), held by a test. Left: nothing.
 - 19/10/2026 · TB · People · Organogram (#92), from a review of the roster on staging, which drew
   four tops (the CEO, both open seats and the build account) and hid the seven marketing officers
   under a seat a phone could not reach. TB's four decisions of 19/10/2026: the sheet's VACANT rows

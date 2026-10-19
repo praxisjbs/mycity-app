@@ -784,6 +784,19 @@ async function tree(db) {
   return rows;
 }
 
+/**
+ * The document a record already has, when an earlier attempt made it, or null: a Download PDF
+ * request's PDF (org-chart.export.js). The document table is the vault's; this only reads it.
+ */
+async function documentOf(db, entityType, entityId) {
+  const row = await one(
+    db,
+    "SELECT document_id FROM document WHERE entity_type = $1 AND entity_id = $2 LIMIT 1",
+    [entityType, String(entityId)],
+  );
+  return row ? row.document_id : null;
+}
+
 /** The highest sequence a staff number carries, so numbering can be moved past it. */
 async function highestStaffNumberSeq(db) {
   const row = await one(
@@ -840,5 +853,6 @@ module.exports = {
   insertSeat,
   updateSeat,
   tree,
+  documentOf,
   highestStaffNumberSeq,
 };

@@ -12,6 +12,7 @@
  * restricted ones (bank, account, gross pay, personal details) are written here and
  * masked on the way out, in the controller (shared/rbac/field-mask.js).
  */
+const crypto = require("node:crypto");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const numbering = require("../../shared/numbering/numbering");
@@ -19,7 +20,7 @@ const lagos = require("../../shared/time/lagos");
 const routeMap = require("../../shared/route-map");
 const managerText = require("./manager-text");
 const repo = require("./organisation.repo");
-const { EVENTS } = require("./organisation.events");
+const { EVENTS, CHART_EXPORT } = require("./organisation.events");
 
 const findDepartmentByName = (client, name) => repo.findDepartmentByName(client, name);
 const findEmployeeByWorkEmail = (client, email) => repo.findEmployeeByWorkEmail(client, email);
@@ -511,6 +512,24 @@ async function orgChart(client, { view = "viewer" } = {}) {
   };
 }
 
+/**
+ * POST /org-chart/exports, Download PDF: queue the whole chart, in the view asked for, for the
+ * worker, which draws it as the person asking and emails it (org-chart.export.js;
+ * docs/guides/organogram.md §5, §7). In the caller's transaction, with its event.
+ * @returns {Promise<{queued: true, email: string}>}
+ */
+async function requestOrgChartExport(client, { view = "viewer" } = {}, actor) {
+  if (!actor || !actor.email)
+    throw new AppError("NO_EMAIL", "Your login has no email to send the PDF to.", 422);
+  await emit(client, {
+    key: EVENTS.ORG_CHART_EXPORT_REQUESTED,
+    entity: { type: CHART_EXPORT, id: crypto.randomUUID() },
+    actor,
+    payload: { view, requested_by: actor.user_id },
+  });
+  return { queued: true, email: actor.email };
+}
+
 /* ------------------------------------------------------------------ *
  * Managers named in a sheet
  * ------------------------------------------------------------------ */
@@ -748,6 +767,7 @@ module.exports = {
   updateSeat,
   findOrCreateSeat,
   orgChart,
+  requestOrgChartExport,
   resolveManager,
   importRow,
   splitName,
