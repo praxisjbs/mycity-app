@@ -381,3 +381,4 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 - 16/10/2026 · TB · `employee` gained `home_address` (masked as personal details) and `contract_ends_on` for consultants and contractors (`0210`), in the contract and the organisation insert; `create-admin --build-account` writes both.
 - 16/10/2026 · TB · `EmployeeCreate` and the organisation insert also take `middle_name`, `preferred_name`, `personal_email` (masked as personal details), `confirmation_due_on` and `confirmed_on`, columns since `0040`; the build account fills them all.
 - 19/10/2026 · LA · ESS's tab switch (`app/src/features/ess/index.tsx`) takes Work Location Requests from its own file (`docs/guides/attendance.md` §10); Org Chart is unchanged.
+- 19/10/2026 · GE · `app/src/features/ess/Queries.tsx` (My Queries) moved onto the contract under the queries guide; nothing the Org Chart viewer shows or does changed.

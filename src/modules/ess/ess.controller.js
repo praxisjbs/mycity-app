@@ -53,6 +53,8 @@ module.exports = {
   cancelLeave: async (req, res) =>
     ok(res, await service.leave.cancel(withActor(req), id(req), req.validated.body || {})),
 
+  queriesSummary: async (req, res) => ok(res, await service.queries.summary(req.user)),
+
   listQueries: async (req, res) => sendPaged(res, await service.queries.list(req.user, req.validated.query)),
 
   listSanctions: async (req, res) => sendPaged(res, await service.queries.listSanctions(req.user, req.validated.query)),

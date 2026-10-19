@@ -21,6 +21,9 @@ const store = require("../../shared/templates/template-store");
 const variables = require("../../shared/templates/variables");
 const documents = require("../../shared/documents/generate");
 const lagos = require("../../shared/time/lagos");
+const { formatLongDate } = require("../../shared/time/day-first");
+const { render } = require("../../shared/documents/render");
+const { markdownToHtml } = require("../../shared/documents/markdown");
 const repo = require("./templates.repo");
 const { EVENTS, SHIPPED, declare } = require("./templates.events");
 
@@ -110,6 +113,45 @@ function sampleData(purpose) {
   };
 }
 
+/* Marks around a value the record fills, kept through rendering and split out after. */
+const OPEN = "\u0001";
+const CLOSE = "\u0002";
+/** The sample values that are plain text: dates and money pass through their formatters unmarked. */
+const MARKED = new Set(["query_number", "subject", "details", "reason", "step_name"]);
+
+function marked(data) {
+  const mark = (v) => (typeof v === "string" && v ? `${OPEN}${v}${CLOSE}` : v);
+  const out = { ...data };
+  for (const k of MARKED) out[k] = mark(out[k]);
+  out.employee = Object.fromEntries(Object.entries(data.employee).map(([k, v]) => [k, mark(v)]));
+  out.signer = { name: mark(data.signer.name), role: mark(data.signer.role) };
+  return out;
+}
+
+const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", nbsp: " " };
+
+/** HTML to paragraphs of text: one per block, tags dropped, entities read. */
+function paragraphsOf(html) {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .split(/<\/(?:p|h[1-6]|div|li)>|<br\s*\/?>/i)
+    .map((chunk) =>
+      chunk
+        .replace(/<[^>]*>/g, "")
+        .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_m, e) => ENTITIES[e])
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter((text) => text.replace(new RegExp(`[${OPEN}${CLOSE}]`, "g"), "").trim())
+    .map((text) => {
+      const runs = [];
+      for (const [i, part] of text.split(new RegExp(`[${OPEN}${CLOSE}]`)).entries()) {
+        if (part) runs.push({ text: part, filled: i % 2 === 1 });
+      }
+      return runs;
+    });
+}
+
 async function preview(id) {
   const row = await repo.get(pool, id, shippedWithWording());
   if (!row) throw notFound();
@@ -118,13 +160,17 @@ async function preview(id) {
   if (!t)
     throw new AppError("TEMPLATE_AWAITING_SAMPLE", "This letter has no wording yet", 409);
   const data = variables.parseData("document", row.key, sampleData(row.purpose));
-  const html = documents.renderDocumentHtml(t, data, {
-    org: await documents.orgProfile(pool),
-    number: "LTR-0000",
-    today: lagos.today(),
-    doc: { title: row.name },
-  });
-  return { title: row.name, html };
+  const today = lagos.today();
+  const values = { ...marked(data), org: await documents.orgProfile(pool), number: "LTR-0000", today, doc: { title: row.name } };
+  const body = render(t.body, values);
+  const html = t.format === "markdown" ? markdownToHtml(body) : body;
+  const title = (t.title ? render(t.title, data) : row.name).trim() || row.name;
+  return {
+    reference: "LTR-0000",
+    title,
+    date_line: formatLongDate(today),
+    paragraphs: paragraphsOf(html).slice(0, 200),
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -231,6 +277,7 @@ async function usable(db, key, purpose, { field = "letter_template", fallback = 
 
 module.exports = {
   keyFrom,
+  paragraphsOf,
   list,
   summary,
   get,

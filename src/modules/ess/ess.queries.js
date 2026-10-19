@@ -16,7 +16,14 @@ const list = (user, query) => queries.listMine(meOf(user), query);
 
 const respond = (user, id, body) => queries.respond(user, meOf(user), id, body);
 
+/** The three cards on My Queries: open, archived, sanctions (and the latest one's date). */
+async function summary(user) {
+  const me = meOf(user);
+  const [q, s] = await Promise.all([queries.mineSummary(me), sanctions.mineSummary(me)]);
+  return { open: q.open, archived: q.archived, sanctions: s.sanctions, last_sanction: s.last_sanction };
+}
+
 /** My Queries · Sanctions: the caller's own issued sanctions. */
 const listSanctions = (user, query) => sanctions.listMine(meOf(user), query);
 
-module.exports = { list, respond, listSanctions };
+module.exports = { list, summary, respond, listSanctions };

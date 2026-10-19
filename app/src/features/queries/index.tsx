@@ -1,18 +1,30 @@
+import queries from "@mycity/contract/schemas/queries.js";
+import query_rules from "@mycity/contract/schemas/query_rules.js";
+import sanctions from "@mycity/contract/schemas/sanctions.js";
+import templates from "@mycity/contract/schemas/templates.js";
+import type { ConsequenceStep, LetterTemplate, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
 import { useState } from "react";
 import { ApiError } from "@/api/client";
+import type { PersonRef as PickedPerson } from "@/api/types/common";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import "@/api/types/queries";
-import type { Firing, LetterTemplate, Outcome, QueryRow, Rule, RuleCreate, SanctionCreate, SanctionRow } from "@/api/types/queries";
-import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
-import { Letter } from "@/features/shared/Letter";
-import { useRouter } from "@/lib/router";
+import { Letter, LetterFile } from "@/features/shared/Letter";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { BarsCard, PagedTable, TrailCard } from "@/features/shared/sections";
-import type { ModuleScreenProps } from "@/shell/screens";
-import { Banner, Button, Card, CardHeader, Chain, Chips, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, KeyValue, LoadingRows, Money, MoneyField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useModal, Who } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { BarsCard, PagedTable } from "@/features/shared/sections";
+import { useRouter } from "@/lib/router";
+import { hasCapability } from "@/shell/access";
+import type { ModuleScreenProps } from "@/shell/screens";
+import {
+  ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
+  KeyValue, LoadingRows, Money, MoneyField, NumberField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useModal, Who,
+} from "@mycity/ui";
 
+/**
+ * Queries & Sanctions (docs/guides/queries.md §10): Queries, Rules, Sanctions and Letter
+ * Templates, on the generated contract. Who sees what is the API's rule (§6.1); the
+ * configure buttons follow `queries.configure`, and the API refuses what they would not.
+ */
 export default function Queries({ tab, id }: ModuleScreenProps) {
   if (tab === "rules") return <Rules />;
   if (tab === "sanctions") return <Sanctions />;
@@ -20,19 +32,35 @@ export default function Queries({ tab, id }: ModuleScreenProps) {
   return <QueriesTab id={id} />;
 }
 
+type Tone = "ok" | "warn" | "err" | "info" | "neutral";
+const pill = (tone: Tone, text: string) => ({ tone, text });
 const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ?? undefined} />;
+const useConfigure = () => {
+  const { me } = useAuth();
+  return !!me && hasCapability(me, "queries.configure");
+};
+/** A save that failed: on its fields when the API named them, otherwise in a toast. */
+const failed = (f: { setServerErrors: (x: Record<string, string[]>) => void }) => (e: unknown) => {
+  if (e instanceof ApiError && Object.keys(e.fields ?? {}).length) f.setServerErrors(e.fields);
+  else toast(e instanceof ApiError ? e.message : "Not saved");
+};
 
 /* ───────────── Queries ───────────── */
+
+function queryStatus(q: Pick<Query, "status" | "outcome" | "escalated">) {
+  if (q.status === "resolved") return q.outcome === "sanctioned" ? pill("neutral", "Sanctioned") : pill("ok", "Closed, No Action");
+  if (q.escalated) return pill("err", "Escalated");
+  return q.status === "under_review" ? pill("info", "Under Review") : pill("warn", "Awaiting Response");
+}
 
 function QueriesTab({ id }: { id: string | null }) {
   const modal = useModal();
   const { navigate } = useRouter();
-  const { me } = useAuth();
-  const full = !!(me?.grants.settings?.includes("view") || me?.is_ceo);
-  const [scope, setScope] = useState<"all" | "mine">(full ? "all" : "mine");
+  const [raised, setRaised] = useState<"all" | "mine">("all");
   const s = useApi("GET /api/v1/queries/summary");
-  const list = usePaged("GET /api/v1/queries", { filters: { scope } });
-  const focus = id ?? s.data?.focus_id ?? null;
+  const list = usePaged("GET /api/v1/queries", { filters: raised === "mine" ? { raised: "mine" } : {}, sort: "-created_at" });
+  const focus = id ?? list.rows[0]?.employee_query_id ?? null;
+  const top = Math.max(1, ...(s.data?.by_reason ?? []).map((r) => r.count));
   return (
     <>
       <PageHeader
@@ -40,31 +68,40 @@ function QueriesTab({ id }: { id: string | null }) {
         sub="Every query and its outcome"
         actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Raise a Query", body: (close) => <RaiseQuery close={close} /> })}>Raise a Query</Button>}
       />
-      {s.data && <KpiTiles items={[{ label: "Open", value: String(s.data.open), tone: s.data.open ? "warn" : "ok" }, { label: "Awaiting Response", value: String(s.data.awaiting_response) }, { label: "Closed This Month", value: String(s.data.closed_this_month), tone: "ok" }, { label: "Escalated", value: String(s.data.escalated), tone: s.data.escalated ? "err" : undefined }]} />}
-      {full && <Chips value={scope} onChange={setScope} options={[["all", "All Queries"], ["mine", "Raised by Me"]]} />}
-      <PagedTable<QueryRow>
-        title={scope === "mine" ? "Queries I Raised" : "All Queries"}
+      {s.data && (
+        <KpiTiles
+          items={[
+            { label: "Open", value: String(s.data.open), tone: s.data.open ? "warn" : "ok" },
+            { label: "Awaiting Response", value: String(s.data.awaiting_response) },
+            { label: "Closed This Month", value: String(s.data.closed_this_month), tone: "ok" },
+            { label: "Escalated", value: String(s.data.escalated), tone: s.data.escalated ? "err" : undefined },
+          ]}
+        />
+      )}
+      <Chips value={raised} onChange={setRaised} options={[["all", "All Queries"], ["mine", "Raised by Me"]]} label="Raised By" />
+      <PagedTable<Query>
+        title={raised === "mine" ? "Queries I Raised" : "All Queries"}
         list={list}
         search="Search name, number or subject"
-        rowKey={(q) => q.query_id}
+        rowKey={(q) => q.employee_query_id}
         noun="query"
         nounPlural="queries"
-        onRowClick={(q) => navigate(`/queries?tab=queries&id=${q.query_id}`)}
+        onRowClick={(q) => navigate(`/queries?tab=queries&id=${q.employee_query_id}`)}
         wide
-        empty={{ title: "No Queries", text: "Queries you raise, and those rules raise on your team, appear here." }}
+        empty={{ title: "No Queries", text: "Queries you raise appear here." }}
         columns={[
           { key: "e", label: "Employee", render: (q) => person(q.employee) },
           { key: "n", label: "Number", render: (q) => q.number, desktop: true },
           { key: "s", label: "Subject", render: (q) => q.subject },
-          { key: "b", label: "Raised By", render: (q) => q.raised_by, desktop: true },
-          { key: "d", label: "Raised", render: (q) => formatDate(q.raised_on) },
-          { key: "r", label: "Response", render: (q) => q.response ?? "Not yet", desktop: true },
-          { key: "st", label: "Status", render: (q) => <StatusPill s={q.status} /> },
+          { key: "b", label: "Raised By", render: (q) => q.raised_by_name ?? q.rule_name ?? "Rule", desktop: true },
+          { key: "d", label: "Raised", render: (q) => formatDate(q.created_at) },
+          { key: "r", label: "Response", render: (q) => (q.responded_at ? formatDate(q.responded_at) : "Not yet"), desktop: true },
+          { key: "st", label: "Status", render: (q) => <StatusPill s={queryStatus(q)} /> },
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {focus ? <QueryCard id={focus} /> : <Card><p className="text-xs text-subtle-foreground">Pick a query to see it here.</p></Card>}
-        {s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason} /> : <Card><LoadingRows /></Card>}
+        {focus ? <QueryCard id={focus} /> : <Card><EmptyState bare icon="doc" title="No Query Open" text="Pick a query to see it here." /></Card>}
+        {s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason.map((r) => ({ label: r.label, pct: Math.round((r.count / top) * 100), value: String(r.count) }))} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
   );
@@ -77,60 +114,61 @@ function QueryCard({ id }: { id: string }) {
   if (q.error) return <Card><ErrorState error={q.error} onRetry={q.reload} /></Card>;
   if (!q.data) return <Card><LoadingRows /></Card>;
   const d = q.data;
+  const sendReminder = async () => {
+    await remind.run({ params: { id: d.employee_query_id }, body: {} });
+    q.reload();
+    toast(`Reminder sent to ${d.employee.display_name}`);
+  };
   return (
     <Card>
-      <CardHeader record title={`${d.number} · ${d.employee.display_name}`} right={<StatusPill s={d.status} />} />
+      <CardHeader record title={`${d.number} · ${d.employee.display_name}`} right={<StatusPill s={queryStatus(d)} />} />
       <KeyValue
         items={[
           ["Subject", d.subject],
-          ["Raised by", d.raised_by === "System rule" ? "A system rule, not a manager" : d.raised_by],
-          ["Raised", formatDateTime(d.raised_at)],
-          ["Response due", d.respond_by ? formatDateTime(d.respond_by) : "Closed"],
-          ...(d.instances.length ? ([["Instances", d.instances.join(", ")]] as Array<[string, string]>) : []),
-          ["Letter", d.letter],
-          ...(d.response_text ? ([["Response", d.response_text]] as Array<[string, string]>) : []),
+          ["Raised By", d.raised_by_name ?? d.rule_name ?? "Rule"],
+          ["Raised", formatDateTime(d.created_at)],
+          ...(d.status === "awaiting_response" && d.response_due_at ? ([[<HelpTerm key="due" help="The employee has 48 hours to respond in writing.">Response Due</HelpTerm>, formatDateTime(d.response_due_at)]] as Array<[React.ReactNode, string]>) : []),
+          ...(d.evidence.length ? ([["Counted", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
+          ...(d.response ? ([["Response", d.response.body]] as Array<[string, string]>) : []),
+          ...(d.sanction ? ([["Sanction", `${d.sanction.step_name}${d.sanction.number ? `, ${d.sanction.number}` : ""}`]] as Array<[string, string]>) : []),
         ]}
       />
-      <div className="mt-3.5 flex flex-wrap gap-2">
-        <Button icon="doc" onClick={() => modal.open({ title: `${d.number} · Query Letter`, wide: true, body: <LetterById id={d.query_id} /> })}>View Letter</Button>
-        {d.can_remind && (
-          <Button busy={remind.pending} onClick={async () => { await remind.run({ params: { id: d.query_id }, body: {} }); toast(`Reminder sent to ${d.employee.display_name}`); }}>Send Reminder</Button>
-        )}
-        {d.can_decide && <Button variant="primary" onClick={() => modal.open({ title: `Decision on ${d.number}`, body: (close) => <Decide id={d.query_id} hasResponse={!!d.response_text} close={close} /> })}>Record a Decision</Button>}
-      </div>
+      <ActionGroup>
+        <div className="mt-3.5 flex flex-wrap gap-2">
+        <Button icon="doc" onClick={() => modal.open({ title: `${d.number} · Query Letter`, wide: true, body: <LetterFile documentId={d.letter_document_id} name={d.number} /> })}>View Letter</Button>
+        {d.can_remind && <Button onClick={sendReminder}>Send Reminder</Button>}
+        {d.can_decide && <Button variant="primary" onClick={() => modal.open({ title: `Decision on ${d.number}`, body: (close) => <Decide q={d} close={close} onDone={q.reload} /> })}>Record Decision</Button>}
+        </div>
+      </ActionGroup>
     </Card>
   );
 }
 
-function LetterById({ id }: { id: string }) {
-  const l = useApi("GET /api/v1/queries/:id/letter", { params: { id } });
-  return l.data ? <Letter l={l.data} note="Query letter as it is sent. Everything underlined came from the record, not from typing." /> : l.error ? <ErrorState error={l.error} /> : <LoadingRows count={6} />;
-}
+type RaiseValues = { subject: string; details: string };
 
 function RaiseQuery({ close }: { close: () => void }) {
-  const [who, setWho] = useState<PersonRef[]>([]);
-  const f = useContractForm({ subject: "", details: "" }, { subject: (v) => (v.trim().length < 4 ? "Name the subject" : null), details: (v) => (v.trim().length < 20 ? "Give the facts" : null) });
+  const [who, setWho] = useState<PickedPerson[]>([]);
   const [tried, setTried] = useState(false);
+  const employee = who[0]?.employee_id ?? "";
+  const f = useContractForm<RaiseValues>({ subject: "", details: "" }, { safeParse: (v: RaiseValues) => queries.QueryCreate.safeParse({ employee_id: employee || undefined, ...v }) });
   const save = useMutation("POST /api/v1/queries");
   const submit = async () => {
     setTried(true);
-    if (!f.check() || !who.length) return;
+    if (!f.check() || !employee) return;
     try {
-      const q = await save.run({ body: { employee_id: who[0].employee_id, subject: f.values.subject.trim(), details: f.values.details.trim() } });
+      const q = await save.run({ body: { employee_id: employee, subject: f.values.subject.trim(), details: f.values.details.trim() } });
       invalidate("/api/v1/queries");
       close();
-      toast(`${q.number} raised. Letter sent by email and app`);
+      toast(`${q.number} raised, letter sent`);
     } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
+      failed(f)(e);
     }
   };
   return (
     <>
-      <Banner tone="info" icon="info">The employee has 48 hours to respond in writing. Their response is read before any decision.</Banner>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="Subject" {...f.field("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out Thursday" /></Field>
-      <Field label="What Happened" {...f.field("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
+      <Field label="Employee" state={tried && !employee ? "bad" : undefined} message={tried && !employee ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
+      <Field label="Subject" {...f.status("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out" /></Field>
+      <Field label="What Happened" {...f.status("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="send" busy={save.pending} onClick={submit}>Raise Query</Button>
@@ -139,33 +177,58 @@ function RaiseQuery({ close }: { close: () => void }) {
   );
 }
 
-const OUTCOMES: Array<[Outcome, string]> = [["no_action", "Close, No Action"], ["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"]];
+type DecideValues = { outcome: string; consequence_step_id: string; reason: string; fine_amount: string; effective_on: string; ends_on: string };
+const decisionOf = (v: DecideValues) => ({
+  outcome: v.outcome as "no_action" | "sanction",
+  reason: v.reason,
+  ...(v.outcome === "sanction" && { consequence_step_id: v.consequence_step_id || undefined, fine_amount: v.fine_amount.replace(/,/g, ""), effective_on: v.effective_on, ends_on: v.ends_on }),
+});
+const money = (s: string) => (s && !s.includes(".") ? `${s}.00` : s && /\.\d$/.test(s) ? `${s}0` : s);
 
-function Decide({ id, hasResponse, close }: { id: string; hasResponse: boolean; close: () => void }) {
-  const f = useContractForm({ outcome: "no_action", note: "", fine: "" }, { note: (v) => (v.trim().length < 10 ? "Record the reason" : null) });
+function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDone: () => void }) {
+  const chain = useApi("GET /api/v1/sanctions/chain", { query: { active: "true" } });
+  const f = useContractForm<DecideValues>(
+    { outcome: "no_action", consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "" },
+    { safeParse: (v: DecideValues) => queries.QueryDecision.safeParse({ ...decisionOf(v), ...(v.outcome === "sanction" && { fine_amount: money(v.fine_amount.replace(/,/g, "")) }) }) },
+  );
   const save = useMutation("POST /api/v1/queries/:id/decision");
+  const steps = (chain.data?.data ?? []).filter((s) => s.letter_ready);
+  const chosen = steps.find((s) => s.consequence_step_id === f.values.consequence_step_id);
   const submit = async () => {
     if (!f.check()) return;
     try {
-      const q = await save.run({ params: { id }, body: { outcome: f.values.outcome as Outcome, note: f.values.note.trim(), ...(f.values.fine && { fine_amount: f.values.fine }) } });
+      const body = { ...decisionOf(f.values), ...(f.values.outcome === "sanction" && { fine_amount: money(f.values.fine_amount.replace(/,/g, "")) || undefined }) };
+      const r = await save.run({ params: { id: q.employee_query_id }, body });
       invalidate("/api/v1/queries");
+      onDone();
       close();
-      toast(`${q.number}: ${q.status.text}`);
+      toast(r.escalated ? "Sanction sent for approval" : `${r.number} closed`);
     } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
+      failed(f)(e);
     }
   };
   return (
     <>
-      {!hasResponse && <Banner tone="warn">No response yet. A sanction waits until the employee has answered or the 48 hours have passed.</Banner>}
-      <Field label="Outcome"><SelectField options={OUTCOMES} {...f.field("outcome")} /></Field>
-      {f.values.outcome !== "no_action" && (
-        <Field label="Fine (Optional)" info="A fine reaches payroll as a pending deduction. Finance or Operations accepts it; it is never automatic.">
-          <MoneyField {...f.field("fine")} />
-        </Field>
+      <Field label="Outcome" {...f.status("outcome")}>
+        <ChoiceField {...f.field("outcome")} options={[["no_action", "Close, No Action"], ["sanction", "Sanction"]]} />
+      </Field>
+      {f.values.outcome === "sanction" && (
+        <>
+          <Field label={<HelpTerm help="The step after the highest one still in force for this person.">Sanction</HelpTerm>} {...f.status("consequence_step_id")}>
+            <SelectField placeholder="Pick a step" options={steps.map((s) => [s.consequence_step_id, s.consequence_step_id === q.next_step?.consequence_step_id ? `${s.name} (Next)` : s.name])} {...f.field("consequence_step_id")} />
+          </Field>
+          {chosen?.financial_effect === "unpaid_days" && (
+            <Grid cols={2}>
+              <Field label="From" optional {...f.status("effective_on")}><DateField {...f.field("effective_on")} /></Field>
+              <Field label="To" optional {...f.status("ends_on")}><DateField {...f.field("ends_on")} /></Field>
+            </Grid>
+          )}
+          <Field label={<HelpTerm help="A fine reaches payroll as a pending deduction, accepted there, never automatic.">Fine</HelpTerm>} optional {...f.status("fine_amount")}>
+            <MoneyField {...f.field("fine_amount")} />
+          </Field>
+        </>
       )}
-      <Field label="Reason" {...f.field("note")}><TextAreaField {...f.field("note")} placeholder="Explanation accepted" /></Field>
+      <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Explanation accepted" /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Record Decision</Button>
@@ -176,45 +239,71 @@ function Decide({ id, hasResponse, close }: { id: string; hasResponse: boolean; 
 
 /* ───────────── Rules ───────────── */
 
+const TRIGGERS: Array<[QueryRuleSource, string]> = [
+  ["lateness", "Late Arrival"],
+  ["absence", "Absence"],
+  ["missing_clock_out", "Missing Clock-Out"],
+  ["unenrolled_device", "Unregistered Device"],
+  ["overdue_task", "Overdue Task"],
+  ["missed_target", "Missed Target"],
+];
+const TRIGGER_NAME = Object.fromEntries(TRIGGERS) as Record<QueryRuleSource, string>;
+const ruleState = (r: QueryRule) => (r.state === "active" ? pill("ok", "Active") : r.state === "paused" ? pill("neutral", "Paused") : pill("warn", "Draft"));
+const threshold = (r: QueryRule) => (r.measure === "minutes" ? `${r.threshold} min in ${r.window_days} days` : `${r.threshold} in ${r.window_days} days`);
+
 function Rules() {
   const modal = useModal();
-  const s = useApi("GET /api/v1/queries/rules/summary");
-  const rules = usePaged("GET /api/v1/queries/rules");
-  const firings = usePaged("GET /api/v1/queries/rules/firings");
-  const activate = useMutation("POST /api/v1/queries/rules/:id/activate");
+  const configure = useConfigure();
+  const s = useApi("GET /api/v1/query-rules/summary");
+  const rules = usePaged("GET /api/v1/query-rules", { sort: "name" });
+  const firings = usePaged("GET /api/v1/query-rules/firings", { sort: "created_at" });
+  const activate = useMutation("POST /api/v1/query-rules/:id/activate");
+  const pause = useMutation("POST /api/v1/query-rules/:id/pause");
+  const flip = async (r: QueryRule) => {
+    try {
+      if (r.active) await pause.run({ params: { id: r.query_rule_id }, body: {} });
+      else await activate.run({ params: { id: r.query_rule_id }, body: {} });
+      invalidate("/api/v1/query-rules");
+      toast(r.active ? `${r.name} paused` : `${r.name} is now active`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not saved");
+    }
+  };
   return (
     <>
-      <PageHeader title="Rules" sub="Automatic queries, configured not coded" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })}>New Rule</Button>} />
+      <PageHeader
+        title="Rules"
+        sub="Automatic queries, configured not coded"
+        actions={configure && <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Rule", body: (close) => <RuleForm close={close} /> })}>New Rule</Button>}
+      />
       {s.data && <KpiTiles items={[{ label: "Active Rules", value: String(s.data.active) }, { label: "Draft", value: String(s.data.draft) }, { label: "Fired This Month", value: String(s.data.fired_this_month) }, { label: "Queries Raised", value: String(s.data.queries_raised) }]} />}
       {rules.loading && !rules.rows.length ? <Card><LoadingRows /></Card> : (
         <Grid cols={3}>
-          {rules.rows.map((r: Rule) => (
-            <div key={r.rule_id} className="rounded-box border border-border bg-card p-3.5">
-              <h2 data-copy="content" className="text-sm font-semibold">{r.name}</h2>
-              <p className="mt-1 text-xs text-muted-foreground">{r.description}</p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                <StatusPill s={r.status} />
-                {r.threshold && <StatusPill s={{ tone: "neutral", text: r.threshold }} />}
-                {r.status.text === "Draft" && (
-                  <Button size="sm" className="ml-auto" busy={activate.pending} onClick={async () => { await activate.run({ params: { id: r.rule_id }, body: {} }); invalidate("/api/v1/queries/rules"); toast(`${r.name} is now active`); }}>Activate</Button>
-                )}
-              </div>
-            </div>
+          {rules.rows.map((r: QueryRule) => (
+            <Card key={r.query_rule_id}>
+              <CardHeader record title={r.name} right={<StatusPill s={ruleState(r)} />} />
+              <KeyValue items={[["Counts", TRIGGER_NAME[r.source_event]], ["Threshold", threshold(r)]]} />
+              {configure && (
+                <div className="mt-2.5 flex justify-end">
+                  <Button size="sm" onClick={() => flip(r)}>{r.active ? "Pause" : "Activate"}</Button>
+                </div>
+              )}
+            </Card>
           ))}
         </Grid>
       )}
       <Grid cols={2} className="mt-3">
-        <PagedTable<Firing>
+        <PagedTable<QueryRuleFiring>
           title="Recent Firings"
-          right={<span className="text-2xs text-subtle-foreground">Last 7 days</span>}
           list={firings}
-          rowKey={(x) => x.firing_id}
+          rowKey={(x) => x.employee_query_id}
           noun="firing"
+          empty={{ title: "No Firings", text: "Nothing has reached a rule." }}
           columns={[
-            { key: "r", label: "Rule", render: (x) => x.rule },
-            { key: "f", label: "Fired", render: (x) => formatWhen(x.fired_at) },
+            { key: "r", label: "Rule", render: (x) => x.rule_name },
+            { key: "f", label: "Fired", render: (x) => formatWhen(x.created_at) },
             { key: "e", label: "Employee", render: (x) => person(x.employee) },
-            { key: "o", label: "Outcome", render: (x) => <StatusPill s={x.outcome} /> },
+            { key: "o", label: "Query", render: (x) => <StatusPill s={queryStatus({ status: x.status, outcome: null, escalated: false })} /> },
           ]}
         />
       </Grid>
@@ -222,40 +311,39 @@ function Rules() {
   );
 }
 
-const TRIGGERS: Array<[RuleCreate["trigger"], string]> = [["lateness", "Late arrival"], ["missing_clock_out", "Missing Clock-Out"], ["unenrolled_device", "Punch from an unenrolled device"], ["absence", "Absence without notice"], ["overdue_task", "Overdue task"], ["missed_kpi", "KPI closed below 50%"]];
+type RuleValues = { name: string; source_event: string; measure: string; threshold: string; window_days: string };
+const ruleOf = (v: RuleValues) => ({ name: v.name, source_event: v.source_event as QueryRuleSource, measure: v.measure as "count" | "minutes", threshold: v.threshold === "" ? undefined : Number(v.threshold), window_days: v.window_days === "" ? undefined : Number(v.window_days) });
 
 function RuleForm({ close }: { close: () => void }) {
-  const tpl = usePaged("GET /api/v1/queries/templates");
-  const f = useContractForm({ name: "", trigger: "lateness", count: "3", window_days: "30", template_id: "" }, {
-    name: (v) => (v.trim().length < 3 ? "Name the rule" : null),
-    count: (v) => (!(Number(v) >= 1) ? "At least 1" : null),
-    window_days: (v) => (!(Number(v) >= 1) ? "At least 1 day" : null),
-    template_id: (v) => (!v ? "Pick a letter" : null),
-  });
-  const save = useMutation("POST /api/v1/queries/rules");
-  const num = (k: "count" | "window_days") => ({ ...f.field(k), onChange: (v: string) => f.set(k, v.replace(/\D/g, "").slice(0, 3)), inputMode: "numeric" as const });
+  const f = useContractForm<RuleValues>(
+    { name: "", source_event: "lateness", measure: "count", threshold: "3", window_days: "30" },
+    { safeParse: (v: RuleValues) => query_rules.QueryRuleCreate.safeParse(ruleOf(v)) },
+  );
+  const save = useMutation("POST /api/v1/query-rules");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      const r = await save.run({ body: { name: f.values.name.trim(), trigger: f.values.trigger as RuleCreate["trigger"], count: Number(f.values.count), window_days: Number(f.values.window_days), template_id: f.values.template_id } });
-      invalidate("/api/v1/queries/rules");
+      const r = await save.run({ body: ruleOf(f.values) as { name: string; source_event: QueryRuleSource; measure: "count" | "minutes"; threshold: number; window_days: number } });
+      invalidate("/api/v1/query-rules");
       close();
       toast(`${r.name} saved as a draft`);
     } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
+      failed(f)(e);
     }
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="e.g. Repeated lateness" /></Field>
-      <Field label="What Sets It Off"><SelectField options={TRIGGERS} {...f.field("trigger")} /></Field>
-      <Field label="How Many Times" {...f.field("count")}><TextField {...num("count")} /></Field>
-      <Field label="Within (Days)" {...f.field("window_days")}><TextField {...num("window_days")} /></Field>
-      <Field label="Letter It Sends" {...f.field("template_id")}>
-        <SelectField placeholder="Pick a template" options={tpl.rows.filter((t) => t.status.tone === "ok").map((t) => [t.template_id, t.name])} {...f.field("template_id")} />
-      </Field>
-      <p className="text-2xs text-subtle-foreground">Saved as a draft. Nothing fires until it is activated.</p>
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Repeated Lateness" /></Field>
+      <Field label="What Sets It Off" {...f.status("source_event")}><SelectField options={TRIGGERS} {...f.field("source_event")} /></Field>
+      {f.values.source_event === "lateness" && (
+        <Field label={<HelpTerm help="Count late days, or add up the minutes late.">Measure</HelpTerm>} {...f.status("measure")}>
+          <ChoiceField {...f.field("measure")} options={[["count", "Days"], ["minutes", "Minutes"]]} />
+        </Field>
+      )}
+      <Grid cols={2}>
+        <Field label={f.values.measure === "minutes" ? "Minutes" : "How Many Times"} {...f.status("threshold")}><NumberField {...f.field("threshold")} /></Field>
+        <Field label="Within, Days" {...f.status("window_days")}><NumberField {...f.field("window_days")} /></Field>
+      </Grid>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Save Rule</Button>
@@ -266,10 +354,15 @@ function RuleForm({ close }: { close: () => void }) {
 
 /* ───────────── Sanctions ───────────── */
 
+const sanctionStatus = (s: Sanction) =>
+  s.status === "issued" ? pill("neutral", "Issued") : s.status === "pending_approval" ? pill("warn", "Awaiting Approval") : s.status === "rejected" ? pill("err", "Not Approved") : pill("neutral", "Withdrawn");
+
 function Sanctions() {
   const modal = useModal();
-  const s = useApi("GET /api/v1/queries/sanctions/summary");
-  const list = usePaged("GET /api/v1/queries/sanctions");
+  const { navigate } = useRouter();
+  const configure = useConfigure();
+  const s = useApi("GET /api/v1/sanctions/summary");
+  const list = usePaged("GET /api/v1/sanctions", { sort: "-created_at" });
   return (
     <>
       <PageHeader
@@ -277,80 +370,132 @@ function Sanctions() {
         sub="The consequence chain · MyCity ladder"
         actions={
           <>
-            <Button icon="cog" onClick={() => modal.open({ title: "Chain Settings", body: <ChainSettings /> })}>Chain Settings</Button>
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Issue Sanction", body: (close) => <IssueSanction close={close} /> })}>Issue Sanction</Button>
+            <Button icon="cog" onClick={() => modal.open({ title: "Chain Settings", wide: true, body: <ChainSettings configure={configure} /> })}>Chain Settings</Button>
+            <Button variant="primary" icon="plus" onClick={() => navigate("/queries?tab=queries")}>Issue Sanction</Button>
           </>
         }
       />
-      {s.data?.focus && (
-        <Card className="mb-3">
-          <CardHeader record title={s.data.focus.title} right={<StatusPill s={s.data.focus.status} />} />
-          <ChainSteps steps={s.data.focus.chain} />
-        </Card>
+      {s.data && (
+        <KpiTiles
+          items={[
+            { label: "Active Sanctions", value: String(s.data.active) },
+            { label: "Awaiting Approval", value: String(s.data.pending_approval), tone: s.data.pending_approval ? "warn" : undefined },
+            { label: "Fines, This Year", value: <Money value={s.data.fines_this_year} /> },
+            { label: "Fines Recovered", value: <Money value={s.data.fines_recovered} />, tone: "ok" },
+          ]}
+        />
       )}
-      {s.data && <KpiTiles items={[{ label: "Active Sanctions", value: String(s.data.active) }, { label: "Served", value: String(s.data.served) }, { label: "Financial, This Year", value: <Money value={s.data.financial_this_year} /> }, { label: "Recovered", value: <Money value={s.data.recovered} />, tone: "ok" }]} />}
-      <PagedTable<SanctionRow>
+      <PagedTable<Sanction>
         title="Sanction History"
         list={list}
         search="Search people or reasons"
         rowKey={(x) => x.sanction_id}
         noun="sanction"
         wide
+        empty={{ title: "No Sanctions", text: "Sanctions follow a query's decision." }}
         columns={[
           { key: "e", label: "Employee", render: (x) => person(x.employee) },
-          { key: "k", label: "Sanction", render: (x) => x.kind },
+          { key: "k", label: "Sanction", render: (x) => x.step_name },
+          { key: "q", label: "Query", render: (x) => x.query_number, desktop: true },
           { key: "r", label: "Reason", render: (x) => x.reason },
-          { key: "b", label: "Issued By", render: (x) => x.issued_by, desktop: true },
-          { key: "d", label: "Date", render: (x) => formatDate(x.date) },
-          { key: "m", label: "Financial", align: "n", render: (x) => (x.amount ? <Money value={x.amount} /> : "None") },
-          { key: "s", label: "Status", render: (x) => <StatusPill s={x.status} /> },
+          { key: "b", label: "Decided By", render: (x) => x.decided_by_name ?? "", desktop: true },
+          { key: "d", label: "Date", render: (x) => formatDate(x.effective_on) },
+          { key: "m", label: "Fine", align: "n", render: (x) => (x.fine ? <Money value={x.fine.amount_ngn} /> : "None") },
+          { key: "s", label: "Status", render: (x) => <StatusPill s={sanctionStatus(x)} /> },
         ]}
       />
-      <Grid cols={2} className="mt-3">
-        {s.data ? <TrailCard title="Chain Activity" items={s.data.activity.map((x) => ({ ...x, when: formatDate(x.when) }))} /> : <Card><LoadingRows /></Card>}
-      </Grid>
     </>
   );
 }
 
-const ChainSteps = ({ steps }: { steps: Array<{ label: string; state: "done" | "now" | null }> }) => <Chain steps={steps.map((s) => ({ label: s.label, state: s.state ?? undefined }))} />;
+const EFFECT: Record<ConsequenceStep["financial_effect"], string> = { none: "None", unpaid_days: "Unpaid Days", ends_employment: "Ends Employment" };
 
-function ChainSettings() {
+function ChainSettings({ configure }: { configure: boolean }) {
+  const modal = useModal();
+  const chain = useApi("GET /api/v1/sanctions/chain", { query: {} });
+  const move = useMutation("PATCH /api/v1/sanctions/chain/:id");
+  const steps = chain.data?.data ?? [];
+  const patch = async (step: ConsequenceStep, body: { position?: number; active?: boolean }) => {
+    try {
+      await move.run({ params: { id: step.consequence_step_id }, body });
+      chain.reload();
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not saved");
+    }
+  };
+  if (chain.error) return <ErrorState error={chain.error} onRetry={chain.reload} />;
+  if (!chain.data) return <LoadingRows />;
   return (
     <>
-      <p className="mb-3 text-xs text-muted-foreground">The MyCity ladder, in order. Each step names the letter it sends; a step without an active letter cannot send one.</p>
-      <KeyValue items={[["1 · Caution", "Caution letter"], ["2 · Warning", "Warning letter"], ["3 · Suspension", "Suspension letter (awaiting sample)"], ["4 · Suspension without pay", "Awaiting sample"], ["5 · Dismissal", "Termination letter (awaiting sample)"], ["Fines", "Attach to any step"]]} />
+      {!steps.length && <EmptyState bare icon="flag" title="No Steps Yet" text="Add MyCity's ladder, top to bottom." />}
+      {steps.map((step) => (
+        <Card key={step.consequence_step_id} className="mb-2">
+          <CardHeader record title={`${step.position} · ${step.name}`} right={<StatusPill s={!step.active ? pill("neutral", "Retired") : step.letter_ready ? pill("ok", "Ready") : pill("warn", "Needs a Letter")} />} />
+          <KeyValue items={[["Letter", step.letter_template ?? "None"], ["Financial Effect", EFFECT[step.financial_effect as ConsequenceStep["financial_effect"]]], [<HelpTerm key="v" help="How long this step counts for the next offence.">In Force For</HelpTerm>, step.valid_days ? `${step.valid_days} days` : "Always"]]} />
+          {configure && (
+            <ActionGroup>
+              <div className="mt-2 flex flex-wrap justify-end gap-2">
+              {step.position > 1 && <Button size="sm" icon="up" onClick={() => patch(step, { position: step.position - 1 })}>Move Up</Button>}
+              {step.position < steps.length && <Button size="sm" icon="down" onClick={() => patch(step, { position: step.position + 1 })}>Move Down</Button>}
+              <Button size="sm" onClick={() => patch(step, { active: !step.active })}>{step.active ? "Retire" : "Restore"}</Button>
+              </div>
+            </ActionGroup>
+          )}
+        </Card>
+      ))}
+      {configure && (
+        <FormFooter>
+          <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Step", body: (close) => <StepForm count={steps.length} close={() => (close(), chain.reload())} /> })}>Add Step</Button>
+        </FormFooter>
+      )}
     </>
   );
 }
 
-function IssueSanction({ close }: { close: () => void }) {
-  const [who, setWho] = useState<PersonRef[]>([]);
-  const [tried, setTried] = useState(false);
-  const f = useContractForm({ kind: "caution", reason: "", amount: "" }, { reason: (v) => (v.trim().length < 6 ? "Give the reason" : null), amount: (v, all) => (all.kind === "fine" && !(Number(v) > 0) ? "Enter the fine" : null) });
-  const save = useMutation("POST /api/v1/queries/sanctions");
+type StepValues = { name: string; position: string; letter_template: string; financial_effect: string; default_days: string; valid_days: string };
+const stepOf = (v: StepValues) => ({
+  name: v.name,
+  position: v.position === "" ? undefined : Number(v.position),
+  letter_template: v.letter_template || null,
+  financial_effect: v.financial_effect as ConsequenceStep["financial_effect"],
+  default_days: v.default_days === "" ? null : Number(v.default_days),
+  valid_days: v.valid_days === "" ? null : Number(v.valid_days),
+});
+
+function StepForm({ count, close }: { count: number; close: () => void }) {
+  const letters = usePaged("GET /api/v1/letter-templates", { filters: { purpose: "sanction" }, sort: "name" });
+  const f = useContractForm<StepValues>(
+    { name: "", position: String(count + 1), letter_template: "", financial_effect: "none", default_days: "", valid_days: "365" },
+    { safeParse: (v: StepValues) => sanctions.ConsequenceStepCreate.safeParse(stepOf(v)) },
+  );
+  const save = useMutation("POST /api/v1/sanctions/chain");
   const submit = async () => {
-    setTried(true);
-    if (!f.check() || !who.length) return;
+    if (!f.check()) return;
     try {
-      const x = await save.run({ body: { employee_id: who[0].employee_id, kind: f.values.kind as SanctionCreate["kind"], reason: f.values.reason.trim(), ...(f.values.amount && { amount: f.values.amount }) } });
-      invalidate("/api/v1/queries/sanctions");
+      const s = await save.run({ body: stepOf(f.values) });
       close();
-      toast(x.kind === "Fine" ? "Fine recorded. It waits in Payroll, Deductions for acceptance" : `${x.kind} issued to ${x.employee.display_name}`);
+      toast(`${s.name} added at step ${s.position}`);
     } catch (e) {
-      f.setServerErrors(save.fields);
-      if (e instanceof ApiError && !e.fields) toast(e.message);
+      failed(f)(e);
     }
   };
   return (
     <>
-      <Field label="Employee" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label="Sanction"><SelectField options={[["caution", "Caution"], ["warning", "Warning"], ["suspension", "Suspension"], ["suspension_without_pay", "Suspension Without Pay"], ["dismissal", "Dismissal"], ["fine", "Fine"]]} {...f.field("kind")} /></Field>
-      {f.values.kind === "fine" && <Field label="Amount" {...f.field("amount")}><MoneyField {...f.field("amount")} /></Field>}
-      <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} placeholder="Follows QRY-0042" /></Field>
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Final Warning" /></Field>
+      <Grid cols={2}>
+        <Field label="Position" {...f.status("position")}><NumberField {...f.field("position")} /></Field>
+        <Field label="In Force, Days" optional {...f.status("valid_days")}><NumberField {...f.field("valid_days")} /></Field>
+      </Grid>
+      <Field label="Letter" optional {...f.status("letter_template")}>
+        <SelectField placeholder="Pick a letter" options={letters.rows.map((t: LetterTemplate) => [t.key, t.name])} {...f.field("letter_template")} />
+      </Field>
+      <Field label="Financial Effect" {...f.status("financial_effect")}>
+        <ChoiceField {...f.field("financial_effect")} options={[["none", "None"], ["unpaid_days", "Unpaid Days"], ["ends_employment", "Ends Employment"]]} />
+      </Field>
+      {f.values.financial_effect === "unpaid_days" && <Field label="Days" {...f.status("default_days")}><NumberField {...f.field("default_days")} /></Field>}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Issue</Button>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Add Step</Button>
       </FormFooter>
     </>
   );
@@ -358,71 +503,137 @@ function IssueSanction({ close }: { close: () => void }) {
 
 /* ───────────── Letter templates ───────────── */
 
+const letterStatus = (t: LetterTemplate) =>
+  t.status === "active" ? pill("ok", "Active") : t.status === "awaiting_sample" ? pill("warn", "Awaiting Sample") : t.status === "retired" ? pill("neutral", "Retired") : pill("info", "Draft");
+
 function Templates() {
   const modal = useModal();
-  const s = useApi("GET /api/v1/queries/templates/summary");
-  const list = usePaged("GET /api/v1/queries/templates");
-  const [sel, setSel] = useState<LetterTemplate | null>(null);
-  const shown = sel ?? list.rows[0] ?? null;
-  const preview = useApi("GET /api/v1/queries/templates/:id/preview", { params: { id: shown?.template_id ?? "" }, enabled: !!shown });
+  const configure = useConfigure();
+  const s = useApi("GET /api/v1/letter-templates/summary");
+  const list = usePaged("GET /api/v1/letter-templates", { sort: "name" });
+  const [sel, setSel] = useState<string | null>(null);
+  const shown = list.rows.find((t) => t.letter_template_id === sel) ?? list.rows[0] ?? null;
+  const preview = useApi("GET /api/v1/letter-templates/:id/preview", { params: { id: shown?.letter_template_id ?? "" }, enabled: !!shown && shown.status !== "awaiting_sample" });
+  const activate = useMutation("POST /api/v1/letter-templates/:id/activate");
+  const turnOn = async () => {
+    if (!shown) return;
+    try {
+      await activate.run({ params: { id: shown.letter_template_id }, body: {} });
+      invalidate("/api/v1/letter-templates");
+      toast(`${shown.name} is active`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not saved");
+    }
+  };
   return (
     <>
       <PageHeader
         title="Letter Templates"
         sub="The system fills name, date and reason"
         actions={
-          <>
-            <Button icon="doc" disabled={!preview.data} onClick={() => preview.data && modal.open({ title: shown!.name, wide: true, body: <Letter l={preview.data} /> })}>Preview</Button>
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>
-          </>
+          configure && (
+            <>
+              {shown && <Button icon="edit" onClick={() => modal.open({ title: shown.name, wide: true, body: (close) => <EditTemplate id={shown.letter_template_id} close={close} /> })}>Edit Template</Button>}
+              {shown && shown.status === "draft" && <Button onClick={turnOn}>Activate</Button>}
+              <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>
+            </>
+          )
         }
       />
-      {s.data && <StatStrip items={[{ label: "Templates", value: s.data.templates }, { label: "Active", value: s.data.active, tone: "ok" }, { label: "Awaiting Sample", value: s.data.awaiting, tone: "warn" }, { label: "Letters Sent, 90d", value: s.data.sent_90d }, { label: "Languages", value: s.data.languages, desktop: true }]} />}
+      {s.data && <StatStrip items={[{ label: "Templates", value: s.data.templates }, { label: "Active", value: s.data.active, tone: "ok" }, { label: "Awaiting Sample", value: s.data.awaiting_sample, tone: "warn" }, { label: "Letters Sent, 90d", value: s.data.sent_90d }]} />}
       <Grid cols="1/1.5">
         <PagedTable<LetterTemplate>
           title="Templates"
           list={list}
-          rowKey={(t) => t.template_id}
+          rowKey={(t) => t.letter_template_id}
           noun="template"
-          onRowClick={setSel}
+          onRowClick={(t) => setSel(t.letter_template_id)}
           columns={[
-            { key: "n", label: "Template", render: (t) => <span className={t.template_id === shown?.template_id ? "font-semibold" : undefined}>{t.name}</span> },
-            { key: "u", label: "Used For", render: (t) => t.used_for },
-            { key: "s", label: "Status", render: (t) => <StatusPill s={t.status} /> },
+            { key: "n", label: "Template", render: (t) => <span className={t.letter_template_id === shown?.letter_template_id ? "font-semibold" : undefined}>{t.name}</span> },
+            { key: "u", label: "Used By", render: (t) => (t.used_by.length ? t.used_by.join(", ") : t.purpose === "query" ? "Queries" : "None"), desktop: true },
+            { key: "s", label: "Status", render: (t) => <StatusPill s={letterStatus(t)} /> },
           ]}
         />
         <div>
-          {preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><Banner tone="warn">{preview.error.message}</Banner></Card> : <Card><LoadingRows count={6} /></Card>}
+          {!shown ? null : shown.status === "awaiting_sample" ? (
+            <Card><EmptyState bare icon="doc" title="Awaiting Sample" text="Write the letter to preview it." /></Card>
+          ) : preview.data ? (
+            <Letter l={preview.data} />
+          ) : preview.error ? (
+            <Card><ErrorState error={preview.error} onRetry={preview.reload} /></Card>
+          ) : (
+            <Card><LoadingRows count={6} /></Card>
+          )}
         </div>
       </Grid>
     </>
   );
 }
 
+type TemplateValues = { name: string; purpose: string; body: string };
+
 function TemplateForm({ close }: { close: () => void }) {
-  const f = useContractForm({ name: "", used_for: "", body: "" }, { name: (v) => (v.trim().length < 3 ? "Name the template" : null), used_for: (v) => (!v.trim() ? "Pick when it sends" : null), body: (v) => (v.trim().length < 40 ? "Write the letter" : null) });
-  const save = useMutation("POST /api/v1/queries/templates");
+  const f = useContractForm<TemplateValues>({ name: "", purpose: "sanction", body: "" }, templates.LetterTemplateCreate);
+  const save = useMutation("POST /api/v1/letter-templates");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: { name: f.values.name.trim(), used_for: f.values.used_for.trim(), body: f.values.body } });
-      invalidate("/api/v1/queries/templates");
+      await save.run({ body: { ...f.values, purpose: f.values.purpose as "query" | "sanction" } });
+      invalidate("/api/v1/letter-templates");
       close();
       toast("Template saved as a draft");
-    } catch {
-      f.setServerErrors(save.fields);
+    } catch (e) {
+      failed(f)(e);
     }
   };
   return (
     <>
-      <Field label="Name" {...f.field("name")}><TextField {...f.field("name")} placeholder="Final warning letter" /></Field>
-      <Field label="Used For" {...f.field("used_for")}><TextField {...f.field("used_for")} placeholder="Step name" /></Field>
-      <Field label="Letter" info="Use {name}, {date}, {reason} and {hours} where the record fills in. Everything else is sent as written." {...f.field("body")}>
-        <TextAreaField {...f.field("body")} rows={8} placeholder="Dear {name}, ..." />
-      </Field>
+      <Field label="Name" {...f.status("name")}><TextField {...f.field("name")} placeholder="Final Warning" /></Field>
+      <Field label="Used For" {...f.status("purpose")}><ChoiceField {...f.field("purpose")} options={[["query", "Queries"], ["sanction", "Sanctions"]]} /></Field>
+      <LetterBody f={f} />
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Save Template</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+function LetterBody({ f }: { f: { status: (k: "body") => object; field: (k: "body") => object } }) {
+  return (
+    <Field label={<HelpTerm help="Write {{ employee.first_name }}, {{ query_number }}, {{ reason }} or {{ step_name }} where the record fills in.">Letter</HelpTerm>} {...f.status("body")}>
+      <TextAreaField {...(f.field("body") as Parameters<typeof TextAreaField>[0])} rows={8} placeholder="Dear Ada," />
+    </Field>
+  );
+}
+
+function EditTemplate({ id, close }: { id: string; close: () => void }) {
+  const t = useApi("GET /api/v1/letter-templates/:id", { params: { id } });
+  if (t.error) return <ErrorState error={t.error} onRetry={t.reload} />;
+  if (!t.data) return <LoadingRows count={6} />;
+  return <EditTemplateForm id={id} body={t.data.format === "markdown" ? (t.data.body ?? "") : ""} close={close} />;
+}
+
+function EditTemplateForm({ id, body, close }: { id: string; body: string; close: () => void }) {
+  const f = useContractForm<{ body: string }>({ body }, templates.LetterTemplateBodySave);
+  const save = useMutation("PUT /api/v1/letter-templates/:id/body");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      const r = await save.run({ params: { id }, body: f.values });
+      invalidate("/api/v1/letter-templates");
+      close();
+      toast(`Saved as version ${r.version}`);
+    } catch (e) {
+      failed(f)(e);
+    }
+  };
+  return (
+    <>
+      <LetterBody f={f} />
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" busy={save.pending} onClick={submit}>Save Letter</Button>
       </FormFooter>
     </>
   );

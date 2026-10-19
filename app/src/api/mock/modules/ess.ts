@@ -1,4 +1,4 @@
-import { at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
+import { at, invalid, isoDaysAhead, ok, paged, route, sid } from "../core";
 import type { EmployeeHistoryEntry, EssProfile } from "@mycity/contract/contract.gen.ts";
 import { byKey, managerOf } from "../data/people";
 
@@ -105,46 +105,7 @@ route("GET /api/v1/ess/performance", (req) => {
   });
 });
 
-const ARCH = (user: string) =>
-  user === "bashir" || user === "cynthia"
-    ? [
-        ["Repeated lateness, August", "Ifeoma Chukwu", 47, "Submitted the next day", "neutral", "Upheld, sanction"],
-        ["Missing Clock-Out", "System", 122, "Submitted the same day", "ok", "Closed, no action"],
-        ["Missing clock-outs, March 2025", "System", 562, "Submitted the next day", "neutral", "Upheld, sanction"],
-      ]
-    : [["Missing Clock-Out", "System", 122, "Submitted the same day", "ok", "Closed, no action"]];
-const OPEN = new Map<string, Array<{ query_id: string; number: string; subject: string; raised_by: string; date: string; response: string | null; outcome: { tone: "warn"; text: string }; respond_by: string | null }>>([
-  ["bashir", [{ query_id: sid("q:bashir:open"), number: "QRY-0014", subject: "3 late arrivals in 30 days", raised_by: "System rule", date: isoDaysAgo(7), response: null, outcome: { tone: "warn", text: "Awaiting your response" }, respond_by: at(-1, "09:41") }]],
-]);
-route("GET /api/v1/ess/queries/summary", (req) => {
-  const arch = ARCH(req.user!);
-  const sanc = SANC(req.user!);
-  return ok({ open: (OPEN.get(req.user!) ?? []).filter((q) => !q.response).length, archived: arch.length, archived_note: `${arch.filter((a) => a[5] === "Closed, no action").length} closed with no action`, sanctions: sanc.length, last_sanction: sanc[0]?.date ?? null });
-});
-route("GET /api/v1/ess/queries", (req) => {
-  const view = req.query.view;
-  const q = Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "view"));
-  if (view === "open") return paged(OPEN.get(req.user!) ?? [], { ...req, query: q });
-  return paged(ARCH(req.user!).map((a, i) => ({ query_id: sid(`qa:${req.user}:${i}`), number: `QRY-${String(11 - i * 3).padStart(4, "0")}`, subject: a[0] as string, raised_by: a[1] as string, date: isoDaysAgo(a[2] as number), response: a[3] as string, outcome: { tone: a[4] as "ok", text: a[5] as string }, respond_by: null })), { ...req, query: q });
-});
-route("POST /api/v1/ess/queries/:id/response", (req) => {
-  const list = OPEN.get(req.user!) ?? [];
-  const qq = list.find((x) => x.query_id === req.params.id);
-  if (!qq) return fail(404, "NOT_FOUND", "That query is not open.");
-  const r = String(req.body.response ?? "");
-  if (r.trim().length < 20) return invalid({ response: ["Write at least 20 characters"] });
-  qq.response = r;
-  qq.outcome = { tone: "warn", text: "Response sent, awaiting decision" };
-  return ok(qq);
-});
-const SANC = (user: string) =>
-  user === "bashir" || user === "cynthia"
-    ? [
-        { sanction_id: sid(`s:${user}:1`), kind: "Warning", reason: "Repeated lateness, August", date: isoDaysAgo(46), deduction: "12500.00", status: { tone: "neutral" as const, text: "Served" } },
-        { sanction_id: sid(`s:${user}:2`), kind: "Caution", reason: "Missing clock-outs, March 2025", date: isoDaysAgo(560), deduction: "7500.00", status: { tone: "neutral" as const, text: "Served" } },
-      ]
-    : [];
-route("GET /api/v1/ess/sanctions", (req) => paged(SANC(req.user!), req));
+/* My Queries is answered by the queries mock (modules/queries.ts), from the same queries People see. */
 
 /**
  * My Documents on the mock: the Vault list the contract describes, a document

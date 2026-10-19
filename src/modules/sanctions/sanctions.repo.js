@@ -310,6 +310,16 @@ function listMine(db, employeeId, query) {
   );
 }
 
+/** ESS: how many issued sanctions the caller has, and the date of the latest. */
+async function mineSummary(db, employeeId) {
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS sanctions, max(effective_on)::text AS last_sanction
+       FROM sanction WHERE employee_id = $1 AND status = 'issued'`,
+    [employeeId],
+  );
+  return rows[0];
+}
+
 /* ------------------------------------------------------------------ *
  * Fines, for payroll (M6)
  * ------------------------------------------------------------------ */
@@ -362,6 +372,7 @@ module.exports = {
   stepAbove,
   summary,
   listMine,
+  mineSummary,
   pendingFines,
   settleFine,
 };

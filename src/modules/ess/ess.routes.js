@@ -81,6 +81,10 @@ route(router, "post", "/leave/:id/cancel",
     self: true, summary: "Cancel one of my leave requests" },
   controller.cancelLeave);
 
+route(router, "get", "/queries/summary",
+  { response: c.queries.MyQueriesSummary, self: true, summary: "The counts above My Queries" },
+  controller.queriesSummary);
+
 route(router, "get", "/queries",
   { query: c.queries.EssQueryListQuery, response: c.queries.MyQueryPage, self: true,
     summary: "My queries" },
