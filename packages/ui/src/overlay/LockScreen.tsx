@@ -7,7 +7,7 @@
  * @phone Fills the screen the same way: the card sits in 16 px gutters and its buttons stack full width.
  * @a11y Radix Dialog underneath: aria-modal, focus moves to the first field and stays inside, Esc and the backdrop do nothing. It stacks over any dialog already open. The title names it; the reason is its description.
  * @status beta
- * @example <LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{passwordField}</LockScreen>
+ * @example <LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{pinField}</LockScreen>
  */
 import { useRef, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -28,9 +28,9 @@ export interface LockScreenProps {
   title: string;
   /** Why it locked, one short line ("Locked after 30 minutes idle"). */
   reason: string;
-  /** The password field (in a Form whose id the footer's submit button names). */
+  /** The credential field (in a Form whose id the footer's submit button names). */
   children: ReactNode;
-  /** Buttons only: the way out (Sign Out), then the primary (Unlock). */
+  /** Buttons only, stacked full width down one centred column: the primary (Unlock) and any alternates first, then the way out (Sign Out) in red, set apart below a hairline. */
   footer: ReactNode;
   /** Where it mounts; document.body by default (the gallery passes its frame). */
   container?: HTMLElement | null;
@@ -66,7 +66,7 @@ export function LockScreen({ open, name, email, photo, title, reason, children, 
               <p className="text-sm text-muted-foreground wrap-any">{email}</p>
             </div>
             {children}
-            <div data-ui="modal-footer" className="mt-5 flex flex-wrap items-center justify-end gap-2 phone:flex-col phone:flex-nowrap phone:items-stretch">
+            <div data-ui="modal-footer" className="mt-6 flex flex-col gap-2 [&>button]:w-full">
               <FooterContext.Provider value={IN_FOOTER}>{footer}</FooterContext.Provider>
             </div>
           </Dialog.Content>
